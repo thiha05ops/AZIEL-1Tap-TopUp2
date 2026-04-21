@@ -1,0 +1,1091 @@
+body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    color: white;
+    overflow-x: hidden;
+    background: url("assets/bg.jpg") no-repeat center center/cover;
+    animation: zoomBg 20s infinite alternate;
+}
+
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(3px);
+    z-index: -1;
+}
+
+@keyframes zoomBg {
+    from {
+        background-size: 100%;
+    }
+
+    to {
+        background-size: 110%;
+    }
+}
+
+.title {
+    margin: 25px;
+    font-size: 34px;
+    color: gold;
+    text-shadow: 0 0 10px gold, 0 0 20px orange;
+}
+
+.container {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 25px;
+    max-width: 500px;
+    margin: auto;
+}
+
+.item {
+    position: relative;
+    background: linear-gradient(145deg, #1a1f4a, #0a0f2c);
+    border: 2px solid gold;
+    border-radius: 15px;
+    padding: 25px;
+    font-size: 18px;
+    cursor: pointer;
+    overflow: hidden;
+    transition: 0.3s;
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+}
+
+.item:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 20px gold;
+}
+
+.item.active {
+    background: gold;
+    color: black;
+}
+
+.middle-text {
+    grid-column: span 3;
+    font-size: 22px;
+    font-weight: bold;
+    color: #00d4ff;
+}
+
+.user-input {
+    margin-top: 0%;
+
+    margin-left: 23%;
+    width: 47%;
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 15px;
+}
+
+.user-input input,
+.login-box input {
+
+    margin-left: 42px;
+    padding: 15px;
+    width: 50%;
+    border-radius: 8px;
+    border: 2px solid gold;
+    background: #111;
+    color: white;
+}
+
+#buyBtn,
+.login-box button,
+#logoutBtn {
+    margin-left: 20px;
+    margin-top: 20px;
+    padding: 15px 40px;
+    font-size: 18px;
+    font-weight: bold;
+    color: black;
+    background: gold;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+}
+
+#selectedText {
+    margin-left: 42px;
+    margin-top: 10px;
+    color: #00d4ff;
+}
+
+#errorMsg,
+#loginError,
+#registerMsg {
+    color: #ff4d4d;
+    margin-top: 10px;
+}
+
+.login-box {
+    max-width: 420px;
+    margin: 80px auto;
+    padding: 40px 30px;
+    background: rgba(0, 0, 0, 0.6);
+    border: 2px solid gold;
+    border-radius: 25px;
+}
+
+.link-text {
+    margin-top: 12px;
+}
+
+.link-text a {
+    color: gold;
+}
+
+.home-icons {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    margin-top: 50px;
+    flex-wrap: wrap;
+}
+
+.card {
+    width: 180px;
+    height: 180px;
+    border: 2px solid gold;
+    border-radius: 20px;
+    background: linear-gradient(145deg, #1a1f4a, #0a0f2c);
+    color: gold;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+}
+
+.card-icon {
+    font-size: 42px;
+    margin-bottom: 10px;
+}
+
+.card p {
+    margin: 0;
+    font-size: 20px;
+    color: white;
+    font-weight: bold;
+}
+
+#menuIcon {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    font-size: 38px;
+    color: gold;
+    cursor: pointer;
+    z-index: 1001;
+}
+
+#sideMenu {
+    position: fixed;
+    top: 0;
+    left: -150px;
+    width: 160px;
+    height: 100%;
+    background: linear-gradient(180deg, #0f2027, #203a43, #2c5364);
+    padding-top: 100px;
+    transition: 0.4s;
+    z-index: 1000;
+}
+
+#sideMenu.active {
+    left: 0;
+}
+
+#sideMenu a {
+    display: block;
+    padding: 15px;
+    color: gold;
+    text-decoration: none;
+}
+
+#overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(5px);
+    opacity: 0;
+    visibility: hidden;
+    transition: 0.3s;
+}
+
+#overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+#mainContent {
+    transition: transform 0.3s ease;
+}
+
+.blur {
+    filter: blur(3px);
+}
+
+@media (max-width: 768px) {
+    .container {
+        grid-template-columns: 1fr;
+    }
+
+    .user-input,
+    .home-icons {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .user-input input,
+    .login-box input,
+    #buyBtn {
+        width: 80%;
+    }
+}
+
+.user-input input {
+    margin-top: 20px;
+    margin-left: 1%;
+    padding: 12px;
+    width: 10%;
+    border-radius: 10px;
+    border: 2px solid gold;
+    background: #111;
+    color: white;
+}
+
+.users-input input {
+    margin-top: 2px;
+    margin-bottom: 1px;
+    margin-left: 1%;
+    padding: 12px;
+    width: 10%;
+    border-radius: 10px;
+    border: 2px solid gold;
+    background: #111;
+    color: white;
+}
+
+.shop-layout {
+    display: flex;
+    gap: 28px;
+    align-items: flex-start;
+    justify-content: space-between;
+    width: 98%;
+    margin: 0 auto;
+}
+
+.shop-left {
+    flex: 1;
+    max-width: 90%;
+}
+
+.shop-right {
+    width: 420px;
+    margin-left: auto;
+    position: sticky;
+    top: 20px;
+    align-self: flex-start;
+}
+
+.promo-card {
+    position: relative;
+    width: 100%;
+    min-height: 1100px;
+    border: 2px solid gold;
+    border-radius: 20px;
+    overflow: hidden;
+    background: #0b1020;
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.35);
+    animation: promoGlow 2.5s infinite alternate;
+}
+
+@keyframes promoGlow {
+    from {
+        box-shadow: 0 0 18px rgba(255, 215, 0, 0.25);
+    }
+
+    to {
+        box-shadow: 0 0 32px rgba(255, 215, 0, 0.65);
+    }
+}
+
+.hero-banner {
+    width: 100%;
+    height: fixed;
+    object-fit: cover;
+    display: block;
+}
+
+.promo-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom,
+            rgba(0, 0, 0, 0.15) 0%,
+            rgba(0, 0, 0, 0.35) 35%,
+            rgba(0, 0, 0, 0.75) 70%,
+            rgba(0, 0, 0, 0.88) 100%);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    padding: 24px 20px;
+    text-align: center;
+}
+
+.promo-logo {
+    color: gold;
+    font-weight: bold;
+    font-size: 20px;
+    margin-bottom: 40px;
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
+}
+
+.promo-title {
+    margin-top: 280px;
+    margin-bottom: 10px;
+    font-size: 56px;
+    line-height: 0.95;
+    font-weight: 900;
+    color: white;
+    text-shadow: 0 0 16px rgba(0, 0, 0, 0.8);
+}
+
+.promo-title span {
+    color: gold;
+    font-size: 70px;
+    text-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+}
+
+.promo-sub {
+    font-size: 26px;
+    font-weight: 800;
+    color: white;
+    margin: 10px 0 5px;
+}
+
+.promo-small {
+    font-size: 16px;
+    color: #ffd95a;
+    margin-bottom: 26px;
+    font-weight: 700;
+}
+
+.promo-features {
+    margin-top: 20px;
+    background: rgba(5, 10, 25, 0.65);
+    border: 1px solid rgba(255, 215, 0, 0.25);
+    border-radius: 18px;
+    padding: 18px 16px;
+    backdrop-filter: blur(4px);
+}
+
+.feature-item {
+    color: white;
+    font-size: 18px;
+    font-weight: 700;
+    text-align: left;
+    padding: 14px 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.feature-item:last-child {
+    border-bottom: none;
+}
+
+.promo-contact {
+    margin-top: auto;
+    padding-top: 30px;
+}
+
+.promo-contact p {
+    color: gold;
+    font-weight: 800;
+    margin-bottom: 8px;
+}
+
+.promo-contact h3 {
+    margin: 0;
+    font-size: 38px;
+    color: white;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+}
+
+.user-input {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    margin-top: 22px;
+}
+
+.user-input input {
+    width: 280px;
+    height: 50px;
+    padding: 0 16px;
+    border-radius: 10px;
+    border: 2px solid gold;
+    background: #07090f;
+    color: white;
+    font-size: 18px;
+}
+
+#buyBtn {
+    margin-top: 18px;
+    width: 580px;
+    max-width: 90%;
+    height: 58px;
+    border-radius: 12px;
+    border: none;
+    background: gold;
+    color: black;
+    font-size: 20px;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+@media (max-width: 1400px) {
+    .shop-layout {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .shop-right {
+        width: 90%;
+        max-width: 420px;
+    }
+
+    .promo-card {
+        min-height: 900px;
+    }
+
+    .hero-banner {
+        height: 900px;
+    }
+
+    .promo-title {
+        margin-top: 180px;
+        font-size: 44px;
+    }
+
+    .promo-title span {
+        font-size: 56px;
+    }
+}
+
+@media (max-width: 768px) {
+    .user-input {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .user-input input,
+    #buyBtn {
+        width: 90%;
+    }
+
+    .promo-card {
+        min-height: 760px;
+    }
+
+    .hero-banner {
+        height: 760px;
+    }
+}
+
+/* =========================
+   TABLET
+========================= */
+@media (max-width: 1200px) {
+    .shop-layout {
+        flex-direction: column;
+        align-items: center;
+        width: 95%;
+    }
+
+    .shop-left,
+    .shop-right {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .shop-right {
+        max-width: 500px;
+    }
+
+    .container {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 18px;
+    }
+
+    .promo-card {
+        min-height: 780px;
+    }
+
+    .hero-banner {
+        height: 780px;
+    }
+
+    .promo-title {
+        margin-top: 140px;
+        font-size: 42px;
+    }
+
+    .promo-title span {
+        font-size: 52px;
+    }
+}
+
+/* =========================
+   MOBILE
+========================= */
+@media (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+
+    .title {
+        font-size: 28px;
+        line-height: 1.2;
+        margin: 18px 0;
+    }
+
+    h2 {
+        font-size: 22px;
+        margin: 8px 0 18px;
+    }
+
+    .shop-layout {
+        flex-direction: column;
+        gap: 18px;
+        width: 100%;
+    }
+
+    .shop-left,
+    .shop-right {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .container {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    .item {
+        padding: 18px;
+        font-size: 20px;
+        border-radius: 14px;
+    }
+
+    .item small {
+        font-size: 16px;
+    }
+
+    .middle-text {
+        grid-column: span 1;
+        font-size: 20px;
+        line-height: 1.4;
+        padding: 8px 0;
+    }
+
+    .user-input {
+        margin: 0 auto;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        width: 90%;
+    }
+
+    .user-input input {
+        width: 92%;
+        max-width: 92%;
+        height: 52px;
+        font-size: 18px;
+        padding: 0 14px;
+        box-sizing: border-box;
+    }
+
+    #buyBtn {
+        width: 92%;
+        max-width: 92%;
+        height: 54px;
+        font-size: 20px;
+        margin-top: 14px;
+    }
+
+    #selectedText,
+    #errorMsg {
+        font-size: 17px;
+        line-height: 1.5;
+        padding: 0 12px;
+    }
+
+    #menuIcon {
+        font-size: 30px;
+        top: 14px;
+        left: 14px;
+    }
+
+    #sideMenu {
+        width: 120px;
+        left: -100px;
+    }
+
+    #sideMenu a {
+        font-size: 18px;
+        padding: 16px 18px;
+    }
+
+    .promo-card {
+        min-height: auto;
+        border-radius: 18px;
+    }
+
+    .hero-banner {
+        height: 520px;
+        border-radius: 18px;
+    }
+
+    .promo-overlay {
+        padding: 18px 16px;
+    }
+
+    .promo-logo {
+        font-size: 18px;
+        margin-bottom: 18px;
+    }
+
+    .promo-title {
+        margin-top: 110px;
+        font-size: 34px;
+    }
+
+    .promo-title span {
+        font-size: 42px;
+    }
+
+    .promo-sub {
+        font-size: 20px;
+    }
+
+    .promo-small {
+        font-size: 14px;
+    }
+
+    .feature-item {
+        font-size: 16px;
+        padding: 12px 6px;
+    }
+
+    .promo-contact h3 {
+        font-size: 28px;
+    }
+
+    .login-box {
+        width: 92%;
+        margin: 40px auto;
+        padding: 26px 18px;
+        box-sizing: border-box;
+    }
+
+    .login-box input {
+        width: 100%;
+        font-size: 18px;
+        height: 52px;
+        box-sizing: border-box;
+    }
+
+    .login-box button {
+        width: 100%;
+        height: 52px;
+        font-size: 19px;
+    }
+
+    #loginError,
+    #registerMsg {
+        font-size: 16px;
+        line-height: 1.5;
+    }
+
+    .home-icons {
+        flex-direction: column;
+        align-items: center;
+        gap: 18px;
+    }
+
+    .card {
+        width: 92%;
+        max-width: 320px;
+        height: 140px;
+    }
+
+    .card-icon {
+        font-size: 36px;
+    }
+
+    .card p {
+        font-size: 20px;
+    }
+
+    #welcomeText {
+        font-size: 18px;
+        line-height: 1.5;
+        padding: 0 10px;
+    }
+
+    #logoutBtn {
+        width: 90%;
+        max-width: 320px;
+        height: 50px;
+        font-size: 18px;
+    }
+}
+
+.user-input input,
+.login-box input {
+
+    margin-left: 17px;
+    padding: 15px;
+    width: 92%;
+    border-radius: 8px;
+    border: 2px solid gold;
+    background: #111;
+    color: white;
+}
+
+#buyBtn,
+.login-box button,
+#logoutBtn {
+    max-width: 50%;
+    margin-right: 3px;
+    margin-left: 2px;
+    margin-top: 20px;
+    padding: 13px 30px;
+    font-size: 18px;
+    font-weight: bold;
+    color: black;
+    background: gold;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+}
+
+/* =========================
+   SMALL PHONES
+========================= */
+@media (max-width: 480px) {
+    .title {
+        font-size: 24px;
+    }
+
+    h2 {
+        font-size: 20px;
+    }
+
+    .item {
+        font-size: 25px;
+        padding: 16px;
+    }
+
+    .item small {
+        font-size: 15px;
+    }
+
+    .user-input input,
+    #buyBtn,
+    .login-box button,
+    #logoutBtn {
+        font-size: 17px;
+    }
+
+    .promo-title {
+        font-size: 28px;
+    }
+
+    .promo-title span {
+        font-size: 36px;
+    }
+
+    .promo-sub {
+        font-size: 18px;
+    }
+
+    .feature-item {
+        font-size: 15px;
+    }
+}
+
+/* =========================
+   TABLET
+========================= */
+@media (max-width: 1200px) {
+    .shop-layout {
+        flex-direction: column;
+        align-items: center;
+        width: 95%;
+    }
+
+    .shop-left,
+    .shop-right {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .shop-right {
+        max-width: 500px;
+    }
+
+    .container {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 18px;
+    }
+
+    .promo-card {
+        min-height: 780px;
+    }
+
+    .hero-banner {
+        height: 780px;
+    }
+
+    .promo-title {
+        margin-top: 140px;
+        font-size: 42px;
+    }
+
+    .promo-title span {
+        font-size: 52px;
+    }
+}
+
+/* =========================
+   PHONE ONLY
+========================= */
+@media (max-width: 768px) {
+    .shop-layout {
+        display: flex;
+        flex-direction: row;
+        /* desktop ပုံစံလို ဘေးချင်းယှဉ်ထား */
+        align-items: flex-start;
+        justify-content: center;
+        gap: 10px;
+        width: 100%;
+    }
+
+    .shop-left {
+        flex: 90;
+        min-width: 1%;
+    }
+
+    .shop-right {
+        width: 105px;
+        /* ညာဘက်ပုံ သေးရှည် */
+        flex-shrink: 0;
+    }
+
+    .promo-card {
+        min-height: 620px;
+        border-radius: 14px;
+    }
+
+    .hero-banner {
+        width: 100%;
+        height: 620px;
+        object-fit: cover;
+        display: block;
+        border-radius: 14px;
+    }
+
+    /* promo text ကို phone မှာသေးချင်အောင် */
+    .promo-overlay {
+        padding: 10px 8px;
+    }
+
+    .promo-logo {
+        font-size: 10px;
+        margin-bottom: 10px;
+    }
+
+    .promo-title {
+        margin-top: 120px;
+        font-size: 18px;
+        line-height: 1;
+    }
+
+    .promo-title span {
+        font-size: 22px;
+    }
+
+    .promo-sub {
+        font-size: 10px;
+        margin: 6px 0 4px;
+    }
+
+    .promo-small {
+        font-size: 8px;
+        margin-bottom: 10px;
+    }
+
+    .promo-features {
+        margin-top: 10px;
+        padding: 8px 6px;
+        border-radius: 10px;
+    }
+
+    .feature-item {
+        font-size: 9px;
+        padding: 8px 2px;
+        line-height: 1.2;
+    }
+
+    .promo-contact {
+        padding-top: 12px;
+    }
+
+    .promo-contact p {
+        font-size: 9px;
+        margin-bottom: 4px;
+    }
+
+    .promo-contact h3 {
+        font-size: 12px;
+        line-height: 1.2;
+    }
+
+    /* item box တွေ phone မှာ ကြီးလာမယ် */
+    .container {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    .item {
+        padding: 18px 14px;
+        font-size: 18px;
+        border-radius: 12px;
+    }
+
+    .item small {
+        font-size: 15px;
+    }
+
+    .middle-text {
+        grid-column: span 1;
+        font-size: 16px;
+        line-height: 1.4;
+        padding: 4px 0;
+    }
+
+    /* input / buy button */
+    .user-input {
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        margin-top: 16px;
+    }
+
+    .user-input input {
+        width: 100%;
+        height: 46px;
+        font-size: 16px;
+        padding: 0 12px;
+        box-sizing: border-box;
+    }
+
+    #buyBtn {
+        width: 100%;
+        height: 48px;
+        font-size: 17px;
+        margin-top: 12px;
+    }
+
+    #selectedText,
+    #errorMsg {
+        font-size: 14px;
+        line-height: 1.4;
+        margin-top: 8px;
+    }
+
+    /* title */
+    .title {
+        font-size: 24px;
+        margin: 12px 0;
+        line-height: 1.2;
+    }
+
+    h2 {
+        font-size: 18px;
+        margin: 6px 0 12px;
+    }
+
+    /* menu */
+    #menuIcon {
+        top: 10px;
+        left: 10px;
+        font-size: 26px;
+    }
+
+    #sideMenu {
+        width: 100px;
+        left: -100px;
+    }
+
+    #sideMenu.active {
+        left: 0;
+    }
+
+    #sideMenu a {
+        font-size: 16px;
+        padding: 14px 16px;
+    }
+}
+
+/* =========================
+   SMALL PHONE
+========================= */
+@media (max-width: 480px) {
+    .shop-right {
+        width: 95px;
+    }
+
+    .promo-card {
+        min-height: 780px;
+    }
+
+    .hero-banner {
+        height: 260px;
+    }
+
+    .promo-title {
+        margin-top: 105px;
+        font-size: 16px;
+    }
+
+    .promo-title span {
+        font-size: 10px;
+    }
+
+    .feature-item {
+        font-size: 10px;
+    }
+
+    .promo-contact h3 {
+        font-size: 11px;
+    }
+
+    .item {
+        font-size: 17px;
+        padding: 10px 8px;
+        margin: 5%;
+        inline-size: none;
+        ;
+    }
+
+    .user-input input,
+    #buyBtn {
+        font-size: 15px;
+    }
+}
