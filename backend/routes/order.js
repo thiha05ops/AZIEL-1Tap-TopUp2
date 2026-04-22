@@ -1,18 +1,63 @@
 const express = require("express");
 const router = express.Router();
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
 const Order = require("../models/Order");
+const { sendTelegramPhoto } = require("../services/telegram");
+
+const uploadDir = path.join(__dirname, "../uploads");
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, uploadDir);
+    },
+    filename: function (req, file, cb) {
+        cb(null, Date.now() + "-" + file.originalname);
+    }
+});
+
+const upload = multer({ storage });
 
 // Create Order
-router.post("/order", async (req, res) => {
+router.post("/order", upload.single("screenshot"), async (req, res) => {
     try {
-        const { username, userId, serverId, selectedPackage } = req.body;
+        const { username, userId, serverId, selectedPackage, paymentMethod } = req.body;
 
-        await Order.create({
+        if (!username || !userId || !serverId || !selectedPackage || !paymentMethod) {
+            return res.json({
+                success: false,
+                message: "Missing required fields"
+            });
+        }
+
+        if (!req.file) {
+            return res.json({
+                success: false,
+                message: "Payment screenshot is required"
+            });
+        }
+
+        const order = await Order.create({
             username,
             userId,
             serverId,
-            packageName: selectedPackage
+            packageName: selectedPackage,
+            status: "Pending"
         });
+
+        const caption = `🛒 New Order
+User: ${username}
+Package: ${selectedPackage}
+Game ID: ${userId}
+Server: ${serverId}
+Payment: ${paymentMethod}
+Status: Pending`;
+
+        await sendTelegramPhoto(req.file.path, caption);
 
         res.json({
             success: true,

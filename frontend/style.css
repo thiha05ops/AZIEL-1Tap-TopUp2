@@ -1106,3 +1106,43 @@ body::before {
     border: 1px solid gold;
     border-radius: 12px;
 }
+
+.payment-section {
+    margin-top: 20px;
+    text-align: center;
+}
+
+.payment-section h3 {
+    color: gold;
+    margin-bottom: 10px;
+}
+
+#paymentMethod {
+    width: 280px;
+    height: 45px;
+    border-radius: 10px;
+    border: 2px solid gold;
+    background: #111;
+    color: white;
+    font-size: 16px;
+    padding: 0 10px;
+}
+
+#paymentInfo {
+    margin-top: 10px;
+    color: #00d4ff;
+    font-weight: bold;
+    min-height: 24px;
+}
+
+.upload-label {
+    display: block;
+    margin-top: 15px;
+    margin-bottom: 8px;
+    color: gold;
+    font-weight: bold;
+}
+
+#paymentScreenshot {
+    color: white;
+}
