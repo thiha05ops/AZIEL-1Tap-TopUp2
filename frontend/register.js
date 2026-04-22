@@ -20,10 +20,17 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
+        if (password.length < 6) {
+            registerMsg.innerText = "❌ Password must be at least 6 characters!";
+            return;
+        }
+
         try {
             const res = await fetch("/api/register", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json"
+                },
                 body: JSON.stringify({ username, password })
             });
 
@@ -33,13 +40,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 registerMsg.innerText = "✅ Register success!";
                 setTimeout(() => {
                     window.location.href = "login.html";
-                }, 1000);
+                }, 1500);
             } else {
                 registerMsg.innerText = "❌ " + data.message;
             }
-        } catch (err) {
+        } catch (error) {
+            console.error(error);
             registerMsg.innerText = "❌ Server error!";
-            console.log(err);
         }
     });
 });
