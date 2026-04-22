@@ -1,5 +1,6 @@
 document.addEventListener("DOMContentLoaded", () => {
     const token = localStorage.getItem("token");
+
     if (!token) {
         window.location.href = "login.html";
         return;
@@ -24,12 +25,13 @@ document.addEventListener("DOMContentLoaded", () => {
         item.addEventListener("click", () => {
             items.forEach(i => i.classList.remove("active"));
             item.classList.add("active");
-            selectedPackage = item.getAttribute("data-value");
+
+            selectedPackage = item.dataset.value;
             selectedText.innerText = "Selected: " + selectedPackage;
         });
     });
 
-    buyBtn.addEventListener("click", async () => {
+    buyBtn?.addEventListener("click", async () => {
         const userId = userIdInput.value.trim();
         const serverId = serverIdInput.value.trim();
         const username = localStorage.getItem("username") || "User";
@@ -54,37 +56,61 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             const res = await fetch("/api/order", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ username, userId, serverId, selectedPackage })
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer " + token
+                },
+                body: JSON.stringify({
+                    username,
+                    userId,
+                    serverId,
+                    selectedPackage
+                })
             });
 
             const data = await res.json();
-            errorMsg.innerText = data.success ? "✅ Order sent!" : "❌ " + data.message;
-        } catch (err) {
+
+            if (data.success) {
+                errorMsg.innerText = "✅ Order sent!";
+                userIdInput.value = "";
+                serverIdInput.value = "";
+            } else {
+                errorMsg.innerText = "❌ " + data.message;
+            }
+
+        } catch (error) {
+            console.error(error);
             errorMsg.innerText = "❌ Server error!";
-            console.log(err);
         }
     });
 
     function openMenu() {
-        sideMenu.classList.add("active");
-        overlay.classList.add("active");
-        mainContent.classList.add("blur");
-        mainContent.style.transform = "translateX(250px)";
+        sideMenu?.classList.add("active");
+        overlay?.classList.add("active");
+
+        if (mainContent) {
+            mainContent.classList.add("blur");
+            mainContent.style.transform = "translateX(250px)";
+        }
+
         menuOpen = true;
     }
 
     function closeMenu() {
-        sideMenu.classList.remove("active");
-        overlay.classList.remove("active");
-        mainContent.classList.remove("blur");
-        mainContent.style.transform = "translateX(0)";
+        sideMenu?.classList.remove("active");
+        overlay?.classList.remove("active");
+
+        if (mainContent) {
+            mainContent.classList.remove("blur");
+            mainContent.style.transform = "translateX(0)";
+        }
+
         menuOpen = false;
     }
 
-    menuIcon.addEventListener("click", () => {
+    menuIcon?.addEventListener("click", () => {
         menuOpen ? closeMenu() : openMenu();
     });
 
-    overlay.addEventListener("click", closeMenu);
+    overlay?.addEventListener("click", closeMenu);
 });
