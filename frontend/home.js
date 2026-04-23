@@ -14,27 +14,27 @@ document.addEventListener("DOMContentLoaded", () => {
     const packages = [
         {
             name: "Weekly Pass",
-            prices: { MM: "6800 Ks", TH: "85 THB" }
+            prices: { MM: "6800 Ks", TH: "55 THB" }
         },
         {
             name: "86 💎",
-            prices: { MM: "5700 Ks", TH: "69 THB" }
+            prices: { MM: "5700 Ks", TH: "45 THB" }
         },
         {
             name: "172 💎",
-            prices: { MM: "12400 Ks", TH: "149 THB" }
+            prices: { MM: "12400 Ks", TH: "88 THB" }
         },
         {
             name: "275 💎",
-            prices: { MM: "21800 Ks", TH: "259 THB" }
+            prices: { MM: "21800 Ks", TH: "159 THB" }
         },
         {
             name: "570 💎",
-            prices: { MM: "35000 Ks", TH: "419 THB" }
+            prices: { MM: "35000 Ks", TH: "274 THB" }
         },
         {
             name: "1007+156 💎",
-            prices: { MM: "69900 Ks", TH: "829 THB" }
+            prices: { MM: "69900 Ks", TH: "545 THB" }
         }
     ];
 
