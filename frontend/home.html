@@ -2,31 +2,116 @@
 <html lang="en">
 
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta charset="UTF-8">
-    <title>Home</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AZIEL 1Tap Shop</title>
     <link rel="stylesheet" href="style.css">
 </head>
 
-<body>
-    <div id="mainContent">
-        <h1 class="title">Welcome to AZIEL 1Tap Shop</h1>
-        <p id="welcomeText"></p>
+<body class="landing-page">
 
-        <div class="home-icons">
-            <div class="card" id="mlbbCard">
-                <div class="card-icon">💎</div>
-                <p>MLBB Shop</p>
-            </div>
-
-            <div class="card" id="comingSoonCard">
-                <div class="card-icon">🎮</div>
-                <p>Coming Soon</p>
+    <!-- TOP NAVBAR -->
+    <header class="topbar">
+        <div class="logo-area">
+            <div class="logo-badge">A</div>
+            <div class="logo-text">
+                <h1>AZIEL 1Tap Shop</h1>
+                <span>Top Up Center</span>
             </div>
         </div>
 
-        <button id="logoutBtn">Logout</button>
+        <nav class="top-actions">
+            <button class="icon-btn" id="searchBtn" title="Search">🔍</button>
+
+            <select id="regionSelect" class="region-select">
+                <option value="MM">Myanmar</option>
+                <option value="TH">Thailand</option>
+            </select>
+
+            <a href="help.html" class="nav-link">Help Center</a>
+            <a href="login.html" class="login-btn" id="loginBtn">Login</a>
+        </nav>
+    </header>
+
+    <!-- SEARCH BAR -->
+    <div class="search-bar-wrap" id="searchWrap">
+        <input type="text" id="searchInput" placeholder="Search package or game...">
     </div>
+
+    <!-- HERO SECTION -->
+    <section class="hero-section">
+        <div class="hero-left">
+            <p class="hero-badge">SMILE ONE INSPIRED • MLBB STYLE</p>
+            <h2 class="hero-title">Fast & Trusted<br>Game Top Up</h2>
+            <p class="hero-desc">
+                Buy Mobile Legends diamonds quickly with a clean, easy, and secure experience.
+                Choose your region, view your local pricing, and top up in seconds.
+            </p>
+
+            <div class="hero-buttons">
+                <a href="shop.html" class="primary-btn">Shop Now</a>
+                <a href="help.html" class="secondary-btn">How To Buy</a>
+            </div>
+
+            <div class="hero-info">
+                <div class="info-box">
+                    <strong>⚡ Instant</strong>
+                    <span>Fast order process</span>
+                </div>
+                <div class="info-box">
+                    <strong>🌍 Region</strong>
+                    <span>MM / TH price switch</span>
+                </div>
+                <div class="info-box">
+                    <strong>🛡 Safe</strong>
+                    <span>Trusted support team</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="hero-right">
+            <div class="hero-card">
+                <img src="assets/hero.jpg" alt="MLBB Hero" class="hero-main-image">
+                <div class="hero-overlay">
+                    <span class="overlay-tag">MOBILE LEGENDS</span>
+                    <h3>TOP UP<br><span>INSTANT</span></h3>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FEATURED PRODUCTS -->
+    <section class="featured-section">
+        <div class="section-head">
+            <h3>Featured Packages</h3>
+            <p id="regionLabel">Showing prices for Myanmar</p>
+        </div>
+
+        <div class="featured-grid" id="featuredGrid">
+            <!-- JS render -->
+        </div>
+    </section>
+
+    <!-- SERVICES -->
+    <section class="service-section">
+        <div class="service-card">
+            <div class="service-icon">💎</div>
+            <h4>Best Pricing</h4>
+            <p>Region-based fixed pricing for clear top up orders.</p>
+        </div>
+
+        <div class="service-card">
+            <div class="service-icon">📞</div>
+            <h4>Support</h4>
+            <p>Contact us anytime if you need help with payment or delivery.</p>
+        </div>
+
+        <div class="service-card">
+            <div class="service-icon">🚀</div>
+            <h4>More Games Later</h4>
+            <p>Help center, profile, and more game support can be added next.</p>
+        </div>
+    </section>
 
     <script src="home.js"></script>
 </body>

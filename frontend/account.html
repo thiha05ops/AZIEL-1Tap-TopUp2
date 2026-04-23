@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Account - AZIEL 1Tap Shop</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="account-page">
+
+    <header class="topbar">
+        <div class="logo-area">
+            <div class="logo-badge">A</div>
+            <div class="logo-text">
+                <h1>AZIEL 1Tap Shop</h1>
+                <span>My Account</span>
+            </div>
+        </div>
+
+        <nav class="top-actions">
+            <a href="home.html" class="nav-link">Home</a>
+            <a href="shop.html" class="nav-link">Shop</a>
+            <a href="history.html" class="nav-link">History</a>
+        </nav>
+    </header>
+
+    <section class="account-wrapper">
+        <div class="account-card">
+            <div class="account-avatar" id="accountAvatar">A</div>
+
+            <h2 id="accountName">User</h2>
+            <p class="account-subtitle">Manage your profile and preferences</p>
+
+            <div class="account-info-list">
+                <div class="account-info-row">
+                    <span>Username</span>
+                    <strong id="accountUsername">-</strong>
+                </div>
+
+                <div class="account-info-row">
+                    <span>Preferred Region</span>
+                    <select id="accountRegion">
+                        <option value="MM">Myanmar</option>
+                        <option value="TH">Thailand</option>
+                    </select>
+                </div>
+
+                <div class="account-info-row">
+                    <span>Telegram</span>
+                    <input type="text" id="telegramName" placeholder="Enter Telegram username">
+                </div>
+
+                <div class="account-info-row">
+                    <span>Phone</span>
+                    <input type="text" id="phoneNumber" placeholder="Enter phone number">
+                </div>
+            </div>
+
+            <div class="account-actions">
+                <button id="saveProfileBtn">Save Profile</button>
+                <button id="goHistoryBtn" class="secondary-account-btn">View History</button>
+                <button id="logoutAccountBtn" class="danger-account-btn">Logout</button>
+            </div>
+
+            <p id="accountMsg"></p>
+        </div>
+    </section>
+
+    <script src="account.js"></script>
+</body>
+
+</html>
