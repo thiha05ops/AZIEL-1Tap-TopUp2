@@ -1,12 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
-    const savedRegion = localStorage.getItem("region") || "MM";
-    const savedUserId = localStorage.getItem("savedMlbbUserId") || "";
-    const savedServerId = localStorage.getItem("savedMlbbServerId") || "";
     const token = localStorage.getItem("token");
     const username = localStorage.getItem("username");
-    regionSelect.value = savedRegion;
-    if (userIdInput) userIdInput.value = savedUserId;
-    if (serverIdInput) serverIdInput.value = savedServerId;
+    const savedRegion = localStorage.getItem("region") || "MM";
 
     if (!token) {
         window.location.href = "login.html";
@@ -30,10 +25,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const paymentInfo = document.getElementById("paymentInfo");
     const paymentScreenshot = document.getElementById("paymentScreenshot");
 
+    if (!packageGrid) {
+        console.log("packageGrid not found");
+        return;
+    }
+
     let selectedPackage = null;
 
     const packages = [
-        { name: "Weekly Pass", prices: { MM: "6800 Ks", TH: "55 THB" } },
+        { name: "Weekly Pass", prices: { MM: "6800 Ks", TH: "85 THB" } },
         { name: "56 💎", prices: { MM: "3850 Ks", TH: "49 THB" } },
         { name: "70 💎", prices: { MM: "5400 Ks", TH: "65 THB" } },
         { name: "86 💎", prices: { MM: "5700 Ks", TH: "69 THB" } },
@@ -71,34 +71,41 @@ document.addEventListener("DOMContentLoaded", () => {
                 document.querySelectorAll(".package-card").forEach(c => c.classList.remove("active"));
                 card.classList.add("active");
                 selectedPackage = card.dataset.value;
-                selectedText.innerText = "Selected: " + selectedPackage;
+                if (selectedText) {
+                    selectedText.innerText = "Selected: " + selectedPackage;
+                }
             });
         });
 
-        regionLabel.innerText =
-            region === "MM"
-                ? "Showing prices for Myanmar"
-                : "Showing prices for Thailand";
+        if (regionLabel) {
+            regionLabel.innerText =
+                region === "MM"
+                    ? "Showing prices for Myanmar"
+                    : "Showing prices for Thailand";
+        }
     }
 
-    regionSelect.value = savedRegion;
+    if (regionSelect) {
+        regionSelect.value = savedRegion;
+    }
+
     renderPackages(savedRegion);
 
-    regionSelect.addEventListener("change", () => {
+    regionSelect?.addEventListener("change", () => {
         const region = regionSelect.value;
         localStorage.setItem("region", region);
-        renderPackages(region, searchInput.value.trim());
+        renderPackages(region, searchInput?.value.trim() || "");
     });
 
     searchBtn?.addEventListener("click", () => {
-        searchWrap.classList.toggle("show");
-        if (searchWrap.classList.contains("show")) {
-            searchInput.focus();
+        searchWrap?.classList.toggle("show");
+        if (searchWrap?.classList.contains("show")) {
+            searchInput?.focus();
         }
     });
 
     searchInput?.addEventListener("input", () => {
-        renderPackages(regionSelect.value, searchInput.value.trim());
+        renderPackages(regionSelect?.value || "MM", searchInput.value.trim());
     });
 
     paymentMethod?.addEventListener("change", () => {
@@ -114,35 +121,35 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     buyBtn?.addEventListener("click", async () => {
-        const userId = userIdInput.value.trim();
-        const serverId = serverIdInput.value.trim();
-        const method = paymentMethod.value;
-        const file = paymentScreenshot.files[0];
+        const userId = userIdInput?.value.trim() || "";
+        const serverId = serverIdInput?.value.trim() || "";
+        const method = paymentMethod?.value || "";
+        const file = paymentScreenshot?.files[0];
 
-        errorMsg.innerText = "";
+        if (errorMsg) errorMsg.innerText = "";
 
         if (!selectedPackage) {
-            errorMsg.innerText = "❌ Please select a package!";
+            if (errorMsg) errorMsg.innerText = "❌ Please select a package!";
             return;
         }
 
         if (!userId) {
-            errorMsg.innerText = "❌ Please enter User ID!";
+            if (errorMsg) errorMsg.innerText = "❌ Please enter User ID!";
             return;
         }
 
         if (!serverId) {
-            errorMsg.innerText = "❌ Please enter Server Code!";
+            if (errorMsg) errorMsg.innerText = "❌ Please enter Server Code!";
             return;
         }
 
         if (!method) {
-            errorMsg.innerText = "❌ Please select payment method!";
+            if (errorMsg) errorMsg.innerText = "❌ Please select payment method!";
             return;
         }
 
         if (!file) {
-            errorMsg.innerText = "❌ Please upload payment screenshot!";
+            if (errorMsg) errorMsg.innerText = "❌ Please upload payment screenshot!";
             return;
         }
 
@@ -166,7 +173,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await res.json();
 
             if (data.success) {
-                errorMsg.innerText = "✅ Order sent!";
+                if (errorMsg) errorMsg.innerText = "✅ Order sent!";
                 userIdInput.value = "";
                 serverIdInput.value = "";
                 paymentMethod.value = "";
@@ -174,14 +181,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 paymentScreenshot.value = "";
                 selectedText.innerText = "ဝယ်ယူလိုသော ပစ္စည်းကိုရွေးပါ";
                 selectedPackage = null;
-                renderPackages(regionSelect.value, searchInput.value.trim());
+                renderPackages(regionSelect?.value || "MM", searchInput?.value.trim() || "");
             } else {
-                errorMsg.innerText = "❌ " + data.message;
+                if (errorMsg) errorMsg.innerText = "❌ " + data.message;
             }
 
         } catch (error) {
             console.error(error);
-            errorMsg.innerText = "❌ Server error!";
+            if (errorMsg) errorMsg.innerText = "❌ Server error!";
         }
     });
 });
