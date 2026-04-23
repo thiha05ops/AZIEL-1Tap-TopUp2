@@ -1,23 +1,69 @@
-<script src="register.js"></script>
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta charset="UTF-8">
-    <title>Register</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - AZIEL 1Tap Shop</title>
     <link rel="stylesheet" href="style.css">
 </head>
 
-<body>
-    <div class="login-box">
-        <h1 class="title">Create Account</h1>
-        <input type="text" id="regUser" placeholder="Enter Username">
-        <input type="password" id="regPass" placeholder="Enter Password">
-        <button id="registerBtn">Register</button>
-        <p id="registerMsg"></p>
-        <p class="link-text">Already have account? <a href="login.html">Login</a></p>
-    </div>
+<body class="auth-page">
+
+    <header class="topbar">
+        <div class="logo-area">
+            <div class="logo-badge">A</div>
+            <div class="logo-text">
+                <h1>AZIEL 1Tap Shop</h1>
+                <span>Register</span>
+            </div>
+        </div>
+
+        <nav class="top-actions">
+            <a href="home.html" class="nav-link">Home</a>
+            <a href="help.html" class="nav-link">Help Center</a>
+            <a href="shop.html" class="nav-link">Shop</a>
+        </nav>
+    </header>
+
+    <section class="auth-layout">
+        <div class="auth-left">
+            <p class="hero-badge">CREATE ACCOUNT</p>
+            <h2 class="auth-title">Join Your<br>AZIEL Account</h2>
+            <p class="auth-desc">
+                Create your account to save your profile, check order history,
+                and enjoy a smoother top up experience.
+            </p>
+
+            <div class="auth-card">
+                <h3>Register</h3>
+
+                <input type="text" id="regUser" placeholder="Enter Username">
+                <input type="password" id="regPass" placeholder="Enter Password">
+
+                <button id="registerBtn">Create Account</button>
+
+                <p id="registerMsg"></p>
+
+                <p class="auth-switch">
+                    Already have an account?
+                    <a href="login.html">Login</a>
+                </p>
+            </div>
+        </div>
+
+        <div class="auth-right">
+            <div class="auth-hero-card">
+                <img src="assets/hero.jpg" alt="MLBB Hero" class="auth-hero-image">
+                <div class="auth-hero-overlay">
+                    <span class="overlay-tag">AZIEL 1TAP SHOP</span>
+                    <h3>NEW<br><span>PLAYER</span></h3>
+                    <p>Create your account and start ordering easily.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <script src="register.js"></script>
 </body>
 
