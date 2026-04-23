@@ -33,21 +33,21 @@ document.addEventListener("DOMContentLoaded", () => {
     let selectedPackage = null;
 
     const packages = [
-        { name: "Weekly Pass", prices: { MM: "6800 Ks", TH: "85 THB" } },
-        { name: "56 💎", prices: { MM: "3850 Ks", TH: "49 THB" } },
-        { name: "70 💎", prices: { MM: "5400 Ks", TH: "65 THB" } },
-        { name: "86 💎", prices: { MM: "5700 Ks", TH: "69 THB" } },
-        { name: "172 💎", prices: { MM: "12400 Ks", TH: "149 THB" } },
-        { name: "275 💎", prices: { MM: "21800 Ks", TH: "259 THB" } },
-        { name: "336 💎", prices: { MM: "22500 Ks", TH: "269 THB" } },
-        { name: "344 💎", prices: { MM: "22800 Ks", TH: "275 THB" } },
-        { name: "570 💎", prices: { MM: "35000 Ks", TH: "419 THB" } },
-        { name: "706 💎", prices: { MM: "43000 Ks", TH: "515 THB" } },
-        { name: "716 💎", prices: { MM: "51000 Ks", TH: "599 THB" } },
-        { name: "1007+156 💎", prices: { MM: "69900 Ks", TH: "829 THB" } },
-        { name: "1160+186 💎", prices: { MM: "84500 Ks", TH: "999 THB" } },
-        { name: "1360+335 💎", prices: { MM: "127000 Ks", TH: "1499 THB" } },
-        { name: "2015+383 💎", prices: { MM: "137800 Ks", TH: "1599 THB" } }
+        { name: "Weekly Pass", prices: { MM: "6800 Ks", TH: "55 THB" } },
+        { name: "56 💎", prices: { MM: "3850 Ks", TH: "30 THB" } },
+        { name: "70 💎", prices: { MM: "5400 Ks", TH: "42 THB" } },
+        { name: "86 💎", prices: { MM: "5700 Ks", TH: "45 THB" } },
+        { name: "172 💎", prices: { MM: "12400 Ks", TH: "88 THB" } },
+        { name: "275 💎", prices: { MM: "21800 Ks", TH: "159 THB" } },
+        { name: "336 💎", prices: { MM: "22500 Ks", TH: "165 THB" } },
+        { name: "344 💎", prices: { MM: "22800 Ks", TH: "170 THB" } },
+        { name: "570 💎", prices: { MM: "35000 Ks", TH: "274 THB" } },
+        { name: "706 💎", prices: { MM: "43000 Ks", TH: "334 THB" } },
+        { name: "716 💎", prices: { MM: "51000 Ks", TH: "340 THB" } },
+        { name: "1007+156 💎", prices: { MM: "69900 Ks", TH: "545 THB" } },
+        { name: "1160+186 💎", prices: { MM: "84500 Ks", TH: "653THB" } },
+        { name: "1360+335 💎", prices: { MM: "127000 Ks", TH: "989 THB" } },
+        { name: "2015+383 💎", prices: { MM: "137800 Ks", TH: "1074 THB" } }
     ];
 
     function renderPackages(region, keyword = "") {
