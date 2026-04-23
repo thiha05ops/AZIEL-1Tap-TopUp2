@@ -2,66 +2,73 @@
 <html lang="en">
 
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta charset="UTF-8">
-    <title>MOBILE LEGENDS Bang Bang</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shop - AZIEL 1Tap Shop</title>
     <link rel="stylesheet" href="style.css">
 </head>
 
-<body>
+<body class="shop-page">
 
-    <div id="menuIcon">☰</div>
-    <div id="overlay"></div>
+    <!-- TOPBAR -->
+    <header class="topbar">
+        <div class="logo-area">
+            <div class="logo-badge">A</div>
+            <div class="logo-text">
+                <h1>AZIEL 1Tap Shop</h1>
+                <span>MLBB Top Up Center</span>
+            </div>
+        </div>
 
-    <div id="sideMenu">
-        <a href="home.html">🏠 Home</a>
-        <a href="shop.html">💎 Top Up</a>
-        <a href="history.html">📜 History</a>
-        <a href="help.html">❓ Help Center</a>
-        <a href="tel:0640972984">📞 Contact</a>
-        <a href="https://t.me/aziel1tap9" target="_blank" rel="noopener noreferrer">💬 Telegram</a>
+        <nav class="top-actions">
+            <button class="icon-btn" id="searchBtn" title="Search">🔍</button>
+
+            <select id="regionSelect" class="region-select">
+                <option value="MM">Myanmar</option>
+                <option value="TH">Thailand</option>
+            </select>
+
+            <a href="help.html" class="nav-link">Help Center</a>
+            <a href="history.html" class="nav-link">History</a>
+            <a href="account.html" class="login-btn" id="accountBtn">My Account</a>
+        </nav>
+    </header>
+
+    <!-- SEARCH -->
+    <div class="search-bar-wrap" id="searchWrap">
+        <input type="text" id="searchInput" placeholder="Search package...">
     </div>
 
-    <div class="shop-scroll" id="mainContent">
-        <div class="shop-layout">
+    <!-- PAGE HEADER -->
+    <section class="shop-header">
+        <div>
+            <p class="hero-badge">MOBILE LEGENDS • INSTANT TOP UP</p>
+            <h2 class="shop-main-title">Choose Your Package</h2>
+            <p class="shop-subtitle" id="regionLabel">Showing prices for Myanmar</p>
+        </div>
+    </section>
 
-            <div class="shop-left">
-                <h1 class="title">MOBILE LEGENDS Bang Bang</h1>
-                <h2>AZIEL 1Tap Shop</h2>
+    <!-- MAIN -->
+    <section class="shop-modern-layout" id="mainContent">
 
-                <div class="container">
-                    <div class="item" data-value="Weekly Pass">Weekly<br>pass 🔥<br><small>6800 Ks</small></div>
-                    <div class="item" data-value="56 💎"><span>56 💎</span><br><small>3850 Ks</small></div>
-                    <div class="item" data-value="70 💎"><span>70 💎</span><br><small>5400 Ks</small></div>
+        <!-- LEFT -->
+        <div class="shop-modern-left">
+            <div class="package-grid" id="packageGrid">
+                <!-- JS render -->
+            </div>
 
-                    <div class="item" data-value="86 💎"><span>86 💎</span><br><small>5700 Ks</small></div>
-                    <div class="item" data-value="172 💎"><span>172 💎</span><br><small>12400 Ks</small></div>
-                    <div class="item" data-value="275 💎"><span>275 💎</span><br><small>21800 Ks</small></div>
-
-                    <div class="item" data-value="336 💎"><span>336 💎</span><br><small>22500 Ks</small></div>
-                    <div class="item" data-value="344 💎"><span>344 💎</span><br><small>22800 Ks</small></div>
-                    <div class="item" data-value="570 💎"><span>570 💎</span><br><small>35000 Ks</small></div>
-
-                    <div class="middle-text">🔥 လျော့စျေးရရှိသော စိန်များ🔥</div>
-
-                    <div class="item" data-value="706 💎"><span>706 💎</span><br><small>43000 Ks</small></div>
-                    <div class="item" data-value="716 💎"><span>716 💎</span><br><small>51000 Ks</small></div>
-                    <div class="item" data-value="1007+156 💎"><span>1007+156 💎</span><br><small>69900 Ks</small></div>
-
-                    <div class="item" data-value="1160+186 💎"><span>1160+186 💎</span><br><small>84500 Ks</small></div>
-                    <div class="item" data-value="1360+335 💎"><span>1360+335 💎</span><br><small>127000 Ks</small>
-                    </div>
-                    <div class="item" data-value="2015+383 💎"><span>2015+383 💎</span><br><small>137800 Ks</small>
-                    </div>
+            <div class="buy-panel">
+                <div class="buy-panel-head">
+                    <h3>Complete Your Order</h3>
+                    <p id="selectedText">ဝယ်ယူလိုသော ပစ္စည်းကိုရွေးပါ</p>
                 </div>
 
-                <div class="user-input">
+                <div class="user-input modern-inputs">
                     <input type="text" id="userId" placeholder="Enter User ID">
                     <input type="text" id="serverId" placeholder="Enter Server Code">
                 </div>
 
-                <button id="buyBtn">🛒 Buy Now</button>
-                <div class="payment-section">
+                <div class="payment-section modern-payment">
                     <h3>Payment Method</h3>
 
                     <select id="paymentMethod">
@@ -76,41 +83,41 @@
                     <input type="file" id="paymentScreenshot" accept="image/*">
                 </div>
 
-                <p id="selectedText">ဝယ်ယူလိုသော ပစ္စည်းကိုရွေးပါ</p>
+                <button id="buyBtn">🛒 Buy Now</button>
                 <p id="errorMsg"></p>
             </div>
+        </div>
 
-            <div class="shop-right">
-                <div class="promo-card">
-                    <img src="assets/hero.jpg" alt="MLBB Hero" class="hero-banner">
+        <!-- RIGHT -->
+        <div class="shop-modern-right">
+            <div class="promo-modern-card">
+                <img src="assets/hero.jpg" alt="MLBB Hero" class="shop-hero-image">
 
-                    <div class="promo-overlay">
-                        <div class="promo-logo">MOBILE LEGENDS</div>
+                <div class="promo-modern-overlay">
+                    <span class="overlay-tag">MOBILE LEGENDS</span>
+                    <h3>TOP UP<br><span>INSTANT</span></h3>
+                    <p class="promo-modern-sub">FAST • SAFE • BEST PRICE</p>
 
-                        <h2 class="promo-title">TOP UP<br><span>INSTANT</span></h2>
-                        <p class="promo-sub">BEST PRICE</p>
-                        <p class="promo-small">TRUSTED & FAST SERVICE</p>
-
-                        <div class="promo-features">
-                            <div class="feature-item">⚡ မြန်ဆန်သောပို့ဆောင်မှု့</div>
-                            <div class="feature-item">🛡 100% စိတ်ချရသော</div>
-                            <div class="feature-item">🎧 24/7 အဆင်သင့်ရှိသောဝန်ဆောင်မှု</div>
-                            <div class="feature-item">💎 ချိုသာသောဈေးနှုန်း</div>
-
-                        </div>
-
-                        <div class="promo-contact">
-                            <p>ဆက်သွယ်ရန်</p>
-                            <h3>@azielshop</h3>
-                        </div>
+                    <div class="promo-modern-features">
+                        <div class="feature-modern-item">⚡ Instant Order</div>
+                        <div class="feature-modern-item">💎 Region Pricing</div>
+                        <div class="feature-modern-item">📱 Easy Payment</div>
+                        <div class="feature-modern-item">🛡 Trusted Support</div>
                     </div>
                 </div>
             </div>
 
+            <div class="support-mini-card">
+                <h4>Payment Numbers</h4>
+                <p><strong>WavePay:</strong> 09403630868</p>
+                <p><strong>SCB:</strong> 4321919025</p>
+                <p><strong>KBZPay:</strong> Coming Soon</p>
+            </div>
         </div>
 
+    </section>
 
-        <script src="script.js"></script>
+    <script src="script.js"></script>
 </body>
 
 </html>
