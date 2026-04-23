@@ -6,6 +6,7 @@ const dotenv = require("dotenv");
 const connectDB = require("./config/db");
 const authRoutes = require("./routes/auth");
 const orderRoutes = require("./routes/order");
+const profileRoutes = require("./routes/profile");
 
 dotenv.config();
 connectDB();
@@ -19,6 +20,7 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.use("/api", authRoutes);
 app.use("/api", orderRoutes);
+app.use("/api", profileRoutes);
 
 app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "../frontend/home.html"));
@@ -28,4 +30,3 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));

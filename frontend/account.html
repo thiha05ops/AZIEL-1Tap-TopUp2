@@ -28,7 +28,10 @@
 
     <section class="account-wrapper">
         <div class="account-card">
-            <div class="account-avatar" id="accountAvatar">A</div>
+            <div class="profile-photo-wrap">
+                <img id="profilePreview" class="profile-preview" src="" alt="Profile">
+                <div id="accountAvatar" class="account-avatar">A</div>
+            </div>
 
             <h2 id="accountName">User</h2>
             <p class="account-subtitle">Manage your profile and preferences</p>
@@ -37,6 +40,11 @@
                 <div class="account-info-row">
                     <span>Username</span>
                     <strong id="accountUsername">-</strong>
+                </div>
+
+                <div class="account-info-row">
+                    <span>Display Name</span>
+                    <input type="text" id="displayName" placeholder="Enter display name">
                 </div>
 
                 <div class="account-info-row">
@@ -55,6 +63,21 @@
                 <div class="account-info-row">
                     <span>Phone</span>
                     <input type="text" id="phoneNumber" placeholder="Enter phone number">
+                </div>
+
+                <div class="account-info-row">
+                    <span>MLBB User ID</span>
+                    <input type="text" id="mlbbUserId" placeholder="Enter MLBB User ID">
+                </div>
+
+                <div class="account-info-row">
+                    <span>MLBB Server ID</span>
+                    <input type="text" id="mlbbServerId" placeholder="Enter MLBB Server ID">
+                </div>
+
+                <div class="account-info-row">
+                    <span>Profile Photo</span>
+                    <input type="file" id="profilePhoto" accept="image/*">
                 </div>
             </div>
 

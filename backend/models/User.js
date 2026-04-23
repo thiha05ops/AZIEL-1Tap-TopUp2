@@ -6,13 +6,40 @@ const userSchema = new mongoose.Schema(
             type: String,
             required: true,
             trim: true,
-            unique: true,
+            unique: true
         },
         password: {
             type: String,
-            required: true,
-            minlength: 6,
+            required: true
         },
+        displayName: {
+            type: String,
+            default: ""
+        },
+        telegram: {
+            type: String,
+            default: ""
+        },
+        phone: {
+            type: String,
+            default: ""
+        },
+        region: {
+            type: String,
+            default: "MM"
+        },
+        mlbbUserId: {
+            type: String,
+            default: ""
+        },
+        mlbbServerId: {
+            type: String,
+            default: ""
+        },
+        photo: {
+            type: String,
+            default: ""
+        }
     },
     { timestamps: true }
 );

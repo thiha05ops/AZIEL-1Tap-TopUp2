@@ -1,7 +1,12 @@
 document.addEventListener("DOMContentLoaded", () => {
+    const savedRegion = localStorage.getItem("region") || "MM";
+    const savedUserId = localStorage.getItem("savedMlbbUserId") || "";
+    const savedServerId = localStorage.getItem("savedMlbbServerId") || "";
     const token = localStorage.getItem("token");
     const username = localStorage.getItem("username");
-    const savedRegion = localStorage.getItem("region") || "MM";
+    regionSelect.value = savedRegion;
+    if (userIdInput) userIdInput.value = savedUserId;
+    if (serverIdInput) serverIdInput.value = savedServerId;
 
     if (!token) {
         window.location.href = "login.html";
