@@ -1790,45 +1790,103 @@ body::before {
 
 /* MOBILE */
 @media (max-width: 768px) {
-    .help-grid {
-        grid-template-columns: 1fr;
-        padding-left: 16px;
-        padding-right: 16px;
+
+    .shop-header,
+    .shop-modern-layout {
+        padding-left: 12px;
+        padding-right: 12px;
     }
 
-    .help-hero {
-        padding-left: 16px;
-        padding-right: 16px;
-    }
-
-    .help-hero h2 {
-        font-size: 30px;
-    }
-
-    .account-wrapper {
-        padding: 24px 14px 40px;
-    }
-
-    .account-card {
-        padding: 22px 16px;
-    }
-
-    .account-card h2 {
+    .shop-main-title {
         font-size: 28px;
     }
 
-    .account-info-row {
+    .package-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+
+    .package-card {
+        padding: 14px 10px;
+        border-radius: 14px;
+    }
+
+    .package-name {
+        font-size: 15px;
+        margin-bottom: 8px;
+        line-height: 1.25;
+    }
+
+    .package-price {
+        font-size: 14px;
+    }
+
+    .modern-inputs {
         flex-direction: column;
-        align-items: stretch;
+        gap: 10px;
     }
 
-    .account-info-row span {
+    .modern-inputs input {
         min-width: auto;
+        width: 100%;
+        height: 46px;
+        font-size: 15px;
     }
 
-    .account-actions button {
-        width: 100%;
+    .promo-modern-card,
+    .shop-hero-image {
+        min-height: 360px;
     }
+
+    .promo-modern-overlay h3 {
+        font-size: 26px;
+    }
+
+    .buy-panel {
+        padding: 18px 14px;
+        border-radius: 18px;
+    }
+
+    #buyBtn {
+        height: 48px;
+        font-size: 16px;
+        border-radius: 14px;
+    }
+}
+
+.help-hero {
+    padding-left: 16px;
+    padding-right: 16px;
+}
+
+.help-hero h2 {
+    font-size: 30px;
+}
+
+.account-wrapper {
+    padding: 24px 14px 40px;
+}
+
+.account-card {
+    padding: 22px 16px;
+}
+
+.account-card h2 {
+    font-size: 28px;
+}
+
+.account-info-row {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.account-info-row span {
+    min-width: auto;
+}
+
+.account-actions button {
+    width: 100%;
+}
 }
 
 /* ===== MODERN SHOP PAGE ===== */
@@ -2339,5 +2397,29 @@ body::before {
 
     .auth-hero-overlay h3 {
         font-size: 30px;
+    }
+}
+
+@media (max-width: 480px) {
+    .package-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+
+    .package-card {
+        padding: 12px 8px;
+        border-radius: 12px;
+    }
+
+    .package-name {
+        font-size: 14px;
+    }
+
+    .package-price {
+        font-size: 13px;
+    }
+
+    .shop-main-title {
+        font-size: 24px;
     }
 }
