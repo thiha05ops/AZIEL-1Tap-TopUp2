@@ -28,7 +28,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let selectedPackage = null;
 
     const packages = [
-        { name: "Weekly Pass", prices: { MM: "6800 Ks", TH: "85 THB" } },
+        { name: "Weekly Pass", prices: { MM: "6800 Ks", TH: "55 THB" } },
         { name: "56 💎", prices: { MM: "3850 Ks", TH: "49 THB" } },
         { name: "70 💎", prices: { MM: "5400 Ks", TH: "65 THB" } },
         { name: "86 💎", prices: { MM: "5700 Ks", TH: "69 THB" } },

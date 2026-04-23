@@ -1280,7 +1280,7 @@ body::before {
 }
 
 .hero-section {
-    max-width: 1250px;
+    max-width: 1950px;
     margin: 0 auto;
     padding: 48px 24px 28px;
     display: flex;
@@ -1434,7 +1434,7 @@ body::before {
 }
 
 .featured-section {
-    max-width: 1250px;
+    max-width: 1950px;
     margin: 0 auto;
     padding: 18px 24px 20px;
 }
@@ -1501,7 +1501,7 @@ body::before {
 }
 
 .service-section {
-    max-width: 1250px;
+    max-width: 1950px;
     margin: 0 auto;
     padding: 12px 24px 50px;
     display: grid;
@@ -1793,12 +1793,12 @@ body::before {
 
     .shop-header,
     .shop-modern-layout {
-        padding-left: 12px;
-        padding-right: 12px;
+        padding-left: 10px;
+        padding-right: 10px;
     }
 
     .shop-main-title {
-        font-size: 28px;
+        font-size: 58px;
     }
 
     .package-grid {
@@ -1887,7 +1887,7 @@ body::before {
 .account-actions button {
     width: 100%;
 }
-}
+
 
 /* ===== MODERN SHOP PAGE ===== */
 .shop-page {
@@ -1899,7 +1899,7 @@ body::before {
 }
 
 .shop-header {
-    max-width: 1250px;
+    max-width: 1550px;
     margin: 0 auto;
     padding: 34px 24px 10px;
 }
@@ -1916,7 +1916,7 @@ body::before {
 }
 
 .shop-modern-layout {
-    max-width: 1250px;
+    max-width: 1550px;
     margin: 0 auto;
     padding: 16px 24px 50px;
     display: flex;
@@ -2063,7 +2063,7 @@ body::before {
     border-radius: 16px;
     background: gold;
     color: black;
-    font-size: 18px;
+    font-size: 13px;
     font-weight: bold;
     cursor: pointer;
     transition: 0.3s ease;
