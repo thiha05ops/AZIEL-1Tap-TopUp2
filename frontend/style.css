@@ -2611,3 +2611,97 @@ body::before {
     align-items: center;
     justify-content: center;
 }
+
+.noti-wrapper {
+    position: relative;
+}
+
+.notification-btn {
+    border: none;
+    background: #16213b;
+    color: white;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.notification-btn span {
+    background: red;
+    color: white;
+    min-width: 20px;
+    height: 20px;
+    border-radius: 999px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.noti-dropdown {
+    position: absolute;
+    right: 0;
+    top: 52px;
+    width: 330px;
+    max-height: 420px;
+    overflow-y: auto;
+    background: #121c33;
+    border: 1px solid rgba(255, 215, 0, 0.25);
+    border-radius: 18px;
+    padding: 16px;
+    box-shadow: 0 0 24px rgba(0, 0, 0, 0.45);
+    display: none;
+    z-index: 9999;
+}
+
+.noti-dropdown.show {
+    display: block;
+}
+
+.noti-dropdown h4 {
+    margin: 0 0 12px;
+    color: gold;
+}
+
+.noti-item {
+    padding: 12px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    margin-bottom: 10px;
+}
+
+.noti-item strong {
+    color: gold;
+}
+
+.noti-item p {
+    margin: 6px 0;
+    color: #dce3ee;
+    font-size: 14px;
+}
+
+.noti-item small {
+    color: #9da9b8;
+}
+
+.view-history-link {
+    display: block;
+    margin-top: 10px;
+    text-align: center;
+    color: black;
+    background: gold;
+    padding: 10px;
+    border-radius: 12px;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+@media (max-width: 768px) {
+    .noti-dropdown {
+        right: -90px;
+        width: 300px;
+    }
+}
