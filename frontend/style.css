@@ -2574,3 +2574,40 @@ body::before {
         flex-wrap: wrap;
     }
 }
+
+.logo-area {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+}
+
+.logo-area:hover {
+    opacity: 0.95;
+    transform: scale(1.01);
+    transition: 0.3s ease;
+}
+
+.notification-btn {
+    text-decoration: none;
+    background: #16213b;
+    color: white;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.notification-btn span {
+    background: red;
+    color: white;
+    min-width: 20px;
+    height: 20px;
+    border-radius: 999px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
