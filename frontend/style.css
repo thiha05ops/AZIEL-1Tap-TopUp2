@@ -2020,7 +2020,7 @@ body::before {
 
 .modern-payment h3 {
     margin-bottom: 10px;
-    color: gold;
+    color: #77ff00;
 }
 
 .modern-payment select {
@@ -2051,7 +2051,7 @@ body::before {
 }
 
 #paymentScreenshot {
-    width: 100%;
+    width: 80%;
     color: white;
 }
 
