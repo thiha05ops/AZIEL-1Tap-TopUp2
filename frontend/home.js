@@ -6,6 +6,28 @@ document.addEventListener("DOMContentLoaded", () => {
     const regionSelect = document.getElementById("regionSelect");
     const regionLabel = document.getElementById("regionLabel");
     const loginBtn = document.getElementById("loginBtn");
+    async function loadNotificationCount() {
+        const token = localStorage.getItem("token");
+        const username = localStorage.getItem("username");
+        const notiCount = document.getElementById("notiCount");
+
+        if (!token || !username || !notiCount) return;
+
+        try {
+            const res = await fetch(`/api/history/${username}`);
+            const data = await res.json();
+
+            if (data.success) {
+                const activeOrders = data.orders.filter(o => o.status !== "Done" && o.status !== "Cancelled");
+                notiCount.innerText = activeOrders.length;
+            }
+        } catch (error) {
+            console.log(error);
+        }
+    }
+
+    loadNotificationCount();
+    setInterval(loadNotificationCount, 10000);
 
     const token = localStorage.getItem("token");
     const username = localStorage.getItem("username");

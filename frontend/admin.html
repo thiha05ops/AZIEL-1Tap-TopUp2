@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Orders</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="admin-page">
+
+    <div class="admin-wrapper">
+        <h1>👑 AZIEL Admin Orders</h1>
+
+        <div class="admin-login-box" id="adminLoginBox">
+            <input type="password" id="adminPassword" placeholder="Enter admin password">
+            <button id="adminLoginBtn">Login Admin</button>
+            <p id="adminMsg"></p>
+        </div>
+
+        <div id="adminPanel" style="display:none;">
+            <button id="refreshOrdersBtn">🔄 Refresh Orders</button>
+            <div id="adminOrdersList"></div>
+        </div>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+
+</html>

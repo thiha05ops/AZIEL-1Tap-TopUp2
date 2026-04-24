@@ -6,9 +6,14 @@ const orderSchema = new mongoose.Schema(
         userId: String,
         serverId: String,
         packageName: String,
+        paymentMethod: String,
         status: {
             type: String,
             default: "Pending"
+        },
+        note: {
+            type: String,
+            default: ""
         }
     },
     { timestamps: true }
