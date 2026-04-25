@@ -20,7 +20,7 @@ document.addEventListener("DOMContentLoaded", () => {
         },
         {
             name: "PUBG Mobile",
-            icon: "🔫",
+            icon: "🎮",
             desc: "UC Top Up Coming Soon",
             link: "pubg.html"
         },
