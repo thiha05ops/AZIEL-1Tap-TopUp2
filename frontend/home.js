@@ -14,25 +14,25 @@ document.addEventListener("DOMContentLoaded", () => {
     const games = [
         {
             name: "Mobile Legends",
-            icon: "💎",
+            image: "assets/mlbb.jpg",
             desc: "MLBB Diamonds Top Up",
             link: "shop.html"
         },
         {
             name: "PUBG Mobile",
-            icon: "🎮",
+            image: "assets/pubg.jpg",
             desc: "UC Top Up Coming Soon",
             link: "pubg.html"
         },
         {
             name: "Free Fire",
-            icon: "🔥",
+            image: "assets/freefire.jpg",
             desc: "Diamond Top Up Coming Soon",
             link: "freefire.html"
         },
         {
             name: "Honor of Kings",
-            icon: "👑",
+            image: "assets/hok.jpg",
             desc: "Tokens Top Up Coming Soon",
             link: "hok.html"
         }
@@ -48,16 +48,18 @@ document.addEventListener("DOMContentLoaded", () => {
         );
 
         featuredGrid.innerHTML = filtered.map(game => `
-            <a href="${game.link}" class="game-card">
-                <div class="game-icon">${game.icon}</div>
-                <h4>${game.name}</h4>
-                <p>${game.desc}</p>
-                <span>Open</span>
-            </a>
-        `).join("");
+    <a href="${game.link}" class="game-card">
+        <img src="${game.image}" alt="${game.name}" class="game-img">
+        <div class="game-card-body">
+            <h4>${game.name}</h4>
+            <p>${game.desc}</p>
+            <span>Open</span>
+        </div>
+    </a>
+ `).join("");
 
         if (filtered.length === 0) {
-            featuredGrid.innerHTML = `<p class="no-result">No game found.</p>`;
+            featuredGrid.innerHTML = `< p class="no-result" > No game found.</p > `;
         }
     }
 
