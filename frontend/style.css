@@ -1240,7 +1240,7 @@ body::before {
 
 .login-btn {
     text-decoration: none;
-    padding: 50px;
+    padding: 10px 10px;
     border-radius: 12px;
     background: gold;
     color: black;
