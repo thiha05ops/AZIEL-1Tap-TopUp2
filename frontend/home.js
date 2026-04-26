@@ -51,47 +51,42 @@ document.addEventListener("DOMContentLoaded", () => {
     }, 900);
 
     featuredGrid.innerHTML = filtered.map(game => `
-    <a href="${game.link}" class="game-card ultra-game-card ${game.className}">
-        <div class="game-image-wrap">
-            <img src="${game.image}" alt="${game.name}" class="game-img">
-            <span class="game-badge">${game.badge}</span>
-            <div class="game-shine"></div>
-        </div>
+<a href="${game.link}" class="game-card ultra-game-card ${game.className}">
+    <div class="game-image-wrap">
+        <img src="${game.image}" alt="${game.name}" class="game-img">
+        <span class="game-badge">${game.badge}</span>
+        <div class="game-shine"></div>
+    </div>
 
-        <div class="game-card-body">
-            <h4>${game.name}</h4>
-            <p>${game.desc}</p>
-            <span class="open-btn">Open</span>
-        </div>
-    </a>
+    <div class="game-card-body">
+        <h4>${game.name}</h4>
+        <p>${game.desc}</p>
+        <span class="open-btn">Open</span>
+    </div>
+</a>
 `).join("");
 
+    regionSelect.value = savedRegion;
+    regionSelect.addEventListener("change", () => {
+        localStorage.setItem("region", regionSelect.value);
+        renderGames(searchInput.value.trim());
+    });
 
-    if (filtered.length === 0) {
-        featuredGrid.innerHTML = `< p class="no-result" > No game found.</p > `;
+    searchBtn?.addEventListener("click", () => {
+        searchWrap.classList.toggle("show");
+        if (searchWrap.classList.contains("show")) {
+            searchInput.focus();
+        }
+    });
+
+    searchInput?.addEventListener("input", () => {
+        renderGames(searchInput.value.trim());
+    });
+
+    if (token && username) {
+        loginBtn.innerText = username;
+        loginBtn.href = "account.html";
     }
-});
-regionSelect.value = savedRegion;
-regionSelect.addEventListener("change", () => {
-    localStorage.setItem("region", regionSelect.value);
-    renderGames(searchInput.value.trim());
-});
 
-searchBtn?.addEventListener("click", () => {
-    searchWrap.classList.toggle("show");
-    if (searchWrap.classList.contains("show")) {
-        searchInput.focus();
-    }
+    renderGames();
 });
-
-searchInput?.addEventListener("input", () => {
-    renderGames(searchInput.value.trim());
-});
-
-if (token && username) {
-    loginBtn.innerText = username;
-    loginBtn.href = "account.html";
-}
-
-renderGames();
-);
