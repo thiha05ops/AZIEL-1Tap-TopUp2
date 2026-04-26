@@ -1,7 +1,13 @@
 const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema(
+
     {
+        email: { type: String, default: "" },
+        googleId: { type: String, default: "" },
+        authProvider: { type: String, default: "local" },
+        resetToken: { type: String, default: "" },
+        resetTokenExpire: { type: Date },
         username: {
             type: String,
             required: true,

@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Google Login Success</title>
+</head>
+
+<body>
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get("token");
+        const username = params.get("username");
+
+        if (token) {
+            localStorage.setItem("token", token);
+            localStorage.setItem("username", username || "Google User");
+            localStorage.setItem("isLoggedIn", "true");
+            window.location.href = "home.html";
+        } else {
+            window.location.href = "login.html";
+        }
+    </script>
+</body>
+
+</html>

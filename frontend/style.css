@@ -3004,3 +3004,15 @@ body::before {
         font-size: 20px;
     }
 }
+
+.google-login-btn {
+    display: block;
+    text-align: center;
+    margin-top: 14px;
+    padding: 14px;
+    border-radius: 14px;
+    background: white;
+    color: #111;
+    text-decoration: none;
+    font-weight: bold;
+}
