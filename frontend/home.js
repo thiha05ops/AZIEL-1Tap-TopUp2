@@ -50,12 +50,22 @@ document.addEventListener("DOMContentLoaded", () => {
         loader?.classList.add("hide");
     }, 900);
 
-    function renderGames(keyword = "") {
-        const filtered = games.filter(game =>
-            game.name.toLowerCase().includes(keyword.toLowerCase())
-        );
+    featuredGrid.innerHTML = filtered.map(game => `
+    <a href="${game.link}" class="game-card ultra-game-card ${game.className}">
+        <div class="game-image-wrap">
+            <img src="${game.image}" alt="${game.name}" class="game-img">
+            <span class="game-badge">${game.badge}</span>
+            <div class="game-shine"></div>
+        </div>
 
-        featuredGrid.innerHTML = filtered.map(game => `
+        <div class="game-card-body">
+            <h4>${game.name}</h4>
+            <p>${game.desc}</p>
+            <span class="open-btn">Open</span>
+        </div>
+    </a>
+`).join("");
+    featuredGrid.innerHTML = filtered.map(game => `
     <a href="${game.link}" class="game-card">
         <img src="${game.image}" alt="${game.name}" class="game-img">
         <div class="game-card-body">
@@ -66,47 +76,33 @@ document.addEventListener("DOMContentLoaded", () => {
     </a>
  `).join("");
 
-        if (filtered.length === 0) {
-            featuredGrid.innerHTML = `< p class="no-result" > No game found.</p > `;
-        }
+    if (filtered.length === 0) {
+        featuredGrid.innerHTML = `< p class="no-result" > No game found.</p > `;
     }
+}
 
     regionSelect.value = savedRegion;
-    regionSelect.addEventListener("change", () => {
-        localStorage.setItem("region", regionSelect.value);
-        renderGames(searchInput.value.trim());
-    });
+regionSelect.addEventListener("change", () => {
+    localStorage.setItem("region", regionSelect.value);
+    renderGames(searchInput.value.trim());
+});
 
-    searchBtn?.addEventListener("click", () => {
-        searchWrap.classList.toggle("show");
-        if (searchWrap.classList.contains("show")) {
-            searchInput.focus();
-        }
-    });
-
-    searchInput?.addEventListener("input", () => {
-        renderGames(searchInput.value.trim());
-    });
-
-    if (token && username) {
-        loginBtn.innerText = username;
-        loginBtn.href = "account.html";
+searchBtn?.addEventListener("click", () => {
+    searchWrap.classList.toggle("show");
+    if (searchWrap.classList.contains("show")) {
+        searchInput.focus();
     }
+});
 
-    renderGames();
-    featuredGrid.innerHTML = filtered.map(game => `
-<a href="${game.link}" class="game-card ultra-game-card ${game.className}">
-    <div class="game-image-wrap">
-        <img src="${game.image}" alt="${game.name}" class="game-img">
-        <span class="game-badge">${game.badge}</span>
-        <div class="game-shine"></div>
-    </div>
+searchInput?.addEventListener("input", () => {
+    renderGames(searchInput.value.trim());
+});
 
-    <div class="game-card-body">
-        <h4>${game.name}</h4>
-        <p>${game.desc}</p>
-        <span class="open-btn">Open</span>
-    </div>
-</a>
-`).join("");
+if (token && username) {
+    loginBtn.innerText = username;
+    loginBtn.href = "account.html";
+}
+
+renderGames();
+    
 });
