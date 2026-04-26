@@ -2858,3 +2858,149 @@ body::before {
         font-size: 20px;
     }
 }
+
+/* ===== ULTRA PRO GAME CARDS ===== */
+.ultra-game-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 24px;
+    background: linear-gradient(145deg, #10192f, #1b2744);
+    border: 1px solid rgba(255, 215, 0, 0.18);
+    box-shadow: 0 0 18px rgba(255, 215, 0, 0.08);
+}
+
+.ultra-game-card::before {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    background: linear-gradient(120deg, transparent, rgba(255, 215, 0, 0.55), transparent);
+    opacity: 0;
+    transition: 0.35s ease;
+    pointer-events: none;
+}
+
+.ultra-game-card:hover::before {
+    opacity: 1;
+}
+
+.game-image-wrap {
+    position: relative;
+    height: 185px;
+    overflow: hidden;
+}
+
+.game-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: 0.45s ease;
+}
+
+.ultra-game-card:hover .game-img {
+    transform: scale(1.16);
+    filter: brightness(0.85) saturate(1.2);
+}
+
+.game-badge {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    background: gold;
+    color: black;
+    font-weight: 900;
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    box-shadow: 0 0 14px rgba(255, 215, 0, 0.55);
+    z-index: 3;
+}
+
+.game-shine {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(120deg, transparent 20%, rgba(255, 255, 255, 0.35), transparent 80%);
+    transform: translateX(-120%);
+    transition: 0.65s ease;
+}
+
+.ultra-game-card:hover .game-shine {
+    transform: translateX(120%);
+}
+
+.game-card-body {
+    position: relative;
+    z-index: 2;
+    padding: 20px;
+}
+
+.game-card-body h4 {
+    margin: 0 0 10px;
+    font-size: 24px;
+    color: gold;
+}
+
+.game-card-body p {
+    margin: 0 0 18px;
+    color: #d5dbe5;
+    line-height: 1.5;
+}
+
+.open-btn {
+    display: inline-block;
+    background: gold;
+    color: black;
+    padding: 10px 18px;
+    border-radius: 12px;
+    font-weight: 900;
+    transition: 0.3s ease;
+}
+
+.ultra-game-card:hover .open-btn {
+    transform: translateY(-2px);
+    box-shadow: 0 0 18px rgba(255, 215, 0, 0.45);
+}
+
+/* per-game crop */
+.mlbb-card .game-img {
+    object-position: top center;
+}
+
+.pubg-card .game-img {
+    object-position: center;
+}
+
+.ff-card .game-img {
+    object-position: top center;
+}
+
+.hok-card .game-img {
+    object-position: center center;
+}
+
+/* coming soon cards dim */
+.ff-card,
+.hok-card {
+    opacity: 0.92;
+}
+
+.ff-card .open-btn,
+.hok-card .open-btn {
+    background: #5d6b82;
+    color: white;
+}
+
+/* mobile */
+@media (max-width: 768px) {
+    .game-image-wrap {
+        height: 145px;
+    }
+
+    .game-card-body {
+        padding: 16px;
+    }
+
+    .game-card-body h4 {
+        font-size: 20px;
+    }
+}

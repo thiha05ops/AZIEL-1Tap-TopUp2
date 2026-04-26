@@ -16,25 +16,33 @@ document.addEventListener("DOMContentLoaded", () => {
             name: "Mobile Legends",
             image: "assets/mlbb.jpg",
             desc: "MLBB Diamonds Top Up",
-            link: "shop.html"
+            link: "shop.html",
+            className: "mlbb-card",
+            badge: "HOT"
         },
         {
             name: "PUBG Mobile",
             image: "assets/pubg.jpg",
             desc: "UC Top Up Coming Soon",
-            link: "pubg.html"
+            link: "pubg.html",
+            className: "pubg-card",
+            badge: "NEW"
         },
         {
             name: "Free Fire",
             image: "assets/freefire.jpg",
             desc: "Diamond Top Up Coming Soon",
-            link: "freefire.html"
+            link: "freefire.html",
+            className: "ff-card",
+            badge: "SOON"
         },
         {
             name: "Honor of Kings",
             image: "assets/hok.jpg",
             desc: "Tokens Top Up Coming Soon",
-            link: "hok.html"
+            link: "hok.html",
+            className: "hok-card",
+            badge: "SOON"
         }
     ];
 
@@ -86,4 +94,19 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     renderGames();
+    featuredGrid.innerHTML = filtered.map(game => `
+<a href="${game.link}" class="game-card ultra-game-card ${game.className}">
+    <div class="game-image-wrap">
+        <img src="${game.image}" alt="${game.name}" class="game-img">
+        <span class="game-badge">${game.badge}</span>
+        <div class="game-shine"></div>
+    </div>
+
+    <div class="game-card-body">
+        <h4>${game.name}</h4>
+        <p>${game.desc}</p>
+        <span class="open-btn">Open</span>
+    </div>
+</a>
+`).join("");
 });
