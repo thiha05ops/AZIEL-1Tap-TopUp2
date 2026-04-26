@@ -16,33 +16,25 @@ document.addEventListener("DOMContentLoaded", () => {
             name: "Mobile Legends",
             image: "assets/mlbb.jpg",
             desc: "MLBB Diamonds Top Up",
-            link: "shop.html",
-            className: "mlbb-card",
-            badge: "HOT"
+            link: "shop.html"
         },
         {
             name: "PUBG Mobile",
             image: "assets/pubg.jpg",
             desc: "UC Top Up Coming Soon",
-            link: "pubg.html",
-            className: "pubg-card",
-            badge: "NEW"
+            link: "pubg.html"
         },
         {
             name: "Free Fire",
             image: "assets/freefire.jpg",
             desc: "Diamond Top Up Coming Soon",
-            link: "freefire.html",
-            className: "ff-card",
-            badge: "SOON"
+            link: "freefire.html"
         },
         {
             name: "Honor of Kings",
             image: "assets/hok.jpg",
             desc: "Tokens Top Up Coming Soon",
-            link: "hok.html",
-            className: "hok-card",
-            badge: "SOON"
+            link: "hok.html"
         }
     ];
 
@@ -50,21 +42,26 @@ document.addEventListener("DOMContentLoaded", () => {
         loader?.classList.add("hide");
     }, 900);
 
-    featuredGrid.innerHTML = filtered.map(game => `
-<a href="${game.link}" class="game-card ultra-game-card ${game.className}">
-    <div class="game-image-wrap">
-        <img src="${game.image}" alt="${game.name}" class="game-img">
-        <span class="game-badge">${game.badge}</span>
-        <div class="game-shine"></div>
-    </div>
+    function renderGames(keyword = "") {
+        const filtered = games.filter(game =>
+            game.name.toLowerCase().includes(keyword.toLowerCase())
+        );
 
-    <div class="game-card-body">
-        <h4>${game.name}</h4>
-        <p>${game.desc}</p>
-        <span class="open-btn">Open</span>
-    </div>
-</a>
-`).join("");
+        featuredGrid.innerHTML = filtered.map(game => `
+    <a href="${game.link}" class="game-card">
+        <img src="${game.image}" alt="${game.name}" class="game-img">
+        <div class="game-card-body">
+            <h4>${game.name}</h4>
+            <p>${game.desc}</p>
+            <span>Open</span>
+        </div>
+    </a>
+ `).join("");
+
+        if (filtered.length === 0) {
+            featuredGrid.innerHTML = `< p class="no-result" > No game found.</p > `;
+        }
+    }
 
     regionSelect.value = savedRegion;
     regionSelect.addEventListener("change", () => {
