@@ -65,16 +65,7 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
     </a>
 `).join("");
-    featuredGrid.innerHTML = filtered.map(game => `
-    <a href="${game.link}" class="game-card">
-        <img src="${game.image}" alt="${game.name}" class="game-img">
-        <div class="game-card-body">
-            <h4>${game.name}</h4>
-            <p>${game.desc}</p>
-            <span>Open</span>
-        </div>
-    </a>
- `).join("");
+
 
     if (filtered.length === 0) {
         featuredGrid.innerHTML = `< p class="no-result" > No game found.</p > `;
@@ -103,3 +94,4 @@ if (token && username) {
 }
 
 renderGames();
+);
