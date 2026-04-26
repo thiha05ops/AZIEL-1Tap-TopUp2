@@ -79,9 +79,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (filtered.length === 0) {
         featuredGrid.innerHTML = `< p class="no-result" > No game found.</p > `;
     }
-}
-
-    regionSelect.value = savedRegion;
+});
+regionSelect.value = savedRegion;
 regionSelect.addEventListener("change", () => {
     localStorage.setItem("region", regionSelect.value);
     renderGames(searchInput.value.trim());
@@ -104,5 +103,3 @@ if (token && username) {
 }
 
 renderGames();
-    
-});
