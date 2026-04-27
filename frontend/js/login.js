@@ -19,7 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         try {
 
-            fetch("http://localhost:3000/api/auth/login", {
+            const res = await fetch("/api/login", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
