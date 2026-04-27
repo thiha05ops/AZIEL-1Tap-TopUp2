@@ -1,0 +1,30 @@
+/* ===== ADMIN ===== */
+.admin-page{
+  min-height:100vh;
+  background:#08111f;
+}
+
+.admin-wrapper{
+  width:min(1100px,94%);
+  margin:auto;
+  padding:34px 0;
+}
+
+.admin-order-card{
+  margin-top:16px;
+  background:#121c33;
+  border-radius:18px;
+  padding:18px;
+  border:1px solid rgba(255,215,0,.14);
+}
+
+.status-badge{
+  padding:6px 10px;
+  border-radius:999px;
+  font-size:13px;
+  font-weight:800;
+}
+
+.status-badge.Pending{background:#725a00;}
+.status-badge.Done{background:#0b7d3d;}
+.status-badge.Cancelled{background:#912626;}

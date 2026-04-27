@@ -1,0 +1,143 @@
+/* frontend/css/responsive.css */
+
+/* Tablet */
+@media (max-width: 992px) {
+
+  .games {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .topup-box {
+    margin: 25px 18px;
+  }
+
+  .overlay h1 {
+    font-size: 34px;
+  }
+
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+
+  .topbar {
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px;
+    text-align: center;
+  }
+
+  .topbar nav {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  .logo {
+    font-size: 22px;
+  }
+
+  .hero,
+  .shop-hero {
+    padding: 50px 15px;
+  }
+
+  .hero h1,
+  .shop-hero h1 {
+    font-size: 28px;
+  }
+
+  .hero p,
+  .shop-hero p {
+    font-size: 15px;
+  }
+
+  .games {
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    padding: 20px 14px;
+  }
+
+  .card img {
+    height: 130px;
+  }
+
+  .card h3 {
+    font-size: 15px;
+    padding: 12px;
+  }
+
+  .game-banner {
+    height: 220px;
+  }
+
+  .overlay h1 {
+    font-size: 26px;
+  }
+
+  .overlay p {
+    font-size: 14px;
+  }
+
+  .topup-box {
+    margin: 18px 12px;
+    padding: 18px;
+    border-radius: 16px;
+  }
+
+  .topup-box h2 {
+    font-size: 18px;
+  }
+
+  .topup-box input {
+    padding: 12px;
+    font-size: 15px;
+  }
+
+  .packages {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .pack {
+    padding: 14px;
+    font-size: 15px;
+  }
+
+  #buyBtn {
+    padding: 15px;
+    font-size: 16px;
+  }
+
+}
+
+/* Small phone */
+@media (max-width: 480px) {
+
+  .games {
+    grid-template-columns: 1fr;
+  }
+
+  .hero h1,
+  .shop-hero h1 {
+    font-size: 24px;
+  }
+
+  .logo {
+    font-size: 20px;
+  }
+
+  .topbar nav a {
+    font-size: 14px;
+  }
+
+  .card img {
+    height: 170px;
+  }
+
+  .overlay h1 {
+    font-size: 22px;
+  }
+
+}

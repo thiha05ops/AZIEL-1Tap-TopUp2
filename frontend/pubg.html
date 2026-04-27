@@ -1,4 +1,71 @@
-<h1
-    style="color: gold; background:#08111f; height:100vh; margin:0; display:flex; align-items:center; justify-content:center;">
-    Coming Soon
-</h1>
+<!-- frontend/pubg.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>PUBG Mobile Top Up</title>
+
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/game.css">
+    <link rel="stylesheet" href="css/responsive.css">
+
+</head>
+
+<body>
+
+    <header class="topbar">
+        <div class="logo">AZIEL 1Tap TopUp</div>
+
+        <nav>
+            <span id="userBox"></span>
+            <a href="home.html">Home</a>
+            <a href="shop.html">Top Up</a>
+            <a href="login.html">Login</a>
+            <a href="#" id="logoutBtn">Logout</a>
+        </nav>
+    </header>
+
+    <section class="game-banner">
+        <img src="assets/pubg.jpg" alt="PUBG">
+        <div class="overlay">
+            <h1>PUBG Mobile</h1>
+            <p>Instant UC Delivery</p>
+        </div>
+    </section>
+
+    <section class="topup-box">
+
+        <h2>Enter Account Info</h2>
+
+        <input type="text" id="userId" placeholder="Player ID">
+
+        <h2>Select Package</h2>
+
+        <div class="packages">
+
+            <div class="pack">60 UC - 1,800 Ks</div>
+            <div class="pack">325 UC - 8,500 Ks</div>
+            <div class="pack">660 UC - 16,500 Ks</div>
+            <div class="pack">1800 UC - 42,000 Ks</div>
+            <div class="pack">3850 UC - 84,000 Ks</div>
+
+        </div>
+
+        <button id="buyBtn">Buy Now</button>
+
+    </section>
+
+    <footer>
+        © 2026 AZIEL 1Tap Shop
+    </footer>
+
+    <script src="js/pubg.js"></script>
+    <script src="js/auth-check.js"></script>
+    <script src="js/logout.js"></script>
+</body>
+
+</html>

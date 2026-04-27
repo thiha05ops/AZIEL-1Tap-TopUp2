@@ -1,75 +1,43 @@
+<!-- frontend/login.html -->
+
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - AZIEL 1Tap Shop</title>
-    <link rel="stylesheet" href="style.css">
+
+    <title>Login - AZIEL 1Tap</title>
+
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/auth.css">
+
 </head>
 
 <body class="auth-page">
 
-    <header class="topbar">
-        <div class="logo-area">
-            <div class="logo-badge">AZ</div>
-            <div class="logo-text">
-                <h1>AZIEL 1Tap Shop</h1>
-                <span>Login</span>
-            </div>
+    <div class="auth-box">
+
+        <h1>Welcome Back</h1>
+        <p>Login to continue top up</p>
+
+        <div id="msg"></div>
+
+        <input type="text" id="username" placeholder="Username">
+        <input type="password" id="password" placeholder="Password">
+
+        <button id="loginBtn">Login</button>
+
+        <div class="auth-links">
+            Don't have account?
+            <a href="register.html">Register</a>
         </div>
 
-        <nav class="top-actions">
-            <a href="home.html" class="nav-link">Home</a>
-            <a href="help.html" class="nav-link">Help Center</a>
-            <a href="shop.html" class="nav-link">Shop</a>
-        </nav>
-    </header>
+    </div>
 
-    <section class="auth-layout">
-        <div class="auth-left">
-            <p class="hero-badge">WELCOME BACK</p>
-            <h2 class="auth-title">Login to Your<br>AZIEL Account</h2>
-            <p class="auth-desc">
-                Access your account, manage your orders, switch region pricing,
-                and continue your top up with a clean and secure login experience.
-            </p>
+    <script src="js/login.js"></script>
+    <script src="js/logout.js"></script>
 
-            <div class="auth-card">
-                <h3>Sign In</h3>
-
-                <input type="text" id="loginUser" placeholder="Enter Username">
-                <input type="password" id="loginPass" placeholder="Enter Password">
-
-                <button id="loginBtn">Login</button>
-                <a href="/api/auth/google" class="google-login-btn">Continue with Google</a>
-
-                <p class="auth-switch">
-                    <a href="forgot.html">Forgot password?</a>
-                </p>
-
-                <p id="loginError"></p>
-
-                <p class="auth-switch">
-                    Don’t have an account?
-                    <a href="register.html">Register</a>
-                </p>
-            </div>
-        </div>
-
-        <div class="auth-right">
-            <div class="auth-hero-card">
-                <img src="assets/hero.jpg" alt="MLBB Hero" class="auth-hero-image">
-                <div class="auth-hero-overlay">
-                    <span class="overlay-tag">AZIEL 1TAP SHOP</span>
-                    <h3>FAST<br><span>LOGIN</span></h3>
-                    <p>Secure account access for top up and order history.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <script src="login.js"></script>
 </body>
 
 </html>

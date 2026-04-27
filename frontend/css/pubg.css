@@ -1,0 +1,12 @@
+/* ===== PUBG SPECIAL ===== */
+.pubg-theme {
+    background: linear-gradient(180deg, #101820, #182b39, #0d1520);
+}
+
+.pubg-card {
+    border-color: #8ce8ff;
+}
+
+.pubg-glow {
+    box-shadow: 0 0 22px rgba(0, 200, 255, .28);
+}

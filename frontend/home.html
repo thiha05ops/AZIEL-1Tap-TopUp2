@@ -1,135 +1,71 @@
+<!-- frontend/home.html -->
+
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AZIEL 1Tap Shop</title>
-    <link rel="stylesheet" href="style.css">
+
+    <title>AZIEL 1Tap TopUp</title>
+
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/home.css">
+    <link rel="stylesheet" href="css/responsive.css">
+
 </head>
 
-<body class="landing-page">
-    <div id="pageLoader">
+<body>
 
-        <p>Loading AZIEL Shop...</p>
-    </div>
-
-    <!-- TOP NAVBAR -->
     <header class="topbar">
-        <a href="home.html" class="logo-area">
-            <div class="logo-badge">AZ</div>
-            <div class="logo-text">
-                <h1>AZIEL 1Tap Shop</h1>
-                <span>Top Up Center</span>
-            </div>
-        </a>
+        <div class="logo">AZIEL 1Tap TopUp</div>
 
-        <nav class="top-actions">
-            <button class="icon-btn" id="searchBtn" title="Search">🔍</button>
-
-            <select id="regionSelect" class="region-select">
-                <option value="MM">🇲🇲</option>
-                <option value="TH">🇹🇭</option>
-            </select>
-
-            <a href="help.html" class="nav-link">Help Center</a>
-            <div class="noti-wrapper">
-                <button class="notification-btn" id="notiBtn">
-                    🔔 <span id="notiCount">0</span>
-                </button>
-
-                <div class="noti-dropdown" id="notiDropdown">
-                    <h4>Notifications</h4>
-                    <div id="notiList">
-                        <p>No notifications yet.</p>
-                    </div>
-                    <a href="history.html" class="view-history-link">View all orders</a>
-                </div>
-            </div>
-            <a href="login.html" class="login-btn" id="loginBtn">Login</a>
+        <nav>
+            <span id="userBox"></span>
+            <a href="home.html">Home</a>
+            <a href="shop.html">Top Up</a>
+            <a href="login.html">Login</a>
+            <a href="#" id="logoutBtn">Logout</a>
         </nav>
     </header>
 
-    <!-- SEARCH BAR -->
-    <div class="search-bar-wrap" id="searchWrap">
-        <input type="text" id="searchInput" placeholder="Search package or game...">
-    </div>
-
-    <!-- HERO SECTION -->
-    <section class="hero-section">
-        <div class="hero-left">
-            <p class="hero-badge">HELLO, WELCOME TO AZIEL CENTER</p>
-            <h2 class="hero-title">Fast & Trusted<br>Game Top Up</h2>
-            <p class="hero-desc">
-                Buy Mobile Legends diamonds quickly with a clean, easy, and secure experience.
-                Choose your region, view your local pricing, and top up in seconds.
-            </p>
-
-            <div class="hero-buttons">
-                <a href="shop.html" class="primary-btn">MOBILE LEGENDS</a>
-
-                <a href="help.html" class="secondary-btn">How To Buy</a>
-            </div>
-
-            <div class="hero-info">
-                <div class="info-box">
-                    <strong>⚡ Instant</strong>
-                    <span>Fast order process</span>
-
-                    <strong>🌍 Region</strong>
-                    <span>MM / TH price switch</span>
-
-                    <strong>🛡 Safe</strong>
-                    <span>Trusted support team</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="hero-right">
-            <div class="hero-card">
-                <img src="assets/hero.jpg" alt="MLBB Hero" class="hero-main-image">
-                <div class="hero-overlay">
-                    <span class="overlay-tag">MOBILE LEGENDS</span>
-                    <h3>TOP UP<br><span>INSTANT</span></h3>
-                </div>
-            </div>
-        </div>
+    <section class="hero">
+        <h1>Fast & Secure Game Top Up</h1>
+        <p>Buy Diamonds / UC / Tokens instantly</p>
     </section>
 
-    <!-- FEATURED PRODUCTS -->
-    <section class="featured-section">
-        <div class="section-head">
-            <h3>Featured Games</h3>
-            <p id="regionLabel">Choose your game</p>
-        </div>
+    <section class="games">
 
-        <div class="featured-grid" id="featuredGrid">
-            <!-- JS render -->
-        </div>
+        <a href="mlbb.html" class="card">
+            <img src="assets/mlbb.jpg">
+            <h3>Mobile Legends</h3>
+        </a>
+
+        <a href="pubg.html" class="card">
+            <img src="assets/pubg.jpg">
+            <h3>PUBG Mobile</h3>
+        </a>
+
+        <a href="freefire.html" class="card">
+            <img src="assets/freefire.jpg">
+            <h3>Free Fire</h3>
+        </a>
+
+        <a href="hok.html" class="card">
+            <img src="assets/hok.jpg">
+            <h3>Honor Of Kings</h3>
+        </a>
+
     </section>
 
-    <!-- SERVICES -->
-    <section class="service-section">
-        <div class="service-card">
-            <div class="service-icon">💎</div>
-            <h4>Best Pricing</h4>
-            <p>Region-based fixed pricing for clear top up orders.</p>
-        </div>
+    <footer>
+        © 2026 AZIEL 1Tap Shop
+    </footer>
 
-        <div class="service-card">
-            <div class="service-icon">📞</div>
-            <h4>Support</h4>
-            <p>Contact us anytime if you need help with payment or delivery.</p>
-        </div>
+    <script src="js/home.js"></script>
+    <script src="js/auth-check.js"></script>
+    <script src="js/logout.js"></script>
 
-        <div class="service-card">
-            <div class="service-icon">🚀</div>
-            <h4>More Games Later</h4>
-            <p>Help center, profile, and more game support can be added next.</p>
-        </div>
-    </section>
-
-    <script src="home.js"></script>
 </body>
 
 </html>

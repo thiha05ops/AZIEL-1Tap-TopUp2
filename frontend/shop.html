@@ -1,137 +1,71 @@
+<!-- frontend/shop.html -->
+
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shop - AZIEL 1Tap Shop</title>
-    <link rel="stylesheet" href="style.css">
+
+    <title>Game Top Up</title>
+
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/shop.css">
+    <link rel="stylesheet" href="css/responsive.css">
+
 </head>
 
-<body class="shop-page">
+<body>
 
-    <!-- TOPBAR -->
     <header class="topbar">
-        <a href="home.html" class="logo-area">
-            <div class="logo-badge">AZ</div>
-            <div class="logo-text">
-                <h1>AZIEL 1Tap Shop</h1>
-                <span>MLBB Top Up Center</span>
-            </div>
-        </a>
+        <div class="logo">AZIEL 1Tap TopUp</div>
 
-        <nav class="top-actions">
-            <button class="icon-btn" id="searchBtn" title="Search">🔍</button>
-
-            <select id="regionSelect" class="region-select">
-                <option value="MM">🇲🇲</option>
-                <option value="TH">🇹🇭</option>
-            </select>
-
-
-            <a href="help.html" class="nav-link">Help Center</a>
-            <a href="history.html" class="nav-link">🛒</a>
-            <div class="noti-wrapper">
-                <button class="notification-btn" id="notiBtn">
-                    🔔 <span id="notiCount">0</span>
-                </button>
-
-                <div class="noti-dropdown" id="notiDropdown">
-                    <h4>Notifications</h4>
-                    <div id="notiList">
-                        <p>No notifications yet.</p>
-                    </div>
-                    <a href="history.html" class="view-history-link">View all orders</a>
-                </div>
-            </div>
-            <a href="account.html" class="login-btn" id="accountBtn">Me</a>
+        <nav>
+            <span id="userBox"></span>
+            <a href="home.html">Home</a>
+            <a href="shop.html">Top Up</a>
+            <a href="login.html">Login</a>
+            <a href="#" id="logoutBtn">Logout</a>
         </nav>
     </header>
 
-    <!-- SEARCH -->
-    <div class="search-bar-wrap" id="searchWrap">
-        <input type="text" id="searchInput" placeholder="Search package...">
-    </div>
-
-    <!-- PAGE HEADER -->
-    <section class="shop-header">
-        <div>
-            <p class="hero-badge">MOBILE LEGENDS • INSTANT TOP UP</p>
-            <h2 class="shop-main-title">Choose Your Package</h2>
-            <p class="shop-subtitle" id="regionLabel">Showing prices for 🇲🇲</p>
-        </div>
+    <section class="shop-hero">
+        <h1>Select Your Game</h1>
+        <p>Fast, Safe & Instant Delivery</p>
     </section>
 
-    <!-- MAIN -->
-    <section class="shop-modern-layout" id="mainContent">
+    <section class="games">
 
-        <!-- LEFT -->
-        <div class="shop-modern-left">
-            <div class="package-grid" id="packageGrid">
-                <!-- JS render -->
-            </div>
+        <a href="mlbb.html" class="card">
+            <img src="assets/mlbb.jpg">
+            <h3>Mobile Legends</h3>
+        </a>
 
-            <div class="buy-panel">
-                <div class="buy-panel-head">
-                    <h3>Complete Your Order</h3>
-                    <p id="selectedText">ဝယ်ယူလိုသော ပစ္စည်းကိုရွေးပါ</p>
-                </div>
+        <a href="pubg.html" class="card">
+            <img src="assets/pubg.jpg">
+            <h3>PUBG Mobile</h3>
+        </a>
 
-                <div class="user-input modern-inputs">
-                    <input type="text" id="userId" placeholder="Enter User ID">
-                    <input type="text" id="serverId" placeholder="Enter Server Code">
-                </div>
+        <a href="freefire.html" class="card">
+            <img src="assets/freefire.jpg">
+            <h3>Free Fire</h3>
+        </a>
 
-                <div class="payment-section modern-payment">
-                    <h3>Payment Method</h3>
-
-                    <select id="paymentMethod">
-                        <option value="">Select Payment</option>
-                        <option value="WavePay">WavePay</option>
-                        <option value="SCB">SCB</option>
-                    </select>
-
-                    <p id="paymentInfo"></p>
-
-                    <label class="upload-label">Upload Payment Screenshot</label>
-                    <input type="file" id="paymentScreenshot" accept="image/*">
-                </div>
-
-                <button id="buyBtn">🛒 Buy Now</button>
-                <p id="errorMsg"></p>
-            </div>
-        </div>
-
-        <!-- RIGHT -->
-        <div class="shop-modern-right">
-            <div class="promo-modern-card">
-                <img src="assets/hero.jpg" alt="MLBB Hero" class="shop-hero-image">
-
-                <div class="promo-modern-overlay">
-                    <span class="overlay-tag">MOBILE LEGENDS</span>
-                    <h3>TOP UP<br><span>INSTANT</span></h3>
-                    <p class="promo-modern-sub">FAST • SAFE • BEST PRICE</p>
-
-                    <div class="promo-modern-features">
-                        <div class="feature-modern-item">⚡ Instant Order</div>
-                        <div class="feature-modern-item">💎 Region Pricing</div>
-                        <div class="feature-modern-item">📱 Easy Payment</div>
-                        <div class="feature-modern-item">🛡 Trusted Support</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="support-mini-card">
-                <h4>Payment Numbers</h4>
-                <p><strong>WavePay:</strong> 09403630868</p>
-                <p><strong>SCB:</strong> 4321919025</p>
-                <p><strong>KBZPay:</strong> Coming Soon</p>
-            </div>
-        </div>
+        <a href="hok.html" class="card">
+            <img src="assets/hok.jpg">
+            <h3>Honor Of Kings</h3>
+        </a>
 
     </section>
 
-    <script src="script.js"></script>
+    <footer>
+        © 2026 AZIEL 1Tap Shop
+    </footer>
+
+    <script src="js/shop.js"></script>
+    <script src="js/auth-check.js"></script>
+    <script src="js/logout.js"></script>
+
 </body>
 
 </html>

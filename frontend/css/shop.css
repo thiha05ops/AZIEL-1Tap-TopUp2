@@ -1,0 +1,133 @@
+/* frontend/css/shop.css */
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  background: #f6f7fb;
+}
+
+/* topbar */
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 30px;
+  background: linear-gradient(90deg, #5b21b6, #7c3aed);
+  color: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 999;
+}
+
+.logo {
+  font-size: 24px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.topbar nav {
+  display: flex;
+  gap: 20px;
+}
+
+.topbar nav a {
+  color: #fff;
+  text-decoration: none;
+  transition: .3s;
+}
+
+.topbar nav a:hover {
+  color: #ffd700;
+}
+
+/* hero */
+.shop-hero {
+  text-align: center;
+  padding: 60px 20px;
+  background: linear-gradient(135deg, #6d28d9, #9333ea);
+  color: #fff;
+}
+
+.shop-hero h1 {
+  margin: 0;
+  font-size: 40px;
+}
+
+.shop-hero p {
+  margin-top: 10px;
+  font-size: 17px;
+  opacity: .95;
+}
+
+/* games */
+.games {
+  max-width: 1200px;
+  margin: auto;
+  padding: 35px 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 22px;
+}
+
+.card {
+  background: #fff;
+  border-radius: 16px;
+  overflow: hidden;
+  text-decoration: none;
+  color: #111;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .08);
+  transition: .25s ease;
+}
+
+.card:hover {
+  transform: translateY(-6px);
+}
+
+.card img {
+  width: 100%;
+  height: 170px;
+  object-fit: cover;
+}
+
+.card h3 {
+  margin: 0;
+  padding: 16px;
+  text-align: center;
+  font-size: 18px;
+}
+
+/* footer */
+footer {
+  text-align: center;
+  padding: 28px;
+  color: #666;
+  font-size: 14px;
+}
+
+/* mobile */
+@media(max-width:768px) {
+
+  .topbar {
+    flex-direction: column;
+    gap: 10px;
+    padding: 15px;
+  }
+
+  .topbar nav {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .shop-hero h1 {
+    font-size: 28px;
+  }
+
+  .shop-hero p {
+    font-size: 15px;
+  }
+
+  .card img {
+    height: 150px;
+  }
+}
