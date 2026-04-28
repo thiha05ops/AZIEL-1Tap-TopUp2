@@ -28,59 +28,39 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // input check
-    userId.addEventListener("input", checkForm);
-    serverId.addEventListener("input", checkForm);
-
-    function checkForm() {
-
-        if (
-            userId.value.trim() !== "" &&
-            serverId.value.trim() !== "" &&
-            selectedPack !== ""
-        ) {
-            buyBtn.disabled = false;
-            buyBtn.style.opacity = "1";
-        } else {
-            buyBtn.disabled = true;
-            buyBtn.style.opacity = ".6";
-        }
-
-    }
-
-    // start disabled
-    checkForm();
-
-    // buy now
     buyBtn.addEventListener("click", async () => {
         const username = localStorage.getItem("username") || "guest";
+        const region = localStorage.getItem("region") || "MM";
+        const paymentMethod = document.getElementById("paymentMethod").value;
 
-        try {
-            const res = await fetch("/api/order", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    game: "Mobile Legends",
-                    userId: userId.value.trim(),
-                    zoneId: serverId.value.trim(),
-                    packageName: selectedPack,
-                    username: username
-                })
-            });
-
-            const data = await res.json();
-
-            if (data.success) {
-                alert("Order sent successfully ✅");
-            } else {
-                alert(data.message || "Order failed");
-            }
-
-        } catch (error) {
-            alert("Server error. Please try again.");
-            console.log(error);
+        if (!paymentMethod) {
+            alert("Please select payment method");
+            return;
         }
+
+        const activePack = document.querySelector(".pack.active");
+
+        if (!activePack) {
+            alert("Please select package");
+            return;
+        }
+
+        const amount = activePack.dataset.price;
+
+        const orderId = "AZL-" + Date.now();
+
+        createPaymentAndRedirect({
+            orderId,
+            game: "Mobile Legends",
+            packageName: selectedPack,
+            amount,
+            currency: region === "TH" ? "THB" : "MMK",
+            region,
+            paymentMethod,
+            username,
+            userId: userId.value.trim(),
+            zoneId: serverId.value.trim()
+        });
     });
 
     // logo top
