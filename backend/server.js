@@ -1,5 +1,6 @@
 const path = require("path");
 const dotenv = require("dotenv");
+const paymentRoutes = require("./routes/payment");
 
 dotenv.config({ path: path.join(__dirname, "../.env") });
 
@@ -43,9 +44,11 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 // Routes
 app.use("/api", authRoutes);
 app.use("/api", orderRoutes);
+app.use("/api", paymentRoutes);
 app.use("/api", profileRoutes);
 app.use("/api", socialAuthRoutes);
 app.use("/api", passwordRoutes);
+
 
 // Home page
 app.get("/", (req, res) => {

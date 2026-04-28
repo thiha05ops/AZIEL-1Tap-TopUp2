@@ -40,6 +40,21 @@
     <section class="topup-box">
 
         <h2>Enter Account Info</h2>
+        <h2>Select Region</h2>
+
+        <select id="regionSelect">
+            <option value="MM">Myanmar - MMK</option>
+            <option value="TH">Thailand - THB</option>
+            <option value="GLOBAL">Global - USD</option>
+        </select>
+
+        <h2>Select Payment</h2>
+
+        <select id="paymentMethod">
+            <option value="">Select Payment Method</option>
+        </select>
+
+        <p>Currency: <b id="currencyText">MMK</b></p>
 
         <input type="text" id="userId" placeholder="Player UID">
 
@@ -66,6 +81,7 @@
     <script src="js/freefire.js"></script>
     <script src="js/auth-check.js"></script>
     <script src="js/logout.js"></script>
+    <script src="js/region-payment.js"></script>
 
 </body>
 
