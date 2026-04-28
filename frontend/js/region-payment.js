@@ -1,10 +1,7 @@
-// frontend/js/region-payment.js
-
 const paymentMethodsByRegion = {
     MM: [
         { id: "kbzpay", name: "KBZPay" },
-        { id: "wavepay", name: "WavePay" },
-        { id: "ayapay", name: "AYA Pay" }
+        { id: "wavepay", name: "WavePay" }
     ],
     TH: [
         { id: "promptpay", name: "PromptPay" },
@@ -23,32 +20,78 @@ const currencyByRegion = {
     GLOBAL: "USD"
 };
 
+// frontend/js/region-payment.js
+
 document.addEventListener("DOMContentLoaded", () => {
-    const regionSelect = document.getElementById("regionSelect");
+
+    const region = localStorage.getItem("region") || "MM";
+
+    const box = document.getElementById("packages");
     const paymentMethod = document.getElementById("paymentMethod");
     const currencyText = document.getElementById("currencyText");
 
-    if (!regionSelect || !paymentMethod) return;
+    const paymentByRegion = {
+        MM: [
+            { id: "kbzpay", name: "KBZPay" },
+            { id: "wavepay", name: "WavePay" },
+            { id: "ayapay", name: "AYA Pay" }
+        ],
 
-    function updatePaymentMethods() {
-        const region = regionSelect.value;
-        const methods = paymentMethodsByRegion[region] || [];
+        TH: [
+            { id: "promptpay", name: "PromptPay" },
+            { id: "truemoney", name: "TrueMoney Wallet" },
+            { id: "thaibank", name: "Thai Bank Transfer" }
+        ]
+    };
 
-        paymentMethod.innerHTML = `<option value="">Select Payment Method</option>`;
-
-        methods.forEach(method => {
-            const option = document.createElement("option");
-            option.value = method.id;
-            option.textContent = method.name;
-            paymentMethod.appendChild(option);
-        });
-
-        if (currencyText) {
-            currencyText.textContent = currencyByRegion[region];
-        }
+    /* Currency text */
+    if (currencyText) {
+        currencyText.innerText = region === "TH" ? "THB" : "MMK";
     }
 
-    regionSelect.addEventListener("change", updatePaymentMethods);
+    /* Payment Methods */
+    if (paymentMethod) {
 
-    updatePaymentMethods();
+        paymentMethod.innerHTML =
+            `<option value="">Select Payment Method</option>`;
+
+        paymentByRegion[region].forEach(pay => {
+
+            paymentMethod.innerHTML += `
+                <option value="${pay.id}">
+                    ${pay.name}
+                </option>
+            `;
+        });
+    }
+
+    /* Package Prices */
+    if (box) {
+
+        const game = box.dataset.game;
+        const items = GAME_PRICES[game] || [];
+
+        box.innerHTML = "";
+
+        items.forEach(item => {
+
+            let priceText = "";
+
+            if (region === "TH") {
+                priceText = `${item.thb} ฿`;
+            } else {
+                priceText = `${item.mmk.toLocaleString()} Ks`;
+            }
+
+            box.innerHTML += `
+                <div class="pack"
+                     data-name="${item.name}"
+                     data-price="${region === "TH" ? item.thb : item.mmk}">
+                    ${item.name} - ${priceText}
+                </div>
+            `;
+        });
+
+    }
+
 });

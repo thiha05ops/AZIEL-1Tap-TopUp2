@@ -66,3 +66,14 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
 });
+const homeRegionSelect = document.getElementById("homeRegionSelect");
+
+if (homeRegionSelect) {
+    const savedRegion = localStorage.getItem("region") || "MM";
+    homeRegionSelect.value = savedRegion;
+
+    homeRegionSelect.addEventListener("change", () => {
+        localStorage.setItem("region", homeRegionSelect.value);
+        alert("Region saved ✅");
+    });
+}

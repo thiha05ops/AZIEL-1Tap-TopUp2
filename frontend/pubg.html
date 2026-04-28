@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="css/game.css">
     <link rel="stylesheet" href="css/responsive.css">
 
+
 </head>
 
 <body>
@@ -40,6 +41,21 @@
     <section class="topup-box">
 
         <h2>Enter Account Info</h2>
+        <h2>Your Region</h2>
+
+        <select id="regionSelect" disabled>
+            <option value="MM">Myanmar - MMK</option>
+            <option value="TH">Thailand - THB</option>
+            <option value="GLOBAL">Global - USD</option>
+        </select>
+
+        <h2>Select Payment</h2>
+
+        <select id="paymentMethod">
+            <option value="">Select Payment Method</option>
+        </select>
+
+        <p>Currency: <b id="currencyText">MMK</b></p>
         <h2>Select Region</h2>
 
         <select id="regionSelect">
@@ -60,15 +76,7 @@
 
         <h2>Select Package</h2>
 
-        <div class="packages">
-
-            <div class="pack">60 UC - 1,800 Ks</div>
-            <div class="pack">325 UC - 8,500 Ks</div>
-            <div class="pack">660 UC - 16,500 Ks</div>
-            <div class="pack">1800 UC - 42,000 Ks</div>
-            <div class="pack">3850 UC - 84,000 Ks</div>
-
-        </div>
+        <div class="packages" id="packages" data-game="pubg"></div>
 
         <button id="buyBtn">Buy Now</button>
 
@@ -81,7 +89,9 @@
     <script src="js/pubg.js"></script>
     <script src="js/auth-check.js"></script>
     <script src="js/logout.js"></script>
+    <script src="js/prices.js"></script>
     <script src="js/region-payment.js"></script>
+    <script src="js/pubg.js"></script>
 </body>
 
 </html>

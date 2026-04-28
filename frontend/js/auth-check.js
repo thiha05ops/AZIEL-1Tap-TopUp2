@@ -6,7 +6,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // pages that need login
     const protectedPages = [
-        "home.html",
         "shop.html",
         "mlbb.html",
         "pubg.html",

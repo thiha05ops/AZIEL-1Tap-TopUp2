@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="css/main.css">
     <link rel="stylesheet" href="css/game.css">
     <link rel="stylesheet" href="css/responsive.css">
+    <div class="packages" id="packages" data-game="mlbb"></div>
 
 </head>
 
@@ -40,6 +41,21 @@
     <section class="topup-box">
 
         <h2>Enter Account Info</h2>
+        <h2>Your Region</h2>
+
+        <select id="regionSelect" disabled>
+            <option value="MM">Myanmar - MMK</option>
+            <option value="TH">Thailand - THB</option>
+            <option value="GLOBAL">Global - USD</option>
+        </select>
+
+        <h2>Select Payment</h2>
+
+        <select id="paymentMethod">
+            <option value="">Select Payment Method</option>
+        </select>
+
+        <p>Currency: <b id="currencyText">MMK</b></p>
         <h2>Select Region</h2>
 
         <select id="regionSelect">
@@ -61,15 +77,7 @@
 
         <h2>Select Package</h2>
 
-        <div class="packages">
-
-            <div class="pack">56 Diamonds - 1,500 Ks</div>
-            <div class="pack">112 Diamonds - 3,000 Ks</div>
-            <div class="pack">223 Diamonds - 6,000 Ks</div>
-            <div class="pack">570 Diamonds - 15,000 Ks</div>
-            <div class="pack">1160 Diamonds - 30,000 Ks</div>
-
-        </div>
+        <div class="packages" id="packages" data-game="mlbb"></div>
 
         <button id="buyBtn">Buy Now</button>
 
@@ -82,7 +90,9 @@
     <script src="js/mlbb.js"></script>
     <script src="js/auth-check.js"></script>
     <script src="js/logout.js"></script>
+    <script src="js/prices.js"></script>
     <script src="js/region-payment.js"></script>
+    <script src="js/mlbb.js"></script>
 
 </body>
 

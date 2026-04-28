@@ -40,6 +40,21 @@
     <section class="topup-box">
 
         <h2>Enter Account Info</h2>
+        <h2>Your Region</h2>
+
+        <select id="regionSelect" disabled>
+            <option value="MM">Myanmar - MMK</option>
+            <option value="TH">Thailand - THB</option>
+            <option value="GLOBAL">Global - USD</option>
+        </select>
+
+        <h2>Select Payment</h2>
+
+        <select id="paymentMethod">
+            <option value="">Select Payment Method</option>
+        </select>
+
+        <p>Currency: <b id="currencyText">MMK</b></p>
         <h2>Select Region</h2>
 
         <select id="regionSelect">
@@ -60,15 +75,7 @@
 
         <h2>Select Package</h2>
 
-        <div class="packages">
-
-            <div class="pack">80 Tokens - 1,500 Ks</div>
-            <div class="pack">240 Tokens - 4,000 Ks</div>
-            <div class="pack">400 Tokens - 6,500 Ks</div>
-            <div class="pack">800 Tokens - 12,500 Ks</div>
-            <div class="pack">1600 Tokens - 24,000 Ks</div>
-
-        </div>
+        <div class="packages" id="packages" data-game="hok"></div>
 
         <button id="buyBtn">Buy Now</button>
 
@@ -81,7 +88,9 @@
     <script src="js/hok.js"></script>
     <script src="js/auth-check.js"></script>
     <script src="js/logout.js"></script>
+    <script src="js/prices.js"></script>
     <script src="js/region-payment.js"></script>
+    <script src="js/hok.js"></script>
 
 </body>
 
