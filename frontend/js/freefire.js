@@ -4,32 +4,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
     console.log("Free Fire Page Loaded ✅");
 
-    const packs = document.querySelectorAll(".pack");
     const buyBtn = document.getElementById("buyBtn");
     const userId = document.getElementById("userId");
 
     let selectedPack = "";
 
-    // package select
-    packs.forEach(pack => {
-
-        pack.addEventListener("click", () => {
-
-            packs.forEach(p => p.classList.remove("active"));
-            pack.classList.add("active");
-
-            selectedPack = pack.innerText;
-
-            checkForm();
-        });
-
-    });
-
-    // input check
-    userId.addEventListener("input", checkForm);
+    function getPacks() {
+        return document.querySelectorAll(".pack");
+    }
 
     function checkForm() {
-
         if (
             userId.value.trim() !== "" &&
             selectedPack !== ""
@@ -40,35 +24,63 @@ document.addEventListener("DOMContentLoaded", () => {
             buyBtn.disabled = true;
             buyBtn.style.opacity = ".6";
         }
-
     }
 
-    // start disabled
-    checkForm();
+    function setupPackageClick() {
+        const packs = getPacks();
 
-    // buy
-    buyBtn.addEventListener("click", () => {
+        packs.forEach(pack => {
+            pack.addEventListener("click", () => {
 
-        alert(
-            `Order Confirmed ✅
+                packs.forEach(p => p.classList.remove("active"));
+                pack.classList.add("active");
 
-Game: Free Fire
-Player UID: ${userId.value}
-Package: ${selectedPack}`
-        );
+                selectedPack = pack.innerText.trim();
 
-    });
-
-    // logo scroll top
-    const logo = document.querySelector(".logo");
-
-    if (logo) {
-        logo.addEventListener("click", () => {
-            window.scrollTo({
-                top: 0,
-                behavior: "smooth"
+                checkForm();
             });
         });
     }
+
+    userId.addEventListener("input", checkForm);
+
+    setupPackageClick();
+    checkForm();
+
+    buyBtn.addEventListener("click", async () => {
+
+        const username = localStorage.getItem("username") || "guest";
+        const region = localStorage.getItem("region") || "MM";
+        const paymentMethod = document.getElementById("paymentMethod")?.value;
+
+        if (!paymentMethod) {
+            alert("Please select payment method");
+            return;
+        }
+
+        const activePack = document.querySelector(".pack.active");
+
+        if (!activePack) {
+            alert("Please select package");
+            return;
+        }
+
+        const amount = activePack.dataset.price;
+        const orderId = "AZL-" + Date.now();
+
+        createPaymentAndRedirect({
+            orderId,
+            game: "Free Fire",
+            packageName: selectedPack,
+            amount,
+            currency: region === "TH" ? "THB" : "MMK",
+            region,
+            paymentMethod,
+            username,
+            userId: userId.value.trim(),
+            zoneId: ""
+        });
+
+    });
 
 });
