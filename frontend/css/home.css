@@ -86,8 +86,9 @@ body {
 
 .logo {
   font-size: 24px;
-  font-weight: 800;
+  font-weight: 900;
   color: #ffd700;
+  text-shadow: 0 0 10px #ffd700;
 }
 
 .topbar nav {
@@ -372,4 +373,93 @@ footer {
   #welcomeSplash h2 {
     font-size: 34px;
   }
+}
+
+#siteLoader {
+  position: fixed;
+  inset: 0;
+  background: #050510;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 99999;
+  animation: hideLoader 2.2s forwards;
+}
+
+.loader-logo {
+  font-size: 42px;
+  font-weight: 900;
+  color: #ffd700;
+  letter-spacing: 4px;
+  animation: glowPulse 1.5s infinite;
+}
+
+@keyframes glowPulse {
+  0% {
+    text-shadow: 0 0 5px #ffd700;
+  }
+
+  50% {
+    text-shadow: 0 0 25px #ffd700;
+  }
+
+  100% {
+    text-shadow: 0 0 5px #ffd700;
+  }
+}
+
+@keyframes hideLoader {
+
+  0%,
+  80% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+.cta-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.cta-btn::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, .4), transparent);
+  transition: .5s;
+}
+
+.cta-btn:hover::after {
+  left: 100%;
+}
+
+.trust {
+  padding: 50px 7%;
+  text-align: center;
+}
+
+.trust h2 {
+  color: #ffd700;
+  margin-bottom: 25px;
+}
+
+.trust-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 15px;
+}
+
+.trust-grid div {
+  background: rgba(255, 255, 255, .07);
+  padding: 18px;
+  border-radius: 14px;
+  font-weight: 700;
 }

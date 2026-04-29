@@ -39,6 +39,7 @@ app.use(passport.session());
 
 // Static files
 app.use(express.static(path.join(__dirname, "../frontend")));
+app.use("/uploads", express.static("backend/uploads"));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Routes
