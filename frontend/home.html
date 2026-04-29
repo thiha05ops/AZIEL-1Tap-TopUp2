@@ -35,7 +35,9 @@
                 <a href="login.html">Login</a>
             </nav>
         </header>
-
+        <video class="hero-video" autoplay muted loop playsinline>
+            <source src="assets/hero-video.mp4" type="video/mp4">
+        </video>
         <section class="hero">
 
             <div class="hero-left">
@@ -66,17 +68,41 @@
 
             <div class="game-grid">
 
-                <a href="mlbb.html" class="game-card">MLBB</a>
-                <a href="pubg.html" class="game-card">PUBG</a>
-                <a href="freefire.html" class="game-card">Free Fire</a>
-                <a href="hok.html" class="game-card">HOK</a>
+                <a href="mlbb.html" class="game-card" style="background-image:url('assets/mlbb.jpg')">
+                    <div class="game-overlay">
+                        <h3>Mobile Legends</h3>
+                        <span>Top Up Diamonds</span>
+                    </div>
+                </a>
+
+                <a href="pubg.html" class="game-card" style="background-image:url('assets/pubg.jpg')">
+                    <div class="game-overlay">
+                        <h3>PUBG Mobile</h3>
+                        <span>Buy UC</span>
+                    </div>
+                </a>
+
+                <a href="freefire.html" class="game-card" style="background-image:url('assets/freefire.jpg')">
+                    <div class="game-overlay">
+                        <h3>Free Fire</h3>
+                        <span>Top Up Diamonds</span>
+                    </div>
+                </a>
+
+                <a href="hok.html" class="game-card" style="background-image:url('assets/hok.jpg')">
+                    <div class="game-overlay">
+                        <h3>Honor Of Kings</h3>
+                        <span>Buy Tokens</span>
+                    </div>
+                </a>
 
             </div>
 
         </section>
 
         <section class="promo-banner">
-            🔥 FLASH SALE TODAY - BEST PRICE GUARANTEE 🔥
+            <span>🔥 FLASH SALE ENDS IN</span>
+            <strong id="saleTimer">02:59:59</strong>
         </section>
 
         <section class="why-us">
@@ -93,7 +119,26 @@
         </section>
 
         <footer>
-            © 2026 AZIEL 1Tap Shop
+
+            <div class="footer-grid">
+
+                <div>
+                    <h3>AZIEL 1Tap Shop</h3>
+                    <p>Fast & Secure Game Top Up Service</p>
+                </div>
+
+                <div>
+                    <h4>Quick Links</h4>
+                    <a href="contact.html">Contact</a>
+                    <a href="terms.html">Terms</a>
+                    <a href="privacy.html">Privacy</a>
+                    <a href="refund.html">Refund</a>
+                </div>
+
+            </div>
+
+            <p class="copy">© 2026 AZIEL 1Tap Shop</p>
+
         </footer>
 
     </div>

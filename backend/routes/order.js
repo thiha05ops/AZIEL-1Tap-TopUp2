@@ -118,5 +118,32 @@ router.put("/admin/orders/:id/status", async (req, res) => {
         res.json({ success: false, message: "Server error" });
     }
 });
+// GET /api/order/track/:orderId
+router.get("/order/track/:orderId", async (req, res) => {
+    try {
+        const { orderId } = req.params;
+
+        const order = await Order.findOne({ orderId });
+
+        if (!order) {
+            return res.json({
+                success: false,
+                message: "Order not found"
+            });
+        }
+
+        res.json({
+            success: true,
+            order
+        });
+
+    } catch (error) {
+        console.log("Track order error:", error);
+        res.json({
+            success: false,
+            message: "Server error"
+        });
+    }
+});
 
 module.exports = router;
