@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment - AZIEL 1Tap Shop</title>
+
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/page.css">
+</head>
+
+<body>
+
+    <div class="page-wrap">
+
+        <a href="home.html" class="back-btn">← Back Home</a>
+
+        <div class="info-card payment-card">
+
+            <h1>Complete Payment</h1>
+            <p>Please pay the exact amount and upload your payment screenshot.</p>
+
+            <div class="pay-info">
+                <p><b>Order ID:</b> <span id="orderIdText"></span></p>
+                <p><b>Game:</b> <span id="gameText"></span></p>
+                <p><b>Package:</b> <span id="packageText"></span></p>
+                <p><b>Amount:</b> <span id="amountText"></span></p>
+            </div>
+
+            <div class="qr-box">
+                <img id="qrImage" src="assets/payments/wavepay.png" alt="Payment QR">
+                <p id="paymentName">WavePay</p>
+            </div>
+
+            <input type="file" id="paymentSlip" accept="image/*">
+
+            <button id="submitPaymentBtn">Submit Payment</button>
+
+            <div id="paymentMsg"></div>
+
+        </div>
+
+    </div>
+
+    <script src="js/payment-page.js"></script>
+
+</body>
+
+</html>

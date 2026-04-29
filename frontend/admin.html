@@ -4,28 +4,48 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Orders</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Admin Panel</title>
+
+    <link rel="stylesheet" href="css/page.css">
 </head>
 
-<body class="admin-page">
+<body>
 
-    <div class="admin-wrapper">
-        <h1>👑 AZIEL Admin Orders</h1>
+    <div class="page-wrap">
 
-        <div class="admin-login-box" id="adminLoginBox">
-            <input type="password" id="adminPassword" placeholder="Enter admin password">
-            <button id="adminLoginBtn">Login Admin</button>
-            <p id="adminMsg"></p>
+        <h1>Admin Panel</h1>
+        <img src="/uploads/xxx.png">
+
+        <input type="password" id="adminPassword" placeholder="Enter admin password">
+        <button id="loginBtn">Login</button>
+
+        <div id="adminContent" style="display:none;">
+
+            <h2>Orders</h2>
+
+            <div class="table-wrap">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Order</th>
+                            <th>Game</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                            <th>Slip</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+
+                    <tbody id="ordersList"></tbody>
+                </table>
+            </div>
+
         </div>
 
-        <div id="adminPanel" style="display:none;">
-            <button id="refreshOrdersBtn">🔄 Refresh Orders</button>
-            <div id="adminOrdersList"></div>
-        </div>
     </div>
 
-    <script src="admin.js"></script>
+    <script src="js/admin.js"></script>
+
 </body>
 
 </html>
