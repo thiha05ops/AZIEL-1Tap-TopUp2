@@ -95,3 +95,24 @@ function showToast(text) {
         toast.style.transform = "translateY(20px)";
     }, 2600);
 }
+/* Flash Sale Countdown */
+let totalSeconds = 3 * 60 * 60 - 1; // 3 hours
+
+setInterval(() => {
+
+    const timer = document.getElementById("saleTimer");
+    if (!timer) return;
+
+    const h = String(Math.floor(totalSeconds / 3600)).padStart(2, "0");
+    const m = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0");
+    const s = String(totalSeconds % 60).padStart(2, "0");
+
+    timer.innerText = `${h}:${m}:${s}`;
+
+    if (totalSeconds > 0) {
+        totalSeconds--;
+    } else {
+        totalSeconds = 3 * 60 * 60 - 1;
+    }
+
+}, 1000);
