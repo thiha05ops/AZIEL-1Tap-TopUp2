@@ -1,97 +1,98 @@
-const paymentMethodsByRegion = {
-    MM: [
-        { id: "kbzpay", name: "KBZPay" },
-        { id: "wavepay", name: "WavePay" }
-    ],
-    TH: [
-        { id: "promptpay", name: "PromptPay" },
-        { id: "truemoney", name: "TrueMoney Wallet" },
-        { id: "thaibank", name: "Thai Bank Transfer" }
-    ],
-    GLOBAL: [
-        { id: "visa", name: "Visa / Mastercard" },
-        { id: "paypal", name: "PayPal" }
-    ]
-};
-
-const currencyByRegion = {
-    MM: "MMK",
-    TH: "THB",
-    GLOBAL: "USD"
-};
-
 // frontend/js/region-payment.js
 
 document.addEventListener("DOMContentLoaded", () => {
 
     const region = localStorage.getItem("region") || "MM";
 
-    const box = document.getElementById("packages");
-    const paymentMethod = document.getElementById("paymentMethod");
+    const regionSelect = document.getElementById("regionSelect");
     const currencyText = document.getElementById("currencyText");
+    const packagesBox = document.getElementById("packages");
+    const paymentGrid = document.getElementById("paymentGrid");
+    const paymentMethod = document.getElementById("paymentMethod");
 
-    const paymentByRegion = {
-        MM: [
-            { id: "kbzpay", name: "KBZPay" },
-            { id: "wavepay", name: "WavePay" },
-            { id: "ayapay", name: "AYA Pay" }
-        ],
-
-        TH: [
-            { id: "promptpay", name: "PromptPay" },
-            { id: "truemoney", name: "TrueMoney Wallet" },
-            { id: "thaibank", name: "Thai Bank Transfer" }
-        ]
+    const regionData = {
+        MM: {
+            currency: "MMK",
+            priceKey: "mmk",
+            payments: [
+                { id: "kbzpay", name: "KBZPay", logo: "assets/payments/kbzpay.png" },
+                { id: "wavepay", name: "WavePay", logo: "assets/payments/wavepay.png" },
+                { id: "ayapay", name: "AYA Pay", logo: "assets/payments/ayapay.png" }
+            ]
+        },
+        TH: {
+            currency: "THB",
+            priceKey: "thb",
+            payments: [
+                { id: "promptpay", name: "PromptPay", logo: "assets/payments/promptpay.png" },
+                { id: "scb", name: "SCB", logo: "assets/payments/scb.png" }
+            ]
+        }
     };
 
-    /* Currency text */
+    const config = regionData[region] || regionData.MM;
+
+    // Region / Currency show
+    if (regionSelect) {
+        regionSelect.value = region;
+    }
+
     if (currencyText) {
-        currencyText.innerText = region === "TH" ? "THB" : "MMK";
+        currencyText.innerText = config.currency;
     }
 
-    /* Payment Methods */
-    if (paymentMethod) {
-
-        paymentMethod.innerHTML =
-            `<option value="">Select Payment Method</option>`;
-
-        paymentByRegion[region].forEach(pay => {
-
-            paymentMethod.innerHTML += `
-                <option value="${pay.id}">
-                    ${pay.name}
-                </option>
-            `;
-        });
-    }
-
-    /* Package Prices */
-    if (box) {
-
-        const game = box.dataset.game;
+    // Package prices auto generate
+    if (packagesBox) {
+        const game = packagesBox.dataset.game;
         const items = GAME_PRICES[game] || [];
 
-        box.innerHTML = "";
+        packagesBox.innerHTML = "";
 
         items.forEach(item => {
+            const price = item[config.priceKey];
 
-            let priceText = "";
+            const priceText =
+                config.currency === "THB"
+                    ? `${price} ฿`
+                    : `${price.toLocaleString()} Ks`;
 
-            if (region === "TH") {
-                priceText = `${item.thb} ฿`;
-            } else {
-                priceText = `${item.mmk.toLocaleString()} Ks`;
-            }
-
-            box.innerHTML += `
+            packagesBox.innerHTML += `
                 <div class="pack"
                      data-name="${item.name}"
-                     data-price="${region === "TH" ? item.thb : item.mmk}">
+                     data-price="${price}"
+                     data-currency="${config.currency}">
                     ${item.name} - ${priceText}
                 </div>
             `;
         });
+    }
 
+    // Payment logo cards auto generate by region
+    if (paymentGrid && paymentMethod) {
+        paymentGrid.innerHTML = "";
+
+        config.payments.forEach((pay, index) => {
+            paymentGrid.innerHTML += `
+                <div class="pay-card ${index === 0 ? "active" : ""}"
+                     data-method="${pay.id}">
+                    <img src="${pay.logo}" alt="${pay.name}">
+                    <span>${pay.name}</span>
+                </div>
+            `;
+        });
+
+        paymentMethod.value = config.payments[0].id;
+
+        document.querySelectorAll(".pay-card").forEach(card => {
+            card.addEventListener("click", () => {
+                document.querySelectorAll(".pay-card").forEach(c => {
+                    c.classList.remove("active");
+                });
+
+                card.classList.add("active");
+                paymentMethod.value = card.dataset.method;
+            });
+        });
     }
 
 });

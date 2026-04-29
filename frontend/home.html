@@ -17,59 +17,86 @@
 
 <body>
 
-    <header class="topbar">
-        <div class="logo">AZIEL 1Tap TopUp</div>
+    <!-- Welcome Splash -->
+    <div id="welcomeSplash">
+        <h1>WELCOME TO</h1>
+        <h2>AZIEL 1Tap Shop</h2>
+    </div>
 
-        <nav>
-            <span id="userBox"></span>
-            <a href="home.html">Home</a>
-            <a href="shop.html">Top Up</a>
-            <a href="login.html">Login</a>
+    <!-- Main Content -->
+    <div id="mainHome">
 
-        </nav>
-    </header>
+        <header class="topbar">
+            <div class="logo">AZIEL 1Tap Shop</div>
 
-    <section class="hero">
-        <h1 class="welcome-title">Welcome to AZIEL 1Tap Shop</h1>
-        <p>Fast & Secure Game Top Up</p>
+            <nav>
+                <a href="home.html">Home</a>
+                <a href="shop.html">Top Up</a>
+                <a href="login.html">Login</a>
+            </nav>
+        </header>
 
-        <div class="region-box">
-            <label>Select Your Region</label>
-            <select id="homeRegionSelect">
-                <option value="MM">Myanmar - MMK</option>
-                <option value="TH">Thailand - THB</option>
-                <option value="GLOBAL">Global - USD</option>
-            </select>
-        </div>
-    </section>
+        <section class="hero">
 
-    <section class="games">
+            <div class="hero-left">
+                <h1>Fast & Secure Game Top Up</h1>
+                <p>Mobile Legends • PUBG • Free Fire • HOK</p>
 
-        <a href="mlbb.html" class="card">
-            <img src="assets/mlbb.jpg">
-            <h3>Mobile Legends</h3>
-        </a>
+                <a href="shop.html" class="cta-btn">Top Up Now</a>
 
-        <a href="pubg.html" class="card">
-            <img src="assets/pubg.jpg">
-            <h3>PUBG Mobile</h3>
-        </a>
+                <div class="region-box">
+                    <label>Select Region</label>
 
-        <a href="freefire.html" class="card">
-            <img src="assets/freefire.jpg">
-            <h3>Free Fire</h3>
-        </a>
+                    <select id="homeRegionSelect">
+                        <option value="MM">Myanmar - MMK</option>
+                        <option value="TH">Thailand - THB</option>
+                    </select>
+                </div>
+            </div>
 
-        <a href="hok.html" class="card">
-            <img src="assets/hok.jpg">
-            <h3>Honor Of Kings</h3>
-        </a>
+            <div class="hero-right">
+                <img src="assets/logo.png" alt="AZIEL">
+            </div>
 
-    </section>
+        </section>
 
-    <footer>
-        © 2026 AZIEL 1Tap Shop
-    </footer>
+        <section class="games-section">
+
+            <h2>Popular Games</h2>
+
+            <div class="game-grid">
+
+                <a href="mlbb.html" class="game-card">MLBB</a>
+                <a href="pubg.html" class="game-card">PUBG</a>
+                <a href="freefire.html" class="game-card">Free Fire</a>
+                <a href="hok.html" class="game-card">HOK</a>
+
+            </div>
+
+        </section>
+
+        <section class="promo-banner">
+            🔥 FLASH SALE TODAY - BEST PRICE GUARANTEE 🔥
+        </section>
+
+        <section class="why-us">
+
+            <h2>Why Choose AZIEL?</h2>
+
+            <div class="why-grid">
+                <div>⚡ Instant Process</div>
+                <div>🔒 Safe Payment</div>
+                <div>🌍 MM / TH Support</div>
+                <div>💬 Fast Customer Service</div>
+            </div>
+
+        </section>
+
+        <footer>
+            © 2026 AZIEL 1Tap Shop
+        </footer>
+
+    </div>
 
     <script src="js/home.js"></script>
     <script src="js/auth-check.js"></script>

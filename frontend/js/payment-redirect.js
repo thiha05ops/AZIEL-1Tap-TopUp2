@@ -17,7 +17,37 @@ async function createPaymentAndRedirect(orderData) {
             return;
         }
 
-        // payment page / app redirect
+        const method = orderData.paymentMethod;
+        const amount = orderData.amount;
+        const orderId = orderData.orderId;
+
+        // Myanmar payment apps
+        if (method === "kbzpay") {
+            window.location.href = data.paymentUrl || `kbzpay://pay?amount=${amount}&remark=${orderId}`;
+            return;
+        }
+
+        if (method === "wavepay") {
+            window.location.href = data.paymentUrl || `wavepay://pay?amount=${amount}&remark=${orderId}`;
+            return;
+        }
+
+        if (method === "ayapay") {
+            window.location.href = data.paymentUrl || `ayapay://pay?amount=${amount}&remark=${orderId}`;
+            return;
+        }
+
+        // Thailand payment apps
+        if (method === "promptpay") {
+            window.location.href = data.paymentUrl || `promptpay://pay?amount=${amount}&ref=${orderId}`;
+            return;
+        }
+
+        if (method === "scb") {
+            window.location.href = data.paymentUrl || `scbeasy://pay?amount=${amount}&ref=${orderId}`;
+            return;
+        }
+
         window.location.href = data.paymentUrl;
 
     } catch (error) {

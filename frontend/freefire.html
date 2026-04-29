@@ -45,38 +45,13 @@
 
                 <select id="paymentMethod">
                     <option value="">Select Payment Method</option>
-                    <div class="payment-grid">
-
-                        <div class="pay-card active" data-method="kbzpay">
-                            <img src="assets/payments/kbzpay.png">
-                            <span>KBZPay</span>
-                        </div>
-
-                        <div class="pay-card" data-method="wavepay">
-                            <img src="assets/payments/wavepay.png">
-                            <span>WavePay</span>
-                        </div>
-
-                    </div>
-                    <!-- Thailand Payment Methods -->
 
                     <h2>Select Payment</h2>
 
-                    <div class="payment-grid" id="paymentGrid">
+                    <div class="payment-grid" id="paymentGrid"></div>
 
-                        <div class="pay-card active" data-method="promptpay">
-                            <img src="assets/payments/promptpay.png" alt="PromptPay">
-                            <span>PromptPay</span>
-                        </div>
+                    <input type="hidden" id="paymentMethod">
 
-                        <div class="pay-card" data-method="scb">
-                            <img src="assets/payments/scb.png" alt="SCB">
-                            <span>SCB Bank</span>
-                        </div>
-
-                    </div>
-
-                    <input type="hidden" id="paymentMethod" value="promptpay">
                 </select>
 
                 <input type="text" id="userId" placeholder="Player UID">
@@ -98,6 +73,7 @@
     <script src="js/logout.js"></script>
     <script src="js/prices.js"></script>
     <script src="js/region-payment.js"></script>
+    <script src="js/payment-redirect.js"></script>
     <script src="js/freefire.js"></script>
 </body>
 

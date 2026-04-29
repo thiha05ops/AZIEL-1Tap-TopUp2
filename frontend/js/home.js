@@ -2,78 +2,96 @@
 
 document.addEventListener("DOMContentLoaded", () => {
 
-    console.log("AZIEL Home Loaded ✅");
+    /* Region Save */
+    const homeRegionSelect = document.getElementById("homeRegionSelect");
 
-    // hero animation
-    const hero = document.querySelector(".hero h1");
-    if (hero) {
-        hero.style.opacity = "0";
-        hero.style.transform = "translateY(25px)";
+    if (homeRegionSelect) {
+        const savedRegion = localStorage.getItem("region") || "MM";
+        homeRegionSelect.value = savedRegion;
 
-        setTimeout(() => {
-            hero.style.transition = "0.8s ease";
-            hero.style.opacity = "1";
-            hero.style.transform = "translateY(0)";
-        }, 200);
+        homeRegionSelect.addEventListener("change", () => {
+            localStorage.setItem("region", homeRegionSelect.value);
+
+            showToast("Region updated ✅");
+        });
     }
 
-    // card hover click effect
-    const cards = document.querySelectorAll(".card");
+    /* Login gate for game cards */
+    const gameCards = document.querySelectorAll(".game-card");
 
-    cards.forEach(card => {
+    gameCards.forEach(card => {
+        card.addEventListener("click", (e) => {
 
-        card.addEventListener("mouseenter", () => {
-            card.style.transform = "translateY(-6px)";
-            card.style.boxShadow = "0 12px 28px rgba(0,0,0,.15)";
+            const isLogin = localStorage.getItem("isLogin");
+
+            if (isLogin !== "true") {
+                e.preventDefault();
+
+                showToast("Please login first 🔐");
+
+                setTimeout(() => {
+                    window.location.href = "login.html";
+                }, 900);
+            }
         });
-
-        card.addEventListener("mouseleave", () => {
-            card.style.transform = "translateY(0)";
-            card.style.boxShadow = "0 6px 18px rgba(0,0,0,.08)";
-        });
-
-        card.addEventListener("click", () => {
-            card.style.transform = "scale(.97)";
-            setTimeout(() => {
-                card.style.transform = "translateY(-6px)";
-            }, 120);
-        });
-
     });
 
-    // active menu
-    const links = document.querySelectorAll(".topbar nav a");
+    /* Recent fake orders popup */
+    const fakeOrders = [
+        "Thiha topped up MLBB 570 Diamonds",
+        "Aung bought PUBG 325 UC",
+        "Moe purchased Free Fire 520 Diamonds",
+        "KoKo ordered HOK 400 Tokens"
+    ];
 
-    links.forEach(link => {
-        const file = link.getAttribute("href");
+    let orderIndex = 0;
 
-        if (window.location.pathname.includes(file)) {
-            link.style.color = "#ffd700";
-            link.style.fontWeight = "bold";
+    setInterval(() => {
+        showToast("🔥 " + fakeOrders[orderIndex]);
+
+        orderIndex++;
+
+        if (orderIndex >= fakeOrders.length) {
+            orderIndex = 0;
         }
-    });
 
-    // logo click top
-    const logo = document.querySelector(".logo");
-
-    if (logo) {
-        logo.addEventListener("click", () => {
-            window.scrollTo({
-                top: 0,
-                behavior: "smooth"
-            });
-        });
-    }
+    }, 9000);
 
 });
-const homeRegionSelect = document.getElementById("homeRegionSelect");
 
-if (homeRegionSelect) {
-    const savedRegion = localStorage.getItem("region") || "MM";
-    homeRegionSelect.value = savedRegion;
+/* Toast Function */
+function showToast(text) {
 
-    homeRegionSelect.addEventListener("change", () => {
-        localStorage.setItem("region", homeRegionSelect.value);
-        alert("Region saved ✅");
-    });
+    let toast = document.getElementById("siteToast");
+
+    if (!toast) {
+        toast = document.createElement("div");
+        toast.id = "siteToast";
+        document.body.appendChild(toast);
+
+        toast.style.position = "fixed";
+        toast.style.bottom = "25px";
+        toast.style.right = "25px";
+        toast.style.background = "linear-gradient(90deg,#7c3aed,#4f46e5)";
+        toast.style.color = "#fff";
+        toast.style.padding = "14px 18px";
+        toast.style.borderRadius = "14px";
+        toast.style.fontWeight = "700";
+        toast.style.zIndex = "99999";
+        toast.style.boxShadow = "0 12px 28px rgba(0,0,0,.25)";
+        toast.style.opacity = "0";
+        toast.style.transition = ".3s";
+        toast.style.maxWidth = "320px";
+    }
+
+    toast.innerText = text;
+    toast.style.opacity = "1";
+    toast.style.transform = "translateY(0)";
+
+    clearTimeout(window.toastTimer);
+
+    window.toastTimer = setTimeout(() => {
+        toast.style.opacity = "0";
+        toast.style.transform = "translateY(20px)";
+    }, 2600);
 }

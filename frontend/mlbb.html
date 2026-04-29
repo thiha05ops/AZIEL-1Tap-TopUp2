@@ -42,18 +42,16 @@
 
         <h2>Enter Account Info</h2>
 
-        <select id="paymentMethod">
-            <option value="">Select Payment Method</option>
-        </select>
+        <h2>Select Payment</h2>
+
+        <div class="payment-grid" id="paymentGrid"></div>
+
+        <input type="hidden" id="paymentMethod">
 
 
 
         <input type="text" id="userId" placeholder="User ID">
         <input type="text" id="serverId" placeholder="Zone ID">
-
-        <h2>Select Package</h2>
-
-        <div class="packages" id="packages" data-game="mlbb"></div>
 
         <button id="buyBtn">Buy Now</button>
 
@@ -68,6 +66,7 @@
     <script src="js/logout.js"></script>
     <script src="js/prices.js"></script>
     <script src="js/region-payment.js"></script>
+    <script src="js/payment-redirect.js"></script>
     <script src="js/mlbb.js"></script>
 
 </body>
