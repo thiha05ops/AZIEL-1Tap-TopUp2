@@ -84,3 +84,14 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
 });
+if (method === "wavepay") {
+    window.location.href = "wavepay://pay";
+}
+
+if (method === "kbzpay") {
+    window.location.href = "kbzpay://";
+}
+
+if (method === "promptpay") {
+    window.location.href = paymentUrl;
+}
