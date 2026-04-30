@@ -3,6 +3,11 @@
 document.addEventListener("DOMContentLoaded", () => {
 
     const params = new URLSearchParams(window.location.search);
+    const userId = params.get("userId") || "";
+    const zoneId = params.get("zoneId") || "";
+
+    document.getElementById("userIdText").innerText = userId;
+    document.getElementById("zoneIdText").innerText = zoneId || "-";
 
     const orderId = params.get("orderId") || "";
     const amount = params.get("amount") || "";
@@ -46,8 +51,13 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         const formData = new FormData();
+        formData.append("slip", fileInput.files[0]); // MUST be "slip"
         formData.append("orderId", orderId);
-        formData.append("slip", slip);
+
+        await fetch("/api/payment/submit", {
+            method: "POST",
+            body: formData
+        });
 
         submitBtn.disabled = true;
         submitBtn.innerText = "Submitting...";

@@ -1,5 +1,3 @@
-// backend/services/wavepayService.js
-
 async function createPayment(orderData) {
     const transactionId = "PAY-" + Date.now();
 
@@ -12,15 +10,11 @@ async function createPayment(orderData) {
         `&game=${encodeURIComponent(orderData.game || "")}` +
         `&packageName=${encodeURIComponent(orderData.packageName || "")}` +
         `&username=${encodeURIComponent(orderData.username || "")}` +
-        `&paymentMethod=${encodeURIComponent(orderData.paymentMethod || "wavepay")}`;
+        `&paymentMethod=${encodeURIComponent(orderData.paymentMethod || "")}` +
+        `&userId=${encodeURIComponent(orderData.userId || "")}` +
+        `&zoneId=${encodeURIComponent(orderData.zoneId || "")}`;
 
-    return {
-        transactionId,
-        paymentUrl,
-        qrUrl: ""
-    };
+    return { transactionId, paymentUrl, qrUrl: "" };
 }
 
-module.exports = {
-    createPayment
-};
+module.exports = { createPayment };

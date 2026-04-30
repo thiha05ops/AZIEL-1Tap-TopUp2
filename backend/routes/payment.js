@@ -49,8 +49,11 @@ router.post("/payment/create", async (req, res) => {
 
         await sendTelegramMessage(
             `🆕 New Order Created
+
 Order: ${orderId}
 Game: ${game}
+User ID: ${userId}
+Server ID: ${zoneId || "-"}
 Package: ${packageName}
 Amount: ${amount} ${currency}
 User: ${username || "guest"}`
@@ -78,6 +81,74 @@ User: ${username || "guest"}`
         res.json({
             success: false,
             message: error.message || "Payment server error"
+        });
+    }
+});
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+const { sendTelegramPhoto } = require("../services/telegram");
+
+const uploadDir = path.join(__dirname, "../uploads");
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, uploadDir),
+    filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname)
+});
+
+const upload = multer({ storage });
+
+// POST /api/payment/submit
+router.post("/payment/submit", upload.single("slip"), async (req, res) => {
+    try {
+        const { orderId } = req.body;
+
+        if (!orderId || !req.file) {
+            return res.json({
+                success: false,
+                message: "Missing payment slip"
+            });
+        }
+
+        const order = await Order.findOne({ orderId });
+
+        if (!order) {
+            return res.json({
+                success: false,
+                message: "Order not found"
+            });
+        }
+
+        order.paymentSlip = req.file.filename;
+        order.status = "paid";
+        await order.save();
+
+        await sendTelegramPhoto(
+            req.file.path,
+            `💸 Payment Slip Received
+
+Order ID: ${order.orderId}
+User: ${order.username}
+Game: ${order.game}
+User ID: ${order.userId}
+Server ID: ${order.zoneId || "-"}
+Package: ${order.packageName}
+Amount: ${order.amount} ${order.currency}
+Payment: ${order.paymentMethod}
+Status: ${order.status}`
+        );
+
+        res.json({
+            success: true,
+            message: "Payment submitted"
+        });
+
+    } catch (error) {
+        console.log("Payment submit error:", error);
+        res.json({
+            success: false,
+            message: error.message || "Server error"
         });
     }
 });
