@@ -77,7 +77,7 @@ User: ${username || "guest"}`
 
         res.json({
             success: false,
-            message: "Payment server error"
+            message: error.message || "Payment server error"
         });
     }
 });
