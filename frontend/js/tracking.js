@@ -1,47 +1,84 @@
-// frontend/js/tracking.js
-
 document.addEventListener("DOMContentLoaded", () => {
+    const params = new URLSearchParams(window.location.search);
+    const orderIdFromUrl = params.get("orderId");
 
-    const trackBtn = document.getElementById("trackBtn");
-    const orderIdInput = document.getElementById("orderIdInput");
-    const result = document.getElementById("trackingResult");
+    if (orderIdFromUrl) {
+        document.getElementById("orderIdInput").value = orderIdFromUrl;
+        trackOrder(orderIdFromUrl);
+    }
 
-    trackBtn.addEventListener("click", async () => {
-
-        const orderId = orderIdInput.value.trim();
+    document.getElementById("trackBtn").addEventListener("click", () => {
+        const orderId = document.getElementById("orderIdInput").value.trim();
 
         if (!orderId) {
-            result.innerHTML = `<p class="error-msg">Please enter Order ID.</p>`;
+            document.getElementById("trackingResult").innerHTML =
+                `<p class="error-msg">Please enter Order ID.</p>`;
             return;
         }
 
-        try {
-            const res = await fetch(`/api/order/track/${orderId}`);
-            const data = await res.json();
+        trackOrder(orderId);
+    });
+});
 
-            if (!data.success) {
-                result.innerHTML = `<p class="error-msg">${data.message}</p>`;
-                return;
-            }
+async function trackOrder(orderId) {
+    const result = document.getElementById("trackingResult");
 
-            const order = data.order;
+    result.innerHTML = `<p>Loading...</p>`;
 
-            result.innerHTML = `
-                <div class="track-card">
-                    <h2>Order Found ✅</h2>
-                    <p><b>Order ID:</b> ${order.orderId}</p>
-                    <p><b>Game:</b> ${order.game}</p>
-                    <p><b>Package:</b> ${order.packageName}</p>
-                    <p><b>Amount:</b> ${order.amount} ${order.currency}</p>
-                    <p><b>Payment:</b> ${order.paymentMethod}</p>
-                    <p><b>Status:</b> <span class="status">${order.status}</span></p>
-                </div>
-            `;
+    try {
+        const res = await fetch(`/api/order/track/${orderId}`);
+        const data = await res.json();
 
-        } catch (error) {
-            result.innerHTML = `<p class="error-msg">Server error.</p>`;
+        if (!data.success) {
+            result.innerHTML = `<p class="error-msg">${data.message}</p>`;
+            return;
         }
 
-    });
+        const o = data.order;
 
-});
+        result.innerHTML = `
+            <div class="track-card">
+                <h2>${o.game}</h2>
+                <p><b>Order ID:</b> ${o.orderId}</p>
+                <p><b>User ID:</b> ${o.userId}</p>
+                <p><b>Server:</b> ${o.zoneId || "-"}</p>
+                <p><b>Package:</b> ${o.packageName}</p>
+                <p><b>Amount:</b> ${o.amount} ${o.currency}</p>
+                <p><b>Payment:</b> ${o.paymentMethod}</p>
+                <p><b>Status:</b> <span class="status ${statusClass(o.status)}">${o.status}</span></p>
+
+                <div class="timeline">
+                    ${stepItem("pending_payment", "Order Created", o.status)}
+                    ${stepItem("paid", "Payment Received", o.status)}
+                    ${stepItem("processing", "Processing TopUp", o.status)}
+                    ${stepItem("completed", "Completed", o.status)}
+                </div>
+
+                <p class="track-note">${o.note || "Please wait while we process your order."}</p>
+            </div>
+        `;
+
+    } catch (error) {
+        result.innerHTML = `<p class="error-msg">Server error.</p>`;
+    }
+}
+
+function stepItem(step, label, current) {
+    const order = ["pending_payment", "paid", "processing", "completed"];
+    const active = order.indexOf(current) >= order.indexOf(step);
+
+    return `
+        <div class="timeline-step ${active ? "active" : ""}">
+            <span></span>
+            <p>${label}</p>
+        </div>
+    `;
+}
+
+function statusClass(status) {
+    if (status === "paid") return "status-paid";
+    if (status === "processing") return "status-processing";
+    if (status === "completed") return "status-completed";
+    if (status === "cancelled" || status === "failed") return "status-failed";
+    return "status-pending";
+}

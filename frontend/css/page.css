@@ -118,3 +118,39 @@ body {
     border-radius: 50%;
     display: none;
 }
+
+.timeline {
+    margin-top: 25px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+}
+
+.timeline-step {
+    text-align: center;
+    opacity: .45;
+}
+
+.timeline-step span {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #555;
+    display: block;
+    margin: 0 auto 8px;
+}
+
+.timeline-step.active {
+    opacity: 1;
+}
+
+.timeline-step.active span {
+    background: #22c55e;
+    box-shadow: 0 0 15px rgba(34, 197, 94, .5);
+}
+
+.track-note {
+    margin-top: 20px;
+    color: #ffd700;
+    font-weight: 700;
+}
