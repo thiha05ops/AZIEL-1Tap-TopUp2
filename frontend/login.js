@@ -1,188 +1,49 @@
-/* frontend/css/auth.css */
+document.addEventListener("DOMContentLoaded", () => {
+    const loginBtn = document.getElementById("loginBtn");
+    const loginUser = document.getElementById("loginUser");
+    const loginPass = document.getElementById("loginPass");
+    const loginError = document.getElementById("loginError");
 
-body.auth - page{
-    margin: 0;
-    min - height: 100vh;
-    background:
-    radial - gradient(circle at top,#2d1b69,#080812 65 %),
-        linear - gradient(135deg,#070716,#151530);
-    font - family: Arial, Helvetica, sans - serif;
-    color: #fff;
-    display: flex;
-    justify - content: center;
-    align - items: center;
-    padding: 20px;
-}
+    loginBtn.addEventListener("click", async () => {
+        const username = loginUser.value.trim();
+        const password = loginPass.value.trim();
 
-.auth - wrapper{
-    width: 100 %;
-    max - width: 460px;
-}
+        loginError.innerText = "";
 
-.auth - logo{
-    text - align: center;
-    font - size: 42px;
-    font - weight: 900;
-    letter - spacing: 4px;
-    color: #ffd700;
-    margin - bottom: 20px;
-    text - shadow: 0 0 20px rgba(255, 215, 0, .55);
-}
+        if (!username) {
+            loginError.innerText = "❌ Please enter username!";
+            return;
+        }
 
-.auth - box{
-    background: #ffffff;
-    color:#111;
-    border - radius: 22px;
-    padding: 28px;
-    box - shadow: 0 20px 55px rgba(0, 0, 0, .35);
-}
+        if (!password) {
+            loginError.innerText = "❌ Please enter password!";
+            return;
+        }
 
-.auth - top{
-    display: flex;
-    justify - content: space - between;
-    align - items: center;
-    margin - bottom: 20px;
-}
+        try {
+            const res = await fetch("/api/login", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ username, password })
+            });
 
-.auth - top h1{
-    font - size: 28px;
-    margin: 0;
-    font - weight: 900;
-}
+            const data = await res.json();
 
-.signup - btn{
-    color:#7c3aed;
-    font - weight: 800;
-    text - decoration: none;
-}
+            if (data.success) {
+                localStorage.setItem("isLoggedIn", "true");
+                localStorage.setItem("username", username);
+                localStorage.setItem("token", data.token);
 
-.auth - tabs{
-    display: grid;
-    grid - template - columns: 1fr 1fr;
-    gap: 10px;
-    margin - bottom: 18px;
-}
+                window.location.href = "home.html";
+            } else {
+                loginError.innerText = "❌ " + data.message;
+            }
 
-.tab{
-    padding: 12px;
-    border: none;
-    border - radius: 12px;
-    background: #eee;
-    font - weight: 800;
-    cursor: pointer;
-}
-
-.tab.active{
-    background:#7c3aed;
-    color: #fff;
-}
-
-.radio - row{
-    display: flex;
-    align - items: center;
-    gap: 10px;
-    margin - bottom: 12px;
-    font - weight: 700;
-}
-
-.radio{
-    width: 16px;
-    height: 16px;
-    border - radius: 50 %;
-    border: 2px solid #7c3aed;
-}
-
-.radio.active{
-    background:#7c3aed;
-}
-
-.input - group{
-    display: flex;
-    align - items: center;
-    gap: 10px;
-    background: #f3f4f6;
-    border: 1px solid #e5e7eb;
-    border - radius: 14px;
-    padding: 0 14px;
-    margin - bottom: 14px;
-}
-
-.input - group input{
-    width: 100 %;
-    border: none;
-    background: transparent;
-    padding: 15px 0;
-    font - size: 15px;
-    outline: none;
-}
-
-.main - login - btn{
-    width: 100 %;
-    padding: 15px;
-    border: none;
-    border - radius: 14px;
-    background: linear - gradient(90deg,#5b21b6,#7c3aed);
-    color: #fff;
-    font - size: 16px;
-    font - weight: 900;
-    cursor: pointer;
-    margin - top: 5px;
-}
-
-.forgot - text{
-    text - align: center;
-    font - size: 14px;
-    color:#666;
-}
-
-.forgot - text a{
-    color:#7c3aed;
-    font - weight: 800;
-    text - decoration: none;
-}
-
-.divider{
-    height: 1px;
-    background: #e5e7eb;
-    margin: 20px 0;
-}
-
-.social - title{
-    text - align: center;
-    color:#666;
-    font - size: 14px;
-    margin - bottom: 14px;
-}
-
-.social - row{
-    display: flex;
-    justify - content: center;
-    gap: 12px;
-    flex - wrap: wrap;
-}
-
-.social - btn{
-    width: 46px;
-    height: 46px;
-    border - radius: 50 %;
-    background: #f3f4f6;
-    color:#111;
-    display: flex;
-    justify - content: center;
-    align - items: center;
-    text - decoration: none;
-    font - weight: 900;
-    box - shadow: 0 6px 14px rgba(0, 0, 0, .08);
-}
-
-.error - msg{
-    color: #dc2626;
-    font - weight: 700;
-    margin - bottom: 12px;
-}
-
-.success - msg{
-    color:#16a34a;
-    font - weight: 700;
-    margin - bottom: 12px;
-}
+        } catch (error) {
+            console.error(error);
+            loginError.innerText = "❌ Server error!";
+        }
+    });
+});
