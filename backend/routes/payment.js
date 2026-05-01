@@ -45,7 +45,7 @@ router.post("/payment/create", async (req, res) => {
             paymentSlip: "",
             transactionId: ""
         });
-        const { sendTelegramMessage } = require("../services/telegram");
+
         // Create payment page/session
         const paymentSession = await wavepayService.createPayment(req.body);
 
