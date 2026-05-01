@@ -17,6 +17,8 @@ const paymentRoutes = require("./routes/payment");
 const profileRoutes = require("./routes/profile");
 const socialAuthRoutes = require("./routes/socialAuth");
 const passwordRoutes = require("./routes/password");
+const supplierRoutes = require("./routes/supplier");
+app.use("/api", supplierRoutes);
 
 const app = express();
 

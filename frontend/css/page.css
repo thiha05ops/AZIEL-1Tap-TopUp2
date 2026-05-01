@@ -83,3 +83,13 @@ body {
     color: #ff6b6b;
     font-weight: 700;
 }
+
+.after-actions {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 15px;
+}
+
+.after-actions button {
+    width: 100%;
+}
