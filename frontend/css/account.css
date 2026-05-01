@@ -203,3 +203,36 @@ button {
   padding: 10px;
   border-bottom: 1px solid rgba(255, 255, 255, .1);
 }
+
+.status-paid {
+  color: #22c55e;
+  font-weight: 800;
+}
+
+.status-processing {
+  color: #f59e0b;
+  font-weight: 800;
+}
+
+.status-completed {
+  color: #3b82f6;
+  font-weight: 800;
+}
+
+.status-failed {
+  color: #ef4444;
+  font-weight: 800;
+}
+
+.status-pending {
+  color: #9ca3af;
+  font-weight: 800;
+}
+
+.noti-item {
+  cursor: pointer;
+}
+
+.noti-item:hover {
+  background: #252552;
+}

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Track Order - AZIEL 1Tap Shop</title>
+    <title>Track Order - AZIEL</title>
 
     <link rel="stylesheet" href="css/main.css">
     <link rel="stylesheet" href="css/page.css">
@@ -12,55 +12,20 @@
 
 <body>
 
-
     <div class="page-wrap">
-
-        <a href="home.html" class="back-btn">← Back Home</a>
+        <a href="account.html" class="back-btn">← Back Account</a>
 
         <div class="info-card">
-            <h1>Track Your Order</h1>
-            <p>Enter your Order ID to check status.</p>
+            <h1>Order Tracking</h1>
 
-            <input type="text" id="orderIdInput" placeholder="Example: AZL-1710000000000">
-
-            <button id="trackBtn">Track Order</button>
+            <input type="text" id="orderIdInput" placeholder="Enter Order ID">
+            <button id="trackBtn">Track</button>
 
             <div id="trackingResult"></div>
         </div>
-
     </div>
-    <h2>Order Tracking</h2>
-
-    <div id="trackingBox"></div>
-
-    <script>
-        const params = new URLSearchParams(window.location.search);
-        const orderId = params.get("orderId");
-
-        fetch(`/api/order/track/${orderId}`)
-            .then(res => res.json())
-            .then(data => {
-                const box = document.getElementById("trackingBox");
-
-                if (!data.success) {
-                    box.innerHTML = "Order not found";
-                    return;
-                }
-
-                const o = data.order;
-
-                box.innerHTML = `
-            <p><b>ID:</b> ${o.orderId}</p>
-            <p><b>Game:</b> ${o.game}</p>
-            <p><b>Package:</b> ${o.packageName}</p>
-            <p><b>Status:</b> ${o.status}</p>
-            <p><b>Note:</b> ${o.note || "-"}</p>
-        `;
-            });
-    </script>
 
     <script src="js/tracking.js"></script>
-
 </body>
 
 </html>
