@@ -283,5 +283,7 @@ button {
   }
 
   100% {
+
     transform: rotate(0);
   }
+}
