@@ -16,27 +16,62 @@
 
 <body class="auth-page">
 
-    <div class="auth-box">
+    <div class="auth-wrapper">
 
-        <h1>Welcome Back</h1>
-        <p>Login to continue top up</p>
+        <div class="auth-logo">AZIEL</div>
 
-        <div id="msg"></div>
+        <div class="auth-box seagm-style">
 
-        <input type="text" id="username" placeholder="Username">
-        <input type="password" id="password" placeholder="Password">
+            <div class="auth-top">
+                <h1>SIGN IN</h1>
+                <a href="register.html" class="signup-btn">Sign up</a>
+            </div>
 
-        <button id="loginBtn">Login</button>
+            <div class="auth-tabs">
+                <button class="tab active">User Account</button>
+                <button class="tab">Mobile OTP</button>
+            </div>
 
-        <div class="auth-links">
-            Don't have account?
-            <a href="register.html">Register</a>
+            <div id="msg"></div>
+
+            <label class="radio-row">
+                <span class="radio active"></span>
+                <span>E-mail / Username</span>
+            </label>
+
+            <div class="input-group">
+                <span>📧</span>
+                <input type="text" id="username" placeholder="Email or Username" autocomplete="off">
+            </div>
+
+            <div class="input-group">
+                <span>🔒</span>
+                <input type="password" id="password" placeholder="Password" autocomplete="new-password">
+            </div>
+
+            <button id="loginBtn" class="main-login-btn">SIGN IN</button>
+
+            <p class="forgot-text">
+                Forgot password?
+                <a href="forgot.html">Reset Password</a>
+            </p>
+
+            <div class="divider"></div>
+
+            <p class="social-title">Sign in with social account</p>
+
+            <div class="social-row">
+                <a href="/api/auth/google" class="social-btn">G</a>
+                <a href="/api/auth/facebook" class="social-btn">f</a>
+                <a href="/api/auth/line" class="social-btn">LINE</a>
+                <a href="/api/auth/telegram" class="social-btn">✈</a>
+            </div>
+
         </div>
 
     </div>
 
     <script src="js/login.js"></script>
-    <script src="js/logout.js"></script>
 
 </body>
 

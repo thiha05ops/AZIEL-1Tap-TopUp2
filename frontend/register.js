@@ -1,29 +1,38 @@
+// frontend/js/register.js
+
 document.addEventListener("DOMContentLoaded", () => {
+
     const registerBtn = document.getElementById("registerBtn");
-    const regUser = document.getElementById("regUser");
-    const regPass = document.getElementById("regPass");
-    const registerMsg = document.getElementById("registerMsg");
+    const username = document.getElementById("username");
+    const email = document.getElementById("email");
+    const password = document.getElementById("password");
+    const confirmPassword = document.getElementById("confirmPassword");
+    const msg = document.getElementById("msg");
 
     registerBtn.addEventListener("click", async () => {
-        const username = regUser.value.trim();
-        const password = regPass.value.trim();
 
-        registerMsg.innerText = "";
+        const user = username.value.trim();
+        const mail = email.value.trim();
+        const pass = password.value.trim();
+        const confirm = confirmPassword.value.trim();
 
-        if (!username) {
-            registerMsg.innerText = "❌ Enter username!";
+        if (!user || !mail || !pass || !confirm) {
+            msg.innerHTML = `<div class="error-msg">Please fill all fields.</div>`;
             return;
         }
 
-        if (!password) {
-            registerMsg.innerText = "❌ Enter password!";
+        if (pass.length < 6) {
+            msg.innerHTML = `<div class="error-msg">Password must be at least 6 characters.</div>`;
             return;
         }
 
-        if (password.length < 6) {
-            registerMsg.innerText = "❌ Password must be at least 6 characters!";
+        if (pass !== confirm) {
+            msg.innerHTML = `<div class="error-msg">Passwords do not match.</div>`;
             return;
         }
+
+        registerBtn.disabled = true;
+        registerBtn.innerText = "Creating...";
 
         try {
             const res = await fetch("/api/register", {
@@ -31,22 +40,33 @@ document.addEventListener("DOMContentLoaded", () => {
                 headers: {
                     "Content-Type": "application/json"
                 },
-                body: JSON.stringify({ username, password })
+                body: JSON.stringify({
+                    username: user,
+                    email: mail,
+                    password: pass
+                })
             });
 
             const data = await res.json();
 
             if (data.success) {
-                registerMsg.innerText = "✅ Register success!";
+                msg.innerHTML = `<div class="success-msg">Account created ✅ Redirecting...</div>`;
+
                 setTimeout(() => {
                     window.location.href = "login.html";
-                }, 1500);
+                }, 1000);
             } else {
-                registerMsg.innerText = "❌ " + data.message;
+                msg.innerHTML = `<div class="error-msg">${data.message}</div>`;
+                registerBtn.disabled = false;
+                registerBtn.innerText = "CREATE ACCOUNT";
             }
+
         } catch (error) {
-            console.error(error);
-            registerMsg.innerText = "❌ Server error!";
+            msg.innerHTML = `<div class="error-msg">Server error.</div>`;
+            registerBtn.disabled = false;
+            registerBtn.innerText = "CREATE ACCOUNT";
         }
+
     });
+
 });

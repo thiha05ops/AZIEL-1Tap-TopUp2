@@ -26,11 +26,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const paymentName = document.getElementById("paymentName");
 
     const paymentData = {
-        kbzpay: { name: "KBZPay", qr: "assets/payments/kbzpay-qr.png" },
-        wavepay: { name: "WavePay", qr: "assets/payments/wavepay-qr.png" },
-        ayapay: { name: "AYA Pay", qr: "assets/payments/ayapay-qr.png" },
-        promptpay: { name: "PromptPay", qr: "assets/payments/promptpay-qr.png" },
-        scb: { name: "SCB", qr: "assets/payments/scb-qr.png" }
+        kbzpay: { qr: "assets/payments/kbzpay-qr.png" },
+        wavepay: { qr: "assets/payments/wavepay-qr.png" },
+        ayapay: { qr: "assets/payments/ayapay-qr.png" },
+        promptpay: { qr: "assets/payments/promptpay-qr.png" },
+        scb: { qr: "assets/payments/scb-qr.png" }
     };
 
     const selected = paymentData[method] || paymentData.wavepay;
@@ -41,6 +41,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const submitBtn = document.getElementById("submitPaymentBtn");
 
     submitBtn.addEventListener("click", async () => {
+        submitBtn.disabled = true;
+        submitBtn.innerText = "PAYING...";
 
         const slip = document.getElementById("paymentSlip").files[0];
         const msg = document.getElementById("paymentMsg");
@@ -77,7 +79,37 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            msg.innerHTML = `<p class="success-msg">Payment submitted ✅</p>`;
+            msg.innerHTML = `<p class="success-msg">Order Sent ✅</p>`;
+
+            let noti = JSON.parse(localStorage.getItem("noti")) || [];
+
+            noti.unshift({
+                id: orderId,
+                text: `${game} ${packageName} order submitted`,
+                time: new Date().toLocaleString()
+            });
+
+            localStorage.setItem("noti", JSON.stringify(noti));
+
+            const actions = document.getElementById("afterPaymentActions");
+            actions.style.display = "grid";
+
+            const gamePageMap = {
+                "Mobile Legends": "mlbb.html",
+                "PUBG Mobile": "pubg.html",
+                "Free Fire": "freefire.html",
+                "Honor Of Kings": "hok.html"
+            };
+
+            document.getElementById("afterPaymentActions").style.display = "grid";
+
+            document.getElementById("backGameBtn").onclick = () => {
+                window.location.href = "mlbb.html"; // change per game
+            };
+
+            document.getElementById("viewHistoryBtn").onclick = () => {
+                window.location.href = "account.html";
+            };
 
             setTimeout(() => {
                 window.location.href = `tracking.html?orderId=${orderId}`;

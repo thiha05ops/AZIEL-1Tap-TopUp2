@@ -1,112 +1,101 @@
+<!-- frontend/account.html -->
+
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Account - AZIEL 1Tap Shop</title>
-    <link rel="stylesheet" href="style.css">
+
+    <title>Account - AZIEL 1Tap</title>
+
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/account.css">
 </head>
 
-<body class="account-page">
+<body>
 
-    <header class="topbar">
-        <a href="home.html" class="logo-area">
-            <div class="logo-badge">A</div>
-            <div class="logo-text">
-                <h1>AZIEL 1Tap Shop</h1>
-                <span>ME</span>
-            </div>
-        </a>
+    <header class="account-header">
+        <a href="home.html" class="brand">AZIEL</a>
 
-        <nav class="top-actions">
-            <a href="home.html" class="nav-link">Home</a>
-            <a href="shop.html" class="nav-link">Shop</a>
-            <a href="history.html" class="nav-link">History</a>
-            <a href="#" id="logoutBtn">Logout</a>
-        </nav>
+        <div class="header-actions">
+            <button id="notiBtn" class="noti-btn">🔔 <span id="notiCount">0</span></button>
+            <button id="logoutBtn" class="logout-btn">Logout</button>
+        </div>
     </header>
 
-    <section class="account-wrapper">
-        <div class="account-card">
-            <div class="profile-photo-wrap">
-                <img id="profilePreview" class="profile-preview" src="" alt="Profile">
-                <div id="accountAvatar" class="account-avatar">A</div>
+    <main class="account-layout">
+
+        <aside class="account-sidebar">
+            <div class="profile-card">
+                <div class="avatar" id="avatarText">A</div>
+                <h3 id="profileName">Username</h3>
+                <p id="profileRegion">Region: MM</p>
             </div>
 
-            <h2 id="accountName">User</h2>
-            <p class="account-subtitle">Manage your profile and preferences</p>
+            <nav>
+                <button class="side-link active" data-tab="overview">Overview</button>
+                <button class="side-link" data-tab="profile">Profile</button>
+                <button class="side-link" data-tab="history">Order History</button>
+                <button class="side-link" data-tab="security">Security</button>
+            </nav>
+        </aside>
 
-            <div class="account-info-list">
-                <div class="account-info-row">
-                    <span>Username</span>
-                    <strong id="accountUsername">-</strong>
-                </div>
+        <section class="account-content">
 
-                <div class="account-info-row">
-                    <span>Display Name</span>
-                    <input type="text" id="displayName" placeholder="Enter display name">
-                </div>
+            <div id="notiPanel" class="noti-panel"></div>
 
-                <div class="account-info-row">
-                    <span>Preferred Region</span>
-                    <select id="accountRegion">
-                        <option value="MM">Myanmar</option>
-                        <option value="TH">Thailand</option>
-                    </select>
-                </div>
-
-                <div class="account-info-row">
-                    <span>Telegram</span>
-                    <input type="text" id="telegramName" placeholder="Enter Telegram username">
-                </div>
-
-                <div class="account-info-row">
-                    <span>Phone</span>
-                    <input type="text" id="phoneNumber" placeholder="Enter phone number">
-                </div>
-
-                <div class="account-info-row">
-                    <span>MLBB User ID</span>
-                    <input type="text" id="mlbbUserId" placeholder="Enter MLBB User ID">
-                </div>
-
-                <div class="account-info-row">
-                    <span>MLBB Server ID</span>
-                    <input type="text" id="mlbbServerId" placeholder="Enter MLBB Server ID">
-                </div>
-
-                <div class="account-info-row">
-                    <span>Profile Photo</span>
-                    <input type="file" id="profilePhoto" accept="image/*">
-                </div>
-            </div>
-
-            <div class="account-actions">
-                <button id="saveProfileBtn">Save Profile</button>
-                <button id="goHistoryBtn" class="secondary-account-btn">View History</button>
-                <div class="noti-wrapper">
-                    <button class="notification-btn" id="notiBtn">
-                        🔔 <span id="notiCount">0</span>
-                    </button>
-
-                    <div class="noti-dropdown" id="notiDropdown">
-                        <h4>Notifications</h4>
-                        <div id="notiList">
-                            <p>No notifications yet.</p>
-                        </div>
-                        <a href="history.html" class="view-history-link">View all orders</a>
+            <div class="tab-panel active" id="overview">
+                <h1>My Account</h1>
+                <div class="dashboard-grid">
+                    <div class="dash-card">
+                        <span>Total Orders</span>
+                        <strong id="totalOrders">0</strong>
+                    </div>
+                    <div class="dash-card">
+                        <span>Pending</span>
+                        <strong id="pendingOrders">0</strong>
+                    </div>
+                    <div class="dash-card">
+                        <span>Completed</span>
+                        <strong id="completedOrders">0</strong>
                     </div>
                 </div>
-                <button id="logoutAccountBtn" class="danger-account-btn">Logout</button>
             </div>
 
-            <p id="accountMsg"></p>
-        </div>
-    </section>
+            <div class="tab-panel" id="profile">
+                <h1>Profile Information</h1>
 
-    <script src="account.js"></script>
+                <label>Display Name</label>
+                <input type="text" id="displayName" placeholder="Your display name">
+
+                <label>Region</label>
+                <select id="accountRegion">
+                    <option value="MM">Myanmar - MMK</option>
+                    <option value="TH">Thailand - THB</option>
+                </select>
+
+                <button id="saveProfileBtn">Save Profile</button>
+            </div>
+
+            <div class="tab-panel" id="history">
+                <h1>Order History</h1>
+                <div id="historyList"></div>
+            </div>
+
+            <div class="tab-panel" id="security">
+                <h1>Account Security</h1>
+                <p>Password reset and social account management will be available here.</p>
+                <a href="forgot.html" class="security-btn">Reset Password</a>
+            </div>
+
+        </section>
+
+    </main>
+
+    <script src="js/account.js"></script>
     <script src="js/logout.js"></script>
+
 </body>
 
 </html>

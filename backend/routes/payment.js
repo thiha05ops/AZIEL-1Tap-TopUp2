@@ -56,6 +56,7 @@ User ID: ${userId}
 Server ID: ${zoneId || "-"}
 Package: ${packageName}
 Amount: ${amount} ${currency}
+Payment: ${paymentMethod}
 User: ${username || "guest"}`
         );
 
@@ -126,13 +127,11 @@ router.post("/payment/submit", upload.single("slip"), async (req, res) => {
 
         await sendTelegramPhoto(
             req.file.path,
-            `💸 Payment Slip Received
+            `💸 Payment Slip
 
-Order ID: ${order.orderId}
-User: ${order.username}
-Game: ${order.game}
+Order: ${order.orderId}
 User ID: ${order.userId}
-Server ID: ${order.zoneId || "-"}
+Server: ${order.zoneId || "-"}
 Package: ${order.packageName}
 Amount: ${order.amount} ${order.currency}
 Payment: ${order.paymentMethod}
