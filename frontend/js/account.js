@@ -1,68 +1,89 @@
 // frontend/js/account.js
 
 document.addEventListener("DOMContentLoaded", () => {
-    document.getElementById("notiBtn").onclick = () => {
-        const panel = document.getElementById("notiPanel");
-        panel.style.display =
-            panel.style.display === "block" ? "none" : "block";
-
-        loadBellOrders(); // 🔥 important
-    };
     const username = localStorage.getItem("username") || "guest";
     const region = localStorage.getItem("region") || "MM";
 
-    document.getElementById("profileName").innerText =
-        localStorage.getItem("displayName") || username;
+    const profileName = document.getElementById("profileName");
+    const avatarText = document.getElementById("avatarText");
+    const profileRegion = document.getElementById("profileRegion");
+    const displayName = document.getElementById("displayName");
+    const accountRegion = document.getElementById("accountRegion");
 
-    document.getElementById("avatarText").innerText =
-        username.charAt(0).toUpperCase();
+    if (profileName) profileName.innerText = localStorage.getItem("displayName") || username;
+    if (avatarText) avatarText.innerText = username.charAt(0).toUpperCase();
+    if (profileRegion) profileRegion.innerText = "Region: " + region;
+    if (displayName) displayName.value = localStorage.getItem("displayName") || username;
+    if (accountRegion) accountRegion.value = region;
 
-    document.getElementById("profileRegion").innerText =
-        "Region: " + region;
-
-    document.getElementById("displayName").value =
-        localStorage.getItem("displayName") || username;
-
-    document.getElementById("accountRegion").value = region;
-
+    // Sidebar tabs
     document.querySelectorAll(".side-link").forEach(btn => {
         btn.addEventListener("click", () => {
             document.querySelectorAll(".side-link").forEach(b => b.classList.remove("active"));
             document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
 
             btn.classList.add("active");
-            document.getElementById(btn.dataset.tab).classList.add("active");
 
-            if (btn.dataset.tab === "history") loadHistory();
+            const panel = document.getElementById(btn.dataset.tab);
+            if (panel) panel.classList.add("active");
+
+            if (btn.dataset.tab === "history") {
+                loadHistory();
+            }
         });
     });
 
-    document.getElementById("saveProfileBtn").addEventListener("click", () => {
-        localStorage.setItem("displayName", document.getElementById("displayName").value.trim() || username);
-        localStorage.setItem("region", document.getElementById("accountRegion").value);
+    // Save profile
+    const saveProfileBtn = document.getElementById("saveProfileBtn");
 
-        alert("Profile saved ✅");
-        location.reload();
-    });
+    if (saveProfileBtn) {
+        saveProfileBtn.addEventListener("click", () => {
+            localStorage.setItem(
+                "displayName",
+                document.getElementById("displayName").value.trim() || username
+            );
 
-    document.getElementById("notiBtn").addEventListener("click", () => {
-        const panel = document.getElementById("notiPanel");
-        panel.style.display = panel.style.display === "block" ? "none" : "block";
-        loadBellOrders();
-    });
+            localStorage.setItem(
+                "region",
+                document.getElementById("accountRegion").value
+            );
+
+            alert("Profile saved ✅");
+            location.reload();
+        });
+    }
+
+    // Bell click
+    const notiBtn = document.getElementById("notiBtn");
+
+    if (notiBtn) {
+        notiBtn.addEventListener("click", () => {
+            const panel = document.getElementById("notiPanel");
+
+            if (!panel) return;
+
+            panel.style.display =
+                panel.style.display === "block" ? "none" : "block";
+
+            loadBellOrders();
+        });
+    }
 
     loadHistory();
     loadBellOrders();
 
+    // Auto refresh
     setInterval(() => {
-        loadHistory();
         loadBellOrders();
-    }, 8000);
+        loadHistory();
+    }, 5000);
 });
 
 async function loadHistory() {
     const username = localStorage.getItem("username") || "guest";
     const box = document.getElementById("historyList");
+
+    if (!box) return;
 
     try {
         const res = await fetch(`/api/history/${username}`);
@@ -77,23 +98,35 @@ async function loadHistory() {
         renderHistory(data.orders);
 
     } catch (error) {
+        console.log("History error:", error);
         box.innerHTML = `<p>Server error.</p>`;
     }
 }
 
 function renderStats(orders) {
-    document.getElementById("totalOrders").innerText = orders.length;
-    document.getElementById("pendingOrders").innerText =
-        orders.filter(o => o.status !== "completed").length;
-    document.getElementById("completedOrders").innerText =
-        orders.filter(o => o.status === "completed").length;
+    const totalOrders = document.getElementById("totalOrders");
+    const pendingOrders = document.getElementById("pendingOrders");
+    const completedOrders = document.getElementById("completedOrders");
+
+    if (totalOrders) totalOrders.innerText = orders.length;
+
+    if (pendingOrders) {
+        pendingOrders.innerText = orders.filter(o => o.status !== "completed").length;
+    }
+
+    if (completedOrders) {
+        completedOrders.innerText = orders.filter(o => o.status === "completed").length;
+    }
 }
 
 function renderHistory(orders) {
     const box = document.getElementById("historyList");
+
+    if (!box) return;
+
     box.innerHTML = "";
 
-    if (orders.length === 0) {
+    if (!orders || orders.length === 0) {
         box.innerHTML = `<p>No orders yet.</p>`;
         return;
     }
@@ -116,11 +149,13 @@ async function loadBellOrders() {
     const panel = document.getElementById("notiPanel");
     const count = document.getElementById("notiCount");
 
+    if (!panel || !count) return;
+
     try {
         const res = await fetch(`/api/history/${username}`);
         const data = await res.json();
 
-        if (!data.success || data.orders.length === 0) {
+        if (!data.success || !data.orders || data.orders.length === 0) {
             count.innerText = "0";
             panel.innerHTML = `<div class="noti-item">No order notifications</div>`;
             return;
@@ -144,6 +179,7 @@ async function loadBellOrders() {
         });
 
     } catch (error) {
+        console.log("Bell error:", error);
         panel.innerHTML = `<div class="noti-item">Server error</div>`;
     }
 }
@@ -153,8 +189,6 @@ function statusClass(status) {
     if (status === "processing") return "status-processing";
     if (status === "completed") return "status-completed";
     if (status === "cancelled" || status === "failed") return "status-failed";
+
     return "status-pending";
 }
-setInterval(() => {
-    loadBellOrders();
-}, 5000);
