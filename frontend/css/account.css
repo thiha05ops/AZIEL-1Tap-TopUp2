@@ -236,3 +236,53 @@ button {
 .noti-item:hover {
   background: #252552;
 }
+
+.noti-bell {
+  position: relative;
+  cursor: pointer;
+  font-size: 22px;
+}
+
+#notiCount {
+  position: absolute;
+  top: -6px;
+  right: -10px;
+  background: red;
+  color: white;
+  font-size: 12px;
+  padding: 3px 7px;
+  border-radius: 50%;
+}
+
+.noti-panel {
+  position: absolute;
+  right: 20px;
+  top: 70px;
+  width: 260px;
+  background: #111;
+  border-radius: 12px;
+  display: none;
+  z-index: 999;
+}
+
+.shake {
+  animation: shake 0.5s;
+}
+
+@keyframes shake {
+  0% {
+    transform: rotate(0);
+  }
+
+  25% {
+    transform: rotate(10deg);
+  }
+
+  50% {
+    transform: rotate(-10deg);
+  }
+
+  100% {
+    transform: rotate(0);
+  }
+}

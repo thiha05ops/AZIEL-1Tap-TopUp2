@@ -13,7 +13,8 @@ function addNotification(text, orderId) {
     });
 
     localStorage.setItem("notifications", JSON.stringify(list));
-    updateBell();
+
+    console.log("NOTI SAVED:", list); // 🔥 debug
 }
 
 function updateBell() {
@@ -31,5 +32,4 @@ function updateBell() {
 function markAllRead() {
     const list = getNotifications().map(n => ({ ...n, read: true }));
     localStorage.setItem("notifications", JSON.stringify(list));
-    updateBell();
 }

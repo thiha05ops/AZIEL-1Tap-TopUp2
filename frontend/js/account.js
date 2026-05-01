@@ -1,6 +1,13 @@
 // frontend/js/account.js
 
 document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("notiBtn").onclick = () => {
+        const panel = document.getElementById("notiPanel");
+        panel.style.display =
+            panel.style.display === "block" ? "none" : "block";
+
+        loadBellOrders(); // 🔥 important
+    };
     const username = localStorage.getItem("username") || "guest";
     const region = localStorage.getItem("region") || "MM";
 
@@ -148,3 +155,6 @@ function statusClass(status) {
     if (status === "cancelled" || status === "failed") return "status-failed";
     return "status-pending";
 }
+setInterval(() => {
+    loadBellOrders();
+}, 5000);
