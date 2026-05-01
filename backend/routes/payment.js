@@ -46,20 +46,6 @@ router.post("/payment/create", async (req, res) => {
             transactionId: ""
         });
         const { sendTelegramMessage } = require("../services/telegram");
-
-        await sendTelegramMessage(
-            `🆕 New Order Created
-
-Order: ${orderId}
-Game: ${game}
-User ID: ${userId}
-Server ID: ${zoneId || "-"}
-Package: ${packageName}
-Amount: ${amount} ${currency}
-Payment: ${paymentMethod}
-User: ${username || "guest"}`
-        );
-
         // Create payment page/session
         const paymentSession = await wavepayService.createPayment(req.body);
 

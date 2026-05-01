@@ -93,3 +93,10 @@ body {
 .after-actions button {
     width: 100%;
 }
+
+.after-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 15px;
+}
