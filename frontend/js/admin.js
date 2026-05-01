@@ -1,20 +1,27 @@
-function getStatusClass(status) {
-    if (status === "paid") return "status-paid";
-    if (status === "processing") return "status-processing";
-    if (status === "completed") return "status-completed";
-    return "status-pending";
-}
+let ADMIN_PASSWORD = "";
+
+document.getElementById("loginBtn").addEventListener("click", () => {
+    ADMIN_PASSWORD = document.getElementById("adminPassword").value.trim();
+
+    if (!ADMIN_PASSWORD) {
+        alert("Enter admin password");
+        return;
+    }
+
+    loadOrders();
+});
 
 async function loadOrders() {
-
     const res = await fetch("/api/admin/orders", {
-        headers: { "x-admin-password": ADMIN_PASSWORD }
+        headers: {
+            "x-admin-password": ADMIN_PASSWORD
+        }
     });
 
     const data = await res.json();
 
     if (!data.success) {
-        alert("Wrong password");
+        alert(data.message || "Wrong password");
         return;
     }
 
@@ -24,28 +31,47 @@ async function loadOrders() {
     box.innerHTML = "";
 
     data.orders.forEach(order => {
-
         box.innerHTML += `
-        <tr>
-            <td>${order.orderId}</td>
-            <td>${order.game}</td>
-            <td>${order.amount} ${order.currency}</td>
+            <div class="track-card">
+                <h3>${order.orderId}</h3>
+                <p><b>User:</b> ${order.username}</p>
+                <p><b>Game:</b> ${order.game}</p>
+                <p><b>User ID:</b> ${order.userId}</p>
+                <p><b>Server:</b> ${order.zoneId || "-"}</p>
+                <p><b>Package:</b> ${order.packageName}</p>
+                <p><b>Amount:</b> ${order.amount} ${order.currency}</p>
+                <p><b>Payment:</b> ${order.paymentMethod}</p>
+                <p><b>Status:</b> ${order.status}</p>
 
-            <td>
-                <span class="status-badge ${getStatusClass(order.status)}">
-                    ${order.status}
-                </span>
-            </td>
+                ${order.paymentSlip ? `<img src="/uploads/${order.paymentSlip}" style="width:140px;border-radius:10px;">` : ""}
 
-            <td>
-                ${order.paymentSlip ? `<img src="/uploads/${order.paymentSlip}" class="slip-img">` : "-"}
-            </td>
-
-            <td>
-                <button class="btn small" onclick="updateStatus('${order._id}','processing')">Processing</button>
-                <button class="btn small success" onclick="updateStatus('${order._id}','completed')">Done</button>
-            </td>
-        </tr>
+                <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:12px;">
+                    <button onclick="updateStatus('${order._id}','paid')">Paid</button>
+                    <button onclick="updateStatus('${order._id}','processing')">Processing</button>
+                    <button onclick="updateStatus('${order._id}','completed')">Completed</button>
+                    <button onclick="updateStatus('${order._id}','cancelled')">Cancel</button>
+                </div>
+            </div>
         `;
     });
+}
+
+async function updateStatus(id, status) {
+    const res = await fetch(`/api/admin/orders/${id}/status`, {
+        method: "PUT",
+        headers: {
+            "Content-Type": "application/json",
+            "x-admin-password": ADMIN_PASSWORD
+        },
+        body: JSON.stringify({ status })
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+        alert(data.message || "Update failed");
+        return;
+    }
+
+    loadOrders();
 }
