@@ -81,6 +81,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
             msg.innerHTML = `<p class="success-msg">Order Sent ✅</p>`;
 
+            const actions = document.getElementById("afterPaymentActions");
+            actions.style.display = "grid";
+
+            const gamePageMap = {
+                "Mobile Legends": "mlbb.html",
+                "PUBG Mobile": "pubg.html",
+                "Free Fire": "freefire.html",
+                "Honor Of Kings": "hok.html"
+            };
+
+            document.getElementById("backGameBtn").onclick = () => {
+                window.location.href = gamePageMap[game] || "shop.html";
+            };
+
+            document.getElementById("viewHistoryBtn").onclick = () => {
+                window.location.href = "account.html";
+            };
+
             let noti = JSON.parse(localStorage.getItem("noti")) || [];
 
             noti.unshift({
