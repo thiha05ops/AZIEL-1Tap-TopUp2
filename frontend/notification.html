@@ -1,0 +1,27 @@
+<h2>Notifications</h2>
+
+<div id="notiList"></div>
+
+<script src="js/notification.js"></script>
+<script>
+    const list = getNotifications();
+
+    const container = document.getElementById("notiList");
+
+    list.forEach(n => {
+        const div = document.createElement("div");
+        div.className = "noti-item";
+        div.innerHTML = `
+        <p>${n.text}</p>
+        <small>${n.time}</small>
+    `;
+
+        div.onclick = () => {
+            window.location.href = `tracking.html?orderId=${n.id}`;
+        };
+
+        container.appendChild(div);
+    });
+
+    markAllRead();
+</script>

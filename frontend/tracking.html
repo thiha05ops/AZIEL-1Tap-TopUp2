@@ -12,6 +12,7 @@
 
 <body>
 
+
     <div class="page-wrap">
 
         <a href="home.html" class="back-btn">← Back Home</a>
@@ -28,6 +29,35 @@
         </div>
 
     </div>
+    <h2>Order Tracking</h2>
+
+    <div id="trackingBox"></div>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const orderId = params.get("orderId");
+
+        fetch(`/api/order/track/${orderId}`)
+            .then(res => res.json())
+            .then(data => {
+                const box = document.getElementById("trackingBox");
+
+                if (!data.success) {
+                    box.innerHTML = "Order not found";
+                    return;
+                }
+
+                const o = data.order;
+
+                box.innerHTML = `
+            <p><b>ID:</b> ${o.orderId}</p>
+            <p><b>Game:</b> ${o.game}</p>
+            <p><b>Package:</b> ${o.packageName}</p>
+            <p><b>Status:</b> ${o.status}</p>
+            <p><b>Note:</b> ${o.note || "-"}</p>
+        `;
+            });
+    </script>
 
     <script src="js/tracking.js"></script>
 
