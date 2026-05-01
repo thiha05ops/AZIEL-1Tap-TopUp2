@@ -10,3 +10,21 @@
 .pubg-glow {
     box-shadow: 0 0 22px rgba(0, 200, 255, .28);
 }
+
+.noti-bell {
+    position: relative;
+    cursor: pointer;
+    font-size: 20px;
+}
+
+.noti-badge {
+    position: absolute;
+    top: -5px;
+    right: -8px;
+    background: red;
+    color: white;
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: 50%;
+    display: none;
+}
