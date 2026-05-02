@@ -1,3 +1,5 @@
+// frontend/js/payment-page.js
+
 document.addEventListener("DOMContentLoaded", () => {
 
     const params = new URLSearchParams(window.location.search);
@@ -14,7 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("orderIdText").innerText = orderId;
     document.getElementById("gameText").innerText = game;
     document.getElementById("packageText").innerText = packageName;
-    document.getElementById("userIdText").innerText = userId;
+    document.getElementById("userIdText").innerText = userId || "-";
     document.getElementById("zoneIdText").innerText = zoneId || "-";
 
     document.getElementById("amountText").innerText =
@@ -71,25 +73,29 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             msg.innerHTML = `<p class="success-msg">Order Sent ✅</p>`;
-            // 🔔 NOTIFICATION ADD (ဒီမှာထည့်)
-            addNotification(
-                `${game} ${packageName} order submitted`,
-                orderId
-            );
+            submitBtn.innerText = "ORDER SENT ✅";
 
-            document.getElementById("afterPaymentActions").style.display = "grid";
+            if (typeof addNotification === "function") {
+                addNotification(`${game} ${packageName} order submitted`, orderId);
+            }
+
+            const actions = document.getElementById("afterPaymentActions");
+            if (actions) actions.style.display = "grid";
+
+            const gamePageMap = {
+                "Mobile Legends": "mlbb.html",
+                "PUBG Mobile": "pubg.html",
+                "Free Fire": "freefire.html",
+                "Honor Of Kings": "hok.html"
+            };
 
             document.getElementById("backGameBtn").onclick = () => {
-                window.location.href = "mlbb.html";
+                window.location.href = gamePageMap[game] || "home.html";
             };
 
             document.getElementById("viewHistoryBtn").onclick = () => {
                 window.location.href = "account.html";
             };
-
-            setTimeout(() => {
-                window.location.href = `tracking.html?orderId=${orderId}`;
-            }, 1200);
 
         } catch (error) {
             console.log(error);
