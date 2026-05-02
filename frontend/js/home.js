@@ -1,63 +1,74 @@
 // frontend/js/home.js
 
 document.addEventListener("DOMContentLoaded", () => {
+    const username = localStorage.getItem("username");
 
-    /* Region Save */
-    const homeRegionSelect = document.getElementById("homeRegionSelect");
+    const btn = document.getElementById("profileBtn");
 
-    if (homeRegionSelect) {
-        const savedRegion = localStorage.getItem("region") || "MM";
-        homeRegionSelect.value = savedRegion;
+    if (!btn) return;
 
-        homeRegionSelect.addEventListener("change", () => {
-            localStorage.setItem("region", homeRegionSelect.value);
+    if (username) {
+        btn.innerText = "👤 " + username;
+    } else {
+        btn.innerText = "👤 Login";
+    }
+});
 
-            showToast("Region updated ✅");
-        });
+/* Region Save */
+const homeRegionSelect = document.getElementById("homeRegionSelect");
+
+if (homeRegionSelect) {
+    const savedRegion = localStorage.getItem("region") || "MM";
+    homeRegionSelect.value = savedRegion;
+
+    homeRegionSelect.addEventListener("change", () => {
+        localStorage.setItem("region", homeRegionSelect.value);
+
+        showToast("Region updated ✅");
+    });
+}
+
+/* Login gate for game cards */
+const gameCards = document.querySelectorAll(".game-card");
+
+gameCards.forEach(card => {
+    card.addEventListener("click", (e) => {
+
+        const isLogin = localStorage.getItem("isLogin");
+
+        if (isLogin !== "true") {
+            e.preventDefault();
+
+            showToast("Please login first 🔐");
+
+            setTimeout(() => {
+                window.location.href = "login.html";
+            }, 900);
+        }
+    });
+});
+
+/* Recent fake orders popup */
+const fakeOrders = [
+    "Thiha topped up MLBB 570 Diamonds",
+    "Aung bought PUBG 325 UC",
+    "Moe purchased Free Fire 520 Diamonds",
+    "KoKo ordered HOK 400 Tokens"
+];
+
+let orderIndex = 0;
+
+setInterval(() => {
+    showToast("🔥 " + fakeOrders[orderIndex]);
+
+    orderIndex++;
+
+    if (orderIndex >= fakeOrders.length) {
+        orderIndex = 0;
     }
 
-    /* Login gate for game cards */
-    const gameCards = document.querySelectorAll(".game-card");
+}, 9000);
 
-    gameCards.forEach(card => {
-        card.addEventListener("click", (e) => {
-
-            const isLogin = localStorage.getItem("isLogin");
-
-            if (isLogin !== "true") {
-                e.preventDefault();
-
-                showToast("Please login first 🔐");
-
-                setTimeout(() => {
-                    window.location.href = "login.html";
-                }, 900);
-            }
-        });
-    });
-
-    /* Recent fake orders popup */
-    const fakeOrders = [
-        "Thiha topped up MLBB 570 Diamonds",
-        "Aung bought PUBG 325 UC",
-        "Moe purchased Free Fire 520 Diamonds",
-        "KoKo ordered HOK 400 Tokens"
-    ];
-
-    let orderIndex = 0;
-
-    setInterval(() => {
-        showToast("🔥 " + fakeOrders[orderIndex]);
-
-        orderIndex++;
-
-        if (orderIndex >= fakeOrders.length) {
-            orderIndex = 0;
-        }
-
-    }, 9000);
-
-});
 
 /* Toast Function */
 function showToast(text) {

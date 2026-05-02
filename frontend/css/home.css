@@ -491,3 +491,12 @@ footer {
   font-weight: 800;
   box-shadow: 0 0 14px rgba(124, 58, 237, .35);
 }
+
+.profile-link {
+  padding: 8px 14px;
+  border-radius: 20px;
+  background: #6d28d9;
+  color: #fff;
+  text-decoration: none;
+  font-weight: 700;
+}

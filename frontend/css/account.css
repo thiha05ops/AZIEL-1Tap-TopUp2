@@ -287,3 +287,12 @@ button {
     transform: rotate(0);
   }
 }
+
+.logout-btn {
+  background: red;
+  color: white;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
