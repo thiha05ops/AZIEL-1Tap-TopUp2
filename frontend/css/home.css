@@ -481,3 +481,13 @@ footer {
   border-radius: 50%;
   display: none;
 }
+
+.profile-link {
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #7c3aed, #5b21b6);
+  color: #fff !important;
+  text-decoration: none;
+  font-weight: 800;
+  box-shadow: 0 0 14px rgba(124, 58, 237, .35);
+}
