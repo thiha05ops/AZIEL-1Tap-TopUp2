@@ -1,19 +1,39 @@
-// frontend/js/home.js
-
 document.addEventListener("DOMContentLoaded", () => {
+
     const username = localStorage.getItem("username");
 
-    const btn = document.getElementById("profileBtn");
-
-    if (!btn) return;
+    const avatar = document.getElementById("avatarText");
+    const nameText = document.getElementById("usernameText");
+    const dropdown = document.getElementById("profileDropdown");
+    const profileBox = document.getElementById("profileBox");
 
     if (username) {
-        btn.innerText = "👤 " + username;
+        avatar.innerText = username.charAt(0).toUpperCase();
+        nameText.innerText = username;
     } else {
-        btn.innerText = "👤 Login";
+        avatar.innerText = "👤";
+        nameText.innerText = "Login";
     }
-});
 
+    // toggle dropdown
+    profileBox.addEventListener("click", () => {
+        dropdown.style.display =
+            dropdown.style.display === "flex" ? "none" : "flex";
+    });
+
+    // logout
+    const logoutBtn = document.getElementById("logoutBtn");
+
+    logoutBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+
+        localStorage.removeItem("username");
+        localStorage.removeItem("token");
+
+        window.location.href = "login.html";
+    });
+
+});
 /* Region Save */
 const homeRegionSelect = document.getElementById("homeRegionSelect");
 
