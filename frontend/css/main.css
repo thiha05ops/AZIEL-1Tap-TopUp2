@@ -110,3 +110,76 @@ textarea {
   border-radius: 50%;
   display: none;
 }
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+/* Avatar */
+.avatar {
+  width: 36px;
+  height: 36px;
+  background: #7c3aed;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+/* Profile box */
+.profile-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+/* Dropdown */
+.profile-dropdown {
+  position: absolute;
+  top: 50px;
+  right: 0;
+  background: #111;
+  border-radius: 10px;
+  display: none;
+  flex-direction: column;
+  min-width: 160px;
+  overflow: hidden;
+}
+
+.profile-dropdown a,
+.profile-dropdown button {
+  padding: 10px;
+  color: white;
+  text-decoration: none;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.profile-dropdown a:hover,
+.profile-dropdown button:hover {
+  background: #222;
+}
+
+/* Bell */
+.noti-bell {
+  position: relative;
+  cursor: pointer;
+}
+
+#notiCount {
+  position: absolute;
+  top: -5px;
+  right: -8px;
+  background: red;
+  padding: 2px 6px;
+  border-radius: 50%;
+  font-size: 12px;
+}
