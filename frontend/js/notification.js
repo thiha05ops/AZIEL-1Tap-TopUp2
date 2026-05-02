@@ -1,5 +1,3 @@
-// notification.js
-
 function addNotification(text, orderId) {
     const list = JSON.parse(localStorage.getItem("aziel_orders") || "[]");
 
