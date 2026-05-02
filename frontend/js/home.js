@@ -60,7 +60,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 /* Toast Function */
-function showToast(text) {
+t(text) {
 
     let toast = document.getElementById("siteToast");
 
