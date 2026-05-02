@@ -192,3 +192,16 @@ function statusClass(status) {
 
     return "status-pending";
 }
+const logoutBtn = document.getElementById("logoutBtn");
+
+if (logoutBtn) {
+    logoutBtn.addEventListener("click", () => {
+
+        localStorage.removeItem("username");
+        localStorage.removeItem("token");
+
+        alert("Logged out");
+
+        window.location.href = "login.html";
+    });
+}
