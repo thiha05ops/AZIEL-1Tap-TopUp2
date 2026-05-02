@@ -1,35 +1,38 @@
-function getNotifications() {
-    return JSON.parse(localStorage.getItem("notifications")) || [];
-}
+// notification.js
 
 function addNotification(text, orderId) {
-    const list = getNotifications();
+    const list = JSON.parse(localStorage.getItem("aziel_orders") || "[]");
 
     list.unshift({
-        id: orderId,
         text,
-        time: new Date().toLocaleString(),
-        read: false
+        orderId,
+        time: new Date().toLocaleString()
     });
 
-    localStorage.setItem("notifications", JSON.stringify(list));
-
-    console.log("NOTI SAVED:", list); // 🔥 debug
+    localStorage.setItem("aziel_orders", JSON.stringify(list));
 }
 
-function updateBell() {
-    const list = getNotifications();
-    const unread = list.filter(n => !n.read).length;
+function loadNotifications() {
+    const list = JSON.parse(localStorage.getItem("aziel_orders") || "[]");
+    const box = document.getElementById("notiList");
 
-    const badge = document.getElementById("notiCount");
+    if (!box) return;
 
-    if (!badge) return;
+    if (list.length === 0) {
+        box.innerHTML = `<p>No notifications</p>`;
+        return;
+    }
 
-    badge.innerText = unread;
-    badge.style.display = unread > 0 ? "block" : "none";
+    box.innerHTML = "";
+
+    list.forEach(item => {
+        box.innerHTML += `
+            <div class="noti-item" onclick="window.location.href='tracking.html?orderId=${item.orderId}'">
+                🔔 ${item.text}<br>
+                <small>${item.time}</small>
+            </div>
+        `;
+    });
 }
 
-function markAllRead() {
-    const list = getNotifications().map(n => ({ ...n, read: true }));
-    localStorage.setItem("notifications", JSON.stringify(list));
-}
+document.addEventListener("DOMContentLoaded", loadNotifications);
