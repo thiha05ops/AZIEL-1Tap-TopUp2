@@ -86,6 +86,8 @@ body {
 
 .logo {
   font-size: 24px;
+  padding: 29px;
+  border: #6d28d9;
   font-weight: 900;
   color: #ffd700;
   text-shadow: 0 0 10px #ffd700;
