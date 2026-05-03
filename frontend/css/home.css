@@ -86,8 +86,6 @@ body {
 
 .logo {
   font-size: 24px;
-  padding: 29px;
-  border: #6d28d9;
   font-weight: 900;
   color: #ffd700;
   text-shadow: 0 0 10px #ffd700;
@@ -345,7 +343,7 @@ footer {
 }
 
 /* mobile */
-@media(max-width:768px) {
+@media(max-width:568px) {
   .topbar {
     flex-direction: column;
     gap: 12px;
@@ -356,7 +354,7 @@ footer {
     grid-template-columns: 1fr;
     text-align: center;
     min-height: auto;
-    padding: 50px 20px;
+    padding: 30px 18px;
   }
 
   .hero-left h1 {
@@ -369,7 +367,7 @@ footer {
   }
 
   .hero-right img {
-    max-width: 220px;
+    max-width: 120px;
   }
 
   #welcomeSplash h2 {
