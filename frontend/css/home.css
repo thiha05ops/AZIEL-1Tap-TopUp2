@@ -116,7 +116,7 @@ body {
   position: absolute;
   inset: 0;
   width: 100%;
-  height: 100%;
+  height: 80%;
   object-fit: cover;
   opacity: .22;
   z-index: 0;
