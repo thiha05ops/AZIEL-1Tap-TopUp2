@@ -1,86 +1,94 @@
 // frontend/js/pubg.js
 
 document.addEventListener("DOMContentLoaded", () => {
-
-    console.log("PUBG Page Loaded ✅");
-
     const buyBtn = document.getElementById("buyBtn");
-    const userId = document.getElementById("userId");
+    const userIdInput = document.getElementById("userId");
+    const serverIdInput = document.getElementById("serverId");
 
-    let selectedPack = "";
+    const selectedText = document.getElementById("selectedText");
+    const summaryPackage = document.getElementById("summaryPackage");
+    const summaryPayment = document.getElementById("summaryPayment");
+    const summaryAmount = document.getElementById("summaryAmount");
 
-    function getPacks() {
-        return document.querySelectorAll(".pack");
-    }
+    let selectedPack = null;
 
-    function checkForm() {
-        if (
-            userId.value.trim() !== "" &&
-            selectedPack !== ""
-        ) {
-            buyBtn.disabled = false;
-            buyBtn.style.opacity = "1";
-        } else {
-            buyBtn.disabled = true;
-            buyBtn.style.opacity = ".6";
-        }
-    }
+    document.addEventListener("click", (e) => {
+        const pack = e.target.closest(".pack");
+        if (!pack) return;
 
-    function setupPackageClick() {
-        const packs = getPacks();
+        document.querySelectorAll(".pack").forEach(p => p.classList.remove("active"));
+        pack.classList.add("active");
 
-        packs.forEach(pack => {
-            pack.addEventListener("click", () => {
+        selectedPack = {
+            name: pack.dataset.name || pack.querySelector(".pack-name")?.innerText || pack.innerText,
+            amount: Number(pack.dataset.price || 0)
+        };
 
-                packs.forEach(p => p.classList.remove("active"));
-                pack.classList.add("active");
+        updateState();
+    });
 
-                selectedPack = pack.innerText.trim();
+    userIdInput?.addEventListener("input", updateState);
 
-                checkForm();
-            });
-        });
-    }
+    document.addEventListener("click", (e) => {
+        const payCard = e.target.closest(".pay-card");
+        if (!payCard) return;
+        setTimeout(updateState, 80);
+    });
 
-    userId.addEventListener("input", checkForm);
-
-    setupPackageClick();
-    checkForm();
-
-    buyBtn.addEventListener("click", async () => {
+    buyBtn?.addEventListener("click", () => {
+        if (buyBtn.disabled || !selectedPack) return;
 
         const username = localStorage.getItem("username") || "guest";
         const region = localStorage.getItem("region") || "MM";
-        const paymentMethod = document.getElementById("paymentMethod")?.value;
+        const currency = region === "TH" ? "THB" : "MMK";
+        const paymentMethod = document.getElementById("paymentMethod")?.value || "";
 
-        if (!paymentMethod) {
-            alert("Please select payment method");
-            return;
-        }
-
-        const activePack = document.querySelector(".pack.active");
-
-        if (!activePack) {
-            alert("Please select package");
-            return;
-        }
-
-        const amount = activePack.dataset.price;
         const orderId = "AZL-" + Date.now();
 
-        createPaymentAndRedirect({
+        const orderData = {
             orderId,
             game: "PUBG Mobile",
-            packageName: selectedPack,
-            amount,
-            currency: region === "TH" ? "THB" : "MMK",
+            packageName: selectedPack.name,
+            amount: selectedPack.amount,
+            currency,
             region,
             paymentMethod,
             username,
-            userId: userId.value.trim(),
-            zoneId: ""
-        });
+            userId: userIdInput.value.trim(),
+            zoneId: serverIdInput.value.trim() || "-"
+        };
 
+        createPaymentAndRedirect(orderData);
     });
 
+    function updateState() {
+        const userId = userIdInput?.value.trim();
+        const paymentMethod = document.getElementById("paymentMethod")?.value || "";
+
+        const paymentNameMap = {
+            kbzpay: "KBZPay",
+            wavepay: "WavePay",
+            ayapay: "AYA Pay",
+            promptpay: "PromptPay",
+            scb: "SCB"
+        };
+
+        if (selectedPack) {
+            summaryPackage.innerText = selectedPack.name;
+            summaryAmount.innerText = `${selectedPack.amount.toLocaleString()} Ks`;
+            selectedText.innerText = "Ready to checkout after completing all fields.";
+        } else {
+            summaryPackage.innerText = "Not selected";
+            summaryAmount.innerText = "0 Ks";
+            selectedText.innerText = "Please select a package.";
+        }
+
+        summaryPayment.innerText = paymentMethod
+            ? paymentNameMap[paymentMethod] || paymentMethod
+            : "Not selected";
+
+        buyBtn.disabled = !(userId && selectedPack && paymentMethod);
+    }
+
+    updateState();
 });
