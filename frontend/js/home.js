@@ -23,7 +23,6 @@ document.addEventListener("DOMContentLoaded", () => {
             nameText.innerText = "Login";
         }
     }
-    const profileBox = document.getElementById("profileBox");
     const dropdown = document.getElementById("profileDropdown");
 
     if (profileBox && dropdown) {
