@@ -1,0 +1,125 @@
+.payment-wrap {
+    min-height: 100vh;
+    background: #070716;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 25px;
+    color: #fff;
+}
+
+.payment-card {
+    width: 100%;
+    max-width: 620px;
+    background: linear-gradient(135deg, #101028, #16163b);
+    border: 1px solid rgba(255, 255, 255, .08);
+    border-radius: 24px;
+    padding: 28px;
+    box-shadow: 0 0 35px rgba(124, 58, 237, .25);
+}
+
+.payment-card h1 {
+    margin: 12px 0 8px;
+    color: #ffd700;
+}
+
+.sub-text {
+    color: #c9c9df;
+}
+
+.back-btn {
+    color: #ffd700;
+    text-decoration: none;
+    font-weight: 800;
+}
+
+.order-info {
+    background: #0d0d22;
+    border-radius: 18px;
+    padding: 18px;
+    margin: 20px 0;
+}
+
+.order-info p {
+    margin: 10px 0;
+}
+
+.qr-section {
+    text-align: center;
+    background: #fff;
+    color: #111;
+    border-radius: 20px;
+    padding: 20px;
+    margin-bottom: 18px;
+}
+
+.qr-section img {
+    width: 210px;
+    max-width: 100%;
+    height: 210px;
+    object-fit: contain;
+}
+
+.qr-section h3 {
+    margin: 10px 0 5px;
+}
+
+.upload-box {
+    display: block;
+    background: #0d0d22;
+    border: 1px dashed rgba(255, 255, 255, .25);
+    border-radius: 16px;
+    padding: 18px;
+    text-align: center;
+    cursor: pointer;
+    margin-bottom: 16px;
+}
+
+.upload-box input {
+    margin-top: 12px;
+    width: 100%;
+}
+
+#submitPaymentBtn,
+.after-actions button {
+    width: 100%;
+    padding: 15px;
+    border: none;
+    border-radius: 14px;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+#submitPaymentBtn {
+    background: linear-gradient(135deg, #ffd700, #ff9f1c);
+    color: #111;
+}
+
+#submitPaymentBtn:disabled {
+    opacity: .6;
+    cursor: not-allowed;
+}
+
+.after-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 15px;
+}
+
+.after-actions button {
+    background: #7c3aed;
+    color: #fff;
+}
+
+.success-msg {
+    color: #22c55e;
+    font-weight: 800;
+    margin-top: 14px;
+}
+
+.error-msg {
+    color: #ef4444;
+    font-weight: 800;
+    margin-top: 14px;
+}

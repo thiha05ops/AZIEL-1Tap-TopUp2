@@ -1,76 +1,83 @@
-<!-- frontend/mlbb.html -->
-
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mobile Legends - AZIEL</title>
 
-    <title>Mobile Legends Top Up</title>
-
-    <link rel="stylesheet" href="css/main.css?v=2">
-    <link rel="stylesheet" href="css/game.css?v=2">
-    <link rel="stylesheet" href="css/responsive.css?v=2">
-
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/game.css">
+    <link rel="stylesheet" href="css/payment-grid.css">
 </head>
 
 <body>
 
-    <header class="topbar">
-        <div class="logo">AZIEL 1Tap TopUp</div>
-
-        <nav>
-            <span id="userBox"></span>
-            <div class="noti-bell" onclick="openNoti()">
-                <span id="notiCount" class="noti-badge">0</span>
-            </div>
-            <a href="notification.html">🔔</a>
-            <a href="home.html">Home</a>
-            <a href="shop.html">Top Up</a>
-            <a href="login.html">Login</a>
-            <a href="#" id="logoutBtn">Logout</a>
-        </nav>
+    <header class="game-header">
+        <a href="home.html" class="brand">AZIEL</a>
+        <a href="account.html" class="account-btn">👤 Account</a>
     </header>
 
-    <section class="game-banner">
-        <img src="assets/mlbb.jpg" alt="MLBB">
-        <div class="overlay">
-            <h1>Mobile Legends</h1>
-            <p>Instant Diamonds Delivery</p>
-        </div>
-    </section>
+    <main class="game-page">
 
-    <section class="topup-box">
+        <section class="game-hero">
+            <div class="game-banner">
+                <img src="assets/mlbb.jpg" alt="Mobile Legends">
+                <div class="banner-overlay">
+                    <h1>Mobile Legends</h1>
+                    <p>Fast & secure diamond top up</p>
+                </div>
+            </div>
 
-        <h2>Enter Account Info</h2>
+            <div class="game-info">
+                <h2>How to Top Up</h2>
+                <p>1. Enter your User ID and Server ID.</p>
+                <p>2. Select diamond package.</p>
+                <p>3. Choose payment method.</p>
+                <p>4. Pay and upload slip.</p>
+            </div>
+        </section>
 
-        <input type="text" id="userId" placeholder="User ID">
-        <input type="text" id="serverId" placeholder="Zone ID">
-        <h2>Select Package</h2>
-        <div class="packages" id="packages" data-game="mlbb"></div>
-        <h2>Select Payment</h2>
-        <div class="payment-grid" id="paymentGrid"></div>
-        <input type="hidden" id="paymentMethod">
+        <section class="order-panel">
 
-        <button id="buyBtn">Buy Now</button>
+            <div class="form-card">
+                <h2>Account Information</h2>
 
-    </section>
+                <label>User ID</label>
+                <input type="text" id="userId" placeholder="Enter User ID">
 
-    <footer>
-        © 2026 AZIEL 1Tap Shop
-    </footer>
+                <label>Server ID</label>
+                <input type="text" id="serverId" placeholder="Enter Server ID">
+            </div>
+
+            <div class="form-card">
+                <h2>Select Package</h2>
+                <div class="packages" id="packages" data-game="mlbb"></div>
+            </div>
+
+            <div class="form-card">
+                <h2>Select Payment</h2>
+
+                <div id="paymentGrid" class="payment-grid"></div>
+
+                <input type="hidden" id="paymentMethod">
+            </div>
+
+            <div class="selected-box">
+                <p id="selectedText">No package selected</p>
+                <button id="buyBtn" disabled>Buy Now</button>
+            </div>
+
+        </section>
+
+    </main>
 
     <script src="js/auth-check.js"></script>
-    <script src="js/logout.js"></script>
-
     <script src="js/prices.js"></script>
     <script src="js/region-payment.js"></script>
     <script src="js/payment-redirect.js"></script>
-
+    <script src="js/payment.js"></script>
     <script src="js/mlbb.js"></script>
-    <script src="js/notification.js"></script>
-    <script src="js/account.js"></script>
 
 </body>
 
