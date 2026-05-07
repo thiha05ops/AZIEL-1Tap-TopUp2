@@ -78,7 +78,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (selectedPack) {
             summaryPackage.innerText = selectedPack.name;
-            summaryAmount.innerText = `${selectedPack.amount.toLocaleString()} Ks`;
+            const region = localStorage.getItem("region") || "MM";
+
+            const currencySymbol = region === "TH"
+                ? "฿"
+                : "Ks";
+
+            summaryAmount.innerText =
+                `${selectedPack.amount.toLocaleString()} ${currencySymbol}`;
             selectedText.innerText = "Ready to checkout after completing all fields.";
         } else {
             summaryPackage.innerText = "Not selected";
