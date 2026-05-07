@@ -39,15 +39,6 @@ document.addEventListener("DOMContentLoaded", () => {
     // logout
     const logoutBtn = document.getElementById("logoutBtn");
 
-    logoutBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-
-        localStorage.removeItem("username");
-        localStorage.removeItem("token");
-
-        window.location.href = "login.html";
-    });
-
 });
 /* Region Save */
 const homeRegionSelect = document.getElementById("homeRegionSelect");
