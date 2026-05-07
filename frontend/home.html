@@ -1,181 +1,95 @@
-<!-- frontend/home.html -->
-
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <title>AZIEL 1Tap TopUp</title>
 
     <link rel="stylesheet" href="css/main.css">
     <link rel="stylesheet" href="css/home.css">
-    <link rel="stylesheet" href="css/responsive.css">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap" rel="stylesheet">
-
 </head>
 
 <body>
-    <div id="siteLoader">
-        <div class="loader-logo">AZIEL</div>
-    </div>
 
-    <!-- Welcome Splash -->
-    <div id="welcomeSplash">
-        <h1>WELCOME TO</h1>
-        <h2>AZIEL 1Tap Shop</h2>
-    </div>
+    <header class="home-header">
+        <div class="logo">AZIEL 1Tap</div>
 
-    <!-- Main Content -->
-    <div id="mainHome">
+        <nav class="nav-links">
+            <a href="home.html">Home</a>
+            <a href="shop.html">Top Up</a>
+        </nav>
 
-        <header class="topbar">
-            <div class="logo">AZIEL 1Tap Shop</div>
+        <div class="header-right">
 
-            <nav>
-                <div class="noti-bell" onclick="openNoti()">
-                    <span id="notiCount" class="noti-badge">0</span>
+            <div class="noti-bell" id="notiBtn">
+                🔔
+                <span id="notiCount">0</span>
+            </div>
+
+            <div class="profile-box" id="profileBox">
+                <div class="avatar" id="avatarText">👤</div>
+                <span id="usernameText">Login</span>
+
+                <div class="profile-dropdown" id="profileDropdown">
+                    <a href="account.html">Account</a>
+                    <a href="notifications.html">Notifications</a>
+                    <button id="logoutBtn">Logout</button>
                 </div>
-                <a href="notifications.html"></a>
-                <a href="home.html">Home</a>
-                <a href="shop.html">Top Up</a>
-                <div class="header-right">
+            </div>
 
-                    <!-- 👤 Profile -->
-                    <div class="profile-box" id="profileBox">
-                        <div class="avatar" id="avatarText">U</div>
-                        <span id="usernameText">Login</span>
-
-                        <div class="profile-box" id="profileBox">
-                            <div class="avatar" id="avatarText">U</div>
-                            <span id="usernameText">Login</span>
-
-                            <div class="profile-dropdown" id="profileDropdown">
-                                <a href="account.html">Account</a>
-                                <a href="notifications.html">Notifications</a>
-                                <button id="logoutBtn">Logout</button>
-                            </div>
-                        </div>
-
-
-                    </div>
-                </div>
-
-    </div>
-
-    </nav>
-
+        </div>
     </header>
 
-    <section class="hero">
+    <main id="mainHome">
 
-        <div class="hero-left">
-            <h1>Fast & Secure Game Top Up</h1>
-            <p>Mobile Legends • PUBG • Free Fire • HOK</p>
-
-            <div class="region-box">
-                <label>Select Region</label>
-
-                <select id="homeRegionSelect">
-                    <option value="MM">Myanmar - MMK</option>
-                    <option value="TH">Thailand - THB</option>
-                </select>
-            </div>
-        </div>
-
-    </section>
-
-    <section class="games-section">
-        <section class="trust">
-
-            <h2>Trusted by Players</h2>
-
-            <div class="trust-grid">
-                <div>🔒 Secure Payment</div>
-                <div>⚡ Fast Delivery</div>
-                <div>🌍 MM & TH Support</div>
-                <div>💬 24/7 Support</div>
+        <section class="hero">
+            <div class="hero-left">
+                <h1>Welcome to AZIEL 1Tap Shop</h1>
+                <p>Fast, secure and trusted game top-up service.</p>
+                <a href="shop.html" class="hero-btn">Start Top Up</a>
             </div>
 
+            <div class="hero-right">
+                <img src="assets/hero.jpg" alt="Hero">
+            </div>
         </section>
 
-        <h2>Popular Games</h2>
+        <section class="games-section">
+            <h2>Popular Games</h2>
 
-        <div class="game-grid">
-
-            <a href="mlbb.html" class="game-card" style="background-image:url('assets/mlbb.jpg')">
-                <div class="game-overlay">
+            <div class="game-grid">
+                <a href="mlbb.html" class="game-card">
+                    <img src="assets/mlbb.jpg" alt="MLBB">
                     <h3>Mobile Legends</h3>
-                    <span>Top Up Diamonds</span>
-                </div>
-            </a>
+                </a>
 
-            <a href="pubg.html" class="game-card" style="background-image:url('assets/pubg.jpg')">
-                <div class="game-overlay">
+                <a href="pubg.html" class="game-card">
+                    <img src="assets/pubg.jpg" alt="PUBG">
                     <h3>PUBG Mobile</h3>
-                    <span>Buy UC</span>
-                </div>
-            </a>
+                </a>
 
-            <a href="freefire.html" class="game-card" style="background-image:url('assets/freefire.jpg')">
-                <div class="game-overlay">
+                <a href="freefire.html" class="game-card">
+                    <img src="assets/freefire.jpg" alt="Free Fire">
                     <h3>Free Fire</h3>
-                    <span>Top Up Diamonds</span>
-                </div>
-            </a>
+                </a>
 
-            <a href="hok.html" class="game-card" style="background-image:url('assets/hok.jpg')">
-                <div class="game-overlay">
-                    <h3>Honor Of Kings</h3>
-                    <span>Buy Tokens</span>
-                </div>
-            </a>
+                <a href="hok.html" class="game-card">
+                    <img src="assets/hok.jpg" alt="HOK">
+                    <h3>Honor of Kings</h3>
+                </a>
+            </div>
+        </section>
 
-        </div>
-
-    </section>
-
-    <section class="promo-banner">
-        <span>🔥 FLASH SALE ENDS IN</span>
-        <strong id="saleTimer">02:59:59</strong>
-    </section>
-
-    <section class="why-us">
-        <h2>Why Choose AZIEL?</h2>
-    </section>
+    </main>
 
     <footer>
-
-        <div class="footer-grid">
-
-            <div>
-                <h3>AZIEL 1Tap Shop</h3>
-                <p>Fast & Secure Game Top Up Service</p>
-            </div>
-
-            <div>
-                <h4>Quick Links</h4>
-                <a href="contact.html">Contact</a>
-                <a href="terms.html">Terms</a>
-                <a href="privacy.html">Privacy</a>
-                <a href="refund.html">Refund</a>
-
-            </div>
-
-        </div>
-
-        <p class="copy">© 2026 AZIEL 1Tap Shop</p>
-
+        © 2026 AZIEL 1Tap Shop
     </footer>
-
-    </div>
 
     <script src="js/auth-check.js"></script>
     <script src="js/logout.js"></script>
     <script src="js/home.js"></script>
-
-
 
 </body>
 

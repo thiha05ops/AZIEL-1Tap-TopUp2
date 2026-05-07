@@ -1,120 +1,92 @@
+// frontend/js/home.js
+
 document.addEventListener("DOMContentLoaded", () => {
+    const username = localStorage.getItem("username");
+    const displayName = localStorage.getItem("displayName") || username;
 
-    const username =
-        localStorage.getItem("displayName")
-        || "Login";
-
-    const profileNameEl = document.getElementById("profileName");
-    if (profileNameEl) {
-        profileNameEl.innerText = username;
-    }
-
-    const avatar = document.getElementById("avatarText");
-    const nameText = document.getElementById("usernameText");
-    const dropdown = document.getElementById("profileDropdown");
+    const avatarText = document.getElementById("avatarText");
+    const usernameText = document.getElementById("usernameText");
     const profileBox = document.getElementById("profileBox");
+    const profileDropdown = document.getElementById("profileDropdown");
+    const notiBtn = document.getElementById("notiBtn");
+    const notiCount = document.getElementById("notiCount");
 
-    if (avatar && nameText) {
-        if (username !== "Login") {
-            avatar.innerText = username.charAt(0).toUpperCase();
-            nameText.innerText = username;
+    // Profile text
+    if (avatarText && usernameText) {
+        if (username) {
+            avatarText.innerText = displayName.charAt(0).toUpperCase();
+            usernameText.innerText = displayName;
         } else {
-            avatar.innerText = "👤";
-            nameText.innerText = "Login";
+            avatarText.innerText = "👤";
+            usernameText.innerText = "Login";
         }
     }
 
-    if (profileBox && dropdown) {
-        profileBox.addEventListener("click", () => {
-            dropdown.style.display =
-                dropdown.style.display === "flex" ? "none" : "flex";
+    // Profile dropdown
+    if (profileBox && profileDropdown) {
+        profileBox.addEventListener("click", (e) => {
+            e.stopPropagation();
+
+            if (!username) {
+                window.location.href = "login.html";
+                return;
+            }
+
+            profileDropdown.style.display =
+                profileDropdown.style.display === "flex" ? "none" : "flex";
+        });
+
+        document.addEventListener("click", () => {
+            profileDropdown.style.display = "none";
         });
     }
-    // toggle dropdown
-    profileBox.addEventListener("click", () => {
-        dropdown.style.display =
-            dropdown.style.display === "flex" ? "none" : "flex";
-    });
 
-    // logout
-    const logoutBtn = document.getElementById("logoutBtn");
+    // Notification button
+    if (notiBtn) {
+        notiBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
 
-});
-/* Region Save */
-const homeRegionSelect = document.getElementById("homeRegionSelect");
-
-if (homeRegionSelect) {
-    const savedRegion = localStorage.getItem("region") || "MM";
-    homeRegionSelect.value = savedRegion;
-
-    homeRegionSelect.addEventListener("change", () => {
-        localStorage.setItem("region", homeRegionSelect.value);
-
-        showToast("Region updated ✅");
-    });
-}
-
-/* Login gate for game cards */
-const gameCards = document.querySelectorAll(".game-card");
-
-gameCards.forEach(card => {
-    card.addEventListener("click", (e) => {
-
-        const isLogin = localStorage.getItem("isLogin");
-
-        if (isLogin !== "true") {
-            e.preventDefault();
-
-            showToast("Please login first 🔐");
-
-            setTimeout(() => {
+            if (!username) {
                 window.location.href = "login.html";
-            }, 900);
-        }
-    });
-});
+                return;
+            }
 
-/* Recent fake orders popup */
-const fakeOrders = [
-    "Thiha topped up MLBB 570 Diamonds",
-    "Aung bought PUBG 325 UC",
-    "Moe purchased Free Fire 520 Diamonds",
-    "KoKo ordered HOK 400 Tokens"
-];
-
-let orderIndex = 0;
-
-/* Toast Function */
-function showToast(text) {
-
-    let toast = document.getElementById("siteToast");
-    toast.style.opacity = "1";
-    toast.style.transform = "translateY(0)";
-
-    clearTimeout(window.toastTimer);
-
-    window.toastTimer = setTimeout(() => {
-        toast.style.opacity = "0";
-        toast.style.transform = "translateY(20px)";
-    }, 2600);
-}
-/* Flash Sale Countdown */
-let totalSeconds = 3 * 60 * 60 - 1; // 3 hours
-setInterval(() => {
-
-    const timer = document.getElementById("saleTimer");
-    if (!timer) return;
-
-    const h = String(Math.floor(totalSeconds / 3600)).padStart(2, "0");
-    const m = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0");
-    const s = String(totalSeconds % 60).padStart(2, "0");
-
-    timer.innerText = `${h}:${m}:${s}`;
-
-    if (totalSeconds > 0) {
-        totalSeconds--;
-    } else {
-        totalSeconds = 3 * 60 * 60 - 1;
+            window.location.href = "notifications.html";
+        });
     }
 
-}, 1000);
+    // Notification count from DB
+    if (username && notiCount) {
+        loadNotificationCount(username, notiCount);
+        setInterval(() => loadNotificationCount(username, notiCount), 8000);
+    }
+
+    // Game cards login gate
+    document.querySelectorAll(".game-card").forEach(card => {
+        card.addEventListener("click", (e) => {
+            if (!username) {
+                e.preventDefault();
+                alert("Please login first 🔐");
+                window.location.href = "login.html";
+            }
+        });
+    });
+});
+
+async function loadNotificationCount(username, badge) {
+    try {
+        const res = await fetch(`/api/history/${username}`);
+        const data = await res.json();
+
+        if (!data.success || !data.orders) {
+            badge.innerText = "0";
+            return;
+        }
+
+        const activeOrders = data.orders.filter(o => o.status !== "completed");
+        badge.innerText = activeOrders.length;
+
+    } catch (error) {
+        badge.innerText = "0";
+    }
+}
