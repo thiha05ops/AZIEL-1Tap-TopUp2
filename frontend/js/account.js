@@ -1,151 +1,134 @@
 // frontend/js/account.js
-const usernameText = document.getElementById("usernameText");
 
-if (usernameText) {
-    usernameText.innerText =
-        localStorage.getItem("username") || "guest";
-}
-localStorage.getItem("username")
-    || "guest";
-const region = localStorage.getItem("region") || "MM";
+document.addEventListener("DOMContentLoaded", () => {
+    const username = localStorage.getItem("username") || "guest";
+    const region = localStorage.getItem("region") || "MM";
+    const displayName = localStorage.getItem("displayName") || username;
 
-const profileName = document.getElementById("profileName");
-const avatarText = document.getElementById("avatarText");
-const profileRegion = document.getElementById("profileRegion");
-const displayName = document.getElementById("displayName");
-const accountRegion = document.getElementById("accountRegion");
+    setText("profileName", displayName);
+    setText("avatarText", displayName.charAt(0).toUpperCase());
+    setText("profileRegion", "Region: " + region);
 
-if (profileName) profileName.innerText = localStorage.getItem("displayName") || username;
-if (avatarText) avatarText.innerText = username.charAt(0).toUpperCase();
-if (profileRegion) profileRegion.innerText = "Region: " + region;
-if (displayName) displayName.value = localStorage.getItem("displayName") || username;
-if (accountRegion) accountRegion.value = region;
+    const displayNameInput = document.getElementById("displayName");
+    const accountRegion = document.getElementById("accountRegion");
 
-// Sidebar tabs
-document.querySelectorAll(".side-link").forEach(btn => {
-    btn.addEventListener("click", () => {
-        document.querySelectorAll(".side-link").forEach(b => b.classList.remove("active"));
-        document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+    if (displayNameInput) displayNameInput.value = displayName;
+    if (accountRegion) accountRegion.value = region;
 
-        btn.classList.add("active");
+    document.querySelectorAll(".side-link").forEach(btn => {
+        btn.addEventListener("click", () => {
+            document.querySelectorAll(".side-link").forEach(b => b.classList.remove("active"));
+            document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
 
-        const panel = document.getElementById(btn.dataset.tab);
-        if (panel) panel.classList.add("active");
+            btn.classList.add("active");
+            document.getElementById(btn.dataset.tab)?.classList.add("active");
 
-        if (btn.dataset.tab === "history") {
-            loadHistory();
-        }
+            if (btn.dataset.tab === "history") loadHistory();
+            if (btn.dataset.tab === "overview") loadHistory();
+        });
     });
-});
 
-// Save profile
-const saveProfileBtn = document.getElementById("saveProfileBtn");
+    document.getElementById("saveProfileBtn")?.addEventListener("click", () => {
+        const newName = document.getElementById("displayName").value.trim() || username;
+        const newRegion = document.getElementById("accountRegion").value;
 
-if (saveProfileBtn) {
-    saveProfileBtn.addEventListener("click", () => {
-        localStorage.setItem(
-            "displayName",
-            document.getElementById("displayName").value.trim() || username
-        );
-
-        localStorage.setItem(
-            "region",
-            document.getElementById("accountRegion").value
-        );
+        localStorage.setItem("displayName", newName);
+        localStorage.setItem("region", newRegion);
 
         alert("Profile saved ✅");
         location.reload();
     });
-}
 
-// Bell click
-const notiBtn = document.getElementById("notiBtn");
-
-if (notiBtn) {
-    notiBtn.addEventListener("click", () => {
+    document.getElementById("notiBtn")?.addEventListener("click", () => {
         const panel = document.getElementById("notiPanel");
-
         if (!panel) return;
 
-        panel.style.display =
-            panel.style.display === "block" ? "none" : "block";
-
+        panel.style.display = panel.style.display === "block" ? "none" : "block";
         loadBellOrders();
     });
-}
 
-loadHistory();
-loadBellOrders();
-
-// Auto refresh
-setInterval(() => {
-    loadBellOrders();
     loadHistory();
-}, 5000);
+    loadBellOrders();
+
+    setInterval(() => {
+        loadHistory();
+        loadBellOrders();
+    }, 8000);
+});
+
+function setText(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.innerText = text;
+}
 
 async function loadHistory() {
     const username = localStorage.getItem("username") || "guest";
-    const box = document.getElementById("historyList");
-
-    if (!box) return;
 
     try {
         const res = await fetch(`/api/history/${username}`);
         const data = await res.json();
 
-        if (!data.success) {
-            box.innerHTML = `<p>No history found.</p>`;
+        if (!data.success || !data.orders) {
+            renderEmpty();
             return;
         }
 
         renderStats(data.orders);
         renderHistory(data.orders);
+        renderRecent(data.orders);
 
     } catch (error) {
         console.log("History error:", error);
-        box.innerHTML = `<p>Server error.</p>`;
+        renderEmpty();
     }
 }
 
 function renderStats(orders) {
-    const totalOrders = document.getElementById("totalOrders");
-    const pendingOrders = document.getElementById("pendingOrders");
-    const completedOrders = document.getElementById("completedOrders");
+    setText("totalOrders", orders.length);
 
-    if (totalOrders) totalOrders.innerText = orders.length;
+    const active = orders.filter(o => o.status !== "completed");
+    const completed = orders.filter(o => o.status === "completed");
 
-    if (pendingOrders) {
-        pendingOrders.innerText = orders.filter(o => o.status !== "completed").length;
-    }
+    setText("pendingOrders", active.length);
+    setText("completedOrders", completed.length);
 
-    if (completedOrders) {
-        completedOrders.innerText = orders.filter(o => o.status === "completed").length;
-    }
+    setText("walletBalance", "0 Ks");
+    setText("walletBalanceBig", "0 Ks");
 }
 
 function renderHistory(orders) {
     const box = document.getElementById("historyList");
-
     if (!box) return;
 
-    box.innerHTML = "";
-
-    if (!orders || orders.length === 0) {
+    if (!orders.length) {
         box.innerHTML = `<p>No orders yet.</p>`;
         return;
     }
 
-    orders.forEach(order => {
-        box.innerHTML += `
-            <div class="history-card">
-                <b>${order.orderId}</b>
-                <p>${order.game} - ${order.packageName}</p>
-                <p>${order.amount} ${order.currency}</p>
-                <p>Status: <span class="status ${statusClass(order.status)}">${order.status}</span></p>
-                <a href="tracking.html?orderId=${order.orderId}">Track Order</a>
-            </div>
-        `;
-    });
+    box.innerHTML = orders.map(order => orderCard(order)).join("");
+}
+
+function renderRecent(orders) {
+    const box = document.getElementById("recentOrders");
+    if (!box) return;
+
+    if (!orders.length) {
+        box.innerHTML = `<p>No recent orders.</p>`;
+        return;
+    }
+
+    box.innerHTML = orders.slice(0, 4).map(order => orderCard(order)).join("");
+}
+
+function orderCard(order) {
+    return `
+        <div class="history-card" onclick="window.location.href='tracking.html?orderId=${order.orderId}'">
+            <b>${order.orderId}</b>
+            <p>${order.game} - ${order.packageName}</p>
+            <p>${order.amount || 0} ${order.currency || ""}</p>
+            <p>Status: <span class="${statusClass(order.status)}">${order.status}</span></p>
+        </div>
+    `;
 }
 
 async function loadBellOrders() {
@@ -159,33 +142,39 @@ async function loadBellOrders() {
         const res = await fetch(`/api/history/${username}`);
         const data = await res.json();
 
-        if (!data.success || !data.orders || data.orders.length === 0) {
+        if (!data.success || !data.orders || !data.orders.length) {
             count.innerText = "0";
             panel.innerHTML = `<div class="noti-item">No order notifications</div>`;
             return;
         }
 
         const activeOrders = data.orders.filter(o => o.status !== "completed");
-
         count.innerText = activeOrders.length;
 
-        panel.innerHTML = "";
-
-        data.orders.slice(0, 8).forEach(order => {
-            panel.innerHTML += `
-                <div class="noti-item" onclick="window.location.href='tracking.html?orderId=${order.orderId}'">
-                    🔔 <b>${order.game}</b><br>
-                    ${order.packageName}<br>
-                    <small>${order.orderId}</small><br>
-                    <span class="status ${statusClass(order.status)}">${order.status}</span>
-                </div>
-            `;
-        });
+        panel.innerHTML = data.orders.slice(0, 8).map(order => `
+            <div class="noti-item" onclick="window.location.href='tracking.html?orderId=${order.orderId}'">
+                🔔 <b>${order.game}</b><br>
+                ${order.packageName}<br>
+                <small>${order.orderId}</small><br>
+                <span class="${statusClass(order.status)}">${order.status}</span>
+            </div>
+        `).join("");
 
     } catch (error) {
-        console.log("Bell error:", error);
         panel.innerHTML = `<div class="noti-item">Server error</div>`;
     }
+}
+
+function renderEmpty() {
+    setText("totalOrders", "0");
+    setText("pendingOrders", "0");
+    setText("completedOrders", "0");
+
+    const history = document.getElementById("historyList");
+    const recent = document.getElementById("recentOrders");
+
+    if (history) history.innerHTML = `<p>No orders yet.</p>`;
+    if (recent) recent.innerHTML = `<p>No recent orders.</p>`;
 }
 
 function statusClass(status) {
@@ -193,19 +182,5 @@ function statusClass(status) {
     if (status === "processing") return "status-processing";
     if (status === "completed") return "status-completed";
     if (status === "cancelled" || status === "failed") return "status-failed";
-
     return "status-pending";
-}
-const logoutBtn = document.getElementById("logoutBtn");
-
-if (logoutBtn) {
-    logoutBtn.addEventListener("click", () => {
-
-        localStorage.removeItem("username");
-        localStorage.removeItem("token");
-
-        alert("Logged out");
-
-        window.location.href = "login.html";
-    });
 }

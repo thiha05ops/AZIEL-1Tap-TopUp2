@@ -1,13 +1,10 @@
-<!-- frontend/account.html -->
-
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>Account - AZIEL 1Tap</title>
+    <title>Account - AZIEL</title>
 
     <link rel="stylesheet" href="css/main.css">
     <link rel="stylesheet" href="css/account.css">
@@ -18,31 +15,28 @@
     <header class="account-header">
         <a href="home.html" class="brand">AZIEL</a>
 
-        <div class="noti-bell" id="notiBtn">
-            🔔
-            <span id="notiCount">0</span>
+        <div class="account-top-actions">
+            <button id="notiBtn" class="noti-btn">🔔 <span id="notiCount">0</span></button>
+            <button id="logoutBtn" class="logout-btn">Logout</button>
         </div>
-
-        <div id="notiPanel" class="noti-panel"></div>
-
     </header>
 
     <main class="account-layout">
 
         <aside class="account-sidebar">
             <div class="profile-card">
-                <div class="avatar" id="avatarText">A</div>
+                <div class="avatar-big" id="avatarText">U</div>
                 <h3 id="profileName">Username</h3>
                 <p id="profileRegion">Region: MM</p>
+                <span class="verified-badge">Verified Customer</span>
             </div>
 
-            <nav>
-                <button class="side-link active" data-tab="overview">Overview</button>
-                <button class="side-link" data-tab="profile">Profile</button>
-                <button class="side-link" data-tab="history">Order History</button>
-                <button class="side-link" data-tab="security">Security</button>
-
-
+            <nav class="account-menu">
+                <button class="side-link active" data-tab="overview">🏠 Overview</button>
+                <button class="side-link" data-tab="wallet">💰 Wallet</button>
+                <button class="side-link" data-tab="history">📦 Orders</button>
+                <button class="side-link" data-tab="profile">👤 Profile</button>
+                <button class="side-link" data-tab="security">🔒 Security</button>
             </nav>
         </aside>
 
@@ -51,47 +45,76 @@
             <div id="notiPanel" class="noti-panel"></div>
 
             <div class="tab-panel active" id="overview">
-                <h1>My Account</h1>
+                <h1>Account Overview</h1>
+
                 <div class="dashboard-grid">
                     <div class="dash-card">
                         <span>Total Orders</span>
                         <strong id="totalOrders">0</strong>
                     </div>
+
                     <div class="dash-card">
-                        <span>Pending</span>
+                        <span>Active Orders</span>
                         <strong id="pendingOrders">0</strong>
                     </div>
+
                     <div class="dash-card">
                         <span>Completed</span>
                         <strong id="completedOrders">0</strong>
                     </div>
+
+                    <div class="dash-card wallet-card">
+                        <span>Wallet Balance</span>
+                        <strong id="walletBalance">0 Ks</strong>
+                    </div>
                 </div>
+
+                <div class="content-card">
+                    <h2>Recent Orders</h2>
+                    <div id="recentOrders">Loading...</div>
+                </div>
+            </div>
+
+            <div class="tab-panel" id="wallet">
+                <h1>Wallet</h1>
+
+                <div class="content-card">
+                    <h2>Balance</h2>
+                    <p class="balance-text" id="walletBalanceBig">0 Ks</p>
+                    <button class="primary-btn">Top Up Wallet</button>
+                    <p class="small-note">Wallet top-up system will be connected with payment approval.</p>
+                </div>
+            </div>
+
+            <div class="tab-panel" id="history">
+                <h1>Order History</h1>
+                <div id="historyList">Loading...</div>
             </div>
 
             <div class="tab-panel" id="profile">
                 <h1>Profile Information</h1>
 
-                <label>Display Name</label>
-                <input type="text" id="displayName" placeholder="Your display name">
+                <div class="content-card">
+                    <label>Display Name</label>
+                    <input type="text" id="displayName" placeholder="Display name">
 
-                <label>Region</label>
-                <select id="accountRegion">
-                    <option value="MM">Myanmar - MMK</option>
-                    <option value="TH">Thailand - THB</option>
-                </select>
+                    <label>Region</label>
+                    <select id="accountRegion">
+                        <option value="MM">Myanmar - MMK</option>
+                        <option value="TH">Thailand - THB</option>
+                    </select>
 
-                <button id="saveProfileBtn">Save Profile</button>
-            </div>
-
-            <div class="tab-panel" id="history">
-                <h1>Order History</h1>
-                <div id="historyList"></div>
+                    <button id="saveProfileBtn" class="primary-btn">Save Profile</button>
+                </div>
             </div>
 
             <div class="tab-panel" id="security">
                 <h1>Account Security</h1>
-                <p>Password reset and social account management will be available here.</p>
-                <a href="forgot.html" class="security-btn">Reset Password</a>
+
+                <div class="content-card">
+                    <p>Keep your account safe. Change your password if you notice suspicious activity.</p>
+                    <a href="forgot.html" class="security-btn">Reset Password</a>
+                </div>
             </div>
 
         </section>
