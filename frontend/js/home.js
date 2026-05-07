@@ -100,8 +100,6 @@ setInterval(() => {
 function showToast(text) {
 
     let toast = document.getElementById("siteToast");
-
-    toast.innerText = text;
     toast.style.opacity = "1";
     toast.style.transform = "translateY(0)";
 
