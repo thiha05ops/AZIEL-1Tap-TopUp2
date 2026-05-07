@@ -84,18 +84,6 @@ const fakeOrders = [
 
 let orderIndex = 0;
 
-setInterval(() => {
-    showToast("🔥 " + fakeOrders[orderIndex]);
-
-    orderIndex++;
-
-    if (orderIndex >= fakeOrders.length) {
-        orderIndex = 0;
-    }
-
-}, 9000);
-
-
 /* Toast Function */
 function showToast(text) {
 
@@ -112,7 +100,6 @@ function showToast(text) {
 }
 /* Flash Sale Countdown */
 let totalSeconds = 3 * 60 * 60 - 1; // 3 hours
-
 setInterval(() => {
 
     const timer = document.getElementById("saleTimer");
