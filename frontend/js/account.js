@@ -1,7 +1,11 @@
 // frontend/js/account.js
-document.getElementById("usernameText")
-    .innerText =
-    localStorage.getItem("username")
+const usernameText = document.getElementById("usernameText");
+
+if (usernameText) {
+    usernameText.innerText =
+        localStorage.getItem("username") || "guest";
+}
+localStorage.getItem("username")
     || "guest";
 const region = localStorage.getItem("region") || "MM";
 
