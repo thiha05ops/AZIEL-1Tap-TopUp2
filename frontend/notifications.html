@@ -5,75 +5,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Notifications - AZIEL</title>
-
     <link rel="stylesheet" href="css/main.css">
     <link rel="stylesheet" href="css/page.css">
-
-    <style>
-        body {
-            background: #0b0b1a;
-            color: #fff;
-            padding: 25px;
-            font-family: Arial, sans-serif;
-        }
-
-        .noti-item {
-            background: #1e1e3f;
-            padding: 15px;
-            border-radius: 12px;
-            margin-bottom: 12px;
-            cursor: pointer;
-        }
-
-        .noti-item:hover {
-            background: #2a2a55;
-        }
-
-        .status {
-            color: #ffd700;
-            font-weight: 800;
-        }
-    </style>
 </head>
 
 <body>
+    <div class="page-wrap">
+        <a href="account.html" class="back-btn">← Back Account</a>
 
-    <h2>🔔 Notifications</h2>
-    <div id="notiList">Loading...</div>
+        <div class="info-card">
+            <h1>🔔 Notifications</h1>
+            <div id="notiList">Loading...</div>
+        </div>
+    </div>
 
-    <script>
-        document.addEventListener("DOMContentLoaded", async () => {
-            const username = localStorage.getItem("username") || "guest";
-            const box = document.getElementById("notiList");
-
-            try {
-                const res = await fetch(`/api/history/${username}`);
-                const data = await res.json();
-
-                if (!data.success || !data.orders || data.orders.length === 0) {
-                    box.innerHTML = "<p>No notifications</p>";
-                    return;
-                }
-
-                box.innerHTML = "";
-
-                data.orders.forEach(order => {
-                    box.innerHTML += `
-                <div class="noti-item" onclick="window.location.href='tracking.html?orderId=${order.orderId}'">
-                    🔔 <b>${order.game}</b><br>
-                    ${order.packageName}<br>
-                    <small>${order.orderId}</small><br>
-                    Status: <span class="status">${order.status}</span>
-                </div>
-            `;
-                });
-
-            } catch (error) {
-                box.innerHTML = "<p>Server error</p>";
-            }
-        });
-    </script>
-
+    <script src="js/notifications.js"></script>
 </body>
 
 </html>
