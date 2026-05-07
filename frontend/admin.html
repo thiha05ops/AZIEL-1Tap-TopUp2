@@ -4,25 +4,84 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Orders - AZIEL</title>
+    <title>Admin Panel - AZIEL</title>
+
     <link rel="stylesheet" href="css/main.css">
-    <link rel="stylesheet" href="css/page.css">
+    <link rel="stylesheet" href="css/admin.css">
 </head>
 
 <body>
 
-    <div class="page-wrap">
-        <div class="info-card">
-            <h1>Admin Orders</h1>
+    <div class="admin-wrap">
 
-            <input type="password" id="adminPassword" placeholder="Admin password">
-            <button id="loginBtn">Login</button>
+        <aside class="admin-sidebar">
+            <h2>AZIEL Admin</h2>
+            <button class="admin-nav active">📦 Orders</button>
+            <a href="home.html">🏠 Back Home</a>
+        </aside>
 
-            <div id="adminContent" style="display:none;">
-                <h2>Orders</h2>
-                <div id="ordersList"></div>
+        <main class="admin-main">
+
+            <div class="admin-login" id="loginBox">
+                <h1>Admin Login</h1>
+                <input type="password" id="adminPassword" placeholder="Admin password">
+                <button id="loginBtn">Login</button>
             </div>
-        </div>
+
+            <section id="adminContent" style="display:none;">
+
+                <div class="admin-top">
+                    <div>
+                        <h1>Orders Dashboard</h1>
+                        <p>Manage payments, slips and order status.</p>
+                    </div>
+
+                    <button id="refreshBtn">Refresh</button>
+                </div>
+
+                <div class="admin-stats">
+                    <div><span>Total Orders</span><b id="totalOrders">0</b></div>
+                    <div><span>Paid</span><b id="paidOrders">0</b></div>
+                    <div><span>Processing</span><b id="processingOrders">0</b></div>
+                    <div><span>Completed</span><b id="completedOrders">0</b></div>
+                </div>
+
+                <div class="admin-tools">
+                    <input type="text" id="searchOrder" placeholder="Search order / user / game">
+                    <select id="statusFilter">
+                        <option value="all">All Status</option>
+                        <option value="pending_payment">Pending Payment</option>
+                        <option value="paid">Paid</option>
+                        <option value="processing">Processing</option>
+                        <option value="completed">Completed</option>
+                        <option value="cancelled">Cancelled</option>
+                        <option value="failed">Failed</option>
+                    </select>
+                </div>
+
+                <div class="orders-table-wrap">
+                    <table class="orders-table">
+                        <thead>
+                            <tr>
+                                <th>Order</th>
+                                <th>User</th>
+                                <th>Game</th>
+                                <th>Package</th>
+                                <th>Amount</th>
+                                <th>Payment</th>
+                                <th>Status</th>
+                                <th>Slip</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ordersList"></tbody>
+                    </table>
+                </div>
+
+            </section>
+
+        </main>
+
     </div>
 
     <script src="js/admin.js"></script>

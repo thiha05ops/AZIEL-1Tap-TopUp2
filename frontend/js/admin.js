@@ -1,77 +1,170 @@
+// frontend/js/admin.js
+
 let ADMIN_PASSWORD = "";
+let allOrders = [];
 
-document.getElementById("loginBtn").addEventListener("click", () => {
-    ADMIN_PASSWORD = document.getElementById("adminPassword").value.trim();
+document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("loginBtn").addEventListener("click", () => {
+        ADMIN_PASSWORD = document.getElementById("adminPassword").value.trim();
 
-    if (!ADMIN_PASSWORD) {
-        alert("Enter admin password");
-        return;
-    }
+        if (!ADMIN_PASSWORD) {
+            alert("Enter admin password");
+            return;
+        }
 
-    loadOrders();
+        loadOrders();
+    });
+
+    document.getElementById("refreshBtn")?.addEventListener("click", loadOrders);
+    document.getElementById("searchOrder")?.addEventListener("input", renderOrders);
+    document.getElementById("statusFilter")?.addEventListener("change", renderOrders);
 });
 
 async function loadOrders() {
-    const res = await fetch("/api/admin/orders", {
-        headers: {
-            "x-admin-password": ADMIN_PASSWORD
+    try {
+        const res = await fetch("/api/admin/orders", {
+            headers: { "x-admin-password": ADMIN_PASSWORD }
+        });
+
+        const data = await res.json();
+
+        if (!data.success) {
+            alert(data.message || "Wrong admin password");
+            return;
         }
-    });
 
-    const data = await res.json();
+        allOrders = data.orders || [];
 
-    if (!data.success) {
-        alert(data.message || "Wrong password");
+        document.getElementById("loginBox").style.display = "none";
+        document.getElementById("adminContent").style.display = "block";
+
+        renderStats();
+        renderOrders();
+
+    } catch (error) {
+        alert("Server error");
+    }
+}
+
+function renderStats() {
+    document.getElementById("totalOrders").innerText = allOrders.length;
+    document.getElementById("paidOrders").innerText =
+        allOrders.filter(o => o.status === "paid").length;
+    document.getElementById("processingOrders").innerText =
+        allOrders.filter(o => o.status === "processing").length;
+    document.getElementById("completedOrders").innerText =
+        allOrders.filter(o => o.status === "completed").length;
+}
+
+function renderOrders() {
+    const list = document.getElementById("ordersList");
+    const search = (document.getElementById("searchOrder")?.value || "").toLowerCase();
+    const filter = document.getElementById("statusFilter")?.value || "all";
+
+    let orders = [...allOrders];
+
+    if (filter !== "all") {
+        orders = orders.filter(o => o.status === filter);
+    }
+
+    if (search) {
+        orders = orders.filter(o =>
+            String(o.orderId || "").toLowerCase().includes(search) ||
+            String(o.username || "").toLowerCase().includes(search) ||
+            String(o.game || "").toLowerCase().includes(search) ||
+            String(o.userId || "").toLowerCase().includes(search)
+        );
+    }
+
+    if (!orders.length) {
+        list.innerHTML = `
+            <tr>
+                <td colspan="9">No orders found</td>
+            </tr>
+        `;
         return;
     }
 
-    document.getElementById("adminContent").style.display = "block";
+    list.innerHTML = orders.map(order => `
+        <tr>
+            <td>
+                <b>${order.orderId}</b><br>
+                <small>${formatDate(order.createdAt)}</small>
+            </td>
 
-    const box = document.getElementById("ordersList");
-    box.innerHTML = "";
+            <td>${order.username || "guest"}</td>
 
-    data.orders.forEach(order => {
-        box.innerHTML += `
-            <div class="track-card">
-                <h3>${order.orderId}</h3>
-                <p><b>User:</b> ${order.username}</p>
-                <p><b>Game:</b> ${order.game}</p>
-                <p><b>User ID:</b> ${order.userId}</p>
-                <p><b>Server:</b> ${order.zoneId || "-"}</p>
-                <p><b>Package:</b> ${order.packageName}</p>
-                <p><b>Amount:</b> ${order.amount} ${order.currency}</p>
-                <p><b>Payment:</b> ${order.paymentMethod}</p>
-                <p><b>Status:</b> ${order.status}</p>
+            <td>
+                ${order.game}<br>
+                <small>ID: ${order.userId || "-"}</small><br>
+                <small>Server: ${order.zoneId || "-"}</small>
+            </td>
 
-                ${order.paymentSlip ? `<img src="/uploads/${order.paymentSlip}" style="width:140px;border-radius:10px;">` : ""}
+            <td>${order.packageName}</td>
 
-                <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:12px;">
-                    <button onclick="updateStatus('${order._id}','paid')">Paid</button>
-                    <button onclick="updateStatus('${order._id}','processing')">Processing</button>
-                    <button onclick="updateStatus('${order._id}','completed')">Completed</button>
-                    <button onclick="updateStatus('${order._id}','cancelled')">Cancel</button>
+            <td>${order.amount || 0} ${order.currency || ""}</td>
+
+            <td>${order.paymentMethod || "-"}</td>
+
+            <td>
+                <span class="status-badge ${statusClass(order.status)}">
+                    ${order.status}
+                </span>
+            </td>
+
+            <td>
+                ${order.paymentSlip
+            ? `<img src="/uploads/${order.paymentSlip}" class="slip-img" onclick="window.open('/uploads/${order.paymentSlip}','_blank')">`
+            : "-"
+        }
+            </td>
+
+            <td>
+                <div class="action-grid">
+                    <button class="btn-paid" onclick="updateStatus('${order._id}','paid')">Paid</button>
+                    <button class="btn-processing" onclick="updateStatus('${order._id}','processing')">Process</button>
+                    <button class="btn-completed" onclick="updateStatus('${order._id}','completed')">Done</button>
+                    <button class="btn-cancel" onclick="updateStatus('${order._id}','cancelled')">Cancel</button>
                 </div>
-            </div>
-        `;
-    });
+            </td>
+        </tr>
+    `).join("");
 }
 
 async function updateStatus(id, status) {
-    const res = await fetch(`/api/admin/orders/${id}/status`, {
-        method: "PUT",
-        headers: {
-            "Content-Type": "application/json",
-            "x-admin-password": ADMIN_PASSWORD
-        },
-        body: JSON.stringify({ status })
-    });
+    try {
+        const res = await fetch(`/api/admin/orders/${id}/status`, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+                "x-admin-password": ADMIN_PASSWORD
+            },
+            body: JSON.stringify({ status })
+        });
 
-    const data = await res.json();
+        const data = await res.json();
 
-    if (!data.success) {
-        alert(data.message || "Update failed");
-        return;
+        if (!data.success) {
+            alert(data.message || "Update failed");
+            return;
+        }
+
+        await loadOrders();
+
+    } catch (error) {
+        alert("Server error");
     }
+}
 
-    loadOrders();
+function statusClass(status) {
+    if (status === "paid") return "status-paid";
+    if (status === "processing") return "status-processing";
+    if (status === "completed") return "status-completed";
+    if (status === "cancelled" || status === "failed") return "status-failed";
+    return "status-pending";
+}
+
+function formatDate(date) {
+    if (!date) return "-";
+    return new Date(date).toLocaleString();
 }
