@@ -8,12 +8,19 @@ const router = express.Router();
 // REGISTER
 router.post("/register", async (req, res) => {
     try {
-        const { username, password } = req.body;
+        const { username, email, password } = req.body;
 
         if (!username || !password) {
             return res.json({
                 success: false,
-                message: "Fill all fields"
+                message: "Username and password required"
+            });
+        }
+
+        if (password.length < 6) {
+            return res.json({
+                success: false,
+                message: "Password must be at least 6 characters"
             });
         }
 
@@ -22,7 +29,7 @@ router.post("/register", async (req, res) => {
         if (existingUser) {
             return res.json({
                 success: false,
-                message: "Username already exists"
+                message: "Username already taken"
             });
         }
 
@@ -30,16 +37,21 @@ router.post("/register", async (req, res) => {
 
         await User.create({
             username,
-            password: hashedPassword
+            email: email || "",
+            password: hashedPassword,
+            displayName: username,
+            region: "MM",
+            walletBalance: 0
         });
 
         res.json({
             success: true,
-            message: "Register success"
+            message: "Account created successfully"
         });
 
     } catch (error) {
         console.log("Register error:", error);
+
         res.json({
             success: false,
             message: "Server error"
