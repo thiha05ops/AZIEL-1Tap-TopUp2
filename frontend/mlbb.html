@@ -15,58 +15,128 @@
 
     <header class="game-header">
         <a href="home.html" class="brand">AZIEL</a>
-        <a href="account.html" class="account-btn">👤 Account</a>
+
+        <div class="game-header-actions">
+            <a href="notifications.html" class="header-btn">🔔</a>
+            <a href="account.html" class="header-btn">👤 Account</a>
+        </div>
     </header>
 
     <main class="game-page">
 
         <section class="game-hero">
+
             <div class="game-banner">
                 <img src="assets/mlbb.jpg" alt="Mobile Legends">
+
                 <div class="banner-overlay">
+                    <span class="game-tag">Mobile Game</span>
                     <h1>Mobile Legends</h1>
-                    <p>Fast & secure diamond top up</p>
+                    <p>Fast & secure diamond top up for Myanmar and Thailand players.</p>
                 </div>
             </div>
 
             <div class="game-info">
                 <h2>How to Top Up</h2>
-                <p>1. Enter your User ID and Server ID.</p>
-                <p>2. Select diamond package.</p>
-                <p>3. Choose payment method.</p>
-                <p>4. Pay and upload slip.</p>
+
+                <div class="step-row">
+                    <span>1</span>
+                    <p>Enter your User ID and Server ID.</p>
+                </div>
+
+                <div class="step-row">
+                    <span>2</span>
+                    <p>Select diamond package.</p>
+                </div>
+
+                <div class="step-row">
+                    <span>3</span>
+                    <p>Choose payment method.</p>
+                </div>
+
+                <div class="step-row">
+                    <span>4</span>
+                    <p>Pay and upload payment screenshot.</p>
+                </div>
+
+                <div class="trust-box">
+                    ⚡ Fast delivery • 🔒 Secure payment • 📦 Order tracking
+                </div>
             </div>
+
         </section>
 
-        <section class="order-panel">
+        <section class="order-layout">
 
-            <div class="form-card">
-                <h2>Account Information</h2>
+            <div class="order-left">
 
-                <label>User ID</label>
-                <input type="text" id="userId" placeholder="Enter User ID">
+                <div class="form-card">
+                    <div class="card-title">
+                        <span>👤</span>
+                        <h2>Account Information</h2>
+                    </div>
 
-                <label>Server ID</label>
-                <input type="text" id="serverId" placeholder="Enter Server ID">
+                    <label>User ID</label>
+                    <input type="text" id="userId" placeholder="Enter MLBB User ID">
+
+                    <label>Server ID</label>
+                    <input type="text" id="serverId" placeholder="Enter Server ID">
+                </div>
+
+                <div class="form-card">
+                    <div class="card-title">
+                        <span>💎</span>
+                        <h2>Select Package</h2>
+                    </div>
+
+                    <div class="packages" id="packages" data-game="mlbb"></div>
+                </div>
+
+                <div class="form-card">
+                    <div class="card-title">
+                        <span>💳</span>
+                        <h2>Select Payment</h2>
+                    </div>
+
+                    <div id="paymentGrid" class="payment-grid"></div>
+                    <input type="hidden" id="paymentMethod">
+                </div>
+
             </div>
 
-            <div class="form-card">
-                <h2>Select Package</h2>
-                <div class="packages" id="packages" data-game="mlbb"></div>
-            </div>
+            <aside class="order-summary">
 
-            <div class="form-card">
-                <h2>Select Payment</h2>
+                <h2>Order Summary</h2>
 
-                <div id="paymentGrid" class="payment-grid"></div>
+                <div class="summary-line">
+                    <span>Game</span>
+                    <b>Mobile Legends</b>
+                </div>
 
-                <input type="hidden" id="paymentMethod">
-            </div>
+                <div class="summary-line">
+                    <span>Package</span>
+                    <b id="summaryPackage">Not selected</b>
+                </div>
 
-            <div class="selected-box">
-                <p id="selectedText">No package selected</p>
+                <div class="summary-line">
+                    <span>Payment</span>
+                    <b id="summaryPayment">Not selected</b>
+                </div>
+
+                <div class="summary-total">
+                    <span>Total</span>
+                    <strong id="summaryAmount">0 Ks</strong>
+                </div>
+
+                <p id="selectedText" class="summary-note">
+                    Please fill all information to continue.
+                </p>
+
                 <button id="buyBtn" disabled>Buy Now</button>
-            </div>
+
+                <p class="safe-note">Your order will be tracked in your account after payment.</p>
+
+            </aside>
 
         </section>
 
