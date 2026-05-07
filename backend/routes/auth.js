@@ -79,9 +79,11 @@ router.post("/login", async (req, res) => {
         res.json({
             success: true,
             token,
-            username: user.username,
-            displayName: user.displayName || user.username,
-            region: user.region || "MM"
+            user: {
+                username: user.username,
+                displayName: user.displayName || user.username,
+                region: user.region || "MM"
+            }
         });
 
     } catch (error) {

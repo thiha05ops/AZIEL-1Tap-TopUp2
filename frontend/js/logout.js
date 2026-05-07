@@ -1,25 +1,13 @@
-// frontend/js/logout.js
+const logoutBtn = document.getElementById("logoutBtn");
 
-document.addEventListener("DOMContentLoaded", () => {
+if (logoutBtn) {
+    logoutBtn.addEventListener("click", () => {
+        localStorage.clear();
+        window.location.href = "login.html";
+    });
+}
 
-    const logoutBtn = document.getElementById("logoutBtn");
-
-    if (logoutBtn) {
-
-        logoutBtn.addEventListener("click", () => {
-
-            const ok = confirm("Are you sure to logout?");
-
-            if (ok) {
-
-                localStorage.removeItem("isLogin");
-                localStorage.removeItem("username");
-
-                window.location.href = "login.html";
-            }
-
-        });
-
-    }
-
-});
+function logout() {
+    localStorage.clear();
+    window.location.href = "login.html";
+}

@@ -1,58 +1,47 @@
-// frontend/js/login.js
+const form = document.getElementById("loginForm");
 
-document.addEventListener("DOMContentLoaded", () => {
+form.addEventListener("submit", async (e) => {
+    e.preventDefault();
 
-    const loginBtn = document.getElementById("loginBtn");
-    const username = document.getElementById("username");
-    const password = document.getElementById("password");
-    const msg = document.getElementById("msg");
+    const username = document.getElementById("username").value;
+    const password = document.getElementById("password").value;
 
-    loginBtn.addEventListener("click", async () => {
+    try {
 
-        const user = username.value.trim();
-        const pass = password.value.trim();
+        const res = await fetch("/api/login", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                username,
+                password
+            })
+        });
 
-        if (user === "" || pass === "") {
-            msg.innerHTML = `<div class="error-msg">Please fill all fields.</div>`;
+        const data = await res.json();
+
+        if (!data.success) {
+            alert(data.message || "Login failed");
             return;
         }
 
-        try {
+        // ✅ SAVE LOGIN
+        localStorage.setItem("isLogin", "true");
+        localStorage.setItem("username", data.user.username);
+        localStorage.setItem("token", data.token);
 
-            const res = await fetch("/api/login", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    username: user,
-                    password: pass
-                })
-            });
+        // optional profile
+        localStorage.setItem(
+            "displayName",
+            data.user.displayName || data.user.username
+        );
 
-            const data = await res.json();
+        // redirect
+        window.location.href = "home.html";
 
-            if (data.success) {
-
-                msg.innerHTML = `<div class="success-msg">Login success...</div>`;
-
-                localStorage.setItem("isLogin", "true");
-                localStorage.setItem("username", user);
-
-                setTimeout(() => {
-                    window.location.href = "home.html";
-                }, 800);
-
-            } else {
-                msg.innerHTML = `<div class="error-msg">${data.message}</div>`;
-            }
-
-        } catch (error) {
-
-            msg.innerHTML = `<div class="error-msg">Server error.</div>`;
-
-        }
-
-    });
-
+    } catch (err) {
+        console.log(err);
+        alert("Server error");
+    }
 });

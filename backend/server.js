@@ -51,6 +51,7 @@ app.use("/api", paymentRoutes);
 app.use("/api", profileRoutes);
 app.use("/api", socialAuthRoutes);
 app.use("/api", passwordRoutes);
+app.use(express.static("frontend"));
 
 // 🔥 Home page
 app.get("/", (req, res) => {

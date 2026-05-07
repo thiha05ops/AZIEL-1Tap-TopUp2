@@ -1,6 +1,11 @@
 document.addEventListener("DOMContentLoaded", () => {
 
-    const username = localStorage.getItem("username");
+    const username =
+        localStorage.getItem("displayName")
+        || "Login";
+
+    document.getElementById("profileName")
+        .innerText = username;
 
     const avatar = document.getElementById("avatarText");
     const nameText = document.getElementById("usernameText");

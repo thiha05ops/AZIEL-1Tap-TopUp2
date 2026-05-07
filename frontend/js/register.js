@@ -1,66 +1,37 @@
-// frontend/js/register.js
+const form = document.getElementById("registerForm");
 
-document.addEventListener("DOMContentLoaded", () => {
+form.addEventListener("submit", async (e) => {
+    e.preventDefault();
 
-    const registerBtn = document.getElementById("registerBtn");
-    const username = document.getElementById("username");
-    const password = document.getElementById("password");
-    const confirmPassword = document.getElementById("confirmPassword");
-    const msg = document.getElementById("msg");
+    const username = document.getElementById("username").value;
+    const password = document.getElementById("password").value;
 
-    registerBtn.addEventListener("click", async () => {
+    try {
 
-        const user = username.value.trim();
-        const pass = password.value.trim();
-        const confirm = confirmPassword.value.trim();
+        const res = await fetch("/api/register", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                username,
+                password
+            })
+        });
 
-        if (user === "" || pass === "" || confirm === "") {
-            msg.innerHTML = `<div class="error-msg">Please fill all fields.</div>`;
+        const data = await res.json();
+
+        if (!data.success) {
+            alert(data.message || "Register failed");
             return;
         }
 
-        if (pass.length < 4) {
-            msg.innerHTML = `<div class="error-msg">Password must be at least 4 characters.</div>`;
-            return;
-        }
+        alert("Register success ✅");
 
-        if (pass !== confirm) {
-            msg.innerHTML = `<div class="error-msg">Passwords do not match.</div>`;
-            return;
-        }
+        window.location.href = "login.html";
 
-        try {
-
-            const res = await fetch("/api/register", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    username: user,
-                    password: pass
-                })
-            });
-            const data = await res.json();
-
-            if (data.success) {
-
-                msg.innerHTML = `<div class="success-msg">Register success. Redirecting...</div>`;
-
-                setTimeout(() => {
-                    window.location.href = "login.html";
-                }, 1000);
-
-            } else {
-                msg.innerHTML = `<div class="error-msg">${data.message}</div>`;
-            }
-
-        } catch (error) {
-
-            msg.innerHTML = `<div class="error-msg">Server error.</div>`;
-
-        }
-
-    });
-
+    } catch (err) {
+        console.log(err);
+        alert("Server error");
+    }
 });

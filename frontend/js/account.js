@@ -1,83 +1,83 @@
 // frontend/js/account.js
+document.getElementById("usernameText")
+    .innerText =
+    localStorage.getItem("username")
+    || "guest";
+const region = localStorage.getItem("region") || "MM";
 
-document.addEventListener("DOMContentLoaded", () => {
-    const username = localStorage.getItem("username") || "guest";
-    const region = localStorage.getItem("region") || "MM";
+const profileName = document.getElementById("profileName");
+const avatarText = document.getElementById("avatarText");
+const profileRegion = document.getElementById("profileRegion");
+const displayName = document.getElementById("displayName");
+const accountRegion = document.getElementById("accountRegion");
 
-    const profileName = document.getElementById("profileName");
-    const avatarText = document.getElementById("avatarText");
-    const profileRegion = document.getElementById("profileRegion");
-    const displayName = document.getElementById("displayName");
-    const accountRegion = document.getElementById("accountRegion");
+if (profileName) profileName.innerText = localStorage.getItem("displayName") || username;
+if (avatarText) avatarText.innerText = username.charAt(0).toUpperCase();
+if (profileRegion) profileRegion.innerText = "Region: " + region;
+if (displayName) displayName.value = localStorage.getItem("displayName") || username;
+if (accountRegion) accountRegion.value = region;
 
-    if (profileName) profileName.innerText = localStorage.getItem("displayName") || username;
-    if (avatarText) avatarText.innerText = username.charAt(0).toUpperCase();
-    if (profileRegion) profileRegion.innerText = "Region: " + region;
-    if (displayName) displayName.value = localStorage.getItem("displayName") || username;
-    if (accountRegion) accountRegion.value = region;
+// Sidebar tabs
+document.querySelectorAll(".side-link").forEach(btn => {
+    btn.addEventListener("click", () => {
+        document.querySelectorAll(".side-link").forEach(b => b.classList.remove("active"));
+        document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
 
-    // Sidebar tabs
-    document.querySelectorAll(".side-link").forEach(btn => {
-        btn.addEventListener("click", () => {
-            document.querySelectorAll(".side-link").forEach(b => b.classList.remove("active"));
-            document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+        btn.classList.add("active");
 
-            btn.classList.add("active");
+        const panel = document.getElementById(btn.dataset.tab);
+        if (panel) panel.classList.add("active");
 
-            const panel = document.getElementById(btn.dataset.tab);
-            if (panel) panel.classList.add("active");
-
-            if (btn.dataset.tab === "history") {
-                loadHistory();
-            }
-        });
+        if (btn.dataset.tab === "history") {
+            loadHistory();
+        }
     });
-
-    // Save profile
-    const saveProfileBtn = document.getElementById("saveProfileBtn");
-
-    if (saveProfileBtn) {
-        saveProfileBtn.addEventListener("click", () => {
-            localStorage.setItem(
-                "displayName",
-                document.getElementById("displayName").value.trim() || username
-            );
-
-            localStorage.setItem(
-                "region",
-                document.getElementById("accountRegion").value
-            );
-
-            alert("Profile saved ✅");
-            location.reload();
-        });
-    }
-
-    // Bell click
-    const notiBtn = document.getElementById("notiBtn");
-
-    if (notiBtn) {
-        notiBtn.addEventListener("click", () => {
-            const panel = document.getElementById("notiPanel");
-
-            if (!panel) return;
-
-            panel.style.display =
-                panel.style.display === "block" ? "none" : "block";
-
-            loadBellOrders();
-        });
-    }
-
-    loadHistory();
-    loadBellOrders();
-
-    // Auto refresh
-    setInterval(() => {
-        loadBellOrders();
-        loadHistory();
-    }, 5000);
 });
+
+// Save profile
+const saveProfileBtn = document.getElementById("saveProfileBtn");
+
+if (saveProfileBtn) {
+    saveProfileBtn.addEventListener("click", () => {
+        localStorage.setItem(
+            "displayName",
+            document.getElementById("displayName").value.trim() || username
+        );
+
+        localStorage.setItem(
+            "region",
+            document.getElementById("accountRegion").value
+        );
+
+        alert("Profile saved ✅");
+        location.reload();
+    });
+}
+
+// Bell click
+const notiBtn = document.getElementById("notiBtn");
+
+if (notiBtn) {
+    notiBtn.addEventListener("click", () => {
+        const panel = document.getElementById("notiPanel");
+
+        if (!panel) return;
+
+        panel.style.display =
+            panel.style.display === "block" ? "none" : "block";
+
+        loadBellOrders();
+    });
+}
+
+loadHistory();
+loadBellOrders();
+
+// Auto refresh
+setInterval(() => {
+    loadBellOrders();
+    loadHistory();
+}, 5000);
 
 async function loadHistory() {
     const username = localStorage.getItem("username") || "guest";
