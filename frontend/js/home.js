@@ -4,20 +4,39 @@ document.addEventListener("DOMContentLoaded", () => {
         localStorage.getItem("displayName")
         || "Login";
 
-    document.getElementById("profileName")
-        .innerText = username;
+    const profileNameEl = document.getElementById("profileName");
+    if (profileNameEl) {
+        profileNameEl.innerText = username;
+    }
 
     const avatar = document.getElementById("avatarText");
     const nameText = document.getElementById("usernameText");
     const dropdown = document.getElementById("profileDropdown");
     const profileBox = document.getElementById("profileBox");
 
-    if (username) {
-        avatar.innerText = username.charAt(0).toUpperCase();
-        nameText.innerText = username;
-    } else {
-        avatar.innerText = "👤";
-        nameText.innerText = "Login";
+    if (avatar && nameText) {
+        if (username !== "Login") {
+            avatar.innerText = username.charAt(0).toUpperCase();
+            nameText.innerText = username;
+        } else {
+            avatar.innerText = "👤";
+            nameText.innerText = "Login";
+        }
+    }
+
+    if (profileBox && dropdown) {
+        profileBox.addEventListener("click", () => {
+            dropdown.style.display =
+                dropdown.style.display === "flex" ? "none" : "flex";
+        });
+    }
+
+    if (logoutBtn) {
+        logoutBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            localStorage.clear();
+            window.location.href = "login.html";
+        });
     }
 
     // toggle dropdown
