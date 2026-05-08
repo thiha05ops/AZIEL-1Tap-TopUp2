@@ -65,4 +65,12 @@ const GAME_PRICES = {
         { name: "8080 Genesis Crystals", price: 235000 },
         { name: "Welkin Moon", price: 13500 }
     ],
+    roblox: [
+        { name: "80 Robux", price: 3500 },
+        { name: "400 Robux", price: 16000 },
+        { name: "800 Robux", price: 31000 },
+        { name: "1700 Robux", price: 65000 },
+        { name: "4500 Robux", price: 165000 },
+        { name: "10000 Robux", price: 355000 }
+    ],
 };
