@@ -1,0 +1,68 @@
+body {
+    margin: 0;
+    background: #070716;
+    color: #fff;
+    font-family: Arial, sans-serif;
+}
+
+.admin-header {
+    height: 72px;
+    background: #101028;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 7%;
+}
+
+.admin-header a {
+    color: #fff;
+    text-decoration: none;
+    background: #1f1f48;
+    padding: 10px 18px;
+    border-radius: 12px;
+}
+
+.admin-wallet-page {
+    width: 92%;
+    max-width: 1200px;
+    margin: 30px auto;
+}
+
+.topup-card {
+    background: #101028;
+    border-radius: 22px;
+    padding: 24px;
+    margin-bottom: 20px;
+    border: 1px solid rgba(255, 255, 255, .08);
+}
+
+.topup-card img {
+    width: 240px;
+    border-radius: 16px;
+    margin-top: 16px;
+}
+
+.topup-actions {
+    display: flex;
+    gap: 14px;
+    margin-top: 20px;
+}
+
+.approve-btn,
+.reject-btn {
+    border: none;
+    padding: 14px 22px;
+    border-radius: 14px;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+.approve-btn {
+    background: #22c55e;
+    color: #fff;
+}
+
+.reject-btn {
+    background: #ef4444;
+    color: #fff;
+}

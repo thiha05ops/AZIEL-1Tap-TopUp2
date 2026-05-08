@@ -4,87 +4,223 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Panel - AZIEL</title>
+
+    <title>AZIEL Admin Panel</title>
 
     <link rel="stylesheet" href="css/main.css">
-    <link rel="stylesheet" href="css/admin.css">
+
+    <style>
+        body {
+            margin: 0;
+            background: #070716;
+            color: #fff;
+            font-family: Arial, sans-serif;
+        }
+
+        .admin-header {
+            height: 72px;
+            background: #101028;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 7%;
+            border-bottom: 1px solid rgba(255, 255, 255, .08);
+        }
+
+        .admin-header h1 {
+            color: #ffd700;
+            margin: 0;
+        }
+
+        .admin-header a {
+            color: #fff;
+            text-decoration: none;
+            background: #1d1d45;
+            padding: 10px 18px;
+            border-radius: 12px;
+            font-weight: 800;
+        }
+
+        .admin-page {
+            width: 92%;
+            max-width: 1300px;
+            margin: 30px auto;
+        }
+
+        .admin-grid {
+            display: grid;
+            grid-template-columns:
+                repeat(auto-fit, minmax(260px, 1fr));
+
+            gap: 22px;
+        }
+
+        .admin-card {
+            background:
+                linear-gradient(135deg,
+                    #101028,
+                    #16163b);
+
+            border-radius: 24px;
+
+            padding: 28px;
+
+            border: 1px solid rgba(255, 255, 255, .08);
+
+            transition: .25s;
+        }
+
+        .admin-card:hover {
+            transform: translateY(-5px);
+            border-color: #ffd700;
+        }
+
+        .admin-card h2 {
+            margin-top: 0;
+            color: #ffd700;
+        }
+
+        .admin-card p {
+            color: #aaa;
+            line-height: 1.6;
+        }
+
+        .admin-card a {
+            display: inline-block;
+            margin-top: 18px;
+            text-decoration: none;
+            background:
+                linear-gradient(135deg,
+                    #ffd700,
+                    #ffb800);
+
+            color: #111;
+
+            padding: 12px 18px;
+
+            border-radius: 14px;
+
+            font-weight: 900;
+        }
+    </style>
 </head>
 
 <body>
 
-    <div class="admin-wrap">
+    <header class="admin-header">
 
-        <aside class="admin-sidebar">
-            <h2>AZIEL Admin</h2>
-            <button class="admin-nav active">📦 Orders</button>
-            <a href="home.html">🏠 Back Home</a>
-        </aside>
+        <h1>AZIEL Admin Panel</h1>
 
-        <main class="admin-main">
+        <a href="home.html">
+            Back Home
+        </a>
 
-            <div class="admin-login" id="loginBox">
-                <h1>Admin Login</h1>
-                <input type="password" id="adminPassword" placeholder="Admin password">
-                <button id="loginBtn">Login</button>
+    </header>
+
+
+    <main class="admin-page">
+
+        <div class="admin-grid">
+
+            <div class="admin-card">
+
+                <h2>📦 Orders</h2>
+
+                <p>
+                    View and manage customer orders,
+                    payment slips and delivery status.
+                </p>
+
+                <a href="admin-orders.html">
+                    Open Orders
+                </a>
+
             </div>
 
-            <section id="adminContent" style="display:none;">
 
-                <div class="admin-top">
-                    <div>
-                        <h1>Orders Dashboard</h1>
-                        <p>Manage payments, slips and order status.</p>
-                    </div>
+            <div class="admin-card">
 
-                    <button id="refreshBtn">Refresh</button>
-                </div>
+                <h2>💰 Wallet Topups</h2>
 
-                <div class="admin-stats">
-                    <div><span>Total Orders</span><b id="totalOrders">0</b></div>
-                    <div><span>Paid</span><b id="paidOrders">0</b></div>
-                    <div><span>Processing</span><b id="processingOrders">0</b></div>
-                    <div><span>Completed</span><b id="completedOrders">0</b></div>
-                </div>
+                <p>
+                    Approve or reject wallet topup
+                    requests submitted by users.
+                </p>
 
-                <div class="admin-tools">
-                    <input type="text" id="searchOrder" placeholder="Search order / user / game">
-                    <select id="statusFilter">
-                        <option value="all">All Status</option>
-                        <option value="pending_payment">Pending Payment</option>
-                        <option value="paid">Paid</option>
-                        <option value="processing">Processing</option>
-                        <option value="completed">Completed</option>
-                        <option value="cancelled">Cancelled</option>
-                        <option value="failed">Failed</option>
-                    </select>
-                </div>
+                <a href="admin-wallet.html">
+                    Open Wallet
+                </a>
 
-                <div class="orders-table-wrap">
-                    <table class="orders-table">
-                        <thead>
-                            <tr>
-                                <th>Order</th>
-                                <th>User</th>
-                                <th>Game</th>
-                                <th>Package</th>
-                                <th>Amount</th>
-                                <th>Payment</th>
-                                <th>Status</th>
-                                <th>Slip</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="ordersList"></tbody>
-                    </table>
-                </div>
+            </div>
 
-            </section>
 
-        </main>
+            <div class="admin-card">
 
-    </div>
+                <h2>👤 Users</h2>
 
-    <script src="js/admin.js"></script>
+                <p>
+                    View registered users,
+                    balances and account information.
+                </p>
+
+                <a href="admin-users.html">
+                    Open Users
+                </a>
+
+            </div>
+
+
+            <div class="admin-card">
+
+                <h2>🎮 Games</h2>
+
+                <p>
+                    Manage games, pricing,
+                    packages and regions.
+                </p>
+
+                <a href="home.html">
+                    Open Games
+                </a>
+
+            </div>
+
+
+            <div class="admin-card">
+
+                <h2>📢 Notifications</h2>
+
+                <p>
+                    Manage user notifications,
+                    announcements and alerts.
+                </p>
+
+                <a href="notifications.html">
+                    Open Notifications
+                </a>
+
+            </div>
+
+
+            <div class="admin-card">
+
+                <h2>⚙️ Settings</h2>
+
+                <p>
+                    Configure payment systems,
+                    supplier APIs and security.
+                </p>
+
+                <a href="#">
+                    Open Settings
+                </a>
+
+            </div>
+
+        </div>
+
+    </main>
+
 </body>
 
 </html>
