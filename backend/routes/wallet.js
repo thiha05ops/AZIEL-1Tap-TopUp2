@@ -359,5 +359,8 @@ router.put(
 
     }
 );
+router.get("/wallet/test", (req, res) => {
+    res.send("Wallet route working");
+});
 
 module.exports = router;
