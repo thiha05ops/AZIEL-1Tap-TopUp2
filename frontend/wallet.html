@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Wallet - AZIEL</title>
+
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/wallet.css">
+    <link rel="stylesheet" href="css/payment-grid.css">
+</head>
+
+<body>
+
+    <header class="wallet-header">
+
+        <a href="home.html" class="brand">
+            AZIEL
+        </a>
+
+        <div class="wallet-actions">
+
+            <a href="account.html" class="wallet-btn">
+                👤 Account
+            </a>
+
+            <a href="home.html" class="wallet-btn">
+                🏠 Home
+            </a>
+
+        </div>
+
+    </header>
+
+
+    <main class="wallet-page">
+
+        <section class="wallet-balance-card">
+
+            <p>Wallet Balance</p>
+
+            <h1 id="walletBalance">
+                0 Ks
+            </h1>
+
+            <span>
+                Fast payment with AZIEL Wallet
+            </span>
+
+        </section>
+
+
+        <section class="wallet-grid">
+
+            <div class="wallet-card">
+
+                <h2>Top Up Wallet</h2>
+
+                <label>Amount</label>
+
+                <input type="number" id="topupAmount" placeholder="Enter amount">
+
+                <label>Select Payment</label>
+
+                <div id="paymentGrid" class="payment-grid"></div>
+
+                <input type="hidden" id="paymentMethod">
+
+                <label>Upload Slip</label>
+
+                <input type="file" id="topupSlip" accept="image/*">
+
+                <button id="submitTopupBtn">
+                    Submit Top Up
+                </button>
+
+            </div>
+
+
+            <div class="wallet-card">
+
+                <h2>Wallet History</h2>
+
+                <div id="walletHistory">
+
+                    <p class="empty-text">
+                        No wallet history yet.
+                    </p>
+
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+    <script src="js/payment.js"></script>
+    <script src="js/wallet.js"></script>
+
+</body>
+
+</html>
