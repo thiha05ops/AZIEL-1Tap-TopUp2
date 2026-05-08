@@ -74,9 +74,15 @@ router.get("/wallet/:username", async (req, res) => {
                 username: req.params.username
             }).sort({ createdAt: -1 });
 
+        const currency = req.query.currency || "MMK";
+
+        const balance =
+            user.wallet?.[currency] || 0;
+
         res.json({
             success: true,
-            balance: user.walletBalance || 0,
+            balance,
+            currency,
             transactions,
             topups
         });
@@ -284,20 +290,15 @@ router.put(
 
             if (status === "approved") {
 
+                const currencyKey = topup.currency === "THB" ? "THB" : "MMK";
+
                 await User.updateOne(
-
-                    {
-                        username:
-                            topup.username
-                    },
-
+                    { username: topup.username },
                     {
                         $inc: {
-                            walletBalance:
-                                topup.amount
+                            [`wallet.${currencyKey}`]: topup.amount
                         }
                     }
-
                 );
 
                 await WalletTransaction.create({
@@ -400,7 +401,25 @@ router.post("/wallet/pay", async (req, res) => {
             });
         }
 
-        user.walletBalance -= Number(amount);
+        const currencyKey =
+            currency === "THB"
+                ? "THB"
+                : "MMK";
+
+        const currentBalance =
+            user.wallet?.[currencyKey] || 0;
+
+        if (currentBalance < Number(amount)) {
+
+            return res.json({
+                success: false,
+                message: "Insufficient wallet balance"
+            });
+
+        }
+
+        user.wallet[currencyKey] -= Number(amount);
+
         await user.save();
 
         await WalletTransaction.create({

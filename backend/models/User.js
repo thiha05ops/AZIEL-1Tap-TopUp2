@@ -36,6 +36,16 @@ const userSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
+    wallet: {
+        MMK: {
+            type: Number,
+            default: 0
+        },
+        THB: {
+            type: Number,
+            default: 0
+        }
+    },
 
     avatar: {
         type: String,
