@@ -521,5 +521,47 @@ router.get("/wallet/:username", async (req, res) => {
     }
 
 });
+function initWalletQrPreview() {
+    const qrBox = document.getElementById("walletQrBox");
+    const qrImg = document.getElementById("walletQrImage");
+    const qrTitle = document.getElementById("walletQrTitle");
+    const paymentInput = document.getElementById("paymentMethod");
+
+    if (!qrBox || !qrImg || !qrTitle || !paymentInput) {
+        console.log("Wallet QR elements missing");
+        return;
+    }
+
+    const qrData = {
+        kbzpay: { name: "KBZPay", qr: "assets/payment/kbzpay-qr.png" },
+        wavepay: { name: "WavePay", qr: "assets/payment/wavepay-qr.png" },
+        ayapay: { name: "AYA Pay", qr: "assets/payment/ayapay-qr.png" },
+        promptpay: { name: "PromptPay", qr: "assets/payment/promptpay-qr.png" },
+        scb: { name: "SCB", qr: "assets/payment/scb-qr.png" }
+    };
+
+    function showQr() {
+        const method = paymentInput.value;
+
+        if (!method || !qrData[method]) {
+            qrBox.style.display = "none";
+            return;
+        }
+
+        qrTitle.innerText = qrData[method].name + " QR";
+        qrImg.src = qrData[method].qr;
+        qrBox.style.display = "block";
+    }
+
+    document.addEventListener("paymentChanged", showQr);
+
+    document.addEventListener("click", (e) => {
+        if (e.target.closest(".pay-card")) {
+            setTimeout(showQr, 100);
+        }
+    });
+
+    showQr();
+}
 
 module.exports = router;
