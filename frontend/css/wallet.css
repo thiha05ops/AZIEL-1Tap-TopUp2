@@ -164,3 +164,18 @@ body {
     }
 
 }
+
+.wallet-qr-box {
+    margin-top: 16px;
+    background: #fff;
+    color: #111;
+    border-radius: 18px;
+    padding: 18px;
+    text-align: center;
+}
+
+.wallet-qr-box img {
+    width: 190px;
+    height: 190px;
+    object-fit: contain;
+}

@@ -14,6 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     loadWallet();
+    initWalletQrPreview();
 
     const submitBtn =
         document.getElementById(
@@ -238,4 +239,75 @@ async function submitTopup() {
 
     }
 
+}
+function initWalletQrPreview() {
+    const qrBox =
+        document.getElementById(
+            "walletQrBox"
+        );
+
+    const qrImg =
+        document.getElementById(
+            "walletQrImage"
+        );
+
+    const qrTitle =
+        document.getElementById(
+            "walletQrTitle"
+        );
+
+    const qrData = {
+
+        kbzpay: {
+            name: "KBZPay",
+            qr: "assets/payment/kbzpay-qr.png"
+        },
+
+        wavepay: {
+            name: "WavePay",
+            qr: "assets/payment/wavepay-qr.png"
+        },
+
+        ayapay: {
+            name: "AYA Pay",
+            qr: "assets/payment/ayapay-qr.png"
+        },
+
+        promptpay: {
+            name: "PromptPay",
+            qr: "assets/payment/promptpay-qr.png"
+        },
+
+        scb: {
+            name: "SCB",
+            qr: "assets/payment/scb-qr.png"
+        }
+
+    };
+
+    document.addEventListener(
+        "paymentChanged",
+        () => {
+
+            const method =
+                document.getElementById(
+                    "paymentMethod"
+                )?.value;
+
+            if (
+                !method ||
+                !qrData[method]
+            ) return;
+
+            qrTitle.innerText =
+                qrData[method].name + " QR";
+
+            qrImg.src =
+                qrData[method].qr;
+
+            qrBox.style.display =
+                "block";
+
+        }
+    );
 }
