@@ -10,11 +10,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const paymentsByRegion = {
         MM: [
+            { id: "wallet", name: "AZIEL Wallet", logo: "assets/logo.png" },
             { id: "kbzpay", name: "KBZPay", logo: "assets/payment/kbzpay.png" },
             { id: "wavepay", name: "WavePay", logo: "assets/payment/wavepay.png" },
             { id: "ayapay", name: "AYA Pay", logo: "assets/payment/ayapay.png" }
         ],
         TH: [
+            { id: "wallet", name: "AZIEL Wallet", logo: "assets/logo.png" },
             { id: "promptpay", name: "PromptPay", logo: "assets/payment/promptpay.png" },
             { id: "scb", name: "SCB", logo: "assets/payment/scb.png" }
         ]

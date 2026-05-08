@@ -60,7 +60,11 @@ document.addEventListener("DOMContentLoaded", () => {
             zoneId: serverIdInput.value.trim() || "-"
         };
 
-        createPaymentAndRedirect(orderData);
+        if (paymentMethod === "wallet") {
+            payWithWallet(orderData);
+        } else {
+            createPaymentAndRedirect(orderData);
+        }
     });
 
     function updateState() {
@@ -97,3 +101,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
     updateState();
 });
+async function payWithWallet(orderData) {
+    try {
+        const res = await fetch("/api/wallet/pay", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(orderData)
+        });
+
+        const data = await res.json();
+
+        if (!data.success) {
+            alert(data.message || "Wallet payment failed");
+            return;
+        }
+
+        alert("Paid with wallet ✅");
+        window.location.href = `tracking.html?orderId=${orderData.orderId}`;
+
+    } catch (error) {
+        console.log(error);
+        alert("Server error");
+    }
+}

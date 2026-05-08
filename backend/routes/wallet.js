@@ -1,5 +1,5 @@
 // backend/routes/wallet.js
-
+const Order = require("../models/Order");
 const express = require("express");
 const router = express.Router();
 
@@ -362,5 +362,85 @@ router.put(
 router.get("/wallet/test", (req, res) => {
     res.send("Wallet route working");
 });
+// PAY WITH WALLET
+router.post("/wallet/pay", async (req, res) => {
+    try {
+        const {
+            orderId,
+            username,
+            userId,
+            zoneId,
+            game,
+            packageName,
+            amount,
+            currency,
+            region
+        } = req.body;
 
+        if (!username || !amount || !game || !packageName) {
+            return res.json({
+                success: false,
+                message: "Missing wallet payment data"
+            });
+        }
+
+        const user = await User.findOne({ username });
+
+        if (!user) {
+            return res.json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        if ((user.walletBalance || 0) < Number(amount)) {
+            return res.json({
+                success: false,
+                message: "Insufficient wallet balance"
+            });
+        }
+
+        user.walletBalance -= Number(amount);
+        await user.save();
+
+        await WalletTransaction.create({
+            transactionId: "TXN-" + Date.now(),
+            username,
+            type: "payment",
+            amount: Number(amount),
+            currency: currency || "MMK",
+            description: `Paid for ${game} - ${packageName}`
+        });
+
+        const order = await Order.create({
+            orderId: orderId || "AZL-" + Date.now(),
+            username,
+            userId,
+            zoneId: zoneId || "-",
+            game,
+            packageName,
+            selectedPackage: packageName,
+            amount: Number(amount),
+            currency: currency || "MMK",
+            region: region || "MM",
+            paymentMethod: "wallet",
+            status: "paid",
+            paymentSlip: "",
+            note: "Paid with wallet"
+        });
+
+        res.json({
+            success: true,
+            message: "Paid with wallet",
+            order
+        });
+
+    } catch (error) {
+        console.log("Wallet pay error:", error);
+        res.json({
+            success: false,
+            message: "Server error"
+        });
+    }
+});
 module.exports = router;
