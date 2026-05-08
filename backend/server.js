@@ -10,6 +10,7 @@ const session = require("express-session");
 const connectDB = require("./config/db");
 const passport = require("./config/passport");
 
+
 // Routes
 const authRoutes = require("./routes/auth");
 const orderRoutes = require("./routes/order");
@@ -18,6 +19,8 @@ const profileRoutes = require("./routes/profile");
 const socialAuthRoutes = require("./routes/socialAuth");
 const passwordRoutes = require("./routes/password");
 const supplierRoutes = require("./routes/supplier");
+const walletRoutes =
+    require("./routes/wallet");
 
 const app = express();
 app.use("/api", supplierRoutes);
