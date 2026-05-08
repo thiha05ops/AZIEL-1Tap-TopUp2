@@ -1,17 +1,16 @@
+// backend/server.js
+
 const path = require("path");
 const dotenv = require("dotenv");
-
 dotenv.config({ path: path.join(__dirname, "../.env") });
 
 const express = require("express");
 const cors = require("cors");
 const session = require("express-session");
-
-const connectDB = require("./config/db");
 const passport = require("./config/passport");
 
+const connectDB = require("./config/db");
 
-// Routes
 const authRoutes = require("./routes/auth");
 const orderRoutes = require("./routes/order");
 const paymentRoutes = require("./routes/payment");
@@ -19,16 +18,12 @@ const profileRoutes = require("./routes/profile");
 const socialAuthRoutes = require("./routes/socialAuth");
 const passwordRoutes = require("./routes/password");
 const supplierRoutes = require("./routes/supplier");
-const walletRoutes =
-    require("./routes/wallet");
+const walletRoutes = require("./routes/wallet");
 
 const app = express();
-app.use("/api", supplierRoutes);
 
-// 🔥 DB connect
 connectDB();
 
-// 🔥 Middleware
 app.use(cors());
 app.use(express.json());
 
@@ -36,34 +31,34 @@ app.use(
     session({
         secret: process.env.SESSION_SECRET || "aziel_session_secret",
         resave: false,
-        saveUninitialized: false,
+        saveUninitialized: false
     })
 );
 
 app.use(passport.initialize());
 app.use(passport.session());
 
-// 🔥 Static files (CLEANED)
+// static
 app.use(express.static(path.join(__dirname, "../frontend")));
-app.use("/uploads", express.static(path.join(__dirname, "uploads"))); // only ONE line needed
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// 🔥 Routes
+// routes
 app.use("/api", authRoutes);
 app.use("/api", orderRoutes);
 app.use("/api", paymentRoutes);
 app.use("/api", profileRoutes);
 app.use("/api", socialAuthRoutes);
 app.use("/api", passwordRoutes);
-app.use(express.static("frontend"));
+app.use("/api", supplierRoutes);
+app.use("/api", walletRoutes);
 
-// 🔥 Home page
+// home
 app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "../frontend/home.html"));
 });
 
-// 🔥 Start server
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-    console.log("Server running on port " + PORT);
+    console.log("Server running on port", PORT);
 });
