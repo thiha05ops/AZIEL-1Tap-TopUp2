@@ -292,11 +292,17 @@ router.put(
 
                 const currencyKey = topup.currency === "THB" ? "THB" : "MMK";
 
+                const currencyKey =
+                    topup.currency === "THB"
+                        ? "THB"
+                        : "MMK";
+
                 await User.updateOne(
                     { username: topup.username },
                     {
                         $inc: {
-                            [`wallet.${currencyKey}`]: topup.amount
+                            [`wallet.${currencyKey}`]:
+                                topup.amount
                         }
                     }
                 );
@@ -462,4 +468,61 @@ router.post("/wallet/pay", async (req, res) => {
         });
     }
 });
+// LOAD WALLET
+router.get("/wallet/:username", async (req, res) => {
+
+    try {
+
+        const username =
+            req.params.username;
+
+        const user =
+            await User.findOne({ username });
+
+        if (!user) {
+
+            return res.json({
+                success: false,
+                message: "User not found"
+            });
+
+        }
+
+        const currency =
+            req.query.currency || "MMK";
+
+        const balance =
+            user.wallet?.[currency] || 0;
+
+        const transactions =
+            await WalletTransaction.find({
+                username
+            }).sort({ createdAt: -1 });
+
+        const topups =
+            await WalletTopup.find({
+                username
+            }).sort({ createdAt: -1 });
+
+        res.json({
+            success: true,
+            balance,
+            currency,
+            transactions,
+            topups
+        });
+
+    } catch (error) {
+
+        console.log(error);
+
+        res.json({
+            success: false,
+            message: "Server error"
+        });
+
+    }
+
+});
+
 module.exports = router;
