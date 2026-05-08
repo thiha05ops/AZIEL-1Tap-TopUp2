@@ -55,5 +55,14 @@ const GAME_PRICES = {
         { name: "2400+108 Tokens", mmk: 113000, thb: 877, code: "hok_2400+108" },
         { name: "4000+180 Tokens", mmk: 188300, thb: 1460, code: "hok_4000+180" },
         { name: "8000+360 Tokens", mmk: 376500, thb: 2920, code: "hok_8000+360" }
-    ]
+    ],
+    genshin: [
+        { name: "60 Genesis Crystals", price: 2500 },
+        { name: "330 Genesis Crystals", price: 12500 },
+        { name: "1090 Genesis Crystals", price: 36000 },
+        { name: "2240 Genesis Crystals", price: 72000 },
+        { name: "3880 Genesis Crystals", price: 118000 },
+        { name: "8080 Genesis Crystals", price: 235000 },
+        { name: "Welkin Moon", price: 13500 }
+    ],
 };

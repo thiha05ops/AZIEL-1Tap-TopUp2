@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Genshin Impact - AZIEL</title>
+
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/game.css">
+    <link rel="stylesheet" href="css/payment-grid.css">
+</head>
+
+<body>
+
+    <header class="game-header">
+        <a href="home.html" class="brand">AZIEL</a>
+
+        <div class="game-header-actions">
+            <a href="notifications.html" class="header-btn">🔔</a>
+            <a href="account.html" class="header-btn">👤 Account</a>
+        </div>
+    </header>
+
+    <main class="game-page">
+
+        <section class="game-hero">
+
+            <div class="game-banner">
+                <img src="assets/genshin.jpg" alt="Genshin Impact">
+
+                <div class="banner-overlay">
+                    <span class="game-tag">Anime Game</span>
+                    <h1>Genshin Impact</h1>
+                    <p>Fast & secure Genesis Crystal top up for Genshin players.</p>
+                </div>
+            </div>
+
+            <div class="game-info">
+                <h2>How to Top Up</h2>
+
+                <div class="step-row"><span>1</span>
+                    <p>Enter your UID.</p>
+                </div>
+                <div class="step-row"><span>2</span>
+                    <p>Select crystal package.</p>
+                </div>
+                <div class="step-row"><span>3</span>
+                    <p>Choose payment method.</p>
+                </div>
+                <div class="step-row"><span>4</span>
+                    <p>Pay and upload payment screenshot.</p>
+                </div>
+
+                <div class="trust-box">
+                    ⚡ Instant delivery • 🔒 Secure payment • 📦 Order tracking
+                </div>
+            </div>
+
+        </section>
+
+        <section class="order-layout">
+
+            <div class="order-left">
+
+                <div class="form-card">
+                    <div class="card-title">
+                        <span>👤</span>
+                        <h2>Account Information</h2>
+                    </div>
+
+                    <label>UID</label>
+                    <input type="text" id="userId" placeholder="Enter Genshin UID">
+
+                    <label>Server</label>
+                    <select id="serverId">
+                        <option value="">Select Server</option>
+                        <option value="Asia">Asia</option>
+                        <option value="Europe">Europe</option>
+                        <option value="America">America</option>
+                        <option value="TW/HK/MO">TW/HK/MO</option>
+                    </select>
+                </div>
+
+                <div class="form-card">
+                    <div class="card-title">
+                        <span>💎</span>
+                        <h2>Select Crystal Package</h2>
+                    </div>
+
+                    <div class="packages" id="packages" data-game="genshin"></div>
+                </div>
+
+                <div class="form-card">
+                    <div class="card-title">
+                        <span>💳</span>
+                        <h2>Select Payment</h2>
+                    </div>
+
+                    <div id="paymentGrid" class="payment-grid"></div>
+                    <input type="hidden" id="paymentMethod">
+                </div>
+
+            </div>
+
+            <aside class="order-summary">
+
+                <h2>Order Summary</h2>
+
+                <div class="summary-line">
+                    <span>Game</span>
+                    <b>Genshin Impact</b>
+                </div>
+
+                <div class="summary-line">
+                    <span>Package</span>
+                    <b id="summaryPackage">Not selected</b>
+                </div>
+
+                <div class="summary-line">
+                    <span>Payment</span>
+                    <b id="summaryPayment">Not selected</b>
+                </div>
+
+                <div class="summary-total">
+                    <span>Total</span>
+                    <strong id="summaryAmount">0 Ks</strong>
+                </div>
+
+                <p id="selectedText" class="summary-note">
+                    Please fill all information to continue.
+                </p>
+
+                <button id="buyBtn" disabled>Buy Now</button>
+
+                <p class="safe-note">Your order will be tracked in your account after payment.</p>
+
+            </aside>
+
+        </section>
+
+    </main>
+
+    <script src="js/auth-check.js"></script>
+    <script src="js/prices.js"></script>
+    <script src="js/region-payment.js"></script>
+    <script src="js/payment-redirect.js"></script>
+    <script src="js/payment.js"></script>
+    <script src="js/genshin.js"></script>
+
+</body>
+
+</html>
