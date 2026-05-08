@@ -289,9 +289,6 @@ router.put(
             }
 
             if (status === "approved") {
-
-                const currencyKey = topup.currency === "THB" ? "THB" : "MMK";
-
                 const currencyKey =
                     topup.currency === "THB"
                         ? "THB"
