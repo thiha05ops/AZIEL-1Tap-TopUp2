@@ -1,62 +1,101 @@
-setInterval(checkNewOrders, 5000);
-
 let lastOrderCount = 0;
+let lastTopupCount = 0;
+let firstLoad = true;
+let soundEnabled = false;
 
-async function checkNewOrders() {
+const ADMIN_PASSWORD = "AZIEL2026";
 
+document.addEventListener("click", () => {
+    soundEnabled = true;
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+    checkAdminNotifications();
+    setInterval(checkAdminNotifications, 5000);
+});
+
+async function checkAdminNotifications() {
     try {
+        const orderRes = await fetch("/api/admin/orders", {
+            headers: { "x-admin-password": ADMIN_PASSWORD }
+        });
 
-        const res =
-            await fetch("/api/orders");
+        const orderData = await orderRes.json();
+        const orders = orderData.orders || [];
 
-        const data =
-            await res.json();
+        const topupRes = await fetch("/api/admin/wallet/topups", {
+            headers: { "x-admin-password": ADMIN_PASSWORD }
+        });
 
-        if (!Array.isArray(data)) return;
+        const topupData = await topupRes.json();
+        const topups = topupData.topups || [];
 
-        if (
-            data.length > lastOrderCount &&
-            lastOrderCount !== 0
-        ) {
+        if (!firstLoad) {
+            if (orders.length > lastOrderCount) {
+                showAdminAlert("🔔 New Order Received!");
+                playBeep();
+            }
 
-            showAdminAlert();
-
+            if (topups.length > lastTopupCount) {
+                showAdminAlert("💰 New Wallet Topup Request!");
+                playBeep();
+            }
         }
 
-        lastOrderCount =
-            data.length;
+        lastOrderCount = orders.length;
+        lastTopupCount = topups.length;
+        firstLoad = false;
 
     } catch (error) {
+        console.log("Admin live error:", error);
+    }
+}
 
-        console.log(error);
+function showAdminAlert(text) {
+    let alertBox = document.getElementById("adminLiveAlert");
 
+    if (!alertBox) {
+        alertBox = document.createElement("div");
+        alertBox.id = "adminLiveAlert";
+        document.body.appendChild(alertBox);
     }
 
+    alertBox.innerText = text;
+
+    alertBox.style.position = "fixed";
+    alertBox.style.top = "20px";
+    alertBox.style.right = "20px";
+    alertBox.style.background = "linear-gradient(135deg,#ffd700,#ffb800)";
+    alertBox.style.color = "#111";
+    alertBox.style.padding = "16px 22px";
+    alertBox.style.borderRadius = "16px";
+    alertBox.style.fontWeight = "900";
+    alertBox.style.zIndex = "99999";
+    alertBox.style.boxShadow = "0 0 30px rgba(255,215,0,.45)";
+
+    setTimeout(() => {
+        alertBox.remove();
+    }, 4000);
 }
 
-function showAdminAlert() {
+function playBeep() {
+    if (!soundEnabled) {
+        console.log("Click admin page once to enable sound");
+        return;
+    }
 
-    const alertBox =
-        document.getElementById(
-            "adminAlert"
-        );
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
 
-    const sound =
-        document.getElementById(
-            "adminSound"
-        );
+    oscillator.connect(gain);
+    gain.connect(audioCtx.destination);
 
-    alertBox.style.display =
-        "flex";
+    oscillator.frequency.value = 880;
+    oscillator.type = "sine";
 
-    sound.play();
+    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
 
-}
-
-function closeAdminAlert() {
-
-    document.getElementById(
-        "adminAlert"
-    ).style.display = "none";
-
+    oscillator.start();
+    oscillator.stop(audioCtx.currentTime + 0.25);
 }
