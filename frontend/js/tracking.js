@@ -82,3 +82,98 @@ function statusClass(status) {
     if (status === "cancelled" || status === "failed") return "status-failed";
     return "status-pending";
 }
+// ======================
+// LIVE TRACKING UPDATE
+// ======================
+
+let lastStatus = "";
+
+setInterval(checkTrackingUpdate, 5000);
+
+async function checkTrackingUpdate() {
+
+    try {
+
+        const params =
+            new URLSearchParams(
+                window.location.search
+            );
+
+        const orderId =
+            params.get("orderId");
+
+        if (!orderId) return;
+
+        const res =
+            await fetch(
+                `/api/orders/${orderId}`
+            );
+
+        const data =
+            await res.json();
+
+        if (!data.success) return;
+
+        const order =
+            data.order;
+
+        if (!lastStatus) {
+
+            lastStatus =
+                order.status;
+
+            return;
+        }
+
+        if (
+            order.status !== lastStatus
+        ) {
+
+            lastStatus =
+                order.status;
+
+            showTrackingPopup(
+                order.status
+            );
+
+            updateTrackingUI(order);
+
+        }
+
+    } catch (error) {
+
+        console.log(error);
+
+    }
+
+}
+
+
+// ======================
+// POPUP
+// ======================
+
+function showTrackingPopup(status) {
+
+    const popup =
+        document.createElement("div");
+
+    popup.className =
+        "tracking-popup";
+
+    popup.innerHTML = `
+        🔔 Your order is now:
+        <strong>${status}</strong>
+    `;
+
+    document.body.appendChild(
+        popup
+    );
+
+    setTimeout(() => {
+
+        popup.remove();
+
+    }, 4000);
+
+}
