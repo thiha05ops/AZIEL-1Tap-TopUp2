@@ -1,103 +1,96 @@
+// frontend/js/admin-live.js
+
+let lastOrderCount = 0;
+let firstLoad = true;
+let soundEnabled = false;
+
+const ADMIN_LIVE_PASSWORD = "AZIEL2026";
+
+document.addEventListener("click", () => {
+    soundEnabled = true;
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+    checkAdminLiveOrders();
+    setInterval(checkAdminLiveOrders, 5000);
+});
+
+async function checkAdminLiveOrders() {
+    try {
+        const res = await fetch("/api/admin/orders", {
+            headers: {
+                "x-admin-password": ADMIN_LIVE_PASSWORD
+            }
+        });
+
+        const data = await res.json();
+        const orders = data.orders || [];
+
+        if (!firstLoad && orders.length > lastOrderCount) {
+            showAdminAlert("🔔 New Order Received!");
+            playAdminBeep();
+        }
+
+        lastOrderCount = orders.length;
+        firstLoad = false;
+
+    } catch (error) {
+        console.log("Admin live error:", error);
+    }
+}
+
 function showAdminAlert(text) {
+    let box = document.getElementById("adminLiveAlert");
 
-    let alertBox =
-        document.getElementById(
-            "adminLiveAlert"
-        );
-
-    if (!alertBox) {
-
-        alertBox =
-            document.createElement("div");
-
-        alertBox.id =
-            "adminLiveAlert";
-
-        document.body.appendChild(
-            alertBox
-        );
-
+    if (!box) {
+        box = document.createElement("div");
+        box.id = "adminLiveAlert";
+        document.body.appendChild(box);
     }
 
-    alertBox.innerHTML = `
-        <div style="
-            display:flex;
-            align-items:center;
-            justify-content:space-between;
-            gap:20px;
-        ">
-
-            <div>
-                ${text}
-            </div>
-
-            <button
-                onclick="
-                    document.getElementById(
-                        'adminLiveAlert'
-                    ).style.display='none'
-                "
-                style="
-                    background:#111827;
-                    color:white;
-                    border:none;
-                    padding:8px 14px;
-                    border-radius:10px;
-                    cursor:pointer;
-                    font-weight:700;
-                "
-            >
+    box.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;">
+            <span>${text}</span>
+            <button onclick="document.getElementById('adminLiveAlert').style.display='none'">
                 Close
             </button>
-
         </div>
     `;
 
-    alertBox.style.position =
-        "fixed";
+    box.style.position = "fixed";
+    box.style.top = "22px";
+    box.style.right = "22px";
+    box.style.background = "linear-gradient(135deg,#ffd700,#ffb800)";
+    box.style.color = "#111";
+    box.style.padding = "16px 20px";
+    box.style.borderRadius = "16px";
+    box.style.fontWeight = "900";
+    box.style.zIndex = "99999";
+    box.style.minWidth = "300px";
+    box.style.boxShadow = "0 0 30px rgba(255,215,0,.45)";
+    box.style.display = "block";
 
-    alertBox.style.top =
-        "20px";
-
-    alertBox.style.right =
-        "20px";
-
-    alertBox.style.background =
-        "linear-gradient(135deg,#ffd700,#ffb800)";
-
-    alertBox.style.color =
-        "#111";
-
-    alertBox.style.padding =
-        "18px 22px";
-
-    alertBox.style.borderRadius =
-        "18px";
-
-    alertBox.style.fontWeight =
-        "900";
-
-    alertBox.style.zIndex =
-        "99999";
-
-    alertBox.style.minWidth =
-        "320px";
-
-    alertBox.style.boxShadow =
-        "0 0 30px rgba(255,215,0,.45)";
-
-    alertBox.style.display =
-        "block";
+    const btn = box.querySelector("button");
+    btn.style.background = "#111827";
+    btn.style.color = "#fff";
+    btn.style.border = "0";
+    btn.style.borderRadius = "10px";
+    btn.style.padding = "8px 12px";
+    btn.style.cursor = "pointer";
 
     setTimeout(() => {
-
-        if (alertBox) {
-
-            alertBox.style.display =
-                "none";
-
-        }
-
+        box.style.display = "none";
     }, 5000);
+}
 
+function playAdminBeep() {
+    if (!soundEnabled) {
+        console.log("Click admin page once to enable sound");
+        return;
+    }
+
+    const audio = new Audio("assets/sounds/notify.mp3");
+    audio.play().catch(err => {
+        console.log("Sound blocked:", err);
+    });
 }
