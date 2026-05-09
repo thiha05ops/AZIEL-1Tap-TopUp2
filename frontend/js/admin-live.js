@@ -1,6 +1,6 @@
 // frontend/js/admin-live.js
 
-let lastOrderCount = 0;
+let lastOrderIds = [];
 let firstLoad = true;
 let soundEnabled = false;
 
@@ -26,12 +26,29 @@ async function checkAdminLiveOrders() {
         const data = await res.json();
         const orders = data.orders || [];
 
-        if (!firstLoad && orders.length > lastOrderCount) {
-            showAdminAlert("🔔 New Order Received!");
-            playAdminBeep();
+        const currentIds = orders.map(order => order._id || order.orderId);
+
+        if (!firstLoad) {
+            const newOrders = orders.filter(order => {
+
+                const id = order._id || order.orderId;
+
+                return (
+                    !lastOrderIds.includes(id) &&
+                    order.status !== "pending_payment"
+                );
+            });
+
+
+            if (newOrders.length > 0) {
+                showAdminAlert(
+                    `🔔 New order sent! ${newOrders[0].game || ""}`
+                );
+                playAdminBeep();
+            }
         }
 
-        lastOrderCount = orders.length;
+        lastOrderIds = currentIds;
         firstLoad = false;
 
     } catch (error) {

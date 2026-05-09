@@ -55,8 +55,9 @@ document.addEventListener("DOMContentLoaded", () => {
             region,
             paymentMethod,
             username,
-            userId: userIdInput.value.trim(),
-            zoneId: serverIdInput.value
+            userId: userIdInput.value.trim() || "-",
+            zoneId: serverIdInput.value.trim() || "-",
+            status: "pending_payment"
         };
 
         if (paymentMethod === "wallet") {
