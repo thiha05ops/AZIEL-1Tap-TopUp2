@@ -77,7 +77,16 @@ function addNotification(item) {
 
     const notifications = JSON.parse(localStorage.getItem(key)) || [];
 
-    notifications.unshift(item);
+    const exists =
+        notifications.find(
+            n =>
+                n.orderId === item.orderId &&
+                n.message === item.message
+        );
+
+    if (!exists) {
+        notifications.unshift(item);
+    }
 
     localStorage.setItem(key, JSON.stringify(notifications.slice(0, 30)));
 }
