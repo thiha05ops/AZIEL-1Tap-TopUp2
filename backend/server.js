@@ -1,13 +1,21 @@
-// backend/server.js
-
 const path = require("path");
 const dotenv = require("dotenv");
-dotenv.config({ path: path.join(__dirname, "../.env") });
+
+dotenv.config({
+    path: path.join(__dirname, "../.env")
+});
 
 const express = require("express");
 const cors = require("cors");
 const http = require("http");
-const { server } = require("socket.io");
+const { Server } = require("socket.io");
+const session = require("express-session");
+const passport = require("./config/passport");
+
+const connectDB = require("./config/db");
+
+const app = express();
+
 const server = http.createServer(app);
 
 const io = new Server(server, {
