@@ -112,7 +112,10 @@ function renderNotifications() {
 
     const unread = notifications.filter(n => !n.read).length;
 
-    if (countEl) countEl.innerText = unread;
+    if (countEl) {
+        countEl.innerText = unread > 99 ? "99+" : unread;
+        countEl.style.display = unread > 0 ? "flex" : "none";
+    }
 
     if (listEl) {
         if (!notifications.length) {
