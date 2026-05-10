@@ -4,6 +4,9 @@ const express = require("express");
 const router = express.Router();
 
 const Order = require("../models/Order");
+const {
+    sendTelegramMessage
+} = require("../services/telegram");
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "AZIEL2026";
 
