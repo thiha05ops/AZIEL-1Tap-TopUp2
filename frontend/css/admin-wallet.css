@@ -66,3 +66,40 @@ body {
     background: #ef4444;
     color: #fff;
 }
+
+.topup-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 15px;
+}
+
+.approve-btn,
+.reject-btn {
+    border: none;
+    padding: 10px 16px;
+    border-radius: 12px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.approve-btn {
+    background: #16a34a;
+    color: white;
+}
+
+.reject-btn {
+    background: #dc2626;
+    color: white;
+}
+
+.approve-btn:disabled,
+.reject-btn:disabled {
+    opacity: .45;
+    cursor: not-allowed;
+}
+
+.topup-slip {
+    width: 120px;
+    border-radius: 12px;
+    margin-top: 10px;
+}
