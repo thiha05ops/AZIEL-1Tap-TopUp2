@@ -28,6 +28,20 @@ async function trackOrder(orderId) {
     try {
         const res = await fetch(`/api/order/track/${orderId}`);
         const data = await res.json();
+        const oldStatus =
+            localStorage.getItem("lastOrderStatus");
+
+        if (
+            oldStatus &&
+            oldStatus !== data.order.status
+        ) {
+            showTrackingPopup(data.order.status);
+        }
+
+        localStorage.setItem(
+            "lastOrderStatus",
+            data.order.status
+        );
 
         if (!data.success) {
             result.innerHTML = `<p class="error-msg">${data.message}</p>`;
@@ -176,4 +190,30 @@ function showTrackingPopup(status) {
 
     }, 4000);
 
+}
+function showTrackingPopup(status) {
+
+    const popup = document.createElement("div");
+
+    popup.className = "tracking-popup";
+
+    popup.innerHTML = `
+        🔔 Order Status Updated:
+        <b>${status}</b>
+    `;
+
+    document.body.appendChild(popup);
+
+    setTimeout(() => {
+        popup.classList.add("show");
+    }, 100);
+
+    setTimeout(() => {
+        popup.classList.remove("show");
+
+        setTimeout(() => {
+            popup.remove();
+        }, 400);
+
+    }, 4000);
 }
