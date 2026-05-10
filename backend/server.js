@@ -7,15 +7,26 @@ dotenv.config({
 
 const express = require("express");
 const cors = require("cors");
+const session = require("express-session");
 const http = require("http");
 const { Server } = require("socket.io");
-const session = require("express-session");
-const passport = require("./config/passport");
 
 const connectDB = require("./config/db");
+const passport = require("./config/passport");
+
+// routes
+const authRoutes = require("./routes/auth");
+const orderRoutes = require("./routes/order");
+const paymentRoutes = require("./routes/payment");
+const profileRoutes = require("./routes/profile");
+const socialAuthRoutes = require("./routes/socialAuth");
+const passwordRoutes = require("./routes/password");
+const supplierRoutes = require("./routes/supplier");
+const walletRoutes = require("./routes/wallet");
 
 const app = express();
 
+// socket server
 const server = http.createServer(app);
 
 const io = new Server(server, {
@@ -32,46 +43,31 @@ io.on("connection", (socket) => {
 
     socket.on("joinUserRoom", (username) => {
         socket.join(username);
-        console.log("User joined room:", username);
     });
 
     socket.on("disconnect", () => {
         console.log("Socket disconnected:", socket.id);
     });
 });
-const session = require("express-session");
-const passport = require("./config/passport");
 
-const connectDB = require("./config/db");
-
-const authRoutes = require("./routes/auth");
-const orderRoutes = require("./routes/order");
-const paymentRoutes = require("./routes/payment");
-const profileRoutes = require("./routes/profile");
-const socialAuthRoutes = require("./routes/socialAuth");
-const passwordRoutes = require("./routes/password");
-const supplierRoutes = require("./routes/supplier");
-const walletRoutes = require("./routes/wallet");
-
-const app = express();
-
+// DB
 connectDB();
 
+// middleware
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-app.use(
-    session({
-        secret: process.env.SESSION_SECRET || "aziel_session_secret",
-        resave: false,
-        saveUninitialized: false
-    })
-);
+app.use(session({
+    secret: process.env.SESSION_SECRET || "aziel_secret",
+    resave: false,
+    saveUninitialized: false
+}));
 
 app.use(passport.initialize());
 app.use(passport.session());
 
-// static
+// static files
 app.use(express.static(path.join(__dirname, "../frontend")));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
@@ -90,6 +86,7 @@ app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "../frontend/home.html"));
 });
 
+// start
 const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, () => {
