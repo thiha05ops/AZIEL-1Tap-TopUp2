@@ -13,6 +13,8 @@ const { Server } = require("socket.io");
 
 const connectDB = require("./config/db");
 const passport = require("./config/passport");
+const adminStatsRoutes =
+    require("./routes/adminStats");
 
 // routes
 const authRoutes = require("./routes/auth");
@@ -23,6 +25,7 @@ const socialAuthRoutes = require("./routes/socialAuth");
 const passwordRoutes = require("./routes/password");
 const supplierRoutes = require("./routes/supplier");
 const walletRoutes = require("./routes/wallet");
+app.use("/api", adminStatsRoutes);
 
 const app = express();
 
