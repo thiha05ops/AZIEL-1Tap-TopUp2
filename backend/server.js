@@ -14,7 +14,7 @@ const { Server } = require("socket.io");
 const connectDB = require("./config/db");
 const passport = require("./config/passport");
 
-// routes
+// ROUTES
 const authRoutes = require("./routes/auth");
 const orderRoutes = require("./routes/order");
 const paymentRoutes = require("./routes/payment");
@@ -23,11 +23,12 @@ const socialAuthRoutes = require("./routes/socialAuth");
 const passwordRoutes = require("./routes/password");
 const supplierRoutes = require("./routes/supplier");
 const walletRoutes = require("./routes/wallet");
+const adminStatsRoutes = require("./routes/adminStats");
 
-
+// EXPRESS APP
 const app = express();
 
-// socket server
+// SOCKET SERVER
 const server = http.createServer(app);
 
 const io = new Server(server, {
@@ -40,24 +41,36 @@ const io = new Server(server, {
 app.set("io", io);
 
 io.on("connection", (socket) => {
+
     console.log("Socket connected:", socket.id);
 
     socket.on("joinUserRoom", (username) => {
+
         socket.join(username);
+
+        console.log("User joined room:", username);
+
     });
 
     socket.on("disconnect", () => {
+
         console.log("Socket disconnected:", socket.id);
+
     });
+
 });
 
-// DB
+// CONNECT DB
 connectDB();
 
-// middleware
+// MIDDLEWARE
 app.use(cors());
+
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+
+app.use(express.urlencoded({
+    extended: true
+}));
 
 app.use(session({
     secret: process.env.SESSION_SECRET || "aziel_secret",
@@ -66,31 +79,60 @@ app.use(session({
 }));
 
 app.use(passport.initialize());
+
 app.use(passport.session());
 
-// static files
-app.use(express.static(path.join(__dirname, "../frontend")));
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+// STATIC FILES
+app.use(express.static(
+    path.join(__dirname, "../frontend")
+));
 
-// routes
+app.use(
+    "/uploads",
+    express.static(
+        path.join(__dirname, "uploads")
+    )
+);
+
+// ROUTES
 app.use("/api", authRoutes);
+
 app.use("/api", orderRoutes);
+
 app.use("/api", paymentRoutes);
+
 app.use("/api", profileRoutes);
+
 app.use("/api", socialAuthRoutes);
+
 app.use("/api", passwordRoutes);
+
 app.use("/api", supplierRoutes);
+
 app.use("/api", walletRoutes);
+
 app.use("/api", adminStatsRoutes);
 
-// home
+// HOME
 app.get("/", (req, res) => {
-    res.sendFile(path.join(__dirname, "../frontend/home.html"));
+
+    res.sendFile(
+        path.join(
+            __dirname,
+            "../frontend/home.html"
+        )
+    );
+
 });
 
-// start
+// PORT
 const PORT = process.env.PORT || 3000;
 
+// START SERVER
 server.listen(PORT, () => {
-    console.log("Server running on port", PORT);
+
+    console.log(
+        `🔥 Server running on port ${PORT}`
+    );
+
 });
