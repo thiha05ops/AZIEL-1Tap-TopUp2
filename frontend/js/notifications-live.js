@@ -13,22 +13,23 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function setupNotificationUI() {
-    const bell =
-        document.getElementById("notifBell") ||
-        document.getElementById("notiBtn");
+    const bell = document.getElementById("notifBell");
+    const panel = document.getElementById("notifPanel");
 
-    const panel =
-        document.getElementById("notifPanel") ||
-        document.getElementById("notiPanel");
-
-    if (bell && panel) {
-        bell.addEventListener("click", () => {
-            panel.style.display =
-                panel.style.display === "block" ? "none" : "block";
-
-            markAllAsRead();
-        });
+    if (!bell || !panel) {
+        console.log("Notification bell or panel missing");
+        return;
     }
+
+    bell.addEventListener("click", (e) => {
+        e.preventDefault();
+
+        panel.classList.toggle("open");
+
+        if (panel.classList.contains("open")) {
+            markAllAsRead();
+        }
+    });
 }
 
 async function checkLiveNotifications() {

@@ -16,7 +16,15 @@
         <a href="home.html" class="brand">AZIEL</a>
 
         <div class="account-top-actions">
-            <button id="notiBtn" class="noti-btn">🔔 <span id="notiCount">0</span></button>
+            <button id="notifBell">
+                🔔
+                <span id="notifCount">0</span>
+            </button>
+
+            <div id="notifPanel">
+                <div class="notif-header">Notifications</div>
+                <div id="notifList"></div>
+            </div>
             <button id="logoutBtn" class="logout-btn">Logout</button>
         </div>
     </header>

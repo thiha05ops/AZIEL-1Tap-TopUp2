@@ -235,6 +235,43 @@ textarea {
 
 }
 
+#notifPanel {
+  position: fixed;
+  top: 90px;
+  right: 20px;
+  width: 340px;
+  max-height: 420px;
+  overflow-y: auto;
+  background: #101028;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 20px;
+  display: none;
+  z-index: 999999;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .45);
+}
+
+#notifPanel.open {
+  display: block;
+}
+
+.notif-header {
+  padding: 18px;
+  font-weight: 900;
+  color: #ffd700;
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+}
+
+.notif-item {
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+  color: #fff;
+  cursor: pointer;
+}
+
+.notif-item.unread {
+  background: rgba(255, 215, 0, .12);
+}
+
 .tracking-popup {
 
   position: fixed;
