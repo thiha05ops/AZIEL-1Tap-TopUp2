@@ -4,21 +4,93 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>Notifications - AZIEL</title>
+
     <link rel="stylesheet" href="css/main.css">
-    <link rel="stylesheet" href="css/page.css">
+
+    <style>
+        body {
+            margin: 0;
+            background: #070716;
+            color: #fff;
+            font-family: Arial, sans-serif;
+        }
+
+        .noti-page {
+            width: 92%;
+            max-width: 800px;
+            margin: 80px auto;
+        }
+
+        .back-link {
+            display: inline-block;
+            color: #ffd700;
+            text-decoration: none;
+            font-weight: 900;
+            margin-bottom: 30px;
+        }
+
+        .noti-card {
+            background: linear-gradient(135deg, #101028, #20104b);
+            border: 1px solid rgba(255, 255, 255, .1);
+            border-radius: 28px;
+            padding: 30px;
+        }
+
+        .noti-card h1 {
+            color: #ffd700;
+            font-size: 42px;
+            margin-top: 0;
+        }
+
+        .notif-item {
+            padding: 18px;
+            border-bottom: 1px solid rgba(255, 255, 255, .08);
+            cursor: pointer;
+        }
+
+        .notif-item:hover {
+            background: rgba(255, 215, 0, .08);
+        }
+
+        .notif-item b {
+            color: #ffd700;
+        }
+
+        .notif-item p {
+            color: #ddd;
+            margin: 8px 0;
+        }
+
+        .notif-item small {
+            color: #aaa;
+        }
+    </style>
 </head>
 
 <body>
-    <div class="page-wrap">
-        <a href="account.html" class="back-btn">← Back Account</a>
 
-        <div class="info-card">
+    <main class="noti-page">
+
+        <a href="account.html" class="back-link">
+            ← Back Account
+        </a>
+
+        <div class="noti-card">
+
             <h1>🔔 Notifications</h1>
-            <div id="notiList">Loading...</div>
+
+            <div id="notifList">
+                Loading...
+            </div>
+
         </div>
-        <script src="js/notifications-page.js"></script>
-    </div>
+
+    </main>
+
+    <script src="js/notifications-page.js"></script>
+
 </body>
 
 </html>
