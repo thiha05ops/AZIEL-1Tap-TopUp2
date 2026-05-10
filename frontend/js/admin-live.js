@@ -111,3 +111,11 @@ function playAdminBeep() {
         console.log("Sound blocked:", err);
     });
 }
+document.addEventListener("DOMContentLoaded", () => {
+    const socket = io();
+
+    socket.on("adminNewUpdate", (data) => {
+        showAdminAlert(`🔔 ${data.game} order is now ${data.status}`);
+        playAdminBeep();
+    });
+});

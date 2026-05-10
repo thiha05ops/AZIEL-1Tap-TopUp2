@@ -362,3 +362,20 @@ function showTrackingPopup(status) {
     }, 4000);
 
 }
+const io = req.app.get("io");
+
+io.emit("adminNewUpdate", {
+    type: "order_status",
+    orderId: order.orderId,
+    username: order.username,
+    status: order.status,
+    game: order.game,
+    packageName: order.packageName
+});
+
+io.to(order.username).emit("userOrderUpdate", {
+    orderId: order.orderId,
+    status: order.status,
+    game: order.game,
+    packageName: order.packageName
+});

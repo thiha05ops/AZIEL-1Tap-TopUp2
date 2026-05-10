@@ -6,6 +6,31 @@ dotenv.config({ path: path.join(__dirname, "../.env") });
 
 const express = require("express");
 const cors = require("cors");
+const http = require("http");
+const { server } = require("socket.io");
+const server = http.createServer(app);
+
+const io = new Server(server, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    }
+});
+
+app.set("io", io);
+
+io.on("connection", (socket) => {
+    console.log("Socket connected:", socket.id);
+
+    socket.on("joinUserRoom", (username) => {
+        socket.join(username);
+        console.log("User joined room:", username);
+    });
+
+    socket.on("disconnect", () => {
+        console.log("Socket disconnected:", socket.id);
+    });
+});
 const session = require("express-session");
 const passport = require("./config/passport");
 
@@ -59,6 +84,6 @@ app.get("/", (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log("Server running on port", PORT);
 });
