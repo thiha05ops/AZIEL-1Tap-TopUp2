@@ -217,3 +217,148 @@ function showTrackingPopup(status) {
 
     }, 4000);
 }
+// ======================
+// LIVE TRACKING SYSTEM
+// ======================
+
+document.addEventListener(
+    "DOMContentLoaded",
+    () => {
+
+        checkLiveTracking();
+
+        setInterval(
+            checkLiveTracking,
+            5000
+        );
+
+    }
+);
+
+async function checkLiveTracking() {
+
+    try {
+
+        const params =
+            new URLSearchParams(
+                window.location.search
+            );
+
+        const orderId =
+            params.get("orderId");
+
+        if (!orderId) return;
+
+        const res =
+            await fetch(
+                `/api/order/track/${orderId}`
+            );
+
+        const data =
+            await res.json();
+
+        if (
+            !data.success ||
+            !data.order
+        ) return;
+
+        const currentStatus =
+            data.order.status;
+
+        const savedStatus =
+            sessionStorage.getItem(
+                "liveTrackingStatus"
+            );
+
+        // first load
+        if (!savedStatus) {
+
+            sessionStorage.setItem(
+                "liveTrackingStatus",
+                currentStatus
+            );
+
+            return;
+        }
+
+        // status changed
+        if (
+            savedStatus !==
+            currentStatus
+        ) {
+
+            showTrackingPopup(
+                currentStatus
+            );
+
+            sessionStorage.setItem(
+                "liveTrackingStatus",
+                currentStatus
+            );
+
+        }
+
+    } catch (error) {
+
+        console.log(
+            "Live tracking error:",
+            error
+        );
+
+    }
+
+}
+
+
+// ======================
+// POPUP
+// ======================
+
+function showTrackingPopup(status) {
+
+    const oldPopup =
+        document.querySelector(
+            ".tracking-popup"
+        );
+
+    if (oldPopup)
+        oldPopup.remove();
+
+    const popup =
+        document.createElement("div");
+
+    popup.className =
+        "tracking-popup";
+
+    popup.innerHTML = `
+        🔔 Order Status Updated:
+        <b>${status}</b>
+    `;
+
+    document.body.appendChild(
+        popup
+    );
+
+    setTimeout(() => {
+
+        popup.classList.add(
+            "show"
+        );
+
+    }, 100);
+
+    setTimeout(() => {
+
+        popup.classList.remove(
+            "show"
+        );
+
+        setTimeout(() => {
+
+            popup.remove();
+
+        }, 400);
+
+    }, 4000);
+
+}
