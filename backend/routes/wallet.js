@@ -362,8 +362,7 @@ router.put(
 
     }
 );
-const io = req.app.get("io");
-io.to(topup.username).emit(
+const io = req.app.get("io").to(topup.username).emit(
     "walletUpdated",
     {
         amount: user.wallet,
