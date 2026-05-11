@@ -305,3 +305,38 @@ textarea {
   right: 20px;
 
 }
+
+.wallet-popup {
+
+  position: fixed;
+
+  top: 20px;
+  right: -400px;
+
+  background:
+    linear-gradient(135deg,
+      #16a34a,
+      #22c55e);
+
+  color: white;
+
+  padding: 20px 24px;
+
+  border-radius: 18px;
+
+  z-index: 99999;
+
+  font-weight: 900;
+
+  transition: .4s;
+
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, .3);
+
+}
+
+.wallet-popup.show {
+
+  right: 20px;
+
+}

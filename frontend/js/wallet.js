@@ -158,3 +158,85 @@ function initWalletQrPreview() {
 
     showQr();
 }
+const socket = io();
+
+const username =
+    localStorage.getItem("username");
+
+if (username) {
+
+    socket.emit(
+        "joinUserRoom",
+        username
+    );
+
+}
+
+socket.on(
+    "walletUpdated",
+    (data) => {
+
+        const balanceEl =
+            document.getElementById(
+                "walletBalance"
+            );
+
+        if (balanceEl) {
+
+            balanceEl.innerText =
+                data.amount;
+
+        }
+
+        showWalletPopup(
+            data.amount,
+            data.currency
+        );
+
+    }
+);
+function showWalletPopup(
+    amount,
+    currency
+) {
+
+    const popup =
+        document.createElement("div");
+
+    popup.className =
+        "wallet-popup";
+
+    popup.innerHTML = `
+        💰 Wallet Updated
+        <br>
+        New Balance:
+        ${amount} ${currency}
+    `;
+
+    document.body.appendChild(
+        popup
+    );
+
+    setTimeout(() => {
+
+        popup.classList.add(
+            "show"
+        );
+
+    }, 100);
+
+    setTimeout(() => {
+
+        popup.classList.remove(
+            "show"
+        );
+
+        setTimeout(() => {
+
+            popup.remove();
+
+        }, 400);
+
+    }, 4000);
+
+}
