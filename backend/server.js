@@ -15,6 +15,7 @@ const connectDB = require("./config/db");
 const passport = require("./config/passport");
 
 // ROUTES
+const notificationRoutes = require("./routes/notification");
 const authRoutes = require("./routes/auth");
 const orderRoutes = require("./routes/order");
 const paymentRoutes = require("./routes/payment");
@@ -100,6 +101,8 @@ app.use("/api", authRoutes);
 app.use("/api", orderRoutes);
 
 app.use("/api", paymentRoutes);
+
+app.use("/api", notificationRoutes);
 
 app.use("/api", profileRoutes);
 

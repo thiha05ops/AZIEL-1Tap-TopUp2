@@ -114,7 +114,8 @@ router.put("/admin/orders/:id/status", async (req, res) => {
             cancelled: "❌ Your order has been cancelled.",
             failed: "❌ Your order failed. Please contact support."
         };
-
+        const crateNotification =
+            require("../services/createNotification");
         const order = await Order.findByIdAndUpdate(
             req.params.id,
             {
@@ -130,6 +131,14 @@ router.put("/admin/orders/:id/status", async (req, res) => {
                 message: "Order not found"
             });
         }
+        await crateNotification({
+            username: order.username,
+            title: "Order Status Updated",
+            message:
+                `${order.game} -${order.packageName} is now ${order.status}`,
+            type: "order",
+            orderId: order.orderId
+        });
 
         res.json({ success: true, order });
 
