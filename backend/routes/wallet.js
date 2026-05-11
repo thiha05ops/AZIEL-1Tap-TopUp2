@@ -12,8 +12,7 @@ const User = require("../models/User");
 const WalletTopup = require("../models/WalletTopup");
 const WalletTransaction = require("../models/WalletTransaction");
 
-const ADMIN_PASSWORD =
-    process.env.ADMIN_PASSWORD || "AZIEL2026";
+const adminMiddleware = require("../middleware/adminMiddleware");
 
 // ======================
 // UPLOAD
@@ -147,158 +146,146 @@ router.post(
 // GET /api/admin/wallet/topups
 // ======================
 
-router.get("/admin/wallet/topups", async (req, res) => {
-    try {
-        const password = req.headers["x-admin-password"];
+router.get(
+    "/admin/wallet/topups",
+    adminMiddleware,
+    async (req, res) => {
+        try {
+            const topups = await WalletTopup.find()
+                .sort({ createdAt: -1 });
 
-        if (password !== ADMIN_PASSWORD) {
-            return res.status(401).json({
+            res.json({
+                success: true,
+                topups
+            });
+
+        } catch (error) {
+            console.log("Admin wallet topups error:", error);
+
+            res.json({
                 success: false,
-                message: "Unauthorized"
+                message: "Server error"
             });
         }
-
-        const topups = await WalletTopup.find()
-            .sort({ createdAt: -1 });
-
-        res.json({
-            success: true,
-            topups
-        });
-
-    } catch (error) {
-        console.log("Admin wallet topups error:", error);
-
-        res.json({
-            success: false,
-            message: "Server error"
-        });
     }
-});
+);
 
 // ======================
 // ADMIN APPROVE / REJECT TOPUP
 // PUT /api/admin/wallet/topups/:id/status
 // ======================
 
-router.put("/admin/wallet/topups/:id/status", async (req, res) => {
-    try {
-        const password = req.headers["x-admin-password"];
+router.put(
+    "/admin/wallet/topups/:id/status",
+    adminMiddleware,
+    async (req, res) => {
+        try {
+            const { status } = req.body;
 
-        if (password !== ADMIN_PASSWORD) {
-            return res.status(401).json({
-                success: false,
-                message: "Unauthorized"
-            });
-        }
-
-        const { status } = req.body;
-
-        if (!["approved", "rejected"].includes(status)) {
-            return res.json({
-                success: false,
-                message: "Invalid status"
-            });
-        }
-
-        const topup = await WalletTopup.findById(req.params.id);
-
-        if (!topup) {
-            return res.json({
-                success: false,
-                message: "Topup not found"
-            });
-        }
-
-        if (topup.status !== "pending") {
-            return res.json({
-                success: false,
-                message: "Already processed"
-            });
-        }
-
-        let user = null;
-        let newBalance = 0;
-
-        if (status === "approved") {
-            const currencyKey =
-                topup.currency === "THB" ? "THB" : "MMK";
-
-            user = await User.findOne({
-                username: topup.username
-            });
-
-            if (!user) {
+            if (!["approved", "rejected"].includes(status)) {
                 return res.json({
                     success: false,
-                    message: "User not found"
+                    message: "Invalid status"
                 });
             }
 
-            if (!user.wallet) {
-                user.wallet = {
-                    MMK: 0,
-                    THB: 0
-                };
+            const topup = await WalletTopup.findById(req.params.id);
+
+            if (!topup) {
+                return res.json({
+                    success: false,
+                    message: "Topup not found"
+                });
             }
 
-            user.wallet[currencyKey] =
-                Number(user.wallet[currencyKey] || 0) +
-                Number(topup.amount || 0);
+            if (topup.status !== "pending") {
+                return res.json({
+                    success: false,
+                    message: "Already processed"
+                });
+            }
 
-            newBalance = user.wallet[currencyKey];
+            let newBalance = 0;
 
-            user.markModified("wallet");
+            if (status === "approved") {
+                const currencyKey =
+                    topup.currency === "THB" ? "THB" : "MMK";
 
-            await user.save();
+                const user = await User.findOne({
+                    username: topup.username
+                });
 
-            await WalletTransaction.create({
-                transactionId: "TXN-" + Date.now(),
-                username: topup.username,
-                type: "topup",
-                amount: Number(topup.amount),
-                currency: topup.currency,
-                description: "Wallet topup approved"
+                if (!user) {
+                    return res.json({
+                        success: false,
+                        message: "User not found"
+                    });
+                }
+
+                if (!user.wallet) {
+                    user.wallet = {
+                        MMK: 0,
+                        THB: 0
+                    };
+                }
+
+                user.wallet[currencyKey] =
+                    Number(user.wallet[currencyKey] || 0) +
+                    Number(topup.amount || 0);
+
+                newBalance = user.wallet[currencyKey];
+
+                user.markModified("wallet");
+
+                await user.save();
+
+                await WalletTransaction.create({
+                    transactionId: "TXN-" + Date.now(),
+                    username: topup.username,
+                    type: "topup",
+                    amount: Number(topup.amount),
+                    currency: topup.currency,
+                    description: "Wallet topup approved"
+                });
+
+                topup.status = "approved";
+                topup.note = "Balance added";
+
+            } else {
+                topup.status = "rejected";
+                topup.note = "Topup rejected";
+            }
+
+            await topup.save();
+
+            if (status === "approved") {
+                const io = req.app.get("io");
+
+                if (io) {
+                    io.to(topup.username).emit("walletUpdated", {
+                        amount: newBalance,
+                        currency: topup.currency,
+                        status: topup.status
+                    });
+                }
+            }
+
+            res.json({
+                success: true,
+                topup,
+                balance: newBalance
             });
 
-            topup.status = "approved";
-            topup.note = "Balance added";
+        } catch (error) {
+            console.log("Wallet status error:", error);
 
-        } else {
-            topup.status = "rejected";
-            topup.note = "Topup rejected";
+            res.json({
+                success: false,
+                message: "Server error"
+            });
         }
-
-        await topup.save();
-
-        // ✅ Realtime wallet update
-        if (status === "approved") {
-            const io = req.app.get("io");
-
-            if (io) {
-                io.to(topup.username).emit("walletUpdated", {
-                    amount: newBalance,
-                    currency: topup.currency,
-                    status: topup.status
-                });
-            }
-        }
-
-        res.json({
-            success: true,
-            topup,
-            balance: newBalance
-        });
-
-    } catch (error) {
-        console.log("Wallet status error:", error);
-
-        res.json({
-            success: false,
-            message: "Server error"
-        });
     }
-});
+);
 
 // ======================
 // WALLET TEST
@@ -390,7 +377,6 @@ router.post("/wallet/pay", async (req, res) => {
             note: "Paid with wallet"
         });
 
-        // ✅ Realtime wallet update after payment
         const io = req.app.get("io");
 
         if (io) {
@@ -398,6 +384,15 @@ router.post("/wallet/pay", async (req, res) => {
                 amount: user.wallet[currencyKey],
                 currency: currencyKey,
                 status: "payment"
+            });
+
+            io.emit("adminNewUpdate", {
+                type: "wallet_payment",
+                orderId: order.orderId,
+                username,
+                status: "paid",
+                game,
+                packageName
             });
         }
 
