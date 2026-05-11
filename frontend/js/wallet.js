@@ -240,3 +240,58 @@ function showWalletPopup(
     }, 4000);
 
 }
+// ======================
+// REALTIME WALLET UPDATE
+// ======================
+
+document.addEventListener("DOMContentLoaded", () => {
+    if (typeof io === "undefined") {
+        console.log("Socket.IO not loaded");
+        return;
+    }
+
+    const socket = io();
+
+    const username = localStorage.getItem("username");
+
+    if (username) {
+        socket.emit("joinUserRoom", username);
+    }
+
+    socket.on("walletUpdated", (data) => {
+        console.log("Wallet updated:", data);
+
+        const balanceEl =
+            document.getElementById("walletBalance") ||
+            document.getElementById("balanceAmount");
+
+        if (balanceEl) {
+            balanceEl.innerText =
+                `${Number(data.amount).toLocaleString()} ${data.currency}`;
+        }
+
+        showWalletPopup(data.amount, data.currency);
+    });
+});
+
+function showWalletPopup(amount, currency) {
+    const oldPopup = document.querySelector(".wallet-popup");
+    if (oldPopup) oldPopup.remove();
+
+    const popup = document.createElement("div");
+    popup.className = "wallet-popup";
+
+    popup.innerHTML = `
+        💰 Wallet Updated<br>
+        New Balance: ${Number(amount).toLocaleString()} ${currency}
+    `;
+
+    document.body.appendChild(popup);
+
+    setTimeout(() => popup.classList.add("show"), 100);
+
+    setTimeout(() => {
+        popup.classList.remove("show");
+        setTimeout(() => popup.remove(), 400);
+    }, 4000);
+}

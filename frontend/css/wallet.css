@@ -179,3 +179,20 @@ body {
     height: 190px;
     object-fit: contain;
 }
+
+.wallet-popup {
+    position: fixed;
+    top: 20px;
+    right: -400px;
+    background: linear-gradient(135deg, #16a34a, #22c55e);
+    color: white;
+    padding: 20px 24px;
+    border-radius: 18px;
+    z-index: 99999;
+    font-weight: 900;
+    transition: .4s;
+}
+
+.wallet-popup.show {
+    right: 20px;
+}
