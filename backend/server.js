@@ -1,3 +1,5 @@
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 const path = require("path");
 const dotenv = require("dotenv");
 
@@ -65,6 +67,18 @@ io.on("connection", (socket) => {
 connectDB();
 
 // MIDDLEWARE
+app.use(helmet());
+
+const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 300,
+    message: {
+        success: false,
+        message: "Too many requests. Please try again later."
+    }
+});
+
+app.use("/api", apiLimiter);
 app.use(cors());
 
 app.use(express.json());
