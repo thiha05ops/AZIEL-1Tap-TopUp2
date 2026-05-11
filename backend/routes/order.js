@@ -12,8 +12,8 @@ const {
 const createNotification =
     require("../services/createNotification");
 
-const ADMIN_PASSWORD =
-    process.env.ADMIN_PASSWORD || "AZIEL2026";
+const adminMiddleware =
+    require("../middleware/adminMiddleware");
 
 
 // ============================
@@ -22,15 +22,10 @@ const ADMIN_PASSWORD =
 // ============================
 
 router.get("/history/:username", async (req, res) => {
-
     try {
-
-        const orders =
-            await Order.find({
-                username: req.params.username
-            }).sort({
-                createdAt: -1
-            });
+        const orders = await Order.find({
+            username: req.params.username
+        }).sort({ createdAt: -1 });
 
         res.json({
             success: true,
@@ -38,19 +33,13 @@ router.get("/history/:username", async (req, res) => {
         });
 
     } catch (error) {
-
-        console.log(
-            "History error:",
-            error
-        );
+        console.log("History error:", error);
 
         res.json({
             success: false,
             message: "Server error"
         });
-
     }
-
 });
 
 
@@ -60,23 +49,16 @@ router.get("/history/:username", async (req, res) => {
 // ============================
 
 router.get("/order/track/:orderId", async (req, res) => {
-
     try {
-
-        const order =
-            await Order.findOne({
-                orderId:
-                    req.params.orderId
-            });
+        const order = await Order.findOne({
+            orderId: req.params.orderId
+        });
 
         if (!order) {
-
             return res.json({
                 success: false,
-                message:
-                    "Order not found"
+                message: "Order not found"
             });
-
         }
 
         res.json({
@@ -85,19 +67,13 @@ router.get("/order/track/:orderId", async (req, res) => {
         });
 
     } catch (error) {
-
-        console.log(
-            "Track error:",
-            error
-        );
+        console.log("Track error:", error);
 
         res.json({
             success: false,
             message: "Server error"
         });
-
     }
-
 });
 
 
@@ -106,55 +82,29 @@ router.get("/order/track/:orderId", async (req, res) => {
 // GET /api/admin/orders
 // ============================
 
-router.get("/admin/orders", async (req, res) => {
+router.get(
+    "/admin/orders",
+    adminMiddleware,
+    async (req, res) => {
+        try {
+            const orders = await Order.find()
+                .sort({ createdAt: -1 });
 
-    try {
+            res.json({
+                success: true,
+                orders
+            });
 
-        const password =
-            req.headers[
-            "x-admin-password"
-            ];
+        } catch (error) {
+            console.log("Admin orders error:", error);
 
-        if (
-            password !==
-            ADMIN_PASSWORD
-        ) {
-
-            return res.status(401)
-                .json({
-                    success: false,
-                    message:
-                        "Unauthorized"
-                });
-
+            res.json({
+                success: false,
+                message: "Server error"
+            });
         }
-
-        const orders =
-            await Order.find()
-                .sort({
-                    createdAt: -1
-                });
-
-        res.json({
-            success: true,
-            orders
-        });
-
-    } catch (error) {
-
-        console.log(
-            "Admin orders error:",
-            error
-        );
-
-        res.json({
-            success: false,
-            message: "Server error"
-        });
-
     }
-
-});
+);
 
 
 // ============================
@@ -164,174 +114,75 @@ router.get("/admin/orders", async (req, res) => {
 
 router.put(
     "/admin/orders/:id/status",
+    adminMiddleware,
     async (req, res) => {
-
         try {
-
-            const password =
-                req.headers[
-                "x-admin-password"
-                ];
-
-            if (
-                password !==
-                ADMIN_PASSWORD
-            ) {
-
-                return res.status(401)
-                    .json({
-                        success: false,
-                        message:
-                            "Unauthorized"
-                    });
-
-            }
-
-            const { status } =
-                req.body;
+            const { status } = req.body;
 
             const allowedStatus = [
-
                 "pending_payment",
-
                 "paid",
-
                 "processing",
-
                 "completed",
-
                 "cancelled",
-
                 "failed"
-
             ];
 
-            if (
-                !allowedStatus.includes(
-                    status
-                )
-            ) {
-
+            if (!allowedStatus.includes(status)) {
                 return res.json({
                     success: false,
-                    message:
-                        "Invalid status"
+                    message: "Invalid status"
                 });
-
             }
 
             const noteMap = {
-
-                pending_payment:
-                    "Waiting for payment confirmation.",
-
-                paid:
-                    "Payment received. Waiting for processing.",
-
-                processing:
-                    "Your order is processing.",
-
-                completed:
-                    "✅ Your order has been completed.",
-
-                cancelled:
-                    "❌ Your order has been cancelled.",
-
-                failed:
-                    "❌ Your order failed. Please contact support."
-
+                pending_payment: "Waiting for payment confirmation.",
+                paid: "Payment received. Waiting for processing.",
+                processing: "Your order is processing.",
+                completed: "✅ Your order has been completed.",
+                cancelled: "❌ Your order has been cancelled.",
+                failed: "❌ Your order failed. Please contact support."
             };
 
-
-            const order =
-                await Order.findByIdAndUpdate(
-
-                    req.params.id,
-
-                    {
-                        status,
-
-                        note:
-                            noteMap[status] || ""
-                    },
-
-                    {
-                        new: true
-                    }
-
-                );
+            const order = await Order.findByIdAndUpdate(
+                req.params.id,
+                {
+                    status,
+                    note: noteMap[status] || ""
+                },
+                { new: true }
+            );
 
             if (!order) {
-
                 return res.json({
                     success: false,
-                    message:
-                        "Order not found"
+                    message: "Order not found"
                 });
-
             }
-
-
-            // ============================
-            // CREATE DATABASE NOTIFICATION
-            // ============================
 
             await createNotification({
-
-                username:
-                    order.username,
-
-                title:
-                    "Order Status Updated",
-
-                message:
-                    `${order.game} - ${order.packageName} is now ${order.status}`,
-
-                type:
-                    "order",
-
-                orderId:
-                    order.orderId
-
+                username: order.username,
+                title: "Order Status Updated",
+                message: `${order.game} - ${order.packageName} is now ${order.status}`,
+                type: "order",
+                orderId: order.orderId
             });
 
-
-            // ============================
-            // SOCKET.IO LIVE UPDATE
-            // ============================
-
-            const io =
-                req.app.get("io");
+            const io = req.app.get("io");
 
             if (io) {
-
-                io.to(order.username)
-                    .emit(
-                        "userOrderUpdate",
-                        {
-                            orderId:
-                                order.orderId,
-
-                            status:
-                                order.status,
-
-                            game:
-                                order.game,
-
-                            packageName:
-                                order.packageName
-                        }
-                    );
-
+                io.to(order.username).emit(
+                    "userOrderUpdate",
+                    {
+                        orderId: order.orderId,
+                        status: order.status,
+                        game: order.game,
+                        packageName: order.packageName
+                    }
+                );
             }
 
-
-            // ============================
-            // TELEGRAM ALERT
-            // ============================
-
             await sendTelegramMessage(
-
                 `📦 ORDER STATUS UPDATED
 
 🎮 Game:
@@ -345,9 +196,7 @@ ${order.username}
 
 📌 Status:
 ${order.status}`
-
             );
-
 
             res.json({
                 success: true,
@@ -355,19 +204,13 @@ ${order.status}`
             });
 
         } catch (error) {
-
-            console.log(
-                "Update status error:",
-                error
-            );
+            console.log("Update status error:", error);
 
             res.json({
                 success: false,
                 message: "Server error"
             });
-
         }
-
     }
 );
 
