@@ -1,65 +1,93 @@
 // frontend/js/admin.js
 
-let ADMIN_PASSWORD = "";
 let allOrders = [];
 
 document.addEventListener("DOMContentLoaded", () => {
-    document.getElementById("loginBtn").addEventListener("click", () => {
-        ADMIN_PASSWORD = document.getElementById("adminPassword").value.trim();
+    if (!localStorage.getItem("adminToken")) {
+        window.location.href = "admin-login.html";
+        return;
+    }
 
-        if (!ADMIN_PASSWORD) {
-            alert("Enter admin password");
-            return;
-        }
+    const adminContent = document.getElementById("adminContent");
+    if (adminContent) {
+        adminContent.style.display = "block";
+    }
 
-        loadOrders();
-    });
+    loadOrders();
 
-    document.getElementById("refreshBtn")?.addEventListener("click", loadOrders);
-    document.getElementById("searchOrder")?.addEventListener("input", renderOrders);
-    document.getElementById("statusFilter")?.addEventListener("change", renderOrders);
+    document
+        .getElementById("refreshBtn")
+        ?.addEventListener("click", loadOrders);
+
+    document
+        .getElementById("searchOrder")
+        ?.addEventListener("input", renderOrders);
+
+    document
+        .getElementById("statusFilter")
+        ?.addEventListener("change", renderOrders);
 });
 
 async function loadOrders() {
     try {
-        const res = await fetch("/api/admin/orders", {
-            headers: { "x-admin-password": ADMIN_PASSWORD }
-        });
+        if (typeof adminFetch !== "function") {
+            alert("admin-api.js not loaded");
+            return;
+        }
 
-        const data = await res.json();
+        const data = await adminFetch("/api/admin/orders");
 
-        if (!data.success) {
-            alert(data.message || "Wrong admin password");
+        if (!data || !data.success) {
+            alert(data?.message || "Failed to load orders");
             return;
         }
 
         allOrders = data.orders || [];
 
-        document.getElementById("loginBox").style.display = "none";
-        document.getElementById("adminContent").style.display = "block";
-
         renderStats();
         renderOrders();
 
     } catch (error) {
+        console.log("Load orders error:", error);
         alert("Server error");
     }
 }
 
 function renderStats() {
-    document.getElementById("totalOrders").innerText = allOrders.length;
-    document.getElementById("paidOrders").innerText =
-        allOrders.filter(o => o.status === "paid").length;
-    document.getElementById("processingOrders").innerText =
-        allOrders.filter(o => o.status === "processing").length;
-    document.getElementById("completedOrders").innerText =
-        allOrders.filter(o => o.status === "completed").length;
+    const totalOrders = document.getElementById("totalOrders");
+    const paidOrders = document.getElementById("paidOrders");
+    const processingOrders = document.getElementById("processingOrders");
+    const completedOrders = document.getElementById("completedOrders");
+
+    if (totalOrders) totalOrders.innerText = allOrders.length;
+
+    if (paidOrders) {
+        paidOrders.innerText =
+            allOrders.filter(o => o.status === "paid").length;
+    }
+
+    if (processingOrders) {
+        processingOrders.innerText =
+            allOrders.filter(o => o.status === "processing").length;
+    }
+
+    if (completedOrders) {
+        completedOrders.innerText =
+            allOrders.filter(o => o.status === "completed").length;
+    }
 }
 
 function renderOrders() {
     const list = document.getElementById("ordersList");
-    const search = (document.getElementById("searchOrder")?.value || "").toLowerCase();
-    const filter = document.getElementById("statusFilter")?.value || "all";
+
+    if (!list) return;
+
+    const search =
+        (document.getElementById("searchOrder")?.value || "")
+            .toLowerCase();
+
+    const filter =
+        document.getElementById("statusFilter")?.value || "all";
 
     let orders = [...allOrders];
 
@@ -85,73 +113,102 @@ function renderOrders() {
         return;
     }
 
-    list.innerHTML = orders.map(order => `
-        <tr>
-            <td>
-                <b>${order.orderId}</b><br>
-                <small>${formatDate(order.createdAt)}</small>
-            </td>
+    list.innerHTML = orders.map(order => {
+        const slip =
+            order.paymentSlip ||
+            order.slip ||
+            "";
 
-            <td>${order.username || "guest"}</td>
+        const slipUrl = slip.startsWith("/uploads/")
+            ? slip
+            : `/uploads/${slip}`;
 
-            <td>
-                ${order.game}<br>
-                <small>ID: ${order.userId || "-"}</small><br>
-                <small>Server: ${order.zoneId || "-"}</small>
-            </td>
+        return `
+            <tr>
+                <td>
+                    <b>${order.orderId || "-"}</b><br>
+                    <small>${formatDate(order.createdAt)}</small>
+                </td>
 
-            <td>${order.packageName}</td>
+                <td>${order.username || "guest"}</td>
 
-            <td>${order.amount || 0} ${order.currency || ""}</td>
+                <td>
+                    ${order.game || "-"}<br>
+                    <small>ID: ${order.userId || "-"}</small><br>
+                    <small>Server: ${order.zoneId || "-"}</small>
+                </td>
 
-            <td>${order.paymentMethod || "-"}</td>
+                <td>${order.packageName || order.selectedPackage || "-"}</td>
 
-            <td>
-                <span class="status-badge ${statusClass(order.status)}">
-                    ${order.status}
-                </span>
-            </td>
+                <td>${order.amount || 0} ${order.currency || ""}</td>
 
-            <td>
-                ${order.paymentSlip
-            ? `<img src="/uploads/${order.paymentSlip}" class="slip-img" onclick="window.open('/uploads/${order.paymentSlip}','_blank')">`
-            : "-"
-        }
-            </td>
+                <td>${order.paymentMethod || "-"}</td>
 
-            <td>
-                <div class="action-grid">
-                    <button class="btn-paid" onclick="updateStatus('${order._id}','paid')">Paid</button>
-                    <button class="btn-processing" onclick="updateStatus('${order._id}','processing')">Process</button>
-                    <button class="btn-completed" onclick="updateStatus('${order._id}','completed')">Done</button>
-                    <button class="btn-cancel" onclick="updateStatus('${order._id}','cancelled')">Cancel</button>
-                </div>
-            </td>
-        </tr>
-    `).join("");
+                <td>
+                    <span class="status-badge ${statusClass(order.status)}">
+                        ${order.status || "pending"}
+                    </span>
+                </td>
+
+                <td>
+                    ${slip
+                ? `<img src="${slipUrl}" class="slip-img" data-slip="${slipUrl}">`
+                : "-"
+            }
+                </td>
+
+                <td>
+                    <div class="action-grid">
+                        <button class="btn-paid" data-id="${order._id}" data-status="paid">Paid</button>
+                        <button class="btn-processing" data-id="${order._id}" data-status="processing">Process</button>
+                        <button class="btn-completed" data-id="${order._id}" data-status="completed">Done</button>
+                        <button class="btn-cancel" data-id="${order._id}" data-status="cancelled">Cancel</button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join("");
+
+    document.querySelectorAll(".slip-img").forEach(img => {
+        img.addEventListener("click", () => {
+            window.open(img.dataset.slip, "_blank");
+        });
+    });
+
+    document.querySelectorAll(".action-grid button").forEach(btn => {
+        btn.addEventListener("click", () => {
+            updateStatus(btn.dataset.id, btn.dataset.status);
+        });
+    });
 }
 
 async function updateStatus(id, status) {
+    if (!id) {
+        alert("Missing order ID");
+        return;
+    }
+
     try {
-        const res = await fetch(`/api/admin/orders/${id}/status`, {
-            method: "PUT",
-            headers: {
-                "Content-Type": "application/json",
-                "x-admin-password": ADMIN_PASSWORD
-            },
-            body: JSON.stringify({ status })
-        });
+        const data = await adminFetch(
+            `/api/admin/orders/${id}/status`,
+            {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ status })
+            }
+        );
 
-        const data = await res.json();
-
-        if (!data.success) {
-            alert(data.message || "Update failed");
+        if (!data || !data.success) {
+            alert(data?.message || "Update failed");
             return;
         }
 
         await loadOrders();
 
     } catch (error) {
+        console.log("Update order error:", error);
         alert("Server error");
     }
 }
@@ -168,3 +225,6 @@ function formatDate(date) {
     if (!date) return "-";
     return new Date(date).toLocaleString();
 }
+
+window.loadOrders = loadOrders;
+window.updateStatus = updateStatus;
