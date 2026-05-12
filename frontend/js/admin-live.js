@@ -2,35 +2,31 @@
 
 let lastOrderIds = [];
 let firstLoad = true;
-let soundEnabled = false;
-
-const ADMIN_LIVE_PASSWORD = "AZIEL2026";
-
-document.addEventListener("click", () => {
-    soundEnabled = true;
-});
 
 document.addEventListener("DOMContentLoaded", () => {
+    if (!localStorage.getItem("adminToken")) {
+        window.location.href = "admin-login.html";
+        return;
+    }
+
     checkAdminLiveOrders();
-    setInterval(checkAdminLiveOrders, 5000);
+    setInterval(checkAdminLiveOrders, 15000);
 });
 
 async function checkAdminLiveOrders() {
     try {
-        const res = await fetch("/api/admin/orders", {
-            headers: {
-                "x-admin-password": ADMIN_LIVE_PASSWORD
-            }
-        });
+        const data = await adminFetch("/api/admin/orders");
 
-        const data = await res.json();
+        if (!data || !data.success) return;
+
         const orders = data.orders || [];
 
-        const currentIds = orders.map(order => order._id || order.orderId);
+        const currentIds = orders.map(order => {
+            return order._id || order.orderId;
+        });
 
         if (!firstLoad) {
             const newOrders = orders.filter(order => {
-
                 const id = order._id || order.orderId;
 
                 return (
@@ -39,20 +35,33 @@ async function checkAdminLiveOrders() {
                 );
             });
 
-
             if (newOrders.length > 0) {
                 showAdminAlert(
                     `🔔 New order sent! ${newOrders[0].game || ""}`
                 );
+
                 playAdminBeep();
             }
         }
 
-        lastOrderIds = currentIds;
         firstLoad = false;
+        lastOrderIds = currentIds;
 
     } catch (error) {
-        console.log("Admin live error:", error);
+        console.log("Admin live orders error:", error);
+    }
+}
+
+function showAdminAlert(message) {
+    alert(message);
+}
+
+function playAdminBeep() {
+    try {
+        const audio = new Audio("/assets/notification.mp3");
+        audio.play().catch(() => { });
+    } catch (error) {
+        console.log(error);
     }
 }
 
