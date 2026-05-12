@@ -127,58 +127,20 @@ function renderTopups(topups) {
                 <div class="topup-actions">
 
                     <button
-                        class="approve-btn"
+  class="approve-btn"
+  onclick="updateStatus('${item._id}', 'approved')"
+  ${!isPending ? "disabled" : ""}
+>
+  ${status === "approved" ? "Approved" : "Approve"}
+</button>
 
-                        onclick="
-                            updateStatus(
-                                '${item._id}',
-                                'approved'
-                            )
-                        "
-
-                        ${!isPending
-                ?
-                "disabled"
-                :
-                ""
-            }
-                    >
-
-                        ${status === "approved"
-                ?
-                "Approved"
-                :
-                "Approve"
-            }
-
-                    </button>
-
-                    <button
-                        class="reject-btn"
-
-                        onclick="
-                            updateStatus(
-                                '${item._id}',
-                                'rejected'
-                            )
-                        "
-
-                        ${!isPending
-                ?
-                "disabled"
-                :
-                ""
-            }
-                    >
-
-                        ${status === "rejected"
-                ?
-                "Rejected"
-                :
-                "Reject"
-            }
-
-                    </button>
+<button
+  class="reject-btn"
+  onclick="updateStatus('${item._id}', 'rejected')"
+  ${!isPending ? "disabled" : ""}
+>
+  ${status === "rejected" ? "Rejected" : "Reject"}
+</button>
 
                 </div>
 
@@ -265,3 +227,4 @@ async function updateStatus(
     }
 
 }
+window.updateStatus = updateStatus;
