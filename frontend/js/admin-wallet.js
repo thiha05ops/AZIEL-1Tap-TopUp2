@@ -1,12 +1,55 @@
 // frontend/js/admin-wallet.js
 
 document.addEventListener("DOMContentLoaded", () => {
+    const token = localStorage.getItem("adminToken");
+
+    if (!token) {
+        alert("Admin session expired");
+        window.location.href = "admin-login.html";
+        return;
+    }
+
     loadWalletTopups();
 });
 
+async function secureAdminFetch(url, options = {}) {
+    if (typeof adminFetch === "function") {
+        return await adminFetch(url, options);
+    }
+
+    const token = localStorage.getItem("adminToken");
+
+    if (!token) {
+        alert("Admin session expired");
+        window.location.href = "admin-login.html";
+        return null;
+    }
+
+    const headers = {
+        ...(options.headers || {}),
+        Authorization: `Bearer ${token}`
+    };
+
+    const res = await fetch(url, {
+        ...options,
+        headers
+    });
+
+    const data = await res.json();
+
+    if (res.status === 401) {
+        alert("Admin session expired");
+        localStorage.removeItem("adminToken");
+        window.location.href = "admin-login.html";
+        return null;
+    }
+
+    return data;
+}
+
 async function loadWalletTopups() {
     try {
-        const data = await adminFetch("/api/admin/wallet/topups");
+        const data = await secureAdminFetch("/api/admin/wallet/topups");
 
         if (!data || !data.success) {
             alert(data?.message || "Failed to load wallet topups");
@@ -62,14 +105,15 @@ function renderTopups(topups) {
                 </p>
 
                 ${slip
-                ? `<img class="topup-slip" src="${slipUrl}" alt="Payment slip" onclick="window.open('${slipUrl}', '_blank')">`
+                ? `<img class="topup-slip" src="${slipUrl}" alt="Payment slip">`
                 : `<p>No slip uploaded</p>`
             }
 
                 <div class="topup-actions">
                     <button
                         class="approve-btn"
-                        onclick="updateStatus('${item._id}','approved')"
+                        data-id="${item._id}"
+                        data-status="approved"
                         ${!isPending ? "disabled" : ""}
                     >
                         ${status === "approved" ? "Approved" : "Approve"}
@@ -77,7 +121,8 @@ function renderTopups(topups) {
 
                     <button
                         class="reject-btn"
-                        onclick="updateStatus('${item._id}','rejected')"
+                        data-id="${item._id}"
+                        data-status="rejected"
                         ${!isPending ? "disabled" : ""}
                     >
                         ${status === "rejected" ? "Rejected" : "Reject"}
@@ -85,6 +130,18 @@ function renderTopups(topups) {
                 </div>
             </div>
         `;
+    });
+
+    document.querySelectorAll(".topup-slip").forEach(img => {
+        img.addEventListener("click", () => {
+            window.open(img.src, "_blank");
+        });
+    });
+
+    document.querySelectorAll(".topup-actions button").forEach(btn => {
+        btn.addEventListener("click", () => {
+            updateStatus(btn.dataset.id, btn.dataset.status);
+        });
     });
 }
 
@@ -99,7 +156,7 @@ async function updateStatus(id, status) {
     }
 
     try {
-        const data = await adminFetch(
+        const data = await secureAdminFetch(
             `/api/admin/wallet/topups/${id}/status`,
             {
                 method: "PUT",
@@ -124,6 +181,5 @@ async function updateStatus(id, status) {
     }
 }
 
-// IMPORTANT: make functions available to onclick=""
 window.updateStatus = updateStatus;
 window.loadWalletTopups = loadWalletTopups;
