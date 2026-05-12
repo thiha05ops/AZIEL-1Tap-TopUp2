@@ -194,7 +194,6 @@ async function updateStatus(
                         status
                     })
                 }
-
             );
 
         if (!data?.success) {
