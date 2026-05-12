@@ -26,90 +26,85 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     async function loadProfile() {
-        try {
-            const res = await fetch("/api/profile/me", {
-                headers: {
-                    Authorization: "Bearer " + token
-                }
-            });
 
-            const data = await res.json();
+        try {
+
+            const data =
+                await apiFetch("/api/profile/me");
 
             if (!data.success) {
-                accountMsg.innerText = "❌ Failed to load profile";
+
+                accountMsg.innerText =
+                    "❌ Failed to load profile";
+
                 return;
             }
 
             const user = data.user;
 
-            accountUsername.innerText = user.username || "-";
-            accountName.innerText = user.displayName || user.username || "User";
-            accountAvatar.innerText = (user.displayName || user.username || "U").charAt(0).toUpperCase();
+            accountUsername.innerText =
+                user.username || "-";
 
-            displayName.value = user.displayName || "";
-            accountRegion.value = user.region || "MM";
-            telegramName.value = user.telegram || "";
-            phoneNumber.value = user.phone || "";
-            mlbbUserId.value = user.mlbbUserId || "";
-            mlbbServerId.value = user.mlbbServerId || "";
+            accountName.innerText =
+                user.displayName || user.username;
 
-            localStorage.setItem("region", user.region || "MM");
+            accountAvatar.innerText =
+                (user.displayName || user.username)
+                    .charAt(0)
+                    .toUpperCase();
+
+            displayName.value =
+                user.displayName || "";
+
+            accountRegion.value =
+                user.region || "MM";
+
+            telegramName.value =
+                user.telegram || "";
+
+            phoneNumber.value =
+                user.phone || "";
+
+            mlbbUserId.value =
+                user.mlbbUserId || "";
+
+            mlbbServerId.value =
+                user.mlbbServerId || "";
+
+            localStorage.setItem(
+                "region",
+                user.region || "MM"
+            );
 
             if (user.photo) {
-                profilePreview.src = user.photo;
-                profilePreview.style.display = "block";
-                accountAvatar.style.display = "none";
+
+                profilePreview.src =
+                    user.photo;
+
+                profilePreview.style.display =
+                    "block";
+
+                accountAvatar.style.display =
+                    "none";
+
             } else {
-                profilePreview.style.display = "none";
-                accountAvatar.style.display = "flex";
+
+                profilePreview.style.display =
+                    "none";
+
+                accountAvatar.style.display =
+                    "flex";
             }
 
         } catch (error) {
+
             console.log(error);
-            accountMsg.innerText = "❌ Server error";
+
+            accountMsg.innerText =
+                "❌ Server error";
         }
+
     }
-
-    await loadProfile();
-
-    saveProfileBtn?.addEventListener("click", async () => {
-        try {
-            const formData = new FormData();
-            formData.append("displayName", displayName.value.trim());
-            formData.append("region", accountRegion.value);
-            formData.append("telegram", telegramName.value.trim());
-            formData.append("phone", phoneNumber.value.trim());
-            formData.append("mlbbUserId", mlbbUserId.value.trim());
-            formData.append("mlbbServerId", mlbbServerId.value.trim());
-
-            if (profilePhoto.files[0]) {
-                formData.append("photo", profilePhoto.files[0]);
-            }
-
-            const res = await fetch("/api/profile/me", {
-                method: "PUT",
-                headers: {
-                    Authorization: "Bearer " + token
-                },
-                body: formData
-            });
-
-            const data = await res.json();
-
-            if (data.success) {
-                localStorage.setItem("region", data.user.region || "MM");
-                localStorage.setItem("username", data.user.username || username);
-                accountMsg.innerText = "✅ Profile saved!";
-                await loadProfile();
-            } else {
-                accountMsg.innerText = "❌ " + data.message;
-            }
-
-        } catch (error) {
-            console.log(error);
-            accountMsg.innerText = "❌ Server error";
-        }
-    });
 
     goHistoryBtn?.addEventListener("click", () => {
         window.location.href = "history.html";
@@ -121,45 +116,45 @@ document.addEventListener("DOMContentLoaded", async () => {
         localStorage.removeItem("isLoggedIn");
         window.location.href = "login.html";
     });
-});
-async function loadNotifications() {
-    const username = localStorage.getItem("username");
-    const token = localStorage.getItem("token");
 
-    const notiBtn = document.getElementById("notiBtn");
-    const notiCount = document.getElementById("notiCount");
-    const notiDropdown = document.getElementById("notiDropdown");
-    const notiList = document.getElementById("notiList");
+    async function loadNotifications() {
+        const username = localStorage.getItem("username");
+        const token = localStorage.getItem("token");
 
-    if (!notiBtn || !notiCount || !notiDropdown || !notiList) return;
+        const notiBtn = document.getElementById("notiBtn");
+        const notiCount = document.getElementById("notiCount");
+        const notiDropdown = document.getElementById("notiDropdown");
+        const notiList = document.getElementById("notiList");
 
-    notiBtn.addEventListener("click", () => {
-        notiDropdown.classList.toggle("show");
-    });
+        if (!notiBtn || !notiCount || !notiDropdown || !notiList) return;
 
-    if (!username || !token) {
-        notiCount.innerText = "0";
-        notiList.innerHTML = "<p>Please login to see notifications.</p>";
-        return;
-    }
+        notiBtn.addEventListener("click", () => {
+            notiDropdown.classList.toggle("show");
+        });
 
-    try {
-        const res = await fetch(`/api/history/${username}`);
-        const data = await res.json();
-
-        if (!data.success || data.orders.length === 0) {
+        if (!username || !token) {
             notiCount.innerText = "0";
-            notiList.innerHTML = "<p>No notifications yet.</p>";
+            notiList.innerHTML = "<p>Please login to see notifications.</p>";
             return;
         }
 
-        const activeOrders = data.orders.filter(
-            o => o.status !== "Done" && o.status !== "Cancelled"
-        );
+        try {
+            const res = await fetch(`/api/history/${username}`);
+            const data = await res.json();
 
-        notiCount.innerText = activeOrders.length;
+            if (!data.success || data.orders.length === 0) {
+                notiCount.innerText = "0";
+                notiList.innerHTML = "<p>No notifications yet.</p>";
+                return;
+            }
 
-        notiList.innerHTML = data.orders.slice(0, 5).map(order => `
+            const activeOrders = data.orders.filter(
+                o => o.status !== "Done" && o.status !== "Cancelled"
+            );
+
+            notiCount.innerText = activeOrders.length;
+
+            notiList.innerHTML = data.orders.slice(0, 5).map(order => `
             <div class="noti-item">
                 <strong>${order.status}</strong>
                 <p>${order.packageName}</p>
@@ -168,11 +163,12 @@ async function loadNotifications() {
             </div>
         `).join("");
 
-    } catch (error) {
-        console.log(error);
-        notiList.innerHTML = "<p>Failed to load notifications.</p>";
+        } catch (error) {
+            console.log(error);
+            notiList.innerHTML = "<p>Failed to load notifications.</p>";
+        }
     }
-}
 
-loadNotifications();
-setInterval(loadNotifications, 10000);
+    loadNotifications();
+    setInterval(loadNotifications, 10000)
+});

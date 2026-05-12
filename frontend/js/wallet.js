@@ -91,28 +91,34 @@ async function submitTopup() {
     btn.innerText = "Submitting...";
 
     try {
-        const res = await fetch("/api/wallet/topup", {
-            method: "POST",
-            body: formData
-        });
 
-        const data = await res.json();
+        const data = await apiFetch(
+            "/api/wallet/topup",
+            {
+                method: "POST",
+                body: formData
+            }
+        );
 
         if (!data.success) {
+
             alert(data.message || "Topup failed");
+
             btn.disabled = false;
+
             btn.innerText = "Submit Top Up";
+
             return;
         }
 
         alert("Wallet topup submitted ✅");
+
         window.location.reload();
 
     } catch (error) {
+
         console.log(error);
-        alert("Server error");
-        btn.disabled = false;
-        btn.innerText = "Submit Top Up";
+
     }
 }
 

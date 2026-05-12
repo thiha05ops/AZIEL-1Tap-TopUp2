@@ -37,8 +37,7 @@ async function checkLiveNotifications() {
     if (!username) return;
 
     try {
-        const res = await fetch(`/api/history/${username}`);
-        const data = await res.json();
+        const data = await apiFetch(`/api/history/${username}`);
 
         if (!data.success || !data.orders) return;
 

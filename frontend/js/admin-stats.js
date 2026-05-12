@@ -49,4 +49,4 @@ async function loadAdminStats() {
 
 loadAdminStats();
 
-setInterval(loadAdminStats, 5000);
+setInterval(loadAdminStats, 15000);

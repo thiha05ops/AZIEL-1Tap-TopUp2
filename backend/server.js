@@ -2,6 +2,8 @@ const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const path = require("path");
 const dotenv = require("dotenv");
+const adminAuthRoutes =
+    require("./routes/adminAuth");
 
 dotenv.config({
     path: path.join(__dirname, "../.env")
@@ -129,6 +131,8 @@ app.use("/api", supplierRoutes);
 app.use("/api", walletRoutes);
 
 app.use("/api", adminStatsRoutes);
+
+app.use("/api", adminAuthRoutes);
 
 // HOME
 app.get("/", (req, res) => {
