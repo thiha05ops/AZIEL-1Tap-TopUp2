@@ -1,17 +1,40 @@
-const ADMIN_PASSWORD =
-    process.env.ADMIN_PASSWORD || "AZIEL2026";
+// backend/middleware/adminMiddleware.js
+
+const jwt = require("jsonwebtoken");
+
+const JWT_SECRET =
+    process.env.JWT_SECRET || "aziel_jwt_secret";
 
 function adminMiddleware(req, res, next) {
-    const password = req.headers["x-admin-password"];
+    try {
+        const authHeader = req.headers.authorization;
 
-    if (password !== ADMIN_PASSWORD) {
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+            return res.status(401).json({
+                success: false,
+                message: "Admin session expired"
+            });
+        }
+
+        const token = authHeader.split(" ")[1];
+
+        const decoded = jwt.verify(token, JWT_SECRET);
+
+        if (decoded.role !== "admin") {
+            return res.status(401).json({
+                success: false,
+                message: "Unauthorized admin request"
+            });
+        }
+
+        next();
+
+    } catch (error) {
         return res.status(401).json({
             success: false,
-            message: "Unauthorized admin request"
+            message: "Admin session expired"
         });
     }
-
-    next();
 }
 
 module.exports = adminMiddleware;
