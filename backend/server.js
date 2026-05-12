@@ -1,6 +1,6 @@
+const path = require("path");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
-const path = require("path");
 const dotenv = require("dotenv");
 const adminAuthRoutes =
     require("./routes/adminAuth");
@@ -100,9 +100,10 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // STATIC FILES
-app.use(express.static(
-    path.join(__dirname, "../frontend")
-));
+app.use(
+    express.static(
+        path.join(__dirname, "../frontend")
+    ));
 
 app.use(
     "/uploads",

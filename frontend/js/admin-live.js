@@ -12,7 +12,7 @@ document.addEventListener("click", () => {
 
 document.addEventListener("DOMContentLoaded", () => {
     checkAdminLiveOrders();
-    setInterval(checkAdminLiveOrders, 5000);
+    setInterval(checkAdminLiveOrders, 15000);
 });
 
 async function checkAdminLiveOrders() {
