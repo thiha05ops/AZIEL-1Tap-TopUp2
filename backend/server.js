@@ -148,3 +148,26 @@ server.listen(PORT, () => {
     );
 
 });
+io.on("connection", socket => {
+
+    console.log(
+        "⚡ User connected:",
+        socket.id
+    );
+
+    socket.on("joinAdmin", () => {
+        socket.join("admins");
+    });
+
+    socket.on("joinUser", username => {
+        socket.join(username);
+    });
+
+    socket.on("disconnect", () => {
+        console.log(
+            "❌ Disconnected:",
+            socket.id
+        );
+    });
+
+});
