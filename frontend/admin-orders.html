@@ -22,62 +22,55 @@
         </aside>
 
         <main class="admin-main">
+            <section id="adminContent"></section>
 
-            <div class="admin-login" id="loginBox">
-                <h1>Admin Login</h1>
-                <input type="password" id="adminPassword" placeholder="Admin password">
-                <button id="loginBtn">Login</button>
+            <div class="admin-top">
+                <div>
+                    <h1>Orders Dashboard</h1>
+                    <p>Manage customer orders, payment slips and status.</p>
+                </div>
+
+                <button id="refreshBtn">Refresh</button>
             </div>
 
-            <section id="adminContent" style="display:none;">
+            <div class="admin-stats">
+                <div><span>Total Orders</span><b id="totalOrders">0</b></div>
+                <div><span>Paid</span><b id="paidOrders">0</b></div>
+                <div><span>Processing</span><b id="processingOrders">0</b></div>
+                <div><span>Completed</span><b id="completedOrders">0</b></div>
+            </div>
 
-                <div class="admin-top">
-                    <div>
-                        <h1>Orders Dashboard</h1>
-                        <p>Manage customer orders, payment slips and status.</p>
-                    </div>
+            <div class="admin-tools">
+                <input type="text" id="searchOrder" placeholder="Search order / user / game">
+                <select id="statusFilter">
+                    <option value="all">All Status</option>
+                    <option value="pending_payment">Pending Payment</option>
+                    <option value="paid">Paid</option>
+                    <option value="processing">Processing</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                    <option value="failed">Failed</option>
+                </select>
+            </div>
 
-                    <button id="refreshBtn">Refresh</button>
-                </div>
-
-                <div class="admin-stats">
-                    <div><span>Total Orders</span><b id="totalOrders">0</b></div>
-                    <div><span>Paid</span><b id="paidOrders">0</b></div>
-                    <div><span>Processing</span><b id="processingOrders">0</b></div>
-                    <div><span>Completed</span><b id="completedOrders">0</b></div>
-                </div>
-
-                <div class="admin-tools">
-                    <input type="text" id="searchOrder" placeholder="Search order / user / game">
-                    <select id="statusFilter">
-                        <option value="all">All Status</option>
-                        <option value="pending_payment">Pending Payment</option>
-                        <option value="paid">Paid</option>
-                        <option value="processing">Processing</option>
-                        <option value="completed">Completed</option>
-                        <option value="cancelled">Cancelled</option>
-                        <option value="failed">Failed</option>
-                    </select>
-                </div>
-
-                <div class="orders-table-wrap">
-                    <table class="orders-table">
-                        <thead>
-                            <tr>
-                                <th>Order</th>
-                                <th>User</th>
-                                <th>Game</th>
-                                <th>Package</th>
-                                <th>Amount</th>
-                                <th>Payment</th>
-                                <th>Status</th>
-                                <th>Slip</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="ordersList"></tbody>
-                    </table>
-                </div>
+            <div class="orders-table-wrap">
+                <table class="orders-table">
+                    <thead>
+                        <tr>
+                            <th>Order</th>
+                            <th>User</th>
+                            <th>Game</th>
+                            <th>Package</th>
+                            <th>Amount</th>
+                            <th>Payment</th>
+                            <th>Status</th>
+                            <th>Slip</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ordersList"></tbody>
+                </table>
+            </div>
 
             </section>
 
