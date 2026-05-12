@@ -2,11 +2,46 @@
 
 let lastOrderIds = [];
 let firstLoad = true;
+let soundEnabled = false;
 
 document.addEventListener("DOMContentLoaded", () => {
-    if (!localStorage.getItem("adminToken")) {
+    const adminToken = localStorage.getItem("adminToken");
+
+    if (!adminToken) {
         window.location.href = "admin-login.html";
         return;
+    }
+
+    // sound enable after first click
+    document.addEventListener(
+        "click",
+        () => {
+            soundEnabled = true;
+        },
+        { once: true }
+    );
+
+    // Socket live update
+    if (typeof io !== "undefined") {
+        const socket = io();
+
+        socket.emit("joinAdmin");
+
+        socket.on("adminNewUpdate", (data) => {
+            showAdminAlert(
+                `🔔 ${data.game || "New"} order is now ${data.status || "updated"}`
+            );
+
+            playAdminBeep();
+
+            if (typeof loadOrders === "function") {
+                loadOrders();
+            }
+
+            if (typeof loadWalletTopups === "function") {
+                loadWalletTopups();
+            }
+        });
     }
 
     checkAdminLiveOrders();
@@ -15,18 +50,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
 async function checkAdminLiveOrders() {
     try {
+        if (typeof adminFetch !== "function") {
+            console.log("adminFetch not loaded");
+            return;
+        }
+
         const data = await adminFetch("/api/admin/orders");
 
         if (!data || !data.success) return;
 
         const orders = data.orders || [];
 
-        const currentIds = orders.map(order => {
+        const currentIds = orders.map((order) => {
             return order._id || order.orderId;
         });
 
         if (!firstLoad) {
-            const newOrders = orders.filter(order => {
+            const newOrders = orders.filter((order) => {
                 const id = order._id || order.orderId;
 
                 return (
@@ -41,6 +81,10 @@ async function checkAdminLiveOrders() {
                 );
 
                 playAdminBeep();
+
+                if (typeof loadOrders === "function") {
+                    loadOrders();
+                }
             }
         }
 
@@ -49,19 +93,6 @@ async function checkAdminLiveOrders() {
 
     } catch (error) {
         console.log("Admin live orders error:", error);
-    }
-}
-
-function showAdminAlert(message) {
-    alert(message);
-}
-
-function playAdminBeep() {
-    try {
-        const audio = new Audio("/assets/notification.mp3");
-        audio.play().catch(() => { });
-    } catch (error) {
-        console.log(error);
     }
 }
 
@@ -75,11 +106,9 @@ function showAdminAlert(text) {
     }
 
     box.innerHTML = `
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;">
+        <div class="admin-live-alert-inner">
             <span>${text}</span>
-            <button onclick="document.getElementById('adminLiveAlert').style.display='none'">
-                Close
-            </button>
+            <button id="adminLiveCloseBtn">Close</button>
         </div>
     `;
 
@@ -96,13 +125,23 @@ function showAdminAlert(text) {
     box.style.boxShadow = "0 0 30px rgba(255,215,0,.45)";
     box.style.display = "block";
 
-    const btn = box.querySelector("button");
+    const inner = box.querySelector(".admin-live-alert-inner");
+    inner.style.display = "flex";
+    inner.style.alignItems = "center";
+    inner.style.justifyContent = "space-between";
+    inner.style.gap = "16px";
+
+    const btn = document.getElementById("adminLiveCloseBtn");
     btn.style.background = "#111827";
     btn.style.color = "#fff";
     btn.style.border = "0";
     btn.style.borderRadius = "10px";
     btn.style.padding = "8px 12px";
     btn.style.cursor = "pointer";
+
+    btn.addEventListener("click", () => {
+        box.style.display = "none";
+    });
 
     setTimeout(() => {
         box.style.display = "none";
@@ -115,16 +154,9 @@ function playAdminBeep() {
         return;
     }
 
-    const audio = new Audio("assets/sounds/notify.mp3");
-    audio.play().catch(err => {
+    const audio = new Audio("/assets/sounds/notify.mp3");
+
+    audio.play().catch((err) => {
         console.log("Sound blocked:", err);
     });
 }
-document.addEventListener("DOMContentLoaded", () => {
-    const socket = io();
-
-    socket.on("adminNewUpdate", (data) => {
-        showAdminAlert(`🔔 ${data.game} order is now ${data.status}`);
-        playAdminBeep();
-    });
-});
