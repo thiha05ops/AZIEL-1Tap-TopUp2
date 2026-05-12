@@ -208,52 +208,95 @@ router.put(
             let newBalance = 0;
 
             if (status === "approved") {
-                const currencyKey =
-                    topup.currency === "THB" ? "THB" : "MMK";
 
-                const user = await User.findOne({
-                    username: topup.username
-                });
+                const currencyKey =
+                    topup.currency === "THB"
+                        ? "THB"
+                        : "MMK";
+
+                // FIND USER
+                const user =
+                    await User.findOne({
+                        username: topup.username
+                    });
 
                 if (!user) {
+
                     return res.json({
                         success: false,
                         message: "User not found"
                     });
+
                 }
 
-                if (!user.wallet) {
+                // FORCE CREATE WALLET
+                if (
+                    !user.wallet ||
+                    typeof user.wallet !== "object"
+                ) {
+
                     user.wallet = {
                         MMK: 0,
                         THB: 0
                     };
+
                 }
 
+                // FORCE NUMBER
+                const oldBalance =
+                    Number(
+                        user.wallet[currencyKey] || 0
+                    );
+
+                const addAmount =
+                    Number(
+                        topup.amount || 0
+                    );
+
+                // UPDATE BALANCE
                 user.wallet[currencyKey] =
-                    Number(user.wallet[currencyKey] || 0) +
-                    Number(topup.amount || 0);
+                    oldBalance + addAmount;
 
-                newBalance = user.wallet[currencyKey];
-
+                // VERY IMPORTANT
                 user.markModified("wallet");
 
+                // SAVE USER
                 await user.save();
 
+                // NEW BALANCE
+                newBalance =
+                    user.wallet[currencyKey];
+
+                // CREATE TRANSACTION
                 await WalletTransaction.create({
-                    transactionId: "TXN-" + Date.now(),
-                    username: topup.username,
-                    type: "topup",
-                    amount: Number(topup.amount),
-                    currency: topup.currency,
-                    description: "Wallet topup approved"
+
+                    transactionId:
+                        "TXN-" + Date.now(),
+
+                    username:
+                        topup.username,
+
+                    type:
+                        "topup",
+
+                    amount:
+                        addAmount,
+
+                    currency:
+                        topup.currency,
+
+                    description:
+                        "Wallet topup approved"
+
                 });
 
-                topup.status = "approved";
-                topup.note = "Balance added";
+                // UPDATE TOPUP
+                topup.status =
+                    "approved";
 
-            } else {
-                topup.status = "rejected";
-                topup.note = "Topup rejected";
+                topup.note =
+                    "Balance added";
+
             }
 
             await topup.save();
