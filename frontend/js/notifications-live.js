@@ -1,7 +1,13 @@
-
 // frontend/js/notification-live.js
 
+let socketInitialized = false;
+
 document.addEventListener("DOMContentLoaded", () => {
+
+    // prevent duplicate socket listener
+    if (socketInitialized) return;
+
+    socketInitialized = true;
 
     if (typeof io === "undefined") {
         console.log("Socket.IO not loaded");
@@ -11,16 +17,22 @@ document.addEventListener("DOMContentLoaded", () => {
     const username =
         localStorage.getItem("username");
 
-    if (!username) return;
+    if (!username) {
+        console.log("No username found");
+        return;
+    }
 
     const socket = io();
 
     socket.emit("joinUser", username);
 
+    // remove old listeners first
+    socket.off("newNotification");
+
     socket.on("newNotification", data => {
 
         console.log(
-            "🔔 Notification:",
+            "🔔 Live Notification:",
             data
         );
 
@@ -52,12 +64,15 @@ function increaseNotificationCount() {
 
 function showLiveNotification(data) {
 
+    // remove old popup
     const old =
         document.getElementById(
             "liveNotificationPopup"
         );
 
-    if (old) old.remove();
+    if (old) {
+        old.remove();
+    }
 
     const popup =
         document.createElement("div");
@@ -77,30 +92,38 @@ function showLiveNotification(data) {
 
     document.body.appendChild(popup);
 
+    // styles
     popup.style.position = "fixed";
     popup.style.top = "20px";
-    popup.style.right = "-400px";
+    popup.style.right = "-420px";
     popup.style.background =
         "linear-gradient(135deg,#2563eb,#1d4ed8)";
     popup.style.color = "#fff";
-    popup.style.padding = "18px";
+    popup.style.padding = "18px 20px";
     popup.style.borderRadius = "18px";
     popup.style.zIndex = "999999";
     popup.style.fontWeight = "700";
     popup.style.transition = ".4s";
     popup.style.boxShadow =
         "0 12px 40px rgba(0,0,0,.35)";
+    popup.style.maxWidth = "320px";
 
+    // animate in
     setTimeout(() => {
         popup.style.right = "20px";
     }, 100);
 
+    // auto remove
     setTimeout(() => {
 
-        popup.style.right = "-400px";
+        popup.style.right = "-420px";
 
         setTimeout(() => {
-            popup.remove();
+
+            if (popup.parentNode) {
+                popup.remove();
+            }
+
         }, 400);
 
     }, 5000);
