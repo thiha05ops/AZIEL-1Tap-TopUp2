@@ -46,7 +46,37 @@ async function loadOrders() {
 
         renderStats();
         renderOrders();
+        initSlipZoom();
+        function initSlipZoom() {
 
+            const modal = document.getElementById("slipModal");
+            const modalImg = document.getElementById("slipModalImg");
+            const closeBtn = document.getElementById("closeSlipModal");
+
+            document.querySelectorAll(".slip-img").forEach(img => {
+
+                img.addEventListener("click", () => {
+
+                    modal.classList.add("show");
+
+                    modalImg.src = img.src;
+
+                });
+
+            });
+
+            closeBtn?.addEventListener("click", () => {
+                modal.classList.remove("show");
+            });
+
+            modal?.addEventListener("click", e => {
+
+                if (e.target === modal) {
+                    modal.classList.remove("show");
+                }
+
+            });
+        }
     } catch (error) {
         console.log("Load orders error:", error);
         alert("Server error");
