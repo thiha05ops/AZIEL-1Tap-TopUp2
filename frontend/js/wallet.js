@@ -301,3 +301,65 @@ function showWalletPopup(amount, currency) {
         setTimeout(() => popup.remove(), 400);
     }, 4000);
 }
+// ======================
+// WALLET LIVE UPDATE
+// ======================
+
+document.addEventListener("DOMContentLoaded", () => {
+    if (typeof io === "undefined") {
+        console.log("Socket.IO not loaded");
+        return;
+    }
+
+    const username = localStorage.getItem("username");
+
+    if (!username) return;
+
+    const socket = io();
+
+    socket.emit("joinUserRoom", username);
+    socket.emit("joinUser", username);
+
+    socket.on("walletUpdated", (data) => {
+        console.log("💰 Wallet live update:", data);
+
+        updateWalletBalanceUI(data.amount, data.currency);
+        showWalletLivePopup(data.amount, data.currency);
+    });
+});
+
+function updateWalletBalanceUI(amount, currency) {
+    const balanceEls = [
+        document.getElementById("walletBalance"),
+        document.getElementById("balanceAmount"),
+        document.getElementById("userWalletBalance")
+    ];
+
+    balanceEls.forEach(el => {
+        if (el) {
+            el.innerText =
+                `${Number(amount || 0).toLocaleString()} ${currency || ""}`;
+        }
+    });
+}
+
+function showWalletLivePopup(amount, currency) {
+    const old = document.getElementById("walletLivePopup");
+    if (old) old.remove();
+
+    const popup = document.createElement("div");
+    popup.id = "walletLivePopup";
+    popup.innerHTML = `
+        💰 Wallet Updated<br>
+        <strong>${Number(amount || 0).toLocaleString()} ${currency || ""}</strong>
+    `;
+
+    document.body.appendChild(popup);
+
+    setTimeout(() => popup.classList.add("show"), 100);
+
+    setTimeout(() => {
+        popup.classList.remove("show");
+        setTimeout(() => popup.remove(), 400);
+    }, 4000);
+}

@@ -196,3 +196,21 @@ body {
 .wallet-popup.show {
     right: 20px;
 }
+
+#walletLivePopup {
+    position: fixed;
+    top: 20px;
+    right: -420px;
+    background: linear-gradient(135deg, #16a34a, #22c55e);
+    color: #fff;
+    padding: 18px 22px;
+    border-radius: 18px;
+    font-weight: 900;
+    z-index: 999999;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, .35);
+    transition: .4s;
+}
+
+#walletLivePopup.show {
+    right: 20px;
+}
