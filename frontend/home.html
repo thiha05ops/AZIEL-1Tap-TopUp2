@@ -37,14 +37,20 @@
             <a href="#mobileGames">Mobile Games</a>
             <a href="#pcGames">PC Games</a>
             <a href="#giftCards">Gift Cards</a>
+            <div class="notification-wrapper">
+
+                <button id="notificationBell">
+                    🔔
+                    <span id="notificationCount">
+                        0
+                    </span>
+                </button>
+
+            </div>
         </nav>
 
         <div class="header-right">
             <input type="text" id="searchInput" placeholder="Search game / card">
-
-            <div class="noti-bell" id="notiBtn">
-                🔔 <span id="notiCount">0</span>
-            </div>
 
             <div class="profile-box" id="profileBox">
                 <div class="avatar" id="avatarText">👤</div>
@@ -280,7 +286,7 @@
     <footer>
         © 2026 AZIEL 1Tap Shop
     </footer>
-
+    <script src="/socket.io/socket.io.js"></script>
     <script src="js/auth-check.js"></script>
     <script src="js/logout.js"></script>
     <script src="js/home.js"></script>

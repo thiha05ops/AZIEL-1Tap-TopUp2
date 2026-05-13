@@ -171,6 +171,7 @@ router.put(
             const io = req.app.get("io");
 
             if (io) {
+
                 io.to(order.username).emit(
                     "userOrderUpdate",
                     {
@@ -180,7 +181,18 @@ router.put(
                         packageName: order.packageName
                     }
                 );
+
+                io.to(order.username).emit(
+                    "newNotification",
+                    {
+                        title: "Order Updated",
+                        message:
+                            `${order.game} is now ${order.status}`
+                    }
+                );
+
             }
+
 
             await sendTelegramMessage(
                 `📦 ORDER STATUS UPDATED

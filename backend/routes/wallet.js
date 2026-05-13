@@ -256,6 +256,14 @@ router.put(
                     currency: topup.currency,
                     status: "approved"
                 });
+                io.to(topup.username).emit(
+                    "newNotification",
+                    {
+                        title: "Wallet Approved",
+                        message:
+                            `${topup.amount} ${topup.currency} added to wallet`
+                    }
+                );
             }
 
             res.json({

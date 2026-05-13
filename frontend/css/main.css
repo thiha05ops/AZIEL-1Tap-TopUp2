@@ -340,3 +340,33 @@ textarea {
   right: 20px;
 
 }
+
+.notification-wrapper {
+  position: relative;
+}
+
+#notificationBell {
+  position: relative;
+  background: none;
+  border: none;
+  font-size: 28px;
+  cursor: pointer;
+  color: #fff;
+}
+
+#notificationCount {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  background: #ff0033;
+  color: #fff;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 900;
+  padding: 0 6px;
+}
