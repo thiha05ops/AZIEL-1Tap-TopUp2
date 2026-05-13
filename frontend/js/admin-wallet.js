@@ -183,3 +183,32 @@ async function updateStatus(id, status) {
 
 window.updateStatus = updateStatus;
 window.loadWalletTopups = loadWalletTopups;
+function initSlipZoom() {
+
+    const modal = document.getElementById("slipModal");
+    const modalImg = document.getElementById("slipModalImg");
+    const closeBtn = document.getElementById("closeSlipModal");
+
+    document.querySelectorAll(".topup-slip").forEach(img => {
+
+        img.addEventListener("click", () => {
+
+            modal.classList.add("show");
+            modalImg.src = img.src;
+
+        });
+
+    });
+
+    closeBtn?.addEventListener("click", () => {
+        modal.classList.remove("show");
+    });
+
+    modal?.addEventListener("click", e => {
+
+        if (e.target === modal) {
+            modal.classList.remove("show");
+        }
+
+    });
+}

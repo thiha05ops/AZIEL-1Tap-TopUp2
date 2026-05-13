@@ -301,3 +301,33 @@ body {
   font-weight: 900;
   cursor: pointer;
 }
+
+.slip-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .88);
+  z-index: 999999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.slip-modal.show {
+  display: flex;
+}
+
+.slip-modal-img {
+  max-width: 95%;
+  max-height: 90vh;
+  border-radius: 18px;
+}
+
+#closeSlipModal {
+  position: absolute;
+  top: 20px;
+  right: 28px;
+  color: #fff;
+  font-size: 42px;
+  cursor: pointer;
+}

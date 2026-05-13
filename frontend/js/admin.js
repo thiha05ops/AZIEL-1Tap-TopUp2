@@ -46,6 +46,7 @@ async function loadOrders() {
 
         renderStats();
         renderOrders();
+        renderTopups(data.topups || []);
         initSlipZoom();
         function initSlipZoom() {
 
