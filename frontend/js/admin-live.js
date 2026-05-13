@@ -160,3 +160,105 @@ function playAdminBeep() {
         console.log("Sound blocked:", err);
     });
 }
+// ======================
+// NOTIFICATION DROPDOWN
+// ======================
+
+const notifications = [];
+
+document.addEventListener("DOMContentLoaded", () => {
+
+    const bell =
+        document.getElementById(
+            "notificationBell"
+        );
+
+    const dropdown =
+        document.getElementById(
+            "notificationDropdown"
+        );
+
+    bell?.addEventListener("click", e => {
+
+        e.stopPropagation();
+
+        dropdown?.classList.toggle("show");
+
+    });
+
+    document.addEventListener("click", e => {
+
+        if (
+            dropdown &&
+            !dropdown.contains(e.target)
+        ) {
+
+            dropdown.classList.remove("show");
+
+        }
+
+    });
+
+});
+
+function addNotificationToDropdown(data) {
+
+    notifications.unshift({
+
+        title:
+            data.title || "Notification",
+
+        message:
+            data.message || "",
+
+        time:
+            new Date().toLocaleTimeString()
+
+    });
+
+    renderNotificationDropdown();
+
+}
+
+function renderNotificationDropdown() {
+
+    const list =
+        document.getElementById(
+            "notificationList"
+        );
+
+    if (!list) return;
+
+    if (!notifications.length) {
+
+        list.innerHTML = `
+            <div class="notification-empty">
+                No notifications
+            </div>
+        `;
+
+        return;
+    }
+
+    list.innerHTML =
+        notifications.map(item => `
+
+            <div class="notification-item">
+
+                <div class="notification-title">
+                    ${item.title}
+                </div>
+
+                <div class="notification-message">
+                    ${item.message}
+                </div>
+
+                <div class="notification-time">
+                    ${item.time}
+                </div>
+
+            </div>
+
+        `).join("");
+
+}

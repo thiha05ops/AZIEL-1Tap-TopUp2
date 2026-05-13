@@ -39,6 +39,7 @@ document.addEventListener("DOMContentLoaded", () => {
         increaseNotificationCount();
 
         showLiveNotification(data);
+        addNotificationToDropdown(data);
 
     });
 

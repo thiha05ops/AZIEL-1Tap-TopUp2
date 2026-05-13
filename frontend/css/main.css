@@ -370,3 +370,63 @@ textarea {
   font-weight: 900;
   padding: 0 6px;
 }
+
+.notification-dropdown {
+  position: absolute;
+  top: 58px;
+  right: 0;
+  width: 340px;
+  max-height: 420px;
+  overflow-y: auto;
+  background: #111827;
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 18px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .4);
+  z-index: 99999;
+  display: none;
+}
+
+.notification-dropdown.show {
+  display: block;
+}
+
+.notification-header {
+  padding: 16px;
+  font-weight: 900;
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+  color: #fff;
+}
+
+.notification-item {
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, .06);
+  cursor: pointer;
+  transition: .25s;
+}
+
+.notification-item:hover {
+  background: rgba(255, 255, 255, .06);
+}
+
+.notification-title {
+  color: #fff;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.notification-message {
+  color: #cbd5e1;
+  font-size: 14px;
+}
+
+.notification-time {
+  color: #94a3b8;
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+.notification-empty {
+  padding: 20px;
+  text-align: center;
+  color: #94a3b8;
+}
