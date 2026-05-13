@@ -130,3 +130,19 @@ function showLiveNotification(data) {
     }, 5000);
 
 }
+document.addEventListener("click", (e) => {
+    const bell = document.getElementById("notificationBell");
+    const dropdown = document.getElementById("notificationDropdown");
+
+    if (!bell || !dropdown) return;
+
+    if (bell.contains(e.target)) {
+        e.stopPropagation();
+        dropdown.classList.toggle("show");
+        return;
+    }
+
+    if (!dropdown.contains(e.target)) {
+        dropdown.classList.remove("show");
+    }
+});
