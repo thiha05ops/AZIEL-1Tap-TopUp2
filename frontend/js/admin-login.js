@@ -87,3 +87,10 @@ document.addEventListener(
 
     }
 );
+function resetAdminSession() {
+    localStorage.removeItem("adminToken");
+
+    alert("Admin session cleared");
+
+    location.reload();
+}
