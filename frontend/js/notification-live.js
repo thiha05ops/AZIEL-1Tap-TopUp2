@@ -2,12 +2,14 @@
 
 let notifications = [];
 let socketInitialized = false;
+let notificationSoundEnabled = false;
 
 document.addEventListener("DOMContentLoaded", () => {
     if (socketInitialized) return;
     socketInitialized = true;
 
     setupNotificationDropdown();
+    setupNotificationSoundUnlock();
 
     if (typeof io === "undefined") {
         console.log("Socket.IO not loaded");
@@ -35,6 +37,7 @@ document.addEventListener("DOMContentLoaded", () => {
         addNotificationToDropdown(data);
         updateUnreadBadge();
         showLiveNotification(data);
+        playNotificationSound();
     });
 });
 
@@ -210,5 +213,32 @@ function setupNotificationDropdown() {
         if (!dropdown.contains(e.target)) {
             dropdown.classList.remove("show");
         }
+    });
+}
+function setupNotificationSoundUnlock() {
+    document.addEventListener(
+        "click",
+        () => {
+            notificationSoundEnabled = true;
+
+            const audio = new Audio("/assets/sounds/notify.mp3");
+            audio.volume = 0;
+            audio.play().catch(() => { });
+        },
+        { once: true }
+    );
+}
+
+function playNotificationSound() {
+    if (!notificationSoundEnabled) {
+        console.log("Click page once to enable notification sound");
+        return;
+    }
+
+    const audio = new Audio("/assets/sounds/notify.mp3");
+    audio.volume = 0.85;
+
+    audio.play().catch(error => {
+        console.log("Notification sound blocked:", error);
     });
 }
