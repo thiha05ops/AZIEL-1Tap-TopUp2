@@ -203,7 +203,6 @@ function addNotificationToDropdown(data) {
             new Date().toLocaleTimeString(),
         createAt:
             new Date()
-
     });
 
     renderNotificationDropdown();
