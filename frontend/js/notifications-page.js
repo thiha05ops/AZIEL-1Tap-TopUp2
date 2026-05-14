@@ -31,35 +31,44 @@ document.addEventListener("DOMContentLoaded", () => {
 // ======================
 
 document.addEventListener("DOMContentLoaded", () => {
+    loadNotificationPage();
+});
 
-    if (typeof io === "undefined") {
-        console.log("Socket.IO not loaded");
+async function loadNotificationPage() {
+    const username = localStorage.getItem("username");
+    const list = document.getElementById("notificationsList");
+
+    if (!list) return;
+
+    if (!username) {
+        list.innerHTML = `<div class="notification-empty">Please login first.</div>`;
         return;
     }
 
-    const username =
-        localStorage.getItem("username");
+    try {
+        const res = await fetch(`/api/notifications/${username}`);
+        const data = await res.json();
 
-    if (!username) return;
+        if (!data.success || !data.notifications.length) {
+            list.innerHTML = `<div class="notification-empty">No notifications yet.</div>`;
+            return;
+        }
 
-    const socket = io();
+        list.innerHTML = data.notifications.map(n => `
+            <div class="notification-card ${n.isRead ? "" : "unread"}">
+                <div class="notification-card-title">🔔 ${n.title}</div>
+                <div class="notification-card-message">${n.message}</div>
+                <div class="notification-card-time">
+                    ${new Date(n.createdAt).toLocaleString()}
+                </div>
+            </div>
+        `).join("");
 
-    socket.emit("joinUser", username);
-
-    socket.off("newNotificationPage");
-
-    socket.on("newNotification", data => {
-
-        console.log(
-            "📩 Notification page live:",
-            data
-        );
-
-        prependLiveNotification(data);
-
-    });
-
-});
+    } catch (error) {
+        console.log(error);
+        list.innerHTML = `<div class="notification-empty">Failed to load notifications.</div>`;
+    }
+}
 
 function prependLiveNotification(data) {
 
