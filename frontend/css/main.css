@@ -435,3 +435,8 @@ textarea {
   background: rgba(37, 99, 235, .18);
   border-left: 4px solid #3b82f6;
 }
+
+.notification-item.unread {
+  background: rgba(37, 99, 235, .18);
+  border-left: 4px solid #3b82f6;
+}
