@@ -305,3 +305,8 @@ body {
     padding: 0 18px;
   }
 }
+
+.notification-card.unread {
+  border-left: 4px solid #3b82f6;
+  background: rgba(59, 130, 246, .08);
+}
