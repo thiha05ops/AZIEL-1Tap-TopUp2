@@ -4,8 +4,7 @@ const notificationSchema = new mongoose.Schema(
     {
         username: {
             type: String,
-            required: true,
-            index: true
+            required: true
         },
 
         title: {
@@ -15,12 +14,12 @@ const notificationSchema = new mongoose.Schema(
 
         message: {
             type: String,
-            required: true
+            default: ""
         },
 
         type: {
             type: String,
-            default: "order"
+            default: "general"
         },
 
         orderId: {
@@ -38,8 +37,7 @@ const notificationSchema = new mongoose.Schema(
     }
 );
 
-module.exports =
-    mongoose.model(
-        "Notification",
-        notificationSchema
-    );
+module.exports = mongoose.model(
+    "Notification",
+    notificationSchema
+);

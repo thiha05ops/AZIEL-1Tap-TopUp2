@@ -1,5 +1,5 @@
 // frontend/js/notification-live.js
-
+let notification = [];
 let socketInitialized = false;
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -25,6 +25,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const socket = io();
 
     socket.emit("joinUser", username);
+    loadNotifications(username);
 
     // remove old listeners first
     socket.off("newNotification");
@@ -40,7 +41,47 @@ document.addEventListener("DOMContentLoaded", () => {
 
         showLiveNotification(data);
         addNotificationToDropdown(data);
+        async function loadNotifications(username) {
 
+            try {
+
+                const res =
+                    await fetch(
+                        `/api/notifications/${username}`
+                    );
+
+                const data =
+                    await res.json();
+
+                if (!data.success) return;
+
+                notifications =
+                    data.notifications || [];
+
+                renderNotificationDropdown();
+
+                const badge =
+                    document.getElementById(
+                        "notificationCount"
+                    );
+
+                if (badge) {
+
+                    badge.innerText =
+                        data.unreadCount || 0;
+
+                }
+
+            } catch (error) {
+
+                console.log(
+                    "Load notifications error:",
+                    error
+                );
+
+            }
+
+        }
     });
 
 });
@@ -159,7 +200,9 @@ function addNotificationToDropdown(data) {
             data.message || "",
 
         time:
-            new Date().toLocaleTimeString()
+            new Date().toLocaleTimeString(),
+        createAt:
+            new Date()
 
     });
 

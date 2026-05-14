@@ -4,15 +4,13 @@ const router = express.Router();
 const Notification =
     require("../models/Notification");
 
-// Get user notifications
+// GET /api/notifications/:username
 router.get("/notifications/:username", async (req, res) => {
     try {
         const notifications =
             await Notification.find({
                 username: req.params.username
-            })
-                .sort({ createdAt: -1 })
-                .limit(50);
+            }).sort({ createdAt: -1 });
 
         const unreadCount =
             await Notification.countDocuments({
@@ -27,34 +25,7 @@ router.get("/notifications/:username", async (req, res) => {
         });
 
     } catch (error) {
-        console.log("Notification get error:", error);
-
-        res.json({
-            success: false,
-            message: "Server error"
-        });
-    }
-});
-
-// Mark all as read
-router.put("/notifications/:username/read", async (req, res) => {
-    try {
-        await Notification.updateMany(
-            {
-                username: req.params.username,
-                isRead: false
-            },
-            {
-                isRead: true
-            }
-        );
-
-        res.json({
-            success: true
-        });
-
-    } catch (error) {
-        console.log("Notification read error:", error);
+        console.log("Notification load error:", error);
 
         res.json({
             success: false,

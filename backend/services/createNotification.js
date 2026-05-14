@@ -1,30 +1,26 @@
 const Notification =
     require("../models/Notification");
 
-async function createNotification({
-    username,
-    title,
-    message,
-    type = "order",
-    orderId = ""
-}) {
+async function createNotification(data) {
     try {
-        if (!username) return;
+        const notification =
+            await Notification.create({
+                username: data.username,
+                title: data.title,
+                message: data.message || "",
+                type: data.type || "general",
+                orderId: data.orderId || ""
+            });
 
-        await Notification.create({
-            username,
-            title,
-            message,
-            type,
-            orderId,
-            isRead: false
-        });
+        return notification;
 
     } catch (error) {
         console.log(
             "Create notification error:",
             error
         );
+
+        return null;
     }
 }
 
