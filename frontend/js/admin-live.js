@@ -202,18 +202,12 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function addNotificationToDropdown(data) {
-
     notifications.unshift({
-
-        title:
-            data.title || "Notification",
-
-        message:
-            data.message || "",
-
-        time:
-            new Date().toLocaleTimeString()
-
+        _id: data._id || data.id || "",
+        title: data.title || "Notification",
+        message: data.message || "",
+        time: new Date().toLocaleTimeString(),
+        isRead: data.isRead || false
     });
 
     renderNotificationDropdown();
@@ -232,10 +226,16 @@ function renderNotificationDropdown() {
     if (!notifications.length) {
 
         list.innerHTML = `
-            <div class="notification-empty">
-                No notifications
-            </div>
+            <div
+             class="notification-item ${item.isRead ? "" : "unread"}"
+            data-id="${item._id}"
+            >
         `;
+        document.querySelectorAll(".notification-item").forEach(el => {
+            el.addEventListener("click", () => {
+                markNotificationRead(el.dataset.id);
+            });
+        });
 
         return;
     }
@@ -261,4 +261,85 @@ function renderNotificationDropdown() {
 
         `).join("");
 
+} async function loadNotifications(username) {
+
+    try {
+
+        const res =
+            await fetch(
+                `/api/notifications/${username}`
+            );
+
+        const data =
+            await res.json();
+
+        if (!data.success) return;
+
+        notifications =
+            (data.notifications || []).map(item => ({
+
+                _id: item._id,
+
+                title: item.title,
+
+                message: item.message,
+
+                time: new Date(
+                    item.createdAt
+                ).toLocaleTimeString(),
+
+                isRead: item.isRead
+
+            }));
+
+        renderNotificationDropdown();
+
+        updateUnreadBadge();
+
+    } catch (error) {
+
+        console.log(
+            "Load notifications error:",
+            error
+        );
+
+    }
+
+}
+async function markNotificationRead(id) {
+    if (!id) return;
+
+    try {
+        const res = await fetch(
+            `/api/notifications/${id}/read`,
+            { method: "PUT" }
+        );
+
+        const data = await res.json();
+
+        if (!data.success) return;
+
+        const item = notifications.find(n => n._id === id);
+
+        if (item) {
+            item.isRead = true;
+        }
+
+        renderNotificationDropdown();
+        updateUnreadBadge();
+
+    } catch (error) {
+        console.log("Mark notification read error:", error);
+    }
+}
+
+function updateUnreadBadge() {
+    const badge = document.getElementById("notificationCount");
+
+    if (!badge) return;
+
+    const unread =
+        notifications.filter(n => !n.isRead).length;
+
+    badge.innerText = unread;
 }

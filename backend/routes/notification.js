@@ -33,5 +33,36 @@ router.get("/notifications/:username", async (req, res) => {
         });
     }
 });
+// PUT /api/notifications/:id/read
+router.put("/notifications/:id/read", async (req, res) => {
+    try {
+        const notification =
+            await Notification.findByIdAndUpdate(
+                req.params.id,
+                { isRead: true },
+                { new: true }
+            );
+
+        if (!notification) {
+            return res.json({
+                success: false,
+                message: "Notification not found"
+            });
+        }
+
+        res.json({
+            success: true,
+            notification
+        });
+
+    } catch (error) {
+        console.log("Mark read error:", error);
+
+        res.json({
+            success: false,
+            message: "Server error"
+        });
+    }
+});
 
 module.exports = router;
