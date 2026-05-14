@@ -26,3 +26,79 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
     `).join("");
 });
+// ======================
+// LIVE NOTIFICATION PAGE
+// ======================
+
+document.addEventListener("DOMContentLoaded", () => {
+
+    if (typeof io === "undefined") {
+        console.log("Socket.IO not loaded");
+        return;
+    }
+
+    const username =
+        localStorage.getItem("username");
+
+    if (!username) return;
+
+    const socket = io();
+
+    socket.emit("joinUser", username);
+
+    socket.off("newNotificationPage");
+
+    socket.on("newNotification", data => {
+
+        console.log(
+            "📩 Notification page live:",
+            data
+        );
+
+        prependLiveNotification(data);
+
+    });
+
+});
+
+function prependLiveNotification(data) {
+
+    const list =
+        document.getElementById(
+            "notificationsList"
+        );
+
+    if (!list) return;
+
+    const empty =
+        list.querySelector(
+            ".notification-empty"
+        );
+
+    if (empty) {
+        empty.remove();
+    }
+
+    const item =
+        document.createElement("div");
+
+    item.className =
+        "notification-card unread";
+
+    item.innerHTML = `
+        <div class="notification-card-title">
+            🔔 ${data.title || "Notification"}
+        </div>
+
+        <div class="notification-card-message">
+            ${data.message || ""}
+        </div>
+
+        <div class="notification-card-time">
+            Just now
+        </div>
+    `;
+
+    list.prepend(item);
+
+}
