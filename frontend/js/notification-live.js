@@ -26,7 +26,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const socket = io();
 
     socket.emit("joinUser", username);
-    loadNotifications(username);
+    loadNotification(username);
 
     // remove old listeners first
     socket.off("newNotification");
@@ -42,7 +42,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
         addNotificationToDropdown(data);
-        async function loadNotifications(username) {
+        async function loadNotification(username) {
 
             try {
 
