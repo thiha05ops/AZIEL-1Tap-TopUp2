@@ -2,6 +2,7 @@
 let notification = [];
 let socketInitialized = false;
 
+
 document.addEventListener("DOMContentLoaded", () => {
 
     // prevent duplicate socket listener
@@ -39,7 +40,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         increaseNotificationCount();
 
-        showLiveNotification(data);
+
         addNotificationToDropdown(data);
         async function loadNotifications(username) {
 

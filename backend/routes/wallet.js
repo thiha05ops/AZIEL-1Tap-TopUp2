@@ -251,19 +251,20 @@ router.put(
             const io = req.app.get("io");
 
             if (io && status === "approved") {
-                io.to(topup.username).emit("walletUpdated", {
-                    amount: newBalance,
-                    currency: topup.currency,
-                    status: "approved"
+                io.to(topup.username).emit("newNotification", {
+                    title: "Wallet Approved",
+                    message: `${topup.amount} ${topup.currency} added to wallet`,
+                    _id: topup._id,
+                    isRead: false
                 });
-                io.to(topup.username).emit(
-                    "newNotification",
-                    {
-                        title: "Wallet Approved",
-                        message:
-                            `${topup.amount} ${topup.currency} added to wallet`
-                    }
-                );
+
+                io.to("admins").emit("adminNewUpdate", {
+                    type: "wallet_topup",
+                    username: topup.username,
+                    status: topup.status,
+                    amount: topup.amount,
+                    currency: topup.currency
+                });
             }
 
             res.json({

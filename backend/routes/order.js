@@ -172,24 +172,20 @@ router.put(
 
             if (io) {
 
-                io.to(order.username).emit(
-                    "userOrderUpdate",
-                    {
-                        orderId: order.orderId,
-                        status: order.status,
-                        game: order.game,
-                        packageName: order.packageName
-                    }
-                );
+                io.to(order.username).emit("newNotification", {
+                    title: "Order Updated",
+                    message: `${order.game} is now ${order.status}`,
+                    _id: order._id,
+                    isRead: false
+                });
 
-                io.to(order.username).emit(
-                    "newNotification",
-                    {
-                        title: "Order Updated",
-                        message:
-                            `${order.game} is now ${order.status}`
-                    }
-                );
+                io.to("admins").emit("adminNewUpdate", {
+                    type: "order_status",
+                    orderId: order.orderId,
+                    username: order.username,
+                    status: order.status,
+                    game: order.game
+                });
 
             }
 

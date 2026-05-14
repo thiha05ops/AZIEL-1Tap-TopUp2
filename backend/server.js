@@ -45,22 +45,23 @@ const io = new Server(server, {
 
 app.set("io", io);
 
-io.on("connection", (socket) => {
+io.on("connection", socket => {
 
     console.log("Socket connected:", socket.id);
 
-    socket.on("joinUserRoom", (username) => {
-
-        socket.join(username);
-
-        console.log("User joined room:", username);
-
+    socket.on("joinAdmin", () => {
+        socket.join("admins");
+        console.log("Admin joined:", socket.id);
     });
 
-    socket.on("disconnect", () => {
+    socket.on("joinUser", username => {
+        socket.join(username);
+        console.log("User joined:", username);
+    });
 
-        console.log("Socket disconnected:", socket.id);
-
+    socket.on("joinUserRoom", username => {
+        socket.join(username);
+        console.log("User room joined:", username);
     });
 
 });
