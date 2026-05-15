@@ -25,204 +25,105 @@
         </div>
     </header>
 
-    <main class="account-center">
+    <main class="account-layout">
 
-        <!-- SIDEBAR -->
-        <aside class="account-sidebar" id="accountSidebar">
-
-            <div class="account-profile">
-
-                <div class="profile-avatar">
-                    T
-                </div>
-
-                <div>
-
-                    <h3 id="accountUsername">
-                        Loading...
-                    </h3>
-
-                    <p>
-                        AZIEL Member
-                    </p>
-
-                </div>
-
+        <aside class="account-sidebar">
+            <div class="profile-card">
+                <div class="avatar-big" id="avatarText">U</div>
+                <h3 id="profileName">Username</h3>
+                <p id="profileRegion">Region: MM</p>
+                <span class="verified-badge">Verified Customer</span>
             </div>
 
             <nav class="account-menu">
-
-                <button class="menu-btn active" data-section="profile">
-                    👤 Profile
-                </button>
-
-                <button class="menu-btn" data-section="orders">
-                    📦 Orders
-                </button>
-
-                <button class="menu-btn" data-section="notifications">
-                    🔔 Notifications
-                </button>
-
-                <button class="menu-btn" data-section="support">
-                    🎧 Support
-                </button>
-
-                <button class="menu-btn" data-section="wallet">
+                <button class="side-link active" data-tab="overview">🏠 Overview</button>
+                <a href="wallet.html" class="side-link">
                     💰 Wallet
-                </button>
-
-                <button class="menu-btn" data-section="settings">
-                    ⚙️ Settings
-                </button>
-
-                <a href="login.html" class="logout-btn">
-                    🚪 Logout
                 </a>
-
+                <button class="side-link" data-tab="history">📦 Orders</button>
+                <button class="side-link" data-tab="profile">👤 Profile</button>
+                <button class="side-link" data-tab="security">🔒 Security</button>
+                <a href="support.html" class="account-btn">
+                    👨🏼‍💻 Customer Support
+                </a>
             </nav>
-
         </aside>
 
-
-        <!-- CONTENT -->
         <section class="account-content">
 
-            <!-- TOPBAR -->
-            <div class="account-topbar">
+            <div id="notiPanel" class="noti-panel"></div>
 
-                <button class="menu-toggle" id="menuToggle">
-                    ☰
-                </button>
+            <div class="tab-panel active" id="overview">
+                <h1>Account Overview</h1>
 
-                <h2 id="sectionTitle">
-                    👤 Profile
-                </h2>
-
-            </div>
-
-
-            <!-- PROFILE -->
-            <div class="account-section active" id="profileSection">
-
-                <div class="glass-card">
-
-                    <h2>
-                        Welcome Back 👋
-                    </h2>
-
-                    <p>
-                        AZIEL 1Tap Shop
-                        Account Center
-                    </p>
-
-                    <div id="profileBox">
-
-                        Loading profile...
-
+                <div class="dashboard-grid">
+                    <div class="dash-card">
+                        <span>Total Orders</span>
+                        <strong id="totalOrders">0</strong>
                     </div>
 
-                </div>
-
-            </div>
-
-
-            <!-- ORDERS -->
-            <div class="account-section" id="ordersSection">
-
-                <div class="glass-card">
-
-                    <h2>
-                        📦 Orders
-                    </h2>
-
-                    <div id="orderHistory">
-
-                        Loading orders...
-
+                    <div class="dash-card">
+                        <span>Active Orders</span>
+                        <strong id="pendingOrders">0</strong>
                     </div>
 
-                </div>
-
-            </div>
-
-
-            <!-- NOTIFICATIONS -->
-            <div class="account-section" id="notificationsSection">
-
-                <div class="glass-card">
-
-                    <h2>
-                        🔔 Notifications
-                    </h2>
-
-                    <div id="notificationDropdown">
-
-                        Loading notifications...
-
+                    <div class="dash-card">
+                        <span>Completed</span>
+                        <strong id="completedOrders">0</strong>
                     </div>
 
-                </div>
-
-            </div>
-
-
-            <!-- SUPPORT -->
-            <div class="account-section" id="supportSection">
-
-                <div class="glass-card">
-
-                    <h2>
-                        🎧 Support Center
-                    </h2>
-
-                    <p>
-                        Customer help &
-                        support tickets
-                    </p>
-
-                    <iframe src="support.html" class="account-embed"></iframe>
-
-                </div>
-
-            </div>
-
-
-            <!-- WALLET -->
-            <div class="account-section" id="walletSection">
-
-                <div class="glass-card">
-
-                    <h2>
-                        💰 Wallet
-                    </h2>
-
-                    <div id="walletBox">
-
-                        Loading wallet...
-
+                    <div class="dash-card wallet-card">
+                        <span>Wallet Balance</span>
+                        <strong id="walletBalance">0 Ks</strong>
                     </div>
-
                 </div>
 
+                <div class="content-card">
+                    <h2>Recent Orders</h2>
+                    <div id="recentOrders">Loading...</div>
+                </div>
             </div>
 
+            <div class="tab-panel" id="wallet">
+                <h1>Wallet</h1>
 
-            <!-- SETTINGS -->
-            <div class="account-section" id="settingsSection">
-
-                <div class="glass-card">
-
-                    <h2>
-                        ⚙️ Settings
-                    </h2>
-
-                    <p>
-                        Theme & preferences
-                    </p>
-
+                <div class="content-card">
+                    <h2>Balance</h2>
+                    <p class="balance-text" id="walletBalanceBig">0 Ks</p>
+                    <button class="primary-btn">Top Up Wallet</button>
+                    <p class="small-note">Wallet top-up system will be connected with payment approval.</p>
                 </div>
+            </div>
 
+            <div class="tab-panel" id="history">
+                <h1>Order History</h1>
+                <div id="historyList">Loading...</div>
+            </div>
+
+            <div class="tab-panel" id="profile">
+                <h1>Profile Information</h1>
+
+                <div class="content-card">
+                    <label>Display Name</label>
+                    <input type="text" id="displayName" placeholder="Display name">
+
+                    <label>Region</label>
+                    <select id="accountRegion">
+                        <option value="MM">Myanmar - MMK</option>
+                        <option value="TH">Thailand - THB</option>
+                    </select>
+
+                    <button id="saveProfileBtn" class="primary-btn">Save Profile</button>
+                </div>
+            </div>
+
+            <div class="tab-panel" id="security">
+                <h1>Account Security</h1>
+
+                <div class="content-card">
+                    <p>Keep your account safe. Change your password if you notice suspicious activity.</p>
+                    <a href="forgot.html" class="security-btn">Reset Password</a>
+                </div>
             </div>
 
         </section>
@@ -233,7 +134,7 @@
     <script src="js/account.js"></script>
     <script src="js/logout.js"></script>
     <script src="js/notification-live.js"></script>
-    <script src="js/support.js"></script>
+
 </body>
 
 </html>
