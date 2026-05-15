@@ -445,3 +445,11 @@ textarea {
   border-left: 4px solid #3b82f6;
   background: rgba(59, 130, 246, .08);
 }
+
+.nav-links a[href="tracking.html"] {
+  background: linear-gradient(135deg, #ffd700, #ffb800);
+  color: #111;
+  padding: 10px 16px;
+  border-radius: 14px;
+  font-weight: 900;
+}
