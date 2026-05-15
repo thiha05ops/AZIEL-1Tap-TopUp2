@@ -133,3 +133,53 @@ body {
 .track-card b {
     color: #fff;
 }
+
+.orders-track-list {
+    width: 100%;
+    max-width: 850px;
+}
+
+.orders-track-list h2 {
+    color: #ffd700;
+}
+
+.mini-order-card {
+    background: linear-gradient(135deg, #101028, #1d1d4d);
+    border: 1px solid rgba(255, 255, 255, .08);
+    border-radius: 18px;
+    padding: 16px;
+    margin-bottom: 14px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.mini-order-card:hover {
+    border-color: #ffd700;
+}
+
+.mini-order-card b {
+    color: #fff;
+}
+
+.mini-order-card span,
+.mini-order-card small {
+    color: #cbd5e1;
+}
+
+.mini-order-card em {
+    font-style: normal;
+    font-weight: 900;
+}
+
+.back-orders-btn {
+    background: #ffd700;
+    color: #111;
+    border: none;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-weight: 900;
+    cursor: pointer;
+    margin-bottom: 16px;
+}
