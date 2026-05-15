@@ -1,6 +1,8 @@
+let supportSocketStarted = false;
 document.addEventListener("DOMContentLoaded", () => {
 
     loadMyTickets();
+    startSupportLiveSystem();
 
     document
         .getElementById("supportForm")
@@ -258,5 +260,157 @@ async function loadMyTickets() {
             "Failed to load tickets.";
 
     }
+
+}
+function startSupportLiveSystem() {
+
+    if (supportSocketStarted)
+        return;
+
+    supportSocketStarted = true;
+
+    if (typeof io === "undefined") {
+        console.log(
+            "Socket.IO not loaded"
+        );
+        return;
+    }
+
+    const username =
+        localStorage.getItem(
+            "username"
+        );
+
+    if (!username) return;
+
+    const socket = io();
+
+    socket.emit(
+        "joinUser",
+        username
+    );
+
+    socket.off(
+        "newNotification"
+    );
+
+    socket.on(
+        "newNotification",
+
+        data => {
+
+            console.log(
+                "🔔 Support Live:",
+                data
+            );
+
+            // support reply only
+            if (
+                data.title ===
+                "Support Reply"
+            ) {
+
+                showSupportPopup(
+                    data.message
+                );
+
+                playSupportSound();
+
+                loadMyTickets();
+
+            }
+
+        }
+
+    );
+
+}
+function showSupportPopup(message) {
+
+    const old =
+        document.querySelector(
+            ".support-live-popup"
+        );
+
+    if (old) old.remove();
+
+    const popup =
+        document.createElement("div");
+
+    popup.className =
+        "support-live-popup";
+
+    popup.innerHTML = `
+        🔔 ${message}
+    `;
+
+    document.body.appendChild(
+        popup
+    );
+
+    popup.style.position =
+        "fixed";
+
+    popup.style.top =
+        "20px";
+
+    popup.style.right =
+        "-400px";
+
+    popup.style.padding =
+        "18px";
+
+    popup.style.borderRadius =
+        "18px";
+
+    popup.style.background =
+        "linear-gradient(135deg,#3b82f6,#2563eb)";
+
+    popup.style.color =
+        "#fff";
+
+    popup.style.fontWeight =
+        "800";
+
+    popup.style.zIndex =
+        "999999";
+
+    popup.style.transition =
+        ".4s";
+
+    popup.style.boxShadow =
+        "0 12px 40px rgba(0,0,0,.35)";
+
+    setTimeout(() => {
+
+        popup.style.right =
+            "20px";
+
+    }, 100);
+
+    setTimeout(() => {
+
+        popup.style.right =
+            "-400px";
+
+        setTimeout(() => {
+
+            popup.remove();
+
+        }, 400);
+
+    }, 5000);
+
+}
+function playSupportSound() {
+
+    const audio =
+        new Audio(
+            "/assets/sounds/notify.mp3"
+        );
+
+    audio.volume = 1;
+
+    audio.play();
 
 }
