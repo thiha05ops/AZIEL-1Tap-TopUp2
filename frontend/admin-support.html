@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>
+        Admin Support Dashboard
+    </title>
+
+    <link rel="stylesheet" href="css/admin-support.css">
+</head>
+
+<body>
+
+    <main class="admin-support-page">
+
+        <div class="admin-support-header">
+
+            <h1>
+                Support Tickets
+            </h1>
+
+            <button id="refreshSupportBtn">
+                Refresh
+            </button>
+
+        </div>
+
+        <div id="supportTickets">
+
+            <p>
+                Loading support tickets...
+            </p>
+
+        </div>
+
+    </main>
+
+    <script src="/socket.io/socket.io.js"></script>
+
+    <script src="js/admin-api.js"></script>
+
+    <script src="js/admin-support.js"></script>
+
+</body>
+
+</html>
