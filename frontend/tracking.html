@@ -2,19 +2,37 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Track Order - AZIEL</title>
-    <link rel="stylesheet" href="css/tracking.css">
+    <meta charset="UTF-8" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>
+        Order Tracking - AZIEL
+    </title>
+
+    <link rel="stylesheet" href="css/tracking.css" />
 </head>
 
 <body>
-    <div class="tracking-page">
-        <div id="trackingResult"></div>
-    </div>
+
+    <main class="tracking-page">
+
+        <div id="trackingResult">
+
+            <div class="loading-box">
+                Loading orders...
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- SOCKET -->
     <script src="/socket.io/socket.io.js"></script>
-    <script src="js/api.js"></script>
-    <script src="js/tracking.js"></script>
+
+    <!-- TRACKING -->
+    <script src="js/tracking.js?v=3"></script>
+
 </body>
 
 </html>
