@@ -4,6 +4,8 @@ const rateLimit = require("express-rate-limit");
 const dotenv = require("dotenv");
 const adminAuthRoutes =
     require("./routes/adminAuth");
+const supportRoutes =
+    require("./routes/support");
 
 dotenv.config({
     path: path.join(__dirname, "../.env")
@@ -125,7 +127,7 @@ app.use("/api", walletRoutes);
 app.use("/api", adminStatsRoutes);
 
 app.use("/api", adminAuthRoutes);
-
+app.use("/api", supportRoutes);
 // HOME
 app.get("/", (req, res) => {
 
