@@ -13,17 +13,61 @@
 
 <body>
 
-    <div class="page-wrap">
-        <a href="account.html" class="back-btn">← Back Account</a>
+    <div class="tracking-wrapper">
 
-        <div class="info-card">
-            <h1>Order Tracking</h1>
-
-            <input type="text" id="orderIdInput" placeholder="Enter Order ID">
-            <button id="trackBtn">Track</button>
-
-            <div id="trackingResult"></div>
+        <div class="tracking-header">
+            <h2>Order Tracking</h2>
+            <p id="trackingOrderId">
+                Order ID: -
+            </p>
         </div>
+
+        <div class="tracking-timeline">
+
+            <div class="tracking-step active" id="stepPending">
+                <div class="tracking-circle"></div>
+                <span>Pending</span>
+            </div>
+
+            <div class="tracking-line"></div>
+
+            <div class="tracking-step" id="stepPaid">
+                <div class="tracking-circle"></div>
+                <span>Paid</span>
+            </div>
+
+            <div class="tracking-line"></div>
+
+            <div class="tracking-step" id="stepProcessing">
+                <div class="tracking-circle"></div>
+                <span>Processing</span>
+            </div>
+
+            <div class="tracking-line"></div>
+
+            <div class="tracking-step" id="stepCompleted">
+                <div class="tracking-circle"></div>
+                <span>Completed</span>
+            </div>
+
+        </div>
+
+        <div class="tracking-status-card">
+
+            <h3 id="trackingStatusText">
+                Waiting for payment...
+            </h3>
+
+            <p id="trackingGame">
+                -
+            </p>
+
+            <p id="trackingPackage">
+                -
+            </p>
+
+        </div>
+
     </div>
     <script src="/socket.io/socket.io.js"></script>
     <script src="js/api.js"></script>
