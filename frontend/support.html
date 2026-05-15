@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Customer Support - AZIEL</title>
+
+    <link rel="stylesheet" href="css/support.css">
+</head>
+
+<body>
+
+    <main class="support-page">
+
+        <section class="support-card">
+
+            <h1>Customer Help Center</h1>
+
+            <p class="support-subtitle">
+                Submit your problem and our admin will help you.
+            </p>
+
+            <form id="supportForm">
+
+                <label>Problem Type</label>
+                <select id="ticketType" required>
+                    <option value="order">Order Issue</option>
+                    <option value="payment">Payment Issue</option>
+                    <option value="wallet">Wallet Issue</option>
+                    <option value="account">Account Issue</option>
+                    <option value="general">General Help</option>
+                </select>
+
+                <label>Subject</label>
+                <input type="text" id="ticketSubject" placeholder="Example: My order is not completed" required>
+
+                <label>Message</label>
+                <textarea id="ticketMessage" rows="6" placeholder="Explain your problem..." required></textarea>
+
+                <label>Screenshot Optional</label>
+                <input type="file" id="ticketScreenshot" accept="image/*">
+
+                <button type="submit" id="submitTicketBtn">
+                    Submit Ticket
+                </button>
+
+                <p id="supportMsg"></p>
+
+            </form>
+
+        </section>
+
+        <section class="support-card">
+
+            <h2>My Tickets</h2>
+
+            <div id="myTickets">
+                Loading tickets...
+            </div>
+
+        </section>
+
+    </main>
+
+    <script src="js/api.js"></script>
+    <script src="js/support.js"></script>
+
+</body>
+
+</html>
