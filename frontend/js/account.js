@@ -184,3 +184,175 @@ function statusClass(status) {
     if (status === "cancelled" || status === "failed") return "status-failed";
     return "status-pending";
 }
+document.addEventListener(
+    "DOMContentLoaded",
+    () => {
+
+        setupAccountMenu();
+
+        setupMobileDrawer();
+
+        loadAccountUser();
+
+    }
+);
+
+
+// ======================
+// MENU SWITCH
+// ======================
+
+function setupAccountMenu() {
+
+    const buttons =
+        document.querySelectorAll(
+            ".menu-btn"
+        );
+
+    const sections =
+        document.querySelectorAll(
+            ".account-section"
+        );
+
+    const title =
+        document.getElementById(
+            "sectionTitle"
+        );
+
+    buttons.forEach(button => {
+
+        button.addEventListener(
+            "click",
+            () => {
+
+                // active button
+                buttons.forEach(btn =>
+                    btn.classList.remove(
+                        "active"
+                    )
+                );
+
+                button.classList.add(
+                    "active"
+                );
+
+                // section name
+                const section =
+                    button.dataset.section;
+
+                // title
+                title.innerText =
+                    button.innerText;
+
+                // hide all
+                sections.forEach(sec =>
+                    sec.classList.remove(
+                        "active"
+                    )
+                );
+
+                // show selected
+                const target =
+                    document.getElementById(
+                        `${section}Section`
+                    );
+
+                if (target) {
+
+                    target.classList.add(
+                        "active"
+                    );
+
+                }
+
+                // mobile close
+                document
+                    .getElementById(
+                        "accountSidebar"
+                    )
+                    ?.classList.remove(
+                        "show"
+                    );
+
+            }
+        );
+
+    });
+
+}
+
+
+// ======================
+// MOBILE DRAWER
+// ======================
+
+function setupMobileDrawer() {
+
+    const toggle =
+        document.getElementById(
+            "menuToggle"
+        );
+
+    const sidebar =
+        document.getElementById(
+            "accountSidebar"
+        );
+
+    if (!toggle || !sidebar)
+        return;
+
+    toggle.addEventListener(
+        "click",
+        () => {
+
+            sidebar.classList.toggle(
+                "show"
+            );
+
+        }
+    );
+
+}
+
+
+// ======================
+// LOAD USER
+// ======================
+
+function loadAccountUser() {
+
+    const username =
+        localStorage.getItem(
+            "username"
+        ) || "Guest";
+
+    const userEl =
+        document.getElementById(
+            "accountUsername"
+        );
+
+    if (userEl) {
+
+        userEl.innerText =
+            username;
+
+    }
+
+    const avatar =
+        document.querySelector(
+            ".profile-avatar"
+        );
+
+    if (
+        avatar &&
+        username.length
+    ) {
+
+        avatar.innerText =
+            username
+                .charAt(0)
+                .toUpperCase();
+
+    }
+
+}
