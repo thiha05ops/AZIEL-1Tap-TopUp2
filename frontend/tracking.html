@@ -9,69 +9,8 @@
 </head>
 
 <body>
-
-    <div class="tracking-wrapper">
-
-        <div class="tracking-header">
-            <h2>Order Tracking</h2>
-            <p id="trackingOrderId">
-                Order ID: -
-            </p>
-        </div>
-
-        <div class="tracking-timeline">
-
-            <div class="tracking-step active" id="stepPending">
-                <div class="tracking-circle"></div>
-                <span>Pending</span>
-            </div>
-
-            <div class="tracking-line"></div>
-
-            <div class="tracking-step" id="stepPaid">
-                <div class="tracking-circle"></div>
-                <span>Paid</span>
-            </div>
-
-            <div class="tracking-line"></div>
-
-            <div class="tracking-step" id="stepProcessing">
-                <div class="tracking-circle"></div>
-                <span>Processing</span>
-            </div>
-
-            <div class="tracking-line"></div>
-
-            <div class="tracking-step" id="stepCompleted">
-                <div class="tracking-circle"></div>
-                <span>Completed</span>
-            </div>
-
-        </div>
-
-        <div class="tracking-status-card">
-
-            <h3 id="trackingStatusText">
-                Waiting for payment...
-            </h3>
-
-            <p id="trackingGame">
-                -
-            </p>
-
-            <p id="trackingPackage">
-                -
-            </p>
-
-        </div>
-        <input type="text" id="orderIdInput">
-
-        <button id="trackBtn">
-            Track Order
-        </button>
-
+    <div class="tracking-page">
         <div id="trackingResult"></div>
-
     </div>
     <script src="/socket.io/socket.io.js"></script>
     <script src="js/api.js"></script>

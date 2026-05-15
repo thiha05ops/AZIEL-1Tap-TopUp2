@@ -447,7 +447,7 @@ textarea {
 }
 
 .nav-links a[href="tracking.html"] {
-  color: #111;
+  color: hsla(90, 19%, 94%, 0.082);
   padding: 10px 16px;
   border-radius: 14px;
   font-weight: 900;
