@@ -14,24 +14,24 @@
 </head>
 
 <body>
-
     <main class="tracking-page">
+        <div class="tracking-search-card">
+            <h1>Check Order Tracking</h1>
 
-        <div id="trackingResult">
-
-            <div class="loading-box">
-                Loading orders...
-            </div>
-
+            <input id="orderIdInput" placeholder="Enter Order ID">
+            <button id="trackBtn">Check Tracking</button>
         </div>
 
+        <div id="trackingResult"></div>
     </main>
+
+    <script src="js/tracking.js?v=4"></script>
 
     <!-- SOCKET -->
     <script src="/socket.io/socket.io.js"></script>
 
     <!-- TRACKING -->
-    <script src="js/tracking.js?v=3"></script>
+    <script src="js/tracking.js?v=4"></script>
 
 </body>
 

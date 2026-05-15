@@ -1,99 +1,63 @@
 // frontend/js/tracking.js
 
-let allTrackingOrders = [];
-let selectedOrderId = "";
+let currentOrderId = "";
 let lastStatus = "";
 
 document.addEventListener("DOMContentLoaded", () => {
-    loadMyOrders();
+    const params = new URLSearchParams(window.location.search);
+    const orderIdFromUrl = params.get("orderId");
 
-    document.getElementById("trackBtn")?.addEventListener("click", () => {
-        const orderId = document.getElementById("orderIdInput").value.trim();
-        if (!orderId) return alert("Please enter Order ID");
+    const input = document.getElementById("orderIdInput");
+    const btn = document.getElementById("trackBtn");
 
-        selectedOrderId = orderId;
+    if (orderIdFromUrl && input) {
+        input.value = orderIdFromUrl;
+        trackOrder(orderIdFromUrl);
+    }
+
+    btn?.addEventListener("click", () => {
+        const orderId = input.value.trim();
+
+        if (!orderId) {
+            showError("Please enter Order ID.");
+            return;
+        }
+
         trackOrder(orderId);
     });
 
     setInterval(checkLiveTracking, 5000);
 });
 
-async function loadMyOrders() {
-    const username = localStorage.getItem("username");
-    const result = document.getElementById("trackingResult");
-
-    if (!username) {
-        result.innerHTML = `<p class="error-msg">Please login first.</p>`;
-        return;
-    }
-
-    try {
-        const res = await fetch(`/api/history/${username}`);
-        const data = await res.json();
-
-        if (!data.success || !data.orders.length) {
-            result.innerHTML = `<p class="error-msg">No orders found.</p>`;
-            return;
-        }
-
-        allTrackingOrders = data.orders;
-
-        result.innerHTML = `
-            <div class="orders-track-list">
-                <h2>My Orders</h2>
-
-                ${allTrackingOrders.map(order => `
-                    <div class="mini-order-card"
-                         onclick="selectTrackingOrder('${order.orderId}')">
-                        <b>${order.game}</b>
-                        <span>${order.packageName}</span>
-                        <small>${order.orderId}</small>
-                        <em class="${statusClass(order.status)}">${order.status}</em>
-                    </div>
-                `).join("")}
-            </div>
-        `;
-
-    } catch (error) {
-        result.innerHTML = `<p class="error-msg">Server error.</p>`;
-    }
-}
-
-function selectTrackingOrder(orderId) {
-    selectedOrderId = orderId;
-    document.getElementById("orderIdInput").value = orderId;
-    trackOrder(orderId);
-}
-
 async function trackOrder(orderId) {
     const result = document.getElementById("trackingResult");
 
-    result.innerHTML = `<p>Loading...</p>`;
+    currentOrderId = orderId;
+    result.innerHTML = `<p class="loading-text">Checking order...</p>`;
 
     try {
         const res = await fetch(`/api/order/track/${orderId}`);
         const data = await res.json();
 
         if (!data.success || !data.order) {
-            result.innerHTML = `<p class="error-msg">${data.message}</p>`;
+            showError(data.message || "Order not found.");
             return;
         }
 
-        const o = data.order;
-        lastStatus = o.status;
+        const order = data.order;
+        lastStatus = order.status;
 
         result.innerHTML = `
             <div class="track-card">
-                <button class="back-orders-btn" onclick="loadMyOrders()">← Back Orders</button>
+                <h2>${order.game || "Order"}</h2>
 
-                <h2>${o.game}</h2>
-
-                <p><b>Order ID:</b> ${o.orderId}</p>
-                <p><b>User ID:</b> ${o.userId}</p>
-                <p><b>Server:</b> ${o.zoneId || "-"}</p>
-                <p><b>Package:</b> ${o.packageName}</p>
-                <p><b>Amount:</b> ${o.amount} ${o.currency}</p>
-                <p><b>Payment:</b> ${o.paymentMethod}</p>
+                <p><b>Order ID:</b> ${order.orderId || "-"}</p>
+                <p><b>User:</b> ${order.username || "-"}</p>
+                <p><b>User ID:</b> ${order.userId || "-"}</p>
+                <p><b>Server:</b> ${order.zoneId || "-"}</p>
+                <p><b>Package:</b> ${order.packageName || order.selectedPackage || "-"}</p>
+                <p><b>Amount:</b> ${order.amount || 0} ${order.currency || ""}</p>
+                <p><b>Payment:</b> ${order.paymentMethod || "-"}</p>
 
                 <div class="tracking-timeline">
                     ${stepHTML("stepPending", "Pending")}
@@ -106,15 +70,16 @@ async function trackOrder(orderId) {
                 </div>
 
                 <p class="track-note">
-                    ${o.note || "Please wait while we process your order."}
+                    ${order.note || "Please wait while we process your order."}
                 </p>
             </div>
         `;
 
-        updateTrackingSteps(o.status);
+        updateTrackingSteps(order.status);
 
     } catch (error) {
-        result.innerHTML = `<p class="error-msg">Server error.</p>`;
+        console.log("Track order error:", error);
+        showError("Server error.");
     }
 }
 
@@ -128,10 +93,10 @@ function stepHTML(id, label) {
 }
 
 async function checkLiveTracking() {
-    if (!selectedOrderId) return;
+    if (!currentOrderId) return;
 
     try {
-        const res = await fetch(`/api/order/track/${selectedOrderId}`);
+        const res = await fetch(`/api/order/track/${currentOrderId}`);
         const data = await res.json();
 
         if (!data.success || !data.order) return;
@@ -139,7 +104,7 @@ async function checkLiveTracking() {
         if (data.order.status !== lastStatus) {
             lastStatus = data.order.status;
             showTrackingPopup(data.order.status);
-            trackOrder(selectedOrderId);
+            trackOrder(currentOrderId);
         }
 
     } catch (error) {
@@ -150,6 +115,7 @@ async function checkLiveTracking() {
 function updateTrackingSteps(status) {
     const steps = {
         pending_payment: ["stepPending"],
+        pending: ["stepPending"],
         paid: ["stepPending", "stepPaid"],
         processing: ["stepPending", "stepPaid", "stepProcessing"],
         completed: ["stepPending", "stepPaid", "stepProcessing", "stepCompleted"]
@@ -158,7 +124,7 @@ function updateTrackingSteps(status) {
     document.querySelectorAll(".tracking-step")
         .forEach(step => step.classList.remove("active"));
 
-    (steps[status] || []).forEach(id => {
+    (steps[status] || ["stepPending"]).forEach(id => {
         document.getElementById(id)?.classList.add("active");
     });
 }
@@ -181,10 +147,12 @@ function showTrackingPopup(status) {
     }, 4000);
 }
 
-function statusClass(status) {
-    if (status === "paid") return "status-paid";
-    if (status === "processing") return "status-processing";
-    if (status === "completed") return "status-completed";
-    if (status === "cancelled" || status === "failed") return "status-failed";
-    return "status-pending";
+function showError(message) {
+    const result = document.getElementById("trackingResult");
+
+    result.innerHTML = `
+        <p class="error-msg">
+            ${message}
+        </p>
+    `;
 }
