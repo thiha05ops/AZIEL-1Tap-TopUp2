@@ -446,9 +446,19 @@ textarea {
   background: rgba(59, 130, 246, .08);
 }
 
-.nav-links a[href="tracking.html"] {
-  color: hsla(90, 19%, 94%, 0.082);
-  padding: 10px 16px;
-  border-radius: 14px;
+a[href="support.html"] {
+  position: relative;
+}
+
+a[href="support.html"]::after {
+  content: "LIVE";
+  position: absolute;
+  top: -8px;
+  right: -18px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 10px;
   font-weight: 900;
+  padding: 2px 6px;
+  border-radius: 999px;
 }

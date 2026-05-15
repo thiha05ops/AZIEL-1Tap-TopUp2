@@ -343,3 +343,142 @@ function updateUnreadBadge() {
 
     badge.innerText = unread;
 }
+socket.on("adminNewUpdate", data => {
+
+    console.log(
+        "🔥 Admin Live:",
+        data
+    );
+
+    // SUPPORT TICKET
+    if (
+        data.type ===
+        "support_ticket"
+    ) {
+
+        showAdminLivePopup(
+            `🎫 New Support Ticket`,
+            `${data.username} submitted a support request`
+        );
+
+        playAdminNotificationSound();
+
+        // auto reload support page
+        if (
+            window.location.pathname.includes(
+                "admin-support"
+            )
+        ) {
+
+            if (
+                typeof loadSupportTickets ===
+                "function"
+            ) {
+
+                loadSupportTickets();
+
+            }
+
+        }
+
+    }
+
+});
+function showAdminLivePopup(
+    title,
+    message
+) {
+
+    const old =
+        document.querySelector(
+            ".admin-live-popup"
+        );
+
+    if (old) old.remove();
+
+    const popup =
+        document.createElement("div");
+
+    popup.className =
+        "admin-live-popup";
+
+    popup.innerHTML = `
+        <strong>
+            ${title}
+        </strong>
+
+        <br>
+
+        ${message}
+    `;
+
+    document.body.appendChild(
+        popup
+    );
+
+    popup.style.position =
+        "fixed";
+
+    popup.style.top =
+        "20px";
+
+    popup.style.right =
+        "-400px";
+
+    popup.style.zIndex =
+        "999999";
+
+    popup.style.padding =
+        "18px";
+
+    popup.style.borderRadius =
+        "18px";
+
+    popup.style.background =
+        "linear-gradient(135deg,#ef4444,#dc2626)";
+
+    popup.style.color =
+        "#fff";
+
+    popup.style.fontWeight =
+        "800";
+
+    popup.style.transition =
+        ".4s";
+
+    popup.style.boxShadow =
+        "0 12px 40px rgba(0,0,0,.35)";
+
+    setTimeout(() => {
+
+        popup.style.right =
+            "20px";
+
+    }, 100);
+
+    setTimeout(() => {
+
+        popup.style.right =
+            "-400px";
+
+        setTimeout(() => {
+
+            popup.remove();
+
+        }, 400);
+
+    }, 5000);
+
+}
+function playAdminNotificationSound() {
+
+    const audio =
+        new Audio(
+            "assets/notification.mp3"
+        );
+
+    audio.volume = 1;
+
+    audio.play();
+
+}
