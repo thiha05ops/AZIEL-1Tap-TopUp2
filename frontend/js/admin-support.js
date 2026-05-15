@@ -1,21 +1,44 @@
-document.addEventListener("DOMContentLoaded", () => {
+// frontend/js/admin-support.js
 
-    loadSupportTickets();
+document.addEventListener(
+    "DOMContentLoaded",
+    () => {
 
-    document
-        .getElementById(
-            "refreshSupportBtn"
-        )
-        ?.addEventListener(
-            "click",
-            loadSupportTickets
-        );
+        loadSupportTickets();
 
-});
+        setupRefreshButton();
+
+    }
+);
 
 
 // ======================
-// LOAD SUPPORT TICKETS
+// REFRESH BUTTON
+// ======================
+
+function setupRefreshButton() {
+
+    const btn =
+        document.getElementById(
+            "refreshSupportBtn"
+        );
+
+    if (!btn) return;
+
+    btn.addEventListener(
+        "click",
+        () => {
+
+            loadSupportTickets();
+
+        }
+    );
+
+}
+
+
+// ======================
+// LOAD TICKETS
 // ======================
 
 async function loadSupportTickets() {
@@ -24,6 +47,8 @@ async function loadSupportTickets() {
         document.getElementById(
             "supportTickets"
         );
+
+    if (!box) return;
 
     box.innerHTML =
         `<p>Loading support tickets...</p>`;
@@ -44,9 +69,11 @@ async function loadSupportTickets() {
                 "Failed to load tickets.";
 
             return;
+
         }
 
         if (
+            !data.tickets ||
             !data.tickets.length
         ) {
 
@@ -57,48 +84,88 @@ async function loadSupportTickets() {
             `;
 
             return;
+
         }
 
         box.innerHTML =
-            data.tickets.map(ticket => `
+            data.tickets
+                .map(renderTicketCard)
+                .join("");
 
-                <div class="support-ticket-card">
+    } catch (error) {
 
-                    <h2>
-                        ${ticket.subject}
-                    </h2>
+        console.log(
+            "Load support tickets error:",
+            error
+        );
 
-                    <p>
-                        <b>User:</b>
-                        ${ticket.username}
-                    </p>
+        box.innerHTML =
+            "Server error.";
 
-                    <p>
-                        <b>Type:</b>
-                        ${ticket.type}
-                    </p>
+    }
 
-                    <p>
-                        ${ticket.message}
-                    </p>
+}
 
-                    <span class="ticket-status-badge">
-                        ${ticket.status}
-                    </span>
 
-                    ${ticket.screenshot
-                    ? `
+// ======================
+// RENDER CARD
+// ======================
+
+function renderTicketCard(
+    ticket
+) {
+
+    const screenshot =
+        ticket.screenshot
+            ? `/uploads/support/${ticket.screenshot}`
+            : "";
+
+    return `
+        <div class="support-ticket-card">
+
+            <h2>
+                ${ticket.subject || "-"}
+            </h2>
+
+            <p>
+                <b>User:</b>
+                ${ticket.username || "-"}
+            </p>
+
+            <p>
+                <b>Ticket ID:</b>
+                ${ticket.ticketId || "-"}
+            </p>
+
+            <p>
+                <b>Type:</b>
+                ${ticket.type || "general"}
+            </p>
+
+            <p>
+                ${ticket.message || ""}
+            </p>
+
+            <span
+                class="ticket-status-badge
+                status-${ticket.status || "open"}"
+            >
+                ${ticket.status || "open"}
+            </span>
+
+            ${screenshot
+            ? `
                         <img
-                            src="/uploads/support/${ticket.screenshot}"
+                            src="${screenshot}"
                             class="ticket-image-admin"
-                            onclick="window.open('/uploads/support/${ticket.screenshot}','_blank')"
+                            onclick="window.open('${screenshot}','_blank')"
                         >
                     `
-                    : ""
-                }
+            : ""
+        }
 
-                    ${ticket.adminReply
-                    ? `
+            ${ticket.adminReply
+            ? `
                         <div class="ticket-admin-reply">
 
                             <h4>
@@ -111,64 +178,60 @@ async function loadSupportTickets() {
 
                         </div>
                     `
-                    : ""
-                }
+            : ""
+        }
 
-                    <div class="admin-reply-box">
+            <div class="admin-reply-box">
 
-                        <textarea
-                            id="reply-${ticket._id}"
-                            placeholder="Write reply..."
-                        ></textarea>
+                <textarea
+                    id="reply-${ticket._id}"
+                    placeholder="Write reply..."
+                ></textarea>
 
-                        <div class="reply-actions">
+                <div class="reply-actions">
 
-                            <button
-                                class="reply-btn"
-                                onclick="replyTicket('${ticket._id}','open')"
-                            >
-                                Send Reply
-                            </button>
+                    <button
+                        class="reply-btn"
+                        onclick="replyTicket('${ticket._id}','open')"
+                    >
+                        Send Reply
+                    </button>
 
-                            <button
-                                class="close-btn"
-                                onclick="replyTicket('${ticket._id}','closed')"
-                            >
-                                Close Ticket
-                            </button>
-
-                        </div>
-
-                    </div>
+                    <button
+                        class="close-btn"
+                        onclick="replyTicket('${ticket._id}','closed')"
+                    >
+                        Close Ticket
+                    </button>
 
                 </div>
 
-            `).join("");
+            </div>
 
-    } catch (error) {
-
-        console.log(error);
-
-        box.innerHTML =
-            "Server error.";
-
-    }
+        </div>
+    `;
 
 }
 
 
 // ======================
-// REPLY TICKET
+// REPLY
 // ======================
 
-async function replyTicket(id, status) {
+async function replyTicket(
+    id,
+    status
+) {
 
     try {
 
-        const reply =
+        const textarea =
             document.getElementById(
                 `reply-${id}`
-            ).value;
+            );
+
+        const reply =
+            textarea?.value?.trim() || "";
 
         const data =
             await adminFetch(
@@ -205,17 +268,21 @@ async function replyTicket(id, status) {
             );
 
             return;
+
         }
 
-        alert(
-            "Ticket updated"
+        showAdminSuccess(
+            "Ticket updated successfully"
         );
 
         loadSupportTickets();
 
     } catch (error) {
 
-        console.log(error);
+        console.log(
+            "Reply support ticket error:",
+            error
+        );
 
         alert(
             "Server error"
@@ -225,5 +292,78 @@ async function replyTicket(id, status) {
 
 }
 
+
+// ======================
+// SUCCESS POPUP
+// ======================
+
+function showAdminSuccess(
+    message
+) {
+
+    const old =
+        document.getElementById(
+            "adminSuccessPopup"
+        );
+
+    if (old) old.remove();
+
+    const popup =
+        document.createElement(
+            "div"
+        );
+
+    popup.id =
+        "adminSuccessPopup";
+
+    popup.innerHTML =
+        `✅ ${message}`;
+
+    document.body.appendChild(
+        popup
+    );
+
+    popup.style.position =
+        "fixed";
+
+    popup.style.bottom =
+        "20px";
+
+    popup.style.right =
+        "20px";
+
+    popup.style.background =
+        "linear-gradient(135deg,#22c55e,#16a34a)";
+
+    popup.style.color =
+        "#fff";
+
+    popup.style.padding =
+        "14px 18px";
+
+    popup.style.borderRadius =
+        "16px";
+
+    popup.style.fontWeight =
+        "800";
+
+    popup.style.zIndex =
+        "999999";
+
+    popup.style.boxShadow =
+        "0 12px 40px rgba(0,0,0,.35)";
+
+    setTimeout(() => {
+
+        popup.remove();
+
+    }, 3000);
+
+}
+
+
 window.replyTicket =
     replyTicket;
+
+window.loadSupportTickets =
+    loadSupportTickets;
