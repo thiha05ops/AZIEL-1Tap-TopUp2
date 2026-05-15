@@ -290,9 +290,7 @@ function startSupportLiveSystem() {
         username
     );
 
-    socket.off(
-        "newNotification"
-    );
+
 
     socket.on(
         "newNotification",
