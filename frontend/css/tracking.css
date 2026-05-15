@@ -21,9 +21,9 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 10px;
-    margin: 30px 0;
-    flex-wrap: wrap;
+    gap: 14px;
+    margin: 40px 0;
+    flex-wrap: nowrap;
 }
 
 .tracking-step {
@@ -100,4 +100,36 @@ body {
     .tracking-step span {
         font-size: 12px;
     }
+}
+
+#trackingResult {
+    display: flex;
+    justify-content: center;
+    margin-top: 40px;
+    padding: 20px;
+}
+
+.track-card {
+    width: 100%;
+    max-width: 850px;
+}
+
+.tracking-step span {
+    margin-top: 8px;
+    font-size: 14px;
+}
+
+.tracking-step span {
+    margin-top: 8px;
+    font-size: 14px;
+}
+
+.track-card p {
+    color: #cbd5e1;
+    margin: 10px 0;
+    font-size: 15px;
+}
+
+.track-card b {
+    color: #fff;
 }
