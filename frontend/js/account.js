@@ -49,10 +49,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     loadHistory();
     loadBellOrders();
+    loadAccountWalletBalance();
 
     setInterval(() => {
         loadHistory();
         loadBellOrders();
+        loadAccountWalletBalance();
     }, 8000);
 });
 
@@ -175,6 +177,32 @@ function renderEmpty() {
 
     if (history) history.innerHTML = `<p>No orders yet.</p>`;
     if (recent) recent.innerHTML = `<p>No recent orders.</p>`;
+}
+async function loadAccountWalletBalance() {
+    const username = localStorage.getItem("username") || "guest";
+
+    const region =
+        localStorage.getItem("selectedRegion") ||
+        localStorage.getItem("region") ||
+        "MM";
+
+    const currency =
+        region === "TH" ? "THB" : "MMK";
+
+    try {
+        const res = await fetch(`/api/wallet/${username}?region=${region}`);
+        const data = await res.json();
+
+        const balance = data.success
+            ? Number(data.wallet.balance || 0).toLocaleString()
+            : "0";
+
+        setText("walletBalance", `${balance} ${currency}`);
+
+    } catch (error) {
+        console.log("Account wallet balance error:", error);
+        setText("walletBalance", `0 ${currency}`);
+    }
 }
 
 function statusClass(status) {
