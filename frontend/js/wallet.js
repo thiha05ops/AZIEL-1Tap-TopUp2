@@ -23,8 +23,8 @@ async function loadWallet() {
         localStorage.getItem("selectedRegion") ||
         "MM";
 
-    const currency = region === "TH" ? "THB" : "MMK";
-    const symbol = currency === "THB" ? "฿" : "Ks";
+    const currency = region === "TH" ? "฿" : "Ks";
+    const symbol = currency === "THB" ? "THB" : "MMK";
 
     try {
         const res = await fetch(`/api/wallet/${username}?currency=${currency}`);
