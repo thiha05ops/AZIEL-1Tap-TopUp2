@@ -186,7 +186,7 @@ async function loadAccountWalletBalance() {
         "MM";
 
     const currency =
-        region === "TH" ? "THB" : "MMK";
+        region === "TH" ? "฿" : "Ks";
 
     try {
         const res = await fetch(`/api/wallet/${username}?region=${region}`);
