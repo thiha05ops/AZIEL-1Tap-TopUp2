@@ -94,8 +94,7 @@ function renderStats(orders) {
     setText("pendingOrders", active.length);
     setText("completedOrders", completed.length);
 
-    setText("walletBalance", "0 Ks");
-    setText("walletBalanceBig", "0 Ks");
+
 }
 
 function renderHistory(orders) {
@@ -187,7 +186,7 @@ async function loadAccountWalletBalance() {
         "MM";
 
     const currency =
-        region === "TH" ? "THB" : "MMK";
+        region === "TH" ? "฿" : "Ks";
 
     try {
         const res = await fetch(`/api/wallet/${username}?region=${region}`);
