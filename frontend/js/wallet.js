@@ -191,6 +191,10 @@ socket.on(
 
             balanceEl.innerText =
                 data.amount;
+            localStorage.setItem(
+                "walletBalance",
+                data.amount
+            );
 
         }
 

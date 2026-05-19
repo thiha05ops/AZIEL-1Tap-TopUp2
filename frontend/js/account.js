@@ -185,22 +185,35 @@ async function loadAccountWalletBalance() {
         localStorage.getItem("region") ||
         "MM";
 
-    const currency =
-        region === "TH" ? "฿" : "Ks";
+    const symbol = region === "TH" ? "฿" : "Ks";
 
     try {
-        const res = await fetch(`/api/wallet/${username}?region=${region}`);
+        const res = await fetch(`/api/wallet/${username}`);
         const data = await res.json();
 
-        const balance = data.success
-            ? Number(data.wallet.balance || 0).toLocaleString()
-            : "0";
+        let balance = data.success && data.wallet
+            ? Number(data.wallet.balance || 0)
+            : 0;
 
-        setText("walletBalance", `${balance} ${currency}`);
+        // fallback from localStorage
+        if (!balance) {
+            balance = Number(
+                localStorage.getItem("walletBalance") ||
+                localStorage.getItem("balance") ||
+                0
+            );
+        }
+
+        setText("walletBalance", `${balance.toLocaleString()} ${symbol}`);
 
     } catch (error) {
-        console.log("Account wallet balance error:", error);
-        setText("walletBalance", `0 ${currency}`);
+        const fallbackBalance = Number(
+            localStorage.getItem("walletBalance") ||
+            localStorage.getItem("balance") ||
+            0
+        );
+
+        setText("walletBalance", `${fallbackBalance.toLocaleString()} ${symbol}`);
     }
 }
 
