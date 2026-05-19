@@ -31,7 +31,9 @@ function getWalletCurrency() {
 }
 
 function getWalletSymbol(currency) {
-    return currency === "THB" ? "฿" : "Ks";
+    return currency === "THB"
+        ? "฿"
+        : "Ks";
 }
 
 // ======================

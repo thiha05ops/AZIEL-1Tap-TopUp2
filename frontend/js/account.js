@@ -4,8 +4,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const username = localStorage.getItem("username") || "guest";
 
     const savedRegion =
-        localStorage.getItem("selectedRegion") ||
         localStorage.getItem("region") ||
+        localStorage.getItem("selectedRegion") ||
         "MM";
 
     const savedCurrency =
@@ -115,8 +115,8 @@ async function loadAccountWalletBalance() {
     const username = localStorage.getItem("username") || "guest";
 
     const region =
-        localStorage.getItem("selectedRegion") ||
         localStorage.getItem("region") ||
+        localStorage.getItem("selectedRegion") ||
         "MM";
 
     const currency = region === "TH" ? "THB" : "MMK";
