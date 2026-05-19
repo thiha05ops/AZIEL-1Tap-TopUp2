@@ -2,50 +2,98 @@
 
 document.addEventListener("DOMContentLoaded", () => {
     const username = localStorage.getItem("username") || "guest";
-    const region = localStorage.getItem("region") || "MM";
-    const displayName = localStorage.getItem("displayName") || username;
+
+    const savedRegion =
+        localStorage.getItem("selectedRegion") ||
+        localStorage.getItem("region") ||
+        "MM";
+
+    const savedCurrency =
+        savedRegion === "TH" ? "THB" : "MMK";
+
+    const displayName =
+        localStorage.getItem("displayName") || username;
+
+    localStorage.setItem("region", savedRegion);
+    localStorage.setItem("selectedRegion", savedRegion);
+    localStorage.setItem("currency", savedCurrency);
+    localStorage.setItem("selectedCurrency", savedCurrency);
 
     setText("profileName", displayName);
     setText("avatarText", displayName.charAt(0).toUpperCase());
-    setText("profileRegion", "Region: " + region);
+    setText("profileRegion", "Region: " + savedRegion);
 
     const displayNameInput = document.getElementById("displayName");
     const accountRegion = document.getElementById("accountRegion");
 
     if (displayNameInput) displayNameInput.value = displayName;
-    if (accountRegion) accountRegion.value = region;
+    if (accountRegion) accountRegion.value = savedRegion;
 
     document.querySelectorAll(".side-link").forEach(btn => {
         btn.addEventListener("click", () => {
-            document.querySelectorAll(".side-link").forEach(b => b.classList.remove("active"));
-            document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+            document.querySelectorAll(".side-link").forEach(b =>
+                b.classList.remove("active")
+            );
+
+            document.querySelectorAll(".tab-panel").forEach(p =>
+                p.classList.remove("active")
+            );
 
             btn.classList.add("active");
             document.getElementById(btn.dataset.tab)?.classList.add("active");
 
             if (btn.dataset.tab === "history") loadHistory();
-            if (btn.dataset.tab === "overview") loadHistory();
+            if (btn.dataset.tab === "overview") {
+                loadHistory();
+                loadAccountWalletBalance();
+            }
+
+            if (btn.dataset.tab === "wallet" && window.loadWallet) {
+                window.loadWallet();
+            }
         });
     });
 
     document.getElementById("saveProfileBtn")?.addEventListener("click", () => {
-        const newName = document.getElementById("displayName").value.trim() || username;
-        const newRegion = document.getElementById("accountRegion").value;
+        const newName =
+            document.getElementById("displayName")?.value.trim() || username;
+
+        const newRegion =
+            document.getElementById("accountRegion")?.value || "MM";
+
+        const newCurrency =
+            newRegion === "TH" ? "THB" : "MMK";
 
         localStorage.setItem("displayName", newName);
         localStorage.setItem("region", newRegion);
+        localStorage.setItem("selectedRegion", newRegion);
+        localStorage.setItem("currency", newCurrency);
+        localStorage.setItem("selectedCurrency", newCurrency);
+
+        setText("profileName", newName);
+        setText("avatarText", newName.charAt(0).toUpperCase());
+        setText("profileRegion", "Region: " + newRegion);
+
+        loadAccountWalletBalance();
+
+        if (window.loadWallet) {
+            window.loadWallet();
+        }
 
         alert("Profile saved ✅");
-        location.reload();
     });
 
     document.getElementById("notiBtn")?.addEventListener("click", () => {
         const panel = document.getElementById("notiPanel");
         if (!panel) return;
 
-        panel.style.display = panel.style.display === "block" ? "none" : "block";
+        panel.style.display =
+            panel.style.display === "block" ? "none" : "block";
+
         loadBellOrders();
     });
+
+    initMobileMenu();
 
     loadHistory();
     loadBellOrders();
@@ -61,6 +109,47 @@ document.addEventListener("DOMContentLoaded", () => {
 function setText(id, text) {
     const el = document.getElementById(id);
     if (el) el.innerText = text;
+}
+
+async function loadAccountWalletBalance() {
+    const username = localStorage.getItem("username") || "guest";
+
+    const region =
+        localStorage.getItem("selectedRegion") ||
+        localStorage.getItem("region") ||
+        "MM";
+
+    const currency = region === "TH" ? "THB" : "MMK";
+    const symbol = currency === "THB" ? "฿" : "Ks";
+
+    try {
+        const res = await fetch(
+            `/api/wallet/${username}?currency=${currency}`
+        );
+
+        const data = await res.json();
+
+        const balance = data.success
+            ? Number(data.balance || 0)
+            : 0;
+
+        setText(
+            "overviewWalletBalance",
+            `${balance.toLocaleString()} ${symbol}`
+        );
+
+    } catch (error) {
+        console.log("Account wallet error:", error);
+
+        const fallback = Number(
+            localStorage.getItem(`walletBalance_${currency}`) || 0
+        );
+
+        setText(
+            "overviewWalletBalance",
+            `${fallback.toLocaleString()} ${symbol}`
+        );
+    }
 }
 
 async function loadHistory() {
@@ -93,8 +182,6 @@ function renderStats(orders) {
 
     setText("pendingOrders", active.length);
     setText("completedOrders", completed.length);
-
-
 }
 
 function renderHistory(orders) {
@@ -177,46 +264,6 @@ function renderEmpty() {
     if (history) history.innerHTML = `<p>No orders yet.</p>`;
     if (recent) recent.innerHTML = `<p>No recent orders.</p>`;
 }
-async function loadAccountWalletBalance() {
-    const username = localStorage.getItem("username") || "guest";
-
-    const region =
-        localStorage.getItem("selectedRegion") ||
-        localStorage.getItem("region") ||
-        "MM";
-
-    const currency = region === "TH" ? "THB" : "MMK";
-    const symbol = currency === "THB" ? "฿" : "Ks";
-
-    try {
-        const res = await fetch(
-            `/api/wallet/${username}?currency=${currency}`
-        );
-
-        const data = await res.json();
-
-        const balance = data.success
-            ? Number(data.balance || 0)
-            : 0;
-
-        setText(
-            "overviewWalletBalance",
-            `${balance.toLocaleString()} ${symbol}`
-        );
-
-    } catch (error) {
-        console.log("Account wallet error:", error);
-
-        const fallback = Number(
-            localStorage.getItem(`walletBalance_${currency}`) || 0
-        );
-
-        setText(
-            "overviewWalletBalance",
-            `${fallback.toLocaleString()} ${symbol}`
-        );
-    }
-}
 
 function statusClass(status) {
     if (status === "paid") return "status-paid";
@@ -225,27 +272,19 @@ function statusClass(status) {
     if (status === "cancelled" || status === "failed") return "status-failed";
     return "status-pending";
 }
-const mobileMenuBtn =
-    document.getElementById("mobileMenuBtn");
 
-const sidebar =
-    document.querySelector(".account-sidebar");
+function initMobileMenu() {
+    const mobileMenuBtn = document.getElementById("mobileMenuBtn");
+    const sidebar = document.querySelector(".account-sidebar");
+    const sidebarOverlay = document.getElementById("sidebarOverlay");
 
-const sidebarOverlay =
-    document.getElementById("sidebarOverlay");
+    mobileMenuBtn?.addEventListener("click", () => {
+        sidebar?.classList.toggle("active");
+        sidebarOverlay?.classList.toggle("active");
+    });
 
-mobileMenuBtn?.addEventListener("click", () => {
-
-    sidebar.classList.toggle("active");
-
-    sidebarOverlay.classList.toggle("active");
-
-});
-
-sidebarOverlay?.addEventListener("click", () => {
-
-    sidebar.classList.remove("active");
-
-    sidebarOverlay.classList.remove("active");
-
-});
+    sidebarOverlay?.addEventListener("click", () => {
+        sidebar?.classList.remove("active");
+        sidebarOverlay?.classList.remove("active");
+    });
+}
