@@ -184,3 +184,27 @@ function statusClass(status) {
     if (status === "cancelled" || status === "failed") return "status-failed";
     return "status-pending";
 }
+const mobileMenuBtn =
+    document.getElementById("mobileMenuBtn");
+
+const sidebar =
+    document.querySelector(".account-sidebar");
+
+const sidebarOverlay =
+    document.getElementById("sidebarOverlay");
+
+mobileMenuBtn?.addEventListener("click", () => {
+
+    sidebar.classList.toggle("active");
+
+    sidebarOverlay.classList.toggle("active");
+
+});
+
+sidebarOverlay?.addEventListener("click", () => {
+
+    sidebar.classList.remove("active");
+
+    sidebarOverlay.classList.remove("active");
+
+});
