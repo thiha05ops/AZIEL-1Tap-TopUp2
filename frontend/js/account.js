@@ -29,22 +29,16 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     document.getElementById("saveProfileBtn")?.addEventListener("click", () => {
-        const newName = document.getElementById("displayName").value.trim();
+        const newName = document.getElementById("displayName").value.trim() || username;
         const newRegion = document.getElementById("accountRegion").value;
-        const newCurrency = newRegion === "TH" ? "THB" : "MMK";
 
         localStorage.setItem("displayName", newName);
         localStorage.setItem("region", newRegion);
-        localStorage.setItem("currency", newCurrency);
-        localStorage.setItem("selectedRegion", newRegion);
-        localStorage.setItem("selectedCurrency", newCurrency);
-
-        setText("profileRegion", "Region: " + newRegion);
-
-        loadAccountWalletBalance();
 
         alert("Profile saved ✅");
+        location.reload();
     });
+
     document.getElementById("notiBtn")?.addEventListener("click", () => {
         const panel = document.getElementById("notiPanel");
         if (!panel) return;
@@ -191,13 +185,17 @@ async function loadAccountWalletBalance() {
         localStorage.getItem("region") ||
         "MM";
 
-    const symbol = region === "TH" ? "฿" : "Ks";
+    const currency = region === "TH" ? "THB" : "MMK";
+    const symbol = currency === "THB" ? "฿" : "Ks";
 
     try {
-        const res = await fetch(`/api/wallet/${username}`);
+        const res = await fetch(
+            `/api/wallet/${username}?currency=${currency}`
+        );
+
         const data = await res.json();
 
-        let balance = data.success
+        const balance = data.success
             ? Number(data.balance || 0)
             : 0;
 
@@ -207,9 +205,15 @@ async function loadAccountWalletBalance() {
         );
 
     } catch (error) {
+        console.log("Account wallet error:", error);
+
+        const fallback = Number(
+            localStorage.getItem(`walletBalance_${currency}`) || 0
+        );
+
         setText(
             "overviewWalletBalance",
-            `0 ${symbol}`
+            `${fallback.toLocaleString()} ${symbol}`
         );
     }
 }
