@@ -204,7 +204,7 @@ async function loadAccountWalletBalance() {
             );
         }
 
-        setText("walletBalance", `${balance.toLocaleString()} ${symbol}`);
+        setText("overviewWalletBalance", `${balance.toLocaleString()} ${symbol}`);
 
     } catch (error) {
         const fallbackBalance = Number(
@@ -213,7 +213,7 @@ async function loadAccountWalletBalance() {
             0
         );
 
-        setText("walletBalance", `${fallbackBalance.toLocaleString()} ${symbol}`);
+        setText("overviewWalletBalance", `${fallbackBalance.toLocaleString()} ${symbol}`);
     }
 }
 
