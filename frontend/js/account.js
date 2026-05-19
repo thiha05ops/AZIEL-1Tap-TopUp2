@@ -197,8 +197,8 @@ async function loadAccountWalletBalance() {
         const res = await fetch(`/api/wallet/${username}`);
         const data = await res.json();
 
-        let balance = data.success && data.wallet
-            ? Number(data.wallet.balance || 0)
+        let balance = data.success
+            ? Number(data.balance || 0)
             : 0;
 
         setText(
