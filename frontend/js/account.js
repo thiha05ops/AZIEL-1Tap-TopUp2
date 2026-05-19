@@ -29,16 +29,22 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     document.getElementById("saveProfileBtn")?.addEventListener("click", () => {
-        const newName = document.getElementById("displayName").value.trim() || username;
+        const newName = document.getElementById("displayName").value.trim();
         const newRegion = document.getElementById("accountRegion").value;
+        const newCurrency = newRegion === "TH" ? "THB" : "MMK";
 
         localStorage.setItem("displayName", newName);
         localStorage.setItem("region", newRegion);
+        localStorage.setItem("currency", newCurrency);
+        localStorage.setItem("selectedRegion", newRegion);
+        localStorage.setItem("selectedCurrency", newCurrency);
+
+        setText("profileRegion", "Region: " + newRegion);
+
+        loadAccountWalletBalance();
 
         alert("Profile saved ✅");
-        location.reload();
     });
-
     document.getElementById("notiBtn")?.addEventListener("click", () => {
         const panel = document.getElementById("notiPanel");
         if (!panel) return;
@@ -195,25 +201,16 @@ async function loadAccountWalletBalance() {
             ? Number(data.wallet.balance || 0)
             : 0;
 
-        // fallback from localStorage
-        if (!balance) {
-            balance = Number(
-                localStorage.getItem("walletBalance") ||
-                localStorage.getItem("balance") ||
-                0
-            );
-        }
-
-        setText("overviewWalletBalance", `${balance.toLocaleString()} ${symbol}`);
-
-    } catch (error) {
-        const fallbackBalance = Number(
-            localStorage.getItem("walletBalance") ||
-            localStorage.getItem("balance") ||
-            0
+        setText(
+            "overviewWalletBalance",
+            `${balance.toLocaleString()} ${symbol}`
         );
 
-        setText("overviewWalletBalance", `${fallbackBalance.toLocaleString()} ${symbol}`);
+    } catch (error) {
+        setText(
+            "overviewWalletBalance",
+            `0 ${symbol}`
+        );
     }
 }
 
