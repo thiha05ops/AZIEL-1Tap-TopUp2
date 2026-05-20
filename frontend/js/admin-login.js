@@ -1,22 +1,41 @@
-document
-    .getElementById("adminLoginForm")
-    ?.addEventListener("submit", adminLogin);
+// frontend/js/admin-login.js
+
+document.addEventListener("DOMContentLoaded", () => {
+
+    const form =
+        document.getElementById("adminLoginForm");
+
+    if (!form) {
+        console.log("Admin login form not found");
+        return;
+    }
+
+    form.addEventListener("submit", adminLogin);
+
+});
 
 async function adminLogin(e) {
 
     e.preventDefault();
 
     const username =
-        document.getElementById("adminUsername").value;
+        document.getElementById("adminUsername")?.value;
 
     const password =
-        document.getElementById("adminPassword").value;
+        document.getElementById("adminPassword")?.value;
 
     const btn =
         document.getElementById("adminLoginBtn");
 
-    btn.disabled = true;
-    btn.innerText = "Logging in...";
+    if (!username || !password) {
+        alert("Fill all fields");
+        return;
+    }
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerText = "Logging in...";
+    }
 
     try {
 
@@ -43,13 +62,14 @@ async function adminLogin(e) {
 
             alert(data.message || "Login failed");
 
-            btn.disabled = false;
-            btn.innerText = "Login";
+            if (btn) {
+                btn.disabled = false;
+                btn.innerText = "Login";
+            }
 
             return;
         }
 
-        // SAVE TOKEN
         localStorage.setItem(
             "adminToken",
             data.token
@@ -71,8 +91,10 @@ async function adminLogin(e) {
 
     } finally {
 
-        btn.disabled = false;
-        btn.innerText = "Login";
+        if (btn) {
+            btn.disabled = false;
+            btn.innerText = "Login";
+        }
 
     }
 }
