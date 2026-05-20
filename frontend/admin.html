@@ -144,52 +144,7 @@
     <script src="js/admin-stats.js"></script>
     <script src="js/admin-live.js?v=3"></script>
 
-    <script>
-        const revenueCtx = document.getElementById("revenueChart");
 
-        new Chart(revenueCtx, {
-            type: "line",
-            data: {
-                labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-                datasets: [{
-                    label: "Revenue",
-                    data: [120000, 180000, 140000, 250000, 310000, 280000, 420000],
-                    borderWidth: 3,
-                    tension: 0.45,
-                    fill: true
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { ticks: { color: "#94a3b8" } },
-                    y: { ticks: { color: "#94a3b8" } }
-                }
-            }
-        });
-
-        const orderCtx = document.getElementById("ordersChart");
-
-        new Chart(orderCtx, {
-            type: "doughnut",
-            data: {
-                labels: ["Completed", "Processing", "Pending", "Cancelled"],
-                datasets: [{
-                    data: [58, 25, 12, 5],
-                    borderWidth: 0
-                }]
-            },
-            options: {
-                plugins: {
-                    legend: {
-                        position: "bottom",
-                        labels: { color: "#cbd5e1" }
-                    }
-                }
-            }
-        });
-    </script>
     <script>
         document.addEventListener("DOMContentLoaded", () => {
             const revenueEl = document.getElementById("revenueChart");
@@ -241,6 +196,9 @@
             }
         });
     </script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="js/admin-stats.js"></script>
+    <script src="js/admin-live.js?v=3"></script>
 </body>
 
 </html>
