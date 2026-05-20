@@ -449,16 +449,3 @@ textarea {
 a[href="support.html"] {
   position: relative;
 }
-
-a[href="support.html"]::after {
-  content: "LIVE";
-  position: absolute;
-  top: -8px;
-  right: -18px;
-  background: #ef4444;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 900;
-  padding: 2px 6px;
-  border-radius: 999px;
-}
