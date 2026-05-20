@@ -13,61 +13,177 @@
 
 <body>
 
+    <header class="support-header">
+        <a href="home.html" class="support-brand">AZIEL</a>
+
+        <div class="support-actions">
+            <a href="account.html" class="support-nav-btn">👤 Account</a>
+            <a href="home.html" class="support-nav-btn">🏠 Home</a>
+        </div>
+    </header>
+
     <main class="support-page">
 
-        <section class="support-card">
+        <section class="support-left">
 
-            <h1>Customer Help Center</h1>
+            <div class="support-hero">
+                <div>
+                    <h1>Help Center</h1>
 
-            <p class="support-subtitle">
-                Submit your problem and our admin will help you.
-            </p>
+                    <p class="support-subtitle">
+                        We are here to help you. Submit a ticket and our team will reply as soon as possible.
+                    </p>
+                </div>
 
-            <form id="supportForm">
+                <div class="hero-icon">🎧</div>
+            </div>
 
-                <label>Problem Type</label>
-                <select id="ticketType" required>
-                    <option value="order">Order Issue</option>
-                    <option value="payment">Payment Issue</option>
-                    <option value="wallet">Wallet Issue</option>
-                    <option value="account">Account Issue</option>
-                    <option value="general">General Help</option>
-                </select>
-
-                <label>Subject</label>
-                <input type="text" id="ticketSubject" placeholder="Example: My order is not completed" required>
-
-                <label>Message</label>
-                <textarea id="ticketMessage" rows="6" placeholder="Explain your problem..." required></textarea>
-
-                <label>Screenshot Optional</label>
-                <input type="file" id="ticketScreenshot" accept="image/*">
-
-                <button type="submit" id="submitTicketBtn">
-                    Submit Ticket
+            <div class="support-categories">
+                <button class="category-card" data-type="order">
+                    <span>🎮</span>
+                    <strong>Order Issue</strong>
+                    <small>Game top up not received</small>
                 </button>
 
-                <p id="supportMsg"></p>
+                <button class="category-card" data-type="payment">
+                    <span>💳</span>
+                    <strong>Payment Issue</strong>
+                    <small>Payment failed or pending</small>
+                </button>
 
-            </form>
+                <button class="category-card" data-type="wallet">
+                    <span>💰</span>
+                    <strong>Wallet Issue</strong>
+                    <small>Balance / Top up problem</small>
+                </button>
+
+                <button class="category-card" data-type="account">
+                    <span>👤</span>
+                    <strong>Account Issue</strong>
+                    <small>Login / account help</small>
+                </button>
+
+                <button class="category-card" data-type="general">
+                    <span>🚨</span>
+                    <strong>Report Problem</strong>
+                    <small>Bug or other issue</small>
+                </button>
+            </div>
+
+            <section class="support-card">
+                <h2>🎫 Submit a Ticket</h2>
+
+                <form id="supportForm">
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Problem Type</label>
+                            <select id="ticketType" required>
+                                <option value="order">Order Issue</option>
+                                <option value="payment">Payment Issue</option>
+                                <option value="wallet">Wallet Issue</option>
+                                <option value="account">Account Issue</option>
+                                <option value="general">General Help</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Order ID (If any)</label>
+                            <input type="text" id="ticketOrderId" placeholder="Example: AZL-123456789">
+                        </div>
+                    </div>
+
+                    <label>Subject</label>
+                    <input type="text" id="ticketSubject" placeholder="Example: My order is not completed" required>
+
+                    <label>Message</label>
+                    <textarea id="ticketMessage" rows="6" placeholder="Please explain your problem in detail..."
+                        required></textarea>
+
+                    <label>Screenshot Optional</label>
+                    <input type="file" id="ticketScreenshot" accept="image/*">
+
+                    <button type="submit" id="submitTicketBtn">
+                        🚀 Submit Ticket
+                    </button>
+
+                    <p id="supportMsg"></p>
+
+                </form>
+            </section>
+
+            <section class="support-card contact-card">
+                <h2>☎️ Contact Us</h2>
+
+                <p class="support-subtitle">
+                    You can also reach us through other channels.
+                </p>
+
+                <div class="contact-grid">
+                    <a href="https://t.me/" class="contact-item">
+                        <span>✈️</span>
+                        <strong>Telegram Support</strong>
+                        <small>Chat now</small>
+                    </a>
+
+                    <a href="#" class="contact-item">
+                        <span>📘</span>
+                        <strong>Facebook Page</strong>
+                        <small>Message now</small>
+                    </a>
+
+                    <a href="mailto:support@aziel.com" class="contact-item">
+                        <span>📧</span>
+                        <strong>Email Support</strong>
+                        <small>support@aziel.com</small>
+                    </a>
+
+                    <div class="contact-item">
+                        <span>⏰</span>
+                        <strong>Working Hours</strong>
+                        <small>Everyday 9:00 AM - 11:00 PM</small>
+                    </div>
+                </div>
+            </section>
 
         </section>
 
-        <section class="support-card">
+        <section class="support-right">
 
-            <h2>My Tickets</h2>
+            <div class="support-card tickets-card">
+                <div class="tickets-header">
+                    <div>
+                        <h2>🎟️ My Tickets</h2>
+                        <p class="support-subtitle">
+                            Check your ticket status and admin replies.
+                        </p>
+                    </div>
+                </div>
 
-            <div id="myTickets">
-                Loading tickets...
+                <div class="ticket-tabs">
+                    <button class="ticket-tab active" data-filter="all">All</button>
+                    <button class="ticket-tab" data-filter="open">Open</button>
+                    <button class="ticket-tab" data-filter="replied">Replied</button>
+                    <button class="ticket-tab" data-filter="solved">Solved</button>
+                    <button class="ticket-tab" data-filter="closed">Closed</button>
+                </div>
+
+                <div id="myTickets">
+                    Loading tickets...
+                </div>
             </div>
 
         </section>
 
     </main>
 
+    <footer class="support-footer">
+        © 2026 AZIEL 1Tap Shop
+    </footer>
+
     <script src="/socket.io/socket.io.js"></script>
     <script src="js/api.js"></script>
-    <script src="js/support.js?v=3"></script>
+    <script src="js/support.js?v=4"></script>
 
 </body>
 

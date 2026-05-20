@@ -1,16 +1,81 @@
 // frontend/js/support.js
 
 let supportLiveStarted = false;
+let allTickets = [];
+let currentFilter = "all";
 
 document.addEventListener("DOMContentLoaded", () => {
+    initSupportForm();
+    initCategoryCards();
+    initTicketTabs();
+    startSupportLiveSystem();
     loadMyTickets();
+});
 
+// ======================
+// INIT
+// ======================
+
+function initSupportForm() {
     document
         .getElementById("supportForm")
         ?.addEventListener("submit", submitSupportTicket);
+}
 
-    startSupportLiveSystem();
-});
+function initCategoryCards() {
+    document.querySelectorAll(".category-card").forEach(card => {
+        card.addEventListener("click", () => {
+            const type = card.dataset.type;
+
+            document.querySelectorAll(".category-card").forEach(c =>
+                c.classList.remove("active")
+            );
+
+            card.classList.add("active");
+
+            const select = document.getElementById("ticketType");
+            if (select) select.value = type;
+
+            const subject = document.getElementById("ticketSubject");
+
+            if (subject && !subject.value.trim()) {
+                subject.value = getSubjectByType(type);
+            }
+        });
+    });
+}
+
+function initTicketTabs() {
+    document.querySelectorAll(".ticket-tab").forEach(tab => {
+        tab.addEventListener("click", () => {
+            document.querySelectorAll(".ticket-tab").forEach(t =>
+                t.classList.remove("active")
+            );
+
+            tab.classList.add("active");
+
+            currentFilter = tab.dataset.filter || "all";
+
+            renderTickets();
+        });
+    });
+}
+
+function getSubjectByType(type) {
+    const subjects = {
+        order: "My order is not completed",
+        payment: "Payment issue",
+        wallet: "Wallet balance problem",
+        account: "Account login issue",
+        general: "Need help"
+    };
+
+    return subjects[type] || "Need help";
+}
+
+// ======================
+// SUBMIT TICKET
+// ======================
 
 async function submitSupportTicket(e) {
     e.preventDefault();
@@ -25,18 +90,31 @@ async function submitSupportTicket(e) {
     const msg = document.getElementById("supportMsg");
     const btn = document.getElementById("submitTicketBtn");
 
-    btn.disabled = true;
-    btn.innerText = "Submitting...";
+    const type = document.getElementById("ticketType")?.value;
+    const subject = document.getElementById("ticketSubject")?.value.trim();
+    const message = document.getElementById("ticketMessage")?.value.trim();
+    const orderId = document.getElementById("ticketOrderId")?.value.trim();
+    const screenshot = document.getElementById("ticketScreenshot")?.files[0];
+
+    if (!type || !subject || !message) {
+        showFormMessage("Please fill all required fields.", "error");
+        return;
+    }
 
     try {
+        btn.disabled = true;
+        btn.innerText = "Submitting...";
+
         const formData = new FormData();
 
         formData.append("username", username);
-        formData.append("type", document.getElementById("ticketType").value);
-        formData.append("subject", document.getElementById("ticketSubject").value.trim());
-        formData.append("message", document.getElementById("ticketMessage").value.trim());
+        formData.append("type", type);
+        formData.append("subject", subject);
+        formData.append("message", message);
 
-        const screenshot = document.getElementById("ticketScreenshot").files[0];
+        if (orderId) {
+            formData.append("orderId", orderId);
+        }
 
         if (screenshot) {
             formData.append("screenshot", screenshot);
@@ -50,29 +128,41 @@ async function submitSupportTicket(e) {
         const data = await res.json();
 
         if (!data.success) {
-            msg.style.color = "#ef4444";
-            msg.innerText = data.message || "Submit failed";
+            showFormMessage(data.message || "Submit failed", "error");
             return;
         }
 
-        msg.style.color = "#22c55e";
-        msg.innerText = "✅ Support ticket submitted successfully";
+        showFormMessage("✅ Support ticket submitted successfully", "success");
 
         document.getElementById("supportForm").reset();
+
+        document.querySelectorAll(".category-card").forEach(c =>
+            c.classList.remove("active")
+        );
 
         await loadMyTickets();
 
     } catch (error) {
         console.log("Submit support error:", error);
-
-        msg.style.color = "#ef4444";
-        msg.innerText = "Server error";
+        showFormMessage("Server error", "error");
 
     } finally {
         btn.disabled = false;
-        btn.innerText = "Submit Ticket";
+        btn.innerText = "🚀 Submit Ticket";
     }
 }
+
+function showFormMessage(text, type) {
+    const msg = document.getElementById("supportMsg");
+    if (!msg) return;
+
+    msg.innerText = text;
+    msg.className = type === "success" ? "msg-success" : "msg-error";
+}
+
+// ======================
+// LOAD TICKETS
+// ======================
 
 async function loadMyTickets() {
     const username = localStorage.getItem("username");
@@ -81,61 +171,178 @@ async function loadMyTickets() {
     if (!box) return;
 
     if (!username) {
-        box.innerHTML = "Please login first.";
+        box.innerHTML = `
+            <div class="empty-ticket">
+                <h3>Please login first</h3>
+                <p>You need to login to view your support tickets.</p>
+            </div>
+        `;
         return;
     }
 
     try {
+        box.innerHTML = `<p class="loading-text">Loading tickets...</p>`;
+
         const res = await fetch(`/api/support/my/${username}`);
         const data = await res.json();
 
-        if (!data.success || !data.tickets.length) {
-            box.innerHTML = `<p>No support tickets yet.</p>`;
+        if (!data.success || !data.tickets || !data.tickets.length) {
+            allTickets = [];
+            renderTickets();
             return;
         }
 
-        box.innerHTML = data.tickets.map(renderTicket).join("");
+        allTickets = data.tickets;
+
+        renderTickets();
 
     } catch (error) {
         console.log("Load tickets error:", error);
-        box.innerHTML = "Failed to load tickets.";
+
+        box.innerHTML = `
+            <div class="empty-ticket">
+                <h3>Failed to load tickets</h3>
+                <p>Please try again later.</p>
+            </div>
+        `;
     }
 }
 
+function renderTickets() {
+    const box = document.getElementById("myTickets");
+    if (!box) return;
+
+    let tickets = allTickets;
+
+    if (currentFilter !== "all") {
+        tickets = allTickets.filter(ticket =>
+            normalizeStatus(ticket.status) === currentFilter
+        );
+    }
+
+    if (!tickets.length) {
+        box.innerHTML = `
+            <div class="empty-ticket">
+                <div class="empty-icon">📭</div>
+                <h3>No tickets found</h3>
+                <p>Your support tickets will appear here.</p>
+            </div>
+        `;
+        return;
+    }
+
+    box.innerHTML = tickets.map(renderTicket).join("");
+}
+
+// ======================
+// RENDER TICKET CARD
+// ======================
+
 function renderTicket(ticket) {
+    const status = normalizeStatus(ticket.status);
+    const type = ticket.type || "general";
+
     const screenshot = ticket.screenshot
         ? `/uploads/support/${ticket.screenshot}`
         : "";
 
     return `
         <div class="ticket-item">
-            <h3>${ticket.subject || "-"}</h3>
+            <div class="ticket-main">
+                <div class="ticket-icon ${type}">
+                    ${getTypeIcon(type)}
+                </div>
 
-            <p><b>Ticket ID:</b> ${ticket.ticketId || "-"}</p>
-            <p><b>Type:</b> ${ticket.type || "general"}</p>
-            <p>${ticket.message || ""}</p>
+                <div class="ticket-info">
+                    <h3>${ticket.subject || "-"}</h3>
 
-            <span class="ticket-status status-${ticket.status || "open"}">
-                ${ticket.status || "open"}
-            </span>
+                    <p>
+                        <b>Ticket ID:</b>
+                        ${ticket.ticketId || "-"}
+                    </p>
+
+                    <p>
+                        <b>Type:</b>
+                        ${formatType(type)}
+                    </p>
+
+                    ${ticket.orderId
+            ? `<p><b>Order ID:</b> ${ticket.orderId}</p>`
+            : ""
+        }
+
+                    <p class="ticket-message">
+                        ${ticket.message || ""}
+                    </p>
+                </div>
+
+                <span class="ticket-status status-${status}">
+                    ${status}
+                </span>
+            </div>
 
             ${screenshot
-            ? `<img src="${screenshot}" class="ticket-image" onclick="window.open('${screenshot}', '_blank')">`
+            ? `
+                    <img
+                        src="${screenshot}"
+                        class="ticket-image"
+                        onclick="window.open('${screenshot}', '_blank')"
+                    >
+                `
             : ""
         }
 
             ${ticket.adminReply
             ? `
-                        <div class="ticket-reply">
-                            <b>Admin Reply:</b>
-                            <p>${ticket.adminReply}</p>
-                        </div>
-                    `
+                    <div class="ticket-reply">
+                        <strong>👤 Admin Reply</strong>
+                        <p>${ticket.adminReply}</p>
+                    </div>
+                `
             : ""
         }
         </div>
     `;
 }
+
+function normalizeStatus(status) {
+    if (!status) return "open";
+
+    if (status === "pending") return "open";
+    if (status === "answered") return "replied";
+    if (status === "reply") return "replied";
+    if (status === "done") return "solved";
+
+    return status;
+}
+
+function getTypeIcon(type) {
+    const icons = {
+        order: "🎮",
+        payment: "💳",
+        wallet: "💰",
+        account: "👤",
+        general: "🚨"
+    };
+
+    return icons[type] || "🎧";
+}
+
+function formatType(type) {
+    const names = {
+        order: "Order Issue",
+        payment: "Payment Issue",
+        wallet: "Wallet Issue",
+        account: "Account Issue",
+        general: "General Help"
+    };
+
+    return names[type] || "General Help";
+}
+
+// ======================
+// LIVE SUPPORT
+// ======================
 
 function startSupportLiveSystem() {
     if (supportLiveStarted) return;
@@ -153,11 +360,19 @@ function startSupportLiveSystem() {
     const socket = io();
 
     socket.emit("joinUser", username);
+    socket.emit("joinUserRoom", username);
 
     socket.on("newNotification", data => {
         if (data.title !== "Support Reply") return;
 
         showSupportPopup(data.message || "Admin replied to your ticket");
+
+        loadMyTickets();
+    });
+
+    socket.on("supportUpdated", data => {
+        showSupportPopup(data.message || "Your support ticket was updated");
+
         loadMyTickets();
     });
 }
@@ -168,29 +383,19 @@ function showSupportPopup(message) {
 
     const popup = document.createElement("div");
     popup.className = "support-live-popup";
-    popup.innerHTML = `🎧 ${message}`;
+
+    popup.innerHTML = `
+        🎧 ${message}
+    `;
 
     document.body.appendChild(popup);
 
-    popup.style.position = "fixed";
-    popup.style.top = "20px";
-    popup.style.right = "-420px";
-    popup.style.padding = "18px 20px";
-    popup.style.borderRadius = "18px";
-    popup.style.background = "linear-gradient(135deg,#3b82f6,#2563eb)";
-    popup.style.color = "#fff";
-    popup.style.fontWeight = "800";
-    popup.style.zIndex = "999999";
-    popup.style.transition = ".4s";
-    popup.style.boxShadow = "0 12px 40px rgba(0,0,0,.35)";
-    popup.style.maxWidth = "320px";
-
     setTimeout(() => {
-        popup.style.right = "20px";
+        popup.classList.add("show");
     }, 100);
 
     setTimeout(() => {
-        popup.style.right = "-420px";
+        popup.classList.remove("show");
 
         setTimeout(() => {
             popup.remove();
