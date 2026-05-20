@@ -1,96 +1,78 @@
-// frontend/js/admin-login.js
+document
+    .getElementById("adminLoginForm")
+    ?.addEventListener("submit", adminLogin);
 
-document.addEventListener(
-    "DOMContentLoaded",
-    () => {
+async function adminLogin(e) {
 
-        const form =
-            document.getElementById(
-                "adminLoginForm"
-            );
+    e.preventDefault();
 
-        const msg =
-            document.getElementById(
-                "adminMsg"
-            );
+    const username =
+        document.getElementById("adminUsername").value;
 
-        form?.addEventListener(
-            "submit",
-            async (e) => {
+    const password =
+        document.getElementById("adminPassword").value;
 
-                e.preventDefault();
+    const btn =
+        document.getElementById("adminLoginBtn");
 
-                const username =
-                    document.getElementById(
-                        "adminUsername"
-                    ).value.trim();
+    btn.disabled = true;
+    btn.innerText = "Logging in...";
 
-                const password =
-                    document.getElementById(
-                        "adminPassword"
-                    ).value.trim();
+    try {
 
-                try {
+        const res = await fetch("/api/admin/login", {
 
-                    const res =
-                        await fetch(
-                            "/api/admin/login",
-                            {
-                                method: "POST",
+            method: "POST",
 
-                                headers: {
-                                    "Content-Type":
-                                        "application/json"
-                                },
+            headers: {
+                "Content-Type": "application/json"
+            },
 
-                                body: JSON.stringify({
-                                    username,
-                                    password
-                                })
-                            }
-                        );
+            body: JSON.stringify({
+                username,
+                password
+            })
 
-                    const data =
-                        await res.json();
+        });
 
-                    if (!data.success) {
+        const data = await res.json();
 
-                        msg.innerText =
-                            data.message ||
-                            "Login failed";
+        console.log("ADMIN LOGIN:", data);
 
-                        return;
-                    }
+        if (!data.success) {
 
-                    // SAVE ADMIN TOKEN
-                    localStorage.setItem(
-                        "adminToken",
-                        data.token
-                    );
+            alert(data.message || "Login failed");
 
-                    msg.innerText =
-                        "✅ Login success";
+            btn.disabled = false;
+            btn.innerText = "Login";
 
-                    window.location.href =
-                        "admin.html";
+            return;
+        }
 
-                } catch (error) {
-
-                    console.log(error);
-
-                    msg.innerText =
-                        "❌ Server error";
-                }
-
-            }
+        // SAVE TOKEN
+        localStorage.setItem(
+            "adminToken",
+            data.token
         );
 
+        alert("Admin login success ✅");
+
+        window.location.href =
+            "admin.html";
+
+    } catch (error) {
+
+        console.log(
+            "Admin login error:",
+            error
+        );
+
+        alert("Server error");
+
+    } finally {
+
+        btn.disabled = false;
+        btn.innerText = "Login";
+
     }
-);
-function resetAdminSession() {
-    localStorage.removeItem("adminToken");
-
-    alert("Admin session cleared");
-
-    location.reload();
 }

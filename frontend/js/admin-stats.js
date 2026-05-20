@@ -1,24 +1,36 @@
 // frontend/js/admin-stats.js
 
+let ordersChartInstance = null;
+
 document.addEventListener("DOMContentLoaded", () => {
     loadAdminDashboard();
 });
 
 async function loadAdminDashboard() {
     try {
-        const res = await fetch("/api/admin/stats");
+        const token =
+            localStorage.getItem("adminToken") ||
+            localStorage.getItem("token");
+
+        if (!token) {
+            alert("Admin session expired. Please login again.");
+            window.location.href = "admin-login.html";
+            return;
+        }
+
+        const res = await fetch("/api/admin/stats", {
+            headers: {
+                Authorization: `Bearer ${token}`
+            }
+        });
+
         const data = await res.json();
 
         console.log("ADMIN STATS:", data);
 
         if (!data.success) {
-            console.log(data.message);
-
-            if (data.message === "Admin session expired") {
-                alert("Admin session expired. Please login again.");
-                window.location.href = "admin-login.html";
-            }
-
+            alert(data.message || "Admin session expired.");
+            window.location.href = "admin-login.html";
             return;
         }
 
@@ -45,9 +57,14 @@ function setValue(id, value) {
 
 function updateOrdersChart(stats) {
     const canvas = document.getElementById("ordersChart");
+
     if (!canvas || typeof Chart === "undefined") return;
 
-    new Chart(canvas, {
+    if (ordersChartInstance) {
+        ordersChartInstance.destroy();
+    }
+
+    ordersChartInstance = new Chart(canvas, {
         type: "doughnut",
         data: {
             labels: ["Completed", "Processing", "Pending", "Cancelled"],
@@ -68,10 +85,13 @@ function updateOrdersChart(stats) {
             }]
         },
         options: {
+            responsive: true,
             plugins: {
                 legend: {
                     position: "bottom",
-                    labels: { color: "#cbd5e1" }
+                    labels: {
+                        color: "#cbd5e1"
+                    }
                 }
             }
         }
