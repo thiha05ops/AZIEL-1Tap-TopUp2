@@ -6,95 +6,69 @@ const router = express.Router();
 const Order = require("../models/Order");
 const User = require("../models/User");
 
-const adminMiddleware =
-    require("../middleware/adminMiddleware");
-
+const adminMiddleware = require("../middleware/adminMiddleware");
 
 // ============================
 // ADMIN DASHBOARD STATS
 // GET /api/admin/stats
 // ============================
 
-router.get(
-    "/admin/stats",
-    adminMiddleware,
+router.get("/admin/stats", adminMiddleware, async (req, res) => {
+    try {
+        const totalOrders = await Order.countDocuments();
 
-    async (req, res) => {
+        const pendingOrders = await Order.countDocuments({
+            status: { $in: ["pending", "pending_payment"] }
+        });
 
-        try {
+        const processingOrders = await Order.countDocuments({
+            status: "processing"
+        });
 
-            const totalOrders =
-                await Order.countDocuments();
+        const completedOrders = await Order.countDocuments({
+            status: "completed"
+        });
 
-            const pendingOrders =
-                await Order.countDocuments({
-                    status: "pending"
-                });
+        const cancelledOrders = await Order.countDocuments({
+            status: { $in: ["cancelled", "failed"] }
+        });
 
-            const processingOrders =
-                await Order.countDocuments({
-                    status: "processing"
-                });
+        const paidOrders = await Order.countDocuments({
+            status: "paid"
+        });
 
-            const completedOrders =
-                await Order.countDocuments({
-                    status: "completed"
-                });
+        const totalUsers = await User.countDocuments();
 
-            const totalUsers =
-                await User.countDocuments();
+        const revenueOrders = await Order.find({
+            status: { $in: ["paid", "processing", "completed"] }
+        });
 
-            const completed =
-                await Order.find({
-                    status: "completed"
-                });
+        let revenue = 0;
 
-            let revenue = 0;
+        revenueOrders.forEach(order => {
+            revenue += Number(order.amount || 0);
+        });
 
-            completed.forEach(order => {
+        res.json({
+            success: true,
+            totalOrders,
+            pendingOrders,
+            processingOrders,
+            completedOrders,
+            cancelledOrders,
+            paidOrders,
+            totalUsers,
+            revenue
+        });
 
-                revenue +=
-                    Number(order.amount || 0);
+    } catch (error) {
+        console.log("Admin stats error:", error);
 
-            });
-
-            res.json({
-
-                success: true,
-
-                stats: {
-
-                    totalOrders,
-
-                    pendingOrders,
-
-                    processingOrders,
-
-                    completedOrders,
-
-                    totalUsers,
-
-                    revenue
-
-                }
-
-            });
-
-        } catch (error) {
-
-            console.log(
-                "Admin stats error:",
-                error
-            );
-
-            res.json({
-                success: false,
-                message: "Server error"
-            });
-
-        }
-
+        res.status(500).json({
+            success: false,
+            message: "Server error"
+        });
     }
-);
+});
 
 module.exports = router;
