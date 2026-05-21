@@ -1,20 +1,52 @@
 // frontend/js/admin-support.js
 
-document.addEventListener(
-    "DOMContentLoaded",
-    () => {
+let supportSocket = null;
 
-        loadSupportTickets();
+document.addEventListener("DOMContentLoaded", () => {
 
-        setupRefreshButton();
+    initAdminSupport();
 
-    }
-);
+});
 
+// ======================================
+// INIT
+// ======================================
 
-// ======================
-// REFRESH BUTTON
-// ======================
+function initAdminSupport() {
+
+    loadSupportTickets();
+
+    setupRefreshButton();
+
+    startAdminLiveSupport();
+
+}
+
+// ======================================
+// SOCKET
+// ======================================
+
+function startAdminLiveSupport() {
+
+    if (typeof io === "undefined") return;
+
+    supportSocket = io();
+
+    supportSocket.emit("joinAdmin");
+    supportSocket.emit("joinAdminRoom");
+
+    // LIVE CHAT MESSAGE
+    supportSocket.on("liveChatMessage", data => {
+
+        showLiveIncomingMessage(data);
+
+    });
+
+}
+
+// ======================================
+// REFRESH
+// ======================================
 
 function setupRefreshButton() {
 
@@ -25,21 +57,17 @@ function setupRefreshButton() {
 
     if (!btn) return;
 
-    btn.addEventListener(
-        "click",
-        () => {
+    btn.addEventListener("click", () => {
 
-            loadSupportTickets();
+        loadSupportTickets();
 
-        }
-    );
+    });
 
 }
 
-
-// ======================
+// ======================================
 // LOAD TICKETS
-// ======================
+// ======================================
 
 async function loadSupportTickets() {
 
@@ -60,10 +88,7 @@ async function loadSupportTickets() {
                 "/api/admin/support/tickets"
             );
 
-        if (
-            !data ||
-            !data.success
-        ) {
+        if (!data?.success) {
 
             box.innerHTML =
                 "Failed to load tickets.";
@@ -72,15 +97,12 @@ async function loadSupportTickets() {
 
         }
 
-        if (
-            !data.tickets ||
-            !data.tickets.length
-        ) {
+        if (!data.tickets?.length) {
 
             box.innerHTML = `
-                <p>
+                <div class="admin-empty-box">
                     No support tickets found.
-                </p>
+                </div>
             `;
 
             return;
@@ -106,14 +128,11 @@ async function loadSupportTickets() {
 
 }
 
+// ======================================
+// RENDER
+// ======================================
 
-// ======================
-// RENDER CARD
-// ======================
-
-function renderTicketCard(
-    ticket
-) {
+function renderTicketCard(ticket) {
 
     const screenshot =
         ticket.screenshot
@@ -121,63 +140,73 @@ function renderTicketCard(
             : "";
 
     return `
+
         <div class="support-ticket-card">
 
-            <h2>
-                ${ticket.subject || "-"}
-            </h2>
+            <div class="support-ticket-top">
 
-            <p>
-                <b>User:</b>
-                ${ticket.username || "-"}
-            </p>
+                <div>
 
-            <p>
-                <b>Ticket ID:</b>
-                ${ticket.ticketId || "-"}
-            </p>
+                    <h2>
+                        ${ticket.subject || "-"}
+                    </h2>
 
-            <p>
-                <b>Type:</b>
-                ${ticket.type || "general"}
-            </p>
+                    <p class="ticket-user">
+                        👤 ${ticket.username || "-"}
+                    </p>
 
-            <p>
+                </div>
+
+                <span class="
+                    ticket-status-badge
+                    status-${ticket.status || "open"}
+                ">
+                    ${ticket.status || "open"}
+                </span>
+
+            </div>
+
+            <div class="ticket-meta">
+
+                <span>
+                    🎫 ${ticket.ticketId || "-"}
+                </span>
+
+                <span>
+                    📂 ${ticket.type || "general"}
+                </span>
+
+            </div>
+
+            <div class="ticket-message-box">
                 ${ticket.message || ""}
-            </p>
-
-            <span
-                class="ticket-status-badge
-                status-${ticket.status || "open"}"
-            >
-                ${ticket.status || "open"}
-            </span>
+            </div>
 
             ${screenshot
             ? `
-                        <img
-                            src="${screenshot}"
-                            class="ticket-image-admin"
-                            onclick="window.open('${screenshot}','_blank')"
-                        >
-                    `
+                <img
+                    src="${screenshot}"
+                    class="ticket-image-admin"
+                    onclick="window.open('${screenshot}','_blank')"
+                >
+            `
             : ""
         }
 
             ${ticket.adminReply
             ? `
-                        <div class="ticket-admin-reply">
+                <div class="ticket-admin-reply">
 
-                            <h4>
-                                Admin Reply
-                            </h4>
+                    <strong>
+                        Admin Reply
+                    </strong>
 
-                            <p>
-                                ${ticket.adminReply}
-                            </p>
+                    <p>
+                        ${ticket.adminReply}
+                    </p>
 
-                        </div>
-                    `
+                </div>
+            `
             : ""
         }
 
@@ -185,23 +214,30 @@ function renderTicketCard(
 
                 <textarea
                     id="reply-${ticket._id}"
-                    placeholder="Write reply..."
+                    placeholder="Write admin reply..."
                 ></textarea>
 
                 <div class="reply-actions">
 
                     <button
                         class="reply-btn"
-                        onclick="replyTicket('${ticket._id}','open')"
+                        onclick="replyTicket('${ticket._id}','replied','${ticket.username}')"
                     >
                         Send Reply
                     </button>
 
                     <button
-                        class="close-btn"
-                        onclick="replyTicket('${ticket._id}','closed')"
+                        class="solve-btn"
+                        onclick="replyTicket('${ticket._id}','solved','${ticket.username}')"
                     >
-                        Close Ticket
+                        Mark Solved
+                    </button>
+
+                    <button
+                        class="close-btn"
+                        onclick="replyTicket('${ticket._id}','closed','${ticket.username}')"
+                    >
+                        Close
                     </button>
 
                 </div>
@@ -210,17 +246,16 @@ function renderTicketCard(
 
         </div>
     `;
-
 }
 
-
-// ======================
+// ======================================
 // REPLY
-// ======================
+// ======================================
 
 async function replyTicket(
     id,
-    status
+    status,
+    username
 ) {
 
     try {
@@ -257,10 +292,7 @@ async function replyTicket(
 
             );
 
-        if (
-            !data ||
-            !data.success
-        ) {
+        if (!data?.success) {
 
             alert(
                 data?.message ||
@@ -268,6 +300,23 @@ async function replyTicket(
             );
 
             return;
+
+        }
+
+        // LIVE USER REPLY
+        if (
+            supportSocket &&
+            username
+        ) {
+
+            supportSocket.emit(
+                "adminLiveReply",
+                {
+                    username,
+                    reply,
+                    status
+                }
+            );
 
         }
 
@@ -292,10 +341,72 @@ async function replyTicket(
 
 }
 
+// ======================================
+// LIVE MESSAGE POPUP
+// ======================================
 
-// ======================
+function showLiveIncomingMessage(data) {
+
+    const old =
+        document.getElementById(
+            "adminLiveMessagePopup"
+        );
+
+    if (old) old.remove();
+
+    const popup =
+        document.createElement("div");
+
+    popup.id =
+        "adminLiveMessagePopup";
+
+    popup.innerHTML = `
+        <strong>
+            💬 Live Support Message
+        </strong>
+
+        <p>
+            ${data.username || "User"}
+        </p>
+
+        <small>
+            ${data.message || ""}
+        </small>
+    `;
+
+    popup.style.position = "fixed";
+    popup.style.right = "20px";
+    popup.style.bottom = "20px";
+    popup.style.width = "320px";
+
+    popup.style.padding = "18px";
+    popup.style.borderRadius = "22px";
+
+    popup.style.background =
+        "linear-gradient(135deg,#7c3aed,#2563eb)";
+
+    popup.style.color = "#fff";
+
+    popup.style.zIndex = "999999";
+
+    popup.style.boxShadow =
+        "0 20px 50px rgba(0,0,0,.45)";
+
+    document.body.appendChild(
+        popup
+    );
+
+    setTimeout(() => {
+
+        popup.remove();
+
+    }, 5000);
+
+}
+
+// ======================================
 // SUCCESS POPUP
-// ======================
+// ======================================
 
 function showAdminSuccess(
     message
@@ -318,10 +429,6 @@ function showAdminSuccess(
 
     popup.innerHTML =
         `✅ ${message}`;
-
-    document.body.appendChild(
-        popup
-    );
 
     popup.style.position =
         "fixed";
@@ -353,6 +460,10 @@ function showAdminSuccess(
     popup.style.boxShadow =
         "0 12px 40px rgba(0,0,0,.35)";
 
+    document.body.appendChild(
+        popup
+    );
+
     setTimeout(() => {
 
         popup.remove();
@@ -360,7 +471,6 @@ function showAdminSuccess(
     }, 3000);
 
 }
-
 
 window.replyTicket =
     replyTicket;
