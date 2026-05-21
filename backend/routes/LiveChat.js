@@ -1,8 +1,12 @@
 const express = require("express");
 const router = express.Router();
+
 const LiveChat = require("../models/LiveChat");
 
+// ===============================
 // USER SEND MESSAGE
+// POST /api/live-chat/send
+// ===============================
 router.post("/send", async (req, res) => {
     try {
         const { username, message } = req.body;
@@ -36,6 +40,7 @@ router.post("/send", async (req, res) => {
                 sender: "user",
                 text: message
             });
+
             chat.lastMessageAt = new Date();
             await chat.save();
         }
@@ -48,12 +53,39 @@ router.post("/send", async (req, res) => {
         console.error("Live chat send error:", error);
         res.status(500).json({
             success: false,
+            message: "Live chat server error"
+        });
+    }
+});
+
+// ===============================
+// USER GET OWN CHAT
+// GET /api/live-chat/user/:username
+// ===============================
+router.get("/user/:username", async (req, res) => {
+    try {
+        const chat = await LiveChat.findOne({
+            username: req.params.username,
+            status: "active"
+        });
+
+        res.json({
+            success: true,
+            chat
+        });
+    } catch (error) {
+        console.error("User chat fetch error:", error);
+        res.status(500).json({
+            success: false,
             message: "Server error"
         });
     }
 });
 
+// ===============================
 // ADMIN GET ALL ACTIVE CHATS
+// GET /api/live-chat/admin
+// ===============================
 router.get("/admin", async (req, res) => {
     try {
         const chats = await LiveChat.find({
@@ -73,10 +105,20 @@ router.get("/admin", async (req, res) => {
     }
 });
 
+// ===============================
 // ADMIN REPLY
+// POST /api/live-chat/admin/reply/:chatId
+// ===============================
 router.post("/admin/reply/:chatId", async (req, res) => {
     try {
         const { message } = req.body;
+
+        if (!message) {
+            return res.status(400).json({
+                success: false,
+                message: "Reply message is required"
+            });
+        }
 
         const chat = await LiveChat.findOne({
             chatId: req.params.chatId,
@@ -111,34 +153,24 @@ router.post("/admin/reply/:chatId", async (req, res) => {
     }
 });
 
-// USER GET OWN CHAT
-router.get("/user/:username", async (req, res) => {
-    try {
-        const chat = await LiveChat.findOne({
-            username: req.params.username,
-            status: "active"
-        });
-
-        res.json({
-            success: true,
-            chat
-        });
-    } catch (error) {
-        console.error("User chat fetch error:", error);
-        res.status(500).json({
-            success: false,
-            message: "Server error"
-        });
-    }
-});
-
-// MANUAL DELETE CHAT
+// ===============================
+// ADMIN MANUAL DELETE CHAT
+// DELETE /api/live-chat/admin/delete/:chatId
+// ===============================
 router.delete("/admin/delete/:chatId", async (req, res) => {
     try {
-        await LiveChat.findOneAndUpdate(
+        const chat = await LiveChat.findOneAndUpdate(
             { chatId: req.params.chatId },
-            { status: "deleted" }
+            { status: "deleted" },
+            { new: true }
         );
+
+        if (!chat) {
+            return res.status(404).json({
+                success: false,
+                message: "Chat not found"
+            });
+        }
 
         res.json({
             success: true,
@@ -153,7 +185,10 @@ router.delete("/admin/delete/:chatId", async (req, res) => {
     }
 });
 
-// AUTO DELETE 1 HOUR INACTIVE CHATS
+// ===============================
+// AUTO CLEAN 1 HOUR INACTIVE CHATS
+// DELETE /api/live-chat/auto-clean
+// ===============================
 router.delete("/auto-clean", async (req, res) => {
     try {
         const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
