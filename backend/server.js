@@ -163,6 +163,53 @@ app.get("/", (req, res) => {
     );
 
 });
+// ===============================
+// SIMPLE LIVE CHAT SYSTEM
+// ===============================
+
+const liveChats = [];
+
+// SEND MESSAGE
+app.post("/api/live-chat/send", (req, res) => {
+
+    const { username, message } = req.body;
+
+    if (!username || !message) {
+
+        return res.status(400).json({
+            success: false,
+            message: "Missing data"
+        });
+
+    }
+
+    const newChat = {
+        id: Date.now(),
+        username,
+        message,
+        createdAt: new Date()
+    };
+
+    liveChats.push(newChat);
+
+    console.log("💬", newChat);
+
+    res.json({
+        success: true,
+        newChat
+    });
+
+});
+
+// ADMIN GET ALL CHATS
+app.get("/api/live-chat/admin", (req, res) => {
+
+    res.json({
+        success: true,
+        chats: liveChats
+    });
+
+});
 
 // PORT
 const PORT = process.env.PORT || 3000;
@@ -175,3 +222,4 @@ server.listen(PORT, () => {
     );
 
 });
+

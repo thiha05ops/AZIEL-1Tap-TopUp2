@@ -1,7 +1,14 @@
 const chatInput = document.getElementById("chatInput");
 const sendChatBtn = document.getElementById("sendChatBtn");
+const chatMessages = document.getElementById("chatMessages");
 
 sendChatBtn.addEventListener("click", sendLiveChat);
+
+chatInput.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") {
+        sendLiveChat();
+    }
+});
 
 async function sendLiveChat() {
     const username =
@@ -28,8 +35,8 @@ async function sendLiveChat() {
         const data = await res.json();
 
         if (data.success) {
+            appendMessage("You", message);
             chatInput.value = "";
-            alert("Message sent to admin ✅");
         } else {
             alert(data.message || "Send failed");
         }
@@ -37,4 +44,19 @@ async function sendLiveChat() {
         console.error("Live chat send error:", error);
         alert("Server connection error");
     }
+}
+
+function appendMessage(sender, text) {
+    if (!chatMessages) return;
+
+    const div = document.createElement("div");
+    div.className = "chat-message";
+
+    div.innerHTML = `
+        <strong>${sender}:</strong>
+        <span>${text}</span>
+    `;
+
+    chatMessages.appendChild(div);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
 }
