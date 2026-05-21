@@ -32,7 +32,6 @@ const supplierRoutes = require("./routes/supplier");
 const walletRoutes = require("./routes/wallet");
 const adminStatsRoutes = require("./routes/adminStats");
 const liveChatRoutes = require("./routes/liveChat");
-
 // EXPRESS APP
 const app = express();
 
