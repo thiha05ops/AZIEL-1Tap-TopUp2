@@ -48,26 +48,43 @@ const io = new Server(server, {
 app.set("io", io);
 
 io.on("connection", socket => {
-
-    console.log("Socket connected:", socket.id);
+    console.log("⚡ Socket connected:", socket.id);
 
     socket.on("joinAdmin", () => {
         socket.join("admins");
-        console.log("Admin joined:", socket.id);
+        console.log("✅ Admin joined admins room");
+    });
+
+    socket.on("joinAdminRoom", () => {
+        socket.join("admins");
+        console.log("✅ Admin joined admins room");
     });
 
     socket.on("joinUser", username => {
-        socket.join(username);
-        console.log("User joined:", username);
+        if (!username) return;
+        socket.join(String(username));
+        console.log("✅ User joined:", username);
     });
 
     socket.on("joinUserRoom", username => {
-        socket.join(username);
-        console.log("User room joined:", username);
+        if (!username) return;
+        socket.join(String(username));
+        console.log("✅ User room joined:", username);
     });
 
-});
+    socket.on("liveChatMessage", data => {
+        socket.to("admins").emit("liveChatMessage", data);
+    });
 
+    socket.on("adminLiveReply", data => {
+        if (!data.username) return;
+        io.to(String(data.username)).emit("adminLiveReply", data);
+    });
+
+    socket.on("disconnect", () => {
+        console.log("❌ Socket disconnected:", socket.id);
+    });
+});
 // CONNECT DB
 connectDB();
 
@@ -152,28 +169,5 @@ server.listen(PORT, () => {
     console.log(
         `🔥 Server running on port ${PORT}`
     );
-
-});
-io.on("connection", socket => {
-
-    console.log(
-        "⚡ User connected:",
-        socket.id
-    );
-
-    socket.on("joinAdmin", () => {
-        socket.join("admins");
-    });
-
-    socket.on("joinUser", username => {
-        socket.join(username);
-    });
-
-    socket.on("disconnect", () => {
-        console.log(
-            "❌ Disconnected:",
-            socket.id
-        );
-    });
 
 });
