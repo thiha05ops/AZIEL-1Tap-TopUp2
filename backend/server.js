@@ -21,6 +21,7 @@ const connectDB = require("./config/db");
 const passport = require("./config/passport");
 
 // ROUTES
+const liveChatRoutes = require("./routes/liveChat");
 const notificationRoutes = require("./routes/notification");
 const authRoutes = require("./routes/auth");
 const orderRoutes = require("./routes/order");
@@ -127,6 +128,7 @@ app.use(
 );
 
 // ROUTES
+app.use("/api/live-chat", liveChatRoutes);
 app.use("/api", authRoutes);
 
 app.use("/api", orderRoutes);
