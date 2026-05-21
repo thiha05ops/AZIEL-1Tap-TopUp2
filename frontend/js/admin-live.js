@@ -323,3 +323,137 @@ function refreshOrdersPage() {
     }
 
 }
+// ======================================
+// LIVE CHAT COUNTER
+// ======================================
+
+let adminUnreadCount = 0;
+
+function updateAdminUnread() {
+
+    let badge =
+        document.getElementById(
+            "adminUnreadBadge"
+        );
+
+    if (!badge) {
+
+        badge =
+            document.createElement("div");
+
+        badge.id =
+            "adminUnreadBadge";
+
+        document.body.appendChild(
+            badge
+        );
+
+        badge.style.position =
+            "fixed";
+
+        badge.style.top =
+            "18px";
+
+        badge.style.right =
+            "18px";
+
+        badge.style.width =
+            "28px";
+
+        badge.style.height =
+            "28px";
+
+        badge.style.borderRadius =
+            "50%";
+
+        badge.style.background =
+            "#ef4444";
+
+        badge.style.color =
+            "#fff";
+
+        badge.style.display =
+            "flex";
+
+        badge.style.alignItems =
+            "center";
+
+        badge.style.justifyContent =
+            "center";
+
+        badge.style.fontWeight =
+            "900";
+
+        badge.style.zIndex =
+            "999999";
+
+        badge.style.boxShadow =
+            "0 0 18px rgba(239,68,68,.7)";
+    }
+
+    badge.innerText =
+        adminUnreadCount;
+
+}
+
+// ======================================
+// LIVE MESSAGE TRACKER
+// ======================================
+
+function handleAdminUpdate(data) {
+
+    // EXISTING SUPPORT
+    if (
+        data.type ===
+        "support_ticket"
+    ) {
+
+        adminUnreadCount++;
+
+        updateAdminUnread();
+
+        showAdminPopup({
+
+            title:
+                "🎫 New Support Ticket",
+
+            message:
+                `${data.username} submitted a support request`
+
+        });
+
+        playAdminSound();
+
+        refreshSupportPage();
+
+        return;
+
+    }
+
+    // LIVE CHAT MESSAGE
+    if (
+        data.type ===
+        "live_chat"
+    ) {
+
+        adminUnreadCount++;
+
+        updateAdminUnread();
+
+        showAdminPopup({
+
+            title:
+                "💬 Live Chat Message",
+
+            message:
+                `${data.username}: ${data.message}`
+
+        });
+
+        playAdminSound();
+
+        return;
+
+    }
+
+}

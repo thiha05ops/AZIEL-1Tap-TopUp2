@@ -291,3 +291,250 @@ body {
 
     color: #ef4444;
 }
+
+/* ======================================
+   MODERN SUPPORT UI
+====================================== */
+
+.support-ticket-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.ticket-user {
+    color: #94a3b8 !important;
+    margin-top: 6px !important;
+}
+
+.ticket-meta {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+}
+
+.ticket-meta span {
+    padding: 8px 12px;
+    border-radius: 12px;
+
+    background:
+        rgba(255, 255, 255, .05);
+
+    border:
+        1px solid rgba(255, 255, 255, .08);
+
+    font-size: 13px;
+    color: #cbd5e1;
+}
+
+.ticket-message-box {
+    padding: 16px;
+    border-radius: 18px;
+
+    background:
+        rgba(255, 255, 255, .04);
+
+    border:
+        1px solid rgba(255, 255, 255, .08);
+
+    line-height: 1.7;
+    color: #e5e7eb;
+
+    margin-bottom: 18px;
+}
+
+.solve-btn {
+    background:
+        linear-gradient(135deg,
+            #a855f7,
+            #7c3aed);
+
+    color: #fff;
+}
+
+.support-ticket-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.support-ticket-card::before {
+    content: "";
+
+    position: absolute;
+    inset: 0;
+
+    background:
+        linear-gradient(135deg,
+            rgba(168, 85, 247, .06),
+            transparent 40%);
+
+    pointer-events: none;
+}
+
+/* ======================================
+   LIVE MESSAGE POPUP
+====================================== */
+
+#adminLiveMessagePopup {
+
+    animation:
+        adminPopupIn .35s ease;
+
+    backdrop-filter: blur(18px);
+
+    border:
+        1px solid rgba(255, 255, 255, .12);
+}
+
+#adminLiveMessagePopup strong {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 15px;
+}
+
+#adminLiveMessagePopup p {
+    margin-bottom: 8px;
+    font-weight: 800;
+}
+
+#adminLiveMessagePopup small {
+    color: rgba(255, 255, 255, .82);
+    line-height: 1.5;
+}
+
+@keyframes adminPopupIn {
+
+    from {
+        opacity: 0;
+        transform:
+            translateY(20px) scale(.95);
+    }
+
+    to {
+        opacity: 1;
+        transform:
+            translateY(0) scale(1);
+    }
+}
+
+/* ======================================
+   EMPTY BOX
+====================================== */
+
+.admin-empty-box {
+
+    min-height: 220px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 24px;
+
+    background:
+        rgba(255, 255, 255, .04);
+
+    border:
+        1px solid rgba(255, 255, 255, .08);
+
+    color: #94a3b8;
+
+    text-align: center;
+    font-size: 18px;
+}
+
+/* ======================================
+   MOBILE
+====================================== */
+
+@media(max-width:768px) {
+
+    .support-ticket-top {
+        flex-direction: column;
+    }
+
+    .reply-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+
+    .reply-actions button {
+        width: 100%;
+    }
+
+    #adminLiveMessagePopup {
+        left: 14px;
+        right: 14px;
+        width: auto !important;
+    }
+
+}
+
+/* LIVE STATUS */
+
+.admin-live-status {
+
+    position: fixed;
+
+    bottom: 20px;
+    left: 20px;
+
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    padding: 12px 16px;
+
+    border-radius: 14px;
+
+    background:
+        rgba(255, 255, 255, .06);
+
+    border:
+        1px solid rgba(255, 255, 255, .08);
+
+    backdrop-filter: blur(16px);
+
+    color: #fff;
+
+    font-weight: 800;
+
+    z-index: 99999;
+}
+
+.live-dot {
+
+    width: 12px;
+    height: 12px;
+
+    border-radius: 50%;
+
+    background: #22c55e;
+
+    box-shadow:
+        0 0 12px rgba(34, 197, 94, .9);
+
+    animation:
+        pulseLive 1.5s infinite;
+}
+
+@keyframes pulseLive {
+
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.35);
+        opacity: .7;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+}
