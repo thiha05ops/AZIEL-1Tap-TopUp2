@@ -31,7 +31,7 @@ const passwordRoutes = require("./routes/password");
 const supplierRoutes = require("./routes/supplier");
 const walletRoutes = require("./routes/wallet");
 const adminStatsRoutes = require("./routes/adminStats");
-const liveChatRoutes = require("./routes/liveChat");
+
 // EXPRESS APP
 const app = express();
 
@@ -149,7 +149,7 @@ app.use("/api", adminStatsRoutes);
 
 app.use("/api", adminAuthRoutes);
 app.use("/api", supportRoutes);
-app.use("/api/live-chat", liveChatRoutes);
+
 // HOME
 app.get("/", (req, res) => {
 
