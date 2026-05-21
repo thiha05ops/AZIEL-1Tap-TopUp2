@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Live Chat | AZIEL</title>
+
+    <link rel="stylesheet" href="./css/admin-live-chat.css" />
+</head>
+
+<body>
+    <div class="admin-chat-page">
+
+        <aside class="chat-sidebar">
+            <div class="sidebar-header">
+                <h2>Live Chats</h2>
+                <button id="refreshBtn">Refresh</button>
+            </div>
+
+            <div id="chatList" class="chat-list">
+                <p class="empty">Loading chats...</p>
+            </div>
+        </aside>
+
+        <main class="chat-panel">
+            <div class="chat-panel-header">
+                <div>
+                    <h2 id="selectedUsername">Select a user</h2>
+                    <p id="selectedChatId">No chat selected</p>
+                </div>
+
+                <button id="deleteChatBtn" class="delete-btn" disabled>
+                    Delete Chat
+                </button>
+            </div>
+
+            <div id="messagesBox" class="messages-box">
+                <p class="empty">Choose a user chat from the left side.</p>
+            </div>
+
+            <form id="replyForm" class="reply-form">
+                <input type="text" id="replyInput" placeholder="Write admin reply..." disabled />
+                <button type="submit" id="sendReplyBtn" disabled>
+                    Send
+                </button>
+            </form>
+        </main>
+
+    </div>
+
+    <script src="./js/admin-live-chat.js"></script>
+</body>
+
+</html>
