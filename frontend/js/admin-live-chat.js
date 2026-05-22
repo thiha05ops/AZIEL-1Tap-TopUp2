@@ -16,12 +16,14 @@ async function loadChats() {
         const res = await fetch("/api/live-chat/admin");
         const data = await res.json();
 
+        console.log("ADMIN CHATS:", data);
+
         if (!data.success) {
             chatList.innerHTML = `<p class="empty">Failed to load chats</p>`;
             return;
         }
 
-        chats = data.chats || [];
+        chats = (data.chats || []).filter(chat => chat.status !== "deleted");
         renderChatList();
     } catch (error) {
         console.error("Load chats error:", error);
@@ -30,32 +32,29 @@ async function loadChats() {
 }
 
 function renderChatList() {
-    if (chats.length === 0) {
+    if (!chats.length) {
         chatList.innerHTML = `<p class="empty">No active live chats</p>`;
         return;
     }
 
     chatList.innerHTML = "";
 
-    chats.forEach((chat) => {
-        const lastMsg = chat.messages[chat.messages.length - 1];
+    chats.forEach(chat => {
+        const lastMsg = chat.messages && chat.messages.length
+            ? chat.messages[chat.messages.length - 1]
+            : null;
 
         const card = document.createElement("div");
-        card.className =
-            "chat-user-card " +
-            (activeChat && activeChat.chatId === chat.chatId ? "active" : "");
+        card.className = "chat-user-card";
 
         card.innerHTML = `
-      <h3>${chat.username}</h3>
+      <h3>${chat.username || "Guest"}</h3>
       <p>${lastMsg ? lastMsg.text : "No message"}</p>
-      <span class="chat-time">
-        ${formatTime(chat.lastMessageAt)}
-      </span>
+      <span class="chat-time">${formatTime(chat.lastMessageAt)}</span>
     `;
 
         card.addEventListener("click", () => {
             activeChat = chat;
-            renderChatList();
             renderMessages(chat);
         });
 
@@ -64,8 +63,8 @@ function renderChatList() {
 }
 
 function renderMessages(chat) {
-    selectedUsername.textContent = chat.username;
-    selectedChatId.textContent = chat.chatId;
+    selectedUsername.textContent = chat.username || "Guest";
+    selectedChatId.textContent = chat.chatId || "No chat ID";
 
     replyInput.disabled = false;
     sendReplyBtn.disabled = false;
@@ -73,13 +72,13 @@ function renderMessages(chat) {
 
     messagesBox.innerHTML = "";
 
-    chat.messages.forEach((msg) => {
+    (chat.messages || []).forEach(msg => {
         const div = document.createElement("div");
-        div.className = `message ${msg.sender}`;
+        div.className = `message ${msg.sender || "user"}`;
 
         div.innerHTML = `
-      ${msg.text}
-      <small>${msg.sender} • ${formatTime(msg.createdAt)}</small>
+      ${msg.text || ""}
+      <small>${msg.sender || "user"} • ${formatTime(msg.createdAt)}</small>
     `;
 
         messagesBox.appendChild(div);
@@ -88,99 +87,54 @@ function renderMessages(chat) {
     messagesBox.scrollTop = messagesBox.scrollHeight;
 }
 
-replyForm.addEventListener("submit", async (e) => {
+replyForm.addEventListener("submit", async e => {
     e.preventDefault();
-
     if (!activeChat) return;
 
     const message = replyInput.value.trim();
-
     if (!message) return;
 
-    try {
-        const res = await fetch(
-            `/api/live-chat/admin/reply/${activeChat.chatId}`,
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ message })
-            }
-        );
+    const res = await fetch(`/api/live-chat/admin/reply/${activeChat.chatId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message })
+    });
 
-        const data = await res.json();
+    const data = await res.json();
 
-        if (!data.success) {
-            alert("Reply failed");
-            return;
-        }
-
+    if (data.success) {
         replyInput.value = "";
         activeChat = data.chat;
-
-        await loadChats();
         renderMessages(activeChat);
-    } catch (error) {
-        console.error("Reply error:", error);
-        alert("Server error");
+        loadChats();
     }
 });
 
 deleteChatBtn.addEventListener("click", async () => {
     if (!activeChat) return;
 
-    const ok = confirm(`Delete chat with ${activeChat.username}?`);
+    await fetch(`/api/live-chat/admin/delete/${activeChat.chatId}`, {
+        method: "DELETE"
+    });
 
-    if (!ok) return;
+    activeChat = null;
+    selectedUsername.textContent = "Select a user";
+    selectedChatId.textContent = "No chat selected";
+    messagesBox.innerHTML = `<p class="empty">Choose a user chat from the left side.</p>`;
 
-    try {
-        const res = await fetch(
-            `/api/live-chat/admin/delete/${activeChat.chatId}`,
-            {
-                method: "DELETE"
-            }
-        );
+    replyInput.disabled = true;
+    sendReplyBtn.disabled = true;
+    deleteChatBtn.disabled = true;
 
-        const data = await res.json();
-
-        if (!data.success) {
-            alert("Delete failed");
-            return;
-        }
-
-        activeChat = null;
-        selectedUsername.textContent = "Select a user";
-        selectedChatId.textContent = "No chat selected";
-        messagesBox.innerHTML =
-            `<p class="empty">Choose a user chat from the left side.</p>`;
-
-        replyInput.value = "";
-        replyInput.disabled = true;
-        sendReplyBtn.disabled = true;
-        deleteChatBtn.disabled = true;
-
-        await loadChats();
-    } catch (error) {
-        console.error("Delete error:", error);
-        alert("Server error");
-    }
+    loadChats();
 });
 
 refreshBtn.addEventListener("click", loadChats);
 
 function formatTime(date) {
     if (!date) return "";
-
-    return new Date(date).toLocaleString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-        month: "short",
-        day: "numeric"
-    });
+    return new Date(date).toLocaleString();
 }
 
-// auto refresh every 5 seconds
-setInterval(loadChats, 5000);
-
 loadChats();
+setInterval(loadChats, 5000);
