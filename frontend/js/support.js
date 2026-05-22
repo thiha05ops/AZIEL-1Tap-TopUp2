@@ -325,7 +325,7 @@ function getTypeIcon(type) {
         general: "🚨"
     };
 
-    return icons[type] || "🎧";
+    return icons[type] || "null";
 }
 
 function formatType(type) {
