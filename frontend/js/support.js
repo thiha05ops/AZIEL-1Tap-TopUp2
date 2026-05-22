@@ -496,8 +496,23 @@ function initLiveChatBall() {
     });
 
     window.addEventListener("pointerup", () => {
+        if (!isDragging) return;
+
         isDragging = false;
         ball.style.transition = ".2s";
+
+        const screenWidth = window.innerWidth;
+        const ballRect = ball.getBoundingClientRect();
+
+        if (ballRect.left < screenWidth / 2) {
+            ball.style.left = "0px";
+            ball.style.right = "auto";
+            ball.style.borderRadius = "0 18px 18px 0";
+        } else {
+            ball.style.left = "auto";
+            ball.style.right = "0px";
+            ball.style.borderRadius = "18px 0 0 18px";
+        }
     });
 }
 

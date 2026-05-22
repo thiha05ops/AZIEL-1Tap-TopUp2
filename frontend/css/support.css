@@ -985,3 +985,26 @@ body {
         border-radius: 22px;
     }
 }
+
+/* Mobile chat ball edge position */
+@media (max-width: 768px) {
+    .chat-ball {
+        position: fixed;
+        right: 0;
+        bottom: 90px;
+        width: 58px;
+        height: 58px;
+        border-radius: 18px 0 0 18px;
+        z-index: 9999;
+    }
+
+    .live-chat-panel {
+        position: fixed;
+        right: 10px;
+        bottom: 85px;
+        width: calc(100vw - 20px);
+        max-width: 360px;
+        height: 520px;
+        z-index: 9998;
+    }
+}
