@@ -164,43 +164,103 @@ app.get("/", (req, res) => {
 
 });
 // ===============================
-// SIMPLE LIVE CHAT SYSTEM
+// LIVE CHAT DIRECT API
 // ===============================
 
-const liveChats = [];
+const mongoose = require("mongoose");
 
-// SEND MESSAGE
-app.post("/api/live-chat/send", (req, res) => {
+const liveChatSchema = new mongoose.Schema(
+    {
+        chatId: String,
+        username: String,
+        status: {
+            type: String,
+            default: "active"
+        },
+        messages: [
+            {
+                sender: String,
+                text: String,
+                createdAt: {
+                    type: Date,
+                    default: Date.now
+                }
+            }
+        ],
+        lastMessageAt: {
+            type: Date,
+            default: Date.now
+        }
+    },
+    { timestamps: true }
+);
 
-    const { username, message } = req.body;
+const DirectLiveChat =
+    mongoose.models.DirectLiveChat ||
+    mongoose.model("DirectLiveChat", liveChatSchema);
 
-    if (!username || !message) {
+app.post("/api/live-chat/send", async (req, res) => {
+    try {
+        const { username, message } = req.body;
 
-        return res.status(400).json({
-            success: false,
-            message: "Missing data"
+        if (!message) {
+            return res.status(400).json({
+                success: false,
+                message: "Message required"
+            });
+        }
+
+        let chat = await DirectLiveChat.findOne({
+            username: username || "Guest",
+            status: "active"
         });
 
+        if (!chat) {
+            chat = await DirectLiveChat.create({
+                chatId: "CHAT-" + Date.now(),
+                username: username || "Guest",
+                messages: []
+            });
+        }
+
+        chat.messages.push({
+            sender: "user",
+            text: message
+        });
+
+        chat.lastMessageAt = new Date();
+        await chat.save();
+
+        res.json({
+            success: true,
+            chat
+        });
+    } catch (error) {
+        console.error("Live chat send error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Live chat server error"
+        });
     }
-
-    const newChat = {
-        id: Date.now(),
-        username,
-        message,
-        createdAt: new Date()
-    };
-
-    liveChats.push(newChat);
-
-    console.log("💬", newChat);
-
-    res.json({
-        success: true,
-        newChat
-    });
-
 });
 
+app.get("/api/live-chat/admin", async (req, res) => {
+    try {
+        const chats = await DirectLiveChat.find({
+            status: "active"
+        }).sort({ lastMessageAt: -1 });
+
+        res.json({
+            success: true,
+            chats
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: "Admin chat fetch error"
+        });
+    }
+});
 // ADMIN GET ALL CHATS
 app.get("/api/live-chat/admin", (req, res) => {
 
