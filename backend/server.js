@@ -270,6 +270,54 @@ app.get("/api/live-chat/admin", (req, res) => {
     });
 
 });
+// ADMIN REPLY
+app.post("/api/live-chat/admin/reply/:chatId", async (req, res) => {
+    try {
+
+        const { message } = req.body;
+
+        if (!message) {
+            return res.status(400).json({
+                success: false,
+                message: "Reply required"
+            });
+        }
+
+        const chat = await DirectLiveChat.findOne({
+            chatId: req.params.chatId
+        });
+
+        if (!chat) {
+            return res.status(404).json({
+                success: false,
+                message: "Chat not found"
+            });
+        }
+
+        chat.messages.push({
+            sender: "admin",
+            text: message
+        });
+
+        chat.lastMessageAt = new Date();
+
+        await chat.save();
+
+        res.json({
+            success: true
+        });
+
+    } catch (error) {
+
+        console.log("Admin reply error:", error);
+
+        res.status(500).json({
+            success: false,
+            message: "Server error"
+        });
+
+    }
+});
 
 // PORT
 const PORT = process.env.PORT || 3000;
