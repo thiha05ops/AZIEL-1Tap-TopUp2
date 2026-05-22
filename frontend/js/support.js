@@ -415,6 +415,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initLiveChatBall();
 
     initLiveChatMessages();
+    initLiveChatSend();
 
 });
 
@@ -567,6 +568,65 @@ function initLiveChatBall() {
 
     });
 
+}
+function initLiveChatSend() {
+    const input = document.getElementById("liveChatInput");
+    const sendBtn = document.getElementById("sendLiveChatBtn");
+    const body = document.getElementById("liveChatBody");
+
+    if (!input || !sendBtn || !body) return;
+
+    async function sendMessage() {
+        const message = input.value.trim();
+
+        if (!message) return;
+
+        // user message UI
+        const userMsg = document.createElement("div");
+        userMsg.className = "chat-msg user";
+        userMsg.innerHTML = `
+            <p>${message}</p>
+            <small>${new Date().toLocaleTimeString()}</small>
+        `;
+        body.appendChild(userMsg);
+        body.scrollTop = body.scrollHeight;
+
+        input.value = "";
+
+        try {
+            const res = await fetch("/api/live-chat/send", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    username:
+                        localStorage.getItem("username") ||
+                        localStorage.getItem("userName") ||
+                        "Guest",
+                    message
+                })
+            });
+
+            const data = await res.json();
+
+            if (!data.success) {
+                alert(data.message || "Live chat send failed");
+            }
+
+        } catch (error) {
+            console.error("Chat ball send error:", error);
+            alert("Server connection error");
+        }
+    }
+
+    sendBtn.addEventListener("click", sendMessage);
+
+    input.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+            sendMessage();
+        }
+    });
 }
 
 // ======================================
