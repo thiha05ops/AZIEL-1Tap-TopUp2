@@ -507,12 +507,7 @@ function initLiveChatSystem() {
 
     if (!input || !sendBtn) return;
 
-    setTimeout(() => {
-        addChatMessage(
-            "bot",
-            "Hello 👋 Welcome to AZIEL Support. How can we help you today?"
-        );
-    }, 700);
+    loadLiveChatHistory();
 
     sendBtn.addEventListener("click", sendLiveChatToAdmin);
 
@@ -521,6 +516,8 @@ function initLiveChatSystem() {
             sendLiveChatToAdmin();
         }
     });
+
+    setInterval(loadLiveChatHistory, 5000);
 }
 
 async function sendLiveChatToAdmin() {
@@ -587,4 +584,49 @@ function addChatMessage(type, text) {
 
     body.appendChild(msg);
     body.scrollTop = body.scrollHeight;
+}
+function initLiveChatSystem() {
+    const input = document.getElementById("liveChatInput");
+    const sendBtn = document.getElementById("sendLiveChatBtn");
+
+    if (!input || !sendBtn) return;
+
+    loadLiveChatHistory();
+
+    sendBtn.addEventListener("click", sendLiveChatToAdmin);
+
+    input.addEventListener("keypress", e => {
+        if (e.key === "Enter") {
+            sendLiveChatToAdmin();
+        }
+    });
+
+    setInterval(loadLiveChatHistory, 5000);
+} async function loadLiveChatHistory() {
+    const username =
+        localStorage.getItem("username") ||
+        localStorage.getItem("userName") ||
+        "Guest";
+
+    try {
+        const res = await fetch(`/api/live-chat/user/${username}`);
+        const data = await res.json();
+
+        if (!data.success || !data.chat) return;
+
+        const body = document.getElementById("liveChatBody");
+        if (!body) return;
+
+        body.innerHTML = "";
+
+        data.chat.messages.forEach(msg => {
+            addChatMessage(
+                msg.sender === "admin" ? "bot" : "user",
+                msg.text
+            );
+        });
+
+    } catch (error) {
+        console.log("Load live chat history error:", error);
+    }
 }

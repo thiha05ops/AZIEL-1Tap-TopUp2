@@ -261,12 +261,40 @@ app.get("/api/live-chat/admin", async (req, res) => {
         });
     }
 });
+// USER GET OWN LIVE CHAT HISTORY
+app.get("/api/live-chat/user/:username", async (req, res) => {
+    try {
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+
+        let chat = await DirectLiveChat.findOne({
+            username: req.params.username,
+            status: "active"
+        }).sort({ lastMessageAt: -1 });
+
+        if (chat && chat.lastMessageAt < oneHourAgo) {
+            chat.status = "deleted";
+            await chat.save();
+            chat = null;
+        }
+
+        res.json({
+            success: true,
+            chat
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: "Load chat history error"
+        });
+    }
+});
 // ADMIN GET ALL CHATS
-app.get("/api/live-chat/admin", (req, res) => {
+app.get("/api/live-chat/admin", async (req, res) => {
 
     res.json({
         success: true,
-        chats: liveChats
+        chat
     });
 
 });
