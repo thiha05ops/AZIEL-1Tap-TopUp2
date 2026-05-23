@@ -45,37 +45,46 @@ async function trackOrder(orderId) {
         }
 
         const order = data.order;
+        const status = normalizeStatus(order.status);
+
         lastStatus = order.status;
 
         result.innerHTML = `
-            <div class="track-card">
-                <h2>${order.game || "Order"}</h2>
+            <div class="order-track-card">
+                <div class="track-head">
+                    <div>
+                        <span class="track-mini">AZIEL ORDER TRACKING</span>
+                        <h2>${order.game || "Game TopUp Order"}</h2>
+                    </div>
 
-                <p><b>Order ID:</b> ${order.orderId || "-"}</p>
-                <p><b>User:</b> ${order.username || "-"}</p>
-                <p><b>User ID:</b> ${order.userId || "-"}</p>
-                <p><b>Server:</b> ${order.zoneId || "-"}</p>
-                <p><b>Package:</b> ${order.packageName || order.selectedPackage || "-"}</p>
-                <p><b>Amount:</b> ${order.amount || 0} ${order.currency || ""}</p>
-                <p><b>Payment:</b> ${order.paymentMethod || "-"}</p>
-
-                <div class="tracking-timeline">
-                    ${stepHTML("stepPending", "Pending")}
-                    <div class="tracking-line"></div>
-                    ${stepHTML("stepPaid", "Paid")}
-                    <div class="tracking-line"></div>
-                    ${stepHTML("stepProcessing", "Processing")}
-                    <div class="tracking-line"></div>
-                    ${stepHTML("stepCompleted", "Completed")}
+                    <span class="track-status status-${status}">
+                        ${formatStatus(status)}
+                    </span>
                 </div>
 
-                <p class="track-note">
+                <div class="track-info-grid">
+                    ${infoItem("Order ID", order.orderId || "-")}
+                    ${infoItem("Username", order.username || "-")}
+                    ${infoItem("User ID", order.userId || "-")}
+                    ${infoItem("Server", order.zoneId || "-")}
+                    ${infoItem("Package", order.packageName || order.selectedPackage || "-")}
+                    ${infoItem("Amount", `${order.amount || 0} ${order.currency || ""}`)}
+                    ${infoItem("Payment", order.paymentMethod || "-")}
+                    ${infoItem("Region", order.region || "-")}
+                </div>
+
+                <div class="timeline">
+                    ${timelineItem("pending", "Pending", "Order received", status)}
+                    ${timelineItem("paid", "Paid", "Payment confirmed", status)}
+                    ${timelineItem("processing", "Processing", "Your order is being processed", status)}
+                    ${timelineItem("completed", "Completed", "Order completed successfully", status)}
+                </div>
+
+                <div class="track-note-box">
                     ${order.note || "Please wait while we process your order."}
-                </p>
+                </div>
             </div>
         `;
-
-        updateTrackingSteps(order.status);
 
     } catch (error) {
         console.log("Track order error:", error);
@@ -83,13 +92,43 @@ async function trackOrder(orderId) {
     }
 }
 
-function stepHTML(id, label) {
+function infoItem(label, value) {
     return `
-        <div class="tracking-step" id="${id}">
-            <div class="tracking-circle"></div>
-            <span>${label}</span>
+        <div class="track-info-item">
+            <small>${label}</small>
+            <strong>${value}</strong>
         </div>
     `;
+}
+
+function timelineItem(step, title, text, currentStatus) {
+    const active = isStepActive(step, currentStatus) ? "active" : "";
+
+    return `
+        <div class="timeline-item ${active}">
+            <h3>${title}</h3>
+            <p>${text}</p>
+        </div>
+    `;
+}
+
+function isStepActive(step, status) {
+    const order = ["pending", "paid", "processing", "completed"];
+    return order.indexOf(step) <= order.indexOf(status);
+}
+
+function normalizeStatus(status) {
+    if (!status) return "pending";
+
+    const s = String(status).toLowerCase();
+
+    if (s === "pending_payment") return "pending";
+    if (s === "pending") return "pending";
+    if (s === "paid") return "paid";
+    if (s === "processing") return "processing";
+    if (s === "completed") return "completed";
+
+    return "pending";
 }
 
 async function checkLiveTracking() {
@@ -112,21 +151,15 @@ async function checkLiveTracking() {
     }
 }
 
-function updateTrackingSteps(status) {
-    const steps = {
-        pending_payment: ["stepPending"],
-        pending: ["stepPending"],
-        paid: ["stepPending", "stepPaid"],
-        processing: ["stepPending", "stepPaid", "stepProcessing"],
-        completed: ["stepPending", "stepPaid", "stepProcessing", "stepCompleted"]
+function formatStatus(status) {
+    const map = {
+        pending: "PENDING",
+        paid: "PAID",
+        processing: "PROCESSING",
+        completed: "COMPLETED"
     };
 
-    document.querySelectorAll(".tracking-step")
-        .forEach(step => step.classList.remove("active"));
-
-    (steps[status] || ["stepPending"]).forEach(id => {
-        document.getElementById(id)?.classList.add("active");
-    });
+    return map[status] || "PENDING";
 }
 
 function showTrackingPopup(status) {
@@ -135,7 +168,7 @@ function showTrackingPopup(status) {
 
     const popup = document.createElement("div");
     popup.className = "tracking-popup";
-    popup.innerHTML = `🔔 Order Status Updated: <b>${status}</b>`;
+    popup.innerHTML = `🔔 Order Status Updated: <b>${formatStatus(normalizeStatus(status))}</b>`;
 
     document.body.appendChild(popup);
 
