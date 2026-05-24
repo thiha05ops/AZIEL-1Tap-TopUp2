@@ -760,3 +760,36 @@ footer {
     font-size: 30px;
   }
 }
+
+/* =========================
+   COMPACT CARD POLISH
+========================= */
+
+.compact-card {
+  position: relative;
+  transition:
+    transform .25s ease,
+    box-shadow .25s ease,
+    border-color .25s ease;
+  border: 1px solid rgba(255, 255, 255, .75);
+}
+
+.compact-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, .13);
+  border-color: rgba(34, 197, 94, .45);
+}
+
+.compact-card img,
+.logo-card {
+  transition: transform .25s ease;
+}
+
+.compact-card:hover img,
+.compact-card:hover .logo-card {
+  transform: scale(1.06);
+}
+
+.compact-card span {
+  box-shadow: 0 6px 14px rgba(34, 197, 94, .25);
+}
