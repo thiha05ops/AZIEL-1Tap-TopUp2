@@ -509,3 +509,141 @@ footer {
   padding: 8px 12px;
   border-radius: 12px;
 }
+
+/* =========================
+   CLEAN MARKETPLACE FOOTER
+========================= */
+
+.main-footer {
+  margin-top: 60px;
+
+  background: #fff;
+
+  border-top: 1px solid #e5e7eb;
+
+  padding: 40px 20px 20px;
+}
+
+.footer-top {
+  max-width: 1180px;
+
+  margin: 0 auto;
+
+  display: grid;
+
+  grid-template-columns:
+    1.4fr 1fr 1fr;
+
+  gap: 40px;
+}
+
+.footer-box h3 {
+  margin-bottom: 18px;
+
+  font-size: 20px;
+
+  color: #111827;
+}
+
+.footer-box p {
+  color: #6b7280;
+
+  margin-bottom: 18px;
+
+  line-height: 1.7;
+}
+
+.footer-box a {
+  display: block;
+
+  margin-bottom: 12px;
+
+  text-decoration: none;
+
+  color: #374151;
+
+  font-weight: 600;
+
+  transition: .2s;
+}
+
+.footer-box a:hover {
+  color: #7c3aed;
+}
+
+.payment-logos {
+  display: flex;
+
+  flex-wrap: wrap;
+
+  gap: 12px;
+}
+
+.payment-logos img {
+  height: 42px;
+
+  background: #f9fafb;
+
+  padding: 8px 14px;
+
+  border-radius: 12px;
+
+  object-fit: contain;
+
+  border: 1px solid #e5e7eb;
+
+  transition: .2s;
+}
+
+.payment-logos img:hover {
+  transform: translateY(-2px);
+
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, .08);
+}
+
+.footer-bottom {
+  max-width: 1180px;
+
+  margin: 40px auto 0;
+
+  padding-top: 20px;
+
+  border-top: 1px solid #e5e7eb;
+
+  display: flex;
+
+  justify-content: space-between;
+
+  align-items: center;
+
+  color: #6b7280;
+
+  font-size: 14px;
+}
+
+.footer-region span {
+  color: #111827;
+
+  font-weight: 800;
+}
+
+/* MOBILE */
+
+@media (max-width: 768px) {
+
+  .footer-top {
+    grid-template-columns: 1fr;
+
+    gap: 28px;
+  }
+
+  .footer-bottom {
+    flex-direction: column;
+
+    gap: 12px;
+
+    text-align: center;
+  }
+
+}
