@@ -1841,3 +1841,44 @@ footer {
     border-radius: 18px;
   }
 }
+
+/* MOBILE NAV AUTO HIDE + GAME CARD SLIDER */
+@media (max-width: 768px) {
+  .home-header {
+    position: sticky;
+    top: 0;
+    z-index: 9999;
+    transition: transform .28s ease;
+  }
+
+  .home-header.hide-mobile-nav .nav-links {
+    max-height: 0;
+    opacity: 0;
+    padding: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .nav-links {
+    transition: max-height .28s ease, opacity .25s ease, padding .25s ease;
+    max-height: 80px;
+  }
+
+  #mobileGames .compact-grid {
+    display: flex;
+    overflow-x: auto;
+    gap: 14px;
+    padding: 4px 2px 14px;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+
+  #mobileGames .compact-grid::-webkit-scrollbar {
+    display: none;
+  }
+
+  #mobileGames .compact-card {
+    min-width: 82%;
+    scroll-snap-align: start;
+  }
+}

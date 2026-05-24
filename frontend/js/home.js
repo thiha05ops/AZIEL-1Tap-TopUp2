@@ -208,3 +208,24 @@ function loadRegionPayments() {
         `).join("");
 
 }
+function initMobileNavAutoHide() {
+    const header = document.querySelector(".home-header");
+
+    if (!header) return;
+
+    let lastScrollY = window.scrollY;
+
+    window.addEventListener("scroll", () => {
+        if (window.innerWidth > 768) return;
+
+        const currentScrollY = window.scrollY;
+
+        if (currentScrollY > lastScrollY && currentScrollY > 120) {
+            header.classList.add("hide-mobile-nav");
+        } else {
+            header.classList.remove("hide-mobile-nav");
+        }
+
+        lastScrollY = currentScrollY;
+    });
+}
