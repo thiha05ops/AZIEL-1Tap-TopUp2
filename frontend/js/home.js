@@ -161,3 +161,50 @@ function initHeroSlider() {
     startSlider();
 
 }
+function loadRegionPayments() {
+
+    const region =
+        localStorage.getItem("selectedRegion") || "myanmar";
+
+    const paymentLogos =
+        document.getElementById("paymentLogos");
+
+    const paymentRegionText =
+        document.getElementById("paymentRegionText");
+
+    if (!paymentLogos) return;
+
+    let logos = [];
+
+    if (region === "thailand") {
+
+        paymentRegionText.innerText =
+            "Thailand Payments";
+
+        logos = [
+            "promptpay.png",
+            "scb.png"
+        ];
+
+    } else {
+
+        paymentRegionText.innerText =
+            "Myanmar Payments";
+
+        logos = [
+            "kbzpay.png",
+            "wavepay.png",
+            "ayapay.png"
+        ];
+
+    }
+
+    paymentLogos.innerHTML =
+        logos.map(logo => `
+            <img
+                src="assets/payment/${logo}"
+                alt="${logo}"
+            >
+        `).join("");
+
+}
