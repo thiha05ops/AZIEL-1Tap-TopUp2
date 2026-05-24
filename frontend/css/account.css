@@ -605,10 +605,6 @@ body {
   text-decoration: none;
 }
 
-.support-link::before {
-  content: "🎧";
-}
-
 .live-badge {
   margin-left: auto;
   padding: 4px 8px;
