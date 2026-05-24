@@ -1,8 +1,17 @@
 document.addEventListener("DOMContentLoaded", () => {
-
     createLiveChatUI();
-
 });
+
+function createLiveChatUI() {
+    const ball = document.createElement("div");
+    ball.className = "chat-ball";
+    ball.innerHTML = `
+        <i class="fa-solid fa-comments"></i>
+        <div class="chat-badge">1</div>
+        <div class="online-dot"></div>
+    `;
+    document.body.appendChild(ball);
+}
 const chatInput = document.getElementById("chatInput");
 const sendChatBtn = document.getElementById("sendChatBtn");
 const chatMessages = document.getElementById("chatMessages");
