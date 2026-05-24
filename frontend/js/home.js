@@ -170,22 +170,26 @@ function loadRegionPayments() {
 
     if (!box) return;
 
-    const region =
+    const rawRegion =
         localStorage.getItem("selectedRegion") ||
         localStorage.getItem("region") ||
+        localStorage.getItem("userRegion") ||
+        localStorage.getItem("azielRegion") ||
         "myanmar";
 
+    const region = rawRegion.toLowerCase();
+
     const isThailand =
-        region.toLowerCase().includes("thai") ||
-        region.toLowerCase() === "thailand";
+        region.includes("thai") ||
+        region.includes("thailand") ||
+        region.includes("th") ||
+        region.includes("ไทย");
 
     const logos = isThailand
         ? ["promptpay.png", "scb.png"]
         : ["kbzpay.png", "wavepay.png", "ayapay.png"];
 
-    if (regionText) {
-        regionText.innerText = isThailand ? "Thailand" : "Myanmar";
-    }
+    regionText.innerText = isThailand ? "Thailand" : "Myanmar";
 
     box.innerHTML = logos.map(logo => `
         <img src="assets/payment/${logo}" alt="${logo}">
