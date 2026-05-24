@@ -1,3 +1,8 @@
+.mobile-drawer,
+.mobile-drawer-overlay {
+    display: none;
+}
+
 * {
     margin: 0;
     padding: 0;

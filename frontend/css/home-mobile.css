@@ -1,5 +1,13 @@
 @media (max-width: 768px) {
 
+    .mobile-drawer,
+    .mobile-drawer-overlay {
+        display: block;
+    }
+}
+
+@media (max-width: 768px) {
+
     body {
         overflow-x: hidden;
     }
