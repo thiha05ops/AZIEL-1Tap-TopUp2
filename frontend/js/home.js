@@ -9,11 +9,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const profileBox = document.getElementById("profileBox");
     const profileDropdown = document.getElementById("profileDropdown");
     const logoutBtn = document.getElementById("logoutBtn");
-    const notiBtn = document.getElementById("notiBtn");
-    const notiCount = document.getElementById("notiCount");
     const searchInput = document.getElementById("searchInput");
 
-    // Profile
     if (avatarText && usernameText) {
         if (username) {
             avatarText.innerText = displayName.charAt(0).toUpperCase();
@@ -50,36 +47,14 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Notification
-    if (notiBtn) {
-        notiBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
-
-            if (!username) {
-                window.location.href = "login.html";
-                return;
-            }
-
-            window.location.href = "notifications.html";
-        });
-    }
-
-    if (username && notiCount) {
-        loadNotificationCount(username, notiCount);
-        setInterval(() => loadNotificationCount(username, notiCount), 8000);
-    }
-
-    // Slider
     initHeroSlider();
 
-    // Coming soon cards
     document.querySelectorAll(".coming-soon-card").forEach(card => {
         card.addEventListener("click", () => {
             showToast("Coming soon 🚀");
         });
     });
 
-    // Active cards login guard
     document.querySelectorAll(".active-card").forEach(card => {
         card.addEventListener("click", (e) => {
             if (!username) {
@@ -93,19 +68,19 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-    // Search
     if (searchInput) {
         searchInput.addEventListener("input", () => {
             const keyword = searchInput.value.toLowerCase().trim();
-            const cards = document.querySelectorAll(".catalog-card, .offer-card");
 
-            cards.forEach(card => {
-                const name =
-                    (card.dataset.name || card.innerText || "")
-                        .toLowerCase();
+            document
+                .querySelectorAll(".compact-card, .catalog-card, .offer-card")
+                .forEach(card => {
+                    const name =
+                        (card.dataset.name || card.innerText || "")
+                            .toLowerCase();
 
-                card.style.display = name.includes(keyword) ? "" : "none";
-            });
+                    card.style.display = name.includes(keyword) ? "" : "none";
+                });
         });
     }
 });
@@ -117,45 +92,46 @@ function initHeroSlider() {
     if (!slides.length) return;
 
     let current = 0;
+    let timer = null;
 
     function showSlide(index) {
-        slides.forEach(s => s.classList.remove("active"));
-        dots.forEach(d => d.classList.remove("active"));
+        if (!slides[index]) return;
+
+        slides.forEach(slide => {
+            slide.classList.remove("active");
+        });
+
+        dots.forEach(dot => {
+            dot.classList.remove("active");
+        });
 
         slides[index].classList.add("active");
-        if (dots[index]) dots[index].classList.add("active");
+
+        if (dots[index]) {
+            dots[index].classList.add("active");
+        }
 
         current = index;
+    }
+
+    function startAutoSlide() {
+        clearInterval(timer);
+
+        timer = setInterval(() => {
+            const next = (current + 1) % slides.length;
+            showSlide(next);
+        }, 4500);
     }
 
     dots.forEach(dot => {
         dot.addEventListener("click", () => {
             showSlide(Number(dot.dataset.slide));
+            startAutoSlide();
         });
     });
 
-    setInterval(() => {
-        const next = (current + 1) % slides.length;
-        showSlide(next);
-    }, 4500);
-}
-
-async function loadNotificationCount(username, badge) {
-    try {
-        const res = await fetch(`/api/history/${username}`);
-        const data = await res.json();
-
-        if (!data.success || !data.orders) {
-            badge.innerText = "0";
-            return;
-        }
-
-        const activeOrders = data.orders.filter(o => o.status !== "completed");
-        badge.innerText = activeOrders.length;
-
-    } catch (error) {
-        badge.innerText = "0";
-    }
+    showSlide(0);
+    startAutoSlide();
 }
 
 function showToast(text) {
@@ -182,6 +158,7 @@ function showToast(text) {
     toast.style.transition = ".3s";
 
     clearTimeout(window.toastTimer);
+
     window.toastTimer = setTimeout(() => {
         toast.style.opacity = "0";
     }, 2200);

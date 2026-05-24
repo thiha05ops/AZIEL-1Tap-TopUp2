@@ -370,3 +370,14 @@ footer {
     font-size: 28px;
   }
 }
+
+.hero-slide {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .7s ease;
+}
+
+.hero-slide.active {
+  opacity: 1;
+  pointer-events: auto;
+}
