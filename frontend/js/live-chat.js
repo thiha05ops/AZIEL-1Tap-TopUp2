@@ -1,3 +1,8 @@
+document.addEventListener("DOMContentLoaded", () => {
+
+    createLiveChatUI();
+
+});
 const chatInput = document.getElementById("chatInput");
 const sendChatBtn = document.getElementById("sendChatBtn");
 const chatMessages = document.getElementById("chatMessages");
