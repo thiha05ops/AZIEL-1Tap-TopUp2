@@ -1711,3 +1711,67 @@ footer {
 .hero-slide:hover img {
   transform: scale(1.03);
 }
+
+/* =========================
+   BUTTON MICRO INTERACTION
+========================= */
+
+.hero-primary-btn,
+.hero-secondary-btn,
+.section-head a,
+.nav-links a,
+.profile-box,
+.category-pill,
+.chat-ball {
+  transition:
+    transform .2s ease,
+    opacity .2s ease,
+    box-shadow .2s ease;
+}
+
+.hero-primary-btn:hover,
+.hero-secondary-btn:hover,
+.section-head a:hover,
+.profile-box:hover,
+.category-pill:hover {
+  transform: translateY(-2px);
+}
+
+.hero-primary-btn:active,
+.hero-secondary-btn:active,
+.category-pill:active {
+  transform: scale(.96);
+}
+
+.nav-links a:hover {
+  opacity: .75;
+}
+
+/* =========================
+   PAGE APPEAR ANIMATION
+========================= */
+
+.hero-slider,
+.home-section,
+.main-footer {
+  animation:
+    fadeUp .6s ease;
+}
+
+@keyframes fadeUp {
+
+  from {
+    opacity: 0;
+
+    transform:
+      translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+
+    transform:
+      translateY(0);
+  }
+
+}
