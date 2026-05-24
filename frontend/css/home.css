@@ -1684,3 +1684,30 @@ footer {
 .trending-info p {
   line-height: 1.4;
 }
+
+/* =========================
+   IMAGE HOVER EFFECT
+========================= */
+
+.compact-card img,
+.trending-card img,
+.hero-slide img {
+  transition:
+    transform .35s ease,
+    filter .35s ease;
+}
+
+.compact-card:hover img,
+.trending-card:hover img {
+  transform: scale(1.08);
+
+  filter: brightness(1.05);
+}
+
+.hero-slide {
+  overflow: hidden;
+}
+
+.hero-slide:hover img {
+  transform: scale(1.03);
+}
