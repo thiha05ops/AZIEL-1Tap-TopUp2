@@ -1278,3 +1278,152 @@ footer {
   }
 
 }
+
+/* =========================
+   TRENDING GAMES
+========================= */
+
+.trending-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(auto-fit, minmax(280px, 1fr));
+
+  gap: 18px;
+}
+
+.trending-card {
+  position: relative;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 14px;
+
+  padding: 16px;
+
+  background: #fff;
+
+  border-radius: 22px;
+
+  text-decoration: none;
+
+  overflow: hidden;
+
+  border: 1px solid #ececec;
+
+  transition:
+    transform .25s ease,
+    box-shadow .25s ease;
+}
+
+.trending-card:hover {
+  transform: translateY(-5px);
+
+  box-shadow:
+    0 18px 40px rgba(0, 0, 0, .12);
+}
+
+.trending-rank {
+  position: absolute;
+
+  top: 14px;
+  left: 14px;
+
+  width: 34px;
+  height: 34px;
+
+  border-radius: 50%;
+
+  background:
+    linear-gradient(135deg,
+      #f59e0b,
+      #f97316);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  color: white;
+
+  font-size: 13px;
+  font-weight: 900;
+
+  box-shadow:
+    0 8px 18px rgba(245, 158, 11, .35);
+}
+
+.trending-card img {
+  width: 72px;
+
+  height: 72px;
+
+  object-fit: cover;
+
+  border-radius: 18px;
+
+  flex-shrink: 0;
+
+  transition: .25s ease;
+}
+
+.trending-card:hover img {
+  transform: scale(1.06);
+}
+
+.trending-info {
+  flex: 1;
+}
+
+.trending-info h3 {
+  font-size: 17px;
+
+  color: #111827;
+
+  margin-bottom: 6px;
+}
+
+.trending-info p {
+  font-size: 13px;
+
+  color: #6b7280;
+}
+
+.trending-badge {
+  position: absolute;
+
+  right: 14px;
+  top: 14px;
+
+  padding: 6px 10px;
+
+  border-radius: 999px;
+
+  font-size: 11px;
+  font-weight: 900;
+
+  color: white;
+}
+
+.trending-badge.hot {
+  background: #ef4444;
+}
+
+.trending-badge.fast {
+  background: #06b6d4;
+}
+
+.trending-badge.new {
+  background: #8b5cf6;
+}
+
+/* MOBILE */
+
+@media (max-width: 768px) {
+
+  .trending-grid {
+    grid-template-columns: 1fr;
+  }
+
+}
