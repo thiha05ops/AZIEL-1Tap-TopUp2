@@ -65,3 +65,61 @@ body {
     font-weight: bold;
     cursor: pointer;
 }
+
+@media (max-width: 768px) {
+    .home-header {
+        position: static !important;
+        padding: 14px 16px 10px;
+        gap: 10px;
+    }
+
+    .nav-links {
+        width: 100%;
+        display: flex;
+        gap: 10px;
+        overflow-x: auto;
+        white-space: nowrap;
+        padding: 4px 0 8px;
+        scrollbar-width: none;
+    }
+
+    .nav-links::-webkit-scrollbar {
+        display: none;
+    }
+
+    .nav-links a {
+        font-size: 12px;
+        line-height: 1;
+        flex-shrink: 0;
+        padding: 8px 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, .65);
+    }
+
+    #notificationBell {
+        position: static !important;
+        width: auto;
+        height: auto;
+        padding: 8px 10px;
+        border-radius: 999px;
+    }
+
+    #mobileGames .compact-grid {
+        display: flex;
+        overflow-x: auto;
+        gap: 14px;
+        padding: 4px 2px 16px;
+        scroll-snap-type: x mandatory;
+        scrollbar-width: none;
+    }
+
+    #mobileGames .compact-grid::-webkit-scrollbar {
+        display: none;
+    }
+
+    #mobileGames .compact-card {
+        min-width: 78%;
+        max-width: 78%;
+        scroll-snap-align: start;
+    }
+}

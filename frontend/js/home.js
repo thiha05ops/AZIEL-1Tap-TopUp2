@@ -229,3 +229,78 @@ function initMobileNavAutoHide() {
         lastScrollY = currentScrollY;
     });
 }
+/* =========================
+   MOBILE DRAWER
+========================= */
+
+const mobileMenuBtn =
+    document.getElementById("mobileMenuBtn");
+
+const mobileDrawer =
+    document.getElementById("mobileDrawer");
+
+const mobileDrawerOverlay =
+    document.getElementById("mobileDrawerOverlay");
+
+const closeDrawerBtn =
+    document.getElementById("closeDrawerBtn");
+
+function openMobileDrawer() {
+
+    mobileDrawer.classList.add("show");
+
+    mobileDrawerOverlay.classList.add("show");
+
+    document.body.style.overflow = "hidden";
+
+}
+
+function closeMobileDrawer() {
+
+    mobileDrawer.classList.remove("show");
+
+    mobileDrawerOverlay.classList.remove("show");
+
+    document.body.style.overflow = "";
+
+}
+
+if (mobileMenuBtn) {
+
+    mobileMenuBtn.addEventListener(
+        "click",
+        openMobileDrawer
+    );
+
+}
+
+if (closeDrawerBtn) {
+
+    closeDrawerBtn.addEventListener(
+        "click",
+        closeMobileDrawer
+    );
+
+}
+
+if (mobileDrawerOverlay) {
+
+    mobileDrawerOverlay.addEventListener(
+        "click",
+        closeMobileDrawer
+    );
+
+}
+
+/* CLOSE DRAWER WHEN LINK CLICK */
+
+document.querySelectorAll(
+    ".mobile-drawer a"
+).forEach(link => {
+
+    link.addEventListener(
+        "click",
+        closeMobileDrawer
+    );
+
+});
