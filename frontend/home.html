@@ -4,27 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <title>AZIEL 1Tap TopUp</title>
 
-    <meta name="description"
-        content="AZIEL 1Tap Shop - Fast and secure game topup website for MLBB, PUBG, Free Fire and HOK with MMK and THB payments.">
-
-    <meta name="keywords"
-        content="AZIEL, AZIEL 1Tap Shop, MLBB topup, PUBG UC, Free Fire diamonds, HOK tokens, Myanmar topup, Thailand topup">
-
-    <meta name="author" content="AZIEL 1Tap Shop">
-
-    <meta property="og:title" content="AZIEL 1Tap Shop">
-    <meta property="og:description" content="Fast and secure game topup website.">
-    <meta property="og:image" content="https://aziel-1tap-topup2.onrender.com/assets/logo.webp">
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://aziel-1tap-topup2.onrender.com">
-
-    <!-- Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
-    <!-- CSS -->
     <link rel="stylesheet" href="css/home-desktop.css">
     <link rel="stylesheet" href="css/home-mobile.css">
     <link rel="stylesheet" href="css/notification.css">
@@ -32,16 +15,12 @@
 
 <body>
 
-    <!-- HEADER -->
     <header class="az-header">
-
-        <button id="mobileMenuBtn" class="mobile-menu-btn" aria-label="Open menu">
+        <button id="mobileMenuBtn" class="mobile-menu-btn">
             <i class="fa-solid fa-bars"></i>
         </button>
 
-        <a href="home.html" class="az-logo">
-            AZIEL
-        </a>
+        <a href="home.html" class="az-logo">AZIEL</a>
 
         <nav class="desktop-nav">
             <a href="home.html">Home</a>
@@ -52,10 +31,8 @@
         </nav>
 
         <div class="header-actions">
-
             <div class="search-box">
-                <input type="text" id="searchInput" placeholder="Search game or card">
-
+                <input id="searchInput" type="text" placeholder="Search game or card">
                 <div id="searchDropdown" class="search-dropdown"></div>
             </div>
 
@@ -68,7 +45,6 @@
                 <div class="avatar" id="avatarText">
                     <i class="fa-regular fa-user"></i>
                 </div>
-
                 <span id="usernameText">Login</span>
 
                 <div class="profile-dropdown" id="profileDropdown">
@@ -77,128 +53,72 @@
                     <button id="logoutBtn">Logout</button>
                 </div>
             </div>
-
         </div>
-
     </header>
 
-    <!-- MOBILE DRAWER -->
     <div id="mobileDrawerOverlay" class="mobile-drawer-overlay"></div>
 
     <aside id="mobileDrawer" class="mobile-drawer">
-
         <div class="drawer-head">
             <strong>AZIEL</strong>
-
-            <button id="closeDrawerBtn" aria-label="Close menu">
+            <button id="closeDrawerBtn">
                 <i class="fa-solid fa-xmark"></i>
             </button>
         </div>
 
-        <a href="home.html">
-            <i class="fa-solid fa-house"></i>
-            <span>Home</span>
-        </a>
-
-        <a href="#mobileGames">
-            <i class="fa-solid fa-gamepad"></i>
-            <span>Mobile Games</span>
-        </a>
-
-        <a href="#pcGames">
-            <i class="fa-solid fa-desktop"></i>
-            <span>PC Games</span>
-        </a>
-
-        <a href="#giftCards">
-            <i class="fa-solid fa-credit-card"></i>
-            <span>Gift Cards</span>
-        </a>
-
-        <a href="support.html">
-            <i class="fa-solid fa-headset"></i>
-            <span>Help Center</span>
-        </a>
-
-        <a href="account.html">
-            <i class="fa-regular fa-user"></i>
-            <span>Account</span>
-        </a>
-
+        <a href="home.html"><i class="fa-solid fa-house"></i><span>Home</span></a>
+        <a href="#mobileGames"><i class="fa-solid fa-gamepad"></i><span>Mobile Games</span></a>
+        <a href="#pcGames"><i class="fa-solid fa-desktop"></i><span>PC Games</span></a>
+        <a href="#giftCards"><i class="fa-solid fa-credit-card"></i><span>Gift Cards</span></a>
+        <a href="support.html"><i class="fa-solid fa-headset"></i><span>Help Center</span></a>
+        <a href="account.html"><i class="fa-regular fa-user"></i><span>Account</span></a>
     </aside>
 
-    <!-- MAIN -->
     <main id="mainHome">
 
-        <!-- HERO SLIDER -->
         <section class="hero-slider">
-
             <div class="hero-slide active">
-                <img src="assets/games/hero.webp" alt="AZIEL Hero" loading="eager">
-
+                <img src="assets/games/hero.webp" alt="AZIEL Hero">
                 <div class="hero-overlay"></div>
 
                 <div class="hero-content">
                     <span class="hero-badge">AZIEL OFFICIAL</span>
-
                     <h1>Fast & Secure Game Top Up</h1>
-
-                    <p>
-                        Trusted top-up service for Myanmar and Thailand.
-                    </p>
+                    <p>Trusted top-up service for Myanmar and Thailand.</p>
 
                     <div class="hero-buttons">
-                        <a href="#mobileGames" class="hero-primary-btn">
-                            Top Up Now
-                        </a>
-
-                        <a href="support.html" class="hero-secondary-btn">
-                            Contact Support
-                        </a>
+                        <a href="#mobileGames" class="hero-primary-btn">Top Up Now</a>
+                        <a href="support.html" class="hero-secondary-btn">Contact Support</a>
                     </div>
                 </div>
             </div>
 
             <div class="hero-slide">
-                <img src="assets/games/mlbb.webp" alt="Mobile Legends" loading="lazy">
-
+                <img src="assets/games/mlbb.webp" alt="Mobile Legends">
                 <div class="hero-overlay"></div>
 
                 <div class="hero-content">
                     <span class="hero-badge">MOBILE LEGENDS</span>
-
                     <h1>MLBB Diamonds Top Up</h1>
-
-                    <p>
-                        Fast diamond top-up with secure payment flow.
-                    </p>
+                    <p>Fast diamond top-up with secure payment flow.</p>
 
                     <div class="hero-buttons">
-                        <a href="mlbb.html" class="hero-primary-btn">
-                            Buy Now
-                        </a>
+                        <a href="mlbb.html" class="hero-primary-btn">Buy Now</a>
                     </div>
                 </div>
             </div>
 
             <div class="hero-slide">
-                <img src="assets/games/pubg.webp" alt="PUBG Mobile" loading="lazy">
-
+                <img src="assets/games/pubg.webp" alt="PUBG Mobile">
                 <div class="hero-overlay"></div>
 
                 <div class="hero-content">
                     <span class="hero-badge">PUBG MOBILE</span>
-
                     <h1>PUBG UC Top Up</h1>
-
-                    <p>
-                        Easy UC top-up with region-based payment methods.
-                    </p>
+                    <p>Easy UC top-up with region-based payment methods.</p>
 
                     <div class="hero-buttons">
-                        <a href="pubg.html" class="hero-primary-btn">
-                            Buy UC
-                        </a>
+                        <a href="pubg.html" class="hero-primary-btn">Buy UC</a>
                     </div>
                 </div>
             </div>
@@ -208,318 +128,164 @@
                 <span class="dot" data-slide="1"></span>
                 <span class="dot" data-slide="2"></span>
             </div>
-
         </section>
 
-        <!-- TRENDING GAMES -->
-        <section class="home-section">
-
-            <div class="section-head">
-                <div>
-                    <h2>Trending Games</h2>
-                    <p>Popular top-up services right now.</p>
-                </div>
-
-                <a href="#mobileGames">View all</a>
-            </div>
-
-            <div class="trending-grid">
-
-                <a href="mlbb.html" class="trending-card active-card">
-                    <div class="trending-rank">#1</div>
-
-                    <img src="assets/games/mlbb.webp" alt="Mobile Legends" loading="lazy">
-
-                    <div class="trending-info">
-                        <h3>Mobile Legends</h3>
-                        <p>Fast diamond top-up</p>
-                    </div>
-
-                    <span class="trending-badge hot">HOT</span>
-                </a>
-
-                <a href="pubg.html" class="trending-card active-card">
-                    <div class="trending-rank">#2</div>
-
-                    <img src="assets/games/pubg.webp" alt="PUBG Mobile" loading="lazy">
-
-                    <div class="trending-info">
-                        <h3>PUBG Mobile</h3>
-                        <p>UC instant service</p>
-                    </div>
-
-                    <span class="trending-badge fast">FAST</span>
-                </a>
-
-                <a href="hok.html" class="trending-card active-card">
-                    <div class="trending-rank">#3</div>
-
-                    <img src="assets/games/hok.webp" alt="Honor of Kings" loading="lazy">
-
-                    <div class="trending-info">
-                        <h3>Honor of Kings</h3>
-                        <p>Token top-up</p>
-                    </div>
-
-                    <span class="trending-badge new">NEW</span>
-                </a>
-
-            </div>
-
-        </section>
-
-        <!-- MOBILE GAMES -->
         <section class="home-section" id="mobileGames">
-
             <div class="section-head">
                 <div>
                     <h2>Mobile Games</h2>
                     <p>Top-up your favorite mobile games.</p>
                 </div>
-
                 <a href="mobile-games.html">View all</a>
             </div>
 
             <div class="compact-grid horizontal-group">
-
                 <a href="mlbb.html" class="compact-card active-card" data-name="Mobile Legends MLBB Diamonds">
-                    <img src="assets/games/mlbb.webp" alt="Mobile Legends" loading="lazy">
-
+                    <img src="assets/games/mlbb.webp" alt="Mobile Legends">
                     <div>
                         <h3>Mobile Legends Diamonds</h3>
                         <p>Instant Top Up</p>
                     </div>
-
                     <span>HOT</span>
                 </a>
 
                 <a href="pubg.html" class="compact-card active-card" data-name="PUBG Mobile UC">
-                    <img src="assets/games/pubg.webp" alt="PUBG Mobile" loading="lazy">
-
+                    <img src="assets/games/pubg.webp" alt="PUBG Mobile">
                     <div>
                         <h3>PUBG Mobile UC</h3>
                         <p>Global / Thailand</p>
                     </div>
-
                     <span>UC</span>
                 </a>
 
                 <a href="freefire.html" class="compact-card active-card" data-name="Free Fire Diamonds">
-                    <img src="assets/games/freefire.webp" alt="Free Fire" loading="lazy">
-
+                    <img src="assets/games/freefire.webp" alt="Free Fire">
                     <div>
                         <h3>Free Fire Diamonds</h3>
                         <p>Fast Delivery</p>
                     </div>
-
                     <span>FAST</span>
                 </a>
 
                 <a href="hok.html" class="compact-card active-card" data-name="Honor of Kings HOK">
-                    <img src="assets/games/hok.webp" alt="Honor of Kings" loading="lazy">
-
+                    <img src="assets/games/hok.webp" alt="Honor of Kings">
                     <div>
                         <h3>Honor of Kings Tokens</h3>
                         <p>MOBA Top Up</p>
                     </div>
-
                     <span>NEW</span>
                 </a>
 
                 <a href="genshin.html" class="compact-card active-card" data-name="Genshin Impact">
-                    <img src="assets/games/genshin.webp" alt="Genshin Impact" loading="lazy">
-
+                    <img src="assets/games/genshin.webp" alt="Genshin Impact">
                     <div>
                         <h3>Genshin Impact</h3>
                         <p>Genesis Crystal</p>
                     </div>
-
                     <span>RPG</span>
                 </a>
 
                 <a href="roblox.html" class="compact-card active-card" data-name="Roblox Robux">
-                    <img src="assets/games/roblox.webp" alt="Roblox" loading="lazy">
-
+                    <img src="assets/games/roblox.webp" alt="Roblox">
                     <div>
                         <h3>Roblox Robux</h3>
                         <p>Robux Top Up</p>
                     </div>
-
                     <span>GAME</span>
                 </a>
-
             </div>
-
         </section>
 
-        <!-- PC GAMES -->
         <section class="home-section" id="pcGames">
-
             <div class="section-head">
                 <div>
                     <h2>PC Games</h2>
                     <p>More PC game services are coming soon.</p>
                 </div>
-
                 <a href="pc-games.html">View all</a>
             </div>
 
             <div class="compact-grid horizontal-group">
-
-                <div class="compact-card coming-soon-card" data-name="Valorant">
+                <div class="compact-card coming-soon-card">
                     <div class="logo-card">V</div>
-
                     <div>
                         <h3>Valorant</h3>
                         <p>Coming Soon</p>
                     </div>
-
                     <span>SOON</span>
                 </div>
 
-                <div class="compact-card coming-soon-card" data-name="Steam Wallet">
+                <div class="compact-card coming-soon-card">
                     <div class="logo-card">ST</div>
-
                     <div>
                         <h3>Steam Wallet</h3>
                         <p>Coming Soon</p>
                     </div>
-
                     <span>SOON</span>
                 </div>
 
-                <div class="compact-card coming-soon-card" data-name="Minecraft">
+                <div class="compact-card coming-soon-card">
                     <div class="logo-card">MC</div>
-
                     <div>
                         <h3>Minecraft</h3>
                         <p>Coming Soon</p>
                     </div>
-
                     <span>SOON</span>
                 </div>
-
-                <div class="compact-card coming-soon-card" data-name="League of Legends">
-                    <div class="logo-card">LOL</div>
-
-                    <div>
-                        <h3>League of Legends</h3>
-                        <p>Coming Soon</p>
-                    </div>
-
-                    <span>SOON</span>
-                </div>
-
             </div>
-
         </section>
 
-        <!-- GIFT CARDS -->
         <section class="home-section" id="giftCards">
-
             <div class="section-head">
                 <div>
                     <h2>Gift Cards</h2>
                     <p>Digital cards and online services.</p>
                 </div>
-
                 <a href="gift-cards.html">View all</a>
             </div>
 
             <div class="compact-grid horizontal-group">
-
-                <div class="compact-card coming-soon-card" data-name="Google Play Gift Card">
+                <div class="compact-card coming-soon-card">
                     <div class="logo-card">GP</div>
-
                     <div>
                         <h3>Google Play</h3>
                         <p>Coming Soon</p>
                     </div>
-
                     <span>SOON</span>
                 </div>
 
-                <div class="compact-card coming-soon-card" data-name="Apple Gift Card">
+                <div class="compact-card coming-soon-card">
                     <div class="logo-card">AP</div>
-
                     <div>
                         <h3>Apple Gift Card</h3>
                         <p>Coming Soon</p>
                     </div>
-
                     <span>SOON</span>
                 </div>
 
-                <div class="compact-card coming-soon-card" data-name="PlayStation PSN Card">
+                <div class="compact-card coming-soon-card">
                     <div class="logo-card">PS</div>
-
                     <div>
                         <h3>PSN Card</h3>
                         <p>Coming Soon</p>
                     </div>
-
                     <span>SOON</span>
                 </div>
-
-                <div class="compact-card coming-soon-card" data-name="Netflix Gift Card">
-                    <div class="logo-card">NF</div>
-
-                    <div>
-                        <h3>Netflix</h3>
-                        <p>Coming Soon</p>
-                    </div>
-
-                    <span>SOON</span>
-                </div>
-
             </div>
-
-        </section>
-
-        <!-- CATEGORIES -->
-        <section class="home-section">
-
-            <div class="section-head">
-                <div>
-                    <h2>Categories</h2>
-                    <p>Browse by service type.</p>
-                </div>
-            </div>
-
-            <div class="category-slider">
-                <div class="category-pill">Popular</div>
-                <div class="category-pill">Game Top Up</div>
-                <div class="category-pill">Diamonds</div>
-                <div class="category-pill">Trending</div>
-                <div class="category-pill">Gift Cards</div>
-                <div class="category-pill">Payment</div>
-                <div class="category-pill">Instant Delivery</div>
-                <div class="category-pill">Thailand</div>
-                <div class="category-pill">Myanmar</div>
-            </div>
-
         </section>
 
     </main>
 
-    <!-- FOOTER -->
     <footer class="main-footer">
-
         <div class="footer-top">
-
             <div class="footer-box">
                 <h3>Payment Methods</h3>
-
-                <p>
-                    Fast and secure payments for your selected region.
-                </p>
-
+                <p>Fast and secure payments for your selected region.</p>
                 <div id="paymentLogos" class="payment-logos"></div>
             </div>
 
             <div class="footer-box">
                 <h3>Policies</h3>
-
                 <a href="#">Privacy Policy</a>
                 <a href="#">Refund Policy</a>
                 <a href="#">Terms & Conditions</a>
@@ -528,27 +294,19 @@
 
             <div class="footer-box">
                 <h3>Contact</h3>
-
                 <a href="#">Telegram Support</a>
                 <a href="#">Facebook Page</a>
                 <a href="#">TikTok</a>
                 <a href="mailto:support@aziel.com">support@aziel.com</a>
             </div>
-
         </div>
 
         <div class="footer-bottom">
             <div>© 2026 AZIEL 1Tap Shop</div>
-
-            <div class="footer-region">
-                Region:
-                <span id="paymentRegionText">Myanmar</span>
-            </div>
+            <div class="footer-region">Region: <span id="paymentRegionText">Myanmar</span></div>
         </div>
-
     </footer>
 
-    <!-- JS -->
     <script src="/socket.io/socket.io.js"></script>
     <script src="js/auth-check.js"></script>
     <script src="js/logout.js"></script>
