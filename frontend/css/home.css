@@ -1775,3 +1775,69 @@ footer {
   }
 
 }
+
+/* =========================
+   MOBILE NAV FIX
+========================= */
+
+@media (max-width: 768px) {
+
+  .home-header {
+    padding: 18px 16px;
+    gap: 14px;
+  }
+
+  .logo {
+    font-size: 42px;
+    width: 100%;
+  }
+
+  .header-right {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+  }
+
+  .nav-links {
+    width: 100%;
+    display: flex;
+    gap: 18px;
+    overflow-x: auto;
+    padding: 8px 0 12px;
+  }
+
+  .nav-links a {
+    font-size: 13px;
+    line-height: 1.2;
+    white-space: nowrap;
+    font-weight: 800;
+  }
+
+  .notification-wrapper {
+    position: static;
+  }
+
+  #notificationBell {
+    position: fixed;
+    right: 16px;
+    top: 150px;
+    z-index: 99999;
+    background: #fff;
+    border-radius: 16px;
+    padding: 10px 12px;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, .12);
+  }
+
+  .notification-dropdown {
+    position: fixed !important;
+    top: 205px !important;
+    right: 14px !important;
+    left: 14px !important;
+    width: auto !important;
+    max-height: 360px;
+    overflow-y: auto;
+    z-index: 999999;
+    border-radius: 18px;
+  }
+}
