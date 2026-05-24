@@ -87,8 +87,8 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function initHeroSlider() {
-    const slides = document.querySelectorAll(".hero-slide");
-    const dots = document.querySelectorAll(".dot");
+    const slides = document.querySelectorAll(".hero-swiper .hero-slide");
+    const dots = document.querySelectorAll(".hero-swiper .dot");
 
     if (!slides.length) return;
 
