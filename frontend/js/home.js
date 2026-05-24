@@ -48,6 +48,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     initHeroSlider();
+    loadRegionPayments();
 
     document.querySelectorAll(".coming-soon-card").forEach(card => {
         card.addEventListener("click", () => {
@@ -162,4 +163,31 @@ function showToast(text) {
     window.toastTimer = setTimeout(() => {
         toast.style.opacity = "0";
     }, 2200);
+}
+function loadRegionPayments() {
+    const box = document.getElementById("paymentLogos");
+    const regionText = document.getElementById("paymentRegionText");
+
+    if (!box) return;
+
+    const region =
+        localStorage.getItem("selectedRegion") ||
+        localStorage.getItem("region") ||
+        "myanmar";
+
+    const isThailand =
+        region.toLowerCase().includes("thai") ||
+        region.toLowerCase() === "thailand";
+
+    const logos = isThailand
+        ? ["promptpay.png", "scb.png"]
+        : ["kbzpay.png", "wavepay.png", "ayapay.png"];
+
+    if (regionText) {
+        regionText.innerText = isThailand ? "Thailand" : "Myanmar";
+    }
+
+    box.innerHTML = logos.map(logo => `
+        <img src="assets/payment/${logo}" alt="${logo}">
+    `).join("");
 }

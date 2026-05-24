@@ -487,3 +487,25 @@ footer {
   opacity: 1;
   pointer-events: auto;
 }
+
+.payment-region-box {
+  background: #fff;
+  border-radius: 18px;
+  padding: 22px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .06);
+}
+
+.payment-logos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.payment-logos img {
+  height: 42px;
+  max-width: 110px;
+  object-fit: contain;
+  background: #f9fafb;
+  padding: 8px 12px;
+  border-radius: 12px;
+}
