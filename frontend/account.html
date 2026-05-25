@@ -7,25 +7,57 @@
     <title>Account - AZIEL</title>
 
     <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/components.css">
     <link rel="stylesheet" href="css/account.css">
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @media (min-width: 900px) {
+            .account-layout {
+                width: 95vw !important;
+                max-width: 1450px !important;
+                margin: 32px auto 80px !important;
+                display: grid !important;
+                grid-template-columns: 320px 1fr !important;
+                gap: 30px !important;
+            }
+
+            .account-sidebar {
+                width: 320px !important;
+            }
+
+            .account-content {
+                width: 100% !important;
+                display: block !important;
+            }
+
+            .dashboard-grid {
+                display: grid !important;
+                grid-template-columns: repeat(4, 1fr) !important;
+                gap: 18px !important;
+            }
+
+            .dash-card {
+                min-height: 145px !important;
+                padding: 26px !important;
+            }
+        }
+    </style>
 </head>
 
 <body>
 
-    <header class="account-header">
-        <a href="home.html" class="brand">AZIEL</a>
+    <header class="account-topbar">
+        <button id="mobileMenuBtn" class="account-menu-btn" type="button">
+            <i class="fa-solid fa-bars"></i>
+        </button>
+
+        <a href="home.html" class="account-brand">AZIEL</a>
 
         <div class="account-top-actions">
-
-
-            <div id="notifPanel">
-                <div class="notif-header">Notifications</div>
-                <div id="notifList"></div>
-            </div>
-            <button id="mobileMenuBtn" class="mobile-menu-btn" type="button">
-                ☰
-            </button>
+            <a href="home.html" class="top-link">Home</a>
+            <a href="support.html" class="top-link">Support</a>
             <button id="logoutBtn" class="logout-btn">Logout</button>
         </div>
     </header>
@@ -35,35 +67,65 @@
         <aside class="account-sidebar">
             <div class="profile-card">
                 <div class="avatar-big" id="avatarText">U</div>
-                <h3 id="profileName">Username</h3>
-                <p id="profileRegion">Region: MM</p>
-                <span class="verified-badge">Verified Customer</span>
+
+                <div class="profile-info">
+                    <h3 id="profileName">Username</h3>
+                    <p id="profileRegion">Region: MM</p>
+                    <span class="verified-badge">Verified Customer</span>
+                </div>
             </div>
 
             <nav class="account-menu">
-                <button class="side-link active" data-tab="overview">🏠 Overview</button>
+                <button class="side-link active" data-tab="overview">
+                    <i class="fa-solid fa-chart-line"></i>
+                    <span>Overview</span>
+                </button>
+
                 <a href="wallet.html" class="side-link">
-                    💰 Wallet
+                    <i class="fa-solid fa-wallet"></i>
+                    <span>Wallet</span>
                 </a>
-                <button class="side-link" data-tab="history">📦 Orders</button>
-                <button class="side-link" data-tab="profile">👤 Profile</button>
-                <button class="side-link" data-tab="security">🔒 Security</button>
+
+                <button class="side-link" data-tab="history">
+                    <i class="fa-solid fa-box"></i>
+                    <span>Orders</span>
+                </button>
+
+                <button class="side-link" data-tab="profile">
+                    <i class="fa-regular fa-user"></i>
+                    <span>Profile</span>
+                </button>
+
+                <button class="side-link" data-tab="security">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    <span>Security</span>
+                </button>
+
                 <a href="support.html" class="side-link support-link">
+                    <i class="fa-solid fa-headset"></i>
                     <span>Customer Support</span>
-                    <div class="hero-icon">
-                        <i class="fa-solid fa-headset"></i>
-                    </div>
-                    <span class="live-badge">LIVE</span>
+                    <b>LIVE</b>
                 </a>
             </nav>
         </aside>
-        <div id="sidebarOverlay" class="sidebar-overlay"></div>
+
+
+
         <section class="account-content">
 
             <div id="notiPanel" class="noti-panel"></div>
+            <div id="notifPanel">
+                <div class="notif-header">Notifications</div>
+                <div id="notifList"></div>
+            </div>
 
             <div class="tab-panel active" id="overview">
-                <h1>Account Overview</h1>
+                <div class="page-title">
+                    <div>
+                        <h1>Account Overview</h1>
+                        <p>Manage your orders, wallet and profile settings.</p>
+                    </div>
+                </div>
 
                 <div class="dashboard-grid">
                     <div class="dash-card">
@@ -88,13 +150,20 @@
                 </div>
 
                 <div class="content-card">
-                    <h2>Recent Orders</h2>
+                    <div class="card-head">
+                        <h2>Recent Orders</h2>
+                        <a href="tracking.html">Track order</a>
+                    </div>
+
                     <div id="recentOrders">Loading...</div>
                 </div>
             </div>
 
             <div class="tab-panel" id="wallet">
-                <h1>Wallet</h1>
+                <div class="page-title">
+                    <h1>Wallet</h1>
+                    <p>View your balance and top-up wallet.</p>
+                </div>
 
                 <div class="content-card">
                     <h2>Balance</h2>
@@ -105,14 +174,21 @@
             </div>
 
             <div class="tab-panel" id="history">
-                <h1>Order History</h1>
+                <div class="page-title">
+                    <h1>Order History</h1>
+                    <p>Check all your previous and active orders.</p>
+                </div>
+
                 <div id="historyList">Loading...</div>
             </div>
 
             <div class="tab-panel" id="profile">
-                <h1>Profile Information</h1>
+                <div class="page-title">
+                    <h1>Profile Information</h1>
+                    <p>Update your display name and selected region.</p>
+                </div>
 
-                <div class="content-card">
+                <div class="content-card form-card">
                     <label>Display Name</label>
                     <input type="text" id="displayName" placeholder="Display name">
 
@@ -127,10 +203,13 @@
             </div>
 
             <div class="tab-panel" id="security">
-                <h1>Account Security</h1>
+                <div class="page-title">
+                    <h1>Account Security</h1>
+                    <p>Keep your account secure and update your password.</p>
+                </div>
 
                 <div class="content-card">
-                    <p>Keep your account safe. Change your password if you notice suspicious activity.</p>
+                    <p>Change your password if you notice suspicious activity.</p>
                     <a href="forgot.html" class="security-btn">Reset Password</a>
                 </div>
             </div>
@@ -138,6 +217,28 @@
         </section>
 
     </main>
+    <nav class="az-bottom-nav">
+        <a href="home.html">
+            <i class="fa-solid fa-house"></i>
+            <span>Home</span>
+        </a>
+
+        <a href="tracking.html">
+            <i class="fa-solid fa-box"></i>
+            <span>Orders</span>
+        </a>
+
+        <a href="notifications.html">
+            <i class="fa-regular fa-bell"></i>
+            <span>Alerts</span>
+        </a>
+
+        <a href="account.html" class="active">
+            <i class="fa-regular fa-user"></i>
+            <span>Account</span>
+        </a>
+    </nav>
+
     <script src="/socket.io/socket.io.js"></script>
     <script src="js/api.js"></script>
     <script src="js/account.js"></script>

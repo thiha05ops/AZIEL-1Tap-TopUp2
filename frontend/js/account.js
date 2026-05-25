@@ -189,35 +189,66 @@ function renderHistory(orders) {
     if (!box) return;
 
     if (!orders.length) {
-        box.innerHTML = `<p>No orders yet.</p>`;
+        box.innerHTML = `
+<div class="empty-orders">
+    <i class="fa-regular fa-folder-open"></i>
+
+    <h3>No Orders Yet</h3>
+
+    <p>
+        Your recent top-up orders will appear here.
+    </p>
+
+    <a href="shop.html">
+        Start Top Up
+    </a>
+</div>
+`;
         return;
     }
 
     box.innerHTML = orders.map(order => orderCard(order)).join("");
 }
 
-function renderRecent(orders) {
-    const box = document.getElementById("recentOrders");
-    if (!box) return;
-
-    if (!orders.length) {
-        box.innerHTML = `<p>No recent orders.</p>`;
-        return;
-    }
-
-    box.innerHTML = orders.slice(0, 4).map(order => orderCard(order)).join("");
-}
-
 function orderCard(order) {
+
+    const statusClass =
+        (order.status || "pending").toLowerCase();
+
     return `
-        <div class="history-card" onclick="window.location.href='tracking.html?orderId=${order.orderId}'">
-            <b>${order.orderId}</b>
-            <p>${order.game} - ${order.packageName}</p>
-            <p>${order.amount || 0} ${order.currency || ""}</p>
-            <p>Status: <span class="${statusClass(order.status)}">${order.status}</span></p>
+    <div class="order-card">
+
+        <div class="order-top">
+            <h3>#${order.orderId}</h3>
+
+            <span class="status ${statusClass}">
+                ${order.status || "Pending"}
+            </span>
         </div>
+
+        <div class="order-game">
+            ${order.game || "Game"}
+        </div>
+
+        <div class="order-package">
+            ${order.packageName || "Package"}
+        </div>
+
+        <div class="order-bottom">
+            <strong>
+                ${order.amount || 0}
+                ${order.currency || "Ks"}
+            </strong>
+
+            <a href="tracking.html?orderId=${order.orderId}">
+                Track
+            </a>
+        </div>
+
+    </div>
     `;
 }
+
 
 async function loadBellOrders() {
     const username = localStorage.getItem("username") || "guest";
