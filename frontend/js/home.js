@@ -162,51 +162,37 @@ function initHeroSlider() {
 
 }
 function loadRegionPayments() {
-
-    const region =
-        localStorage.getItem("selectedRegion") || "myanmar";
-
-    const paymentLogos =
-        document.getElementById("paymentLogos");
-
-    const paymentRegionText =
-        document.getElementById("paymentRegionText");
+    const paymentLogos = document.getElementById("paymentLogos");
+    const paymentRegionText = document.getElementById("paymentRegionText");
 
     if (!paymentLogos) return;
 
-    let logos = [];
+    const rawRegion =
+        localStorage.getItem("selectedRegion") ||
+        localStorage.getItem("region") ||
+        localStorage.getItem("userRegion") ||
+        localStorage.getItem("azielRegion") ||
+        "myanmar";
 
-    if (region === "thailand") {
+    const region = rawRegion.toLowerCase();
 
-        paymentRegionText.innerText =
-            "Thailand Payments";
+    const isThailand =
+        region.includes("thai") ||
+        region.includes("thailand") ||
+        region === "th" ||
+        region.includes("ไทย");
 
-        logos = [
-            "promptpay.png",
-            "scb.png"
-        ];
+    const logos = isThailand
+        ? ["promptpay.png", "scb.png"]
+        : ["kbzpay.png", "wavepay.png", "ayapay.png"];
 
-    } else {
-
-        paymentRegionText.innerText =
-            "Myanmar Payments";
-
-        logos = [
-            "kbzpay.png",
-            "wavepay.png",
-            "ayapay.png"
-        ];
-
+    if (paymentRegionText) {
+        paymentRegionText.innerText = isThailand ? "Thailand" : "Myanmar";
     }
 
-    paymentLogos.innerHTML =
-        logos.map(logo => `
-            <img
-                src="assets/payment/${logo}"
-                alt="${logo}"
-            >
-        `).join("");
-
+    paymentLogos.innerHTML = logos.map(logo => `
+        <img src="assets/payment/${logo}" alt="${logo}">
+    `).join("");
 }
 function initMobileNavAutoHide() {
     const header = document.querySelector(".home-header");
