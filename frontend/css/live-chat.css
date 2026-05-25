@@ -175,3 +175,29 @@
         height: 58px !important;
     }
 }
+
+@media (max-width: 768px) {
+    .chat-ball {
+        width: 50px !important;
+        height: 50px !important;
+        right: 18px !important;
+        bottom: 105px !important;
+        font-size: 20px !important;
+    }
+
+    .chat-badge {
+        min-width: 18px;
+        height: 18px;
+        font-size: 10px;
+    }
+
+    .online-dot {
+        width: 10px;
+        height: 10px;
+    }
+
+    .live-chat-panel {
+        bottom: 165px !important;
+        height: 62vh !important;
+    }
+}
