@@ -127,5 +127,26 @@ router.post("/login", async (req, res) => {
         });
     }
 });
+// ADMIN GET USERS LIST
+router.get("/admin/users", async (req, res) => {
+    try {
+        const users = await User.find({})
+            .select("username email displayName region createdAt")
+            .sort({ createdAt: -1 });
+
+        res.json({
+            success: true,
+            users
+        });
+
+    } catch (error) {
+        console.log("Admin users error:", error);
+
+        res.json({
+            success: false,
+            message: "Server error"
+        });
+    }
+});
 
 module.exports = router;

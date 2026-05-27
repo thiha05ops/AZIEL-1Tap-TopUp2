@@ -7,19 +7,37 @@
     <title>Mobile Legends - AZIEL</title>
 
     <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/components.css">
     <link rel="stylesheet" href="css/game.css">
     <link rel="stylesheet" href="css/payment-grid.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="css/responsive.css">
 </head>
 
 <body>
 
-    <header class="game-header">
-        <a href="home.html" class="brand">AZIEL</a>
+    <header class="az-topbar">
 
-        <div class="game-header-actions">
-            <a href="notifications.html" class="header-btn">🔔</a>
-            <a href="account.html" class="header-btn">👤 Account</a>
+        <a href="home.html" class="az-topbar-brand">
+            AZIEL
+        </a>
+
+        <div class="az-topbar-actions">
+
+            <a href="home.html">
+                Home
+            </a>
+
+            <a href="tracking.html">
+                Orders
+            </a>
+
+            <a href="account.html">
+                Account
+            </a>
+
         </div>
+
     </header>
 
     <main class="game-page">
@@ -88,6 +106,18 @@
                         <span>💎</span>
                         <h2>Select Package</h2>
                     </div>
+                    <button class="mobile-selected-package" id="openPackagePanel" type="button">
+                        <div class="mobile-pack-icon">
+                            <img src="assets/icons/diamond.webp" alt="">
+                        </div>
+
+                        <div>
+                            <strong id="mobileSelectedPackageName">Select Top-Up Amount</strong>
+                            <span id="mobileSelectedPackagePrice">Choose your package</span>
+                        </div>
+
+                        <b>›</b>
+                    </button>
 
                     <div class="packages" id="packages" data-game="mlbb"></div>
                 </div>
@@ -141,13 +171,94 @@
         </section>
 
     </main>
+    <nav class="az-bottom-nav">
 
-    <script src="js/auth-check.js"></script>
-    <script src="js/prices.js"></script>
-    <script src="js/region-payment.js"></script>
-    <script src="js/payment-redirect.js"></script>
-    <script src="js/payment.js"></script>
-    <script src="js/mlbb.js"></script>
+        <a href="home.html">
+            <i class="fa-solid fa-house"></i>
+            <span>Home</span>
+        </a>
+
+        <a href="tracking.html">
+            <i class="fa-solid fa-box"></i>
+            <span>Orders</span>
+        </a>
+
+        <a href="notifications.html">
+            <i class="fa-regular fa-bell"></i>
+            <span>Alerts</span>
+        </a>
+
+        <a href="account.html">
+            <i class="fa-regular fa-user"></i>
+            <span>Account</span>
+        </a>
+
+    </nav>
+    <div class="mobile-package-panel" id="mobilePackagePanel">
+        <div class="mobile-panel-card">
+            <div class="mobile-panel-head">
+                <h3>Select Top-Up Amount</h3>
+                <button id="closePackagePanel" type="button">×</button>
+            </div>
+
+            <div id="mobilePackageList"></div>
+
+            <button id="confirmPackagePanel" type="button">
+                Confirm
+            </button>
+        </div>
+    </div>
+    <div id="orderLoadingOverlay" class="order-loading-overlay">
+        <div class="order-loading-box">
+            <div class="order-loading-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+
+            <h3>Please wait a few seconds...</h3>
+            <p>Your order is being submitted.</p>
+        </div>
+    </div>
+    <div id="successModal" class="success-modal">
+
+        <div class="success-modal-box">
+
+            <div class="success-icon">
+                ✓
+            </div>
+
+            <h2>Order Submitted</h2>
+
+            <p>
+                Your payment screenshot has been sent successfully.
+            </p>
+
+            <div class="success-actions">
+
+                <button id="trackOrderBtn">
+                    Track Order
+                </button>
+
+                <button id="backHomeBtn">
+                    Back Home
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-script src="js/auth-check.js"></script>
+
+        <script src="js/prices.js"></script>
+        <!-script src="js/region-payment.js"></script>
+
+            <script src="js/payment-redirect.js"></script>
+            <script src="js/payment.js"></script>
+            <script src="js/mlbb.js"></script>
 
 </body>
 

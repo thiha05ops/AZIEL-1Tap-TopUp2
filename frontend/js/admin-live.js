@@ -1,459 +1,250 @@
 // frontend/js/admin-live.js
 
-document.addEventListener(
-    "DOMContentLoaded",
-    () => {
+document.addEventListener("DOMContentLoaded", () => {
+    startAdminLiveSystem();
+});
 
-        startAdminLiveSystem();
-
-    }
-);
-
-
-// ======================
-// START
-// ======================
+let adminUnreadCount = 0;
 
 function startAdminLiveSystem() {
+    if (window.__adminLiveStarted) return;
+    window.__adminLiveStarted = true;
 
-    // prevent duplicate
-    if (
-        window.__adminLiveStarted
-    ) {
-        return;
-    }
-
-    window.__adminLiveStarted =
-        true;
-
-    // socket check
-    if (
-        typeof io === "undefined"
-    ) {
-
-        console.log(
-            "Socket.IO not loaded"
-        );
-
+    if (typeof io === "undefined") {
+        console.log("Socket.IO not loaded");
         return;
     }
 
     const socket = io();
 
-    // join admin room
-    socket.emit(
-        "joinAdminRoom"
-    );
+    socket.emit("joinAdminRoom");
+    socket.emit("joinAdmin");
 
-    // realtime updates
-    socket.on(
-        "adminNewUpdate",
+    socket.on("adminNewUpdate", data => {
+        console.log("🔥 Admin Update:", data);
+        handleAdminUpdate(data);
+    });
 
-        data => {
+    socket.on("liveChatMessage", data => {
+        handleAdminUpdate({
+            type: "live_chat",
+            username: data.username || "Guest",
+            message: data.message || data.text || ""
+        });
+    });
 
-            console.log(
-                "🔥 Admin Update:",
-                data
-            );
-
-            handleAdminUpdate(
-                data
-            );
-
-        }
-
-    );
-
-    // unlock sound
     unlockAdminSound();
-
 }
 
+function handleAdminUpdate(data) {
+    if (!data || !data.type) return;
 
-// ======================
-// HANDLE UPDATE
-// ======================
-
-function handleAdminUpdate(
-    data
-) {
-
-    // SUPPORT
-    if (
-        data.type ===
-        "support_ticket"
-    ) {
+    if (data.type === "support_ticket") {
+        increaseAdminUnread();
 
         showAdminPopup({
-
-            title:
-                "🎫 New Support Ticket",
-
-            message:
-                `${data.username} submitted a support request`
-
+            title: "🎫 New Support Ticket",
+            message: `${data.username || "User"} submitted a support request`
         });
 
+        prependAdminActivity("Support Ticket", data.username || "User");
         playAdminSound();
-
         refreshSupportPage();
-
         return;
-
     }
 
-    // ORDER
-    if (
-        data.type ===
-        "new_order"
-    ) {
+    if (data.type === "live_chat") {
+        increaseAdminUnread();
 
         showAdminPopup({
-
-            title:
-                "📦 New Order",
-
-            message:
-                `${data.username} placed a new order`
-
+            title: "💬 Live Chat Message",
+            message: `${data.username || "Guest"}: ${data.message || ""}`
         });
 
+        prependAdminActivity("Live Chat", data.username || "Guest");
         playAdminSound();
-
-        refreshOrdersPage();
-
         return;
-
     }
 
-    // ORDER STATUS
-    if (
-        data.type ===
-        "order_status"
-    ) {
-
+    if (data.type === "new_order") {
         showAdminPopup({
-
-            title:
-                "⚡ Order Updated",
-
-            message:
-                `${data.orderId} → ${data.status}`
-
+            title: "📦 New Order",
+            message: `${data.username || "User"} placed a new order`
         });
 
+        prependAdminActivity("New Order", data.orderId || data.username || "Order");
+        playAdminSound();
         refreshOrdersPage();
-
-    }
-
-}
-
-
-// ======================
-// POPUP
-// ======================
-
-function showAdminPopup(
-    data
-) {
-
-    const old =
-        document.getElementById(
-            "adminLivePopup"
-        );
-
-    if (old) old.remove();
-
-    const popup =
-        document.createElement(
-            "div"
-        );
-
-    popup.id =
-        "adminLivePopup";
-
-    popup.innerHTML = `
-        <strong>
-            ${data.title}
-        </strong>
-
-        <br>
-
-        ${data.message}
-    `;
-
-    document.body.appendChild(
-        popup
-    );
-
-    popup.style.position =
-        "fixed";
-
-    popup.style.top =
-        "20px";
-
-    popup.style.right =
-        "-420px";
-
-    popup.style.padding =
-        "18px 20px";
-
-    popup.style.borderRadius =
-        "18px";
-
-    popup.style.background =
-        "linear-gradient(135deg,#7c3aed,#6d28d9)";
-
-    popup.style.color =
-        "#fff";
-
-    popup.style.fontWeight =
-        "800";
-
-    popup.style.zIndex =
-        "999999";
-
-    popup.style.transition =
-        ".4s";
-
-    popup.style.boxShadow =
-        "0 12px 40px rgba(0,0,0,.35)";
-
-    popup.style.maxWidth =
-        "340px";
-
-    setTimeout(() => {
-
-        popup.style.right =
-            "20px";
-
-    }, 100);
-
-    setTimeout(() => {
-
-        popup.style.right =
-            "-420px";
-
-        setTimeout(() => {
-
-            popup.remove();
-
-        }, 400);
-
-    }, 5000);
-
-}
-
-
-// ======================
-// SOUND
-// ======================
-
-function unlockAdminSound() {
-
-    document.addEventListener(
-        "click",
-
-        () => {
-
-            window.__adminSoundUnlocked =
-                true;
-
-        },
-
-        { once: true }
-    );
-
-}
-
-function playAdminSound() {
-
-    if (
-        !window.__adminSoundUnlocked
-    ) {
+        refreshAdminStats();
         return;
     }
 
-    const audio =
-        new Audio(
-            "/assets/sounds/notify.mp3"
-        );
+    if (data.type === "order_status") {
+        showAdminPopup({
+            title: "⚡ Order Updated",
+            message: `${data.orderId || "Order"} → ${data.status || "updated"}`
+        });
 
-    audio.volume = 0.9;
+        prependAdminActivity("Order Updated", `${data.orderId || ""} ${data.status || ""}`);
+        refreshOrdersPage();
+        refreshAdminStats();
+        return;
+    }
 
-    audio.play().catch(() => { });
+    if (data.type === "wallet_topup") {
+        showAdminPopup({
+            title: "💳 Wallet Topup",
+            message: `${data.username || "User"} submitted wallet topup`
+        });
 
+        prependAdminActivity("Wallet Topup", data.username || "User");
+        playAdminSound();
+        refreshAdminStats();
+        return;
+    }
 }
 
+function increaseAdminUnread() {
+    adminUnreadCount++;
+    updateAdminUnread();
+}
 
-// ======================
-// AUTO REFRESH
-// ======================
+function updateAdminUnread() {
+    let badge = document.getElementById("adminUnreadBadge");
 
-function refreshSupportPage() {
+    if (!badge) {
+        badge = document.createElement("div");
+        badge.id = "adminUnreadBadge";
+        document.body.appendChild(badge);
+    }
 
+    badge.innerText = adminUnreadCount;
+    badge.style.display = adminUnreadCount > 0 ? "flex" : "none";
+}
+
+function prependAdminActivity(title, text) {
+
+    const list =
+        document.getElementById(
+            "recentActivity"
+        );
+
+    if (!list) return;
+
+    // remove placeholder
     if (
-        window.location.pathname.includes(
-            "admin-support"
+        list.innerText.includes(
+            "Waiting for live activity"
         )
     ) {
 
-        if (
-            typeof loadSupportTickets ===
-            "function"
-        ) {
-
-            loadSupportTickets();
-
-        }
+        list.innerHTML = "";
 
     }
 
+    const item =
+        document.createElement("div");
+
+    item.className =
+        "live-activity-item";
+
+    item.innerHTML = `
+
+        <div class="live-dot"></div>
+
+        <div class="live-content">
+
+            <strong>
+                ${title}
+            </strong>
+
+            <p>
+                ${text}
+            </p>
+
+            <small>
+                Just now
+            </small>
+
+        </div>
+
+    `;
+
+    list.prepend(item);
+
+    // max 8 items
+    const items =
+        list.querySelectorAll(
+            ".live-activity-item"
+        );
+
+    if (items.length > 8) {
+
+        items[
+            items.length - 1
+        ].remove();
+
+    }
+
+}
+
+function showAdminPopup(data) {
+    const old = document.getElementById("adminLivePopup");
+    if (old) old.remove();
+
+    const popup = document.createElement("div");
+    popup.id = "adminLivePopup";
+
+    popup.innerHTML = `
+        <strong>${data.title}</strong>
+        <br>
+        ${data.message}
+    `;
+
+    document.body.appendChild(popup);
+
+    setTimeout(() => {
+        popup.classList.add("show");
+    }, 80);
+
+    setTimeout(() => {
+        popup.classList.remove("show");
+        setTimeout(() => popup.remove(), 350);
+    }, 5000);
+}
+
+function unlockAdminSound() {
+    document.addEventListener(
+        "click",
+        () => {
+            window.__adminSoundUnlocked = true;
+        },
+        { once: true }
+    );
+}
+
+function playAdminSound() {
+    if (!window.__adminSoundUnlocked) return;
+
+    const audio = new Audio("/assets/sounds/notify.mp3");
+    audio.volume = 0.9;
+    audio.play().catch(() => { });
+}
+
+function refreshSupportPage() {
+    if (typeof loadSupportTickets === "function") {
+        loadSupportTickets();
+    }
 }
 
 function refreshOrdersPage() {
-
-    if (
-        typeof loadOrders ===
-        "function"
-    ) {
-
+    if (typeof loadOrders === "function") {
         loadOrders();
-
     }
-
-}
-// ======================================
-// LIVE CHAT COUNTER
-// ======================================
-
-let adminUnreadCount = 0;
-
-function updateAdminUnread() {
-
-    let badge =
-        document.getElementById(
-            "adminUnreadBadge"
-        );
-
-    if (!badge) {
-
-        badge =
-            document.createElement("div");
-
-        badge.id =
-            "adminUnreadBadge";
-
-        document.body.appendChild(
-            badge
-        );
-
-        badge.style.position =
-            "fixed";
-
-        badge.style.top =
-            "18px";
-
-        badge.style.right =
-            "18px";
-
-        badge.style.width =
-            "28px";
-
-        badge.style.height =
-            "28px";
-
-        badge.style.borderRadius =
-            "50%";
-
-        badge.style.background =
-            "#ef4444";
-
-        badge.style.color =
-            "#fff";
-
-        badge.style.display =
-            "flex";
-
-        badge.style.alignItems =
-            "center";
-
-        badge.style.justifyContent =
-            "center";
-
-        badge.style.fontWeight =
-            "900";
-
-        badge.style.zIndex =
-            "999999";
-
-        badge.style.boxShadow =
-            "0 0 18px rgba(239,68,68,.7)";
-    }
-
-    badge.innerText =
-        adminUnreadCount;
-
 }
 
-// ======================================
-// LIVE MESSAGE TRACKER
-// ======================================
-
-function handleAdminUpdate(data) {
-
-    // EXISTING SUPPORT
-    if (
-        data.type ===
-        "support_ticket"
-    ) {
-
-        adminUnreadCount++;
-
-        updateAdminUnread();
-
-        showAdminPopup({
-
-            title:
-                "🎫 New Support Ticket",
-
-            message:
-                `${data.username} submitted a support request`
-
-        });
-
-        playAdminSound();
-
-        refreshSupportPage();
-
-        return;
-
+function refreshAdminStats() {
+    if (typeof loadAdminStats === "function") {
+        loadAdminStats();
     }
-
-    // LIVE CHAT MESSAGE
-    if (
-        data.type ===
-        "live_chat"
-    ) {
-
-        adminUnreadCount++;
-
-        updateAdminUnread();
-
-        showAdminPopup({
-
-            title:
-                "💬 Live Chat Message",
-
-            message:
-                `${data.username}: ${data.message}`
-
-        });
-
-        playAdminSound();
-
-        return;
-
-    }
-
 }

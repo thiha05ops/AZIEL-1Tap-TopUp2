@@ -97,18 +97,29 @@ function renderWalletHistory(topups) {
     if (!box) return;
 
     if (!topups.length) {
-        box.innerHTML =
-            `<p class="empty-text">No wallet history yet.</p>`;
+        box.innerHTML = `
+            <div class="wallet-empty">
+                <i class="fa-regular fa-folder-open"></i>
+                <h3>No Wallet History</h3>
+                <p>Your wallet transactions will appear here.</p>
+            </div>
+        `;
         return;
     }
 
     box.innerHTML = topups.map(item => `
         <div class="wallet-history-item">
-            <strong>
-                ${Number(item.amount).toLocaleString()} ${item.currency}
-            </strong>
-            <p>${item.paymentMethod}</p>
-            <p class="status-${item.status}">${item.status}</p>
+            <div>
+                <strong>
+                    ${Number(item.amount || 0).toLocaleString()}
+                    ${item.currency || ""}
+                </strong>
+                <p>${item.paymentMethod || "Payment"}</p>
+            </div>
+
+            <span class="wallet-status status-${item.status || "pending"}">
+                ${item.status || "pending"}
+            </span>
         </div>
     `).join("");
 }
@@ -226,7 +237,7 @@ function initWalletQrPreview() {
     document.addEventListener("paymentChanged", showQr);
 
     document.addEventListener("click", e => {
-        if (e.target.closest(".pay-card")) {
+        if (e.target.closest(".pay-card, .payment-option, .payment-card, .payment-method, .payment-item")) {
             setTimeout(showQr, 100);
         }
     });

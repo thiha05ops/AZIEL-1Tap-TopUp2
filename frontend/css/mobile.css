@@ -1,0 +1,456 @@
+@media (max-width: 768px) {
+
+    /* =========================
+       PAGE
+    ========================= */
+
+    .az-page {
+        width: calc(100% - 24px);
+        padding: 14px 0 110px;
+    }
+
+    .az-section {
+        margin-top: 34px;
+    }
+
+    .az-section-head {
+        align-items: center;
+        margin-bottom: 14px;
+    }
+
+    .az-section-head h2 {
+        font-size: 22px;
+    }
+
+    .az-section-head p {
+        font-size: 13px;
+    }
+
+    .az-section-head a {
+        font-size: 13px;
+    }
+
+    /* =========================
+       HEADER
+    ========================= */
+
+    .az-header {
+        width: calc(100% - 24px);
+
+        height: auto;
+
+        padding: 14px 0;
+
+        gap: 12px;
+
+        flex-wrap: wrap;
+    }
+
+    .az-logo {
+        font-size: 24px;
+    }
+
+    .az-nav {
+        display: none;
+    }
+
+    .az-header-right {
+        width: 100%;
+
+        display: grid;
+        grid-template-columns: 1fr auto auto;
+
+        gap: 10px;
+    }
+
+    .az-search {
+        width: 100%;
+    }
+
+    .az-search input {
+        height: 46px;
+    }
+
+    .az-profile span {
+        display: none;
+    }
+
+    .az-profile {
+        padding: 7px 10px;
+    }
+
+    .az-avatar {
+        width: 34px;
+        height: 34px;
+    }
+
+    /* =========================
+       HERO
+    ========================= */
+
+    .az-hero {
+        height: 240px;
+        border-radius: 26px;
+    }
+
+    .az-hero-content {
+        left: 24px;
+        right: 24px;
+
+        max-width: 100%;
+    }
+
+    .az-hero-content h1 {
+        font-size: 30px;
+        line-height: 1.1;
+    }
+
+    .az-hero-content p {
+        font-size: 14px;
+        margin-bottom: 18px;
+    }
+
+    /* =========================
+       MOBILE SLIDER
+    ========================= */
+
+    .az-game-grid {
+        display: flex;
+
+        overflow-x: auto;
+
+        gap: 14px;
+
+        padding-bottom: 8px;
+
+        flex-wrap: nowrap;
+
+        scroll-snap-type: x mandatory;
+
+        scrollbar-width: none;
+
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .az-game-grid::-webkit-scrollbar {
+        display: none;
+    }
+
+    .az-game-card {
+        min-width: 84%;
+        max-width: 84%;
+
+        flex: 0 0 auto;
+
+        scroll-snap-align: start;
+    }
+
+    .az-game-card img {
+        height: 160px;
+    }
+
+    .az-game-info {
+        padding: 14px;
+    }
+
+    .az-game-info h3 {
+        font-size: 15px;
+    }
+
+    .az-game-info p {
+        font-size: 12px;
+    }
+
+    /* =========================
+       FOOTER
+    ========================= */
+
+    .az-footer-grid {
+        grid-template-columns: 1fr;
+        gap: 26px;
+    }
+
+    /* =========================
+       MOBILE DRAWER
+    ========================= */
+
+    .az-mobile-menu-btn {
+        width: 42px;
+        height: 42px;
+
+        border: none;
+
+        border-radius: 14px;
+
+        background: #fff;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        font-size: 18px;
+
+        box-shadow: var(--shadow);
+
+        cursor: pointer;
+    }
+
+    .az-mobile-drawer-overlay {
+        position: fixed;
+        inset: 0;
+
+        background: rgba(0, 0, 0, .45);
+
+        opacity: 0;
+        pointer-events: none;
+
+        transition: .25s ease;
+
+        z-index: 9998;
+    }
+
+    .az-mobile-drawer-overlay.show {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .az-mobile-drawer {
+        position: fixed;
+
+        top: 0;
+        left: -300px;
+
+        width: 280px;
+        height: 100vh;
+
+        background: #fff;
+
+        z-index: 9999;
+
+        padding: 20px;
+
+        transition: .28s ease;
+
+        display: flex;
+        flex-direction: column;
+
+        gap: 8px;
+
+        box-shadow:
+            18px 0 40px rgba(0, 0, 0, .12);
+    }
+
+    .az-mobile-drawer.show {
+        left: 0;
+    }
+
+    .az-mobile-drawer a {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+
+        padding: 14px;
+
+        border-radius: 14px;
+
+        font-weight: 700;
+    }
+
+    .az-mobile-drawer a:hover {
+        background: #f3f4f6;
+    }
+
+    /* =========================
+       BOTTOM NAV
+    ========================= */
+
+    .az-bottom-nav {
+        position: fixed;
+
+        left: 12px;
+        right: 12px;
+        bottom: 14px;
+
+        height: 72px;
+
+        background:
+            rgba(255, 255, 255, .92);
+
+        backdrop-filter: blur(18px);
+
+        border-radius: 24px;
+
+        display: flex;
+        align-items: center;
+        justify-content: space-around;
+
+        z-index: 999;
+
+        box-shadow:
+            0 10px 30px rgba(0, 0, 0, .08);
+    }
+
+    .az-bottom-nav a {
+        flex: 1;
+
+        display: flex;
+        flex-direction: column;
+
+        align-items: center;
+        justify-content: center;
+
+        gap: 4px;
+
+        font-size: 11px;
+        font-weight: 700;
+
+        color: #7b8191;
+    }
+
+    .az-bottom-nav a i {
+        font-size: 20px;
+    }
+
+    .az-bottom-nav a.active {
+        color: var(--primary);
+    }
+
+}
+
+/* =========================
+   DESKTOP ONLY
+========================= */
+
+@media (min-width: 769px) {
+
+    .az-mobile-menu-btn,
+    .az-mobile-drawer,
+    .az-mobile-drawer-overlay,
+    .az-bottom-nav {
+        display: none;
+    }
+
+}
+
+@media (max-width: 768px) {
+
+    body {
+        background:
+            radial-gradient(circle at top right,
+                rgba(124, 58, 237, .10),
+                transparent 32%),
+            #f6f3eb;
+    }
+
+    .az-header {
+        align-items: center;
+    }
+
+    .az-mobile-menu-btn {
+        background: #ffffff;
+        color: var(--primary);
+        border-radius: 20px;
+        width: 54px;
+        height: 54px;
+        font-size: 22px;
+    }
+
+    .az-logo {
+        font-size: 34px;
+        font-weight: 900;
+        letter-spacing: .5px;
+    }
+
+    .az-header-right {
+        grid-template-columns: 1fr auto auto;
+        margin-top: 8px;
+    }
+
+    .az-search input {
+        height: 58px;
+        border-radius: 22px;
+        font-size: 16px;
+        padding: 0 18px;
+    }
+
+    .az-hero {
+        height: 280px;
+        border-radius: 30px;
+    }
+
+    .az-hero-content h1 {
+        font-size: 38px;
+    }
+
+    .az-section-head h2 {
+        font-size: 30px;
+        line-height: 1.1;
+    }
+
+    .az-game-grid {
+        display: flex;
+        overflow-x: auto;
+        gap: 14px;
+        padding: 6px 4px 18px;
+        scroll-snap-type: x mandatory;
+        scrollbar-width: none;
+    }
+
+    .az-game-grid::-webkit-scrollbar {
+        display: none;
+    }
+
+    .az-game-card {
+        min-width: 82%;
+        max-width: 82%;
+        flex: 0 0 auto;
+        scroll-snap-align: start;
+
+        display: grid;
+        grid-template-columns: 86px 1fr;
+        align-items: center;
+
+        min-height: 118px;
+        border-radius: 24px;
+    }
+
+    .az-game-card img {
+        width: 86px;
+        height: 86px;
+        border-radius: 20px;
+        margin-left: 14px;
+    }
+
+    .az-game-info h3 {
+        font-size: 18px;
+        line-height: 1.2;
+    }
+
+    .az-game-info p {
+        font-size: 14px;
+    }
+
+    .az-bottom-nav {
+        height: 72px;
+        border-radius: 26px;
+    }
+}
+
+@media (max-width: 768px) {
+    .az-game-card {
+        min-width: 86%;
+        max-width: 86%;
+    }
+
+    .az-section {
+        margin-top: 36px;
+    }
+
+    .az-footer {
+        margin-bottom: 90px;
+    }
+
+    .az-bottom-nav {
+        z-index: 99999;
+    }
+}

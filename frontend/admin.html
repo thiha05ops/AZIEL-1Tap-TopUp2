@@ -4,30 +4,71 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AZIEL Admin Dashboard</title>
+
+    <title>AZIEL Admin App</title>
 
     <link rel="stylesheet" href="css/admin.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
-    <div class="admin-shell">
+
+    <div class="admin-app">
+
         <aside class="admin-sidebar">
+
             <div class="admin-logo">
                 <h1>AZIEL</h1>
-                <span>ADMIN PANEL</span>
+                <span>CONTROL APP</span>
             </div>
 
             <nav class="admin-menu">
-                <a class="active" href="admin.html">📊 Dashboard</a>
-                <a href="admin-orders.html">🛒 Orders</a>
-                <a href="admin-wallet.html">💳 Wallet Topups</a>
-                <a href="admin-users.html">👥 Users</a>
-                <a href="admin-games.html">🎮 Games</a>
-                <a href="admin-support.html">🎟 Support Tickets</a>
-                <a href="admin-live-chat.html">💬 Live Chat</a>
-                <a href="admin-notifications.html">🔔 Notifications</a>
-                <a href="admin-settings.html">⚙ Settings</a>
+                <button class="admin-nav active" data-section="dashboard">
+                    <i class="fa-solid fa-chart-line"></i>
+                    Dashboard
+                </button>
+
+                <button class="admin-nav" data-section="orders">
+                    <i class="fa-solid fa-box"></i>
+                    Orders
+                </button>
+
+                <button class="admin-nav" data-section="wallet">
+                    <i class="fa-solid fa-wallet"></i>
+                    Wallet Topups
+                </button>
+
+                <button class="admin-nav" data-section="users">
+                    <i class="fa-solid fa-users"></i>
+                    Users
+                </button>
+
+                <button class="admin-nav" data-section="games">
+                    <i class="fa-solid fa-gamepad"></i>
+                    Games
+                </button>
+
+                <button class="admin-nav" data-section="support">
+                    <i class="fa-solid fa-headset"></i>
+                    Support
+                </button>
+
+                <button class="admin-nav" data-section="chat">
+                    <i class="fa-solid fa-comments"></i>
+                    Live Chat
+                </button>
+
+                <button class="admin-nav" data-section="broadcast">
+                    <i class="fa-solid fa-bullhorn"></i>
+                    Broadcast
+                </button>
+
+                <button class="admin-nav" data-section="settings">
+                    <i class="fa-solid fa-gear"></i>
+                    Settings
+                </button>
             </nav>
 
             <div class="admin-user-box">
@@ -37,13 +78,15 @@
                     <small>Super Admin</small>
                 </div>
             </div>
+
         </aside>
 
         <main class="admin-main">
+
             <header class="admin-topbar">
                 <div>
-                    <h2>Dashboard</h2>
-                    <p>Welcome back, Admin. Here is today’s overview.</p>
+                    <h2 id="adminPageTitle">Dashboard</h2>
+                    <p id="adminPageSub">Live control center for AZIEL 1Tap Shop.</p>
                 </div>
 
                 <div class="top-actions">
@@ -52,94 +95,357 @@
                 </div>
             </header>
 
-            <section class="stats-grid">
-                <div class="stat-card">
-                    <span>Total Orders</span>
-                    <strong id="totalOrders">0</strong>
-                    <small class="up">Live synced</small>
+            <section class="admin-section active" id="section-dashboard">
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <span>Total Orders</span>
+                        <strong id="totalOrders">0</strong>
+                        <small class="up">Live synced</small>
+                    </div>
+
+                    <div class="stat-card">
+                        <span>Pending</span>
+                        <strong id="pendingOrders">0</strong>
+                        <small class="warn">Needs action</small>
+                    </div>
+
+                    <div class="stat-card">
+                        <span>Processing</span>
+                        <strong id="processingOrders">0</strong>
+                        <small>In progress</small>
+                    </div>
+
+                    <div class="stat-card">
+                        <span>Completed</span>
+                        <strong id="completedOrders">0</strong>
+                        <small class="up">Delivered</small>
+                    </div>
+
+                    <div class="stat-card">
+                        <span>Users</span>
+                        <strong id="totalUsers">0</strong>
+                        <small>Registered</small>
+                    </div>
+
+                    <div class="stat-card">
+                        <span>Revenue</span>
+                        <strong id="revenue">0</strong>
+                        <small class="up">MMK / THB</small>
+                    </div>
                 </div>
 
-                <div class="stat-card">
-                    <span>Pending</span>
-                    <strong id="pendingOrders">0</strong>
-                    <small class="warn">Needs action</small>
+                <div class="dashboard-grid">
+
+                    <div class="panel wide">
+                        <div class="panel-head">
+                            <h3>Revenue Overview</h3>
+                            <span>This Week</span>
+                        </div>
+                        <canvas id="revenueChart"></canvas>
+                    </div>
+                    <div class="dashboard-bottom-grid">
+
+                        <div class="panel">
+                            <div class="panel-head">
+                                <h3>Pending Payments</h3>
+                                <span>Live Queue</span>
+                            </div>
+
+                            <div class="payment-live-list">
+
+                                <div class="payment-live-item">
+                                    <div>
+                                        <strong>User123</strong>
+                                        <small>KBZPay</small>
+                                    </div>
+
+                                    <span class="status-pill pending">
+                                        Pending
+                                    </span>
+                                </div>
+
+                                <div class="payment-live-item">
+                                    <div>
+                                        <strong>PlayerOne</strong>
+                                        <small>WavePay</small>
+                                    </div>
+
+                                    <span class="status-pill processing">
+                                        Processing
+                                    </span>
+                                </div>
+
+                                <div class="payment-live-item">
+                                    <div>
+                                        <strong>LegendBoy</strong>
+                                        <small>AYA Pay</small>
+                                    </div>
+
+                                    <span class="status-pill completed">
+                                        Completed
+                                    </span>
+                                </div>
+
+                            </div>
+                        </div>
+
+                        <div class="panel quick-broadcast-panel">
+
+                            <div class="panel-head">
+                                <h3>Broadcast Quick Send</h3>
+                                <span>Realtime</span>
+                            </div>
+
+                            <div class="quick-broadcast-grid">
+
+                                <button class="quick-action purple">
+                                    📢
+                                    <span>Announcement</span>
+                                </button>
+
+                                <button class="quick-action pink">
+                                    🎁
+                                    <span>Promotion</span>
+                                </button>
+
+                                <button class="quick-action orange">
+                                    ⚠️
+                                    <span>Delay</span>
+                                </button>
+
+                                <button class="quick-action green">
+                                    ✅
+                                    <span>Completed</span>
+                                </button>
+
+                            </div>
+
+                        </div>
+
+                        <div class="panel">
+
+                            <div class="panel-head">
+                                <h3>System Status</h3>
+                                <span>Live</span>
+                            </div>
+
+                            <div class="system-status-list">
+
+                                <div class="system-status-item">
+                                    <span>Website</span>
+                                    <b class="online">Online</b>
+                                </div>
+
+                                <div class="system-status-item">
+                                    <span>Database</span>
+                                    <b class="online">Online</b>
+                                </div>
+
+                                <div class="system-status-item">
+                                    <span>Socket Server</span>
+                                    <b class="online">Online</b>
+                                </div>
+
+                                <div class="system-status-item">
+                                    <span>Payment API</span>
+                                    <b class="online">Online</b>
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-head">
+                            <h3>Orders Status</h3>
+                            <span>Live</span>
+                        </div>
+                        <canvas id="ordersChart"></canvas>
+                    </div>
+
+                    <div class="panel">
+                        <h3>Top Games</h3>
+                        <div class="mini-list">
+                            <p><span>Mobile Legends</span><b>45%</b></p>
+                            <p><span>PUBG Mobile</span><b>25%</b></p>
+                            <p><span>Free Fire</span><b>15%</b></p>
+                            <p><span>Honor Of Kings</span><b>10%</b></p>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <h3>Recent Activity</h3>
+                        <div id="recentActivity" class="activity-list">
+                            <p>Waiting for live activity...</p>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="stat-card">
-                    <span>Processing</span>
-                    <strong id="processingOrders">0</strong>
-                    <small>In progress</small>
-                </div>
+            </section>
 
-                <div class="stat-card">
-                    <span>Completed</span>
-                    <strong id="completedOrders">0</strong>
-                    <small class="up">Delivered</small>
-                </div>
+            <section class="admin-section" id="section-orders">
+                <div class="panel">
+                    <div class="panel-head">
+                        <h3>Orders</h3>
+                        <span>Live orders</span>
+                    </div>
 
-                <div class="stat-card">
-                    <span>Users</span>
-                    <strong id="totalUsers">0</strong>
-                    <small>Registered</small>
-                </div>
+                    <div class="admin-table-wrap">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Order ID</th>
+                                    <th>User</th>
+                                    <th>Game</th>
+                                    <th>Package</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminOrdersBody">
+                                <tr>
+                                    <td colspan="6">Orders will appear here.</td>
+                                </tr>
+                            </tbody>
+                            <div class="admin-filter-bar">
+                                <input id="orderSearchInput" type="text" placeholder="Search order, user, game...">
 
-                <div class="stat-card">
-                    <span>Revenue</span>
-                    <strong id="revenue">0</strong>
-                    <small class="up">MMK / THB</small>
+                                <select id="orderStatusFilter">
+                                    <option value="all">All Status</option>
+                                    <option value="pending_payment">Pending</option>
+                                    <option value="paid">Paid</option>
+                                    <option value="processing">Processing</option>
+                                    <option value="completed">Completed</option>
+                                    <option value="cancelled">Cancelled</option>
+                                </select>
+                            </div>
+                        </table>
+                    </div>
                 </div>
             </section>
 
-            <section class="dashboard-grid">
-                <div class="panel wide">
-                    <div class="panel-head">
-                        <h3>Revenue Overview</h3>
-                        <span>This Week</span>
-                    </div>
-                    <canvas id="revenueChart"></canvas>
-                </div>
-
+            <section class="admin-section" id="section-wallet">
                 <div class="panel">
                     <div class="panel-head">
-                        <h3>Orders Status</h3>
-                        <span>Live</span>
+                        <h3>Wallet Topups</h3>
+                        <span>Pending approvals</span>
                     </div>
-                    <canvas id="ordersChart"></canvas>
-                </div>
 
+                    <div id="adminWalletList" class="admin-list-empty">
+                        Wallet topups will appear here.
+                    </div>
+                </div>
+            </section>
+
+            <section class="admin-section" id="section-users">
                 <div class="panel">
-                    <h3>Top Games</h3>
+                    <div class="panel-head">
+                        <h3>Users</h3>
+                        <span>Registered customers</span>
+                    </div>
+
+                    <div id="adminUsersList" class="admin-list-empty">
+                        Users will appear here.
+                    </div>
+                </div>
+            </section>
+
+            <section class="admin-section" id="section-games">
+                <div class="panel">
+                    <div class="panel-head">
+                        <h3>Games & Prices</h3>
+                        <span>Manage packages</span>
+                    </div>
+
                     <div class="mini-list">
-                        <p><span>Mobile Legends</span><b>45%</b></p>
-                        <p><span>PUBG Mobile</span><b>25%</b></p>
-                        <p><span>Free Fire</span><b>15%</b></p>
-                        <p><span>Genshin Impact</span><b>10%</b></p>
+                        <p><span>Mobile Legends</span><b>Active</b></p>
+                        <p><span>PUBG Mobile</span><b>Active</b></p>
+                        <p><span>Free Fire</span><b>Active</b></p>
+                        <p><span>Honor Of Kings</span><b>Active</b></p>
                     </div>
                 </div>
+            </section>
 
+            <section class="admin-section" id="section-support">
                 <div class="panel">
-                    <h3>Recent Activity</h3>
-                    <div id="recentActivity" class="activity-list">
-                        <p>Waiting for live activity...</p>
+                    <div class="panel-head">
+                        <h3>Support Tickets</h3>
+                        <span>User help requests</span>
+                    </div>
+
+                    <div id="adminSupportList" class="admin-list-empty">
+                        Support tickets will appear here.
                     </div>
                 </div>
             </section>
 
-            <section class="admin-modules">
-                <a href="admin-orders.html">Orders</a>
-                <a href="admin-wallet.html">Wallet Topups</a>
-                <a href="admin-users.html">Users</a>
-                <a href="admin-games.html">Games</a>
-                <a href="admin-support.html">Support Tickets</a>
-                <a href="admin-live-chat.html">💬 Live Chat</a>
-                <a href="admin-notifications.html">Notifications</a>
+            <section class="admin-section" id="section-chat">
+                <div class="panel">
+                    <div class="panel-head">
+                        <h3>Live Chat</h3>
+                        <span>Realtime messages</span>
+                    </div>
+
+                    <div id="adminLiveChatList" class="admin-list-empty">
+                        Live chat messages will appear here.
+                    </div>
+                </div>
             </section>
+
+            <section class="admin-section" id="section-broadcast">
+                <div class="panel">
+                    <div class="panel-head">
+                        <h3>Broadcast Notifications</h3>
+                        <span>Send updates to users</span>
+                    </div>
+
+                    <div class="broadcast-form">
+                        <label>Type</label>
+                        <select id="broadcastType">
+                            <option value="announcement">Admin Announcement</option>
+                            <option value="promo">Promo / Discount</option>
+                            <option value="topup_delayed">Top-up Delayed</option>
+                            <option value="system">System Notice</option>
+                        </select>
+
+                        <label>Title</label>
+                        <input id="broadcastTitle" type="text" placeholder="Notification title">
+
+                        <label>Message</label>
+                        <textarea id="broadcastMessage" placeholder="Write message..."></textarea>
+
+                        <button id="sendBroadcastBtn">
+                            Send Broadcast
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="admin-section" id="section-settings">
+                <div class="panel">
+                    <div class="panel-head">
+                        <h3>Settings</h3>
+                        <span>Admin controls</span>
+                    </div>
+
+                    <div class="admin-list-empty">
+                        Settings will be added here.
+                    </div>
+                </div>
+            </section>
+
         </main>
+
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="js/admin-stats.js"></script>
     <script src="js/admin-live.js?v=3"></script>
+    <script src="js/admin-app.js"></script>
+    <script src="js/admin-orders.js"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", () => {
@@ -192,9 +498,7 @@
             }
         });
     </script>
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="js/admin-stats.js"></script>
-    <script src="js/admin-live.js?v=3"></script>
+
 </body>
 
 </html>

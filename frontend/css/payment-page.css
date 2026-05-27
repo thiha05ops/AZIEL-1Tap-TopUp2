@@ -1,125 +1,403 @@
+body {
+    background:
+        radial-gradient(circle at top right, rgba(124, 58, 237, .18), transparent 30%),
+        linear-gradient(180deg, #0b1020, #0f172a);
+    color: #f8fafc;
+}
+
 .payment-wrap {
-    min-height: 100vh;
-    background: #070716;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 25px;
-    color: #fff;
+    width: min(980px, 92%);
+    margin: 36px auto 90px;
 }
 
 .payment-card {
-    width: 100%;
-    max-width: 620px;
-    background: linear-gradient(135deg, #101028, #16163b);
-    border: 1px solid rgba(255, 255, 255, .08);
-    border-radius: 24px;
+    background: rgba(21, 29, 49, .96);
+    border: 1px solid rgba(255, 255, 255, .07);
+    border-radius: 30px;
     padding: 28px;
-    box-shadow: 0 0 35px rgba(124, 58, 237, .25);
-}
-
-.payment-card h1 {
-    margin: 12px 0 8px;
-    color: #ffd700;
-}
-
-.sub-text {
-    color: #c9c9df;
+    box-shadow: 0 16px 50px rgba(0, 0, 0, .35);
 }
 
 .back-btn {
-    color: #ffd700;
+    display: inline-flex;
+    margin-bottom: 20px;
+    color: #c084fc;
     text-decoration: none;
-    font-weight: 800;
+    font-weight: 900;
+}
+
+.payment-card h1 {
+    font-size: 38px;
+    margin-bottom: 8px;
+}
+
+.sub-text {
+    color: #94a3b8;
+    margin-bottom: 22px;
 }
 
 .order-info {
-    background: #0d0d22;
-    border-radius: 18px;
-    padding: 18px;
-    margin: 20px 0;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 22px;
 }
 
 .order-info p {
-    margin: 10px 0;
+    background: rgba(255, 255, 255, .04);
+    border: 1px solid rgba(255, 255, 255, .06);
+    border-radius: 16px;
+    padding: 13px 14px;
+    color: #cbd5e1;
+}
+
+.order-info b {
+    color: #fff;
 }
 
 .qr-section {
     text-align: center;
-    background: #fff;
-    color: #111;
-    border-radius: 20px;
-    padding: 20px;
-    margin-bottom: 18px;
+    background: rgba(255, 255, 255, .04);
+    border: 1px solid rgba(255, 255, 255, .06);
+    border-radius: 24px;
+    padding: 24px;
+    margin-bottom: 20px;
 }
 
-.qr-section img {
-    width: 210px;
+#qrImage {
+    width: 230px;
     max-width: 100%;
-    height: 210px;
-    object-fit: contain;
+    border-radius: 20px;
+    margin: 0 auto 16px;
+    background: #fff;
+    padding: 10px;
 }
 
-.qr-section h3 {
-    margin: 10px 0 5px;
+#paymentName {
+    font-size: 24px;
+    margin-bottom: 6px;
+}
+
+.qr-section p {
+    color: #94a3b8;
 }
 
 .upload-box {
-    display: block;
-    background: #0d0d22;
-    border: 1px dashed rgba(255, 255, 255, .25);
-    border-radius: 16px;
-    padding: 18px;
-    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 90px;
+    border: 1px dashed rgba(168, 85, 247, .45);
+    border-radius: 22px;
+    background: rgba(168, 85, 247, .08);
     cursor: pointer;
-    margin-bottom: 16px;
+    margin-bottom: 18px;
+    color: #fff;
+    font-weight: 900;
 }
 
 .upload-box input {
-    margin-top: 12px;
-    width: 100%;
-}
-
-#submitPaymentBtn,
-.after-actions button {
-    width: 100%;
-    padding: 15px;
-    border: none;
-    border-radius: 14px;
-    font-weight: 900;
-    cursor: pointer;
+    display: none;
 }
 
 #submitPaymentBtn {
-    background: linear-gradient(135deg, #ffd700, #ff9f1c);
-    color: #111;
+    width: 100%;
+    height: 56px;
+    border: none;
+    border-radius: 18px;
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    color: #fff;
+    font-weight: 900;
+    font-size: 16px;
+    cursor: pointer;
 }
 
-#submitPaymentBtn:disabled {
-    opacity: .6;
-    cursor: not-allowed;
+#paymentMsg {
+    margin-top: 14px;
+    text-align: center;
+}
+
+.error-msg {
+    color: #f87171;
+}
+
+.success-msg {
+    color: #4ade80;
 }
 
 .after-actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 12px;
-    margin-top: 15px;
+    margin-top: 16px;
 }
 
 .after-actions button {
-    background: #7c3aed;
+    height: 48px;
+    border: none;
+    border-radius: 14px;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+#backGameBtn {
+    background: rgba(255, 255, 255, .08);
     color: #fff;
 }
 
-.success-msg {
-    color: #22c55e;
-    font-weight: 800;
-    margin-top: 14px;
+#viewHistoryBtn {
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    color: #fff;
 }
 
-.error-msg {
-    color: #ef4444;
-    font-weight: 800;
+/* Loading + Success modal */
+.order-loading-overlay,
+.success-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 999999;
+    background: rgba(2, 6, 23, .72);
+    backdrop-filter: blur(10px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.order-loading-overlay.show,
+.success-modal.show {
+    display: flex;
+}
+
+.order-loading-box,
+.success-modal-box {
+    width: min(340px, calc(100% - 40px));
+    padding: 28px 22px;
+    border-radius: 26px;
+    background: rgba(21, 29, 49, .96);
+    border: 1px solid rgba(255, 255, 255, .08);
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, .35);
+}
+
+.order-loading-dots {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 18px;
+}
+
+.order-loading-dots span {
+    width: 12px;
+    height: 12px;
+    border-radius: 4px;
+    background: #a855f7;
+    animation: loadingDots .8s infinite alternate;
+}
+
+.order-loading-dots span:nth-child(2) {
+    animation-delay: .12s;
+}
+
+.order-loading-dots span:nth-child(3) {
+    animation-delay: .24s;
+}
+
+.order-loading-dots span:nth-child(4) {
+    animation-delay: .36s;
+}
+
+@keyframes loadingDots {
+    from {
+        opacity: .35;
+        transform: translateY(0);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(-8px);
+    }
+}
+
+.success-icon {
+    width: 72px;
+    height: 72px;
+    margin: 0 auto 18px;
+    border-radius: 24px;
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 34px;
+    font-weight: 900;
+}
+
+.success-modal-box h2,
+.order-loading-box h3 {
+    color: #fff;
+    margin-bottom: 8px;
+}
+
+.success-modal-box p,
+.order-loading-box p {
+    color: #94a3b8;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.success-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 22px;
+}
+
+.success-actions button {
+    flex: 1;
+    height: 48px;
+    border: none;
+    border-radius: 14px;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+#trackOrderBtn {
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    color: #fff;
+}
+
+#backHomeBtn {
+    background: rgba(255, 255, 255, .08);
+    color: #fff;
+}
+
+@media (max-width: 768px) {
+    .payment-wrap {
+        width: calc(100% - 24px);
+        margin-top: 16px;
+    }
+
+    .payment-card {
+        padding: 18px;
+        border-radius: 24px;
+    }
+
+    .payment-card h1 {
+        font-size: 28px;
+    }
+
+    .order-info {
+        grid-template-columns: 1fr;
+    }
+
+    #qrImage {
+        width: 200px;
+    }
+}
+
+.slip-preview-box {
     margin-top: 14px;
+
+    height: 140px;
+
+    border-radius: 18px;
+    overflow: hidden;
+
+    border: 1px solid rgba(255, 255, 255, .08);
+
+    background: rgba(255, 255, 255, .04);
+}
+
+#slipPreviewImage {
+    width: 100%;
+    height: 100%;
+
+    object-fit: cover;
+    display: block;
+}
+
+.slip-preview-box {
+    position: relative;
+}
+
+#removeSlipBtn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+
+    width: 34px;
+    height: 34px;
+
+    border: none;
+    border-radius: 50%;
+
+    background: rgba(0, 0, 0, .65);
+    color: #fff;
+
+    cursor: pointer;
+
+    z-index: 2;
+}
+
+/* UPLOAD STEPS */
+.upload-steps {
+    margin-top: 18px;
+
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.upload-step {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    padding: 14px;
+
+    border-radius: 16px;
+
+    background: rgba(255, 255, 255, .04);
+
+    border: 1px solid rgba(255, 255, 255, .06);
+
+    opacity: .45;
+
+    transition: .25s ease;
+}
+
+.upload-step.active {
+    opacity: 1;
+
+    border-color: rgba(168, 85, 247, .45);
+
+    background: rgba(168, 85, 247, .08);
+}
+
+.step-loader {
+    width: 18px;
+    height: 18px;
+
+    border-radius: 6px;
+
+    background: #a855f7;
+
+    animation: stepPulse .8s infinite alternate;
+}
+
+@keyframes stepPulse {
+    from {
+        opacity: .35;
+        transform: scale(.9);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1.1);
+    }
+}
+
+.upload-step p {
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
 }

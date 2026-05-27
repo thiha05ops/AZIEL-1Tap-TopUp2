@@ -289,15 +289,7 @@ app.get("/api/live-chat/user/:username", async (req, res) => {
         });
     }
 });
-// ADMIN GET ALL CHATS
-app.get("/api/live-chat/admin", async (req, res) => {
 
-    res.json({
-        success: true,
-        chat
-    });
-
-});
 // ADMIN REPLY
 app.post("/api/live-chat/admin/reply/:chatId", async (req, res) => {
     try {

@@ -1,43 +1,86 @@
 const mongoose = require("mongoose");
 
-const notificationSchema = new mongoose.Schema(
-    {
-        username: {
-            type: String,
-            required: true
-        },
+const notificationSchema =
+    new mongoose.Schema(
+        {
 
-        title: {
-            type: String,
-            required: true
-        },
+            username: {
+                type: String,
+                required: true
+            },
 
-        message: {
-            type: String,
-            default: ""
-        },
+            title: {
+                type: String,
+                required: true
+            },
 
-        type: {
-            type: String,
-            default: "general"
-        },
+            message: {
+                type: String,
+                default: ""
+            },
 
-        orderId: {
-            type: String,
-            default: ""
-        },
+            type: {
+                type: String,
+                enum: [
+                    "order_completed",
+                    "topup_delayed",
+                    "announcement",
+                    "promo",
+                    "system",
+                    "general"
+                ],
+                default: "general"
+            },
 
-        isRead: {
-            type: Boolean,
-            default: false
+            category: {
+                type: String,
+                enum: [
+                    "orders",
+                    "announcements",
+                    "promotions",
+                    "system"
+                ],
+                default: "system"
+            },
+
+            orderId: {
+                type: String,
+                default: ""
+            },
+
+            isRead: {
+                type: Boolean,
+                default: false
+            },
+
+            isArchived: {
+                type: Boolean,
+                default: false
+            },
+
+            deletedByUser: {
+                type: Boolean,
+                default: false
+            },
+
+            expiresAt: {
+                type: Date,
+                default: () => {
+                    return new Date(
+                        Date.now() +
+                        90 * 24 * 60 * 60 * 1000
+                    );
+                }
+            }
+
+        },
+        {
+            timestamps: true
         }
-    },
-    {
-        timestamps: true
-    }
-);
+    );
 
-module.exports = mongoose.model(
-    "Notification",
-    notificationSchema
-);
+module.exports =
+    mongoose.model(
+        "Notification",
+        notificationSchema
+    );

@@ -7,8 +7,10 @@
     <title>Payment - AZIEL</title>
 
     <link rel="stylesheet" href="css/main.css">
-    <link rel="stylesheet" href="css/page.css">
+    <link rel="stylesheet" href="css/components.css">
+    <!-- <link rel="stylesheet" href="css/page.css"> -->
     <link rel="stylesheet" href="css/payment-page.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 
 <body>
@@ -41,8 +43,35 @@
                 <span>📤 Upload Payment Screenshot</span>
                 <input type="file" id="paymentSlip" accept="image/*">
             </label>
+            <div id="slipPreviewBox" class="slip-preview-box" style="display:none;">
+
+                <button type="button" id="removeSlipBtn">
+                    ✕
+                </button>
+
+                <img id="slipPreviewImage" src="" alt="Payment Slip">
+
+            </div>
 
             <button id="submitPaymentBtn">Submit Payment</button>
+            <div id="uploadSteps" class="upload-steps" style="display:none;">
+
+                <div class="upload-step" id="step1">
+                    <span class="step-loader"></span>
+                    <p>Uploading Screenshot...</p>
+                </div>
+
+                <div class="upload-step" id="step2">
+                    <span class="step-loader"></span>
+                    <p>Verifying Order...</p>
+                </div>
+
+                <div class="upload-step" id="step3">
+                    <span class="step-loader"></span>
+                    <p>Submitting Order...</p>
+                </div>
+
+            </div>
 
             <div id="paymentMsg"></div>
 
@@ -54,7 +83,49 @@
         </div>
 
     </div>
+    <div id="orderLoadingOverlay" class="order-loading-overlay">
+        <div class="order-loading-box">
+            <div class="order-loading-dots">
+                <span></span><span></span><span></span><span></span>
+            </div>
+            <h3>Please wait a few seconds...</h3>
+            <p>Your order is being submitted.</p>
+        </div>
+    </div>
 
+    <div id="successModal" class="success-modal">
+        <div class="success-modal-box">
+            <div class="success-icon">✓</div>
+            <h2>Order Submitted</h2>
+            <p>Your payment screenshot has been sent successfully.</p>
+
+            <div class="success-actions">
+                <button id="trackOrderBtn">Track Order</button>
+                <button id="backHomeBtn">Back Home</button>
+            </div>
+        </div>
+    </div>
+    <nav class="az-bottom-nav">
+        <a href="home.html">
+            <i class="fa-solid fa-house"></i>
+            <span>Home</span>
+        </a>
+
+        <a href="tracking.html">
+            <i class="fa-solid fa-box"></i>
+            <span>Orders</span>
+        </a>
+
+        <a href="notifications.html">
+            <i class="fa-regular fa-bell"></i>
+            <span>Alerts</span>
+        </a>
+
+        <a href="account.html">
+            <i class="fa-regular fa-user"></i>
+            <span>Account</span>
+        </a>
+    </nav>
     <script src="js/payment-page.js"></script>
 </body>
 

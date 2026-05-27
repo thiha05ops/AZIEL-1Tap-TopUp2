@@ -2,34 +2,89 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Order Tracking - AZIEL</title>
 
-    <link rel="stylesheet" href="css/tracking.css" />
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/tracking.css">
+    <link rel="stylesheet" href="css/components.css">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 
 <body>
+
+    <header class="az-topbar">
+        <a href="home.html" class="az-topbar-brand">AZIEL</a>
+
+        <nav class="az-topbar-actions">
+            <a href="home.html">Home</a>
+            <a href="account.html">Account</a>
+            <a href="support.html">Support</a>
+        </nav>
+    </header>
+
     <main class="tracking-page">
 
         <section class="tracking-hero">
-            <div class="brand-pill">AZIEL 1Tap Shop</div>
+            <span class="brand-pill">AZIEL 1Tap Shop</span>
+
             <h1>Track Your Order</h1>
-            <p>Enter your Order ID and check your top-up status in real time.</p>
+
+            <p>
+                Enter your Order ID and check your top-up status in real time.
+            </p>
         </section>
 
         <section class="tracking-search-card">
-            <input id="orderIdInput" placeholder="Enter Order ID e.g. AZL-123456" />
-            <button id="trackBtn">Check Tracking</button>
-        </section>
+            <div class="tracking-input-wrap">
+                <i class="fa-solid fa-magnifying-glass"></i>
 
-        <section id="trackingResult"></section>
+                <input id="orderIdInput" placeholder="Enter Order ID e.g. AZL-123456">
+            </div>
+
+            <button id="trackBtn">
+                Check Tracking
+            </button>
+        </section>
+        <section class="recent-track-card">
+            <div class="recent-track-head">
+                <h2>Recent Orders</h2>
+                <span>Tap to track</span>
+            </div>
+
+            <div id="recentTrackOrders">
+                Loading...
+            </div>
+        </section>
+        <section id="trackingResult" class="tracking-result"></section>
 
     </main>
-
     <script src="/socket.io/socket.io.js"></script>
     <script src="js/tracking.js?v=6"></script>
+    <nav class="az-bottom-nav">
+        <a href="home.html">
+            <i class="fa-solid fa-house"></i>
+            <span>Home</span>
+        </a>
+
+        <a href="tracking.html" class="active">
+            <i class="fa-solid fa-box"></i>
+            <span>Orders</span>
+        </a>
+
+        <a href="notifications.html">
+            <i class="fa-regular fa-bell"></i>
+            <span>Alerts</span>
+        </a>
+
+        <a href="account.html">
+            <i class="fa-regular fa-user"></i>
+            <span>Account</span>
+        </a>
+    </nav>
+
 </body>
 
 </html>

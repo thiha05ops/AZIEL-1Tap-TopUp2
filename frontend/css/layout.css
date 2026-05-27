@@ -1,0 +1,99 @@
+/* =========================
+   PAGE LAYOUT SYSTEM
+========================= */
+
+.az-page {
+    width: min(1180px, 92%);
+    margin: 0 auto;
+    padding: 24px 0 70px;
+}
+
+.az-section {
+    margin-top: 42px;
+}
+
+.az-section-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 18px;
+}
+
+.az-section-head h2 {
+    font-size: 26px;
+    color: var(--text);
+}
+
+.az-section-head p {
+    margin-top: 6px;
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.az-section-head a {
+    font-weight: 800;
+    color: var(--text);
+}
+
+/* =========================
+   GRID SYSTEM
+========================= */
+
+.az-grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+}
+
+.az-grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+}
+
+/* =========================
+   HEADER SPACE
+========================= */
+
+.az-header-space {
+    height: 82px;
+}
+
+/* =========================
+   FOOTER SPACE
+========================= */
+
+.az-footer-space {
+    margin-top: 60px;
+}
+
+.az-container {
+    width: min(1280px, 94%);
+    margin: 0 auto;
+}
+
+@media (min-width: 769px) {
+    .az-main {
+        padding-top: 26px;
+        padding-bottom: 80px;
+    }
+
+    .az-content-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 38px;
+    }
+
+    .az-section {
+        background: transparent;
+    }
+
+    .az-grid-3 {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .az-grid-4 {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}

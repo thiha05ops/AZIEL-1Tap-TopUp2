@@ -217,3 +217,106 @@ function showError(message) {
         </div>
     `;
 }
+loadRecentOrders();
+
+async function loadRecentOrders() {
+
+    const box =
+        document.getElementById(
+            "recentTrackOrders"
+        );
+
+    if (!box) return;
+
+    const username =
+        localStorage.getItem("username");
+
+    if (!username) {
+
+        box.innerHTML = `
+            <p class="empty-orders">
+                Login required.
+            </p>
+        `;
+
+        return;
+    }
+
+    try {
+
+        const res = await fetch(
+            `/api/order/user/${username}`
+        );
+
+        const data = await res.json();
+
+        if (!data.success || !data.orders?.length) {
+
+            box.innerHTML = `
+                <p class="empty-orders">
+                    No recent orders.
+                </p>
+            `;
+
+            return;
+        }
+
+        const recentOrders =
+            data.orders.slice(0, 5);
+
+        box.innerHTML =
+            recentOrders.map(order => `
+
+                <div class="recent-order-item"
+                     onclick="trackRecentOrder('${order.orderId}')">
+
+                    <div class="recent-order-left">
+
+                        <h4>
+                            ${order.game || "Game"}
+                        </h4>
+
+                        <p>
+                            ${order.packageName || "-"}
+                        </p>
+
+                    </div>
+
+                    <div class="recent-order-status">
+                        ${formatStatus(
+                normalizeStatus(order.status)
+            )}
+                    </div>
+
+                </div>
+
+            `).join("");
+
+    } catch (error) {
+
+        console.log(
+            "Recent orders error:",
+            error
+        );
+
+    }
+}
+
+function trackRecentOrder(orderId) {
+
+    const input =
+        document.getElementById(
+            "orderIdInput"
+        );
+
+    if (input) {
+        input.value = orderId;
+    }
+
+    trackOrder(orderId);
+
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+    });
+}

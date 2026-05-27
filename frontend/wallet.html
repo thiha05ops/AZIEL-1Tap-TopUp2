@@ -8,55 +8,89 @@
     <title>Wallet - AZIEL</title>
 
     <link rel="stylesheet" href="css/main.css">
-    <link rel="stylesheet" href="css/wallet.css">
+    <link rel="stylesheet" href="css/components.css">
     <link rel="stylesheet" href="css/payment-grid.css">
+    <link rel="stylesheet" href="css/wallet.css">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 
 <body>
 
-    <header class="wallet-header">
+    <header class="az-topbar">
 
-        <a href="home.html" class="brand">
+        <a href="home.html" class="az-topbar-brand">
             AZIEL
         </a>
 
-        <div class="wallet-actions">
+        <div class="az-topbar-actions">
 
-            <a href="account.html" class="wallet-btn">
-                👤 Account
+            <a href="home.html">
+                Home
             </a>
 
-            <a href="home.html" class="wallet-btn">
-                🏠 Home
+            <a href="tracking.html">
+                Orders
+            </a>
+
+            <a href="account.html">
+                Account
             </a>
 
         </div>
 
     </header>
 
-
     <main class="wallet-page">
 
-        <section class="wallet-balance-card">
+        <section class="wallet-hero">
 
-            <p>Wallet Balance</p>
+            <div class="wallet-badge">
+                AZIEL Wallet
+            </div>
 
-            <h1 id="walletBalance">
-                0 Ks
+            <h1>
+                Fast & Secure Wallet
             </h1>
 
-            <span>
-                Fast payment with AZIEL Wallet
-            </span>
+            <p>
+                Store balance and top-up faster with AZIEL Wallet system.
+            </p>
 
         </section>
 
+        <section class="wallet-balance-card">
+
+            <div class="wallet-balance-top">
+
+                <div>
+                    <span>Wallet Balance</span>
+
+                    <h1 id="walletBalance">
+                        0 Ks
+                    </h1>
+                </div>
+
+                <div class="wallet-icon">
+                    <i class="fa-solid fa-wallet"></i>
+                </div>
+
+            </div>
+
+            <p class="wallet-balance-note">
+                Fast payment with AZIEL Wallet
+            </p>
+
+        </section>
 
         <section class="wallet-grid">
 
             <div class="wallet-card">
 
-                <h2>Top Up Wallet</h2>
+                <div class="wallet-card-head">
+                    <h2>Top Up Wallet</h2>
+                    <span>Instant top-up system</span>
+                </div>
 
                 <label>Amount</label>
 
@@ -65,10 +99,19 @@
                 <label>Select Payment</label>
 
                 <div id="paymentGrid" class="payment-grid"></div>
+
                 <div id="walletQrBox" class="wallet-qr-box" style="display:none;">
-                    <h3 id="walletQrTitle">Payment QR</h3>
+
+                    <h3 id="walletQrTitle">
+                        Payment QR
+                    </h3>
+
                     <img id="walletQrImage" src="" alt="Payment QR">
-                    <p>Scan QR and upload slip.</p>
+
+                    <p>
+                        Scan QR and upload payment slip.
+                    </p>
+
                 </div>
 
                 <input type="hidden" id="paymentMethod">
@@ -83,24 +126,62 @@
 
             </div>
 
-
             <div class="wallet-card">
 
-                <h2>Wallet History</h2>
+                <div class="wallet-card-head">
+                    <h2>Wallet History</h2>
+                    <span>Recent wallet activities</span>
+                </div>
 
                 <div id="walletHistory">
 
-                    <p class="empty-text">
-                        No wallet history yet.
-                    </p>
+                    <div class="wallet-empty">
+
+                        <i class="fa-regular fa-folder-open"></i>
+
+                        <h3>
+                            No Wallet History
+                        </h3>
+
+                        <p>
+                            Your wallet transactions will appear here.
+                        </p>
+
+                    </div>
 
                 </div>
 
             </div>
 
+
         </section>
 
     </main>
+
+    <nav class="az-bottom-nav">
+
+        <a href="home.html">
+            <i class="fa-solid fa-house"></i>
+            <span>Home</span>
+        </a>
+
+        <a href="tracking.html">
+            <i class="fa-solid fa-box"></i>
+            <span>Orders</span>
+        </a>
+
+        <a href="notifications.html">
+            <i class="fa-regular fa-bell"></i>
+            <span>Alerts</span>
+        </a>
+
+        <a href="account.html" class="active">
+            <i class="fa-regular fa-user"></i>
+            <span>Account</span>
+        </a>
+
+    </nav>
+
     <script src="/socket.io/socket.io.js"></script>
     <script src="js/payment.js"></script>
     <script src="js/api.js"></script>

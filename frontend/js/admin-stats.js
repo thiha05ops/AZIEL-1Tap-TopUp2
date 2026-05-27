@@ -51,8 +51,27 @@ async function loadAdminDashboard() {
 }
 
 function setValue(id, value) {
-    const el = document.getElementById(id);
-    if (el) el.innerText = value;
+
+    const el =
+        document.getElementById(id);
+
+    if (!el) return;
+
+    // revenue string
+    if (
+        typeof value === "string"
+    ) {
+
+        el.innerText = value;
+        return;
+
+    }
+
+    animateCounter(
+        el,
+        Number(value || 0)
+    );
+
 }
 
 function updateOrdersChart(stats) {
@@ -97,3 +116,68 @@ function updateOrdersChart(stats) {
         }
     });
 }
+// ======================
+// COUNTER ANIMATION
+// ======================
+
+function animateCounter(
+    element,
+    target
+) {
+
+    const start =
+        Number(
+            element.dataset.value || 0
+        );
+
+    const duration = 700;
+
+    const startTime =
+        performance.now();
+
+    function update(now) {
+
+        const progress =
+            Math.min(
+                (now - startTime) / duration,
+                1
+            );
+
+        const current =
+            Math.floor(
+                start +
+                (target - start) * progress
+            );
+
+        element.innerText =
+            current.toLocaleString();
+
+        if (progress < 1) {
+
+            requestAnimationFrame(update);
+
+        } else {
+
+            element.dataset.value =
+                target;
+
+        }
+
+    }
+
+    requestAnimationFrame(update);
+
+}
+// ======================
+// AUTO LIVE REFRESH
+// ======================
+
+setInterval(() => {
+
+    if (
+        document.hidden
+    ) return;
+
+    loadAdminDashboard();
+
+}, 15000);

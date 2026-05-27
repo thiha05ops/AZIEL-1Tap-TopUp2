@@ -4,82 +4,61 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <title>Notifications - AZIEL</title>
 
     <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/notifications.css">
 
-    <style>
-        body {
-            margin: 0;
-            background: #070716;
-            color: #fff;
-            font-family: Arial, sans-serif;
-        }
-
-        .noti-page {
-            width: 92%;
-            max-width: 800px;
-            margin: 80px auto;
-        }
-
-        .back-link {
-            display: inline-block;
-            color: #ffd700;
-            text-decoration: none;
-            font-weight: 900;
-            margin-bottom: 30px;
-        }
-
-        .noti-card {
-            background: linear-gradient(135deg, #101028, #20104b);
-            border: 1px solid rgba(255, 255, 255, .1);
-            border-radius: 28px;
-            padding: 30px;
-        }
-
-        .noti-card h1 {
-            color: #ffd700;
-            font-size: 42px;
-            margin-top: 0;
-        }
-
-        .notif-item {
-            padding: 18px;
-            border-bottom: 1px solid rgba(255, 255, 255, .08);
-            cursor: pointer;
-        }
-
-        .notif-item:hover {
-            background: rgba(255, 215, 0, .08);
-        }
-
-        .notif-item b {
-            color: #ffd700;
-        }
-
-        .notif-item p {
-            color: #ddd;
-            margin: 8px 0;
-        }
-
-        .notif-item small {
-            color: #aaa;
-        }
-    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 
 <body>
 
-    <main class="noti-page">
+    <header class="az-topbar">
+        <a href="home.html" class="az-topbar-brand">AZIEL</a>
 
-        <a href="account.html" class="back-link">
-            ← Back Account
+        <div class="az-topbar-actions">
+            <a href="home.html">Home</a>
+            <a href="account.html">Account</a>
+            <button id="markAllReadBtn">Mark all read</button>
+        </div>
+    </header>
+
+    <main class="noti-page">
+        <section class="noti-hero">
+            <span>Notification Center</span>
+            <h1>Notifications</h1>
+            <p>Order updates, admin announcements and promotions will appear here.</p>
+        </section>
+
+        <div id="notificationsList" class="notifications-list">
+            Loading...
+        </div>
+    </main>
+
+    <nav class="az-bottom-nav">
+        <a href="home.html">
+            <i class="fa-solid fa-house"></i>
+            <span>Home</span>
         </a>
 
-        <div id="notificationsList">
+        <a href="tracking.html">
+            <i class="fa-solid fa-box"></i>
+            <span>Orders</span>
+        </a>
 
-    </main>
+        <a href="notifications.html" class="active">
+            <i class="fa-regular fa-bell"></i>
+            <span>Alerts</span>
+        </a>
+
+        <a href="account.html">
+            <i class="fa-regular fa-user"></i>
+            <span>Account</span>
+        </a>
+    </nav>
+
     <script src="/socket.io/socket.io.js"></script>
     <script src="js/api.js"></script>
     <script src="js/notifications-page.js"></script>

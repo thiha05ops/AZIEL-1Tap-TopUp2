@@ -48,17 +48,13 @@
 
 <body>
 
-    <header class="account-topbar">
-        <button id="mobileMenuBtn" class="account-menu-btn" type="button">
-            <i class="fa-solid fa-bars"></i>
-        </button>
+    <header class="az-topbar">
+        <a href="home.html" class="az-topbar-brand">AZIEL</a>
 
-        <a href="home.html" class="account-brand">AZIEL</a>
-
-        <div class="account-top-actions">
-            <a href="home.html" class="top-link">Home</a>
-            <a href="support.html" class="top-link">Support</a>
-            <button id="logoutBtn" class="logout-btn">Logout</button>
+        <div class="az-topbar-actions">
+            <a href="home.html">Home</a>
+            <a href="support.html">Support</a>
+            <button id="logoutBtn">Logout</button>
         </div>
     </header>
 
@@ -217,6 +213,21 @@
         </section>
 
     </main>
+    <div id="orderDetailModal" class="admin-modal">
+        <div class="admin-modal-box">
+            <div class="admin-modal-head">
+                <h3>Order Details</h3>
+                <button id="closeOrderModal" type="button">×</button>
+            </div>
+
+            <div id="orderDetailContent"></div>
+        </div>
+    </div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/account.js"></script>
+    <script src="js/logout.js"></script>
+    <script src="js/notification-live.js"></script>
     <nav class="az-bottom-nav">
         <a href="home.html">
             <i class="fa-solid fa-house"></i>
@@ -233,17 +244,11 @@
             <span>Alerts</span>
         </a>
 
-        <a href="account.html" class="active">
+        <a href="account.html">
             <i class="fa-regular fa-user"></i>
             <span>Account</span>
         </a>
     </nav>
-
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="js/api.js"></script>
-    <script src="js/account.js"></script>
-    <script src="js/logout.js"></script>
-    <script src="js/notification-live.js"></script>
 
 </body>
 

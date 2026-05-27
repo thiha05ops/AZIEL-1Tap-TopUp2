@@ -38,7 +38,45 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const submitBtn = document.getElementById("submitPaymentBtn");
     const fileInput = document.getElementById("paymentSlip");
+    const previewBox =
+        document.getElementById("slipPreviewBox");
+
+    const previewImage =
+        document.getElementById("slipPreviewImage");
+
+    fileInput.addEventListener("change", () => {
+
+        const file = fileInput.files[0];
+
+        if (!file) return;
+
+        const reader = new FileReader();
+
+        reader.onload = (e) => {
+
+            previewImage.src = e.target.result;
+
+            previewBox.style.display = "block";
+        };
+
+        reader.readAsDataURL(file);
+    });
+    const removeSlipBtn =
+        document.getElementById("removeSlipBtn");
+
+    removeSlipBtn.addEventListener("click", (e) => {
+
+        e.preventDefault();
+
+        fileInput.value = "";
+
+        previewImage.src = "";
+
+        previewBox.style.display = "none";
+    });
     const msg = document.getElementById("paymentMsg");
+
+    initSuccessModal(orderId);
 
     submitBtn.addEventListener("click", async () => {
         const slip = fileInput.files[0];
@@ -50,6 +88,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         submitBtn.disabled = true;
         submitBtn.innerText = "PAYING...";
+        showOrderLoading();
+        startUploadSteps();
 
         const formData = new FormData();
         formData.append("orderId", orderId);
@@ -63,39 +103,88 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const data = await res.json();
 
+            hideOrderLoading();
+
             if (!data.success) {
-                msg.innerHTML = `<p class="error-msg">${data.message}</p>`;
+                msg.innerHTML = `<p class="error-msg">${data.message || "Payment submit failed."}</p>`;
                 submitBtn.disabled = false;
                 submitBtn.innerText = "Submit Payment";
+                resetUploadSteps();
                 return;
             }
 
             msg.innerHTML = `<p class="success-msg">Order Sent ✅</p>`;
             submitBtn.innerText = "ORDER SENT ✅";
 
-            const actions = document.getElementById("afterPaymentActions");
-            if (actions) actions.style.display = "grid";
-
-            const gamePageMap = {
-                "Mobile Legends": "mlbb.html",
-                "PUBG Mobile": "pubg.html",
-                "Free Fire": "freefire.html",
-                "Honor Of Kings": "hok.html"
-            };
-
-            document.getElementById("backGameBtn").onclick = () => {
-                window.location.href = gamePageMap[game] || "home.html";
-            };
-
-            document.getElementById("viewHistoryBtn").onclick = () => {
-                window.location.href = "account.html";
-            };
+            showSuccessModal();
 
         } catch (error) {
             console.log(error);
+            hideOrderLoading();
+
             msg.innerHTML = `<p class="error-msg">Server error</p>`;
             submitBtn.disabled = false;
             submitBtn.innerText = "Submit Payment";
         }
     });
 });
+
+function showOrderLoading() {
+    const overlay = document.getElementById("orderLoadingOverlay");
+    if (overlay) overlay.classList.add("show");
+}
+
+function hideOrderLoading() {
+    const overlay = document.getElementById("orderLoadingOverlay");
+    if (overlay) overlay.classList.remove("show");
+}
+
+function showSuccessModal() {
+    const modal = document.getElementById("successModal");
+    if (modal) modal.classList.add("show");
+}
+
+function initSuccessModal(orderId) {
+    const trackBtn = document.getElementById("trackOrderBtn");
+    const homeBtn = document.getElementById("backHomeBtn");
+
+    if (trackBtn) {
+        trackBtn.onclick = () => {
+            window.location.href = `tracking.html?orderId=${orderId}`;
+        };
+    }
+
+    if (homeBtn) {
+        homeBtn.onclick = () => {
+            window.location.href = "home.html";
+        };
+    }
+}
+function startUploadSteps() {
+    const box = document.getElementById("uploadSteps");
+    const step1 = document.getElementById("step1");
+    const step2 = document.getElementById("step2");
+    const step3 = document.getElementById("step3");
+
+    if (!box || !step1 || !step2 || !step3) return;
+
+    box.style.display = "flex";
+
+    step1.classList.add("active");
+
+    setTimeout(() => {
+        step2.classList.add("active");
+    }, 600);
+
+    setTimeout(() => {
+        step3.classList.add("active");
+    }, 1200);
+}
+
+function resetUploadSteps() {
+    document.getElementById("uploadSteps").style.display = "none";
+
+    ["step1", "step2", "step3"].forEach(id => {
+        document.getElementById(id)?.classList.remove("active");
+    });
+}
