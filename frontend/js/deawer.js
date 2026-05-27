@@ -1,26 +1,35 @@
-document.addEventListener("DOMContentLoaded", () => {
-    const btn = document.getElementById("mobileMenuBtn");
-    const drawer = document.getElementById("mobileDrawer");
-    const overlay = document.getElementById("mobileDrawerOverlay");
+// MOBILE DRAWER
 
-    if (!btn || !drawer || !overlay) return;
+document.addEventListener("DOMContentLoaded", () => {
+
+    const menuBtn =
+        document.getElementById("mobileMenuBtn");
+
+    const drawer =
+        document.getElementById("mobileDrawer");
+
+    const overlay =
+        document.getElementById("mobileDrawerOverlay");
+
+    if (!menuBtn || !drawer || !overlay) {
+        console.log("Drawer elements missing");
+        return;
+    }
 
     function openDrawer() {
-        drawer.classList.add("show");
-        overlay.classList.add("show");
-        document.body.classList.add("drawer-open");
+        drawer.classList.add("active");
+        overlay.classList.add("active");
+        document.body.style.overflow = "hidden";
     }
 
     function closeDrawer() {
-        drawer.classList.remove("show");
-        overlay.classList.remove("show");
-        document.body.classList.remove("drawer-open");
+        drawer.classList.remove("active");
+        overlay.classList.remove("active");
+        document.body.style.overflow = "";
     }
 
-    btn.addEventListener("click", openDrawer);
+    menuBtn.addEventListener("click", openDrawer);
+
     overlay.addEventListener("click", closeDrawer);
 
-    drawer.querySelectorAll("a").forEach(link => {
-        link.addEventListener("click", closeDrawer);
-    });
 });

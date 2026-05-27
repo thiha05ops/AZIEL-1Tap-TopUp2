@@ -524,3 +524,32 @@ body.drawer-open {
         pointer-events: none !important;
     }
 }
+
+@media (max-width: 768px) {
+
+    .az-mobile-menu-btn {
+        width: 44px !important;
+        height: 44px !important;
+
+        min-width: 44px;
+        min-height: 44px;
+
+        border-radius: 14px;
+
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+
+        font-size: 18px !important;
+
+        position: relative;
+        z-index: 100000;
+
+        flex-shrink: 0;
+    }
+
+    .az-mobile-menu-btn i {
+        font-size: 18px !important;
+    }
+
+}
