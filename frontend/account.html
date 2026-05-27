@@ -55,21 +55,11 @@
 </head>
 
 <body>
-    <header class="az-header">
+    <button id="accountMenuBtn" class="account-menu-btn">
+        <i class="fa-solid fa-bars"></i>
+    </button>
 
-        <button id="mobileMenuBtn" class="az-mobile-menu-btn">
-            <i class="fa-solid fa-bars"></i>
-        </button>
-
-        <a href="home.html" class="az-logo">
-            AZIEL
-        </a>
-
-        <a href="notifications.html" class="az-btn az-btn-light">
-            <i class="fa-regular fa-bell"></i>
-        </a>
-
-    </header>
+    <div id="accountDrawerOverlay" class="account-drawer-overlay"></div>
 
     <header class="az-topbar">
         <a href="home.html" class="az-topbar-brand">AZIEL</a>
@@ -274,7 +264,25 @@
             <span>Account</span>
         </a>
     </nav>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const btn = document.getElementById("accountMenuBtn");
+            const sidebar = document.querySelector(".account-sidebar");
+            const overlay = document.getElementById("accountDrawerOverlay");
 
+            if (!btn || !sidebar || !overlay) return;
+
+            btn.addEventListener("click", () => {
+                sidebar.classList.add("show");
+                overlay.classList.add("show");
+            });
+
+            overlay.addEventListener("click", () => {
+                sidebar.classList.remove("show");
+                overlay.classList.remove("show");
+            });
+        });
+    </script>
 </body>
 
 </html>
