@@ -815,3 +815,57 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+.topup-card {
+  padding: 18px;
+  margin-bottom: 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .06);
+  border: 1px solid rgba(255, 255, 255, .08);
+}
+
+.topup-card h2 {
+  font-size: 20px;
+  margin-bottom: 8px;
+}
+
+.topup-card p {
+  color: #cbd5e1;
+  margin: 5px 0;
+}
+
+.topup-slip {
+  width: 160px;
+  height: 160px;
+  object-fit: cover;
+  border-radius: 16px;
+  margin: 12px 0;
+  border: 1px solid rgba(255, 255, 255, .12);
+}
+
+.topup-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.approve-btn,
+.reject-btn {
+  border: none;
+  padding: 10px 14px;
+  border-radius: 12px;
+  color: #fff;
+  font-weight: 900;
+}
+
+.approve-btn {
+  background: #22c55e;
+}
+
+.reject-btn {
+  background: #ef4444;
+}
+
+.approve-btn:disabled,
+.reject-btn:disabled {
+  opacity: .45;
+}
