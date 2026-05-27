@@ -56,6 +56,7 @@
 
 <body>
 
+
     <div id="accountDrawerOverlay" class="account-drawer-overlay"></div>
 
     <header class="az-topbar">
@@ -64,14 +65,14 @@
         <div class="az-topbar-actions">
             <a href="home.html">Home</a>
             <a href="support.html">Support</a>
+            <button id="accountMenuBtn" class="account-menu-btn">
+                <i class="fa-solid fa-bars"></i>
+            </button>
             <button id="logoutBtn">Logout</button>
         </div>
 
 
     </header>
-    <button id="accountMenuBtn" class="account-menu-btn">
-        <i class="fa-solid fa-bars"></i>
-    </button>
 
     <main class="account-layout">
 
@@ -119,7 +120,6 @@
                 </a>
             </nav>
         </aside>
-
 
 
         <section class="account-content">
@@ -238,6 +238,7 @@
             <div id="orderDetailContent"></div>
         </div>
     </div>
+
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="js/api.js"></script>

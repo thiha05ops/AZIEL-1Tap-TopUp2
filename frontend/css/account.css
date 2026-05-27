@@ -847,25 +847,6 @@ body {
     visibility: visible;
   }
 
-  .account-menu-btn {
-    position: fixed;
-    top: 18px;
-    left: 18px;
-    z-index: 1000000;
-
-    width: 44px;
-    height: 44px;
-
-    border: 1px solid rgba(255, 255, 255, .12);
-    border-radius: 15px;
-
-    background: rgba(255, 255, 255, .12);
-    color: #fff;
-
-    display: grid !important;
-    place-items: center;
-    font-size: 18px;
-  }
 
   .account-main {
     width: calc(100% - 28px) !important;
@@ -875,4 +856,37 @@ body {
   .account-profile-card {
     transform: none !important;
   }
+}
+
+@media (max-width: 768px) {
+
+  .account-topbar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .account-topbar .menu-btn,
+  .account-topbar .account-menu-btn,
+  .account-topbar button {
+    position: relative !important;
+    top: 0 !important;
+    left: 0 !important;
+
+    width: 42px;
+    height: 42px;
+
+    border-radius: 14px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .account-logo,
+  .az-logo {
+    margin-left: 0 !important;
+    font-size: 32px;
+  }
+
 }
