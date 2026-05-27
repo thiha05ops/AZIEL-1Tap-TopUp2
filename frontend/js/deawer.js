@@ -1,35 +1,29 @@
-// MOBILE DRAWER
-
 document.addEventListener("DOMContentLoaded", () => {
+    const btn = document.getElementById("mobileMenuBtn");
+    const drawer = document.getElementById("mobileDrawer");
+    const overlay = document.getElementById("mobileDrawerOverlay");
 
-    const menuBtn =
-        document.getElementById("mobileMenuBtn");
-
-    const drawer =
-        document.getElementById("mobileDrawer");
-
-    const overlay =
-        document.getElementById("mobileDrawerOverlay");
-
-    if (!menuBtn || !drawer || !overlay) {
-        console.log("Drawer elements missing");
+    if (!btn || !drawer || !overlay) {
+        console.log("Drawer missing", { btn, drawer, overlay });
         return;
     }
 
     function openDrawer() {
-        drawer.classList.add("active");
-        overlay.classList.add("active");
-        document.body.style.overflow = "hidden";
+        drawer.classList.add("show");
+        overlay.classList.add("show");
+        document.body.classList.add("drawer-open");
     }
 
     function closeDrawer() {
-        drawer.classList.remove("active");
-        overlay.classList.remove("active");
-        document.body.style.overflow = "";
+        drawer.classList.remove("show");
+        overlay.classList.remove("show");
+        document.body.classList.remove("drawer-open");
     }
 
-    menuBtn.addEventListener("click", openDrawer);
+    btn.onclick = openDrawer;
+    overlay.onclick = closeDrawer;
 
-    overlay.addEventListener("click", closeDrawer);
-
+    drawer.querySelectorAll("a").forEach(a => {
+        a.onclick = closeDrawer;
+    });
 });

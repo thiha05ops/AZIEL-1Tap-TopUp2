@@ -42,7 +42,7 @@
     <header class="az-header">
 
         <!-- MOBILE MENU -->
-        <button id="mobileMenuBtn" class="az-mobile-menu-btn">
+        <button id="mobileMenuBtn" class="az-mobile-menu-btn" onclick="openMobileDrawer()">
             <i class="fa-solid fa-bars"></i>
         </button>
 
@@ -111,7 +111,7 @@
          MOBILE DRAWER
     ========================== -->
 
-    <div id="mobileDrawerOverlay" class="az-mobile-drawer-overlay"></div>
+    <div id="mobileDrawerOverlay" class="az-mobile-drawer-overlay" onclick="closeMobileDrawer()"></div>
 
     <aside id="mobileDrawer" class="az-mobile-drawer">
 
@@ -493,6 +493,17 @@
         </div>
 
     </footer>
+    <script>
+        function openMobileDrawer() {
+            document.getElementById("mobileDrawer").classList.add("show");
+            document.getElementById("mobileDrawerOverlay").classList.add("show");
+        }
+
+        function closeMobileDrawer() {
+            document.getElementById("mobileDrawer").classList.remove("show");
+            document.getElementById("mobileDrawerOverlay").classList.remove("show");
+        }
+    </script>
 
     <!-- JS -->
     <script src="js/app.js"></script>
