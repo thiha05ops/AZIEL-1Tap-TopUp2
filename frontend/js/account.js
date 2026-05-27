@@ -310,12 +310,35 @@ function initMobileMenu() {
     const sidebarOverlay = document.getElementById("sidebarOverlay");
 
     mobileMenuBtn?.addEventListener("click", () => {
-        sidebar?.classList.toggle("active");
-        sidebarOverlay?.classList.toggle("active");
+        sidebar?.classList.toggle("show");
+        sidebarOverlay?.classList.toggle("show");
     });
 
     sidebarOverlay?.addEventListener("click", () => {
-        sidebar?.classList.remove("active");
-        sidebarOverlay?.classList.remove("active");
+        sidebar?.classList.remove("show");
+        sidebarOverlay?.classList.remove("show");
     });
+}
+function renderRecent(orders) {
+    const box = document.getElementById("recentOrders");
+    if (!box) return;
+
+    if (!orders.length) {
+        box.innerHTML = `<p>No recent orders.</p>`;
+        return;
+    }
+
+    box.innerHTML = orders.slice(0, 3).map(order => `
+        <div class="recent-order-item"
+             onclick="window.location.href='tracking.html?orderId=${order.orderId}'">
+            <div>
+                <strong>${order.game || "Game"}</strong>
+                <small>${order.packageName || "Package"}</small>
+            </div>
+
+            <span class="${statusClass(order.status)}">
+                ${order.status || "pending"}
+            </span>
+        </div>
+    `).join("");
 }

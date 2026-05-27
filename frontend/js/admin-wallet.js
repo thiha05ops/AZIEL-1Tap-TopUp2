@@ -65,7 +65,9 @@ async function loadWalletTopups() {
 }
 
 function renderTopups(topups) {
-    const box = document.getElementById("walletTopups");
+    const box =
+        document.getElementById("adminWalletList") ||
+        document.getElementById("walletTopups");
 
     if (!box) return;
 
@@ -83,7 +85,7 @@ function renderTopups(topups) {
         const slip = item.paymentSlip || item.slip || item.filename || "";
         const slipUrl = slip.startsWith("/uploads/")
             ? slip
-            : `/uploads/${slip}`;
+            : `uploads/${slip}`;
 
         box.innerHTML += `
             <div class="topup-card">
