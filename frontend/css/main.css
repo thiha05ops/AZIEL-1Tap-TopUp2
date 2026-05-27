@@ -121,3 +121,35 @@ select,
 textarea {
   touch-action: manipulation;
 }
+
+.az-header {
+  position: sticky;
+  top: 0;
+  z-index: 99999;
+}
+
+.az-header-right {
+  position: relative;
+  z-index: 99999;
+}
+
+.az-profile,
+.az-btn,
+.az-btn-light,
+#profileBox {
+  position: relative;
+  z-index: 999999;
+  pointer-events: auto !important;
+  cursor: pointer;
+}
+
+.az-hero,
+.az-hero-overlay,
+.az-page,
+main {
+  position: relative;
+}
+
+.az-hero-overlay {
+  pointer-events: none !important;
+}

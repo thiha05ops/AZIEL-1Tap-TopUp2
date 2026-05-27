@@ -754,3 +754,49 @@ body {
     margin-top: 10px;
   }
 }
+
+@media (max-width: 768px) {
+  .account-layout {
+    display: block !important;
+  }
+
+  .account-sidebar {
+    display: block !important;
+    width: calc(100% - 28px) !important;
+    margin: 16px auto !important;
+    position: relative !important;
+  }
+
+  .account-main {
+    width: calc(100% - 28px) !important;
+    margin: 16px auto 110px !important;
+  }
+
+  .account-menu,
+  .profile-menu,
+  .account-tabs {
+    display: grid !important;
+    gap: 10px !important;
+  }
+
+  .az-header,
+  .az-header-right,
+  .az-profile,
+  .az-btn,
+  .az-mobile-menu-btn {
+    position: relative !important;
+    z-index: 99999 !important;
+    pointer-events: auto !important;
+  }
+
+  .az-page,
+  .account-page,
+  .account-bg,
+  .az-hero-overlay {
+    pointer-events: auto;
+  }
+
+  .az-hero-overlay {
+    pointer-events: none !important;
+  }
+}
