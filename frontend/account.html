@@ -12,6 +12,14 @@
     <link rel="stylesheet" href="css/account.css">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="manifest" href="/manifest.json">
+
+    <meta name="theme-color" content="#070716">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="AZIEL">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         @media (min-width: 900px) {
             .account-layout {
@@ -47,7 +55,64 @@
 </head>
 
 <body>
+    <header class="az-header">
 
+        <button id="mobileMenuBtn" class="az-mobile-menu-btn">
+            <i class="fa-solid fa-bars"></i>
+        </button>
+
+        <a href="home.html" class="az-logo">
+            AZIEL
+        </a>
+
+        <div class="az-header-right">
+
+            <button class="az-btn az-btn-light">
+                <i class="fa-regular fa-bell"></i>
+            </button>
+
+        </div>
+
+    </header>
+    <!-- =========================
+         MOBILE DRAWER
+    ========================== -->
+
+    <div id="mobileDrawerOverlay" class="az-mobile-drawer-overlay"></div>
+
+    <aside id="mobileDrawer" class="az-mobile-drawer">
+
+        <a href="home.html">
+            <i class="fa-solid fa-house"></i>
+            Home
+        </a>
+
+        <a href="#mobileGames">
+            <i class="fa-solid fa-gamepad"></i>
+            Mobile Games
+        </a>
+
+        <a href="#pcGames">
+            <i class="fa-solid fa-desktop"></i>
+            PC Games
+        </a>
+
+        <a href="#giftCards">
+            <i class="fa-solid fa-gift"></i>
+            Gift Cards
+        </a>
+
+        <a href="account.html">
+            <i class="fa-regular fa-user"></i>
+            Account
+        </a>
+
+        <a href="support.html">
+            <i class="fa-solid fa-headset"></i>
+            Support
+        </a>
+
+    </aside>
     <header class="az-topbar">
         <a href="home.html" class="az-topbar-brand">AZIEL</a>
 
@@ -223,11 +288,13 @@
             <div id="orderDetailContent"></div>
         </div>
     </div>
+
     <script src="/socket.io/socket.io.js"></script>
     <script src="js/api.js"></script>
     <script src="js/account.js"></script>
     <script src="js/logout.js"></script>
     <script src="js/notification-live.js"></script>
+    <script src="js/drawer.js"></script>
     <nav class="az-bottom-nav">
         <a href="home.html">
             <i class="fa-solid fa-house"></i>

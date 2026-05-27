@@ -454,3 +454,27 @@
         z-index: 99999;
     }
 }
+
+.az-mobile-drawer {
+    transform: translateX(-110%);
+    transition: .3s ease;
+}
+
+.az-mobile-drawer.show {
+    transform: translateX(0);
+}
+
+.az-mobile-drawer-overlay {
+    opacity: 0;
+    visibility: hidden;
+    transition: .25s ease;
+}
+
+.az-mobile-drawer-overlay.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+body.drawer-open {
+    overflow: hidden;
+}

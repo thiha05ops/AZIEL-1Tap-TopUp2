@@ -159,3 +159,56 @@
   border-radius: 50%;
   display: none;
 }
+
+@media (max-width: 480px) {
+
+  .mobile-menu-btn,
+  .menu-btn,
+  .hamburger,
+  #menuBtn {
+    width: 48px !important;
+    height: 48px !important;
+    border-radius: 16px !important;
+    font-size: 20px !important;
+  }
+
+  .logo,
+  .brand,
+  .site-logo {
+    font-size: 42px !important;
+  }
+
+  h1 {
+    font-size: 34px !important;
+    line-height: 1.05 !important;
+  }
+
+  h2 {
+    font-size: 26px !important;
+  }
+
+  .game-card,
+  .home-game-card,
+  .card {
+    min-height: 108px !important;
+    border-radius: 28px !important;
+    padding: 18px !important;
+  }
+
+  .game-card img,
+  .home-game-card img {
+    width: 86px !important;
+    height: 86px !important;
+    border-radius: 22px !important;
+  }
+
+  .game-card h3,
+  .home-game-card h3 {
+    font-size: 24px !important;
+  }
+
+  .game-card p,
+  .home-game-card p {
+    font-size: 15px !important;
+  }
+}
