@@ -256,6 +256,21 @@ function formatDate(date) {
     if (!date) return "-";
     return new Date(date).toLocaleString();
 }
+document.addEventListener("click", e => {
+    const link = e.target.closest("a");
+    if (!link) return;
 
+    const href = link.getAttribute("href");
+    if (!href) return;
+
+    if (href.startsWith("#")) return;
+
+    const url = new URL(href, window.location.href);
+
+    if (url.origin === window.location.origin) {
+        e.preventDefault();
+        window.location.href = url.pathname + url.search + url.hash;
+    }
+});
 window.loadOrders = loadOrders;
 window.updateStatus = updateStatus;
