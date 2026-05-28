@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <title>Google Login Success</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="/style.css">
+    <link rel="manifest" href="/manifest.json">
 
     <meta name="theme-color" content="#070716">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -25,12 +25,12 @@
             localStorage.setItem("token", token);
             localStorage.setItem("username", username || "Google User");
             localStorage.setItem("isLoggedIn", "true");
-            window.location.href = "home.html";
+            window.location.href = "/home.html";
         } else {
-            window.location.href = "login.html";
+            window.location.href = "/login.html";
         }
     </script>
-    <script src="js/pwa-fix.js"></script>
+    <script src="/js/pwa-fix.js"></script>
 </body>
 
 </html>
