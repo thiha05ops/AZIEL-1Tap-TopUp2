@@ -30,6 +30,8 @@ function adminMiddleware(req, res, next) {
         next();
 
     } catch (error) {
+        console.log("ADMIN TOKEN ERROR:", error.message);
+
         return res.status(401).json({
             success: false,
             message: "Admin session expired"
