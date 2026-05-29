@@ -1,3 +1,5 @@
+const adminUsersRoutes =
+    require("./routes/adminUsers");
 const path = require("path");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
@@ -150,7 +152,7 @@ app.use("/api", adminStatsRoutes);
 
 app.use("/api", adminAuthRoutes);
 app.use("/api", supportRoutes);
-
+app.use("/api", adminUsersRoutes);
 
 // HOME
 app.get("/", (req, res) => {

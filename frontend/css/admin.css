@@ -869,3 +869,29 @@ body {
 .reject-btn:disabled {
   opacity: .45;
 }
+
+.admin-user-card {
+  padding: 18px;
+  margin-bottom: 12px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .05);
+}
+
+.user-top {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.user-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.user-actions button {
+  border: none;
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+}
