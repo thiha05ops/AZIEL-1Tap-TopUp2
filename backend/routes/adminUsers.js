@@ -185,5 +185,26 @@ router.delete(
 
     }
 );
+router.get(
+    "/admin/debug/orders",
+    adminMiddleware,
+    async (req, res) => {
+        const orders = await Order.find()
+            .sort({ createdAt: -1 })
+            .limit(10);
 
+        res.json({
+            success: true,
+            orders: orders.map(o => ({
+                orderId: o.orderId,
+                username: o.username,
+                user: o.user,
+                userId: o.userId,
+                customerName: o.customerName,
+                game: o.game,
+                packageName: o.packageName
+            }))
+        });
+    }
+);
 module.exports = router;
