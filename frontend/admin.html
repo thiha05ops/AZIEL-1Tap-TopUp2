@@ -301,6 +301,19 @@
                         <span>Live orders</span>
                     </div>
 
+
+                    <div class="admin-filter-bar">
+                        <input id="orderSearchInput" type="text" placeholder="Search order, user, game...">
+
+                        <select id="orderStatusFilter">
+                            <option value="all">All Status</option>
+                            <option value="pending_payment">Pending</option>
+                            <option value="paid">Paid</option>
+                            <option value="processing">Processing</option>
+                            <option value="completed">Completed</option>
+                            <option value="cancelled">Cancelled</option>
+                        </select>
+                    </div>
                     <div class="admin-table-wrap">
                         <table class="admin-table">
                             <thead>
@@ -313,23 +326,12 @@
                                     <th>Action</th>
                                 </tr>
                             </thead>
+
                             <tbody id="adminOrdersBody">
                                 <tr>
-                                    <td colspan="6">Orders will appear here.</td>
+                                    <td colspan="6">Loading orders...</td>
                                 </tr>
                             </tbody>
-                            <div class="admin-filter-bar">
-                                <input id="orderSearchInput" type="text" placeholder="Search order, user, game...">
-
-                                <select id="orderStatusFilter">
-                                    <option value="all">All Status</option>
-                                    <option value="pending_payment">Pending</option>
-                                    <option value="paid">Paid</option>
-                                    <option value="processing">Processing</option>
-                                    <option value="completed">Completed</option>
-                                    <option value="cancelled">Cancelled</option>
-                                </select>
-                            </div>
                         </table>
                     </div>
                 </div>
