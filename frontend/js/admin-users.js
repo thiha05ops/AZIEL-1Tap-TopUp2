@@ -86,18 +86,17 @@ function renderUsers(users) {
             </div>
 
             <p>
-                Orders:
-                ${user.totalOrders}
+               Orders: ${user.totalOrders || 0}
             </p>
 
             <p>
-                MMK:
+               MMK:
                 ${(user.wallet?.MMK || 0).toLocaleString()}
             </p>
 
             <p>
-                THB:
-                ${(user.wallet?.THB || 0).toLocaleString()}
+            THB:
+                 ${(user.wallet?.THB || 0).toLocaleString()}
             </p>
 
             <div class="user-actions">
