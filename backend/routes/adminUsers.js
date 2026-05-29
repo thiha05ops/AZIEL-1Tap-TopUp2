@@ -24,10 +24,15 @@ router.get(
 
                 users.map(async user => {
 
-                    const totalOrders =
-                        await Order.countDocuments({
-                            username: user.username
-                        });
+                    const totalOrders = await Order.countDocuments({
+                        $or: [
+                            { username: user.username },
+                            { user: user.username },
+                            { customerName: user.username },
+                            { userId: user._id },
+                            { userId: String(user._id) }
+                        ]
+                    });
 
                     return {
 
