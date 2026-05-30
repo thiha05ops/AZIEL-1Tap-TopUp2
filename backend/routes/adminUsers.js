@@ -21,47 +21,34 @@ router.get(
                 .sort({ createdAt: -1 });
 
             const formattedUsers = await Promise.all(
-
                 users.map(async user => {
+                    const username = String(user.username || "").trim().toLowerCase();
 
-                    const totalOrders = await Order.countDocuments({
-                        $or: [
-                            { username: user.username },
-                            { user: user.username },
-                            { customerName: user.username },
-                            { userId: user._id },
-                            { userId: String(user._id) }
-                        ]
+                    const userOrders = await Order.find();
+
+                    const matchedOrders = userOrders.filter(order => {
+                        return String(order.username || "")
+                            .trim()
+                            .toLowerCase() === username;
                     });
 
+                    const totalOrders = matchedOrders.length;
+
+                    const totalSpent = matchedOrders.reduce((sum, order) => {
+                        return sum + Number(order.amount || 0);
+                    }, 0);
+
                     return {
-
                         _id: user._id,
-
-                        username:
-                            user.username || "Unknown",
-
-                        region:
-                            user.region || "MM",
-
-                        wallet:
-                            user.wallet || {
-                                MMK: 0,
-                                THB: 0
-                            },
-
+                        username: user.username || "Unknown",
+                        region: user.region || "MM",
+                        wallet: user.wallet || { MMK: 0, THB: 0 },
                         totalOrders,
-
-                        isBlocked:
-                            user.isBlocked || false,
-
-                        createdAt:
-                            user.createdAt
-
+                        totalSpent,
+                        isBlocked: user.isBlocked || false,
+                        createdAt: user.createdAt
                     };
-
                 })
-
             );
 
             res.json({
