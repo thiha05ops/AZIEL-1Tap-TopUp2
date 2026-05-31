@@ -108,5 +108,11 @@ router.delete("/admin/users/:id", adminMiddleware, async (req, res) => {
         });
     }
 });
-
+router.get("/admin/users-debug-version", (req, res) => {
+    res.json({
+        success: true,
+        version: "ADMIN_USERS_V2_TOTALS",
+        time: new Date()
+    });
+});
 module.exports = router;
