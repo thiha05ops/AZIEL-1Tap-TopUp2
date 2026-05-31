@@ -7,29 +7,16 @@ const adminMiddleware = require("../middleware/adminMiddleware");
 
 router.get("/admin/users", adminMiddleware, async (req, res) => {
     try {
-        const users = await User.find().sort({ createdAt: -1 });
-        const orders = await Order.find();
+        const users = await User.find().lean().sort({ createdAt: -1 });
+        const orders = await Order.find().lean();
 
         const formattedUsers = users.map(user => {
-            const names = [
-                user.username,
-                user.displayName,
-                user.name
-            ]
-                .filter(Boolean)
-                .map(v => String(v).trim().toLowerCase());
+            const username = String(user.username || "").trim().toLowerCase();
 
             const userOrders = orders.filter(order => {
-                const orderNames = [
-                    order.username,
-                    order.displayName,
-                    order.customerName,
-                    order.name
-                ]
-                    .filter(Boolean)
-                    .map(v => String(v).trim().toLowerCase());
-
-                return orderNames.some(name => names.includes(name));
+                return String(order.username || "")
+                    .trim()
+                    .toLowerCase() === username;
             });
 
             const totalOrders = userOrders.length;
@@ -40,19 +27,19 @@ router.get("/admin/users", adminMiddleware, async (req, res) => {
 
             return {
                 _id: user._id,
-                username: user.username || "Unknown",
+                username: user.username || user.email || "Unknown",
                 email: user.email || "",
                 displayName: user.displayName || user.username || "",
                 region: user.region || "MM",
                 wallet: user.wallet || { MMK: 0, THB: 0 },
-                totalOrders,
-                totalSpent,
+                totalOrders: totalOrders,
+                totalSpent: totalSpent,
                 isBlocked: user.isBlocked || false,
                 createdAt: user.createdAt
             };
         });
 
-        res.json({
+        return res.json({
             success: true,
             users: formattedUsers
         });
@@ -60,7 +47,7 @@ router.get("/admin/users", adminMiddleware, async (req, res) => {
     } catch (error) {
         console.log("Admin users error:", error);
 
-        res.json({
+        return res.status(500).json({
             success: false,
             message: "Server error"
         });
