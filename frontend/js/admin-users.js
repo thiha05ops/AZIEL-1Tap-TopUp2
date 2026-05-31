@@ -26,7 +26,7 @@ async function loadAdminUsers() {
         );
 
         const data = await res.json();
-        alert(JSON.stringify(data.users[0], null, 2));
+
         console.log("ADMIN USERS DATA:", data);
 
         if (!data.success) {

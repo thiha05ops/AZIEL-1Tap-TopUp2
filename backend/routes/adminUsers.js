@@ -40,8 +40,9 @@ router.get("/admin/users", adminMiddleware, async (req, res) => {
 
             return {
                 _id: user._id,
-                username: user.username || user.displayName || "Unknown",
-                displayName: user.displayName || "",
+                username: user.username || "Unknown",
+                email: user.email || "",
+                displayName: user.displayName || user.username || "",
                 region: user.region || "MM",
                 wallet: user.wallet || { MMK: 0, THB: 0 },
                 totalOrders,
