@@ -147,12 +147,12 @@ app.use("/api", passwordRoutes);
 app.use("/api", supplierRoutes);
 
 app.use("/api", walletRoutes);
+app.use("/api", adminUsersRoutes);
 
 app.use("/api", adminStatsRoutes);
 
 app.use("/api", adminAuthRoutes);
 app.use("/api", supportRoutes);
-app.use("/api", adminUsersRoutes);
 
 // HOME
 app.get("/", (req, res) => {
