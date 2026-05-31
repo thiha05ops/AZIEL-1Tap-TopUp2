@@ -26,9 +26,8 @@ async function loadAdminUsers() {
         );
 
         const data = await res.json();
-
+        window.ADMIN_USERS_DATA = data;
         console.log("ADMIN USERS DATA:", data);
-
         if (!data.success) {
 
             box.innerHTML =
