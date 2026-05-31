@@ -52,7 +52,6 @@ async function loadAdminUsers() {
 }
 
 function renderUsers(users) {
-
     const box =
         document.getElementById("adminUsersList") ||
         document.getElementById("usersList");
@@ -60,115 +59,58 @@ function renderUsers(users) {
     if (!box) return;
 
     if (!users.length) {
-
-        box.innerHTML =
-            "<p>No users found.</p>";
-
+        box.innerHTML = `
+            <div class="admin-list-empty">
+                Users will appear here.
+            </div>
+        `;
         return;
-
     }
 
-    box.innerHTML =
-        users.map(user => `
-
+    box.innerHTML = users.map(user => `
         <div class="admin-user-card">
-
             <div class="user-top">
+                <div>
+                    <h3>${user.username || "Unknown"}</h3>
+                    <span>${user.region || "MM"}</span>
+                </div>
 
-                <h3>
-                    ${user.username}
-                </h3>
-
-                <span>
-                    ${user.region}
+                <span class="${user.isBlocked ? "user-badge blocked" : "user-badge active"}">
+                    ${user.isBlocked ? "Blocked" : "Active"}
                 </span>
-
             </div>
 
-           <p>Orders: ${user.totalOrders || 0}</p>
+            <div class="user-stats">
+                <div>
+                    <small>Orders</small>
+                    <strong>${user.totalOrders || 0}</strong>
+                </div>
 
-<p>Total Spent: ${(user.totalSpent || 0).toLocaleString()}</p>
+                <div>
+                    <small>Total Spent</small>
+                    <strong>${Number(user.totalSpent || 0).toLocaleString()}</strong>
+                </div>
 
-<p>MMK: ${(user.wallet?.MMK || 0).toLocaleString()}</p>
+                <div>
+                    <small>MMK</small>
+                    <strong>${Number(user.wallet?.MMK || 0).toLocaleString()}</strong>
+                </div>
 
-<p>THB: ${(user.wallet?.THB || 0).toLocaleString()}</p>
+                <div>
+                    <small>THB</small>
+                    <strong>${Number(user.wallet?.THB || 0).toLocaleString()}</strong>
+                </div>
+            </div>
 
             <div class="user-actions">
-
-                <button
-                    onclick="toggleUserBlock('${user._id}')"
-                >
-                    ${user.isBlocked
-                ? "Unblock"
-                : "Block"}
+                <button onclick="toggleUserBlock('${user._id}')">
+                    ${user.isBlocked ? "Unblock" : "Block"}
                 </button>
 
-                <button
-                    onclick="deleteUser('${user._id}')"
-                >
+                <button onclick="deleteUser('${user._id}')">
                     Delete
                 </button>
-
             </div>
-
         </div>
-
     `).join("");
-
-}
-
-async function toggleUserBlock(id) {
-
-    const token =
-        localStorage.getItem("adminToken");
-
-    const res = await fetch(
-        `/api/admin/users/${id}/block`,
-        {
-            method: "PUT",
-            headers: {
-                Authorization:
-                    `Bearer ${token}`
-            }
-        }
-    );
-
-    const data =
-        await res.json();
-
-    alert(data.message);
-
-    loadAdminUsers();
-
-}
-
-async function deleteUser(id) {
-
-    if (
-        !confirm(
-            "Delete this user?"
-        )
-    ) return;
-
-    const token =
-        localStorage.getItem("adminToken");
-
-    const res = await fetch(
-        `/api/admin/users/${id}`,
-        {
-            method: "DELETE",
-            headers: {
-                Authorization:
-                    `Bearer ${token}`
-            }
-        }
-    );
-
-    const data =
-        await res.json();
-
-    alert(data.message);
-
-    loadAdminUsers();
-
 }
