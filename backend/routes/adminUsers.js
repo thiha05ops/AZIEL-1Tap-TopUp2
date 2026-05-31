@@ -35,6 +35,7 @@ router.get("/admin/users", adminMiddleware, async (req, res) => {
                 totalOrders: totalOrders,
                 totalSpent: totalSpent,
                 isBlocked: user.isBlocked || false,
+                debugVersion: "ADMIN_USERS_V2",
                 createdAt: user.createdAt
             };
         });
