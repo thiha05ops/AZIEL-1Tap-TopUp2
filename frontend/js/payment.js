@@ -17,7 +17,8 @@ async function loadPaymentMethods() {
 
     try {
         const res = await fetch(`/api/payment-methods?region=${region}`);
-        const methods = await res.json();
+        const data = await res.json();
+        const methods = data.methods || [];
 
         if (!res.ok) {
             throw new Error(methods.message || "Failed to load payment methods");
