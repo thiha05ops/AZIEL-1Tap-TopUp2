@@ -1455,3 +1455,18 @@ body {
 .pack-info {
     min-width: 0;
 }
+
+.pack {
+    display: grid !important;
+    grid-template-columns: 54px 1fr !important;
+    align-items: center !important;
+    gap: 12px !important;
+}
+
+.pack-icon,
+.pack-icon img {
+    width: 48px !important;
+    height: 48px !important;
+    object-fit: contain !important;
+    display: block !important;
+}
