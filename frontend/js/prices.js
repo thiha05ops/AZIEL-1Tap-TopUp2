@@ -18,13 +18,13 @@ const GAME_PRICES = {
     { name: "716 Diamonds", mmk: 51000, thb: 340, code: "MLBB_716", icon: "assets/mlbb/icons/chest2.webp" },
     { name: "1163 Diamonds", mmk: 70500, thb: 545, code: "MLBB_1163", icon: "assets/mlbb/icons/chest3.webp" },
     { name: "1163 Diamonds", mmk: 70500, thb: 545, code: "MLBB_1163", icon: "assets/mlbb/icons/chest3.webp" },
-    { name: "1160+186 Diamonds", mmk: 84500, thb: 652, code: "MLBB_1160+186", icon: "assets/mlbb/icons/chest3.webp" },
-    { name: "1360+335 Diamonds", mmk: 138500, thb: 989, code: "MLBB_1360+335", icon: "assets/mlbb/icons/chest3.webp" },
-    { name: "2015+475 Diamonds", mmk: 193000, thb: 1490, code: "MLBB_2015+475", icon: "assets/mlbb/icons/chest4.webp" },
-    { name: "2015+475 Diamonds", mmk: 193000, thb: 1490, code: "MLBB_2015+475", icon: "assets/mlbb/icons/chest4.webp" },
-    { name: "2015+475 Diamonds", mmk: 193000, thb: 1490, code: "MLBB_2015+475", icon: "assets/mlbb/icons/chest4.webp" },
-    { name: "5000+1000 Diamonds", mmk: 193000, thb: 1490, code: "MLBB_5000+1000", icon: "assets/mlbb/icons/chest5.webp" },
-    { name: "7740+1548 Diamonds", mmk: 193000, thb: 1490, code: "MLBB_7740+1548", icon: "assets/mlbb/icons/chest5.webp" }
+    { name: "1160+186 Diamonds", mmk: 84500, thb: 652, code: "MLBB_1160+186", icon: "assets/mlbb/icons/cheset3.webp" },
+    { name: "1360+335 Diamonds", mmk: 138500, thb: 989, code: "MLBB_1360+335", icon: "assets/mlbb/icons/cheset3.webp" },
+    { name: "2015+475 Diamonds", mmk: 193000, thb: 1490, code: "MLBB_2015+475", icon: "assets/mlbb/icons/cheset4.webp" },
+    { name: "2015+475 Diamonds", mmk: 193000, thb: 1490, code: "MLBB_2015+475", icon: "assets/mlbb/icons/cheset4.webp" },
+    { name: "2015+475 Diamonds", mmk: 193000, thb: 1490, code: "MLBB_2015+475", icon: "assets/mlbb/icons/cheset4.webp" },
+    { name: "5000+1000 Diamonds", mmk: 193000, thb: 1490, code: "MLBB_5000+1000", icon: "assets/mlbb/icons/cheset5.webp" },
+    { name: "7740+1548 Diamonds", mmk: 193000, thb: 1490, code: "MLBB_7740+1548", icon: "assets/mlbb/icons/cheset5.webp" }
   ]
 };
 
