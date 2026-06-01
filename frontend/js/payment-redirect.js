@@ -28,7 +28,7 @@ async function createPaymentAndRedirect(orderData) {
             zoneId: orderData.zoneId
         });
 
-        window.location.href = `payment.html?${params.toString()}`;
+        window.location.href = `payment-page.html?${params.toString()}`;
 
     } catch (error) {
         console.log(error);
