@@ -3,7 +3,7 @@
 const GAME_PRICES = {
   mlbb: [
     { name: "Weekly pass 1x", mmk: 6800, thb: 55, code: "MLBB_Weekly pass 1x", icon: "assets/mlbb/icons/weekly.webp" },
-    { name: "13+1 Diamonds", mmk: 1100, thb: 10, code: "MLBB_13+1", icon: "assets/mlbb/icons/smaill.webp" },
+    { name: "13+1 Diamonds", mmk: 1100, thb: 10, code: "MLBB_13+1", icon: "assets/mlbb/icons/small.webp" },
     { name: "22 Diamonds", mmk: 1800, thb: 12, code: "MLBB_22", icon: "assets/mlbb/icons/small.webp" },
     { name: "42 Diamonds", mmk: 3456, thb: 27, code: "MLBB_42", icon: "assets/mlbb/icons/small.webp" },
     { name: "56 Diamonds", mmk: 3750, thb: 30, code: "MLBB_56", icon: "assets/mlbb/icons/medium.webp" },
@@ -24,7 +24,7 @@ const GAME_PRICES = {
     { name: "2015+475 Diamonds", mmk: 193000, thb: 1490, code: "MLBB_2015+475", icon: "assets/mlbb/icons/cheset4.webp" },
     { name: "2015+475 Diamonds", mmk: 193000, thb: 1490, code: "MLBB_2015+475", icon: "assets/mlbb/icons/cheset4.webp" },
     { name: "5000+1000 Diamonds", mmk: 193000, thb: 1490, code: "MLBB_5000+1000", icon: "assets/mlbb/icons/cheset5.webp" },
-    { name: "7740+1548 Diamonds", mmk: 193000, thb: 1490, code: "MLBB_7740+1548", icon: "assets/mlbb/icons/cheset5.webp" }
+    { name: "7740+1548 Diamonds", mmk: 193000, thb: 1490, code: "MLBB_7740+1548", icon: "assets/mlbb/icons/cheset5.webp" },
   ]
 };
 
