@@ -44,7 +44,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   packageContainer.innerHTML = "";
-
   packages.forEach(item => {
     const price = region === "TH" ? item.thb : item.mmk;
 
@@ -60,7 +59,7 @@ document.addEventListener("DOMContentLoaded", () => {
             ${Number(price).toLocaleString()} ${currencySymbol}
         </span>
     </div>
-</div>
+   </div>
     `;
   });
 });
