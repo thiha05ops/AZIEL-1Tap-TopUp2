@@ -14,23 +14,17 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const config = regionData[region] || regionData.MM;
 
-    if (regionSelect) {
-        regionSelect.value = region;
-    }
-
-    if (currencyText) {
-        currencyText.innerText = config.currency;
-    }
+    if (regionSelect) regionSelect.value = region;
+    if (currencyText) currencyText.innerText = config.currency;
 
     if (packagesBox) {
         const game = packagesBox.dataset.game;
-        const items = window.GAME_PRICES?.[game] || GAME_PRICES?.[game] || [];
+        const items = window.GAME_PRICES?.[game] || [];
 
         packagesBox.innerHTML = "";
 
         items.forEach(item => {
             const price = item[config.priceKey] || 0;
-
             const priceText =
                 config.currency === "THB"
                     ? `${price} ฿`
@@ -63,7 +57,7 @@ async function loadDynamicPaymentMethods(region) {
         const res = await fetch(`/api/payment-methods?region=${region}`);
         const data = await res.json();
 
-        if (!res.ok) {
+        if (!res.ok || data.success === false) {
             throw new Error(data.message || "Failed to load payment methods");
         }
 
@@ -82,13 +76,13 @@ async function loadDynamicPaymentMethods(region) {
         }
 
         activeMethods.forEach((pay, index) => {
-            const id = pay.methodKey || pay.id || pay._id;
-            const name = pay.name || pay.title || pay.methodName || "Payment";
+            const id = pay.method || pay.methodKey || pay.id || pay._id;
+            const name = pay.method || pay.name || pay.title || "Payment";
             const logo = pay.logo || pay.logoUrl || pay.qrImage || "assets/logo.png";
 
             const card = document.createElement("div");
             card.className = `pay-card ${index === 0 ? "active" : ""}`;
-            card.dataset.method = id;
+            card.dataset.method = name;
 
             card.innerHTML = `
                 <img src="${logo}" alt="${name}">
@@ -101,7 +95,7 @@ async function loadDynamicPaymentMethods(region) {
                 });
 
                 card.classList.add("active");
-                paymentMethod.value = id;
+                paymentMethod.value = name;
 
                 document.dispatchEvent(new CustomEvent("paymentChanged", {
                     detail: pay
@@ -111,7 +105,7 @@ async function loadDynamicPaymentMethods(region) {
             paymentGrid.appendChild(card);
 
             if (index === 0) {
-                paymentMethod.value = id;
+                paymentMethod.value = name;
             }
         });
 
