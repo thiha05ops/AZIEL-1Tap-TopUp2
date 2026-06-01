@@ -1,38 +1,19 @@
 // frontend/js/region-payment.js
 
-document.addEventListener("DOMContentLoaded", () => {
-
+document.addEventListener("DOMContentLoaded", async () => {
     const region = localStorage.getItem("region") || "MM";
 
     const regionSelect = document.getElementById("regionSelect");
     const currencyText = document.getElementById("currencyText");
     const packagesBox = document.getElementById("packages");
-    const paymentGrid = document.getElementById("paymentGrid");
-    const paymentMethod = document.getElementById("paymentMethod");
 
     const regionData = {
-        MM: {
-            currency: "MMK",
-            priceKey: "mmk",
-            payments: [
-                { id: "kbzpay", name: "KBZPay", logo: "assets/payments/kbzpay.png" },
-                { id: "wavepay", name: "WavePay", logo: "assets/payments/wavepay.png" },
-                { id: "ayapay", name: "AYA Pay", logo: "assets/payments/ayapay.png" }
-            ]
-        },
-        TH: {
-            currency: "THB",
-            priceKey: "thb",
-            payments: [
-                { id: "promptpay", name: "PromptPay", logo: "assets/payments/promptpay.png" },
-                { id: "scb", name: "SCB", logo: "assets/payments/scb.png" }
-            ]
-        }
+        MM: { currency: "MMK", priceKey: "mmk" },
+        TH: { currency: "THB", priceKey: "thb" }
     };
 
     const config = regionData[region] || regionData.MM;
 
-    // Region / Currency show
     if (regionSelect) {
         regionSelect.value = region;
     }
@@ -41,20 +22,19 @@ document.addEventListener("DOMContentLoaded", () => {
         currencyText.innerText = config.currency;
     }
 
-    // Package prices auto generate
     if (packagesBox) {
         const game = packagesBox.dataset.game;
-        const items = GAME_PRICES[game] || [];
+        const items = window.GAME_PRICES?.[game] || GAME_PRICES?.[game] || [];
 
         packagesBox.innerHTML = "";
 
         items.forEach(item => {
-            const price = item[config.priceKey];
+            const price = item[config.priceKey] || 0;
 
             const priceText =
                 config.currency === "THB"
                     ? `${price} ฿`
-                    : `${price.toLocaleString()} Ks`;
+                    : `${Number(price).toLocaleString()} Ks`;
 
             packagesBox.innerHTML += `
                 <div class="pack"
@@ -67,32 +47,76 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Payment logo cards auto generate by region
-    if (paymentGrid && paymentMethod) {
+    await loadDynamicPaymentMethods(region);
+});
+
+async function loadDynamicPaymentMethods(region) {
+    const paymentGrid = document.getElementById("paymentGrid");
+    const paymentMethod = document.getElementById("paymentMethod");
+
+    if (!paymentGrid || !paymentMethod) return;
+
+    paymentGrid.innerHTML = `<p>Loading payment methods...</p>`;
+    paymentMethod.value = "";
+
+    try {
+        const res = await fetch(`/api/payment-methods?region=${region}`);
+        const data = await res.json();
+
+        if (!res.ok) {
+            throw new Error(data.message || "Failed to load payment methods");
+        }
+
+        const methods = Array.isArray(data) ? data : [];
+
+        const activeMethods = methods.filter(pay =>
+            pay.enabled === true &&
+            pay.maintenance !== true
+        );
+
         paymentGrid.innerHTML = "";
 
-        config.payments.forEach((pay, index) => {
-            paymentGrid.innerHTML += `
-                <div class="pay-card ${index === 0 ? "active" : ""}"
-                     data-method="${pay.id}">
-                    <img src="${pay.logo}" alt="${pay.name}">
-                    <span>${pay.name}</span>
-                </div>
+        if (activeMethods.length === 0) {
+            paymentGrid.innerHTML = `<p>No payment methods available.</p>`;
+            return;
+        }
+
+        activeMethods.forEach((pay, index) => {
+            const id = pay.methodKey || pay.id || pay._id;
+            const name = pay.name || pay.title || pay.methodName || "Payment";
+            const logo = pay.logo || pay.logoUrl || pay.qrImage || "assets/logo.png";
+
+            const card = document.createElement("div");
+            card.className = `pay-card ${index === 0 ? "active" : ""}`;
+            card.dataset.method = id;
+
+            card.innerHTML = `
+                <img src="${logo}" alt="${name}">
+                <span>${name}</span>
             `;
-        });
 
-        paymentMethod.value = config.payments[0].id;
-
-        document.querySelectorAll(".pay-card").forEach(card => {
             card.addEventListener("click", () => {
                 document.querySelectorAll(".pay-card").forEach(c => {
                     c.classList.remove("active");
                 });
 
                 card.classList.add("active");
-                paymentMethod.value = card.dataset.method;
-            });
-        });
-    }
+                paymentMethod.value = id;
 
-});
+                document.dispatchEvent(new CustomEvent("paymentChanged", {
+                    detail: pay
+                }));
+            });
+
+            paymentGrid.appendChild(card);
+
+            if (index === 0) {
+                paymentMethod.value = id;
+            }
+        });
+
+    } catch (err) {
+        console.error("Payment methods load error:", err);
+        paymentGrid.innerHTML = `<p>Payment methods failed to load.</p>`;
+    }
+}

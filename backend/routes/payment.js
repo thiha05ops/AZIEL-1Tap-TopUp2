@@ -138,5 +138,26 @@ Status: ${order.status}`
         });
     }
 });
+const PaymentMethod = require("../models/PaymentMethod");
+
+// GET /api/payment-methods?region=MM
+router.get("/payment-methods", async (req, res) => {
+    try {
+        const region = req.query.region || "MM";
+
+        const methods = await PaymentMethod.find({
+            region,
+            enabled: true,
+            maintenance: { $ne: true }
+        }).sort({ order: 1 });
+
+        res.json(methods);
+    } catch (error) {
+        console.log("Payment methods load error:", error);
+        res.status(500).json({
+            message: "Failed to load payment methods"
+        });
+    }
+});
 
 module.exports = router;

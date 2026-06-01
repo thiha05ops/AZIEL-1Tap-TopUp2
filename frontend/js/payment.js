@@ -1,6 +1,10 @@
 // frontend/js/payment.js
 
 document.addEventListener("DOMContentLoaded", () => {
+    loadPaymentMethods();
+});
+
+async function loadPaymentMethods() {
     const paymentGrid = document.getElementById("paymentGrid");
     const paymentInput = document.getElementById("paymentMethod");
 
@@ -8,42 +12,66 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const region = localStorage.getItem("region") || "MM";
 
-    const paymentsByRegion = {
-        MM: [
-            { id: "wallet", name: "AZIEL Wallet", logo: "assets/logo.png" },
-            { id: "kbzpay", name: "KBZPay", logo: "assets/payment/kbzpay.png" },
-            { id: "wavepay", name: "WavePay", logo: "assets/payment/wavepay.png" },
-            { id: "ayapay", name: "AYA Pay", logo: "assets/payment/ayapay.png" }
-        ],
-        TH: [
-            { id: "wallet", name: "AZIEL Wallet", logo: "assets/logo.png" },
-            { id: "promptpay", name: "PromptPay", logo: "assets/payment/promptpay.png" },
-            { id: "scb", name: "SCB", logo: "assets/payment/scb.png" }
-        ]
-    };
-
-    const methods = paymentsByRegion[region] || paymentsByRegion.MM;
-
-    paymentGrid.innerHTML = "";
+    paymentGrid.innerHTML = `<p class="pay-loading">Loading payment methods...</p>`;
     paymentInput.value = "";
 
-    methods.forEach(method => {
-        const card = document.createElement("div");
-        card.className = "pay-card";
-        card.dataset.method = method.id;
+    try {
+        const res = await fetch(`/api/payment-methods?region=${region}`);
+        const methods = await res.json();
 
-        card.innerHTML = `
-            <img src="${method.logo}" class="pay-logo" alt="${method.name}">
-            <span>${method.name}</span>
-        `;
+        if (!res.ok) {
+            throw new Error(methods.message || "Failed to load payment methods");
+        }
 
-        card.addEventListener("click", () => {
-            document.querySelectorAll(".pay-card").forEach(c => c.classList.remove("active"));
-            card.classList.add("active");
-            paymentInput.value = method.id;
-            document.dispatchEvent(new Event("paymentChanged"));
+        paymentGrid.innerHTML = "";
+
+        const activeMethods = methods.filter(method =>
+            method.enabled === true &&
+            method.maintenance !== true
+        );
+
+        if (activeMethods.length === 0) {
+            paymentGrid.innerHTML = `<p class="pay-empty">No payment methods available.</p>`;
+            return;
+        }
+
+        activeMethods.forEach(method => {
+            const methodId = method.methodKey || method.id || method._id;
+            const methodName = method.name || method.title || "Payment";
+            const methodLogo = method.logo || method.logoUrl || method.qrImage || "assets/logo.png";
+
+            const card = document.createElement("div");
+            card.className = "pay-card";
+            card.dataset.method = methodId;
+
+            card.innerHTML = `
+                <img src="${methodLogo}" class="pay-logo" alt="${methodName}">
+                <span>${methodName}</span>
+                ${method.maintenance ? `<small>Maintenance</small>` : ""}
+            `;
+
+            card.addEventListener("click", () => {
+                document
+                    .querySelectorAll(".pay-card")
+                    .forEach(c => c.classList.remove("active"));
+
+                card.classList.add("active");
+                paymentInput.value = methodId;
+
+                localStorage.setItem("selectedPaymentMethod", methodId);
+
+                document.dispatchEvent(new CustomEvent("paymentChanged", {
+                    detail: method
+                }));
+            });
+
+            paymentGrid.appendChild(card);
         });
 
-        paymentGrid.appendChild(card);
-    });
-});
+    } catch (err) {
+        console.error("Load payment methods error:", err);
+        paymentGrid.innerHTML = `
+            <p class="pay-error">Payment methods failed to load.</p>
+        `;
+    }
+}
