@@ -67,7 +67,7 @@ async function loadDynamicPaymentMethods(region) {
             throw new Error(data.message || "Failed to load payment methods");
         }
 
-        const methods = Array.isArray(data) ? data : [];
+        const methods = Array.isArray(data) ? data : (data.methods || []);
 
         const activeMethods = methods.filter(pay =>
             pay.enabled === true &&

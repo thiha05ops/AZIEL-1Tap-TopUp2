@@ -140,22 +140,30 @@ Status: ${order.status}`
 });
 const PaymentMethod = require("../models/PaymentMethod");
 
-// GET /api/payment-methods?region=MM
+// GET /api/payment-methods
 router.get("/payment-methods", async (req, res) => {
     try {
-        const region = req.query.region || "MM";
+        const { region } = req.query;
 
-        const methods = await PaymentMethod.find({
-            region,
-            enabled: true,
-            maintenance: { $ne: true }
-        }).sort({ order: 1 });
+        const filter = {};
 
-        res.json(methods);
+        if (region) {
+            filter.region = region;
+        }
+
+        const methods = await PaymentMethod.find(filter).sort({ createdAt: 1 });
+
+        res.json({
+            success: true,
+            methods
+        });
+
     } catch (error) {
         console.log("Payment methods load error:", error);
         res.status(500).json({
-            message: "Failed to load payment methods"
+            success: false,
+            message: "Failed to load payment methods",
+            methods: []
         });
     }
 });
