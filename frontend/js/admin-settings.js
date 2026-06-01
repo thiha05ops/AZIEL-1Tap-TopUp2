@@ -91,3 +91,39 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 });
+document.addEventListener("DOMContentLoaded", () => {
+
+    const tabs =
+        document.querySelectorAll(".settings-tab[data-settings-tab]");
+
+    const panels =
+        document.querySelectorAll(".settings-panel");
+
+    tabs.forEach(tab => {
+
+        tab.addEventListener("click", () => {
+
+            const target =
+                tab.dataset.settingsTab;
+
+            tabs.forEach(t =>
+                t.classList.remove("active")
+            );
+
+            panels.forEach(p =>
+                p.classList.remove("active")
+            );
+
+            tab.classList.add("active");
+
+            document
+                .querySelector(
+                    `[data-settings-panel="${target}"]`
+                )
+                ?.classList.add("active");
+
+        });
+
+    });
+
+});

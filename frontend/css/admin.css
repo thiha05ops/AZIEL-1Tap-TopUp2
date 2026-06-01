@@ -1293,3 +1293,27 @@ body {
   gap: 10px;
   color: #fff;
 }
+
+.settings-panel {
+  display: none;
+}
+
+.settings-panel.active {
+  display: block;
+}
+
+.settings-tab {
+  cursor: pointer;
+}
+
+.settings-tab.active {
+  background: linear-gradient(135deg, #6d28d9, #9333ea);
+}
+
+.settings-panel {
+  display: none;
+}
+
+.settings-panel.active {
+  display: block;
+}
