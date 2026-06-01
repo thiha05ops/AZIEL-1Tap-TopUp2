@@ -435,14 +435,154 @@
             </section>
 
             <section class="admin-section" id="section-settings">
-                <div class="panel">
-                    <div class="panel-head">
-                        <h3>Settings</h3>
-                        <span>Admin controls</span>
+                <div class="settings-page">
+
+                    <div class="settings-menu">
+                        <h3>Settings Menu</h3>
+
+                        <button class="settings-tab active">
+                            ⚙️
+                            <span>
+                                <b>General</b>
+                                <small>Basic site settings</small>
+                            </span>
+                        </button>
+
+                        <button class="settings-tab">
+                            🛡️
+                            <span>
+                                <b>System Controls</b>
+                                <small>System behavior</small>
+                            </span>
+                        </button>
+
+                        <button class="settings-tab disabled">
+                            💳
+                            <span>
+                                <b>Payments</b>
+                                <small>Payment methods</small>
+                            </span>
+                            <em>Coming Next</em>
+                        </button>
+
+                        <button class="settings-tab disabled">
+                            🎮
+                            <span>
+                                <b>Games</b>
+                                <small>Game management</small>
+                            </span>
+                            <em>Coming Next</em>
+                        </button>
+
+                        <button class="settings-tab disabled">
+                            🔔
+                            <span>
+                                <b>Notifications</b>
+                                <small>Notification settings</small>
+                            </span>
+                            <em>Coming Next</em>
+                        </button>
                     </div>
 
-                    <div class="admin-list-empty">
-                        Settings will be added here.
+                    <div class="settings-content">
+
+                        <div class="settings-card">
+                            <h3>General Settings</h3>
+                            <p>Update your website and announcement information.</p>
+
+                            <div class="settings-row">
+                                <div>
+                                    <label>Website Name</label>
+                                    <small>Your website or shop name</small>
+                                </div>
+                                <input id="siteName" type="text" placeholder="AZIEL 1Tap Shop">
+                            </div>
+
+                            <div class="settings-row">
+                                <div>
+                                    <label>Announcement Bar</label>
+                                    <small>Show announcement on top of website</small>
+                                </div>
+                                <textarea id="announcement" placeholder="Welcome to AZIEL 1Tap Shop!"></textarea>
+                            </div>
+
+                            <div class="settings-row">
+                                <div>
+                                    <label>Default Region</label>
+                                    <small>Default region for users</small>
+                                </div>
+                                <select id="defaultRegion">
+                                    <option value="MM">🌐 Myanmar (MM)</option>
+                                    <option value="TH">🌐 Thailand (TH)</option>
+                                </select>
+                            </div>
+
+                            <div class="settings-row">
+                                <div>
+                                    <label>Support Email</label>
+                                    <small>Support email for users</small>
+                                </div>
+                                <input id="supportEmail" type="email" placeholder="support@azielshop.com">
+                            </div>
+
+                            <div class="settings-row">
+                                <div>
+                                    <label>Telegram Group Link</label>
+                                    <small>Your telegram group or channel link</small>
+                                </div>
+                                <input id="telegramLink" type="text" placeholder="https://t.me/azielshop">
+                            </div>
+                        </div>
+
+                        <div class="settings-card">
+                            <h3>System Controls</h3>
+                            <p>Manage system-wide options and features.</p>
+
+                            <div class="switch-grid">
+                                <label class="switch-item">
+                                    <span>
+                                        <b>Maintenance Mode</b>
+                                        <small>Enable to put site under maintenance</small>
+                                    </span>
+                                    <input id="maintenanceMode" type="checkbox">
+                                </label>
+
+                                <label class="switch-item">
+                                    <span>
+                                        <b>Support Ticket Enabled</b>
+                                        <small>Allow users to create support tickets</small>
+                                    </span>
+                                    <input id="supportEnabled" type="checkbox">
+                                </label>
+
+                                <label class="switch-item">
+                                    <span>
+                                        <b>Live Chat Enabled</b>
+                                        <small>Allow users to use live chat</small>
+                                    </span>
+                                    <input id="liveChatEnabled" type="checkbox">
+                                </label>
+
+                                <label class="switch-item">
+                                    <span>
+                                        <b>User Registration</b>
+                                        <small>Allow new users to register</small>
+                                    </span>
+                                    <input id="registrationEnabled" type="checkbox" checked>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="settings-actions">
+                            <button class="reset-settings-btn" type="button">
+                                ↻ Reset Changes
+                            </button>
+
+                            <button id="saveSettingsBtn" class="save-settings-btn" type="button">
+                                💾 Save All Settings
+                            </button>
+                        </div>
+
                     </div>
                 </div>
             </section>
