@@ -21,7 +21,7 @@ async function loadPaymentMethods() {
         const methods = data.methods || [];
 
         if (!res.ok) {
-            throw new Error(methods.message || "Failed to load payment methods");
+            throw new Error(data.message || "Failed to load payment methods");
         }
 
         paymentGrid.innerHTML = "";
@@ -36,19 +36,52 @@ async function loadPaymentMethods() {
             return;
         }
 
+        const paymentMap = {
+            kbzpay: {
+                name: "KBZPay",
+                logo: "assets/payment/kbzpay.png"
+            },
+            wavepay: {
+                name: "WavePay",
+                logo: "assets/payment/wavepay.png"
+            },
+            ayapay: {
+                name: "AYA Pay",
+                logo: "assets/payment/ayapay.png"
+            },
+            promptpay: {
+                name: "PromptPay",
+                logo: "assets/payment/promptpay.png"
+            },
+            scb: {
+                name: "SCB",
+                logo: "assets/payment/scb.png"
+            }
+        };
+
         activeMethods.forEach(method => {
-            const methodId = method.methodKey || method.id || method._id;
-            const methodName = method.name || method.title || "Payment";
-            const methodLogo = method.logo || method.logoUrl || method.qrImage || "assets/logo.png";
+
+            const key = (method.method || "").toLowerCase();
+
+            const methodName =
+                paymentMap[key]?.name ||
+                method.name ||
+                method.title ||
+                "Payment";
+
+            const methodLogo =
+                paymentMap[key]?.logo ||
+                method.logo ||
+                method.logoUrl ||
+                "assets/logo.png";
 
             const card = document.createElement("div");
             card.className = "pay-card";
-            card.dataset.method = methodId;
+            card.dataset.method = methodName;
 
             card.innerHTML = `
                 <img src="${methodLogo}" class="pay-logo" alt="${methodName}">
                 <span>${methodName}</span>
-                ${method.maintenance ? `<small>Maintenance</small>` : ""}
             `;
 
             card.addEventListener("click", () => {
@@ -57,22 +90,42 @@ async function loadPaymentMethods() {
                     .forEach(c => c.classList.remove("active"));
 
                 card.classList.add("active");
-                paymentInput.value = methodId;
 
-                localStorage.setItem("selectedPaymentMethod", methodId);
+                // Order Summary မှာ KBZPay / WavePay ပြမယ်
+                paymentInput.value = methodName;
 
-                document.dispatchEvent(new CustomEvent("paymentChanged", {
-                    detail: method
-                }));
+                localStorage.setItem(
+                    "selectedPaymentMethod",
+                    methodName
+                );
+
+                document.dispatchEvent(
+                    new CustomEvent("paymentChanged", {
+                        detail: method
+                    })
+                );
             });
 
             paymentGrid.appendChild(card);
         });
 
+        // Default selected
+        if (activeMethods.length > 0) {
+            const firstKey = (activeMethods[0].method || "").toLowerCase();
+
+            paymentInput.value =
+                paymentMap[firstKey]?.name ||
+                activeMethods[0].name ||
+                "Payment";
+        }
+
     } catch (err) {
         console.error("Load payment methods error:", err);
+
         paymentGrid.innerHTML = `
-            <p class="pay-error">Payment methods failed to load.</p>
+            <p class="pay-error">
+                Payment methods failed to load.
+            </p>
         `;
     }
 }
