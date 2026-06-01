@@ -39,33 +39,47 @@ async function loadPaymentMethods() {
 
 async function savePaymentMethod(id) {
     const card = document.querySelector(`.payment-method-card[data-id="${id}"]`);
-    if (!card) return;
+    if (!card) {
+        alert("Payment method card not found");
+        return;
+    }
 
     const token = localStorage.getItem("adminToken");
+    if (!token) {
+        alert("Admin token missing. Please login again.");
+        return;
+    }
 
     const payload = {
-        enabled: card.querySelector(".pm-enabled").checked,
-        accountName: card.querySelector(".pm-name").value,
-        accountNumber: card.querySelector(".pm-number").value,
-        qrImage: card.querySelector(".pm-qr").value,
-        maintenanceMessage: card.querySelector(".pm-message").value
+        enabled: card.querySelector(".pm-enabled")?.checked || false,
+        accountName: card.querySelector(".pm-name")?.value || "",
+        accountNumber: card.querySelector(".pm-number")?.value || "",
+        qrImage: card.querySelector(".pm-qr")?.value || "",
+        maintenance: card.querySelector(".pm-maintenance")?.checked || false
     };
 
-    const res = await fetch(`/api/admin/payment-methods/${id}`, {
-        method: "PUT",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
-    });
+    try {
+        const res = await fetch(`/api/admin/payment-methods/${id}`, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify(payload)
+        });
 
-    const data = await res.json();
+        const data = await res.json();
 
-    if (data.success) {
-        alert("Payment method saved");
-    } else {
-        alert(data.message || "Save failed");
+        if (!res.ok) {
+            console.error("Save payment method error:", data);
+            alert(data.message || "Save failed");
+            return;
+        }
+
+        alert("Payment method saved successfully ✅");
+    } catch (err) {
+        console.error("Save payment method failed:", err);
+        alert("Server connection error");
     }
 }
 document.addEventListener("DOMContentLoaded", () => {
