@@ -50,9 +50,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     packageContainer.innerHTML += `
       <div class="pack" data-name="${item.name}" data-price="${price}" data-code="${item.code}">
-       <div class="pack-icon">
-    <img src="${item.icon || "assets/mlbb/icons/small.webp"}" alt="${item.name}">
-</div>
+      <div class="pack-icon">
+        <img src="${item.icon || "assets/mlbb/icons/small.webp"}" alt="${item.name}">
+      </div>
 
 <div class="pack-info">
           <strong class="pack-name">${item.name}</strong>

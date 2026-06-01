@@ -1428,3 +1428,30 @@ body {
 .pack-info {
     flex: 1;
 }
+
+.pack {
+    display: grid !important;
+    grid-template-columns: 64px 1fr auto;
+    align-items: center;
+    gap: 14px;
+    min-height: 94px;
+}
+
+.pack-icon {
+    width: 58px !important;
+    height: 58px !important;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+}
+
+.pack-icon img {
+    width: 58px !important;
+    height: 58px !important;
+    object-fit: contain;
+    display: block !important;
+}
+
+.pack-info {
+    min-width: 0;
+}
