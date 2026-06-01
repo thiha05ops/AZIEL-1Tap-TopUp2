@@ -195,7 +195,33 @@
     <script src="js/api.js"></script>
     <script src="js/wallet.js"></script>
     <script src="js/pwa-fix.js"></script>
+    <script src="js/site-settings.js"></script>
+    <div id="orderLoadingOverlay" class="order-loading-overlay">
+        <div class="order-loading-box">
+            <div class="order-loading-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
 
+            <h3>Please wait a few seconds...</h3>
+            <p>Your top-up is being submitted.</p>
+        </div>
+    </div>
+    <div id="successModal" class="success-modal">
+
+        <div class="success-modal-box">
+            <div class="success-icon">✓</div>
+            <h2>Top-Up Submitted</h2>
+            <p>Your payment slip has been sent successfully.</p>
+
+            <div class="success-actions">
+                <button id="viewHistoryBtn">View History</button>
+                <button id="backHomeBtn">Back Home</button>
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>

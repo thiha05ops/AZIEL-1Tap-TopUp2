@@ -1,0 +1,40 @@
+document.addEventListener("DOMContentLoaded", () => {
+    loadSiteSettings();
+});
+
+async function loadSiteSettings() {
+    try {
+        const res = await fetch("/api/settings");
+        const data = await res.json();
+
+        if (!data.success) return;
+
+        const s = data.settings;
+
+        if (s.maintenanceMode) {
+            document.body.innerHTML = `
+                <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#070716;color:white;text-align:center;padding:30px;">
+                    <div>
+                        <h1>AZIEL is under maintenance</h1>
+                        <p>Please come back later.</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        if (s.announcement) {
+            const bar = document.createElement("div");
+            bar.className = "az-announcement-bar";
+            bar.innerText = s.announcement;
+            document.body.prepend(bar);
+        }
+
+        if (s.liveChatEnabled === false) {
+            document.querySelector(".live-chat-ball")?.remove();
+        }
+
+    } catch (error) {
+        console.log("Site settings error:", error);
+    }
+}
