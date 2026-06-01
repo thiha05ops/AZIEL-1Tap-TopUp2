@@ -1251,3 +1251,45 @@ body {
     min-width: unset;
   }
 }
+
+.payment-method-card {
+  padding: 20px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, .08);
+  background: rgba(15, 23, 42, .65);
+  margin-bottom: 18px;
+}
+
+.payment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.payment-header h4 {
+  color: #fff;
+  margin: 0;
+}
+
+.payment-method-card input,
+.payment-method-card textarea {
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, .08);
+  background: #0f172a;
+  color: #fff;
+}
+
+.payment-method-card textarea {
+  min-height: 80px;
+}
+
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #fff;
+}

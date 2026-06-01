@@ -485,6 +485,41 @@
                     </div>
 
                     <div class="settings-content">
+                        <div class="settings-card">
+
+                            <h3>Payment Management</h3>
+                            <p>Enable or disable payment methods and update account info.</p>
+
+                            <div id="paymentMethodsContainer">
+
+                                <div class="payment-method-card">
+
+                                    <div class="payment-header">
+                                        <h4>KBZPay</h4>
+
+                                        <label class="switch">
+                                            <input type="checkbox" checked>
+                                            <span>Enabled</span>
+                                        </label>
+                                    </div>
+
+                                    <input type="text" placeholder="Account Name" class="payment-account-name">
+
+                                    <input type="text" placeholder="Account Number" class="payment-account-number">
+
+                                    <input type="text" placeholder="QR Image URL" class="payment-qr">
+
+                                    <textarea placeholder="Maintenance Message" class="payment-message"></textarea>
+
+                                </div>
+
+                            </div>
+
+                            <button id="savePaymentMethodsBtn" class="save-settings-btn">
+                                Save Payment Settings
+                            </button>
+
+                        </div>
 
                         <div class="settings-card">
                             <h3>General Settings</h3>

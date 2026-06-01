@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Settings - AZIEL</title>
+
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+
+<body>
+
+    <div class="admin-shell">
+
+        <aside class="admin-sidebar">
+
+            <div class="admin-logo">
+                <h1>AZIEL</h1>
+                <span>ADMIN PANEL</span>
+            </div>
+
+            <nav class="admin-menu">
+                <a href="admin.html">📊 Dashboard</a>
+                <a href="admin.html">🛒 Orders</a>
+                <a href="admin.html">💳 Wallet Topups</a>
+                <a href="admin.html">👥 Users</a>
+                <a href="admin.html">🎮 Games</a>
+                <a href="admin.html">🎟 Support</a>
+                <a href="admin.html">💬 Live Chat</a>
+                <a href="admin.html">📢 Broadcast</a>
+                <a class="active" href="admin-settings.html">⚙ Settings</a>
+            </nav>
+
+        </aside>
+
+        <main class="admin-main">
+
+            <header class="admin-topbar">
+                <div>
+                    <h2>Settings</h2>
+                    <p>Control AZIEL shop settings from one place.</p>
+                </div>
+
+                <div class="top-actions">
+                    <a href="admin.html">Back Dashboard</a>
+                    <a href="home.html">Back Home</a>
+                </div>
+            </header>
+
+            <section class="settings-grid">
+
+                <div class="panel settings-card">
+
+                    <div class="panel-head">
+                        <h3>General Settings</h3>
+                        <span>Shop Control</span>
+                    </div>
+
+                    <label>Website Name</label>
+                    <input id="siteName" class="admin-input" type="text">
+
+                    <label>Announcement</label>
+                    <textarea id="announcement" class="admin-input" rows="4"></textarea>
+
+                    <label>Default Region</label>
+                    <select id="defaultRegion" class="admin-input">
+                        <option value="MM">Myanmar</option>
+                        <option value="TH">Thailand</option>
+                    </select>
+
+                    <div class="admin-switch-row">
+                        <label>Maintenance Mode</label>
+                        <input id="maintenanceMode" type="checkbox">
+                    </div>
+
+                    <div class="admin-switch-row">
+                        <label>Support Enabled</label>
+                        <input id="supportEnabled" type="checkbox">
+                    </div>
+
+                    <div class="admin-switch-row">
+                        <label>Live Chat Enabled</label>
+                        <input id="liveChatEnabled" type="checkbox">
+                    </div>
+
+                    <button id="saveSettingsBtn" class="admin-save-btn">
+                        Save Settings
+                    </button>
+
+                </div>
+
+                <div class="panel settings-card locked">
+
+                    <div class="panel-head">
+                        <h3>Payment Management</h3>
+                        <span>Phase 2</span>
+                    </div>
+
+                    <p>KBZPay, WavePay, AYA Pay, PromptPay, SCB enable/disable and QR upload will be here.</p>
+
+                </div>
+
+                <div class="panel settings-card locked">
+
+                    <div class="panel-head">
+                        <h3>Game Management</h3>
+                        <span>Phase 3</span>
+                    </div>
+
+                    <p>Add games, edit packages, update MMK/THB prices and icons without touching code.</p>
+
+                </div>
+
+                <div class="panel settings-card locked">
+
+                    <div class="panel-head">
+                        <h3>Analytics Settings</h3>
+                        <span>Phase 4</span>
+                    </div>
+
+                    <p>Revenue charts, top games, daily order history and reports will connect here.</p>
+
+                </div>
+
+            </section>
+
+        </main>
+
+    </div>
+
+    <script src="js/admin-settings.js"></script>
+
+</body>
+
+</html>
