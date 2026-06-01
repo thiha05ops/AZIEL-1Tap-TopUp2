@@ -1,7 +1,6 @@
 const express = require("express");
 const router = express.Router();
-
-const Setting = require("../models/Setting");
+const Setting = require("../models/Settings");
 const adminMiddleware = require("../middleware/adminMiddleware");
 
 async function getOrCreateSettings() {
@@ -67,6 +66,5 @@ router.put("/admin/settings", adminMiddleware, async (req, res) => {
         });
     }
 });
-
 
 module.exports = router;
