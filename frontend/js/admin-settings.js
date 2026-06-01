@@ -68,3 +68,26 @@ async function savePaymentMethod(id) {
         alert(data.message || "Save failed");
     }
 }
+document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll(".settings-tab").forEach(tab => {
+        tab.addEventListener("click", () => {
+            const name = tab.dataset.settingsTab;
+
+            document.querySelectorAll(".settings-tab")
+                .forEach(t => t.classList.remove("active"));
+
+            document.querySelectorAll(".settings-panel")
+                .forEach(p => p.classList.remove("active"));
+
+            tab.classList.add("active");
+
+            document
+                .querySelector(`[data-settings-panel="${name}"]`)
+                ?.classList.add("active");
+
+            if (name === "payments") {
+                loadPaymentMethods();
+            }
+        });
+    });
+});

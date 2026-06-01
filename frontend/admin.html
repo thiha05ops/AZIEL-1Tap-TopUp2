@@ -440,7 +440,7 @@
                     <div class="settings-menu">
                         <h3>Settings Menu</h3>
 
-                        <button class="settings-tab active">
+                        <button class="settings-tab active" data-settings-tab="general">
                             ⚙️
                             <span>
                                 <b>General</b>
@@ -448,14 +448,15 @@
                             </span>
                         </button>
 
-                        <button class="settings-tab">
+                        <button class="settings-tab" data-settings-tab="system">
                             🛡️
                             <span>
                                 <b>System Controls</b>
                                 <small>System behavior</small>
                             </span>
                         </button>
-                        <button class="settings-tab" data-setting-tab="payments">
+
+                        <button class="settings-tab" data-settings-tab="payments">
                             💳
                             <span>
                                 <b>Payment Management</b>
@@ -463,165 +464,144 @@
                             </span>
                         </button>
 
-                        <button class="settings-tab disabled">
+                        <button class="settings-tab disabled" type="button">
                             🎮
                             <span>
                                 <b>Games</b>
-                                <small>Game management</small>
+                                <small>Coming next</small>
                             </span>
                             <em>Coming Next</em>
                         </button>
 
-                        <button class="settings-tab disabled">
+                        <button class="settings-tab disabled" type="button">
                             🔔
                             <span>
                                 <b>Notifications</b>
-                                <small>Notification settings</small>
+                                <small>Coming next</small>
                             </span>
                             <em>Coming Next</em>
                         </button>
                     </div>
 
                     <div class="settings-content">
-                        <div class="settings-card">
 
-                            <h3>Payment Management</h3>
-                            <p>Enable or disable payment methods and update account info.</p>
+                        <div class="settings-panel active" data-settings-panel="general">
+                            <div class="settings-card">
+                                <h3>General Settings</h3>
+                                <p>Update your website and announcement information.</p>
 
-                            <div id="paymentMethodsContainer">
-
-                                <div class="payment-method-card">
-
-                                    <div id="paymentMethodsContainer">
-                                        Loading payment methods...
+                                <div class="settings-row">
+                                    <div>
+                                        <label>Website Name</label>
+                                        <small>Your website or shop name</small>
                                     </div>
-
-                                    <label class="switch">
-                                        <input type="checkbox" checked>
-                                        <span>Enabled</span>
-                                    </label>
+                                    <input id="siteName" type="text" placeholder="AZIEL 1Tap Shop">
                                 </div>
 
-                                <input type="text" placeholder="Account Name" class="payment-account-name">
+                                <div class="settings-row">
+                                    <div>
+                                        <label>Announcement Bar</label>
+                                        <small>Show announcement on top of website</small>
+                                    </div>
+                                    <textarea id="announcement" placeholder="Welcome to AZIEL 1Tap Shop!"></textarea>
+                                </div>
 
-                                <input type="text" placeholder="Account Number" class="payment-account-number">
+                                <div class="settings-row">
+                                    <div>
+                                        <label>Default Region</label>
+                                        <small>Default region for users</small>
+                                    </div>
+                                    <select id="defaultRegion">
+                                        <option value="MM">🌐 Myanmar (MM)</option>
+                                        <option value="TH">🌐 Thailand (TH)</option>
+                                    </select>
+                                </div>
 
-                                <input type="text" placeholder="QR Image URL" class="payment-qr">
+                                <div class="settings-row">
+                                    <div>
+                                        <label>Support Email</label>
+                                        <small>Support email for users</small>
+                                    </div>
+                                    <input id="supportEmail" type="email" placeholder="support@azielshop.com">
+                                </div>
 
-                                <textarea placeholder="Maintenance Message" class="payment-message"></textarea>
-
+                                <div class="settings-row">
+                                    <div>
+                                        <label>Telegram Group Link</label>
+                                        <small>Your Telegram group or channel link</small>
+                                    </div>
+                                    <input id="telegramLink" type="text" placeholder="https://t.me/azielshop">
+                                </div>
                             </div>
-
                         </div>
 
-                        <button id="savePaymentMethodsBtn" class="save-settings-btn">
-                            Save Payment Settings
-                        </button>
+                        <div class="settings-panel" data-settings-panel="system">
+                            <div class="settings-card">
+                                <h3>System Controls</h3>
+                                <p>Manage system-wide options and features.</p>
+
+                                <div class="switch-grid">
+                                    <label class="switch-item">
+                                        <span>
+                                            <b>Maintenance Mode</b>
+                                            <small>Enable to put site under maintenance</small>
+                                        </span>
+                                        <input id="maintenanceMode" type="checkbox">
+                                    </label>
+
+                                    <label class="switch-item">
+                                        <span>
+                                            <b>Support Ticket Enabled</b>
+                                            <small>Allow users to create support tickets</small>
+                                        </span>
+                                        <input id="supportEnabled" type="checkbox">
+                                    </label>
+
+                                    <label class="switch-item">
+                                        <span>
+                                            <b>Live Chat Enabled</b>
+                                            <small>Allow users to use live chat</small>
+                                        </span>
+                                        <input id="liveChatEnabled" type="checkbox">
+                                    </label>
+
+                                    <label class="switch-item">
+                                        <span>
+                                            <b>User Registration</b>
+                                            <small>Allow new users to register</small>
+                                        </span>
+                                        <input id="registrationEnabled" type="checkbox" checked>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="settings-panel" data-settings-panel="payments">
+                            <div class="settings-card">
+                                <h3>Payment Management</h3>
+                                <p>Enable or disable payment methods and update account info.</p>
+
+                                <div id="paymentMethodsContainer">
+                                    Loading payment methods...
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="settings-actions">
+                            <button class="reset-settings-btn" type="button">
+                                ↻ Reset Changes
+                            </button>
+
+                            <button id="saveSettingsBtn" class="save-settings-btn" type="button">
+                                💾 Save All Settings
+                            </button>
+                        </div>
 
                     </div>
-
-                    <div class="settings-card">
-                        <h3>General Settings</h3>
-                        <p>Update your website and announcement information.</p>
-
-                        <div class="settings-row">
-                            <div>
-                                <label>Website Name</label>
-                                <small>Your website or shop name</small>
-                            </div>
-                            <input id="siteName" type="text" placeholder="AZIEL 1Tap Shop">
-                        </div>
-
-                        <div class="settings-row">
-                            <div>
-                                <label>Announcement Bar</label>
-                                <small>Show announcement on top of website</small>
-                            </div>
-                            <textarea id="announcement" placeholder="Welcome to AZIEL 1Tap Shop!"></textarea>
-                        </div>
-
-                        <div class="settings-row">
-                            <div>
-                                <label>Default Region</label>
-                                <small>Default region for users</small>
-                            </div>
-                            <select id="defaultRegion">
-                                <option value="MM">🌐 Myanmar (MM)</option>
-                                <option value="TH">🌐 Thailand (TH)</option>
-                            </select>
-                        </div>
-
-                        <div class="settings-row">
-                            <div>
-                                <label>Support Email</label>
-                                <small>Support email for users</small>
-                            </div>
-                            <input id="supportEmail" type="email" placeholder="support@azielshop.com">
-                        </div>
-
-                        <div class="settings-row">
-                            <div>
-                                <label>Telegram Group Link</label>
-                                <small>Your telegram group or channel link</small>
-                            </div>
-                            <input id="telegramLink" type="text" placeholder="https://t.me/azielshop">
-                        </div>
-                    </div>
-
-                    <div class="settings-card">
-                        <h3>System Controls</h3>
-                        <p>Manage system-wide options and features.</p>
-
-                        <div class="switch-grid">
-                            <label class="switch-item">
-                                <span>
-                                    <b>Maintenance Mode</b>
-                                    <small>Enable to put site under maintenance</small>
-                                </span>
-                                <input id="maintenanceMode" type="checkbox">
-                            </label>
-
-                            <label class="switch-item">
-                                <span>
-                                    <b>Support Ticket Enabled</b>
-                                    <small>Allow users to create support tickets</small>
-                                </span>
-                                <input id="supportEnabled" type="checkbox">
-                            </label>
-
-                            <label class="switch-item">
-                                <span>
-                                    <b>Live Chat Enabled</b>
-                                    <small>Allow users to use live chat</small>
-                                </span>
-                                <input id="liveChatEnabled" type="checkbox">
-                            </label>
-
-                            <label class="switch-item">
-                                <span>
-                                    <b>User Registration</b>
-                                    <small>Allow new users to register</small>
-                                </span>
-                                <input id="registrationEnabled" type="checkbox" checked>
-                            </label>
-                        </div>
-                    </div>
-
-                    <div class="settings-actions">
-                        <button class="reset-settings-btn" type="button">
-                            ↻ Reset Changes
-                        </button>
-
-                        <button id="saveSettingsBtn" class="save-settings-btn" type="button">
-                            💾 Save All Settings
-                        </button>
-                    </div>
-
                 </div>
-    </div>
-    </section>
+            </section>
 
-    </main>
+        </main>
 
     </div>
 
@@ -633,6 +613,7 @@
     <script src="js/admin-wallet.js"></script>
     <script src="js/admin-users.js?v=20260531"></script>
     <script src="js/pwa-fix.js"></script>
+    <script src="js/admin-settings.js"></script>
 
 
     <script>
