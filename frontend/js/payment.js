@@ -91,17 +91,22 @@ async function loadPaymentMethods() {
 
                 card.classList.add("active");
 
-                // Order Summary မှာ KBZPay / WavePay ပြမယ်
                 paymentInput.value = methodName;
 
-                localStorage.setItem(
-                    "selectedPaymentMethod",
-                    methodName
-                );
+                localStorage.setItem("selectedPaymentMethod", methodName);
+                localStorage.setItem("selectedPaymentQr", method.qrImage || "");
+                localStorage.setItem("selectedPaymentAccountName", method.accountName || "");
+                localStorage.setItem("selectedPaymentAccountNumber", method.accountNumber || "");
 
                 document.dispatchEvent(
                     new CustomEvent("paymentChanged", {
-                        detail: method
+                        detail: {
+                            ...method,
+                            displayName: methodName,
+                            qrImage: method.qrImage || "",
+                            accountName: method.accountName || "",
+                            accountNumber: method.accountNumber || ""
+                        }
                     })
                 );
             });

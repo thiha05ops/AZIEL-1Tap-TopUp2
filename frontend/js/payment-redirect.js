@@ -17,38 +17,18 @@ async function createPaymentAndRedirect(orderData) {
             return;
         }
 
-        const method = orderData.paymentMethod;
-        const amount = orderData.amount;
-        const orderId = orderData.orderId;
+        const params = new URLSearchParams({
+            orderId: orderData.orderId,
+            amount: orderData.amount,
+            currency: orderData.currency,
+            game: orderData.game,
+            packageName: orderData.packageName,
+            paymentMethod: orderData.paymentMethod,
+            userId: orderData.userId,
+            zoneId: orderData.zoneId
+        });
 
-        // Myanmar payment apps
-        if (method === "kbzpay") {
-            window.location.href = data.paymentUrl || `kbzpay://pay?amount=${amount}&remark=${orderId}`;
-            return;
-        }
-
-        if (method === "wavepay") {
-            window.location.href = data.paymentUrl || `wavepay://pay?amount=${amount}&remark=${orderId}`;
-            return;
-        }
-
-        if (method === "ayapay") {
-            window.location.href = data.paymentUrl || `ayapay://pay?amount=${amount}&remark=${orderId}`;
-            return;
-        }
-
-        // Thailand payment apps
-        if (method === "promptpay") {
-            window.location.href = data.paymentUrl || `promptpay://pay?amount=${amount}&ref=${orderId}`;
-            return;
-        }
-
-        if (method === "scb") {
-            window.location.href = data.paymentUrl || `scbeasy://pay?amount=${amount}&ref=${orderId}`;
-            return;
-        }
-
-        window.location.href = data.paymentUrl;
+        window.location.href = `payment.html?${params.toString()}`;
 
     } catch (error) {
         console.log(error);
