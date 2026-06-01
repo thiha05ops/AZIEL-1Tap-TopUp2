@@ -57,32 +57,27 @@ async function loadDynamicPaymentMethods(region) {
         const res = await fetch(`/api/payment-methods?region=${region}`);
         const data = await res.json();
 
-        if (!res.ok || data.success === false) {
-            throw new Error(data.message || "Failed to load payment methods");
-        }
+        console.log("PAYMENT METHODS:", data);
 
-        const methods = Array.isArray(data) ? data : (data.methods || []);
-
-        const activeMethods = methods.filter(pay =>
-            pay.enabled === true &&
-            pay.maintenance !== true
-        );
+        const methods = Array.isArray(data)
+            ? data
+            : Array.isArray(data.methods)
+                ? data.methods
+                : [];
 
         paymentGrid.innerHTML = "";
 
-        if (activeMethods.length === 0) {
+        if (methods.length === 0) {
             paymentGrid.innerHTML = `<p>No payment methods available.</p>`;
             return;
         }
 
-        activeMethods.forEach((pay, index) => {
-            const id = pay.method || pay.methodKey || pay.id || pay._id;
-            const name = pay.method || pay.name || pay.title || "Payment";
+        methods.forEach((pay, index) => {
+            const name = pay.method || pay.name || pay.methodName || "Payment";
             const logo = pay.logo || pay.logoUrl || pay.qrImage || "assets/logo.png";
 
             const card = document.createElement("div");
             card.className = `pay-card ${index === 0 ? "active" : ""}`;
-            card.dataset.method = name;
 
             card.innerHTML = `
                 <img src="${logo}" alt="${name}">
@@ -90,23 +85,14 @@ async function loadDynamicPaymentMethods(region) {
             `;
 
             card.addEventListener("click", () => {
-                document.querySelectorAll(".pay-card").forEach(c => {
-                    c.classList.remove("active");
-                });
-
+                document.querySelectorAll(".pay-card").forEach(c => c.classList.remove("active"));
                 card.classList.add("active");
                 paymentMethod.value = name;
-
-                document.dispatchEvent(new CustomEvent("paymentChanged", {
-                    detail: pay
-                }));
             });
 
             paymentGrid.appendChild(card);
 
-            if (index === 0) {
-                paymentMethod.value = name;
-            }
+            if (index === 0) paymentMethod.value = name;
         });
 
     } catch (err) {
