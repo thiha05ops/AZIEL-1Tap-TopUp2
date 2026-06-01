@@ -127,3 +127,38 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
 });
+document.addEventListener("DOMContentLoaded", () => {
+    document
+        .getElementById("saveSettingsBtn")
+        ?.addEventListener("click", saveSettings);
+});
+
+async function saveSettings() {
+    const token = localStorage.getItem("adminToken");
+
+    const payload = {
+        siteName: document.getElementById("siteName")?.value || "",
+        announcement: document.getElementById("announcement")?.value || "",
+        defaultRegion: document.getElementById("defaultRegion")?.value || "MM",
+        maintenanceMode: document.getElementById("maintenanceMode")?.checked || false,
+        supportEnabled: document.getElementById("supportEnabled")?.checked || false,
+        liveChatEnabled: document.getElementById("liveChatEnabled")?.checked || false
+    };
+
+    const res = await fetch("/api/admin/settings", {
+        method: "PUT",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+        alert("Settings saved successfully");
+    } else {
+        alert(data.message || "Settings save failed");
+    }
+}
