@@ -37,6 +37,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 Number(pack.dataset.price || 0)
         };
 
+        const selectedIcon =
+            pack.querySelector(".pack-icon img")?.src ||
+            "assets/mlbb/icons/small.webp";
+
+        const mobilePreviewIcon =
+            document.querySelector(".mobile-pack-icon img");
+
+        if (mobilePreviewIcon) {
+            mobilePreviewIcon.src = selectedIcon;
+        }
+
         updateState();
         initSuccessModal();
     });
