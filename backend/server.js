@@ -24,7 +24,7 @@ const passport = require("./config/passport");
 
 // ROUTES
 const paymentMethodsRoutes = require("./routes/paymentMethods");
-const settingsRoutes = require("./routes/Settings");
+const settingsRoutes = require("./routes/settings");
 const notificationRoutes = require("./routes/notification");
 const authRoutes = require("./routes/auth");
 const orderRoutes = require("./routes/order");
