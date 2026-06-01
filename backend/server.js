@@ -23,7 +23,8 @@ const connectDB = require("./config/db");
 const passport = require("./config/passport");
 
 // ROUTES
-
+const paymentMethodsRoutes = require("./routes/paymentMethods");
+const settingsRoutes = require("./routes/settings");
 const notificationRoutes = require("./routes/notification");
 const authRoutes = require("./routes/auth");
 const orderRoutes = require("./routes/order");
@@ -154,7 +155,8 @@ app.use("/api", adminStatsRoutes);
 
 app.use("/api", adminAuthRoutes);
 app.use("/api", supportRoutes);
-
+app.use("/api", settingsRoutes);
+app.use("/api", paymentMethodsRoutes);
 // HOME
 app.get("/", (req, res) => {
 
