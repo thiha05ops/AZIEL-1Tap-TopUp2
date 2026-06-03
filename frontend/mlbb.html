@@ -197,7 +197,40 @@
             </aside>
 
         </section>
+        <div id="paymentConfirmModal" class="payment-confirm-modal">
+            <div class="payment-confirm-box">
 
+                <button id="closePaymentModal" class="payment-modal-close">
+                    ×
+                </button>
+
+                <h2>Confirm Payment</h2>
+
+                <div class="payment-modal-summary">
+                    <p><b>Game:</b> <span id="modalGame"></span></p>
+                    <p><b>Package:</b> <span id="modalPackage"></span></p>
+                    <p><b>Amount:</b> <span id="modalAmount"></span></p>
+                    <p><b>Payment:</b> <span id="modalPayment"></span></p>
+                    <p><b>User ID:</b> <span id="modalUserId"></span></p>
+                    <p><b>Server ID:</b> <span id="modalZoneId"></span></p>
+                </div>
+
+                <div class="payment-modal-qr">
+                    <img id="modalPaymentLogo" src="" alt="Payment Logo">
+                    <img id="modalQrImage" src="" alt="Payment QR">
+                    <p id="modalAccountName"></p>
+                    <p id="modalAccountNumber"></p>
+                </div>
+
+                <label>Upload payment screenshot</label>
+                <input type="file" id="modalPaymentSlip" accept="image/*">
+
+                <button id="confirmPaymentOrderBtn">
+                    Confirm Order
+                </button>
+
+            </div>
+        </div>
     </main>
     <nav class="az-bottom-nav">
 

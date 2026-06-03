@@ -174,3 +174,22 @@ main {
   box-shadow:
     0 4px 20px rgba(147, 51, 234, .25);
 }
+
+.pm-qr-preview {
+  width: 140px;
+  max-width: 100%;
+  display: block;
+  margin: 14px 0;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, .12);
+  background: #fff;
+  padding: 8px;
+}
+
+.pm-empty-preview {
+  margin: 14px 0;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .05);
+  color: #94a3b8;
+}

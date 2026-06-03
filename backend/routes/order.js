@@ -1,12 +1,20 @@
 // backend/routes/order.js
+const Order = require("../models/Order");
 
+const upload = require("../middleware/orderUpload");
+
+const {
+    sendTelegramMessage,
+    sendTelegramPhoto
+} = require("../services/telegram");
 const express = require("express");
 const router = express.Router();
 
 const Order = require("../models/Order");
 
 const {
-    sendTelegramMessage
+    sendTelegramMessage,
+    sendTelegramPhoto
 } = require("../services/telegram");
 
 const createNotification =
@@ -219,6 +227,79 @@ ${order.status}`
                 message: "Server error"
             });
         }
+    }
+);
+router.post(
+    "/orders",
+    upload.single("paymentSlip"),
+    async (req, res) => {
+
+        try {
+
+            const order = await Order.create({
+                orderId: req.body.orderId,
+                username: req.body.username || "guest",
+                game: req.body.game,
+                userId: req.body.userId,
+                zoneId: req.body.zoneId || "",
+                packageName: req.body.packageName,
+                amount: req.body.amount,
+                currency: req.body.currency,
+                region: req.body.region,
+                paymentMethod: req.body.paymentMethod,
+
+                paymentSlip: req.file
+                    ? `/uploads/orders/${req.file.filename}`
+                    : "",
+
+                status: "pending_payment"
+            });
+
+            if (req.file) {
+
+                await sendTelegramPhoto(
+                    req.file.path,
+
+                    `🛒 NEW ORDER
+
+🎮 Game: ${order.game}
+
+📦 Package: ${order.packageName}
+
+👤 User: ${order.username}
+
+🆔 User ID: ${order.userId}
+
+🌍 Region: ${order.region}
+
+💳 Payment: ${order.paymentMethod}
+
+💰 Amount: ${order.amount} ${order.currency}
+
+📌 Status: ${order.status}`
+                );
+
+            }
+
+            res.json({
+                success: true,
+                order
+            });
+
+        } catch (error) {
+
+            console.log(
+                "Create order error:",
+                error
+            );
+
+            res.status(500).json({
+                success: false,
+                message: "Create order failed"
+            });
+
+        }
+
     }
 );
 
