@@ -188,3 +188,25 @@
         font-size: 12px;
     }
 }
+
+.payment-preview {
+    margin-top: 20px;
+    padding: 20px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, .04);
+    text-align: center;
+}
+
+.payment-preview h3 {
+    margin-bottom: 12px;
+}
+
+.payment-preview p {
+    margin: 8px 0;
+}
+
+.payment-note {
+    margin-top: 12px;
+    font-size: 13px;
+    opacity: .8;
+}
