@@ -5,7 +5,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const regionSelect = document.getElementById("regionSelect");
     const currencyText = document.getElementById("currencyText");
-    const packagesBox = document.getElementById("packages");
 
     const regionData = {
         MM: { currency: "MMK", priceKey: "mmk" },
@@ -16,30 +15,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (regionSelect) regionSelect.value = region;
     if (currencyText) currencyText.innerText = config.currency;
-
-    if (packagesBox) {
-        const game = packagesBox.dataset.game;
-        const items = window.GAME_PRICES?.[game] || [];
-
-        packagesBox.innerHTML = "";
-
-        items.forEach(item => {
-            const price = item[config.priceKey] || 0;
-            const priceText =
-                config.currency === "THB"
-                    ? `${price} ฿`
-                    : `${Number(price).toLocaleString()} Ks`;
-
-            packagesBox.innerHTML += `
-                <div class="pack"
-                     data-name="${item.name}"
-                     data-price="${price}"
-                     data-currency="${config.currency}">
-                    ${item.name} - ${priceText}
-                </div>
-            `;
-        });
-    }
 
     await loadDynamicPaymentMethods(region);
 });
@@ -57,13 +32,9 @@ async function loadDynamicPaymentMethods(region) {
         const res = await fetch(`/api/payment-methods?region=${region}`);
         const data = await res.json();
 
-        console.log("PAYMENT METHODS:", data);
-
-        const methods = Array.isArray(data)
-            ? data
-            : Array.isArray(data.methods)
-                ? data.methods
-                : [];
+        const methods = Array.isArray(data.methods)
+            ? data.methods.filter(method => method.enabled)
+            : [];
 
         paymentGrid.innerHTML = "";
 
@@ -73,30 +44,85 @@ async function loadDynamicPaymentMethods(region) {
         }
 
         methods.forEach((pay, index) => {
-            const name = pay.method || pay.name || pay.methodName || "Payment";
-            const logo = pay.logo || pay.logoUrl || pay.qrImage || "assets/logo.png";
+            const name = pay.method || "Payment";
+            const key = pay.key || name.toLowerCase();
+            const logo = pay.qrImage || getPaymentLogo(key);
 
             const card = document.createElement("div");
             card.className = `pay-card ${index === 0 ? "active" : ""}`;
+            card.dataset.method = key;
+            card.dataset.name = name;
+            card.dataset.qr = pay.qrImage || "";
+            card.dataset.accountName = pay.accountName || "";
+            card.dataset.accountNumber = pay.accountNumber || "";
 
             card.innerHTML = `
                 <img src="${logo}" alt="${name}">
                 <span>${name}</span>
+                ${pay.maintenanceMessage
+                    ? `<small>${pay.maintenanceMessage}</small>`
+                    : ""
+                }
             `;
 
             card.addEventListener("click", () => {
-                document.querySelectorAll(".pay-card").forEach(c => c.classList.remove("active"));
+                document
+                    .querySelectorAll(".pay-card")
+                    .forEach(c => c.classList.remove("active"));
+
                 card.classList.add("active");
-                paymentMethod.value = name;
+                paymentMethod.value = key;
+
+                updatePaymentPreview(card);
             });
 
             paymentGrid.appendChild(card);
 
-            if (index === 0) paymentMethod.value = name;
+            if (index === 0) {
+                paymentMethod.value = key;
+                updatePaymentPreview(card);
+            }
         });
 
     } catch (err) {
         console.error("Payment methods load error:", err);
         paymentGrid.innerHTML = `<p>Payment methods failed to load.</p>`;
+    }
+}
+
+function getPaymentLogo(key) {
+    const logos = {
+        kbzpay: "assets/payment/kbzpay.png",
+        wavepay: "assets/payment/wavepay.png",
+        ayapay: "assets/payment/ayapay.png",
+        promptpay: "assets/payment/promptpay.png",
+        scb: "assets/payment/scb.png"
+    };
+
+    return logos[key] || "assets/logo.png";
+}
+
+function updatePaymentPreview(card) {
+    const qrImg =
+        document.getElementById("paymentQrImage") ||
+        document.getElementById("qrImage");
+
+    const accountName =
+        document.getElementById("paymentAccountName");
+
+    const accountNumber =
+        document.getElementById("paymentAccountNumber");
+
+    if (qrImg && card.dataset.qr) {
+        qrImg.src = card.dataset.qr;
+        qrImg.style.display = "block";
+    }
+
+    if (accountName) {
+        accountName.innerText = card.dataset.accountName || "";
+    }
+
+    if (accountNumber) {
+        accountNumber.innerText = card.dataset.accountNumber || "";
     }
 }
