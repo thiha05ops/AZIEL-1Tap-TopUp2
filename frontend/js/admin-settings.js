@@ -14,27 +14,65 @@ async function loadPaymentMethods() {
         return;
     }
 
-    box.innerHTML = data.methods.map(method => `
-        <div class="payment-method-card" data-id="${method._id}">
-            <div class="payment-header">
-                <h4>${method.method} <small>${method.region}</small></h4>
+    box.innerHTML = data.methods.map(method => {
+        const qr =
+            method.uploadedQrImage ||
+            method.qrImageUrl ||
+            method.qrImage ||
+            "";
 
-                <label class="switch">
-                    <input class="pm-enabled" type="checkbox" ${method.enabled ? "checked" : ""}>
-                    <span>Enabled</span>
-                </label>
+        return `
+            <div class="payment-method-card" data-id="${method._id}">
+                <div class="payment-header">
+                    <h4>${method.method} <small>${method.region}</small></h4>
+
+                    <label class="switch">
+                        <input class="pm-enabled" type="checkbox" ${method.enabled ? "checked" : ""}>
+                        <span>Enabled</span>
+                    </label>
+                </div>
+
+                <label>Account Name</label>
+                <input class="pm-name" type="text" placeholder="Account Name" value="${method.accountName || ""}">
+
+                <label>Account Number</label>
+                <input class="pm-number" type="text" placeholder="Account Number" value="${method.accountNumber || ""}">
+
+                <label>QR Image URL</label>
+                <input class="pm-qr" type="text" placeholder="https://example.com/qr.png" value="${method.qrImageUrl || method.qrImage || ""}">
+
+                <label>Uploaded QR Image Path</label>
+                <input class="pm-uploaded-qr" type="text" placeholder="/uploads/payments/kbz.png" value="${method.uploadedQrImage || ""}">
+
+                ${qr
+                ? `<img class="pm-qr-preview" src="${qr}" alt="QR Preview">`
+                : `<div class="pm-empty-preview">No QR preview</div>`
+            }
+
+                <label>Maintenance Message</label>
+                <textarea class="pm-message" placeholder="Maintenance Message">${method.maintenanceMessage || ""}</textarea>
+
+                <label>Payment Type</label>
+                <select class="pm-type">
+                    <option value="manual" ${method.paymentType === "manual" ? "selected" : ""}>Manual Payment</option>
+                    <option value="auto" ${method.paymentType === "auto" ? "selected" : ""}>Auto Payment Future</option>
+                </select>
+
+                <label>Provider</label>
+                <select class="pm-provider">
+                    <option value="manual" ${method.provider === "manual" ? "selected" : ""}>Manual</option>
+                    <option value="kbzpay" ${method.provider === "kbzpay" ? "selected" : ""}>KBZPay API</option>
+                    <option value="wavepay" ${method.provider === "wavepay" ? "selected" : ""}>WavePay API</option>
+                    <option value="promptpay" ${method.provider === "promptpay" ? "selected" : ""}>PromptPay</option>
+                    <option value="omise" ${method.provider === "omise" ? "selected" : ""}>Omise</option>
+                </select>
+
+                <button class="save-payment-btn" onclick="savePaymentMethod('${method._id}')">
+                    Save ${method.method}
+                </button>
             </div>
-
-            <input class="pm-name" type="text" placeholder="Account Name" value="${method.accountName || ""}">
-            <input class="pm-number" type="text" placeholder="Account Number" value="${method.accountNumber || ""}">
-            <input class="pm-qr" type="text" placeholder="QR Image URL" value="${method.qrImage || ""}">
-            <textarea class="pm-message" placeholder="Maintenance Message">${method.maintenanceMessage || ""}</textarea>
-
-            <button class="save-payment-btn" onclick="savePaymentMethod('${method._id}')">
-                Save ${method.method}
-            </button>
-        </div>
-    `).join("");
+        `;
+    }).join("");
 }
 
 async function savePaymentMethod(id) {
@@ -51,11 +89,29 @@ async function savePaymentMethod(id) {
     }
 
     const payload = {
-        enabled: card.querySelector(".pm-enabled")?.checked || false,
-        accountName: card.querySelector(".pm-name")?.value || "",
-        accountNumber: card.querySelector(".pm-number")?.value || "",
-        qrImage: card.querySelector(".pm-qr")?.value || "",
-        maintenance: card.querySelector(".pm-maintenance")?.checked || false
+        enabled:
+            card.querySelector(".pm-enabled")?.checked || false,
+
+        accountName:
+            card.querySelector(".pm-name")?.value || "",
+
+        accountNumber:
+            card.querySelector(".pm-number")?.value || "",
+
+        qrImageUrl:
+            card.querySelector(".pm-qr")?.value || "",
+
+        uploadedQrImage:
+            card.querySelector(".pm-uploaded-qr")?.value || "",
+
+        maintenanceMessage:
+            card.querySelector(".pm-message")?.value || "",
+
+        paymentType:
+            card.querySelector(".pm-type")?.value || "manual",
+
+        provider:
+            card.querySelector(".pm-provider")?.value || "manual"
     };
 
     try {
