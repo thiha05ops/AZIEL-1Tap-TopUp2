@@ -1,15 +1,14 @@
 // backend/routes/order.js
 
-const upload = require("../middleware/orderUpload");
+// backend/routes/order.js
 
-const {
-    sendTelegramMessage,
-    sendTelegramPhoto
-} = require("../services/telegram");
 const express = require("express");
 const router = express.Router();
 
 const Order = require("../models/Order");
+
+const upload =
+    require("../middleware/orderUpload");
 
 const {
     sendTelegramMessage,
