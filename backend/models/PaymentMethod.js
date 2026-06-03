@@ -34,7 +34,12 @@ const paymentMethodSchema = new mongoose.Schema(
             default: ""
         },
 
-        qrImage: {
+        qrImageUrl: {
+            type: String,
+            default: ""
+        },
+
+        uploadedQrImage: {
             type: String,
             default: ""
         },
@@ -42,12 +47,50 @@ const paymentMethodSchema = new mongoose.Schema(
         maintenanceMessage: {
             type: String,
             default: ""
+        },
+
+        paymentType: {
+            type: String,
+            enum: ["manual", "auto"],
+            default: "manual"
+        },
+
+        provider: {
+            type: String,
+            default: "manual"
+        },
+
+        providerConfig: {
+            merchantId: {
+                type: String,
+                default: ""
+            },
+            apiKey: {
+                type: String,
+                default: ""
+            },
+            webhookSecret: {
+                type: String,
+                default: ""
+            }
         }
     },
     {
         timestamps: true
     }
 );
+
+paymentMethodSchema.virtual("finalQrImage").get(function () {
+    return this.uploadedQrImage || this.qrImageUrl || "";
+});
+
+paymentMethodSchema.set("toJSON", {
+    virtuals: true
+});
+
+paymentMethodSchema.set("toObject", {
+    virtuals: true
+});
 
 module.exports = mongoose.model(
     "PaymentMethod",

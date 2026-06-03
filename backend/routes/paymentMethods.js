@@ -90,8 +90,11 @@ router.put("/admin/payment-methods/:id", adminMiddleware, async (req, res) => {
             "enabled",
             "accountName",
             "accountNumber",
-            "qrImage",
-            "maintenanceMessage"
+            "qrImageUrl",
+            "uploadedQrImage",
+            "maintenanceMessage",
+            "paymentType",
+            "provider"
         ];
 
         allowed.forEach(key => {
@@ -105,9 +108,30 @@ router.put("/admin/payment-methods/:id", adminMiddleware, async (req, res) => {
         res.json({
             success: true,
             message: "Payment method updated",
-            method
+            method: {
+                ...method.toObject(),
+                qrImage:
+                    method.uploadedQrImage ||
+                    method.qrImageUrl ||
+                    ""
+            }
         });
+        const methods = await PaymentMethod
+            .find(filter)
+            .sort({ region: 1, method: 1 });
 
+        const formattedMethods = methods.map(method => ({
+            ...method.toObject(),
+            qrImage:
+                method.uploadedQrImage ||
+                method.qrImageUrl ||
+                ""
+        }));
+
+        res.json({
+            success: true,
+            methods: formattedMethods
+        });
     } catch (error) {
         console.log("Update payment method error:", error);
 
