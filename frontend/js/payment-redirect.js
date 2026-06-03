@@ -2,36 +2,64 @@
 
 async function createPaymentAndRedirect(orderData) {
     try {
-        const res = await fetch("/api/payment/create", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(orderData)
-        });
+        const activeCard =
+            document.querySelector(".pay-card.active");
 
-        const data = await res.json();
-
-        if (!data.success) {
-            alert(data.message || "Payment create failed");
+        if (!activeCard) {
+            alert("Please select payment method");
             return;
         }
 
-        const params = new URLSearchParams({
-            orderId: orderData.orderId,
-            amount: orderData.amount,
-            currency: orderData.currency,
-            game: orderData.game,
-            packageName: orderData.packageName,
-            paymentMethod: orderData.paymentMethod,
-            userId: orderData.userId,
-            zoneId: orderData.zoneId
-        });
+        const qr =
+            activeCard.dataset.qr || "";
 
-        window.location.href = `payment-page.html?${params.toString()}`;
+        const accountName =
+            activeCard.dataset.accountName || "";
+
+        const accountNumber =
+            activeCard.dataset.accountNumber || "";
+
+        const qrImg =
+            document.getElementById("paymentQrImage");
+
+        const nameBox =
+            document.getElementById("paymentAccountName");
+
+        const numberBox =
+            document.getElementById("paymentAccountNumber");
+
+        if (qrImg && qr) {
+            qrImg.src = qr;
+            qrImg.style.display = "block";
+        }
+
+        if (nameBox) {
+            nameBox.innerText =
+                accountName
+                    ? `Account Name: ${accountName}`
+                    : "";
+        }
+
+        if (numberBox) {
+            numberBox.innerText =
+                accountNumber
+                    ? `Account Number: ${accountNumber}`
+                    : "";
+        }
+
+        const preview =
+            document.getElementById("paymentPreview");
+
+        if (preview) {
+            preview.style.display = "block";
+        }
+
+        alert(
+            "Payment QR loaded. Please pay and upload screenshot."
+        );
 
     } catch (error) {
         console.log(error);
-        alert("Payment server error");
+        alert("Payment preview error");
     }
 }
