@@ -210,3 +210,62 @@
     font-size: 13px;
     opacity: .8;
 }
+
+.payment-confirm-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 999999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, .75);
+    padding: 18px;
+}
+
+.payment-confirm-modal.show {
+    display: flex;
+}
+
+.payment-confirm-box {
+    width: min(520px, 100%);
+    max-height: 90vh;
+    overflow-y: auto;
+    background: #0f172a;
+    border: 1px solid rgba(255, 255, 255, .12);
+    border-radius: 22px;
+    padding: 22px;
+    color: white;
+}
+
+.payment-modal-close {
+    float: right;
+    border: 0;
+    background: #ef4444;
+    color: white;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+}
+
+.payment-modal-qr img {
+    max-width: 220px;
+    width: 100%;
+    display: block;
+    margin: 14px auto;
+    border-radius: 14px;
+}
+
+#modalPaymentSlip {
+    width: 100%;
+    margin: 14px 0;
+}
+
+#confirmPaymentOrderBtn {
+    width: 100%;
+    padding: 14px;
+    border: 0;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #6d28d9, #9333ea);
+    color: white;
+    font-weight: 900;
+}

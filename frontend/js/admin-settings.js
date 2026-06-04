@@ -42,6 +42,16 @@ async function loadPaymentMethods() {
                 <input class="pm-qr" type="text" placeholder="https://example.com/qr.png" value="${method.qrImageUrl || method.qrImage || ""}">
 
                 <label>Uploaded QR Image Path</label>
+                <input class="pm-file" type="file" accept="image/*">
+
+<button
+    class="upload-qr-btn"
+    type="button"
+    onclick="uploadPaymentQR('${method._id}')">
+    Upload QR Photo
+</button>
+
+
                 <input class="pm-uploaded-qr" type="text" placeholder="/uploads/payments/kbz.png" value="${method.uploadedQrImage || ""}">
 
                 ${qr
@@ -231,4 +241,32 @@ async function saveSettings() {
     } else {
         alert(data.message || "Settings save failed");
     }
+}
+async function uploadPaymentQR(id) {
+    const card = document.querySelector(`.payment-method-card[data-id="${id}"]`);
+    const file = card.querySelector(".pm-file")?.files?.[0];
+
+    if (!file) {
+        alert("Please choose QR image");
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("qr", file);
+
+    const res = await fetch("/api/admin/upload-payment-qr", {
+        method: "POST",
+        body: formData
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+        alert(data.message || "QR upload failed");
+        return;
+    }
+
+    card.querySelector(".pm-uploaded-qr").value = data.image;
+
+    alert("QR uploaded successfully");
 }

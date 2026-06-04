@@ -3,6 +3,10 @@ const router = express.Router();
 
 const PaymentMethod = require("../models/PaymentMethod");
 const adminMiddleware = require("../middleware/adminMiddleware");
+const paymentQrUpload =
+    require(
+        "../middleware/paymentQrUpload"
+    );
 
 const defaultMethods = [
     {
@@ -141,5 +145,48 @@ router.put("/admin/payment-methods/:id", adminMiddleware, async (req, res) => {
         });
     }
 });
+router.post(
+    "/admin/upload-payment-qr",
+
+    paymentQrUpload.single("qr"),
+
+    async (req, res) => {
+
+        try {
+
+            if (!req.file) {
+
+                return res.json({
+                    success: false,
+                    message:
+                        "No image uploaded"
+                });
+
+            }
+
+            res.json({
+                success: true,
+
+                image:
+                    `/uploads/payments/${req.file.filename}`
+            });
+
+        } catch (error) {
+
+            console.log(
+                "QR upload error:",
+                error
+            );
+
+            res.status(500).json({
+                success: false,
+                message:
+                    "Upload failed"
+            });
+
+        }
+
+    }
+);
 
 module.exports = router;
