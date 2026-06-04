@@ -243,8 +243,17 @@ async function saveSettings() {
     }
 }
 async function uploadPaymentQR(id) {
-    const card = document.querySelector(`.payment-method-card[data-id="${id}"]`);
-    const file = card.querySelector(".pm-file")?.files?.[0];
+    const card = document.querySelector(
+        `.payment-method-card[data-id="${id}"]`
+    );
+
+    if (!card) {
+        alert("Payment method card not found");
+        return;
+    }
+
+    const fileInput = card.querySelector(".pm-file");
+    const file = fileInput?.files?.[0];
 
     if (!file) {
         alert("Please choose QR image");
@@ -254,19 +263,37 @@ async function uploadPaymentQR(id) {
     const formData = new FormData();
     formData.append("qr", file);
 
-    const res = await fetch("/api/admin/upload-payment-qr", {
-        method: "POST",
-        body: formData
-    });
+    try {
+        const res = await fetch("/api/admin/upload-payment-qr", {
+            method: "POST",
+            body: formData
+        });
 
-    const data = await res.json();
+        const data = await res.json();
 
-    if (!data.success) {
-        alert(data.message || "QR upload failed");
-        return;
+        console.log("QR UPLOAD RESPONSE:", data);
+
+        if (!res.ok || !data.success) {
+            alert(data.message || "QR upload failed");
+            return;
+        }
+
+        const uploadedInput = card.querySelector(".pm-uploaded-qr");
+
+        if (uploadedInput) {
+            uploadedInput.value = data.image;
+        }
+
+        const preview = card.querySelector(".pm-qr-preview");
+
+        if (preview) {
+            preview.src = data.image;
+            preview.style.display = "block";
+        }
+
+        alert("QR uploaded. Now click Save payment method.");
+    } catch (error) {
+        console.error("QR upload error:", error);
+        alert("QR upload server error");
     }
-
-    card.querySelector(".pm-uploaded-qr").value = data.image;
-
-    alert("QR uploaded successfully");
 }
