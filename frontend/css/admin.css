@@ -1317,3 +1317,18 @@ body {
 .settings-panel.active {
   display: block;
 }
+
+.pm-qr-preview {
+  width: 160px !important;
+  height: 160px !important;
+  object-fit: contain !important;
+  display: block;
+  margin: 14px 0;
+  padding: 10px;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.payment-method-card img {
+  max-width: 160px !important;
+}

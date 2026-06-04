@@ -268,6 +268,8 @@ router.post(
 
 🆔 User ID: ${order.userId}
 
+🌐 Server ID: ${order.zoneId || "-"}
+
 🌍 Region: ${order.region}
 
 💳 Payment: ${order.paymentMethod}
