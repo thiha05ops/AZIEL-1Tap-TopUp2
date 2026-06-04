@@ -99,9 +99,10 @@ function buildPaymentCard(method, index) {
         getPaymentLogo(key);
 
     const qrImage =
-        method.qrImage ||
+        method.finalQrImage ||
         method.uploadedQrImage ||
         method.qrImageUrl ||
+        method.qrImage ||
         "";
 
     const card =
