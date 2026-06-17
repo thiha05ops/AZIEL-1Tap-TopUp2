@@ -1,0 +1,128 @@
+/* =========================
+   AZIEL HEADER V1
+   Auto Theme
+========================= */
+
+.az-header {
+    position: sticky;
+    top: 0;
+    z-index: 9999;
+
+    height: 78px;
+    width: 100%;
+
+    display: flex;
+    align-items: center;
+    gap: 22px;
+
+    padding-left: max(32px, calc((100vw - 1280px) / 2));
+    padding-right: max(32px, calc((100vw - 1280px) / 2));
+
+    background: color-mix(in srgb, var(--surface-strong) 88%, transparent);
+    backdrop-filter: blur(18px);
+
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+}
+
+.az-logo {
+    color: var(--text);
+    text-decoration: none;
+    font-size: 32px;
+    font-weight: 900;
+    letter-spacing: .5px;
+}
+
+.az-nav {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+}
+
+.az-nav a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.az-nav a:hover {
+    color: var(--text);
+}
+
+.az-header-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.az-search {
+    width: 320px;
+}
+
+.az-search input {
+    width: 100%;
+    height: 46px;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    padding: 0 16px;
+    outline: none;
+}
+
+.az-search input::placeholder {
+    color: var(--text-muted);
+}
+
+.az-btn-light {
+    width: 46px;
+    height: 46px;
+    border-radius: 16px;
+    display: grid;
+    place-items: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    text-decoration: none;
+}
+
+.az-profile {
+    height: 46px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 14px 0 6px;
+    border-radius: 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    text-decoration: none;
+    font-weight: 800;
+}
+
+.az-avatar {
+    width: 42px;
+    height: 42px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    color: #fff;
+
+    font-size: 18px;
+    font-weight: 700;
+
+    border-radius: 50%;
+
+    line-height: 1;
+    padding: 0;
+    margin: 0;
+}
+
+.az-mobile-menu-btn {
+    display: none;
+}

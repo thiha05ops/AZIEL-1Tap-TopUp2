@@ -1,36 +1,36 @@
 const express = require("express");
 const router = express.Router();
-
 const LiveChat = require("../models/LiveChat");
 
-// ===============================
+function makeChatId() {
+    return "CHAT-" + Date.now() + "-" + Math.floor(Math.random() * 9999);
+}
+
 // USER SEND MESSAGE
-// POST /api/live-chat/send
-// ===============================
 router.post("/send", async (req, res) => {
     try {
-        const { username, message } = req.body;
+        const username = (req.body.username || "Guest").trim();
+        const message = (req.body.message || "").trim();
 
-        if (!username || !message) {
+        if (!message) {
             return res.status(400).json({
                 success: false,
-                message: "Username and message are required"
+                message: "Message is required"
             });
         }
 
-        let chat = await LiveChat.findOne({
-            username,
-            status: "active"
-        });
+        let chat = await LiveChat.findOne({ username, status: "active" });
 
         if (!chat) {
             chat = await LiveChat.create({
-                chatId: "CHAT-" + Date.now(),
+                chatId: makeChatId(),
                 username,
                 messages: [
                     {
                         sender: "user",
-                        text: message
+                        text: message,
+                        readByUser: true,
+                        readByAdmin: false
                     }
                 ],
                 lastMessageAt: new Date()
@@ -38,17 +38,16 @@ router.post("/send", async (req, res) => {
         } else {
             chat.messages.push({
                 sender: "user",
-                text: message
+                text: message,
+                readByUser: true,
+                readByAdmin: false
             });
 
             chat.lastMessageAt = new Date();
             await chat.save();
         }
 
-        res.json({
-            success: true,
-            chat
-        });
+        res.json({ success: true, chat });
     } catch (error) {
         console.error("Live chat send error:", error);
         res.status(500).json({
@@ -58,10 +57,7 @@ router.post("/send", async (req, res) => {
     }
 });
 
-// ===============================
 // USER GET OWN CHAT
-// GET /api/live-chat/user/:username
-// ===============================
 router.get("/user/:username", async (req, res) => {
     try {
         const chat = await LiveChat.findOne({
@@ -69,49 +65,76 @@ router.get("/user/:username", async (req, res) => {
             status: "active"
         });
 
-        res.json({
-            success: true,
-            chat
-        });
+        res.json({ success: true, chat });
     } catch (error) {
         console.error("User chat fetch error:", error);
-        res.status(500).json({
-            success: false,
-            message: "Server error"
-        });
+        res.status(500).json({ success: false, message: "Server error" });
     }
 });
 
-// ===============================
+// USER UNREAD COUNT
+router.get("/user/:username/unread", async (req, res) => {
+    try {
+        const chat = await LiveChat.findOne({
+            username: req.params.username,
+            status: "active"
+        });
+
+        if (!chat) {
+            return res.json({ success: true, unread: 0 });
+        }
+
+        const unread = chat.messages.filter(
+            msg => msg.sender === "admin" && !msg.readByUser
+        ).length;
+
+        res.json({ success: true, unread });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+});
+
+// USER MARK ADMIN MESSAGES AS READ
+router.put("/user/:username/read", async (req, res) => {
+    try {
+        const chat = await LiveChat.findOne({
+            username: req.params.username,
+            status: "active"
+        });
+
+        if (!chat) {
+            return res.json({ success: true });
+        }
+
+        chat.messages.forEach(msg => {
+            if (msg.sender === "admin") msg.readByUser = true;
+        });
+
+        await chat.save();
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+});
+
 // ADMIN GET ALL ACTIVE CHATS
-// GET /api/live-chat/admin
-// ===============================
 router.get("/admin", async (req, res) => {
     try {
-        const chats = await LiveChat.find({
-            status: "active"
-        }).sort({ lastMessageAt: -1 });
-
-        res.json({
-            success: true,
-            chats
+        const chats = await LiveChat.find({ status: "active" }).sort({
+            lastMessageAt: -1
         });
+
+        res.json({ success: true, chats });
     } catch (error) {
         console.error("Admin live chat fetch error:", error);
-        res.status(500).json({
-            success: false,
-            message: "Server error"
-        });
+        res.status(500).json({ success: false, message: "Server error" });
     }
 });
 
-// ===============================
 // ADMIN REPLY
-// POST /api/live-chat/admin/reply/:chatId
-// ===============================
 router.post("/admin/reply/:chatId", async (req, res) => {
     try {
-        const { message } = req.body;
+        const message = (req.body.message || "").trim();
 
         if (!message) {
             return res.status(400).json({
@@ -134,29 +157,48 @@ router.post("/admin/reply/:chatId", async (req, res) => {
 
         chat.messages.push({
             sender: "admin",
-            text: message
+            text: message,
+            readByUser: false,
+            readByAdmin: true
         });
 
         chat.lastMessageAt = new Date();
         await chat.save();
 
-        res.json({
-            success: true,
-            chat
-        });
+        res.json({ success: true, chat });
     } catch (error) {
         console.error("Admin reply error:", error);
-        res.status(500).json({
-            success: false,
-            message: "Server error"
-        });
+        res.status(500).json({ success: false, message: "Server error" });
     }
 });
 
-// ===============================
-// ADMIN MANUAL DELETE CHAT
-// DELETE /api/live-chat/admin/delete/:chatId
-// ===============================
+// ADMIN MARK USER MESSAGES AS READ
+router.put("/admin/read/:chatId", async (req, res) => {
+    try {
+        const chat = await LiveChat.findOne({
+            chatId: req.params.chatId,
+            status: "active"
+        });
+
+        if (!chat) {
+            return res.status(404).json({
+                success: false,
+                message: "Chat not found"
+            });
+        }
+
+        chat.messages.forEach(msg => {
+            if (msg.sender === "user") msg.readByAdmin = true;
+        });
+
+        await chat.save();
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+});
+
+// ADMIN DELETE
 router.delete("/admin/delete/:chatId", async (req, res) => {
     try {
         const chat = await LiveChat.findOneAndUpdate(
@@ -172,23 +214,14 @@ router.delete("/admin/delete/:chatId", async (req, res) => {
             });
         }
 
-        res.json({
-            success: true,
-            message: "Chat deleted"
-        });
+        res.json({ success: true, message: "Chat deleted" });
     } catch (error) {
         console.error("Delete chat error:", error);
-        res.status(500).json({
-            success: false,
-            message: "Server error"
-        });
+        res.status(500).json({ success: false, message: "Server error" });
     }
 });
 
-// ===============================
-// AUTO CLEAN 1 HOUR INACTIVE CHATS
-// DELETE /api/live-chat/auto-clean
-// ===============================
+// AUTO CLEAN 1 HOUR
 router.delete("/auto-clean", async (req, res) => {
     try {
         const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
@@ -198,9 +231,7 @@ router.delete("/auto-clean", async (req, res) => {
                 status: "active",
                 lastMessageAt: { $lt: oneHourAgo }
             },
-            {
-                status: "deleted"
-            }
+            { status: "deleted" }
         );
 
         res.json({
@@ -209,11 +240,16 @@ router.delete("/auto-clean", async (req, res) => {
         });
     } catch (error) {
         console.error("Auto clean error:", error);
-        res.status(500).json({
-            success: false,
-            message: "Server error"
-        });
+        res.status(500).json({ success: false, message: "Server error" });
     }
+});
+
+// FUTURE AI READY ROUTE
+router.post("/ai", async (req, res) => {
+    res.json({
+        success: true,
+        reply: "AI assistant is not connected yet."
+    });
 });
 
 module.exports = router;

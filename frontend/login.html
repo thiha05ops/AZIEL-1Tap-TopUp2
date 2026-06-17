@@ -1,67 +1,109 @@
 <!-- frontend/login.html -->
-
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
     <title>Login - AZIEL 1Tap</title>
 
-    <link rel="stylesheet" href="/css/main.css">
-    <link rel="stylesheet" href="/css/auth.css">
-    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="css/core/main.css">
+    <link rel="stylesheet" href="css/core/aziel-design-system.css">
+    <link rel="stylesheet" href="css/auth/auth.css">
+    <link rel="stylesheet" href="css/auth/login.css">
 
-    <meta name="theme-color" content="#070716">
+    <link rel="manifest" href="manifest.json">
+
+    <meta name="theme-color" content="#7c3aed">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="AZIEL">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 
 <body class="auth-page">
 
-    <div class="auth-wrapper">
+    <main class="auth-shell">
 
-        <div class="auth-logo">AZIEL</div>
+        <section class="auth-brand-panel">
+            <a href="home.html" class="auth-logo">AZIEL</a>
 
-        <form id="loginForm" class="auth-box seagm-style">
 
-            <div class="auth-top">
-                <h1>SIGN IN</h1>
-                <a href="register.html" class="signup-btn">Sign up</a>
+            <div class="auth-brand-content">
+                <span class="auth-pill">1Tap Game Top Up</span>
+                <h1>Welcome back</h1>
+                <p>Sign in to continue your top up orders, wallet, notifications and support.</p>
+            </div>
+        </section>
+
+        <section class="auth-card">
+
+            <div class="auth-card-head">
+                <div>
+                    <h2>Sign in</h2>
+                    <p>Use your username or email</p>
+                </div>
+                <a href="register.html">Create</a>
             </div>
 
-            <div id="msg"></div>
+            <div id="msg" class="auth-message"></div>
 
-            <div class="input-group">
-                <span>👤</span>
-                <input type="text" id="username" placeholder="Username" autocomplete="off" required>
-            </div>
+            <form id="loginForm" autocomplete="off">
 
-            <div class="input-group">
-                <span>🔒</span>
-                <input type="password" id="password" placeholder="Password" autocomplete="current-password" required>
-            </div>
+                <label class="auth-label">Username or Email</label>
+                <div class="auth-input">
+                    <i class="fa-regular fa-user auth-icon"></i>
+                    <input id="username" type="text" placeholder="Enter username or email" autocomplete="username"
+                        required>
+                </div>
 
-            <button type="submit" id="loginBtn" class="main-login-btn">
-                SIGN IN
-            </button>
+                <label class="auth-label">Password</label>
+                <div class="auth-input">
+                    <i class="fa-solid fa-lock auth-icon"></i>
+                    <input id="password" type="password" placeholder="Enter password" autocomplete="current-password"
+                        required>
+                    <button type="button" id="togglePassword" class="password-eye">
+                        <i class="fa-regular fa-eye"></i>
+                    </button>
+                </div>
 
-            <p class="social-title">
-                Don't have account?
-                <a href="register.html">Create account</a>
-            </p>
 
-        </form>
+                <div class="auth-row">
+                    <label class="remember">
+                        <input type="checkbox" id="rememberMe">
+                        <span>Remember me</span>
+                    </label>
 
-    </div>
+                    <a href="forgot-password.html" class="forgot-link">Forgot password?</a>
+                </div>
 
+                <button type="submit" id="loginBtn" class="auth-main-btn">
+                    Sign In
+                </button>
+
+                <div class="auth-divider">
+                    <span>or</span>
+                </div>
+
+                <a href="http://localhost:3000/api/auth/google" class="google-btn">
+                    <img src="assets/google.svg" alt="Google" class="google-icon">
+                    <span class="google-text">Continue with Google</span>
+                </a>
+
+                <p class="auth-bottom-text">
+                    Don’t have an account?
+                    <a href="register.html">Create account</a>
+                </p>
+
+            </form>
+
+        </section>
+
+    </main>
+
+    <script src="js/login.js"></script>
+    <script src="js/pwa-fix.js"></script>
 </body>
-<script src="/js/login.js"></script>
-<script src="/js/pwa-fix.js"></script>
 
 </html>

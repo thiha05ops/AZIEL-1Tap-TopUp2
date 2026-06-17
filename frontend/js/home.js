@@ -1,170 +1,62 @@
 // frontend/js/home.js
 
 document.addEventListener("DOMContentLoaded", () => {
+    initUserHeader();
+    initDrawer();
+    initRegionPayments();
+    initWalletPreview();
+    initTheme();
+
+    initAzielBanner();
+});
+
+function initUserHeader() {
     const username = localStorage.getItem("username");
     const displayName = localStorage.getItem("displayName") || username;
 
     const avatarText = document.getElementById("avatarText");
-    const usernameText = document.getElementById("usernameText");
-    const profileBox = document.getElementById("profileBox");
-    const profileDropdown = document.getElementById("profileDropdown");
-    const logoutBtn = document.getElementById("logoutBtn");
-    const searchInput = document.getElementById("searchInput");
 
-    if (avatarText && usernameText) {
-        if (username) {
-            avatarText.innerText = displayName.charAt(0).toUpperCase();
-            usernameText.innerText = displayName;
-        } else {
-            avatarText.innerText = "👤";
-            usernameText.innerText = "Login";
-        }
+    if (avatarText) {
+        avatarText.innerText = username
+            ? displayName.charAt(0).toUpperCase()
+            : "👤";
     }
-
-    if (profileBox && profileDropdown) {
-        profileBox.addEventListener("click", (e) => {
-            e.stopPropagation();
-
-            if (!username) {
-                window.location.href = "login.html";
-                return;
-            }
-
-            profileDropdown.style.display =
-                profileDropdown.style.display === "flex" ? "none" : "flex";
-        });
-
-        document.addEventListener("click", () => {
-            profileDropdown.style.display = "none";
-        });
-    }
-
-    if (logoutBtn) {
-        logoutBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            localStorage.clear();
-            window.location.href = "login.html";
-        });
-    }
-
-    initHeroSlider();
-    loadRegionPayments();
-
-    document.querySelectorAll(".coming-soon-card").forEach(card => {
-        card.addEventListener("click", () => {
-            showToast("Coming soon 🚀");
-        });
-    });
-
-    document.querySelectorAll(".active-card").forEach(card => {
-        card.addEventListener("click", (e) => {
-            if (!username) {
-                e.preventDefault();
-                showToast("Please login first 🔐");
-
-                setTimeout(() => {
-                    window.location.href = "login.html";
-                }, 700);
-            }
-        });
-    });
-
-    if (searchInput) {
-        searchInput.addEventListener("input", () => {
-            const keyword = searchInput.value.toLowerCase().trim();
-
-            document
-                .querySelectorAll(".compact-card, .catalog-card, .offer-card")
-                .forEach(card => {
-                    const name =
-                        (card.dataset.name || card.innerText || "")
-                            .toLowerCase();
-
-                    card.style.display = name.includes(keyword) ? "" : "none";
-                });
-        });
-    }
-});
-
-function initHeroSlider() {
-
-    const slides =
-        document.querySelectorAll(".hero-slide");
-
-    const dots =
-        document.querySelectorAll(".dot");
-
-    if (!slides.length) return;
-
-    let current = 0;
-
-    let timer = null;
-
-    function showSlide(index) {
-
-        slides.forEach(slide => {
-            slide.classList.remove("active");
-        });
-
-        dots.forEach(dot => {
-            dot.classList.remove("active");
-        });
-
-        slides[index].classList.add("active");
-
-        if (dots[index]) {
-            dots[index].classList.add("active");
-        }
-
-        current = index;
-
-    }
-
-    function nextSlide() {
-
-        let next =
-            (current + 1) % slides.length;
-
-        showSlide(next);
-
-    }
-
-    function startSlider() {
-
-        clearInterval(timer);
-
-        timer = setInterval(() => {
-
-            nextSlide();
-
-        }, 4500);
-
-    }
-
-    dots.forEach(dot => {
-
-        dot.addEventListener("click", () => {
-
-            const slideIndex =
-                Number(dot.dataset.slide);
-
-            showSlide(slideIndex);
-
-            startSlider();
-
-        });
-
-    });
-
-    showSlide(0);
-
-    startSlider();
-
 }
-function loadRegionPayments() {
-    const paymentLogos = document.getElementById("paymentLogos");
-    const paymentRegionText = document.getElementById("paymentRegionText");
 
+function initDrawer() {
+    const mobileMenuBtn = document.getElementById("mobileMenuBtn");
+    const mobileDrawer = document.getElementById("mobileDrawer");
+    const mobileDrawerOverlay = document.getElementById("mobileDrawerOverlay");
+    const closeDrawerBtn = document.getElementById("closeDrawerBtn");
+
+    if (!mobileMenuBtn || !mobileDrawer || !mobileDrawerOverlay) return;
+
+    function openMobileDrawer() {
+        mobileDrawer.classList.add("show");
+        mobileDrawerOverlay.classList.add("show");
+        document.body.style.overflow = "hidden";
+    }
+
+    function closeMobileDrawer() {
+        mobileDrawer.classList.remove("show");
+        mobileDrawerOverlay.classList.remove("show");
+        document.body.style.overflow = "";
+    }
+
+    mobileMenuBtn.addEventListener("click", openMobileDrawer);
+    mobileDrawerOverlay.addEventListener("click", closeMobileDrawer);
+
+    if (closeDrawerBtn) {
+        closeDrawerBtn.addEventListener("click", closeMobileDrawer);
+    }
+
+    document.querySelectorAll(".az-mobile-drawer a").forEach(link => {
+        link.addEventListener("click", closeMobileDrawer);
+    });
+}
+
+function initRegionPayments() {
+    const paymentLogos = document.getElementById("paymentLogos");
     if (!paymentLogos) return;
 
     const rawRegion =
@@ -172,7 +64,7 @@ function loadRegionPayments() {
         localStorage.getItem("region") ||
         localStorage.getItem("userRegion") ||
         localStorage.getItem("azielRegion") ||
-        "myanmar";
+        "MM";
 
     const region = rawRegion.toLowerCase();
 
@@ -183,126 +75,377 @@ function loadRegionPayments() {
         region.includes("ไทย");
 
     const logos = isThailand
-        ? ["promptpay.png", "scb.png"]
+        ? ["promptpay.png", "scb.png", "visa.png"]
         : ["kbzpay.png", "wavepay.png", "ayapay.png"];
-
-    if (paymentRegionText) {
-        paymentRegionText.innerText = isThailand ? "Thailand" : "Myanmar";
-    }
 
     paymentLogos.innerHTML = logos.map(logo => `
         <img src="assets/payment/${logo}" alt="${logo}">
     `).join("");
 }
-function initMobileNavAutoHide() {
-    const header = document.querySelector(".home-header");
 
-    if (!header) return;
+function initWalletPreview() {
+    const headerWalletText = document.getElementById("headerWalletText");
 
-    let lastScrollY = window.scrollY;
+    if (!headerWalletText) return;
 
-    window.addEventListener("scroll", () => {
-        if (window.innerWidth > 768) return;
+    const rawRegion =
+        localStorage.getItem("selectedRegion") ||
+        localStorage.getItem("region") ||
+        "MM";
 
-        const currentScrollY = window.scrollY;
+    const region = rawRegion.toLowerCase();
 
-        if (currentScrollY > lastScrollY && currentScrollY > 120) {
-            header.classList.add("hide-mobile-nav");
-        } else {
-            header.classList.remove("hide-mobile-nav");
-        }
+    const isThailand =
+        region.includes("thai") ||
+        region === "th" ||
+        region.includes("ไทย");
 
-        lastScrollY = currentScrollY;
+    const currency = isThailand ? "THB" : "MMK";
+
+    const walletMMK =
+        localStorage.getItem("walletMMK") ||
+        localStorage.getItem("balanceMMK") ||
+        "48500";
+
+    const walletTHB =
+        localStorage.getItem("walletTHB") ||
+        localStorage.getItem("balanceTHB") ||
+        "0";
+
+    const amount = isThailand ? walletTHB : walletMMK;
+
+    headerWalletText.innerText = `${currency} ${Number(amount).toLocaleString()}`;
+}
+
+function initTheme() {
+    const savedTheme = localStorage.getItem("azielTheme");
+
+    const systemLight =
+        window.matchMedia &&
+        window.matchMedia("(prefers-color-scheme: light)").matches;
+
+    const theme = savedTheme || (systemLight ? "light" : "dark");
+
+    document.body.classList.remove("theme-light", "theme-dark");
+    document.body.classList.add(`theme-${theme}`);
+
+    if (!window.matchMedia) return;
+
+    const media = window.matchMedia("(prefers-color-scheme: light)");
+
+    media.addEventListener("change", e => {
+        if (localStorage.getItem("azielTheme")) return;
+
+        document.body.classList.remove("theme-light", "theme-dark");
+        document.body.classList.add(e.matches ? "theme-light" : "theme-dark");
     });
 }
-/* =========================
-   MOBILE DRAWER
-========================= */
+function initAzielBanner() {
+    const track = document.getElementById("azBannerTrack");
+    const cards = [...document.querySelectorAll(".az-banner-card")];
+    const dots = [...document.querySelectorAll("#azBannerDots button")];
 
-const mobileMenuBtn =
-    document.getElementById("mobileMenuBtn");
+    if (!track || cards.length === 0) return;
 
-const mobileDrawer =
-    document.getElementById("mobileDrawer");
+    let current = 0;
+    let dragStartX = 0;
+    let dragCurrentX = 0;
+    let isDragging = false;
+    let autoTimer = null;
+    let animationFrame = null;
 
-const mobileDrawerOverlay =
-    document.getElementById("mobileDrawerOverlay");
+    const GAP = 0.78;
+    const DRAG_LIMIT = 160;
+    const AUTO_DELAY = 4500;
 
-const closeDrawerBtn =
-    document.getElementById("closeDrawerBtn");
-
-function openMobileDrawer() {
-
-    mobileDrawer.classList.add("show");
-
-    mobileDrawerOverlay.classList.add("show");
-
-    document.body.style.overflow = "hidden";
-
-}
-
-function closeMobileDrawer() {
-
-    mobileDrawer.classList.remove("show");
-
-    mobileDrawerOverlay.classList.remove("show");
-
-    document.body.style.overflow = "";
-
-}
-
-if (mobileMenuBtn) {
-
-    mobileMenuBtn.addEventListener(
-        "click",
-        openMobileDrawer
-    );
-
-}
-
-if (closeDrawerBtn) {
-
-    closeDrawerBtn.addEventListener(
-        "click",
-        closeMobileDrawer
-    );
-
-}
-
-if (mobileDrawerOverlay) {
-
-    mobileDrawerOverlay.addEventListener(
-        "click",
-        closeMobileDrawer
-    );
-
-}
-
-/* CLOSE DRAWER WHEN LINK CLICK */
-
-document.querySelectorAll(
-    ".mobile-drawer a"
-).forEach(link => {
-
-    link.addEventListener(
-        "click",
-        closeMobileDrawer
-    );
-
-});
-document.addEventListener("click", e => {
-    const link = e.target.closest("a");
-    if (!link) return;
-
-    const href = link.getAttribute("href");
-    if (!href) return;
-
-    if (href.startsWith("#")) return;
-
-    const url = new URL(href, window.location.href);
-
-    if (url.origin === window.location.origin) {
-        e.preventDefault();
-        window.location.href = url.pathname + url.search + url.hash;
+    function clampDrag(value) {
+        return Math.max(-DRAG_LIMIT, Math.min(DRAG_LIMIT, value));
     }
-});
+
+    function getShortestOffset(index) {
+        let offset = index - current;
+
+        if (offset > cards.length / 2) {
+            offset -= cards.length;
+        }
+
+        if (offset < -cards.length / 2) {
+            offset += cards.length;
+        }
+
+        return offset;
+    }
+
+    function updateDots() {
+        dots.forEach((dot, index) => {
+            dot.classList.toggle("active", index === current);
+        });
+    }
+
+    function setAtmosphereColor() {
+        const activeImg = cards[current].querySelector("img");
+
+        if (!activeImg) return;
+
+        function readColor() {
+            try {
+                const canvas = document.createElement("canvas");
+                const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+                canvas.width = 24;
+                canvas.height = 24;
+
+                ctx.drawImage(activeImg, 0, 0, 24, 24);
+
+                const data = ctx.getImageData(0, 0, 24, 24).data;
+
+                let r = 0;
+                let g = 0;
+                let b = 0;
+                let count = 0;
+
+                for (let i = 0; i < data.length; i += 4) {
+                    const alpha = data[i + 3];
+
+                    if (alpha < 120) continue;
+
+                    r += data[i];
+                    g += data[i + 1];
+                    b += data[i + 2];
+                    count++;
+                }
+
+                if (!count) return;
+
+                r = Math.floor(r / count);
+                g = Math.floor(g / count);
+                b = Math.floor(b / count);
+
+                document.documentElement.style.setProperty(
+                    "--banner-rgb",
+                    `${r}, ${g}, ${b}`
+                );
+            } catch (err) {
+                document.documentElement.style.setProperty(
+                    "--banner-rgb",
+                    "139, 92, 246"
+                );
+            }
+        }
+
+        if (activeImg.complete) {
+            readColor();
+        } else {
+            activeImg.onload = readColor;
+        }
+    }
+
+    function render(dragOffset = 0) {
+        const cardWidth = cards[0].offsetWidth;
+        const step = cardWidth * GAP;
+
+        cards.forEach((card, index) => {
+            card.classList.toggle("active", index === current);
+
+            const offset = getShortestOffset(index);
+            const x = offset * step + dragOffset;
+
+            const distance = Math.abs(x) / step;
+
+            const scale = Math.max(0.72, 1 - distance * 0.15);
+            const opacity = Math.max(0.15, 1 - distance * 0.55);
+            const brightness = Math.max(0.72, 1 - distance * 0.18);
+            const blur = Math.min(distance * 4, 7);
+            const zIndex = 100 - Math.floor(distance * 10);
+
+            card.style.transform =
+                `translateX(calc(-50% + ${x}px)) scale(${scale})`;
+
+            card.style.opacity = opacity;
+            card.style.filter = `brightness(${brightness}) blur(${blur}px)`;
+            card.style.zIndex = zIndex;
+
+            card.style.transition =
+                isDragging
+                    ? "none"
+                    : "transform .5s ease, opacity .5s ease, filter .5s ease";
+
+            card.style.pointerEvents =
+                Math.abs(offset) === 0 && Math.abs(dragOffset) < 8
+                    ? "auto"
+                    : "none";
+        });
+    }
+
+    function goTo(index) {
+        current = (index + cards.length) % cards.length;
+        render(0);
+        updateDots();
+        setAtmosphereColor();
+    }
+
+    function next() {
+        goTo(current + 1);
+    }
+
+    function prev() {
+        goTo(current - 1);
+    }
+
+    function startAuto() {
+        clearInterval(autoTimer);
+        autoTimer = setInterval(next, AUTO_DELAY);
+    }
+
+    function stopAuto() {
+        clearInterval(autoTimer);
+    }
+
+    function animateBack() {
+        const start = dragCurrentX;
+        const duration = 260;
+        const startTime = performance.now();
+
+        function frame(now) {
+            const progress = Math.min((now - startTime) / duration, 1);
+            const ease = 1 - Math.pow(1 - progress, 3);
+            const value = start * (1 - ease);
+
+            render(value);
+
+            if (progress < 1) {
+                animationFrame = requestAnimationFrame(frame);
+            } else {
+                render(0);
+            }
+        }
+
+        cancelAnimationFrame(animationFrame);
+        animationFrame = requestAnimationFrame(frame);
+    }
+
+    function finishDrag() {
+        const diff = dragCurrentX;
+
+        if (diff < -70) {
+            next();
+        } else if (diff > 70) {
+            prev();
+        } else {
+            animateBack();
+        }
+
+        dragCurrentX = 0;
+        startAuto();
+    }
+
+    dots.forEach((dot, index) => {
+        dot.addEventListener("click", () => {
+            stopAuto();
+            goTo(index);
+            startAuto();
+        });
+    });
+
+    track.addEventListener("pointerdown", e => {
+        isDragging = true;
+        dragStartX = e.clientX;
+        dragCurrentX = 0;
+
+        stopAuto();
+        track.setPointerCapture(e.pointerId);
+    });
+
+    track.addEventListener("pointermove", e => {
+        if (!isDragging) return;
+
+        dragCurrentX = clampDrag(e.clientX - dragStartX);
+        render(dragCurrentX);
+    });
+
+    track.addEventListener("pointerup", e => {
+        if (!isDragging) return;
+
+        isDragging = false;
+        track.releasePointerCapture(e.pointerId);
+        finishDrag();
+    });
+
+    track.addEventListener("pointercancel", () => {
+        isDragging = false;
+        animateBack();
+        startAuto();
+    });
+
+    window.addEventListener("resize", () => {
+        render(0);
+    });
+
+    goTo(0);
+    startAuto();
+}
+
+function setAtmosphereColor() {
+    const activeImg = cards[current].querySelector("img");
+    if (!activeImg) return;
+
+    function readColor() {
+        try {
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+            canvas.width = 64;
+            canvas.height = 64;
+
+            ctx.drawImage(activeImg, 0, 0, 64, 64);
+
+            const data = ctx.getImageData(0, 0, 64, 64).data;
+            const buckets = {};
+
+            for (let i = 0; i < data.length; i += 4) {
+                let r = data[i];
+                let g = data[i + 1];
+                let b = data[i + 2];
+                const a = data[i + 3];
+
+                if (a < 180) continue;
+
+                const max = Math.max(r, g, b);
+                const min = Math.min(r, g, b);
+                const saturation = max - min;
+                const brightness = (r + g + b) / 3;
+
+                if (brightness < 45 || brightness > 225) continue;
+                if (saturation < 35) continue;
+
+                r = Math.round(r / 28) * 28;
+                g = Math.round(g / 28) * 28;
+                b = Math.round(b / 28) * 28;
+
+                const key = `${r},${g},${b}`;
+                buckets[key] = (buckets[key] || 0) + 1;
+            }
+
+            let bestKey = "139,92,246";
+            let bestCount = 0;
+
+            Object.entries(buckets).forEach(([key, count]) => {
+                if (count > bestCount) {
+                    bestKey = key;
+                    bestCount = count;
+                }
+            });
+
+            document.documentElement.style.setProperty("--banner-rgb", bestKey);
+
+        } catch (err) {
+            document.documentElement.style.setProperty("--banner-rgb", "139,92,246");
+        }
+    }
+
+    if (activeImg.complete) {
+        readColor();
+    } else {
+        activeImg.onload = readColor;
+    }
+}

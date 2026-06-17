@@ -84,70 +84,37 @@ router.put(
                 mlbbServerId
             } = req.body;
 
-            const currentUser = await User.findById(req.user.id);
+            const user = await User.findById(req.user.id);
 
-            if (!currentUser) {
+            if (!user) {
                 return res.json({
                     success: false,
                     message: "User not found"
                 });
             }
 
-            const oldUsername =
-                currentUser.username ||
-                currentUser.displayName;
+            user.displayName =
+                (displayName || user.displayName || user.username).trim();
 
-            const newUsername =
-                (displayName || oldUsername || "")
-                    .trim();
-
-            const updateData = {
-                displayName: newUsername,
-                username: newUsername,
-                telegram: telegram || "",
-                phone: phone || "",
-                region: region || "MM",
-                mlbbUserId: mlbbUserId || "",
-                mlbbServerId: mlbbServerId || ""
-            };
+            user.telegram = telegram || "";
+            user.phone = phone || "";
+            user.region = region || "MM";
+            user.mlbbUserId = mlbbUserId || "";
+            user.mlbbServerId = mlbbServerId || "";
 
             if (req.file) {
-                updateData.photo =
-                    `/uploads/profile/${req.file.filename}`;
+                user.photo = `/uploads/profile/${req.file.filename}`;
             }
 
-            currentUser.set(updateData);
+            await user.save();
 
-            await currentUser.save();
-
-            if (
-                oldUsername &&
-                newUsername &&
-                oldUsername !== newUsername
-            ) {
-                await Order.updateMany(
-                    { username: oldUsername },
-                    { username: newUsername }
-                );
-
-                await Notification.updateMany(
-                    { username: oldUsername },
-                    { username: newUsername }
-                );
-
-                await WalletTopup.updateMany(
-                    { username: oldUsername },
-                    { username: newUsername }
-                );
-            }
-
-            const user = await User.findById(req.user.id)
+            const updatedUser = await User.findById(req.user.id)
                 .select("-password");
 
             res.json({
                 success: true,
                 message: "Profile updated",
-                user
+                user: updatedUser
             });
 
         } catch (error) {

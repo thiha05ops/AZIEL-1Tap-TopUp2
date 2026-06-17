@@ -2,535 +2,315 @@
 <html lang="en">
 
 <head>
-
     <meta charset="UTF-8">
-
     <title>AZIEL 1Tap Shop</title>
-
-    <!-- ICONS -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-
-    <!-- CSS -->
-    <link rel="stylesheet" href="/css/main.css">
-
-    <link rel="stylesheet" href="/css/layout.css">
-
-    <link rel="stylesheet" href="/css/components.css">
-
-    <link rel="stylesheet" href="/css/desktop.css">
-
-    <link rel="stylesheet" href="/css/mobile.css">
-
-    <link rel="stylesheet" href="/css/live-chat.css">
-    <link rel="manifest" href="/manifest.json">
-
-    <meta name="theme-color" content="#070716">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="AZIEL">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+
+    <link rel="stylesheet" href="css/theme/aziel-design-system.css">
+
+    <link rel="stylesheet" href="css/core/main.css">
+    <link rel="stylesheet" href="css/core/layout.css">
+    <link rel="stylesheet" href="css/core/components.css">
+
+    <link rel="stylesheet" href="css/home/home.css">
+    <link rel="stylesheet" href="css/home/aziel-home.css">
+
+    <link rel="stylesheet" href="css/theme/desktop.css">
+    <link rel="stylesheet" href="css/theme/mobile.css">
+    <link rel="stylesheet" href="css/theme/aziel-header.css">
+    <link rel="stylesheet" href="css/theme/aziel-design-system.css">
+    <link rel="stylesheet" href="css/theme/aziel-components.css">
+    <link rel="stylesheet" href="css/theme/wave-background.css">
+    <link rel="stylesheet" href="/css/support/live-chat.css">
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#070B1D">
 </head>
 
 <body>
-
-    <!-- =========================
-         HEADER
-    ========================== -->
+    <div class="az-bg-wave"></div>
 
     <header class="az-header">
+        <a href="home.html" class="az-logo">AZIEL</a>
 
-        <!-- MOBILE MENU -->
-        <button id="mobileMenuBtn" class="az-mobile-menu-btn" onclick="openMobileDrawer()">
-            <i class="fa-solid fa-bars"></i>
-        </button>
-
-        <!-- LOGO -->
-        <a href="home.html" class="az-logo">
-            AZIEL
-        </a>
-
-        <!-- NAV -->
         <nav class="az-nav">
-
-            <a href="home.html">
-                Home
-            </a>
-
-            <a href="#mobileGames">
-                Mobile Games
-            </a>
-
-            <a href="#pcGames">
-                PC Games
-            </a>
-
-            <a href="#giftCards">
-                Gift Cards
-            </a>
-
-            <a href="support.html">
-                Support
-            </a>
-
+            <a href="home.html" class="active">Home</a>
+            <a href="#popularGames">Games</a>
+            <a href="#categories">Top Up</a>
+            <a href="wallet.html">Wallet</a>
+            <a href="tracking.html">Transactions</a>
+            <a href="support.html">Support</a>
         </nav>
 
-        <!-- RIGHT -->
         <div class="az-header-right">
+            <a href="wallet.html" class="az-wallet-pill">
+                <span id="headerWalletText">MMK 48,500</span>
+                <i class="fa-solid fa-plus"></i>
+            </a>
 
-            <!-- SEARCH -->
-            <div class="az-search">
-
-                <input id="searchInput" class="az-input" type="text" placeholder="Search game or card">
-
-                <div id="searchDropdown" class="search-dropdown"></div>
-
-            </div>
-
-            <a href="notifications.html" class="az-btn az-btn-light">
+            <a href="notifications.html" class="az-icon-btn">
                 <i class="fa-regular fa-bell"></i>
             </a>
-
-            <!-- PROFILE -->
+            <button id="localeOpenBtn" class="az-locale-btn" type="button">
+                <span id="localeFlag">🇹🇭</span>
+            </button>
             <a href="account.html" id="profileBox" class="az-profile">
-
-                <div id="avatarText" class="az-avatar">
-                    T
-                </div>
-
-                <span id="usernameText">
-                    thiha2
-                </span>
-
+                <div id="avatarText" class="az-avatar">T</div>
             </a>
-
+        </div>
     </header>
 
-    <!-- =========================
-         MOBILE DRAWER
-    ========================== -->
-
-    <div id="mobileDrawerOverlay" class="az-mobile-drawer-overlay" onclick="closeMobileDrawer()"></div>
+    <div id="mobileDrawerOverlay" class="az-mobile-drawer-overlay"></div>
 
     <aside id="mobileDrawer" class="az-mobile-drawer">
+        <button id="closeDrawerBtn" class="drawer-close">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
 
-        <a href="home.html">
-            <i class="fa-solid fa-house"></i>
-            Home
-        </a>
-
-        <a href="#mobileGames">
-            <i class="fa-solid fa-gamepad"></i>
-            Mobile Games
-        </a>
-
-        <a href="#pcGames">
-            <i class="fa-solid fa-desktop"></i>
-            PC Games
-        </a>
-
-        <a href="#giftCards">
-            <i class="fa-solid fa-gift"></i>
-            Gift Cards
-        </a>
-
-        <a href="account.html">
-            <i class="fa-regular fa-user"></i>
-            Account
-        </a>
-
-        <a href="support.html">
-            <i class="fa-solid fa-headset"></i>
-            Support
-        </a>
-
+        <a href="home.html"><i class="fa-solid fa-house"></i> Home</a>
+        <a href="#popularGames"><i class="fa-solid fa-gamepad"></i> Games</a>
+        <a href="#categories"><i class="fa-solid fa-bolt"></i> Top Up</a>
+        <a href="wallet.html"><i class="fa-solid fa-wallet"></i> Wallet</a>
+        <a href="tracking.html"><i class="fa-solid fa-receipt"></i> Transactions</a>
+        <a href="support.html"><i class="fa-solid fa-headset"></i> Support</a>
+        <a href="account.html"><i class="fa-regular fa-user"></i> Account</a>
     </aside>
+    <main class="az-home">
 
-    <!-- =========================
-         PAGE
-    ========================== -->
+        <section class="az-banner-zone" id="bannerZone">
 
-    <main class="az-page">
+            <div class="az-banner-track" id="azBannerTrack">
 
-        <!-- HERO -->
+                <a href="mlbb.html" class="az-banner-card">
+                    <img src="assets/banners/hero.webp" alt="MLBB Banner">
+                </a>
 
-        <section class="az-hero">
+                <a href="pubg.html" class="az-banner-card">
+                    <img src="assets/banners/pubg-banner.webp" alt="PUBG Banner">
+                </a>
 
-            <img src="assets/banners/hero.webp" alt="AZIEL">
+                <a href="freefire.html" class="az-banner-card">
+                    <img src="assets/banners/freefire-banner.webp" alt="Free Fire Banner">
+                </a>
 
-            <div class="az-hero-overlay"></div>
+            </div>
 
-            <div class="az-hero-content">
-
-                <span class="az-badge">
-                    AZIEL OFFICIAL
-                </span>
-
-                <h1>
-                    Fast & Secure
-                    Game Top Up
-                </h1>
-
-                <p>
-                    Trusted game top up marketplace
-                    for Myanmar and Thailand.
-                </p>
-
-                <div style="display:flex; gap:12px;">
-
-                    <a href="#mobileGames" class="az-btn az-btn-primary">
-                        Top Up Now
-                    </a>
-
-                    <a href="support.html" class="az-btn az-btn-light">
-                        Support
-                    </a>
-
-                </div>
-
+            <div class="az-banner-dots" id="azBannerDots">
+                <button class="active"></button>
+                <button></button>
+                <button></button>
             </div>
 
         </section>
 
-        <!-- MOBILE GAMES -->
-
-        <section id="mobileGames" class="az-section">
-
-            <div class="az-section-head">
-
+        <section class="az-trust-row">
+            <div class="trust-card">
+                <i class="fa-solid fa-bolt"></i>
                 <div>
-
-                    <h2>
-                        Mobile Games
-                    </h2>
-
-                    <p>
-                        Popular mobile game top ups
-                    </p>
-
+                    <strong>Instant Delivery</strong>
+                    <span>1-5 Minutes</span>
                 </div>
-
-                <a href="#">
-                    View all
-                </a>
-
             </div>
 
-            <div class="az-game-grid">
+            <div class="trust-card">
+                <i class="fa-solid fa-shield-halved"></i>
+                <div>
+                    <strong>100% Secure</strong>
+                    <span>Safe & Trusted</span>
+                </div>
+            </div>
 
-                <!-- MLBB -->
-                <a href="mlbb.html" class="az-game-card">
+            <div class="trust-card">
+                <i class="fa-solid fa-headset"></i>
+                <div>
+                    <strong>24/7 Support</strong>
+                    <span>We are here</span>
+                </div>
+            </div>
 
-                    <img src="assets/games/mlbb.webp" alt="MLBB">
+            <div class="trust-card">
+                <i class="fa-solid fa-tags"></i>
+                <div>
+                    <strong>Best Price</strong>
+                    <span>Always low price</span>
+                </div>
+            </div>
+        </section>
 
-                    <div class="az-game-info">
+        <section id="popularGames" class="az-section">
+            <div class="az-section-head">
+                <div>
+                    <h2>Popular Games</h2>
+                </div>
+                <a href="#categories">View All <i class="fa-solid fa-angle-right"></i></a>
+            </div>
 
-                        <h3>
-                            Mobile Legends
-                        </h3>
-
-                        <p>
-                            Instant Diamonds
-                        </p>
-
-                    </div>
-
+            <div class="popular-game-grid">
+                <a href="mlbb.html" class="popular-game-card" data-name="Mobile Legends MLBB">
+                    <img src="assets/games/mlbb.webp" alt="Mobile Legends">
+                    <h3>Mobile Legends</h3>
+                    <p>From MMK 90</p>
                 </a>
 
-                <!-- PUBG -->
-                <a href="pubg.html" class="az-game-card">
-
-                    <img src="assets/games/pubg.webp" alt="PUBG">
-
-                    <div class="az-game-info">
-
-                        <h3>
-                            PUBG Mobile
-                        </h3>
-
-                        <p>
-                            UC Top Up
-                        </p>
-
-                    </div>
-
+                <a href="pubg.html" class="popular-game-card" data-name="PUBG Mobile UC">
+                    <img src="assets/games/pubg.webp" alt="PUBG Mobile">
+                    <h3>PUBG Mobile</h3>
+                    <p>From MMK 180</p>
                 </a>
 
-                <!-- FREE FIRE -->
-                <a href="freefire.html" class="az-game-card">
-
+                <a href="freefire.html" class="popular-game-card" data-name="Free Fire Diamonds">
                     <img src="assets/games/freefire.webp" alt="Free Fire">
-
-                    <div class="az-game-info">
-
-                        <h3>
-                            Free Fire
-                        </h3>
-
-                        <p>
-                            Diamonds
-                        </p>
-
-                    </div>
-
+                    <h3>Free Fire</h3>
+                    <p>From MMK 90</p>
                 </a>
 
-                <!-- HOK -->
-                <a href="hok.html" class="az-game-card">
-
-                    <img src="assets/games/hok.webp" alt="HOK">
-
-                    <div class="az-game-info">
-
-                        <h3>
-                            Honor of Kings
-                        </h3>
-
-                        <p>
-                            Tokens
-                        </p>
-
-                    </div>
-
+                <a href="#" class="popular-game-card locked" data-name="Ragnarok Origin">
+                    <img src="assets/games/ragnarok.webp" alt="Ragnarok Origin">
+                    <h3>Ragnarok Origin</h3>
+                    <p>From MMK 90</p>
                 </a>
 
-            </div>
-
-        </section>
-
-        <!-- PC GAMES -->
-
-        <section id="pcGames" class="az-section">
-
-            <div class="az-section-head">
-
-                <div>
-
-                    <h2>
-                        PC Games
-                    </h2>
-
-                    <p>
-                        PC game services
-                    </p>
-
-                </div>
-
-                <a href="#">
-                    View all
-                </a>
-
-            </div>
-
-            <div class="az-game-grid">
-
-                <div class="az-game-card">
-
+                <a href="#" class="popular-game-card locked" data-name="Valorant">
                     <img src="assets/games/valorant.webp" alt="Valorant">
-
-                    <div class="az-game-info">
-
-                        <h3>
-                            Valorant
-                        </h3>
-
-                        <p>
-                            Coming Soon
-                        </p>
-
-                    </div>
-
-                </div>
-
-                <div class="az-game-card">
-
-                    <img src="assets/games/steam.webp" alt="Steam">
-
-                    <div class="az-game-info">
-
-                        <h3>
-                            Steam Wallet
-                        </h3>
-
-                        <p>
-                            Coming Soon
-                        </p>
-
-                    </div>
-
-                </div>
-
+                    <h3>Valorant</h3>
+                    <p>From MMK 420</p>
+                </a>
             </div>
-
         </section>
 
-        <!-- GIFT CARDS -->
-
-        <section id="giftCards" class="az-section">
-
-            <div class="az-section-head">
-
-                <div>
-
-                    <h2>
-                        Gift Cards
-                    </h2>
-
-                    <p>
-                        Digital gift cards
-                    </p>
-
+        <section id="categories" class="az-dashboard-grid">
+            <div class="az-panel">
+                <div class="az-section-head small">
+                    <h2>Top Up Categories</h2>
+                    <a href="#">View All</a>
                 </div>
 
-                <a href="#">
-                    View all
-                </a>
-
+                <div class="category-grid">
+                    <a href="mlbb.html"><img src="assets/games/mlbb.webp"> Mobile Legend</a>
+                    <a href="pubg.html"><img src="assets/games/pubg.webp"> PUBG Mobile</a>
+                    <a href="freefire.html"><img src="assets/games/freefire.webp"> Free Fire</a>
+                    <a href="#"><img src="assets/games/ragnarok.webp"> Ragnarok Origin</a>
+                    <a href="#"><img src="assets/games/valorant.webp"> Valorant</a>
+                    <a href="#"><img src="assets/games/roblox.webp"> Roblox</a>
+                    <a href="#"><img src="assets/games/steam.webp"> Steam Wallet</a>
+                    <a href="#popularGames"><i class="fa-solid fa-border-all"></i> All Games</a>
+                </div>
             </div>
 
-            <div class="az-game-grid">
-
-                <div class="az-game-card">
-
-                    <img src="assets/games/googleplay.webp" alt="Google Play">
-
-                    <div class="az-game-info">
-
-                        <h3>
-                            Google Play
-                        </h3>
-
-                        <p>
-                            Gift Card
-                        </p>
-
-                    </div>
-
+            <div class="az-panel">
+                <div class="az-section-head small">
+                    <h2>Why Choose AZIEL?</h2>
                 </div>
 
-                <div class="az-game-card">
-
-                    <img src="assets/games/apple.webp" alt="Apple">
-
-                    <div class="az-game-info">
-
-                        <h3>
-                            Apple Gift Card
-                        </h3>
-
-                        <p>
-                            Coming Soon
-                        </p>
-
+                <div class="why-grid">
+                    <div>
+                        <i class="fa-solid fa-bolt"></i>
+                        <strong>Instant Top Up</strong>
+                        <span>Fast & Easy</span>
                     </div>
-
+                    <div>
+                        <i class="fa-solid fa-shield-halved"></i>
+                        <strong>Secure Payment</strong>
+                        <span>100% Protected</span>
+                    </div>
+                    <div>
+                        <i class="fa-solid fa-gift"></i>
+                        <strong>Trusted Platform</strong>
+                        <span>Millions of Users</span>
+                    </div>
+                    <div>
+                        <i class="fa-solid fa-headset"></i>
+                        <strong>24/7 Support</strong>
+                        <span>Always Here</span>
+                    </div>
                 </div>
-
             </div>
 
+            <div class="az-panel">
+                <div class="az-section-head small">
+                    <h2>Latest Promotions</h2>
+                    <a href="#">View All</a>
+                </div>
+
+                <div class="promo-list">
+                    <div class="promo-item">
+                        <div>
+                            <strong>MLBB Diamond Bonus</strong>
+                            <span>Up to 10% Extra</span>
+                            <small>20 May - 30 May</small>
+                        </div>
+                        <i class="fa-solid fa-gift"></i>
+                    </div>
+
+                    <div class="promo-item">
+                        <div>
+                            <strong>PUBG UC Promo</strong>
+                            <span>Up to 8% Extra</span>
+                            <small>16 May - 28 May</small>
+                        </div>
+                        <i class="fa-solid fa-ticket"></i>
+                    </div>
+                </div>
+            </div>
         </section>
 
     </main>
+    <footer class="site-footer">
 
-    <!-- =========================
-         FOOTER
-    ========================== -->
+        <div>
+            <h3>AZIEL</h3>
+            <p>
+                Fast, Secure and Trusted Game Top Up Platform.
+            </p>
+        </div>
 
-    <footer class="az-footer">
+        <div>
+            <h4>Company</h4>
+            <a href="#">About</a><br>
+            <a href="#">Contact</a>
+        </div>
 
-        <div class="az-footer-container">
+        <div>
+            <h4>Help</h4>
+            <a href="#">FAQ</a><br>
+            <a href="#">Support</a>
+        </div>
 
-            <div class="az-footer-grid">
-
-                <!-- PAYMENT -->
-                <div class="az-footer-box">
-
-                    <h3>
-                        Payment Methods
-                    </h3>
-
-                    <div id="paymentLogos" class="payment-logos"></div>
-
-                </div>
-
-                <!-- POLICY -->
-                <div class="az-footer-box">
-
-                    <h3>
-                        Policies
-                    </h3>
-
-                    <a href="#">
-                        Privacy Policy
-                    </a>
-
-                    <a href="#">
-                        Terms & Conditions
-                    </a>
-
-                </div>
-
-                <!-- SUPPORT -->
-                <div class="az-footer-box">
-
-                    <h3>
-                        Support
-                    </h3>
-
-                    <a href="#">
-                        Telegram Support
-                    </a>
-
-                    <a href="#">
-                        Facebook Page
-                    </a>
-
-                </div>
-
-            </div>
-
+        <div>
+            <h4>Follow</h4>
+            <a href="#">Facebook</a><br>
+            <a href="#">Telegram</a>
+        </div>
+        <div>
+            <h3>Payment Methods</h3>
+            <div class="payment-logos" id="footerPaymentLogos"></div>
         </div>
 
     </footer>
-    <script>
-        function openMobileDrawer() {
-            document.getElementById("mobileDrawer").classList.add("show");
-            document.getElementById("mobileDrawerOverlay").classList.add("show");
-        }
 
-        function closeMobileDrawer() {
-            document.getElementById("mobileDrawer").classList.remove("show");
-            document.getElementById("mobileDrawerOverlay").classList.remove("show");
-        }
-    </script>
-
-    <!-- JS -->
-    <script src="js/app.js"></script>
-
-    <script src="js/drawer.js"></script>
-
-    <script src="js/search.js"></script>
-
-    <script src="js/region.js"></script>
-
-    <script src="js/live-chat.js"></script>
-    <script src="js/pwa-fix.js"></script>
-    <script src="js/site-settings.js"></script>
     <nav class="az-bottom-nav">
-        <a href="home.html">
+        <a href="home.html" class="active">
             <i class="fa-solid fa-house"></i>
             <span>Home</span>
         </a>
 
-        <a href="tracking.html">
-            <i class="fa-solid fa-box"></i>
-            <span>Orders</span>
+        <a href="#popularGames">
+            <i class="fa-regular fa-gamepad"></i>
+            <span>Games</span>
         </a>
 
-        <a href="notifications.html">
-            <i class="fa-regular fa-bell"></i>
-            <span>Alerts</span>
+        <a href="#categories" class="topup-float">
+            <i class="fa-solid fa-bolt"></i>
+            <span>Top Up</span>
+        </a>
+
+        <a href="wallet.html">
+            <i class="fa-solid fa-wallet"></i>
+            <span>Wallet</span>
         </a>
 
         <a href="account.html">
@@ -538,6 +318,93 @@
             <span>Account</span>
         </a>
     </nav>
+
+    <div id="google_translate_element" style="display:none;"></div>
+    <div id="localeModal" class="az-locale-modal">
+        <div class="az-locale-box">
+            <button id="localeCloseBtn" class="az-locale-close" type="button">×</button>
+
+            <h2>Select your location</h2>
+            <p>Choose region, language and currency for AZIEL.</p>
+
+            <label>Region</label>
+            <select id="regionSelect">
+                <option value="TH">🇹🇭 Thailand</option>
+                <option value="MM">🇲🇲 Myanmar</option>
+            </select>
+
+            <label>Language</label>
+            <select id="languageSelect">
+                <option value="en">English</option>
+                <option value="my">မြန်မာ</option>
+                <option value="th">ไทย</option>
+            </select>
+
+            <label>Currency</label>
+            <select id="currencySelect">
+                <option value="THB">Thailand Baht ฿</option>
+                <option value="MMK">Myanmar Kyat Ks</option>
+                <option value="USD">US Dollar $</option>
+            </select>
+
+            <button id="saveLocaleBtn" class="az-locale-save" type="button">
+                Save Preferences
+            </button>
+        </div>
+    </div>
+
+
+    <script src="js/home.js"></script>
+    <script src="js/search.js"></script>
+    <script src="js/region.js"></script>
+    <script src="js/live-chat.js"></script>
+    <script src="js/pwa-fix.js"></script>
+    <script src="js/site-settings.js"></script>
+
+    <script src="js/locale-switcher.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const box = document.getElementById("footerPaymentLogos");
+            if (!box) return;
+
+            const region =
+                localStorage.getItem("region") ||
+                localStorage.getItem("selectedRegion") ||
+                "MM";
+
+            const logos = {
+                MM: [
+                    "/assets/payment/kbzpay.png",
+                    "/assets/payment/wavepay.png",
+                    "/assets/payment/ayapay.png"
+                ],
+                TH: [
+                    "/assets/payment/promptpay.png",
+                    "/assets/payment/scb.png"
+                ]
+            };
+
+            box.innerHTML = "";
+
+            (logos[region] || logos.MM).forEach(src => {
+                const img = document.createElement("img");
+                img.src = src;
+                img.alt = "Payment";
+                box.appendChild(img);
+            });
+        });
+    </script>
+    <script>
+        function googleTranslateElementInit() {
+            new google.translate.TranslateElement({
+                pageLanguage: "en",
+                includedLanguages: "en,my,th",
+                autoDisplay: false
+            }, "google_translate_element");
+        }
+    </script>
+
+    <script src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 
 </body>
 

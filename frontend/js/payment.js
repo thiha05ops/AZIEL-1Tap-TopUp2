@@ -28,8 +28,10 @@ async function loadPaymentMethods() {
     window.selectedPaymentData = null;
 
     try {
+        const API_BASE = "http://localhost:3000";
+
         const res = await fetch(
-            `/api/payment-methods?region=${region}`
+            `${API_BASE}/api/payment-methods?region=${region}`
         );
 
         const data = await res.json();
@@ -41,10 +43,9 @@ async function loadPaymentMethods() {
             );
         }
 
-        const methods =
-            Array.isArray(data.methods)
-                ? data.methods
-                : [];
+        const methods = Array.isArray(data.methods)
+            ? data.methods
+            : [];
 
         const activeMethods = methods.filter(method =>
             method.enabled === true
@@ -62,14 +63,11 @@ async function loadPaymentMethods() {
         }
 
         activeMethods.forEach((method, index) => {
-            const card =
-                buildPaymentCard(method, index);
-
+            const card = buildPaymentCard(method, index);
             paymentGrid.appendChild(card);
         });
 
-        const firstCard =
-            paymentGrid.querySelector(".pay-card");
+        const firstCard = paymentGrid.querySelector(".pay-card");
 
         if (firstCard) {
             selectPaymentCard(firstCard);
@@ -96,6 +94,9 @@ function buildPaymentCard(method, index) {
         getPaymentDisplayName(key);
 
     const logo =
+        method.logo ||
+        method.logoUrl ||
+        method.logoImage ||
         getPaymentLogo(key);
 
     const qrImage =
@@ -103,13 +104,37 @@ function buildPaymentCard(method, index) {
         method.uploadedQrImage ||
         method.qrImageUrl ||
         method.qrImage ||
+        method.qrImagePath ||
+        method.paymentQr ||
+        method.paymentQrImage ||
         "";
 
-    const card =
-        document.createElement("div");
+    const region =
+        method.region ||
+        localStorage.getItem("region") ||
+        localStorage.getItem("selectedRegion") ||
+        "MM";
 
-    card.className =
-        `pay-card ${index === 0 ? "active" : ""}`;
+    let paymentType =
+        method.paymentType ||
+        "manual";
+
+    let provider =
+        method.provider ||
+        "manual";
+
+    // TH PromptPay ကို auto gateway အဖြစ် frontend မှာသေချာသတ်မှတ်
+    if (
+        String(region).toUpperCase() === "TH" &&
+        key === "promptpay"
+    ) {
+        paymentType = "auto";
+        provider = "omise";
+    }
+
+    const card = document.createElement("div");
+
+    card.className = `pay-card ${index === 0 ? "active" : ""}`;
 
     card.dataset.method = key;
     card.dataset.name = displayName;
@@ -117,8 +142,9 @@ function buildPaymentCard(method, index) {
     card.dataset.qr = qrImage;
     card.dataset.accountName = method.accountName || "";
     card.dataset.accountNumber = method.accountNumber || "";
-    card.dataset.paymentType = method.paymentType || "manual";
-    card.dataset.provider = method.provider || "manual";
+    card.dataset.paymentType = paymentType;
+    card.dataset.provider = provider;
+    card.dataset.region = region;
     card.dataset.maintenanceMessage =
         method.maintenanceMessage || "";
 
@@ -132,7 +158,7 @@ function buildPaymentCard(method, index) {
         <div class="pay-info">
             <span>${displayName}</span>
 
-            ${method.paymentType === "auto"
+            ${paymentType === "auto"
             ? `<small class="auto-pay-badge">Auto Ready</small>`
             : `<small class="manual-pay-badge">Manual</small>`
         }
@@ -140,7 +166,7 @@ function buildPaymentCard(method, index) {
             ${method.maintenanceMessage
             ? `<small class="pay-message">
                         ${method.maintenanceMessage}
-                    </small>`
+                   </small>`
             : ""
         }
         </div>
@@ -177,6 +203,7 @@ function selectPaymentCard(card) {
         accountNumber: card.dataset.accountNumber || "",
         paymentType: card.dataset.paymentType || "manual",
         provider: card.dataset.provider || "manual",
+        region: card.dataset.region || "",
         maintenanceMessage:
             card.dataset.maintenanceMessage || ""
     };
@@ -205,6 +232,18 @@ function selectPaymentCard(card) {
         "selectedPaymentAccountNumber",
         window.selectedPaymentData.accountNumber
     );
+
+    localStorage.setItem(
+        "selectedPaymentType",
+        window.selectedPaymentData.paymentType
+    );
+
+    localStorage.setItem(
+        "selectedPaymentProvider",
+        window.selectedPaymentData.provider
+    );
+
+    console.log("SELECTED PAYMENT =", window.selectedPaymentData);
 
     document.dispatchEvent(
         new CustomEvent("paymentChanged", {

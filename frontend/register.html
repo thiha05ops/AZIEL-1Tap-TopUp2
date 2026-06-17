@@ -1,72 +1,104 @@
+<!-- frontend/register.html -->
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign Up - AZIEL</title>
-
-    <link rel="stylesheet" href="/css/main.css">
-    <link rel="stylesheet" href="/css/auth.css">
-    <link rel="manifest" href="/manifest.json">
-
-    <meta name="theme-color" content="#070716">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="AZIEL">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <title>Register - AZIEL 1Tap</title>
+
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/aziel-design-system.css">
+    <link rel="stylesheet" href="css/auth.css">
+    <link rel="manifest" href="manifest.json">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 
 <body class="auth-page">
 
-    <div class="auth-wrapper">
+    <main class="auth-shell">
 
-        <div class="auth-logo">AZIEL</div>
+        <section class="auth-brand-panel">
+            <a href="home.html" class="auth-logo">AZIEL</a>
 
-        <form id="registerForm" class="auth-box seagm-style">
+            <div class="auth-brand-content">
+                <span class="auth-pill">Create your account</span>
+                <h1>Join AZIEL</h1>
+                <p>Create your account to manage orders, wallet, notifications and support easily.</p>
+            </div>
+        </section>
 
-            <div class="auth-top">
-                <h1>SIGN UP</h1>
-                <a href="/login.html" class="signup-btn">Sign in</a>
+        <section class="auth-card">
+
+            <div class="auth-card-head">
+                <div>
+                    <h2>Sign up</h2>
+                    <p>Email is required for account recovery</p>
+                </div>
+                <a href="login.html">Sign in</a>
             </div>
 
-            <div id="msg"></div>
+            <div id="msg" class="auth-message"></div>
 
-            <div class="input-group">
-                <span>👤</span>
-                <input type="text" id="username" placeholder="Username" autocomplete="off" required>
-            </div>
+            <form id="registerForm">
 
-            <div class="input-group">
-                <span>✉️</span>
-                <input type="email" id="email" placeholder="Email address" autocomplete="off">
-            </div>
+                <label class="auth-label">Username</label>
+                <div class="auth-input">
+                    <i class="fa-regular fa-user auth-icon"></i>
+                    <input id="username" type="text" placeholder="Choose username" autocomplete="username" required>
+                </div>
 
-            <div class="input-group">
-                <span>🔒</span>
-                <input type="password" id="password" placeholder="Password" autocomplete="new-password" required>
-            </div>
+                <label class="auth-label">Email address</label>
+                <div class="auth-input">
+                    <i class="fa-regular fa-envelope auth-icon"></i>
+                    <input id="email" type="email" placeholder="Enter Gmail address" autocomplete="email" required>
+                </div>
 
-            <div class="input-group">
-                <span>🔒</span>
-                <input type="password" id="confirmPassword" placeholder="Confirm Password" autocomplete="new-password"
-                    required>
-            </div>
+                <label class="auth-label">Password</label>
+                <div class="auth-input">
+                    <i class="fa-solid fa-lock auth-icon"></i>
+                    <input id="password" type="password" placeholder="Create password" autocomplete="new-password"
+                        required>
+                    <button type="button" id="togglePassword" class="password-eye">
+                        <i class="fa-regular fa-eye"></i>
+                    </button>
+                </div>
 
-            <button type="submit" id="registerBtn" class="main-login-btn">CREATE ACCOUNT</button>
+                <label class="auth-label">Confirm Password</label>
+                <div class="auth-input">
+                    <i class="fa-solid fa-shield-halved auth-icon"></i>
+                    <input id="confirmPassword" type="password" placeholder="Confirm password"
+                        autocomplete="new-password" required>
+                </div>
 
-            <p class="social-title">
-                Already have account? <a href="/login.html">Sign in</a>
-            </p>
+                <button type="submit" id="registerBtn" class="auth-main-btn">
+                    Create Account
+                </button>
 
-        </form>
+                <div class="auth-divider">
+                    <span>or</span>
+                </div>
 
-    </div>
+                <a href="/api/auth/google" class="google-btn">
+                    <img src="assets/google.svg" alt="Google" class="google-icon">
+                    <span class="google-text">Continue with Google</span>
+                </a>
 
-    <script src="/js/register.js"></script>
-    <script src="/js/pwa-fix.js"></script>
-    <script src="js/site-settings.js"></script>
+                <p class="auth-bottom-text">
+                    Already have an account?
+                    <a href="login.html">Sign in</a>
+                </p>
+
+            </form>
+
+        </section>
+
+    </main>
+
+    <script src="js/register.js"></script>
+    <script src="js/pwa-fix.js"></script>
 </body>
 
 </html>

@@ -6,46 +6,46 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mobile Legends - AZIEL</title>
 
-    <link rel="stylesheet" href="css/main.css">
-    <link rel="stylesheet" href="css/components.css">
-    <link rel="stylesheet" href="css/game.css">
-    <link rel="stylesheet" href="css/payment-grid.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="css/responsive.css">
+    <link rel="stylesheet" href="/css/core/main.css">
+    <link rel="stylesheet" href="/css/core/layout.css">
+    <link rel="stylesheet" href="/css/theme/aziel-design-system.css">
+    <link rel="stylesheet" href="/css/game/game.css">
+    <link rel="stylesheet" href="/css/game/mlbb.css">
+    <link rel="stylesheet" href="/css/game/payment-grid.css">
+    <link rel="stylesheet" href="/css/support/live-chat.css">
+
+    <link rel="stylesheet" href="/css/support/live-chat.css">
     <link rel="manifest" href="/manifest.json">
-
-    <meta name="theme-color" content="#070716">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="AZIEL">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 </head>
 
 <body>
 
-    <header class="az-topbar">
+    <header class="az-header">
+        <a href="home.html" class="az-logo">AZIEL</a>
 
-        <a href="home.html" class="az-topbar-brand">
-            AZIEL
-        </a>
+        <nav class="az-nav">
+            <a href="home.html">Home</a>
+            <a href="home.html#popularGames">Games</a>
+            <a href="home.html#categories">Top Up</a>
+            <a href="wallet.html">Wallet</a>
+            <a href="tracking.html">Orders</a>
+            <a href="support.html">Support</a>
+        </nav>
 
-        <div class="az-topbar-actions">
-
-            <a href="home.html">
-                Home
+        <div class="az-header-right">
+            <a href="wallet.html" class="az-wallet-pill">
+                <span id="headerWalletText">0 Ks</span>
+                <i class="fa-solid fa-plus"></i>
             </a>
 
-            <a href="tracking.html">
-                Orders
+            <a href="notifications.html" class="az-icon-btn">
+                <i class="fa-regular fa-bell"></i>
             </a>
 
-            <a href="account.html">
-                Account
+            <a href="account.html" class="az-profile">
+                <div id="avatarText" class="az-avatar">A</div>
             </a>
-
         </div>
-
     </header>
 
     <main class="game-page">
@@ -53,12 +53,12 @@
         <section class="game-hero">
 
             <div class="game-banner">
-                <img src="assets/games/mlbb.webp" alt="Mobile Legends">
+                <img src="/assets/games/mlbb.webp" alt="Mobile Legends">
 
                 <div class="banner-overlay">
                     <span class="game-tag">Mobile Game</span>
                     <h1>Mobile Legends</h1>
-                    <p>Fast & secure diamond top up for Myanmar and Thailand players.</p>
+                    <p>Fast and secure diamond top up for Myanmar and Thailand players.</p>
                 </div>
             </div>
 
@@ -72,17 +72,17 @@
 
                 <div class="step-row">
                     <span>2</span>
-                    <p>Select diamond package.</p>
+                    <p>Select your diamond package.</p>
                 </div>
 
                 <div class="step-row">
                     <span>3</span>
-                    <p>Choose payment method.</p>
+                    <p>Choose your payment method.</p>
                 </div>
 
                 <div class="step-row">
                     <span>4</span>
-                    <p>Pay and upload payment screenshot.</p>
+                    <p>Scan QR and wait for payment confirmation.</p>
                 </div>
 
                 <div class="trust-box">
@@ -102,10 +102,10 @@
                         <h2>Account Information</h2>
                     </div>
 
-                    <label>User ID</label>
+                    <label for="userId">User ID</label>
                     <input type="text" id="userId" placeholder="Enter MLBB User ID">
 
-                    <label>Server ID</label>
+                    <label for="serverId">Server ID</label>
                     <input type="text" id="serverId" placeholder="Enter Server ID">
                 </div>
 
@@ -114,9 +114,10 @@
                         <span>💎</span>
                         <h2>Select Package</h2>
                     </div>
+
                     <button class="mobile-selected-package" id="openPackagePanel" type="button">
                         <div class="mobile-pack-icon">
-                            <img src="assets/mlbb/icons/small.webp" alt="">
+                            <img src="/assets/mlbb/icons/small.webp" alt="">
                         </div>
 
                         <div>
@@ -138,32 +139,11 @@
 
                     <div id="paymentGrid" class="payment-grid"></div>
                     <input type="hidden" id="paymentMethod">
-                    <div id="paymentPreview" class="payment-preview" style="display:none;">
-
-                        <h3>Payment Information</h3>
-
-                        <img id="paymentQrImage" src="" alt="Payment QR" style="
-                                display:none;
-                                width:220px;
-                                max-width:100%;
-                                margin:15px auto;
-                            ">
-
-                        <p id="paymentAccountName"></p>
-
-                        <p id="paymentAccountNumber"></p>
-
-                        <div class="payment-note">
-                            Please complete payment and upload screenshot.
-                        </div>
-
-                    </div>
                 </div>
 
             </div>
 
             <aside class="order-summary">
-
                 <h2>Order Summary</h2>
 
                 <div class="summary-line">
@@ -190,50 +170,67 @@
                     Please fill all information to continue.
                 </p>
 
-                <button id="buyBtn" disabled>Buy Now</button>
+                <button id="buyBtn" disabled>Continue To Payment</button>
 
-                <p class="safe-note">Your order will be tracked in your account after payment.</p>
-
+                <p class="safe-note">
+                    Your order will be tracked in your account after payment.
+                </p>
             </aside>
 
         </section>
-        <div id="paymentConfirmModal" class="payment-confirm-modal">
-            <div class="payment-confirm-box">
 
-                <button id="closePaymentModal" class="payment-modal-close">
-                    ×
-                </button>
-
-                <h2>Confirm Payment</h2>
-
-                <div class="payment-modal-summary">
-                    <p><b>Game:</b> <span id="modalGame"></span></p>
-                    <p><b>Package:</b> <span id="modalPackage"></span></p>
-                    <p><b>Amount:</b> <span id="modalAmount"></span></p>
-                    <p><b>Payment:</b> <span id="modalPayment"></span></p>
-                    <p><b>User ID:</b> <span id="modalUserId"></span></p>
-                    <p><b>Server ID:</b> <span id="modalZoneId"></span></p>
-                </div>
-
-                <div class="payment-modal-qr">
-                    <img id="modalPaymentLogo" src="" alt="Payment Logo">
-                    <img id="modalQrImage" src="" alt="Payment QR">
-                    <p id="modalAccountName"></p>
-                    <p id="modalAccountNumber"></p>
-                </div>
-
-                <label>Upload payment screenshot</label>
-                <input type="file" id="modalPaymentSlip" accept="image/*">
-
-                <button id="confirmPaymentOrderBtn">
-                    Confirm Order
-                </button>
-
+        <footer class="game-mini-footer">
+            <div>
+                <h3>AZIEL</h3>
+                <p>Fast, secure and trusted game top up platform.</p>
             </div>
-        </div>
-    </main>
-    <nav class="az-bottom-nav">
 
+            <div>
+                <h4>Help</h4>
+                <a href="support.html">Support</a>
+                <a href="tracking.html">Track Order</a>
+            </div>
+
+            <div>
+                <h4>Payment Methods</h4>
+                <div class="payment-logos" id="footerPaymentLogos"></div>
+            </div>
+        </footer>
+
+    </main>
+
+    <div id="paymentConfirmModal" class="payment-confirm-modal">
+        <div class="payment-confirm-box">
+
+            <button id="closePaymentModal" class="payment-modal-close">×</button>
+
+            <h2>Scan & Pay</h2>
+
+            <div class="payment-modal-summary">
+                <p><b>Order ID:</b> <span id="modalOrderId"></span></p>
+                <p><b>Game:</b> <span id="modalGame"></span></p>
+                <p><b>Package:</b> <span id="modalPackage"></span></p>
+                <p><b>Amount:</b> <span id="modalAmount"></span></p>
+                <p><b>Payment:</b> <span id="modalPayment"></span></p>
+                <p><b>User ID:</b> <span id="modalUserId"></span></p>
+                <p><b>Server ID:</b> <span id="modalZoneId"></span></p>
+            </div>
+
+            <div class="payment-modal-qr">
+                <img id="modalPaymentLogo" src="" alt="Payment Logo">
+                <img id="modalQrImage" src="" alt="Payment QR">
+                <p id="modalAccountName"></p>
+                <p id="modalAccountNumber"></p>
+            </div>
+
+            <button id="confirmPaymentOrderBtn" disabled>
+                Waiting Payment...
+            </button>
+
+        </div>
+    </div>
+
+    <nav class="az-bottom-nav">
         <a href="home.html">
             <i class="fa-solid fa-house"></i>
             <span>Home</span>
@@ -253,8 +250,8 @@
             <i class="fa-regular fa-user"></i>
             <span>Account</span>
         </a>
-
     </nav>
+
     <div class="mobile-package-panel" id="mobilePackagePanel">
         <div class="mobile-panel-card">
             <div class="mobile-panel-head">
@@ -269,6 +266,7 @@
             </button>
         </div>
     </div>
+
     <div id="orderLoadingOverlay" class="order-loading-overlay">
         <div class="order-loading-box">
             <div class="order-loading-dots">
@@ -282,46 +280,62 @@
             <p>Your order is being submitted.</p>
         </div>
     </div>
+
     <div id="successModal" class="success-modal">
-
         <div class="success-modal-box">
+            <div class="success-icon">✓</div>
 
-            <div class="success-icon">
-                ✓
-            </div>
-
-            <h2>Order Submitted</h2>
-
-            <p>
-                Your payment screenshot has been sent successfully.
-            </p>
+            <h2>Payment Success</h2>
+            <p>Your payment has been detected. Admin will process your top-up soon.</p>
 
             <div class="success-actions">
-
-                <button id="trackOrderBtn">
-                    Track Order
-                </button>
-
-                <button id="backHomeBtn">
-                    Back Home
-                </button>
-
+                <button id="trackOrderBtn">Track Order</button>
+                <button id="backHomeBtn">Back Home</button>
             </div>
-
         </div>
-
     </div>
 
-    <script src="js/auth-check.js"></script>
+    <script src="/js/site-settings.js"></script>
+    <script src="/js/auth-check.js"></script>
+    <script src="/js/region-payment.js"></script>
+    <script src="/js/payment.js"></script>
+    <script src="/js/prices.js?v=20260601"></script>
+    <script src="/js/mlbb.js"></script>
+    <script src="/js/live-chat.js"></script>
+    <script src="/js/pwa-fix.js"></script>
 
-    <script src="js/region-payment.js"></script>
-    <script src="js/payment-redirect.js"></script>
-    <script src="js/payment.js"></script>
-    <script src="js/mlbb.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const box = document.getElementById("footerPaymentLogos");
+            if (!box) return;
 
-    <script src="js/prices.js?v=20260601"></script>
-    <script src="js/pwa-fix.js"></script>
-    <script src="js/site-settings.js"></script>
+            const region =
+                localStorage.getItem("region") ||
+                localStorage.getItem("selectedRegion") ||
+                "MM";
+
+            const logos = {
+                MM: [
+                    "/assets/payment/kbzpay.png",
+                    "/assets/payment/wavepay.png",
+                    "/assets/payment/ayapay.png"
+                ],
+                TH: [
+                    "/assets/payment/promptpay.png",
+                    "/assets/payment/scb.png"
+                ]
+            };
+
+            box.innerHTML = "";
+
+            (logos[region] || logos.MM).forEach(src => {
+                const img = document.createElement("img");
+                img.src = src;
+                img.alt = "Payment";
+                box.appendChild(img);
+            });
+        });
+    </script>
 
 </body>
 

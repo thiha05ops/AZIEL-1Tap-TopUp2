@@ -1,0 +1,89 @@
+/* home-like bottom arcs */
+.az-bg-wave::after {
+    content: "";
+    position: absolute;
+
+    left: -20%;
+    bottom: -52%;
+
+    width: 150%;
+    height: 95%;
+
+    border-radius: 50%;
+
+    border-top: 74px solid rgba(124, 58, 237, .045);
+    border-right: 74px solid rgba(124, 58, 237, .035);
+    border-left: 74px solid transparent;
+    border-bottom: 74px solid transparent;
+
+    transform: rotate(-8deg);
+}
+
+/* second arc */
+.az-wave-layer {
+    position: absolute;
+
+    left: -8%;
+    bottom: -42%;
+
+    width: 140%;
+    height: 82%;
+
+    border-radius: 50%;
+
+    border-top: 58px solid rgba(124, 58, 237, .032);
+    border-right: 58px solid rgba(124, 58, 237, .025);
+    border-left: 58px solid transparent;
+    border-bottom: 58px solid transparent;
+
+    transform: rotate(-8deg);
+}
+
+/* dark */
+body.dark .az-bg-wave::after,
+html.dark .az-bg-wave::after,
+body[data-theme="dark"] .az-bg-wave::after {
+    border-top-color: rgba(255, 255, 255, .035);
+    border-right-color: rgba(255, 255, 255, .026);
+}
+
+body.dark .az-wave-layer,
+html.dark .az-wave-layer,
+body[data-theme="dark"] .az-wave-layer {
+    border-top-color: rgba(255, 255, 255, .026);
+    border-right-color: rgba(255, 255, 255, .018);
+}
+
+/* content above wave */
+.az-topbar,
+.wallet-page,
+.account-layout,
+#mainHome,
+main,
+header,
+footer,
+.az-bottom-nav {
+    position: relative;
+    z-index: 2;
+}
+
+.az-bg-wave {
+    position: absolute;
+    inset: 0;
+    min-height: 100%;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.az-bg-wave::after {
+    content: "";
+    position: absolute;
+    left: -18%;
+    bottom: -18%;
+    width: 150%;
+    height: 70%;
+
+    background: url("../../img/seagm-wave.svg") center bottom / cover no-repeat;
+    opacity: .45;
+}

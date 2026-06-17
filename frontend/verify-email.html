@@ -1,0 +1,70 @@
+<!-- frontend/verify-email.html -->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <title>Verify Email - AZIEL 1Tap</title>
+
+    <link rel="stylesheet" href="css/core/main.css">
+    <link rel="stylesheet" href="css/core/aziel-design-system.css">
+    <link rel="stylesheet" href="css/auth/auth.css">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+
+<body class="auth-page">
+
+    <main class="auth-shell">
+
+        <section class="auth-brand-panel">
+            <a href="home.html" class="auth-logo">AZIEL</a>
+
+            <div class="auth-brand-content">
+                <span class="auth-pill">Email Verification</span>
+                <h1>Verify Gmail</h1>
+                <p>Enter the 6-digit OTP sent to your Gmail to activate your AZIEL account.</p>
+            </div>
+        </section>
+
+        <section class="auth-card">
+
+            <div class="auth-card-head">
+                <div>
+                    <h2>Verify Email</h2>
+                    <p id="verifyEmailText">Check your Gmail inbox</p>
+                </div>
+                <a href="register.html">Back</a>
+            </div>
+
+            <div id="msg" class="auth-message"></div>
+
+            <form id="verifyEmailForm">
+
+                <label class="auth-label">6-digit OTP</label>
+                <div class="auth-input">
+                    <i class="fa-solid fa-shield-halved auth-icon"></i>
+                    <input id="otp" type="text" inputmode="numeric" maxlength="6" placeholder="Enter OTP" required>
+                </div>
+
+                <button type="submit" id="verifyEmailBtn" class="auth-main-btn">
+                    Verify & Create Account
+                </button>
+
+                <p class="auth-bottom-text">
+                    Wrong email?
+                    <a href="register.html">Register again</a>
+                </p>
+
+            </form>
+
+        </section>
+
+    </main>
+
+    <script src="js/verify-email.js"></script>
+</body>
+
+</html>

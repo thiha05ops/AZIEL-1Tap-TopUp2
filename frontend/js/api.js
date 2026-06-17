@@ -1,49 +1,48 @@
 // frontend/js/api.js
 
 function getToken() {
-    return localStorage.getItem("token");
+    return (
+        localStorage.getItem("token") ||
+        sessionStorage.getItem("token")
+    );
 }
 
-function logoutUser() {
-
+function logoutUser(message = "") {
     localStorage.removeItem("token");
-
     localStorage.removeItem("username");
+    localStorage.removeItem("isLogin");
+    localStorage.removeItem("displayName");
+    localStorage.removeItem("email");
+    localStorage.removeItem("role");
 
-    localStorage.removeItem("region");
+    sessionStorage.removeItem("token");
+    sessionStorage.removeItem("username");
 
-    window.location.href =
-        "login.html";
+    if (message) {
+        localStorage.setItem("logoutMessage", message);
+    }
+
+    window.location.href = "login.html";
 }
 
 function isTokenExpired(token) {
-
     try {
-
-        const payload =
-            JSON.parse(
-                atob(
-                    token.split(".")[1]
-                )
-            );
+        const payload = JSON.parse(
+            atob(token.split(".")[1])
+        );
 
         if (!payload.exp) {
             return false;
         }
 
-        return (
-            payload.exp * 1000 <
-            Date.now()
-        );
+        return payload.exp * 1000 < Date.now();
 
     } catch (error) {
-
         return true;
     }
 }
 
 function checkToken() {
-
     const token = getToken();
 
     if (!token) {
@@ -51,84 +50,68 @@ function checkToken() {
     }
 
     if (isTokenExpired(token)) {
-
-        alert(
-            "Session expired. Please login again."
-        );
-
-        logoutUser();
+        logoutUser("Session expired. Please login again.");
     }
 }
 
-async function apiFetch(
-    url,
-    options = {}
-) {
-
+async function apiFetch(url, options = {}) {
     checkToken();
 
-    const token =
-        getToken();
+    const token = getToken();
 
     const headers = {
-
         ...(options.headers || {})
-
     };
 
     if (token) {
-
-        headers.Authorization =
-            `Bearer ${token}`;
+        headers.Authorization = `Bearer ${token}`;
     }
 
-    const res =
-        await fetch(
-            url,
-            {
-                ...options,
-                headers
-            }
-        );
+    const res = await fetch(url, {
+        ...options,
+        headers
+    });
 
-    const data =
-        await res.json();
+    let data = {};
 
-    if (res.status === 401) {
+    try {
+        data = await res.json();
+    } catch (error) {
+        data = {};
+    }
 
-        alert(
-            "Login expired."
-        );
+    if (res.status === 401 || data.forceLogout) {
+        const message =
+            data.reason === "another_device"
+                ? "Your account was logged in on another device."
+                : data.reason === "inactive"
+                    ? "Your session expired because this account was inactive for 15 days."
+                    : data.message || "Login expired. Please login again.";
 
-        logoutUser();
-
-        return;
+        logoutUser(message);
+        return null;
     }
 
     return data;
 }
 
+function showLogoutMessage() {
+    const msg = localStorage.getItem("logoutMessage");
+
+    if (!msg) {
+        return;
+    }
+
+    alert(msg);
+    localStorage.removeItem("logoutMessage");
+}
+
 // AUTO CHECK EVERY 1 MINUTE
-setInterval(
-    checkToken,
-    60000
-);
+setInterval(checkToken, 60000);
 
 // CHECK ON PAGE LOAD
 checkToken();
-document.addEventListener("click", e => {
-    const link = e.target.closest("a");
-    if (!link) return;
 
-    const href = link.getAttribute("href");
-    if (!href) return;
-
-    if (href.startsWith("#")) return;
-
-    const url = new URL(href, window.location.href);
-
-    if (url.origin === window.location.origin) {
-        e.preventDefault();
-        window.location.href = url.pathname + url.search + url.hash;
-    }
+document.addEventListener("DOMContentLoaded", () => {
+    showLogoutMessage();
 });

@@ -8,9 +8,9 @@ router.get(
     "/auth/google",
     passport.authenticate("google", {
         scope: ["profile", "email"],
+        prompt: "consent select_account"
     })
 );
-
 router.get(
     "/auth/google/callback",
     passport.authenticate("google", {

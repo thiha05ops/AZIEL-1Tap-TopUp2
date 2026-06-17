@@ -1,69 +1,94 @@
 // frontend/js/admin-api.js
 
 function getAdminToken() {
-
-    return localStorage.getItem(
-        "adminToken"
-    );
-
+    return localStorage.getItem("adminToken");
 }
 
-function adminLogout() {
+function adminLogout(message = "") {
+    localStorage.removeItem("adminToken");
+    localStorage.removeItem("adminUsername");
+    localStorage.removeItem("adminRole");
 
-    localStorage.removeItem(
-        "adminToken"
-    );
+    if (message) {
+        localStorage.setItem("adminLogoutMessage", message);
+    }
 
-    window.location.href =
-        "admin-login.html";
+    window.location.href = "admin-login.html";
 }
 
-async function adminFetch(
-    url,
-    options = {}
-) {
+function isAdminTokenExpired(token) {
+    try {
+        const payload = JSON.parse(
+            atob(token.split(".")[1])
+        );
 
-    const token =
-        getAdminToken();
+        if (!payload.exp) return false;
+
+        return payload.exp * 1000 < Date.now();
+
+    } catch (error) {
+        return true;
+    }
+}
+
+function checkAdminToken() {
+    const token = getAdminToken();
+
+    if (!token) return;
+
+    if (isAdminTokenExpired(token)) {
+        adminLogout("Admin session expired. Please login again.");
+    }
+}
+
+async function adminFetch(url, options = {}) {
+    checkAdminToken();
+
+    const token = getAdminToken();
 
     if (!token) {
-
-        adminLogout();
-
-        return;
+        adminLogout("Admin login required.");
+        return null;
     }
 
     const headers = {
-
         ...(options.headers || {}),
-
-        Authorization:
-            `Bearer ${token}`
-
+        Authorization: `Bearer ${token}`
     };
 
-    const res =
-        await fetch(
-            url,
-            {
-                ...options,
-                headers
-            }
-        );
+    const res = await fetch(url, {
+        ...options,
+        headers
+    });
 
-    const data =
-        await res.json();
+    let data = {};
 
-    if (res.status === 401) {
+    try {
+        data = await res.json();
+    } catch (error) {
+        data = {};
+    }
 
-        alert(
-            "Admin session expired"
-        );
-
-        adminLogout();
-
-        return;
+    if (res.status === 401 || data.forceLogout) {
+        adminLogout(data.message || "Admin session expired.");
+        return null;
     }
 
     return data;
 }
+
+function showAdminLogoutMessage() {
+    const msg = localStorage.getItem("adminLogoutMessage");
+
+    if (!msg) return;
+
+    alert(msg);
+    localStorage.removeItem("adminLogoutMessage");
+}
+
+setInterval(checkAdminToken, 60000);
+checkAdminToken();
+
+document.addEventListener("DOMContentLoaded", () => {
+    showAdminLogoutMessage();
+});

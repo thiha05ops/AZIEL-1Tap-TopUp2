@@ -201,7 +201,7 @@
 
     .footer-top {
         grid-template-columns: 1fr;
-        gap: 26px;
+        gap: 10px;
     }
 
     .footer-bottom {

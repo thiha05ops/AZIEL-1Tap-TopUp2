@@ -4,14 +4,19 @@ const messageSchema = new mongoose.Schema(
     {
         sender: {
             type: String,
-            enum: ["user", "admin"],
+            enum: ["user", "admin", "bot"],
             required: true
         },
         text: {
             type: String,
-            required: true
+            required: true,
+            trim: true
         },
-        read: {
+        readByUser: {
+            type: Boolean,
+            default: false
+        },
+        readByAdmin: {
             type: Boolean,
             default: false
         }
@@ -28,7 +33,8 @@ const liveChatSchema = new mongoose.Schema(
         },
         username: {
             type: String,
-            required: true
+            required: true,
+            index: true
         },
         messages: [messageSchema],
         status: {

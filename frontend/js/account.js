@@ -1,110 +1,137 @@
 // frontend/js/account.js
 
-document.addEventListener("DOMContentLoaded", () => {
-    const username = localStorage.getItem("username") || "guest";
+document.querySelectorAll(".side-link").forEach(btn => {
+    btn.addEventListener("click", () => {
+        if (!btn.dataset.tab) return;
 
-    const savedRegion =
-        localStorage.getItem("region") ||
-        localStorage.getItem("selectedRegion") ||
-        "MM";
+        document.querySelectorAll(".side-link").forEach(b =>
+            b.classList.remove("active")
+        );
 
-    const savedCurrency =
-        savedRegion === "TH" ? "THB" : "MMK";
+        document.querySelectorAll(".tab-panel").forEach(p =>
+            p.classList.remove("active")
+        );
 
-    const displayName =
-        localStorage.getItem("displayName") || username;
+        btn.classList.add("active");
+        document.getElementById(btn.dataset.tab)?.classList.add("active");
 
-    localStorage.setItem("region", savedRegion);
-    localStorage.setItem("selectedRegion", savedRegion);
-    localStorage.setItem("currency", savedCurrency);
-    localStorage.setItem("selectedCurrency", savedCurrency);
-
-    setText("profileName", displayName);
-    setText("avatarText", displayName.charAt(0).toUpperCase());
-    setText("profileRegion", "Region: " + savedRegion);
-
-    const displayNameInput = document.getElementById("displayName");
-    const accountRegion = document.getElementById("accountRegion");
-
-    if (displayNameInput) displayNameInput.value = displayName;
-    if (accountRegion) accountRegion.value = savedRegion;
-
-    document.querySelectorAll(".side-link").forEach(btn => {
-        btn.addEventListener("click", () => {
-            document.querySelectorAll(".side-link").forEach(b =>
-                b.classList.remove("active")
-            );
-
-            document.querySelectorAll(".tab-panel").forEach(p =>
-                p.classList.remove("active")
-            );
-
-            btn.classList.add("active");
-            document.getElementById(btn.dataset.tab)?.classList.add("active");
-
-            if (btn.dataset.tab === "history") loadHistory();
-            if (btn.dataset.tab === "overview") {
-                loadHistory();
-                loadAccountWalletBalance();
-            }
-
-            if (btn.dataset.tab === "wallet" && window.loadWallet) {
-                window.loadWallet();
-            }
-        });
-    });
-
-    document.getElementById("saveProfileBtn")?.addEventListener("click", () => {
-        const newName =
-            document.getElementById("displayName")?.value.trim() || username;
-
-        const newRegion =
-            document.getElementById("accountRegion")?.value || "MM";
-
-        const newCurrency =
-            newRegion === "TH" ? "THB" : "MMK";
-
-        localStorage.setItem("displayName", newName);
-        localStorage.setItem("region", newRegion);
-        localStorage.setItem("selectedRegion", newRegion);
-        localStorage.setItem("currency", newCurrency);
-        localStorage.setItem("selectedCurrency", newCurrency);
-
-        setText("profileName", newName);
-        setText("avatarText", newName.charAt(0).toUpperCase());
-        setText("profileRegion", "Region: " + newRegion);
-
-        loadAccountWalletBalance();
-
-        if (window.loadWallet) {
-            window.loadWallet();
+        if (btn.dataset.tab === "history") {
+            loadHistory();
         }
 
+        if (btn.dataset.tab === "overview") {
+            loadHistory();
+            loadAccountWalletBalance();
+            loadMyProfile();
+        }
+    });
+});
+
+
+document.getElementById("goWalletTopupBtn")?.addEventListener("click", () => {
+    window.location.href = "wallet.html";
+});
+
+document.getElementById("goWalletHistoryBtn")?.addEventListener("click", () => {
+    window.location.href = "wallet.html#history";
+});
+
+
+document.getElementById("saveProfileBtn")?.addEventListener("click", () => {
+    const newName =
+        document.getElementById("displayName")?.value.trim() || username;
+
+    const newRegion =
+        document.getElementById("accountRegion")?.value || "MM";
+
+    const newCurrency =
+        newRegion === "TH" ? "THB" : "MMK";
+
+    localStorage.setItem("displayName", newName);
+    localStorage.setItem("region", newRegion);
+    localStorage.setItem("selectedRegion", newRegion);
+    localStorage.setItem("currency", newCurrency);
+    localStorage.setItem("selectedCurrency", newCurrency);
+
+    setText("profileName", newName);
+    setText("avatarText", newName.charAt(0).toUpperCase());
+    setText("profileRegion", "Region: " + newRegion);
+
+    loadAccountWalletBalance();
+
+    if (window.loadWallet) {
+        window.loadWallet();
+    }
+
+    alert("Profile saved ✅");
+});
+
+document.getElementById("saveProfileBtn")?.addEventListener("click", async () => {
+    const token =
+        localStorage.getItem("token") ||
+        sessionStorage.getItem("token");
+
+    if (!token) {
+        window.location.href = "login.html";
+        return;
+    }
+
+    const displayName =
+        document.getElementById("displayName")?.value.trim() || "";
+
+    const region =
+        document.getElementById("accountRegion")?.value || "MM";
+
+    try {
+        const res = await fetch("http://localhost:3000/api/profile/me", {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                displayName,
+                region
+            })
+        });
+
+        const data = await res.json();
+
+        if (!data.success) {
+            alert(data.message || "Profile save failed");
+            return;
+        }
+
+        const user = data.user;
+
+        localStorage.setItem("displayName", user.displayName || user.username);
+        localStorage.setItem("region", user.region || "MM");
+        localStorage.setItem("selectedRegion", user.region || "MM");
+
+        setText("profileName", user.displayName || user.username);
+        setText("avatarText", (user.displayName || user.username).charAt(0).toUpperCase());
+        setText("profileRegion", "Region: " + (user.region || "MM"));
+
         alert("Profile saved ✅");
-    });
 
-    document.getElementById("notiBtn")?.addEventListener("click", () => {
-        const panel = document.getElementById("notiPanel");
-        if (!panel) return;
+    } catch (error) {
+        console.log("Save profile error:", error);
+        alert("Server error");
+    }
+});
 
-        panel.style.display =
-            panel.style.display === "block" ? "none" : "block";
+initMobileMenu();
 
-        loadBellOrders();
-    });
+loadHistory();
+loadBellOrders();
+loadAccountWalletBalance();
 
-    initMobileMenu();
-
+setInterval(() => {
     loadHistory();
     loadBellOrders();
     loadAccountWalletBalance();
+}, 8000);
 
-    setInterval(() => {
-        loadHistory();
-        loadBellOrders();
-        loadAccountWalletBalance();
-    }, 8000);
-});
 
 function setText(id, text) {
     const el = document.getElementById(id);
@@ -137,6 +164,10 @@ async function loadAccountWalletBalance() {
             "overviewWalletBalance",
             `${balance.toLocaleString()} ${symbol}`
         );
+        setText(
+            "walletBalanceBig",
+            `${balance.toLocaleString()} ${symbol}`
+        );
 
     } catch (error) {
         console.log("Account wallet error:", error);
@@ -147,6 +178,10 @@ async function loadAccountWalletBalance() {
 
         setText(
             "overviewWalletBalance",
+            `${fallback.toLocaleString()} ${symbol}`
+        );
+        setText(
+            "walletBalanceBig",
             `${fallback.toLocaleString()} ${symbol}`
         );
     }
@@ -342,3 +377,160 @@ function renderRecent(orders) {
         </div>
     `).join("");
 }
+async function loadMyProfile() {
+    const token =
+        localStorage.getItem("token") ||
+        sessionStorage.getItem("token");
+
+    if (!token) {
+        window.location.href = "login.html";
+        return;
+    }
+
+    try {
+        const res = await fetch("http://localhost:3000/api/profile/me", {
+            headers: {
+                Authorization: `Bearer ${token}`
+            }
+        });
+
+        const data = await res.json();
+
+        if (!data.success || !data.user) {
+            console.log("Profile load failed:", data.message);
+            return;
+        }
+
+        const user = data.user;
+
+        localStorage.setItem("username", user.username || "");
+        localStorage.setItem("displayName", user.displayName || user.username || "");
+        localStorage.setItem("region", user.region || "MM");
+
+        setText("profileName", user.displayName || user.username);
+        setText("avatarText", (user.displayName || user.username || "U").charAt(0).toUpperCase());
+        setText("profileRegion", "Region: " + (user.region || "MM"));
+
+        const displayNameInput = document.getElementById("displayName");
+        const accountRegion = document.getElementById("accountRegion");
+
+        if (displayNameInput) displayNameInput.value = user.displayName || user.username || "";
+        if (accountRegion) accountRegion.value = user.region || "MM";
+
+    } catch (error) {
+        console.log("Load profile error:", error);
+    }
+}
+async function loadMyProfile() {
+
+    const token =
+        localStorage.getItem("token");
+
+    if (!token) return;
+
+    try {
+
+        const res = await fetch(
+            "/api/profile/me",
+            {
+                headers: {
+                    Authorization:
+                        `Bearer ${token}`
+                }
+            }
+        );
+
+        const data = await res.json();
+
+        if (!data.success) return;
+
+        const user = data.user;
+
+        setText(
+            "profileName",
+            user.displayName ||
+            user.username
+        );
+
+        setText(
+            "profileRegion",
+            `Region: ${user.region || "MM"}`
+        );
+
+        setText(
+            "avatarText",
+            (
+                user.displayName ||
+                user.username ||
+                "U"
+            )
+                .charAt(0)
+                .toUpperCase()
+        );
+
+        const displayNameInput =
+            document.getElementById(
+                "displayName"
+            );
+
+        if (displayNameInput) {
+            displayNameInput.value =
+                user.displayName ||
+                user.username;
+        }
+
+        const profileEmail =
+            document.getElementById(
+                "profileEmail"
+            );
+
+        if (profileEmail) {
+            profileEmail.value =
+                user.email || "";
+        }
+
+        const accountRegion =
+            document.getElementById(
+                "accountRegion"
+            );
+
+        if (accountRegion) {
+            accountRegion.value =
+                user.region || "MM";
+        }
+
+    } catch (error) {
+
+        console.log(
+            "Load profile error:",
+            error
+        );
+
+    }
+
+}
+document.getElementById("topupSlip")?.addEventListener("change", e => {
+
+    const file = e.target.files[0];
+
+    document.getElementById("slipFileName").innerText =
+        file
+            ? file.name
+            : "No file selected";
+
+});
+document
+    .getElementById("topupSlip")
+    ?.addEventListener("change", e => {
+
+        const file = e.target.files[0];
+
+        if (file) {
+
+            document.getElementById(
+                "slipFileName"
+            ).innerText = file.name;
+
+        }
+
+    });

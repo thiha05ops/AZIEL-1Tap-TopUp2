@@ -1,53 +1,139 @@
 // frontend/js/login.js
 
 document.addEventListener("DOMContentLoaded", () => {
+    const token =
+        localStorage.getItem("token") ||
+        sessionStorage.getItem("token");
+
+    if (token) {
+        window.location.href = "home.html";
+        return;
+    }
+
     const form = document.getElementById("loginForm");
     const msg = document.getElementById("msg");
     const btn = document.getElementById("loginBtn");
 
+    const usernameInput = document.getElementById("username");
+    const passwordInput = document.getElementById("password");
+    const togglePassword = document.getElementById("togglePassword");
+    const rememberMe = document.getElementById("rememberMe");
+
+    setTimeout(() => {
+        if (usernameInput) usernameInput.value = "";
+        if (passwordInput) passwordInput.value = "";
+    }, 200);
+
+    if (!form || !msg || !btn || !usernameInput || !passwordInput) {
+        console.log("Login form elements missing");
+        return;
+    }
+
+    if (togglePassword) {
+        togglePassword.addEventListener("click", (e) => {
+            e.preventDefault();
+
+            const icon = togglePassword.querySelector("i");
+
+            if (passwordInput.type === "password") {
+                passwordInput.type = "text";
+                if (icon) icon.className = "fa-regular fa-eye";
+            } else {
+                passwordInput.type = "password";
+                if (icon) icon.className = "fa-regular fa-eye-slash";
+            }
+        });
+    }
+
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
 
-        const username = document.getElementById("username").value.trim();
-        const password = document.getElementById("password").value.trim();
+        const username = usernameInput.value.trim();
+        const password = passwordInput.value;
 
         if (!username || !password) {
-            msg.innerHTML = `<div class="error-msg">Please enter username and password.</div>`;
+            showMessage("Please enter username/email and password.", "error");
             return;
         }
 
-        btn.disabled = true;
-        btn.innerText = "Signing in...";
+        setLoading(true);
 
         try {
-            const res = await fetch("/api/login", {
+            const res = await fetch("http://localhost:3000/api/login", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ username, password })
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    username,
+                    password
+                })
             });
 
             const data = await res.json();
 
             if (!data.success) {
-                msg.innerHTML = `<div class="error-msg">${data.message || "Login failed"}</div>`;
-                btn.disabled = false;
-                btn.innerText = "SIGN IN";
+                showMessage(data.message || "Login failed", "error");
+                setLoading(false);
                 return;
             }
 
+            localStorage.removeItem("token");
+            localStorage.removeItem("username");
+            sessionStorage.removeItem("token");
+            sessionStorage.removeItem("username");
+
             localStorage.setItem("isLogin", "true");
-            localStorage.setItem("token", data.token || "");
-            localStorage.setItem("username", data.user.username);
             localStorage.setItem("displayName", data.user.displayName || data.user.username);
             localStorage.setItem("region", data.user.region || "MM");
+            localStorage.setItem("email", data.user.email || "");
+            localStorage.setItem("role", data.user.role || "user");
 
-            window.location.href = "home.html";
+            if (rememberMe && rememberMe.checked) {
+                localStorage.setItem("token", data.token);
+                localStorage.setItem("username", data.user.username);
+            } else {
+                sessionStorage.setItem("token", data.token);
+                sessionStorage.setItem("username", data.user.username);
+            }
+
+            showMessage("Login success ✅ Redirecting...", "success");
+
+            const redirectUrl =
+                localStorage.getItem("redirectAfterLogin") || "home.html";
+
+            localStorage.removeItem("redirectAfterLogin");
+
+            setTimeout(() => {
+                window.location.href = redirectUrl;
+            }, 500);
 
         } catch (error) {
             console.log("Login error:", error);
-            msg.innerHTML = `<div class="error-msg">Server error.</div>`;
-            btn.disabled = false;
-            btn.innerText = "SIGN IN";
+            showMessage("Server error. Please try again.", "error");
+            setLoading(false);
         }
     });
+
+    function setLoading(isLoading) {
+        btn.disabled = isLoading;
+        btn.textContent = isLoading ? "Signing in..." : "Sign In";
+    }
+
+    function showMessage(text, type) {
+        msg.innerHTML = `
+            <div class="${type === "success" ? "success-msg" : "error-msg"}">
+                ${escapeHTML(text)}
+            </div>
+        `;
+    }
+
+    function escapeHTML(value) {
+        return String(value)
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#039;");
+    }
 });

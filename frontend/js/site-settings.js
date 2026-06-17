@@ -38,3 +38,29 @@ async function loadSiteSettings() {
         console.log("Site settings error:", error);
     }
 }
+(function autoSystemTheme() {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+
+    function applyTheme() {
+        const theme = media.matches ? "dark" : "light";
+
+        document.documentElement.classList.remove(
+            "light", "dark", "theme-light", "theme-dark"
+        );
+        document.body.classList.remove(
+            "light", "dark", "theme-light", "theme-dark"
+        );
+
+        document.documentElement.classList.add(theme);
+        document.body.classList.add(theme);
+
+        document.documentElement.dataset.theme = theme;
+        document.body.dataset.theme = theme;
+
+        localStorage.setItem("theme", theme);
+    }
+
+    applyTheme();
+
+    media.addEventListener("change", applyTheme);
+})();

@@ -5,39 +5,63 @@ document.addEventListener("DOMContentLoaded", () => {
     const msg = document.getElementById("msg");
     const btn = document.getElementById("registerBtn");
 
+    const passwordInput = document.getElementById("password");
+    const confirmPasswordInput = document.getElementById("confirmPassword");
+    const togglePassword = document.getElementById("togglePassword");
+
     if (!form || !btn || !msg) {
         console.log("Register form elements missing");
         return;
     }
 
+    togglePassword?.addEventListener("click", (e) => {
+        e.preventDefault();
+
+        const icon = togglePassword.querySelector("i");
+        const isHidden = passwordInput.type === "password";
+
+        passwordInput.type = isHidden ? "text" : "password";
+        confirmPasswordInput.type = isHidden ? "text" : "password";
+
+        if (icon) {
+            icon.className = isHidden
+                ? "fa-regular fa-eye"
+                : "fa-regular fa-eye-slash";
+        }
+    });
+
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
 
-        const username = document.getElementById("username").value.trim();
-        const email = document.getElementById("email").value.trim();
-        const password = document.getElementById("password").value.trim();
-        const confirmPassword = document.getElementById("confirmPassword").value.trim();
+        const username = document.getElementById("username").value.trim().toLowerCase();
+        const email = document.getElementById("email").value.trim().toLowerCase();
+        const password = passwordInput.value.trim();
+        const confirmPassword = confirmPasswordInput.value.trim();
 
-        if (!username || !password || !confirmPassword) {
-            msg.innerHTML = `<div class="error-msg">Please fill all required fields.</div>`;
+        if (!username || !email || !password || !confirmPassword) {
+            showMessage("Please fill all required fields.", "error");
+            return;
+        }
+
+        if (!isValidGmail(email)) {
+            showMessage("Please enter a valid Gmail address.", "error");
             return;
         }
 
         if (password.length < 6) {
-            msg.innerHTML = `<div class="error-msg">Password must be at least 6 characters.</div>`;
+            showMessage("Password must be at least 6 characters.", "error");
             return;
         }
 
         if (password !== confirmPassword) {
-            msg.innerHTML = `<div class="error-msg">Passwords do not match.</div>`;
+            showMessage("Passwords do not match.", "error");
             return;
         }
 
-        btn.disabled = true;
-        btn.innerText = "Creating...";
+        setLoading(true);
 
         try {
-            const res = await fetch("/api/register", {
+            const res = await fetch("http://localhost:3000/api/register", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
@@ -52,23 +76,49 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await res.json();
 
             if (!data.success) {
-                msg.innerHTML = `<div class="error-msg">${data.message || "Register failed"}</div>`;
-                btn.disabled = false;
-                btn.innerText = "CREATE ACCOUNT";
+                showMessage(data.message || "Register failed", "error");
+                setLoading(false);
                 return;
             }
 
-            msg.innerHTML = `<div class="success-msg">Account created ✅ Redirecting...</div>`;
+            localStorage.setItem("verifyEmail", email);
+
+            showMessage("OTP sent ✅ Check your Gmail...", "success");
 
             setTimeout(() => {
-                window.location.href = "login.html";
-            }, 1000);
+                window.location.href = "verify-email.html";
+            }, 800);
 
         } catch (error) {
             console.log("Register error:", error);
-            msg.innerHTML = `<div class="error-msg">Server error. Try again.</div>`;
-            btn.disabled = false;
-            btn.innerText = "CREATE ACCOUNT";
+            showMessage("Server error. Try again.", "error");
+            setLoading(false);
         }
     });
+
+    function setLoading(isLoading) {
+        btn.disabled = isLoading;
+        btn.textContent = isLoading ? "Sending OTP..." : "Create Account";
+    }
+
+    function isValidGmail(email) {
+        return /^[a-zA-Z0-9._%+-]+@gmail\.com$/.test(email);
+    }
+
+    function showMessage(text, type) {
+        msg.innerHTML = `
+            <div class="${type === "success" ? "success-msg" : "error-msg"}">
+                ${escapeHTML(text)}
+            </div>
+        `;
+    }
+
+    function escapeHTML(value) {
+        return String(value)
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#039;");
+    }
 });

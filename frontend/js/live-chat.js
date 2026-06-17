@@ -1,72 +1,104 @@
-console.log("LIVE CHAT LOADED");
+console.log("AZIEL ASSISTANT V2 LOADED");
 
 document.addEventListener("DOMContentLoaded", () => {
     createLiveChatUI();
     initLiveChatSystem();
 });
 
+const AZIEL_CHAT = {
+    username:
+        localStorage.getItem("username") ||
+        localStorage.getItem("userName") ||
+        localStorage.getItem("azielUsername") ||
+        "Guest",
+    polling: null,
+    lastMessageCount: 0,
+    isOpen: false
+};
+
 function createLiveChatUI() {
-    const ball = document.createElement("div");
-    ball.className = "chat-ball";
+    if (document.querySelector(".aziel-support-tab")) return;
 
+    const ball = document.createElement("button");
+    ball.className = "aziel-support-tab";
+    ball.type = "button";
     ball.innerHTML = `
-        <i class="fa-solid fa-comments"></i>
-        <div class="chat-badge">1</div>
-        <div class="online-dot"></div>
-    `;
-
-    document.body.appendChild(ball);
+    <i class="fa-solid fa-headset"></i>
+    <span>Live Chat</span>
+    <b></b>
+`;
 
     const panel = document.createElement("div");
     panel.className = "live-chat-panel";
-
     panel.innerHTML = `
         <div class="chat-header">
             <div class="chat-agent">
-                <div class="chat-agent-icon">💬</div>
+                <div class="chat-agent-icon">AI</div>
                 <div>
-                    <strong>AZIEL Support</strong>
-                    <small>Online</small>
+                    <strong>AZIEL Assistant</strong>
+                    <small><span class="mini-online"></span> Online support</small>
                 </div>
             </div>
-            <button class="chat-close-btn">✕</button>
+            <button class="chat-close-btn" type="button">✕</button>
         </div>
 
         <div class="chat-body" id="liveChatBody"></div>
 
+        <div class="typing-indicator" id="typingIndicator">
+            AZIEL is typing<span>.</span><span>.</span><span>.</span>
+        </div>
+
         <div class="chat-input-row">
-            <input id="liveChatInput" type="text" placeholder="Type your message...">
-            <button id="sendLiveChatBtn">➤</button>
+            <input id="liveChatInput" type="text" placeholder="Type your message..." autocomplete="off">
+            <button id="sendLiveChatBtn" type="button">➤</button>
         </div>
     `;
 
+    document.body.appendChild(ball);
     document.body.appendChild(panel);
 
-    ball.addEventListener("click", () => {
+    ball.addEventListener("click", async () => {
+        AZIEL_CHAT.isOpen = !panel.classList.contains("open");
         panel.classList.toggle("open");
+
+        if (panel.classList.contains("open")) {
+            await loadLiveChatHistory();
+            await markUserRead();
+            updateBadge(0);
+            document.getElementById("liveChatInput")?.focus();
+        }
     });
 
     panel.querySelector(".chat-close-btn").addEventListener("click", () => {
+        AZIEL_CHAT.isOpen = false;
         panel.classList.remove("open");
     });
 }
 
 function initLiveChatSystem() {
-    addChatMessage("bot", "Hello 👋 Welcome to AZIEL Support. How can we help you today?");
+    addChatMessage(
+        "bot",
+        "Hello 👋 Welcome to AZIEL Assistant. How can we help you today?",
+        false
+    );
+
     loadLiveChatHistory();
+    loadUnreadCount();
 
-    const input = document.getElementById("liveChatInput");
-    const sendBtn = document.getElementById("sendLiveChatBtn");
+    document
+        .getElementById("sendLiveChatBtn")
+        ?.addEventListener("click", sendLiveChatMessage);
 
-    sendBtn.addEventListener("click", sendLiveChatMessage);
+    document
+        .getElementById("liveChatInput")
+        ?.addEventListener("keydown", e => {
+            if (e.key === "Enter") sendLiveChatMessage();
+        });
 
-    input.addEventListener("keypress", e => {
-        if (e.key === "Enter") {
-            sendLiveChatMessage();
-        }
-    });
-
-    setInterval(loadLiveChatHistory, 5000);
+    AZIEL_CHAT.polling = setInterval(() => {
+        loadLiveChatHistory();
+        loadUnreadCount();
+    }, 5000);
 }
 
 async function sendLiveChatMessage() {
@@ -75,99 +107,159 @@ async function sendLiveChatMessage() {
 
     if (!message) return;
 
-    addChatMessage("user", message);
     input.value = "";
+    addChatMessage("user", message, true);
+    showTyping(true);
 
     try {
         const res = await fetch("/api/live-chat/send", {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                username:
-                    localStorage.getItem("username") ||
-                    localStorage.getItem("userName") ||
-                    "Guest",
+                username: AZIEL_CHAT.username,
                 message
             })
         });
 
         const data = await res.json();
 
+        showTyping(false);
+
         if (!data.success) {
-            alert(data.message || "Send failed");
+            addChatMessage("bot", data.message || "Send failed.", true);
             return;
         }
 
-        addChatMessage("bot", "✅ Message sent to admin. Please wait for reply.");
+        setTimeout(() => {
+            addChatMessage(
+                "bot",
+                "✅ Message sent to admin. Please wait for reply.",
+                true
+            );
+        }, 300);
 
+        AZIEL_CHAT.lastMessageCount = data.chat.messages.length;
     } catch (error) {
+        showTyping(false);
         console.error("Live chat send error:", error);
-        alert("Server connection error");
+        addChatMessage("bot", "Server connection error. Please try again.", true);
     }
 }
 
 async function loadLiveChatHistory() {
-    const username =
-        localStorage.getItem("username") ||
-        localStorage.getItem("userName") ||
-        "Guest";
-
     try {
-        const res = await fetch(`/api/live-chat/user/${username}`);
+        const res = await fetch(
+            `/api/live-chat/user/${encodeURIComponent(AZIEL_CHAT.username)}`
+        );
         const data = await res.json();
 
         if (!data.success || !data.chat) return;
+
+        const messages = data.chat.messages || [];
+
+        if (messages.length === AZIEL_CHAT.lastMessageCount) return;
 
         const body = document.getElementById("liveChatBody");
         if (!body) return;
 
         body.innerHTML = "";
 
-        data.chat.messages.forEach(msg => {
+        messages.forEach(msg => {
             addChatMessage(
-                msg.sender === "admin" ? "bot" : "user",
-                msg.text
+                msg.sender === "admin" ? "bot" : msg.sender,
+                msg.text,
+                false,
+                msg.createdAt
             );
         });
 
+        AZIEL_CHAT.lastMessageCount = messages.length;
+
+        if (AZIEL_CHAT.isOpen) {
+            await markUserRead();
+            updateBadge(0);
+        }
     } catch (error) {
         console.log("Load chat history error:", error);
     }
 }
 
-function addChatMessage(type, text) {
+async function loadUnreadCount() {
+    try {
+        const res = await fetch(
+            `/api/live-chat/user/${encodeURIComponent(AZIEL_CHAT.username)}/unread`
+        );
+        const data = await res.json();
+
+        if (data.success) {
+            updateBadge(AZIEL_CHAT.isOpen ? 0 : data.unread);
+        }
+    } catch (error) {
+        console.log("Unread count error:", error);
+    }
+}
+
+async function markUserRead() {
+    try {
+        await fetch(
+            `/api/live-chat/user/${encodeURIComponent(AZIEL_CHAT.username)}/read`,
+            { method: "PUT" }
+        );
+    } catch (error) {
+        console.log("Mark read error:", error);
+    }
+}
+
+function addChatMessage(type, text, saveScroll = true, createdAt = null) {
     const body = document.getElementById("liveChatBody");
     if (!body) return;
 
     const msg = document.createElement("div");
     msg.className = `chat-message ${type}`;
 
+    const safeText = escapeHTML(text);
+    const time = createdAt ? new Date(createdAt) : new Date();
+
     msg.innerHTML = `
-        ${text}
-        <small>${new Date().toLocaleTimeString([], {
+        <div>${safeText}</div>
+        <small>${time.toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit"
     })}</small>
     `;
 
     body.appendChild(msg);
-    body.scrollTop = body.scrollHeight;
-}
-document.addEventListener("click", e => {
-    const link = e.target.closest("a");
-    if (!link) return;
 
-    const href = link.getAttribute("href");
-    if (!href) return;
-
-    if (href.startsWith("#")) return;
-
-    const url = new URL(href, window.location.href);
-
-    if (url.origin === window.location.origin) {
-        e.preventDefault();
-        window.location.href = url.pathname + url.search + url.hash;
+    if (saveScroll) {
+        body.scrollTop = body.scrollHeight;
+    } else {
+        requestAnimationFrame(() => {
+            body.scrollTop = body.scrollHeight;
+        });
     }
-});
+}
+
+function updateBadge(count) {
+    const badge = document.getElementById("chatBadge");
+    if (!badge) return;
+
+    const number = Number(count || 0);
+
+    badge.textContent = number > 99 ? "99+" : number;
+    badge.style.display = number > 0 ? "flex" : "none";
+}
+
+function showTyping(show) {
+    const typing = document.getElementById("typingIndicator");
+    if (!typing) return;
+    typing.classList.toggle("show", !!show);
+}
+
+function escapeHTML(value) {
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}

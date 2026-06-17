@@ -11,6 +11,7 @@ const Order = require("../models/Order");
 const User = require("../models/User");
 const WalletTopup = require("../models/WalletTopup");
 const WalletTransaction = require("../models/WalletTransaction");
+const Notification = require("../models/Notification");
 
 const adminMiddleware = require("../middleware/adminMiddleware");
 
@@ -250,13 +251,38 @@ router.put(
 
             const io = req.app.get("io");
 
-            if (io && status === "approved") {
-                io.to(topup.username).emit("newNotification", {
-                    title: "Wallet Approved",
-                    message: `${topup.amount} ${topup.currency} added to wallet`,
-                    _id: topup._id,
-                    isRead: false
+            let notification = null;
+
+            if (status === "approved") {
+                notification = await Notification.create({
+                    username: topup.username,
+                    title: "Wallet Top-Up Approved",
+                    message: `${Number(topup.amount).toLocaleString()} ${topup.currency} has been added to your wallet.`,
+                    type: "system",
+                    category: "system"
                 });
+            }
+
+            if (status === "rejected") {
+                notification = await Notification.create({
+                    username: topup.username,
+                    title: "Wallet Top-Up Rejected",
+                    message: `${Number(topup.amount).toLocaleString()} ${topup.currency} top-up was rejected. Please contact support.`,
+                    type: "system",
+                    category: "system"
+                });
+            }
+
+            if (io) {
+                io.to(topup.username).emit("newNotification", notification);
+
+                if (status === "approved") {
+                    io.to(topup.username).emit("walletUpdated", {
+                        amount: newBalance,
+                        currency: topup.currency,
+                        status: "approved"
+                    });
+                }
 
                 io.to("admins").emit("adminNewUpdate", {
                     type: "wallet_topup",

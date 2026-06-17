@@ -1,0 +1,467 @@
+/* ======================================
+   AZIEL DESIGN SYSTEM V1
+   Auto Dark / Light Theme
+====================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+:root {
+    --primary: #8b5cf6;
+    --primary-hover: #a855f7;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+
+    --radius-sm: 12px;
+    --radius-md: 18px;
+    --radius-lg: 24px;
+    --radius-xl: 32px;
+
+    --transition: .25s ease;
+}
+
+/* DARK MODE DEFAULT */
+:root,
+body.theme-dark {
+    --bg: #070b1d;
+    --bg-soft: #0c1224;
+    --surface: rgba(255, 255, 255, .055);
+    --surface-strong: #10182f;
+    --card: rgba(255, 255, 255, .06);
+    --card-hover: rgba(255, 255, 255, .09);
+    --border: rgba(255, 255, 255, .09);
+
+    --text: #ffffff;
+    --text-secondary: #b7c0d4;
+    --text-muted: #8a93a8;
+
+    --shadow-sm: 0 4px 12px rgba(0, 0, 0, .18);
+    --shadow-md: 0 12px 28px rgba(0, 0, 0, .28);
+    --shadow-lg: 0 24px 60px rgba(0, 0, 0, .38);
+}
+
+/* LIGHT MODE */
+body.theme-light {
+    --bg: #f5f6fb;
+    --bg-soft: #eef1f7;
+    --surface: rgba(255, 255, 255, .78);
+    --surface-strong: #ffffff;
+    --card: rgba(255, 255, 255, .86);
+    --card-hover: #ffffff;
+    --border: rgba(17, 24, 39, .10);
+
+    --text: #111827;
+    --text-secondary: #374151;
+    --text-muted: #6b7280;
+
+    --shadow-sm: 0 4px 12px rgba(17, 24, 39, .06);
+    --shadow-md: 0 12px 28px rgba(17, 24, 39, .10);
+    --shadow-lg: 0 24px 60px rgba(17, 24, 39, .14);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: "Inter", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow-x: hidden;
+    transition: background .3s ease, color .3s ease;
+}
+
+img {
+    max-width: 100%;
+    display: block;
+}
+
+a {
+    color: inherit;
+}
+
+.container {
+    width: min(1280px, calc(100% - 32px));
+    margin: auto;
+}
+
+h1,
+h2,
+h3 {
+    color: var(--text);
+}
+
+p {
+    color: var(--text-secondary);
+    line-height: 1.7;
+}
+
+.section {
+    margin-top: 80px;
+}
+
+.card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+.btn {
+    border: none;
+    outline: none;
+    cursor: pointer;
+    padding: 14px 24px;
+    border-radius: var(--radius-md);
+    font-weight: 800;
+    transition: var(--transition);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+    color: white;
+}
+
+.btn-secondary {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+}
+
+.input {
+    width: 100%;
+    height: 56px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    padding: 0 18px;
+    outline: none;
+}
+
+.input::placeholder {
+    color: var(--text-muted);
+}
+
+.badge {
+    display: inline-flex;
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: rgba(139, 92, 246, .15);
+    border: 1px solid rgba(139, 92, 246, .25);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 800;
+}
+
+/* =========================
+   AZIEL V2.5 SHARED LAYOUT
+========================= */
+
+:root {
+    --az-container: 1180px;
+    --az-page-x: 92%;
+    --az-header-h: 78px;
+}
+
+.az-container,
+#mainHome,
+.wallet-page,
+.account-layout {
+    width: min(var(--az-container), var(--az-page-x)) !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+/* Shared Header */
+.az-header,
+.az-topbar,
+.site-header {
+    width: 100% !important;
+    height: var(--az-header-h) !important;
+
+    padding-left: max(24px, calc((100vw - var(--az-container)) / 2)) !important;
+    padding-right: max(24px, calc((100vw - var(--az-container)) / 2)) !important;
+
+    margin: 0 !important;
+
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+
+    border-radius: 0 !important;
+    border-bottom: 1px solid rgba(17, 24, 39, .08) !important;
+
+    background: rgba(255, 255, 255, .72) !important;
+    backdrop-filter: blur(18px) !important;
+
+    color: var(--az-text, #111827) !important;
+}
+
+body.dark .az-header,
+body.dark .az-topbar,
+body.dark .site-header,
+html.dark .az-header,
+html.dark .az-topbar,
+html.dark .site-header {
+    background: rgba(15, 16, 35, .88) !important;
+    border-bottom-color: rgba(255, 255, 255, .08) !important;
+    color: #f8fafc !important;
+}
+
+.az-header *,
+.az-topbar *,
+.site-header * {
+    color: inherit !important;
+}
+
+.az-logo,
+.logo,
+.az-topbar-brand {
+    font-size: 32px !important;
+    font-weight: 950 !important;
+    letter-spacing: -1px !important;
+    text-decoration: none !important;
+}
+
+.az-nav,
+.nav-links,
+.az-topbar-actions {
+    display: flex !important;
+    align-items: center !important;
+    gap: 26px !important;
+}
+
+.az-nav a,
+.nav-links a,
+.az-topbar-actions a,
+.az-topbar-actions button {
+    font-size: 14px !important;
+    font-weight: 850 !important;
+    text-decoration: none !important;
+    border: none;
+}
+
+/* small nav pill only for action buttons */
+.az-topbar-actions button {
+    padding: 10px 16px !important;
+    border-radius: 999px !important;
+    background: rgba(124, 58, 237, .10) !important;
+    color: #7c3aed !important;
+}
+
+@media (max-width: 768px) {
+    :root {
+        --az-header-h: 66px;
+    }
+
+    .az-header,
+    .az-topbar,
+    .site-header {
+        padding-left: 16px !important;
+        padding-right: 16px !important;
+    }
+
+    .az-logo,
+    .logo,
+    .az-topbar-brand {
+        font-size: 26px !important;
+    }
+
+    .az-nav,
+    .nav-links {
+        display: none !important;
+    }
+
+    #mainHome,
+    .wallet-page,
+    .account-layout {
+        width: calc(100% - 32px) !important;
+    }
+}
+
+/* AZIEL LOCALE SWITCHER */
+
+.az-locale-switcher {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.az-locale-switcher select {
+    height: 38px;
+    min-width: 92px;
+    padding: 0 10px;
+
+    border-radius: 13px;
+    border: 1px solid rgba(17, 24, 39, .10);
+
+    background: rgba(255, 255, 255, .58);
+    color: #111827;
+
+    font-size: 13px;
+    font-weight: 850;
+
+    outline: none;
+    cursor: pointer;
+}
+
+body.dark .az-locale-switcher select,
+html.dark .az-locale-switcher select {
+    background: rgba(255, 255, 255, .08);
+    color: #f8fafc;
+    border-color: rgba(255, 255, 255, .12);
+}
+
+.az-locale-switcher select option {
+    color: #111827;
+}
+
+.az-profile,
+.profile-box {
+    background: rgba(17, 24, 39, .06) !important;
+    border: 1px solid rgba(17, 24, 39, .08) !important;
+}
+
+body.dark .az-profile,
+html.dark .az-profile,
+body.dark .profile-box,
+html.dark .profile-box {
+    background: rgba(255, 255, 255, .08) !important;
+    border-color: rgba(255, 255, 255, .10) !important;
+}
+
+@media (max-width: 768px) {
+    .az-locale-switcher {
+        gap: 6px;
+    }
+
+    .az-locale-switcher select {
+        min-width: 74px;
+        height: 34px;
+        font-size: 12px;
+        padding: 0 6px;
+    }
+}
+
+.az-locale-modal {
+    display: none;
+}
+
+.az-locale-modal.show {
+    position: fixed;
+    inset: 0;
+    z-index: 999999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, .45);
+    backdrop-filter: blur(10px);
+}
+
+.az-locale-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 999999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(15, 15, 25, .46);
+    backdrop-filter: blur(18px);
+}
+
+.az-locale-modal.show {
+    display: flex;
+}
+
+.az-locale-box {
+    width: min(440px, 100%);
+    padding: 28px;
+    border-radius: 30px;
+    background: rgba(255, 255, 255, .92);
+    border: 1px solid rgba(17, 24, 39, .08);
+    box-shadow: 0 30px 90px rgba(17, 24, 39, .22);
+    position: relative;
+}
+
+.az-locale-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 38px;
+    height: 38px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(124, 58, 237, .10);
+    color: #7c3aed;
+    font-size: 22px;
+    cursor: pointer;
+}
+
+.az-locale-box h2 {
+    margin: 0 0 8px;
+    font-size: 30px;
+    font-weight: 950;
+    letter-spacing: -1px;
+    color: #111827;
+}
+
+.az-locale-box p {
+    margin: 0 0 22px;
+    color: #6b7280;
+    font-size: 14px;
+}
+
+.az-locale-box label {
+    display: block;
+    margin: 16px 0 8px;
+    color: #6b7280;
+    font-size: 13px;
+    font-weight: 900;
+}
+
+.az-locale-box select {
+    width: 100%;
+    height: 54px;
+    border-radius: 16px;
+    border: 1px solid rgba(17, 24, 39, .10);
+    background: #f8fafc;
+    color: #111827;
+    padding: 0 14px;
+    font-weight: 850;
+    outline: none;
+}
+
+.az-locale-save {
+    width: 100%;
+    height: 54px;
+    margin-top: 24px;
+    border: none;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #7c3aed, #9333ea);
+    color: white;
+    font-weight: 950;
+    cursor: pointer;
+}
+
+.az-locale-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    border: 1px solid rgba(17, 24, 39, .08);
+    background: rgba(255, 255, 255, .65);
+    font-size: 20px;
+    cursor: pointer;
+}

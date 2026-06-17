@@ -12,6 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initWalletQrPreview();
     initWalletTopup();
     initWalletSocket();
+    initSlipPreview();
 });
 
 // ======================
@@ -173,8 +174,9 @@ async function submitTopup() {
             return;
         }
 
-        alert("Wallet topup submitted ✅");
-        window.location.reload();
+        showSubmitSuccessModal();
+        await loadWallet();
+        resetTopupForm();
 
     } catch (error) {
         console.log("Topup error:", error);
@@ -300,4 +302,85 @@ function showWalletPopup(amount, symbol) {
         popup.classList.remove("show");
         setTimeout(() => popup.remove(), 400);
     }, 4000);
+}
+function initSlipPreview() {
+    const input = document.getElementById("topupSlip");
+    const fileName = document.getElementById("slipFileName");
+    const box = document.querySelector(".upload-slip-box");
+
+    if (!input || !fileName || !box) return;
+
+    input.addEventListener("change", () => {
+        const file = input.files[0];
+        if (!file) return;
+
+        const shortName =
+            file.name.length > 24
+                ? file.name.substring(0, 24) + "..."
+                : file.name;
+
+        fileName.innerText = "✓ " + shortName;
+        box.classList.add("has-file");
+    });
+}
+function showSubmitSuccessModal() {
+    const modal = document.getElementById("successModal");
+    if (!modal) return;
+
+    modal.classList.add("show");
+
+    document.getElementById("viewHistoryBtn")?.addEventListener("click", () => {
+        modal.classList.remove("show");
+        document.getElementById("walletHistory")?.scrollIntoView({
+            behavior: "smooth"
+        });
+    });
+
+    document.getElementById("backHomeBtn")?.addEventListener("click", () => {
+        window.location.href = "home.html";
+    });
+}
+
+function resetTopupForm() {
+    const amount = document.getElementById("topupAmount");
+    const method = document.getElementById("paymentMethod");
+    const slip = document.getElementById("topupSlip");
+    const fileName = document.getElementById("slipFileName");
+    const qrBox = document.getElementById("walletQrBox");
+
+    if (amount) amount.value = "";
+    if (method) method.value = "";
+    if (slip) slip.value = "";
+    if (fileName) fileName.innerText = "JPG, PNG, WEBP accepted";
+    if (qrBox) qrBox.style.display = "none";
+}
+function showSubmitSuccessModal() {
+    const modal = document.getElementById("successModal");
+    if (!modal) return;
+
+    modal.classList.add("show");
+
+    document.getElementById("viewHistoryBtn").onclick = () => {
+        modal.classList.remove("show");
+        document.getElementById("walletHistory")?.scrollIntoView({
+            behavior: "smooth",
+            block: "start"
+        });
+    };
+
+    document.getElementById("backHomeBtn").onclick = () => {
+        window.location.href = "home.html";
+    };
+}
+
+function resetTopupForm() {
+    const amount = document.getElementById("topupAmount");
+    const slip = document.getElementById("topupSlip");
+    const fileName = document.getElementById("slipFileName");
+    const box = document.querySelector(".upload-slip-box");
+
+    if (amount) amount.value = "";
+    if (slip) slip.value = "";
+    if (fileName) fileName.innerText = "JPG, PNG, WEBP accepted";
+    if (box) box.classList.remove("has-file");
 }

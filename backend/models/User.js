@@ -12,7 +12,8 @@ const userSchema = new mongoose.Schema(
         email: {
             type: String,
             default: "",
-            trim: true
+            trim: true,
+            lowercase: true
         },
 
         password: {
@@ -70,7 +71,75 @@ const userSchema = new mongoose.Schema(
         role: {
             type: String,
             default: "user"
-        }
+        },
+
+        // Forgot password
+        resetOTP: {
+            type: String,
+            default: ""
+        },
+
+        resetOTPExpire: {
+            type: Date,
+            default: null
+        },
+        resetOTPVerified: {
+            type: Boolean,
+            default: false
+        },
+
+        // Email verification
+        isVerified: {
+            type: Boolean,
+            default: false
+        },
+
+        verifyOTP: {
+            type: String,
+            default: ""
+        },
+
+        verifyOTPExpire: {
+            type: Date,
+            default: null
+        },
+
+        // Login security
+        currentSessionToken: {
+            type: String,
+            default: ""
+        },
+
+        sessionUpdatedAt: {
+            type: Date,
+            default: null
+        },
+
+        lastActiveAt: {
+            type: Date,
+            default: Date.now
+        },
+
+        lastLoginDevice: {
+            deviceName: {
+                type: String,
+                default: ""
+            },
+            browser: {
+                type: String,
+                default: ""
+            },
+            ip: {
+                type: String,
+                default: ""
+            },
+            loginAt: {
+                type: Date,
+                default: null
+            }
+        },
+
+
     },
     {
         timestamps: true

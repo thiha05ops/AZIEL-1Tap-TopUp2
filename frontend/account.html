@@ -6,58 +6,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Account - AZIEL</title>
 
-    <link rel="stylesheet" href="css/main.css">
-    <link rel="stylesheet" href="css/layout.css">
-    <link rel="stylesheet" href="css/components.css">
-    <link rel="stylesheet" href="css/account.css">
+    <link rel="stylesheet" href="css/core/main.css">
+    <link rel="stylesheet" href="css/theme/aziel-design-system.css">
+    <link rel="stylesheet" href="css/account/account.css">
+
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="manifest" href="/manifest.json">
-
-    <meta name="theme-color" content="#070716">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="AZIEL">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <style>
-        @media (min-width: 900px) {
-            .account-layout {
-                width: 95vw !important;
-                max-width: 1450px !important;
-                margin: 32px auto 80px !important;
-                display: grid !important;
-                grid-template-columns: 320px 1fr !important;
-                gap: 30px !important;
-            }
-
-            .account-sidebar {
-                width: 320px !important;
-            }
-
-            .account-content {
-                width: 100% !important;
-                display: block !important;
-            }
-
-            .dashboard-grid {
-                display: grid !important;
-                grid-template-columns: repeat(4, 1fr) !important;
-                gap: 18px !important;
-            }
-
-            .dash-card {
-                min-height: 145px !important;
-                padding: 26px !important;
-            }
-        }
-    </style>
 </head>
 
-<body>
+<body class="account-page">
 
-
-    <div id="accountDrawerOverlay" class="account-drawer-overlay"></div>
 
     <header class="az-topbar">
         <a href="home.html" class="az-topbar-brand">AZIEL</a>
@@ -65,77 +23,83 @@
         <div class="az-topbar-actions">
             <a href="home.html">Home</a>
             <a href="support.html">Support</a>
-            <button id="accountMenuBtn" class="account-menu-btn">
+
+            <button id="accountMenuBtn" class="account-menu-btn" type="button">
                 <i class="fa-solid fa-bars"></i>
             </button>
-            <button id="logoutBtn">Logout</button>
+
+            <button onclick="logout()" type="button">Logout</button>
         </div>
-
-
     </header>
+
+    <div id="accountDrawerOverlay" class="account-drawer-overlay"></div>
 
     <main class="account-layout">
 
         <aside class="account-sidebar">
-            <div class="profile-card">
+
+            <div class="profile-card clean-profile-card">
                 <div class="avatar-big" id="avatarText">U</div>
 
                 <div class="profile-info">
                     <h3 id="profileName">Username</h3>
                     <p id="profileRegion">Region: MM</p>
-                    <span class="verified-badge">Verified Customer</span>
+
+                    <div class="profile-badges">
+                        <span class="verified-badge">
+                            <i class="fa-solid fa-circle-check"></i>
+                            Verified
+                        </span>
+
+                        <span class="gmail-badge">
+                            <i class="fa-regular fa-envelope"></i>
+                            Gmail
+                        </span>
+                    </div>
                 </div>
             </div>
 
             <nav class="account-menu">
-                <button class="side-link active" data-tab="overview">
+                <button class="side-link active" data-tab="overview" type="button">
                     <i class="fa-solid fa-chart-line"></i>
                     <span>Overview</span>
                 </button>
 
+                <button class="side-link" data-tab="profile" type="button">
+                    <i class="fa-regular fa-user"></i>
+                    <span>Profile</span>
+                </button>
+
+                <button class="side-link" data-tab="history" type="button">
+                    <i class="fa-solid fa-box"></i>
+                    <span>Orders</span>
+                </button>
                 <a href="wallet.html" class="side-link">
                     <i class="fa-solid fa-wallet"></i>
                     <span>Wallet</span>
                 </a>
 
-                <button class="side-link" data-tab="history">
-                    <i class="fa-solid fa-box"></i>
-                    <span>Orders</span>
-                </button>
-
-                <button class="side-link" data-tab="profile">
-                    <i class="fa-regular fa-user"></i>
-                    <span>Profile</span>
-                </button>
-
-                <button class="side-link" data-tab="security">
+                <button class="side-link" data-tab="security" type="button">
                     <i class="fa-solid fa-shield-halved"></i>
                     <span>Security</span>
                 </button>
 
                 <a href="support.html" class="side-link support-link">
                     <i class="fa-solid fa-headset"></i>
-                    <span>Customer Support</span>
+                    <span>Support</span>
                     <b>LIVE</b>
                 </a>
             </nav>
-        </aside>
 
+        </aside>
 
         <section class="account-content">
 
-            <div id="notiPanel" class="noti-panel"></div>
-            <div id="notifPanel">
-                <div class="notif-header">Notifications</div>
-                <div id="notifList"></div>
-            </div>
-
+            <!-- OVERVIEW TAB -->
             <div class="tab-panel active" id="overview">
                 <div class="page-title">
-                    <div>
-                        <h1>Account Overview</h1>
-                        <p>Manage your orders, wallet and profile settings.</p>
-                    </div>
+                    <h1>Account Overview</h1>
+                    <p>Manage your profile, wallet and recent orders.</p>
                 </div>
 
                 <div class="dashboard-grid">
@@ -170,38 +134,16 @@
                 </div>
             </div>
 
-            <div class="tab-panel" id="wallet">
-                <div class="page-title">
-                    <h1>Wallet</h1>
-                    <p>View your balance and top-up wallet.</p>
-                </div>
-
-                <div class="content-card">
-                    <h2>Balance</h2>
-                    <p class="balance-text" id="walletBalanceBig">0 Ks</p>
-                    <button class="primary-btn">Top Up Wallet</button>
-                    <p class="small-note">Wallet top-up system will be connected with payment approval.</p>
-                </div>
-            </div>
-
-            <div class="tab-panel" id="history">
-                <div class="page-title">
-                    <h1>Order History</h1>
-                    <p>Check all your previous and active orders.</p>
-                </div>
-
-                <div id="historyList">Loading...</div>
-            </div>
-
+            <!-- PROFILE TAB -->
             <div class="tab-panel" id="profile">
                 <div class="page-title">
-                    <h1>Profile Information</h1>
-                    <p>Update your display name and selected region.</p>
+                    <h1>Profile</h1>
+                    <p>Update your display name and region.</p>
                 </div>
 
                 <div class="content-card form-card">
                     <label>Display Name</label>
-                    <input type="text" id="displayName" placeholder="Display name">
+                    <input type="text" id="displayName">
 
                     <label>Region</label>
                     <select id="accountRegion">
@@ -209,80 +151,77 @@
                         <option value="TH">Thailand - THB</option>
                     </select>
 
-                    <button id="saveProfileBtn" class="primary-btn">Save Profile</button>
+                    <button id="saveProfileBtn" class="primary-btn" type="button">
+                        Save Profile
+                    </button>
                 </div>
             </div>
 
-            <div class="tab-panel" id="security">
+            <!-- ORDERS TAB -->
+            <div class="tab-panel" id="history">
                 <div class="page-title">
-                    <h1>Account Security</h1>
-                    <p>Keep your account secure and update your password.</p>
+                    <h1>Orders</h1>
+                    <p>Your active and completed orders.</p>
                 </div>
 
-                <div class="content-card">
-                    <p>Change your password if you notice suspicious activity.</p>
-                    <a href="forgot.html" class="security-btn">Reset Password</a>
+                <div id="historyList">Loading...</div>
+            </div>
+
+            <!-- SECURITY TAB -->
+            <div class="tab-panel" id="security">
+                <div class="page-title">
+                    <h1>Security</h1>
+                    <p>Keep your AZIEL account safe.</p>
+                </div>
+
+                <div class="security-grid">
+                    <div class="security-card">
+                        <div class="security-icon">
+                            <i class="fa-solid fa-lock"></i>
+                        </div>
+
+                        <div>
+                            <h3>Password</h3>
+                            <p>Reset your password using Gmail OTP verification.</p>
+                            <a href="forgot-password.html" class="security-btn">Reset Password</a>
+                        </div>
+                    </div>
+
+                    <div class="security-card">
+                        <div class="security-icon">
+                            <i class="fa-regular fa-envelope"></i>
+                        </div>
+
+                        <div>
+                            <h3>Email Verification</h3>
+                            <p>Your Gmail is used for OTP, password reset and order notifications.</p>
+                            <span class="security-status">Verified</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
         </section>
 
     </main>
-    <div id="orderDetailModal" class="admin-modal">
-        <div class="admin-modal-box">
-            <div class="admin-modal-head">
-                <h3>Order Details</h3>
-                <button id="closeOrderModal" type="button">×</button>
-            </div>
 
-            <div id="orderDetailContent"></div>
-        </div>
-    </div>
-
-
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="js/api.js"></script>
     <script src="js/account.js"></script>
     <script src="js/logout.js"></script>
-    <script src="js/notification-live.js"></script>
-    <script src="js/drawer.js"></script>
-    <script src="js/pwa-fix.js"></script>
     <script src="js/site-settings.js"></script>
-    <nav class="az-bottom-nav">
-        <a href="home.html">
-            <i class="fa-solid fa-house"></i>
-            <span>Home</span>
-        </a>
+    <script src="js/api.js"></script>
 
-        <a href="tracking.html">
-            <i class="fa-solid fa-box"></i>
-            <span>Orders</span>
-        </a>
-
-        <a href="notifications.html">
-            <i class="fa-regular fa-bell"></i>
-            <span>Alerts</span>
-        </a>
-
-        <a href="account.html">
-            <i class="fa-regular fa-user"></i>
-            <span>Account</span>
-        </a>
-    </nav>
     <script>
         document.addEventListener("DOMContentLoaded", () => {
             const btn = document.getElementById("accountMenuBtn");
             const sidebar = document.querySelector(".account-sidebar");
             const overlay = document.getElementById("accountDrawerOverlay");
 
-            if (!btn || !sidebar || !overlay) return;
-
-            btn.addEventListener("click", () => {
+            btn?.addEventListener("click", () => {
                 sidebar.classList.add("show");
                 overlay.classList.add("show");
             });
 
-            overlay.addEventListener("click", () => {
+            overlay?.addEventListener("click", () => {
                 sidebar.classList.remove("show");
                 overlay.classList.remove("show");
             });

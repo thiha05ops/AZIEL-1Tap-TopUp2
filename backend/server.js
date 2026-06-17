@@ -12,7 +12,7 @@ const supportRoutes =
 dotenv.config({
     path: path.join(__dirname, "../.env")
 });
-
+const liveChatRoutes = require("./routes/liveChat");
 const express = require("express");
 const cors = require("cors");
 const session = require("express-session");
@@ -125,9 +125,7 @@ app.use(
 
 app.use(
     "/uploads",
-    express.static(
-        path.join(__dirname, "uploads")
-    )
+    express.static(path.join(__dirname, "uploads"))
 );
 
 // ROUTES
@@ -143,7 +141,7 @@ app.use("/api", profileRoutes);
 
 app.use("/api", socialAuthRoutes);
 
-app.use("/api", passwordRoutes);
+app.use("/api/password", passwordRoutes);
 
 app.use("/api", supplierRoutes);
 
@@ -157,6 +155,7 @@ app.use("/api", adminAuthRoutes);
 app.use("/api", supportRoutes);
 app.use("/api", settingsRoutes);
 app.use("/api", paymentMethodsRoutes);
+app.use("/api", liveChatRoutes);
 // HOME
 app.get("/", (req, res) => {
 

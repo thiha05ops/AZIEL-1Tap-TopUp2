@@ -3,171 +3,125 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
     <title>Wallet - AZIEL</title>
 
-    <link rel="stylesheet" href="/css/main.css">
-    <link rel="stylesheet" href="/css/components.css">
-    <link rel="stylesheet" href="/css/payment-grid.css">
-    <link rel="stylesheet" href="/css/wallet.css">
+    <link rel="stylesheet" href="css/core/main.css">
+    <link rel="stylesheet" href="css/theme/aziel-design-system.css">
+    <link rel="stylesheet" href="css/theme/wave-background.css">
+    <link rel="stylesheet" href="css/core/components.css">
+    <link rel="stylesheet" href="css/game/payment-grid.css">
+    <link rel="stylesheet" href="css/account/wallet.css">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="manifest" href="/manifest.json">
-
-    <meta name="theme-color" content="#070716">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="AZIEL">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 </head>
 
 <body>
-
+    <div class="az-bg-wave"></div>
     <header class="az-topbar">
-
-        <a href="home.html" class="az-topbar-brand">
-            AZIEL
-        </a>
+        <a href="home.html" class="az-topbar-brand">AZIEL</a>
 
         <div class="az-topbar-actions">
-
-            <a href="home.html">
-                Home
-            </a>
-
-            <a href="tracking.html">
-                Orders
-            </a>
-
-            <a href="account.html">
-                Account
-            </a>
-
+            <a href="home.html">Home</a>
+            <a href="tracking.html">Orders</a>
+            <a href="account.html">Account</a>
         </div>
-
     </header>
 
     <main class="wallet-page">
 
-        <section class="wallet-hero">
-
-            <div class="wallet-badge">
-                AZIEL Wallet
+        <section class="wallet-title-row">
+            <div>
+                <span class="wallet-badge">AZIEL Wallet</span>
+                <h1>Wallet</h1>
+                <p>Top up, track and manage your AZIEL wallet balance.</p>
             </div>
-
-            <h1>
-                Fast & Secure Wallet
-            </h1>
-
-            <p>
-                Store balance and top-up faster with AZIEL Wallet system.
-            </p>
-
         </section>
 
         <section class="wallet-balance-card">
-
             <div class="wallet-balance-top">
-
                 <div>
-                    <span>Wallet Balance</span>
-
-                    <h1 id="walletBalance">
-                        0 Ks
-                    </h1>
+                    <span>Available Balance</span>
+                    <h1 id="walletBalance">0 Ks</h1>
+                    <p class="wallet-balance-note">Use wallet balance for faster top-up orders.</p>
                 </div>
 
                 <div class="wallet-icon">
                     <i class="fa-solid fa-wallet"></i>
                 </div>
-
             </div>
-
-            <p class="wallet-balance-note">
-                Fast payment with AZIEL Wallet
-            </p>
-
         </section>
 
         <section class="wallet-grid">
 
-            <div class="wallet-card">
-
+            <div class="wallet-card wallet-topup-card">
                 <div class="wallet-card-head">
-                    <h2>Top Up Wallet</h2>
-                    <span>Instant top-up system</span>
+                    <div>
+                        <h2>Top Up Wallet</h2>
+                        <span>Select amount, payment method and upload slip.</span>
+                    </div>
                 </div>
 
-                <label>Amount</label>
-
-                <input type="number" id="topupAmount" placeholder="Enter amount">
+                <label for="topupAmount">Amount</label>
+                <input type="number" id="topupAmount" placeholder="Enter amount" min="1">
 
                 <label>Select Payment</label>
-
                 <div id="paymentGrid" class="payment-grid"></div>
 
                 <div id="walletQrBox" class="wallet-qr-box" style="display:none;">
-
-                    <h3 id="walletQrTitle">
-                        Payment QR
-                    </h3>
-
+                    <h3 id="walletQrTitle">Payment QR</h3>
                     <img id="walletQrImage" src="" alt="Payment QR">
+                    <p>Scan QR and upload your payment slip.</p>
+                </div>
 
-                    <p>
-                        Scan QR and upload payment slip.
+                <input type="hidden" id="paymentMethod">
+                <label>Upload Slip</label>
+
+                <div class="upload-slip-box" onclick="document.getElementById('topupSlip').click()">
+
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+
+                    <h4>Upload Payment Slip</h4>
+
+                    <p id="slipFileName">
+                        JPG, PNG, WEBP accepted
                     </p>
 
                 </div>
 
-                <input type="hidden" id="paymentMethod">
+                <input type="file" id="topupSlip" accept="image/*" hidden>
 
-                <label>Upload Slip</label>
-
-                <input type="file" id="topupSlip" accept="image/*">
-
-                <button id="submitTopupBtn">
+                <button id="submitTopupBtn" class="wallet-submit-btn" type="button">
                     Submit Top Up
                 </button>
-
+                <p class="wallet-note">
+                    Payment will be reviewed by admin after slip upload.
+                </p>
             </div>
 
-            <div class="wallet-card">
-
+            <div class="wallet-card wallet-history-card">
                 <div class="wallet-card-head">
-                    <h2>Wallet History</h2>
-                    <span>Recent wallet activities</span>
+                    <div>
+                        <h2>Wallet History</h2>
+                        <span>Recent wallet activities</span>
+                    </div>
                 </div>
 
                 <div id="walletHistory">
-
                     <div class="wallet-empty">
-
                         <i class="fa-regular fa-folder-open"></i>
-
-                        <h3>
-                            No Wallet History
-                        </h3>
-
-                        <p>
-                            Your wallet transactions will appear here.
-                        </p>
-
+                        <h3>No Wallet History</h3>
+                        <p>Your wallet transactions will appear here.</p>
                     </div>
-
                 </div>
-
             </div>
-
 
         </section>
 
     </main>
 
     <nav class="az-bottom-nav">
-
         <a href="home.html">
             <i class="fa-solid fa-house"></i>
             <span>Home</span>
@@ -187,15 +141,8 @@
             <i class="fa-regular fa-user"></i>
             <span>Account</span>
         </a>
-
     </nav>
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="js/payment.js"></script>
-    <script src="js/api.js"></script>
-    <script src="js/wallet.js"></script>
-    <script src="js/pwa-fix.js"></script>
-    <script src="js/site-settings.js"></script>
     <div id="orderLoadingOverlay" class="order-loading-overlay">
         <div class="order-loading-box">
             <div class="order-loading-dots">
@@ -209,19 +156,27 @@
             <p>Your top-up is being submitted.</p>
         </div>
     </div>
-    <div id="successModal" class="success-modal">
 
+    <div id="successModal" class="success-modal">
         <div class="success-modal-box">
             <div class="success-icon">✓</div>
             <h2>Top-Up Submitted</h2>
             <p>Your payment slip has been sent successfully.</p>
 
             <div class="success-actions">
-                <button id="viewHistoryBtn">View History</button>
-                <button id="backHomeBtn">Back Home</button>
+                <button id="viewHistoryBtn" type="button">View History</button>
+                <button id="backHomeBtn" type="button">Back Home</button>
             </div>
         </div>
     </div>
+
+    <script src="http://localhost:3000/socket.io/socket.io.js"></script>
+    <script src="js/payment.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/wallet.js"></script>
+    <script src="js/pwa-fix.js"></script>
+    <script src="js/site-settings.js"></script>
+
 </body>
 
 </html>
