@@ -12,7 +12,7 @@ const supportRoutes =
 dotenv.config({
     path: path.join(__dirname, "../.env")
 });
-const liveChatRoutes = require("./routes/liveChat");
+
 const express = require("express");
 const cors = require("cors");
 const session = require("express-session");
@@ -23,6 +23,7 @@ const connectDB = require("./config/db");
 const passport = require("./config/passport");
 
 // ROUTES
+const liveChatRoutes = require("./routes/liveChat");
 const paymentMethodsRoutes = require("./routes/paymentMethods");
 const settingsRoutes = require("./routes/settings");
 const notificationRoutes = require("./routes/notification");
