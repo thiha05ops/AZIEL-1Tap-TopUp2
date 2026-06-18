@@ -2,26 +2,159 @@
 
 const express = require("express");
 const router = express.Router();
+
 const Omise = require("../services/opnService");
+
 const Order = require("../models/Order");
+const User = require("../models/User");
+const WalletTopup = require("../models/WalletTopup");
+const WalletTransaction = require("../models/WalletTransaction");
+const Notification = require("../models/Notification");
+const PaymentMethod = require("../models/PaymentMethod");
+
 const wavepayService = require("../services/wavepayService");
 
-const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
-const { sendTelegramPhoto } = require("../services/telegram");
+// ======================
+// HELPERS
+// ======================
 
-const uploadDir = path.join(__dirname, "../uploads");
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+function getCurrencyKey(currency) {
+    return currency === "THB" ? "THB" : "MMK";
+}
 
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, uploadDir),
-    filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname)
-});
+function createPromptPayCharge(amount, metadata = {}) {
+    return new Promise((resolve, reject) => {
+        Omise.sources.create(
+            {
+                type: "promptpay",
+                amount: Number(amount) * 100,
+                currency: "THB"
+            },
+            (err, source) => {
+                if (err) return reject(err);
 
-const upload = multer({ storage });
+                Omise.charges.create(
+                    {
+                        amount: Number(amount) * 100,
+                        currency: "THB",
+                        source: source.id,
+                        metadata
+                    },
+                    (err, charge) => {
+                        if (err) return reject(err);
 
+                        resolve({ source, charge });
+                    }
+                );
+            }
+        );
+    });
+}
+
+function getQrUrl(source, charge) {
+    return (
+        source?.scannable_code?.image?.download_uri ||
+        source?.scannable_code?.image?.uri ||
+        charge?.source?.scannable_code?.image?.download_uri ||
+        charge?.source?.scannable_code?.image?.uri ||
+        ""
+    );
+}
+
+async function markWalletTopupPaid(req, topupId, transactionId = "") {
+    const topup = await WalletTopup.findOne({ topupId });
+
+    if (!topup) {
+        return {
+            success: false,
+            message: "Topup not found"
+        };
+    }
+
+    if (topup.status === "paid" || topup.status === "completed") {
+        return {
+            success: true,
+            message: "Already paid",
+            topup
+        };
+    }
+
+    const currencyKey = getCurrencyKey(topup.currency);
+
+    const updatedUser = await User.findOneAndUpdate(
+        { username: topup.username },
+        {
+            $inc: {
+                [`wallet.${currencyKey}`]: Number(topup.amount || 0)
+            }
+        },
+        { new: true }
+    );
+
+    if (!updatedUser) {
+        return {
+            success: false,
+            message: "User not found"
+        };
+    }
+
+    topup.status = "paid";
+    topup.transactionId = transactionId || topup.transactionId || "";
+    topup.note = "Wallet balance added automatically by webhook";
+    topup.paidAt = new Date();
+
+    await topup.save();
+
+    await WalletTransaction.create({
+        transactionId: "TXN-" + Date.now(),
+        username: topup.username,
+        type: "topup",
+        amount: Number(topup.amount),
+        currency: currencyKey,
+        status: "completed",
+        description: `Wallet topup via ${topup.paymentMethod}`
+    });
+
+    const notification = await Notification.create({
+        username: topup.username,
+        title: "Wallet Top-Up Successful",
+        message: `${Number(topup.amount).toLocaleString()} ${currencyKey} has been added to your wallet.`,
+        type: "system",
+        category: "wallet"
+    });
+
+    const io = req.app.get("io");
+
+    if (io) {
+        io.to(topup.username).emit("walletUpdated", {
+            amount: updatedUser.wallet?.[currencyKey] || 0,
+            currency: currencyKey,
+            status: "paid"
+        });
+
+        io.to(topup.username).emit("newNotification", notification);
+
+        io.to("admins").emit("adminNewUpdate", {
+            type: "wallet_topup_paid",
+            username: topup.username,
+            amount: topup.amount,
+            currency: currencyKey
+        });
+    }
+
+    return {
+        success: true,
+        message: "Wallet topup paid",
+        topup,
+        balance: updatedUser.wallet?.[currencyKey] || 0
+    };
+}
+
+// ======================
+// GAME PAYMENT CREATE
 // POST /api/payment/create
+// ======================
+
 router.post("/payment/create", async (req, res) => {
     try {
         console.log("PAYMENT CREATE BODY =", req.body);
@@ -53,45 +186,33 @@ router.post("/payment/create", async (req, res) => {
             userId,
             zoneId: zoneId || "",
             packageName,
-            amount,
+            amount: Number(amount),
             currency,
             region,
             paymentMethod,
             status: "pending_payment",
             paymentSlip: "",
-            transactionId: ""
+            transactionId: "",
+            paymentProvider: ""
         });
 
         const methodKey = String(paymentMethod || "")
             .toLowerCase()
             .replace(/\s+/g, "");
 
-        console.log("REGION =", region);
-        console.log("METHOD =", paymentMethod);
-        console.log("METHOD KEY =", methodKey);
-
-        // ============================
-        // TH PROMPTPAY AUTO PAYMENT
-        // ============================
         if (
             String(region).toUpperCase() === "TH" &&
             methodKey.includes("promptpay")
         ) {
-            const result = await createPromptPayCharge(Number(amount));
+            const result = await createPromptPayCharge(Number(amount), {
+                type: "game_order",
+                orderId,
+                username: username || "guest"
+            });
 
             const charge = result.charge;
             const source = result.source;
-
-            const qrUrl =
-                source?.scannable_code?.image?.download_uri ||
-                source?.scannable_code?.image?.uri ||
-                charge?.source?.scannable_code?.image?.download_uri ||
-                charge?.source?.scannable_code?.image?.uri ||
-                "";
-
-            console.log("OMISE SOURCE =", source);
-            console.log("OMISE CHARGE =", charge);
-            console.log("OMISE QR URL =", qrUrl);
+            const qrUrl = getQrUrl(source, charge);
 
             order.transactionId = charge.id;
             order.paymentProvider = "omise";
@@ -111,9 +232,6 @@ router.post("/payment/create", async (req, res) => {
             });
         }
 
-        // ============================
-        // MANUAL PAYMENT FALLBACK
-        // ============================
         const paymentSession = await wavepayService.createPayment(req.body);
 
         await Order.updateOne(
@@ -139,20 +257,160 @@ router.post("/payment/create", async (req, res) => {
         });
     }
 });
-const PaymentMethod = require("../models/PaymentMethod");
 
+// ======================
+// WALLET PAYMENT CREATE
+// POST /api/wallet/create
+// ======================
+
+router.post("/wallet/create", async (req, res) => {
+    try {
+        console.log("WALLET CREATE BODY =", req.body);
+
+        const {
+            username,
+            amount,
+            currency,
+            region,
+            paymentMethod
+        } = req.body;
+
+        if (!username || !amount || !paymentMethod) {
+            return res.json({
+                success: false,
+                message: "Missing wallet topup data"
+            });
+        }
+
+        const user = await User.findOne({ username });
+
+        if (!user) {
+            return res.json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        const currencyKey = getCurrencyKey(currency || "MMK");
+        const methodKey = String(paymentMethod || "")
+            .toLowerCase()
+            .replace(/\s+/g, "");
+
+        const topupId = "WAL-" + Date.now();
+
+        const topup = await WalletTopup.create({
+            topupId,
+            username,
+            amount: Number(amount),
+            currency: currencyKey,
+            region: region || "MM",
+            paymentMethod,
+            paymentSlip: "",
+            status: "pending",
+            transactionId: "",
+            paymentProvider: "",
+            note: "Waiting for payment confirmation."
+        });
+
+        if (
+            String(region).toUpperCase() === "TH" &&
+            methodKey.includes("promptpay")
+        ) {
+            const result = await createPromptPayCharge(Number(amount), {
+                type: "wallet_topup",
+                topupId,
+                username
+            });
+
+            const charge = result.charge;
+            const source = result.source;
+            const qrUrl = getQrUrl(source, charge);
+
+            topup.transactionId = charge.id;
+            topup.paymentProvider = "omise";
+            topup.note = "Waiting for PromptPay wallet confirmation.";
+            await topup.save();
+
+            return res.json({
+                success: true,
+                provider: "omise",
+                paymentType: "auto",
+                paymentName: "PromptPay",
+                topupId,
+                qrUrl,
+                qrImage: qrUrl,
+                transactionId: charge.id,
+                chargeId: charge.id,
+                status: charge.status
+            });
+        }
+
+        return res.json({
+            success: false,
+            message: "Auto wallet topup currently supports TH PromptPay only."
+        });
+
+    } catch (error) {
+        console.log("Wallet create error:", error);
+
+        res.json({
+            success: false,
+            message: error.message || "Wallet create server error"
+        });
+    }
+});
+
+// ======================
+// WALLET STATUS
+// GET /api/wallet/status/:topupId
+// ======================
+
+router.get("/wallet/status/:topupId", async (req, res) => {
+    try {
+        const topup = await WalletTopup.findOne({
+            topupId: req.params.topupId
+        });
+
+        if (!topup) {
+            return res.json({
+                success: false,
+                message: "Topup not found"
+            });
+        }
+
+        res.json({
+            success: true,
+            topupId: topup.topupId,
+            status: topup.status,
+            amount: topup.amount,
+            currency: topup.currency,
+            paymentMethod: topup.paymentMethod
+        });
+
+    } catch (error) {
+        console.log("Wallet status error:", error);
+
+        res.json({
+            success: false,
+            message: "Server error"
+        });
+    }
+});
+
+// ======================
+// PAYMENT METHODS
 // GET /api/payment-methods
+// ======================
+
 router.get("/payment-methods", async (req, res) => {
     try {
         const { region } = req.query;
 
         const filter = {};
+        if (region) filter.region = region;
 
-        if (region) {
-            filter.region = region;
-        }
-
-        const methods = await PaymentMethod.find(filter).sort({ createdAt: 1 });
+        const methods = await PaymentMethod.find(filter)
+            .sort({ createdAt: 1 });
 
         res.json({
             success: true,
@@ -161,6 +419,7 @@ router.get("/payment-methods", async (req, res) => {
 
     } catch (error) {
         console.log("Payment methods load error:", error);
+
         res.status(500).json({
             success: false,
             message: "Failed to load payment methods",
@@ -168,28 +427,12 @@ router.get("/payment-methods", async (req, res) => {
         });
     }
 });
-router.get("/payment/test-paid/:orderId", async (req, res) => {
-    const order = await Order.findOne({ orderId: req.params.orderId });
 
-    if (!order) {
-        return res.json({
-            success: false,
-            message: "Order not found"
-        });
-    }
-
-    order.status = "paid";
-    order.paidAt = new Date();
-    order.note = "Payment received. Waiting for admin processing.";
-    await order.save();
-
-    res.json({
-        success: true,
-        orderId: order.orderId,
-        status: order.status
-    });
-});
+// ======================
+// GAME PAYMENT STATUS
 // GET /api/payment/status/:orderId
+// ======================
+
 router.get("/payment/status/:orderId", async (req, res) => {
     try {
         const order = await Order.findOne({
@@ -218,114 +461,107 @@ router.get("/payment/status/:orderId", async (req, res) => {
         });
     }
 });
-async function createPromptPayCharge(amount) {
 
-    return new Promise((resolve, reject) => {
-
-        Omise.sources.create({
-            type: "promptpay",
-            amount: amount * 100,
-            currency: "THB"
-
-        }, (err, source) => {
-
-            if (err) return reject(err);
-
-            Omise.charges.create({
-                amount: amount * 100,
-                currency: "THB",
-                source: source.id
-
-            }, (err, charge) => {
-
-                if (err) return reject(err);
-
-                resolve({
-                    source,
-                    charge
-                });
-
-            });
-
-        });
-
-    });
-
-}
+// ======================
+// WEBHOOK
 // POST /api/payment/webhook
+// ======================
+
 router.post("/payment/webhook", async (req, res) => {
     console.log("WEBHOOK =", req.body);
 
     try {
-
         const data = req.body.data;
 
         if (
             req.body.key === "charge.complete" &&
             data.status === "successful"
         ) {
+            const metadata = data.metadata || {};
+
+            if (metadata.type === "wallet_topup") {
+                await markWalletTopupPaid(
+                    req,
+                    metadata.topupId,
+                    data.id
+                );
+
+                return res.sendStatus(200);
+            }
 
             const order = await Order.findOne({
                 transactionId: data.id
             });
 
             if (order) {
-
                 order.status = "paid";
                 order.paidAt = new Date();
-
+                order.note = "Payment received. Waiting for admin processing.";
                 await order.save();
 
-                console.log(
-                    "PAYMENT SUCCESS:",
-                    order.orderId
-                );
-
+                console.log("GAME PAYMENT SUCCESS:", order.orderId);
             }
-
         }
 
         res.sendStatus(200);
 
     } catch (err) {
-
         console.log("Webhook error:", err);
-
         res.sendStatus(500);
+    }
+});
 
+// ======================
+// DEV ONLY: TEST GAME PAID
+// GET /api/payment/test-paid/:orderId
+// ======================
+
+router.get("/payment/test-paid/:orderId", async (req, res) => {
+    const order = await Order.findOne({
+        orderId: req.params.orderId
+    });
+
+    if (!order) {
+        return res.json({
+            success: false,
+            message: "Order not found"
+        });
     }
 
+    order.status = "paid";
+    order.paidAt = new Date();
+    order.note = "Payment received. Waiting for admin processing.";
+    await order.save();
+
+    res.json({
+        success: true,
+        orderId: order.orderId,
+        status: order.status
+    });
 });
-// DEV ONLY: simulate Omise paid
-router.get("/payment/test-omise-paid/:orderId", async (req, res) => {
+
+// ======================
+// DEV ONLY: TEST WALLET PAID
+// POST /api/wallet/test-paid/:topupId
+// ======================
+
+router.post("/wallet/test-paid/:topupId", async (req, res) => {
     try {
-        const order = await Order.findOne({
-            orderId: req.params.orderId
-        });
+        const result = await markWalletTopupPaid(
+            req,
+            req.params.topupId
+        );
 
-        if (!order) {
-            return res.json({
-                success: false,
-                message: "Order not found"
-            });
-        }
-
-        order.status = "paid";
-        order.paidAt = new Date();
-        order.note = "Omise test payment completed.";
-        await order.save();
-
-        res.json({
-            success: true,
-            orderId: order.orderId,
-            status: order.status
-        });
+        res.json(result);
 
     } catch (error) {
+        console.log("Wallet test paid error:", error);
+
         res.json({
             success: false,
-            message: error.message
+            message: error.message || "Server error"
         });
     }
 });
+
 module.exports = router;

@@ -473,63 +473,7 @@ body.dark .payment-item {
     line-height: 1.6 !important;
 }
 
-/* =========================
-   UPLOAD
-========================= */
 
-.upload-slip-box {
-    min-height: 116px !important;
-    margin-top: 10px !important;
-    padding: 18px !important;
-
-    border: 1.8px dashed rgba(124, 58, 237, .28) !important;
-    border-radius: 24px !important;
-
-    background: rgba(255, 255, 255, .30) !important;
-
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: 7px !important;
-
-    cursor: pointer !important;
-    text-align: center !important;
-
-    transition: .2s ease !important;
-}
-
-body.dark .upload-slip-box {
-    background: rgba(255, 255, 255, .04) !important;
-}
-
-.upload-slip-box:hover,
-.upload-slip-box.has-file {
-    border-color: var(--az-primary) !important;
-    background: var(--az-soft-purple) !important;
-}
-
-.upload-slip-box i {
-    color: var(--az-primary) !important;
-    font-size: 28px !important;
-}
-
-.upload-slip-box h4 {
-    margin: 0 !important;
-
-    color: var(--az-text);
-    font-size: 15px;
-    font-weight: 950;
-}
-
-.upload-slip-box p,
-#slipFileName {
-    margin: 0 !important;
-
-    color: var(--az-muted) !important;
-    font-size: 13px !important;
-    font-weight: 750 !important;
-}
 
 /* =========================
    SUBMIT
@@ -915,14 +859,6 @@ body.dark .qr-modal-box {
 }
 
 /* =========================
-   BOTTOM NAV
-========================= */
-
-.az-bottom-nav {
-    display: none;
-}
-
-/* =========================
    MOBILE
 ========================= */
 
@@ -987,46 +923,6 @@ body.dark .qr-modal-box {
         width: 100% !important;
         min-width: 0 !important;
     }
-
-    .az-bottom-nav {
-        position: fixed;
-        left: 14px;
-        right: 14px;
-        bottom: 14px;
-        z-index: 99999;
-
-        height: 64px;
-
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-
-        border-radius: 24px;
-        background: rgba(255, 255, 255, .76);
-        backdrop-filter: blur(18px);
-        border: 1px solid var(--az-line);
-    }
-
-    body.dark .az-bottom-nav {
-        background: rgba(15, 16, 35, .82);
-    }
-
-    .az-bottom-nav a {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-
-        gap: 4px;
-
-        color: var(--az-muted);
-        text-decoration: none;
-        font-size: 11px;
-        font-weight: 850;
-    }
-
-    .az-bottom-nav a.active {
-        color: var(--az-primary);
-    }
 }
 
 @media (max-width: 520px) {
@@ -1063,4 +959,215 @@ body.dark .qr-modal-box {
         font-size: 140px;
         right: -42px;
     }
+}
+
+/* =========================
+   WALLET V2.5 FINAL POLISH
+========================= */
+
+.az-topbar-actions a:not(.az-account-icon) {
+    display: none !important;
+}
+
+.az-account-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 16px;
+
+    display: grid !important;
+    place-items: center;
+
+    background: var(--az-soft-purple);
+    color: var(--az-primary) !important;
+
+    font-size: 18px !important;
+    text-decoration: none !important;
+}
+
+.quick-amounts {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin: 14px 0 22px;
+}
+
+.quick-amounts button {
+    height: 44px;
+
+    border: 1px solid var(--az-line);
+    border-radius: 999px;
+
+    background: transparent;
+    color: var(--az-text);
+
+    font-size: 14px;
+    font-weight: 950;
+
+    cursor: pointer;
+    transition: .2s ease;
+}
+
+.quick-amounts button:hover,
+.quick-amounts button.active {
+    border-color: rgba(124, 58, 237, .35);
+    background: var(--az-soft-purple);
+    color: var(--az-primary);
+}
+
+.wallet-submit-btn,
+#submitTopupBtn {
+    margin-top: 18px !important;
+}
+
+.wallet-note {
+    text-align: left !important;
+}
+
+/* force remove old slip/bottom nav */
+.upload-slip-box,
+#topupSlip,
+.az-bottom-nav {
+    display: none !important;
+}
+
+/* mobile */
+@media (max-width: 900px) {
+
+    .az-topbar {
+        height: 66px !important;
+        padding: 0 16px !important;
+    }
+
+    .az-topbar-brand {
+        font-size: 27px !important;
+    }
+
+    .az-account-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 15px;
+    }
+
+    .wallet-page {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 auto 70px !important;
+        padding: 28px 16px 80px !important;
+    }
+
+    .wallet-title-row {
+        margin-bottom: 30px !important;
+    }
+
+    .wallet-title-row h1 {
+        font-size: 42px !important;
+        line-height: .95 !important;
+        letter-spacing: -2px !important;
+    }
+
+    .wallet-title-row p {
+        font-size: 14px !important;
+        line-height: 1.55 !important;
+    }
+
+    .wallet-balance-top {
+        align-items: flex-start !important;
+    }
+
+    .wallet-balance-top h1 {
+        font-size: 46px !important;
+        letter-spacing: -2px !important;
+    }
+
+    .wallet-icon {
+        width: 50px !important;
+        height: 50px !important;
+        font-size: 20px !important;
+    }
+
+    .wallet-grid {
+        grid-template-columns: 1fr !important;
+        gap: 32px !important;
+    }
+
+    .wallet-card-head h2 {
+        font-size: 26px !important;
+    }
+
+    .wallet-card-head span {
+        font-size: 14px !important;
+    }
+
+    .quick-amounts {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .payment-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+
+    .wallet-qr-box img {
+        width: 170px !important;
+        height: 170px !important;
+    }
+}
+
+@media (max-width: 520px) {
+
+    .payment-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .wallet-balance-top {
+        flex-direction: column !important;
+        gap: 18px !important;
+    }
+
+    .success-actions {
+        flex-direction: column !important;
+    }
+}
+
+.wallet-qr-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center !important;
+}
+
+.wallet-qr-box img {
+    margin: auto;
+}
+
+.wallet-qr-box p {
+    margin-top: 16px !important;
+    text-align: center !important;
+}
+
+.wallet-history-item {
+    min-height: 72px;
+}
+
+.wallet-history-item strong {
+    font-size: 17px;
+}
+
+.wallet-status {
+    min-width: 90px;
+}
+
+@media(max-width:768px) {
+
+    .wallet-title-row h1 {
+        font-size: 38px !important;
+    }
+
+    .wallet-balance-top h1 {
+        font-size: 42px !important;
+    }
+
+    .wallet-card-head h2 {
+        font-size: 24px !important;
+    }
+
 }

@@ -1,499 +1,404 @@
-@media (max-width: 768px) {
+/* =========================================================
+   AZIEL MOBILE.CSS — CLEAN RESPONSIVE VERSION
+   Replace the whole css/theme/mobile.css with this file
+========================================================= */
 
-    /* =========================
-       PAGE
-    ========================= */
-
-    .az-page {
-        width: calc(100% - 24px);
-        padding: 14px 0 110px;
-    }
-
-    .az-section {
-        margin-top: 34px;
-    }
-
-    .az-section-head {
-        align-items: center;
-        margin-bottom: 14px;
-    }
-
-    .az-section-head h2 {
-        font-size: 22px;
-    }
-
-    .az-section-head p {
-        font-size: 13px;
-    }
-
-    .az-section-head a {
-        font-size: 13px;
-    }
-
-    /* =========================
-       HEADER
-    ========================= */
-
-    .az-header {
-        width: calc(100% - 24px);
-
-        height: auto;
-
-        padding: 14px 0;
-
-        gap: 12px;
-
-        flex-wrap: wrap;
-    }
-
-    .az-logo {
-        font-size: 24px;
-    }
-
-    .az-nav {
-        display: none;
-    }
-
-    .az-header-right {
-        width: 100%;
-
-        display: grid;
-        grid-template-columns: 1fr auto auto;
-
-        gap: 10px;
-    }
-
-    .az-search {
-        width: 100%;
-    }
-
-    .az-search input {
-        height: 46px;
-    }
-
-    .az-profile span {
-        display: none;
-    }
-
-    .az-profile {
-        padding: 7px 10px;
-    }
-
-    .az-avatar {
-        width: 34px;
-        height: 34px;
-    }
-
-    /* =========================
-       HERO
-    ========================= */
-
-    .az-hero {
-        height: 240px;
-        border-radius: 26px;
-    }
-
-    .az-hero-content {
-        left: 24px;
-        right: 24px;
-
-        max-width: 100%;
-    }
-
-    .az-hero-content h1 {
-        font-size: 30px;
-        line-height: 1.1;
-    }
-
-    .az-hero-content p {
-        font-size: 14px;
-        margin-bottom: 18px;
-    }
-
-    /* =========================
-       MOBILE SLIDER
-    ========================= */
-
-    .az-game-grid {
-        display: flex;
-
-        overflow-x: auto;
-
-        gap: 14px;
-
-        padding-bottom: 8px;
-
-        flex-wrap: nowrap;
-
-        scroll-snap-type: x mandatory;
-
-        scrollbar-width: none;
-
-        -webkit-overflow-scrolling: touch;
-    }
-
-    .az-game-grid::-webkit-scrollbar {
-        display: none;
-    }
-
-    .az-game-card {
-        min-width: 84%;
-        max-width: 84%;
-
-        flex: 0 0 auto;
-
-        scroll-snap-align: start;
-    }
-
-    .az-game-card img {
-        height: 160px;
-    }
-
-    .az-game-info {
-        padding: 14px;
-    }
-
-    .az-game-info h3 {
-        font-size: 15px;
-    }
-
-    .az-game-info p {
-        font-size: 12px;
-    }
-
-    /* =========================
-       FOOTER
-    ========================= */
-
-    .az-footer-grid {
-        grid-template-columns: 1fr;
-        gap: 26px;
-    }
-
-    /* =========================
-       MOBILE DRAWER
-    ========================= */
-
-    .az-mobile-menu-btn {
-        width: 42px;
-        height: 42px;
-
-        border: none;
-
-        border-radius: 14px;
-
-        background: #fff;
-
-        display: flex;
-        align-items: center;
-        justify-content: center;
-
-        font-size: 18px;
-
-        box-shadow: var(--shadow);
-
-        cursor: pointer;
-    }
-
-    .az-mobile-drawer-overlay {
-        position: fixed;
-        inset: 0;
-
-        background: rgba(0, 0, 0, .45);
-
-        opacity: 0;
-        pointer-events: none;
-
-        transition: .25s ease;
-
-        z-index: 9998;
-    }
-
-    .az-mobile-drawer-overlay.show {
-        opacity: 1;
-        pointer-events: auto;
-    }
-
-    .az-mobile-drawer {
-        position: fixed;
-
-        top: 0;
-        left: -300px;
-
-        width: 280px;
-        height: 100vh;
-
-        background: #fff;
-
-        z-index: 9999;
-
-        padding: 20px;
-
-        transition: .28s ease;
-
-        display: flex;
-        flex-direction: column;
-
-        gap: 8px;
-
-        box-shadow:
-            18px 0 40px rgba(0, 0, 0, .12);
-    }
-
-    .az-mobile-drawer.show {
-        left: 0;
-    }
-
-    .az-mobile-drawer a {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-
-        padding: 14px;
-
-        border-radius: 14px;
-
-        font-weight: 700;
-    }
-
-    .az-mobile-drawer a:hover {
-        background: #f3f4f6;
-    }
-
-    /* =========================
-       BOTTOM NAV
-    ========================= */
-
-    .az-bottom-nav {
-        position: fixed;
-
-        left: 12px;
-        right: 12px;
-        bottom: 14px;
-
-        height: 72px;
-
-        background:
-            rgba(255, 255, 255, .92);
-
-        backdrop-filter: blur(18px);
-
-        border-radius: 24px;
-
-        display: flex;
-        align-items: center;
-        justify-content: space-around;
-
-        z-index: 999;
-
-        box-shadow:
-            0 10px 30px rgba(0, 0, 0, .08);
-    }
-
-    .az-bottom-nav a {
-        flex: 1;
-
-        display: flex;
-        flex-direction: column;
-
-        align-items: center;
-        justify-content: center;
-
-        gap: 4px;
-
-        font-size: 11px;
-        font-weight: 700;
-
-        color: #7b8191;
-    }
-
-    .az-bottom-nav a i {
-        font-size: 20px;
-    }
-
-    .az-bottom-nav a.active {
-        color: var(--primary);
-    }
-
-}
 
 /* =========================
-   DESKTOP ONLY
+   DESKTOP HIDE MOBILE UI
 ========================= */
-
 @media (min-width: 769px) {
 
     .az-mobile-menu-btn,
     .az-mobile-drawer,
     .az-mobile-drawer-overlay,
     .az-bottom-nav {
-        display: none;
+        display: none !important;
     }
-
 }
 
+
+/* =========================
+   MOBILE GLOBAL
+========================= */
 @media (max-width: 768px) {
 
+    *,
+    *::before,
+    *::after {
+        box-sizing: border-box;
+    }
+
+    html,
     body {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: hidden !important;
+    }
+
+    body {
+        margin: 0;
+        padding: 0;
         background:
-            radial-gradient(circle at top right,
-                rgba(124, 58, 237, .10),
-                transparent 32%),
+            radial-gradient(circle at top right, rgba(124, 58, 237, .10), transparent 34%),
             #f6f3eb;
     }
 
-    .az-header {
-        align-items: center;
+    img,
+    video,
+    canvas,
+    svg {
+        max-width: 100%;
     }
 
-    .az-mobile-menu-btn {
-        background: #ffffff;
-        color: var(--primary);
-        border-radius: 20px;
-        width: 54px;
-        height: 54px;
-        font-size: 22px;
+    main,
+    .az-page,
+    .home-page,
+    .main-content,
+    .az-container,
+    .container,
+    .page-container,
+    .section-container {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin-inline: auto !important;
+        padding-left: 14px !important;
+        padding-right: 14px !important;
     }
 
-    .az-logo {
-        font-size: 34px;
-        font-weight: 900;
-        letter-spacing: .5px;
-    }
-
-    .az-header-right {
-        grid-template-columns: 1fr auto auto;
-        margin-top: 8px;
-    }
-
-    .az-search input {
-        height: 58px;
-        border-radius: 22px;
-        font-size: 16px;
-        padding: 0 18px;
-    }
-
-    .az-hero {
-        height: 280px;
-        border-radius: 30px;
-    }
-
-    .az-hero-content h1 {
-        font-size: 38px;
-    }
-
-    .az-section-head h2 {
-        font-size: 30px;
-        line-height: 1.1;
-    }
-
-    .az-game-grid {
-        display: flex;
-        overflow-x: auto;
-        gap: 14px;
-        padding: 6px 4px 18px;
-        scroll-snap-type: x mandatory;
-        scrollbar-width: none;
-    }
-
-    .az-game-grid::-webkit-scrollbar {
-        display: none;
-    }
-
-    .az-game-card {
-        min-width: 82%;
-        max-width: 82%;
-        flex: 0 0 auto;
-        scroll-snap-align: start;
-
-        display: grid;
-        grid-template-columns: 86px 1fr;
-        align-items: center;
-
-        min-height: 118px;
-        border-radius: 24px;
-    }
-
-    .az-game-card img {
-        width: 86px;
-        height: 86px;
-        border-radius: 20px;
-        margin-left: 14px;
-    }
-
-    .az-game-info h3 {
-        font-size: 18px;
-        line-height: 1.2;
-    }
-
-    .az-game-info p {
-        font-size: 14px;
-    }
-
-    .az-bottom-nav {
-        height: 72px;
-        border-radius: 26px;
-    }
-}
-
-@media (max-width: 768px) {
-    .az-game-card {
-        min-width: 86%;
-        max-width: 86%;
+    .az-page {
+        padding-top: 14px !important;
+        padding-bottom: 120px !important;
     }
 
     .az-section {
-        margin-top: 36px;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin-top: 28px !important;
     }
 
-    .az-footer {
-        margin-bottom: 90px;
+    .az-section-head,
+    .section-header,
+    .home-section-header {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 12px !important;
+        margin-bottom: 14px !important;
     }
 
-    .az-bottom-nav {
-        z-index: 99999;
+    .az-section-head h2,
+    .section-header h2,
+    .home-section-header h2 {
+        font-size: 22px !important;
+        line-height: 1.15 !important;
+        margin: 0 !important;
+    }
+
+    .az-section-head a,
+    .section-header a,
+    .home-section-header a {
+        font-size: 12px !important;
+        white-space: nowrap !important;
     }
 }
 
-.az-mobile-drawer {
-    transform: translateX(-110%);
-    transition: .3s ease;
-}
 
-.az-mobile-drawer.show {
-    transform: translateX(0);
-}
-
-.az-mobile-drawer-overlay {
-    opacity: 0;
-    visibility: hidden;
-    transition: .25s ease;
-}
-
-.az-mobile-drawer-overlay.show {
-    opacity: 1;
-    visibility: visible;
-}
-
-body.drawer-open {
-    overflow: hidden;
-}
-
+/* =========================
+   MOBILE HEADER
+========================= */
 @media (max-width: 768px) {
+
+    .az-header,
+    header {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-height: auto !important;
+        padding: 12px 14px !important;
+        margin: 0 auto !important;
+
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 10px !important;
+
+        position: relative !important;
+        z-index: 1000 !important;
+    }
+
+    .az-logo {
+        font-size: 26px !important;
+        line-height: 1 !important;
+        font-weight: 900 !important;
+        letter-spacing: .2px !important;
+        white-space: nowrap !important;
+    }
+
+    .az-nav {
+        display: none !important;
+    }
+
+    .az-header-right {
+        width: auto !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-end !important;
+        gap: 8px !important;
+        margin: 0 !important;
+    }
+
+    .az-search {
+        display: none !important;
+    }
+
+    .az-profile {
+        width: 42px !important;
+        height: 42px !important;
+        min-width: 42px !important;
+
+        padding: 0 !important;
+        border-radius: 14px !important;
+
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+
+        position: relative !important;
+        z-index: 1001 !important;
+    }
+
+    .az-profile span {
+        display: none !important;
+    }
+
+    .az-avatar {
+        width: 34px !important;
+        height: 34px !important;
+        border-radius: 12px !important;
+    }
+
+    .az-mobile-menu-btn {
+        width: 42px !important;
+        height: 42px !important;
+        min-width: 42px !important;
+
+        border: 0 !important;
+        border-radius: 14px !important;
+
+        background: rgba(255, 255, 255, .88) !important;
+        color: var(--primary, #8b5cf6) !important;
+
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+
+        font-size: 18px !important;
+        cursor: pointer !important;
+
+        position: relative !important;
+        z-index: 1001 !important;
+
+        box-shadow: 0 8px 24px rgba(15, 23, 42, .08) !important;
+    }
+}
+
+
+/* =========================
+   MOBILE HERO / BANNER
+========================= */
+@media (max-width: 768px) {
+
+    .az-hero,
+    .hero,
+    .banner,
+    .hero-slider,
+    .banner-slider,
+    .swiper {
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+        min-height: 0 !important;
+
+        overflow: hidden !important;
+        border-radius: 18px !important;
+    }
+
+    .az-hero {
+        aspect-ratio: 16 / 9 !important;
+    }
+
+    .az-hero img,
+    .hero img,
+    .banner img,
+    .hero-slider img,
+    .banner-slider img,
+    .swiper img {
+        width: 100% !important;
+        height: 100% !important;
+        display: block !important;
+        object-fit: cover !important;
+    }
+
+    .az-hero-content {
+        left: 18px !important;
+        right: 18px !important;
+        bottom: 18px !important;
+        max-width: calc(100% - 36px) !important;
+    }
+
+    .az-hero-content h1 {
+        font-size: 26px !important;
+        line-height: 1.1 !important;
+    }
+
+    .az-hero-content p {
+        font-size: 13px !important;
+        line-height: 1.4 !important;
+    }
+}
+
+
+/* =========================
+   MOBILE POPULAR GAMES
+========================= */
+@media (max-width: 768px) {
+
+    .az-game-grid,
+    .game-grid,
+    .popular-games,
+    .popular-game-list,
+    .games-row {
+        width: 100% !important;
+        max-width: 100% !important;
+
+        display: grid !important;
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        gap: 10px !important;
+
+        overflow: visible !important;
+        padding: 0 !important;
+    }
+
+    .az-game-card,
+    .game-card,
+    .popular-game-card {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+
+        display: block !important;
+        border-radius: 16px !important;
+        overflow: hidden !important;
+    }
+
+    .az-game-card img,
+    .game-card img,
+    .popular-game-card img {
+        width: 100% !important;
+        height: auto !important;
+        aspect-ratio: 1 / 1 !important;
+
+        display: block !important;
+        object-fit: cover !important;
+        border-radius: 14px !important;
+        margin: 0 !important;
+    }
+
+    .az-game-info,
+    .game-info,
+    .popular-game-info {
+        padding: 8px 4px 4px !important;
+        text-align: left !important;
+    }
+
+    .az-game-info h3,
+    .game-card h3,
+    .popular-game-card h3 {
+        font-size: 11px !important;
+        line-height: 1.15 !important;
+        margin: 0 0 4px !important;
+
+        display: -webkit-box !important;
+        -webkit-line-clamp: 2 !important;
+        -webkit-box-orient: vertical !important;
+        overflow: hidden !important;
+    }
+
+    .az-game-info p,
+    .game-card p,
+    .popular-game-card p {
+        font-size: 9.5px !important;
+        line-height: 1.2 !important;
+        margin: 0 !important;
+    }
+}
+
+
+/* =========================
+   MOBILE CATEGORIES
+========================= */
+@media (max-width: 768px) {
+
+    .category-grid,
+    .topup-category-grid,
+    .az-category-grid,
+    .categories-grid {
+        width: 100% !important;
+        max-width: 100% !important;
+
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 10px !important;
+    }
+
+    .category-card,
+    .az-category-card,
+    .topup-category-card {
+        width: 100% !important;
+        min-width: 0 !important;
+        border-radius: 14px !important;
+        padding: 12px !important;
+    }
+
+    .category-card img,
+    .az-category-card img,
+    .topup-category-card img {
+        width: 28px !important;
+        height: 28px !important;
+        object-fit: cover !important;
+        border-radius: 8px !important;
+    }
+
+    .category-card h3,
+    .az-category-card h3,
+    .topup-category-card h3 {
+        font-size: 12px !important;
+        line-height: 1.2 !important;
+    }
+}
+
+
+/* =========================
+   MOBILE ACCOUNT PAGE
+========================= */
+@media (max-width: 768px) {
+
     .account-layout {
         display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
     }
 
-    .account-sidebar {
-        display: block !important;
-        width: calc(100% - 28px) !important;
-        margin: 16px auto !important;
+    .account-sidebar,
+    .account-main {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 14px auto !important;
         position: relative !important;
     }
 
     .account-main {
-        width: calc(100% - 28px) !important;
-        margin: 16px auto 110px !important;
+        margin-bottom: 120px !important;
     }
 
     .account-menu,
@@ -502,97 +407,153 @@ body.drawer-open {
         display: grid !important;
         gap: 10px !important;
     }
+}
 
-    .az-header,
-    .az-header-right,
-    .az-profile,
-    .az-btn,
-    .az-mobile-menu-btn {
-        position: relative !important;
-        z-index: 99999 !important;
-        pointer-events: auto !important;
+
+/* =========================
+   MOBILE FOOTER
+========================= */
+@media (max-width: 768px) {
+
+    .az-footer,
+    .site-footer,
+    footer {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 34px auto 90px !important;
+        padding: 28px 14px 120px !important;
+        box-sizing: border-box !important;
     }
 
-    .az-page,
-    .account-page,
-    .account-bg,
-    .az-hero-overlay {
-        pointer-events: auto;
+    .az-footer-grid,
+    .footer-grid {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        gap: 26px !important;
     }
 
-    .az-hero-overlay {
-        pointer-events: none !important;
+    .footer-payment,
+    .payment-methods,
+    .payment-logo-row {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 14px !important;
+    }
+
+    .footer-payment img,
+    .payment-methods img,
+    .payment-logo-row img {
+        max-width: 52px !important;
+        height: auto !important;
+        object-fit: contain !important;
     }
 }
 
+
+/* =========================
+   MOBILE BOTTOM NAV
+========================= */
 @media (max-width: 768px) {
 
-    .az-mobile-menu-btn {
-        width: 44px !important;
-        height: 44px !important;
+    .az-bottom-nav,
+    .bottom-nav,
+    .mobile-bottom-nav {
+        position: fixed !important;
 
-        min-width: 44px;
-        min-height: 44px;
+        left: 14px !important;
+        right: 14px !important;
+        bottom: 14px !important;
 
-        border-radius: 14px;
+        width: auto !important;
+        height: 66px !important;
+
+        background: rgba(255, 255, 255, .92) !important;
+        backdrop-filter: blur(18px) !important;
+        -webkit-backdrop-filter: blur(18px) !important;
+
+        border-radius: 24px !important;
 
         display: flex !important;
-        align-items: center;
-        justify-content: center;
+        align-items: center !important;
+        justify-content: space-around !important;
 
-        font-size: 18px !important;
+        z-index: 99990 !important;
 
-        position: relative;
-        z-index: 100000;
-
-        flex-shrink: 0;
+        box-shadow: 0 12px 32px rgba(15, 23, 42, .12) !important;
     }
 
-    .az-mobile-menu-btn i {
+    .az-bottom-nav a,
+    .bottom-nav a,
+    .mobile-bottom-nav a {
+        flex: 1 !important;
+
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+
+        gap: 4px !important;
+
+        font-size: 10px !important;
+        line-height: 1 !important;
+        font-weight: 700 !important;
+
+        color: #7b8191 !important;
+        text-decoration: none !important;
+    }
+
+    .az-bottom-nav a i,
+    .bottom-nav a i,
+    .mobile-bottom-nav a i {
         font-size: 18px !important;
     }
 
+    .az-bottom-nav a.active,
+    .bottom-nav a.active,
+    .mobile-bottom-nav a.active {
+        color: var(--primary, #8b5cf6) !important;
+    }
 }
 
-.az-mobile-drawer {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 78% !important;
-    max-width: 300px !important;
-    height: 100vh !important;
-    z-index: 999999 !important;
-    transform: translateX(-110%) !important;
-    transition: .3s ease !important;
-    background: rgba(15, 23, 42, .96) !important;
-    padding: 90px 22px 24px !important;
-}
 
-.az-mobile-drawer.show {
-    transform: translateX(0) !important;
-}
-
-.az-mobile-drawer-overlay {
-    position: fixed !important;
-    inset: 0 !important;
-    z-index: 999998 !important;
-    background: rgba(0, 0, 0, .55) !important;
-    opacity: 0 !important;
-    visibility: hidden !important;
-}
-
-.az-mobile-drawer-overlay.show {
-    opacity: 1 !important;
-    visibility: visible !important;
-}
-
-.drawer-open {
-    overflow: hidden !important;
-}
-
+/* =========================
+   MOBILE LIVE CHAT
+========================= */
 @media (max-width: 768px) {
 
-    #mobileDrawer.az-mobile-drawer {
+    .live-chat,
+    .chat-ball,
+    .chat-widget,
+    .live-chat-btn {
+        right: 18px !important;
+        bottom: 88px !important;
+        z-index: 99991 !important;
+    }
+
+    .live-chat-panel,
+    .chat-panel {
+        width: calc(100vw - 28px) !important;
+        max-width: 360px !important;
+        right: 14px !important;
+        bottom: 150px !important;
+        border-radius: 22px !important;
+    }
+}
+
+
+/* =========================
+   MOBILE DRAWER
+========================= */
+@media (max-width: 768px) {
+
+    body.drawer-open {
+        overflow: hidden !important;
+    }
+
+    .az-mobile-drawer,
+    #mobileDrawer {
         position: fixed !important;
         top: 0 !important;
         left: 0 !important;
@@ -602,7 +563,7 @@ body.drawer-open {
         height: 100vh !important;
 
         transform: translateX(-110%) !important;
-        transition: .3s ease !important;
+        transition: transform .3s ease !important;
 
         background: rgba(12, 18, 38, .98) !important;
         color: #fff !important;
@@ -616,10 +577,12 @@ body.drawer-open {
         box-shadow: 18px 0 60px rgba(0, 0, 0, .45) !important;
     }
 
-    #mobileDrawer.az-mobile-drawer.show {
+    .az-mobile-drawer.show,
+    #mobileDrawer.show {
         transform: translateX(0) !important;
     }
 
+    .az-mobile-drawer a,
     #mobileDrawer a {
         display: flex !important;
         align-items: center !important;
@@ -636,56 +599,938 @@ body.drawer-open {
         background: rgba(255, 255, 255, .06) !important;
     }
 
+    .az-mobile-drawer a:hover,
     #mobileDrawer a:hover {
         background: rgba(168, 85, 247, .22) !important;
     }
 
-    #mobileDrawerOverlay.az-mobile-drawer-overlay {
+    .az-mobile-drawer-overlay,
+    #mobileDrawerOverlay {
         position: fixed !important;
         inset: 0 !important;
 
         background: rgba(0, 0, 0, .55) !important;
         backdrop-filter: blur(5px) !important;
+        -webkit-backdrop-filter: blur(5px) !important;
 
         opacity: 0 !important;
         visibility: hidden !important;
 
         z-index: 999998 !important;
+
+        transition: opacity .25s ease, visibility .25s ease !important;
     }
 
-    #mobileDrawerOverlay.az-mobile-drawer-overlay.show {
+    .az-mobile-drawer-overlay.show,
+    #mobileDrawerOverlay.show {
         opacity: 1 !important;
         visibility: visible !important;
     }
 }
 
-#mobileDrawer {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 280px !important;
-    height: 100vh !important;
-    background: #0f172a !important;
-    z-index: 999999 !important;
-    transform: translateX(-110%) !important;
-    transition: .3s ease !important;
-    padding: 90px 22px !important;
+
+/* =========================
+   SMALL PHONE
+========================= */
+@media (max-width: 430px) {
+
+    main,
+    .az-page,
+    .home-page,
+    .main-content,
+    .az-container,
+    .container,
+    .page-container,
+    .section-container {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+
+    .az-header,
+    header {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+
+    .az-section-head h2,
+    .section-header h2,
+    .home-section-header h2 {
+        font-size: 21px !important;
+    }
+
+    .az-bottom-nav,
+    .bottom-nav,
+    .mobile-bottom-nav {
+        left: 12px !important;
+        right: 12px !important;
+        bottom: 12px !important;
+    }
 }
 
-#mobileDrawer.show {
-    transform: translateX(0) !important;
+/* =========================
+   MOBILE FOOTER + LIVE CHAT FIX
+========================= */
+@media (max-width: 768px) {
+
+    .az-footer,
+    .site-footer,
+    footer {
+        min-height: auto !important;
+        margin: 24px auto 82px !important;
+        padding: 26px 14px 90px !important;
+    }
+
+    .az-footer-grid,
+    .footer-grid {
+        gap: 20px !important;
+    }
+
+    .az-footer h3,
+    footer h3 {
+        margin-bottom: 10px !important;
+        font-size: 14px !important;
+    }
+
+    .az-footer p,
+    .az-footer a,
+    footer p,
+    footer a {
+        margin-bottom: 8px !important;
+        font-size: 13px !important;
+        line-height: 1.35 !important;
+    }
+
+    .footer-payment,
+    .payment-methods,
+    .payment-logo-row {
+        justify-content: flex-start !important;
+        gap: 12px !important;
+        margin-top: 8px !important;
+    }
+
+    .footer-payment img,
+    .payment-methods img,
+    .payment-logo-row img {
+        max-width: 46px !important;
+        max-height: 26px !important;
+    }
+
+    .aziel-support-tab,
+    .live-chat,
+    .chat-ball,
+    .chat-widget,
+    .live-chat-btn {
+        position: fixed !important;
+        right: 22px !important;
+        bottom: 96px !important;
+        z-index: 100000 !important;
+    }
+
+    .aziel-support-tab {
+        width: auto !important;
+        height: 48px !important;
+        padding: 0 16px !important;
+        border-radius: 16px !important;
+    }
+
+    .live-chat-panel,
+    .chat-panel,
+    #liveChatPanel {
+        position: fixed !important;
+        right: 14px !important;
+        bottom: 154px !important;
+        width: calc(100vw - 28px) !important;
+        max-width: 360px !important;
+        max-height: 68vh !important;
+        border-radius: 22px !important;
+        z-index: 100001 !important;
+    }
 }
 
-#mobileDrawerOverlay {
-    position: fixed !important;
-    inset: 0 !important;
-    background: rgba(0, 0, 0, .55) !important;
-    z-index: 999998 !important;
-    opacity: 0 !important;
-    visibility: hidden !important;
+/* =========================
+   MOBILE FOOTER SEAGM STYLE
+   + REMOVE BOTTOM NAV
+========================= */
+@media (max-width: 768px) {
+
+    /* remove bottom nav */
+    .az-bottom-nav,
+    .bottom-nav,
+    .mobile-bottom-nav {
+        display: none !important;
+    }
+
+    /* footer compact */
+    .az-footer,
+    .site-footer,
+    footer {
+        margin: 28px auto 0 !important;
+        padding: 26px 14px 70px !important;
+        min-height: auto !important;
+    }
+
+    .az-footer-grid,
+    .footer-grid {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 22px 28px !important;
+    }
+
+    .az-footer-brand,
+    .footer-brand {
+        grid-column: 1 / -1 !important;
+    }
+
+    .az-footer h3,
+    footer h3 {
+        font-size: 13px !important;
+        margin: 0 0 10px !important;
+    }
+
+    .az-footer p,
+    .az-footer a,
+    footer p,
+    footer a {
+        font-size: 12px !important;
+        line-height: 1.45 !important;
+        margin: 0 0 8px !important;
+    }
+
+    .footer-payment,
+    .payment-methods,
+    .payment-logo-row {
+        grid-column: 1 / -1 !important;
+        justify-content: flex-start !important;
+        gap: 10px !important;
+        margin-top: 8px !important;
+    }
+
+    .footer-payment img,
+    .payment-methods img,
+    .payment-logo-row img {
+        max-width: 52px !important;
+        max-height: 28px !important;
+        object-fit: contain !important;
+    }
+
+    /* live chat bottom-right like SEAGM */
+    .aziel-support-tab,
+    .live-chat,
+    .chat-ball,
+    .chat-widget,
+    .live-chat-btn {
+        position: fixed !important;
+        right: 16px !important;
+        bottom: 18px !important;
+        z-index: 100000 !important;
+    }
+
+    .aziel-support-tab {
+        width: 52px !important;
+        height: 52px !important;
+        padding: 0 !important;
+        border-radius: 16px !important;
+        font-size: 0 !important;
+    }
+
+    .aziel-support-tab i {
+        font-size: 20px !important;
+        margin: 0 !important;
+    }
+
+    .live-chat-panel,
+    .chat-panel,
+    #liveChatPanel {
+        position: fixed !important;
+        right: 14px !important;
+        bottom: 82px !important;
+        width: calc(100vw - 28px) !important;
+        max-width: 360px !important;
+        max-height: 72vh !important;
+        border-radius: 22px !important;
+        z-index: 100001 !important;
+    }
 }
 
-#mobileDrawerOverlay.show {
-    opacity: 1 !important;
-    visibility: visible !important;
+/* =========================
+   SEAGM STYLE FOOTER
+========================= */
+@media (max-width:768px) {
+
+    .site-footer {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 24px 28px !important;
+
+        margin-top: 24px !important;
+        padding: 24px 14px 80px !important;
+
+        border-top: 1px solid rgba(0, 0, 0, .08);
+    }
+
+    /* AZIEL brand full width */
+    .site-footer>div:first-child {
+        grid-column: 1 / -1;
+    }
+
+    /* Payment methods full width */
+    .site-footer>div:last-child {
+        grid-column: 1 / -1;
+    }
+
+    .site-footer h3,
+    .site-footer h4 {
+        margin-bottom: 10px;
+        font-size: 14px;
+    }
+
+    .site-footer p,
+    .site-footer a {
+        display: block;
+        font-size: 12px;
+        line-height: 1.5;
+        margin-bottom: 8px;
+        text-decoration: none;
+        color: inherit;
+    }
+
+    .payment-logos {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .payment-logos img {
+        width: 52px;
+        height: auto;
+    }
+
+    /* remove <br> effect */
+    .site-footer br {
+        display: none;
+    }
+
+}
+
+/* =========================
+   TYPOGRAPHY FOOTER
+========================= */
+@media (max-width:768px) {
+
+    .site-footer {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 22px 28px;
+
+        padding: 28px 16px 80px;
+        margin-top: 28px;
+
+        background: none !important;
+        border: none !important;
+        box-shadow: none !important;
+    }
+
+    /* Brand full width */
+    .site-footer>div:first-child {
+        grid-column: 1 / -1;
+    }
+
+    /* Payment methods full width */
+    .site-footer>div:last-child {
+        grid-column: 1 / -1;
+    }
+
+    .site-footer h3,
+    .site-footer h4 {
+        font-size: 14px;
+        font-weight: 700;
+        margin: 0 0 12px;
+        color: var(--text-primary);
+    }
+
+    .site-footer p {
+        font-size: 12px;
+        line-height: 1.7;
+        color: var(--text-secondary);
+        margin: 0;
+    }
+
+    .site-footer a {
+        display: block;
+        font-size: 12px;
+        line-height: 2;
+        text-decoration: none;
+        color: var(--text-secondary);
+        transition: .2s;
+    }
+
+    .site-footer a:hover {
+        color: var(--primary);
+    }
+
+    .site-footer br {
+        display: none;
+    }
+
+    .payment-logos {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 10px;
+    }
+
+    .payment-logos img {
+        max-width: 52px;
+        max-height: 26px;
+        object-fit: contain;
+    }
+
+}
+
+.footer-copy {
+    width: 100%;
+    text-align: center;
+    font-size: 11px;
+    opacity: .7;
+    margin-top: 20px;
+    color: var(--text-secondary);
+}
+
+@media (max-width:768px) {
+    .footer-copy {
+        grid-column: 1 / -1;
+    }
+}
+
+/* =========================================================
+   ACCOUNT PAGE FINAL RESPONSIVE POLISH
+   Add this at the VERY BOTTOM of account.css
+========================================================= */
+
+
+/* =========================
+   DESKTOP HEADER CLEAN
+========================= */
+
+.az-topbar,
+.account-topbar {
+    width: min(1180px, 92%);
+    margin: 0 auto;
+    padding: 22px 0;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.az-topbar .az-logo,
+.account-topbar .az-logo {
+    color: var(--az-text);
+    text-decoration: none;
+    font-size: 30px;
+    line-height: 1;
+    font-weight: 950;
+    letter-spacing: -1px;
+}
+
+.account-menu-btn,
+.az-menu-btn {
+    display: none;
+}
+
+
+/* =========================
+   DESKTOP ACCOUNT LAYOUT
+========================= */
+
+@media (min-width: 901px) {
+
+    .account-layout {
+        width: min(1180px, 92%) !important;
+        margin: 40px auto 100px !important;
+
+        display: grid !important;
+        grid-template-columns: 250px minmax(0, 1fr) !important;
+        gap: 58px !important;
+        align-items: start !important;
+    }
+
+    .account-sidebar {
+        position: sticky !important;
+        top: 110px !important;
+        transform: none !important;
+        height: auto !important;
+        width: auto !important;
+        max-width: none !important;
+        padding: 0 !important;
+        background: transparent !important;
+        border: 0 !important;
+        z-index: auto !important;
+    }
+
+    .account-drawer-overlay {
+        display: none !important;
+    }
+}
+
+
+/* =========================
+   MOBILE TOPBAR
+========================= */
+
+@media (max-width: 900px) {
+
+    body.account-page {
+        min-height: 100vh !important;
+        overflow-x: hidden !important;
+    }
+
+    body.account-page::after {
+        display: none !important;
+    }
+
+    .az-topbar,
+    .account-topbar,
+    header.az-topbar {
+        width: 100% !important;
+        max-width: 100% !important;
+
+        margin: 0 !important;
+        padding: 14px 16px !important;
+
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 99990 !important;
+
+        background: rgba(255, 255, 255, .58) !important;
+        backdrop-filter: blur(18px) !important;
+        -webkit-backdrop-filter: blur(18px) !important;
+
+        border-bottom: 1px solid rgba(17, 24, 39, .06) !important;
+    }
+
+    body.dark .az-topbar,
+    body.dark .account-topbar,
+    html.dark .az-topbar,
+    html.dark .account-topbar,
+    body[data-theme="dark"] .az-topbar,
+    body[data-theme="dark"] .account-topbar {
+        background: rgba(5, 8, 20, .72) !important;
+        border-bottom-color: rgba(255, 255, 255, .08) !important;
+    }
+
+    .az-topbar .az-logo,
+    .account-topbar .az-logo {
+        font-size: 27px !important;
+        font-weight: 950 !important;
+        letter-spacing: -1px !important;
+        color: var(--az-text) !important;
+        text-decoration: none !important;
+    }
+
+    .az-topbar>a:not(.az-logo),
+    .account-topbar>a:not(.az-logo),
+    .az-topbar .topbar-link,
+    .account-topbar .topbar-link {
+        display: none !important;
+    }
+
+    .account-menu-btn,
+    .az-menu-btn {
+        width: 42px !important;
+        height: 42px !important;
+
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+
+        border: 0 !important;
+        border-radius: 15px !important;
+
+        background: var(--az-soft-purple) !important;
+        color: var(--az-primary) !important;
+
+        font-size: 18px !important;
+        cursor: pointer !important;
+    }
+}
+
+
+/* =========================
+   MOBILE DRAWER
+========================= */
+
+@media (max-width: 900px) {
+
+    .account-sidebar {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+
+        width: 82% !important;
+        max-width: 318px !important;
+        height: 100vh !important;
+
+        padding: 88px 20px 24px !important;
+
+        background:
+            radial-gradient(circle at top left, rgba(124, 58, 237, .18), transparent 34%),
+            linear-gradient(180deg, var(--az-bg), var(--az-bg-2)) !important;
+
+        border-right: 1px solid var(--az-line) !important;
+        box-shadow: 18px 0 60px rgba(0, 0, 0, .20) !important;
+
+        transform: translateX(-110%) !important;
+        transition: transform .28s ease !important;
+
+        z-index: 999999 !important;
+        overflow-y: auto !important;
+    }
+
+    .account-sidebar.show {
+        transform: translateX(0) !important;
+    }
+
+    .account-drawer-overlay {
+        position: fixed !important;
+        inset: 0 !important;
+
+        display: block !important;
+
+        background: rgba(0, 0, 0, .48) !important;
+        backdrop-filter: blur(6px) !important;
+        -webkit-backdrop-filter: blur(6px) !important;
+
+        opacity: 0 !important;
+        visibility: hidden !important;
+
+        transition: .25s ease !important;
+        z-index: 999998 !important;
+    }
+
+    .account-drawer-overlay.show {
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+
+    body.drawer-open {
+        overflow: hidden !important;
+    }
+
+    .profile-card {
+        padding-bottom: 22px !important;
+        margin-bottom: 18px !important;
+    }
+
+    .account-menu {
+        margin-top: 20px !important;
+        display: grid !important;
+        gap: 8px !important;
+    }
+
+    .side-link {
+        min-height: 48px !important;
+        padding: 0 14px !important;
+
+        border-radius: 16px !important;
+
+        font-size: 14px !important;
+        font-weight: 900 !important;
+    }
+}
+
+
+/* =========================
+   MOBILE CONTENT
+========================= */
+
+@media (max-width: 900px) {
+
+    .account-layout {
+        width: 100% !important;
+        max-width: 100% !important;
+
+        display: block !important;
+
+        margin: 0 !important;
+        padding: 26px 16px 80px !important;
+    }
+
+    .account-content {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        padding-bottom: 40px !important;
+    }
+
+    .page-title {
+        margin-bottom: 30px !important;
+    }
+
+    .page-title h1 {
+        font-size: 36px !important;
+        line-height: .96 !important;
+        letter-spacing: -1.8px !important;
+        margin: 0 !important;
+    }
+
+    .page-title p {
+        max-width: 320px !important;
+        margin-top: 14px !important;
+
+        font-size: 14px !important;
+        line-height: 1.6 !important;
+        font-weight: 700 !important;
+    }
+}
+
+
+/* =========================
+   MOBILE OVERVIEW STATS
+========================= */
+
+@media (max-width: 900px) {
+
+    .dashboard-grid {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 26px 18px !important;
+
+        padding-bottom: 30px !important;
+        margin-bottom: 30px !important;
+
+        border-bottom: 1px solid var(--az-line) !important;
+    }
+
+    .dash-card {
+        min-width: 0 !important;
+        padding: 0 !important;
+        background: transparent !important;
+        border: 0 !important;
+        box-shadow: none !important;
+    }
+
+    .dash-card span {
+        margin-bottom: 8px !important;
+        font-size: 12px !important;
+        line-height: 1.25 !important;
+        font-weight: 950 !important;
+    }
+
+    .dash-card strong {
+        font-size: 31px !important;
+        line-height: 1 !important;
+        letter-spacing: -1.4px !important;
+    }
+}
+
+
+/* =========================
+   MOBILE CONTENT CARDS
+========================= */
+
+@media (max-width: 900px) {
+
+    .content-card,
+    .form-card {
+        padding: 0 0 30px !important;
+        margin-bottom: 30px !important;
+
+        background: transparent !important;
+        border: 0 !important;
+        border-bottom: 1px solid var(--az-line) !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+    }
+
+    .card-head {
+        display: flex !important;
+        align-items: flex-start !important;
+        justify-content: space-between !important;
+        flex-direction: row !important;
+
+        gap: 14px !important;
+        margin-bottom: 18px !important;
+    }
+
+    .card-head h2,
+    .content-card h2 {
+        font-size: 27px !important;
+        line-height: 1.05 !important;
+        letter-spacing: -1px !important;
+        margin: 0 !important;
+    }
+
+    .card-head a {
+        font-size: 12px !important;
+        white-space: nowrap !important;
+    }
+}
+
+
+/* =========================
+   MOBILE ORDERS
+========================= */
+
+@media (max-width: 900px) {
+
+    #recentOrders,
+    #historyList {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        gap: 0 !important;
+    }
+
+    .recent-order-item {
+        display: grid !important;
+        grid-template-columns: 1fr auto !important;
+        align-items: center !important;
+        gap: 14px !important;
+
+        padding: 16px 0 !important;
+        border-bottom: 1px solid var(--az-line) !important;
+
+        background: transparent !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+    }
+
+    .recent-order-item strong {
+        font-size: 15px !important;
+        line-height: 1.2 !important;
+    }
+
+    .recent-order-item small {
+        font-size: 12px !important;
+    }
+
+    .order-card {
+        padding: 16px 0 !important;
+        border-bottom: 1px solid var(--az-line) !important;
+        background: transparent !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+    }
+
+    .order-top,
+    .order-bottom {
+        align-items: flex-start !important;
+        gap: 12px !important;
+    }
+
+    .order-game {
+        font-size: 16px !important;
+    }
+
+    .order-package {
+        font-size: 13px !important;
+    }
+
+    .empty-orders {
+        padding: 24px 0 !important;
+    }
+
+    .empty-orders h3 {
+        font-size: 20px !important;
+    }
+
+    .empty-orders p,
+    #recentOrders p,
+    #historyList p {
+        font-size: 14px !important;
+        line-height: 1.55 !important;
+    }
+}
+
+
+/* =========================
+   MOBILE FORMS
+========================= */
+
+@media (max-width: 900px) {
+
+    .form-card {
+        max-width: 100% !important;
+    }
+
+    .form-card label {
+        margin: 20px 0 8px !important;
+        font-size: 12px !important;
+    }
+
+    .form-card input,
+    .form-card select {
+        height: 52px !important;
+        font-size: 16px !important;
+    }
+
+    .primary-btn,
+    .security-btn {
+        width: auto !important;
+        min-height: 46px !important;
+        padding: 0 20px !important;
+        font-size: 13px !important;
+    }
+}
+
+
+/* =========================
+   MOBILE SECURITY
+========================= */
+
+@media (max-width: 900px) {
+
+    .security-card {
+        display: grid !important;
+        grid-template-columns: 44px 1fr !important;
+        gap: 14px !important;
+
+        padding: 22px 0 !important;
+    }
+
+    .security-icon {
+        width: 40px !important;
+        height: 40px !important;
+        font-size: 16px !important;
+    }
+
+    .security-card h3 {
+        font-size: 19px !important;
+        line-height: 1.15 !important;
+    }
+
+    .security-card p {
+        font-size: 14px !important;
+        line-height: 1.55 !important;
+    }
+}
+
+
+/* =========================
+   SMALL PHONE
+========================= */
+
+@media (max-width: 430px) {
+
+    .account-layout {
+        padding-left: 14px !important;
+        padding-right: 14px !important;
+    }
+
+    .page-title h1 {
+        font-size: 34px !important;
+    }
+
+    .dashboard-grid {
+        gap: 24px 16px !important;
+    }
+
+    .dash-card strong {
+        font-size: 30px !important;
+    }
 }

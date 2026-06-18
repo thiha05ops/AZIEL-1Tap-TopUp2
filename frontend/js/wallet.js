@@ -1,4 +1,5 @@
 // frontend/js/wallet.js
+// AZIEL Wallet V2.5 - Auto QR TopUp
 
 document.addEventListener("DOMContentLoaded", () => {
     const username = localStorage.getItem("username");
@@ -9,15 +10,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     loadWallet();
-    initWalletQrPreview();
+    initQuickAmounts();
     initWalletTopup();
     initWalletSocket();
-    initSlipPreview();
 });
-
-// ======================
-// REGION / CURRENCY
-// ======================
 
 function getWalletRegion() {
     return (
@@ -32,14 +28,8 @@ function getWalletCurrency() {
 }
 
 function getWalletSymbol(currency) {
-    return currency === "THB"
-        ? "฿"
-        : "Ks";
+    return currency === "THB" ? "฿" : "Ks";
 }
-
-// ======================
-// LOAD WALLET
-// ======================
 
 async function loadWallet() {
     const username = localStorage.getItem("username");
@@ -47,23 +37,15 @@ async function loadWallet() {
     const symbol = getWalletSymbol(currency);
 
     try {
-        const res = await fetch(
-            `/api/wallet/${username}?currency=${currency}`
-        );
-
+        const res = await fetch(`/api/wallet/${username}?currency=${currency}`);
         const data = await res.json();
 
         if (!data.success) return;
 
         const balance = Number(data.balance || 0);
-
         updateWalletBalanceUI(balance, symbol);
 
-        localStorage.setItem(
-            `walletBalance_${currency}`,
-            String(balance)
-        );
-
+        localStorage.setItem(`walletBalance_${currency}`, String(balance));
         renderWalletHistory(data.topups || []);
 
     } catch (error) {
@@ -71,27 +53,14 @@ async function loadWallet() {
     }
 }
 
-// ======================
-// UPDATE UI
-// ======================
-
 function updateWalletBalanceUI(amount, symbol) {
-    const text =
-        `${Number(amount || 0).toLocaleString()} ${symbol || ""}`;
+    const text = `${Number(amount || 0).toLocaleString()} ${symbol || ""}`;
 
-    [
-        "walletBalance",
-        "balanceAmount",
-        "userWalletBalance"
-    ].forEach(id => {
+    ["walletBalance", "balanceAmount", "userWalletBalance"].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.innerText = text;
     });
 }
-
-// ======================
-// HISTORY
-// ======================
 
 function renderWalletHistory(topups) {
     const box = document.getElementById("walletHistory");
@@ -100,7 +69,6 @@ function renderWalletHistory(topups) {
     if (!topups.length) {
         box.innerHTML = `
             <div class="wallet-empty">
-                <i class="fa-regular fa-folder-open"></i>
                 <h3>No Wallet History</h3>
                 <p>Your wallet transactions will appear here.</p>
             </div>
@@ -125,9 +93,20 @@ function renderWalletHistory(topups) {
     `).join("");
 }
 
-// ======================
-// TOPUP
-// ======================
+function initQuickAmounts() {
+    const input = document.getElementById("topupAmount");
+    const buttons = document.querySelectorAll(".quick-amounts button");
+
+    if (!input || !buttons.length) return;
+
+    buttons.forEach(btn => {
+        btn.addEventListener("click", () => {
+            buttons.forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            input.value = btn.dataset.amount || "";
+        });
+    });
+}
 
 function initWalletTopup() {
     const btn = document.getElementById("submitTopupBtn");
@@ -138,118 +117,121 @@ function initWalletTopup() {
 
 async function submitTopup() {
     const username = localStorage.getItem("username");
-    const amount = document.getElementById("topupAmount")?.value;
+    const amount = Number(document.getElementById("topupAmount")?.value);
     const paymentMethod = document.getElementById("paymentMethod")?.value;
-    const slip = document.getElementById("topupSlip")?.files[0];
-
     const currency = getWalletCurrency();
+    const region = getWalletRegion();
 
-    if (!amount || !paymentMethod || !slip) {
-        alert("Please fill amount, payment and slip.");
+    if (!amount || amount <= 0) {
+        alert("Please enter amount.");
         return;
     }
 
-    const formData = new FormData();
-    formData.append("username", username);
-    formData.append("amount", amount);
-    formData.append("currency", currency);
-    formData.append("paymentMethod", paymentMethod);
-    formData.append("slip", slip);
+    if (!paymentMethod) {
+        alert("Please select payment method.");
+        return;
+    }
 
     const btn = document.getElementById("submitTopupBtn");
 
     try {
         btn.disabled = true;
-        btn.innerText = "Submitting...";
+        btn.innerText = "Creating QR...";
 
-        const res = await fetch("/api/wallet/topup", {
+        showLoading(true);
+
+        const res = await fetch("/api/wallet/create", {
             method: "POST",
-            body: formData
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                username,
+                amount,
+                currency,
+                region,
+                paymentMethod
+            })
         });
 
         const data = await res.json();
 
         if (!data.success) {
-            alert(data.message || "Topup failed");
+            alert(data.message || "Create wallet payment failed.");
             return;
         }
 
-        showSubmitSuccessModal();
-        await loadWallet();
-        resetTopupForm();
+        showWalletQr(data);
+        startPaymentStatusPolling(data.topupId);
 
     } catch (error) {
-        console.log("Topup error:", error);
+        console.log("Wallet create error:", error);
         alert("Server error");
 
     } finally {
+        showLoading(false);
         btn.disabled = false;
-        btn.innerText = "Submit Top Up";
+        btn.innerText = "Continue";
     }
 }
 
-// ======================
-// QR PREVIEW
-// ======================
-
-function initWalletQrPreview() {
+function showWalletQr(data) {
     const qrBox = document.getElementById("walletQrBox");
     const qrImg = document.getElementById("walletQrImage");
     const qrTitle = document.getElementById("walletQrTitle");
-    const paymentInput = document.getElementById("paymentMethod");
 
-    if (!qrBox || !qrImg || !qrTitle || !paymentInput) return;
+    if (!qrBox || !qrImg || !qrTitle) return;
 
-    const qrData = {
-        kbzpay: {
-            name: "KBZPay",
-            qr: "assets/payment/kbzpay-qr.png"
-        },
-        wavepay: {
-            name: "WavePay",
-            qr: "assets/payment/wavepay-qr.png"
-        },
-        ayapay: {
-            name: "AYA Pay",
-            qr: "assets/payment/ayapay-qr.png"
-        },
-        promptpay: {
-            name: "PromptPay",
-            qr: "assets/payment/promptpay-qr.png"
-        },
-        scb: {
-            name: "SCB",
-            qr: "assets/payment/scb-qr.png"
-        }
-    };
+    qrTitle.innerText = "Scan QR to Pay";
 
-    function showQr() {
-        const method = paymentInput.value;
+    qrImg.src =
+        data.qrImage ||
+        data.qrUrl ||
+        data.paymentUrl ||
+        "";
 
-        if (!method || !qrData[method]) {
-            qrBox.style.display = "none";
-            return;
-        }
+    qrBox.style.display = "block";
 
-        qrTitle.innerText = qrData[method].name + " QR";
-        qrImg.src = qrData[method].qr;
-        qrBox.style.display = "block";
-    }
-
-    document.addEventListener("paymentChanged", showQr);
-
-    document.addEventListener("click", e => {
-        if (e.target.closest(".pay-card, .payment-option, .payment-card, .payment-method, .payment-item")) {
-            setTimeout(showQr, 100);
-        }
+    qrBox.scrollIntoView({
+        behavior: "smooth",
+        block: "center"
     });
-
-    showQr();
 }
 
-// ======================
-// SOCKET LIVE UPDATE
-// ======================
+function startPaymentStatusPolling(topupId) {
+    if (!topupId) return;
+
+    let count = 0;
+    const maxCount = 60;
+
+    const timer = setInterval(async () => {
+        count++;
+
+        try {
+            const res = await fetch(`/api/wallet/status/${topupId}`);
+            const data = await res.json();
+
+            if (data.success && data.status === "paid") {
+                clearInterval(timer);
+
+                await loadWallet();
+                showSubmitSuccessModal();
+                resetTopupForm();
+            }
+
+            if (count >= maxCount) {
+                clearInterval(timer);
+            }
+
+        } catch (error) {
+            console.log("Wallet status polling error:", error);
+
+            if (count >= maxCount) {
+                clearInterval(timer);
+            }
+        }
+    }, 3000);
+}
 
 function initWalletSocket() {
     if (typeof io === "undefined") return;
@@ -262,25 +244,22 @@ function initWalletSocket() {
     socket.emit("joinUser", username);
     socket.emit("joinUserRoom", username);
 
-    socket.on("walletUpdated", data => {
+    socket.on("walletUpdated", async data => {
         const currency = data.currency || getWalletCurrency();
         const symbol = getWalletSymbol(currency);
         const amount = Number(data.amount || 0);
 
         updateWalletBalanceUI(amount, symbol);
 
-        localStorage.setItem(
-            `walletBalance_${currency}`,
-            String(amount)
-        );
+        localStorage.setItem(`walletBalance_${currency}`, String(amount));
 
         showWalletPopup(amount, symbol);
+        showSubmitSuccessModal();
+        resetTopupForm();
+
+        await loadWallet();
     });
 }
-
-// ======================
-// POPUP
-// ======================
 
 function showWalletPopup(amount, symbol) {
     const old = document.getElementById("walletLivePopup");
@@ -303,84 +282,57 @@ function showWalletPopup(amount, symbol) {
         setTimeout(() => popup.remove(), 400);
     }, 4000);
 }
-function initSlipPreview() {
-    const input = document.getElementById("topupSlip");
-    const fileName = document.getElementById("slipFileName");
-    const box = document.querySelector(".upload-slip-box");
 
-    if (!input || !fileName || !box) return;
+function showLoading(show) {
+    const overlay = document.getElementById("orderLoadingOverlay");
+    if (!overlay) return;
 
-    input.addEventListener("change", () => {
-        const file = input.files[0];
-        if (!file) return;
-
-        const shortName =
-            file.name.length > 24
-                ? file.name.substring(0, 24) + "..."
-                : file.name;
-
-        fileName.innerText = "✓ " + shortName;
-        box.classList.add("has-file");
-    });
+    if (show) {
+        overlay.classList.add("show");
+    } else {
+        overlay.classList.remove("show");
+    }
 }
+
 function showSubmitSuccessModal() {
     const modal = document.getElementById("successModal");
     if (!modal) return;
 
     modal.classList.add("show");
 
-    document.getElementById("viewHistoryBtn")?.addEventListener("click", () => {
-        modal.classList.remove("show");
-        document.getElementById("walletHistory")?.scrollIntoView({
-            behavior: "smooth"
-        });
-    });
+    const viewBtn = document.getElementById("viewHistoryBtn");
+    const homeBtn = document.getElementById("backHomeBtn");
 
-    document.getElementById("backHomeBtn")?.addEventListener("click", () => {
-        window.location.href = "home.html";
-    });
+    if (viewBtn) {
+        viewBtn.onclick = () => {
+            modal.classList.remove("show");
+            document.getElementById("walletHistory")?.scrollIntoView({
+                behavior: "smooth",
+                block: "start"
+            });
+        };
+    }
+
+    if (homeBtn) {
+        homeBtn.onclick = () => {
+            window.location.href = "home.html";
+        };
+    }
 }
 
 function resetTopupForm() {
     const amount = document.getElementById("topupAmount");
     const method = document.getElementById("paymentMethod");
-    const slip = document.getElementById("topupSlip");
-    const fileName = document.getElementById("slipFileName");
     const qrBox = document.getElementById("walletQrBox");
+    const quickBtns = document.querySelectorAll(".quick-amounts button");
+    const payCards = document.querySelectorAll(
+        ".pay-card, .payment-option, .payment-card, .payment-method, .payment-item"
+    );
 
     if (amount) amount.value = "";
     if (method) method.value = "";
-    if (slip) slip.value = "";
-    if (fileName) fileName.innerText = "JPG, PNG, WEBP accepted";
     if (qrBox) qrBox.style.display = "none";
-}
-function showSubmitSuccessModal() {
-    const modal = document.getElementById("successModal");
-    if (!modal) return;
 
-    modal.classList.add("show");
-
-    document.getElementById("viewHistoryBtn").onclick = () => {
-        modal.classList.remove("show");
-        document.getElementById("walletHistory")?.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-        });
-    };
-
-    document.getElementById("backHomeBtn").onclick = () => {
-        window.location.href = "home.html";
-    };
-}
-
-function resetTopupForm() {
-    const amount = document.getElementById("topupAmount");
-    const slip = document.getElementById("topupSlip");
-    const fileName = document.getElementById("slipFileName");
-    const box = document.querySelector(".upload-slip-box");
-
-    if (amount) amount.value = "";
-    if (slip) slip.value = "";
-    if (fileName) fileName.innerText = "JPG, PNG, WEBP accepted";
-    if (box) box.classList.remove("has-file");
+    quickBtns.forEach(btn => btn.classList.remove("active"));
+    payCards.forEach(card => card.classList.remove("active"));
 }

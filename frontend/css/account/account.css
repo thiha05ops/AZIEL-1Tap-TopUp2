@@ -238,6 +238,7 @@ body[data-theme="dark"].account-page::after {
 
 .account-content {
   min-width: 0;
+  padding-bottom: 80px;
 }
 
 .tab-panel {

@@ -18,18 +18,21 @@
 
 
     <header class="az-topbar">
-        <a href="home.html" class="az-topbar-brand">AZIEL</a>
+
+        <a href="home.html" class="az-topbar-brand">
+            AZIEL
+        </a>
 
         <div class="az-topbar-actions">
-            <a href="home.html">Home</a>
-            <a href="support.html">Support</a>
 
             <button id="accountMenuBtn" class="account-menu-btn" type="button">
+
                 <i class="fa-solid fa-bars"></i>
+
             </button>
 
-            <button onclick="logout()" type="button">Logout</button>
         </div>
+
     </header>
 
     <div id="accountDrawerOverlay" class="account-drawer-overlay"></div>
@@ -59,36 +62,62 @@
                 </div>
             </div>
 
+
             <nav class="account-menu">
+
                 <button class="side-link active" data-tab="overview" type="button">
+
                     <i class="fa-solid fa-chart-line"></i>
                     <span>Overview</span>
+
                 </button>
 
                 <button class="side-link" data-tab="profile" type="button">
+
                     <i class="fa-regular fa-user"></i>
                     <span>Profile</span>
+
                 </button>
 
                 <button class="side-link" data-tab="history" type="button">
+
                     <i class="fa-solid fa-box"></i>
                     <span>Orders</span>
+
                 </button>
+
                 <a href="wallet.html" class="side-link">
                     <i class="fa-solid fa-wallet"></i>
                     <span>Wallet</span>
                 </a>
 
                 <button class="side-link" data-tab="security" type="button">
+
                     <i class="fa-solid fa-shield-halved"></i>
                     <span>Security</span>
+
                 </button>
+
+
+                <a href="tracking.html" class="side-link">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    <span>Transactions</span>
+                </a>
 
                 <a href="support.html" class="side-link support-link">
                     <i class="fa-solid fa-headset"></i>
                     <span>Support</span>
+
                     <b>LIVE</b>
                 </a>
+
+                <button class="side-link logout-link" onclick="logout()" type="button">
+
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                    <span>Logout</span>
+
+                </button>
+
             </nav>
 
         </aside>
