@@ -1,5 +1,5 @@
 // frontend/js/wallet.js
-// AZIEL Wallet V2.5 - Auto QR TopUp
+// AZIEL Wallet V2.5 - Auto QR TopUp without Continue button
 
 document.addEventListener("DOMContentLoaded", () => {
     const username = localStorage.getItem("username");
@@ -11,9 +11,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     loadWallet();
     initQuickAmounts();
-    initWalletTopup();
+    initAutoQrTopup();
     initWalletSocket();
 });
+
+let autoQrTimer = null;
+let currentTopupId = null;
+let currentCreateKey = "";
 
 function getWalletRegion() {
     return (
@@ -43,9 +47,10 @@ async function loadWallet() {
         if (!data.success) return;
 
         const balance = Number(data.balance || 0);
-        updateWalletBalanceUI(balance, symbol);
 
+        updateWalletBalanceUI(balance, symbol);
         localStorage.setItem(`walletBalance_${currency}`, String(balance));
+
         renderWalletHistory(data.topups || []);
 
     } catch (error) {
@@ -103,41 +108,72 @@ function initQuickAmounts() {
         btn.addEventListener("click", () => {
             buttons.forEach(b => b.classList.remove("active"));
             btn.classList.add("active");
+
             input.value = btn.dataset.amount || "";
+
+            scheduleAutoQrCreate();
         });
+    });
+
+    input.addEventListener("input", () => {
+        buttons.forEach(b => b.classList.remove("active"));
+        scheduleAutoQrCreate();
     });
 }
 
-function initWalletTopup() {
-    const btn = document.getElementById("submitTopupBtn");
-    if (!btn) return;
+function initAutoQrTopup() {
+    const amountInput = document.getElementById("topupAmount");
 
-    btn.addEventListener("click", submitTopup);
+    amountInput?.addEventListener("input", scheduleAutoQrCreate);
+
+    document.addEventListener("paymentChanged", scheduleAutoQrCreate);
+
+    document.addEventListener("click", e => {
+        if (
+            e.target.closest(
+                ".pay-card, .payment-option, .payment-card, .payment-method, .payment-item"
+            )
+        ) {
+            setTimeout(scheduleAutoQrCreate, 150);
+        }
+    });
+
+    const btn = document.getElementById("submitTopupBtn");
+    if (btn) {
+        btn.style.display = "none";
+    }
 }
 
-async function submitTopup() {
+function scheduleAutoQrCreate() {
+    clearTimeout(autoQrTimer);
+
+    autoQrTimer = setTimeout(() => {
+        createWalletQrAuto();
+    }, 700);
+}
+
+async function createWalletQrAuto() {
     const username = localStorage.getItem("username");
     const amount = Number(document.getElementById("topupAmount")?.value);
     const paymentMethod = document.getElementById("paymentMethod")?.value;
+
     const currency = getWalletCurrency();
     const region = getWalletRegion();
 
-    if (!amount || amount <= 0) {
-        alert("Please enter amount.");
+    if (!amount || amount <= 0 || !paymentMethod) {
+        hideWalletQr();
         return;
     }
 
-    if (!paymentMethod) {
-        alert("Please select payment method.");
+    const createKey = `${amount}-${currency}-${region}-${paymentMethod}`;
+
+    if (createKey === currentCreateKey && currentTopupId) {
         return;
     }
 
-    const btn = document.getElementById("submitTopupBtn");
+    currentCreateKey = createKey;
 
     try {
-        btn.disabled = true;
-        btn.innerText = "Creating QR...";
-
         showLoading(true);
 
         const res = await fetch("/api/wallet/create", {
@@ -158,20 +194,23 @@ async function submitTopup() {
 
         if (!data.success) {
             alert(data.message || "Create wallet payment failed.");
+            currentCreateKey = "";
             return;
         }
 
+        currentTopupId = data.topupId;
+
         showWalletQr(data);
         startPaymentStatusPolling(data.topupId);
+        await loadWallet();
 
     } catch (error) {
         console.log("Wallet create error:", error);
+        currentCreateKey = "";
         alert("Server error");
 
     } finally {
         showLoading(false);
-        btn.disabled = false;
-        btn.innerText = "Continue";
     }
 }
 
@@ -190,12 +229,18 @@ function showWalletQr(data) {
         data.paymentUrl ||
         "";
 
-    qrBox.style.display = "block";
+    qrBox.style.display = "flex";
+}
 
-    qrBox.scrollIntoView({
-        behavior: "smooth",
-        block: "center"
-    });
+function hideWalletQr() {
+    const qrBox = document.getElementById("walletQrBox");
+    const qrImg = document.getElementById("walletQrImage");
+
+    if (qrBox) qrBox.style.display = "none";
+    if (qrImg) qrImg.src = "";
+
+    currentTopupId = null;
+    currentCreateKey = "";
 }
 
 function startPaymentStatusPolling(topupId) {
@@ -250,7 +295,6 @@ function initWalletSocket() {
         const amount = Number(data.amount || 0);
 
         updateWalletBalanceUI(amount, symbol);
-
         localStorage.setItem(`walletBalance_${currency}`, String(amount));
 
         showWalletPopup(amount, symbol);
@@ -323,7 +367,6 @@ function showSubmitSuccessModal() {
 function resetTopupForm() {
     const amount = document.getElementById("topupAmount");
     const method = document.getElementById("paymentMethod");
-    const qrBox = document.getElementById("walletQrBox");
     const quickBtns = document.querySelectorAll(".quick-amounts button");
     const payCards = document.querySelectorAll(
         ".pay-card, .payment-option, .payment-card, .payment-method, .payment-item"
@@ -331,8 +374,9 @@ function resetTopupForm() {
 
     if (amount) amount.value = "";
     if (method) method.value = "";
-    if (qrBox) qrBox.style.display = "none";
 
     quickBtns.forEach(btn => btn.classList.remove("active"));
     payCards.forEach(card => card.classList.remove("active"));
+
+    hideWalletQr();
 }
