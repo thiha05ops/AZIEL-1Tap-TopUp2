@@ -46,6 +46,7 @@ const walletTopupSchema = new mongoose.Schema({
             "cancelled",
             "failed"
         ],
+        default: "pending"
     },
 
     note: {
