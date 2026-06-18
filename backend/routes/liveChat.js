@@ -19,10 +19,10 @@ router.post("/send", async (req, res) => {
             });
         }
 
-        let chat = await liveChat.findOne({ username, status: "active" });
+        let chat = await LiveChat.findOne({ username, status: "active" });
 
         if (!chat) {
-            chat = await liveChat.create({
+            chat = await LiveChat.create({
                 chatId: makeChatId(),
                 username,
                 messages: [
