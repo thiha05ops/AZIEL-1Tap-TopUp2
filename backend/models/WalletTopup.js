@@ -37,7 +37,15 @@ const walletTopupSchema = new mongoose.Schema({
 
     status: {
         type: String,
-        enum: ["pending", "approved", "rejected"],
+        enum: [
+            "pending",
+            "paid",
+            "completed",
+            "approved",
+            "rejected",
+            "cancelled",
+            "failed"
+        ],
         default: "pending"
     },
 
