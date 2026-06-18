@@ -80,14 +80,10 @@
 
                 <input type="hidden" id="paymentMethod">
 
-                <div id="walletQrBox" class="wallet-qr-box" style="display:none;">
-                    <h3 id="walletQrTitle">Scan QR to Pay</h3>
-                    <img id="walletQrImage" src="" alt="Payment QR">
-                    <p>
-                        Scan this QR with your banking app. Your wallet will update automatically
-                        after payment is confirmed.
-                    </p>
-                </div>
+
+                <button id="submitTopupBtn" class="wallet-submit-btn" type="button">
+                    Generate QR
+                </button>
 
                 <p class="wallet-note">
                     Auto payment enabled. Scan the QR and your wallet will update after payment is confirmed.
@@ -113,6 +109,47 @@
         </section>
 
     </main>
+    <div id="walletQrModal" class="wallet-qr-modal">
+        <div class="wallet-qr-modal-box">
+
+            <button id="closeWalletQrModal" class="wallet-qr-close" type="button">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+
+            <h2>Scan & Pay</h2>
+
+            <div class="wallet-pay-summary">
+                <div>
+                    <span>Topup ID</span>
+                    <strong id="modalTopupId">-</strong>
+                </div>
+
+                <div>
+                    <span>Amount</span>
+                    <strong id="modalTopupAmount">-</strong>
+                </div>
+
+                <div>
+                    <span>Payment</span>
+                    <strong id="modalPaymentMethod">-</strong>
+                </div>
+            </div>
+
+            <div class="wallet-modal-qr">
+                <img id="modalWalletQrImage" src="" alt="Wallet QR">
+            </div>
+
+            <h3 id="modalAmountText">0 THB</h3>
+
+            <p>Payment expires in</p>
+            <div id="walletCountdown" class="wallet-countdown">10:00</div>
+
+            <button class="wallet-waiting-btn" type="button">
+                Waiting Payment...
+            </button>
+
+        </div>
+    </div>
 
     <div id="orderLoadingOverlay" class="order-loading-overlay">
         <div class="order-loading-box">

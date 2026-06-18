@@ -1,5 +1,8 @@
 // frontend/js/wallet.js
-// AZIEL Wallet V2.5 - Auto QR TopUp without Continue button
+// AZIEL Wallet V2.5 - Generate QR Modal Flow
+
+let walletPollingTimer = null;
+let walletCountdownTimer = null;
 
 document.addEventListener("DOMContentLoaded", () => {
     const username = localStorage.getItem("username");
@@ -11,13 +14,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     loadWallet();
     initQuickAmounts();
-    initAutoQrTopup();
+    initWalletTopup();
     initWalletSocket();
-});
 
-let autoQrTimer = null;
-let currentTopupId = null;
-let currentCreateKey = "";
+    document
+        .getElementById("closeWalletQrModal")
+        ?.addEventListener("click", closeWalletQrModal);
+});
 
 function getWalletRegion() {
     return (
@@ -52,7 +55,6 @@ async function loadWallet() {
         localStorage.setItem(`walletBalance_${currency}`, String(balance));
 
         renderWalletHistory(data.topups || []);
-
     } catch (error) {
         console.log("Wallet load error:", error);
     }
@@ -84,10 +86,7 @@ function renderWalletHistory(topups) {
     box.innerHTML = topups.map(item => `
         <div class="wallet-history-item">
             <div>
-                <strong>
-                    ${Number(item.amount || 0).toLocaleString()}
-                    ${item.currency || ""}
-                </strong>
+                <strong>${Number(item.amount || 0).toLocaleString()} ${item.currency || ""}</strong>
                 <p>${item.paymentMethod || "Payment"}</p>
             </div>
 
@@ -108,79 +107,50 @@ function initQuickAmounts() {
         btn.addEventListener("click", () => {
             buttons.forEach(b => b.classList.remove("active"));
             btn.classList.add("active");
-
             input.value = btn.dataset.amount || "";
-
-            scheduleAutoQrCreate();
         });
     });
 
     input.addEventListener("input", () => {
         buttons.forEach(b => b.classList.remove("active"));
-        scheduleAutoQrCreate();
     });
 }
 
-function initAutoQrTopup() {
-    const amountInput = document.getElementById("topupAmount");
-
-    amountInput?.addEventListener("input", scheduleAutoQrCreate);
-
-    document.addEventListener("paymentChanged", scheduleAutoQrCreate);
-
-    document.addEventListener("click", e => {
-        if (
-            e.target.closest(
-                ".pay-card, .payment-option, .payment-card, .payment-method, .payment-item"
-            )
-        ) {
-            setTimeout(scheduleAutoQrCreate, 150);
-        }
-    });
-
+function initWalletTopup() {
     const btn = document.getElementById("submitTopupBtn");
-    if (btn) {
-        btn.style.display = "none";
-    }
+    if (!btn) return;
+
+    btn.innerText = "Generate QR";
+    btn.addEventListener("click", submitTopup);
 }
 
-function scheduleAutoQrCreate() {
-    clearTimeout(autoQrTimer);
-
-    autoQrTimer = setTimeout(() => {
-        createWalletQrAuto();
-    }, 700);
-}
-
-async function createWalletQrAuto() {
+async function submitTopup() {
     const username = localStorage.getItem("username");
     const amount = Number(document.getElementById("topupAmount")?.value);
     const paymentMethod = document.getElementById("paymentMethod")?.value;
-
     const currency = getWalletCurrency();
     const region = getWalletRegion();
 
-    if (!amount || amount <= 0 || !paymentMethod) {
-        hideWalletQr();
+    if (!amount || amount <= 0) {
+        alert("Please enter amount.");
         return;
     }
 
-    const createKey = `${amount}-${currency}-${region}-${paymentMethod}`;
-
-    if (createKey === currentCreateKey && currentTopupId) {
+    if (!paymentMethod) {
+        alert("Please select payment method.");
         return;
     }
 
-    currentCreateKey = createKey;
+    const btn = document.getElementById("submitTopupBtn");
 
     try {
+        btn.disabled = true;
+        btn.innerText = "Generating QR...";
         showLoading(true);
 
         const res = await fetch("/api/wallet/create", {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 username,
                 amount,
@@ -194,62 +164,108 @@ async function createWalletQrAuto() {
 
         if (!data.success) {
             alert(data.message || "Create wallet payment failed.");
-            currentCreateKey = "";
             return;
         }
 
-        currentTopupId = data.topupId;
+        openWalletQrModal(data, {
+            amount,
+            currency,
+            paymentMethod
+        });
 
-        showWalletQr(data);
         startPaymentStatusPolling(data.topupId);
         await loadWallet();
 
     } catch (error) {
         console.log("Wallet create error:", error);
-        currentCreateKey = "";
         alert("Server error");
-
     } finally {
         showLoading(false);
+        btn.disabled = false;
+        btn.innerText = "Generate QR";
     }
 }
 
-function showWalletQr(data) {
-    const qrBox = document.getElementById("walletQrBox");
-    const qrImg = document.getElementById("walletQrImage");
-    const qrTitle = document.getElementById("walletQrTitle");
+function openWalletQrModal(data, info) {
+    const modal = document.getElementById("walletQrModal");
+    const topupIdEl = document.getElementById("modalTopupId");
+    const amountEl = document.getElementById("modalTopupAmount");
+    const methodEl = document.getElementById("modalPaymentMethod");
+    const qrImg = document.getElementById("modalWalletQrImage");
+    const amountText = document.getElementById("modalAmountText");
 
-    if (!qrBox || !qrImg || !qrTitle) return;
+    if (!modal || !qrImg) return;
 
-    qrTitle.innerText = "Scan QR to Pay";
+    if (topupIdEl) topupIdEl.innerText = data.topupId || "-";
+    if (amountEl) amountEl.innerText = `${Number(info.amount).toLocaleString()} ${info.currency}`;
+    if (methodEl) methodEl.innerText = info.paymentMethod || "-";
+    if (amountText) amountText.innerText = `${Number(info.amount).toLocaleString()} ${info.currency}`;
 
-    qrImg.src =
-        data.qrImage ||
-        data.qrUrl ||
-        data.paymentUrl ||
-        "";
+    qrImg.src = data.qrImage || data.qrUrl || data.paymentUrl || "";
 
-    qrBox.style.display = "flex";
+    modal.classList.add("show");
+
+    startWalletCountdown(10 * 60);
 }
 
-function hideWalletQr() {
-    const qrBox = document.getElementById("walletQrBox");
-    const qrImg = document.getElementById("walletQrImage");
+function closeWalletQrModal() {
+    const modal = document.getElementById("walletQrModal");
 
-    if (qrBox) qrBox.style.display = "none";
-    if (qrImg) qrImg.src = "";
+    if (modal) modal.classList.remove("show");
 
-    currentTopupId = null;
-    currentCreateKey = "";
+    if (walletPollingTimer) {
+        clearInterval(walletPollingTimer);
+        walletPollingTimer = null;
+    }
+
+    if (walletCountdownTimer) {
+        clearInterval(walletCountdownTimer);
+        walletCountdownTimer = null;
+    }
+}
+
+function startWalletCountdown(seconds) {
+    const el = document.getElementById("walletCountdown");
+    if (!el) return;
+
+    if (walletCountdownTimer) {
+        clearInterval(walletCountdownTimer);
+    }
+
+    let remaining = seconds;
+
+    function render() {
+        const min = String(Math.floor(remaining / 60)).padStart(2, "0");
+        const sec = String(remaining % 60).padStart(2, "0");
+        el.innerText = `${min}:${sec}`;
+    }
+
+    render();
+
+    walletCountdownTimer = setInterval(() => {
+        remaining--;
+        render();
+
+        if (remaining <= 0) {
+            clearInterval(walletCountdownTimer);
+            walletCountdownTimer = null;
+            closeWalletQrModal();
+            alert("Payment session expired. Please generate a new QR.");
+        }
+    }, 1000);
 }
 
 function startPaymentStatusPolling(topupId) {
     if (!topupId) return;
 
-    let count = 0;
-    const maxCount = 60;
+    if (walletPollingTimer) {
+        clearInterval(walletPollingTimer);
+    }
 
-    const timer = setInterval(async () => {
+    let count = 0;
+    const maxCount = 200;
+
+    walletPollingTimer = setInterval(async () => {
         count++;
 
         try {
@@ -257,7 +273,10 @@ function startPaymentStatusPolling(topupId) {
             const data = await res.json();
 
             if (data.success && data.status === "paid") {
-                clearInterval(timer);
+                clearInterval(walletPollingTimer);
+                walletPollingTimer = null;
+
+                closeWalletQrModal();
 
                 await loadWallet();
                 showSubmitSuccessModal();
@@ -265,15 +284,11 @@ function startPaymentStatusPolling(topupId) {
             }
 
             if (count >= maxCount) {
-                clearInterval(timer);
+                clearInterval(walletPollingTimer);
+                walletPollingTimer = null;
             }
-
         } catch (error) {
             console.log("Wallet status polling error:", error);
-
-            if (count >= maxCount) {
-                clearInterval(timer);
-            }
         }
     }, 3000);
 }
@@ -331,11 +346,7 @@ function showLoading(show) {
     const overlay = document.getElementById("orderLoadingOverlay");
     if (!overlay) return;
 
-    if (show) {
-        overlay.classList.add("show");
-    } else {
-        overlay.classList.remove("show");
-    }
+    overlay.classList.toggle("show", Boolean(show));
 }
 
 function showSubmitSuccessModal() {
@@ -377,6 +388,4 @@ function resetTopupForm() {
 
     quickBtns.forEach(btn => btn.classList.remove("active"));
     payCards.forEach(card => card.classList.remove("active"));
-
-    hideWalletQr();
 }
