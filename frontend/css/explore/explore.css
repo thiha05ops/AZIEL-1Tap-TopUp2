@@ -1,0 +1,151 @@
+/* ===============================
+   AZIEL Explore Global
+================================ */
+
+:root {
+    --az-bg: #05050b;
+    --az-panel: #0d0d18;
+    --az-card: rgba(255, 255, 255, .045);
+    --az-border: rgba(255, 255, 255, .09);
+    --az-text: #ffffff;
+    --az-muted: #9ca3af;
+    --az-purple: #8b5cf6;
+    --az-purple-2: #a855f7;
+    --az-gold: #facc15;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    min-height: 100vh;
+    overflow-x: hidden;
+    background:
+        radial-gradient(circle at 55% 8%, rgba(139, 92, 246, .20), transparent 28%),
+        radial-gradient(circle at 80% 42%, rgba(168, 85, 247, .10), transparent 30%),
+        linear-gradient(180deg, #05050b 0%, #090817 45%, #05050b 100%);
+    color: var(--az-text);
+    font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+img {
+    max-width: 100%;
+    display: block;
+}
+
+.explore-page {
+    position: relative;
+}
+
+section {
+    width: min(1200px, calc(100% - 40px));
+    margin: 0 auto;
+}
+
+/* subtle grid */
+.az-bg-wave {
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    pointer-events: none;
+    opacity: .08;
+    background-image:
+        linear-gradient(rgba(255, 255, 255, .08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, .08) 1px, transparent 1px);
+    background-size: 70px 70px;
+}
+
+/* SEAGM-inspired section title */
+.section-title {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 34px;
+}
+
+.section-title span {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    height: 34px;
+    padding: 0 18px;
+    background: linear-gradient(135deg, var(--az-purple), #6d28d9);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.section-title span::after {
+    content: "";
+    position: absolute;
+    right: -18px;
+    bottom: 0;
+    width: 18px;
+    height: 34px;
+    background: rgba(255, 255, 255, .18);
+    clip-path: polygon(0 0, 100% 100%, 0 100%);
+}
+
+.section-title div {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(139, 92, 246, .9), rgba(255, 255, 255, .12), transparent);
+}
+
+/* buttons */
+.hero-btn,
+.header-cta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    border-radius: 15px;
+    font-weight: 800;
+    color: #fff;
+    background: linear-gradient(135deg, var(--az-purple), var(--az-purple-2));
+    box-shadow: 0 18px 45px rgba(139, 92, 246, .32);
+    transition: .25s ease;
+}
+
+.hero-btn {
+    padding: 16px 24px;
+}
+
+.hero-btn.ghost {
+    background: rgba(255, 255, 255, .035);
+    border: 1px solid var(--az-border);
+    box-shadow: none;
+}
+
+.hero-btn:hover,
+.header-cta:hover {
+    transform: translateY(-3px);
+}
+
+/* scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #05050b;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #7c3aed;
+    border-radius: 999px;
+}

@@ -1,0 +1,193 @@
+/* ==========================
+      CTA
+========================== */
+
+.explore-cta {
+
+    padding: 120px 0;
+
+    position: relative;
+
+}
+
+
+.cta-content {
+
+    position: relative;
+
+    z-index: 2;
+
+    text-align: center;
+
+}
+
+
+.cta-content span {
+
+    color: #8b5cf6;
+
+    font-size: 13px;
+
+    letter-spacing: 3px;
+
+}
+
+
+.cta-content h2 {
+
+    margin-top: 25px;
+
+    font-size: clamp(60px, 8vw, 110px);
+
+    line-height: .88;
+
+    letter-spacing: -5px;
+
+    color: white;
+
+}
+
+
+.cta-content p {
+
+    max-width: 650px;
+
+    margin: 30px auto;
+
+    color: #8f96b2;
+
+    line-height: 1.9;
+
+}
+
+
+.cta-buttons {
+
+    display: flex;
+
+    justify-content: center;
+
+}
+
+
+.cta-glow {
+
+    position: absolute;
+
+    width: 600px;
+
+    height: 600px;
+
+    left: 50%;
+
+    top: 50%;
+
+    transform: translate(-50%, -50%);
+
+    background:
+
+        radial-gradient(rgba(139, 92, 246, .35),
+
+            transparent);
+
+    filter: blur(120px);
+
+}
+
+
+
+/* ==========================
+        FOOTER
+========================== */
+
+.explore-footer {
+
+    width: min(1200px, calc(100% - 40px));
+
+    margin: auto;
+
+    padding: 70px 0;
+
+    border-top:
+
+        1px solid rgba(255, 255, 255, .06);
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+}
+
+
+.footer-left h2 {
+
+    color: white;
+
+    font-size: 40px;
+
+    margin-bottom: 15px;
+
+}
+
+
+.footer-left p {
+
+    color: #8f96b2;
+
+}
+
+
+.footer-right {
+
+    display: flex;
+
+    gap: 30px;
+
+}
+
+
+.footer-right a {
+
+    color: #8f96b2;
+
+    text-decoration: none;
+
+    transition: .3s;
+
+}
+
+
+.footer-right a:hover {
+
+    color: white;
+
+}
+
+
+/* ==========================
+      Mobile
+========================== */
+
+@media(max-width:768px) {
+
+    .explore-footer {
+
+        flex-direction: column;
+
+        gap: 30px;
+
+        text-align: center;
+
+    }
+
+    .footer-right {
+
+        flex-wrap: wrap;
+
+        justify-content: center;
+
+    }
+
+}

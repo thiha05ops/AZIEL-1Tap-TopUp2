@@ -1,0 +1,67 @@
+.platform-showcase {
+    padding: 120px 0;
+}
+
+.showcase-header {
+    text-align: center;
+    margin-bottom: 70px;
+}
+
+.showcase-header span {
+    color: #8b5cf6;
+    letter-spacing: 3px;
+    font-size: 13px;
+}
+
+.showcase-header h2 {
+    margin-top: 15px;
+    font-size: 60px;
+    color: #fff;
+    font-weight: 800;
+}
+
+.showcase-header h2 span {
+    color: #8b5cf6;
+}
+
+.showcase-header p {
+    color: #8f96b2;
+    margin-top: 18px;
+}
+
+.showcase-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 25px;
+}
+
+.showcase-card {
+    background: rgba(17, 20, 38, .55);
+    border: 1px solid rgba(255, 255, 255, .05);
+    border-radius: 30px;
+    overflow: hidden;
+    transition: .4s;
+}
+
+.showcase-card:hover {
+    transform: translateY(-8px);
+    border-color: #8b5cf6;
+    box-shadow: 0 0 35px rgba(139, 92, 246, .18);
+}
+
+.showcase-card img {
+    width: 100%;
+    display: block;
+}
+
+.showcase-card h3 {
+    color: white;
+    padding: 22px 22px 8px;
+    font-size: 22px;
+}
+
+.showcase-card p {
+    color: #8f96b2;
+    padding: 0 22px 24px;
+    line-height: 1.7;
+}

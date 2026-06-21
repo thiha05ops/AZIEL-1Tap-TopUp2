@@ -1,0 +1,133 @@
+/* ===============================
+   Explore Header
+================================ */
+
+.explore-header {
+    width: min(1280px, calc(100% - 32px));
+    height: 92px;
+    margin: 0 auto;
+    margin-top: 0;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+
+    padding: 0 28px;
+
+    border: 1px solid rgba(255, 255, 255, .1);
+    border-radius: 0 0 24px 24px;
+
+    background: rgba(14, 14, 28, .86);
+    backdrop-filter: blur(24px);
+
+    position: sticky;
+    top: 0;
+    z-index: 999;
+}
+
+.explore-logo {
+    display: flex;
+    align-items: center;
+    gap: 0px;
+    min-width: 0px;
+}
+
+.header-logo-icon {
+    width: 90px;
+    height: 206px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 16px rgba(139, 92, 246, .6));
+}
+
+.header-logo-wordmark {
+    width: 180px;
+    height: auto;
+    object-fit: contain;
+}
+
+.explore-logo span {
+    font-size: 34px;
+    font-weight: 900;
+}
+
+.explore-nav {
+    display: flex;
+    align-items: center;
+    gap: 34px;
+}
+
+.explore-nav a {
+    position: relative;
+    color: rgba(255, 255, 255, .78);
+    font-size: 15px;
+    font-weight: 700;
+    transition: .25s ease;
+}
+
+.explore-nav a:hover {
+    color: #fff;
+}
+
+.explore-nav a::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: -27px;
+    width: 0;
+    height: 2px;
+    transform: translateX(-50%);
+    background: linear-gradient(90deg, transparent, #8b5cf6, transparent);
+    transition: .25s ease;
+}
+
+.explore-nav a:hover::after {
+    width: 38px;
+}
+
+.header-cta {
+    min-width: 150px;
+    height: 46px;
+    padding: 0 18px;
+    font-size: 14px;
+}
+
+/* Mobile header fallback */
+@media (max-width: 900px) {
+    .explore-header {
+        height: auto;
+        padding: 16px;
+        flex-wrap: wrap;
+        top: 10px;
+    }
+
+    .explore-nav {
+        order: 3;
+        width: 100%;
+        justify-content: center;
+        gap: 18px;
+        flex-wrap: wrap;
+        padding-top: 12px;
+        border-top: 1px solid rgba(255, 255, 255, .07);
+    }
+
+    .explore-nav a::after {
+        display: none;
+    }
+}
+
+@media (max-width: 520px) {
+    .explore-header {
+        width: calc(100% - 24px);
+        margin-top: 12px;
+        border-radius: 18px;
+    }
+
+    .explore-logo span {
+        font-size: 24px;
+    }
+
+    .header-cta {
+        width: 100%;
+    }
+}
