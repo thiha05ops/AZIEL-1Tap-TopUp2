@@ -1,67 +1,180 @@
+/* ===============================
+   PLATFORM SHOWCASE
+================================ */
+
 .platform-showcase {
-    padding: 120px 0;
+    padding: 70px 0 110px;
 }
+
+/* ===============================
+   HEADER
+================================ */
 
 .showcase-header {
-    text-align: center;
-    margin-bottom: 70px;
-}
-
-.showcase-header span {
-    color: #8b5cf6;
-    letter-spacing: 3px;
-    font-size: 13px;
+    margin-bottom: 42px;
 }
 
 .showcase-header h2 {
-    margin-top: 15px;
-    font-size: 60px;
-    color: #fff;
-    font-weight: 800;
+    font-size: clamp(38px, 5vw, 66px);
+
+    line-height: 1;
+    letter-spacing: -2px;
+
+    color: var(--heading);
 }
 
 .showcase-header h2 span {
-    color: #8b5cf6;
+    color: var(--az-purple);
 }
 
 .showcase-header p {
-    color: #8f96b2;
-    margin-top: 18px;
+    max-width: 620px;
+
+    margin-top: 16px;
+
+    color: var(--text2);
+
+    line-height: 1.8;
 }
+
+/* ===============================
+   GRID
+================================ */
 
 .showcase-grid {
     display: grid;
+
     grid-template-columns: repeat(5, 1fr);
-    gap: 25px;
+
+    gap: 18px;
 }
 
+/* ===============================
+   CARD
+================================ */
+
 .showcase-card {
-    background: rgba(17, 20, 38, .55);
-    border: 1px solid rgba(255, 255, 255, .05);
-    border-radius: 30px;
+
     overflow: hidden;
-    transition: .4s;
+
+    border-radius: 22px;
+
+    background: var(--card-2);
+
+    border: 1px solid var(--border);
+
+    backdrop-filter: blur(18px);
+
+    transition: .25s ease;
+
+    box-shadow: var(--shadow);
 }
 
 .showcase-card:hover {
-    transform: translateY(-8px);
-    border-color: #8b5cf6;
-    box-shadow: 0 0 35px rgba(139, 92, 246, .18);
+
+    transform: translateY(-6px);
+
+    border-color: rgba(139, 92, 246, .7);
+
+    box-shadow:
+        0 24px 70px rgba(139, 92, 246, .16);
 }
+
+/* ===============================
+   IMAGE
+================================ */
 
 .showcase-card img {
+
     width: 100%;
-    display: block;
+
+    height: 135px;
+
+    object-fit: cover;
+
+    object-position: top center;
+
+    border-bottom: 1px solid var(--border);
 }
+
+/* ===============================
+   TITLE
+================================ */
 
 .showcase-card h3 {
-    color: white;
-    padding: 22px 22px 8px;
-    font-size: 22px;
+
+    color: var(--heading);
+
+    font-size: 18px;
+
+    padding: 18px 18px 8px;
 }
 
+/* ===============================
+   DESCRIPTION
+================================ */
+
 .showcase-card p {
-    color: #8f96b2;
-    padding: 0 22px 24px;
+
+    color: var(--text2);
+
+    font-size: 14px;
+
     line-height: 1.7;
+
+    padding: 0 18px 20px;
+}
+
+/* ===============================
+   LIGHT MODE
+================================ */
+
+body:not(.dark) .showcase-card {
+
+    background: rgba(255, 255, 255, .86);
+
+    box-shadow:
+        0 12px 40px rgba(15, 23, 42, .08);
+}
+
+body:not(.dark) .showcase-card:hover {
+
+    box-shadow:
+        0 20px 50px rgba(139, 92, 246, .15);
+}
+
+/* ===============================
+   TABLET
+================================ */
+
+@media(max-width:1100px) {
+
+    .showcase-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+}
+
+/* ===============================
+   MOBILE
+================================ */
+
+@media(max-width:720px) {
+
+    .platform-showcase {
+        padding: 55px 0 80px;
+    }
+
+    .showcase-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .showcase-card img {
+        height: 210px;
+    }
+
+    .showcase-card h3 {
+        font-size: 20px;
+    }
+
 }

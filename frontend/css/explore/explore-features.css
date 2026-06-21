@@ -1,122 +1,179 @@
-/* ==========================
-   Explore Features Section
-========================== */
+/* ===============================
+   FEATURES
+================================ */
 
 .explore-features {
-    padding: 120px 0;
-    position: relative;
+    padding: 70px 0 110px;
 }
 
-.features-header {
-    text-align: center;
-    margin-bottom: 70px;
+.features-layout {
+    display: grid;
+    grid-template-columns: .8fr 1.2fr;
+    gap: 42px;
+    align-items: start;
 }
 
-.features-header span {
-    display: inline-block;
-    color: #8b5cf6;
-    font-size: 13px;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    margin-bottom: 18px;
+/* ===============================
+   LEFT
+================================ */
+
+.features-intro h2 {
+    font-size: clamp(36px, 4vw, 58px);
+    line-height: 1;
+    letter-spacing: -2px;
+
+    color: var(--heading);
 }
 
-.features-header h2 {
-    font-size: 58px;
-    font-weight: 800;
-    line-height: 1.1;
-    color: #fff;
-    margin-bottom: 20px;
-}
+.features-intro p {
+    max-width: 420px;
 
-.features-header p {
-    max-width: 650px;
-    margin: auto;
-    color: #8f96b2;
-    font-size: 17px;
+    margin-top: 18px;
+
+    color: var(--text2);
+
     line-height: 1.8;
 }
+
+/* ===============================
+   GRID
+================================ */
 
 .features-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 28px;
+    gap: 18px;
 }
 
+/* ===============================
+   CARD
+================================ */
+
 .feature-card {
-    background: rgba(15, 18, 35, .55);
-    border: 1px solid rgba(255, 255, 255, .06);
-    border-radius: 28px;
-    padding: 40px;
-    transition: .35s;
+    min-height: 230px;
+
+    padding: 28px;
+
+    border-radius: 24px;
+
+    background: var(--card-2);
+
+    border: 1px solid var(--border);
+
     backdrop-filter: blur(20px);
+
+    transition: .25s ease;
+
+    box-shadow: var(--shadow);
 }
 
 .feature-card:hover {
-    transform: translateY(-8px);
-    border-color: #8b5cf6;
+
+    transform: translateY(-6px);
+
+    border-color: rgba(139, 92, 246, .7);
+
     box-shadow:
-        0 0 30px rgba(139, 92, 246, .25);
+        0 24px 70px rgba(139, 92, 246, .18);
 }
 
+/* ===============================
+   ICON
+================================ */
+
 .feature-card i {
-    width: 70px;
-    height: 70px;
-    border-radius: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 28px;
+
+    width: 58px;
+    height: 58px;
+
+    border-radius: 18px;
+
+    display: grid;
+    place-items: center;
+
+    margin-bottom: 26px;
+
     color: #fff;
+
+    font-size: 24px;
 
     background:
         linear-gradient(135deg,
             #7c3aed,
             #a855f7);
 
-    margin-bottom: 28px;
+    box-shadow:
+        0 18px 40px rgba(139, 92, 246, .28);
 }
+
+/* ===============================
+   TITLE
+================================ */
 
 .feature-card h3 {
-    font-size: 26px;
-    color: #fff;
-    margin-bottom: 16px;
+
+    color: var(--heading);
+
+    font-size: 22px;
+
+    margin-bottom: 12px;
 }
+
+/* ===============================
+   DESCRIPTION
+================================ */
 
 .feature-card p {
-    color: #8f96b2;
-    line-height: 1.8;
+
+    color: var(--text2);
+
+    line-height: 1.7;
+
+    font-size: 15px;
 }
 
-/* ==========================
-      Tablet
-========================== */
+/* ===============================
+   LIGHT MODE EXTRA
+================================ */
 
-@media(max-width:992px) {
+body:not(.dark) .feature-card {
+
+    background: rgba(255, 255, 255, .85);
+
+    box-shadow:
+        0 12px 40px rgba(15, 23, 42, .08);
+}
+
+body:not(.dark) .feature-card:hover {
+
+    box-shadow:
+        0 20px 50px rgba(139, 92, 246, .15);
+}
+
+/* ===============================
+   TABLET
+================================ */
+
+@media(max-width:1024px) {
+
+    .features-layout {
+        grid-template-columns: 1fr;
+    }
 
     .features-grid {
         grid-template-columns: repeat(2, 1fr);
     }
 
-    .features-header h2 {
-        font-size: 48px;
-    }
-
 }
 
+/* ===============================
+   MOBILE
+================================ */
 
-/* ==========================
-       Mobile
-========================== */
-
-@media(max-width:768px) {
+@media(max-width:640px) {
 
     .explore-features {
-        padding: 90px 0;
-    }
-
-    .features-header h2 {
-        font-size: 38px;
+        padding: 55px 0 80px;
     }
 
     .features-grid {
@@ -124,11 +181,11 @@
     }
 
     .feature-card {
-        padding: 30px;
+        min-height: auto;
     }
 
     .feature-card h3 {
-        font-size: 22px;
+        font-size: 20px;
     }
 
 }

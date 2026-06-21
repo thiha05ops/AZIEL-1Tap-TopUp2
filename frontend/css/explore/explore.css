@@ -3,16 +3,52 @@
 ================================ */
 
 :root {
-    --az-bg: #05050b;
-    --az-panel: #0d0d18;
-    --az-card: rgba(255, 255, 255, .045);
-    --az-border: rgba(255, 255, 255, .09);
-    --az-text: #ffffff;
-    --az-muted: #9ca3af;
     --az-purple: #8b5cf6;
     --az-purple-2: #a855f7;
     --az-gold: #facc15;
+
+    --bg: #f5f7fb;
+    --bg-soft: #ffffff;
+
+    --card: #ffffff;
+    --card-2: rgba(255, 255, 255, .82);
+
+    --heading: #111827;
+    --text: #374151;
+    --text2: #6b7280;
+
+    --border: rgba(17, 24, 39, .12);
+    --line: rgba(139, 92, 246, .35);
+
+    --header-bg: rgba(255, 255, 255, .78);
+    --glass: rgba(255, 255, 255, .62);
+
+    --shadow: 0 18px 50px rgba(17, 24, 39, .10);
 }
+
+body.dark {
+    --bg: #080816;
+    --bg-soft: #0b0b18;
+
+    --card: #0d1020;
+    --card-2: rgba(12, 13, 28, .72);
+
+    --heading: #ffffff;
+    --text: #d1d5db;
+    --text2: #9ca3af;
+
+    --border: rgba(255, 255, 255, .08);
+    --line: rgba(139, 92, 246, .55);
+
+    --header-bg: rgba(10, 10, 22, .72);
+    --glass: rgba(255, 255, 255, .045);
+
+    --shadow: 0 22px 70px rgba(0, 0, 0, .35);
+}
+
+/* ===============================
+   Reset
+================================ */
 
 * {
     margin: 0;
@@ -27,12 +63,19 @@ html {
 body {
     min-height: 100vh;
     overflow-x: hidden;
+
     background:
-        radial-gradient(circle at 55% 8%, rgba(139, 92, 246, .20), transparent 28%),
-        radial-gradient(circle at 80% 42%, rgba(168, 85, 247, .10), transparent 30%),
-        linear-gradient(180deg, #05050b 0%, #090817 45%, #05050b 100%);
-    color: var(--az-text);
+        radial-gradient(circle at 55% 8%, rgba(139, 92, 246, .16), transparent 28%),
+        radial-gradient(circle at 80% 42%, rgba(168, 85, 247, .08), transparent 30%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-soft) 48%, var(--bg) 100%);
+
+    color: var(--text);
+
     font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+    transition:
+        background .35s ease,
+        color .35s ease;
 }
 
 a {
@@ -54,20 +97,43 @@ section {
     margin: 0 auto;
 }
 
-/* subtle grid */
+/* ===============================
+   Typography Theme
+================================ */
+
+h1,
+h2,
+h3,
+h4 {
+    color: var(--heading);
+}
+
+p {
+    color: var(--text2);
+}
+
+/* ===============================
+   Background Grid
+================================ */
+
 .az-bg-wave {
     position: fixed;
     inset: 0;
     z-index: -2;
     pointer-events: none;
-    opacity: .08;
+    opacity: .06;
+
     background-image:
-        linear-gradient(rgba(255, 255, 255, .08) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, .08) 1px, transparent 1px);
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+
     background-size: 70px 70px;
 }
 
-/* SEAGM-inspired section title */
+/* ===============================
+   SEAGM-inspired Section Title
+================================ */
+
 .section-title {
     display: flex;
     align-items: center;
@@ -77,12 +143,16 @@ section {
 
 .section-title span {
     position: relative;
+
     display: inline-flex;
     align-items: center;
+
     height: 34px;
     padding: 0 18px;
+
     background: linear-gradient(135deg, var(--az-purple), #6d28d9);
     color: #fff;
+
     font-size: 13px;
     font-weight: 800;
     letter-spacing: .06em;
@@ -91,33 +161,58 @@ section {
 
 .section-title span::after {
     content: "";
+
     position: absolute;
     right: -18px;
     bottom: 0;
+
     width: 18px;
     height: 34px;
-    background: rgba(255, 255, 255, .18);
+
+    background: rgba(0, 0, 0, .22);
     clip-path: polygon(0 0, 100% 100%, 0 100%);
+}
+
+body.dark .section-title span::after {
+    background: rgba(255, 255, 255, .18);
 }
 
 .section-title div {
     flex: 1;
     height: 1px;
-    background: linear-gradient(90deg, rgba(139, 92, 246, .9), rgba(255, 255, 255, .12), transparent);
+
+    background: linear-gradient(90deg,
+            var(--line),
+            rgba(255, 255, 255, .10),
+            transparent);
 }
 
-/* buttons */
+body:not(.dark) .section-title div {
+    background: linear-gradient(90deg,
+            var(--line),
+            rgba(17, 24, 39, .16),
+            transparent);
+}
+
+/* ===============================
+   Buttons
+================================ */
+
 .hero-btn,
 .header-cta {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 10px;
+
     border-radius: 15px;
+
     font-weight: 800;
     color: #fff;
+
     background: linear-gradient(135deg, var(--az-purple), var(--az-purple-2));
     box-shadow: 0 18px 45px rgba(139, 92, 246, .32);
+
     transition: .25s ease;
 }
 
@@ -126,9 +221,15 @@ section {
 }
 
 .hero-btn.ghost {
-    background: rgba(255, 255, 255, .035);
-    border: 1px solid var(--az-border);
+    color: var(--heading);
+    background: var(--glass);
+    border: 1px solid var(--border);
     box-shadow: none;
+    backdrop-filter: blur(18px);
+}
+
+body.dark .hero-btn.ghost {
+    color: #fff;
 }
 
 .hero-btn:hover,
@@ -136,16 +237,66 @@ section {
     transform: translateY(-3px);
 }
 
-/* scrollbar */
+/* ===============================
+   Global Themed Cards
+================================ */
+
+.feature-card,
+.showcase-card,
+.video-card,
+.video-mini,
+.guide-card,
+.stats-box,
+.coming-content {
+    background: var(--card-2);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+}
+
+/* ===============================
+   Scrollbar
+================================ */
+
 ::-webkit-scrollbar {
     width: 8px;
 }
 
 ::-webkit-scrollbar-track {
-    background: #05050b;
+    background: var(--bg);
 }
 
 ::-webkit-scrollbar-thumb {
     background: #7c3aed;
     border-radius: 999px;
+}
+
+/* ===============================
+   Reveal Animation
+================================ */
+
+.reveal-item {
+    opacity: 0;
+    transform: translateY(28px);
+    transition: .65s ease;
+}
+
+.reveal-item.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* ===============================
+   Active Nav
+================================ */
+
+.explore-nav a.active {
+    color: var(--heading);
+}
+
+body.dark .explore-nav a.active {
+    color: #fff;
+}
+
+.explore-nav a.active::after {
+    width: 38px;
 }

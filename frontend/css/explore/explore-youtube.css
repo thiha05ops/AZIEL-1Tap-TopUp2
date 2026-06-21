@@ -1,0 +1,181 @@
+/* ===============================
+   YOUTUBE / VIDEOS
+================================ */
+
+.youtube-section {
+    padding: 70px 0 110px;
+}
+
+.youtube-layout {
+    display: grid;
+    grid-template-columns: 1.2fr .8fr;
+    gap: 28px;
+    align-items: start;
+}
+
+.video-card,
+.video-mini {
+    background: rgba(12, 13, 28, .72);
+    border: 1px solid rgba(255, 255, 255, .08);
+    border-radius: 24px;
+    overflow: hidden;
+    transition: .25s ease;
+}
+
+.video-card:hover,
+.video-mini:hover {
+    transform: translateY(-6px);
+    border-color: rgba(139, 92, 246, .7);
+    box-shadow: 0 24px 70px rgba(139, 92, 246, .16);
+}
+
+.main-video {
+    position: relative;
+    display: block;
+}
+
+.main-video img {
+    width: 100%;
+    height: 360px;
+    object-fit: cover;
+}
+
+.play-btn {
+    position: absolute;
+    left: 50%;
+    top: 42%;
+    transform: translate(-50%, -50%);
+
+    width: 78px;
+    height: 56px;
+    border-radius: 16px;
+
+    display: grid;
+    place-items: center;
+
+    background: #ff0033;
+    color: #fff;
+    font-size: 28px;
+
+    box-shadow: 0 18px 50px rgba(255, 0, 51, .35);
+}
+
+.main-video h3 {
+    color: #fff;
+    font-size: 26px;
+    padding: 24px 26px 8px;
+}
+
+.main-video p {
+    color: #9ca3af;
+    padding: 0 26px 26px;
+    line-height: 1.7;
+}
+
+.youtube-list {
+    display: grid;
+    gap: 16px;
+}
+
+.video-mini {
+    display: grid;
+    grid-template-columns: 150px 1fr;
+    align-items: center;
+}
+
+.video-mini img {
+    width: 150px;
+    height: 96px;
+    object-fit: cover;
+}
+
+.video-mini div {
+    padding: 16px;
+}
+
+.video-mini h4 {
+    color: #fff;
+    font-size: 16px;
+    line-height: 1.35;
+    margin-bottom: 6px;
+}
+
+.video-mini p {
+    color: #9ca3af;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+/* Guides section */
+.guide-section {
+    padding: 20px 0 110px;
+}
+
+.guide-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 22px;
+}
+
+.guide-card {
+    background: rgba(12, 13, 28, .72);
+    border: 1px solid rgba(255, 255, 255, .08);
+    border-radius: 24px;
+    overflow: hidden;
+    transition: .25s ease;
+}
+
+.guide-card:hover {
+    transform: translateY(-6px);
+    border-color: rgba(139, 92, 246, .7);
+    box-shadow: 0 24px 70px rgba(139, 92, 246, .16);
+}
+
+.guide-card img {
+    width: 100%;
+    height: 190px;
+    object-fit: cover;
+}
+
+.guide-card h3 {
+    color: #fff;
+    font-size: 20px;
+    padding: 22px 22px 8px;
+}
+
+.guide-card p {
+    color: #9ca3af;
+    padding: 0 22px 24px;
+    line-height: 1.7;
+}
+
+/* tablet */
+@media(max-width:950px) {
+    .youtube-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .guide-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* mobile */
+@media(max-width:600px) {
+    .youtube-section {
+        padding: 55px 0 80px;
+    }
+
+    .main-video img {
+        height: 220px;
+    }
+
+    .video-mini {
+        grid-template-columns: 1fr;
+    }
+
+    .video-mini img {
+        width: 100%;
+        height: 180px;
+    }
+}
