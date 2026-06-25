@@ -41,10 +41,10 @@
         <a href="home.html" class="az-logo">AZIEL</a>
 
         <nav class="az-nav">
-            <a href="explore.html" class="active">Explore</a>
-            <a href="home.html" class="active">Home</a>
-            <a href="#popularGames">Games</a>
-            <a href="#categories">Top Up</a>
+            <a href="explore.html">Explore</a>
+            <a href="home.html">Home</a>
+            <a href="home.html#popularGames">Games</a>
+            <a href="home.html#categories">Top Up</a>
             <a href="wallet.html">Wallet</a>
             <a href="tracking.html">Transactions</a>
             <a href="support.html">Support</a>
@@ -52,18 +52,20 @@
 
         <div class="az-header-right">
             <a href="wallet.html" class="az-wallet-pill">
-                <span id="headerWalletText">MMK 48,500</span>
+                <span id="headerWalletText">0 Ks</span>
                 <i class="fa-solid fa-plus"></i>
             </a>
 
-            <a href="notifications.html" class="az-icon-btn">
+            <a href="notifications.html" class="az-icon-btn" aria-label="Notifications">
                 <i class="fa-regular fa-bell"></i>
             </a>
+
             <button id="localeOpenBtn" class="az-locale-btn" type="button">
-                <span id="localeFlag">🇹🇭</span>
+                <span id="localeFlag">🇲🇲</span>
             </button>
+
             <a href="account.html" id="profileBox" class="az-profile">
-                <div id="avatarText" class="az-avatar">T</div>
+                <div id="avatarText" class="az-avatar">U</div>
             </a>
         </div>
     </header>
@@ -366,7 +368,7 @@
     <script src="js/live-chat.js"></script>
     <script src="js/pwa-fix.js"></script>
     <script src="js/site-settings.js"></script>
-
+    <script src="/js/header.js"></script>
     <script src="js/locale-switcher.js"></script>
     <script>
         document.addEventListener("DOMContentLoaded", () => {
