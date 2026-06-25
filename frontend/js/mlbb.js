@@ -55,9 +55,27 @@ document.addEventListener("DOMContentLoaded", () => {
     document.addEventListener("paymentChanged", updateState);
 
     buyBtn?.addEventListener("click", async () => {
+
+        const token = localStorage.getItem("token");
+
+        if (!token) {
+            const pendingBuy = {
+                game: "Mobile Legends",
+                selectedPackage: selectedPack,
+                userId: userIdInput?.value.trim() || "",
+                zoneId: serverIdInput?.value.trim() || "",
+                paymentMethod: document.getElementById("paymentMethod")?.value || "",
+                returnUrl: window.location.pathname
+            };
+
+            localStorage.setItem("pendingBuy", JSON.stringify(pendingBuy));
+            window.location.href = "login.html";
+            return;
+        }
+
         if (buyBtn.disabled || !selectedPack) return;
 
-        const username = localStorage.getItem("username") || "guest";
+        const username = localStorage.getItem("username") || "user";
         const region =
             localStorage.getItem("region") ||
             localStorage.getItem("selectedRegion") ||
