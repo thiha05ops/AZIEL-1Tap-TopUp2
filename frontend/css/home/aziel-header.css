@@ -205,3 +205,165 @@
         font-size: 15px;
     }
 }
+
+/* =========================
+   AZIEL HEADER FIX OVERRIDE
+========================= */
+
+.az-header.az-global-header {
+    position: sticky !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+
+    min-height: 86px !important;
+    padding: 0 max(24px, calc((100vw - 1280px) / 2)) !important;
+
+    display: grid !important;
+    grid-template-columns: auto 1fr auto !important;
+    align-items: center !important;
+    gap: 28px !important;
+
+    overflow: visible !important;
+}
+
+.az-header-top {
+    display: contents !important;
+}
+
+.az-header .az-logo {
+    width: 190px !important;
+    min-width: 190px !important;
+    height: 58px !important;
+    display: flex !important;
+    align-items: center !important;
+    overflow: hidden !important;
+}
+
+.az-header .az-logo img {
+    width: 190px !important;
+    height: auto !important;
+    max-height: 58px !important;
+    object-fit: contain !important;
+    display: block !important;
+}
+
+.az-header .az-nav {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 26px !important;
+    min-width: 0 !important;
+}
+
+.az-header .az-header-right {
+    margin-left: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 12px !important;
+    min-width: max-content !important;
+}
+
+/* MOBILE */
+@media (max-width: 768px) {
+    .az-header.az-global-header {
+        min-height: 78px !important;
+        padding: 10px 14px 0 !important;
+
+        grid-template-columns: 1fr auto !important;
+        gap: 12px !important;
+
+        overflow: hidden !important;
+    }
+
+    .az-header-top {
+        display: contents !important;
+    }
+
+    .az-header .az-logo {
+        width: 150px !important;
+        min-width: 150px !important;
+        height: 48px !important;
+    }
+
+    .az-header .az-logo img {
+        width: 150px !important;
+        max-height: 48px !important;
+    }
+
+    .az-header .az-header-right {
+        gap: 7px !important;
+    }
+
+    .az-header .az-wallet-pill {
+        min-height: 38px !important;
+        padding: 0 8px !important;
+        font-size: 12px !important;
+    }
+
+    .az-header .az-icon-btn,
+    .az-header .az-locale-btn {
+        width: 38px !important;
+        min-height: 38px !important;
+    }
+
+    .az-header .az-profile {
+        min-width: 42px !important;
+        min-height: 38px !important;
+        padding: 0 4px !important;
+    }
+
+    .az-header .az-avatar {
+        width: 28px !important;
+        height: 28px !important;
+        font-size: 13px !important;
+    }
+
+    .az-header .az-nav {
+        grid-column: 1 / -1 !important;
+        display: flex !important;
+        justify-content: flex-start !important;
+
+        max-height: 0 !important;
+        opacity: 0 !important;
+        overflow-x: auto !important;
+
+        padding: 0 !important;
+        margin-top: 0 !important;
+
+        border-top: 1px solid rgba(255, 255, 255, .08) !important;
+        transform: translateY(-8px) !important;
+        transition: .25s ease !important;
+        scrollbar-width: none !important;
+    }
+
+    .az-header .az-nav::-webkit-scrollbar {
+        display: none !important;
+    }
+
+    .az-header.nav-open .az-nav {
+        max-height: 56px !important;
+        opacity: 1 !important;
+        transform: translateY(0) !important;
+        padding: 14px 0 !important;
+    }
+}
+
+@media (max-width: 430px) {
+    .az-header .az-logo {
+        width: 130px !important;
+        min-width: 130px !important;
+    }
+
+    .az-header .az-logo img {
+        width: 130px !important;
+    }
+
+    .az-header .az-wallet-pill {
+        max-width: 66px !important;
+        overflow: hidden !important;
+    }
+}
