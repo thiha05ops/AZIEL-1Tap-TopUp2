@@ -114,8 +114,6 @@ async function loadMyProfile() {
 
         localStorage.setItem("username", currentUser.username || "");
         localStorage.setItem("displayName", name);
-        localStorage.setItem("region", region);
-        localStorage.setItem("selectedRegion", region);
         localStorage.setItem("currency", currency);
         localStorage.setItem("selectedCurrency", currency);
 

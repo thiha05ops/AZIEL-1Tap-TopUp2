@@ -1,23 +1,76 @@
-// frontend/js/region-payment.js
+// frontend/js/region-payment.js - AZIEL V2.5 Global Region + Payment Methods
 
 document.addEventListener("DOMContentLoaded", async () => {
-    const region = localStorage.getItem("region") || "MM";
+    const region = getActiveRegion();
+
+    syncRegionStorage(region);
+    updateRegionUI(region);
 
     const regionSelect = document.getElementById("regionSelect");
-    const currencyText = document.getElementById("currencyText");
 
-    const regionData = {
-        MM: { currency: "MMK", priceKey: "mmk" },
-        TH: { currency: "THB", priceKey: "thb" }
-    };
+    if (regionSelect) {
+        regionSelect.value = region;
 
-    const config = regionData[region] || regionData.MM;
+        regionSelect.addEventListener("change", () => {
+            setActiveRegion(regionSelect.value);
+        });
+    }
 
-    if (regionSelect) regionSelect.value = region;
-    if (currencyText) currencyText.innerText = config.currency;
+    const localeOpenBtn = document.getElementById("localeOpenBtn");
+
+    if (localeOpenBtn) {
+        localeOpenBtn.addEventListener("click", () => {
+            const nextRegion = getActiveRegion() === "TH" ? "MM" : "TH";
+            setActiveRegion(nextRegion);
+        });
+    }
 
     await loadDynamicPaymentMethods(region);
 });
+
+function getActiveRegion() {
+    return (
+        localStorage.getItem("selectedRegion") ||
+        localStorage.getItem("region") ||
+        "MM"
+    );
+}
+
+function syncRegionStorage(region) {
+    const currency = region === "TH" ? "THB" : "MMK";
+
+    localStorage.setItem("region", region);
+    localStorage.setItem("selectedRegion", region);
+    localStorage.setItem("currency", currency);
+    localStorage.setItem("selectedCurrency", currency);
+}
+
+function setActiveRegion(region) {
+    syncRegionStorage(region);
+
+    window.dispatchEvent(
+        new CustomEvent("regionChanged", {
+            detail: { region }
+        })
+    );
+
+    window.location.reload();
+}
+
+function updateRegionUI(region) {
+    const currencyText = document.getElementById("currencyText");
+    const localeFlag = document.getElementById("localeFlag");
+
+    const currency = region === "TH" ? "THB" : "MMK";
+
+    if (currencyText) {
+        currencyText.innerText = currency;
+    }
+
+    if (localeFlag) {
+        localeFlag.innerText = region === "TH" ? "🇹🇭" : "🇲🇲";
+    }
+}
 
 async function loadDynamicPaymentMethods(region) {
     const paymentGrid = document.getElementById("paymentGrid");
@@ -73,14 +126,41 @@ async function loadDynamicPaymentMethods(region) {
                 card.classList.add("active");
                 paymentMethod.value = key;
 
+                window.selectedPaymentData = {
+                    method: name,
+                    key,
+                    logo,
+                    qrImage: pay.qrImage || "",
+                    accountName: pay.accountName || "",
+                    accountNumber: pay.accountNumber || "",
+                    provider: pay.provider || "manual",
+                    paymentType: pay.paymentType || "manual"
+                };
+
                 updatePaymentPreview(card);
+
+                document.dispatchEvent(new Event("paymentChanged"));
             });
 
             paymentGrid.appendChild(card);
 
             if (index === 0) {
                 paymentMethod.value = key;
+
+                window.selectedPaymentData = {
+                    method: name,
+                    key,
+                    logo,
+                    qrImage: pay.qrImage || "",
+                    accountName: pay.accountName || "",
+                    accountNumber: pay.accountNumber || "",
+                    provider: pay.provider || "manual",
+                    paymentType: pay.paymentType || "manual"
+                };
+
                 updatePaymentPreview(card);
+
+                document.dispatchEvent(new Event("paymentChanged"));
             }
         });
 
@@ -113,9 +193,14 @@ function updatePaymentPreview(card) {
     const accountNumber =
         document.getElementById("paymentAccountNumber");
 
-    if (qrImg && card.dataset.qr) {
-        qrImg.src = card.dataset.qr;
-        qrImg.style.display = "block";
+    if (qrImg) {
+        if (card.dataset.qr) {
+            qrImg.src = card.dataset.qr;
+            qrImg.style.display = "block";
+        } else {
+            qrImg.removeAttribute("src");
+            qrImg.style.display = "none";
+        }
     }
 
     if (accountName) {
