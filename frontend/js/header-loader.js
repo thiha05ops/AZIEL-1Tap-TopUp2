@@ -10,7 +10,6 @@ const AZIEL_NAV_ITEMS = {
         ["tracking.html", "Transactions"],
         ["support.html", "Support"]
     ],
-
     game: [
         ["home.html", "Home"],
         ["home.html#popularGames", "Games"],
@@ -18,52 +17,57 @@ const AZIEL_NAV_ITEMS = {
         ["tracking.html", "Orders"],
         ["support.html", "Support"]
     ],
-
     account: [
         ["home.html", "Home"],
         ["wallet.html", "Wallet"],
         ["tracking.html", "Orders"],
         ["support.html", "Support"]
     ],
-
     explore: [
         ["home.html", "Home"],
+        ["explore.html", "Explore"],
         ["explore.html#features", "Features"],
         ["explore.html#platform", "Platform"],
-        ["explore.html#youtube", "YouTube"],
         ["support.html", "Support"]
     ]
 };
 
-document.addEventListener("DOMContentLoaded", async () => {
+document.addEventListener("DOMContentLoaded", loadAZIELHeader);
+
+async function loadAZIELHeader() {
     const mount = document.getElementById("azHeaderMount");
     if (!mount) return;
 
     const navType = mount.dataset.nav || "home";
 
     try {
-        const res = await fetch("/components/header.html");
+        const res = await fetch("/components/header.html?v=20260629");
+
+        if (!res.ok) {
+            throw new Error(`Header fetch failed: ${res.status}`);
+        }
+
         const html = await res.text();
 
         mount.innerHTML = html;
 
         renderHeaderNav(navType);
-        window.renderHeader?.();
 
-        window.dispatchEvent(new Event("aziel:headerLoaded"));
+        setTimeout(() => {
+            window.renderHeader?.();
+            window.dispatchEvent(new Event("aziel:headerLoaded"));
+        }, 0);
 
     } catch (error) {
         console.error("Header load error:", error);
     }
-});
+}
 
 function renderHeaderNav(navType) {
     const nav = document.getElementById("azHeaderNav");
     if (!nav) return;
 
-    const items =
-        AZIEL_NAV_ITEMS[navType] ||
-        AZIEL_NAV_ITEMS.home;
+    const items = AZIEL_NAV_ITEMS[navType] || AZIEL_NAV_ITEMS.home;
 
     nav.innerHTML = items.map(([href, label]) => {
         return `<a href="${href}">${label}</a>`;
