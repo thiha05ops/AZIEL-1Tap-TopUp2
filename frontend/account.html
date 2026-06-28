@@ -167,18 +167,24 @@
             <div class="tab-panel" id="profile">
                 <div class="page-title">
                     <h1>Profile</h1>
-                    <p>Update your display name and region.</p>
+                    <p>Your personal AZIEL account information.</p>
                 </div>
 
                 <div class="content-card form-card">
                     <label>Display Name</label>
-                    <input type="text" id="displayName">
+                    <input type="text" id="displayName" placeholder="Your display name">
+
+                    <label>Username</label>
+                    <input type="text" id="profileUsername" readonly>
+
+                    <label>Email</label>
+                    <input type="email" id="profileEmail" readonly>
 
                     <label>Region</label>
-                    <select id="accountRegion">
-                        <option value="MM">Myanmar - MMK</option>
-                        <option value="TH">Thailand - THB</option>
-                    </select>
+                    <input type="text" id="profileRegionReadOnly" readonly>
+
+                    <label>Member Since</label>
+                    <input type="text" id="profileCreatedAt" readonly>
 
                     <button id="saveProfileBtn" class="primary-btn" type="button">
                         Save Profile
