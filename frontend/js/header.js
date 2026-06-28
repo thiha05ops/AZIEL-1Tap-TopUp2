@@ -2,12 +2,13 @@
 
 document.addEventListener("DOMContentLoaded", () => {
     renderHeader();
+    initAutoRevealNav();
 
     window.addEventListener("aziel:ready", renderHeader);
     window.addEventListener("aziel:userChanged", renderHeader);
     window.addEventListener("aziel:walletChanged", renderHeader);
 
-    window.addEventListener("aziel:regionChanged", async () => {
+    window.addEventListener("aziel:shopRegionChanged", async () => {
         renderHeader();
 
         if (window.AZIEL?.loadWallet) {
@@ -24,8 +25,8 @@ function renderHeader() {
     const localeFlag = document.getElementById("localeFlag");
     const profileBox = document.getElementById("profileBox");
 
-    const region = window.AZIEL?.getRegion?.() || "MM";
-    const symbol = window.AZIEL?.getSymbol?.() || (region === "TH" ? "฿" : "Ks");
+    const region = window.AZIEL?.getShopRegion?.() || "MM";
+    const symbol = window.AZIEL?.getShopSymbol?.() || (region === "TH" ? "฿" : "Ks");
 
     const user = window.AZIEL?.user || null;
     const wallet = window.AZIEL?.wallet || null;
@@ -58,6 +59,30 @@ function renderHeader() {
     const balance = Number(wallet?.balance || 0);
 
     if (walletText) {
-        walletText.innerText = `${balance.toLocaleString()} ${symbol}`;
+        walletText.innerText =
+            `${balance.toLocaleString()} ${symbol}`;
     }
+}
+
+function initAutoRevealNav() {
+    const header = document.querySelector(".az-header");
+    const nav = document.querySelector(".az-nav");
+
+    if (!header || !nav) return;
+
+    let lastScrollY = window.scrollY;
+
+    window.addEventListener("scroll", () => {
+        const currentY = window.scrollY;
+
+        if (currentY > 80 && currentY > lastScrollY) {
+            header.classList.add("nav-open");
+        }
+
+        if (currentY < lastScrollY || currentY < 40) {
+            header.classList.remove("nav-open");
+        }
+
+        lastScrollY = currentY;
+    }, { passive: true });
 }
