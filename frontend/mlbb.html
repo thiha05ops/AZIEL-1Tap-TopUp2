@@ -20,33 +20,7 @@
 
 <body>
 
-    <header class="az-header">
-        <a href="home.html" class="az-logo">AZIEL</a>
-
-        <nav class="az-nav">
-            <a href="home.html">Home</a>
-            <a href="home.html#popularGames">Games</a>
-            <a href="home.html#categories">Top Up</a>
-            <a href="wallet.html">Wallet</a>
-            <a href="tracking.html">Orders</a>
-            <a href="support.html">Support</a>
-        </nav>
-
-        <div class="az-header-right">
-            <a href="wallet.html" class="az-wallet-pill">
-                <span id="headerWalletText">0 Ks</span>
-                <i class="fa-solid fa-plus"></i>
-            </a>
-
-            <a href="notifications.html" class="az-icon-btn">
-                <i class="fa-regular fa-bell"></i>
-            </a>
-
-            <a href="account.html" class="az-profile">
-                <div id="avatarText" class="az-avatar">A</div>
-            </a>
-        </div>
-    </header>
+    <div id="azHeaderMount" data-nav="game"></div>
 
     <main class="game-page">
 
@@ -299,6 +273,7 @@
     <script src="/js/site-settings.js"></script>
 
     <script src="/js/user-state.js"></script>
+    <script src="/js/header-loader.js"></script>
     <script src="/js/header.js"></script>
 
     <script src="/js/auth-check.js"></script>

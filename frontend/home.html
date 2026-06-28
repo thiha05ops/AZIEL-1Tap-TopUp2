@@ -37,42 +37,7 @@
 <body>
     <div class="az-bg-wave"></div>
 
-    <header class="az-header az-global-header">
-        <div class="az-header-top">
-            <a href="home.html" class="az-logo">
-                <img src="/assets/logo/aziel-wordmark.webp" alt="AZIEL">
-            </a>
-
-            <div class="az-header-right">
-                <a href="wallet.html" class="az-wallet-pill">
-                    <span id="headerWalletText">0 Ks</span>
-                    <i class="fa-solid fa-plus"></i>
-                </a>
-
-                <a href="notifications.html" class="az-icon-btn" aria-label="Notifications">
-                    <i class="fa-regular fa-bell"></i>
-                </a>
-
-                <button id="localeOpenBtn" class="az-locale-btn" type="button">
-                    <span id="localeFlag">🇲🇲</span>
-                </button>
-
-                <a href="account.html" id="profileBox" class="az-profile">
-                    <div id="avatarText" class="az-avatar">U</div>
-                </a>
-            </div>
-        </div>
-
-        <nav id="azMobileNav" class="az-nav az-mobile-nav">
-            <a href="explore.html">Explore</a>
-            <a href="home.html">Home</a>
-            <a href="home.html#popularGames">Games</a>
-            <a href="home.html#categories">Top Up</a>
-            <a href="wallet.html">Wallet</a>
-            <a href="tracking.html">Transactions</a>
-            <a href="support.html">Support</a>
-        </nav>
-    </header>
+    <div id="azHeaderMount" data-nav="home"></div>
 
     <div id="mobileDrawerOverlay" class="az-mobile-drawer-overlay"></div>
 
@@ -370,6 +335,7 @@
 
     <script src="/js/user-state.js"></script>
     <script src="/js/auth-check.js"></script>
+    <script src="/js/header-loader.js"></script>
     <script src="/js/header.js"></script>
     <script src="js/locale-switcher.js"></script>
 

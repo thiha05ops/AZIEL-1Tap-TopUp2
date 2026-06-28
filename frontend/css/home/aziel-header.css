@@ -1,96 +1,176 @@
-/* =========================
-   AZIEL GLOBAL HEADER V2.5
-   Explore-style + Auto Reveal Nav
-========================= */
+/* ===========================================
+   AZIEL GLOBAL HEADER
+=========================================== */
 
 .az-header {
     position: sticky;
-    top: 14px;
+    top: 0;
     z-index: 9999;
 
-    width: min(1280px, calc(100% - 28px));
-    margin: 14px auto;
+    width: min(1280px, calc(100% - 32px));
+    margin: 0 auto;
 
-    min-height: 82px;
+    height: 92px;
 
-    display: grid;
-    grid-template-columns: auto 1fr;
-    align-items: center;
-    gap: 28px;
-
-    padding: 0 26px;
-
-    background: rgba(10, 10, 28, .76);
-    border: 1px solid rgba(255, 255, 255, .08);
-    border-radius: 26px;
-    backdrop-filter: blur(18px);
-
-    box-shadow: 0 22px 70px rgba(0, 0, 0, .35);
-}
-
-.az-logo {
-    display: inline-flex;
-    align-items: center;
-    text-decoration: none;
-}
-
-.az-logo img {
-    height: 40px;
-    width: auto;
-    display: block;
-}
-
-.az-nav {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 28px;
-    min-width: 0;
+    justify-content: space-between;
+
+    gap: 32px;
+
+    padding: 0 28px;
+
+    border: 1px solid var(--border);
+
+    border-radius: 0 0 24px 24px;
+
+    background: var(--header-bg);
+
+    backdrop-filter: blur(24px);
+
+    box-shadow: var(--shadow);
+}
+
+/* =====================
+Logo
+===================== */
+
+.az-logo {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 14px;
+
+    min-width: 220px;
+
+    text-decoration: none;
+
+}
+
+.az-logo-icon {
+
+    width: 54px;
+
+    height: 54px;
+
+    object-fit: contain;
+
+    filter: drop-shadow(0 0 16px rgba(139, 92, 246, .6));
+
+}
+
+.az-logo-wordmark {
+
+    width: 150px;
+
+    object-fit: contain;
+
+}
+
+/* =====================
+Navigation
+===================== */
+
+.az-nav {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 34px;
+
 }
 
 .az-nav a {
-    color: rgba(255, 255, 255, .82);
+
+    position: relative;
+
+    color: var(--text);
+
     text-decoration: none;
+
     font-size: 15px;
-    font-weight: 900;
-    white-space: nowrap;
+
+    font-weight: 800;
+
+    transition: .25s;
+
 }
 
-.az-nav a:hover,
-.az-nav a.active {
-    color: #fff;
+.az-nav a:hover {
+
+    color: var(--heading);
+
 }
+
+.az-nav a::after {
+
+    content: "";
+
+    position: absolute;
+
+    left: 50%;
+
+    bottom: -35px;
+
+    transform: translateX(-50%);
+
+    width: 0;
+
+    height: 2px;
+
+    background: linear-gradient(90deg,
+            transparent,
+            var(--az-purple),
+            transparent);
+
+    transition: .25s;
+
+}
+
+.az-nav a:hover::after {
+
+    width: 40px;
+
+}
+
+/* =====================
+Header Right
+===================== */
 
 .az-header-right {
-    margin-left: auto;
     display: flex;
     align-items: center;
+    justify-content: flex-end;
     gap: 12px;
+    min-width: 230px;
 }
 
 .az-wallet-pill,
 .az-icon-btn,
 .az-locale-btn,
 .az-profile {
-    min-height: 44px;
+    height: 46px;
     border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, .10);
-    background: rgba(255, 255, 255, .07);
-    color: #fff;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, .06);
+    color: var(--heading);
+    text-decoration: none;
 }
 
 .az-wallet-pill {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 0 12px;
-    text-decoration: none;
-    font-weight: 950;
+    padding: 0 14px;
+    font-weight: 900;
 }
 
 .az-icon-btn,
 .az-locale-btn {
-    width: 44px;
+    width: 46px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -103,267 +183,110 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    text-decoration: none;
 }
 
 .az-avatar {
     width: 34px;
     height: 34px;
     border-radius: 50%;
-
     display: grid;
     place-items: center;
-
     background: linear-gradient(135deg, #7c3aed, #a855f7);
     color: #fff;
-
-    font-size: 16px;
     font-weight: 950;
 }
 
-/* =========================
-   MOBILE AUTO REVEAL NAV
-========================= */
+/* =====================
+Mobile
+===================== */
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
     .az-header {
-        top: 10px;
-        width: min(96%, 430px);
-        min-height: unset;
-
+        width: calc(100% - 20px);
+        height: auto;
+        margin: 10px auto 0;
+        padding: 12px;
+        display: grid;
         grid-template-columns: 1fr auto;
-        gap: 14px;
-
-        padding: 16px 16px 0;
-        overflow: hidden;
+        gap: 12px;
+        border-radius: 18px;
     }
 
-    .az-logo img {
-        height: 34px;
+    .az-logo {
+        min-width: 0;
+    }
+
+    .az-logo-icon {
+        width: 38px;
+        height: 38px;
+    }
+
+    .az-logo-wordmark {
+        width: 118px;
     }
 
     .az-header-right {
+        min-width: 0;
         gap: 8px;
     }
 
     .az-wallet-pill {
-        min-height: 40px;
-        padding: 0 8px;
-        font-size: 13px;
+        height: 40px;
+        padding: 0 9px;
+        font-size: 12px;
     }
 
     .az-icon-btn,
     .az-locale-btn {
         width: 40px;
-        min-height: 40px;
+        height: 40px;
     }
 
     .az-profile {
-        min-width: 46px;
-        min-height: 40px;
-        padding: 0 5px;
+        min-width: 42px;
+        height: 40px;
+        padding: 0 4px;
     }
 
     .az-avatar {
         width: 30px;
         height: 30px;
-        font-size: 14px;
+        font-size: 13px;
     }
 
     .az-nav {
         grid-column: 1 / -1;
-
-        justify-content: flex-start;
-        gap: 24px;
-
+        width: 100%;
         overflow-x: auto;
-        white-space: nowrap;
+        justify-content: flex-start;
+        gap: 22px;
+        padding: 12px 2px 0;
+        border-top: 1px solid var(--border);
         scrollbar-width: none;
-
-        max-height: 0;
-        opacity: 0;
-        transform: translateY(-8px);
-
-        padding: 0;
-        border-top: 1px solid rgba(255, 255, 255, .08);
-
-        transition: .25s ease;
     }
 
     .az-nav::-webkit-scrollbar {
         display: none;
     }
 
-    .az-header.nav-open .az-nav {
-        max-height: 64px;
-        opacity: 1;
-        transform: translateY(0);
-        padding: 16px 0;
-    }
-
     .az-nav a {
-        font-size: 15px;
+        flex: 0 0 auto;
+        font-size: 13px;
+        white-space: nowrap;
+    }
+
+    .az-nav a::after {
+        display: none;
     }
 }
 
-/* =========================
-   AZIEL HEADER FIX OVERRIDE
-========================= */
-
-.az-header.az-global-header {
-    position: sticky !important;
-    top: 0 !important;
-    width: 100% !important;
-    max-width: none !important;
-    margin: 0 !important;
-    border-radius: 0 !important;
-
-    min-height: 86px !important;
-    padding: 0 max(24px, calc((100vw - 1280px) / 2)) !important;
-
-    display: grid !important;
-    grid-template-columns: auto 1fr auto !important;
-    align-items: center !important;
-    gap: 28px !important;
-
-    overflow: visible !important;
-}
-
-.az-header-top {
-    display: contents !important;
-}
-
-.az-header .az-logo {
-    width: 190px !important;
-    min-width: 190px !important;
-    height: 58px !important;
-    display: flex !important;
-    align-items: center !important;
-    overflow: hidden !important;
-}
-
-.az-header .az-logo img {
-    width: 190px !important;
-    height: auto !important;
-    max-height: 58px !important;
-    object-fit: contain !important;
-    display: block !important;
-}
-
-.az-header .az-nav {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: 26px !important;
-    min-width: 0 !important;
-}
-
-.az-header .az-header-right {
-    margin-left: 0 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: flex-end !important;
-    gap: 12px !important;
-    min-width: max-content !important;
-}
-
-/* MOBILE */
-@media (max-width: 768px) {
-    .az-header.az-global-header {
-        min-height: 78px !important;
-        padding: 10px 14px 0 !important;
-
-        grid-template-columns: 1fr auto !important;
-        gap: 12px !important;
-
-        overflow: hidden !important;
+@media (max-width: 520px) {
+    .az-wallet-pill {
+        max-width: 72px;
+        overflow: hidden;
     }
 
-    .az-header-top {
-        display: contents !important;
-    }
-
-    .az-header .az-logo {
-        width: 150px !important;
-        min-width: 150px !important;
-        height: 48px !important;
-    }
-
-    .az-header .az-logo img {
-        width: 150px !important;
-        max-height: 48px !important;
-    }
-
-    .az-header .az-header-right {
-        gap: 7px !important;
-    }
-
-    .az-header .az-wallet-pill {
-        min-height: 38px !important;
-        padding: 0 8px !important;
-        font-size: 12px !important;
-    }
-
-    .az-header .az-icon-btn,
-    .az-header .az-locale-btn {
-        width: 38px !important;
-        min-height: 38px !important;
-    }
-
-    .az-header .az-profile {
-        min-width: 42px !important;
-        min-height: 38px !important;
-        padding: 0 4px !important;
-    }
-
-    .az-header .az-avatar {
-        width: 28px !important;
-        height: 28px !important;
-        font-size: 13px !important;
-    }
-
-    .az-header .az-nav {
-        grid-column: 1 / -1 !important;
-        display: flex !important;
-        justify-content: flex-start !important;
-
-        max-height: 0 !important;
-        opacity: 0 !important;
-        overflow-x: auto !important;
-
-        padding: 0 !important;
-        margin-top: 0 !important;
-
-        border-top: 1px solid rgba(255, 255, 255, .08) !important;
-        transform: translateY(-8px) !important;
-        transition: .25s ease !important;
-        scrollbar-width: none !important;
-    }
-
-    .az-header .az-nav::-webkit-scrollbar {
-        display: none !important;
-    }
-
-    .az-header.nav-open .az-nav {
-        max-height: 56px !important;
-        opacity: 1 !important;
-        transform: translateY(0) !important;
-        padding: 14px 0 !important;
-    }
-}
-
-@media (max-width: 430px) {
-    .az-header .az-logo {
-        width: 130px !important;
-        min-width: 130px !important;
-    }
-
-    .az-header .az-logo img {
-        width: 130px !important;
-    }
-
-    .az-header .az-wallet-pill {
-        max-width: 66px !important;
-        overflow: hidden !important;
+    .az-icon-btn {
+        display: none;
     }
 }
