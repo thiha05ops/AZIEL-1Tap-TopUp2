@@ -1,4 +1,4 @@
-// frontend/js/account.js - AZIEL V2.5 Clean Account Flow
+// frontend/js/account.js - AZIEL V2.5 Production Account Flow
 
 document.addEventListener("DOMContentLoaded", () => {
     initTabs();
@@ -56,15 +56,11 @@ function setValue(id, value) {
 }
 
 function getDisplayName(user) {
-    return (
-        user?.displayName ||
-        user?.username ||
-        "User"
-    );
+    return user?.displayName || user?.username || "User";
 }
 
 function getRegion(user) {
-    return user?.region || "MM";
+    return user?.region || localStorage.getItem("region") || "MM";
 }
 
 function getCurrency(region) {
@@ -73,6 +69,20 @@ function getCurrency(region) {
 
 function getSymbol(currency) {
     return currency === "THB" ? "฿" : "Ks";
+}
+
+function formatDate(dateValue) {
+    if (!dateValue) return "-";
+
+    const date = new Date(dateValue);
+
+    if (Number.isNaN(date.getTime())) return "-";
+
+    return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric"
+    });
 }
 
 // ============================
@@ -100,15 +110,17 @@ async function loadMyProfile() {
 
         const name = getDisplayName(currentUser);
         const region = getRegion(currentUser);
+        const currency = getCurrency(region);
 
         localStorage.setItem("username", currentUser.username || "");
         localStorage.setItem("displayName", name);
         localStorage.setItem("region", region);
         localStorage.setItem("selectedRegion", region);
-        localStorage.setItem("currency", getCurrency(region));
-        localStorage.setItem("selectedCurrency", getCurrency(region));
+        localStorage.setItem("currency", currency);
+        localStorage.setItem("selectedCurrency", currency);
 
         renderProfile(currentUser);
+        renderSecurity(currentUser);
 
     } catch (error) {
         console.log("Load profile error:", error);
@@ -118,19 +130,42 @@ async function loadMyProfile() {
 function renderProfile(user) {
     const name = getDisplayName(user);
     const region = getRegion(user);
+    const verified = Boolean(user.emailVerified || user.isEmailVerified || user.verified);
 
     setText("profileName", name);
     setText("avatarText", name.charAt(0).toUpperCase());
     setText("profileRegion", "Region: " + region);
 
     setValue("displayName", name);
+    setValue("profileUsername", user.username || "");
     setValue("profileEmail", user.email || "");
-    setValue("accountRegion", region);
+    setValue("profileRegionReadOnly", region === "TH" ? "Thailand - THB" : "Myanmar - MMK");
+    setValue("profileCreatedAt", formatDate(user.createdAt));
 
-    setValue("telegram", user.telegram || "");
-    setValue("phone", user.phone || "");
-    setValue("mlbbUserId", user.mlbbUserId || "");
-    setValue("mlbbServerId", user.mlbbServerId || "");
+    const verifiedBadge = document.querySelector(".verified-badge");
+    if (verifiedBadge) {
+        verifiedBadge.innerHTML = verified
+            ? `<i class="fa-solid fa-circle-check"></i> Verified`
+            : `<i class="fa-solid fa-circle-exclamation"></i> Not Verified`;
+    }
+}
+
+function renderSecurity(user) {
+    const email = user.email || "-";
+    const verified = Boolean(user.emailVerified || user.isEmailVerified || user.verified);
+    const googleLinked = Boolean(user.googleId || user.googleLinked || user.provider === "google");
+
+    setText("securityEmailText", email);
+    setText("emailVerifiedStatus", verified ? "Verified" : "Not Verified");
+
+    setText(
+        "googleLinkedText",
+        googleLinked
+            ? "Your Google account is linked to AZIEL."
+            : "Google account is not linked yet."
+    );
+
+    setText("googleLinkedStatus", googleLinked ? "Linked" : "Not Linked");
 }
 
 async function saveProfile() {
@@ -141,14 +176,13 @@ async function saveProfile() {
         return;
     }
 
-    const body = {
-        displayName: document.getElementById("displayName")?.value.trim() || "",
-        region: document.getElementById("accountRegion")?.value || "MM",
-        telegram: document.getElementById("telegram")?.value.trim() || "",
-        phone: document.getElementById("phone")?.value.trim() || "",
-        mlbbUserId: document.getElementById("mlbbUserId")?.value.trim() || "",
-        mlbbServerId: document.getElementById("mlbbServerId")?.value.trim() || ""
-    };
+    const displayName =
+        document.getElementById("displayName")?.value.trim() || "";
+
+    if (!displayName) {
+        alert("Display name is required");
+        return;
+    }
 
     try {
         const res = await fetch("/api/profile/me", {
@@ -157,7 +191,7 @@ async function saveProfile() {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${token}`
             },
-            body: JSON.stringify(body)
+            body: JSON.stringify({ displayName })
         });
 
         const data = await res.json();
@@ -170,6 +204,7 @@ async function saveProfile() {
         currentUser = data.user;
 
         renderProfile(currentUser);
+        renderSecurity(currentUser);
         await loadAccountWalletBalance();
 
         alert("Profile saved ✅");
@@ -316,7 +351,7 @@ function orderCard(order) {
 
             <div class="order-bottom">
                 <strong>
-                    ${(order.amount || 0).toLocaleString?.() || order.amount || 0}
+                    ${Number(order.amount || 0).toLocaleString()}
                     ${order.currency || "Ks"}
                 </strong>
 
@@ -442,18 +477,18 @@ function initButtons() {
 }
 
 function initMobileMenu() {
-    const mobileMenuBtn = document.getElementById("mobileMenuBtn");
+    const btn = document.getElementById("accountMenuBtn");
     const sidebar = document.querySelector(".account-sidebar");
-    const sidebarOverlay = document.getElementById("sidebarOverlay");
+    const overlay = document.getElementById("accountDrawerOverlay");
 
-    mobileMenuBtn?.addEventListener("click", () => {
-        sidebar?.classList.toggle("show");
-        sidebarOverlay?.classList.toggle("show");
+    btn?.addEventListener("click", () => {
+        sidebar?.classList.add("show");
+        overlay?.classList.add("show");
     });
 
-    sidebarOverlay?.addEventListener("click", () => {
+    overlay?.addEventListener("click", () => {
         sidebar?.classList.remove("show");
-        sidebarOverlay?.classList.remove("show");
+        overlay?.classList.remove("show");
     });
 }
 

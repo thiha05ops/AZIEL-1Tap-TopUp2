@@ -197,13 +197,26 @@
             </div>
 
             <!-- SECURITY TAB -->
+            <!-- SECURITY TAB -->
             <div class="tab-panel" id="security">
                 <div class="page-title">
                     <h1>Security</h1>
-                    <p>Keep your AZIEL account safe.</p>
+                    <p>Keep your AZIEL account safe and verified.</p>
                 </div>
 
                 <div class="security-grid">
+                    <div class="security-card">
+                        <div class="security-icon">
+                            <i class="fa-regular fa-envelope"></i>
+                        </div>
+
+                        <div>
+                            <h3>Email Verification</h3>
+                            <p id="securityEmailText">Loading email status...</p>
+                            <span id="emailVerifiedStatus" class="security-status">Checking...</span>
+                        </div>
+                    </div>
+
                     <div class="security-card">
                         <div class="security-icon">
                             <i class="fa-solid fa-lock"></i>
@@ -218,13 +231,25 @@
 
                     <div class="security-card">
                         <div class="security-icon">
-                            <i class="fa-regular fa-envelope"></i>
+                            <i class="fa-brands fa-google"></i>
                         </div>
 
                         <div>
-                            <h3>Email Verification</h3>
-                            <p>Your Gmail is used for OTP, password reset and order notifications.</p>
-                            <span class="security-status">Verified</span>
+                            <h3>Google Login</h3>
+                            <p id="googleLinkedText">Google account link status.</p>
+                            <span id="googleLinkedStatus" class="security-status">Coming Soon</span>
+                        </div>
+                    </div>
+
+                    <div class="security-card">
+                        <div class="security-icon">
+                            <i class="fa-solid fa-shield-halved"></i>
+                        </div>
+
+                        <div>
+                            <h3>Two-Factor Authentication</h3>
+                            <p>Extra account protection for future AZIEL accounts.</p>
+                            <span class="security-status">Coming Soon</span>
                         </div>
                     </div>
                 </div>
@@ -238,24 +263,6 @@
     <script src="js/logout.js"></script>
     <script src="js/site-settings.js"></script>
     <script src="js/api.js"></script>
-
-    <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            const btn = document.getElementById("accountMenuBtn");
-            const sidebar = document.querySelector(".account-sidebar");
-            const overlay = document.getElementById("accountDrawerOverlay");
-
-            btn?.addEventListener("click", () => {
-                sidebar.classList.add("show");
-                overlay.classList.add("show");
-            });
-
-            overlay?.addEventListener("click", () => {
-                sidebar.classList.remove("show");
-                overlay.classList.remove("show");
-            });
-        });
-    </script>
 
 </body>
 
