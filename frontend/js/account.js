@@ -4,46 +4,90 @@ document.addEventListener("DOMContentLoaded", () => {
     initTabs();
     initButtons();
     initMobileMenu();
-    initSlipPreview();
     initAccount();
 });
 
 let currentUser = null;
+let accountRefreshTimer = null;
 
 // ============================
 // INIT
 // ============================
 
 async function initAccount() {
-    const token = getToken();
+    const token = window.AZIEL?.getToken?.();
 
     if (!token) {
         window.location.href = "login.html";
         return;
     }
 
-    await loadMyProfile();
-    await loadAccountWalletBalance();
+    await ensureAZIELState();
+
+    currentUser = window.AZIEL?.user || null;
+
+    if (!currentUser) {
+        window.location.href = "login.html";
+        return;
+    }
+
+    renderAccount();
     await loadHistory();
     await loadBellOrders();
 
-    setInterval(() => {
-        loadAccountWalletBalance();
-        loadHistory();
-        loadBellOrders();
-    }, 8000);
+    window.addEventListener("aziel:ready", async () => {
+        currentUser = window.AZIEL?.user || currentUser;
+        renderAccount();
+        await loadHistory();
+        await loadBellOrders();
+    });
+
+    window.addEventListener("aziel:userChanged", async () => {
+        currentUser = window.AZIEL?.user || currentUser;
+        renderAccount();
+        await loadHistory();
+        await loadBellOrders();
+    });
+
+    window.addEventListener("aziel:walletChanged", () => {
+        renderWallet();
+    });
+
+    window.addEventListener("aziel:regionChanged", async () => {
+        await window.AZIEL?.loadWallet?.();
+        renderAccount();
+    });
+
+    accountRefreshTimer = setInterval(async () => {
+        await window.AZIEL?.loadWallet?.();
+        await loadHistory();
+        await loadBellOrders();
+        renderAccount();
+    }, 10000);
+}
+
+// ============================
+// GLOBAL STATE
+// ============================
+
+async function ensureAZIELState() {
+    if (!window.AZIEL) {
+        console.error("AZIEL user-state.js not loaded");
+        return;
+    }
+
+    if (!window.AZIEL.user) {
+        await window.AZIEL.loadUser?.();
+    }
+
+    if (!window.AZIEL.wallet) {
+        await window.AZIEL.loadWallet?.();
+    }
 }
 
 // ============================
 // HELPERS
 // ============================
-
-function getToken() {
-    return (
-        localStorage.getItem("token") ||
-        sessionStorage.getItem("token")
-    );
-}
 
 function setText(id, text) {
     const el = document.getElementById(id);
@@ -55,20 +99,20 @@ function setValue(id, value) {
     if (el) el.value = value ?? "";
 }
 
-function getDisplayName(user) {
-    return user?.displayName || user?.username || "User";
+function getDisplayName(user = currentUser) {
+    return window.AZIEL?.getDisplayName?.(user) || user?.displayName || user?.username || "User";
 }
 
-function getRegion(user) {
-    return user?.region || localStorage.getItem("region") || "MM";
+function getRegion() {
+    return window.AZIEL?.getRegion?.() || "MM";
 }
 
-function getCurrency(region) {
-    return region === "TH" ? "THB" : "MMK";
+function getCurrency() {
+    return window.AZIEL?.getCurrency?.() || (getRegion() === "TH" ? "THB" : "MMK");
 }
 
-function getSymbol(currency) {
-    return currency === "THB" ? "฿" : "Ks";
+function getSymbol() {
+    return window.AZIEL?.getSymbol?.() || (getCurrency() === "THB" ? "฿" : "Ks");
 }
 
 function formatDate(dateValue) {
@@ -85,62 +129,49 @@ function formatDate(dateValue) {
     });
 }
 
-// ============================
-// PROFILE
-// ============================
-
-async function loadMyProfile() {
-    const token = getToken();
-
-    try {
-        const res = await fetch("/api/profile/me", {
-            headers: {
-                Authorization: `Bearer ${token}`
-            }
-        });
-
-        const data = await res.json();
-
-        if (!data.success || !data.user) {
-            console.log("Profile load failed:", data.message);
-            return;
-        }
-
-        currentUser = data.user;
-
-        const name = getDisplayName(currentUser);
-        const region = getRegion(currentUser);
-        const currency = getCurrency(region);
-
-        localStorage.setItem("username", currentUser.username || "");
-        localStorage.setItem("displayName", name);
-        localStorage.setItem("currency", currency);
-        localStorage.setItem("selectedCurrency", currency);
-
-        renderProfile(currentUser);
-        renderSecurity(currentUser);
-
-    } catch (error) {
-        console.log("Load profile error:", error);
-    }
+function isVerified(user = currentUser) {
+    return Boolean(user?.emailVerified || user?.isEmailVerified || user?.verified);
 }
 
-function renderProfile(user) {
+function isGoogleLinked(user = currentUser) {
+    return Boolean(user?.googleId || user?.googleLinked || user?.provider === "google");
+}
+
+// ============================
+// RENDER
+// ============================
+
+function renderAccount() {
+    currentUser = window.AZIEL?.user || currentUser;
+
+    if (!currentUser) return;
+
+    renderProfile();
+    renderSecurity();
+    renderWallet();
+}
+
+function renderProfile() {
+    const user = currentUser;
     const name = getDisplayName(user);
-    const region = getRegion(user);
-    const verified = Boolean(user.emailVerified || user.isEmailVerified || user.verified);
+    const region = getRegion();
+    const verified = isVerified(user);
 
     setText("profileName", name);
     setText("avatarText", name.charAt(0).toUpperCase());
-    setText("profileRegion", "Region: " + region);
+    setText("profileRegion", `Region: ${region}`);
 
     setValue("displayName", name);
     setValue("profileUsername", user.username || "");
     setValue("profileEmail", user.email || "");
-    setValue("profileRegionReadOnly", region === "TH" ? "Thailand - THB" : "Myanmar - MMK");
+    setValue(
+        "profileRegionReadOnly",
+        region === "TH" ? "Thailand - THB" : "Myanmar - MMK"
+    );
     setValue("profileCreatedAt", formatDate(user.createdAt));
 
     const verifiedBadge = document.querySelector(".verified-badge");
+
     if (verifiedBadge) {
         verifiedBadge.innerHTML = verified
             ? `<i class="fa-solid fa-circle-check"></i> Verified`
@@ -148,12 +179,12 @@ function renderProfile(user) {
     }
 }
 
-function renderSecurity(user) {
-    const email = user.email || "-";
-    const verified = Boolean(user.emailVerified || user.isEmailVerified || user.verified);
-    const googleLinked = Boolean(user.googleId || user.googleLinked || user.provider === "google");
+function renderSecurity() {
+    const user = currentUser;
+    const verified = isVerified(user);
+    const googleLinked = isGoogleLinked(user);
 
-    setText("securityEmailText", email);
+    setText("securityEmailText", user?.email || "-");
     setText("emailVerifiedStatus", verified ? "Verified" : "Not Verified");
 
     setText(
@@ -166,8 +197,21 @@ function renderSecurity(user) {
     setText("googleLinkedStatus", googleLinked ? "Linked" : "Not Linked");
 }
 
+function renderWallet() {
+    const wallet = window.AZIEL?.wallet || {};
+    const symbol = getSymbol();
+    const balance = Number(wallet.balance || 0);
+
+    setText("overviewWalletBalance", `${balance.toLocaleString()} ${symbol}`);
+    setText("walletBalanceBig", `${balance.toLocaleString()} ${symbol}`);
+}
+
+// ============================
+// SAVE PROFILE
+// ============================
+
 async function saveProfile() {
-    const token = getToken();
+    const token = window.AZIEL?.getToken?.();
 
     if (!token) {
         window.location.href = "login.html";
@@ -194,16 +238,20 @@ async function saveProfile() {
 
         const data = await res.json();
 
-        if (!data.success) {
+        if (!data.success || !data.user) {
             alert(data.message || "Profile save failed");
             return;
         }
 
+        window.AZIEL.user = data.user;
         currentUser = data.user;
 
-        renderProfile(currentUser);
-        renderSecurity(currentUser);
-        await loadAccountWalletBalance();
+        localStorage.setItem("username", data.user.username || "");
+        localStorage.setItem("displayName", getDisplayName(data.user));
+
+        window.dispatchEvent(new Event("aziel:userChanged"));
+
+        renderAccount();
 
         alert("Profile saved ✅");
 
@@ -214,50 +262,14 @@ async function saveProfile() {
 }
 
 // ============================
-// WALLET
-// ============================
-
-async function loadAccountWalletBalance() {
-    if (!currentUser) return;
-
-    const username = currentUser.username;
-    const region = getRegion(currentUser);
-    const currency = getCurrency(region);
-    const symbol = getSymbol(currency);
-
-    try {
-        const res = await fetch(
-            `/api/wallet/${encodeURIComponent(username)}?currency=${currency}`
-        );
-
-        const data = await res.json();
-
-        const balance = data.success
-            ? Number(data.balance || 0)
-            : 0;
-
-        setText("overviewWalletBalance", `${balance.toLocaleString()} ${symbol}`);
-        setText("walletBalanceBig", `${balance.toLocaleString()} ${symbol}`);
-
-    } catch (error) {
-        console.log("Account wallet error:", error);
-
-        setText("overviewWalletBalance", `0 ${symbol}`);
-        setText("walletBalanceBig", `0 ${symbol}`);
-    }
-}
-
-// ============================
 // HISTORY / ORDERS
 // ============================
 
 async function loadHistory() {
-    if (!currentUser) return;
-
-    const username = currentUser.username;
+    if (!currentUser?.username) return;
 
     try {
-        const res = await fetch(`/api/history/${encodeURIComponent(username)}`);
+        const res = await fetch(`/api/history/${encodeURIComponent(currentUser.username)}`);
         const data = await res.json();
 
         if (!data.success || !Array.isArray(data.orders)) {
@@ -276,8 +288,8 @@ async function loadHistory() {
 }
 
 function renderStats(orders) {
-    const completed = orders.filter(o => o.status === "completed");
-    const active = orders.filter(o => o.status !== "completed");
+    const completed = orders.filter(order => order.status === "completed");
+    const active = orders.filter(order => order.status !== "completed");
 
     setText("totalOrders", orders.length);
     setText("pendingOrders", active.length);
@@ -350,7 +362,7 @@ function orderCard(order) {
             <div class="order-bottom">
                 <strong>
                     ${Number(order.amount || 0).toLocaleString()}
-                    ${order.currency || "Ks"}
+                    ${order.currency || getCurrency()}
                 </strong>
 
                 <a href="tracking.html?orderId=${order.orderId}">
@@ -378,16 +390,15 @@ function renderEmpty() {
 // ============================
 
 async function loadBellOrders() {
-    if (!currentUser) return;
+    if (!currentUser?.username) return;
 
-    const username = currentUser.username;
     const panel = document.getElementById("notiPanel");
     const count = document.getElementById("notiCount");
 
     if (!panel || !count) return;
 
     try {
-        const res = await fetch(`/api/history/${encodeURIComponent(username)}`);
+        const res = await fetch(`/api/history/${encodeURIComponent(currentUser.username)}`);
         const data = await res.json();
 
         if (!data.success || !Array.isArray(data.orders) || !data.orders.length) {
@@ -396,7 +407,7 @@ async function loadBellOrders() {
             return;
         }
 
-        const activeOrders = data.orders.filter(o => o.status !== "completed");
+        const activeOrders = data.orders.filter(order => order.status !== "completed");
 
         count.innerText = activeOrders.length;
 
@@ -435,12 +446,12 @@ function initTabs() {
         btn.addEventListener("click", () => {
             if (!btn.dataset.tab) return;
 
-            document.querySelectorAll(".side-link").forEach(b =>
-                b.classList.remove("active")
+            document.querySelectorAll(".side-link").forEach(button =>
+                button.classList.remove("active")
             );
 
-            document.querySelectorAll(".tab-panel").forEach(p =>
-                p.classList.remove("active")
+            document.querySelectorAll(".tab-panel").forEach(panel =>
+                panel.classList.remove("active")
             );
 
             btn.classList.add("active");
@@ -451,15 +462,17 @@ function initTabs() {
             }
 
             if (btn.dataset.tab === "overview") {
+                renderAccount();
                 loadHistory();
-                loadAccountWalletBalance();
-                loadMyProfile();
             }
         });
     });
 }
 
 function initButtons() {
+    document.getElementById("saveProfileBtn")
+        ?.addEventListener("click", saveProfile);
+
     document.getElementById("goWalletTopupBtn")
         ?.addEventListener("click", () => {
             window.location.href = "wallet.html";
@@ -469,9 +482,6 @@ function initButtons() {
         ?.addEventListener("click", () => {
             window.location.href = "wallet.html#history";
         });
-
-    document.getElementById("saveProfileBtn")
-        ?.addEventListener("click", saveProfile);
 }
 
 function initMobileMenu() {
@@ -488,16 +498,4 @@ function initMobileMenu() {
         sidebar?.classList.remove("show");
         overlay?.classList.remove("show");
     });
-}
-
-function initSlipPreview() {
-    document.getElementById("topupSlip")
-        ?.addEventListener("change", e => {
-            const file = e.target.files[0];
-            const nameBox = document.getElementById("slipFileName");
-
-            if (nameBox) {
-                nameBox.innerText = file ? file.name : "No file selected";
-            }
-        });
 }

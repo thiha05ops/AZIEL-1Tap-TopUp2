@@ -1,4 +1,10 @@
+// frontend/js/locale-switcher.js - AZIEL V2.5 Shop Region Switcher
+
 document.addEventListener("DOMContentLoaded", () => {
+    initLocaleSwitcher();
+});
+
+function initLocaleSwitcher() {
     const openBtn = document.getElementById("localeOpenBtn");
     const closeBtn = document.getElementById("localeCloseBtn");
     const modal = document.getElementById("localeModal");
@@ -9,45 +15,80 @@ document.addEventListener("DOMContentLoaded", () => {
     const saveBtn = document.getElementById("saveLocaleBtn");
     const localeFlag = document.getElementById("localeFlag");
 
-    const region = localStorage.getItem("region") || "TH";
-    const lang = localStorage.getItem("azielLang") || "en";
-    const currency = localStorage.getItem("currency") || (region === "TH" ? "THB" : "MMK");
+    const activeRegion = window.AZIEL?.getShopRegion?.() || "MM";
+    const activeCurrency = window.AZIEL?.getShopCurrency?.() || "MMK";
+    const activeLang = localStorage.getItem("azielLang") || "en";
 
-    regionSelect.value = region;
-    languageSelect.value = lang;
-    currencySelect.value = currency;
-    updateFlag(region);
+    renderLocaleUI(activeRegion, activeCurrency, activeLang);
 
     openBtn?.addEventListener("click", () => {
-        modal.classList.add("show");
+        modal?.classList.add("show");
     });
 
     closeBtn?.addEventListener("click", () => {
-        modal.classList.remove("show");
+        modal?.classList.remove("show");
     });
 
-    modal?.addEventListener("click", e => {
-        if (e.target === modal) modal.classList.remove("show");
+    modal?.addEventListener("click", (e) => {
+        if (e.target === modal) {
+            modal.classList.remove("show");
+        }
     });
 
     regionSelect?.addEventListener("change", () => {
-        const r = regionSelect.value;
-        currencySelect.value = r === "TH" ? "THB" : "MMK";
-        updateFlag(r);
+        const region = normalizeRegion(regionSelect.value);
+        const currency = getCurrencyByRegion(region);
+
+        if (currencySelect) {
+            currencySelect.value = currency;
+        }
+
+        updateFlag(localeFlag, region);
     });
 
     saveBtn?.addEventListener("click", () => {
-        localStorage.setItem("region", regionSelect.value);
-        localStorage.setItem("selectedRegion", regionSelect.value);
-        localStorage.setItem("azielLang", languageSelect.value);
-        localStorage.setItem("currency", currencySelect.value);
-        localStorage.setItem("selectedCurrency", currencySelect.value);
+        const region = normalizeRegion(regionSelect?.value || "MM");
+        const currency = getCurrencyByRegion(region);
+        const lang = languageSelect?.value || "en";
 
-        modal.classList.remove("show");
-        location.reload();
+        localStorage.setItem("azielLang", lang);
+
+        window.AZIEL?.setShopRegion?.(region, { reload: true });
+
+        localStorage.setItem("shopCurrency", currency);
+        localStorage.setItem("currency", currency);
+        localStorage.setItem("selectedCurrency", currency);
+
+        modal?.classList.remove("show");
     });
 
-    function updateFlag(region) {
-        localeFlag.innerText = region === "MM" ? "🇲🇲" : "🇹🇭";
+    window.addEventListener("aziel:shopRegionChanged", (e) => {
+        const region = e.detail?.region || window.AZIEL?.getShopRegion?.() || "MM";
+        const currency = e.detail?.currency || getCurrencyByRegion(region);
+        const lang = localStorage.getItem("azielLang") || "en";
+
+        renderLocaleUI(region, currency, lang);
+    });
+
+    function renderLocaleUI(region, currency, lang) {
+        if (regionSelect) regionSelect.value = region;
+        if (currencySelect) currencySelect.value = currency;
+        if (languageSelect) languageSelect.value = lang;
+
+        updateFlag(localeFlag, region);
     }
-});
+
+    function updateFlag(flagEl, region) {
+        if (flagEl) {
+            flagEl.innerText = region === "TH" ? "🇹🇭" : "🇲🇲";
+        }
+    }
+
+    function normalizeRegion(region) {
+        return region === "TH" ? "TH" : "MM";
+    }
+
+    function getCurrencyByRegion(region) {
+        return region === "TH" ? "THB" : "MMK";
+    }
+}

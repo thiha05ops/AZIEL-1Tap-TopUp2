@@ -1,69 +1,146 @@
 // frontend/js/wallet.js
-// AZIEL Wallet V2.5 - Generate QR Modal Flow
+// AZIEL Wallet V2.5 - Global State Wallet Flow
 
 let walletPollingTimer = null;
 let walletCountdownTimer = null;
 
-document.addEventListener("DOMContentLoaded", () => {
-    const username = localStorage.getItem("username");
-
-    if (!username) {
+document.addEventListener("DOMContentLoaded", async () => {
+    if (!window.AZIEL) {
+        console.error("AZIEL user-state.js not loaded");
         window.location.href = "login.html";
         return;
     }
 
-    loadWallet();
+    if (!AZIEL.getToken()) {
+        window.location.href = "login.html";
+        return;
+    }
+
+    await ensureWalletState();
+
     initQuickAmounts();
     initWalletTopup();
     initWalletSocket();
+    bindWalletEvents();
+
+    renderWalletFromState();
+    await loadWallet();
 
     document
         .getElementById("closeWalletQrModal")
         ?.addEventListener("click", closeWalletQrModal);
 });
 
+async function ensureWalletState() {
+    if (!AZIEL.user) {
+        await AZIEL.loadUser();
+    }
+
+    if (!AZIEL.user) {
+        window.location.href = "login.html";
+        return;
+    }
+
+    if (!AZIEL.wallet) {
+        await AZIEL.loadWallet();
+    }
+}
+
+function bindWalletEvents() {
+    window.addEventListener("aziel:walletChanged", () => {
+        renderWalletFromState();
+    });
+
+    window.addEventListener("aziel:regionChanged", async () => {
+        await loadWallet();
+        renderWalletFromState();
+    });
+
+    window.addEventListener("aziel:userChanged", async () => {
+        await loadWallet();
+        renderWalletFromState();
+    });
+}
+
+function getWalletUser() {
+    return AZIEL.user || null;
+}
+
 function getWalletRegion() {
-    return (
-        localStorage.getItem("selectedRegion") ||
-        localStorage.getItem("region") ||
-        "MM"
-    );
+    return AZIEL.getRegion ? AZIEL.getRegion() : "MM";
 }
 
 function getWalletCurrency() {
-    return getWalletRegion() === "TH" ? "THB" : "MMK";
+    return AZIEL.getCurrency
+        ? AZIEL.getCurrency()
+        : getWalletRegion() === "TH"
+            ? "THB"
+            : "MMK";
 }
 
-function getWalletSymbol(currency) {
-    return currency === "THB" ? "฿" : "Ks";
+function getWalletSymbol() {
+    return AZIEL.getSymbol
+        ? AZIEL.getSymbol()
+        : getWalletCurrency() === "THB"
+            ? "฿"
+            : "Ks";
 }
 
 async function loadWallet() {
-    const username = localStorage.getItem("username");
+    await AZIEL.loadWallet?.();
+
+    const user = getWalletUser();
+    if (!user?.username) return;
+
     const currency = getWalletCurrency();
-    const symbol = getWalletSymbol(currency);
 
     try {
-        const res = await fetch(`/api/wallet/${username}?currency=${currency}`);
+        const res = await fetch(
+            `/api/wallet/${encodeURIComponent(user.username)}?currency=${currency}`
+        );
+
         const data = await res.json();
 
-        if (!data.success) return;
+        if (!data.success) {
+            renderWalletFromState();
+            return;
+        }
 
         const balance = Number(data.balance || 0);
 
-        updateWalletBalanceUI(balance, symbol);
-        localStorage.setItem(`walletBalance_${currency}`, String(balance));
+        AZIEL.wallet = {
+            balance,
+            currency,
+            symbol: getWalletSymbol()
+        };
+
+        window.dispatchEvent(new Event("aziel:walletChanged"));
 
         renderWalletHistory(data.topups || []);
+
     } catch (error) {
         console.log("Wallet load error:", error);
+        renderWalletFromState();
     }
+}
+
+function renderWalletFromState() {
+    const wallet = AZIEL.wallet || {};
+    const symbol = getWalletSymbol();
+    const balance = Number(wallet.balance || 0);
+
+    updateWalletBalanceUI(balance, symbol);
 }
 
 function updateWalletBalanceUI(amount, symbol) {
     const text = `${Number(amount || 0).toLocaleString()} ${symbol || ""}`;
 
-    ["walletBalance", "balanceAmount", "userWalletBalance"].forEach(id => {
+    [
+        "walletBalance",
+        "balanceAmount",
+        "userWalletBalance",
+        "headerWalletText"
+    ].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.innerText = text;
     });
@@ -86,7 +163,10 @@ function renderWalletHistory(topups) {
     box.innerHTML = topups.map(item => `
         <div class="wallet-history-item">
             <div>
-                <strong>${Number(item.amount || 0).toLocaleString()} ${item.currency || ""}</strong>
+                <strong>
+                    ${Number(item.amount || 0).toLocaleString()}
+                    ${item.currency || getWalletCurrency()}
+                </strong>
                 <p>${item.paymentMethod || "Payment"}</p>
             </div>
 
@@ -125,7 +205,14 @@ function initWalletTopup() {
 }
 
 async function submitTopup() {
-    const username = localStorage.getItem("username");
+    const user = getWalletUser();
+
+    if (!user?.username) {
+        window.location.href = "login.html";
+        return;
+    }
+
+    const username = user.username;
     const amount = Number(document.getElementById("topupAmount")?.value);
     const paymentMethod = document.getElementById("paymentMethod")?.value;
     const currency = getWalletCurrency();
@@ -144,13 +231,18 @@ async function submitTopup() {
     const btn = document.getElementById("submitTopupBtn");
 
     try {
-        btn.disabled = true;
-        btn.innerText = "Generating QR...";
+        if (btn) {
+            btn.disabled = true;
+            btn.innerText = "Generating QR...";
+        }
+
         showLoading(true);
 
         const res = await fetch("/api/wallet/create", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+                "Content-Type": "application/json"
+            },
             body: JSON.stringify({
                 username,
                 amount,
@@ -181,11 +273,13 @@ async function submitTopup() {
         alert("Server error");
     } finally {
         showLoading(false);
-        btn.disabled = false;
-        btn.innerText = "Generate QR";
+
+        if (btn) {
+            btn.disabled = false;
+            btn.innerText = "Generate QR";
+        }
     }
 }
-
 function openWalletQrModal(data, info) {
     const modal = document.getElementById("walletQrModal");
     const topupIdEl = document.getElementById("modalTopupId");
@@ -279,6 +373,8 @@ function startPaymentStatusPolling(topupId) {
                 closeWalletQrModal();
 
                 await loadWallet();
+                await window.AZIEL?.loadWallet?.();
+
                 showSubmitSuccessModal();
                 resetTopupForm();
             }
@@ -296,21 +392,28 @@ function startPaymentStatusPolling(topupId) {
 function initWalletSocket() {
     if (typeof io === "undefined") return;
 
-    const username = localStorage.getItem("username");
-    if (!username) return;
+    const user = getWalletUser();
+    if (!user?.username) return;
 
     const socket = io();
 
-    socket.emit("joinUser", username);
-    socket.emit("joinUserRoom", username);
+    socket.emit("joinUser", user.username);
+    socket.emit("joinUserRoom", user.username);
 
     socket.on("walletUpdated", async data => {
         const currency = data.currency || getWalletCurrency();
-        const symbol = getWalletSymbol(currency);
+        const symbol = currency === "THB" ? "฿" : "Ks";
         const amount = Number(data.amount || 0);
 
+        AZIEL.wallet = {
+            balance: amount,
+            currency,
+            symbol
+        };
+
+        window.dispatchEvent(new Event("aziel:walletChanged"));
+
         updateWalletBalanceUI(amount, symbol);
-        localStorage.setItem(`walletBalance_${currency}`, String(amount));
 
         showWalletPopup(amount, symbol);
         showSubmitSuccessModal();

@@ -77,9 +77,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const username = localStorage.getItem("username") || "user";
         const region =
-            localStorage.getItem("region") ||
-            localStorage.getItem("selectedRegion") ||
-            "MM";
+            window.AZIEL?.getShopRegion?.() || "MM";
 
         const currency = region === "TH" ? "THB" : "MMK";
         const paymentMethod =
@@ -137,20 +135,30 @@ document.addEventListener("DOMContentLoaded", () => {
         const selectedPayment = window.selectedPaymentData;
 
         if (selectedPack) {
-            summaryPackage.innerText = selectedPack.name;
+
+            const activePack =
+                document.querySelector(".pack.active");
+
+            if (activePack) {
+                selectedPack.amount =
+                    Number(activePack.dataset.price);
+            }
+
+            summaryPackage.innerText =
+                selectedPack.name;
 
             const region =
-                localStorage.getItem("region") ||
-                localStorage.getItem("selectedRegion") ||
-                "MM";
+                window.AZIEL?.getShopRegion?.() || "MM";
 
-            const currencySymbol = region === "TH" ? "฿" : "Ks";
+            const currencySymbol =
+                region === "TH" ? "฿" : "Ks";
 
             summaryAmount.innerText =
                 `${selectedPack.amount.toLocaleString()} ${currencySymbol}`;
 
             selectedText.innerText =
                 "Ready to continue payment.";
+
         } else {
             summaryPackage.innerText = "Not selected";
             summaryAmount.innerText = "0 Ks";
@@ -175,6 +183,38 @@ document.addEventListener("DOMContentLoaded", () => {
     initMobilePackagePanel();
     initSuccessModal();
     updateState();
+    window.addEventListener("aziel:shopRegionChanged", () => {
+
+        const activePack =
+            document.querySelector(".pack.active");
+
+        const activeCode =
+            activePack?.dataset.code;
+
+        if (window.renderGamePrices) {
+            window.renderGamePrices();
+        }
+
+        if (activeCode) {
+
+            const newPack =
+                document.querySelector(
+                    `.pack[data-code="${activeCode}"]`
+                );
+
+            if (newPack) {
+                newPack.click();
+            } else {
+                selectedPack = null;
+            }
+
+        } else {
+            selectedPack = null;
+        }
+
+        updateState();
+
+    });
 
     function initMobilePackagePanel() {
         const openBtn = document.getElementById("openPackagePanel");

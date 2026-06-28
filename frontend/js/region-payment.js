@@ -1,75 +1,32 @@
-// frontend/js/region-payment.js - AZIEL V2.5 Global Region + Payment Methods
+// frontend/js/region-payment.js - AZIEL V2.5 Shop Region Payment Methods
 
 document.addEventListener("DOMContentLoaded", async () => {
-    const region = getActiveRegion();
+    await initRegionPayments();
 
-    syncRegionStorage(region);
-    updateRegionUI(region);
+    window.addEventListener("aziel:shopRegionChanged", async () => {
+        await initRegionPayments();
+    });
 
-    const regionSelect = document.getElementById("regionSelect");
-
-    if (regionSelect) {
-        regionSelect.value = region;
-
-        regionSelect.addEventListener("change", () => {
-            setActiveRegion(regionSelect.value);
-        });
-    }
-
-    const localeOpenBtn = document.getElementById("localeOpenBtn");
-
-    if (localeOpenBtn) {
-        localeOpenBtn.addEventListener("click", () => {
-            const nextRegion = getActiveRegion() === "TH" ? "MM" : "TH";
-            setActiveRegion(nextRegion);
-        });
-    }
-
-    await loadDynamicPaymentMethods(region);
+    window.addEventListener("aziel:regionChanged", async () => {
+        await initRegionPayments();
+    });
 });
 
-function getActiveRegion() {
-    return (
-        localStorage.getItem("selectedRegion") ||
-        localStorage.getItem("region") ||
-        "MM"
-    );
+async function initRegionPayments() {
+    const region =
+        window.AZIEL?.getShopRegion?.() ||
+        "MM";
+
+    updatePaymentCurrencyText(region);
+    await loadDynamicPaymentMethods(region);
 }
 
-function syncRegionStorage(region) {
-    const currency = region === "TH" ? "THB" : "MMK";
-
-    localStorage.setItem("region", region);
-    localStorage.setItem("selectedRegion", region);
-    localStorage.setItem("currency", currency);
-    localStorage.setItem("selectedCurrency", currency);
-}
-
-function setActiveRegion(region) {
-    syncRegionStorage(region);
-
-    window.dispatchEvent(
-        new CustomEvent("regionChanged", {
-            detail: { region }
-        })
-    );
-
-    window.location.reload();
-}
-
-function updateRegionUI(region) {
+function updatePaymentCurrencyText(region) {
     const currencyText = document.getElementById("currencyText");
-    const localeFlag = document.getElementById("localeFlag");
+    if (!currencyText) return;
 
-    const currency = region === "TH" ? "THB" : "MMK";
-
-    if (currencyText) {
-        currencyText.innerText = currency;
-    }
-
-    if (localeFlag) {
-        localeFlag.innerText = region === "TH" ? "🇹🇭" : "🇲🇲";
-    }
+    currencyText.innerText =
+        region === "TH" ? "THB" : "MMK";
 }
 
 async function loadDynamicPaymentMethods(region) {
@@ -80,6 +37,7 @@ async function loadDynamicPaymentMethods(region) {
 
     paymentGrid.innerHTML = `<p>Loading payment methods...</p>`;
     paymentMethod.value = "";
+    window.selectedPaymentData = null;
 
     try {
         const res = await fetch(`/api/payment-methods?region=${region}`);
@@ -91,15 +49,16 @@ async function loadDynamicPaymentMethods(region) {
 
         paymentGrid.innerHTML = "";
 
-        if (methods.length === 0) {
+        if (!methods.length) {
             paymentGrid.innerHTML = `<p>No payment methods available.</p>`;
+            document.dispatchEvent(new Event("paymentChanged"));
             return;
         }
 
         methods.forEach((pay, index) => {
             const name = pay.method || "Payment";
             const key = pay.key || name.toLowerCase();
-            const logo = pay.qrImage || getPaymentLogo(key);
+            const logo = pay.logo || pay.qrImage || getPaymentLogo(key);
 
             const card = document.createElement("div");
             card.className = `pay-card ${index === 0 ? "active" : ""}`;
@@ -108,6 +67,8 @@ async function loadDynamicPaymentMethods(region) {
             card.dataset.qr = pay.qrImage || "";
             card.dataset.accountName = pay.accountName || "";
             card.dataset.accountNumber = pay.accountNumber || "";
+            card.dataset.provider = pay.provider || "manual";
+            card.dataset.paymentType = pay.paymentType || "manual";
 
             card.innerHTML = `
                 <img src="${logo}" alt="${name}">
@@ -119,67 +80,62 @@ async function loadDynamicPaymentMethods(region) {
             `;
 
             card.addEventListener("click", () => {
-                document
-                    .querySelectorAll(".pay-card")
-                    .forEach(c => c.classList.remove("active"));
-
-                card.classList.add("active");
-                paymentMethod.value = key;
-
-                window.selectedPaymentData = {
-                    method: name,
-                    key,
-                    logo,
-                    qrImage: pay.qrImage || "",
-                    accountName: pay.accountName || "",
-                    accountNumber: pay.accountNumber || "",
-                    provider: pay.provider || "manual",
-                    paymentType: pay.paymentType || "manual"
-                };
-
-                updatePaymentPreview(card);
-
-                document.dispatchEvent(new Event("paymentChanged"));
+                selectPaymentCard(card);
             });
 
             paymentGrid.appendChild(card);
 
             if (index === 0) {
-                paymentMethod.value = key;
-
-                window.selectedPaymentData = {
-                    method: name,
-                    key,
-                    logo,
-                    qrImage: pay.qrImage || "",
-                    accountName: pay.accountName || "",
-                    accountNumber: pay.accountNumber || "",
-                    provider: pay.provider || "manual",
-                    paymentType: pay.paymentType || "manual"
-                };
-
-                updatePaymentPreview(card);
-
-                document.dispatchEvent(new Event("paymentChanged"));
+                selectPaymentCard(card);
             }
         });
 
     } catch (err) {
         console.error("Payment methods load error:", err);
         paymentGrid.innerHTML = `<p>Payment methods failed to load.</p>`;
+        document.dispatchEvent(new Event("paymentChanged"));
     }
+}
+
+function selectPaymentCard(card) {
+    const paymentMethod = document.getElementById("paymentMethod");
+    if (!card || !paymentMethod) return;
+
+    document
+        .querySelectorAll(".pay-card")
+        .forEach(c => c.classList.remove("active"));
+
+    card.classList.add("active");
+
+    paymentMethod.value = card.dataset.method || "";
+
+    window.selectedPaymentData = {
+        method: card.dataset.name || "Payment",
+        key: card.dataset.method || "",
+        logo: card.querySelector("img")?.getAttribute("src") || "",
+        qrImage: card.dataset.qr || "",
+        accountName: card.dataset.accountName || "",
+        accountNumber: card.dataset.accountNumber || "",
+        provider: card.dataset.provider || "manual",
+        paymentType: card.dataset.paymentType || "manual"
+    };
+
+    updatePaymentPreview(card);
+
+    document.dispatchEvent(new Event("paymentChanged"));
 }
 
 function getPaymentLogo(key) {
     const logos = {
-        kbzpay: "assets/payment/kbzpay.png",
-        wavepay: "assets/payment/wavepay.png",
-        ayapay: "assets/payment/ayapay.png",
-        promptpay: "assets/payment/promptpay.png",
-        scb: "assets/payment/scb.png"
+        kbzpay: "/assets/payment/kbzpay.png",
+        wavepay: "/assets/payment/wavepay.png",
+        ayapay: "/assets/payment/ayapay.png",
+        promptpay: "/assets/payment/promptpay.png",
+        scb: "/assets/payment/scb.png",
+        wallet: "/assets/payment/wallet.png"
     };
 
-    return logos[key] || "assets/logo.png";
+    return logos[key] || "/assets/logo.png";
 }
 
 function updatePaymentPreview(card) {

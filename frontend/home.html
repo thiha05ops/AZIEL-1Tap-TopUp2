@@ -362,22 +362,27 @@
     </div>
 
 
-    <script src="js/home.js"></script>
-    <script src="js/search.js"></script>
-    <script src="js/region.js"></script>
-    <script src="js/live-chat.js"></script>
-    <script src="js/pwa-fix.js"></script>
     <script src="js/site-settings.js"></script>
+
+    <script src="/js/user-state.js"></script>
+    <script src="/js/auth-check.js"></script>
     <script src="/js/header.js"></script>
     <script src="js/locale-switcher.js"></script>
+
+    <script src="js/home.js"></script>
+    <script src="js/search.js"></script>
+
+    <script src="js/live-chat.js"></script>
+    <script src="js/pwa-fix.js"></script>
     <script>
         document.addEventListener("DOMContentLoaded", () => {
             const box = document.getElementById("footerPaymentLogos");
             if (!box) return;
 
             const region =
-                localStorage.getItem("region") ||
+                window.AZIEL?.getRegion?.() ||
                 localStorage.getItem("selectedRegion") ||
+                localStorage.getItem("region") ||
                 "MM";
 
             const logos = {
