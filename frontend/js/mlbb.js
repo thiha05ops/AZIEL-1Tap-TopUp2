@@ -161,7 +161,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         } else {
             summaryPackage.innerText = "Not selected";
-            summaryAmount.innerText = "0 Ks";
+            summaryAmount.innerText = "0";
             selectedText.innerText = "Please select a package.";
         }
 
