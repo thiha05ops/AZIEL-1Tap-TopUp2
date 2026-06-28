@@ -184,36 +184,33 @@ document.addEventListener("DOMContentLoaded", () => {
     initSuccessModal();
     updateState();
     window.addEventListener("aziel:shopRegionChanged", () => {
-
-        const activePack =
-            document.querySelector(".pack.active");
-
-        const activeCode =
-            activePack?.dataset.code;
+        const activePack = document.querySelector(".pack.active");
+        const activeCode = activePack?.dataset.code;
 
         if (window.renderGamePrices) {
             window.renderGamePrices();
         }
 
         if (activeCode) {
-
-            const newPack =
-                document.querySelector(
-                    `.pack[data-code="${activeCode}"]`
-                );
+            const newPack = document.querySelector(`.pack[data-code="${activeCode}"]`);
 
             if (newPack) {
                 newPack.click();
             } else {
                 selectedPack = null;
             }
-
         } else {
             selectedPack = null;
         }
 
         updateState();
+    });
+    window.addEventListener("aziel:ready", () => {
+        if (window.renderGamePrices) {
+            window.renderGamePrices();
+        }
 
+        updateState();
     });
 
     function initMobilePackagePanel() {
