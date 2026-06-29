@@ -39,7 +39,7 @@ async function loadAZIELHeader() {
     const navType = mount.dataset.nav || "home";
 
     try {
-        const res = await fetch("components/header.html?v=2026062905");
+        const res = await fetch("components/header.html?v=202606291812")
         if (!res.ok) throw new Error(`Header fetch failed: ${res.status}`);
 
         mount.innerHTML = await res.text();
