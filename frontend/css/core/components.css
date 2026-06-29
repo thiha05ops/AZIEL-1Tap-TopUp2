@@ -393,39 +393,6 @@
 }
 
 /* =========================
-   HEADER
-========================= */
-
-.az-header {
-    position: sticky;
-
-    top: 0;
-
-    z-index: 999;
-
-    background:
-        rgba(11, 16, 32, .72);
-
-    backdrop-filter: blur(18px);
-
-    border-bottom:
-        1px solid rgba(255, 255, 255, .05);
-}
-
-.az-logo {
-    color: #ffffff;
-}
-
-.az-nav a {
-    color:
-        rgba(255, 255, 255, .72);
-}
-
-.az-nav a:hover {
-    color: #ffffff;
-}
-
-/* =========================
    SEARCH
 ========================= */
 
@@ -444,19 +411,7 @@
         rgba(255, 255, 255, .42);
 }
 
-/* =========================
-   PROFILE
-========================= */
 
-.az-profile {
-    background:
-        rgba(255, 255, 255, .05);
-
-    border:
-        1px solid rgba(255, 255, 255, .06);
-
-    color: #ffffff;
-}
 
 /* FORCE DARK THEME */
 body {
@@ -471,26 +426,16 @@ body {
     background: transparent !important;
 }
 
-.az-section-head h2,
-.az-game-info h3,
-.az-logo {
-    color: #ffffff !important;
-}
 
 .az-section-head p,
 .az-game-info p {
     color: #94a3b8 !important;
 }
 
-.az-header {
-    background: rgba(11, 16, 32, .78) !important;
-    border-bottom: 1px solid rgba(255, 255, 255, .06) !important;
-}
-
 .az-game-card,
 .az-card,
 .az-mini-card,
-.az-profile,
+
 .notification-btn,
 .az-btn-light {
     background: rgba(21, 29, 49, .95) !important;
@@ -498,9 +443,7 @@ body {
     color: #ffffff !important;
 }
 
-.az-nav a {
-    color: rgba(255, 255, 255, .75) !important;
-}
+
 
 .az-search input {
     background: rgba(255, 255, 255, .06) !important;
@@ -610,7 +553,7 @@ body {
 
 .az-game-card,
 .az-hero,
-.az-profile,
+
 .az-search input,
 .az-btn-light,
 .az-footer,
@@ -699,65 +642,7 @@ body {
     transition: .28s ease;
 }
 
-/* =========================
-   GLOBAL TOPBAR
-========================= */
 
-.az-topbar {
-    width: min(1180px, 92%);
-    height: 72px;
-    margin: 0 auto;
-
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 18px;
-}
-
-.az-topbar-brand {
-    color: #fff;
-    font-size: 30px;
-    font-weight: 900;
-    text-decoration: none;
-}
-
-.az-topbar-actions {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.az-topbar-actions a,
-.az-topbar-actions button {
-    background: rgba(255, 255, 255, .06);
-    border: 1px solid rgba(255, 255, 255, .08);
-    color: #fff;
-    padding: 10px 14px;
-    border-radius: 14px;
-    text-decoration: none;
-    font-weight: 800;
-    cursor: pointer;
-}
-
-@media (max-width: 768px) {
-    .az-topbar {
-        width: calc(100% - 24px);
-        height: 64px;
-    }
-
-    .az-topbar-brand {
-        font-size: 26px;
-    }
-
-    .az-topbar-actions a {
-        display: none;
-    }
-
-    .az-topbar-actions button {
-        padding: 9px 12px;
-        font-size: 12px;
-    }
-}
 
 /* GLOBAL MOBILE BOTTOM NAV */
 .az-bottom-nav {

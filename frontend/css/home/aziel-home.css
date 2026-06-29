@@ -526,10 +526,6 @@ html {
         padding-bottom: 88px;
     }
 
-    .az-header {
-        border-radius: 0 0 22px 22px;
-    }
-
     .az-home {
         width: calc(100% - 24px);
         margin-top: 12px;
@@ -798,26 +794,6 @@ html body {
 }
 
 
-.az-header,
-.az-home,
-.az-footer,
-.az-bottom-nav,
-.live-chat-btn {
-    position: relative;
-    z-index: 2;
-}
-
-
-
-.az-header,
-.az-home,
-.az-footer,
-.az-bottom-nav,
-.live-chat-btn {
-    position: relative !important;
-    z-index: 3 !important;
-}
-
 /* =========================
    HOME READABILITY FINAL
 ========================= */
@@ -907,19 +883,4 @@ body.theme-dark .az-panel h2 {
 body.theme-dark .popular-game-card p,
 body.theme-dark .trust-card span {
     color: rgba(255, 255, 255, .68) !important;
-}
-
-/* =========================
-   DARK WAVE LINE VISIBLE FIX
-========================= */
-
-
-.az-header,
-.az-home,
-.az-footer,
-.az-bottom-nav,
-.live-chat-btn,
-.chat-ball {
-    position: relative !important;
-    z-index: 3 !important;
 }

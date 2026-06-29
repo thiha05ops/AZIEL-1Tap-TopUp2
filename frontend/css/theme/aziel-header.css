@@ -1,0 +1,349 @@
+/* AZIEL GLOBAL HEADER - CLEAN FINAL */
+
+.az-header,
+.az-header * {
+    box-sizing: border-box;
+}
+
+.az-header {
+    position: sticky;
+    top: 0;
+    z-index: 99999;
+
+    width: 100%;
+    height: 86px;
+
+    display: flex;
+    align-items: center;
+    gap: 30px;
+
+    padding: 0 max(28px, calc((100vw - 1280px) / 2));
+
+    background: var(--header-bg, rgba(10, 10, 22, .82));
+    border-bottom: 1px solid var(--border, rgba(255, 255, 255, .08));
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+}
+
+.az-logo {
+    flex: 0 0 185px;
+    width: 185px;
+    height: 64px;
+
+    display: flex;
+    align-items: center;
+
+    text-decoration: none;
+    color: var(--heading, #fff);
+}
+
+.az-logo-img {
+    width: 185px;
+    max-width: 185px;
+    max-height: 54px;
+    object-fit: contain;
+    display: block;
+}
+
+.az-nav {
+    flex: 1 1 auto;
+    min-width: 0;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 30px;
+}
+
+.az-nav a {
+    color: var(--text, rgba(255, 255, 255, .78));
+    text-decoration: none;
+    font-size: 15px;
+    font-weight: 900;
+    white-space: nowrap;
+}
+
+.az-nav a:hover {
+    color: var(--heading, #fff);
+}
+
+.az-header-right {
+    flex: 0 0 auto;
+
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.az-wallet-pill,
+.az-icon-btn,
+.az-locale-btn,
+.az-profile {
+    height: 46px;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 16px;
+    border: 1px solid var(--border, rgba(255, 255, 255, .08));
+    background: var(--surface, rgba(255, 255, 255, .07));
+    color: var(--heading, #fff);
+
+    text-decoration: none;
+}
+
+.az-wallet-pill {
+    gap: 8px;
+    padding: 0 14px;
+    font-weight: 950;
+}
+
+.az-icon-btn,
+.az-locale-btn {
+    width: 46px;
+}
+
+.az-profile {
+    min-width: 58px;
+    padding: 0 8px;
+}
+
+.az-avatar {
+    width: 34px;
+    height: 34px;
+
+    display: grid;
+    place-items: center;
+
+    border-radius: 50%;
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    color: #fff;
+
+    font-weight: 950;
+}
+
+/* LIGHT */
+body.light .az-header {
+    background: rgba(255, 255, 255, .72);
+    border-bottom-color: rgba(15, 23, 42, .10);
+}
+
+body.light .az-nav a,
+body.light .az-logo {
+    color: #111827;
+}
+
+body.light .az-wallet-pill,
+body.light .az-icon-btn,
+body.light .az-locale-btn,
+body.light .az-profile {
+    background: rgba(15, 23, 42, .06);
+    color: #111827;
+    border-color: rgba(15, 23, 42, .10);
+}
+
+/* DARK */
+body.dark .az-header {
+    background: rgba(10, 10, 22, .82);
+    border-bottom-color: rgba(255, 255, 255, .08);
+}
+
+body.dark .az-nav a,
+body.dark .az-logo {
+    color: rgba(255, 255, 255, .86);
+}
+
+body.dark .az-wallet-pill,
+body.dark .az-icon-btn,
+body.dark .az-locale-btn,
+body.dark .az-profile {
+    background: rgba(255, 255, 255, .07);
+    color: #fff;
+    border-color: rgba(255, 255, 255, .10);
+}
+
+/* MOBILE */
+@media (max-width: 768px) {
+    body {
+        padding-top: 86px !important;
+    }
+
+    .az-header {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        transform: none !important;
+
+        width: 100% !important;
+        height: auto !important;
+        margin: 0 !important;
+
+        display: grid !important;
+        grid-template-columns: 1fr auto !important;
+        grid-template-areas:
+            "logo actions"
+            "nav nav" !important;
+
+        align-items: center !important;
+        gap: 10px !important;
+
+        padding: 10px 14px !important;
+
+        border-radius: 0 0 22px 22px !important;
+        overflow: hidden !important;
+    }
+
+    .az-logo {
+        grid-area: logo !important;
+        flex: 0 0 150px !important;
+        width: 150px !important;
+        height: 48px !important;
+    }
+
+    .az-logo-img {
+        width: 150px !important;
+        max-width: 150px !important;
+        max-height: 42px !important;
+    }
+
+    .az-header-right {
+        grid-area: actions !important;
+
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-end !important;
+
+        gap: 8px !important;
+        min-width: 0 !important;
+    }
+
+    .az-wallet-pill {
+        height: 42px !important;
+        min-width: 72px !important;
+        max-width: none !important;
+        padding: 0 10px !important;
+        font-size: 13px !important;
+    }
+
+    .az-icon-btn {
+        display: none !important;
+    }
+
+    .az-locale-btn,
+    .az-profile {
+        width: 42px !important;
+        min-width: 42px !important;
+        height: 42px !important;
+        padding: 0 !important;
+    }
+
+    .az-avatar {
+        width: 30px !important;
+        height: 30px !important;
+        font-size: 13px !important;
+    }
+
+    .az-nav {
+        grid-area: nav !important;
+
+        width: 100% !important;
+        max-height: 54px !important;
+
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        gap: 28px !important;
+
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+
+        padding: 10px 0 0 !important;
+        margin: 0 !important;
+        border-top: 1px solid var(--border, rgba(255, 255, 255, .08)) !important;
+
+        opacity: 1 !important;
+        transition: max-height .25s ease, opacity .22s ease, padding .25s ease !important;
+
+        scrollbar-width: none !important;
+    }
+
+    .az-nav::-webkit-scrollbar {
+        display: none !important;
+    }
+
+    .az-nav a {
+        flex: 0 0 auto !important;
+        font-size: 14px !important;
+        font-weight: 900 !important;
+    }
+
+    .az-header.nav-hidden {
+        opacity: 1 !important;
+        visibility: visible !important;
+        transform: none !important;
+    }
+
+    .az-header.nav-hidden .az-logo,
+    .az-header.nav-hidden .az-header-right {
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+
+    .az-header.nav-hidden .az-nav {
+        max-height: 0 !important;
+        opacity: 0 !important;
+        padding-top: 0 !important;
+        border-top: 0 !important;
+        overflow: hidden !important;
+    }
+
+    main,
+    main.az-home,
+    .az-home {
+        margin-top: 0 !important;
+    }
+}
+
+@media (max-width: 430px) {
+    .az-logo {
+        flex-basis: 138px !important;
+        width: 138px !important;
+    }
+
+    .az-logo-img {
+        width: 138px !important;
+        max-width: 138px !important;
+    }
+
+    .az-header-right {
+        gap: 6px !important;
+    }
+
+    .az-wallet-pill {
+        min-width: 68px !important;
+        padding: 0 8px !important;
+        font-size: 12px !important;
+    }
+
+    .az-locale-btn,
+    .az-profile {
+        width: 40px !important;
+        min-width: 40px !important;
+        height: 40px !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .az-header {
+        border-radius: 0 !important;
+    }
+
+    body {
+        padding-top: 108px !important;
+    }
+
+    .az-banner-zone {
+        margin-top: 10px !important;
+    }
+}

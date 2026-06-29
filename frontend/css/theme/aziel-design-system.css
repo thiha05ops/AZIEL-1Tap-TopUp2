@@ -184,75 +184,6 @@ p {
     margin-right: auto !important;
 }
 
-/* Shared Header */
-.az-header,
-.az-topbar,
-.site-header {
-    width: 100% !important;
-    height: var(--az-header-h) !important;
-
-    padding-left: max(24px, calc((100vw - var(--az-container)) / 2)) !important;
-    padding-right: max(24px, calc((100vw - var(--az-container)) / 2)) !important;
-
-    margin: 0 !important;
-
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-
-    border-radius: 0 !important;
-    border-bottom: 1px solid rgba(17, 24, 39, .08) !important;
-
-    background: rgba(255, 255, 255, .72) !important;
-    backdrop-filter: blur(18px) !important;
-
-    color: var(--az-text, #111827) !important;
-}
-
-body.dark .az-header,
-body.dark .az-topbar,
-body.dark .site-header,
-html.dark .az-header,
-html.dark .az-topbar,
-html.dark .site-header {
-    background: rgba(15, 16, 35, .88) !important;
-    border-bottom-color: rgba(255, 255, 255, .08) !important;
-    color: #f8fafc !important;
-}
-
-.az-header *,
-.az-topbar *,
-.site-header * {
-    color: inherit !important;
-}
-
-.az-logo,
-.logo,
-.az-topbar-brand {
-    font-size: 32px !important;
-    font-weight: 950 !important;
-    letter-spacing: -1px !important;
-    text-decoration: none !important;
-}
-
-.az-nav,
-.nav-links,
-.az-topbar-actions {
-    display: flex !important;
-    align-items: center !important;
-    gap: 26px !important;
-}
-
-.az-nav a,
-.nav-links a,
-.az-topbar-actions a,
-.az-topbar-actions button {
-    font-size: 14px !important;
-    font-weight: 850 !important;
-    text-decoration: none !important;
-    border: none;
-}
-
 /* small nav pill only for action buttons */
 .az-topbar-actions button {
     padding: 10px 16px !important;
@@ -266,23 +197,6 @@ html.dark .site-header {
         --az-header-h: 66px;
     }
 
-    .az-header,
-    .az-topbar,
-    .site-header {
-        padding-left: 16px !important;
-        padding-right: 16px !important;
-    }
-
-    .az-logo,
-    .logo,
-    .az-topbar-brand {
-        font-size: 26px !important;
-    }
-
-    .az-nav,
-    .nav-links {
-        display: none !important;
-    }
 
     #mainHome,
     .wallet-page,
@@ -328,14 +242,7 @@ html.dark .az-locale-switcher select {
     color: #111827;
 }
 
-.az-profile,
-.profile-box {
-    background: rgba(17, 24, 39, .06) !important;
-    border: 1px solid rgba(17, 24, 39, .08) !important;
-}
 
-body.dark .az-profile,
-html.dark .az-profile,
 body.dark .profile-box,
 html.dark .profile-box {
     background: rgba(255, 255, 255, .08) !important;
@@ -456,12 +363,46 @@ html.dark .profile-box {
     cursor: pointer;
 }
 
-.az-locale-btn {
-    width: 42px;
-    height: 42px;
-    border-radius: 14px;
-    border: 1px solid rgba(17, 24, 39, .08);
-    background: rgba(255, 255, 255, .65);
-    font-size: 20px;
-    cursor: pointer;
+/* =========================
+   AZIEL FORCE DARK THEME
+========================= */
+
+html,
+body {
+    background:
+        radial-gradient(circle at top right, rgba(124, 58, 237, .18), transparent 30%),
+        linear-gradient(180deg, #07081a, #0b1020) !important;
+    color: #f8fafc !important;
+}
+
+body,
+body.dark,
+body.theme-dark {
+    --bg: #080816;
+    --page-bg: #07081a;
+    --surface: rgba(12, 13, 28, .72);
+    --surface-strong: rgba(10, 10, 22, .86);
+    --header-bg: rgba(10, 10, 22, .78);
+    --card: rgba(12, 13, 28, .72);
+    --card-2: rgba(18, 19, 38, .88);
+
+    --text: rgba(255, 255, 255, .78);
+    --text-secondary: rgba(255, 255, 255, .68);
+    --text-muted: rgba(255, 255, 255, .48);
+    --heading: #ffffff;
+
+    --border: rgba(255, 255, 255, .08);
+    --shadow: 0 22px 70px rgba(0, 0, 0, .35);
+}
+
+.az-home,
+.az-page,
+main {
+    background: transparent !important;
+}
+
+
+.az-section-head p,
+.az-game-info p {
+    color: #94a3b8 !important;
 }

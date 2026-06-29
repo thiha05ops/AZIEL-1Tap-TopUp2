@@ -12,13 +12,6 @@
         overflow-x: hidden;
     }
 
-    .az-header {
-        height: auto;
-        padding: 14px 16px;
-        gap: 12px;
-        flex-wrap: wrap;
-    }
-
     .mobile-menu-btn {
         display: grid;
         place-items: center;
@@ -32,9 +25,7 @@
         box-shadow: 0 6px 18px rgba(0, 0, 0, .08);
     }
 
-    .az-logo {
-        font-size: 24px;
-    }
+
 
     .desktop-nav {
         display: none;

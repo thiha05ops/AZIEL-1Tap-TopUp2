@@ -15,26 +15,10 @@ body {
     color: #111827;
 }
 
-.az-header {
-    max-width: 1180px;
-    margin: 0 auto;
-    height: 82px;
-    padding: 0 20px;
-    display: flex;
-    align-items: center;
-    gap: 26px;
-}
-
 .mobile-menu-btn {
     display: none;
 }
 
-.az-logo {
-    font-size: 30px;
-    font-weight: 900;
-    text-decoration: none;
-    color: #111827;
-}
 
 .desktop-nav {
     display: flex;

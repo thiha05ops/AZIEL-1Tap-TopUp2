@@ -1,4 +1,4 @@
-// frontend/js/header-loader.js - AZIEL V2.5 Header Component Loader
+// frontend/js/header-loader.js
 
 const AZIEL_NAV_ITEMS = {
     home: [
@@ -32,8 +32,6 @@ const AZIEL_NAV_ITEMS = {
     ]
 };
 
-document.addEventListener("DOMContentLoaded", loadAZIELHeader);
-
 async function loadAZIELHeader() {
     const mount = document.getElementById("azHeaderMount");
     if (!mount) return;
@@ -41,25 +39,19 @@ async function loadAZIELHeader() {
     const navType = mount.dataset.nav || "home";
 
     try {
-        const res = await fetch("/components/header.html?v=20260629");
+        const res = await fetch("components/header.html?v=2026062905");
+        if (!res.ok) throw new Error(`Header fetch failed: ${res.status}`);
 
-        if (!res.ok) {
-            throw new Error(`Header fetch failed: ${res.status}`);
-        }
-
-        const html = await res.text();
-
-        mount.innerHTML = html;
+        mount.innerHTML = await res.text();
 
         renderHeaderNav(navType);
 
-        setTimeout(() => {
-            window.renderHeader?.();
-            window.dispatchEvent(new Event("aziel:headerLoaded"));
-        }, 0);
+        window.dispatchEvent(new Event("aziel:headerLoaded"));
 
-    } catch (error) {
-        console.error("Header load error:", error);
+        console.log("AZIEL header loaded ✅");
+
+    } catch (err) {
+        console.error("Header load error:", err);
     }
 }
 
@@ -69,7 +61,16 @@ function renderHeaderNav(navType) {
 
     const items = AZIEL_NAV_ITEMS[navType] || AZIEL_NAV_ITEMS.home;
 
-    nav.innerHTML = items.map(([href, label]) => {
-        return `<a href="${href}">${label}</a>`;
-    }).join("");
+    nav.innerHTML = items
+        .map(([href, label]) => `<a href="${href}">${label}</a>`)
+        .join("");
+}
+
+window.loadAZIELHeader = loadAZIELHeader;
+window.renderHeaderNav = renderHeaderNav;
+
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", loadAZIELHeader);
+} else {
+    loadAZIELHeader();
 }

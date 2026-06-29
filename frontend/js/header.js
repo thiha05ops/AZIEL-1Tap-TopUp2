@@ -3,7 +3,7 @@
 document.addEventListener("DOMContentLoaded", () => {
     renderHeader();
     initAutoRevealNav();
-
+    window.addEventListener("aziel:headerLoaded", renderHeader);
     window.addEventListener("aziel:ready", renderHeader);
     window.addEventListener("aziel:userChanged", renderHeader);
     window.addEventListener("aziel:walletChanged", renderHeader);

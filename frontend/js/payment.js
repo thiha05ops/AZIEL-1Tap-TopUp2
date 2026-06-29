@@ -28,11 +28,12 @@ async function loadPaymentMethods() {
     window.selectedPaymentData = null;
 
     try {
-        const API_BASE = "http://localhost:3000";
+        const API_BASE =
+            location.port === "5500"
+                ? "http://localhost:3000"
+                : "";
 
-        const res = await fetch(
-            `${API_BASE}/api/payment-methods?region=${region}`
-        );
+        const res = await fetch(`${API_BASE}/api/payment-methods?region=${region}`);
 
         const data = await res.json();
 

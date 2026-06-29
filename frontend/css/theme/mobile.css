@@ -105,105 +105,6 @@
 
 
 /* =========================
-   MOBILE HEADER
-========================= */
-@media (max-width: 768px) {
-
-    .az-header,
-    header {
-        width: 100% !important;
-        max-width: 100% !important;
-        min-height: auto !important;
-        padding: 12px 14px !important;
-        margin: 0 auto !important;
-
-        display: flex !important;
-        align-items: center !important;
-        justify-content: space-between !important;
-        gap: 10px !important;
-
-        position: relative !important;
-        z-index: 1000 !important;
-    }
-
-    .az-logo {
-        font-size: 26px !important;
-        line-height: 1 !important;
-        font-weight: 900 !important;
-        letter-spacing: .2px !important;
-        white-space: nowrap !important;
-    }
-
-    .az-nav {
-        display: none !important;
-    }
-
-    .az-header-right {
-        width: auto !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: flex-end !important;
-        gap: 8px !important;
-        margin: 0 !important;
-    }
-
-    .az-search {
-        display: none !important;
-    }
-
-    .az-profile {
-        width: 42px !important;
-        height: 42px !important;
-        min-width: 42px !important;
-
-        padding: 0 !important;
-        border-radius: 14px !important;
-
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-
-        position: relative !important;
-        z-index: 1001 !important;
-    }
-
-    .az-profile span {
-        display: none !important;
-    }
-
-    .az-avatar {
-        width: 34px !important;
-        height: 34px !important;
-        border-radius: 12px !important;
-    }
-
-    .az-mobile-menu-btn {
-        width: 42px !important;
-        height: 42px !important;
-        min-width: 42px !important;
-
-        border: 0 !important;
-        border-radius: 14px !important;
-
-        background: rgba(255, 255, 255, .88) !important;
-        color: var(--primary, #8b5cf6) !important;
-
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-
-        font-size: 18px !important;
-        cursor: pointer !important;
-
-        position: relative !important;
-        z-index: 1001 !important;
-
-        box-shadow: 0 8px 24px rgba(15, 23, 42, .08) !important;
-    }
-}
-
-
-/* =========================
    MOBILE HERO / BANNER
 ========================= */
 @media (max-width: 768px) {
@@ -417,7 +318,7 @@
 @media (max-width: 768px) {
 
     .az-footer,
-    .site-footer,
+
     footer {
         width: 100% !important;
         max-width: 100% !important;
@@ -647,11 +548,6 @@
         padding-right: 12px !important;
     }
 
-    .az-header,
-    header {
-        padding-left: 12px !important;
-        padding-right: 12px !important;
-    }
 
     .az-section-head h2,
     .section-header h2,
@@ -674,7 +570,7 @@
 @media (max-width: 768px) {
 
     .az-footer,
-    .site-footer,
+
     footer {
         min-height: auto !important;
         margin: 24px auto 82px !important;
@@ -763,7 +659,7 @@
 
     /* footer compact */
     .az-footer,
-    .site-footer,
+
     footer {
         margin: 28px auto 0 !important;
         padding: 26px 14px 70px !important;
@@ -853,142 +749,6 @@
     }
 }
 
-/* =========================
-   SEAGM STYLE FOOTER
-========================= */
-@media (max-width:768px) {
-
-    .site-footer {
-        display: grid !important;
-        grid-template-columns: 1fr 1fr !important;
-        gap: 24px 28px !important;
-
-        margin-top: 24px !important;
-        padding: 24px 14px 80px !important;
-
-        border-top: 1px solid rgba(0, 0, 0, .08);
-    }
-
-    /* AZIEL brand full width */
-    .site-footer>div:first-child {
-        grid-column: 1 / -1;
-    }
-
-    /* Payment methods full width */
-    .site-footer>div:last-child {
-        grid-column: 1 / -1;
-    }
-
-    .site-footer h3,
-    .site-footer h4 {
-        margin-bottom: 10px;
-        font-size: 14px;
-    }
-
-    .site-footer p,
-    .site-footer a {
-        display: block;
-        font-size: 12px;
-        line-height: 1.5;
-        margin-bottom: 8px;
-        text-decoration: none;
-        color: inherit;
-    }
-
-    .payment-logos {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-
-    .payment-logos img {
-        width: 52px;
-        height: auto;
-    }
-
-    /* remove <br> effect */
-    .site-footer br {
-        display: none;
-    }
-
-}
-
-/* =========================
-   TYPOGRAPHY FOOTER
-========================= */
-@media (max-width:768px) {
-
-    .site-footer {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 22px 28px;
-
-        padding: 28px 16px 80px;
-        margin-top: 28px;
-
-        background: none !important;
-        border: none !important;
-        box-shadow: none !important;
-    }
-
-    /* Brand full width */
-    .site-footer>div:first-child {
-        grid-column: 1 / -1;
-    }
-
-    /* Payment methods full width */
-    .site-footer>div:last-child {
-        grid-column: 1 / -1;
-    }
-
-    .site-footer h3,
-    .site-footer h4 {
-        font-size: 14px;
-        font-weight: 700;
-        margin: 0 0 12px;
-        color: var(--text-primary);
-    }
-
-    .site-footer p {
-        font-size: 12px;
-        line-height: 1.7;
-        color: var(--text-secondary);
-        margin: 0;
-    }
-
-    .site-footer a {
-        display: block;
-        font-size: 12px;
-        line-height: 2;
-        text-decoration: none;
-        color: var(--text-secondary);
-        transition: .2s;
-    }
-
-    .site-footer a:hover {
-        color: var(--primary);
-    }
-
-    .site-footer br {
-        display: none;
-    }
-
-    .payment-logos {
-        display: flex;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin-top: 10px;
-    }
-
-    .payment-logos img {
-        max-width: 52px;
-        max-height: 26px;
-        object-fit: contain;
-    }
-
-}
-
 .footer-copy {
     width: 100%;
     text-align: center;
@@ -1023,16 +783,6 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-}
-
-.az-topbar .az-logo,
-.account-topbar .az-logo {
-    color: var(--az-text);
-    text-decoration: none;
-    font-size: 30px;
-    line-height: 1;
-    font-weight: 950;
-    letter-spacing: -1px;
 }
 
 .account-menu-btn,
@@ -1125,21 +875,7 @@
         border-bottom-color: rgba(255, 255, 255, .08) !important;
     }
 
-    .az-topbar .az-logo,
-    .account-topbar .az-logo {
-        font-size: 27px !important;
-        font-weight: 950 !important;
-        letter-spacing: -1px !important;
-        color: var(--az-text) !important;
-        text-decoration: none !important;
-    }
 
-    .az-topbar>a:not(.az-logo),
-    .account-topbar>a:not(.az-logo),
-    .az-topbar .topbar-link,
-    .account-topbar .topbar-link {
-        display: none !important;
-    }
 
     .account-menu-btn,
     .az-menu-btn {

@@ -6,10 +6,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     window.addEventListener("aziel:shopRegionChanged", async () => {
         await initRegionPayments();
     });
-
-    window.addEventListener("aziel:regionChanged", async () => {
-        await initRegionPayments();
-    });
 });
 
 async function initRegionPayments() {
@@ -25,8 +21,7 @@ function updatePaymentCurrencyText(region) {
     const currencyText = document.getElementById("currencyText");
     if (!currencyText) return;
 
-    currencyText.innerText =
-        region === "TH" ? "THB" : "MMK";
+    currencyText.innerText = region === "TH" ? "THB" : "MMK";
 }
 
 async function loadDynamicPaymentMethods(region) {
@@ -40,7 +35,12 @@ async function loadDynamicPaymentMethods(region) {
     window.selectedPaymentData = null;
 
     try {
-        const res = await fetch(`/api/payment-methods?region=${region}`);
+        const API_BASE =
+            location.port === "5500"
+                ? "http://localhost:3000"
+                : "";
+
+        const res = await fetch(`${API_BASE}/api/payment-methods?region=${region}`);
         const data = await res.json();
 
         const methods = Array.isArray(data.methods)
@@ -58,13 +58,18 @@ async function loadDynamicPaymentMethods(region) {
         methods.forEach((pay, index) => {
             const name = pay.method || "Payment";
             const key = pay.key || name.toLowerCase();
-            const logo = pay.logo || pay.qrImage || getPaymentLogo(key);
+
+            const logo = normalizeAssetPath(
+                pay.logo || pay.qrImage || getPaymentLogo(key)
+            );
+
+            const qrImage = normalizeAssetPath(pay.qrImage || "");
 
             const card = document.createElement("div");
             card.className = `pay-card ${index === 0 ? "active" : ""}`;
             card.dataset.method = key;
             card.dataset.name = name;
-            card.dataset.qr = pay.qrImage || "";
+            card.dataset.qr = qrImage;
             card.dataset.accountName = pay.accountName || "";
             card.dataset.accountNumber = pay.accountNumber || "";
             card.dataset.provider = pay.provider || "manual";
@@ -127,15 +132,30 @@ function selectPaymentCard(card) {
 
 function getPaymentLogo(key) {
     const logos = {
-        kbzpay: "/assets/payment/kbzpay.png",
-        wavepay: "/assets/payment/wavepay.png",
-        ayapay: "/assets/payment/ayapay.png",
-        promptpay: "/assets/payment/promptpay.png",
-        scb: "/assets/payment/scb.png",
-        wallet: "/assets/payment/wallet.png"
+        kbzpay: ASSET.payment("kbzpay.png"),
+        wavepay: ASSET.payment("wavepay.png"),
+        ayapay: ASSET.payment("ayapay.png"),
+        promptpay: ASSET.payment("promptpay.png"),
+        scb: ASSET.payment("scb.png"),
+        wallet: ASSET.payment("wallet.png")
     };
 
-    return logos[key] || "/assets/logo.png";
+    return logos[key] || ASSET.root("logo.png");
+}
+
+function normalizeAssetPath(path) {
+
+    if (!path) return "";
+
+    if (path.startsWith("http")) return path;
+
+    path = path.replace(/^\/+/, "");
+
+    if (!path.startsWith("frontend/")) {
+        path = "frontend/" + path;
+    }
+
+    return path;
 }
 
 function updatePaymentPreview(card) {
@@ -151,7 +171,7 @@ function updatePaymentPreview(card) {
 
     if (qrImg) {
         if (card.dataset.qr) {
-            qrImg.src = card.dataset.qr;
+            qrImg.src = normalizeAssetPath(card.dataset.qr);
             qrImg.style.display = "block";
         } else {
             qrImg.removeAttribute("src");

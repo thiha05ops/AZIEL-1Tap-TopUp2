@@ -53,14 +53,6 @@
 }
 
 /* =========================
-   HEADER SPACE
-========================= */
-
-.az-header-space {
-    height: 82px;
-}
-
-/* =========================
    FOOTER SPACE
 ========================= */
 
@@ -98,17 +90,7 @@
     }
 }
 
-.az-header {
-    position: relative;
-    z-index: 9999;
-}
 
-.az-header-right {
-    position: relative;
-    z-index: 9999;
-}
-
-.az-profile,
 .az-btn,
 .az-mobile-menu-btn {
     position: relative;

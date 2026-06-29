@@ -6,15 +6,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mobile Legends - AZIEL</title>
 
-    <link rel="stylesheet" href="/css/core/main.css">
-    <link rel="stylesheet" href="/css/core/layout.css">
-    <link rel="stylesheet" href="/css/theme/aziel-design-system.css">
-    <link rel="stylesheet" href="/css/game/game.css">
-    <link rel="stylesheet" href="/css/game/mlbb.css">
-    <link rel="stylesheet" href="/css/game/payment-grid.css">
-    <link rel="stylesheet" href="/css/support/live-chat.css">
+    <link rel="stylesheet" href="css/core/main.css">
+    <link rel="stylesheet" href="css/core/layout.css">
+    <link rel="stylesheet" href="css/theme/aziel-header.css">
+    <link rel="stylesheet" href="css/theme/aziel-design-system.css">
+    <link rel="stylesheet" href="css/game/game.css">
+    <link rel="stylesheet" href="css/game/mlbb.css">
+    <link rel="stylesheet" href="css/game/payment-grid.css">
+    <link rel="stylesheet" href="css/support/live-chat.css">
 
-    <link rel="stylesheet" href="/css/support/live-chat.css">
+    <link rel="stylesheet" href="css/support/live-chat.css">
     <link rel="manifest" href="/manifest.json">
 </head>
 
@@ -27,7 +28,7 @@
         <section class="game-hero">
 
             <div class="game-banner">
-                <img src="/assets/games/mlbb.webp" alt="Mobile Legends">
+                <img id="gameBanner">
 
                 <div class="banner-overlay">
                     <span class="game-tag">Mobile Game</span>
@@ -91,7 +92,7 @@
 
                     <button class="mobile-selected-package" id="openPackagePanel" type="button">
                         <div class="mobile-pack-icon">
-                            <img src="/assets/mlbb/icons/small.webp" alt="">
+                            <img id="mobilePackageIcon">
                         </div>
 
                         <div>
@@ -269,24 +270,24 @@
         </div>
     </div>
 
+    <script src="js/asset.js"></script>
+    <script src="js/site-settings.js"></script>
 
-    <script src="/js/site-settings.js"></script>
+    <script src="js/user-state.js"></script>
+    <script src="js/header-loader.js"></script>
+    <script src="js/header.js"></script>
 
-    <script src="/js/user-state.js"></script>
-    <script src="/js/header-loader.js"></script>
-    <script src="/js/header.js"></script>
+    <script src="js/auth-check.js"></script>
+    <script src="js/locale-switcher.js"></script>
+    <script src="js/region-payment.js?v=20260629"></script>
 
-    <script src="/js/auth-check.js"></script>
-    <script src="/js/locale-switcher.js"></script>
-    <script src="/js/region-payment.js?v=20260629"></script>
+    <script src="js/payment.js"></script>
+    <script src="js/prices.js?v=20260629"></script>
 
-    <script src="/js/payment.js"></script>
-    <script src="/js/prices.js?v=20260629"></script>
+    <script src="js/mlbb.js?v=20260629"></script>
 
-    <script src="/js/mlbb.js?v=20260629"></script>
-
-    <script src="/js/live-chat.js"></script>
-    <script src="/js/pwa-fix.js"></script>
+    <script src="js/live-chat.js"></script>
+    <script src="js/pwa-fix.js"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", () => {
@@ -301,13 +302,14 @@
 
             const logos = {
                 MM: [
-                    "/assets/payment/kbzpay.png",
-                    "/assets/payment/wavepay.png",
-                    "/assets/payment/ayapay.png"
+                    ASSET.payment("kbzpay.png"),
+                    ASSET.payment("wavepay.png"),
+                    ASSET.payment("ayapay.png")
                 ],
+
                 TH: [
-                    "/assets/payment/promptpay.png",
-                    "/assets/payment/scb.png"
+                    ASSET.payment("promptpay.png"),
+                    ASSET.payment("scb.png")
                 ]
             };
 
@@ -321,7 +323,17 @@
             });
         });
     </script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
 
+            document.getElementById("gameBanner").src =
+                ASSET.game("mlbb.webp");
+
+            document.getElementById("mobilePackageIcon").src =
+                ASSET.mlbb("icons/small.webp");
+
+        });
+    </script>
 </body>
 
 </html>

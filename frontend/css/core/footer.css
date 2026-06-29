@@ -1,0 +1,111 @@
+.site-footer {
+    width: min(1400px, calc(100% - 48px));
+    margin: 90px auto 0;
+    padding: 56px 0 32px;
+
+    display: grid;
+    grid-template-columns: 1.35fr repeat(5, 1fr);
+    gap: 38px;
+
+    border-top: 1px solid var(--border);
+}
+
+.site-footer h3,
+.site-footer h4 {
+    margin-bottom: 18px;
+    color: var(--heading);
+    font-weight: 900;
+}
+
+.site-footer p,
+.site-footer a {
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 1.8;
+    text-decoration: none;
+}
+
+.site-footer a {
+    display: inline-block;
+    margin-bottom: 10px;
+    transition: .22s ease;
+}
+
+.site-footer a:hover {
+    color: #8b5cf6;
+    transform: translateX(3px);
+}
+
+.site-footer .payment-logos {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.site-footer .payment-logos img {
+    height: 32px;
+    width: auto;
+    object-fit: contain;
+    padding: 5px 9px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, .08);
+    border: 1px solid var(--border);
+}
+
+.footer-copy {
+    grid-column: 1 / -1;
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+/* Light */
+body.light .site-footer {
+    border-top-color: rgba(15, 23, 42, .10);
+}
+
+body.light .site-footer .payment-logos img {
+    background: rgba(255, 255, 255, .72);
+    border-color: rgba(15, 23, 42, .08);
+}
+
+/* Mobile */
+@media (max-width: 900px) {
+    .site-footer {
+        width: calc(100% - 28px);
+        grid-template-columns: repeat(2, 1fr);
+        gap: 28px;
+        margin-top: 60px;
+        padding-top: 36px;
+    }
+}
+
+@media (max-width: 520px) {
+    .site-footer {
+        grid-template-columns: 1fr;
+    }
+
+    .footer-copy {
+        text-align: left;
+    }
+}
+
+/* FOOTER PAYMENT LOGO FIX */
+.site-footer .payment-logos {
+    justify-content: flex-start !important;
+    gap: 12px !important;
+}
+
+.site-footer .payment-logos img {
+    height: 34px !important;
+    min-width: 54px !important;
+    padding: 6px 10px !important;
+    background: rgba(255, 255, 255, .75) !important;
+    border-radius: 12px !important;
+    object-fit: contain !important;
+}

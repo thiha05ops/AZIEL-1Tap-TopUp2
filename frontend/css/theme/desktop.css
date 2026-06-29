@@ -1,49 +1,4 @@
 /* =========================
-   DESKTOP HEADER
-========================= */
-
-.az-header {
-    width: min(1180px, 92%);
-    height: 82px;
-
-    margin: 0 auto;
-
-    display: flex;
-    align-items: center;
-    gap: 24px;
-}
-
-.az-logo {
-    font-size: 30px;
-    font-weight: 900;
-    color: var(--text);
-}
-
-.az-nav {
-    display: flex;
-    align-items: center;
-    gap: 22px;
-}
-
-.az-nav a {
-    font-size: 14px;
-    font-weight: 700;
-    color: #374151;
-}
-
-.az-nav a:hover {
-    color: var(--primary);
-}
-
-.az-header-right {
-    margin-left: auto;
-
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-/* =========================
    SEARCH
 ========================= */
 
@@ -56,43 +11,6 @@
     width: 100%;
 }
 
-/* =========================
-   PROFILE
-========================= */
-
-.az-profile {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-
-    background: #fff;
-
-    padding: 8px 12px;
-
-    border-radius: var(--radius-sm);
-
-    border: 1px solid var(--border);
-}
-
-.az-avatar {
-    width: 36px;
-    height: 36px;
-
-    border-radius: 50%;
-
-    background:
-        linear-gradient(135deg,
-            var(--primary),
-            var(--primary-2));
-
-    color: #fff;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    font-weight: 900;
-}
 
 /* =========================
    HERO
@@ -256,19 +174,7 @@
             #f6f3eb;
     }
 
-    .az-header {
-        position: sticky;
-        top: 0;
-        z-index: 500;
 
-        background:
-            rgba(246, 243, 235, .88);
-
-        backdrop-filter: blur(18px);
-
-        border-bottom:
-            1px solid rgba(15, 23, 42, .06);
-    }
 
     .az-page {
         width: min(1120px, 90%);
@@ -373,39 +279,6 @@
 
     .az-game-info p {
         font-size: 12px;
-    }
-}
-
-@media (min-width: 769px) {
-    .az-header {
-        height: 70px;
-    }
-
-    .az-logo {
-        font-size: 26px;
-    }
-
-    .az-nav a {
-        font-size: 13px;
-    }
-
-    .az-search {
-        width: 300px;
-    }
-
-    .az-search input {
-        height: 40px;
-        border-radius: 12px;
-        font-size: 13px;
-    }
-
-    .az-btn {
-        padding: 10px 13px;
-    }
-
-    .az-profile {
-        height: 42px;
-        border-radius: 14px;
     }
 }
 
