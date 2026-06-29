@@ -8,6 +8,7 @@
     <title>Wallet - AZIEL</title>
 
     <link rel="stylesheet" href="css/core/main.css">
+    <link rel="stylesheet" href="css/theme/aziel-header.css?v=20260629">
     <link rel="stylesheet" href="css/theme/aziel-design-system.css">
     <link rel="stylesheet" href="css/theme/wave-background.css">
     <link rel="stylesheet" href="css/core/components.css">
@@ -21,15 +22,7 @@
 
     <div class="az-bg-wave"></div>
 
-    <header class="az-topbar">
-        <a href="home.html" class="az-topbar-brand">AZIEL</a>
-
-        <div class="az-topbar-actions">
-            <a href="account.html" class="az-account-icon">
-                <i class="fa-regular fa-user"></i>
-            </a>
-        </div>
-    </header>
+    <div id="azHeaderMount" data-nav="wallet"></div>
 
     <main class="wallet-page">
 
@@ -180,7 +173,9 @@
 
     <script src="/js/site-settings.js"></script>
     <script src="/js/user-state.js"></script>
-    <script src="/js/header.js"></script>
+    <script src="js/header-loader.js?v=202606291812"></script>
+    <script src="js/header.js?v=202606291812"></script>
+    <script src="js/header-scroll.js?v=202606291812"></script>
     <script src="/js/auth-check.js"></script>
     <script src="/js/region-payment.js"></script>
     <script src="/js/payment.js"></script>
