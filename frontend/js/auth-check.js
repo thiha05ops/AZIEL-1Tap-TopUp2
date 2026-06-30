@@ -1,36 +1,29 @@
 // frontend/js/auth-check.js
 
 document.addEventListener("DOMContentLoaded", () => {
-
     const token =
+        window.AZIEL?.getToken?.() ||
         localStorage.getItem("token") ||
         sessionStorage.getItem("token");
 
-    const isLogin =
-        localStorage.getItem("isLogin") === "true" ||
-        sessionStorage.getItem("isLogin") === "true";
-
-    // Pages that REQUIRE login
     const protectedPages = [
         "account.html",
         "wallet.html",
-        "notifications.html"
+        "notifications.html",
+        "tracking.html"
     ];
 
-    const currentPage = window.location.pathname.split("/").pop();
+    const currentPage =
+        window.location.pathname.split("/").pop() || "home.html";
 
-    if (protectedPages.includes(currentPage)) {
+    if (!protectedPages.includes(currentPage)) return;
 
-        if (!token || !isLogin) {
+    if (!token) {
+        localStorage.setItem(
+            "redirectAfterLogin",
+            window.location.href
+        );
 
-            localStorage.setItem(
-                "redirectAfterLogin",
-                window.location.href
-            );
-
-            window.location.href = "login.html";
-        }
-
+        window.location.href = "login.html";
     }
-
 });

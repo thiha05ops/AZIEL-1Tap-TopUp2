@@ -144,16 +144,12 @@ function getPaymentLogo(key) {
 }
 
 function normalizeAssetPath(path) {
-
     if (!path) return "";
-
     if (path.startsWith("http")) return path;
+    if (path.startsWith("data:")) return path;
 
     path = path.replace(/^\/+/, "");
-
-    if (!path.startsWith("frontend/")) {
-        path = "frontend/" + path;
-    }
+    path = path.replace(/^frontend\//, "");
 
     return path;
 }

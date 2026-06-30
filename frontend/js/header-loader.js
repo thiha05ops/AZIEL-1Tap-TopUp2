@@ -39,8 +39,11 @@ async function loadAZIELHeader() {
     const navType = mount.dataset.nav || "home";
 
     try {
-        const res = await fetch("components/header.html?v=202606291812")
-        if (!res.ok) throw new Error(`Header fetch failed: ${res.status}`);
+        const res = await fetch("components/header.html?v=202606291812");
+
+        if (!res.ok) {
+            throw new Error(`Header fetch failed: ${res.status}`);
+        }
 
         mount.innerHTML = await res.text();
 
@@ -49,7 +52,6 @@ async function loadAZIELHeader() {
         window.dispatchEvent(new Event("aziel:headerLoaded"));
 
         console.log("AZIEL header loaded ✅");
-
     } catch (err) {
         console.error("Header load error:", err);
     }
@@ -60,9 +62,15 @@ function renderHeaderNav(navType) {
     if (!nav) return;
 
     const items = AZIEL_NAV_ITEMS[navType] || AZIEL_NAV_ITEMS.home;
+    const currentPage = location.pathname.split("/").pop() || "home.html";
 
     nav.innerHTML = items
-        .map(([href, label]) => `<a href="${href}">${label}</a>`)
+        .map(([href, label]) => {
+            const hrefPage = href.split("#")[0];
+            const activeClass = hrefPage === currentPage ? "active" : "";
+
+            return `<a href="${href}" class="${activeClass}">${label}</a>`;
+        })
         .join("");
 }
 

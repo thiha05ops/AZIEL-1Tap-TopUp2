@@ -1,15 +1,26 @@
+// frontend/js/site-settings.js
+
+const SITE_API_BASE =
+    location.port === "5500"
+        ? "http://localhost:3000"
+        : "";
+
+function siteApiUrl(path) {
+    return `${SITE_API_BASE}${path}`;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     loadSiteSettings();
 });
 
 async function loadSiteSettings() {
     try {
-        const res = await fetch("/api/settings");
+        const res = await fetch(siteApiUrl("/api/settings"));
         const data = await res.json();
 
         if (!data.success) return;
 
-        const s = data.settings;
+        const s = data.settings || {};
 
         if (s.maintenanceMode) {
             document.body.innerHTML = `
@@ -31,13 +42,14 @@ async function loadSiteSettings() {
         }
 
         if (s.liveChatEnabled === false) {
-            document.querySelector(".live-chat-ball")?.remove();
+            document.querySelector(".aziel-support-tab")?.remove();
+            document.querySelector(".live-chat-panel")?.remove();
         }
-
     } catch (error) {
         console.log("Site settings error:", error);
     }
 }
+
 (function autoSystemTheme() {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
 

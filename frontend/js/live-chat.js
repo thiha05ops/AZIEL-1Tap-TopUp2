@@ -1,9 +1,16 @@
+// frontend/js/live-chat.js
+// AZIEL Assistant V2.5 - Live Chat
+
 console.log("AZIEL ASSISTANT V2 LOADED");
 
-document.addEventListener("DOMContentLoaded", () => {
-    createLiveChatUI();
-    initLiveChatSystem();
-});
+const API_BASE =
+    location.port === "5500"
+        ? "http://localhost:3000"
+        : "";
+
+function apiUrl(path) {
+    return `${API_BASE}${path}`;
+}
 
 const AZIEL_CHAT = {
     username:
@@ -16,6 +23,11 @@ const AZIEL_CHAT = {
     isOpen: false
 };
 
+document.addEventListener("DOMContentLoaded", () => {
+    createLiveChatUI();
+    initLiveChatSystem();
+});
+
 function createLiveChatUI() {
     if (document.querySelector(".aziel-support-tab")) return;
 
@@ -23,10 +35,10 @@ function createLiveChatUI() {
     ball.className = "aziel-support-tab";
     ball.type = "button";
     ball.innerHTML = `
-    <i class="fa-solid fa-headset"></i>
-    <span>Live Chat</span>
-    <b></b>
-`;
+        <i class="fa-solid fa-headset"></i>
+        <span>Live Chat</span>
+        <b id="chatBadge"></b>
+    `;
 
     const panel = document.createElement("div");
     panel.className = "live-chat-panel";
@@ -69,7 +81,7 @@ function createLiveChatUI() {
         }
     });
 
-    panel.querySelector(".chat-close-btn").addEventListener("click", () => {
+    panel.querySelector(".chat-close-btn")?.addEventListener("click", () => {
         AZIEL_CHAT.isOpen = false;
         panel.classList.remove("open");
     });
@@ -92,8 +104,14 @@ function initLiveChatSystem() {
     document
         .getElementById("liveChatInput")
         ?.addEventListener("keydown", e => {
-            if (e.key === "Enter") sendLiveChatMessage();
+            if (e.key === "Enter") {
+                sendLiveChatMessage();
+            }
         });
+
+    if (AZIEL_CHAT.polling) {
+        clearInterval(AZIEL_CHAT.polling);
+    }
 
     AZIEL_CHAT.polling = setInterval(() => {
         loadLiveChatHistory();
@@ -103,8 +121,9 @@ function initLiveChatSystem() {
 
 async function sendLiveChatMessage() {
     const input = document.getElementById("liveChatInput");
-    const message = input.value.trim();
+    if (!input) return;
 
+    const message = input.value.trim();
     if (!message) return;
 
     input.value = "";
@@ -112,9 +131,11 @@ async function sendLiveChatMessage() {
     showTyping(true);
 
     try {
-        const res = await fetch("/api/live-chat/send", {
+        const res = await fetch(apiUrl("/api/live-chat/send"), {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+                "Content-Type": "application/json"
+            },
             body: JSON.stringify({
                 username: AZIEL_CHAT.username,
                 message
@@ -138,7 +159,7 @@ async function sendLiveChatMessage() {
             );
         }, 300);
 
-        AZIEL_CHAT.lastMessageCount = data.chat.messages.length;
+        AZIEL_CHAT.lastMessageCount = data.chat?.messages?.length || AZIEL_CHAT.lastMessageCount;
     } catch (error) {
         showTyping(false);
         console.error("Live chat send error:", error);
@@ -149,8 +170,9 @@ async function sendLiveChatMessage() {
 async function loadLiveChatHistory() {
     try {
         const res = await fetch(
-            `/api/live-chat/user/${encodeURIComponent(AZIEL_CHAT.username)}`
+            apiUrl(`/api/live-chat/user/${encodeURIComponent(AZIEL_CHAT.username)}`)
         );
+
         const data = await res.json();
 
         if (!data.success || !data.chat) return;
@@ -187,8 +209,9 @@ async function loadLiveChatHistory() {
 async function loadUnreadCount() {
     try {
         const res = await fetch(
-            `/api/live-chat/user/${encodeURIComponent(AZIEL_CHAT.username)}/unread`
+            apiUrl(`/api/live-chat/user/${encodeURIComponent(AZIEL_CHAT.username)}/unread`)
         );
+
         const data = await res.json();
 
         if (data.success) {
@@ -202,8 +225,10 @@ async function loadUnreadCount() {
 async function markUserRead() {
     try {
         await fetch(
-            `/api/live-chat/user/${encodeURIComponent(AZIEL_CHAT.username)}/read`,
-            { method: "PUT" }
+            apiUrl(`/api/live-chat/user/${encodeURIComponent(AZIEL_CHAT.username)}/read`),
+            {
+                method: "PUT"
+            }
         );
     } catch (error) {
         console.log("Mark read error:", error);
@@ -252,7 +277,8 @@ function updateBadge(count) {
 function showTyping(show) {
     const typing = document.getElementById("typingIndicator");
     if (!typing) return;
-    typing.classList.toggle("show", !!show);
+
+    typing.classList.toggle("show", Boolean(show));
 }
 
 function escapeHTML(value) {

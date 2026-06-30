@@ -1,13 +1,23 @@
 // frontend/js/login.js
 
+const API_BASE =
+    location.port === "5500"
+        ? "http://localhost:3000"
+        : "";
+
+function apiUrl(path) {
+    return `${API_BASE}${path}`;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     const token =
         localStorage.getItem("token") ||
         sessionStorage.getItem("token");
 
     if (token) {
-        window.location.href = "home.html";
-        return;
+        localStorage.removeItem("token");
+        localStorage.removeItem("isLogin");
+        sessionStorage.removeItem("token");
     }
 
     const form = document.getElementById("loginForm");
@@ -59,7 +69,7 @@ document.addEventListener("DOMContentLoaded", () => {
         setLoading(true);
 
         try {
-            const res = await fetch("/api/login", {
+            const res = await fetch(apiUrl("/api/login"), {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"

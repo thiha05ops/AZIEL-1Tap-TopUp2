@@ -3,7 +3,12 @@
 document.addEventListener("DOMContentLoaded", () => {
     renderHeader();
     initAutoRevealNav();
-    window.addEventListener("aziel:headerLoaded", renderHeader);
+
+    window.addEventListener("aziel:headerLoaded", () => {
+        renderHeader();
+        initAutoRevealNav();
+    });
+
     window.addEventListener("aziel:ready", renderHeader);
     window.addEventListener("aziel:userChanged", renderHeader);
     window.addEventListener("aziel:walletChanged", renderHeader);
@@ -26,7 +31,9 @@ function renderHeader() {
     const profileBox = document.getElementById("profileBox");
 
     const region = window.AZIEL?.getShopRegion?.() || "MM";
-    const symbol = window.AZIEL?.getShopSymbol?.() || (region === "TH" ? "฿" : "Ks");
+    const symbol =
+        window.AZIEL?.getShopSymbol?.() ||
+        (region === "TH" ? "฿" : "Ks");
 
     const user = window.AZIEL?.user || null;
     const wallet = window.AZIEL?.wallet || null;
@@ -59,8 +66,7 @@ function renderHeader() {
     const balance = Number(wallet?.balance || 0);
 
     if (walletText) {
-        walletText.innerText =
-            `${balance.toLocaleString()} ${symbol}`;
+        walletText.innerText = `${balance.toLocaleString()} ${symbol}`;
     }
 }
 
@@ -69,6 +75,9 @@ function initAutoRevealNav() {
     const nav = document.querySelector(".az-nav");
 
     if (!header || !nav) return;
+
+    if (header.dataset.navRevealReady === "true") return;
+    header.dataset.navRevealReady = "true";
 
     let lastScrollY = window.scrollY;
 
