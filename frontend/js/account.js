@@ -10,6 +10,19 @@ document.addEventListener("DOMContentLoaded", () => {
 let currentUser = null;
 let accountRefreshTimer = null;
 
+function accountApiUrl(path) {
+    if (window.AZIEL?.apiUrl) {
+        return window.AZIEL.apiUrl(path);
+    }
+
+    const base =
+        location.port === "5500"
+            ? "http://localhost:3000"
+            : "";
+
+    return `${base}${path}`;
+}
+
 // ============================
 // INIT
 // ============================
@@ -32,38 +45,46 @@ async function initAccount() {
     }
 
     renderAccount();
-    await loadHistory();
-    await loadBellOrders();
+    await refreshAccountData();
 
     window.addEventListener("aziel:ready", async () => {
         currentUser = window.AZIEL?.user || currentUser;
         renderAccount();
-        await loadHistory();
-        await loadBellOrders();
+        await refreshAccountData();
     });
 
     window.addEventListener("aziel:userChanged", async () => {
         currentUser = window.AZIEL?.user || currentUser;
         renderAccount();
-        await loadHistory();
-        await loadBellOrders();
+        await refreshAccountData();
     });
 
     window.addEventListener("aziel:walletChanged", () => {
         renderWallet();
     });
 
-    window.addEventListener("aziel:regionChanged", async () => {
+    window.addEventListener("aziel:shopRegionChanged", async () => {
         await window.AZIEL?.loadWallet?.();
         renderAccount();
     });
 
     accountRefreshTimer = setInterval(async () => {
         await window.AZIEL?.loadWallet?.();
-        await loadHistory();
-        await loadBellOrders();
+        await refreshAccountData();
         renderAccount();
     }, 10000);
+}
+
+window.addEventListener("beforeunload", () => {
+    if (accountRefreshTimer) {
+        clearInterval(accountRefreshTimer);
+        accountRefreshTimer = null;
+    }
+});
+
+async function refreshAccountData() {
+    await loadHistory();
+    await loadBellOrders();
 }
 
 // ============================
@@ -100,19 +121,32 @@ function setValue(id, value) {
 }
 
 function getDisplayName(user = currentUser) {
-    return window.AZIEL?.getDisplayName?.(user) || user?.displayName || user?.username || "User";
+    return (
+        window.AZIEL?.getDisplayName?.(user) ||
+        user?.displayName ||
+        user?.username ||
+        "User"
+    );
 }
 
 function getRegion() {
-    return window.AZIEL?.getRegion?.() || "MM";
+    return window.AZIEL?.getShopRegion?.() || window.AZIEL?.getRegion?.() || "MM";
 }
 
 function getCurrency() {
-    return window.AZIEL?.getCurrency?.() || (getRegion() === "TH" ? "THB" : "MMK");
+    return (
+        window.AZIEL?.getShopCurrency?.() ||
+        window.AZIEL?.getCurrency?.() ||
+        (getRegion() === "TH" ? "THB" : "MMK")
+    );
 }
 
 function getSymbol() {
-    return window.AZIEL?.getSymbol?.() || (getCurrency() === "THB" ? "฿" : "Ks");
+    return (
+        window.AZIEL?.getShopSymbol?.() ||
+        window.AZIEL?.getSymbol?.() ||
+        (getCurrency() === "THB" ? "฿" : "Ks")
+    );
 }
 
 function formatDate(dateValue) {
@@ -199,7 +233,7 @@ function renderSecurity() {
 
 function renderWallet() {
     const wallet = window.AZIEL?.wallet || {};
-    const symbol = getSymbol();
+    const symbol = wallet.symbol || getSymbol();
     const balance = Number(wallet.balance || 0);
 
     setText("overviewWalletBalance", `${balance.toLocaleString()} ${symbol}`);
@@ -227,7 +261,7 @@ async function saveProfile() {
     }
 
     try {
-        const res = await fetch("/api/profile/me", {
+        const res = await fetch(accountApiUrl("/api/profile/me"), {
             method: "PUT",
             headers: {
                 "Content-Type": "application/json",
@@ -254,7 +288,6 @@ async function saveProfile() {
         renderAccount();
 
         alert("Profile saved ✅");
-
     } catch (error) {
         console.log("Save profile error:", error);
         alert("Server error");
@@ -269,7 +302,10 @@ async function loadHistory() {
     if (!currentUser?.username) return;
 
     try {
-        const res = await fetch(`/api/history/${encodeURIComponent(currentUser.username)}`);
+        const res = await fetch(
+            accountApiUrl(`/api/history/${encodeURIComponent(currentUser.username)}`)
+        );
+
         const data = await res.json();
 
         if (!data.success || !Array.isArray(data.orders)) {
@@ -280,7 +316,6 @@ async function loadHistory() {
         renderStats(data.orders);
         renderHistory(data.orders);
         renderRecent(data.orders);
-
     } catch (error) {
         console.log("History error:", error);
         renderEmpty();
@@ -326,14 +361,14 @@ function renderRecent(orders) {
 
     box.innerHTML = orders.slice(0, 3).map(order => `
         <div class="recent-order-item"
-             onclick="window.location.href='tracking.html?orderId=${order.orderId}'">
+             onclick="window.location.href='tracking.html?orderId=${escapeHTML(order.orderId)}'">
             <div>
-                <strong>${order.game || "Game"}</strong>
-                <small>${order.packageName || "Package"}</small>
+                <strong>${escapeHTML(order.game || "Game")}</strong>
+                <small>${escapeHTML(order.packageName || "Package")}</small>
             </div>
 
             <span class="${statusClass(order.status)}">
-                ${order.status || "pending"}
+                ${escapeHTML(order.status || "pending")}
             </span>
         </div>
     `).join("");
@@ -341,31 +376,32 @@ function renderRecent(orders) {
 
 function orderCard(order) {
     const status = order.status || "pending";
+    const orderId = order.orderId || "";
 
     return `
         <div class="order-card">
             <div class="order-top">
-                <h3>#${order.orderId}</h3>
-                <span class="status ${status.toLowerCase()}">
-                    ${status}
+                <h3>#${escapeHTML(orderId)}</h3>
+                <span class="status ${statusClass(status)}">
+                    ${escapeHTML(status)}
                 </span>
             </div>
 
             <div class="order-game">
-                ${order.game || "Game"}
+                ${escapeHTML(order.game || "Game")}
             </div>
 
             <div class="order-package">
-                ${order.packageName || "Package"}
+                ${escapeHTML(order.packageName || "Package")}
             </div>
 
             <div class="order-bottom">
                 <strong>
                     ${Number(order.amount || 0).toLocaleString()}
-                    ${order.currency || getCurrency()}
+                    ${escapeHTML(order.currency || getCurrency())}
                 </strong>
 
-                <a href="tracking.html?orderId=${order.orderId}">
+                <a href="tracking.html?orderId=${encodeURIComponent(orderId)}">
                     Track
                 </a>
             </div>
@@ -398,7 +434,10 @@ async function loadBellOrders() {
     if (!panel || !count) return;
 
     try {
-        const res = await fetch(`/api/history/${encodeURIComponent(currentUser.username)}`);
+        const res = await fetch(
+            accountApiUrl(`/api/history/${encodeURIComponent(currentUser.username)}`)
+        );
+
         const data = await res.json();
 
         if (!data.success || !Array.isArray(data.orders) || !data.orders.length) {
@@ -413,16 +452,15 @@ async function loadBellOrders() {
 
         panel.innerHTML = data.orders.slice(0, 8).map(order => `
             <div class="noti-item"
-                 onclick="window.location.href='tracking.html?orderId=${order.orderId}'">
-                🔔 <b>${order.game || "Game"}</b><br>
-                ${order.packageName || "Package"}<br>
-                <small>${order.orderId}</small><br>
+                 onclick="window.location.href='tracking.html?orderId=${escapeHTML(order.orderId)}'">
+                🔔 <b>${escapeHTML(order.game || "Game")}</b><br>
+                ${escapeHTML(order.packageName || "Package")}<br>
+                <small>${escapeHTML(order.orderId || "")}</small><br>
                 <span class="${statusClass(order.status)}">
-                    ${order.status || "pending"}
+                    ${escapeHTML(order.status || "pending")}
                 </span>
             </div>
         `).join("");
-
     } catch (error) {
         console.log("Bell order error:", error);
         panel.innerHTML = `<div class="noti-item">Server error</div>`;
@@ -430,10 +468,13 @@ async function loadBellOrders() {
 }
 
 function statusClass(status) {
-    if (status === "paid") return "status-paid";
-    if (status === "processing") return "status-processing";
-    if (status === "completed") return "status-completed";
-    if (status === "cancelled" || status === "failed") return "status-failed";
+    const normalized = String(status || "").toLowerCase();
+
+    if (normalized === "paid") return "status-paid";
+    if (normalized === "processing") return "status-processing";
+    if (normalized === "completed") return "status-completed";
+    if (normalized === "cancelled" || normalized === "failed") return "status-failed";
+
     return "status-pending";
 }
 
@@ -498,4 +539,13 @@ function initMobileMenu() {
         sidebar?.classList.remove("show");
         overlay?.classList.remove("show");
     });
+}
+
+function escapeHTML(value) {
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
 }

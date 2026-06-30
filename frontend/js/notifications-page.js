@@ -7,46 +7,49 @@ document.addEventListener("DOMContentLoaded", () => {
 
 let pageNotifications = [];
 
-async function loadNotificationPage() {
-    const username = localStorage.getItem("username");
-    const list = document.getElementById("notificationsList");
+function notificationApiUrl(path) {
+    if (window.AZIEL?.apiUrl) {
+        return window.AZIEL.apiUrl(path);
+    }
 
+    const base =
+        location.port === "5500"
+            ? "http://localhost:3000"
+            : "";
+
+    return `${base}${path}`;
+}
+
+async function loadNotificationPage() {
+    const username =
+        window.AZIEL?.user?.username ||
+        localStorage.getItem("username");
+
+    const list = document.getElementById("notificationsList");
     if (!list) return;
 
     if (!username) {
-        list.innerHTML = `
-            <div class="empty-noti">
-                Please login first.
-            </div>
-        `;
+        list.innerHTML = `<div class="empty-noti">Please login first.</div>`;
         return;
     }
 
     try {
-        const res = await fetch(`/api/notifications/${username}`);
+        const res = await fetch(
+            notificationApiUrl(`/api/notifications/${encodeURIComponent(username)}`)
+        );
+
         const data = await res.json();
 
         if (!data.success) {
-            list.innerHTML = `
-                <div class="empty-noti">
-                    Failed to load notifications.
-                </div>
-            `;
+            list.innerHTML = `<div class="empty-noti">Failed to load notifications.</div>`;
             return;
         }
 
         pageNotifications = data.notifications || [];
-
         renderNotificationGroups();
-
     } catch (error) {
         console.log("Notification page error:", error);
-
-        list.innerHTML = `
-            <div class="empty-noti">
-                Failed to load notifications.
-            </div>
-        `;
+        list.innerHTML = `<div class="empty-noti">Failed to load notifications.</div>`;
     }
 }
 
@@ -57,31 +60,15 @@ function renderNotificationGroups() {
     const visible = pageNotifications.filter(n => !n.deletedByUser);
 
     if (!visible.length) {
-        list.innerHTML = `
-            <div class="empty-noti">
-                No notifications yet.
-            </div>
-        `;
+        list.innerHTML = `<div class="empty-noti">No notifications yet.</div>`;
         return;
     }
 
     const groups = [
-        {
-            key: "orders",
-            title: "Order Updates"
-        },
-        {
-            key: "announcements",
-            title: "Admin Announcements"
-        },
-        {
-            key: "promotions",
-            title: "Promotions & Discounts"
-        },
-        {
-            key: "system",
-            title: "System"
-        }
+        { key: "orders", title: "Order Updates" },
+        { key: "announcements", title: "Admin Announcements" },
+        { key: "promotions", title: "Promotions & Discounts" },
+        { key: "system", title: "System" }
     ];
 
     list.innerHTML = groups.map(group => {
@@ -93,10 +80,7 @@ function renderNotificationGroups() {
 
         return `
             <section class="category-block">
-                <h2 class="category-title">
-                    ${group.title}
-                </h2>
-
+                <h2 class="category-title">${escapeHTML(group.title)}</h2>
                 ${items.map(renderNotificationItem).join("")}
             </section>
         `;
@@ -105,32 +89,27 @@ function renderNotificationGroups() {
 
 function renderNotificationItem(n) {
     const status = n.isRead ? "" : "unread";
+    const id = String(n._id || "");
 
     return `
-        <div class="notif-item ${status}" data-id="${n._id}">
+        <div class="notif-item ${status}" data-id="${escapeHTML(id)}">
             <div class="notif-main"
-                 onclick="openNotification('${n._id}')">
+                 onclick="openNotification('${escapeHTML(id)}')">
                 <h3>
-                    ${getTypeIcon(n.type)} ${n.title || "Notification"}
+                    ${getTypeIcon(n.type)} ${escapeHTML(n.title || "Notification")}
                 </h3>
 
-                <p>
-                    ${n.message || ""}
-                </p>
+                <p>${escapeHTML(n.message || "")}</p>
 
-                <small>
-                    ${formatNotificationTime(n.createdAt)}
-                </small>
+                <small>${escapeHTML(formatNotificationTime(n.createdAt))}</small>
             </div>
 
             <div class="notif-actions">
-                <button onclick="markOneRead('${n._id}')"
-                        title="Mark as read">
+                <button onclick="markOneRead('${escapeHTML(id)}')" title="Mark as read">
                     ✓
                 </button>
 
-                <button onclick="deleteNotification('${n._id}')"
-                        title="Delete">
+                <button onclick="deleteNotification('${escapeHTML(id)}')" title="Delete">
                     ×
                 </button>
             </div>
@@ -140,13 +119,13 @@ function renderNotificationItem(n) {
 
 async function openNotification(id) {
     const n = pageNotifications.find(item => String(item._id) === String(id));
-
     if (!n) return;
 
     await markOneRead(id);
 
     if (n.orderId) {
-        window.location.href = `tracking.html?orderId=${n.orderId}`;
+        window.location.href =
+            `tracking.html?orderId=${encodeURIComponent(n.orderId)}`;
     }
 }
 
@@ -158,7 +137,7 @@ async function markOneRead(id) {
     renderNotificationGroups();
 
     try {
-        await fetch(`/api/notifications/${id}/read`, {
+        await fetch(notificationApiUrl(`/api/notifications/${encodeURIComponent(id)}/read`), {
             method: "PUT"
         });
     } catch (error) {
@@ -174,7 +153,7 @@ async function deleteNotification(id) {
     renderNotificationGroups();
 
     try {
-        await fetch(`/api/notifications/${id}`, {
+        await fetch(notificationApiUrl(`/api/notifications/${encodeURIComponent(id)}`), {
             method: "DELETE"
         });
     } catch (error) {
@@ -191,7 +170,10 @@ function initNotificationActions() {
 }
 
 async function markAllRead() {
-    const username = localStorage.getItem("username");
+    const username =
+        window.AZIEL?.user?.username ||
+        localStorage.getItem("username");
+
     if (!username) return;
 
     pageNotifications.forEach(n => {
@@ -201,9 +183,10 @@ async function markAllRead() {
     renderNotificationGroups();
 
     try {
-        await fetch(`/api/notifications/${username}/read-all`, {
-            method: "PUT"
-        });
+        await fetch(
+            notificationApiUrl(`/api/notifications/${encodeURIComponent(username)}/read-all`),
+            { method: "PUT" }
+        );
     } catch (error) {
         console.log("Mark all read error:", error);
     }
@@ -224,7 +207,6 @@ function getTypeIcon(type) {
 
 function formatNotificationTime(date) {
     if (!date) return "";
-
     return new Date(date).toLocaleString();
 }
 
@@ -242,4 +224,13 @@ function prependLiveNotification(data) {
     });
 
     renderNotificationGroups();
+}
+
+function escapeHTML(value) {
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
 }

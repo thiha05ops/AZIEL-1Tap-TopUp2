@@ -6,11 +6,11 @@
 
     <title>Order Tracking - AZIEL</title>
 
-    <link rel="stylesheet" href="/css/core/main.css">
-    <link rel="stylesheet" href="/css/support/tracking.css">
-    <link rel="stylesheet" href="/css/core/components.css">
-    <link rel="stylesheet" href="/css/theme/aziel-design-system.css">
-    <link rel="stylesheet" href="/css/tracking/tracking.css">
+    <link rel="stylesheet" href="css/core/main.css">
+    <link rel="stylesheet" href="css/core/components.css">
+    <link rel="stylesheet" href="css/theme/aziel-design-system.css">
+    <link rel="stylesheet" href="css/theme/aziel-header.css">
+    <link rel="stylesheet" href="css/tracking/tracking.css">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="manifest" href="/manifest.json">
@@ -25,15 +25,7 @@
 
 <body>
 
-    <header class="az-topbar">
-        <a href="home.html" class="az-topbar-brand">AZIEL</a>
-
-        <nav class="az-topbar-actions">
-            <a href="home.html">Home</a>
-            <a href="account.html">Account</a>
-            <a href="support.html">Support</a>
-        </nav>
-    </header>
+    <div id="azHeaderMount" data-nav="account"></div>
 
     <main class="tracking-page">
 
@@ -72,32 +64,18 @@
 
     </main>
     <script src="/socket.io/socket.io.js"></script>
+
+    <script src="js/api.js"></script>
+    <script src="js/user-state.js"></script>
+
+    <script src="js/header-loader.js?v=202606291812"></script>
+    <script src="js/header.js?v=202606291812"></script>
+    <script src="js/header-scroll.js?v=202606291812"></script>
+
     <script src="js/tracking.js?v=6"></script>
+
     <script src="js/pwa-fix.js"></script>
     <script src="js/site-settings.js"></script>
-    <script src="js/api.js"></script>
-
-    <nav class="az-bottom-nav">
-        <a href="home.html">
-            <i class="fa-solid fa-house"></i>
-            <span>Home</span>
-        </a>
-
-        <a href="tracking.html" class="active">
-            <i class="fa-solid fa-box"></i>
-            <span>Orders</span>
-        </a>
-
-        <a href="notifications.html">
-            <i class="fa-regular fa-bell"></i>
-            <span>Alerts</span>
-        </a>
-
-        <a href="account.html">
-            <i class="fa-regular fa-user"></i>
-            <span>Account</span>
-        </a>
-    </nav>
 
 </body>
 

@@ -5,6 +5,19 @@ let walletPollingTimer = null;
 let walletCountdownTimer = null;
 let walletSocketReady = false;
 
+function walletApiUrl(path) {
+    if (window.AZIEL?.apiUrl) {
+        return window.AZIEL.apiUrl(path);
+    }
+
+    const base =
+        location.port === "5500"
+            ? "http://localhost:3000"
+            : "";
+
+    return `${base}${path}`;
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
     if (!window.AZIEL) {
         console.error("AZIEL user-state.js not loaded");
@@ -91,7 +104,9 @@ async function loadWallet() {
 
     try {
         const res = await fetch(
-            `/api/wallet/${encodeURIComponent(user.username)}?currency=${currency}`
+            walletApiUrl(
+                `/api/wallet/${encodeURIComponent(user.username)}?currency=${currency}`
+            )
         );
 
         const data = await res.json();
@@ -152,21 +167,36 @@ function renderWalletHistory(topups) {
         return;
     }
 
-    box.innerHTML = topups.map(item => `
-        <div class="wallet-history-item">
-            <div>
-                <strong>
-                    ${Number(item.amount || 0).toLocaleString()}
-                    ${item.currency || getWalletCurrency()}
-                </strong>
-                <p>${item.paymentMethod || "Payment"}</p>
-            </div>
+    box.innerHTML = topups.map(item => {
+        const status = normalizeWalletStatus(item.status);
 
-            <span class="wallet-status status-${item.status || "pending"}">
-                ${item.status || "pending"}
-            </span>
-        </div>
-    `).join("");
+        return `
+            <div class="wallet-history-item">
+                <div>
+                    <strong>
+                        ${Number(item.amount || 0).toLocaleString()}
+                        ${item.currency || getWalletCurrency()}
+                    </strong>
+                    <p>${item.paymentMethod || "Payment"}</p>
+                </div>
+
+                <span class="wallet-status status-${status}">
+                    ${status}
+                </span>
+            </div>
+        `;
+    }).join("");
+}
+
+function normalizeWalletStatus(status) {
+    const value = String(status || "pending").toLowerCase();
+
+    if (value === "paid") return "paid";
+    if (value === "completed") return "completed";
+    if (value === "expired") return "expired";
+    if (value === "failed") return "failed";
+
+    return "pending";
 }
 
 function initQuickAmounts() {
@@ -229,7 +259,7 @@ async function submitTopup() {
 
         showLoading(true);
 
-        const res = await fetch("/api/wallet/create", {
+        const res = await fetch(walletApiUrl("/api/wallet/create"), {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
@@ -282,11 +312,14 @@ function openWalletQrModal(data, info) {
     if (!modal || !qrImg) return;
 
     if (topupIdEl) topupIdEl.innerText = data.topupId || "-";
+
     if (amountEl) {
         amountEl.innerText =
             `${Number(info.amount).toLocaleString()} ${info.currency}`;
     }
+
     if (methodEl) methodEl.innerText = info.paymentMethod || "-";
+
     if (amountText) {
         amountText.innerText =
             `${Number(info.amount).toLocaleString()} ${info.currency}`;
@@ -355,7 +388,10 @@ function startPaymentStatusPolling(topupId) {
         count++;
 
         try {
-            const res = await fetch(`/api/wallet/status/${topupId}`);
+            const res = await fetch(
+                walletApiUrl(`/api/wallet/status/${topupId}`)
+            );
+
             const data = await res.json();
 
             if (data.success && data.status === "paid") {
@@ -391,7 +427,10 @@ function initWalletSocket() {
     const user = getWalletUser();
     if (!user?.username) return;
 
-    const socket = io();
+    const socket =
+        location.port === "5500"
+            ? io("http://localhost:3000")
+            : io();
 
     socket.emit("joinUser", user.username);
 
@@ -477,9 +516,7 @@ function resetTopupForm() {
     const amount = document.getElementById("topupAmount");
     const method = document.getElementById("paymentMethod");
     const quickBtns = document.querySelectorAll(".quick-amounts button");
-    const payCards = document.querySelectorAll(
-        ".pay-card, .payment-option, .payment-card, .payment-method, .payment-item"
-    );
+    const payCards = document.querySelectorAll(".pay-card");
 
     if (amount) amount.value = "";
     if (method) method.value = "";

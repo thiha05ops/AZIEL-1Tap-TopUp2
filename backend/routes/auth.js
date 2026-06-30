@@ -11,13 +11,27 @@ const { sendVerifyOTP } = require("../services/mail");
 const router = express.Router();
 
 const JWT_SECRET = process.env.JWT_SECRET || "aziel_jwt_secret";
+const isProduction = process.env.NODE_ENV === "production";
 
 const pendingRegisters = {};
 
+function devLog(...args) {
+    if (!isProduction) {
+        console.log(...args);
+    }
+}
+
 function isValidGmail(email) {
     return /^[a-zA-Z0-9._%+-]+@gmail\.com$/.test(
-        String(email).toLowerCase()
+        String(email || "").toLowerCase()
     );
+}
+
+function normalizeUsername(username) {
+    return String(username || "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, "");
 }
 
 function makeOTP() {
@@ -30,13 +44,16 @@ function makeSessionToken() {
 
 function getDeviceInfo(req) {
     const userAgent = req.headers["user-agent"] || "";
+
     const ip =
         req.headers["x-forwarded-for"]?.split(",")[0] ||
         req.socket.remoteAddress ||
         "";
 
     return {
-        deviceName: userAgent.includes("Mobile") ? "Mobile Device" : "Desktop Device",
+        deviceName: userAgent.includes("Mobile")
+            ? "Mobile Device"
+            : "Desktop Device",
         browser: userAgent,
         ip,
         loginAt: new Date()
@@ -52,16 +69,28 @@ function createToken(user, sessionToken) {
             sessionToken
         },
         JWT_SECRET,
-        { expiresIn: "15d" }
+        {
+            expiresIn: "15d"
+        }
     );
 }
 
-/* =========================
-   REGISTER - SEND VERIFY OTP
-========================= */
+function cleanExpiredPendingRegisters() {
+    const now = Date.now();
+
+    Object.keys(pendingRegisters).forEach(email => {
+        if (pendingRegisters[email]?.expireAt < now) {
+            delete pendingRegisters[email];
+        }
+    });
+}
+
+// REGISTER - SEND VERIFY OTP
 router.post("/register", async (req, res) => {
     try {
-        const username = String(req.body.username || "").trim().toLowerCase();
+        cleanExpiredPendingRegisters();
+
+        const username = normalizeUsername(req.body.username);
         const email = String(req.body.email || "").trim().toLowerCase();
         const password = String(req.body.password || "");
 
@@ -69,6 +98,13 @@ router.post("/register", async (req, res) => {
             return res.json({
                 success: false,
                 message: "Username, Gmail and password required"
+            });
+        }
+
+        if (username.length < 3) {
+            return res.json({
+                success: false,
+                message: "Username must be at least 3 characters"
             });
         }
 
@@ -87,7 +123,10 @@ router.post("/register", async (req, res) => {
         }
 
         const existingUser = await User.findOne({
-            $or: [{ username }, { email }]
+            $or: [
+                { username },
+                { email }
+            ]
         });
 
         if (existingUser) {
@@ -110,7 +149,7 @@ router.post("/register", async (req, res) => {
             expireAt: Date.now() + 10 * 60 * 1000
         };
 
-        console.log("AZIEL VERIFY OTP:", email, otp);
+        devLog("AZIEL VERIFY OTP:", email, otp);
 
         await sendVerifyOTP(email, otp);
 
@@ -118,7 +157,6 @@ router.post("/register", async (req, res) => {
             success: true,
             message: "Verification OTP sent"
         });
-
     } catch (error) {
         console.log("Register error:", error);
 
@@ -129,11 +167,11 @@ router.post("/register", async (req, res) => {
     }
 });
 
-/* =========================
-   VERIFY EMAIL - CREATE USER
-========================= */
+// VERIFY EMAIL - CREATE USER
 router.post("/verify-email", async (req, res) => {
     try {
+        cleanExpiredPendingRegisters();
+
         const email = String(req.body.email || "").trim().toLowerCase();
         const otp = String(req.body.otp || "").trim();
 
@@ -186,11 +224,14 @@ router.post("/verify-email", async (req, res) => {
             password: hashedPassword,
             displayName: pending.username,
             isVerified: true,
+            emailVerified: true,
             region: "MM",
             wallet: {
                 MMK: 0,
                 THB: 0
             },
+            currentSessionToken: "",
+            sessionUpdatedAt: null,
             lastActiveAt: new Date()
         });
 
@@ -207,7 +248,6 @@ router.post("/verify-email", async (req, res) => {
                 role: user.role || "user"
             }
         });
-
     } catch (error) {
         console.log("Verify email error:", error);
 
@@ -218,9 +258,7 @@ router.post("/verify-email", async (req, res) => {
     }
 });
 
-/* =========================
-   LOGIN
-========================= */
+// LOGIN
 router.post("/login", async (req, res) => {
     try {
         const loginId = String(req.body.username || "").trim().toLowerCase();
@@ -257,23 +295,6 @@ router.post("/login", async (req, res) => {
         }
 
         const now = new Date();
-        const lastActive = user.lastActiveAt || user.updatedAt || user.createdAt;
-        const inactiveDays =
-            (now.getTime() - new Date(lastActive).getTime()) /
-            (1000 * 60 * 60 * 24);
-
-        if (inactiveDays >= 15) {
-            user.currentSessionToken = "";
-            user.sessionUpdatedAt = now;
-            await user.save();
-
-            return res.json({
-                success: false,
-                inactive: true,
-                message: "Your session expired because this account was inactive for 15 days. Please login again."
-            });
-        }
-
         const sessionToken = makeSessionToken();
 
         user.currentSessionToken = sessionToken;
@@ -295,10 +316,11 @@ router.post("/login", async (req, res) => {
                 displayName: user.displayName || user.username,
                 region: user.region || "MM",
                 role: user.role || "user",
+                emailVerified: Boolean(user.emailVerified || user.isVerified),
+                isVerified: Boolean(user.emailVerified || user.isVerified),
                 lastLoginDevice: user.lastLoginDevice
             }
         });
-
     } catch (error) {
         console.log("Login error:", error);
 

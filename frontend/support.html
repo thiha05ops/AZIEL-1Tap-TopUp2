@@ -7,12 +7,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>Customer Support - AZIEL</title>
+    <link rel="stylesheet" href="css/theme/aziel-header.css">
+    <link rel="stylesheet" href="css/theme/aziel-design-system.css">
+    <link rel="stylesheet" href="css/support/support.css?v=20260630">
+    <link rel="stylesheet" href="css/support/live-chat.css?v=20260630">
 
-    <link rel="stylesheet" href="/css/support/support.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <link rel="manifest" href="/manifest.json">
-    <link rel="stylesheet" href="/css/theme/aziel-design-system.css">
+    <link rel="manifest" href="manifest.json">
 
     <meta name="theme-color" content="#070716">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -24,14 +25,7 @@
 
 <body>
 
-    <header class="support-header">
-        <a href="home.html" class="support-brand">AZIEL</a>
-
-        <div class="support-actions">
-            <a href="account.html" class="support-nav-btn">👤 Account</a>
-            <a href="home.html" class="support-nav-btn"> Home</a>
-        </div>
-    </header>
+    <div id="azHeaderMount" data-nav="account"></div>
 
     <main class="support-page">
 
@@ -212,11 +206,19 @@
         © 2026 AZIEL 1Tap Shop
     </footer>
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="js/api.js"></script>
-    <script src="js/support.js?v=5"></script>
-    <script src="js/pwa-fix.js"></script>
-    <script src="js/site-settings.js"></script>
+    <script src="js/site-settings.js?v=20260630"></script>
+    <script src="js/api.js?v=20260630"></script>
+    <script src="js/user-state.js?v=20260630"></script>
+
+    <script src="js/header-loader.js?v=202606291812"></script>
+    <script src="js/header.js?v=202606291812"></script>
+    <script src="js/header-scroll.js?v=202606291812"></script>
+
+    <script src="http://localhost:3000/socket.io/socket.io.js"></script>
+
+    <script src="js/support.js?v=20260630"></script>
+    <script src="js/live-chat.js?v=20260630"></script>
+    <script src="js/pwa-fix.js?v=20260630"></script>
 </body>
 
 </html>

@@ -2,7 +2,6 @@ const adminUsersRoutes =
     require("./routes/adminUsers");
 const path = require("path");
 const helmet = require("helmet");
-const rateLimit = require("express-rate-limit");
 const dotenv = require("dotenv");
 const adminAuthRoutes =
     require("./routes/adminAuth");

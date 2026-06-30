@@ -2,6 +2,20 @@
 
 let currentOrderId = "";
 let lastStatus = "";
+let liveTrackingTimer = null;
+
+function trackingApiUrl(path) {
+    if (window.AZIEL?.apiUrl) {
+        return window.AZIEL.apiUrl(path);
+    }
+
+    const base =
+        location.port === "5500"
+            ? "http://localhost:3000"
+            : "";
+
+    return `${base}${path}`;
+}
 
 document.addEventListener("DOMContentLoaded", () => {
     const params = new URLSearchParams(window.location.search);
@@ -16,7 +30,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     btn?.addEventListener("click", () => {
-        const orderId = input.value.trim();
+        const orderId = input?.value.trim();
 
         if (!orderId) {
             showError("Please enter Order ID.");
@@ -26,17 +40,30 @@ document.addEventListener("DOMContentLoaded", () => {
         trackOrder(orderId);
     });
 
-    setInterval(checkLiveTracking, 5000);
+    loadRecentOrders();
+
+    liveTrackingTimer = setInterval(checkLiveTracking, 5000);
+});
+
+window.addEventListener("beforeunload", () => {
+    if (liveTrackingTimer) {
+        clearInterval(liveTrackingTimer);
+        liveTrackingTimer = null;
+    }
 });
 
 async function trackOrder(orderId) {
     const result = document.getElementById("trackingResult");
+    if (!result) return;
 
     currentOrderId = orderId;
     result.innerHTML = `<div class="loading-card">Checking order...</div>`;
 
     try {
-        const res = await fetch(`/api/order/track/${orderId}`);
+        const res = await fetch(
+            trackingApiUrl(`/api/order/track/${encodeURIComponent(orderId)}`)
+        );
+
         const data = await res.json();
 
         if (!data.success || !data.order) {
@@ -50,7 +77,6 @@ async function trackOrder(orderId) {
 
         result.innerHTML = `
             <div class="phone-track-card">
-
                 <div class="order-top">
                     <div>
                         <span class="mini-label">ORDER STATUS</span>
@@ -64,7 +90,7 @@ async function trackOrder(orderId) {
 
                 <div class="order-id-box">
                     <small>Order ID</small>
-                    <strong>${order.orderId || "-"}</strong>
+                    <strong>${escapeHTML(order.orderId || "-")}</strong>
                 </div>
 
                 <div class="order-info-grid">
@@ -96,12 +122,10 @@ async function trackOrder(orderId) {
                 </div>
 
                 <p class="order-note">
-                    ${order.note || "Please wait while we process your order."}
+                    ${escapeHTML(order.note || "Please wait while we process your order.")}
                 </p>
-
             </div>
         `;
-
     } catch (error) {
         console.log("Track order error:", error);
         showError("Server error.");
@@ -111,8 +135,8 @@ async function trackOrder(orderId) {
 function infoItem(label, value) {
     return `
         <div class="order-info-item">
-            <small>${label}</small>
-            <strong>${value}</strong>
+            <small>${escapeHTML(label)}</small>
+            <strong>${escapeHTML(value)}</strong>
         </div>
     `;
 }
@@ -124,8 +148,8 @@ function timelineStep(step, title, text, currentStatus) {
         <div class="track-step ${active}">
             <div class="step-dot"></div>
             <div>
-                <h4>${title}</h4>
-                <p>${text}</p>
+                <h4>${escapeHTML(title)}</h4>
+                <p>${escapeHTML(text)}</p>
             </div>
         </div>
     `;
@@ -174,7 +198,10 @@ async function checkLiveTracking() {
     if (!currentOrderId) return;
 
     try {
-        const res = await fetch(`/api/order/track/${currentOrderId}`);
+        const res = await fetch(
+            trackingApiUrl(`/api/order/track/${encodeURIComponent(currentOrderId)}`)
+        );
+
         const data = await res.json();
 
         if (!data.success || !data.order) return;
@@ -184,7 +211,6 @@ async function checkLiveTracking() {
             showTrackingPopup(data.order.status);
             trackOrder(currentOrderId);
         }
-
     } catch (error) {
         console.log("Live tracking error:", error);
     }
@@ -210,104 +236,70 @@ function showTrackingPopup(status) {
 
 function showError(message) {
     const result = document.getElementById("trackingResult");
+    if (!result) return;
 
     result.innerHTML = `
         <div class="error-msg">
-            ${message}
+            ${escapeHTML(message)}
         </div>
     `;
 }
-loadRecentOrders();
 
 async function loadRecentOrders() {
-
-    const box =
-        document.getElementById(
-            "recentTrackOrders"
-        );
-
+    const box = document.getElementById("recentTrackOrders");
     if (!box) return;
 
     const username =
+        window.AZIEL?.user?.username ||
         localStorage.getItem("username");
 
     if (!username) {
-
         box.innerHTML = `
             <p class="empty-orders">
                 Login required.
             </p>
         `;
-
         return;
     }
 
     try {
-
         const res = await fetch(
-            `/api/order/user/${username}`
+            trackingApiUrl(`/api/order/user/${encodeURIComponent(username)}`)
         );
 
         const data = await res.json();
 
         if (!data.success || !data.orders?.length) {
-
             box.innerHTML = `
                 <p class="empty-orders">
                     No recent orders.
                 </p>
             `;
-
             return;
         }
 
-        const recentOrders =
-            data.orders.slice(0, 5);
+        const recentOrders = data.orders.slice(0, 5);
 
-        box.innerHTML =
-            recentOrders.map(order => `
-
-                <div class="recent-order-item"
-                     onclick="trackRecentOrder('${order.orderId}')">
-
-                    <div class="recent-order-left">
-
-                        <h4>
-                            ${order.game || "Game"}
-                        </h4>
-
-                        <p>
-                            ${order.packageName || "-"}
-                        </p>
-
-                    </div>
-
-                    <div class="recent-order-status">
-                        ${formatStatus(
-                normalizeStatus(order.status)
-            )}
-                    </div>
-
+        box.innerHTML = recentOrders.map(order => `
+            <div class="recent-order-item"
+                 onclick="trackRecentOrder('${escapeHTML(order.orderId)}')">
+                <div class="recent-order-left">
+                    <h4>${escapeHTML(order.game || "Game")}</h4>
+                    <p>${escapeHTML(order.packageName || "-")}</p>
                 </div>
 
-            `).join("");
-
+                <div class="recent-order-status">
+                    ${formatStatus(normalizeStatus(order.status))}
+                </div>
+            </div>
+        `).join("");
     } catch (error) {
-
-        console.log(
-            "Recent orders error:",
-            error
-        );
-
+        console.log("Recent orders error:", error);
     }
 }
 
 function trackRecentOrder(orderId) {
-
-    const input =
-        document.getElementById(
-            "orderIdInput"
-        );
+    const input = document.getElementById("orderIdInput");
 
     if (input) {
         input.value = orderId;
@@ -319,4 +311,13 @@ function trackRecentOrder(orderId) {
         top: 0,
         behavior: "smooth"
     });
+}
+
+function escapeHTML(value) {
+    return String(value ?? "")
+        .replaceAll("&", "&amp")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
 }

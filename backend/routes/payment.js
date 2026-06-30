@@ -14,9 +14,11 @@ const PaymentMethod = require("../models/PaymentMethod");
 
 const wavepayService = require("../services/wavepayService");
 
-// ======================
-// HELPERS
-// ======================
+const isProduction = process.env.NODE_ENV === "production";
+
+function devLog(...args) {
+    if (!isProduction) console.log(...args);
+}
 
 function getCurrencyKey(currency) {
     return currency === "THB" ? "THB" : "MMK";
@@ -42,7 +44,6 @@ function createPromptPayCharge(amount, metadata = {}) {
                     },
                     (err, charge) => {
                         if (err) return reject(err);
-
                         resolve({ source, charge });
                     }
                 );
@@ -65,18 +66,11 @@ async function markWalletTopupPaid(req, topupId, transactionId = "") {
     const topup = await WalletTopup.findOne({ topupId });
 
     if (!topup) {
-        return {
-            success: false,
-            message: "Topup not found"
-        };
+        return { success: false, message: "Topup not found" };
     }
 
     if (topup.status === "paid" || topup.status === "completed") {
-        return {
-            success: true,
-            message: "Already paid",
-            topup
-        };
+        return { success: true, message: "Already paid", topup };
     }
 
     const currencyKey = getCurrencyKey(topup.currency);
@@ -92,10 +86,7 @@ async function markWalletTopupPaid(req, topupId, transactionId = "") {
     );
 
     if (!updatedUser) {
-        return {
-            success: false,
-            message: "User not found"
-        };
+        return { success: false, message: "User not found" };
     }
 
     topup.status = "paid";
@@ -150,14 +141,10 @@ async function markWalletTopupPaid(req, topupId, transactionId = "") {
     };
 }
 
-// ======================
 // GAME PAYMENT CREATE
-// POST /api/payment/create
-// ======================
-
 router.post("/payment/create", async (req, res) => {
     try {
-        console.log("PAYMENT CREATE BODY =", req.body);
+        devLog("PAYMENT CREATE BODY =", req.body);
 
         const {
             orderId,
@@ -200,10 +187,7 @@ router.post("/payment/create", async (req, res) => {
             .toLowerCase()
             .replace(/\s+/g, "");
 
-        if (
-            String(region).toUpperCase() === "TH" &&
-            methodKey.includes("promptpay")
-        ) {
+        if (String(region).toUpperCase() === "TH" && methodKey.includes("promptpay")) {
             const result = await createPromptPayCharge(Number(amount), {
                 type: "game_order",
                 orderId,
@@ -258,22 +242,12 @@ router.post("/payment/create", async (req, res) => {
     }
 });
 
-// ======================
 // WALLET PAYMENT CREATE
-// POST /api/wallet/create
-// ======================
-
 router.post("/wallet/create", async (req, res) => {
     try {
-        console.log("WALLET CREATE BODY =", req.body);
+        devLog("WALLET CREATE BODY =", req.body);
 
-        const {
-            username,
-            amount,
-            currency,
-            region,
-            paymentMethod
-        } = req.body;
+        const { username, amount, currency, region, paymentMethod } = req.body;
 
         if (!username || !amount || !paymentMethod) {
             return res.json({
@@ -312,10 +286,7 @@ router.post("/wallet/create", async (req, res) => {
             note: "Waiting for payment confirmation."
         });
 
-        if (
-            String(region).toUpperCase() === "TH" &&
-            methodKey.includes("promptpay")
-        ) {
+        if (String(region).toUpperCase() === "TH" && methodKey.includes("promptpay")) {
             const result = await createPromptPayCharge(Number(amount), {
                 type: "wallet_topup",
                 topupId,
@@ -360,11 +331,7 @@ router.post("/wallet/create", async (req, res) => {
     }
 });
 
-// ======================
 // WALLET STATUS
-// GET /api/wallet/status/:topupId
-// ======================
-
 router.get("/wallet/status/:topupId", async (req, res) => {
     try {
         const topup = await WalletTopup.findOne({
@@ -397,11 +364,7 @@ router.get("/wallet/status/:topupId", async (req, res) => {
     }
 });
 
-// ======================
 // PAYMENT METHODS
-// GET /api/payment-methods
-// ======================
-
 router.get("/payment-methods", async (req, res) => {
     try {
         const { region } = req.query;
@@ -409,8 +372,7 @@ router.get("/payment-methods", async (req, res) => {
         const filter = {};
         if (region) filter.region = region;
 
-        const methods = await PaymentMethod.find(filter)
-            .sort({ createdAt: 1 });
+        const methods = await PaymentMethod.find(filter).sort({ createdAt: 1 });
 
         res.json({
             success: true,
@@ -428,11 +390,7 @@ router.get("/payment-methods", async (req, res) => {
     }
 });
 
-// ======================
 // GAME PAYMENT STATUS
-// GET /api/payment/status/:orderId
-// ======================
-
 router.get("/payment/status/:orderId", async (req, res) => {
     try {
         const order = await Order.findOne({
@@ -462,30 +420,18 @@ router.get("/payment/status/:orderId", async (req, res) => {
     }
 });
 
-// ======================
 // WEBHOOK
-// POST /api/payment/webhook
-// ======================
-
 router.post("/payment/webhook", async (req, res) => {
-    console.log("WEBHOOK =", req.body);
+    devLog("WEBHOOK =", req.body);
 
     try {
         const data = req.body.data;
 
-        if (
-            req.body.key === "charge.complete" &&
-            data.status === "successful"
-        ) {
+        if (req.body.key === "charge.complete" && data.status === "successful") {
             const metadata = data.metadata || {};
 
             if (metadata.type === "wallet_topup") {
-                await markWalletTopupPaid(
-                    req,
-                    metadata.topupId,
-                    data.id
-                );
-
+                await markWalletTopupPaid(req, metadata.topupId, data.id);
                 return res.sendStatus(200);
             }
 
@@ -499,7 +445,7 @@ router.post("/payment/webhook", async (req, res) => {
                 order.note = "Payment received. Waiting for admin processing.";
                 await order.save();
 
-                console.log("GAME PAYMENT SUCCESS:", order.orderId);
+                devLog("GAME PAYMENT SUCCESS:", order.orderId);
             }
         }
 
@@ -511,57 +457,50 @@ router.post("/payment/webhook", async (req, res) => {
     }
 });
 
-// ======================
-// DEV ONLY: TEST GAME PAID
-// GET /api/payment/test-paid/:orderId
-// ======================
-
-router.get("/payment/test-paid/:orderId", async (req, res) => {
-    const order = await Order.findOne({
-        orderId: req.params.orderId
-    });
-
-    if (!order) {
-        return res.json({
-            success: false,
-            message: "Order not found"
+// DEV ONLY ROUTES
+if (!isProduction) {
+    router.get("/payment/test-paid/:orderId", async (req, res) => {
+        const order = await Order.findOne({
+            orderId: req.params.orderId
         });
-    }
 
-    order.status = "paid";
-    order.paidAt = new Date();
-    order.note = "Payment received. Waiting for admin processing.";
-    await order.save();
+        if (!order) {
+            return res.json({
+                success: false,
+                message: "Order not found"
+            });
+        }
 
-    res.json({
-        success: true,
-        orderId: order.orderId,
-        status: order.status
-    });
-});
-
-// ======================
-// DEV ONLY: TEST WALLET PAID
-// POST /api/wallet/test-paid/:topupId
-// ======================
-
-router.post("/wallet/test-paid/:topupId", async (req, res) => {
-    try {
-        const result = await markWalletTopupPaid(
-            req,
-            req.params.topupId
-        );
-
-        res.json(result);
-
-    } catch (error) {
-        console.log("Wallet test paid error:", error);
+        order.status = "paid";
+        order.paidAt = new Date();
+        order.note = "Payment received. Waiting for admin processing.";
+        await order.save();
 
         res.json({
-            success: false,
-            message: error.message || "Server error"
+            success: true,
+            orderId: order.orderId,
+            status: order.status
         });
-    }
-});
+    });
+
+    router.post("/wallet/test-paid/:topupId", async (req, res) => {
+        try {
+            const result = await markWalletTopupPaid(
+                req,
+                req.params.topupId
+            );
+
+            res.json(result);
+
+        } catch (error) {
+            console.log("Wallet test paid error:", error);
+
+            res.json({
+                success: false,
+                message: error.message || "Server error"
+            });
+        }
+    });
+}
 
 module.exports = router;

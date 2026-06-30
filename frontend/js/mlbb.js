@@ -1,4 +1,4 @@
-// frontend/js/mlbb.js - AZIEL V2.5 Semi-Auto Flow
+// frontend/js/mlbb.js - AZIEL V2.5 Semi-Auto Flow Cleaned
 
 document.addEventListener("DOMContentLoaded", () => {
     const buyBtn = document.getElementById("buyBtn");
@@ -31,7 +31,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 pack.dataset.name ||
                 pack.querySelector(".pack-name")?.innerText ||
                 "Package",
-
             amount: Number(pack.dataset.price || 0)
         };
 
@@ -51,12 +50,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     userIdInput?.addEventListener("input", updateState);
     serverIdInput?.addEventListener("input", updateState);
-
     document.addEventListener("paymentChanged", updateState);
 
     buyBtn?.addEventListener("click", async () => {
-
-        const token = localStorage.getItem("token");
+        const token =
+            window.AZIEL?.getToken?.() ||
+            localStorage.getItem("token") ||
+            sessionStorage.getItem("token");
 
         if (!token) {
             const pendingBuy = {
@@ -64,7 +64,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 selectedPackage: selectedPack,
                 userId: userIdInput?.value.trim() || "",
                 zoneId: serverIdInput?.value.trim() || "",
-                paymentMethod: document.getElementById("paymentMethod")?.value || "",
+                paymentMethod: window.selectedPaymentData?.key || "",
                 returnUrl: window.location.pathname
             };
 
@@ -75,13 +75,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (buyBtn.disabled || !selectedPack) return;
 
-        const username = localStorage.getItem("username") || "user";
+        const username =
+            window.AZIEL?.user?.username ||
+            localStorage.getItem("username") ||
+            "user";
+
         const region =
             window.AZIEL?.getShopRegion?.() || "MM";
 
-        const currency = region === "TH" ? "THB" : "MMK";
-        const paymentMethod =
-            document.getElementById("paymentMethod")?.value || "";
+        const currency =
+            window.AZIEL?.getShopCurrency?.() ||
+            (region === "TH" ? "THB" : "MMK");
+
+        const selectedPayment = window.selectedPaymentData || {};
+        const paymentMethod = selectedPayment.key || "";
 
         const orderId = "AZL-" + Date.now();
 
@@ -97,15 +104,14 @@ document.addEventListener("DOMContentLoaded", () => {
             userId: userIdInput.value.trim(),
             zoneId: serverIdInput.value.trim() || "-",
             status: "pending_payment",
-
-            paymentType: window.selectedPaymentData?.paymentType || "manual",
-            provider: window.selectedPaymentData?.provider || "manual",
+            paymentType: selectedPayment.paymentType || "manual",
+            provider: selectedPayment.provider || "manual"
         };
 
         showOrderLoading();
 
         try {
-            if (paymentMethod === "wallet") {
+            if (selectedPayment.key === "wallet") {
                 await payWithWallet(orderData);
                 return;
             }
@@ -116,9 +122,7 @@ document.addEventListener("DOMContentLoaded", () => {
             hideOrderLoading();
 
             showPaymentWaitingModal(orderData, paymentSession);
-
             startPaymentStatusPolling(orderId);
-
         } catch (error) {
             console.log("Payment create error:", error);
             hideOrderLoading();
@@ -129,49 +133,47 @@ document.addEventListener("DOMContentLoaded", () => {
     function updateState() {
         const userId = userIdInput?.value.trim();
         const serverId = serverIdInput?.value.trim();
-        const paymentMethod =
-            document.getElementById("paymentMethod")?.value || "";
-
-        const selectedPayment = window.selectedPaymentData;
+        const selectedPayment = window.selectedPaymentData || null;
+        const paymentMethod = selectedPayment?.key || "";
 
         if (selectedPack) {
-
-            const activePack =
-                document.querySelector(".pack.active");
+            const activePack = document.querySelector(".pack.active");
 
             if (activePack) {
-                selectedPack.amount =
-                    Number(activePack.dataset.price);
+                selectedPack.amount = Number(activePack.dataset.price || 0);
             }
 
-            summaryPackage.innerText =
-                selectedPack.name;
+            if (summaryPackage) {
+                summaryPackage.innerText = selectedPack.name;
+            }
 
-            const region =
-                window.AZIEL?.getShopRegion?.() || "MM";
+            const symbol =
+                window.AZIEL?.getShopSymbol?.() ||
+                ((window.AZIEL?.getShopRegion?.() || "MM") === "TH" ? "฿" : "Ks");
 
-            const currencySymbol =
-                region === "TH" ? "฿" : "Ks";
+            if (summaryAmount) {
+                summaryAmount.innerText =
+                    `${selectedPack.amount.toLocaleString()} ${symbol}`;
+            }
 
-            summaryAmount.innerText =
-                `${selectedPack.amount.toLocaleString()} ${currencySymbol}`;
-
-            selectedText.innerText =
-                "Ready to continue payment.";
-
+            if (selectedText) {
+                selectedText.innerText = "Ready to continue payment.";
+            }
         } else {
-            summaryPackage.innerText = "Not selected";
-            summaryAmount.innerText = "0";
-            selectedText.innerText = "Please select a package.";
+            if (summaryPackage) summaryPackage.innerText = "Not selected";
+            if (summaryAmount) summaryAmount.innerText = "0";
+            if (selectedText) selectedText.innerText = "Please select a package.";
         }
 
-        summaryPayment.innerText =
-            selectedPayment?.method ||
-            paymentMethod ||
-            "Not selected";
+        if (summaryPayment) {
+            summaryPayment.innerText =
+                selectedPayment?.method || "Not selected";
+        }
 
-        buyBtn.disabled =
-            !(userId && serverId && selectedPack && paymentMethod);
+        if (buyBtn) {
+            buyBtn.disabled =
+                !(userId && serverId && selectedPack && paymentMethod);
+        }
 
         if (userId && serverId && selectedPack && paymentMethod) {
             scrollToBuyNowOnce();
@@ -183,6 +185,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initMobilePackagePanel();
     initSuccessModal();
     updateState();
+
     window.addEventListener("aziel:shopRegionChanged", () => {
         const activePack = document.querySelector(".pack.active");
         const activeCode = activePack?.dataset.code;
@@ -205,6 +208,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         updateState();
     });
+
     window.addEventListener("aziel:ready", () => {
         if (window.renderGamePrices) {
             window.renderGamePrices();
@@ -230,7 +234,6 @@ document.addEventListener("DOMContentLoaded", () => {
             document.querySelectorAll("#packages .pack")
                 .forEach(pack => {
                     const row = pack.cloneNode(true);
-
                     row.classList.add("mobile-pack-row");
 
                     if (pack.classList.contains("active")) {
@@ -295,12 +298,11 @@ document.addEventListener("DOMContentLoaded", () => {
             "Selected Package";
 
         priceEl.innerText =
-            active.querySelector(".pack-price")?.innerText ||
-            "";
+            active.querySelector(".pack-price")?.innerText || "";
     }
 
     async function createPaymentSession(orderData) {
-        const res = await fetch("/api/payment/create", {
+        const res = await fetch(apiUrl("/api/payment/create"), {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
@@ -327,17 +329,18 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        document.getElementById("modalOrderId").innerText = orderData.orderId;
-        document.getElementById("modalGame").innerText = orderData.game;
-        document.getElementById("modalPackage").innerText = orderData.packageName;
-        document.getElementById("modalAmount").innerText =
-            `${orderData.amount.toLocaleString()} ${orderData.currency}`;
-        document.getElementById("modalPayment").innerText =
+        setText("modalOrderId", orderData.orderId);
+        setText("modalGame", orderData.game);
+        setText("modalPackage", orderData.packageName);
+        setText("modalAmount", `${orderData.amount.toLocaleString()} ${orderData.currency}`);
+        setText(
+            "modalPayment",
             paymentSession.paymentName ||
             window.selectedPaymentData?.method ||
-            orderData.paymentMethod;
-        document.getElementById("modalUserId").innerText = orderData.userId;
-        document.getElementById("modalZoneId").innerText = orderData.zoneId;
+            orderData.paymentMethod
+        );
+        setText("modalUserId", orderData.userId);
+        setText("modalZoneId", orderData.zoneId);
 
         const logo = document.getElementById("modalPaymentLogo");
         const qr = document.getElementById("modalQrImage");
@@ -356,17 +359,10 @@ document.addEventListener("DOMContentLoaded", () => {
             paymentSession.qrImage ||
             "";
 
-        const finalQr = qrPath
-            ? qrPath.startsWith("http")
-                ? qrPath
-                : `${window.location.origin}${qrPath}`
-            : "";
-
-        console.log("PAYMENT SESSION =", paymentSession);
-        console.log("FINAL QR =", finalQr);
+        const finalQr = normalizeUrl(qrPath);
 
         if (logo) {
-            logo.src = logoPath;
+            logo.src = normalizeUrl(logoPath);
             logo.style.display = logoPath ? "block" : "none";
         }
 
@@ -468,7 +464,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         paymentCheckTimer = setInterval(async () => {
             try {
-                const res = await fetch(`/api/payment/status/${orderId}`);
+                const res = await fetch(apiUrl(`/api/payment/status/${orderId}`));
                 const data = await res.json();
 
                 if (!data.success) return;
@@ -481,7 +477,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
                     showSuccessModal(orderId);
                 }
-
             } catch (error) {
                 console.log("Payment status check error:", error);
             }
@@ -496,13 +491,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 });
 
-// =========================
 // WALLET PAYMENT
-// =========================
-
 async function payWithWallet(orderData) {
     try {
-        const res = await fetch("/api/wallet/pay", {
+        const res = await fetch(apiUrl("/api/wallet/pay"), {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
@@ -521,7 +513,6 @@ async function payWithWallet(orderData) {
 
         window.location.href =
             `tracking.html?orderId=${orderData.orderId}`;
-
     } catch (error) {
         console.log(error);
         alert("Server error");
@@ -572,7 +563,10 @@ function showSuccessModal(orderId) {
     const text = modal.querySelector("p");
 
     if (title) title.innerText = "Payment Success";
-    if (text) text.innerText = "Your payment has been detected. Admin will process your top-up soon.";
+    if (text) {
+        text.innerText =
+            "Your payment has been detected. Admin will process your top-up soon.";
+    }
 
     modal.classList.add("show");
 }
@@ -593,6 +587,7 @@ function initSuccessModal() {
         });
     }
 }
+
 let paymentCountdownTimer = null;
 
 function startPaymentCountdown(seconds) {
@@ -628,4 +623,39 @@ function startPaymentCountdown(seconds) {
 
     updateTimer();
     paymentCountdownTimer = setInterval(updateTimer, 1000);
+}
+
+function apiUrl(path) {
+    if (window.AZIEL?.apiUrl) {
+        return window.AZIEL.apiUrl(path);
+    }
+
+    const base =
+        location.port === "5500"
+            ? "http://localhost:3000"
+            : "";
+
+    return `${base}${path}`;
+}
+
+function normalizeUrl(path) {
+    if (!path) return "";
+    if (path.startsWith("http")) return path;
+    if (path.startsWith("data:")) return path;
+
+    path = path.replace(/^\/+/, "");
+    path = path.replace(/^frontend\//, "");
+
+    if (location.port === "5500") {
+        return path;
+    }
+
+    return path.startsWith("assets/")
+        ? path
+        : `/${path}`;
+}
+
+function setText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.innerText = value || "";
 }

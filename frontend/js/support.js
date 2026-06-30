@@ -1,20 +1,33 @@
 // frontend/js/support.js
+// AZIEL V2.5 Support Ticket System
+// Live Chat is handled by frontend/js/live-chat.js
 
-let supportLiveStarted = false;
 let allTickets = [];
 let currentFilter = "all";
+let supportSocketStarted = false;
+
+function supportApiUrl(path) {
+    if (window.AZIEL?.apiUrl) {
+        return window.AZIEL.apiUrl(path);
+    }
+
+    const base =
+        location.port === "5500"
+            ? "http://localhost:3000"
+            : "";
+
+    return `${base}${path}`;
+}
 
 document.addEventListener("DOMContentLoaded", () => {
     initSupportForm();
     initCategoryCards();
     initTicketTabs();
-    startSupportLiveSystem();
+    startSupportSocket();
     loadMyTickets();
 });
 
-// ======================
 // INIT
-// ======================
 
 function initSupportForm() {
     document
@@ -53,7 +66,6 @@ function initTicketTabs() {
             );
 
             tab.classList.add("active");
-
             currentFilter = tab.dataset.filter || "all";
 
             renderTickets();
@@ -73,21 +85,21 @@ function getSubjectByType(type) {
     return subjects[type] || "Need help";
 }
 
-// ======================
 // SUBMIT TICKET
-// ======================
 
 async function submitSupportTicket(e) {
     e.preventDefault();
 
-    const username = localStorage.getItem("username");
+    const username =
+        window.AZIEL?.user?.username ||
+        localStorage.getItem("username");
 
     if (!username) {
         alert("Please login first");
         return;
     }
 
-    const msg = document.getElementById("supportMsg");
+    const form = document.getElementById("supportForm");
     const btn = document.getElementById("submitTicketBtn");
 
     const type = document.getElementById("ticketType")?.value;
@@ -102,8 +114,10 @@ async function submitSupportTicket(e) {
     }
 
     try {
-        btn.disabled = true;
-        btn.innerText = "Submitting...";
+        if (btn) {
+            btn.disabled = true;
+            btn.innerText = "Submitting...";
+        }
 
         const formData = new FormData();
 
@@ -120,7 +134,7 @@ async function submitSupportTicket(e) {
             formData.append("screenshot", screenshot);
         }
 
-        const res = await fetch("/api/support/ticket", {
+        const res = await fetch(supportApiUrl("/api/support/ticket"), {
             method: "POST",
             body: formData
         });
@@ -134,21 +148,21 @@ async function submitSupportTicket(e) {
 
         showFormMessage("✅ Support ticket submitted successfully", "success");
 
-        document.getElementById("supportForm").reset();
+        form?.reset();
 
         document.querySelectorAll(".category-card").forEach(c =>
             c.classList.remove("active")
         );
 
         await loadMyTickets();
-
     } catch (error) {
         console.log("Submit support error:", error);
         showFormMessage("Server error", "error");
-
     } finally {
-        btn.disabled = false;
-        btn.innerText = "🚀 Submit Ticket";
+        if (btn) {
+            btn.disabled = false;
+            btn.innerText = "🚀 Submit Ticket";
+        }
     }
 }
 
@@ -160,14 +174,14 @@ function showFormMessage(text, type) {
     msg.className = type === "success" ? "msg-success" : "msg-error";
 }
 
-// ======================
 // LOAD TICKETS
-// ======================
 
 async function loadMyTickets() {
-    const username = localStorage.getItem("username");
-    const box = document.getElementById("myTickets");
+    const username =
+        window.AZIEL?.user?.username ||
+        localStorage.getItem("username");
 
+    const box = document.getElementById("myTickets");
     if (!box) return;
 
     if (!username) {
@@ -183,19 +197,20 @@ async function loadMyTickets() {
     try {
         box.innerHTML = `<p class="loading-text">Loading tickets...</p>`;
 
-        const res = await fetch(`/api/support/my/${username}`);
+        const res = await fetch(
+            supportApiUrl(`/api/support/my/${encodeURIComponent(username)}`)
+        );
+
         const data = await res.json();
 
-        if (!data.success || !data.tickets || !data.tickets.length) {
+        if (!data.success || !data.tickets?.length) {
             allTickets = [];
             renderTickets();
             return;
         }
 
         allTickets = data.tickets;
-
         renderTickets();
-
     } catch (error) {
         console.log("Load tickets error:", error);
 
@@ -234,86 +249,98 @@ function renderTickets() {
     box.innerHTML = tickets.map(renderTicket).join("");
 }
 
-// ======================
-// RENDER TICKET CARD
-// ======================
+// RENDER
 
 function renderTicket(ticket) {
     const status = normalizeStatus(ticket.status);
     const type = ticket.type || "general";
 
     const screenshot = ticket.screenshot
-        ? `/uploads/support/${ticket.screenshot}`
+        ? normalizeUploadPath(`/uploads/support/${ticket.screenshot}`)
         : "";
 
     return `
         <div class="ticket-item">
             <div class="ticket-main">
-                <div class="ticket-icon ${type}">
+                <div class="ticket-icon ${escapeHTML(type)}">
                     ${getTypeIcon(type)}
                 </div>
 
                 <div class="ticket-info">
-                    <h3>${ticket.subject || "-"}</h3>
+                    <h3>${escapeHTML(ticket.subject || "-")}</h3>
 
                     <p>
                         <b>Ticket ID:</b>
-                        ${ticket.ticketId || "-"}
+                        ${escapeHTML(ticket.ticketId || "-")}
                     </p>
 
                     <p>
                         <b>Type:</b>
-                        ${formatType(type)}
+                        ${escapeHTML(formatType(type))}
                     </p>
 
                     ${ticket.orderId
-            ? `<p><b>Order ID:</b> ${ticket.orderId}</p>`
+            ? `<p><b>Order ID:</b> ${escapeHTML(ticket.orderId)}</p>`
             : ""
         }
 
                     <p class="ticket-message">
-                        ${ticket.message || ""}
+                        ${escapeHTML(ticket.message || "")}
                     </p>
                 </div>
 
-                <span class="ticket-status status-${status}">
-                    ${status}
+                <span class="ticket-status status-${escapeHTML(status)}">
+                    ${escapeHTML(status)}
                 </span>
             </div>
 
             ${screenshot
             ? `
-                    <img
-                        src="${screenshot}"
-                        class="ticket-image"
-                        onclick="window.open('${screenshot}', '_blank')"
-                    >
-                `
+                        <img
+                            src="${escapeHTML(screenshot)}"
+                            class="ticket-image"
+                            onclick="window.open('${escapeHTML(screenshot)}', '_blank')"
+                            alt="Support screenshot"
+                        >
+                    `
             : ""
         }
 
             ${ticket.adminReply
             ? `
-                    <div class="ticket-reply">
-                        <strong>👤 Admin Reply</strong>
-                        <p>${ticket.adminReply}</p>
-                    </div>
-                `
+                        <div class="ticket-reply">
+                            <strong>👤 Admin Reply</strong>
+                            <p>${escapeHTML(ticket.adminReply)}</p>
+                        </div>
+                    `
             : ""
         }
         </div>
     `;
 }
 
+function normalizeUploadPath(path) {
+    if (!path) return "";
+
+    if (path.startsWith("http")) return path;
+
+    if (location.port === "5500") {
+        return `http://localhost:3000${path}`;
+    }
+
+    return path;
+}
+
 function normalizeStatus(status) {
-    if (!status) return "open";
+    const value = String(status || "").toLowerCase();
 
-    if (status === "pending") return "open";
-    if (status === "answered") return "replied";
-    if (status === "reply") return "replied";
-    if (status === "done") return "solved";
+    if (!value) return "open";
+    if (value === "pending") return "open";
+    if (value === "answered") return "replied";
+    if (value === "reply") return "replied";
+    if (value === "done") return "solved";
 
-    return status;
+    return value;
 }
 
 function getTypeIcon(type) {
@@ -325,7 +352,7 @@ function getTypeIcon(type) {
         general: "🚨"
     };
 
-    return icons[type] || "null";
+    return icons[type] || "🚨";
 }
 
 function formatType(type) {
@@ -340,39 +367,39 @@ function formatType(type) {
     return names[type] || "General Help";
 }
 
-// ======================
-// LIVE SUPPORT
-// ======================
+// SUPPORT SOCKET ONLY
 
-function startSupportLiveSystem() {
-    if (supportLiveStarted) return;
-    supportLiveStarted = true;
+function startSupportSocket() {
+    if (supportSocketStarted) return;
+    supportSocketStarted = true;
 
     if (typeof io === "undefined") {
         console.log("Socket.IO not loaded for support");
         return;
     }
 
-    const username = localStorage.getItem("username");
+    const username =
+        window.AZIEL?.user?.username ||
+        localStorage.getItem("username");
 
     if (!username) return;
 
-    const socket = io();
+    const socket =
+        location.port === "5500"
+            ? io("http://localhost:3000")
+            : io();
 
     socket.emit("joinUser", username);
-    socket.emit("joinUserRoom", username);
 
     socket.on("newNotification", data => {
         if (data.title !== "Support Reply") return;
 
         showSupportPopup(data.message || "Admin replied to your ticket");
-
         loadMyTickets();
     });
 
     socket.on("supportUpdated", data => {
         showSupportPopup(data.message || "Your support ticket was updated");
-
         loadMyTickets();
     });
 }
@@ -383,10 +410,7 @@ function showSupportPopup(message) {
 
     const popup = document.createElement("div");
     popup.className = "support-live-popup";
-
-    popup.innerHTML = `
-         ${message}
-    `;
+    popup.innerHTML = escapeHTML(message);
 
     document.body.appendChild(popup);
 
@@ -403,245 +427,13 @@ function showSupportPopup(message) {
     }, 5000);
 }
 
+function escapeHTML(value) {
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
 window.loadMyTickets = loadMyTickets;
-// ======================================
-// FLOATING LIVE CHAT SYSTEM
-// ======================================
-
-document.addEventListener("DOMContentLoaded", () => {
-    createLiveChatUI();
-    initLiveChatBall();
-    initLiveChatSystem();
-});
-
-function createLiveChatUI() {
-    const ball = document.createElement("div");
-    ball.className = "chat-ball";
-    ball.innerHTML = `
-        <i class="fa-solid fa-comments"></i>
-        <div class="chat-badge">1</div>
-        <div class="online-dot"></div>
-    `;
-    document.body.appendChild(ball);
-
-    const panel = document.createElement("div");
-    panel.className = "live-chat-panel";
-
-    panel.innerHTML = `
-        <div class="chat-header">
-            <div class="chat-agent">
-                <div class="chat-agent-icon">
-                    <i class="fa-solid fa-headset"></i>
-                </div>
-                <div>
-                    <strong>AZIEL Live Support</strong>
-                    <small id="supportStatusText">Support Online</small>
-                </div>
-            </div>
-            <button class="chat-close-btn">✕</button>
-        </div>
-
-        <div class="chat-body" id="liveChatBody"></div>
-
-        <div class="chat-typing" id="chatTyping">
-            Admin is typing...
-        </div>
-
-        <div class="chat-input-row">
-            <input
-                type="text"
-                id="liveChatInput"
-                placeholder="Type your message..."
-            >
-            <button id="sendLiveChatBtn">
-                <i class="fa-solid fa-paper-plane"></i>
-            </button>
-        </div>
-    `;
-
-    document.body.appendChild(panel);
-
-    ball.addEventListener("click", () => {
-        panel.classList.toggle("open");
-        ball.classList.remove("has-unread");
-    });
-
-    panel.querySelector(".chat-close-btn")?.addEventListener("click", () => {
-        panel.classList.remove("open");
-    });
-}
-
-function initLiveChatBall() {
-    const ball = document.querySelector(".chat-ball");
-    if (!ball) return;
-
-    let isDragging = false;
-    let offsetX = 0;
-    let offsetY = 0;
-
-    ball.addEventListener("pointerdown", e => {
-        isDragging = true;
-        offsetX = e.clientX - ball.offsetLeft;
-        offsetY = e.clientY - ball.offsetTop;
-        ball.style.transition = "none";
-    });
-
-    window.addEventListener("pointermove", e => {
-        if (!isDragging) return;
-
-        ball.style.left = `${e.clientX - offsetX}px`;
-        ball.style.top = `${e.clientY - offsetY}px`;
-        ball.style.right = "auto";
-        ball.style.bottom = "auto";
-    });
-
-    window.addEventListener("pointerup", () => {
-        if (!isDragging) return;
-
-        isDragging = false;
-        ball.style.transition = ".2s";
-
-        const screenWidth = window.innerWidth;
-        const ballRect = ball.getBoundingClientRect();
-
-        if (ballRect.left < screenWidth / 2) {
-            ball.style.left = "0px";
-            ball.style.right = "auto";
-            ball.style.borderRadius = "0 18px 18px 0";
-        } else {
-            ball.style.left = "auto";
-            ball.style.right = "0px";
-            ball.style.borderRadius = "18px 0 0 18px";
-        }
-    });
-}
-
-function initLiveChatSystem() {
-    const input = document.getElementById("liveChatInput");
-    const sendBtn = document.getElementById("sendLiveChatBtn");
-
-    if (!input || !sendBtn) return;
-
-    loadLiveChatHistory();
-
-    sendBtn.addEventListener("click", sendLiveChatToAdmin);
-
-    input.addEventListener("keypress", e => {
-        if (e.key === "Enter") {
-            sendLiveChatToAdmin();
-        }
-    });
-
-    setInterval(loadLiveChatHistory, 5000);
-}
-
-async function sendLiveChatToAdmin() {
-    const input = document.getElementById("liveChatInput");
-
-    if (!input) return;
-
-    const message = input.value.trim();
-
-    if (!message) return;
-
-    addChatMessage("user", message);
-    input.value = "";
-
-    try {
-        const res = await fetch("/api/live-chat/send", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                username:
-                    localStorage.getItem("username") ||
-                    localStorage.getItem("userName") ||
-                    "Guest",
-                message
-            })
-        });
-
-        const data = await res.json();
-
-        if (!data.success) {
-            alert(data.message || "Live chat send failed");
-            return;
-        }
-
-        addChatMessage(
-            "bot",
-            "✅ Message sent to admin. Please wait for reply."
-        );
-
-    } catch (error) {
-        console.error("Live chat send error:", error);
-        alert("Server connection error");
-    }
-}
-
-function addChatMessage(type, text) {
-    const body = document.getElementById("liveChatBody");
-    if (!body) return;
-
-    const msg = document.createElement("div");
-    msg.className = `chat-message ${type}`;
-
-    msg.innerHTML = `
-        ${text}
-        <small>
-            ${new Date().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit"
-    })}
-        </small>
-    `;
-
-    body.appendChild(msg);
-    body.scrollTop = body.scrollHeight;
-}
-function initLiveChatSystem() {
-    const input = document.getElementById("liveChatInput");
-    const sendBtn = document.getElementById("sendLiveChatBtn");
-
-    if (!input || !sendBtn) return;
-
-    loadLiveChatHistory();
-
-    sendBtn.addEventListener("click", sendLiveChatToAdmin);
-
-    input.addEventListener("keypress", e => {
-        if (e.key === "Enter") {
-            sendLiveChatToAdmin();
-        }
-    });
-
-    setInterval(loadLiveChatHistory, 5000);
-} async function loadLiveChatHistory() {
-    const username =
-        localStorage.getItem("username") ||
-        localStorage.getItem("userName") ||
-        "Guest";
-
-    try {
-        const res = await fetch(`/api/live-chat/user/${username}`);
-        const data = await res.json();
-
-        if (!data.success || !data.chat) return;
-
-        const body = document.getElementById("liveChatBody");
-        if (!body) return;
-
-        body.innerHTML = "";
-
-        data.chat.messages.forEach(msg => {
-            addChatMessage(
-                msg.sender === "admin" ? "bot" : "user",
-                msg.text
-            );
-        });
-
-    } catch (error) {
-        console.log("Load live chat history error:", error);
-    }
-}

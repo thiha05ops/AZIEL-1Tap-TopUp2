@@ -67,8 +67,12 @@ const authMiddleware = async (req, res, next) => {
         }
 
         // Update active time on protected API use
-        user.lastActiveAt = now;
-        await user.save();
+        const oneHour = 60 * 60 * 1000;
+
+        if (!user.lastActiveAt || now - new Date(user.lastActiveAt) > oneHour) {
+            user.lastActiveAt = now;
+            await user.save();
+        }
 
         req.user = {
             id: user._id,
