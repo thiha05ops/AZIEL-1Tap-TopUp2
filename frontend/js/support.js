@@ -11,10 +11,9 @@ function supportApiUrl(path) {
         return window.AZIEL.apiUrl(path);
     }
 
-    const base =
-        location.port === "5500"
-            ? "http://localhost:3000"
-            : "";
+    const base = location.port === "5500"
+        ? "http://localhost:3000"
+        : "";
 
     return `${base}${path}`;
 }
@@ -23,26 +22,30 @@ document.addEventListener("DOMContentLoaded", () => {
     initSupportForm();
     initCategoryCards();
     initTicketTabs();
+    initFaq();
     startSupportSocket();
     loadMyTickets();
 });
 
-// INIT
+/* ===============================
+   INIT
+================================ */
 
 function initSupportForm() {
-    document
-        .getElementById("supportForm")
-        ?.addEventListener("submit", submitSupportTicket);
+    const form = document.getElementById("supportForm");
+    if (!form) return;
+
+    form.addEventListener("submit", submitSupportTicket);
 }
 
 function initCategoryCards() {
     document.querySelectorAll(".category-card").forEach(card => {
         card.addEventListener("click", () => {
-            const type = card.dataset.type;
+            const type = card.dataset.type || "general";
 
-            document.querySelectorAll(".category-card").forEach(c =>
-                c.classList.remove("active")
-            );
+            document.querySelectorAll(".category-card").forEach(item => {
+                item.classList.remove("active");
+            });
 
             card.classList.add("active");
 
@@ -50,7 +53,6 @@ function initCategoryCards() {
             if (select) select.value = type;
 
             const subject = document.getElementById("ticketSubject");
-
             if (subject && !subject.value.trim()) {
                 subject.value = getSubjectByType(type);
             }
@@ -61,13 +63,13 @@ function initCategoryCards() {
 function initTicketTabs() {
     document.querySelectorAll(".ticket-tab").forEach(tab => {
         tab.addEventListener("click", () => {
-            document.querySelectorAll(".ticket-tab").forEach(t =>
-                t.classList.remove("active")
-            );
+            document.querySelectorAll(".ticket-tab").forEach(item => {
+                item.classList.remove("active");
+            });
 
             tab.classList.add("active");
-            currentFilter = tab.dataset.filter || "all";
 
+            currentFilter = tab.dataset.filter || "all";
             renderTickets();
         });
     });
@@ -85,17 +87,76 @@ function getSubjectByType(type) {
     return subjects[type] || "Need help";
 }
 
-// SUBMIT TICKET
+const faqData = [
+    {
+        question: "My order is still pending",
+        answer: "Orders are usually completed within a few minutes after payment. If your order is still pending, submit a support ticket with your Order ID."
+    },
+    {
+        question: "Payment was successful but my order is not completed",
+        answer: "Payment confirmation may take a short time. If your order remains pending, contact support and include your payment details or Order ID."
+    },
+    {
+        question: "Wallet balance not updated",
+        answer: "Wallet balance updates automatically after successful payment. If the balance is not updated, create a ticket with your payment method and amount."
+    },
+    {
+        question: "I forgot my password",
+        answer: "Use the Forgot Password page to receive an OTP by email and reset your password securely."
+    },
+    {
+        question: "Can I cancel or refund my order?",
+        answer: "Orders that are already processed cannot usually be cancelled. For special cases, submit a support ticket and our team will review it."
+    },
+    {
+        question: "How long does support take to reply?",
+        answer: "Our support team replies as soon as possible during working hours. Order and payment issues are handled first."
+    }
+];
+
+function initFaq() {
+    renderFaq();
+
+    document.addEventListener("click", (e) => {
+        const btn = e.target.closest(".faq-question");
+        if (!btn) return;
+
+        const item = btn.closest(".faq-item");
+        if (!item) return;
+
+        item.classList.toggle("active");
+    });
+}
+
+function renderFaq() {
+    const box = document.getElementById("faqList");
+    if (!box) return;
+
+    box.innerHTML = faqData.map((faq, index) => `
+        <div class="faq-item ${index === 0 ? "active" : ""}">
+            <button class="faq-question" type="button">
+                <span>${escapeHTML(faq.question)}</span>
+                <i class="fa-solid fa-chevron-down"></i>
+            </button>
+
+            <div class="faq-answer">
+                ${escapeHTML(faq.answer)}
+            </div>
+        </div>
+    `).join("");
+}
+
+/* ===============================
+   SUBMIT TICKET
+================================ */
 
 async function submitSupportTicket(e) {
     e.preventDefault();
 
-    const username =
-        window.AZIEL?.user?.username ||
-        localStorage.getItem("username");
+    const username = getSupportUsername();
 
     if (!username) {
-        alert("Please login first");
+        showFormMessage("Please login first to submit a support ticket.", "error");
         return;
     }
 
@@ -114,10 +175,7 @@ async function submitSupportTicket(e) {
     }
 
     try {
-        if (btn) {
-            btn.disabled = true;
-            btn.innerText = "Submitting...";
-        }
+        setSubmitLoading(true);
 
         const formData = new FormData();
 
@@ -126,84 +184,95 @@ async function submitSupportTicket(e) {
         formData.append("subject", subject);
         formData.append("message", message);
 
-        if (orderId) {
-            formData.append("orderId", orderId);
-        }
-
-        if (screenshot) {
-            formData.append("screenshot", screenshot);
-        }
+        if (orderId) formData.append("orderId", orderId);
+        if (screenshot) formData.append("screenshot", screenshot);
 
         const res = await fetch(supportApiUrl("/api/support/ticket"), {
             method: "POST",
             body: formData
         });
 
-        const data = await res.json();
+        const data = await safeJson(res);
 
-        if (!data.success) {
-            showFormMessage(data.message || "Submit failed", "error");
+        if (!res.ok || !data.success) {
+            showFormMessage(data.message || "Submit failed. Please try again.", "error");
             return;
         }
 
-        showFormMessage("✅ Support ticket submitted successfully", "success");
+        showFormMessage("Support ticket submitted successfully.", "success");
 
         form?.reset();
-
-        document.querySelectorAll(".category-card").forEach(c =>
-            c.classList.remove("active")
-        );
+        resetCategoryCards();
 
         await loadMyTickets();
+
     } catch (error) {
         console.log("Submit support error:", error);
-        showFormMessage("Server error", "error");
+        showFormMessage("Server error. Please try again later.", "error");
     } finally {
-        if (btn) {
-            btn.disabled = false;
-            btn.innerText = "🚀 Submit Ticket";
-        }
+        setSubmitLoading(false);
     }
 }
 
-function showFormMessage(text, type) {
+function setSubmitLoading(isLoading) {
+    const btn = document.getElementById("submitTicketBtn");
+    if (!btn) return;
+
+    btn.disabled = isLoading;
+
+    btn.innerHTML = isLoading
+        ? `<i class="fa-solid fa-spinner fa-spin"></i> Submitting...`
+        : `<i class="fa-solid fa-paper-plane"></i> Submit Ticket`;
+}
+
+function resetCategoryCards() {
+    document.querySelectorAll(".category-card").forEach(card => {
+        card.classList.remove("active");
+    });
+
+    const first = document.querySelector('.category-card[data-type="order"]');
+    if (first) first.classList.add("active");
+
+    const select = document.getElementById("ticketType");
+    if (select) select.value = "order";
+}
+
+function showFormMessage(text, type = "info") {
     const msg = document.getElementById("supportMsg");
     if (!msg) return;
 
     msg.innerText = text;
-    msg.className = type === "success" ? "msg-success" : "msg-error";
+    msg.className = `support-msg ${type}`;
 }
 
-// LOAD TICKETS
+/* ===============================
+   LOAD TICKETS
+================================ */
 
 async function loadMyTickets() {
-    const username =
-        window.AZIEL?.user?.username ||
-        localStorage.getItem("username");
-
+    const username = getSupportUsername();
     const box = document.getElementById("myTickets");
+
     if (!box) return;
 
     if (!username) {
-        box.innerHTML = `
-            <div class="empty-ticket">
-                <h3>Please login first</h3>
-                <p>You need to login to view your support tickets.</p>
-            </div>
-        `;
+        box.innerHTML = renderEmptyState(
+            "Please login first",
+            "You need to login to view your support tickets."
+        );
         return;
     }
 
     try {
-        box.innerHTML = `<p class="loading-text">Loading tickets...</p>`;
+        box.innerHTML = renderTicketSkeleton();
 
         const res = await fetch(
             supportApiUrl(`/api/support/my/${encodeURIComponent(username)}`)
         );
 
-        const data = await res.json();
+        const data = await safeJson(res);
 
-        if (!data.success || !data.tickets?.length) {
+        if (!res.ok || !data.success || !Array.isArray(data.tickets) || !data.tickets.length) {
             allTickets = [];
             renderTickets();
             return;
@@ -211,15 +280,14 @@ async function loadMyTickets() {
 
         allTickets = data.tickets;
         renderTickets();
+
     } catch (error) {
         console.log("Load tickets error:", error);
 
-        box.innerHTML = `
-            <div class="empty-ticket">
-                <h3>Failed to load tickets</h3>
-                <p>Please try again later.</p>
-            </div>
-        `;
+        box.innerHTML = renderEmptyState(
+            "Failed to load tickets",
+            "Please check your connection and try again later."
+        );
     }
 }
 
@@ -227,101 +295,151 @@ function renderTickets() {
     const box = document.getElementById("myTickets");
     if (!box) return;
 
-    let tickets = allTickets;
+    let tickets = Array.isArray(allTickets) ? allTickets : [];
 
     if (currentFilter !== "all") {
-        tickets = allTickets.filter(ticket =>
+        tickets = tickets.filter(ticket =>
             normalizeStatus(ticket.status) === currentFilter
         );
     }
 
     if (!tickets.length) {
-        box.innerHTML = `
-            <div class="empty-ticket">
-                <div class="empty-icon">📭</div>
-                <h3>No tickets found</h3>
-                <p>Your support tickets will appear here.</p>
-            </div>
-        `;
+        box.innerHTML = renderEmptyState(
+            "No tickets found",
+            "Your support tickets will appear here after you submit a ticket."
+        );
         return;
     }
 
     box.innerHTML = tickets.map(renderTicket).join("");
 }
 
-// RENDER
+/* ===============================
+   RENDER TICKET
+================================ */
 
 function renderTicket(ticket) {
     const status = normalizeStatus(ticket.status);
     const type = ticket.type || "general";
-
-    const screenshot = ticket.screenshot
-        ? normalizeUploadPath(`/uploads/support/${ticket.screenshot}`)
-        : "";
+    const screenshot = getTicketScreenshot(ticket);
+    const createdAt = formatTicketDate(ticket.createdAt || ticket.updatedAt);
 
     return `
-        <div class="ticket-item">
-            <div class="ticket-main">
-                <div class="ticket-icon ${escapeHTML(type)}">
-                    ${getTypeIcon(type)}
-                </div>
+        <article class="ticket-item">
 
-                <div class="ticket-info">
-                    <h3>${escapeHTML(ticket.subject || "-")}</h3>
+            <div class="ticket-top">
 
-                    <p>
-                        <b>Ticket ID:</b>
-                        ${escapeHTML(ticket.ticketId || "-")}
-                    </p>
+                <div>
+                    <div class="ticket-title">
+                        ${getTypeIcon(type)}
+                        ${escapeHTML(ticket.subject || "Support Ticket")}
+                    </div>
 
-                    <p>
-                        <b>Type:</b>
+                    <div class="ticket-meta">
                         ${escapeHTML(formatType(type))}
-                    </p>
-
-                    ${ticket.orderId
-            ? `<p><b>Order ID:</b> ${escapeHTML(ticket.orderId)}</p>`
-            : ""
-        }
-
-                    <p class="ticket-message">
-                        ${escapeHTML(ticket.message || "")}
-                    </p>
+                        ${ticket.ticketId ? ` • ${escapeHTML(ticket.ticketId)}` : ""}
+                        ${createdAt ? ` • ${escapeHTML(createdAt)}` : ""}
+                    </div>
                 </div>
 
-                <span class="ticket-status status-${escapeHTML(status)}">
+                <span class="ticket-status ${escapeHTML(status)}">
                     ${escapeHTML(status)}
                 </span>
+
             </div>
 
-            ${screenshot
-            ? `
-                        <img
-                            src="${escapeHTML(screenshot)}"
-                            class="ticket-image"
-                            onclick="window.open('${escapeHTML(screenshot)}', '_blank')"
-                            alt="Support screenshot"
-                        >
-                    `
-            : ""
-        }
+            ${ticket.orderId ? `
+                <div class="ticket-meta">
+                    <strong>Order ID:</strong> ${escapeHTML(ticket.orderId)}
+                </div>
+            ` : ""}
 
-            ${ticket.adminReply
-            ? `
-                        <div class="ticket-reply">
-                            <strong>👤 Admin Reply</strong>
-                            <p>${escapeHTML(ticket.adminReply)}</p>
-                        </div>
-                    `
-            : ""
-        }
+            <p class="ticket-message">
+                ${escapeHTML(ticket.message || "")}
+            </p>
+
+            ${screenshot ? `
+                <img
+                    src="${escapeHTML(screenshot)}"
+                    class="ticket-image"
+                    onclick="window.open('${escapeHTML(screenshot)}', '_blank')"
+                    alt="Support screenshot"
+                >
+            ` : ""}
+
+            ${ticket.adminReply ? `
+                <div class="ticket-reply">
+                    <strong>Admin Reply</strong>
+                    <p>${escapeHTML(ticket.adminReply)}</p>
+                </div>
+            ` : ""}
+
+        </article>
+    `;
+}
+
+function renderEmptyState(title, text) {
+    return `
+        <div class="empty-tickets">
+            <strong>${escapeHTML(title)}</strong>
+            <p>${escapeHTML(text)}</p>
         </div>
     `;
 }
 
+function renderTicketSkeleton() {
+    return `
+        <div class="ticket-item">
+            <div class="ticket-top">
+                <div>
+                    <div class="ticket-title">Loading tickets...</div>
+                    <div class="ticket-meta">Please wait</div>
+                </div>
+            </div>
+        </div>
+        <div class="ticket-item">
+            <div class="ticket-top">
+                <div>
+                    <div class="ticket-title">Checking ticket status...</div>
+                    <div class="ticket-meta">Syncing support data</div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+/* ===============================
+   HELPERS
+================================ */
+
+function getSupportUsername() {
+    return (
+        window.AZIEL?.user?.username ||
+        localStorage.getItem("username") ||
+        localStorage.getItem("azielUsername")
+    );
+}
+
+async function safeJson(res) {
+    try {
+        return await res.json();
+    } catch {
+        return {};
+    }
+}
+
+function getTicketScreenshot(ticket) {
+    if (!ticket?.screenshot) return "";
+
+    const path = ticket.screenshot.startsWith("/uploads")
+        ? ticket.screenshot
+        : `/uploads/support/${ticket.screenshot}`;
+
+    return normalizeUploadPath(path);
+}
+
 function normalizeUploadPath(path) {
     if (!path) return "";
-
     if (path.startsWith("http")) return path;
 
     if (location.port === "5500") {
@@ -345,14 +463,14 @@ function normalizeStatus(status) {
 
 function getTypeIcon(type) {
     const icons = {
-        order: "🎮",
-        payment: "💳",
-        wallet: "💰",
-        account: "👤",
-        general: "🚨"
+        order: `<i class="fa-solid fa-gamepad"></i>`,
+        payment: `<i class="fa-solid fa-credit-card"></i>`,
+        wallet: `<i class="fa-solid fa-wallet"></i>`,
+        account: `<i class="fa-solid fa-user-shield"></i>`,
+        general: `<i class="fa-solid fa-circle-question"></i>`
     };
 
-    return icons[type] || "🚨";
+    return icons[type] || icons.general;
 }
 
 function formatType(type) {
@@ -367,41 +485,62 @@ function formatType(type) {
     return names[type] || "General Help";
 }
 
-// SUPPORT SOCKET ONLY
+function formatTicketDate(value) {
+    if (!value) return "";
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+
+    return date.toLocaleString([], {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+    });
+}
+
+/* ===============================
+   SOCKET
+================================ */
 
 function startSupportSocket() {
     if (supportSocketStarted) return;
     supportSocketStarted = true;
 
-    if (typeof io === "undefined") {
-        console.log("Socket.IO not loaded for support");
-        return;
-    }
-
-    const username =
-        window.AZIEL?.user?.username ||
-        localStorage.getItem("username");
-
+    const username = getSupportUsername();
     if (!username) return;
 
-    const socket =
-        location.port === "5500"
-            ? io("http://localhost:3000")
-            : io();
+    const socket = getSupportSocket();
+    if (!socket) return;
 
     socket.emit("joinUser", username);
 
     socket.on("newNotification", data => {
-        if (data.title !== "Support Reply") return;
+        if (data?.title !== "Support Reply") return;
 
         showSupportPopup(data.message || "Admin replied to your ticket");
         loadMyTickets();
     });
 
     socket.on("supportUpdated", data => {
-        showSupportPopup(data.message || "Your support ticket was updated");
+        showSupportPopup(data?.message || "Your support ticket was updated");
         loadMyTickets();
     });
+}
+
+function getSupportSocket() {
+    if (window.AZIEL?.socket) {
+        return window.AZIEL.socket;
+    }
+
+    if (typeof io === "undefined") {
+        console.log("Socket.IO not loaded for support");
+        return null;
+    }
+
+    return location.port === "5500"
+        ? io("http://localhost:3000")
+        : io();
 }
 
 function showSupportPopup(message) {
@@ -416,16 +555,20 @@ function showSupportPopup(message) {
 
     setTimeout(() => {
         popup.classList.add("show");
-    }, 100);
+    }, 80);
 
     setTimeout(() => {
         popup.classList.remove("show");
 
         setTimeout(() => {
             popup.remove();
-        }, 400);
-    }, 5000);
+        }, 350);
+    }, 4500);
 }
+
+/* ===============================
+   SECURITY
+================================ */
 
 function escapeHTML(value) {
     return String(value ?? "")

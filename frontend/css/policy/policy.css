@@ -4,7 +4,7 @@ body {
     min-height: 100vh;
     background:
         radial-gradient(circle at top right, rgba(124, 58, 237, .22), transparent 32%),
-        linear-gradient(180deg, var(--bg), var(--page-bg));
+        linear-gradient(180deg, var(--bg), var(--bg-soft));
     color: var(--text);
 }
 
@@ -29,7 +29,7 @@ body {
 .policy-header h1 {
     font-size: clamp(42px, 7vw, 76px);
     line-height: 1;
-    color: var(--heading);
+    color: var(--text);
     letter-spacing: -2px;
 }
 
@@ -45,12 +45,12 @@ body {
     border-radius: 26px;
     background: var(--surface);
     border: 1px solid var(--border);
-    box-shadow: var(--shadow);
+    box-shadow: var(--shadow-md);
     backdrop-filter: blur(18px);
 }
 
 .policy-card h2 {
-    color: var(--heading);
+    color: var(--text);
     margin-bottom: 12px;
     font-size: 24px;
 }
@@ -79,7 +79,7 @@ body {
     padding: 0 20px;
     align-items: center;
     border-radius: 16px;
-    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    background: linear-gradient(135deg, var(--primary), var(--primary-hover));
     color: #fff;
     text-decoration: none;
     font-weight: 900;

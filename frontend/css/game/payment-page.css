@@ -1,9 +1,18 @@
+/* =========================
+   AZIEL PAYMENT PAGE V2.5
+   Shared Theme Compatible
+========================= */
+
 body {
+    color: var(--text);
     background:
         radial-gradient(circle at top right, rgba(124, 58, 237, .18), transparent 30%),
-        linear-gradient(180deg, #0b1020, #0f172a);
-    color: #f8fafc;
+        linear-gradient(180deg, var(--bg), var(--bg-soft));
 }
+
+/* =========================
+   WRAPPER
+========================= */
 
 .payment-wrap {
     width: min(980px, 92%);
@@ -11,88 +20,126 @@ body {
 }
 
 .payment-card {
-    background: rgba(21, 29, 49, .96);
-    border: 1px solid rgba(255, 255, 255, .07);
-    border-radius: 30px;
     padding: 28px;
-    box-shadow: 0 16px 50px rgba(0, 0, 0, .35);
+
+    border-radius: 30px;
+
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+
+    box-shadow: var(--shadow-lg);
+    backdrop-filter: blur(18px);
 }
 
 .back-btn {
     display: inline-flex;
+
     margin-bottom: 20px;
-    color: #c084fc;
+
+    color: var(--primary);
     text-decoration: none;
     font-weight: 900;
 }
 
 .payment-card h1 {
-    font-size: 38px;
     margin-bottom: 8px;
+
+    color: var(--text);
+    font-size: 38px;
 }
 
 .sub-text {
-    color: #94a3b8;
     margin-bottom: 22px;
+
+    color: var(--text-muted);
 }
+
+/* =========================
+   ORDER INFO
+========================= */
 
 .order-info {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 12px;
+
     margin-bottom: 22px;
 }
 
 .order-info p {
-    background: rgba(255, 255, 255, .04);
-    border: 1px solid rgba(255, 255, 255, .06);
-    border-radius: 16px;
     padding: 13px 14px;
-    color: #cbd5e1;
+
+    border-radius: 16px;
+
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
 }
 
 .order-info b {
-    color: #fff;
+    color: var(--text);
 }
 
+/* =========================
+   QR SECTION
+========================= */
+
 .qr-section {
-    text-align: center;
-    background: rgba(255, 255, 255, .04);
-    border: 1px solid rgba(255, 255, 255, .06);
-    border-radius: 24px;
     padding: 24px;
     margin-bottom: 20px;
+
+    text-align: center;
+
+    border-radius: 24px;
+
+    background: var(--surface);
+    border: 1px solid var(--border);
 }
 
 #qrImage {
     width: 230px;
     max-width: 100%;
-    border-radius: 20px;
+
     margin: 0 auto 16px;
-    background: #fff;
     padding: 10px;
+
+    border-radius: 20px;
+
+    background: #fff;
 }
 
 #paymentName {
-    font-size: 24px;
     margin-bottom: 6px;
+
+    color: var(--text);
+    font-size: 24px;
 }
 
 .qr-section p {
-    color: #94a3b8;
+    color: var(--text-muted);
 }
 
+/* =========================
+   UPLOAD
+========================= */
+
 .upload-box {
+    min-height: 90px;
+
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 90px;
+
+    margin-bottom: 18px;
+
     border: 1px dashed rgba(168, 85, 247, .45);
     border-radius: 22px;
+
     background: rgba(168, 85, 247, .08);
+    color: var(--text);
+
     cursor: pointer;
-    margin-bottom: 18px;
-    color: #fff;
     font-weight: 900;
 }
 
@@ -100,16 +147,65 @@ body {
     display: none;
 }
 
+.slip-preview-box {
+    position: relative;
+
+    margin-top: 14px;
+
+    height: 140px;
+
+    border-radius: 18px;
+    overflow: hidden;
+
+    border: 1px solid var(--border);
+    background: var(--surface);
+}
+
+#slipPreviewImage {
+    width: 100%;
+    height: 100%;
+
+    object-fit: cover;
+    display: block;
+}
+
+#removeSlipBtn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+
+    width: 34px;
+    height: 34px;
+
+    border: none;
+    border-radius: 50%;
+
+    background: rgba(0, 0, 0, .65);
+    color: #fff;
+
+    cursor: pointer;
+    z-index: 2;
+}
+
+/* =========================
+   SUBMIT
+========================= */
+
 #submitPaymentBtn {
     width: 100%;
     height: 56px;
+
     border: none;
     border-radius: 18px;
-    background: linear-gradient(135deg, #7c3aed, #a855f7);
+
+    background: linear-gradient(135deg, var(--primary), var(--primary-hover));
     color: #fff;
+
     font-weight: 900;
     font-size: 16px;
+
     cursor: pointer;
+    box-shadow: 0 16px 34px rgba(124, 58, 237, .24);
 }
 
 #paymentMsg {
@@ -118,49 +214,61 @@ body {
 }
 
 .error-msg {
-    color: #f87171;
+    color: var(--danger);
 }
 
 .success-msg {
-    color: #4ade80;
+    color: var(--success);
 }
+
+/* =========================
+   AFTER ACTIONS
+========================= */
 
 .after-actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 12px;
+
     margin-top: 16px;
 }
 
 .after-actions button {
     height: 48px;
+
     border: none;
     border-radius: 14px;
+
     font-weight: 900;
     cursor: pointer;
 }
 
 #backGameBtn {
-    background: rgba(255, 255, 255, .08);
-    color: #fff;
+    background: rgba(139, 92, 246, .12);
+    color: var(--primary);
 }
 
 #viewHistoryBtn {
-    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    background: linear-gradient(135deg, var(--primary), var(--primary-hover));
     color: #fff;
 }
 
-/* Loading + Success modal */
+/* =========================
+   LOADING + SUCCESS MODAL
+========================= */
+
 .order-loading-overlay,
 .success-modal {
     position: fixed;
     inset: 0;
     z-index: 999999;
-    background: rgba(2, 6, 23, .72);
-    backdrop-filter: blur(10px);
+
     display: none;
     align-items: center;
     justify-content: center;
+
+    background: rgba(0, 0, 0, .58);
+    backdrop-filter: blur(12px);
 }
 
 .order-loading-overlay.show,
@@ -171,26 +279,36 @@ body {
 .order-loading-box,
 .success-modal-box {
     width: min(340px, calc(100% - 40px));
+
     padding: 28px 22px;
+
     border-radius: 26px;
-    background: rgba(21, 29, 49, .96);
-    border: 1px solid rgba(255, 255, 255, .08);
+
     text-align: center;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, .35);
+
+    background: var(--surface-strong);
+    border: 1px solid var(--border);
+    color: var(--text);
+
+    box-shadow: var(--shadow-lg);
 }
 
 .order-loading-dots {
     display: flex;
     justify-content: center;
     gap: 8px;
+
     margin-bottom: 18px;
 }
 
 .order-loading-dots span {
     width: 12px;
     height: 12px;
+
     border-radius: 4px;
-    background: #a855f7;
+
+    background: var(--primary);
+
     animation: loadingDots .8s infinite alternate;
 }
 
@@ -221,26 +339,32 @@ body {
 .success-icon {
     width: 72px;
     height: 72px;
+
     margin: 0 auto 18px;
+
     border-radius: 24px;
-    background: linear-gradient(135deg, #7c3aed, #a855f7);
+
+    background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+    color: #fff;
+
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #fff;
+
     font-size: 34px;
     font-weight: 900;
 }
 
 .success-modal-box h2,
 .order-loading-box h3 {
-    color: #fff;
     margin-bottom: 8px;
+
+    color: var(--text);
 }
 
 .success-modal-box p,
 .order-loading-box p {
-    color: #94a3b8;
+    color: var(--text-muted);
     font-size: 14px;
     line-height: 1.5;
 }
@@ -248,97 +372,35 @@ body {
 .success-actions {
     display: flex;
     gap: 10px;
+
     margin-top: 22px;
 }
 
 .success-actions button {
     flex: 1;
     height: 48px;
+
     border: none;
     border-radius: 14px;
+
     font-weight: 900;
     cursor: pointer;
 }
 
 #trackOrderBtn {
-    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    background: linear-gradient(135deg, var(--primary), var(--primary-hover));
     color: #fff;
 }
 
 #backHomeBtn {
-    background: rgba(255, 255, 255, .08);
-    color: #fff;
+    background: rgba(139, 92, 246, .12);
+    color: var(--primary);
 }
 
-@media (max-width: 768px) {
-    .payment-wrap {
-        width: calc(100% - 24px);
-        margin-top: 16px;
-    }
+/* =========================
+   UPLOAD STEPS
+========================= */
 
-    .payment-card {
-        padding: 18px;
-        border-radius: 24px;
-    }
-
-    .payment-card h1 {
-        font-size: 28px;
-    }
-
-    .order-info {
-        grid-template-columns: 1fr;
-    }
-
-    #qrImage {
-        width: 200px;
-    }
-}
-
-.slip-preview-box {
-    margin-top: 14px;
-
-    height: 140px;
-
-    border-radius: 18px;
-    overflow: hidden;
-
-    border: 1px solid rgba(255, 255, 255, .08);
-
-    background: rgba(255, 255, 255, .04);
-}
-
-#slipPreviewImage {
-    width: 100%;
-    height: 100%;
-
-    object-fit: cover;
-    display: block;
-}
-
-.slip-preview-box {
-    position: relative;
-}
-
-#removeSlipBtn {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-
-    width: 34px;
-    height: 34px;
-
-    border: none;
-    border-radius: 50%;
-
-    background: rgba(0, 0, 0, .65);
-    color: #fff;
-
-    cursor: pointer;
-
-    z-index: 2;
-}
-
-/* UPLOAD STEPS */
 .upload-steps {
     margin-top: 18px;
 
@@ -356,9 +418,8 @@ body {
 
     border-radius: 16px;
 
-    background: rgba(255, 255, 255, .04);
-
-    border: 1px solid rgba(255, 255, 255, .06);
+    background: var(--surface);
+    border: 1px solid var(--border);
 
     opacity: .45;
 
@@ -369,7 +430,6 @@ body {
     opacity: 1;
 
     border-color: rgba(168, 85, 247, .45);
-
     background: rgba(168, 85, 247, .08);
 }
 
@@ -379,7 +439,7 @@ body {
 
     border-radius: 6px;
 
-    background: #a855f7;
+    background: var(--primary);
 
     animation: stepPulse .8s infinite alternate;
 }
@@ -397,7 +457,40 @@ body {
 }
 
 .upload-step p {
-    color: #fff;
+    color: var(--text);
     font-size: 14px;
     font-weight: 700;
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 768px) {
+    .payment-wrap {
+        width: calc(100% - 24px);
+        margin-top: 16px;
+    }
+
+    .payment-card {
+        padding: 18px;
+        border-radius: 24px;
+    }
+
+    .payment-card h1 {
+        font-size: 28px;
+    }
+
+    .order-info,
+    .after-actions {
+        grid-template-columns: 1fr;
+    }
+
+    #qrImage {
+        width: 200px;
+    }
+
+    .success-actions {
+        flex-direction: column;
+    }
 }

@@ -1,23 +1,28 @@
-/* AZIEL V2.5 Payment Grid */
+/* =========================
+   AZIEL V2.5 PAYMENT GRID
+   Shared Theme Compatible
+========================= */
 
 .payment-grid {
+    width: 100%;
+
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     gap: 12px;
-    width: 100%;
 }
 
 .pay-card {
     position: relative;
+
     min-height: 108px;
     padding: 16px 12px;
+
     border-radius: 20px;
 
-    background: linear-gradient(180deg,
-            rgba(255, 255, 255, .06),
-            rgba(255, 255, 255, .025));
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
 
-    border: 1px solid rgba(255, 255, 255, .08);
     cursor: pointer;
 
     display: flex;
@@ -32,11 +37,11 @@
 .pay-card:hover {
     transform: translateY(-3px);
     border-color: rgba(168, 85, 247, .45);
-    box-shadow: 0 14px 30px rgba(0, 0, 0, .25);
+    box-shadow: var(--shadow-md);
 }
 
 .pay-card.active {
-    border-color: #a855f7;
+    border-color: var(--primary);
     background: rgba(168, 85, 247, .14);
     box-shadow:
         0 0 0 1px rgba(168, 85, 247, .35),
@@ -45,16 +50,18 @@
 
 .pay-card.active::after {
     content: "✓";
+
     position: absolute;
     top: 10px;
     right: 10px;
 
     width: 22px;
     height: 22px;
+
     border-radius: 50%;
 
-    background: #22c55e;
-    color: white;
+    background: var(--success);
+    color: #fff;
 
     display: grid;
     place-items: center;
@@ -67,9 +74,11 @@
 .pay-card img {
     width: 58px;
     height: 42px;
+
     object-fit: contain;
     margin: 0;
-    filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .35));
+
+    filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .22));
 }
 
 .pay-info {
@@ -77,42 +86,48 @@
     flex-direction: column;
     align-items: center;
     gap: 4px;
+
     text-align: center;
 }
 
 .pay-info span {
-    color: #fff;
+    color: var(--text);
     font-size: 13px;
     font-weight: 900;
 }
 
 .auto-pay-badge,
 .manual-pay-badge {
+    padding: 4px 8px;
+
+    border-radius: 999px;
+
     font-size: 10px;
     font-weight: 900;
-    padding: 4px 8px;
-    border-radius: 999px;
 }
 
 .auto-pay-badge {
-    color: #86efac;
+    color: var(--success);
     background: rgba(34, 197, 94, .12);
 }
 
 .manual-pay-badge {
-    color: #fde68a;
+    color: var(--warning);
     background: rgba(250, 204, 21, .12);
 }
 
 .pay-loading,
 .pay-empty,
 .pay-error {
-    color: #94a3b8;
-    font-size: 13px;
     padding: 12px 0;
+
+    color: var(--text-muted);
+    font-size: 13px;
 }
 
-/* QR Confirm Modal */
+/* =========================
+   QR CONFIRM MODAL
+========================= */
 
 .payment-confirm-modal {
     position: fixed;
@@ -124,7 +139,8 @@
     justify-content: center;
 
     padding: 16px;
-    background: rgba(2, 6, 23, .82);
+
+    background: rgba(0, 0, 0, .58);
     backdrop-filter: blur(14px);
 }
 
@@ -137,16 +153,18 @@
 
     width: min(430px, 100%);
     max-height: 88vh;
+
     overflow-y: auto;
 
     padding: 20px;
+
     border-radius: 26px;
 
-    color: #fff;
-    background: linear-gradient(180deg, #111827, #0f172a);
+    color: var(--text);
+    background: var(--surface-strong);
     border: 1px solid rgba(168, 85, 247, .35);
 
-    box-shadow: 0 24px 80px rgba(0, 0, 0, .55);
+    box-shadow: var(--shadow-lg);
 }
 
 .payment-modal-close {
@@ -157,11 +175,11 @@
     width: 34px;
     height: 34px;
 
-    border: 0;
+    border: none;
     border-radius: 50%;
 
-    background: rgba(239, 68, 68, .95);
-    color: white;
+    background: var(--danger);
+    color: #fff;
 
     font-size: 18px;
     cursor: pointer;
@@ -169,8 +187,9 @@
 
 .payment-confirm-box h2 {
     margin: 0 42px 14px 0;
+
+    color: var(--primary);
     font-size: 25px;
-    color: #c084fc;
 }
 
 .payment-modal-summary {
@@ -178,8 +197,9 @@
     padding: 14px;
 
     border-radius: 16px;
-    background: rgba(255, 255, 255, .045);
-    border: 1px solid rgba(255, 255, 255, .06);
+
+    background: var(--surface);
+    border: 1px solid var(--border);
 }
 
 .payment-modal-summary p {
@@ -188,16 +208,17 @@
     gap: 12px;
 
     margin: 7px 0;
-    color: #cbd5e1;
+
+    color: var(--text-muted);
     font-size: 13px;
 }
 
 .payment-modal-summary b {
-    color: #94a3b8;
+    color: var(--text-muted);
 }
 
 .payment-modal-summary span {
-    color: #fff;
+    color: var(--text);
     font-weight: 800;
     text-align: right;
 }
@@ -209,8 +230,10 @@
 #modalPaymentLogo {
     width: 90px;
     height: 46px;
+
     object-fit: contain;
     display: block;
+
     margin: 6px auto 10px;
 }
 
@@ -232,9 +255,40 @@
 #modalAccountName,
 #modalAccountNumber {
     margin: 6px 0;
-    color: #cbd5e1;
+
+    color: var(--text-muted);
     font-size: 13px;
     font-weight: 800;
+}
+
+.payment-amount-big {
+    margin: 10px auto 0;
+
+    text-align: center;
+
+    color: var(--warning);
+    font-size: 28px;
+    font-weight: 950;
+}
+
+.payment-timer {
+    margin-top: 10px;
+
+    text-align: center;
+
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.payment-timer span {
+    display: block;
+
+    margin-top: 4px;
+
+    color: var(--danger);
+    font-size: 22px;
+    font-weight: 950;
 }
 
 #confirmPaymentOrderBtn {
@@ -243,21 +297,37 @@
 
     margin-top: 14px;
 
-    border: 0;
+    border: none;
     border-radius: 16px;
 
-    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    background: linear-gradient(135deg, var(--primary), var(--primary-hover));
     color: #fff;
 
     font-weight: 900;
     cursor: default;
+
+    animation: azPulse 1.4s infinite;
 }
 
 #confirmPaymentOrderBtn:disabled {
     opacity: .85;
 }
 
-/* Mobile */
+@keyframes azPulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: .65;
+    }
+}
+
+/* =========================
+   MOBILE
+========================= */
 
 @media (max-width: 768px) {
     .payment-grid {
@@ -269,6 +339,7 @@
     .pay-card {
         min-height: 58px;
         padding: 10px 14px;
+
         border-radius: 16px;
 
         flex-direction: row;
@@ -319,44 +390,4 @@
         width: 210px;
         height: 210px;
     }
-}
-
-#confirmPaymentOrderBtn {
-    animation: azPulse 1.4s infinite;
-}
-
-@keyframes azPulse {
-
-    0%,
-    100% {
-        opacity: 1;
-    }
-
-    50% {
-        opacity: .65;
-    }
-}
-
-.payment-amount-big {
-    margin: 10px auto 0;
-    text-align: center;
-    color: #facc15;
-    font-size: 28px;
-    font-weight: 950;
-}
-
-.payment-timer {
-    margin-top: 10px;
-    text-align: center;
-    color: #94a3b8;
-    font-size: 13px;
-    font-weight: 800;
-}
-
-.payment-timer span {
-    display: block;
-    margin-top: 4px;
-    color: #ef4444;
-    font-size: 22px;
-    font-weight: 950;
 }

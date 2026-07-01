@@ -1,14 +1,9 @@
-// frontend/js/header.js - AZIEL V2.5 Global Header Renderer
+// frontend/js/header.js - AZIEL V2.5 Global Header
 
 document.addEventListener("DOMContentLoaded", () => {
-    renderHeader();
-    initAutoRevealNav();
+    initHeader();
 
-    window.addEventListener("aziel:headerLoaded", () => {
-        renderHeader();
-        initAutoRevealNav();
-    });
-
+    window.addEventListener("aziel:headerLoaded", initHeader);
     window.addEventListener("aziel:ready", renderHeader);
     window.addEventListener("aziel:userChanged", renderHeader);
     window.addEventListener("aziel:walletChanged", renderHeader);
@@ -24,11 +19,18 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 });
 
+function initHeader() {
+    renderHeader();
+    initProfileDropdown();
+    initThemeButton();
+    initHeaderLogout();
+    initAutoRevealNav();
+}
+
 function renderHeader() {
     const walletText = document.getElementById("headerWalletText");
     const avatarText = document.getElementById("avatarText");
     const localeFlag = document.getElementById("localeFlag");
-    const profileBox = document.getElementById("profileBox");
 
     const region = window.AZIEL?.getShopRegion?.() || "MM";
     const symbol =
@@ -45,7 +47,6 @@ function renderHeader() {
     if (!user) {
         if (walletText) walletText.innerText = `0 ${symbol}`;
         if (avatarText) avatarText.innerText = "G";
-        if (profileBox) profileBox.href = "login.html";
         return;
     }
 
@@ -59,10 +60,6 @@ function renderHeader() {
         avatarText.innerText = name.charAt(0).toUpperCase();
     }
 
-    if (profileBox) {
-        profileBox.href = "account.html";
-    }
-
     const balance = Number(wallet?.balance || 0);
 
     if (walletText) {
@@ -70,13 +67,91 @@ function renderHeader() {
     }
 }
 
+function initProfileDropdown() {
+    const btn = document.getElementById("profileMenuBtn");
+    const dropdown = document.getElementById("profileDropdown");
+
+    if (!btn || !dropdown) return;
+    if (btn.dataset.ready === "true") return;
+
+    btn.dataset.ready = "true";
+
+    btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+
+        const user = window.AZIEL?.user || null;
+
+        if (!user) {
+            window.location.href = "login.html";
+            return;
+        }
+
+        dropdown.classList.toggle("show");
+    });
+
+    dropdown.addEventListener("click", (e) => {
+        e.stopPropagation();
+    });
+
+    document.addEventListener("click", () => {
+        dropdown.classList.remove("show");
+    });
+
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+            dropdown.classList.remove("show");
+        }
+    });
+}
+
+function initThemeButton() {
+    const btn = document.getElementById("themeToggleBtn");
+    if (!btn) return;
+    if (btn.dataset.ready === "true") return;
+
+    btn.dataset.ready = "true";
+
+    btn.addEventListener("click", () => {
+        if (window.AZIEL?.toggleTheme) {
+            window.AZIEL.toggleTheme();
+            return;
+        }
+
+        document.body.classList.toggle("theme-dark");
+        document.body.classList.toggle("theme-light");
+    });
+}
+
+function initHeaderLogout() {
+    const btn = document.getElementById("logoutBtn");
+    if (!btn) return;
+    if (btn.dataset.ready === "true") return;
+
+    btn.dataset.ready = "true";
+
+    btn.addEventListener("click", () => {
+        localStorage.removeItem("token");
+        localStorage.removeItem("azielToken");
+        localStorage.removeItem("user");
+        localStorage.removeItem("azielUser");
+
+        window.AZIEL = window.AZIEL || {};
+        window.AZIEL.user = null;
+        window.AZIEL.wallet = null;
+
+        window.dispatchEvent(new Event("aziel:userChanged"));
+
+        window.location.href = "login.html";
+    });
+}
+
 function initAutoRevealNav() {
     const header = document.querySelector(".az-header");
     const nav = document.querySelector(".az-nav");
 
     if (!header || !nav) return;
-
     if (header.dataset.navRevealReady === "true") return;
+
     header.dataset.navRevealReady = "true";
 
     let lastScrollY = window.scrollY;
@@ -85,11 +160,11 @@ function initAutoRevealNav() {
         const currentY = window.scrollY;
 
         if (currentY > 80 && currentY > lastScrollY) {
-            header.classList.add("nav-open");
+            header.classList.add("nav-hidden");
         }
 
         if (currentY < lastScrollY || currentY < 40) {
-            header.classList.remove("nav-open");
+            header.classList.remove("nav-hidden");
         }
 
         lastScrollY = currentY;

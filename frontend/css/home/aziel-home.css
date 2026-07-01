@@ -1,11 +1,10 @@
 /* =========================
    AZIEL HOME V2.5 BASE
-   Banner color atmosphere + wave
+   Shared Theme Compatible
 ========================= */
 
 :root {
     --home-max: 1280px;
-    --home-gap: 16px;
     --banner-rgb: 139, 92, 246;
 }
 
@@ -13,14 +12,13 @@ html {
     scroll-behavior: smooth;
 }
 
-
 /* PAGE WRAPPER */
 .az-home {
     width: min(var(--home-max), calc(100% - 32px));
     margin: 24px auto 0;
 }
 
-/* SEAGM SMOOTH BANNER */
+/* BANNER */
 .az-banner-zone {
     position: relative;
     width: 100%;
@@ -53,7 +51,7 @@ html {
     text-decoration: none;
     transform: translateX(-50%);
     background: var(--card);
-    box-shadow: 0 20px 50px rgba(15, 23, 42, .18);
+    box-shadow: var(--shadow-md);
     will-change: transform, opacity, filter;
 }
 
@@ -91,42 +89,7 @@ html {
     background: var(--primary);
 }
 
-/* mobile */
-@media (max-width: 768px) {
-    body::before {
-        inset: 64px 0 auto 0;
-        height: 280px;
-    }
-
-    .az-banner-zone {
-        height: 220px;
-        margin-top: 14px;
-    }
-
-    .az-banner-track {
-        height: 200px;
-    }
-
-    .az-banner-card {
-        width: 82vw;
-        height: 190px;
-        border-radius: 18px;
-    }
-
-    .az-banner-dots {
-        bottom: 22px;
-    }
-
-    .az-banner-dots button {
-        width: 24px;
-        height: 4px;
-    }
-
-    .az-banner-dots button.active {
-        width: 48px;
-    }
-}
-
+/* BUTTONS */
 .az-primary-btn,
 .az-secondary-btn {
     height: 48px;
@@ -153,6 +116,7 @@ html {
     border: 1px solid var(--border);
 }
 
+/* HERO ART */
 .az-hero-art {
     position: absolute;
     right: 0;
@@ -188,9 +152,10 @@ html {
     gap: 14px;
     padding: 14px 18px;
     border-radius: 18px;
-    background: color-mix(in srgb, var(--card) 88%, transparent);
+    background: var(--card);
     border: 1px solid var(--border);
     box-shadow: var(--shadow-sm);
+    backdrop-filter: blur(18px);
 }
 
 .trust-card i {
@@ -240,7 +205,8 @@ html {
     color: var(--text-muted);
 }
 
-.az-section-head a {
+.az-section-head a,
+.az-view-all {
     color: var(--primary);
     text-decoration: none;
     font-size: 13px;
@@ -291,6 +257,7 @@ html {
     margin: 14px 14px 4px;
     font-size: 15px;
     line-height: 1.2;
+    color: var(--text);
 }
 
 .popular-game-card p {
@@ -316,6 +283,7 @@ html {
     background: var(--card);
     border: 1px solid var(--border);
     box-shadow: var(--shadow-sm);
+    backdrop-filter: blur(18px);
 }
 
 .category-grid {
@@ -391,6 +359,7 @@ html {
     color: var(--text-muted);
 }
 
+/* PROMO */
 .promo-list {
     display: grid;
     gap: 10px;
@@ -488,14 +457,8 @@ html {
 }
 
 /* MOBILE DRAWER */
-.az-mobile-drawer-overlay {
-    display: none;
-}
-
-.az-mobile-drawer {
-    display: none;
-}
-
+.az-mobile-drawer-overlay,
+.az-mobile-drawer,
 .az-bottom-nav {
     display: none;
 }
@@ -529,6 +492,34 @@ html {
     .az-home {
         width: calc(100% - 24px);
         margin-top: 12px;
+    }
+
+    .az-banner-zone {
+        height: 220px;
+        margin-top: 14px;
+    }
+
+    .az-banner-track {
+        height: 200px;
+    }
+
+    .az-banner-card {
+        width: 82vw;
+        height: 190px;
+        border-radius: 18px;
+    }
+
+    .az-banner-dots {
+        bottom: 22px;
+    }
+
+    .az-banner-dots button {
+        width: 24px;
+        height: 4px;
+    }
+
+    .az-banner-dots button.active {
+        width: 48px;
     }
 
     .az-hero {
@@ -680,9 +671,9 @@ html {
         grid-template-columns: repeat(5, 1fr);
         align-items: center;
         border-radius: 22px;
-        background: color-mix(in srgb, var(--card) 92%, transparent);
+        background: var(--card);
         border: 1px solid var(--border);
-        box-shadow: 0 16px 40px rgba(0, 0, 0, .18);
+        box-shadow: var(--shadow-md);
         backdrop-filter: blur(18px);
     }
 
@@ -773,114 +764,81 @@ html {
     }
 }
 
-html body {
-    background:
-        linear-gradient(180deg,
-            rgba(var(--banner-rgb), .92) 0px,
-            rgba(var(--banner-rgb), .6) 40px,
-            rgba(var(--banner-rgb), .40) 60px,
-            rgba(var(--banner-rgb), .90) 00px,
-            var(--bg) 1750px,
-            var(--bg) 100%) !important;
-}
-
-
-
-.az-section-head h2,
-.popular-game-card h3,
-.trust-card strong,
-.az-panel h2 {
-    color: var(--text) !important;
-}
 
 
 /* =========================
-   HOME READABILITY FINAL
-========================= */
-
-.trust-card,
-.popular-game-card,
-.az-panel,
-.category-grid a,
-.promo-item {
-    background: color-mix(in srgb, var(--card) 82%, transparent) !important;
-    backdrop-filter: blur(18px);
-    border: 1px solid color-mix(in srgb, var(--border) 72%, white 18%) !important;
-}
-
-.trust-card strong,
-.popular-game-card h3,
-.az-section-head h2,
-.az-panel h2,
-.category-grid a,
-.why-grid strong,
-.promo-item strong {
-    color: var(--text) !important;
-}
-
-.trust-card span,
-.popular-game-card p,
-.why-grid span,
-.promo-item span,
-.promo-item small {
-    color: var(--text-secondary) !important;
-}
-
-.az-section-head a,
-.az-view-all {
-    color: var(--primary) !important;
-    font-weight: 900;
-}
-
-body.theme-dark .trust-card,
-body.theme-dark .popular-game-card,
-body.theme-dark .az-panel,
-body.theme-dark .category-grid a,
-body.theme-dark .promo-item {
-    background: rgba(18, 24, 42, .72) !important;
-}
-
-body.theme-light .trust-card,
-body.theme-light .popular-game-card,
-body.theme-light .az-panel,
-body.theme-light .category-grid a,
-body.theme-light .promo-item {
-    background: rgba(245, 245, 245, .50) !important;
-}
-
-/* =========================
-   DARK MODE ATMOSPHERE FIX
+   HOME RGB ATMOSPHERE FINAL
 ========================= */
 
 body.theme-dark {
     background:
+        radial-gradient(circle at 50% 120px, rgba(var(--banner-rgb), .34), transparent 32%),
+        radial-gradient(circle at 85% 260px, rgba(168, 85, 247, .22), transparent 28%),
         linear-gradient(180deg,
-            rgba(var(--banner-rgb), .84) 0px,
-            rgba(var(--banner-rgb), .92) 220px,
-            rgba(7, 11, 29, .94) 1060px,
-            #070b1d 1800px,
-            #070b1d 50%) !important;
+            rgba(var(--banner-rgb), .38) 0px,
+            rgba(18, 14, 42, .92) 420px,
+            var(--bg) 900px,
+            var(--bg) 100%) !important;
 }
 
-
-
-body.theme-dark .trust-card,
-body.theme-dark .popular-game-card,
-body.theme-dark .az-panel,
-body.theme-dark .category-grid a,
-body.theme-dark .promo-item {
-    background: rgba(18, 22, 38, .82) !important;
-    border-color: rgba(255, 255, 255, .10) !important;
+body.theme-light {
+    background:
+        radial-gradient(circle at 50% 120px, rgba(var(--banner-rgb), .28), transparent 34%),
+        radial-gradient(circle at 85% 260px, rgba(168, 85, 247, .14), transparent 30%),
+        linear-gradient(180deg,
+            rgba(var(--banner-rgb), .18) 0px,
+            var(--bg-soft) 460px,
+            var(--bg) 920px,
+            var(--bg) 100%) !important;
 }
 
-body.theme-dark .az-section-head h2,
-body.theme-dark .popular-game-card h3,
-body.theme-dark .trust-card strong,
-body.theme-dark .az-panel h2 {
-    color: #ffffff !important;
+/* ===============================
+   DYNAMIC RGB ATMOSPHERE STRONG
+=============================== */
+
+body::before {
+    content: "";
+    position: fixed;
+    inset: 86px 0 0;
+    pointer-events: none;
+    z-index: 0;
+
+    background:
+        radial-gradient(ellipse at 50% 120px,
+            rgba(var(--banner-rgb), .85) 0%,
+            rgba(var(--banner-rgb), .48) 24%,
+            rgba(var(--banner-rgb), .24) 46%,
+            transparent 76%);
+
+    filter: blur(55px);
+    opacity: 1;
+    transition: background .45s ease;
 }
 
-body.theme-dark .popular-game-card p,
-body.theme-dark .trust-card span {
-    color: rgba(255, 255, 255, .68) !important;
+body::after {
+    content: "";
+    position: fixed;
+    inset: 86px 0 0;
+    pointer-events: none;
+    z-index: 0;
+
+    background:
+        linear-gradient(180deg,
+            rgba(var(--banner-rgb), .45) 0px,
+            rgba(var(--banner-rgb), .22) 260px,
+            rgba(var(--banner-rgb), .10) 520px,
+            transparent 900px);
+}
+
+.az-home,
+.az-header,
+main {
+    position: relative;
+    z-index: 1;
+}
+
+body.theme-light .trust-card,
+body.theme-light .popular-game-card,
+body.theme-light .az-panel {
+    background: rgba(255, 255, 255, .68);
 }

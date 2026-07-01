@@ -4,54 +4,62 @@
 <head>
     <meta charset="UTF-8">
 
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
     <title>Customer Support - AZIEL</title>
-    <link rel="stylesheet" href="css/theme/aziel-header.css">
-    <link rel="stylesheet" href="css/theme/aziel-design-system.css">
+
+    <link rel="stylesheet" href="css/theme/aziel-theme.css?v=20260630">
+    <link rel="stylesheet" href="css/theme/aziel-header.css?v=20260630">
+    <link rel="stylesheet" href="css/theme/aziel-design-system.css?v=20260630">
+
     <link rel="stylesheet" href="css/support/support.css?v=20260630">
     <link rel="stylesheet" href="css/support/live-chat.css?v=20260630">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
     <link rel="manifest" href="manifest.json">
 
     <meta name="theme-color" content="#070716">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="AZIEL">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 </head>
 
 <body>
 
-    <div id="azHeaderMount" data-nav="account"></div>
+    <div id="azHeaderMount" data-nav="support"></div>
 
     <main class="support-page">
 
         <section class="support-left">
 
-            <div class="support-hero">
-                <div>
-                    <h1>Help Center</h1>
+            <section class="support-hero">
+                <div class="support-hero-content">
+                    <span class="support-badge">
+                        <i class="fa-solid fa-headset"></i>
+                        AZIEL Support
+                    </span>
+
+                    <h1>How can we help?</h1>
 
                     <p class="support-subtitle">
-                        We are here to help you. Submit a ticket and our team will reply as soon as possible.
+                        Get help with orders, payments, wallet top-ups, account issues, and general questions.
                     </p>
                 </div>
 
                 <div class="hero-icon">
                     <i class="fa-solid fa-headset"></i>
                 </div>
-            </div>
+            </section>
 
-            <div class="support-categories">
-                <button class="category-card" data-type="order">
+            <section class="support-categories">
+
+                <button class="category-card active" data-type="order">
                     <span>
-                        <i class="fa-solid fa-shopping-cart"></i>
+                        <i class="fa-solid fa-cart-shopping"></i>
                     </span>
                     <strong>Order Issue</strong>
-                    <small>Game top up not received</small>
+                    <small>Top-up not received or delayed</small>
                 </button>
 
                 <button class="category-card" data-type="payment">
@@ -59,7 +67,7 @@
                         <i class="fa-solid fa-credit-card"></i>
                     </span>
                     <strong>Payment Issue</strong>
-                    <small>Payment failed or pending</small>
+                    <small>Payment failed, pending, or duplicated</small>
                 </button>
 
                 <button class="category-card" data-type="wallet">
@@ -67,34 +75,55 @@
                         <i class="fa-solid fa-wallet"></i>
                     </span>
                     <strong>Wallet Issue</strong>
-                    <small>Balance / Top up problem</small>
+                    <small>Balance or wallet top-up problem</small>
                 </button>
 
                 <button class="category-card" data-type="account">
                     <span>
-                        <i class="fa-solid fa-user"></i>
+                        <i class="fa-solid fa-user-shield"></i>
                     </span>
                     <strong>Account Issue</strong>
-                    <small>Login / account help</small>
+                    <small>Login, profile, or security help</small>
                 </button>
 
                 <button class="category-card" data-type="general">
                     <span>
-                        <i class="fa-solid fa-exclamation-triangle"></i>
+                        <i class="fa-solid fa-circle-question"></i>
                     </span>
-                    <strong>Report Problem</strong>
-                    <small>Bug or other issue</small>
+                    <strong>General Help</strong>
+                    <small>Bug report or other questions</small>
                 </button>
-            </div>
+
+            </section>
+            <section class="support-card faq-card">
+                <div class="section-heading">
+                    <div>
+                        <h2>Frequently Asked Questions</h2>
+                        <p class="support-subtitle">
+                            Find quick answers before submitting a support ticket.
+                        </p>
+                    </div>
+                </div>
+
+                <div id="faqList" class="faq-list"></div>
+            </section>
 
             <section class="support-card">
-                <h2>🎫 Submit a Ticket</h2>
+                <div class="section-heading">
+                    <div>
+                        <h2>Submit a Ticket</h2>
+                        <p class="support-subtitle">
+                            Tell us what happened. Our team will check and reply as soon as possible.
+                        </p>
+                    </div>
+                </div>
 
-                <form id="supportForm">
+                <form id="supportForm" class="support-form">
 
                     <div class="form-grid">
+
                         <div class="form-group">
-                            <label>Problem Type</label>
+                            <label for="ticketType">Problem Type</label>
                             <select id="ticketType" required>
                                 <option value="order">Order Issue</option>
                                 <option value="payment">Payment Issue</option>
@@ -105,44 +134,56 @@
                         </div>
 
                         <div class="form-group">
-                            <label>Order ID (If any)</label>
+                            <label for="ticketOrderId">Order ID Optional</label>
                             <input type="text" id="ticketOrderId" placeholder="Example: AZL-123456789">
                         </div>
+
                     </div>
 
-                    <label>Subject</label>
-                    <input type="text" id="ticketSubject" placeholder="Example: My order is not completed" required>
+                    <div class="form-group">
+                        <label for="ticketSubject">Subject</label>
+                        <input type="text" id="ticketSubject" placeholder="Example: My order is not completed" required>
+                    </div>
 
-                    <label>Message</label>
-                    <textarea id="ticketMessage" rows="6" placeholder="Please explain your problem in detail..."
-                        required></textarea>
+                    <div class="form-group">
+                        <label for="ticketMessage">Message</label>
+                        <textarea id="ticketMessage" rows="6" placeholder="Please explain your problem in detail..."
+                            required></textarea>
+                    </div>
 
-                    <label>Screenshot Optional</label>
-                    <input type="file" id="ticketScreenshot" accept="image/*">
+                    <div class="form-group">
+                        <label for="ticketScreenshot">Screenshot Optional</label>
+                        <input type="file" id="ticketScreenshot" accept="image/*">
+                    </div>
 
-                    <button type="submit" id="submitTicketBtn">
+                    <button type="submit" id="submitTicketBtn" class="support-submit-btn">
+                        <i class="fa-solid fa-paper-plane"></i>
                         Submit Ticket
                     </button>
 
-                    <p id="supportMsg"></p>
+                    <p id="supportMsg" class="support-msg"></p>
 
                 </form>
             </section>
 
             <section class="support-card contact-card">
-                <h2>Contact Us</h2>
-
-                <p class="support-subtitle">
-                    You can also reach us through other channels.
-                </p>
+                <div class="section-heading">
+                    <div>
+                        <h2>Contact Channels</h2>
+                        <p class="support-subtitle">
+                            You can also reach us through these channels.
+                        </p>
+                    </div>
+                </div>
 
                 <div class="contact-grid">
-                    <a href="https://t.me/" class="contact-item">
+
+                    <a href="https://t.me/" class="contact-item" target="_blank" rel="noopener">
                         <span>
                             <i class="fa-brands fa-telegram"></i>
                         </span>
                         <strong>Telegram Support</strong>
-                        <small>Chat now</small>
+                        <small>Chat with support</small>
                     </a>
 
                     <a href="#" class="contact-item">
@@ -150,12 +191,12 @@
                             <i class="fa-brands fa-facebook"></i>
                         </span>
                         <strong>Facebook Page</strong>
-                        <small>Message now</small>
+                        <small>Message us</small>
                     </a>
 
                     <a href="mailto:support@aziel.com" class="contact-item">
                         <span>
-                            <i class="fa-brands fa-envelope"></i>
+                            <i class="fa-solid fa-envelope"></i>
                         </span>
                         <strong>Email Support</strong>
                         <small>support@aziel.com</small>
@@ -168,17 +209,44 @@
                         <strong>Working Hours</strong>
                         <small>Everyday 9:00 AM - 11:00 PM</small>
                     </div>
+
                 </div>
             </section>
 
         </section>
 
-        <section class="support-right">
+        <aside class="support-right">
 
-            <div class="support-card tickets-card">
-                <div class="tickets-header">
+            <section class="support-card status-card">
+                <h2>Support Status</h2>
+
+                <div class="status-list">
+
+                    <div class="status-item">
+                        <span class="status-dot online"></span>
+                        <div>
+                            <strong>Support Online</strong>
+                            <small>Usually replies as soon as possible</small>
+                        </div>
+                    </div>
+
+                    <div class="status-item">
+                        <span>
+                            <i class="fa-solid fa-bolt"></i>
+                        </span>
+                        <div>
+                            <strong>Fast Help</strong>
+                            <small>Order and payment issues are priority</small>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+            <section class="support-card tickets-card">
+                <div class="section-heading">
                     <div>
-                        <h2> My Tickets</h2>
+                        <h2>My Tickets</h2>
                         <p class="support-subtitle">
                             Check your ticket status and admin replies.
                         </p>
@@ -193,18 +261,20 @@
                     <button class="ticket-tab" data-filter="closed">Closed</button>
                 </div>
 
-                <div id="myTickets">
+                <div id="myTickets" class="my-tickets">
                     Loading tickets...
                 </div>
-            </div>
+            </section>
 
-        </section>
+        </aside>
 
     </main>
 
     <footer class="support-footer">
-        © 2026 AZIEL 1Tap Shop
+        © 2026 AZIEL 1Tap Shop. All rights reserved.
     </footer>
+
+    <script src="js/theme.js?v=20260630"></script>
 
     <script src="js/site-settings.js?v=20260630"></script>
     <script src="js/api.js?v=20260630"></script>
@@ -214,11 +284,11 @@
     <script src="js/header.js?v=202606291812"></script>
     <script src="js/header-scroll.js?v=202606291812"></script>
 
-    <script src="http://localhost:3000/socket.io/socket.io.js"></script>
-
+    <script src="js/socket-client.js?v=20260630"></script>
     <script src="js/support.js?v=20260630"></script>
     <script src="js/live-chat.js?v=20260630"></script>
     <script src="js/pwa-fix.js?v=20260630"></script>
+
 </body>
 
 </html>

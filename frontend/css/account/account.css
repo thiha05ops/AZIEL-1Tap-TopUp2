@@ -1,42 +1,10 @@
 /* =========================
    AZIEL ACCOUNT V2.5
-   Home-style Typography UI
+   Shared Theme Compatible
 ========================= */
 
 * {
   box-sizing: border-box;
-}
-
-:root {
-  --az-bg: #efe6dd;
-  --az-bg-2: #f7f1eb;
-  --az-text: #111827;
-  --az-muted: #6b7280;
-  --az-line: rgba(17, 24, 39, .12);
-
-  --az-primary: #7c3aed;
-  --az-primary-2: #9333ea;
-
-  --az-green: #22c55e;
-  --az-blue: #3b82f6;
-  --az-yellow: #f59e0b;
-  --az-red: #ef4444;
-
-  --az-soft-purple: rgba(124, 58, 237, .10);
-  --az-soft-white: rgba(255, 255, 255, .50);
-}
-
-body.dark,
-html.dark,
-body[data-theme="dark"],
-html[data-theme="dark"] {
-  --az-bg: #050814;
-  --az-bg-2: #0b1020;
-  --az-text: #f8fafc;
-  --az-muted: #94a3b8;
-  --az-line: rgba(255, 255, 255, .12);
-  --az-soft-purple: rgba(168, 85, 247, .16);
-  --az-soft-white: rgba(255, 255, 255, .06);
 }
 
 body.account-page {
@@ -44,30 +12,33 @@ body.account-page {
   min-height: 100vh;
   position: relative;
   overflow-x: hidden;
-
-  color: var(--az-text);
+  color: var(--text);
   font-family: Inter, Arial, sans-serif;
-
   background:
     radial-gradient(circle at 50% 12%, rgba(124, 58, 237, .16), transparent 28%),
     radial-gradient(circle at 88% 42%, rgba(168, 85, 247, .10), transparent 30%),
-    linear-gradient(180deg, var(--az-bg), var(--az-bg-2));
+    linear-gradient(180deg, var(--bg), var(--bg-soft));
 }
 
-/* soft wave background */
 body.account-page::before {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: -1;
-
   background:
-    linear-gradient(120deg, transparent 0%, transparent 18%, rgba(255, 255, 255, .14) 18.2%, transparent 18.7%),
-    linear-gradient(150deg, transparent 0%, transparent 35%, rgba(255, 255, 255, .12) 35.2%, transparent 36%),
+    linear-gradient(120deg, transparent 0%, transparent 18%, rgba(255, 255, 255, .10) 18.2%, transparent 18.7%),
+    linear-gradient(150deg, transparent 0%, transparent 35%, rgba(255, 255, 255, .08) 35.2%, transparent 36%),
     linear-gradient(24deg, transparent 0%, transparent 62%, rgba(124, 58, 237, .10) 62.2%, transparent 63%);
+  opacity: .8;
+}
 
-  opacity: .9;
+body.theme-light.account-page::after {
+  color: rgba(17, 24, 39, .06);
+}
+
+body.theme-dark.account-page::after {
+  color: rgba(255, 255, 255, .035);
 }
 
 body.account-page::after {
@@ -76,43 +47,24 @@ body.account-page::after {
   right: -60px;
   bottom: 40px;
   z-index: -1;
-
   font-size: 260px;
   line-height: 1;
   font-weight: 950;
   letter-spacing: -16px;
-
-  color: rgba(255, 255, 255, .14);
   pointer-events: none;
-}
-
-body.dark.account-page::after,
-html.dark body.account-page::after,
-body[data-theme="dark"].account-page::after {
-  color: rgba(255, 255, 255, .035);
 }
 
 .account-menu-btn {
   display: none;
 }
 
-/* =========================
-   LAYOUT
-========================= */
-
 .account-layout {
-  width: min(1180px, 92%);
   margin: 46px auto 100px;
-
   display: grid;
   grid-template-columns: 250px minmax(0, 1fr);
   gap: 58px;
   align-items: start;
 }
-
-/* =========================
-   SIDEBAR
-========================= */
 
 .account-sidebar {
   position: sticky;
@@ -123,29 +75,25 @@ body[data-theme="dark"].account-page::after {
   display: flex;
   align-items: center;
   gap: 14px;
-
   padding-bottom: 26px;
-  border-bottom: 1px solid var(--az-line);
+  border-bottom: 1px solid var(--border);
 }
 
 .avatar-big {
   width: 56px;
   height: 56px;
   border-radius: 50%;
-
   display: grid;
   place-items: center;
-
-  background: linear-gradient(135deg, var(--az-primary), var(--az-primary-2));
+  background: linear-gradient(135deg, var(--primary), var(--primary-hover));
   color: #fff;
-
   font-size: 22px;
   font-weight: 950;
 }
 
 .profile-info h3 {
   margin: 0 0 4px;
-  color: var(--az-text);
+  color: var(--text);
   font-size: 18px;
   font-weight: 950;
   letter-spacing: -.3px;
@@ -153,7 +101,7 @@ body[data-theme="dark"].account-page::after {
 
 .profile-info p {
   margin: 0;
-  color: var(--az-muted);
+  color: var(--text-muted);
   font-size: 13px;
   font-weight: 750;
 }
@@ -170,18 +118,17 @@ body[data-theme="dark"].account-page::after {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-
-  color: var(--az-muted);
+  color: var(--text-muted);
   font-size: 11px;
   font-weight: 900;
 }
 
 .verified-badge i {
-  color: var(--az-green);
+  color: var(--success);
 }
 
 .gmail-badge i {
-  color: var(--az-blue);
+  color: #3b82f6;
 }
 
 .account-menu {
@@ -193,24 +140,18 @@ body[data-theme="dark"].account-page::after {
 .side-link {
   width: 100%;
   min-height: 46px;
-
   border: none;
   border-radius: 999px;
   background: transparent;
-
   display: flex;
   align-items: center;
   gap: 12px;
-
   padding: 0 14px;
-
-  color: var(--az-muted);
+  color: var(--text-muted);
   text-align: left;
   text-decoration: none;
-
   font-size: 15px;
   font-weight: 850;
-
   cursor: pointer;
   transition: .2s ease;
 }
@@ -221,20 +162,16 @@ body[data-theme="dark"].account-page::after {
 
 .side-link:hover,
 .side-link.active {
-  color: var(--az-primary);
-  background: var(--az-soft-purple);
+  color: var(--primary);
+  background: rgba(124, 58, 237, .12);
 }
 
 .support-link b {
   margin-left: auto;
-  color: var(--az-green);
+  color: var(--success);
   font-size: 10px;
   font-weight: 950;
 }
-
-/* =========================
-   CONTENT
-========================= */
 
 .account-content {
   min-width: 0;
@@ -269,8 +206,7 @@ body[data-theme="dark"].account-page::after {
 .page-title h1 {
   max-width: 820px;
   margin: 0;
-
-  color: var(--az-text);
+  color: var(--text);
   font-size: clamp(44px, 5.4vw, 70px);
   line-height: .94;
   font-weight: 950;
@@ -280,26 +216,19 @@ body[data-theme="dark"].account-page::after {
 .page-title p {
   max-width: 580px;
   margin: 17px 0 0;
-
-  color: var(--az-muted);
+  color: var(--text-muted);
   font-size: 16px;
   line-height: 1.65;
   font-weight: 650;
 }
 
-/* =========================
-   STATS - NO BOX
-========================= */
-
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 28px;
-
   padding-bottom: 34px;
   margin-bottom: 34px;
-
-  border-bottom: 1px solid var(--az-line);
+  border-bottom: 1px solid var(--border);
 }
 
 .dash-card {
@@ -307,7 +236,6 @@ body[data-theme="dark"].account-page::after {
   border: none !important;
   box-shadow: none !important;
   border-radius: 0 !important;
-
   min-height: unset !important;
   padding: 0 !important;
 }
@@ -315,16 +243,14 @@ body[data-theme="dark"].account-page::after {
 .dash-card span {
   display: block;
   margin-bottom: 10px;
-
-  color: var(--az-muted);
+  color: var(--text-muted);
   font-size: 13px;
   font-weight: 950;
 }
 
 .dash-card strong {
   display: block;
-
-  color: var(--az-text);
+  color: var(--text);
   font-size: clamp(30px, 3.2vw, 46px);
   line-height: 1;
   font-weight: 950;
@@ -332,12 +258,8 @@ body[data-theme="dark"].account-page::after {
 }
 
 .wallet-card strong {
-  color: var(--az-yellow);
+  color: var(--warning);
 }
-
-/* =========================
-   CONTENT BLOCKS
-========================= */
 
 .content-card,
 .form-card {
@@ -345,11 +267,9 @@ body[data-theme="dark"].account-page::after {
   border: none !important;
   box-shadow: none !important;
   border-radius: 0 !important;
-
   padding: 0 0 34px !important;
   margin-bottom: 34px !important;
-
-  border-bottom: 1px solid var(--az-line) !important;
+  border-bottom: 1px solid var(--border) !important;
 }
 
 .card-head {
@@ -357,15 +277,13 @@ body[data-theme="dark"].account-page::after {
   align-items: end;
   justify-content: space-between;
   gap: 22px;
-
   margin-bottom: 20px;
 }
 
 .card-head h2,
 .content-card h2 {
   margin: 0;
-
-  color: var(--az-text);
+  color: var(--text);
   font-size: 30px;
   line-height: 1.05;
   font-weight: 950;
@@ -373,19 +291,15 @@ body[data-theme="dark"].account-page::after {
 }
 
 .card-head a {
-  color: var(--az-muted);
+  color: var(--text-muted);
   text-decoration: none;
   font-size: 14px;
   font-weight: 950;
 }
 
 .card-head a:hover {
-  color: var(--az-primary);
+  color: var(--primary);
 }
-
-/* =========================
-   ORDER LIST
-========================= */
 
 #recentOrders,
 #historyList {
@@ -398,13 +312,11 @@ body[data-theme="dark"].account-page::after {
 .recent-order-item {
   background: transparent !important;
   border: none !important;
-  border-bottom: 1px solid var(--az-line) !important;
+  border-bottom: 1px solid var(--border) !important;
   border-radius: 0 !important;
   box-shadow: none !important;
-
   padding: 18px 0 !important;
-
-  color: var(--az-text);
+  color: var(--text);
 }
 
 .recent-order-item {
@@ -412,7 +324,6 @@ body[data-theme="dark"].account-page::after {
   grid-template-columns: 1fr auto;
   align-items: center;
   gap: 20px;
-
   cursor: pointer;
 }
 
@@ -424,16 +335,14 @@ body[data-theme="dark"].account-page::after {
 .recent-order-item strong {
   display: block;
   margin-bottom: 5px;
-
-  color: var(--az-text);
+  color: var(--text);
   font-size: 16px;
   font-weight: 950;
 }
 
 .recent-order-item small {
   display: block;
-
-  color: var(--az-muted);
+  color: var(--text-muted);
   font-size: 13px;
   font-weight: 750;
 }
@@ -451,42 +360,25 @@ body[data-theme="dark"].account-page::after {
   gap: 18px;
 }
 
-.order-top h3 {
-  margin: 0;
-
-  color: var(--az-text);
-  font-size: 16px;
-  font-weight: 950;
-}
-
-.order-game {
-  color: var(--az-text);
-  font-size: 18px;
+.order-top h3,
+.order-game,
+.order-bottom strong {
+  color: var(--text);
   font-weight: 950;
 }
 
 .order-package {
-  color: var(--az-muted);
+  color: var(--text-muted);
   font-size: 14px;
   font-weight: 750;
 }
 
-.order-bottom strong {
-  color: var(--az-text);
-  font-size: 16px;
-  font-weight: 950;
-}
-
 .order-bottom a {
-  color: var(--az-primary);
+  color: var(--primary);
   text-decoration: none;
   font-size: 14px;
   font-weight: 950;
 }
-
-/* =========================
-   STATUS BADGE
-========================= */
 
 .status,
 .status-pending,
@@ -504,12 +396,9 @@ body[data-theme="dark"].account-page::after {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-
   min-height: 28px;
   padding: 0 11px;
-
   border-radius: 999px;
-
   font-size: 12px;
   font-weight: 950;
   text-transform: capitalize;
@@ -520,37 +409,33 @@ body[data-theme="dark"].account-page::after {
 .status.pending,
 .status.pending_payment {
   background: rgba(245, 158, 11, .16);
-  color: var(--az-yellow);
+  color: var(--warning);
 }
 
 .status-paid,
 .status.paid {
   background: rgba(59, 130, 246, .15);
-  color: var(--az-blue);
+  color: #3b82f6;
 }
 
 .status-processing,
 .status.processing {
   background: rgba(124, 58, 237, .15);
-  color: var(--az-primary);
+  color: var(--primary);
 }
 
 .status-completed,
 .status.completed {
   background: rgba(34, 197, 94, .16);
-  color: var(--az-green);
+  color: var(--success);
 }
 
 .status-failed,
 .status.cancelled,
 .status.failed {
   background: rgba(239, 68, 68, .15);
-  color: var(--az-red);
+  color: var(--danger);
 }
-
-/* =========================
-   PROFILE FORM
-========================= */
 
 .form-card {
   max-width: 700px;
@@ -559,8 +444,7 @@ body[data-theme="dark"].account-page::after {
 .form-card label {
   display: block;
   margin: 22px 0 8px;
-
-  color: var(--az-muted);
+  color: var(--text-muted);
   font-size: 13px;
   font-weight: 950;
 }
@@ -569,24 +453,21 @@ body[data-theme="dark"].account-page::after {
 .form-card select {
   width: 100%;
   height: 56px;
-
   border: none;
-  border-bottom: 1px solid var(--az-line);
+  border-bottom: 1px solid var(--border);
   border-radius: 0;
-
   background: transparent;
-  color: var(--az-text);
-
+  color: var(--text);
   padding: 0;
   outline: none;
-
   font-size: 18px;
   font-weight: 850;
 }
 
 .form-card input:focus,
 .form-card select:focus {
-  border-bottom-color: var(--az-primary);
+  border-bottom-color: var(--primary);
+  box-shadow: none;
 }
 
 .form-card select option {
@@ -598,28 +479,19 @@ body[data-theme="dark"].account-page::after {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-
   min-height: 48px;
   padding: 0 22px;
   margin-top: 24px;
-
   border: none;
   border-radius: 999px;
-
-  background: linear-gradient(135deg, var(--az-primary), var(--az-primary-2));
+  background: linear-gradient(135deg, var(--primary), var(--primary-hover));
   color: #fff;
-
   text-decoration: none;
   font-size: 14px;
   font-weight: 950;
-
   cursor: pointer;
   box-shadow: 0 12px 24px rgba(124, 58, 237, .24);
 }
-
-/* =========================
-   SECURITY
-========================= */
 
 .security-grid {
   display: grid;
@@ -630,12 +502,10 @@ body[data-theme="dark"].account-page::after {
   display: grid;
   grid-template-columns: 54px 1fr;
   gap: 18px;
-
   padding: 25px 0;
-
   background: transparent !important;
   border: none !important;
-  border-bottom: 1px solid var(--az-line) !important;
+  border-bottom: 1px solid var(--border) !important;
   border-radius: 0 !important;
   box-shadow: none !important;
 }
@@ -643,21 +513,17 @@ body[data-theme="dark"].account-page::after {
 .security-icon {
   width: 44px;
   height: 44px;
-
   display: grid;
   place-items: center;
-
   border-radius: 50%;
-  background: var(--az-soft-purple);
-  color: var(--az-primary);
-
+  background: rgba(124, 58, 237, .12);
+  color: var(--primary);
   font-size: 18px;
 }
 
 .security-card h3 {
   margin: 0 0 8px;
-
-  color: var(--az-text);
+  color: var(--text);
   font-size: 23px;
   font-weight: 950;
   letter-spacing: -.7px;
@@ -666,26 +532,21 @@ body[data-theme="dark"].account-page::after {
 .security-card p {
   max-width: 590px;
   margin: 0 0 14px;
-
-  color: var(--az-muted);
+  color: var(--text-muted);
   font-size: 15px;
   line-height: 1.65;
   font-weight: 650;
 }
 
 .security-status {
-  color: var(--az-green);
+  color: var(--success);
   font-size: 13px;
   font-weight: 950;
 }
 
-/* =========================
-   EMPTY
-========================= */
-
 .empty-orders {
   padding: 38px 0;
-  border-bottom: 1px solid var(--az-line);
+  border-bottom: 1px solid var(--border);
 }
 
 .empty-orders i {
@@ -694,8 +555,7 @@ body[data-theme="dark"].account-page::after {
 
 .empty-orders h3 {
   margin: 0 0 8px;
-
-  color: var(--az-text);
+  color: var(--text);
   font-size: 22px;
   font-weight: 950;
 }
@@ -704,8 +564,7 @@ body[data-theme="dark"].account-page::after {
 #recentOrders p,
 #historyList p {
   margin: 0;
-
-  color: var(--az-muted);
+  color: var(--text-muted);
   font-size: 15px;
   line-height: 1.65;
 }
@@ -713,15 +572,10 @@ body[data-theme="dark"].account-page::after {
 .empty-orders a {
   display: inline-flex;
   margin-top: 18px;
-
-  color: var(--az-primary);
+  color: var(--primary);
   text-decoration: none;
   font-weight: 950;
 }
-
-/* =========================
-   HIDE OLD
-========================= */
 
 #notifPanel,
 .noti-panel,
@@ -729,26 +583,19 @@ body[data-theme="dark"].account-page::after {
   display: none !important;
 }
 
-/* =========================
-   MOBILE
-========================= */
-
 .account-drawer-overlay {
   display: none;
 }
 
 @media (max-width: 900px) {
-
   .account-menu-btn {
     width: 42px;
     height: 42px;
-
     display: inline-flex !important;
     align-items: center;
     justify-content: center;
-
     border-radius: 50%;
-    background: var(--az-soft-purple) !important;
+    background: rgba(124, 58, 237, .12) !important;
   }
 
   .account-layout {
@@ -761,17 +608,13 @@ body[data-theme="dark"].account-page::after {
     position: fixed;
     top: 0;
     left: 0;
-
     width: 82%;
     max-width: 320px;
     height: 100vh;
-
     z-index: 999999;
     padding: 84px 22px 24px;
-
-    background: linear-gradient(180deg, var(--az-bg), var(--az-bg-2));
-    border-right: 1px solid var(--az-line);
-
+    background: linear-gradient(180deg, var(--bg), var(--bg-soft));
+    border-right: 1px solid var(--border);
     transform: translateX(-105%);
     transition: .28s ease;
   }
@@ -784,11 +627,9 @@ body[data-theme="dark"].account-page::after {
     position: fixed;
     inset: 0;
     z-index: 999998;
-
     display: block;
     background: rgba(0, 0, 0, .48);
     backdrop-filter: blur(6px);
-
     opacity: 0;
     visibility: hidden;
     transition: .25s ease;
@@ -821,8 +662,6 @@ body[data-theme="dark"].account-page::after {
 }
 
 @media (max-width: 520px) {
-
-
   .dashboard-grid {
     grid-template-columns: 1fr 1fr;
   }

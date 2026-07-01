@@ -28,6 +28,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const passwordInput = document.getElementById("password");
     const togglePassword = document.getElementById("togglePassword");
     const rememberMe = document.getElementById("rememberMe");
+    const googleLoginBtn = document.getElementById("googleLoginBtn");
+
+    if (googleLoginBtn) {
+        googleLoginBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            window.location.href = apiUrl("/api/auth/google");
+        });
+    }
 
     setTimeout(() => {
         if (usernameInput) usernameInput.value = "";

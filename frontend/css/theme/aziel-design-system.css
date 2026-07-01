@@ -1,13 +1,17 @@
 /* ======================================
-   AZIEL DESIGN SYSTEM V1
-   Auto Dark / Light Theme
+   AZIEL DESIGN SYSTEM V2.5
+   Shared Theme Foundation
 ====================================== */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
+/* =========================
+   BRAND / TOKENS
+========================= */
+
 :root {
     --primary: #8b5cf6;
-    --primary-hover: #a855f7;
+    --primary-hover: #7c3aed;
     --success: #22c55e;
     --warning: #f59e0b;
     --danger: #ef4444;
@@ -18,10 +22,16 @@
     --radius-xl: 32px;
 
     --transition: .25s ease;
+
+    --az-container: 1180px;
+    --az-page-x: 92%;
+    --az-header-h: 78px;
 }
 
-/* DARK MODE DEFAULT */
-:root,
+/* =========================
+   DARK / LIGHT VARIABLES
+========================= */
+
 body.theme-dark {
     --bg: #070b1d;
     --bg-soft: #0c1224;
@@ -40,7 +50,6 @@ body.theme-dark {
     --shadow-lg: 0 24px 60px rgba(0, 0, 0, .38);
 }
 
-/* LIGHT MODE */
 body.theme-light {
     --bg: #f5f6fb;
     --bg-soft: #eef1f7;
@@ -59,6 +68,10 @@ body.theme-light {
     --shadow-lg: 0 24px 60px rgba(17, 24, 39, .14);
 }
 
+/* =========================
+   RESET
+========================= */
+
 * {
     margin: 0;
     padding: 0;
@@ -67,10 +80,19 @@ body.theme-light {
 
 html {
     scroll-behavior: smooth;
+    color-scheme: dark;
+}
+
+body.theme-light {
+    color-scheme: light;
+}
+
+body.theme-dark {
+    color-scheme: dark;
 }
 
 body {
-    font-family: "Inter", system-ui, sans-serif;
+    font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
     background: var(--bg);
     color: var(--text);
     overflow-x: hidden;
@@ -84,16 +106,26 @@ img {
 
 a {
     color: inherit;
+    text-decoration: none;
 }
 
-.container {
-    width: min(1280px, calc(100% - 32px));
-    margin: auto;
+button,
+input,
+textarea,
+select {
+    font-family: inherit;
 }
+
+/* =========================
+   TYPOGRAPHY
+========================= */
 
 h1,
 h2,
-h3 {
+h3,
+h4,
+h5,
+h6 {
     color: var(--text);
 }
 
@@ -102,16 +134,53 @@ p {
     line-height: 1.7;
 }
 
+small {
+    color: var(--text-muted);
+}
+
+label {
+    color: var(--text-secondary);
+}
+
+/* =========================
+   LAYOUT
+========================= */
+
+.container,
+.az-container {
+    width: min(var(--az-container), var(--az-page-x));
+    margin-left: auto;
+    margin-right: auto;
+}
+
+#mainHome,
+.wallet-page,
+.account-layout {
+    width: min(var(--az-container), var(--az-page-x)) !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
 .section {
     margin-top: 80px;
 }
 
-.card {
+/* =========================
+   CARD
+========================= */
+
+.card,
+.az-card {
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-sm);
+    backdrop-filter: blur(16px);
 }
+
+/* =========================
+   BUTTONS
+========================= */
 
 .btn {
     border: none;
@@ -121,7 +190,6 @@ p {
     border-radius: var(--radius-md);
     font-weight: 800;
     transition: var(--transition);
-    text-decoration: none;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -130,7 +198,12 @@ p {
 
 .btn-primary {
     background: linear-gradient(135deg, var(--primary), var(--primary-hover));
-    color: white;
+    color: #ffffff;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 16px 36px rgba(124, 58, 237, .32);
 }
 
 .btn-secondary {
@@ -139,23 +212,55 @@ p {
     color: var(--text);
 }
 
+.btn-secondary:hover {
+    background: var(--card-hover);
+}
+
+/* =========================
+   INPUTS
+========================= */
+
+.input,
+input,
+textarea,
+select {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    outline: none;
+}
+
 .input {
     width: 100%;
     height: 56px;
     border-radius: var(--radius-md);
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--text);
     padding: 0 18px;
-    outline: none;
 }
 
-.input::placeholder {
+textarea {
+    resize: vertical;
+}
+
+input::placeholder,
+textarea::placeholder {
     color: var(--text-muted);
 }
 
+input:focus,
+textarea:focus,
+select:focus {
+    border-color: rgba(139, 92, 246, .65);
+    box-shadow: 0 0 0 4px rgba(139, 92, 246, .12);
+}
+
+/* =========================
+   BADGE
+========================= */
+
 .badge {
     display: inline-flex;
+    align-items: center;
+    gap: 8px;
     padding: 8px 14px;
     border-radius: 999px;
     background: rgba(139, 92, 246, .15);
@@ -166,46 +271,20 @@ p {
 }
 
 /* =========================
-   AZIEL V2.5 SHARED LAYOUT
+   TOPBAR ACTIONS
 ========================= */
 
-:root {
-    --az-container: 1180px;
-    --az-page-x: 92%;
-    --az-header-h: 78px;
-}
-
-.az-container,
-#mainHome,
-.wallet-page,
-.account-layout {
-    width: min(var(--az-container), var(--az-page-x)) !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-}
-
-/* small nav pill only for action buttons */
 .az-topbar-actions button {
-    padding: 10px 16px !important;
-    border-radius: 999px !important;
-    background: rgba(124, 58, 237, .10) !important;
-    color: #7c3aed !important;
+    padding: 10px 16px;
+    border-radius: 999px;
+    background: rgba(124, 58, 237, .10);
+    color: var(--primary);
+    border: 1px solid rgba(124, 58, 237, .14);
 }
 
-@media (max-width: 768px) {
-    :root {
-        --az-header-h: 66px;
-    }
-
-
-    #mainHome,
-    .wallet-page,
-    .account-layout {
-        width: calc(100% - 32px) !important;
-    }
-}
-
-/* AZIEL LOCALE SWITCHER */
+/* =========================
+   LOCALE SWITCHER
+========================= */
 
 .az-locale-switcher {
     display: flex;
@@ -217,65 +296,24 @@ p {
     height: 38px;
     min-width: 92px;
     padding: 0 10px;
-
     border-radius: 13px;
-    border: 1px solid rgba(17, 24, 39, .10);
-
-    background: rgba(255, 255, 255, .58);
-    color: #111827;
-
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
     font-size: 13px;
     font-weight: 850;
-
     outline: none;
     cursor: pointer;
 }
 
-body.dark .az-locale-switcher select,
-html.dark .az-locale-switcher select {
-    background: rgba(255, 255, 255, .08);
-    color: #f8fafc;
-    border-color: rgba(255, 255, 255, .12);
-}
-
 .az-locale-switcher select option {
     color: #111827;
+    background: #ffffff;
 }
 
-
-body.dark .profile-box,
-html.dark .profile-box {
-    background: rgba(255, 255, 255, .08) !important;
-    border-color: rgba(255, 255, 255, .10) !important;
-}
-
-@media (max-width: 768px) {
-    .az-locale-switcher {
-        gap: 6px;
-    }
-
-    .az-locale-switcher select {
-        min-width: 74px;
-        height: 34px;
-        font-size: 12px;
-        padding: 0 6px;
-    }
-}
-
-.az-locale-modal {
-    display: none;
-}
-
-.az-locale-modal.show {
-    position: fixed;
-    inset: 0;
-    z-index: 999999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, .45);
-    backdrop-filter: blur(10px);
-}
+/* =========================
+   LOCALE MODAL
+========================= */
 
 .az-locale-modal {
     position: fixed;
@@ -297,9 +335,9 @@ html.dark .profile-box {
     width: min(440px, 100%);
     padding: 28px;
     border-radius: 30px;
-    background: rgba(255, 255, 255, .92);
-    border: 1px solid rgba(17, 24, 39, .08);
-    box-shadow: 0 30px 90px rgba(17, 24, 39, .22);
+    background: var(--surface-strong);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-lg);
     position: relative;
 }
 
@@ -312,7 +350,7 @@ html.dark .profile-box {
     border: none;
     border-radius: 50%;
     background: rgba(124, 58, 237, .10);
-    color: #7c3aed;
+    color: var(--primary);
     font-size: 22px;
     cursor: pointer;
 }
@@ -322,19 +360,19 @@ html.dark .profile-box {
     font-size: 30px;
     font-weight: 950;
     letter-spacing: -1px;
-    color: #111827;
+    color: var(--text);
 }
 
 .az-locale-box p {
     margin: 0 0 22px;
-    color: #6b7280;
+    color: var(--text-muted);
     font-size: 14px;
 }
 
 .az-locale-box label {
     display: block;
     margin: 16px 0 8px;
-    color: #6b7280;
+    color: var(--text-muted);
     font-size: 13px;
     font-weight: 900;
 }
@@ -343,9 +381,9 @@ html.dark .profile-box {
     width: 100%;
     height: 54px;
     border-radius: 16px;
-    border: 1px solid rgba(17, 24, 39, .10);
-    background: #f8fafc;
-    color: #111827;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
     padding: 0 14px;
     font-weight: 850;
     outline: none;
@@ -357,52 +395,66 @@ html.dark .profile-box {
     margin-top: 24px;
     border: none;
     border-radius: 999px;
-    background: linear-gradient(135deg, #7c3aed, #9333ea);
+    background: linear-gradient(135deg, var(--primary), var(--primary-hover));
     color: white;
     font-weight: 950;
     cursor: pointer;
 }
 
 /* =========================
-   AZIEL FORCE DARK THEME
+   COMMON PAGE BACKGROUND
 ========================= */
-
-html,
-body {
-    background:
-        radial-gradient(circle at top right, rgba(124, 58, 237, .18), transparent 30%),
-        linear-gradient(180deg, #07081a, #0b1020) !important;
-    color: #f8fafc !important;
-}
-
-body,
-body.dark,
-body.theme-dark {
-    --bg: #080816;
-    --page-bg: #07081a;
-    --surface: rgba(12, 13, 28, .72);
-    --surface-strong: rgba(10, 10, 22, .86);
-    --header-bg: rgba(10, 10, 22, .78);
-    --card: rgba(12, 13, 28, .72);
-    --card-2: rgba(18, 19, 38, .88);
-
-    --text: rgba(255, 255, 255, .78);
-    --text-secondary: rgba(255, 255, 255, .68);
-    --text-muted: rgba(255, 255, 255, .48);
-    --heading: #ffffff;
-
-    --border: rgba(255, 255, 255, .08);
-    --shadow: 0 22px 70px rgba(0, 0, 0, .35);
-}
 
 .az-home,
 .az-page,
 main {
-    background: transparent !important;
+    background: transparent;
 }
 
+/* =========================
+   SCROLLBAR
+========================= */
 
-.az-section-head p,
-.az-game-info p {
-    color: #94a3b8 !important;
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(139, 92, 246, .35);
+    border-radius: 20px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(139, 92, 246, .55);
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 768px) {
+    :root {
+        --az-header-h: 66px;
+    }
+
+    #mainHome,
+    .wallet-page,
+    .account-layout {
+        width: calc(100% - 32px) !important;
+    }
+
+    .az-locale-switcher {
+        gap: 6px;
+    }
+
+    .az-locale-switcher select {
+        min-width: 74px;
+        height: 34px;
+        font-size: 12px;
+        padding: 0 6px;
+    }
 }
