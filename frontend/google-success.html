@@ -6,29 +6,43 @@
 </head>
 
 <body>
-
     <script>
-
-        const params =
-            new URLSearchParams(window.location.search);
+        const params = new URLSearchParams(window.location.search);
 
         const token = params.get("token");
+        const username = params.get("username") || "";
+        const displayName = params.get("displayName") || username || "User";
+        const email = params.get("email") || "";
+        const region = params.get("region") || "MM";
+        const role = params.get("role") || "user";
 
-        if (token) {
+        if (!token) {
+            window.location.href = "login.html";
+        } else {
+            const user = {
+                username,
+                displayName,
+                email,
+                region,
+                role
+            };
 
             localStorage.setItem("token", token);
+            localStorage.setItem("azielToken", token);
             localStorage.setItem("isLogin", "true");
 
-            window.location.href = "home.html";
+            localStorage.setItem("username", username);
+            localStorage.setItem("displayName", displayName);
+            localStorage.setItem("email", email);
+            localStorage.setItem("region", region);
+            localStorage.setItem("role", role);
 
-        } else {
+            localStorage.setItem("user", JSON.stringify(user));
+            localStorage.setItem("azielUser", JSON.stringify(user));
 
-            window.location.href = "login.html";
-
+            window.location.replace("home.html");
         }
-
     </script>
-
 </body>
 
 </html>

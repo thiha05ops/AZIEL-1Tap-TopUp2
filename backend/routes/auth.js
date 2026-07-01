@@ -4,6 +4,8 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
+const passport = require("passport");
+const GoogleStrategy = require("passport-google-oauth20").Strategy;
 
 const User = require("../models/User");
 const { sendVerifyOTP } = require("../services/mail");
@@ -23,7 +25,7 @@ function devLog(...args) {
 
 function isValidGmail(email) {
     return /^[a-zA-Z0-9._%+-]+@gmail\.com$/.test(
-        String(email || "").toLowerCase()
+        String(email || "").trim().toLowerCase()
     );
 }
 
@@ -85,7 +87,176 @@ function cleanExpiredPendingRegisters() {
     });
 }
 
-// REGISTER - SEND VERIFY OTP
+function getFrontendUrl() {
+    return (
+        process.env.FRONTEND_URL ||
+        process.env.CLIENT_URL ||
+        "http://127.0.0.1:5500/frontend"
+    ).replace(/\/$/, "");
+}
+
+async function makeUniqueUsername(email, displayName) {
+    const emailName = String(email || "")
+        .split("@")[0]
+        .toLowerCase()
+        .replace(/[^a-z0-9_]/g, "");
+
+    const nameBase = String(displayName || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9_]/g, "");
+
+    let base = emailName || nameBase || "googleuser";
+
+    if (base.length < 3) {
+        base = `user${base}`;
+    }
+
+    let username = base;
+    let count = 1;
+
+    while (await User.findOne({ username })) {
+        username = `${base}${count}`;
+        count++;
+    }
+
+    return username;
+}
+
+/* ======================================================
+   GOOGLE AUTH STRATEGY
+====================================================== */
+
+if (
+    process.env.GOOGLE_CLIENT_ID &&
+    process.env.GOOGLE_CLIENT_SECRET
+) {
+    passport.use(
+        new GoogleStrategy(
+            {
+                clientID: process.env.GOOGLE_CLIENT_ID,
+                clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+                callbackURL:
+                    process.env.GOOGLE_CALLBACK_URL ||
+                    "/api/auth/google/callback"
+            },
+            async (accessToken, refreshToken, profile, done) => {
+                try {
+                    const email =
+                        profile.emails?.[0]?.value?.toLowerCase() || "";
+
+                    if (!email) {
+                        return done(null, false, {
+                            message: "Google email not found"
+                        });
+                    }
+
+                    let user = await User.findOne({ email });
+
+                    if (!user) {
+                        const username = await makeUniqueUsername(
+                            email,
+                            profile.displayName
+                        );
+
+                        const randomPassword = crypto
+                            .randomBytes(24)
+                            .toString("hex");
+
+                        const hashedPassword = await bcrypt.hash(
+                            randomPassword,
+                            10
+                        );
+
+                        user = await User.create({
+                            username,
+                            email,
+                            password: hashedPassword,
+                            displayName:
+                                profile.displayName ||
+                                username,
+                            isVerified: true,
+                            emailVerified: true,
+                            region: "MM",
+                            wallet: {
+                                MMK: 0,
+                                THB: 0
+                            },
+                            currentSessionToken: "",
+                            sessionUpdatedAt: null,
+                            lastActiveAt: new Date()
+                        });
+                    }
+
+                    return done(null, user);
+                } catch (error) {
+                    return done(error, null);
+                }
+            }
+        )
+    );
+}
+
+/* ======================================================
+   GOOGLE AUTH ROUTES
+====================================================== */
+
+router.get(
+    "/auth/google",
+    passport.authenticate("google", {
+        scope: ["profile", "email"],
+        session: false
+    })
+);
+
+router.get(
+    "/auth/google/callback",
+    passport.authenticate("google", {
+        session: false,
+        failureRedirect: `${getFrontendUrl()}/login.html`
+    }),
+    async (req, res) => {
+        try {
+            const user = req.user;
+
+            if (!user) {
+                return res.redirect(`${getFrontendUrl()}/login.html`);
+            }
+
+            const now = new Date();
+            const sessionToken = makeSessionToken();
+
+            user.currentSessionToken = sessionToken;
+            user.sessionUpdatedAt = now;
+            user.lastActiveAt = now;
+            user.lastLoginDevice = getDeviceInfo(req);
+
+            await user.save();
+
+            const token = createToken(user, sessionToken);
+
+            const params = new URLSearchParams({
+                token,
+                username: user.username || "",
+                displayName: user.displayName || user.username || "",
+                email: user.email || "",
+                region: user.region || "MM",
+                role: user.role || "user"
+            });
+
+            return res.redirect(
+                `${getFrontendUrl()}/google-success.html?${params.toString()}`
+            );
+        } catch (error) {
+            console.log("Google callback error:", error);
+            return res.redirect(`${getFrontendUrl()}/login.html`);
+        }
+    }
+);
+
+/* ======================================================
+   REGISTER - SEND VERIFY OTP
+====================================================== */
+
 router.post("/register", async (req, res) => {
     try {
         cleanExpiredPendingRegisters();
@@ -167,7 +338,10 @@ router.post("/register", async (req, res) => {
     }
 });
 
-// VERIFY EMAIL - CREATE USER
+/* ======================================================
+   VERIFY EMAIL - CREATE USER
+====================================================== */
+
 router.post("/verify-email", async (req, res) => {
     try {
         cleanExpiredPendingRegisters();
@@ -258,7 +432,10 @@ router.post("/verify-email", async (req, res) => {
     }
 });
 
-// LOGIN
+/* ======================================================
+   LOGIN
+====================================================== */
+
 router.post("/login", async (req, res) => {
     try {
         const loginId = String(req.body.username || "").trim().toLowerCase();
