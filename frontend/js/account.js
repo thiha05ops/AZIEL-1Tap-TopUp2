@@ -482,32 +482,49 @@ function statusClass(status) {
 // UI EVENTS
 // ============================
 
+function showAccountTab(tabName) {
+    if (!tabName) return;
+
+    const panel = document.getElementById(tabName);
+    if (!panel) return;
+
+    document.querySelectorAll(".side-link[data-tab]").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.tab === tabName);
+    });
+
+    document.querySelectorAll(".tab-panel").forEach(item => {
+        item.classList.toggle("active", item.id === tabName);
+    });
+
+    document.querySelector(".az-profile-dropdown")?.classList.remove("show");
+
+    if (tabName === "history") {
+        loadHistory();
+    }
+
+    if (tabName === "overview") {
+        renderAccount();
+        loadHistory();
+    }
+}
+
 function initTabs() {
-    document.querySelectorAll(".side-link").forEach(btn => {
+    document.querySelectorAll(".side-link[data-tab]").forEach(btn => {
         btn.addEventListener("click", () => {
-            if (!btn.dataset.tab) return;
-
-            document.querySelectorAll(".side-link").forEach(button =>
-                button.classList.remove("active")
-            );
-
-            document.querySelectorAll(".tab-panel").forEach(panel =>
-                panel.classList.remove("active")
-            );
-
-            btn.classList.add("active");
-            document.getElementById(btn.dataset.tab)?.classList.add("active");
-
-            if (btn.dataset.tab === "history") {
-                loadHistory();
-            }
-
-            if (btn.dataset.tab === "overview") {
-                renderAccount();
-                loadHistory();
-            }
+            const tab = btn.dataset.tab;
+            showAccountTab(tab);
+            history.replaceState(null, "", `#${tab}`);
         });
     });
+
+    function openHashTab() {
+        const tab = location.hash.replace("#", "") || "overview";
+        showAccountTab(tab);
+    }
+
+    openHashTab();
+
+    window.addEventListener("hashchange", openHashTab);
 }
 
 function initButtons() {

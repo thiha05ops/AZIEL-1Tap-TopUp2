@@ -458,3 +458,63 @@ main {
         padding: 0 6px;
     }
 }
+
+/* =========================
+   THEME VISIBILITY SAFETY
+========================= */
+
+body.theme-light {
+    --heading: #111827;
+    --page-bg: #f5f6fb;
+    --input-bg: rgba(255, 255, 255, .86);
+    --input-text: #111827;
+    --soft-panel: rgba(255, 255, 255, .82);
+}
+
+body.theme-dark {
+    --heading: #ffffff;
+    --page-bg: #070b1d;
+    --input-bg: rgba(255, 255, 255, .06);
+    --input-text: #ffffff;
+    --soft-panel: rgba(255, 255, 255, .06);
+}
+
+body,
+main,
+section,
+div {
+    color: var(--text);
+}
+
+h1,
+h2,
+h3,
+h4,
+strong {
+    color: var(--heading, var(--text));
+}
+
+input,
+textarea,
+select {
+    background: var(--input-bg);
+    color: var(--input-text);
+}
+
+.content-card,
+.form-card,
+.account-content,
+.account-sidebar,
+.az-panel,
+.trust-card,
+.popular-game-card,
+.security-card {
+    color: var(--text);
+}
+
+.content-card p,
+.form-card p,
+.account-content p,
+.security-card p {
+    color: var(--text-secondary);
+}

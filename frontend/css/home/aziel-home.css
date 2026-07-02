@@ -799,7 +799,7 @@ body.theme-light {
 body::before {
     content: "";
     position: fixed;
-    inset: 86px 0 0;
+    inset: 0px 0 0;
     pointer-events: none;
     z-index: 0;
 
@@ -818,14 +818,14 @@ body::before {
 body::after {
     content: "";
     position: fixed;
-    inset: 86px 0 0;
+    inset: 0px 0 0;
     pointer-events: none;
     z-index: 0;
 
     background:
         linear-gradient(180deg,
-            rgba(var(--banner-rgb), .45) 0px,
-            rgba(var(--banner-rgb), .22) 260px,
+            rgba(var(--banner-rgb), .85) 0px,
+            rgba(var(--banner-rgb), .42) 260px,
             rgba(var(--banner-rgb), .10) 520px,
             transparent 900px);
 }

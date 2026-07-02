@@ -252,3 +252,12 @@ a {
     background: rgba(139, 92, 246, .55);
 
 }
+
+.theme-status-btn {
+    cursor: default !important;
+    opacity: 1 !important;
+}
+
+.theme-status-btn:hover {
+    transform: none !important;
+}

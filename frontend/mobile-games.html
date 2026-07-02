@@ -6,10 +6,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mobile Games - AZIEL</title>
 
-    <link rel="stylesheet" href="/css/core/main.css">
-    <link rel="stylesheet" href="/css/core/home.css">
-    <link rel="manifest" href="/manifest.json">
-    <link rel="stylesheet" href="/css/theme/aziel-design-system.css">
+    <link rel="stylesheet" href="css/theme/aziel-design-system.css?v=20260701">
+    <link rel="stylesheet" href="css/theme/aziel-header.css?v=20260701">
+
+    <link rel="stylesheet" href="css/core/main.css">
+    <link rel="stylesheet" href="css/core/layout.css">
+    <link rel="stylesheet" href="css/core/components.css">
+    <link rel="stylesheet" href="css/core/footer.css">
+
+    <link rel="stylesheet" href="css/theme/wave-background.css">
+    <link rel="stylesheet" href="css/theme/desktop.css">
+    <link rel="stylesheet" href="css/theme/mobile.css">
+
+    <link rel="stylesheet" href="css/home/home.css?v=20260702">
+    <link rel="stylesheet" href="css/home/aziel-home.css?v=20260702">
+
 
     <meta name="theme-color" content="#070716">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -21,33 +32,7 @@
 
 <body>
 
-    <header class="home-header">
-
-        <div class="logo">AZIEL</div>
-
-        <nav class="nav-links">
-            <a href="home.html">Home</a>
-            <a href="mobile-games.html">Mobile Games</a>
-        </nav>
-
-        <div class="header-right">
-
-            <input type="text" id="searchInput" placeholder="Search games">
-
-            <div class="profile-box" id="profileBox">
-                <div class="avatar" id="avatarText">👤</div>
-                <span id="usernameText">Login</span>
-
-                <div class="profile-dropdown" id="profileDropdown">
-                    <a href="account.html">Account</a>
-                    <a href="notifications.html">Notifications</a>
-                    <button id="logoutBtn">Logout</button>
-                </div>
-            </div>
-
-        </div>
-
-    </header>
+    <div id="azHeaderMount" data-nav="game"></div>
 
     <main id="mainHome">
 
@@ -159,10 +144,13 @@
         © 2026 AZIEL 1Tap Shop
     </footer>
 
-    <script src="/js/auth-check.js"></script>
-    <script src="/js/home.js"></script>
-    <script src="/js/pwa-fix.js"></script>
     <script src="js/site-settings.js"></script>
+    <script src="js/user-state.js?v=2026062905"></script>
+    <script src="js/auth-check.js"></script>
+    <script src="js/header-loader.js?v=20260702"></script>
+    <script src="js/header.js?v=20260702"></script>
+    <script src="js/locale-switcher.js"></script>
+    <script src="js/theme.js?v=20260702"></script>
 </body>
 
 </html>
