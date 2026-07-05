@@ -1,10 +1,10 @@
 // frontend/js/payment.js
+// AZIEL V2.5 Dynamic Payment Methods + Wallet
 
 document.addEventListener("DOMContentLoaded", () => {
     loadPaymentMethods();
 });
 
-// Store selected payment object globally
 window.selectedPaymentData = null;
 
 async function loadPaymentMethods() {
@@ -18,87 +18,63 @@ async function loadPaymentMethods() {
         localStorage.getItem("selectedRegion") ||
         "MM";
 
-    paymentGrid.innerHTML = `
-        <p class="pay-loading">
-            Loading payment methods...
-        </p>
-    `;
-
+    paymentGrid.innerHTML = `<p class="pay-loading">Loading payment methods...</p>`;
     paymentInput.value = "";
     window.selectedPaymentData = null;
 
     try {
-        const API_BASE =
-            location.port === "5500"
-                ? "http://localhost:3000"
-                : "";
-
+        const API_BASE = location.port === "5500" ? "http://localhost:3000" : "";
         const res = await fetch(`${API_BASE}/api/payment-methods?region=${region}`);
-
         const data = await res.json();
 
         if (!res.ok || !data.success) {
-            throw new Error(
-                data.message ||
-                "Failed to load payment methods"
-            );
+            throw new Error(data.message || "Failed to load payment methods");
         }
 
-        const methods = Array.isArray(data.methods)
-            ? data.methods
-            : [];
+        let methods = Array.isArray(data.methods) ? data.methods : [];
+        methods = methods.filter(method => method.enabled === true);
 
-        const activeMethods = methods.filter(method =>
-            method.enabled === true
-        );
+        methods.push(getWalletMethod(region));
 
         paymentGrid.innerHTML = "";
 
-        if (!activeMethods.length) {
-            paymentGrid.innerHTML = `
-                <p class="pay-empty">
-                    No payment methods available.
-                </p>
-            `;
+        if (!methods.length) {
+            paymentGrid.innerHTML = `<p class="pay-empty">No payment methods available.</p>`;
             return;
         }
 
-        activeMethods.forEach((method, index) => {
-            const card = buildPaymentCard(method, index);
-            paymentGrid.appendChild(card);
+        methods.forEach((method, index) => {
+            paymentGrid.appendChild(buildPaymentCard(method, index));
         });
 
         const firstCard = paymentGrid.querySelector(".pay-card");
-
-        if (firstCard) {
-            selectPaymentCard(firstCard);
-        }
+        if (firstCard) selectPaymentCard(firstCard);
 
     } catch (error) {
         console.error("Load payment methods error:", error);
-
-        paymentGrid.innerHTML = `
-            <p class="pay-error">
-                Payment methods failed to load.
-            </p>
-        `;
+        paymentGrid.innerHTML = `<p class="pay-error">Payment methods failed to load.</p>`;
     }
 }
 
+function getWalletMethod(region) {
+    return {
+        method: "AZIEL Wallet",
+        key: "wallet",
+        region,
+        enabled: true,
+        paymentType: "wallet",
+        provider: "wallet",
+        logo: "assets/logo.png",
+        accountName: "",
+        accountNumber: "",
+        maintenanceMessage: "Pay instantly using your AZIEL wallet balance."
+    };
+}
+
 function buildPaymentCard(method, index) {
-    const key =
-        method.key ||
-        normalizePaymentKey(method.method);
-
-    const displayName =
-        method.method ||
-        getPaymentDisplayName(key);
-
-    const logo =
-        method.logo ||
-        method.logoUrl ||
-        method.logoImage ||
-        getPaymentLogo(key);
+    const key = method.key || normalizePaymentKey(method.method);
+    const displayName = method.method || getPaymentDisplayName(key);
+    const logo = method.logo || method.logoUrl || method.logoImage || getPaymentLogo(key);
 
     const qrImage =
         method.finalQrImage ||
@@ -116,25 +92,25 @@ function buildPaymentCard(method, index) {
         localStorage.getItem("selectedRegion") ||
         "MM";
 
-    let paymentType =
-        method.paymentType ||
-        "manual";
+    let paymentType = method.paymentType || "manual";
+    let provider = method.provider || "manual";
 
-    let provider =
-        method.provider ||
-        "manual";
+    if (key === "wallet") {
+        paymentType = "wallet";
+        provider = "wallet";
+    }
 
-    // TH PromptPay ကို auto gateway အဖြစ် frontend မှာသေချာသတ်မှတ်
-    if (
-        String(region).toUpperCase() === "TH" &&
-        key === "promptpay"
-    ) {
+    if (String(region).toUpperCase() === "TH" && key === "promptpay") {
         paymentType = "auto";
         provider = "omise";
     }
 
-    const card = document.createElement("div");
+    if (String(region).toUpperCase() === "TH" && key === "scb") {
+        paymentType = "deeplink";
+        provider = "scb";
+    }
 
+    const card = document.createElement("div");
     card.className = `pay-card ${index === 0 ? "active" : ""}`;
 
     card.dataset.method = key;
@@ -146,53 +122,46 @@ function buildPaymentCard(method, index) {
     card.dataset.paymentType = paymentType;
     card.dataset.provider = provider;
     card.dataset.region = region;
-    card.dataset.maintenanceMessage =
-        method.maintenanceMessage || "";
+    card.dataset.maintenanceMessage = method.maintenanceMessage || "";
 
     card.innerHTML = `
-        <img
-            src="${logo}"
-            class="pay-logo"
-            alt="${displayName}"
-        >
+        <img src="${logo}" class="pay-logo" alt="${displayName}">
 
         <div class="pay-info">
             <span>${displayName}</span>
-
-            ${paymentType === "auto"
-            ? `<small class="auto-pay-badge">Auto Ready</small>`
-            : `<small class="manual-pay-badge">Manual</small>`
-        }
-
-            ${method.maintenanceMessage
-            ? `<small class="pay-message">
-                        ${method.maintenanceMessage}
-                   </small>`
-            : ""
-        }
+            ${getPaymentBadge(paymentType)}
+            ${method.maintenanceMessage ? `<small class="pay-message">${method.maintenanceMessage}</small>` : ""}
         </div>
     `;
 
-    card.addEventListener("click", () => {
-        selectPaymentCard(card);
-    });
-
+    card.addEventListener("click", () => selectPaymentCard(card));
     return card;
 }
 
+function getPaymentBadge(paymentType) {
+    if (paymentType === "auto") {
+        return `<small class="auto-pay-badge">Auto</small>`;
+    }
+
+    if (paymentType === "deeplink") {
+        return `<small class="manual-pay-badge">Bank App</small>`;
+    }
+
+    if (paymentType === "wallet") {
+        return `<small class="auto-pay-badge">Wallet Pay</small>`;
+    }
+
+    return `<small class="manual-pay-badge">Manual</small>`;
+}
+
 function selectPaymentCard(card) {
-    const paymentInput =
-        document.getElementById("paymentMethod");
+    const paymentInput = document.getElementById("paymentMethod");
 
-    document
-        .querySelectorAll(".pay-card")
-        .forEach(c => c.classList.remove("active"));
-
+    document.querySelectorAll(".pay-card").forEach(c => c.classList.remove("active"));
     card.classList.add("active");
 
     if (paymentInput) {
-        paymentInput.value =
-            card.dataset.method || "";
+        paymentInput.value = card.dataset.method || "";
     }
 
     window.selectedPaymentData = {
@@ -205,44 +174,16 @@ function selectPaymentCard(card) {
         paymentType: card.dataset.paymentType || "manual",
         provider: card.dataset.provider || "manual",
         region: card.dataset.region || "",
-        maintenanceMessage:
-            card.dataset.maintenanceMessage || ""
+        maintenanceMessage: card.dataset.maintenanceMessage || ""
     };
 
-    localStorage.setItem(
-        "selectedPaymentMethod",
-        window.selectedPaymentData.key
-    );
-
-    localStorage.setItem(
-        "selectedPaymentName",
-        window.selectedPaymentData.method
-    );
-
-    localStorage.setItem(
-        "selectedPaymentQr",
-        window.selectedPaymentData.qrImage
-    );
-
-    localStorage.setItem(
-        "selectedPaymentAccountName",
-        window.selectedPaymentData.accountName
-    );
-
-    localStorage.setItem(
-        "selectedPaymentAccountNumber",
-        window.selectedPaymentData.accountNumber
-    );
-
-    localStorage.setItem(
-        "selectedPaymentType",
-        window.selectedPaymentData.paymentType
-    );
-
-    localStorage.setItem(
-        "selectedPaymentProvider",
-        window.selectedPaymentData.provider
-    );
+    localStorage.setItem("selectedPaymentMethod", window.selectedPaymentData.key);
+    localStorage.setItem("selectedPaymentName", window.selectedPaymentData.method);
+    localStorage.setItem("selectedPaymentQr", window.selectedPaymentData.qrImage);
+    localStorage.setItem("selectedPaymentAccountName", window.selectedPaymentData.accountName);
+    localStorage.setItem("selectedPaymentAccountNumber", window.selectedPaymentData.accountNumber);
+    localStorage.setItem("selectedPaymentType", window.selectedPaymentData.paymentType);
+    localStorage.setItem("selectedPaymentProvider", window.selectedPaymentData.provider);
 
     console.log("SELECTED PAYMENT =", window.selectedPaymentData);
 
@@ -285,3 +226,5 @@ function getPaymentLogo(key) {
 
     return logos[key] || "assets/logo.png";
 }
+
+window.loadPaymentMethods = loadPaymentMethods;
