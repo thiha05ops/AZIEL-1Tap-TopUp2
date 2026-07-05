@@ -4,6 +4,7 @@ const express = require("express");
 const router = express.Router();
 
 const Omise = require("../services/opnService");
+const upload = require("../middleware/orderUpload");
 
 const Order = require("../models/Order");
 const User = require("../models/User");
@@ -389,7 +390,82 @@ router.get("/payment-methods", async (req, res) => {
         });
     }
 });
+// MANUAL / DEEPLINK PAYMENT SLIP SUBMIT
+// POST /api/payment/submit
+router.post("/payment/submit", upload.single("slip"), async (req, res) => {
+    try {
+        const { orderId } = req.body;
 
+        if (!orderId) {
+            return res.json({
+                success: false,
+                message: "Missing order ID"
+            });
+        }
+
+        if (!req.file) {
+            return res.json({
+                success: false,
+                message: "Please upload payment slip"
+            });
+        }
+
+        const order = await Order.findOne({ orderId });
+
+        if (!order) {
+            return res.json({
+                success: false,
+                message: "Order not found"
+            });
+        }
+
+        order.paymentSlip = `/uploads/orders/${req.file.filename}`;
+        order.status = "paid";
+        order.note = "Payment slip uploaded. Waiting for admin verification.";
+        order.paidAt = new Date();
+
+        await order.save();
+
+        const notification = await Notification.create({
+            username: order.username,
+            title: "Payment Slip Submitted",
+            message: `${order.game} - ${order.packageName} payment slip has been submitted.`,
+            type: "order",
+            category: "orders",
+            orderId: order.orderId
+        });
+
+        const io = req.app.get("io");
+
+        if (io) {
+            io.to(order.username).emit("newNotification", notification);
+
+            io.to("admins").emit("adminNewUpdate", {
+                type: "payment_slip_uploaded",
+                orderId: order.orderId,
+                username: order.username,
+                game: order.game,
+                amount: order.amount,
+                currency: order.currency,
+                status: order.status
+            });
+        }
+
+        return res.json({
+            success: true,
+            message: "Payment slip submitted",
+            order
+        });
+
+    } catch (error) {
+        console.log("Payment submit error:", error);
+
+        return res.json({
+            success: false,
+            message: error.message || "Payment submit server error"
+        });
+    }
+});
 // GAME PAYMENT STATUS
 router.get("/payment/status/:orderId", async (req, res) => {
     try {

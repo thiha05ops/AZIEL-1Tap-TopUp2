@@ -1,5 +1,5 @@
 // backend/routes/wallet.js
-// AZIEL Wallet V2.5 - Auto QR / Webhook Ready
+// AZIEL Wallet V2.5 - Auto QR / Webhook / Admin Ready
 
 const express = require("express");
 const router = express.Router();
@@ -9,6 +9,7 @@ const Order = require("../models/Order");
 const WalletTopup = require("../models/WalletTopup");
 const WalletTransaction = require("../models/WalletTransaction");
 const Notification = require("../models/Notification");
+const adminMiddleware = require("../middleware/adminMiddleware");
 
 // ======================
 // HELPERS
@@ -28,6 +29,19 @@ function getQrByMethod(paymentMethod) {
     };
 
     return qrMap[paymentMethod] || "";
+}
+
+function emitWalletUpdate(req, username, payload) {
+    const io = req.app.get("io");
+
+    if (!io || !username) return;
+
+    io.to(username).emit("walletUpdated", payload);
+    io.to("admins").emit("adminNewUpdate", {
+        type: "wallet",
+        username,
+        ...payload
+    });
 }
 
 // ======================
@@ -78,24 +92,145 @@ router.get("/wallet/:username", async (req, res) => {
 });
 
 // ======================
-// MARK WALLET TOPUP PAID
-// Used by webhook later
+// ADMIN WALLET TOPUPS
+// GET /api/admin/wallet/topups
 // ======================
 
-async function markWalletTopupPaid(req, topupId) {
-    const topup = await WalletTopup.findOne({ topupId });
+router.get("/admin/wallet/topups", adminMiddleware, async (req, res) => {
+    try {
+        const topups = await WalletTopup.find()
+            .sort({ createdAt: -1 })
+            .limit(200);
 
-    if (!topup) {
-        return {
+        res.json({
+            success: true,
+            topups
+        });
+
+    } catch (error) {
+        console.log("Admin wallet topups error:", error);
+
+        res.status(500).json({
             success: false,
-            message: "Topup not found"
-        };
+            message: "Server error"
+        });
     }
+});
 
-    if (topup.status === "paid" || topup.status === "completed") {
+// ======================
+// ADMIN UPDATE TOPUP STATUS
+// PUT /api/admin/wallet/topups/:id/status
+// ======================
+
+router.put("/admin/wallet/topups/:id/status", adminMiddleware, async (req, res) => {
+    try {
+        const { status } = req.body;
+
+        const allowedStatus = [
+            "pending",
+            "approved",
+            "rejected",
+            "paid",
+            "completed",
+            "cancelled"
+        ];
+
+        if (!allowedStatus.includes(status)) {
+            return res.json({
+                success: false,
+                message: "Invalid status"
+            });
+        }
+
+        const topup = await WalletTopup.findById(req.params.id);
+
+        if (!topup) {
+            return res.json({
+                success: false,
+                message: "Topup not found"
+            });
+        }
+
+        if (["approved", "paid", "completed"].includes(status)) {
+            const result = await completeWalletTopup(req, topup);
+
+            if (!result.success) {
+                return res.json(result);
+            }
+
+            return res.json({
+                success: true,
+                message: "Wallet topup approved",
+                topup: result.topup,
+                balance: result.balance
+            });
+        }
+
+        if (["rejected", "cancelled"].includes(status)) {
+            topup.status = "rejected";
+            topup.note = "Wallet topup rejected by admin";
+            await topup.save();
+
+            try {
+                const notification = await Notification.create({
+                    username: topup.username,
+                    title: "Wallet Top-Up Rejected",
+                    message: `Your ${Number(topup.amount || 0).toLocaleString()} ${getCurrencyKey(topup.currency)} wallet top-up was rejected.`,
+                    type: "wallet",
+                    category: "wallet",
+                    isRead: false
+                });
+
+                const io = req.app.get("io");
+
+                if (io) {
+                    io.to(topup.username).emit("newNotification", notification);
+                    io.to("admins").emit("adminNewUpdate", {
+                        type: "wallet_topup_rejected",
+                        username: topup.username,
+                        amount: topup.amount,
+                        currency: topup.currency
+                    });
+                }
+            } catch (notiError) {
+                console.log("Reject notification error:", notiError.message);
+            }
+
+            return res.json({
+                success: true,
+                message: "Wallet topup rejected",
+                topup
+            });
+        }
+
+        topup.status = status;
+        await topup.save();
+
+        res.json({
+            success: true,
+            message: "Topup status updated",
+            topup
+        });
+
+    } catch (error) {
+        console.log("Admin wallet status update error:", error);
+
+        res.status(500).json({
+            success: false,
+            message: "Server error"
+        });
+    }
+});
+
+// ======================
+// COMPLETE WALLET TOPUP
+// ======================
+
+async function completeWalletTopup(req, topup) {
+    if (["approved", "paid", "completed"].includes(topup.status)) {
         return {
             success: true,
-            message: "Already paid",
+            message: "Already completed",
             topup
         };
     }
@@ -119,15 +254,15 @@ async function markWalletTopupPaid(req, topupId) {
         };
     }
 
-    topup.status = "paid";
-    topup.note = "Wallet balance added automatically";
+    topup.status = "approved";
+    topup.note = "Wallet balance added by admin";
     await topup.save();
 
     await WalletTransaction.create({
         transactionId: "TXN-" + Date.now(),
         username: topup.username,
         type: "topup",
-        amount: Number(topup.amount),
+        amount: Number(topup.amount || 0),
         currency: currencyKey,
         status: "completed",
         description: `Wallet topup via ${topup.paymentMethod}`
@@ -136,7 +271,7 @@ async function markWalletTopupPaid(req, topupId) {
     const notification = await Notification.create({
         username: topup.username,
         title: "Wallet Top-Up Successful",
-        message: `${Number(topup.amount).toLocaleString()} ${currencyKey} has been added to your wallet.`,
+        message: `${Number(topup.amount || 0).toLocaleString()} ${currencyKey} has been added to your wallet.`,
         type: "system",
         category: "wallet"
     });
@@ -147,13 +282,13 @@ async function markWalletTopupPaid(req, topupId) {
         io.to(topup.username).emit("walletUpdated", {
             amount: updatedUser.wallet?.[currencyKey] || 0,
             currency: currencyKey,
-            status: "paid"
+            status: "approved"
         });
 
         io.to(topup.username).emit("newNotification", notification);
 
         io.to("admins").emit("adminNewUpdate", {
-            type: "wallet_topup_paid",
+            type: "wallet_topup_approved",
             username: topup.username,
             amount: topup.amount,
             currency: currencyKey
@@ -162,10 +297,28 @@ async function markWalletTopupPaid(req, topupId) {
 
     return {
         success: true,
-        message: "Wallet topup paid",
+        message: "Wallet topup approved",
         topup,
         balance: updatedUser.wallet?.[currencyKey] || 0
     };
+}
+
+// ======================
+// MARK WALLET TOPUP PAID
+// Used by webhook later
+// ======================
+
+async function markWalletTopupPaid(req, topupId) {
+    const topup = await WalletTopup.findOne({ topupId });
+
+    if (!topup) {
+        return {
+            success: false,
+            message: "Topup not found"
+        };
+    }
+
+    return await completeWalletTopup(req, topup);
 }
 
 // ======================
@@ -246,15 +399,15 @@ router.post("/wallet/pay", async (req, res) => {
             note: "Paid with wallet"
         });
 
+        emitWalletUpdate(req, username, {
+            amount: user.wallet[currencyKey],
+            currency: currencyKey,
+            status: "payment"
+        });
+
         const io = req.app.get("io");
 
         if (io) {
-            io.to(username).emit("walletUpdated", {
-                amount: user.wallet[currencyKey],
-                currency: currencyKey,
-                status: "payment"
-            });
-
             io.to("admins").emit("adminNewUpdate", {
                 type: "wallet_payment",
                 orderId: order.orderId,
