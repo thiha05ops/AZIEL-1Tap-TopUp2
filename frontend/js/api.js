@@ -1,39 +1,45 @@
-// frontend/js/api.js
+// frontend/js/admin-api.js
+// AZIEL Admin V2.5 API Helper
 
-function getToken() {
+const ADMIN_API_BASE =
+    window.location.port === "5500"
+        ? `${window.location.protocol}//${window.location.hostname}:3000`
+        : "";
+
+function adminApiUrl(url) {
+    if (!url) return ADMIN_API_BASE;
+
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+        return url;
+    }
+
+    return `${ADMIN_API_BASE}${url}`;
+}
+
+function getAdminToken() {
     return (
-        localStorage.getItem("token") ||
-        sessionStorage.getItem("token")
+        localStorage.getItem("adminToken") ||
+        localStorage.getItem("token")
     );
 }
 
-function logoutUser(message = "") {
-    localStorage.removeItem("token");
-    localStorage.removeItem("username");
-    localStorage.removeItem("isLogin");
-    localStorage.removeItem("displayName");
-    localStorage.removeItem("email");
-    localStorage.removeItem("role");
-
-    sessionStorage.removeItem("token");
-    sessionStorage.removeItem("username");
+function adminLogout(message = "") {
+    localStorage.removeItem("adminToken");
+    localStorage.removeItem("adminUsername");
+    localStorage.removeItem("adminRole");
 
     if (message) {
-        localStorage.setItem("logoutMessage", message);
+        localStorage.setItem("adminLogoutMessage", message);
     }
 
-    window.location.href = "login.html";
+    window.location.href = "admin-login.html";
 }
 
-function isTokenExpired(token) {
+function isAdminTokenExpired(token) {
     try {
-        const payload = JSON.parse(
-            atob(token.split(".")[1])
-        );
+        const payload = JSON.parse(atob(token.split(".")[1]));
 
-        if (!payload.exp) {
-            return false;
-        }
+        if (!payload.exp) return false;
 
         return payload.exp * 1000 < Date.now();
 
@@ -42,32 +48,32 @@ function isTokenExpired(token) {
     }
 }
 
-function checkToken() {
-    const token = getToken();
+function checkAdminToken() {
+    const token = getAdminToken();
 
-    if (!token) {
-        return;
-    }
+    if (!token) return;
 
-    if (isTokenExpired(token)) {
-        logoutUser("Session expired. Please login again.");
+    if (isAdminTokenExpired(token)) {
+        adminLogout("Admin session expired. Please login again.");
     }
 }
 
-async function apiFetch(url, options = {}) {
-    checkToken();
+async function adminFetch(url, options = {}) {
+    checkAdminToken();
 
-    const token = getToken();
+    const token = getAdminToken();
 
-    const headers = {
-        ...(options.headers || {})
-    };
-
-    if (token) {
-        headers.Authorization = `Bearer ${token}`;
+    if (!token) {
+        adminLogout("Admin login required.");
+        return null;
     }
 
-    const res = await fetch(url, {
+    const headers = {
+        ...(options.headers || {}),
+        Authorization: `Bearer ${token}`
+    };
+
+    const res = await fetch(adminApiUrl(url), {
         ...options,
         headers
     });
@@ -81,37 +87,32 @@ async function apiFetch(url, options = {}) {
     }
 
     if (res.status === 401 || data.forceLogout) {
-        const message =
-            data.reason === "another_device"
-                ? "Your account was logged in on another device."
-                : data.reason === "inactive"
-                    ? "Your session expired because this account was inactive for 15 days."
-                    : data.message || "Login expired. Please login again.";
-
-        logoutUser(message);
+        adminLogout(data.message || "Admin session expired.");
         return null;
     }
 
     return data;
 }
 
-function showLogoutMessage() {
-    const msg = localStorage.getItem("logoutMessage");
+function showAdminLogoutMessage() {
+    const msg = localStorage.getItem("adminLogoutMessage");
 
-    if (!msg) {
-        return;
-    }
+    if (!msg) return;
 
-    alert(msg);
-    localStorage.removeItem("logoutMessage");
+    localStorage.removeItem("adminLogoutMessage");
+
+    setTimeout(() => {
+        if (typeof showAdminToast === "function") {
+            showAdminToast(msg, "error");
+        } else {
+            alert(msg);
+        }
+    }, 300);
 }
 
-// AUTO CHECK EVERY 1 MINUTE
-setInterval(checkToken, 60000);
-
-// CHECK ON PAGE LOAD
-checkToken();
+setInterval(checkAdminToken, 60000);
+checkAdminToken();
 
 document.addEventListener("DOMContentLoaded", () => {
-    showLogoutMessage();
+    showAdminLogoutMessage();
 });

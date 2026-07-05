@@ -1,443 +1,273 @@
-let allAdminOrders = [];
 // frontend/js/admin-orders.js
+// AZIEL Admin V2.5 Orders Controller
+
+let allAdminOrders = [];
+let ordersAutoRefreshTimer = null;
 
 document.addEventListener("DOMContentLoaded", () => {
+    initOrderFilters();
+    initOrderModal();
     loadOrders();
+
+    ordersAutoRefreshTimer = setInterval(() => {
+        if (!document.hidden) loadOrders(false);
+    }, 20000);
 });
 
-async function loadOrders() {
-
-    const body =
-        document.getElementById(
-            "adminOrdersBody"
-        );
-
+async function loadOrders(showLoading = true) {
+    const body = document.getElementById("adminOrdersBody");
     if (!body) return;
 
-    try {
-
-        const token =
-            localStorage.getItem("adminToken") ||
-            localStorage.getItem("token");
-
-        const res =
-            await fetch(
-                "/api/admin/orders",
-                {
-                    headers: {
-                        Authorization:
-                            `Bearer ${token}`
-                    }
-                }
-            );
-
-        const data =
-            await res.json();
-
-        if (
-            !data.success
-        ) {
-
-            body.innerHTML = `
-                <tr>
-                    <td colspan="6">
-                        Failed to load orders
-                    </td>
-                </tr>
-            `;
-
-            return;
-
-        }
-
-        if (
-            !data.orders.length
-        ) {
-
-            body.innerHTML = `
-                <tr>
-                    <td colspan="6">
-                        No orders found
-                    </td>
-                </tr>
-            `;
-
-            return;
-
-        }
-
-        allAdminOrders = data.orders || [];
-        renderOrders(allAdminOrders);
-
-
-    } catch (error) {
-
-        console.log(
-            "Load orders error:",
-            error
-        );
-
+    if (showLoading) {
+        body.innerHTML = `<tr><td colspan="6">Loading orders...</td></tr>`;
     }
 
-}
-
-async function updateOrderStatus(
-    orderId,
-    status
-) {
-
     try {
+        const data = await adminFetch("/api/admin/orders");
 
-        const token =
-            localStorage.getItem("adminToken") ||
-            localStorage.getItem("token");
-
-        const res =
-            await fetch(
-                `/api/admin/orders/${orderId}/status`,
-                {
-                    method: "PUT",
-
-                    headers: {
-                        "Content-Type":
-                            "application/json",
-
-                        Authorization:
-                            `Bearer ${token}`
-                    },
-
-                    body: JSON.stringify({
-                        status
-                    })
-                }
-            );
-
-        const data =
-            await res.json();
-
-        if (!data.success) {
-
-            showAdminToast(
-                data.message ||
-                "Update failed",
-                "error"
-            );
-
+        if (!data || !data.success) {
+            body.innerHTML = `<tr><td colspan="6">${escapeHTML(data?.message || "Failed to load orders")}</td></tr>`;
             return;
-
         }
 
-        showAdminToast(
-            "Order updated",
-            "success"
-        );
-
-        loadOrders();
-        loadAdminDashboard();
+        allAdminOrders = Array.isArray(data.orders) ? data.orders : [];
+        applyOrderFilter();
 
     } catch (error) {
-
-        console.log(error);
-
-        showAdminToast(
-            "Server error",
-            "error"
-        );
-
+        console.log("Load orders error:", error);
+        body.innerHTML = `<tr><td colspan="6">Server error while loading orders</td></tr>`;
     }
-
 }
 
-function normalizeStatus(status) {
-
-    const s =
-        String(status || "")
-            .toLowerCase();
-
-    if (
-        s === "pending_payment"
-    ) return "pending";
-
-    return s;
-
+function initOrderFilters() {
+    document.getElementById("orderSearchInput")?.addEventListener("input", applyOrderFilter);
+    document.getElementById("orderStatusFilter")?.addEventListener("change", applyOrderFilter);
 }
 
-function formatStatus(status) {
+function applyOrderFilter() {
+    const keyword = (document.getElementById("orderSearchInput")?.value || "").trim().toLowerCase();
+    const status = document.getElementById("orderStatusFilter")?.value || "all";
 
-    const map = {
+    const filtered = allAdminOrders.filter(order => {
+        const text = `
+            ${order.orderId || ""}
+            ${order.username || ""}
+            ${order.game || ""}
+            ${order.packageName || ""}
+            ${order.userId || ""}
+            ${order.zoneId || ""}
+            ${order.paymentMethod || ""}
+            ${order.region || ""}
+            ${order.currency || ""}
+        `.toLowerCase();
 
-        pending_payment:
-            "Pending",
+        const matchText = !keyword || text.includes(keyword);
+        const matchStatus = status === "all" || order.status === status;
 
-        paid:
-            "Paid",
+        return matchText && matchStatus;
+    });
 
-        processing:
-            "Processing",
-
-        completed:
-            "Completed",
-
-        cancelled:
-            "Cancelled"
-
-    };
-
-    return map[status] || status;
-
+    renderOrders(filtered);
 }
+
 function renderOrders(orders) {
     const body = document.getElementById("adminOrdersBody");
     if (!body) return;
 
     if (!orders.length) {
-        body.innerHTML = `
-            <tr>
-                <td colspan="6">No orders found</td>
-            </tr>
-        `;
+        body.innerHTML = `<tr><td colspan="6">No orders found</td></tr>`;
         return;
     }
 
     body.innerHTML = orders.map(order => {
-        const safeOrder = encodeURIComponent(JSON.stringify(order));
+        const id = escapeHTML(order._id || "");
+        const status = order.status || "pending_payment";
 
         return `
             <tr>
-                <td onclick="openOrderModal(JSON.parse(decodeURIComponent('${safeOrder}')))">
-                    ${order.orderId || "-"}
+                <td>
+                    <button class="order-link-btn" data-action="view-order" data-id="${id}">
+                        ${escapeHTML(order.orderId || "-")}
+                    </button>
                 </td>
 
-                <td>${order.username || "-"}</td>
-                <td>${order.game || "-"}</td>
-                <td>${order.packageName || "-"}</td>
+                <td>${escapeHTML(order.username || "-")}</td>
+                <td>${escapeHTML(order.game || "-")}</td>
+                <td>${escapeHTML(order.packageName || "-")}</td>
 
                 <td>
-                    <span class="admin-status ${normalizeStatus(order.status)}">
-                        ${formatStatus(order.status)}
+                    <span class="admin-status ${normalizeStatus(status)}">
+                        ${formatStatus(status)}
                     </span>
                 </td>
 
                 <td>
-                    <select
-                        onchange="updateOrderStatus('${order._id}', this.value)"
-                        class="admin-status-select">
-
-                        <option value="pending_payment" ${order.status === "pending_payment" ? "selected" : ""}>Pending</option>
-                        <option value="paid" ${order.status === "paid" ? "selected" : ""}>Paid</option>
-                        <option value="processing" ${order.status === "processing" ? "selected" : ""}>Processing</option>
-                        <option value="completed" ${order.status === "completed" ? "selected" : ""}>Completed</option>
-                        <option value="cancelled" ${order.status === "cancelled" ? "selected" : ""}>Cancelled</option>
+                    <select class="admin-status-select" data-action="status-change" data-id="${id}">
+                        <option value="pending_payment" ${status === "pending_payment" ? "selected" : ""}>Pending</option>
+                        <option value="paid" ${status === "paid" ? "selected" : ""}>Paid</option>
+                        <option value="processing" ${status === "processing" ? "selected" : ""}>Processing</option>
+                        <option value="completed" ${status === "completed" ? "selected" : ""}>Completed</option>
+                        <option value="cancelled" ${status === "cancelled" ? "selected" : ""}>Cancelled</option>
+                        <option value="failed" ${status === "failed" ? "selected" : ""}>Failed</option>
                     </select>
                 </td>
             </tr>
         `;
     }).join("");
+
+    bindOrderActions();
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-    const search = document.getElementById("orderSearchInput");
-    const filter = document.getElementById("orderStatusFilter");
+function bindOrderActions() {
+    document.querySelectorAll('[data-action="view-order"]').forEach(btn => {
+        btn.addEventListener("click", () => {
+            const order = allAdminOrders.find(o => String(o._id) === String(btn.dataset.id));
+            if (order) openOrderModal(order);
+        });
+    });
 
-    function applyFilter() {
-        const keyword = (search?.value || "").toLowerCase();
-        const status = filter?.value || "all";
+    document.querySelectorAll('[data-action="status-change"]').forEach(select => {
+        select.addEventListener("change", () => {
+            updateOrderStatus(select.dataset.id, select.value, select);
+        });
+    });
+}
 
-        const filtered = allAdminOrders.filter(order => {
-            const text = `
-                ${order.orderId || ""}
-                ${order.username || ""}
-                ${order.game || ""}
-                ${order.packageName || ""}
-            `.toLowerCase();
+async function updateOrderStatus(orderId, status, selectEl = null) {
+    if (!orderId || !status) return;
 
-            const matchText = text.includes(keyword);
-            const matchStatus = status === "all" || order.status === status;
+    const oldValue = allAdminOrders.find(o => String(o._id) === String(orderId))?.status;
 
-            return matchText && matchStatus;
+    try {
+        if (selectEl) selectEl.disabled = true;
+
+        const data = await adminFetch(`/api/admin/orders/${orderId}/status`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status })
         });
 
-        renderOrders(filtered);
+        if (!data || !data.success) {
+            showAdminToast?.(data?.message || "Update failed", "error");
+            if (selectEl && oldValue) selectEl.value = oldValue;
+            return;
+        }
+
+        showAdminToast?.(`Order changed to ${formatStatus(status)}`, "success");
+
+        await loadOrders(false);
+        loadAdminDashboard?.(false);
+
+    } catch (error) {
+        console.log("Update order error:", error);
+        showAdminToast?.("Server error", "error");
+        if (selectEl && oldValue) selectEl.value = oldValue;
+    } finally {
+        if (selectEl) selectEl.disabled = false;
     }
+}
 
-    search?.addEventListener("input", applyFilter);
-    filter?.addEventListener("change", applyFilter);
-});
-// ======================
-// ORDER DETAILS MODAL
-// ======================
+function initOrderModal() {
+    document.getElementById("closeOrderModal")?.addEventListener("click", closeOrderModal);
 
-document.addEventListener(
-    "DOMContentLoaded",
+    document.getElementById("orderDetailModal")?.addEventListener("click", e => {
+        if (e.target.id === "orderDetailModal") closeOrderModal();
+    });
 
-    () => {
-
-        const closeBtn =
-            document.getElementById(
-                "closeOrderModal"
-            );
-
-        closeBtn?.addEventListener(
-            "click",
-
-            closeOrderModal
-        );
-
-    }
-);
+    document.addEventListener("keydown", e => {
+        if (e.key === "Escape") closeOrderModal();
+    });
+}
 
 function openOrderModal(order) {
+    const modal = document.getElementById("orderDetailModal");
+    const content = document.getElementById("orderDetailContent");
+    if (!modal || !content) return;
 
-    const modal =
-        document.getElementById(
-            "orderDetailModal"
-        );
-
-    const content =
-        document.getElementById(
-            "orderDetailContent"
-        );
-
-    if (
-        !modal ||
-        !content
-    ) return;
+    const slip = order.paymentSlip || order.screenshot || "";
 
     content.innerHTML = `
-
         <div class="order-detail-grid">
-
-            ${detailItem(
-        "Order ID",
-        order.orderId
-    )}
-
-            ${detailItem(
-        "Username",
-        order.username
-    )}
-
-            ${detailItem(
-        "Game",
-        order.game
-    )}
-
-            ${detailItem(
-        "Package",
-        order.packageName
-    )}
-
-            ${detailItem(
-        "User ID",
-        order.userId || "-"
-    )}
-
-            ${detailItem(
-        "Server ID",
-        order.zoneId || "-"
-    )}
-
-            ${detailItem(
-        "Amount",
-        `${order.amount || 0} ${order.currency || ""}`
-    )}
-
-            ${detailItem(
-        "Payment",
-        order.paymentMethod || "-"
-    )}
-
-            ${detailItem(
-        "Status",
-        formatStatus(order.status)
-    )}
-
-            ${detailItem(
-        "Created",
-        new Date(order.createdAt)
-            .toLocaleString()
-    )}
-
+            ${detailItem("Order ID", order.orderId)}
+            ${detailItem("Username", order.username)}
+            ${detailItem("Game", order.game)}
+            ${detailItem("Package", order.packageName)}
+            ${detailItem("User ID", order.userId || "-")}
+            ${detailItem("Server ID", order.zoneId || "-")}
+            ${detailItem("Amount", `${Number(order.amount || 0).toLocaleString()} ${order.currency || ""}`)}
+            ${detailItem("Region", order.region || "-")}
+            ${detailItem("Payment", order.paymentMethod || "-")}
+            ${detailItem("Status", formatStatus(order.status))}
+            ${detailItem("Note", order.note || "-")}
+            ${detailItem("Created", formatDate(order.createdAt))}
         </div>
 
-        ${order.screenshot ? `
-
-            <div style="margin-top:18px;">
-
-                <small style="color:#94a3b8;">
-                    Payment Screenshot
-                </small>
-
-                <img
-                    src="${order.screenshot}"
-                    style="
-                        width:100%;
-                        margin-top:10px;
-                        border-radius:18px;
-                        border:1px solid rgba(255,255,255,.08);
-                    "
-                >
-
+        ${slip ? `
+            <div class="order-screenshot-box">
+                <small>Payment Slip</small>
+                <img src="${escapeHTML(getUploadUrl(slip))}" alt="Payment Slip">
             </div>
-
         ` : ""}
-
     `;
 
-    modal.classList.add(
-        "show"
-    );
-
+    modal.classList.add("show");
 }
 
 function closeOrderModal() {
-
-    const modal =
-        document.getElementById(
-            "orderDetailModal"
-        );
-
-    modal?.classList.remove(
-        "show"
-    );
-
+    document.getElementById("orderDetailModal")?.classList.remove("show");
 }
 
-function detailItem(
-    label,
-    value
-) {
-
+function detailItem(label, value) {
     return `
-
         <div class="order-detail-item">
-
-            <small>
-                ${label}
-            </small>
-
-            <strong>
-                ${value || "-"}
-            </strong>
-
+            <small>${escapeHTML(label)}</small>
+            <strong>${escapeHTML(value || "-")}</strong>
         </div>
-
     `;
-
 }
-document.addEventListener("click", e => {
-    const link = e.target.closest("a");
-    if (!link) return;
 
-    const href = link.getAttribute("href");
-    if (!href) return;
+function normalizeStatus(status) {
+    const s = String(status || "").toLowerCase();
 
-    if (href.startsWith("#")) return;
+    if (s === "pending_payment") return "pending";
+    if (s === "canceled") return "cancelled";
+    if (s === "failed") return "cancelled";
 
-    const url = new URL(href, window.location.href);
+    return s;
+}
 
-    if (url.origin === window.location.origin) {
-        e.preventDefault();
-        window.location.href = url.pathname + url.search + url.hash;
-    }
-});
+function formatStatus(status) {
+    return {
+        pending_payment: "Pending",
+        paid: "Paid",
+        processing: "Processing",
+        completed: "Completed",
+        cancelled: "Cancelled",
+        canceled: "Cancelled",
+        failed: "Failed"
+    }[status] || status || "-";
+}
+
+function formatDate(date) {
+    if (!date) return "-";
+
+    const parsed = new Date(date);
+    return Number.isNaN(parsed.getTime()) ? "-" : parsed.toLocaleString();
+}
+
+function getUploadUrl(path) {
+    if (!path) return "";
+    if (path.startsWith("http://") || path.startsWith("https://")) return path;
+    return path;
+}
+
+function escapeHTML(value) {
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+window.loadOrders = loadOrders;

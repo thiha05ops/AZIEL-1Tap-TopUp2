@@ -1,36 +1,30 @@
 // frontend/js/admin-stats.js
+// AZIEL Admin V2.5 Dashboard Stats
 
 let ordersChartInstance = null;
+let revenueChartInstance = null;
 
 document.addEventListener("DOMContentLoaded", () => {
     loadAdminDashboard();
+
+    setInterval(() => {
+        if (!document.hidden) loadAdminDashboard(false);
+    }, 15000);
 });
 
-async function loadAdminDashboard() {
+async function loadAdminDashboard(showError = true) {
     try {
-        const token =
-            localStorage.getItem("adminToken") ||
-            localStorage.getItem("token");
-
-        if (!token) {
-            alert("Admin session expired. Please login again.");
-            window.location.href = "admin-login.html";
+        if (typeof adminFetch !== "function") {
+            console.error("adminFetch not found. Make sure admin-api.js is loaded first.");
             return;
         }
 
-        const res = await fetch("/api/admin/stats", {
-            headers: {
-                Authorization: `Bearer ${token}`
+        const data = await adminFetch("/api/admin/stats");
+
+        if (!data || !data.success) {
+            if (showError) {
+                showAdminToast?.(data?.message || "Failed to load dashboard stats", "error");
             }
-        });
-
-        const data = await res.json();
-
-        console.log("ADMIN STATS:", data);
-
-        if (!data.success) {
-            alert(data.message || "Admin session expired.");
-            window.location.href = "admin-login.html";
             return;
         }
 
@@ -44,44 +38,31 @@ async function loadAdminDashboard() {
         setValue("revenue", Number(stats.revenue || 0).toLocaleString());
 
         updateOrdersChart(stats);
+        updateRevenueChart(stats);
 
     } catch (error) {
         console.log("Admin stats error:", error);
+        if (showError) showAdminToast?.("Dashboard stats error", "error");
     }
 }
 
 function setValue(id, value) {
-
-    const el =
-        document.getElementById(id);
-
+    const el = document.getElementById(id);
     if (!el) return;
 
-    // revenue string
-    if (
-        typeof value === "string"
-    ) {
-
+    if (typeof value === "string") {
         el.innerText = value;
         return;
-
     }
 
-    animateCounter(
-        el,
-        Number(value || 0)
-    );
-
+    animateCounter(el, Number(value || 0));
 }
 
 function updateOrdersChart(stats) {
     const canvas = document.getElementById("ordersChart");
-
     if (!canvas || typeof Chart === "undefined") return;
 
-    if (ordersChartInstance) {
-        ordersChartInstance.destroy();
-    }
+    if (ordersChartInstance) ordersChartInstance.destroy();
 
     ordersChartInstance = new Chart(canvas, {
         type: "doughnut",
@@ -94,106 +75,73 @@ function updateOrdersChart(stats) {
                     stats.pendingOrders || 0,
                     stats.cancelledOrders || 0
                 ],
-                backgroundColor: [
-                    "#22c55e",
-                    "#3b82f6",
-                    "#f59e0b",
-                    "#ef4444"
-                ],
                 borderWidth: 0
             }]
         },
         options: {
             responsive: true,
+            cutout: "68%",
             plugins: {
                 legend: {
                     position: "bottom",
-                    labels: {
-                        color: "#cbd5e1"
-                    }
+                    labels: { color: "#cbd5e1" }
                 }
             }
         }
     });
 }
-// ======================
-// COUNTER ANIMATION
-// ======================
 
-function animateCounter(
-    element,
-    target
-) {
+function updateRevenueChart(stats) {
+    const canvas = document.getElementById("revenueChart");
+    if (!canvas || typeof Chart === "undefined") return;
 
-    const start =
-        Number(
-            element.dataset.value || 0
-        );
+    if (revenueChartInstance) revenueChartInstance.destroy();
 
+    const labels = stats.revenueLabels || ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    const values = stats.revenueSeries || [0, 0, 0, 0, 0, 0, stats.revenue || 0];
+
+    revenueChartInstance = new Chart(canvas, {
+        type: "line",
+        data: {
+            labels,
+            datasets: [{
+                label: "Revenue",
+                data: values,
+                borderWidth: 3,
+                tension: 0.45,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { ticks: { color: "#94a3b8" } },
+                y: { ticks: { color: "#94a3b8" } }
+            }
+        }
+    });
+}
+
+function animateCounter(element, target) {
+    const start = Number(element.dataset.value || 0);
     const duration = 700;
-
-    const startTime =
-        performance.now();
+    const startTime = performance.now();
 
     function update(now) {
+        const progress = Math.min((now - startTime) / duration, 1);
+        const current = Math.floor(start + (target - start) * progress);
 
-        const progress =
-            Math.min(
-                (now - startTime) / duration,
-                1
-            );
-
-        const current =
-            Math.floor(
-                start +
-                (target - start) * progress
-            );
-
-        element.innerText =
-            current.toLocaleString();
+        element.innerText = current.toLocaleString();
 
         if (progress < 1) {
-
             requestAnimationFrame(update);
-
         } else {
-
-            element.dataset.value =
-                target;
-
+            element.dataset.value = target;
         }
-
     }
 
     requestAnimationFrame(update);
-
 }
-// ======================
-// AUTO LIVE REFRESH
-// ======================
 
-setInterval(() => {
-
-    if (
-        document.hidden
-    ) return;
-
-    loadAdminDashboard();
-
-}, 15000);
-document.addEventListener("click", e => {
-    const link = e.target.closest("a");
-    if (!link) return;
-
-    const href = link.getAttribute("href");
-    if (!href) return;
-
-    if (href.startsWith("#")) return;
-
-    const url = new URL(href, window.location.href);
-
-    if (url.origin === window.location.origin) {
-        e.preventDefault();
-        window.location.href = url.pathname + url.search + url.hash;
-    }
-});
+window.loadAdminDashboard = loadAdminDashboard;

@@ -198,6 +198,17 @@
                 <p id="modalAccountNumber"></p>
             </div>
 
+            <div class="payment-modal-qr">
+                <img id="modalPaymentLogo" src="" alt="Payment Logo">
+                <img id="modalQrImage" src="" alt="Payment QR">
+                <p id="modalAccountName"></p>
+                <p id="modalAccountNumber"></p>
+            </div>
+
+            <button id="confirmPaymentOrderBtn" disabled>
+                Waiting Payment...
+            </button>
+
             <button id="confirmPaymentOrderBtn" disabled>
                 Waiting Payment...
             </button>
@@ -259,10 +270,17 @@
     <script src="/js/locale-switcher.js"></script>
     <script src="/js/region-payment.js?v=20260629"></script>
     <script src="/js/theme.js?v=20260701"></script>
-    <script src="/js/payment.js?v=20260706-wallet3"></script>
+    <script src="/js/payment/payment-utils.js?v=20260707"></script>
+    <script src="/js/payment/payment-wallet.js?v=20260707"></script>
+    <script src="/js/payment/payment-promptpay.js?v=20260707"></script>
+    <script src="/js/payment/payment-deeplink.js?v=20260707"></script>
+    <script src="/js/payment/payment-manual.js?v=20260707"></script>
+    <script src="/js/payment/payment-engine.js?v=20260707"></script>
+
     <script src="/js/prices.js?v=20260629"></script>
 
-    <script src="/js/mlbb.js?v=20260706-wallet"></script>
+    <script src="/js/mlbb.js?v=20260707-modular"></script>
+
 
     <script src="/js/live-chat.js"></script>
     <script src="/js/pwa-fix.js"></script>

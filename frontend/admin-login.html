@@ -3,15 +3,13 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login</title>
 
-    <title>
-        Admin Login
-    </title>
-    <link rel="stylesheet" href="css/main.css">
-    <link rel="stylesheet" href="css/theme/aziel-design-system.css?v=20260701">
-    <link rel="stylesheet" href="css/theme/aziel-header.css?v=20260701">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#070716">
+
     <style>
         body {
             margin: 0;
@@ -39,19 +37,22 @@
             margin-top: 0;
         }
 
-        #adminLoginForm input {
+        #adminLoginForm input,
+        #adminLoginForm button {
             width: 100%;
+            box-sizing: border-box;
+        }
+
+        #adminLoginForm input {
             padding: 15px;
             margin: 10px 0;
             border: none;
             border-radius: 14px;
             background: #070716;
             color: white;
-            box-sizing: border-box;
         }
 
         #adminLoginForm button {
-            width: 100%;
             padding: 15px;
             margin-top: 14px;
             border: none;
@@ -67,41 +68,23 @@
             color: #ffd700;
         }
     </style>
-    <link rel="manifest" href="/manifest.json">
-
-    <meta name="theme-color" content="#070716">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="AZIEL">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 </head>
 
 <body>
 
     <form id="adminLoginForm">
-
-        <h1>
-            ADMIN LOGIN
-        </h1>
+        <h1>ADMIN LOGIN</h1>
 
         <input type="text" id="adminUsername" placeholder="Username">
-
         <input type="password" id="adminPassword" placeholder="Password">
 
-        <button type="submit" id="adminLoginBth">
-            LOGIN
-        </button>
-        <button type="button" onclick="resetAdminSession()">
-            Reset Admin Session
-        </button>
+        <button type="submit" id="adminLoginBtn">LOGIN</button>
+        <button type="button" id="resetAdminSessionBtn">Reset Admin Session</button>
 
         <p id="adminMsg"></p>
-
     </form>
-    <script src="js/theme.js?v=20260701"></script>
-    <script src="js/admin-login.js"></script>
-    <script src="js/admin-api.js"></script>
+
+    <script src="/js/admin-login.js?v=20260706-5"></script>
 </body>
 
 </html>

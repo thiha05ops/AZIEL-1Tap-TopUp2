@@ -3,82 +3,129 @@
 
 <head>
     <meta charset="UTF-8" />
+    <title>AZIEL Admin V2.5</title>
 
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
-    <title>AZIEL Admin App</title>
-
-    <link rel="stylesheet" href="css/admin/admin.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="manifest" href="/manifest.json">
-    <link rel="stylesheet" href="css/theme/aziel-design-system.css?v=20260701">
-    <link rel="stylesheet" href="css/theme/aziel-header.css?v=20260701">
-
     <meta name="theme-color" content="#070716">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="AZIEL">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="/css/theme/aziel-design-system.css?v=20260701">
+    <link rel="stylesheet" href="/css/theme/aziel-header.css?v=20260701">
+
+    <link rel="stylesheet" href="/css/admin/admin.css?v=20260706-2">
+    <link rel="stylesheet" href="/css/admin/admin-wallet.css?v=20260706-2">
+    <link rel="stylesheet" href="/css/admin/admin-support.css?v=20260706-2">
+    <link rel="stylesheet" href="/css/admin/admin-live-chat.css?v=20260706-2">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
+
+    <div id="adminSidebarOverlay" class="admin-sidebar-overlay"></div>
 
     <div class="admin-app">
 
         <aside class="admin-sidebar">
 
-            <div class="admin-logo">
-                <h1>AZIEL</h1>
-                <span>CONTROL APP</span>
+            <div class="admin-sidebar-head">
+                <div class="admin-logo">
+                    <h1>AZIEL</h1>
+                    <span>CONTROL CENTER</span>
+                </div>
+
+                <button id="adminSidebarClose" class="admin-sidebar-close" type="button">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
             </div>
 
             <nav class="admin-menu">
+
                 <button class="admin-nav active" data-section="dashboard">
                     <i class="fa-solid fa-chart-line"></i>
-                    Dashboard
+                    <span>Dashboard</span>
                 </button>
 
                 <button class="admin-nav" data-section="orders">
                     <i class="fa-solid fa-box"></i>
-                    Orders
+                    <span>Orders</span>
+                </button>
+
+                <button class="admin-nav" data-section="payments">
+                    <i class="fa-solid fa-credit-card"></i>
+                    <span>Payments</span>
                 </button>
 
                 <button class="admin-nav" data-section="wallet">
                     <i class="fa-solid fa-wallet"></i>
-                    Wallet Topups
+                    <span>Wallet</span>
                 </button>
 
                 <button class="admin-nav" data-section="users">
                     <i class="fa-solid fa-users"></i>
-                    Users
+                    <span>Users</span>
                 </button>
 
                 <button class="admin-nav" data-section="games">
                     <i class="fa-solid fa-gamepad"></i>
-                    Games
+                    <span>Products</span>
+                </button>
+
+                <button class="admin-nav" data-section="suppliers">
+                    <i class="fa-solid fa-truck-fast"></i>
+                    <span>Suppliers</span>
+                </button>
+
+                <button class="admin-nav" data-section="coupons">
+                    <i class="fa-solid fa-ticket"></i>
+                    <span>Coupons</span>
                 </button>
 
                 <button class="admin-nav" data-section="support">
                     <i class="fa-solid fa-headset"></i>
-                    Support
+                    <span>Support</span>
                 </button>
 
                 <button class="admin-nav" data-section="chat">
                     <i class="fa-solid fa-comments"></i>
-                    Live Chat
+                    <span>Live Chat</span>
+                </button>
+
+                <button class="admin-nav" data-section="notifications">
+                    <i class="fa-solid fa-bell"></i>
+                    <span>Notifications</span>
                 </button>
 
                 <button class="admin-nav" data-section="broadcast">
                     <i class="fa-solid fa-bullhorn"></i>
-                    Broadcast
+                    <span>Broadcast</span>
+                </button>
+
+                <button class="admin-nav" data-section="analytics">
+                    <i class="fa-solid fa-chart-pie"></i>
+                    <span>Analytics</span>
                 </button>
 
                 <button class="admin-nav" data-section="settings">
                     <i class="fa-solid fa-gear"></i>
-                    Settings
+                    <span>Settings</span>
                 </button>
+
+                <button class="admin-nav" data-section="admins">
+                    <i class="fa-solid fa-user-shield"></i>
+                    <span>Admins</span>
+                </button>
+
+                <button class="admin-nav" data-section="logs">
+                    <i class="fa-solid fa-clipboard-list"></i>
+                    <span>Logs</span>
+                </button>
+
             </nav>
 
             <div class="admin-user-box">
@@ -94,15 +141,28 @@
         <main class="admin-main">
 
             <header class="admin-topbar">
-                <div>
-                    <h2 id="adminPageTitle">Dashboard</h2>
-                    <p id="adminPageSub">Live control center for AZIEL 1Tap Shop.</p>
+
+                <div class="admin-title-wrap">
+                    <button id="adminMenuToggle" class="admin-menu-toggle" type="button">
+                        <i class="fa-solid fa-bars"></i>
+                    </button>
+
+                    <div>
+                        <h2 id="adminPageTitle">Dashboard</h2>
+                        <p id="adminPageSub">Live control center for AZIEL 1Tap Shop.</p>
+                    </div>
                 </div>
 
                 <div class="top-actions">
-                    <input type="text" placeholder="Search anything..." />
+                    <input id="adminGlobalSearch" type="text" placeholder="Search order, user, wallet..." />
+
+                    <button class="top-icon-btn" type="button">
+                        <i class="fa-solid fa-bell"></i>
+                    </button>
+
                     <a href="home.html">Back Home</a>
                 </div>
+
             </header>
 
             <section class="admin-section active" id="section-dashboard">
@@ -154,119 +214,6 @@
                         </div>
                         <canvas id="revenueChart"></canvas>
                     </div>
-                    <div class="dashboard-bottom-grid">
-
-                        <div class="panel">
-                            <div class="panel-head">
-                                <h3>Pending Payments</h3>
-                                <span>Live Queue</span>
-                            </div>
-
-                            <div class="payment-live-list">
-
-                                <div class="payment-live-item">
-                                    <div>
-                                        <strong>User123</strong>
-                                        <small>KBZPay</small>
-                                    </div>
-
-                                    <span class="status-pill pending">
-                                        Pending
-                                    </span>
-                                </div>
-
-                                <div class="payment-live-item">
-                                    <div>
-                                        <strong>PlayerOne</strong>
-                                        <small>WavePay</small>
-                                    </div>
-
-                                    <span class="status-pill processing">
-                                        Processing
-                                    </span>
-                                </div>
-
-                                <div class="payment-live-item">
-                                    <div>
-                                        <strong>LegendBoy</strong>
-                                        <small>AYA Pay</small>
-                                    </div>
-
-                                    <span class="status-pill completed">
-                                        Completed
-                                    </span>
-                                </div>
-
-                            </div>
-                        </div>
-
-                        <div class="panel quick-broadcast-panel">
-
-                            <div class="panel-head">
-                                <h3>Broadcast Quick Send</h3>
-                                <span>Realtime</span>
-                            </div>
-
-                            <div class="quick-broadcast-grid">
-
-                                <button class="quick-action purple">
-                                    📢
-                                    <span>Announcement</span>
-                                </button>
-
-                                <button class="quick-action pink">
-                                    🎁
-                                    <span>Promotion</span>
-                                </button>
-
-                                <button class="quick-action orange">
-                                    ⚠️
-                                    <span>Delay</span>
-                                </button>
-
-                                <button class="quick-action green">
-                                    ✅
-                                    <span>Completed</span>
-                                </button>
-
-                            </div>
-
-                        </div>
-
-                        <div class="panel">
-
-                            <div class="panel-head">
-                                <h3>System Status</h3>
-                                <span>Live</span>
-                            </div>
-
-                            <div class="system-status-list">
-
-                                <div class="system-status-item">
-                                    <span>Website</span>
-                                    <b class="online">Online</b>
-                                </div>
-
-                                <div class="system-status-item">
-                                    <span>Database</span>
-                                    <b class="online">Online</b>
-                                </div>
-
-                                <div class="system-status-item">
-                                    <span>Socket Server</span>
-                                    <b class="online">Online</b>
-                                </div>
-
-                                <div class="system-status-item">
-                                    <span>Payment API</span>
-                                    <b class="online">Online</b>
-                                </div>
-
-                            </div>
-
-                        </div>
-
-                    </div>
 
                     <div class="panel">
                         <div class="panel-head">
@@ -277,7 +224,11 @@
                     </div>
 
                     <div class="panel">
-                        <h3>Top Games</h3>
+                        <div class="panel-head">
+                            <h3>Top Games</h3>
+                            <span>Today</span>
+                        </div>
+
                         <div class="mini-list">
                             <p><span>Mobile Legends</span><b>45%</b></p>
                             <p><span>PUBG Mobile</span><b>25%</b></p>
@@ -287,11 +238,73 @@
                     </div>
 
                     <div class="panel">
-                        <h3>Recent Activity</h3>
+                        <div class="panel-head">
+                            <h3>Recent Activity</h3>
+                            <span>Realtime</span>
+                        </div>
+
                         <div id="recentActivity" class="activity-list">
                             <p>Waiting for live activity...</p>
                         </div>
                     </div>
+
+                </div>
+
+                <div class="dashboard-bottom-grid">
+
+                    <div class="panel">
+                        <div class="panel-head">
+                            <h3>Pending Payments</h3>
+                            <span>Live Queue</span>
+                        </div>
+
+                        <div class="payment-live-list">
+                            <div class="payment-live-item">
+                                <div>
+                                    <strong>Waiting Orders</strong>
+                                    <small>Auto / Manual payment queue</small>
+                                </div>
+                                <span class="status-pill pending">Pending</span>
+                            </div>
+
+                            <div class="payment-live-item">
+                                <div>
+                                    <strong>PromptPay</strong>
+                                    <small>Webhook ready</small>
+                                </div>
+                                <span class="status-pill completed">Online</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel quick-broadcast-panel">
+                        <div class="panel-head">
+                            <h3>Broadcast Quick Send</h3>
+                            <span>Realtime</span>
+                        </div>
+
+                        <div class="quick-broadcast-grid">
+                            <button class="quick-action purple">📢 <span>Announcement</span></button>
+                            <button class="quick-action pink">🎁 <span>Promotion</span></button>
+                            <button class="quick-action orange">⚠️ <span>Delay</span></button>
+                            <button class="quick-action green">✅ <span>Completed</span></button>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-head">
+                            <h3>System Status</h3>
+                            <span>Live</span>
+                        </div>
+
+                        <div class="system-status-list">
+                            <div class="system-status-item"><span>Website</span><b class="online">Online</b></div>
+                            <div class="system-status-item"><span>Database</span><b class="online">Online</b></div>
+                            <div class="system-status-item"><span>Socket Server</span><b class="online">Online</b></div>
+                            <div class="system-status-item"><span>Payment API</span><b class="online">Online</b></div>
+                        </div>
+                    </div>
+
                 </div>
 
             </section>
@@ -303,7 +316,6 @@
                         <span>Live orders</span>
                     </div>
 
-
                     <div class="admin-filter-bar">
                         <input id="orderSearchInput" type="text" placeholder="Search order, user, game...">
 
@@ -314,8 +326,10 @@
                             <option value="processing">Processing</option>
                             <option value="completed">Completed</option>
                             <option value="cancelled">Cancelled</option>
+                            <option value="failed">Failed</option>
                         </select>
                     </div>
+
                     <div class="admin-table-wrap">
                         <table class="admin-table">
                             <thead>
@@ -335,6 +349,35 @@
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </section>
+
+            <section class="admin-section" id="section-payments">
+                <div class="settings-page">
+                    <div class="settings-menu">
+                        <h3>Payment Control</h3>
+
+                        <button class="settings-tab active" data-settings-tab="payments">
+                            💳
+                            <span>
+                                <b>Payment Methods</b>
+                                <small>PromptPay, SCB, KBZPay, WavePay</small>
+                            </span>
+                        </button>
+                    </div>
+
+                    <div class="settings-content">
+                        <div class="settings-panel active" data-settings-panel="payments">
+                            <div class="settings-card">
+                                <h3>Payment Management</h3>
+                                <p>Enable or disable payment methods and update QR/account information.</p>
+
+                                <div id="paymentMethodsContainer">
+                                    Loading payment methods...
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -368,7 +411,7 @@
             <section class="admin-section" id="section-games">
                 <div class="panel">
                     <div class="panel-head">
-                        <h3>Games & Prices</h3>
+                        <h3>Products & Prices</h3>
                         <span>Manage packages</span>
                     </div>
 
@@ -377,6 +420,50 @@
                         <p><span>PUBG Mobile</span><b>Active</b></p>
                         <p><span>Free Fire</span><b>Active</b></p>
                         <p><span>Honor Of Kings</span><b>Active</b></p>
+                        <p><span>Roblox</span><b>Coming</b></p>
+                        <p><span>Gift Cards</span><b>Coming</b></p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="admin-section" id="section-suppliers">
+                <div class="panel">
+                    <div class="panel-head">
+                        <h3>Suppliers</h3>
+                        <span>Manual / API</span>
+                    </div>
+
+                    <div class="mini-list">
+                        <p><span>Manual Supplier</span><b>Active</b></p>
+                        <p><span>Supplier API</span><b>Coming Next</b></p>
+                        <p><span>Supplier Balance</span><b>Not Connected</b></p>
+                        <p><span>Fulfillment Logs</span><b>Coming Next</b></p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="admin-section" id="section-coupons">
+                <div class="panel">
+                    <div class="panel-head">
+                        <h3>Coupons</h3>
+                        <span>Promotions</span>
+                    </div>
+
+                    <div class="broadcast-form">
+                        <label>Coupon Code</label>
+                        <input type="text" placeholder="AZIEL10">
+
+                        <label>Discount</label>
+                        <input type="text" placeholder="10% or 500 MMK">
+
+                        <label>Status</label>
+                        <select>
+                            <option>Draft</option>
+                            <option>Active</option>
+                            <option>Expired</option>
+                        </select>
+
+                        <button type="button">Save Coupon</button>
                     </div>
                 </div>
             </section>
@@ -407,6 +494,22 @@
                 </div>
             </section>
 
+            <section class="admin-section" id="section-notifications">
+                <div class="panel">
+                    <div class="panel-head">
+                        <h3>Notification Center</h3>
+                        <span>System / Order / Wallet</span>
+                    </div>
+
+                    <div class="mini-list">
+                        <p><span>Order Notifications</span><b>Enabled</b></p>
+                        <p><span>Wallet Notifications</span><b>Enabled</b></p>
+                        <p><span>Promotion Notifications</span><b>Enabled</b></p>
+                        <p><span>System Notices</span><b>Enabled</b></p>
+                    </div>
+                </div>
+            </section>
+
             <section class="admin-section" id="section-broadcast">
                 <div class="panel">
                     <div class="panel-head">
@@ -420,6 +523,7 @@
                             <option value="announcement">Admin Announcement</option>
                             <option value="promo">Promo / Discount</option>
                             <option value="topup_delayed">Top-up Delayed</option>
+                            <option value="order_completed">Order Completed</option>
                             <option value="system">System Notice</option>
                         </select>
 
@@ -429,9 +533,25 @@
                         <label>Message</label>
                         <textarea id="broadcastMessage" placeholder="Write message..."></textarea>
 
-                        <button id="sendBroadcastBtn">
+                        <button id="sendBroadcastBtn" type="button">
                             Send Broadcast
                         </button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="admin-section" id="section-analytics">
+                <div class="panel">
+                    <div class="panel-head">
+                        <h3>Analytics</h3>
+                        <span>Coming Next</span>
+                    </div>
+
+                    <div class="mini-list">
+                        <p><span>Daily Sales</span><b>Coming</b></p>
+                        <p><span>Monthly Sales</span><b>Coming</b></p>
+                        <p><span>Top Regions</span><b>Coming</b></p>
+                        <p><span>Best Selling Games</span><b>Coming</b></p>
                     </div>
                 </div>
             </section>
@@ -457,32 +577,6 @@
                                 <small>System behavior</small>
                             </span>
                         </button>
-
-                        <button class="settings-tab" data-settings-tab="payments">
-                            💳
-                            <span>
-                                <b>Payment Management</b>
-                                <small>Payment methods</small>
-                            </span>
-                        </button>
-
-                        <button class="settings-tab disabled" type="button">
-                            🎮
-                            <span>
-                                <b>Games</b>
-                                <small>Coming next</small>
-                            </span>
-                            <em>Coming Next</em>
-                        </button>
-
-                        <button class="settings-tab disabled" type="button">
-                            🔔
-                            <span>
-                                <b>Notifications</b>
-                                <small>Coming next</small>
-                            </span>
-                            <em>Coming Next</em>
-                        </button>
                     </div>
 
                     <div class="settings-content">
@@ -490,7 +584,7 @@
                         <div class="settings-panel active" data-settings-panel="general">
                             <div class="settings-card">
                                 <h3>General Settings</h3>
-                                <p>Update your website and announcement information.</p>
+                                <p>Update website and announcement information.</p>
 
                                 <div class="settings-row">
                                     <div>
@@ -514,8 +608,8 @@
                                         <small>Default region for users</small>
                                     </div>
                                     <select id="defaultRegion">
-                                        <option value="MM">🌐 Myanmar (MM)</option>
-                                        <option value="TH">🌐 Thailand (TH)</option>
+                                        <option value="MM">Myanmar (MM)</option>
+                                        <option value="TH">Thailand (TH)</option>
                                     </select>
                                 </div>
 
@@ -578,17 +672,6 @@
                             </div>
                         </div>
 
-                        <div class="settings-panel" data-settings-panel="payments">
-                            <div class="settings-card">
-                                <h3>Payment Management</h3>
-                                <p>Enable or disable payment methods and update account info.</p>
-
-                                <div id="paymentMethodsContainer">
-                                    Loading payment methods...
-                                </div>
-                            </div>
-                        </div>
-
                         <div class="settings-actions">
                             <button class="reset-settings-btn" type="button">
                                 ↻ Reset Changes
@@ -603,74 +686,74 @@
                 </div>
             </section>
 
+            <section class="admin-section" id="section-admins">
+                <div class="panel">
+                    <div class="panel-head">
+                        <h3>Admin Accounts</h3>
+                        <span>Roles</span>
+                    </div>
+
+                    <div class="mini-list">
+                        <p><span>Super Admin</span><b>Full Access</b></p>
+                        <p><span>Operator</span><b>Orders / Wallet</b></p>
+                        <p><span>Support</span><b>Tickets / Chat</b></p>
+                        <p><span>Marketing</span><b>Broadcast / Coupons</b></p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="admin-section" id="section-logs">
+                <div class="panel">
+                    <div class="panel-head">
+                        <h3>Logs</h3>
+                        <span>Audit</span>
+                    </div>
+
+                    <div class="mini-list">
+                        <p><span>Admin Logs</span><b>Coming</b></p>
+                        <p><span>Payment Logs</span><b>Coming</b></p>
+                        <p><span>Login Logs</span><b>Coming</b></p>
+                        <p><span>Error Logs</span><b>Coming</b></p>
+                    </div>
+                </div>
+            </section>
+
         </main>
-
     </div>
-    <script src="js/theme.js?v=20260701"></script>
 
+    <div id="orderDetailModal" class="admin-modal">
+        <div class="admin-modal-box">
+            <div class="admin-modal-head">
+                <h3>Order Details</h3>
+                <button id="closeOrderModal" type="button">&times;</button>
+            </div>
+
+            <div id="orderDetailContent"></div>
+        </div>
+    </div>
+
+    <div id="slipModal" class="admin-modal">
+        <div class="admin-modal-box">
+            <div class="admin-modal-head">
+                <h3>Payment Slip</h3>
+                <button id="closeSlipModal" type="button">&times;</button>
+            </div>
+
+            <img id="slipModalImg" src="" alt="Payment Slip" style="width:100%;border-radius:18px;">
+        </div>
+    </div>
+
+    <script src="/js/theme.js?v=20260701"></script>
     <script src="/socket.io/socket.io.js"></script>
-    <script src="js/admin-stats.js"></script>
-    <script src="js/admin-live.js?v=3"></script>
-    <script src="js/admin-app.js"></script>
-    <script src="js/admin-orders.js"></script>
-    <script src="js/admin-wallet.js"></script>
-    <script src="js/admin-users.js?v=20260531"></script>
-    <script src="js/pwa-fix.js"></script>
-    <script src="js/admin-settings.js"></script>
-    <script src="js/admin-api.js"></script>
 
-
-    <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            const revenueEl = document.getElementById("revenueChart");
-            const ordersEl = document.getElementById("ordersChart");
-
-            if (revenueEl) {
-                new Chart(revenueEl, {
-                    type: "line",
-                    data: {
-                        labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-                        datasets: [{
-                            label: "Revenue",
-                            data: [120000, 180000, 140000, 250000, 310000, 280000, 420000],
-                            borderWidth: 3,
-                            tension: 0.45,
-                            fill: true
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            x: { ticks: { color: "#94a3b8" } },
-                            y: { ticks: { color: "#94a3b8" } }
-                        }
-                    }
-                });
-            }
-
-            if (ordersEl) {
-                new Chart(ordersEl, {
-                    type: "doughnut",
-                    data: {
-                        labels: ["Completed", "Processing", "Pending", "Cancelled"],
-                        datasets: [{
-                            data: [58, 25, 12, 5],
-                            borderWidth: 0
-                        }]
-                    },
-                    options: {
-                        plugins: {
-                            legend: {
-                                position: "bottom",
-                                labels: { color: "#cbd5e1" }
-                            }
-                        }
-                    }
-                });
-            }
-        });
-    </script>
+    <script src="/js/admin-api.js?v=20260706"></script>
+    <script src="/js/admin-app.js?v=20260706"></script>
+    <script src="/js/admin-stats.js?v=20260706"></script>
+    <script src="/js/admin-orders.js?v=20260706"></script>
+    <script src="/js/admin-wallet.js?v=20260706"></script>
+    <script src="/js/admin-users.js?v=20260706"></script>
+    <script src="/js/admin-settings.js?v=20260706"></script>
+    <script src="/js/pwa-fix.js"></script>
 
 </body>
 

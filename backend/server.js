@@ -1,40 +1,36 @@
-const adminUsersRoutes =
-    require("./routes/adminUsers");
 const path = require("path");
 const helmet = require("helmet");
 const dotenv = require("dotenv");
-const adminAuthRoutes =
-    require("./routes/adminAuth");
-const supportRoutes =
-    require("./routes/support");
-
-dotenv.config({
-    path: path.join(__dirname, "../.env")
-});
-
 const express = require("express");
 const cors = require("cors");
 const session = require("express-session");
 const http = require("http");
 const { Server } = require("socket.io");
 
+dotenv.config({
+    path: path.join(__dirname, "../.env")
+});
+
 const connectDB = require("./config/db");
 const passport = require("./config/passport");
 
 // ROUTES
-const liveChatRoutes = require("./routes/liveChat");
-const paymentMethodsRoutes = require("./routes/paymentMethods");
-const settingsRoutes = require("./routes/settings");
-const notificationRoutes = require("./routes/notification");
 const authRoutes = require("./routes/auth");
+const adminAuthRoutes = require("./routes/adminAuth");
+const adminUsersRoutes = require("./routes/adminUsers");
+const adminStatsRoutes = require("./routes/adminStats");
 const orderRoutes = require("./routes/order");
 const paymentRoutes = require("./routes/payment");
+const notificationRoutes = require("./routes/notification");
 const profileRoutes = require("./routes/profile");
 const socialAuthRoutes = require("./routes/socialAuth");
 const passwordRoutes = require("./routes/password");
 const supplierRoutes = require("./routes/supplier");
 const walletRoutes = require("./routes/wallet");
-const adminStatsRoutes = require("./routes/adminStats");
+const supportRoutes = require("./routes/support");
+const settingsRoutes = require("./routes/settings");
+const paymentMethodsRoutes = require("./routes/paymentMethods");
+const liveChatRoutes = require("./routes/liveChat");
 
 // EXPRESS APP
 const app = express();
@@ -49,9 +45,9 @@ const io = new Server(server, {
     }
 });
 
-
 app.set("io", io);
 
+// SOCKET EVENTS
 io.on("connection", socket => {
     console.log("⚡ Socket connected:", socket.id);
 
@@ -90,6 +86,7 @@ io.on("connection", socket => {
         console.log("❌ Socket disconnected:", socket.id);
     });
 });
+
 // CONNECT DB
 connectDB();
 
@@ -100,12 +97,8 @@ app.use(helmet({
 }));
 
 app.use(cors());
-
 app.use(express.json());
-
-app.use(express.urlencoded({
-    extended: true
-}));
+app.use(express.urlencoded({ extended: true }));
 
 app.use(session({
     secret: process.env.SESSION_SECRET || "aziel_secret",
@@ -114,14 +107,10 @@ app.use(session({
 }));
 
 app.use(passport.initialize());
-
 app.use(passport.session());
 
 // STATIC FILES
-app.use(
-    express.static(
-        path.join(__dirname, "../frontend")
-    ));
+app.use(express.static(path.join(__dirname, "../frontend")));
 
 app.use(
     "/uploads",
@@ -130,42 +119,35 @@ app.use(
 
 // ROUTES
 app.use("/api", authRoutes);
-
-app.use("/api", orderRoutes);
-
-app.use("/api", paymentRoutes);
-
-app.use("/api", notificationRoutes);
-
-app.use("/api", profileRoutes);
-
-app.use("/api", socialAuthRoutes);
-
-app.use("/api/password", passwordRoutes);
-
-app.use("/api", supplierRoutes);
-
-app.use("/api", walletRoutes);
-
-app.use("/api", adminUsersRoutes);
-
-app.use("/api", adminStatsRoutes);
-
 app.use("/api", adminAuthRoutes);
+app.use("/api", adminUsersRoutes);
+app.use("/api", adminStatsRoutes);
+app.use("/api", orderRoutes);
+app.use("/api", paymentRoutes);
+app.use("/api", notificationRoutes);
+app.use("/api", profileRoutes);
+app.use("/api", socialAuthRoutes);
+app.use("/api/password", passwordRoutes);
+app.use("/api", supplierRoutes);
+app.use("/api", walletRoutes);
 app.use("/api", supportRoutes);
 app.use("/api", settingsRoutes);
 app.use("/api", paymentMethodsRoutes);
 app.use("/api/live-chat", liveChatRoutes);
+
 // HOME
 app.get("/", (req, res) => {
-
     res.sendFile(
-        path.join(
-            __dirname,
-            "../frontend/home.html"
-        )
+        path.join(__dirname, "../frontend/home.html")
     );
+});
 
+// 404 API FALLBACK
+app.use("/api", (req, res) => {
+    res.status(404).json({
+        success: false,
+        message: `API route not found: ${req.method} ${req.originalUrl}`
+    });
 });
 
 // PORT
@@ -173,10 +155,5 @@ const PORT = process.env.PORT || 3000;
 
 // START SERVER
 server.listen(PORT, () => {
-
-    console.log(
-        `🔥 Server running on port ${PORT}`
-    );
-
+    console.log(`🔥 Server running on port ${PORT}`);
 });
-

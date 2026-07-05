@@ -1,58 +1,21 @@
 // frontend/js/admin-wallet.js
 
 document.addEventListener("DOMContentLoaded", () => {
-    const token = localStorage.getItem("adminToken");
-
-    if (!token) {
-        alert("Admin session expired");
-        window.location.href = "admin-login.html";
-        return;
-    }
-
     loadWalletTopups();
+    initSlipZoom();
 });
 
-async function secureAdminFetch(url, options = {}) {
-    if (typeof adminFetch === "function") {
-        return await adminFetch(url, options);
-    }
-
-    const token = localStorage.getItem("adminToken");
-
-    if (!token) {
-        alert("Admin session expired");
-        window.location.href = "admin-login.html";
-        return null;
-    }
-
-    const headers = {
-        ...(options.headers || {}),
-        Authorization: `Bearer ${token}`
-    };
-
-    const res = await fetch(url, {
-        ...options,
-        headers
-    });
-
-    const data = await res.json();
-
-    if (res.status === 401) {
-        alert("Admin session expired");
-        localStorage.removeItem("adminToken");
-        window.location.href = "admin-login.html";
-        return null;
-    }
-
-    return data;
-}
-
 async function loadWalletTopups() {
+    const box = document.getElementById("adminWalletList");
+    if (!box) return;
+
+    box.innerHTML = `<div class="admin-list-empty">Loading wallet topups...</div>`;
+
     try {
-        const data = await secureAdminFetch("/api/admin/wallet/topups");
+        const data = await adminFetch("/api/admin/wallet/topups");
 
         if (!data || !data.success) {
-            alert(data?.message || "Failed to load wallet topups");
+            box.innerHTML = `<div class="admin-list-empty">${data?.message || "Failed to load wallet topups"}</div>`;
             return;
         }
 
@@ -60,173 +23,133 @@ async function loadWalletTopups() {
 
     } catch (error) {
         console.log("Wallet topup load error:", error);
-        alert("Wallet topups load error");
+        box.innerHTML = `<div class="admin-list-empty">Wallet topups load error.</div>`;
     }
 }
 
 function renderTopups(topups) {
-    const box =
-        document.getElementById("adminWalletList") ||
-        document.getElementById("walletTopups");
-
+    const box = document.getElementById("adminWalletList");
     if (!box) return;
 
     if (!topups.length) {
-        box.innerHTML = `<p>No wallet topups found.</p>`;
+        box.innerHTML = `<div class="admin-list-empty">No wallet topups found.</div>`;
         return;
     }
 
-    box.innerHTML = "";
-
-    topups.forEach(item => {
-        const status = (item.status || "pending").toLowerCase();
-        const isPending = status === "pending";
-
+    box.innerHTML = topups.map(item => {
+        const status = String(item.status || "pending").toLowerCase();
         const slip = item.paymentSlip || item.slip || item.filename || "";
-        const slipUrl = slip.startsWith("/uploads/")
-            ? slip
-            : `/uploads/${slip}`;
+        const slipUrl = getSlipUrl(slip);
+        const pending = status === "pending";
 
-        box.innerHTML += `
+        return `
             <div class="topup-card">
-                <h2>${item.username || "Unknown User"}</h2>
+                <div class="topup-card-head">
+                    <div>
+                        <h2>${escapeHTML(item.username || "Unknown User")}</h2>
+                        <small>${formatDate(item.createdAt)}</small>
+                    </div>
+                    <span class="admin-status ${normalizeTopupStatus(status)}">${formatTopupStatus(status)}</span>
+                </div>
 
-                <p>
-                    Amount:
-                    ${Number(item.amount || 0).toLocaleString()}
-                    ${item.currency || ""}
-                </p>
+                <p><b>Amount:</b> ${Number(item.amount || 0).toLocaleString()} ${escapeHTML(item.currency || "")}</p>
+                <p><b>Payment:</b> ${escapeHTML(item.paymentMethod || "-")}</p>
 
-                <p>Payment: ${item.paymentMethod || "-"}</p>
-
-                <p>
-                    Status:
-                    <span class="status-${status}">
-                        ${status}
-                    </span>
-                </p>
-
-                ${slip
-                ? `<img class="topup-slip" src="${slipUrl}" alt="Payment slip">`
-                : `<p>No slip uploaded</p>`
-            }
+                ${slip ? `<img class="topup-slip" src="${escapeHTML(slipUrl)}" data-slip="${escapeHTML(slipUrl)}">` : `<p>No slip uploaded</p>`}
 
                 <div class="topup-actions">
-                    <button
-                        class="approve-btn"
-                        data-id="${item._id}"
-                        data-status="approved"
-                        ${!isPending ? "disabled" : ""}
-                    >
-                        ${status === "approved" ? "Approved" : "Approve"}
-                    </button>
-
-                    <button
-                        class="reject-btn"
-                        data-id="${item._id}"
-                        data-status="rejected"
-                        ${!isPending ? "disabled" : ""}
-                    >
-                        ${status === "rejected" ? "Rejected" : "Reject"}
-                    </button>
+                    <button class="approve-btn" data-id="${escapeHTML(item._id)}" data-status="approved" ${!pending ? "disabled" : ""}>Approve</button>
+                    <button class="reject-btn" data-id="${escapeHTML(item._id)}" data-status="rejected" ${!pending ? "disabled" : ""}>Reject</button>
                 </div>
             </div>
         `;
-    });
+    }).join("");
 
-    document.querySelectorAll(".topup-slip").forEach(img => {
-        img.addEventListener("click", () => {
-            window.open(img.src, "_blank");
-        });
-    });
+    bindTopupActions();
+}
 
+function bindTopupActions() {
     document.querySelectorAll(".topup-actions button").forEach(btn => {
-        btn.addEventListener("click", () => {
-            updateStatus(btn.dataset.id, btn.dataset.status);
-        });
+        btn.addEventListener("click", () => updateTopupStatus(btn.dataset.id, btn.dataset.status));
     });
-}
-
-async function updateStatus(id, status) {
-    if (!id) {
-        alert("Missing topup ID");
-        return;
-    }
-
-    if (!confirm(`Are you sure to ${status} this topup?`)) {
-        return;
-    }
-
-    try {
-        const data = await secureAdminFetch(
-            `/api/admin/wallet/topups/${id}/status`,
-            {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ status })
-            }
-        );
-
-        if (!data || !data.success) {
-            alert(data?.message || "Update failed");
-            return;
-        }
-
-        alert(`Topup ${status}`);
-        loadWalletTopups();
-
-    } catch (error) {
-        console.log("Wallet status update error:", error);
-        alert("Server error");
-    }
-}
-
-window.updateStatus = updateStatus;
-window.loadWalletTopups = loadWalletTopups;
-function initSlipZoom() {
-
-    const modal = document.getElementById("slipModal");
-    const modalImg = document.getElementById("slipModalImg");
-    const closeBtn = document.getElementById("closeSlipModal");
 
     document.querySelectorAll(".topup-slip").forEach(img => {
-
-        img.addEventListener("click", () => {
-
-            modal.classList.add("show");
-            modalImg.src = img.src;
-
-        });
-
-    });
-
-    closeBtn?.addEventListener("click", () => {
-        modal.classList.remove("show");
-    });
-
-    modal?.addEventListener("click", e => {
-
-        if (e.target === modal) {
-            modal.classList.remove("show");
-        }
-
+        img.addEventListener("click", () => openSlipModal(img.dataset.slip || img.src));
     });
 }
-document.addEventListener("click", e => {
-    const link = e.target.closest("a");
-    if (!link) return;
 
-    const href = link.getAttribute("href");
-    if (!href) return;
+async function updateTopupStatus(id, status) {
+    if (!confirm(`Are you sure to ${status} this topup?`)) return;
 
-    if (href.startsWith("#")) return;
+    const data = await adminFetch(`/api/admin/wallet/topups/${id}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status })
+    });
 
-    const url = new URL(href, window.location.href);
-
-    if (url.origin === window.location.origin) {
-        e.preventDefault();
-        window.location.href = url.pathname + url.search + url.hash;
+    if (!data || !data.success) {
+        showAdminToast?.(data?.message || "Update failed", "error");
+        return;
     }
-});
+
+    showAdminToast?.(`Topup ${status}`, "success");
+    await loadWalletTopups();
+    loadAdminDashboard?.(false);
+}
+
+function initSlipZoom() {
+    document.getElementById("closeSlipModal")?.addEventListener("click", closeSlipModal);
+
+    document.getElementById("slipModal")?.addEventListener("click", e => {
+        if (e.target.id === "slipModal") closeSlipModal();
+    });
+}
+
+function openSlipModal(src) {
+    const modal = document.getElementById("slipModal");
+    const img = document.getElementById("slipModalImg");
+
+    if (!modal || !img) {
+        window.open(src, "_blank");
+        return;
+    }
+
+    img.src = src;
+    modal.classList.add("show");
+}
+
+function closeSlipModal() {
+    document.getElementById("slipModal")?.classList.remove("show");
+}
+
+function getSlipUrl(slip) {
+    if (!slip) return "";
+    if (slip.startsWith("http") || slip.startsWith("/uploads/")) return slip;
+    return `/uploads/${slip}`;
+}
+
+function normalizeTopupStatus(status) {
+    if (status === "approved") return "completed";
+    if (status === "rejected") return "cancelled";
+    return status;
+}
+
+function formatTopupStatus(status) {
+    return { pending: "Pending", approved: "Approved", rejected: "Rejected" }[status] || status;
+}
+
+function formatDate(date) {
+    const parsed = new Date(date);
+    return Number.isNaN(parsed.getTime()) ? "-" : parsed.toLocaleString();
+}
+
+function escapeHTML(value) {
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+window.loadWalletTopups = loadWalletTopups;

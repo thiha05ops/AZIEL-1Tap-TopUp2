@@ -1,7 +1,11 @@
 // frontend/js/admin-api.js
+// AZIEL Admin V2.5 API Helper
 
 function getAdminToken() {
-    return localStorage.getItem("adminToken");
+    return (
+        localStorage.getItem("adminToken") ||
+        localStorage.getItem("token")
+    );
 }
 
 function adminLogout(message = "") {
@@ -18,9 +22,7 @@ function adminLogout(message = "") {
 
 function isAdminTokenExpired(token) {
     try {
-        const payload = JSON.parse(
-            atob(token.split(".")[1])
-        );
+        const payload = JSON.parse(atob(token.split(".")[1]));
 
         if (!payload.exp) return false;
 
@@ -82,8 +84,15 @@ function showAdminLogoutMessage() {
 
     if (!msg) return;
 
-    alert(msg);
     localStorage.removeItem("adminLogoutMessage");
+
+    setTimeout(() => {
+        if (typeof showAdminToast === "function") {
+            showAdminToast(msg, "error");
+        } else {
+            alert(msg);
+        }
+    }, 300);
 }
 
 setInterval(checkAdminToken, 60000);

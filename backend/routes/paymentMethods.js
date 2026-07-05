@@ -3,61 +3,58 @@ const router = express.Router();
 
 const PaymentMethod = require("../models/PaymentMethod");
 const adminMiddleware = require("../middleware/adminMiddleware");
-const paymentQrUpload =
-    require(
-        "../middleware/paymentQrUpload"
-    );
+const paymentQrUpload = require("../middleware/paymentQrUpload");
 
 const defaultMethods = [
-    {
-        method: "KBZPay",
-        key: "kbzpay",
-        region: "MM"
-    },
-    {
-        method: "WavePay",
-        key: "wavepay",
-        region: "MM"
-    },
-    {
-        method: "AYA Pay",
-        key: "ayapay",
-        region: "MM"
-    },
-    {
-        method: "PromptPay",
-        key: "promptpay",
-        region: "TH"
-    },
-    {
-        method: "SCB",
-        key: "scb",
-        region: "TH"
-    }
+    { method: "KBZPay", key: "kbzpay", region: "MM" },
+    { method: "WavePay", key: "wavepay", region: "MM" },
+    { method: "AYA Pay", key: "ayapay", region: "MM" },
+    { method: "PromptPay", key: "promptpay", region: "TH" },
+    { method: "SCB", key: "scb", region: "TH" }
 ];
 
 async function seedPaymentMethods() {
     for (const item of defaultMethods) {
-        const exists = await PaymentMethod.findOne({
-            key: item.key
-        });
+        const exists = await PaymentMethod.findOne({ key: item.key });
 
         if (!exists) {
-            await PaymentMethod.create(item);
+            await PaymentMethod.create({
+                ...item,
+                enabled: false,
+                accountName: "",
+                accountNumber: "",
+                qrImageUrl: "",
+                uploadedQrImage: "",
+                maintenanceMessage: "",
+                paymentType: "manual",
+                provider: "manual"
+            });
         }
     }
 }
 
+function formatMethod(method) {
+    const obj = method.toObject();
+
+    return {
+        ...obj,
+        qrImage:
+            obj.uploadedQrImage ||
+            obj.qrImageUrl ||
+            obj.qrImage ||
+            ""
+    };
+}
+
+// GET /api/payment-methods
 router.get("/payment-methods", async (req, res) => {
     try {
         await seedPaymentMethods();
 
-        const region = req.query.region;
-
         const filter = {};
 
-        if (region) {
-            filter.region = region;
+        if (req.query.region) {
+            filter.region = req.query.region;
         }
 
         const methods = await PaymentMethod
@@ -66,7 +63,7 @@ router.get("/payment-methods", async (req, res) => {
 
         res.json({
             success: true,
-            methods
+            methods: methods.map(formatMethod)
         });
 
     } catch (error) {
@@ -79,6 +76,7 @@ router.get("/payment-methods", async (req, res) => {
     }
 });
 
+// PUT /api/admin/payment-methods/:id
 router.put("/admin/payment-methods/:id", adminMiddleware, async (req, res) => {
     try {
         const method = await PaymentMethod.findById(req.params.id);
@@ -112,30 +110,9 @@ router.put("/admin/payment-methods/:id", adminMiddleware, async (req, res) => {
         res.json({
             success: true,
             message: "Payment method updated",
-            method: {
-                ...method.toObject(),
-                qrImage:
-                    method.uploadedQrImage ||
-                    method.qrImageUrl ||
-                    ""
-            }
+            method: formatMethod(method)
         });
-        const methods = await PaymentMethod
-            .find(filter)
-            .sort({ region: 1, method: 1 });
 
-        const formattedMethods = methods.map(method => ({
-            ...method.toObject(),
-            qrImage:
-                method.uploadedQrImage ||
-                method.qrImageUrl ||
-                ""
-        }));
-
-        res.json({
-            success: true,
-            methods: formattedMethods
-        });
     } catch (error) {
         console.log("Update payment method error:", error);
 
@@ -145,47 +122,34 @@ router.put("/admin/payment-methods/:id", adminMiddleware, async (req, res) => {
         });
     }
 });
+
+// POST /api/admin/upload-payment-qr
 router.post(
     "/admin/upload-payment-qr",
-
+    adminMiddleware,
     paymentQrUpload.single("qr"),
-
     async (req, res) => {
-
         try {
-
             if (!req.file) {
-
                 return res.json({
                     success: false,
-                    message:
-                        "No image uploaded"
+                    message: "No image uploaded"
                 });
-
             }
 
             res.json({
                 success: true,
-
-                image:
-                    `/uploads/payments/${req.file.filename}`
+                image: `/uploads/payments/${req.file.filename}`
             });
 
         } catch (error) {
-
-            console.log(
-                "QR upload error:",
-                error
-            );
+            console.log("QR upload error:", error);
 
             res.status(500).json({
                 success: false,
-                message:
-                    "Upload failed"
+                message: "Upload failed"
             });
-
         }
-
     }
 );
 
