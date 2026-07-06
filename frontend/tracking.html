@@ -10,6 +10,8 @@
     <link rel="stylesheet" href="css/core/components.css">
     <link rel="stylesheet" href="css/theme/aziel-design-system.css?v=20260701">
     <link rel="stylesheet" href="css/theme/aziel-header.css?v=20260701">
+    <link rel="stylesheet" href="css/theme/aziel-header.css?v=20260701">
+    <link rel="stylesheet" href="css/theme/aziel-theme.css?v=20260701">
     <link rel="stylesheet" href="css/tracking/tracking.css">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -63,6 +65,43 @@
         <section id="trackingResult" class="tracking-result"></section>
 
     </main>
+    <div id="refundRequestModal" class="refund-modal">
+        <div class="refund-modal-box">
+
+            <button id="closeRefundModal" class="refund-modal-close" type="button">
+                ×
+            </button>
+
+            <div class="refund-modal-icon">
+                💸
+            </div>
+
+            <h2>Request Refund</h2>
+
+            <p>
+                Tell us why you want a refund. Admin will review your request.
+            </p>
+
+            <div class="refund-order-box">
+                <small>Order ID</small>
+                <strong id="refundModalOrderId">-</strong>
+            </div>
+
+            <label class="refund-label">
+                Refund Reason
+            </label>
+
+            <textarea id="refundReasonInput"
+                placeholder="Example: Order failed / item not received / wrong top-up..."></textarea>
+
+            <div id="refundRequestMsg"></div>
+
+            <button id="submitRefundRequestBtn" type="button">
+                Submit Refund Request
+            </button>
+
+        </div>
+    </div>
     <script src="/socket.io/socket.io.js"></script>
 
     <script src="js/api.js"></script>
@@ -72,11 +111,11 @@
     <script src="js/header.js?v=202606291812"></script>
     <script src="js/header-scroll.js?v=202606291812"></script>
 
-    <script src="js/tracking.js?v=6"></script>
+    <script src="js/tracking.js?v=refund-request-1"></script>
 
     <script src="js/pwa-fix.js"></script>
     <script src="js/site-settings.js"></script>
-    <script src="js/theme.js?v=20260701"></script>
+    <script src="/js/theme.js?v=20260701"></script>
 
 </body>
 

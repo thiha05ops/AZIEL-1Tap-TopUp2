@@ -69,12 +69,31 @@ const orderSchema = new mongoose.Schema({
             "paid",
             "processing",
             "completed",
+            "cancelled",
             "failed",
+            "refund_requested",
             "refund_pending",
+            "refund_rejected",
             "refunded"
         ],
         default: "pending_payment"
     },
+
+    refundRequested: {
+        type: Boolean,
+        default: false
+    },
+
+    refundRequestReason: {
+        type: String,
+        default: ""
+    },
+
+    refundRequestedAt: {
+        type: Date,
+        default: null
+    },
+
     refunded: {
         type: Boolean,
         default: false
@@ -86,6 +105,11 @@ const orderSchema = new mongoose.Schema({
     },
 
     refundReason: {
+        type: String,
+        default: ""
+    },
+
+    refundRejectedReason: {
         type: String,
         default: ""
     },
@@ -104,14 +128,10 @@ const orderSchema = new mongoose.Schema({
     refundedAt: {
         type: Date,
         default: null
-    },
+    }
 
 }, {
     timestamps: true
 });
 
-module.exports =
-    mongoose.model(
-        "Order",
-        orderSchema
-    );
+module.exports = mongoose.model("Order", orderSchema);

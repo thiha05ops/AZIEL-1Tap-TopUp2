@@ -1,5 +1,5 @@
 // frontend/js/admin-orders.js
-// AZIEL Admin V2.5 Orders Controller + Wallet Refund
+// AZIEL Admin V2.5 Orders Controller + Customer Refund Request Flow
 
 let allAdminOrders = [];
 let ordersAutoRefreshTimer = null;
@@ -108,13 +108,19 @@ function renderOrders(orders) {
                         <option value="completed" ${status === "completed" ? "selected" : ""}>Completed</option>
                         <option value="cancelled" ${status === "cancelled" ? "selected" : ""}>Cancelled</option>
                         <option value="failed" ${status === "failed" ? "selected" : ""}>Failed</option>
+                        <option value="refund_requested" ${status === "refund_requested" ? "selected" : ""}>Refund Requested</option>
                         <option value="refund_pending" ${status === "refund_pending" ? "selected" : ""}>Refund Pending</option>
+                        <option value="refund_rejected" ${status === "refund_rejected" ? "selected" : ""}>Refund Rejected</option>
                         <option value="refunded" ${status === "refunded" ? "selected" : ""}>Refunded</option>
                     </select>
 
-                    ${canRefund(order) ? `
-                        <button class="refund-order-btn" data-action="refund-order" data-id="${id}">
-                            Refund to Wallet
+                    ${canApproveRefund(order) ? `
+                        <button class="refund-order-btn" data-action="approve-refund" data-id="${id}">
+                            Approve Refund
+                        </button>
+
+                        <button class="reject-refund-btn" data-action="reject-refund" data-id="${id}">
+                            Reject
                         </button>
                     ` : ""}
                 </td>
@@ -139,9 +145,15 @@ function bindOrderActions() {
         });
     });
 
-    document.querySelectorAll('[data-action="refund-order"]').forEach(btn => {
+    document.querySelectorAll('[data-action="approve-refund"]').forEach(btn => {
         btn.addEventListener("click", () => {
-            refundOrderToWallet(btn.dataset.id);
+            approveRefundToWallet(btn.dataset.id);
+        });
+    });
+
+    document.querySelectorAll('[data-action="reject-refund"]').forEach(btn => {
+        btn.addEventListener("click", () => {
+            rejectRefund(btn.dataset.id);
         });
     });
 }
@@ -180,19 +192,16 @@ async function updateOrderStatus(orderId, status, selectEl = null) {
     }
 }
 
-function canRefund(order) {
+function canApproveRefund(order) {
     if (!order) return false;
-
-    const status = String(order.status || "").toLowerCase();
 
     return (
         !order.refunded &&
-        status !== "refunded" &&
-        ["paid", "processing", "failed", "cancelled", "completed"].includes(status)
+        String(order.status || "").toLowerCase() === "refund_requested"
     );
 }
 
-async function refundOrderToWallet(orderId) {
+async function approveRefundToWallet(orderId) {
     const order = allAdminOrders.find(o => String(o._id) === String(orderId));
 
     if (!order) {
@@ -201,7 +210,7 @@ async function refundOrderToWallet(orderId) {
     }
 
     const reason = prompt(
-        `Refund ${Number(order.amount || 0).toLocaleString()} ${order.currency || ""} to ${order.username}'s wallet?\n\nEnter refund reason:`
+        `Approve refund ${Number(order.amount || 0).toLocaleString()} ${order.currency || ""} to ${order.username}'s wallet?\n\nAdmin note/reason:`
     );
 
     if (!reason || !reason.trim()) {
@@ -209,12 +218,12 @@ async function refundOrderToWallet(orderId) {
         return;
     }
 
-    if (!confirm("Confirm refund to wallet? This action cannot be repeated.")) {
+    if (!confirm("Confirm approve refund to wallet? This action cannot be repeated.")) {
         return;
     }
 
     try {
-        const data = await adminFetch(`/api/admin/orders/${orderId}/refund`, {
+        const data = await adminFetch(`/api/admin/orders/${orderId}/refund/approve`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ reason: reason.trim() })
@@ -225,13 +234,55 @@ async function refundOrderToWallet(orderId) {
             return;
         }
 
-        showAdminToast?.("Refunded to wallet", "success");
+        showAdminToast?.("Refund approved to wallet", "success");
 
         await loadOrders(false);
         loadAdminDashboard?.(false);
 
     } catch (error) {
-        console.log("Refund error:", error);
+        console.log("Approve refund error:", error);
+        showAdminToast?.("Server error", "error");
+    }
+}
+
+async function rejectRefund(orderId) {
+    const order = allAdminOrders.find(o => String(o._id) === String(orderId));
+
+    if (!order) {
+        showAdminToast?.("Order not found", "error");
+        return;
+    }
+
+    const reason = prompt("Enter reject reason:");
+
+    if (!reason || !reason.trim()) {
+        showAdminToast?.("Reject reason is required", "error");
+        return;
+    }
+
+    if (!confirm("Reject this refund request?")) {
+        return;
+    }
+
+    try {
+        const data = await adminFetch(`/api/admin/orders/${orderId}/refund/reject`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ reason: reason.trim() })
+        });
+
+        if (!data || !data.success) {
+            showAdminToast?.(data?.message || "Reject failed", "error");
+            return;
+        }
+
+        showAdminToast?.("Refund rejected", "success");
+
+        await loadOrders(false);
+        loadAdminDashboard?.(false);
+
+    } catch (error) {
+        console.log("Reject refund error:", error);
         showAdminToast?.("Server error", "error");
     }
 }
@@ -268,8 +319,11 @@ function openOrderModal(order) {
             ${detailItem("Payment", order.paymentMethod || "-")}
             ${detailItem("Status", formatStatus(order.status))}
             ${detailItem("Note", order.note || "-")}
+            ${order.refundRequested ? detailItem("Refund Request Reason", order.refundRequestReason || "-") : ""}
+            ${order.refundRequestedAt ? detailItem("Refund Requested At", formatDate(order.refundRequestedAt)) : ""}
             ${order.refunded ? detailItem("Refund Amount", `${Number(order.refundAmount || 0).toLocaleString()} ${order.currency || ""}`) : ""}
             ${order.refunded ? detailItem("Refund Reason", order.refundReason || "-") : ""}
+            ${order.refundRejectedReason ? detailItem("Reject Reason", order.refundRejectedReason || "-") : ""}
             ${order.refunded ? detailItem("Refund Method", order.refundMethod || "-") : ""}
             ${order.refunded ? detailItem("Refunded At", formatDate(order.refundedAt)) : ""}
             ${detailItem("Created", formatDate(order.createdAt))}
@@ -282,10 +336,14 @@ function openOrderModal(order) {
             </div>
         ` : ""}
 
-        ${canRefund(order) ? `
+        ${canApproveRefund(order) ? `
             <div class="order-modal-actions">
-                <button class="refund-order-btn" type="button" onclick="refundOrderToWallet('${escapeHTML(order._id)}')">
-                    Refund to Wallet
+                <button class="refund-order-btn" type="button" onclick="approveRefundToWallet('${escapeHTML(order._id)}')">
+                    Approve Refund to Wallet
+                </button>
+
+                <button class="reject-refund-btn" type="button" onclick="rejectRefund('${escapeHTML(order._id)}')">
+                    Reject Refund
                 </button>
             </div>
         ` : ""}
@@ -311,7 +369,9 @@ function normalizeStatus(status) {
     const s = String(status || "").toLowerCase();
 
     if (s === "pending_payment") return "pending";
+    if (s === "refund_requested") return "pending";
     if (s === "refund_pending") return "pending";
+    if (s === "refund_rejected") return "cancelled";
     if (s === "canceled") return "cancelled";
     if (s === "failed") return "cancelled";
     if (s === "refunded") return "completed";
@@ -328,7 +388,9 @@ function formatStatus(status) {
         cancelled: "Cancelled",
         canceled: "Cancelled",
         failed: "Failed",
+        refund_requested: "Refund Requested",
         refund_pending: "Refund Pending",
+        refund_rejected: "Refund Rejected",
         refunded: "Refunded"
     }[status] || status || "-";
 }
@@ -356,4 +418,5 @@ function escapeHTML(value) {
 }
 
 window.loadOrders = loadOrders;
-window.refundOrderToWallet = refundOrderToWallet;
+window.approveRefundToWallet = approveRefundToWallet;
+window.rejectRefund = rejectRefund;

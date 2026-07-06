@@ -1,34 +1,38 @@
 // frontend/js/header-loader.js
+// AZIEL V2.5 Header Loader + i18n
 
 const AZIEL_NAV_ITEMS = {
     home: [
-        ["explore.html", "Explore"],
-        ["home.html", "Home"],
-        ["home.html#popularGames", "Games"],
-        ["home.html#categories", "Top Up"],
-        ["wallet.html", "Wallet"],
-        ["tracking.html", "Transactions"],
-        ["support.html", "Support"]
+        ["explore.html", "nav_explore"],
+        ["home.html", "nav_home"],
+        ["home.html#popularGames", "nav_games"],
+        ["home.html#categories", "nav_topup"],
+        ["wallet.html", "nav_wallet"],
+        ["tracking.html", "nav_transactions"],
+        ["support.html", "nav_support"]
     ],
+
     game: [
-        ["home.html", "Home"],
-        ["home.html#popularGames", "Games"],
-        ["wallet.html", "Wallet"],
-        ["tracking.html", "Orders"],
-        ["support.html", "Support"]
+        ["home.html", "nav_home"],
+        ["home.html#popularGames", "nav_games"],
+        ["wallet.html", "nav_wallet"],
+        ["tracking.html", "nav_orders"],
+        ["support.html", "nav_support"]
     ],
+
     account: [
-        ["home.html", "Home"],
-        ["wallet.html", "Wallet"],
-        ["tracking.html", "Orders"],
-        ["support.html", "Support"]
+        ["home.html", "nav_home"],
+        ["wallet.html", "nav_wallet"],
+        ["tracking.html", "nav_orders"],
+        ["support.html", "nav_support"]
     ],
+
     explore: [
-        ["home.html", "Home"],
-        ["explore.html", "Explore"],
-        ["explore.html#features", "Features"],
-        ["explore.html#platform", "Platform"],
-        ["support.html", "Support"]
+        ["home.html", "nav_home"],
+        ["explore.html", "nav_explore"],
+        ["explore.html#features", "nav_features"],
+        ["explore.html#platform", "nav_platform"],
+        ["support.html", "nav_support"]
     ]
 };
 
@@ -41,6 +45,7 @@ async function loadAZIELHeader() {
 
     if (azielHeaderLoading || azielHeaderLoaded) {
         renderHeaderNav(mount.dataset.nav || "home");
+        translateHeaderContent();
         return;
     }
 
@@ -49,7 +54,7 @@ async function loadAZIELHeader() {
     const navType = mount.dataset.nav || "home";
 
     try {
-        const res = await fetch("components/header.html?v=20260702");
+        const res = await fetch("components/header.html?v=20260706-i18n");
 
         if (!res.ok) {
             throw new Error(`Header fetch failed: ${res.status}`);
@@ -58,6 +63,7 @@ async function loadAZIELHeader() {
         mount.innerHTML = await res.text();
 
         const headers = document.querySelectorAll(".az-header");
+
         if (headers.length > 1) {
             headers.forEach((header, index) => {
                 if (index > 0) header.remove();
@@ -67,9 +73,13 @@ async function loadAZIELHeader() {
         renderHeaderNav(navType);
 
         azielHeaderLoaded = true;
+
+        translateHeaderContent();
+
         window.dispatchEvent(new Event("aziel:headerLoaded"));
 
         console.log("AZIEL header loaded ✅");
+
     } catch (err) {
         console.error("Header load error:", err);
     } finally {
@@ -86,7 +96,7 @@ function renderHeaderNav(navType) {
     const currentHash = location.hash || "";
 
     nav.innerHTML = items
-        .map(([href, label]) => {
+        .map(([href, key]) => {
             const [hrefPage, hrefHashRaw] = href.split("#");
             const hrefHash = hrefHashRaw ? `#${hrefHashRaw}` : "";
 
@@ -104,13 +114,50 @@ function renderHeaderNav(navType) {
                         : "";
             }
 
-            return `<a href="${href}" class="${activeClass}">${label}</a>`;
+            const fallback = getFallbackLabel(key);
+
+            return `
+                <a href="${href}"
+                   class="${activeClass}"
+                   data-i18n="${key}">
+                    ${fallback}
+                </a>
+            `;
         })
         .join("");
+
+    translateHeaderContent();
+}
+
+function translateHeaderContent() {
+    if (window.AZIEL_I18N?.translatePage) {
+        window.AZIEL_I18N.translatePage(document);
+    }
+}
+
+function getFallbackLabel(key) {
+    const labels = {
+        nav_explore: "Explore",
+        nav_home: "Home",
+        nav_games: "Games",
+        nav_topup: "Top Up",
+        nav_wallet: "Wallet",
+        nav_transactions: "Transactions",
+        nav_orders: "Orders",
+        nav_support: "Support",
+        nav_features: "Features",
+        nav_platform: "Platform"
+    };
+
+    return labels[key] || key;
 }
 
 window.loadAZIELHeader = loadAZIELHeader;
 window.renderHeaderNav = renderHeaderNav;
+
+window.addEventListener("aziel:languageChanged", () => {
+    translateHeaderContent();
+});
 
 if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", loadAZIELHeader, { once: true });

@@ -1,0 +1,76 @@
+// frontend/lang/my.js
+
+window.AZIEL_LANG = window.AZIEL_LANG || {};
+
+window.AZIEL_LANG.my = {
+    nav_home: "ပင်မ",
+    nav_games: "ဂိမ်းများ",
+    nav_wallet: "ပိုက်ဆံအိတ်",
+    nav_orders: "အော်ဒါများ",
+    nav_tracking: "အော်ဒါစစ်ရန်",
+    nav_support: "အကူအညီ",
+    nav_account: "အကောင့်",
+    nav_login: "အကောင့်ဝင်ရန်",
+    nav_register: "အကောင့်ဖွင့်ရန်",
+    nav_logout: "အကောင့်ထွက်ရန်",
+
+    action_buy_now: "ဝယ်မည်",
+    action_continue: "ဆက်လုပ်မည်",
+    action_save: "သိမ်းမည်",
+    action_cancel: "မလုပ်တော့ပါ",
+    action_confirm: "အတည်ပြုမည်",
+    action_submit: "တင်သွင်းမည်",
+    action_view_all: "အားလုံးကြည့်ရန်",
+    action_request_refund: "Refund တောင်းမည်",
+
+    home_popular_games: "လူကြိုက်များသော ဂိမ်းများ",
+    home_topup_categories: "Top Up အမျိုးအစားများ",
+    home_why_choose: "ဘာကြောင့် AZIEL ကိုရွေးသင့်လဲ?",
+    home_latest_promotions: "နောက်ဆုံး Promotion များ",
+
+    trust_instant_delivery: "မြန်ဆန်စွာ ဖြည့်ပေးခြင်း",
+    trust_delivery_time: "၁ မိနစ် - ၅ မိနစ်",
+    trust_secure: "၁၀၀% လုံခြုံမှု",
+    trust_secure_sub: "စိတ်ချရပြီး ယုံကြည်နိုင်သည်",
+    trust_support: "၂၄/၇ အကူအညီ",
+    trust_support_sub: "ကျွန်ုပ်တို့ ရှိနေပါတယ်",
+    trust_best_price: "အကောင်းဆုံးစျေးနှုန်း",
+    trust_best_price_sub: "အမြဲတမ်း စျေးသက်သာ",
+
+    tracking_title: "အော်ဒါစစ်ရန်",
+    tracking_subtitle: "Order ID ထည့်ပြီး သင့် top-up status ကို realtime စစ်ဆေးနိုင်သည်။",
+    tracking_input_placeholder: "Order ID ထည့်ပါ ဥပမာ AZL-123456",
+    tracking_check: "စစ်ဆေးမည်",
+    tracking_recent_orders: "လတ်တလော အော်ဒါများ",
+    tracking_tap_to_track: "နှိပ်ပြီး စစ်ဆေးရန်",
+
+    refund_request_title: "Refund တောင်းရန်",
+    refund_request_desc: "Refund လိုချင်ရသည့် အကြောင်းအရင်းကိုရေးပါ။ Admin မှ စစ်ဆေးပေးပါမည်။",
+    refund_reason: "Refund အကြောင်းအရင်း",
+    refund_reason_placeholder: "ဥပမာ: Order failed / item မရရှိ / top-up မှား...",
+    refund_submit: "Refund Request တင်မည်",
+
+    locale_title: "သင့်နေရာကို ရွေးပါ",
+    locale_desc: "AZIEL အတွက် region, language နှင့် currency ကိုရွေးပါ။",
+    locale_region: "Region",
+    locale_language: "ဘာသာစကား",
+    locale_currency: "ငွေကြေး",
+    locale_save: "သိမ်းမည်",
+
+    footer_description: "မြန်မာနှင့် ထိုင်းအတွက် မြန်ဆန်၊ လုံခြုံ၊ ယုံကြည်စိတ်ချရသော Game Top Up Platform။",
+    footer_explore: "လေ့လာရန်",
+    footer_company: "ကုမ္ပဏီ",
+    footer_support: "အကူအညီ",
+    footer_legal: "စည်းမျဉ်းများ",
+    footer_follow: "Follow လုပ်ရန်",
+    footer_payment_methods: "ငွေပေးချေမှုနည်းလမ်းများ",
+    nav_explore: "လေ့လာရန်",
+    nav_topup: "Top Up",
+    nav_transactions: "ငွေလွှဲမှတ်တမ်း",
+    nav_features: "Feature များ",
+    nav_platform: "Platform",
+    overview: "အကျဉ်းချုပ်",
+    security: "လုံခြုံရေး",
+    transactions: "ငွေလွှဲမှတ်တမ်း",
+    theme: "Theme"
+};

@@ -1,0 +1,76 @@
+// frontend/lang/th.js
+
+window.AZIEL_LANG = window.AZIEL_LANG || {};
+
+window.AZIEL_LANG.th = {
+    nav_home: "หน้าหลัก",
+    nav_games: "เกม",
+    nav_wallet: "กระเป๋าเงิน",
+    nav_orders: "คำสั่งซื้อ",
+    nav_tracking: "ติดตามคำสั่งซื้อ",
+    nav_support: "ช่วยเหลือ",
+    nav_account: "บัญชี",
+    nav_login: "เข้าสู่ระบบ",
+    nav_register: "สมัครสมาชิก",
+    nav_logout: "ออกจากระบบ",
+
+    action_buy_now: "ซื้อเลย",
+    action_continue: "ดำเนินการต่อ",
+    action_save: "บันทึก",
+    action_cancel: "ยกเลิก",
+    action_confirm: "ยืนยัน",
+    action_submit: "ส่ง",
+    action_view_all: "ดูทั้งหมด",
+    action_request_refund: "ขอคืนเงิน",
+
+    home_popular_games: "เกมยอดนิยม",
+    home_topup_categories: "หมวดหมู่เติมเงิน",
+    home_why_choose: "ทำไมต้องเลือก AZIEL?",
+    home_latest_promotions: "โปรโมชั่นล่าสุด",
+
+    trust_instant_delivery: "จัดส่งทันที",
+    trust_delivery_time: "1-5 นาที",
+    trust_secure: "ปลอดภัย 100%",
+    trust_secure_sub: "ปลอดภัยและเชื่อถือได้",
+    trust_support: "ช่วยเหลือ 24/7",
+    trust_support_sub: "เราพร้อมช่วยเหลือ",
+    trust_best_price: "ราคาดีที่สุด",
+    trust_best_price_sub: "ราคาถูกเสมอ",
+
+    tracking_title: "ติดตามคำสั่งซื้อ",
+    tracking_subtitle: "กรอก Order ID เพื่อตรวจสอบสถานะการเติมเงินแบบเรียลไทม์",
+    tracking_input_placeholder: "กรอก Order ID เช่น AZL-123456",
+    tracking_check: "ตรวจสอบ",
+    tracking_recent_orders: "คำสั่งซื้อล่าสุด",
+    tracking_tap_to_track: "แตะเพื่อติดตาม",
+
+    refund_request_title: "ขอคืนเงิน",
+    refund_request_desc: "แจ้งเหตุผลในการขอคืนเงิน แอดมินจะตรวจสอบคำขอของคุณ",
+    refund_reason: "เหตุผลในการคืนเงิน",
+    refund_reason_placeholder: "ตัวอย่าง: ออเดอร์ล้มเหลว / ไม่ได้รับสินค้า / เติมผิด...",
+    refund_submit: "ส่งคำขอคืนเงิน",
+
+    locale_title: "เลือกตำแหน่งของคุณ",
+    locale_desc: "เลือกภูมิภาค ภาษา และสกุลเงินสำหรับ AZIEL",
+    locale_region: "ภูมิภาค",
+    locale_language: "ภาษา",
+    locale_currency: "สกุลเงิน",
+    locale_save: "บันทึกการตั้งค่า",
+
+    footer_description: "แพลตฟอร์มเติมเกมที่รวดเร็ว ปลอดภัย และเชื่อถือได้ สำหรับเมียนมาและไทย",
+    footer_explore: "สำรวจ",
+    footer_company: "บริษัท",
+    footer_support: "ช่วยเหลือ",
+    footer_legal: "กฎหมาย",
+    footer_follow: "ติดตามเรา",
+    footer_payment_methods: "วิธีชำระเงิน",
+    nav_explore: "สำรวจ",
+    nav_topup: "เติมเงิน",
+    nav_transactions: "ธุรกรรม",
+    nav_features: "ฟีเจอร์",
+    nav_platform: "แพลตฟอร์ม",
+    overview: "ภาพรวม",
+    security: "ความปลอดภัย",
+    transactions: "ธุรกรรม",
+    theme: "ธีม"
+};

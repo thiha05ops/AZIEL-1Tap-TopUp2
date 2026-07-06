@@ -18,7 +18,15 @@ const createNotification = require("../services/createNotification");
 const adminMiddleware = require("../middleware/adminMiddleware");
 
 function getCurrencyKey(currency) {
-    return currency === "THB" ? "THB" : "MMK";
+    return String(currency || "").toUpperCase() === "THB" ? "THB" : "MMK";
+}
+
+function getRefundAllowedStatus(status) {
+    return ["failed", "cancelled"].includes(String(status || "").toLowerCase());
+}
+
+function createTransactionId(prefix = "WTX") {
+    return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 }
 
 // CUSTOMER ORDER HISTORY
@@ -73,6 +81,127 @@ router.get("/order/track/:orderId", async (req, res) => {
     }
 });
 
+// CUSTOMER REQUEST REFUND
+// POST /api/order/:orderId/refund-request
+router.post("/order/:orderId/refund-request", async (req, res) => {
+    try {
+        const { username, reason } = req.body;
+
+        if (!reason || !String(reason).trim()) {
+            return res.json({
+                success: false,
+                message: "Refund reason is required"
+            });
+        }
+
+        const order = await Order.findOne({
+            orderId: req.params.orderId
+        });
+
+        if (!order) {
+            return res.json({
+                success: false,
+                message: "Order not found"
+            });
+        }
+
+        if (username && order.username !== username) {
+            return res.json({
+                success: false,
+                message: "This order does not belong to your account"
+            });
+        }
+
+        if (!getRefundAllowedStatus(order.status)) {
+            return res.json({
+                success: false,
+                message: "Refund can only be requested for failed or cancelled orders"
+            });
+        }
+
+        if (order.refunded || order.status === "refunded") {
+            return res.json({
+                success: false,
+                message: "This order has already been refunded"
+            });
+        }
+
+        if (order.refundRequested || order.status === "refund_requested") {
+            return res.json({
+                success: false,
+                message: "Refund request already submitted"
+            });
+        }
+
+        order.status = "refund_requested";
+        order.refundRequested = true;
+        order.refundRequestReason = String(reason).trim();
+        order.refundRequestedAt = new Date();
+        order.note = "Refund request submitted. Admin will review your request.";
+
+        await order.save();
+
+        const notification = await createNotification({
+            username: order.username,
+            title: "Refund Request Submitted",
+            message: `Your refund request for ${order.game} - ${order.packageName} has been submitted.`,
+            type: "refund",
+            category: "refunds",
+            orderId: order.orderId
+        });
+
+        const io = req.app.get("io");
+
+        if (io) {
+            io.to(order.username).emit("newNotification", notification);
+
+            io.to("admins").emit("adminNewUpdate", {
+                type: "refund_requested",
+                orderId: order.orderId,
+                username: order.username,
+                amount: order.amount,
+                currency: order.currency
+            });
+        }
+
+        await sendTelegramMessage(
+            `💸 REFUND REQUESTED
+
+📦 Order:
+${order.orderId}
+
+🎮 Game:
+${order.game}
+
+📦 Package:
+${order.packageName}
+
+👤 User:
+${order.username}
+
+💰 Amount:
+${order.amount} ${order.currency}
+
+📝 Reason:
+${order.refundRequestReason}`
+        );
+
+        res.json({
+            success: true,
+            message: "Refund request submitted",
+            order
+        });
+
+    } catch (error) {
+        console.log("Refund request error:", error);
+
+        res.status(500).json({
+            success: false,
+            message: "Server error"
+        });
+    }
+});
+
 // ADMIN GET ALL ORDERS
 router.get("/admin/orders", adminMiddleware, async (req, res) => {
     try {
@@ -98,7 +227,9 @@ router.put("/admin/orders/:id/status", adminMiddleware, async (req, res) => {
             "completed",
             "cancelled",
             "failed",
+            "refund_requested",
             "refund_pending",
+            "refund_rejected",
             "refunded"
         ];
 
@@ -115,8 +246,10 @@ router.put("/admin/orders/:id/status", adminMiddleware, async (req, res) => {
             processing: "Your order is processing.",
             completed: "✅ Your order has been completed.",
             cancelled: "❌ Your order has been cancelled.",
-            failed: "❌ Your order failed. Please contact support.",
+            failed: "❌ Your order failed. You may request a wallet refund.",
+            refund_requested: "Refund request submitted. Admin will review your request.",
             refund_pending: "Refund is being reviewed.",
+            refund_rejected: "Refund request was rejected.",
             refunded: "✅ This order has been refunded to your wallet."
         };
 
@@ -139,7 +272,7 @@ router.put("/admin/orders/:id/status", adminMiddleware, async (req, res) => {
         const notification = await createNotification({
             username: order.username,
             title: "Order Status Updated",
-            message: `${order.game} - ${order.packageName} is now ${order.status}`,
+            message: `${order.game} - ${order.packageName} is now ${formatStatusText(order.status)}`,
             type: "order",
             category: "orders",
             orderId: order.orderId
@@ -195,17 +328,11 @@ ${order.status}`
     }
 });
 
-// ADMIN REFUND ORDER TO WALLET
-router.post("/admin/orders/:id/refund", adminMiddleware, async (req, res) => {
+// ADMIN APPROVE REFUND TO WALLET
+// POST /api/admin/orders/:id/refund/approve
+router.post("/admin/orders/:id/refund/approve", adminMiddleware, async (req, res) => {
     try {
         const { reason } = req.body;
-
-        if (!reason || !String(reason).trim()) {
-            return res.json({
-                success: false,
-                message: "Refund reason is required"
-            });
-        }
 
         const order = await Order.findById(req.params.id);
 
@@ -216,15 +343,22 @@ router.post("/admin/orders/:id/refund", adminMiddleware, async (req, res) => {
             });
         }
 
-        if (order.refunded === true || order.status === "refunded") {
+        if (order.refunded || order.status === "refunded") {
             return res.json({
                 success: false,
                 message: "This order has already been refunded"
             });
         }
 
-        const currencyKey = getCurrencyKey(order.currency);
+        if (!order.refundRequested && order.status !== "refund_requested") {
+            return res.json({
+                success: false,
+                message: "Customer has not requested refund yet"
+            });
+        }
+
         const refundAmount = Number(order.amount || 0);
+        const currencyKey = getCurrencyKey(order.currency);
 
         if (refundAmount <= 0) {
             return res.json({
@@ -251,7 +385,7 @@ router.post("/admin/orders/:id/refund", adminMiddleware, async (req, res) => {
         }
 
         await WalletTransaction.create({
-            transactionId: "RF-" + Date.now(),
+            transactionId: createTransactionId("RF"),
             username: order.username,
             orderId: order.orderId,
             type: "refund",
@@ -266,11 +400,14 @@ router.post("/admin/orders/:id/refund", adminMiddleware, async (req, res) => {
         order.status = "refunded";
         order.refunded = true;
         order.refundAmount = refundAmount;
-        order.refundReason = String(reason).trim();
+        order.refundReason =
+            String(reason || "").trim() ||
+            order.refundRequestReason ||
+            "Refund approved by admin";
         order.refundMethod = "wallet";
         order.refundedBy = "admin";
         order.refundedAt = new Date();
-        order.note = `Refunded to wallet. Reason: ${reason}`;
+        order.note = `Refunded to wallet. Reason: ${order.refundReason}`;
 
         await order.save();
 
@@ -278,8 +415,8 @@ router.post("/admin/orders/:id/refund", adminMiddleware, async (req, res) => {
             username: order.username,
             title: "Refund Completed",
             message: `${refundAmount.toLocaleString()} ${currencyKey} has been returned to your AZIEL Wallet.`,
-            type: "wallet",
-            category: "wallet",
+            type: "refund",
+            category: "refunds",
             orderId: order.orderId
         });
 
@@ -304,7 +441,7 @@ router.post("/admin/orders/:id/refund", adminMiddleware, async (req, res) => {
         }
 
         await sendTelegramMessage(
-            `💸 ORDER REFUNDED TO WALLET
+            `✅ REFUND APPROVED TO WALLET
 
 📦 Order:
 ${order.orderId}
@@ -322,18 +459,145 @@ ${order.username}
 ${refundAmount} ${currencyKey}
 
 📝 Reason:
-${reason}`
+${order.refundReason}`
         );
 
         res.json({
             success: true,
-            message: "Order refunded to wallet",
+            message: "Refund approved and returned to wallet",
             order,
             balance: user.wallet?.[currencyKey] || 0
         });
 
     } catch (error) {
-        console.log("Refund order error:", error);
+        console.log("Approve refund error:", error);
+
+        res.status(500).json({
+            success: false,
+            message: "Server error"
+        });
+    }
+});
+
+// ADMIN REJECT REFUND
+// POST /api/admin/orders/:id/refund/reject
+router.post("/admin/orders/:id/refund/reject", adminMiddleware, async (req, res) => {
+    try {
+        const { reason } = req.body;
+
+        if (!reason || !String(reason).trim()) {
+            return res.json({
+                success: false,
+                message: "Reject reason is required"
+            });
+        }
+
+        const order = await Order.findById(req.params.id);
+
+        if (!order) {
+            return res.json({
+                success: false,
+                message: "Order not found"
+            });
+        }
+
+        if (!order.refundRequested && order.status !== "refund_requested") {
+            return res.json({
+                success: false,
+                message: "No refund request to reject"
+            });
+        }
+
+        if (order.refunded || order.status === "refunded") {
+            return res.json({
+                success: false,
+                message: "This order has already been refunded"
+            });
+        }
+
+        order.status = "refund_rejected";
+        order.refundRejectedReason = String(reason).trim();
+        order.note = `Refund rejected. Reason: ${order.refundRejectedReason}`;
+
+        await order.save();
+
+        const notification = await createNotification({
+            username: order.username,
+            title: "Refund Request Rejected",
+            message: order.refundRejectedReason,
+            type: "refund",
+            category: "refunds",
+            orderId: order.orderId
+        });
+
+        const io = req.app.get("io");
+
+        if (io) {
+            io.to(order.username).emit("newNotification", notification);
+
+            io.to("admins").emit("adminNewUpdate", {
+                type: "refund_rejected",
+                orderId: order.orderId,
+                username: order.username
+            });
+        }
+
+        await sendTelegramMessage(
+            `❌ REFUND REJECTED
+
+📦 Order:
+${order.orderId}
+
+👤 User:
+${order.username}
+
+📝 Reason:
+${order.refundRejectedReason}`
+        );
+
+        res.json({
+            success: true,
+            message: "Refund request rejected",
+            order
+        });
+
+    } catch (error) {
+        console.log("Reject refund error:", error);
+
+        res.status(500).json({
+            success: false,
+            message: "Server error"
+        });
+    }
+});
+
+// LEGACY DIRECT ADMIN REFUND - Optional compatibility
+// POST /api/admin/orders/:id/refund
+router.post("/admin/orders/:id/refund", adminMiddleware, async (req, res) => {
+    try {
+        const { reason } = req.body;
+
+        const order = await Order.findById(req.params.id);
+
+        if (!order) {
+            return res.json({
+                success: false,
+                message: "Order not found"
+            });
+        }
+
+        if (!order.refundRequested && order.status !== "refund_requested") {
+            return res.json({
+                success: false,
+                message: "Customer has not requested refund yet"
+            });
+        }
+
+        req.url = `/admin/orders/${req.params.id}/refund/approve`;
+        return router.handle(req, res);
+
+    } catch (error) {
+        console.log("Legacy refund error:", error);
 
         res.status(500).json({
             success: false,
@@ -401,5 +665,11 @@ router.post("/orders", upload.single("paymentSlip"), async (req, res) => {
         });
     }
 });
+
+function formatStatusText(status) {
+    return String(status || "")
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, c => c.toUpperCase());
+}
 
 module.exports = router;

@@ -1,4 +1,4 @@
-// frontend/js/header.js - AZIEL V2.5 Global Header
+// frontend/js/header.js - AZIEL V2.5 Global Header + i18n
 
 document.addEventListener("DOMContentLoaded", () => {
     initHeader();
@@ -7,6 +7,10 @@ document.addEventListener("DOMContentLoaded", () => {
     window.addEventListener("aziel:ready", renderHeader);
     window.addEventListener("aziel:userChanged", renderHeader);
     window.addEventListener("aziel:walletChanged", renderHeader);
+
+    window.addEventListener("aziel:languageChanged", () => {
+        translateHeader();
+    });
 
     window.addEventListener("aziel:shopRegionChanged", async () => {
         renderHeader();
@@ -21,10 +25,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function initHeader() {
     renderHeader();
+    renderHeaderNav();
     initProfileDropdown();
     initThemeButton();
     initHeaderLogout();
     initAutoRevealNav();
+    translateHeader();
 }
 
 function renderHeader() {
@@ -47,6 +53,7 @@ function renderHeader() {
     if (!user) {
         if (walletText) walletText.innerText = `0 ${symbol}`;
         if (avatarText) avatarText.innerText = "G";
+        translateHeader();
         return;
     }
 
@@ -64,6 +71,53 @@ function renderHeader() {
 
     if (walletText) {
         walletText.innerText = `${balance.toLocaleString()} ${symbol}`;
+    }
+
+    translateHeader();
+}
+
+function renderHeaderNav() {
+    const nav = document.getElementById("azHeaderNav");
+    if (!nav) return;
+    if (nav.dataset.rendered === "true") {
+        translateHeader();
+        return;
+    }
+
+    nav.dataset.rendered = "true";
+
+    nav.innerHTML = `
+        <a href="home.html" data-i18n="nav_home">Home</a>
+        <a href="mobile-games.html" data-i18n="nav_games">Games</a>
+        <a href="wallet.html" data-i18n="nav_wallet">Wallet</a>
+        <a href="tracking.html" data-i18n="nav_orders">Orders</a>
+        <a href="support.html" data-i18n="nav_support">Support</a>
+    `;
+
+    const active = document.getElementById("azHeaderMount")?.dataset?.nav;
+
+    if (active) {
+        nav.querySelectorAll("a").forEach(link => {
+            const href = link.getAttribute("href") || "";
+
+            if (
+                (active === "home" && href.includes("home")) ||
+                (active === "games" && href.includes("mobile-games")) ||
+                (active === "wallet" && href.includes("wallet")) ||
+                (active === "orders" && href.includes("tracking")) ||
+                (active === "support" && href.includes("support"))
+            ) {
+                link.classList.add("active");
+            }
+        });
+    }
+
+    translateHeader();
+}
+
+function translateHeader() {
+    if (window.AZIEL_I18N?.translatePage) {
+        window.AZIEL_I18N.translatePage(document);
     }
 }
 

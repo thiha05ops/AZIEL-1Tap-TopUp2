@@ -843,3 +843,73 @@
     border-radius: 14px;
     margin-top: 12px;
 }
+
+/* =========================
+   PAYMENT TRANSFER LIGHT/DARK FIX
+========================= */
+
+.payment-transfer-area {
+    margin: 18px 0;
+    display: grid;
+    gap: 12px;
+}
+
+.transfer-card {
+    padding: 14px;
+    border-radius: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border-color, var(--border));
+}
+
+.transfer-card h4 {
+    margin: 0 0 8px;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 900;
+}
+
+.transfer-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.transfer-row strong {
+    color: var(--text-color, var(--text));
+    font-size: 15px;
+    font-weight: 900;
+    word-break: break-all;
+}
+
+.transfer-row button,
+.copy-transfer-btn {
+    border: none;
+    border-radius: 12px;
+    padding: 9px 12px;
+    background: rgba(139, 92, 246, .16);
+    color: var(--primary);
+    font-weight: 900;
+    cursor: pointer;
+}
+
+.payment-open-bank {
+    width: 100%;
+    margin-top: 12px;
+    border: none;
+    border-radius: 14px;
+    padding: 13px 16px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+    color: #fff;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+body.dark .transfer-row strong {
+    color: #fff;
+}
+
+body.dark .transfer-card {
+    background: rgba(255, 255, 255, .05);
+    border-color: rgba(255, 255, 255, .1);
+}
