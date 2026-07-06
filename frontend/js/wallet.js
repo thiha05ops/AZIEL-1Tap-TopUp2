@@ -1,19 +1,16 @@
 // frontend/js/wallet.js
-// AZIEL Wallet V2.5 - Cleaned Stable Version
+// AZIEL Wallet V2.5 - Stable History + Transactions
 
 let walletPollingTimer = null;
 let walletCountdownTimer = null;
 let walletSocketReady = false;
 
 function walletApiUrl(path) {
-    if (window.AZIEL?.apiUrl) {
-        return window.AZIEL.apiUrl(path);
-    }
+    if (window.AZIEL?.apiUrl) return window.AZIEL.apiUrl(path);
 
-    const base =
-        location.port === "5500"
-            ? "http://localhost:3000"
-            : "";
+    const base = location.port === "5500"
+        ? "http://localhost:3000"
+        : "";
 
     return `${base}${path}`;
 }
@@ -46,18 +43,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 async function ensureWalletState() {
-    if (!AZIEL.user) {
-        await AZIEL.loadUser?.();
-    }
+    if (!AZIEL.user) await AZIEL.loadUser?.();
 
     if (!AZIEL.user) {
         window.location.href = "login.html";
         return;
     }
 
-    if (!AZIEL.wallet) {
-        await AZIEL.loadWallet?.();
-    }
+    if (!AZIEL.wallet) await AZIEL.loadWallet?.();
 }
 
 function bindWalletEvents() {
@@ -104,9 +97,7 @@ async function loadWallet() {
 
     try {
         const res = await fetch(
-            walletApiUrl(
-                `/api/wallet/${encodeURIComponent(user.username)}?currency=${currency}`
-            )
+            walletApiUrl(`/api/wallet/${encodeURIComponent(user.username)}?currency=${currency}`)
         );
 
         const data = await res.json();
@@ -124,7 +115,13 @@ async function loadWallet() {
 
         window.dispatchEvent(new Event("aziel:walletChanged"));
 
-        renderWalletHistory(data.topups || []);
+        const history = [
+            ...(data.transactions || []),
+            ...(data.topups || [])
+        ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+        renderWalletHistory(history);
+
     } catch (error) {
         console.log("Wallet load error:", error);
         renderWalletFromState();
@@ -133,10 +130,7 @@ async function loadWallet() {
 
 function renderWalletFromState() {
     const wallet = AZIEL.wallet || {};
-    const symbol = wallet.symbol || getWalletSymbol();
-    const balance = Number(wallet.balance || 0);
-
-    updateWalletBalanceUI(balance, symbol);
+    updateWalletBalanceUI(Number(wallet.balance || 0), wallet.symbol || getWalletSymbol());
 }
 
 function updateWalletBalanceUI(amount, symbol) {
@@ -153,11 +147,11 @@ function updateWalletBalanceUI(amount, symbol) {
     });
 }
 
-function renderWalletHistory(topups) {
+function renderWalletHistory(history) {
     const box = document.getElementById("walletHistory");
     if (!box) return;
 
-    if (!topups.length) {
+    if (!history.length) {
         box.innerHTML = `
             <div class="wallet-empty">
                 <h3>No Wallet History</h3>
@@ -167,21 +161,41 @@ function renderWalletHistory(topups) {
         return;
     }
 
-    box.innerHTML = topups.map(item => {
-        const status = normalizeWalletStatus(item.status);
+    box.innerHTML = history.map(item => {
+        const isPayment = item.type === "payment";
+        const isTopup = item.type === "topup" || Boolean(item.paymentMethod);
+
+        const sign = isPayment ? "-" : isTopup ? "+" : "";
+        const color = isPayment ? "#ff6868" : "#32d583";
+
+        const statusRaw = String(item.status || "pending").toLowerCase();
+        const prettyStatus =
+            statusRaw.charAt(0).toUpperCase() + statusRaw.slice(1);
+
+        const title =
+            item.description ||
+            item.paymentMethod ||
+            "Wallet transaction";
+
+        const amount = Number(item.amount || 0).toLocaleString();
+        const currency = item.currency || getWalletCurrency();
 
         return `
             <div class="wallet-history-item">
                 <div>
-                    <strong>
-                        ${Number(item.amount || 0).toLocaleString()}
-                        ${item.currency || getWalletCurrency()}
+                    <strong style="color:${color}">
+                        ${sign}${amount} ${currency}
                     </strong>
-                    <p>${item.paymentMethod || "Payment"}</p>
+
+                    <p>${escapeWalletHTML(title)}</p>
+
+                    <small>
+                        ${formatWalletDate(item.createdAt)}
+                    </small>
                 </div>
 
-                <span class="wallet-status status-${status}">
-                    ${status}
+                <span class="wallet-status status-${statusRaw}">
+                    ${prettyStatus}
                 </span>
             </div>
         `;
@@ -193,10 +207,28 @@ function normalizeWalletStatus(status) {
 
     if (value === "paid") return "paid";
     if (value === "completed") return "completed";
+    if (value === "approved") return "approved";
+    if (value === "rejected") return "rejected";
     if (value === "expired") return "expired";
     if (value === "failed") return "failed";
 
     return "pending";
+}
+
+function formatWalletDate(date) {
+    const parsed = new Date(date);
+    return Number.isNaN(parsed.getTime())
+        ? "-"
+        : parsed.toLocaleString();
+}
+
+function escapeWalletHTML(value) {
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
 }
 
 function initQuickAmounts() {
@@ -261,9 +293,7 @@ async function submitTopup() {
 
         const res = await fetch(walletApiUrl("/api/wallet/create"), {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 username: user.username,
                 amount,
@@ -280,14 +310,11 @@ async function submitTopup() {
             return;
         }
 
-        openWalletQrModal(data, {
-            amount,
-            currency,
-            paymentMethod
-        });
-
+        openWalletQrModal(data, { amount, currency, paymentMethod });
         startPaymentStatusPolling(data.topupId);
+
         await loadWallet();
+
     } catch (error) {
         console.log("Wallet create error:", error);
         alert("Server error");
@@ -314,28 +341,23 @@ function openWalletQrModal(data, info) {
     if (topupIdEl) topupIdEl.innerText = data.topupId || "-";
 
     if (amountEl) {
-        amountEl.innerText =
-            `${Number(info.amount).toLocaleString()} ${info.currency}`;
+        amountEl.innerText = `${Number(info.amount).toLocaleString()} ${info.currency}`;
     }
 
     if (methodEl) methodEl.innerText = info.paymentMethod || "-";
 
     if (amountText) {
-        amountText.innerText =
-            `${Number(info.amount).toLocaleString()} ${info.currency}`;
+        amountText.innerText = `${Number(info.amount).toLocaleString()} ${info.currency}`;
     }
 
     qrImg.src = data.qrImage || data.qrUrl || data.paymentUrl || "";
-
     modal.classList.add("show");
 
     startWalletCountdown(10 * 60);
 }
 
 function closeWalletQrModal() {
-    const modal = document.getElementById("walletQrModal");
-    if (modal) modal.classList.remove("show");
-
+    document.getElementById("walletQrModal")?.classList.remove("show");
     stopWalletPolling();
     stopWalletCountdown();
 }
@@ -388,10 +410,7 @@ function startPaymentStatusPolling(topupId) {
         count++;
 
         try {
-            const res = await fetch(
-                walletApiUrl(`/api/wallet/status/${topupId}`)
-            );
-
+            const res = await fetch(walletApiUrl(`/api/wallet/status/${topupId}`));
             const data = await res.json();
 
             if (data.success && data.status === "paid") {
@@ -404,9 +423,8 @@ function startPaymentStatusPolling(topupId) {
                 resetTopupForm();
             }
 
-            if (count >= maxCount) {
-                stopWalletPolling();
-            }
+            if (count >= maxCount) stopWalletPolling();
+
         } catch (error) {
             console.log("Wallet status polling error:", error);
         }
@@ -427,10 +445,9 @@ function initWalletSocket() {
     const user = getWalletUser();
     if (!user?.username) return;
 
-    const socket =
-        location.port === "5500"
-            ? io("http://localhost:3000")
-            : io();
+    const socket = location.port === "5500"
+        ? io("http://localhost:3000")
+        : io();
 
     socket.emit("joinUser", user.username);
 
@@ -439,11 +456,7 @@ function initWalletSocket() {
         const symbol = currency === "THB" ? "฿" : "Ks";
         const amount = Number(data.amount || data.balance || 0);
 
-        AZIEL.wallet = {
-            balance: amount,
-            currency,
-            symbol
-        };
+        AZIEL.wallet = { balance: amount, currency, symbol };
 
         window.dispatchEvent(new Event("aziel:walletChanged"));
 
@@ -458,8 +471,7 @@ function initWalletSocket() {
 }
 
 function showWalletPopup(amount, symbol) {
-    const old = document.getElementById("walletLivePopup");
-    if (old) old.remove();
+    document.getElementById("walletLivePopup")?.remove();
 
     const popup = document.createElement("div");
     popup.id = "walletLivePopup";
@@ -498,6 +510,7 @@ function showSubmitSuccessModal() {
     if (viewBtn) {
         viewBtn.onclick = () => {
             modal.classList.remove("show");
+
             document.getElementById("walletHistory")?.scrollIntoView({
                 behavior: "smooth",
                 block: "start"

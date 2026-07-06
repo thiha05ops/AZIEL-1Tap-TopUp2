@@ -1,5 +1,5 @@
 // frontend/js/admin-orders.js
-// AZIEL Admin V2.5 Orders Controller
+// AZIEL Admin V2.5 Orders Controller + Wallet Refund
 
 let allAdminOrders = [];
 let ordersAutoRefreshTimer = null;
@@ -59,12 +59,11 @@ function applyOrderFilter() {
             ${order.paymentMethod || ""}
             ${order.region || ""}
             ${order.currency || ""}
+            ${order.status || ""}
         `.toLowerCase();
 
-        const matchText = !keyword || text.includes(keyword);
-        const matchStatus = status === "all" || order.status === status;
-
-        return matchText && matchStatus;
+        return (!keyword || text.includes(keyword)) &&
+            (status === "all" || order.status === status);
     });
 
     renderOrders(filtered);
@@ -109,7 +108,15 @@ function renderOrders(orders) {
                         <option value="completed" ${status === "completed" ? "selected" : ""}>Completed</option>
                         <option value="cancelled" ${status === "cancelled" ? "selected" : ""}>Cancelled</option>
                         <option value="failed" ${status === "failed" ? "selected" : ""}>Failed</option>
+                        <option value="refund_pending" ${status === "refund_pending" ? "selected" : ""}>Refund Pending</option>
+                        <option value="refunded" ${status === "refunded" ? "selected" : ""}>Refunded</option>
                     </select>
+
+                    ${canRefund(order) ? `
+                        <button class="refund-order-btn" data-action="refund-order" data-id="${id}">
+                            Refund to Wallet
+                        </button>
+                    ` : ""}
                 </td>
             </tr>
         `;
@@ -129,6 +136,12 @@ function bindOrderActions() {
     document.querySelectorAll('[data-action="status-change"]').forEach(select => {
         select.addEventListener("change", () => {
             updateOrderStatus(select.dataset.id, select.value, select);
+        });
+    });
+
+    document.querySelectorAll('[data-action="refund-order"]').forEach(btn => {
+        btn.addEventListener("click", () => {
+            refundOrderToWallet(btn.dataset.id);
         });
     });
 }
@@ -167,6 +180,62 @@ async function updateOrderStatus(orderId, status, selectEl = null) {
     }
 }
 
+function canRefund(order) {
+    if (!order) return false;
+
+    const status = String(order.status || "").toLowerCase();
+
+    return (
+        !order.refunded &&
+        status !== "refunded" &&
+        ["paid", "processing", "failed", "cancelled", "completed"].includes(status)
+    );
+}
+
+async function refundOrderToWallet(orderId) {
+    const order = allAdminOrders.find(o => String(o._id) === String(orderId));
+
+    if (!order) {
+        showAdminToast?.("Order not found", "error");
+        return;
+    }
+
+    const reason = prompt(
+        `Refund ${Number(order.amount || 0).toLocaleString()} ${order.currency || ""} to ${order.username}'s wallet?\n\nEnter refund reason:`
+    );
+
+    if (!reason || !reason.trim()) {
+        showAdminToast?.("Refund reason is required", "error");
+        return;
+    }
+
+    if (!confirm("Confirm refund to wallet? This action cannot be repeated.")) {
+        return;
+    }
+
+    try {
+        const data = await adminFetch(`/api/admin/orders/${orderId}/refund`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ reason: reason.trim() })
+        });
+
+        if (!data || !data.success) {
+            showAdminToast?.(data?.message || "Refund failed", "error");
+            return;
+        }
+
+        showAdminToast?.("Refunded to wallet", "success");
+
+        await loadOrders(false);
+        loadAdminDashboard?.(false);
+
+    } catch (error) {
+        console.log("Refund error:", error);
+        showAdminToast?.("Server error", "error");
+    }
+}
+
 function initOrderModal() {
     document.getElementById("closeOrderModal")?.addEventListener("click", closeOrderModal);
 
@@ -199,6 +268,10 @@ function openOrderModal(order) {
             ${detailItem("Payment", order.paymentMethod || "-")}
             ${detailItem("Status", formatStatus(order.status))}
             ${detailItem("Note", order.note || "-")}
+            ${order.refunded ? detailItem("Refund Amount", `${Number(order.refundAmount || 0).toLocaleString()} ${order.currency || ""}`) : ""}
+            ${order.refunded ? detailItem("Refund Reason", order.refundReason || "-") : ""}
+            ${order.refunded ? detailItem("Refund Method", order.refundMethod || "-") : ""}
+            ${order.refunded ? detailItem("Refunded At", formatDate(order.refundedAt)) : ""}
             ${detailItem("Created", formatDate(order.createdAt))}
         </div>
 
@@ -206,6 +279,14 @@ function openOrderModal(order) {
             <div class="order-screenshot-box">
                 <small>Payment Slip</small>
                 <img src="${escapeHTML(getUploadUrl(slip))}" alt="Payment Slip">
+            </div>
+        ` : ""}
+
+        ${canRefund(order) ? `
+            <div class="order-modal-actions">
+                <button class="refund-order-btn" type="button" onclick="refundOrderToWallet('${escapeHTML(order._id)}')">
+                    Refund to Wallet
+                </button>
             </div>
         ` : ""}
     `;
@@ -230,8 +311,10 @@ function normalizeStatus(status) {
     const s = String(status || "").toLowerCase();
 
     if (s === "pending_payment") return "pending";
+    if (s === "refund_pending") return "pending";
     if (s === "canceled") return "cancelled";
     if (s === "failed") return "cancelled";
+    if (s === "refunded") return "completed";
 
     return s;
 }
@@ -244,7 +327,9 @@ function formatStatus(status) {
         completed: "Completed",
         cancelled: "Cancelled",
         canceled: "Cancelled",
-        failed: "Failed"
+        failed: "Failed",
+        refund_pending: "Refund Pending",
+        refunded: "Refunded"
     }[status] || status || "-";
 }
 
@@ -271,3 +356,4 @@ function escapeHTML(value) {
 }
 
 window.loadOrders = loadOrders;
+window.refundOrderToWallet = refundOrderToWallet;

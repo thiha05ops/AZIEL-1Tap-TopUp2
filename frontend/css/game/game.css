@@ -757,3 +757,89 @@
         grid-template-columns: 1fr;
     }
 }
+
+.payment-transfer-area {
+    margin-top: 18px;
+    display: grid;
+    gap: 10px;
+}
+
+.transfer-card {
+    background: rgba(255, 255, 255, .06);
+    border: 1px solid rgba(255, 255, 255, .1);
+    border-radius: 14px;
+    padding: 12px;
+}
+
+.transfer-card h4 {
+    margin: 0 0 8px;
+    color: #9ca3af;
+    font-size: 13px;
+}
+
+.transfer-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+
+.transfer-row strong {
+    color: #fff;
+    font-size: 15px;
+    word-break: break-all;
+}
+
+.copy-transfer-btn,
+.payment-open-bank,
+#confirmPaymentOrderBtn {
+    border: none;
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+.copy-transfer-btn {
+    background: rgba(139, 92, 246, .2);
+    color: #a78bfa;
+}
+
+.payment-open-bank,
+#confirmPaymentOrderBtn {
+    width: 100%;
+    background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+    color: #fff;
+}
+
+.manual-payment-note {
+    margin: 12px 0;
+    color: #cbd5e1;
+    line-height: 1.5;
+}
+
+.manual-payment-note strong,
+.manual-payment-note span {
+    display: block;
+}
+
+.manual-slip-upload {
+    display: block;
+    background: rgba(255, 255, 255, .06);
+    border: 1px dashed rgba(255, 255, 255, .2);
+    border-radius: 14px;
+    padding: 14px;
+    color: #fff;
+}
+
+.manual-slip-upload span {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 800;
+}
+
+.manual-slip-preview img {
+    width: 100%;
+    border-radius: 14px;
+    margin-top: 12px;
+}

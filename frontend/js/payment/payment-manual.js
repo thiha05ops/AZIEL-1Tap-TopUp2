@@ -2,287 +2,72 @@
 // AZIEL Manual QR Payment V2.5
 
 (function () {
-
     function show(orderData, paymentSession) {
-
-        const modal =
-            document.getElementById("paymentConfirmModal");
-
+        const modal = PaymentUtils.prepareModal(orderData, paymentSession);
         if (!modal) return;
 
-        const payment =
-            window.selectedPaymentData || {};
+        const payment = window.selectedPaymentData || {};
 
-        // ---------- Summary ----------
-
-        setText("modalOrderId", orderData.orderId);
-
-        setText("modalGame", orderData.game);
-
-        setText("modalPackage", orderData.packageName);
-
-        setText(
-            "modalAmount",
-            `${Number(orderData.amount).toLocaleString()} ${orderData.currency}`
-        );
-
-        setText(
-            "modalPayment",
-            payment.method || orderData.paymentMethod
-        );
-
-        setText(
-            "modalUserId",
-            orderData.userId
-        );
-
-        setText(
-            "modalZoneId",
-            orderData.zoneId
-        );
-
-        //---------------------------------
-
-        buildQR(paymentSession, payment);
-
-        buildSlip(orderData);
-
-        PaymentUtils.startCountdown(600);
-
-        modal.classList.add("show");
-
-    }
-
-    // ==========================
-    // QR
-    // ==========================
-
-    function buildQR(paymentSession, payment) {
+        PaymentUtils.setModalTitle("Scan & Upload Slip");
 
         const qr =
-            document.getElementById("modalQrImage");
-
-        if (!qr) return;
-
-        const image =
             paymentSession.qrImage ||
             paymentSession.qrUrl ||
             payment.qrImage ||
             "";
 
-        if (!image) {
+        PaymentUtils.showQr(qr);
 
-            qr.style.display = "none";
+        PaymentUtils.renderDynamic(`
+            <div class="manual-payment-area">
+                <div class="manual-payment-note">
+                    <strong>Already paid?</strong>
+                    <span>Upload your payment slip and wait for admin verification.</span>
+                </div>
 
-            return;
+                ${slipUploaderHTML()}
 
-        }
+                <div id="manualPaymentMsg"></div>
+            </div>
+        `);
 
-        qr.src =
-            PaymentUtils.normalizeUrl(image);
+        PaymentUtils.bindSlipPreview();
 
-        qr.style.display = "block";
+        const confirmBtn = document.getElementById("confirmPaymentOrderBtn");
+        if (confirmBtn) {
+            confirmBtn.disabled = false;
+            confirmBtn.innerText = "Submit Payment Slip";
+            confirmBtn.onclick = () => {
+                const file = document.getElementById("manualPaymentSlip")?.files?.[0];
 
-        qr.style.width = "220px";
-
-        qr.style.height = "220px";
-
-        qr.style.objectFit = "contain";
-
-        qr.style.background = "#fff";
-
-        qr.style.padding = "10px";
-
-    }
-
-    // ==========================
-    // Slip
-    // ==========================
-
-    function buildSlip(orderData) {
-
-        document
-            .getElementById("manualSlipArea")
-            ?.remove();
-
-        const area =
-            document.createElement("div");
-
-        area.id =
-            "manualSlipArea";
-
-        area.innerHTML = `
-
-<label class="upload-box">
-
-Upload Payment Slip
-
-<input
-type="file"
-id="manualPaymentSlip"
-accept="image/*">
-
-</label>
-
-<div
-id="manualSlipPreview">
-
-</div>
-
-<button
-id="submitManualSlip">
-
-Submit Payment
-
-</button>
-
-<div
-id="manualPaymentMsg">
-
-</div>
-
-`;
-
-        document
-            .querySelector(".payment-confirm-box")
-            ?.appendChild(area);
-
-        const input =
-            document.getElementById(
-                "manualPaymentSlip"
-            );
-
-        input.onchange =
-            previewSlip;
-
-        document
-            .getElementById(
-                "submitManualSlip"
-            )
-            .onclick =
-            () =>
-                submitSlip(orderData);
-
-    }
-
-    function previewSlip(e) {
-
-        const file =
-            e.target.files[0];
-
-        if (!file) return;
-
-        const reader =
-            new FileReader();
-
-        reader.onload =
-            event => {
-
-                document
-                    .getElementById(
-                        "manualSlipPreview"
-                    )
-                    .innerHTML =
-
-                    `<img
-                    src="${event.target.result}"
-                    style="
-                    width:100%;
-                    border-radius:15px;
-                    margin-top:15px;
-                    ">`;
-
+                PaymentUtils.submitSlip(
+                    orderData,
+                    file,
+                    document.getElementById("manualPaymentMsg"),
+                    confirmBtn
+                );
             };
-
-        reader.readAsDataURL(file);
-
-    }
-
-    async function submitSlip(orderData) {
-
-        const file =
-            document
-                .getElementById(
-                    "manualPaymentSlip"
-                )
-                ?.files?.[0];
-
-        if (!file) {
-
-            alert(
-                "Please upload payment slip."
-            );
-
-            return;
-
         }
 
-        const fd =
-            new FormData();
-
-        fd.append(
-            "orderId",
-            orderData.orderId
-        );
-
-        fd.append(
-            "slip",
-            file
-        );
-
-        const res =
-            await fetch(
-                PaymentUtils.apiUrl(
-                    "/api/payment/submit"
-                ),
-                {
-                    method: "POST",
-                    body: fd
-                }
-            );
-
-        const data =
-            await res.json();
-
-        if (!data.success) {
-
-            alert(
-                data.message
-            );
-
-            return;
-
-        }
-
-        document
-            .getElementById(
-                "paymentConfirmModal"
-            )
-            ?.classList.remove("show");
-
-        document
-            .getElementById(
-                "successModal"
-            )
-            ?.classList.add("show");
-
+        PaymentUtils.startCountdown(600);
+        modal.classList.add("show");
     }
 
-    function setText(id, value) {
+    function slipUploaderHTML() {
+        return `
+            <label class="manual-slip-upload">
+                <span>Upload Payment Slip</span>
+                <input type="file" id="manualPaymentSlip" accept="image/*">
+            </label>
 
-        const el =
-            document.getElementById(id);
-
-        if (el)
-            el.innerText =
-                value;
-
+            <div id="manualSlipPreviewBox" class="manual-slip-preview" style="display:none;">
+                <img id="manualSlipPreviewImage" src="" alt="Payment Slip">
+                <button type="button" id="removeManualSlipBtn">Remove</button>
+            </div>
+        `;
     }
 
     window.PaymentManual = {
-
         show
-
     };
-
 })();

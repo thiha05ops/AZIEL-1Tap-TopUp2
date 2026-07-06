@@ -1,18 +1,16 @@
 // frontend/js/tracking.js
+// AZIEL Tracking V2.5 + Refund Status
 
 let currentOrderId = "";
 let lastStatus = "";
 let liveTrackingTimer = null;
 
 function trackingApiUrl(path) {
-    if (window.AZIEL?.apiUrl) {
-        return window.AZIEL.apiUrl(path);
-    }
+    if (window.AZIEL?.apiUrl) return window.AZIEL.apiUrl(path);
 
-    const base =
-        location.port === "5500"
-            ? "http://localhost:3000"
-            : "";
+    const base = location.port === "5500"
+        ? "http://localhost:3000"
+        : "";
 
     return `${base}${path}`;
 }
@@ -98,8 +96,10 @@ async function trackOrder(orderId) {
                     ${infoItem("Package", order.packageName || order.selectedPackage || "-")}
                     ${infoItem("User ID", order.userId || "-")}
                     ${infoItem("Server", order.zoneId || "-")}
-                    ${infoItem("Amount", `${order.amount || 0} ${order.currency || ""}`)}
+                    ${infoItem("Amount", `${Number(order.amount || 0).toLocaleString()} ${order.currency || ""}`)}
                     ${infoItem("Payment", order.paymentMethod || "-")}
+                    ${status === "refunded" ? infoItem("Refund", `${Number(order.refundAmount || order.amount || 0).toLocaleString()} ${order.currency || ""}`) : ""}
+                    ${status === "refunded" ? infoItem("Refund Method", order.refundMethod || "wallet") : ""}
                 </div>
 
                 <div class="progress-wrap">
@@ -113,8 +113,21 @@ async function trackOrder(orderId) {
                         ${timelineStep("paid", "Payment Confirmed", "Payment has been checked.", status)}
                         ${timelineStep("processing", "Processing", "Your top-up is being processed.", status)}
                         ${timelineStep("completed", "Completed", "Your order is completed.", status)}
+                        ${timelineStep("refunded", "Refunded", "Refund has been returned to your AZIEL Wallet.", status)}
                     </div>
                 </div>
+
+                ${status === "refunded" ? `
+                    <div class="refund-box">
+                        <strong>Wallet Refunded</strong>
+                        <p>
+                            ${Number(order.refundAmount || order.amount || 0).toLocaleString()}
+                            ${escapeHTML(order.currency || "")}
+                            has been returned to your AZIEL Wallet.
+                        </p>
+                        <small>${escapeHTML(order.refundReason || "Refund completed.")}</small>
+                    </div>
+                ` : ""}
 
                 <div class="support-box">
                     <span>Need help?</span>
@@ -122,7 +135,7 @@ async function trackOrder(orderId) {
                 </div>
 
                 <p class="order-note">
-                    ${escapeHTML(order.note || "Please wait while we process your order.")}
+                    ${escapeHTML(order.note || getDefaultNote(status))}
                 </p>
             </div>
         `;
@@ -156,6 +169,10 @@ function timelineStep(step, title, text, currentStatus) {
 }
 
 function isStepActive(step, status) {
+    if (status === "refunded") {
+        return ["pending", "paid", "processing", "refunded"].includes(step);
+    }
+
     const list = ["pending", "paid", "processing", "completed"];
     return list.indexOf(step) <= list.indexOf(status);
 }
@@ -168,6 +185,10 @@ function normalizeStatus(status) {
     if (s === "paid") return "paid";
     if (s === "processing") return "processing";
     if (s === "completed") return "completed";
+    if (s === "failed") return "failed";
+    if (s === "cancelled" || s === "canceled") return "cancelled";
+    if (s === "refund_pending") return "refund_pending";
+    if (s === "refunded") return "refunded";
 
     return "pending";
 }
@@ -177,7 +198,11 @@ function formatStatus(status) {
         pending: "Pending",
         paid: "Paid",
         processing: "Processing",
-        completed: "Completed"
+        completed: "Completed",
+        failed: "Failed",
+        cancelled: "Cancelled",
+        refund_pending: "Refund Pending",
+        refunded: "Refunded"
     };
 
     return map[status] || "Pending";
@@ -188,10 +213,29 @@ function getStatusIcon(status) {
         pending: "⏳",
         paid: "💳",
         processing: "⚡",
-        completed: "✅"
+        completed: "✅",
+        failed: "❌",
+        cancelled: "🚫",
+        refund_pending: "💸",
+        refunded: "↩️"
     };
 
     return map[status] || "⏳";
+}
+
+function getDefaultNote(status) {
+    const map = {
+        pending: "Please wait while we confirm your payment.",
+        paid: "Payment confirmed. Waiting for processing.",
+        processing: "Your order is processing.",
+        completed: "Your order has been completed.",
+        failed: "Your order failed. Please contact support.",
+        cancelled: "Your order was cancelled.",
+        refund_pending: "Refund is being reviewed.",
+        refunded: "This order has been refunded to your AZIEL Wallet."
+    };
+
+    return map[status] || "Please wait while we process your order.";
 }
 
 async function checkLiveTracking() {
@@ -217,8 +261,7 @@ async function checkLiveTracking() {
 }
 
 function showTrackingPopup(status) {
-    const old = document.querySelector(".tracking-popup");
-    if (old) old.remove();
+    document.querySelector(".tracking-popup")?.remove();
 
     const popup = document.createElement("div");
     popup.className = "tracking-popup";
@@ -254,11 +297,7 @@ async function loadRecentOrders() {
         localStorage.getItem("username");
 
     if (!username) {
-        box.innerHTML = `
-            <p class="empty-orders">
-                Login required.
-            </p>
-        `;
+        box.innerHTML = `<p class="empty-orders">Login required.</p>`;
         return;
     }
 
@@ -270,11 +309,7 @@ async function loadRecentOrders() {
         const data = await res.json();
 
         if (!data.success || !data.orders?.length) {
-            box.innerHTML = `
-                <p class="empty-orders">
-                    No recent orders.
-                </p>
-            `;
+            box.innerHTML = `<p class="empty-orders">No recent orders.</p>`;
             return;
         }
 
@@ -288,7 +323,7 @@ async function loadRecentOrders() {
                     <p>${escapeHTML(order.packageName || "-")}</p>
                 </div>
 
-                <div class="recent-order-status">
+                <div class="recent-order-status ${normalizeStatus(order.status)}">
                     ${formatStatus(normalizeStatus(order.status))}
                 </div>
             </div>
@@ -301,9 +336,7 @@ async function loadRecentOrders() {
 function trackRecentOrder(orderId) {
     const input = document.getElementById("orderIdInput");
 
-    if (input) {
-        input.value = orderId;
-    }
+    if (input) input.value = orderId;
 
     trackOrder(orderId);
 
@@ -315,7 +348,7 @@ function trackRecentOrder(orderId) {
 
 function escapeHTML(value) {
     return String(value ?? "")
-        .replaceAll("&", "&amp")
+        .replaceAll("&", "&amp;")
         .replaceAll("<", "&lt;")
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")

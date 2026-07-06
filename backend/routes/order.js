@@ -4,6 +4,8 @@ const express = require("express");
 const router = express.Router();
 
 const Order = require("../models/Order");
+const User = require("../models/User");
+const WalletTransaction = require("../models/WalletTransaction");
 
 const upload = require("../middleware/orderUpload");
 
@@ -15,52 +17,41 @@ const {
 const createNotification = require("../services/createNotification");
 const adminMiddleware = require("../middleware/adminMiddleware");
 
+function getCurrencyKey(currency) {
+    return currency === "THB" ? "THB" : "MMK";
+}
+
 // CUSTOMER ORDER HISTORY
-// GET /api/history/:username
 router.get("/history/:username", async (req, res) => {
     try {
         const orders = await Order.find({
             username: req.params.username
         }).sort({ createdAt: -1 });
 
-        res.json({
-            success: true,
-            orders
-        });
+        res.json({ success: true, orders });
+
     } catch (error) {
         console.log("History error:", error);
-
-        res.json({
-            success: false,
-            message: "Server error"
-        });
+        res.json({ success: false, message: "Server error" });
     }
 });
 
 // CUSTOMER RECENT ORDERS
-// GET /api/order/user/:username
 router.get("/order/user/:username", async (req, res) => {
     try {
         const orders = await Order.find({
             username: req.params.username
         }).sort({ createdAt: -1 });
 
-        res.json({
-            success: true,
-            orders
-        });
+        res.json({ success: true, orders });
+
     } catch (error) {
         console.log("User orders error:", error);
-
-        res.json({
-            success: false,
-            message: "Server error"
-        });
+        res.json({ success: false, message: "Server error" });
     }
 });
 
 // TRACK SINGLE ORDER
-// GET /api/order/track/:orderId
 router.get("/order/track/:orderId", async (req, res) => {
     try {
         const order = await Order.findOne({
@@ -74,42 +65,28 @@ router.get("/order/track/:orderId", async (req, res) => {
             });
         }
 
-        res.json({
-            success: true,
-            order
-        });
+        res.json({ success: true, order });
+
     } catch (error) {
         console.log("Track error:", error);
-
-        res.json({
-            success: false,
-            message: "Server error"
-        });
+        res.json({ success: false, message: "Server error" });
     }
 });
 
 // ADMIN GET ALL ORDERS
-// GET /api/admin/orders
 router.get("/admin/orders", adminMiddleware, async (req, res) => {
     try {
         const orders = await Order.find().sort({ createdAt: -1 });
 
-        res.json({
-            success: true,
-            orders
-        });
+        res.json({ success: true, orders });
+
     } catch (error) {
         console.log("Admin orders error:", error);
-
-        res.json({
-            success: false,
-            message: "Server error"
-        });
+        res.json({ success: false, message: "Server error" });
     }
 });
 
 // ADMIN UPDATE ORDER STATUS
-// PUT /api/admin/orders/:id/status
 router.put("/admin/orders/:id/status", adminMiddleware, async (req, res) => {
     try {
         const { status } = req.body;
@@ -120,7 +97,9 @@ router.put("/admin/orders/:id/status", adminMiddleware, async (req, res) => {
             "processing",
             "completed",
             "cancelled",
-            "failed"
+            "failed",
+            "refund_pending",
+            "refunded"
         ];
 
         if (!allowedStatus.includes(status)) {
@@ -136,7 +115,9 @@ router.put("/admin/orders/:id/status", adminMiddleware, async (req, res) => {
             processing: "Your order is processing.",
             completed: "✅ Your order has been completed.",
             cancelled: "❌ Your order has been cancelled.",
-            failed: "❌ Your order failed. Please contact support."
+            failed: "❌ Your order failed. Please contact support.",
+            refund_pending: "Refund is being reviewed.",
+            refunded: "✅ This order has been refunded to your wallet."
         };
 
         const order = await Order.findByIdAndUpdate(
@@ -203,6 +184,7 @@ ${order.status}`
             success: true,
             order
         });
+
     } catch (error) {
         console.log("Update status error:", error);
 
@@ -213,8 +195,154 @@ ${order.status}`
     }
 });
 
+// ADMIN REFUND ORDER TO WALLET
+router.post("/admin/orders/:id/refund", adminMiddleware, async (req, res) => {
+    try {
+        const { reason } = req.body;
+
+        if (!reason || !String(reason).trim()) {
+            return res.json({
+                success: false,
+                message: "Refund reason is required"
+            });
+        }
+
+        const order = await Order.findById(req.params.id);
+
+        if (!order) {
+            return res.json({
+                success: false,
+                message: "Order not found"
+            });
+        }
+
+        if (order.refunded === true || order.status === "refunded") {
+            return res.json({
+                success: false,
+                message: "This order has already been refunded"
+            });
+        }
+
+        const currencyKey = getCurrencyKey(order.currency);
+        const refundAmount = Number(order.amount || 0);
+
+        if (refundAmount <= 0) {
+            return res.json({
+                success: false,
+                message: "Invalid refund amount"
+            });
+        }
+
+        const user = await User.findOneAndUpdate(
+            { username: order.username },
+            {
+                $inc: {
+                    [`wallet.${currencyKey}`]: refundAmount
+                }
+            },
+            { new: true }
+        );
+
+        if (!user) {
+            return res.json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        await WalletTransaction.create({
+            transactionId: "RF-" + Date.now(),
+            username: order.username,
+            orderId: order.orderId,
+            type: "refund",
+            amount: refundAmount,
+            currency: currencyKey,
+            status: "completed",
+            description: `Refund for ${order.game} - ${order.packageName}`,
+            referenceType: "refund",
+            performedBy: "admin"
+        });
+
+        order.status = "refunded";
+        order.refunded = true;
+        order.refundAmount = refundAmount;
+        order.refundReason = String(reason).trim();
+        order.refundMethod = "wallet";
+        order.refundedBy = "admin";
+        order.refundedAt = new Date();
+        order.note = `Refunded to wallet. Reason: ${reason}`;
+
+        await order.save();
+
+        const notification = await createNotification({
+            username: order.username,
+            title: "Refund Completed",
+            message: `${refundAmount.toLocaleString()} ${currencyKey} has been returned to your AZIEL Wallet.`,
+            type: "wallet",
+            category: "wallet",
+            orderId: order.orderId
+        });
+
+        const io = req.app.get("io");
+
+        if (io) {
+            io.to(order.username).emit("walletUpdated", {
+                amount: user.wallet?.[currencyKey] || 0,
+                currency: currencyKey,
+                status: "refund"
+            });
+
+            io.to(order.username).emit("newNotification", notification);
+
+            io.to("admins").emit("adminNewUpdate", {
+                type: "order_refunded",
+                orderId: order.orderId,
+                username: order.username,
+                amount: refundAmount,
+                currency: currencyKey
+            });
+        }
+
+        await sendTelegramMessage(
+            `💸 ORDER REFUNDED TO WALLET
+
+📦 Order:
+${order.orderId}
+
+🎮 Game:
+${order.game}
+
+📦 Package:
+${order.packageName}
+
+👤 User:
+${order.username}
+
+💰 Refund:
+${refundAmount} ${currencyKey}
+
+📝 Reason:
+${reason}`
+        );
+
+        res.json({
+            success: true,
+            message: "Order refunded to wallet",
+            order,
+            balance: user.wallet?.[currencyKey] || 0
+        });
+
+    } catch (error) {
+        console.log("Refund order error:", error);
+
+        res.status(500).json({
+            success: false,
+            message: "Server error"
+        });
+    }
+});
+
 // LEGACY / MANUAL ORDER CREATE
-// POST /api/orders
 router.post("/orders", upload.single("paymentSlip"), async (req, res) => {
     try {
         const order = await Order.create({
@@ -263,6 +391,7 @@ router.post("/orders", upload.single("paymentSlip"), async (req, res) => {
             success: true,
             order
         });
+
     } catch (error) {
         console.log("Create order error:", error);
 

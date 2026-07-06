@@ -6,7 +6,6 @@ let allPaymentMethods = [];
 document.addEventListener("DOMContentLoaded", () => {
     initSettingsTabs();
     initSettingsSave();
-    loadPaymentMethods();
 });
 
 function initSettingsTabs() {
@@ -19,8 +18,6 @@ function initSettingsTabs() {
 
             tab.classList.add("active");
             document.querySelector(`[data-settings-panel="${target}"]`)?.classList.add("active");
-
-            if (target === "payments") loadPaymentMethods();
         });
     });
 }
@@ -275,15 +272,6 @@ async function saveSettings() {
     }
 
     showAdminToast?.("Settings saved successfully", "success");
-}
-
-function escapeHTML(value) {
-    return String(value ?? "")
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
 }
 
 window.loadPaymentMethods = loadPaymentMethods;

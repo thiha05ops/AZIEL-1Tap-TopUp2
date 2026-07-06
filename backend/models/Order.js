@@ -64,8 +64,47 @@ const orderSchema = new mongoose.Schema({
 
     status: {
         type: String,
+        enum: [
+            "pending_payment",
+            "paid",
+            "processing",
+            "completed",
+            "failed",
+            "refund_pending",
+            "refunded"
+        ],
         default: "pending_payment"
-    }
+    },
+    refunded: {
+        type: Boolean,
+        default: false
+    },
+
+    refundAmount: {
+        type: Number,
+        default: 0
+    },
+
+    refundReason: {
+        type: String,
+        default: ""
+    },
+
+    refundMethod: {
+        type: String,
+        enum: ["wallet", "bank", ""],
+        default: ""
+    },
+
+    refundedBy: {
+        type: String,
+        default: ""
+    },
+
+    refundedAt: {
+        type: Date,
+        default: null
+    },
 
 }, {
     timestamps: true

@@ -6,11 +6,41 @@ const adminMiddleware = require("../middleware/adminMiddleware");
 const paymentQrUpload = require("../middleware/paymentQrUpload");
 
 const defaultMethods = [
-    { method: "KBZPay", key: "kbzpay", region: "MM" },
-    { method: "WavePay", key: "wavepay", region: "MM" },
-    { method: "AYA Pay", key: "ayapay", region: "MM" },
-    { method: "PromptPay", key: "promptpay", region: "TH" },
-    { method: "SCB", key: "scb", region: "TH" }
+    {
+        method: "KBZPay",
+        key: "kbzpay",
+        region: "MM",
+        paymentType: "manual",
+        provider: "manual"
+    },
+    {
+        method: "WavePay",
+        key: "wavepay",
+        region: "MM",
+        paymentType: "manual",
+        provider: "manual"
+    },
+    {
+        method: "AYA Pay",
+        key: "ayapay",
+        region: "MM",
+        paymentType: "manual",
+        provider: "manual"
+    },
+    {
+        method: "PromptPay",
+        key: "promptpay",
+        region: "TH",
+        paymentType: "auto",
+        provider: "omise"
+    },
+    {
+        method: "SCB",
+        key: "scb",
+        region: "TH",
+        paymentType: "deeplink",
+        provider: "scb"
+    }
 ];
 
 async function seedPaymentMethods() {
@@ -26,8 +56,8 @@ async function seedPaymentMethods() {
                 qrImageUrl: "",
                 uploadedQrImage: "",
                 maintenanceMessage: "",
-                paymentType: "manual",
-                provider: "manual"
+                paymentType: item.paymentType || "manual",
+                provider: item.provider || "manual"
             });
         }
     }

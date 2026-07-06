@@ -51,10 +51,9 @@ const paymentMethodSchema = new mongoose.Schema(
 
         paymentType: {
             type: String,
-            enum: ["manual", "auto"],
+            enum: ["manual", "auto", "deeplink", "wallet"],
             default: "manual"
         },
-
         provider: {
             type: String,
             default: "manual"

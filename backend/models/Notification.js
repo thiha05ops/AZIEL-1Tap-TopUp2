@@ -3,7 +3,6 @@ const mongoose = require("mongoose");
 const notificationSchema =
     new mongoose.Schema(
         {
-
             username: {
                 type: String,
                 required: true
@@ -22,6 +21,10 @@ const notificationSchema =
             type: {
                 type: String,
                 enum: [
+                    "order",
+                    "wallet",
+                    "refund",
+                    "support",
                     "order_completed",
                     "topup_delayed",
                     "announcement",
@@ -36,6 +39,9 @@ const notificationSchema =
                 type: String,
                 enum: [
                     "orders",
+                    "wallet",
+                    "refunds",
+                    "support",
                     "announcements",
                     "promotions",
                     "system"
@@ -67,12 +73,10 @@ const notificationSchema =
                 type: Date,
                 default: () => {
                     return new Date(
-                        Date.now() +
-                        90 * 24 * 60 * 60 * 1000
+                        Date.now() + 90 * 24 * 60 * 60 * 1000
                     );
                 }
             }
-
         },
         {
             timestamps: true

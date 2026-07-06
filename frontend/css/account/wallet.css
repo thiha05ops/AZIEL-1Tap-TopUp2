@@ -1082,3 +1082,23 @@ body {
         height: 180px;
     }
 }
+
+.wallet-status.status-completed {
+    color: #22c55e;
+}
+
+.wallet-status.status-pending {
+    color: #f59e0b;
+}
+
+.wallet-status.status-paid {
+    color: #3b82f6;
+}
+
+.wallet-status.status-failed {
+    color: #ef4444;
+}
+
+.wallet-status.status-rejected {
+    color: #ef4444;
+}

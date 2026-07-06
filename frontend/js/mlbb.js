@@ -13,6 +13,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const summaryAmount = document.getElementById("summaryAmount");
 
     let selectedPack = null;
+    let hasAutoScrolledToBuy = false;
 
     if (buyBtn) {
         buyBtn.innerText = "Continue To Payment";
@@ -32,7 +33,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 pack.dataset.name ||
                 pack.querySelector(".pack-name")?.innerText ||
                 "Package",
-
             amount: Number(pack.dataset.price || 0)
         };
 
@@ -98,8 +98,7 @@ document.addEventListener("DOMContentLoaded", () => {
             window.AZIEL?.getShopCurrency?.() ||
             (region === "TH" ? "THB" : "MMK");
 
-        const selectedPayment =
-            window.selectedPaymentData || {};
+        const selectedPayment = window.selectedPaymentData || {};
 
         const orderData = {
             orderId: "AZL-" + Date.now(),
@@ -262,36 +261,22 @@ document.addEventListener("DOMContentLoaded", () => {
             active.querySelector(".pack-price")?.innerText || "";
     }
 
-    let hasAutoScrolledToBuy = false;
-
     function scrollToBuyNowOnce() {
         if (hasAutoScrolledToBuy) return;
 
-        const btn = document.getElementById("buyBtn");
-        if (!btn) return;
+        if (!buyBtn) return;
 
         hasAutoScrolledToBuy = true;
 
         setTimeout(() => {
-            btn.scrollIntoView({
+            buyBtn.scrollIntoView({
                 behavior: "smooth",
                 block: "center"
             });
         }, 250);
     }
 
-    function initSuccessModal() {
-        const homeBtn = document.getElementById("backHomeBtn");
-
-        if (homeBtn) {
-            homeBtn.addEventListener("click", () => {
-                window.location.href = "home.html";
-            });
-        }
-    }
-
     initMobilePackagePanel();
-    initSuccessModal();
     updateState();
 
     window.addEventListener("aziel:shopRegionChanged", () => {

@@ -16,6 +16,11 @@ const walletTransactionSchema =
             required: true
         },
 
+        orderId: {
+            type: String,
+            default: ""
+        },
+
         type: {
             type: String,
             enum: [
@@ -44,6 +49,22 @@ const walletTransactionSchema =
         description: {
             type: String,
             default: ""
+        },
+
+        referenceType: {
+            type: String,
+            enum: [
+                "topup",
+                "order",
+                "refund",
+                "bonus"
+            ],
+            default: "order"
+        },
+
+        performedBy: {
+            type: String,
+            default: "system"
         }
 
     }, {
