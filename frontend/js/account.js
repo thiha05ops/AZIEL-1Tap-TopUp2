@@ -1,4 +1,4 @@
-// frontend/js/account.js - AZIEL V2.5 Production Account Flow
+// frontend/js/account.js - AZIEL V3 i18n Account Flow
 
 document.addEventListener("DOMContentLoaded", () => {
     initTabs();
@@ -9,6 +9,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
 let currentUser = null;
 let accountRefreshTimer = null;
+
+function t(key, fallback = "") {
+    if (window.AZIEL_I18N?.t) {
+        return window.AZIEL_I18N.t(key, fallback);
+    }
+
+    return fallback || key;
+}
 
 function accountApiUrl(path) {
     if (window.AZIEL?.apiUrl) {
@@ -22,10 +30,6 @@ function accountApiUrl(path) {
 
     return `${base}${path}`;
 }
-
-// ============================
-// INIT
-// ============================
 
 async function initAccount() {
     const token = window.AZIEL?.getToken?.();
@@ -68,6 +72,12 @@ async function initAccount() {
         renderAccount();
     });
 
+    window.addEventListener("aziel:languageChanged", () => {
+        renderAccount();
+        refreshAccountData();
+        window.AZIEL_I18N?.translatePage?.(document);
+    });
+
     accountRefreshTimer = setInterval(async () => {
         await window.AZIEL?.loadWallet?.();
         await refreshAccountData();
@@ -87,10 +97,6 @@ async function refreshAccountData() {
     await loadBellOrders();
 }
 
-// ============================
-// GLOBAL STATE
-// ============================
-
 async function ensureAZIELState() {
     if (!window.AZIEL) {
         console.error("AZIEL user-state.js not loaded");
@@ -105,10 +111,6 @@ async function ensureAZIELState() {
         await window.AZIEL.loadWallet?.();
     }
 }
-
-// ============================
-// HELPERS
-// ============================
 
 function setText(id, text) {
     const el = document.getElementById(id);
@@ -125,7 +127,7 @@ function getDisplayName(user = currentUser) {
         window.AZIEL?.getDisplayName?.(user) ||
         user?.displayName ||
         user?.username ||
-        "User"
+        t("user", "User")
     );
 }
 
@@ -153,14 +155,9 @@ function formatDate(dateValue) {
     if (!dateValue) return "-";
 
     const date = new Date(dateValue);
-
     if (Number.isNaN(date.getTime())) return "-";
 
-    return date.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric"
-    });
+    return date.toLocaleDateString();
 }
 
 function isVerified(user = currentUser) {
@@ -171,10 +168,6 @@ function isGoogleLinked(user = currentUser) {
     return Boolean(user?.googleId || user?.googleLinked || user?.provider === "google");
 }
 
-// ============================
-// RENDER
-// ============================
-
 function renderAccount() {
     currentUser = window.AZIEL?.user || currentUser;
 
@@ -183,6 +176,8 @@ function renderAccount() {
     renderProfile();
     renderSecurity();
     renderWallet();
+
+    window.AZIEL_I18N?.translatePage?.(document);
 }
 
 function renderProfile() {
@@ -193,23 +188,27 @@ function renderProfile() {
 
     setText("profileName", name);
     setText("avatarText", name.charAt(0).toUpperCase());
-    setText("profileRegion", `Region: ${region}`);
+    setText("profileRegion", `${t("region", "Region")}: ${region}`);
 
     setValue("displayName", name);
     setValue("profileUsername", user.username || "");
     setValue("profileEmail", user.email || "");
+
     setValue(
         "profileRegionReadOnly",
-        region === "TH" ? "Thailand - THB" : "Myanmar - MMK"
+        region === "TH"
+            ? t("regionThailand", "Thailand - THB")
+            : t("regionMyanmar", "Myanmar - MMK")
     );
+
     setValue("profileCreatedAt", formatDate(user.createdAt));
 
     const verifiedBadge = document.querySelector(".verified-badge");
 
     if (verifiedBadge) {
         verifiedBadge.innerHTML = verified
-            ? `<i class="fa-solid fa-circle-check"></i> Verified`
-            : `<i class="fa-solid fa-circle-exclamation"></i> Not Verified`;
+            ? `<i class="fa-solid fa-circle-check"></i> ${t("verified", "Verified")}`
+            : `<i class="fa-solid fa-circle-exclamation"></i> ${t("notVerified", "Not Verified")}`;
     }
 }
 
@@ -219,16 +218,22 @@ function renderSecurity() {
     const googleLinked = isGoogleLinked(user);
 
     setText("securityEmailText", user?.email || "-");
-    setText("emailVerifiedStatus", verified ? "Verified" : "Not Verified");
+    setText(
+        "emailVerifiedStatus",
+        verified ? t("verified", "Verified") : t("notVerified", "Not Verified")
+    );
 
     setText(
         "googleLinkedText",
         googleLinked
-            ? "Your Google account is linked to AZIEL."
-            : "Google account is not linked yet."
+            ? t("googleLinkedDesc", "Your Google account is linked to AZIEL.")
+            : t("googleNotLinkedDesc", "Google account is not linked yet.")
     );
 
-    setText("googleLinkedStatus", googleLinked ? "Linked" : "Not Linked");
+    setText(
+        "googleLinkedStatus",
+        googleLinked ? t("linked", "Linked") : t("notLinked", "Not Linked")
+    );
 }
 
 function renderWallet() {
@@ -239,11 +244,6 @@ function renderWallet() {
     setText("overviewWalletBalance", `${balance.toLocaleString()} ${symbol}`);
     setText("walletBalanceBig", `${balance.toLocaleString()} ${symbol}`);
 }
-
-// ============================
-// SAVE PROFILE
-// ============================
-
 async function saveProfile() {
     const token = window.AZIEL?.getToken?.();
 
@@ -256,7 +256,7 @@ async function saveProfile() {
         document.getElementById("displayName")?.value.trim() || "";
 
     if (!displayName) {
-        alert("Display name is required");
+        alert(t("displayNameRequired", "Display name is required"));
         return;
     }
 
@@ -273,7 +273,7 @@ async function saveProfile() {
         const data = await res.json();
 
         if (!data.success || !data.user) {
-            alert(data.message || "Profile save failed");
+            alert(data.message || t("profileSaveFailed", "Profile save failed"));
             return;
         }
 
@@ -287,16 +287,12 @@ async function saveProfile() {
 
         renderAccount();
 
-        alert("Profile saved ✅");
+        alert(t("profileSaved", "Profile saved ✅"));
     } catch (error) {
         console.log("Save profile error:", error);
-        alert("Server error");
+        alert(t("serverError", "Server error"));
     }
 }
-
-// ============================
-// HISTORY / ORDERS
-// ============================
 
 async function loadHistory() {
     if (!currentUser?.username) return;
@@ -339,9 +335,14 @@ function renderHistory(orders) {
         box.innerHTML = `
             <div class="empty-orders">
                 <i class="fa-regular fa-folder-open"></i>
-                <h3>No Orders Yet</h3>
-                <p>Your recent top-up orders will appear here.</p>
-                <a href="home.html">Start Top Up</a>
+
+                <h3>${t("noOrdersYet", "No Orders Yet")}</h3>
+
+                <p>${t("ordersAppearHere", "Your recent top-up orders will appear here.")}</p>
+
+                <a href="home.html">
+                    ${t("startTopUp", "Start Top Up")}
+                </a>
             </div>
         `;
         return;
@@ -355,20 +356,21 @@ function renderRecent(orders) {
     if (!box) return;
 
     if (!orders.length) {
-        box.innerHTML = `<p>No recent orders.</p>`;
+        box.innerHTML = `<p>${t("noRecentOrders", "No recent orders.")}</p>`;
         return;
     }
 
     box.innerHTML = orders.slice(0, 3).map(order => `
         <div class="recent-order-item"
              onclick="window.location.href='tracking.html?orderId=${escapeHTML(order.orderId)}'">
+
             <div>
-                <strong>${escapeHTML(order.game || "Game")}</strong>
-                <small>${escapeHTML(order.packageName || "Package")}</small>
+                <strong>${escapeHTML(order.game || t("game", "Game"))}</strong>
+                <small>${escapeHTML(order.packageName || t("package", "Package"))}</small>
             </div>
 
             <span class="${statusClass(order.status)}">
-                ${escapeHTML(order.status || "pending")}
+                ${escapeHTML(formatAccountStatus(order.status))}
             </span>
         </div>
     `).join("");
@@ -382,17 +384,18 @@ function orderCard(order) {
         <div class="order-card">
             <div class="order-top">
                 <h3>#${escapeHTML(orderId)}</h3>
+
                 <span class="status ${statusClass(status)}">
-                    ${escapeHTML(status)}
+                    ${escapeHTML(formatAccountStatus(status))}
                 </span>
             </div>
 
             <div class="order-game">
-                ${escapeHTML(order.game || "Game")}
+                ${escapeHTML(order.game || t("game", "Game"))}
             </div>
 
             <div class="order-package">
-                ${escapeHTML(order.packageName || "Package")}
+                ${escapeHTML(order.packageName || t("package", "Package"))}
             </div>
 
             <div class="order-bottom">
@@ -402,7 +405,7 @@ function orderCard(order) {
                 </strong>
 
                 <a href="tracking.html?orderId=${encodeURIComponent(orderId)}">
-                    Track
+                    ${t("trackOrder", "Track Order")}
                 </a>
             </div>
         </div>
@@ -417,13 +420,14 @@ function renderEmpty() {
     const history = document.getElementById("historyList");
     const recent = document.getElementById("recentOrders");
 
-    if (history) history.innerHTML = `<p>No orders yet.</p>`;
-    if (recent) recent.innerHTML = `<p>No recent orders.</p>`;
-}
+    if (history) {
+        history.innerHTML = `<p>${t("noOrdersYet", "No orders yet.")}</p>`;
+    }
 
-// ============================
-// NOTIFICATIONS
-// ============================
+    if (recent) {
+        recent.innerHTML = `<p>${t("noRecentOrders", "No recent orders.")}</p>`;
+    }
+}
 
 async function loadBellOrders() {
     if (!currentUser?.username) return;
@@ -442,7 +446,11 @@ async function loadBellOrders() {
 
         if (!data.success || !Array.isArray(data.orders) || !data.orders.length) {
             count.innerText = "0";
-            panel.innerHTML = `<div class="noti-item">No order notifications</div>`;
+            panel.innerHTML = `
+                <div class="noti-item">
+                    ${t("noOrderNotifications", "No order notifications")}
+                </div>
+            `;
             return;
         }
 
@@ -453,18 +461,47 @@ async function loadBellOrders() {
         panel.innerHTML = data.orders.slice(0, 8).map(order => `
             <div class="noti-item"
                  onclick="window.location.href='tracking.html?orderId=${escapeHTML(order.orderId)}'">
-                🔔 <b>${escapeHTML(order.game || "Game")}</b><br>
-                ${escapeHTML(order.packageName || "Package")}<br>
+
+                🔔 <b>${escapeHTML(order.game || t("game", "Game"))}</b><br>
+
+                ${escapeHTML(order.packageName || t("package", "Package"))}<br>
+
                 <small>${escapeHTML(order.orderId || "")}</small><br>
+
                 <span class="${statusClass(order.status)}">
-                    ${escapeHTML(order.status || "pending")}
+                    ${escapeHTML(formatAccountStatus(order.status))}
                 </span>
             </div>
         `).join("");
     } catch (error) {
         console.log("Bell order error:", error);
-        panel.innerHTML = `<div class="noti-item">Server error</div>`;
+        panel.innerHTML = `
+            <div class="noti-item">
+                ${t("serverError", "Server error")}
+            </div>
+        `;
     }
+}
+
+function formatAccountStatus(status) {
+    const value = String(status || "pending").toLowerCase();
+
+    const map = {
+        pending: t("statusPending", "Pending"),
+        pending_payment: t("statusPending", "Pending"),
+        paid: t("statusPaid", "Paid"),
+        processing: t("statusProcessing", "Processing"),
+        completed: t("statusCompleted", "Completed"),
+        cancelled: t("statusCancelled", "Cancelled"),
+        canceled: t("statusCancelled", "Cancelled"),
+        failed: t("statusFailed", "Failed"),
+        refund_requested: t("statusRefundRequested", "Refund Requested"),
+        refund_pending: t("statusRefundRequested", "Refund Requested"),
+        refund_rejected: t("statusRefundRejected", "Refund Rejected"),
+        refunded: t("statusRefunded", "Refunded")
+    };
+
+    return map[value] || value;
 }
 
 function statusClass(status) {
@@ -473,14 +510,26 @@ function statusClass(status) {
     if (normalized === "paid") return "status-paid";
     if (normalized === "processing") return "status-processing";
     if (normalized === "completed") return "status-completed";
-    if (normalized === "cancelled" || normalized === "failed") return "status-failed";
+    if (
+        normalized === "cancelled" ||
+        normalized === "canceled" ||
+        normalized === "failed"
+    ) {
+        return "status-failed";
+    }
+
+    if (
+        normalized === "refund_requested" ||
+        normalized === "refund_pending"
+    ) {
+        return "status-processing";
+    }
+
+    if (normalized === "refunded") return "status-completed";
+    if (normalized === "refund_rejected") return "status-failed";
 
     return "status-pending";
 }
-
-// ============================
-// UI EVENTS
-// ============================
 
 function showAccountTab(tabName) {
     if (!tabName) return;
@@ -506,6 +555,8 @@ function showAccountTab(tabName) {
         renderAccount();
         loadHistory();
     }
+
+    window.AZIEL_I18N?.translatePage?.(document);
 }
 
 function initTabs() {
@@ -528,15 +579,18 @@ function initTabs() {
 }
 
 function initButtons() {
-    document.getElementById("saveProfileBtn")
+    document
+        .getElementById("saveProfileBtn")
         ?.addEventListener("click", saveProfile);
 
-    document.getElementById("goWalletTopupBtn")
+    document
+        .getElementById("goWalletTopupBtn")
         ?.addEventListener("click", () => {
             window.location.href = "wallet.html";
         });
 
-    document.getElementById("goWalletHistoryBtn")
+    document
+        .getElementById("goWalletHistoryBtn")
         ?.addEventListener("click", () => {
             window.location.href = "wallet.html#history";
         });

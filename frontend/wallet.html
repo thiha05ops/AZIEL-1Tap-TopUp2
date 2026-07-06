@@ -7,14 +7,14 @@
 
     <title>Wallet - AZIEL</title>
 
-    <link rel="stylesheet" href="css/theme/aziel-design-system.css?v=20260701">
-    <link rel="stylesheet" href="css/core/main.css">
-    <link rel="stylesheet" href="css/theme/aziel-header.css?v=20260701">
-    <link rel="stylesheet" href="css/theme/wave-background.css">
-    <link rel="stylesheet" href="css/core/components.css">
-    <link rel="stylesheet" href="css/game/payment-grid.css">
-    <link rel="stylesheet" href="css/account/wallet.css">
-    <link rel="stylesheet" href="css/support/live-chat.css?v=20260630">
+    <link rel="stylesheet" href="/css/theme/aziel-design-system.css?v=20260701">
+    <link rel="stylesheet" href="/css/core/main.css">
+    <link rel="stylesheet" href="/css/theme/aziel-header.css?v=20260701">
+    <link rel="stylesheet" href="/css/theme/wave-background.css">
+    <link rel="stylesheet" href="/css/core/components.css">
+    <link rel="stylesheet" href="/css/game/payment-grid.css">
+    <link rel="stylesheet" href="/css/account/wallet.css">
+    <link rel="stylesheet" href="/css/support/live-chat.css?v=20260630">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
@@ -22,23 +22,28 @@
 <body>
 
     <div class="az-bg-wave"></div>
-
     <div id="azHeaderMount" data-nav="wallet"></div>
 
     <main class="wallet-page">
 
         <section class="wallet-title-row">
-            <span class="wallet-badge">AZIEL Wallet</span>
-            <h1>Wallet</h1>
-            <p>Top up with QR payment and use your balance for faster game orders.</p>
+            <span class="wallet-badge" data-i18n="walletBadge">AZIEL Wallet</span>
+
+            <h1 data-i18n="walletTitle">Wallet</h1>
+
+            <p data-i18n="walletSubtitle">
+                Top up with QR payment and use your balance for faster game orders.
+            </p>
         </section>
 
         <section class="wallet-balance-card">
             <div class="wallet-balance-top">
                 <div>
-                    <span>Available Balance</span>
+                    <span data-i18n="availableBalance">Available Balance</span>
+
                     <h1 id="walletBalance">0 Ks</h1>
-                    <p class="wallet-balance-note">
+
+                    <p class="wallet-balance-note" data-i18n="walletBalanceNote">
                         Wallet balance updates automatically after successful payment.
                     </p>
                 </div>
@@ -54,13 +59,18 @@
             <div class="wallet-card wallet-topup-card">
                 <div class="wallet-card-head">
                     <div>
-                        <h2>Top Up Wallet</h2>
-                        <span>Select amount and payment method. No slip upload required.</span>
+                        <h2 data-i18n="topUpWallet">Top Up Wallet</h2>
+
+                        <span data-i18n="walletTopupDesc">
+                            Select amount and payment method. No slip upload required.
+                        </span>
                     </div>
                 </div>
 
-                <label for="topupAmount">Amount</label>
-                <input type="number" id="topupAmount" placeholder="Enter amount" min="1">
+                <label for="topupAmount" data-i18n="amount">Amount</label>
+
+                <input type="number" id="topupAmount" placeholder="Enter amount" data-i18n-placeholder="enterAmount"
+                    min="1">
 
                 <div class="quick-amounts">
                     <button type="button" data-amount="100">100</button>
@@ -69,17 +79,16 @@
                     <button type="button" data-amount="1000">1000</button>
                 </div>
 
-                <label>Select Payment</label>
-                <div id="paymentGrid" class="payment-grid"></div>
+                <label data-i18n="selectPayment">Select Payment</label>
 
+                <div id="paymentGrid" class="payment-grid"></div>
                 <input type="hidden" id="paymentMethod">
 
-
-                <button id="submitTopupBtn" class="wallet-submit-btn" type="button">
+                <button id="submitTopupBtn" class="wallet-submit-btn" type="button" data-i18n="generateQr">
                     Generate QR
                 </button>
 
-                <p class="wallet-note">
+                <p class="wallet-note" data-i18n="walletAutoPaymentNote">
                     Auto payment enabled. Scan the QR and your wallet will update after payment is confirmed.
                 </p>
             </div>
@@ -87,15 +96,18 @@
             <div class="wallet-card wallet-history-card">
                 <div class="wallet-card-head">
                     <div>
-                        <h2>Wallet History</h2>
-                        <span>Recent wallet top-ups and transactions</span>
+                        <h2 data-i18n="walletHistory">Wallet History</h2>
+
+                        <span data-i18n="walletHistoryDesc">
+                            Recent wallet top-ups and transactions
+                        </span>
                     </div>
                 </div>
 
                 <div id="walletHistory">
                     <div class="wallet-empty">
-                        <h3>No Wallet History</h3>
-                        <p>Your wallet transactions will appear here.</p>
+                        <h3 data-i18n="noWalletHistory">No Wallet History</h3>
+                        <p data-i18n="walletHistoryEmptyText">Your wallet transactions will appear here.</p>
                     </div>
                 </div>
             </div>
@@ -103,6 +115,7 @@
         </section>
 
     </main>
+
     <div id="walletQrModal" class="wallet-qr-modal">
         <div class="wallet-qr-modal-box">
 
@@ -110,21 +123,21 @@
                 <i class="fa-solid fa-xmark"></i>
             </button>
 
-            <h2>Scan & Pay</h2>
+            <h2 data-i18n="scanPay">Scan & Pay</h2>
 
             <div class="wallet-pay-summary">
                 <div>
-                    <span>Topup ID</span>
+                    <span data-i18n="topupId">Topup ID</span>
                     <strong id="modalTopupId">-</strong>
                 </div>
 
                 <div>
-                    <span>Amount</span>
+                    <span data-i18n="amount">Amount</span>
                     <strong id="modalTopupAmount">-</strong>
                 </div>
 
                 <div>
-                    <span>Payment</span>
+                    <span data-i18n="payment">Payment</span>
                     <strong id="modalPaymentMethod">-</strong>
                 </div>
             </div>
@@ -135,10 +148,10 @@
 
             <h3 id="modalAmountText">0 THB</h3>
 
-            <p>Payment expires in</p>
+            <p data-i18n="paymentExpiresIn">Payment expires in</p>
             <div id="walletCountdown" class="wallet-countdown">10:00</div>
 
-            <button class="wallet-waiting-btn" type="button">
+            <button class="wallet-waiting-btn" type="button" data-i18n="waitingPayment">
                 Waiting Payment...
             </button>
 
@@ -154,41 +167,53 @@
                 <span></span>
             </div>
 
-            <h3>Creating QR Payment...</h3>
-            <p>Please wait a few seconds.</p>
+            <h3 data-i18n="creatingQrPayment">Creating QR Payment...</h3>
+            <p data-i18n="pleaseWaitSeconds">Please wait a few seconds.</p>
         </div>
     </div>
 
     <div id="successModal" class="success-modal">
         <div class="success-modal-box">
             <div class="success-icon">✓</div>
-            <h2>Wallet Updated</h2>
-            <p>Your payment was successful and your balance has been updated.</p>
+
+            <h2 data-i18n="walletUpdated">Wallet Updated</h2>
+
+            <p data-i18n="walletUpdatedText">
+                Your payment was successful and your balance has been updated.
+            </p>
 
             <div class="success-actions">
-                <button id="viewHistoryBtn" type="button">View History</button>
-                <button id="backHomeBtn" type="button">Back Home</button>
+                <button id="viewHistoryBtn" type="button" data-i18n="viewHistory">View History</button>
+                <button id="backHomeBtn" type="button" data-i18n="backHome">Back Home</button>
             </div>
         </div>
     </div>
-    <script src="js/asset.js"></script>
-    <script src="js/site-settings.js"></script>
-    <script src="js/user-state.js?v=202606301"></script>
-    <script src="js/header-loader.js?v=202606301"></script>
-    <script src="js/header.js?v=202606301"></script>
-    <script src="js/header-scroll.js?v=202606301"></script>
 
-    <script src="js/auth-check.js?v=202606301"></script>
-    <script src="js/region-payment.js?v=202606301"></script>
-    <script src="js/api.js?v=202606301"></script>
+    <script src="/js/asset.js"></script>
+    <script src="/js/site-settings.js"></script>
+
+    <script src="/lang/en.js?v=20260706-i18n"></script>
+    <script src="/lang/th.js?v=20260706-i18n"></script>
+    <script src="/lang/my.js?v=20260706-i18n"></script>
+    <script src="/js/i18n.js?v=20260706-i18n"></script>
+
+    <script src="/js/user-state.js?v=202606301"></script>
+    <script src="/js/auth-check.js?v=202606301"></script>
+
+    <script src="/js/header-loader.js?v=20260706-i18n"></script>
+    <script src="/js/header.js?v=20260706-i18n"></script>
+    <script src="/js/header-scroll.js?v=20260706"></script>
+
+    <script src="/js/theme.js?v=20260701"></script>
+    <script src="/js/locale-switcher.js?v=20260706-i18n"></script>
+    <script src="/js/region-payment.js?v=202606301"></script>
+    <script src="/js/api.js?v=202606301"></script>
 
     <script src="/socket.io/socket.io.js"></script>
 
-    <script src="js/wallet.js?v=202606301"></script>
-    <script src="js/live-chat.js?v=202606301"></script>
-    <script src="js/pwa-fix.js?v=202606301"></script>
-
-    <script src="js/theme.js?v=20260701"></script>
+    <script src="/js/wallet.js?v=20260706-i18n"></script>
+    <script src="/js/live-chat.js?v=202606301"></script>
+    <script src="/js/pwa-fix.js?v=202606301"></script>
 
 </body>
 

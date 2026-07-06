@@ -2,167 +2,166 @@
 <html lang="en">
 
 <head>
-
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>Refund Policy | AZIEL 1Tap Shop</title>
 
-    <link rel="stylesheet" href="../css/theme/aziel-design-system.css">
-
-    <link rel="stylesheet" href="../css/core/main.css">
-
-    <link rel="stylesheet" href="../css/core/layout.css">
-
-    <link rel="stylesheet" href="../css/core/components.css">
-
-    <link rel="stylesheet" href="../css/policy/policy.css">
-
+    <link rel="stylesheet" href="/css/theme/aziel-design-system.css?v=20260701">
+    <link rel="stylesheet" href="/css/core/main.css">
+    <link rel="stylesheet" href="/css/core/layout.css">
+    <link rel="stylesheet" href="/css/core/components.css">
+    <link rel="stylesheet" href="/css/theme/aziel-header.css?v=20260701">
+    <link rel="stylesheet" href="/css/policy/policy.css">
 </head>
 
 <body>
 
-    <div class="policy-container">
+    <div id="azHeaderMount" data-nav="account"></div>
+
+    <main class="policy-container">
 
         <div class="policy-header">
-
-            <a href="../home.html" class="back-btn">
-
-                ← Back
-
+            <a href="/home.html" class="back-btn" data-i18n="backHome">
+                ← Back Home
             </a>
 
-            <h1>
-
+            <h1 data-i18n="refundPolicyTitle">
                 Refund Policy
-
             </h1>
 
-            <p>
-
-                Last Updated : June 2026
-
+            <p data-i18n="policyLastUpdated">
+                Last Updated : July 2026
             </p>
-
         </div>
 
         <section class="policy-card">
-
-            <h2>
-
+            <h2 data-i18n="refundOverviewTitle">
                 Overview
-
             </h2>
 
-            <p>
-
-                AZIEL 1Tap Shop provides digital game top-up services. Since digital goods are delivered instantly after
-                payment, refunds are only available under specific conditions described below.
-
+            <p data-i18n="refundOverviewText">
+                AZIEL 1Tap Shop provides digital game top-up services. Since digital goods may be delivered quickly
+                after payment, refunds are only available under eligible conditions described below.
             </p>
-
         </section>
 
         <section class="policy-card">
-
-            <h2>
-
+            <h2 data-i18n="refundEligibleTitle">
                 Eligible For Refund
-
             </h2>
 
             <ul>
-
-                <li>✅ Payment was successful but no order was created.</li>
-
-                <li>✅ Duplicate payment for the same order.</li>
-
-                <li>✅ Payment confirmed but delivery permanently failed due to our system.</li>
-
-                <li>✅ AZIEL Support confirms the transaction cannot be completed.</li>
-
+                <li data-i18n="refundEligible1">✅ Order failed after payment was confirmed.</li>
+                <li data-i18n="refundEligible2">✅ Order was cancelled by AZIEL or supplier.</li>
+                <li data-i18n="refundEligible3">✅ Payment was successful but top-up was not delivered.</li>
+                <li data-i18n="refundEligible4">✅ Duplicate payment for the same order.</li>
+                <li data-i18n="refundEligible5">✅ System error or supplier error confirmed by AZIEL Support.</li>
             </ul>
-
         </section>
 
         <section class="policy-card">
-
-            <h2>
-
+            <h2 data-i18n="refundNotEligibleTitle">
                 Not Eligible
-
             </h2>
 
             <ul>
-
-                <li>❌ Wrong User ID entered.</li>
-
-                <li>❌ Wrong Server ID entered.</li>
-
-                <li>❌ Wrong game selected.</li>
-
-                <li>❌ Customer changed their mind.</li>
-
-                <li>❌ Item has already been delivered.</li>
-
-                <li>❌ Third-party account problems.</li>
-
+                <li data-i18n="refundNotEligible1">❌ Wrong User ID entered.</li>
+                <li data-i18n="refundNotEligible2">❌ Wrong Server ID entered.</li>
+                <li data-i18n="refundNotEligible3">❌ Wrong game or package selected.</li>
+                <li data-i18n="refundNotEligible4">❌ Customer changed their mind after payment.</li>
+                <li data-i18n="refundNotEligible5">❌ Item has already been delivered successfully.</li>
+                <li data-i18n="refundNotEligible6">❌ Third-party account restrictions or account problems.</li>
             </ul>
-
         </section>
 
         <section class="policy-card">
-
-            <h2>
-
-                Refund Processing
-
+            <h2 data-i18n="refundProcessTitle">
+                Refund Process
             </h2>
 
-            <p>
-
-                Approved refunds are normally processed within
-                <strong>1–7 business days</strong> depending on the payment provider.
-
-            </p>
-
+            <ol>
+                <li data-i18n="refundProcess1">Customer can request a refund only for failed or cancelled orders.</li>
+                <li data-i18n="refundProcess2">Customer must provide a clear refund reason.</li>
+                <li data-i18n="refundProcess3">Admin reviews the order, payment status, and delivery status.</li>
+                <li data-i18n="refundProcess4">If approved, the refund amount will be returned to the customer’s AZIEL
+                    Wallet.</li>
+                <li data-i18n="refundProcess5">If rejected, the customer will see the rejection reason in tracking or
+                    notification.</li>
+            </ol>
         </section>
 
         <section class="policy-card">
+            <h2 data-i18n="refundWalletTitle">
+                Wallet Refund
+            </h2>
 
-            <h2>
+            <p data-i18n="refundWalletText">
+                Approved refunds are credited to your AZIEL Wallet. You can use the refunded balance for future
+                purchases on AZIEL.
+            </p>
+        </section>
 
+        <section class="policy-card">
+            <h2 data-i18n="refundTimelineTitle">
+                Review Time
+            </h2>
+
+            <p data-i18n="refundTimelineText">
+                Refund requests are reviewed as soon as possible. In most cases, review may take up to 24 hours
+                depending on order details and payment verification.
+            </p>
+        </section>
+
+        <section class="policy-card">
+            <h2 data-i18n="refundAbuseTitle">
+                Abuse Prevention
+            </h2>
+
+            <p data-i18n="refundAbuseText">
+                Fake refund requests, repeated abuse, or fraudulent claims may result in account restriction or
+                suspension.
+            </p>
+        </section>
+
+        <section class="policy-card">
+            <h2 data-i18n="needHelp">
                 Need Help?
-
             </h2>
 
-            <p>
-
-                If you believe your payment qualifies for a refund, please contact AZIEL Support with:
-
+            <p data-i18n="refundHelpText">
+                If you believe your order qualifies for a refund, please contact AZIEL Support or submit a refund
+                request from your order tracking page.
             </p>
 
             <ul>
-
-                <li>Order ID</li>
-
-                <li>Payment Method</li>
-
-                <li>Payment Receipt (if available)</li>
-
-                <li>Description of the issue</li>
-
+                <li data-i18n="refundHelpItem1">Order ID</li>
+                <li data-i18n="refundHelpItem2">Payment Method</li>
+                <li data-i18n="refundHelpItem3">Payment Receipt or slip if available</li>
+                <li data-i18n="refundHelpItem4">Description of the issue</li>
             </ul>
 
-            <a href="../support.html" class="policy-btn">
-
+            <a href="/support.html" class="policy-btn" data-i18n="contactSupport">
                 Contact Support
-
             </a>
-
         </section>
 
-    </div>
+    </main>
+
+    <script src="/js/site-settings.js"></script>
+
+    <script src="/lang/en.js?v=20260706-i18n"></script>
+    <script src="/lang/th.js?v=20260706-i18n"></script>
+    <script src="/lang/my.js?v=20260706-i18n"></script>
+    <script src="/js/i18n.js?v=20260706-i18n"></script>
+
+    <script src="/js/user-state.js"></script>
+    <script src="/js/header-loader.js?v=20260706-i18n"></script>
+    <script src="/js/header.js?v=20260706-i18n"></script>
+    <script src="/js/header-scroll.js?v=20260706"></script>
+
+    <script src="/js/theme.js?v=20260701"></script>
+    <script src="/js/locale-switcher.js?v=20260706-i18n"></script>
 
 </body>
 

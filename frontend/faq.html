@@ -6,13 +6,13 @@
     <title>FAQ | AZIEL 1Tap Shop</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <link rel="stylesheet" href="css/theme/aziel-design-system.css?v=20260701">
-    <link rel="stylesheet" href="css/core/main.css">
-    <link rel="stylesheet" href="css/core/layout.css">
-    <link rel="stylesheet" href="css/core/components.css">
-    <link rel="stylesheet" href="css/theme/aziel-header.css?v=20260701">
-    <link rel="stylesheet" href="css/core/footer.css">
-    <link rel="stylesheet" href="css/faq.css">
+    <link rel="stylesheet" href="/css/theme/aziel-design-system.css?v=20260701">
+    <link rel="stylesheet" href="/css/core/main.css">
+    <link rel="stylesheet" href="/css/core/layout.css">
+    <link rel="stylesheet" href="/css/core/components.css">
+    <link rel="stylesheet" href="/css/theme/aziel-header.css?v=20260701">
+    <link rel="stylesheet" href="/css/core/footer.css">
+    <link rel="stylesheet" href="/css/faq.css">
 </head>
 
 <body>
@@ -20,70 +20,75 @@
 
     <main class="faq-page">
         <section class="faq-hero">
-            <a href="home.html" class="faq-back">← Back Home</a>
-            <h1>Frequently Asked Questions</h1>
-            <p>Find answers about orders, payments, refunds, accounts, and support.</p>
+            <a href="/home.html" class="faq-back" data-i18n="backHome">← Back Home</a>
 
-            <input id="faqSearch" class="faq-search" type="text" placeholder="Search questions...">
+            <h1 data-i18n="faqTitle">Frequently Asked Questions</h1>
+
+            <p data-i18n="faqSubtitle">
+                Find answers about orders, payments, refunds, accounts, and support.
+            </p>
+
+            <input id="faqSearch" class="faq-search" type="text" placeholder="Search questions..."
+                data-i18n-placeholder="faqSearchPlaceholder">
         </section>
 
         <section class="faq-list" id="faqList">
 
             <div class="faq-item">
-                <button class="faq-question">What is AZIEL 1Tap Shop?</button>
-                <div class="faq-answer">
+                <button class="faq-question" data-i18n="faqQ1">What is AZIEL 1Tap Shop?</button>
+                <div class="faq-answer" data-i18n="faqA1">
                     AZIEL is a game top-up platform for fast and secure digital game purchases.
                 </div>
             </div>
 
             <div class="faq-item">
-                <button class="faq-question">Which countries are supported?</button>
-                <div class="faq-answer">
+                <button class="faq-question" data-i18n="faqQ2">Which countries are supported?</button>
+                <div class="faq-answer" data-i18n="faqA2">
                     AZIEL currently focuses on Myanmar and Thailand users.
                 </div>
             </div>
 
             <div class="faq-item">
-                <button class="faq-question">Which payment methods are available?</button>
-                <div class="faq-answer">
+                <button class="faq-question" data-i18n="faqQ3">Which payment methods are available?</button>
+                <div class="faq-answer" data-i18n="faqA3">
                     Myanmar users can use KBZPay, WavePay, and AYA Pay. Thailand users can use PromptPay and SCB when
                     available.
                 </div>
             </div>
 
             <div class="faq-item">
-                <button class="faq-question">How long does delivery take?</button>
-                <div class="faq-answer">
+                <button class="faq-question" data-i18n="faqQ4">How long does delivery take?</button>
+                <div class="faq-answer" data-i18n="faqA4">
                     Most orders are processed as quickly as possible after payment confirmation. Some orders may take
                     longer during maintenance or high traffic.
                 </div>
             </div>
 
             <div class="faq-item">
-                <button class="faq-question">Where can I check my order status?</button>
-                <div class="faq-answer">
+                <button class="faq-question" data-i18n="faqQ5">Where can I check my order status?</button>
+                <div class="faq-answer" data-i18n="faqA5">
                     You can check your order status from the Transactions page.
                 </div>
             </div>
 
             <div class="faq-item">
-                <button class="faq-question">Can I request a refund?</button>
-                <div class="faq-answer">
+                <button class="faq-question" data-i18n="faqQ6">Can I request a refund?</button>
+                <div class="faq-answer" data-i18n="faqA6">
                     Refunds are available only under eligible conditions. Please read the Refund Policy for details.
                 </div>
             </div>
 
             <div class="faq-item">
-                <button class="faq-question">What happens if I enter the wrong Game ID?</button>
-                <div class="faq-answer">
+                <button class="faq-question" data-i18n="faqQ7">What happens if I enter the wrong Game ID?</button>
+                <div class="faq-answer" data-i18n="faqA7">
                     Orders with incorrect User ID or Server ID may not be refundable after delivery. Always check your
                     information before payment.
                 </div>
             </div>
 
             <div class="faq-item">
-                <button class="faq-question">How can I contact support?</button>
-                <div class="faq-answer">
+                <button class="faq-question" data-i18n="faqQ8">How can I contact support?</button>
+                <div class="faq-answer" data-i18n="faqA8">
                     You can contact AZIEL Support through the Support Center or Live Chat.
                 </div>
             </div>
@@ -91,12 +96,22 @@
         </section>
     </main>
 
-    <script src="js/site-settings.js"></script>
-    <script src="js/header-loader.js"></script>
-    <script src="js/header.js"></script>
-    <script src="js/header-scroll.js"></script>
-    <script src="js/faq.js"></script>
-    <script src="js/theme.js?v=20260701"></script>
+    <script src="/js/site-settings.js"></script>
+
+    <script src="/lang/en.js?v=20260706-i18n"></script>
+    <script src="/lang/th.js?v=20260706-i18n"></script>
+    <script src="/lang/my.js?v=20260706-i18n"></script>
+    <script src="/js/i18n.js?v=20260706-i18n"></script>
+
+    <script src="/js/user-state.js"></script>
+    <script src="/js/header-loader.js?v=20260706-i18n"></script>
+    <script src="/js/header.js?v=20260706-i18n"></script>
+    <script src="/js/header-scroll.js?v=20260706"></script>
+
+    <script src="/js/theme.js?v=20260701"></script>
+    <script src="/js/locale-switcher.js?v=20260706-i18n"></script>
+
+    <script src="/js/faq.js"></script>
 </body>
 
 </html>

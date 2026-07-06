@@ -33,14 +33,11 @@
                     <p id="profileRegion">Region: MM</p>
 
                     <div class="profile-badges">
-                        <span class="verified-badge">
-                            <i class="fa-solid fa-circle-check"></i>
-                            Verified
-                        </span>
+                        <span data-i18n="verified">Verified</span>
 
                         <span class="gmail-badge">
                             <i class="fa-regular fa-envelope"></i>
-                            Gmail
+                            <span data-i18n="gmail">Gmail</span>
                         </span>
                     </div>
                 </div>
@@ -52,45 +49,45 @@
                 <button class="side-link active" data-tab="overview" type="button">
 
                     <i class="fa-solid fa-chart-line"></i>
-                    <span>Overview</span>
+                    <span data-i18n="overview">Overview</span>
 
                 </button>
 
                 <button class="side-link" data-tab="profile" type="button">
 
                     <i class="fa-regular fa-user"></i>
-                    <span>Profile</span>
+                    <span data-i18n="profile">Profile</span>
 
                 </button>
 
                 <button class="side-link" data-tab="history" type="button">
 
                     <i class="fa-solid fa-box"></i>
-                    <span>Orders</span>
+                    <span data-i18n="orders">Orders</span>
 
                 </button>
 
                 <a href="wallet.html" class="side-link">
                     <i class="fa-solid fa-wallet"></i>
-                    <span>Wallet</span>
+                    <span data-i18n="wallet">Wallet</span>
                 </a>
 
                 <button class="side-link" data-tab="security" type="button">
 
                     <i class="fa-solid fa-shield-halved"></i>
-                    <span>Security</span>
+                    <span data-i18n="security">Security</span>
 
                 </button>
 
 
                 <a href="tracking.html" class="side-link">
                     <i class="fa-solid fa-clock-rotate-left"></i>
-                    <span>Transactions</span>
+                    <span data-i18n="transactions">Transactions</span>
                 </a>
 
                 <a href="support.html" class="side-link support-link">
                     <i class="fa-solid fa-headset"></i>
-                    <span>Support</span>
+                    <span data-i18n="support">Support</span>
 
                     <b>LIVE</b>
                 </a>
@@ -98,7 +95,7 @@
                 <button class="side-link logout-link" onclick="logout()" type="button">
 
                     <i class="fa-solid fa-right-from-bracket"></i>
-                    <span>Logout</span>
+                    <span data-i18n="logout">Logout</span>
 
                 </button>
 
@@ -111,66 +108,66 @@
             <!-- OVERVIEW TAB -->
             <div class="tab-panel active" id="overview">
                 <div class="page-title">
-                    <h1>Account Overview</h1>
-                    <p>Manage your profile, wallet and recent orders.</p>
+                    <h1 data-i18n="accountOverview">Account Overview</h1>
+                    <p data-i18n="manageProfileWalletOrders">Manage your profile, wallet and recent orders.</p>
                 </div>
 
                 <div class="dashboard-grid">
                     <div class="dash-card">
-                        <span>Total Orders</span>
+                        <span data-i18n="totalOrders">Total Orders</span>
                         <strong id="totalOrders">0</strong>
                     </div>
 
                     <div class="dash-card">
-                        <span>Active Orders</span>
+                        <span data-i18n="activeOrders">Active Orders</span>
                         <strong id="pendingOrders">0</strong>
                     </div>
 
                     <div class="dash-card">
-                        <span>Completed</span>
+                        <span data-i18n="completedOrders">Completed</span>
                         <strong id="completedOrders">0</strong>
                     </div>
 
                     <div class="dash-card wallet-card">
-                        <span>Wallet Balance</span>
+                        <span data-i18n="walletBalance">Wallet Balance</span>
                         <strong id="overviewWalletBalance">0 Ks</strong>
                     </div>
                 </div>
 
                 <div class="content-card">
                     <div class="card-head">
-                        <h2>Recent Orders</h2>
-                        <a href="tracking.html">Track order</a>
+                        <h2 data-i18n="recentOrders">Recent Orders</h2>
+                        <a href="tracking.html" data-i18n="trackOrder">Track order</a>
                     </div>
 
-                    <div id="recentOrders">Loading...</div>
+                    <div id="recentOrders" data-i18n="loading">Loading...</div>
                 </div>
             </div>
 
             <!-- PROFILE TAB -->
             <div class="tab-panel" id="profile">
                 <div class="page-title">
-                    <h1>Profile</h1>
-                    <p>Your personal AZIEL account information.</p>
+                    <h1 data-i18n="profile">Profile</h1>
+                    <p data-i18n="profileInfo">Your personal AZIEL account information.</p>
                 </div>
 
                 <div class="content-card form-card">
-                    <label>Display Name</label>
+                    <label data-i18n="displayName">Display Name</label>
                     <input type="text" id="displayName" placeholder="Your display name">
 
-                    <label>Username</label>
+                    <label data-i18n="username">Username</label>
                     <input type="text" id="profileUsername" readonly>
 
-                    <label>Email</label>
+                    <label data-i18n="email">Email</label>
                     <input type="email" id="profileEmail" readonly>
 
-                    <label>Region</label>
+                    <label data-i18n="region">Region</label>
                     <input type="text" id="profileRegionReadOnly" readonly>
 
-                    <label>Member Since</label>
+                    <label data-i18n="memberSince">Member Since</label>
                     <input type="text" id="profileCreatedAt" readonly>
 
-                    <button id="saveProfileBtn" class="primary-btn" type="button">
+                    <button id="saveProfileBtn" class="primary-btn" type="button" data-i18n="saveProfile">
                         Save Profile
                     </button>
                 </div>
@@ -179,17 +176,17 @@
             <!-- ORDERS TAB -->
             <div class="tab-panel" id="history">
                 <div class="page-title">
-                    <h1>Orders</h1>
-                    <p>Your active and completed orders.</p>
+                    <h1 data-i18n="orders">Orders</h1>
+                    <p data-i18n="orderInfo">Your active and completed orders.</p>
                 </div>
 
-                <div id="historyList">Loading...</div>
+                <div id="historyList" data-i18n="loading">Loading...</div>
             </div>
             <!-- SECURITY TAB -->
             <div class="tab-panel" id="security">
                 <div class="page-title">
-                    <h1>Security</h1>
-                    <p>Keep your AZIEL account safe and verified.</p>
+                    <h1 data-i18n="security">Security</h1>
+                    <p data-i18n="securityInfo">Keep your AZIEL account safe and verified.</p>
                 </div>
 
                 <div class="security-grid">
@@ -199,9 +196,10 @@
                         </div>
 
                         <div>
-                            <h3>Email Verification</h3>
-                            <p id="securityEmailText">Loading email status...</p>
-                            <span id="emailVerifiedStatus" class="security-status">Checking...</span>
+                            <h3 data-i18n="emailVerification">Email Verification</h3>
+                            <p id="securityEmailText" data-i18n="loading">Loading email status...</p>
+                            <span id="emailVerifiedStatus" class="security-status"
+                                data-i18n="checking">Checking...</span>
                         </div>
                     </div>
 
@@ -211,9 +209,10 @@
                         </div>
 
                         <div>
-                            <h3>Password</h3>
-                            <p>Reset your password using Gmail OTP verification.</p>
-                            <a href="forgot-password.html" class="security-btn">Reset Password</a>
+                            <h3 data-i18n="password">Password</h3>
+                            <p data-i18n="passwordInfo">Reset your password using Gmail OTP verification.</p>
+                            <a href="forgot-password.html" class="security-btn" data-i18n="resetPassword">Reset
+                                Password</a>
                         </div>
                     </div>
 
@@ -223,9 +222,10 @@
                         </div>
 
                         <div>
-                            <h3>Google Login</h3>
-                            <p id="googleLinkedText">Google account link status.</p>
-                            <span id="googleLinkedStatus" class="security-status">Coming Soon</span>
+                            <h3 data-i18n="googleLogin">Google Login</h3>
+                            <p id="googleLinkedText" data-i18n="googleLinkedInfo">Google account link status.</p>
+                            <span id="googleLinkedStatus" class="security-status" data-i18n="comingSoon">Coming
+                                Soon</span>
                         </div>
                     </div>
 
@@ -235,9 +235,9 @@
                         </div>
 
                         <div>
-                            <h3>Two-Factor Authentication</h3>
-                            <p>Extra account protection for future AZIEL accounts.</p>
-                            <span class="security-status">Coming Soon</span>
+                            <h3 data-i18n="twoFactorAuth">Two-Factor Authentication</h3>
+                            <p data-i18n="twoFactorAuthInfo">Extra account protection for future AZIEL accounts.</p>
+                            <span class="security-status" data-i18n="comingSoon">Coming Soon</span>
                         </div>
                     </div>
                 </div>
@@ -248,17 +248,25 @@
     </main>
 
     <script src="js/site-settings.js"></script>
+
+    <script src="lang/en.js?v=20260706-i18n"></script>
+    <script src="lang/th.js?v=20260706-i18n"></script>
+    <script src="lang/my.js?v=20260706-i18n"></script>
+    <script src="js/i18n.js?v=20260706-i18n"></script>
+
     <script src="js/theme.js?v=20260701"></script>
 
-    <script src="js/user-state.js?v=202606291812"></script>
-    <script src="js/header-loader.js?v=202606291812"></script>
-    <script src="js/header.js?v=202606291812"></script>
-    <script src="js/header-scroll.js?v=202606291812"></script>
-    <script src="js/auth-check.js?v=202606291812"></script>
-    <script src="js/account.js"></script>
+    <script src="js/user-state.js"></script>
+    <script src="js/header-loader.js"></script>
+    <script src="js/header.js"></script>
+    <script src="js/header-scroll.js"></script>
+
+    <script src="js/auth-check.js"></script>
+
+    <script src="js/account.js?v=20260707-i18n"></script>
+
     <script src="js/logout.js"></script>
     <script src="js/api.js"></script>
-
     <script src="js/pwa-fix.js"></script>
 
 </body>
