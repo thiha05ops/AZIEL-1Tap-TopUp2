@@ -318,8 +318,20 @@ router.post("/wallet/create", async (req, res) => {
         }
 
         return res.json({
-            success: false,
-            message: "Auto wallet topup currently supports TH PromptPay only."
+            success: true,
+            provider: "manual",
+            paymentType: "manual",
+
+            topupId,
+
+            accountName: "",
+            accountNumber: "",
+
+            paymentMethod,
+            currency: currencyKey,
+            amount: Number(amount),
+
+            status: "pending"
         });
 
     } catch (error) {

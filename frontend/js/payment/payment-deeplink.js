@@ -1,5 +1,5 @@
 // frontend/js/payment/payment-deeplink.js
-// AZIEL Deep Link Payment V2.5
+// AZIEL Deep Link Payment V2.5.1
 
 (function () {
     function show(orderData, paymentSession) {
@@ -8,27 +8,37 @@
 
         const payment = window.selectedPaymentData || {};
 
-        PaymentUtils.setModalTitle(`${payment.method || orderData.paymentMethod} Transfer`);
+        PaymentUtils.setModalTitle(`${payment.method || orderData.paymentMethod || "Manual"} Transfer`);
         PaymentUtils.hideQr();
 
         const accountName =
-            paymentSession.accountName ||
+            paymentSession?.accountName ||
             payment.accountName ||
             "-";
 
         const accountNumber =
-            paymentSession.accountNumber ||
+            paymentSession?.accountNumber ||
             payment.accountNumber ||
             "-";
 
-        const provider = payment.provider || payment.key || "";
-        const bankName = payment.method || orderData.paymentMethod || "Bank";
+        const provider =
+            paymentSession?.provider ||
+            payment.provider ||
+            payment.key ||
+            orderData.paymentProvider ||
+            "";
+
+        const bankName =
+            payment.method ||
+            payment.name ||
+            orderData.paymentMethod ||
+            "Payment";
 
         PaymentUtils.renderDynamic(`
             <div class="payment-transfer-area">
                 ${copyCard(
             "Amount",
-            `${Number(orderData.amount || 0).toLocaleString()} ${orderData.currency}`,
+            `${Number(orderData.amount || 0).toLocaleString()} ${orderData.currency || ""}`,
             String(orderData.amount || 0)
         )}
 
@@ -36,7 +46,7 @@
 
                 ${copyCard("Account Number", accountNumber, accountNumber)}
 
-                ${copyCard("Order Reference", orderData.orderId, orderData.orderId)}
+                ${copyCard("Reference", orderData.orderId || orderData.topupId || "-", orderData.orderId || orderData.topupId || "")}
 
                 <button
                     id="openBankAppBtn"
@@ -58,7 +68,7 @@
             </div>
         `);
 
-        bindEvents(orderData);
+        bindEvents(orderData, provider);
 
         const confirmBtn = document.getElementById("confirmPaymentOrderBtn");
         if (confirmBtn) {
@@ -66,6 +76,16 @@
             confirmBtn.innerText = "Submit Payment Slip";
             confirmBtn.onclick = () => {
                 const file = document.getElementById("manualPaymentSlip")?.files?.[0];
+
+                if (!file) {
+                    PaymentUtils.setMsg(
+                        document.getElementById("manualPaymentMsg"),
+                        "Please upload your payment slip first.",
+                        "error"
+                    );
+                    return;
+                }
+
                 PaymentUtils.submitSlip(
                     orderData,
                     file,
@@ -113,7 +133,7 @@
         `;
     }
 
-    function bindEvents(orderData) {
+    function bindEvents(orderData, provider) {
         document.querySelectorAll(".copy-transfer-btn").forEach(btn => {
             btn.addEventListener("click", () => {
                 PaymentUtils.copy(btn.dataset.copy || "");
@@ -121,43 +141,75 @@
         });
 
         document.getElementById("openBankAppBtn")?.addEventListener("click", e => {
-            const provider = e.currentTarget.dataset.provider || "";
-            const link = getDeepLink(provider);
-
-            if (!link) {
-                alert("Bank app unavailable.");
-                return;
-            }
-
-            window.location.href = link;
-
-            PaymentUtils.setMsg(
-                document.getElementById("manualPaymentMsg"),
-                "After transfer, return here and upload your payment slip.",
-                "success"
-            );
+            const p = e.currentTarget.dataset.provider || provider || "";
+            openPaymentApp(p);
         });
 
         PaymentUtils.bindSlipPreview();
     }
 
+    function openPaymentApp(provider) {
+        const link = getDeepLink(provider);
+
+        const msgBox = document.getElementById("manualPaymentMsg");
+
+        if (!link) {
+            PaymentUtils.setMsg(
+                msgBox,
+                "This payment app cannot be opened automatically. Please open it manually.",
+                "error"
+            );
+            return;
+        }
+
+        PaymentUtils.setMsg(
+            msgBox,
+            "Opening payment app... After transfer, return here and upload your payment slip.",
+            "success"
+        );
+
+        setTimeout(() => {
+            window.location.href = link;
+        }, 300);
+    }
+
     function getDeepLink(provider) {
-        const p = String(provider || "").toLowerCase();
+        const p = String(provider || "").toLowerCase().trim();
 
         const links = {
+            // Thailand banking apps
             scb: "scbeasy://",
+            scbeasy: "scbeasy://",
             kplus: "kplus://",
+            kasikorn: "kplus://",
             bbl: "bualuangmbanking://",
             bangkok: "bualuangmbanking://",
             ktb: "krungthainext://",
+            krungthai: "krungthainext://",
             krungsri: "kma://",
-            ttb: "ttbtouch://"
+            kma: "kma://",
+            ttb: "ttbtouch://",
+
+            // Myanmar wallet apps
+            // iOS မှာ တကယ်ဖွင့်/မဖွင့် test လုပ်ရမယ်
+            wavepay: "wavepay://",
+            wave: "wavepay://",
+            kbzpay: "kbzpay://",
+            kbz: "kbzpay://",
+            ayapay: "ayapay://",
+            aya: "ayapay://",
+            cbpay: "cbpay://",
+            cb: "cbpay://",
+            uabpay: "uabpay://",
+            uab: "uabpay://"
         };
 
         return links[p] || "";
     }
 
     window.PaymentDeepLink = {
-        show
+        show,
+        getDeepLink,
+        openPaymentApp
     };
 })();

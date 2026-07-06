@@ -1,8 +1,11 @@
 // backend/routes/wallet.js
-// AZIEL Wallet V2.5 - Auto QR / Webhook / Admin Ready
+// AZIEL Wallet V2.5.1 - PromptPay Auto QR + Manual Slip Ready
 
 const express = require("express");
 const router = express.Router();
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
 
 const User = require("../models/User");
 const Order = require("../models/Order");
@@ -12,23 +15,100 @@ const Notification = require("../models/Notification");
 const adminMiddleware = require("../middleware/adminMiddleware");
 
 // ======================
+// UPLOAD SETUP
+// ======================
+
+const uploadDir = path.join(__dirname, "../uploads/slips");
+
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, uploadDir),
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname || ".jpg");
+        cb(null, `wallet-${Date.now()}${ext}`);
+    }
+});
+
+const upload = multer({
+    storage,
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        if (!file.mimetype.startsWith("image/")) {
+            return cb(new Error("Only image files are allowed"));
+        }
+
+        cb(null, true);
+    }
+});
+
+// ======================
 // HELPERS
 // ======================
 
 function getCurrencyKey(currency) {
-    return currency === "THB" ? "THB" : "MMK";
+    return String(currency || "MMK").toUpperCase() === "THB" ? "THB" : "MMK";
+}
+
+function normalizeMethod(method) {
+    return String(method || "")
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, "")
+        .replaceAll("-", "")
+        .replaceAll("_", "");
+}
+
+function isPromptPay(method) {
+    return normalizeMethod(method) === "promptpay";
 }
 
 function getQrByMethod(paymentMethod) {
+    const method = normalizeMethod(paymentMethod);
+
     const qrMap = {
-        kbzpay: "/assets/payment/kbzpay-qr.png",
-        wavepay: "/assets/payment/wavepay-qr.png",
-        ayapay: "/assets/payment/ayapay-qr.png",
-        promptpay: "/assets/payment/promptpay-qr.png",
-        scb: "/assets/payment/scb-qr.png"
+        promptpay: "/assets/payment/promptpay-qr.png"
     };
 
-    return qrMap[paymentMethod] || "";
+    return qrMap[method] || "";
+}
+
+function getAccountByMethod(paymentMethod) {
+    const method = normalizeMethod(paymentMethod);
+
+    const accounts = {
+        scb: {
+            accountName: process.env.SCB_ACCOUNT_NAME || "AZIEL",
+            accountNumber: process.env.SCB_ACCOUNT_NUMBER || "-"
+        },
+        wavepay: {
+            accountName: process.env.WAVEPAY_ACCOUNT_NAME || "AZIEL",
+            accountNumber: process.env.WAVEPAY_ACCOUNT_NUMBER || "-"
+        },
+        kbzpay: {
+            accountName: process.env.KBZPAY_ACCOUNT_NAME || "AZIEL",
+            accountNumber: process.env.KBZPAY_ACCOUNT_NUMBER || "-"
+        },
+        ayapay: {
+            accountName: process.env.AYAPAY_ACCOUNT_NAME || "AZIEL",
+            accountNumber: process.env.AYAPAY_ACCOUNT_NUMBER || "-"
+        },
+        cbpay: {
+            accountName: process.env.CBPAY_ACCOUNT_NAME || "AZIEL",
+            accountNumber: process.env.CBPAY_ACCOUNT_NUMBER || "-"
+        },
+        uabpay: {
+            accountName: process.env.UABPAY_ACCOUNT_NAME || "AZIEL",
+            accountNumber: process.env.UABPAY_ACCOUNT_NUMBER || "-"
+        }
+    };
+
+    return accounts[method] || {
+        accountName: process.env.DEFAULT_PAYMENT_ACCOUNT_NAME || "AZIEL",
+        accountNumber: process.env.DEFAULT_PAYMENT_ACCOUNT_NUMBER || "-"
+    };
 }
 
 function emitWalletUpdate(req, username, payload) {
@@ -43,6 +123,124 @@ function emitWalletUpdate(req, username, payload) {
         ...payload
     });
 }
+
+async function createWalletNotification(req, topup, title, message, type = "wallet") {
+    try {
+        const notification = await Notification.create({
+            username: topup.username,
+            title,
+            message,
+            type,
+            category: "wallet",
+            isRead: false
+        });
+
+        const io = req.app.get("io");
+
+        if (io) {
+            io.to(topup.username).emit("newNotification", notification);
+        }
+
+        return notification;
+    } catch (error) {
+        console.log("Wallet notification error:", error.message);
+        return null;
+    }
+}
+
+// ======================
+// CREATE WALLET TOPUP
+// POST /api/wallet/create
+// ======================
+
+router.post("/wallet/create", async (req, res) => {
+    try {
+        const {
+            username,
+            amount,
+            currency,
+            region,
+            paymentMethod,
+            provider
+        } = req.body;
+
+        if (!username || !amount || Number(amount) <= 0 || !paymentMethod) {
+            return res.json({
+                success: false,
+                message: "Missing wallet topup data"
+            });
+        }
+
+        const user = await User.findOne({ username });
+
+        if (!user) {
+            return res.json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        const currencyKey = getCurrencyKey(currency);
+        const method = normalizeMethod(provider || paymentMethod);
+        const topupId = "WALLET-" + Date.now();
+
+        const account = getAccountByMethod(method);
+        const autoQr = isPromptPay(method);
+        const qrImage = autoQr ? getQrByMethod(method) : "";
+
+        const topup = await WalletTopup.create({
+            topupId,
+            username,
+            amount: Number(amount),
+            currency: currencyKey,
+            region: region || (currencyKey === "THB" ? "TH" : "MM"),
+            paymentMethod: method,
+            status: "pending",
+            qrImage,
+            paymentSlip: "",
+            note: autoQr
+                ? "PromptPay QR generated. Waiting for payment."
+                : "Manual payment. Waiting for slip upload."
+        });
+
+        const io = req.app.get("io");
+
+        if (io) {
+            io.to("admins").emit("adminNewUpdate", {
+                type: "wallet_topup_created",
+                topupId,
+                username,
+                amount: Number(amount),
+                currency: currencyKey,
+                paymentMethod: method,
+                status: topup.status
+            });
+        }
+
+        return res.json({
+            success: true,
+            message: autoQr
+                ? "Wallet QR created"
+                : "Wallet manual payment created",
+            topupId,
+            topup,
+            paymentType: autoQr ? "auto_qr" : "manual",
+            qrImage,
+            qrUrl: qrImage,
+            accountName: account.accountName,
+            accountNumber: account.accountNumber,
+            status: topup.status
+        });
+
+    } catch (error) {
+        console.log("Wallet create error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Server error"
+        });
+    }
+});
 
 // ======================
 // LOAD WALLET
@@ -89,6 +287,123 @@ router.get("/wallet/:username", async (req, res) => {
             message: "Server error"
         });
     }
+});
+
+// ======================
+// WALLET TOPUP STATUS
+// GET /api/wallet/status/:topupId
+// ======================
+
+router.get("/wallet/status/:topupId", async (req, res) => {
+    try {
+        const topup = await WalletTopup.findOne({
+            topupId: req.params.topupId
+        });
+
+        if (!topup) {
+            return res.json({
+                success: false,
+                message: "Topup not found"
+            });
+        }
+
+        return res.json({
+            success: true,
+            topupId: topup.topupId,
+            status: topup.status,
+            amount: topup.amount,
+            currency: topup.currency,
+            paymentMethod: topup.paymentMethod
+        });
+
+    } catch (error) {
+        console.log("Wallet status error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Server error"
+        });
+    }
+});
+
+// ======================
+// UPLOAD WALLET SLIP
+// POST /api/wallet/slip/:topupId
+// ======================
+
+router.post("/wallet/slip/:topupId", upload.single("slip"), async (req, res) => {
+    try {
+        const topup = await WalletTopup.findOne({
+            topupId: req.params.topupId
+        });
+
+        if (!topup) {
+            return res.json({
+                success: false,
+                message: "Topup not found"
+            });
+        }
+
+        if (!req.file) {
+            return res.json({
+                success: false,
+                message: "Payment slip is required"
+            });
+        }
+
+        const slipPath = `/uploads/slips/${req.file.filename}`;
+
+        topup.paymentSlip = slipPath;
+        topup.status = "pending";
+        topup.note = "Payment slip uploaded. Waiting for admin verification.";
+        await topup.save();
+
+        await createWalletNotification(
+            req,
+            topup,
+            "Wallet Slip Uploaded",
+            `Your ${Number(topup.amount || 0).toLocaleString()} ${getCurrencyKey(topup.currency)} wallet top-up slip has been submitted.`
+        );
+
+        const io = req.app.get("io");
+
+        if (io) {
+            io.to("admins").emit("adminNewUpdate", {
+                type: "wallet_slip_uploaded",
+                topupId: topup.topupId,
+                username: topup.username,
+                amount: topup.amount,
+                currency: topup.currency,
+                paymentMethod: topup.paymentMethod,
+                paymentSlip: slipPath
+            });
+        }
+
+        return res.json({
+            success: true,
+            message: "Payment slip submitted",
+            topup
+        });
+
+    } catch (error) {
+        console.log("Wallet slip upload error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Server error"
+        });
+    }
+});
+
+// alias routes for frontend fallback
+router.post("/wallet/topup/:topupId/slip", upload.single("slip"), async (req, res) => {
+    req.url = `/wallet/slip/${req.params.topupId}`;
+    router.handle(req, res);
+});
+
+router.post("/wallet/upload-slip/:topupId", upload.single("slip"), async (req, res) => {
+    req.url = `/wallet/slip/${req.params.topupId}`;
+    router.handle(req, res);
 });
 
 // ======================
@@ -154,9 +469,7 @@ router.put("/admin/wallet/topups/:id/status", adminMiddleware, async (req, res) 
         if (["approved", "paid", "completed"].includes(status)) {
             const result = await completeWalletTopup(req, topup);
 
-            if (!result.success) {
-                return res.json(result);
-            }
+            if (!result.success) return res.json(result);
 
             return res.json({
                 success: true,
@@ -171,29 +484,22 @@ router.put("/admin/wallet/topups/:id/status", adminMiddleware, async (req, res) 
             topup.note = "Wallet topup rejected by admin";
             await topup.save();
 
-            try {
-                const notification = await Notification.create({
+            await createWalletNotification(
+                req,
+                topup,
+                "Wallet Top-Up Rejected",
+                `Your ${Number(topup.amount || 0).toLocaleString()} ${getCurrencyKey(topup.currency)} wallet top-up was rejected.`
+            );
+
+            const io = req.app.get("io");
+
+            if (io) {
+                io.to("admins").emit("adminNewUpdate", {
+                    type: "wallet_topup_rejected",
                     username: topup.username,
-                    title: "Wallet Top-Up Rejected",
-                    message: `Your ${Number(topup.amount || 0).toLocaleString()} ${getCurrencyKey(topup.currency)} wallet top-up was rejected.`,
-                    type: "wallet",
-                    category: "wallet",
-                    isRead: false
+                    amount: topup.amount,
+                    currency: topup.currency
                 });
-
-                const io = req.app.get("io");
-
-                if (io) {
-                    io.to(topup.username).emit("newNotification", notification);
-                    io.to("admins").emit("adminNewUpdate", {
-                        type: "wallet_topup_rejected",
-                        username: topup.username,
-                        amount: topup.amount,
-                        currency: topup.currency
-                    });
-                }
-            } catch (notiError) {
-                console.log("Reject notification error:", notiError.message);
             }
 
             return res.json({
@@ -268,13 +574,13 @@ async function completeWalletTopup(req, topup) {
         description: `Wallet topup via ${topup.paymentMethod}`
     });
 
-    const notification = await Notification.create({
-        username: topup.username,
-        title: "Wallet Top-Up Successful",
-        message: `${Number(topup.amount || 0).toLocaleString()} ${currencyKey} has been added to your wallet.`,
-        type: "system",
-        category: "wallet"
-    });
+    await createWalletNotification(
+        req,
+        topup,
+        "Wallet Top-Up Successful",
+        `${Number(topup.amount || 0).toLocaleString()} ${currencyKey} has been added to your wallet.`,
+        "system"
+    );
 
     const io = req.app.get("io");
 
@@ -284,8 +590,6 @@ async function completeWalletTopup(req, topup) {
             currency: currencyKey,
             status: "approved"
         });
-
-        io.to(topup.username).emit("newNotification", notification);
 
         io.to("admins").emit("adminNewUpdate", {
             type: "wallet_topup_approved",
@@ -366,9 +670,7 @@ router.post("/wallet/pay", async (req, res) => {
             });
         }
 
-        user.wallet[currencyKey] =
-            Number(currentBalance) - Number(amount);
-
+        user.wallet[currencyKey] = Number(currentBalance) - Number(amount);
         user.markModified("wallet");
         await user.save();
 
