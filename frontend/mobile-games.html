@@ -4,153 +4,124 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mobile Games - AZIEL</title>
+    <title>Games - AZIEL</title>
 
-    <link rel="stylesheet" href="css/theme/aziel-design-system.css?v=20260701">
-    <link rel="stylesheet" href="css/theme/aziel-header.css?v=20260701">
+    <link rel="stylesheet" href="/css/theme/aziel-design-system.css?v=20260701">
+    <link rel="stylesheet" href="/css/theme/aziel-header.css?v=20260701">
 
-    <link rel="stylesheet" href="css/core/main.css">
-    <link rel="stylesheet" href="css/core/layout.css">
-    <link rel="stylesheet" href="css/core/components.css">
-    <link rel="stylesheet" href="css/core/footer.css">
+    <link rel="stylesheet" href="/css/core/main.css">
+    <link rel="stylesheet" href="/css/core/layout.css">
+    <link rel="stylesheet" href="/css/core/components.css">
+    <link rel="stylesheet" href="/css/core/footer.css">
 
-    <link rel="stylesheet" href="css/theme/wave-background.css">
-    <link rel="stylesheet" href="css/theme/desktop.css">
-    <link rel="stylesheet" href="css/theme/mobile.css">
+    <link rel="stylesheet" href="/css/theme/wave-background.css">
+    <link rel="stylesheet" href="/css/theme/desktop.css">
+    <link rel="stylesheet" href="/css/theme/aziel-theme.css">
+    <link rel="stylesheet" href="/css/theme/mobile.css">
+    <link rel="stylesheet" href="/css/catalog/games-typography.css?v=20260707">
+    <link rel="stylesheet" href="/css/catalog/games.css?v=20260707">
+    <link rel="stylesheet" href="/css/catalog/games-home-style.css?v=20260707">
 
-    <link rel="stylesheet" href="css/home/home.css?v=20260702">
-    <link rel="stylesheet" href="css/home/aziel-home.css?v=20260702">
 
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
     <meta name="theme-color" content="#070716">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="AZIEL">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 </head>
 
 <body>
+    <div id="azHeaderMount" data-nav="games"></div>
 
-    <div id="azHeaderMount" data-nav="game"></div>
+    <main class="az-catalog-page">
+        <section class="az-catalog-shell">
 
-    <main id="mainHome">
+            <div class="az-catalog-breadcrumb">AZIEL / Games</div>
 
-        <section class="home-section">
+            <div class="az-featured-grid">
+                <a href="mlbb.html" class="az-featured-card purple">
+                    <img src="/assets/games/mlbb.webp" alt="Mobile Legends">
+                    <div>
+                        <h3>Mobile Legends</h3>
+                        <p>Diamonds • Myanmar / Thailand</p>
+                    </div>
+                </a>
 
-            <div class="section-head">
-                <h2>Mobile Games</h2>
+                <a href="pubg.html" class="az-featured-card blue">
+                    <img src="/assets/games/pubg.webp" alt="PUBG Mobile">
+                    <div>
+                        <h3>PUBG Mobile</h3>
+                        <p>UC Top Up • Global</p>
+                    </div>
+                </a>
+
+                <a href="hok.html" class="az-featured-card pink">
+                    <img src="/assets/games/hok.webp" alt="Honor of Kings">
+                    <div>
+                        <h3>Honor of Kings</h3>
+                        <p>Tokens • Global</p>
+                    </div>
+                </a>
             </div>
 
-            <div class="catalog-grid">
-
-                <!-- ACTIVE -->
-
-                <a href="mlbb.html" class="catalog-card active-card" data-name="Mobile Legends MLBB">
-
-                    <img src="assets/mlbb.jpg" alt="">
-                    <h3>Mobile Legends</h3>
-                    <p>Top Up</p>
-
-                </a>
-
-                <a href="pubg.html" class="catalog-card active-card" data-name="PUBG Mobile UC">
-
-                    <img src="assets/pubg.jpg" alt="">
-                    <h3>PUBG Mobile</h3>
-                    <p>Top Up</p>
-
-                </a>
-
-                <a href="freefire.html" class="catalog-card active-card" data-name="Free Fire">
-
-                    <img src="assets/freefire.jpg" alt="">
-                    <h3>Free Fire</h3>
-                    <p>Top Up</p>
-
-                </a>
-
-                <a href="hok.html" class="catalog-card active-card" data-name="Honor Of Kings">
-
-                    <img src="assets/hok.jpg" alt="">
-                    <h3>Honor Of Kings</h3>
-                    <p>Top Up</p>
-
-                </a>
-
-                <!-- COMING SOON -->
-
-                <div class="catalog-card coming-soon-card" data-name="Genshin Impact">
-
-                    <div class="logo-card">GI</div>
-
-                    <h3>Genshin Impact</h3>
-                    <p>Coming Soon</p>
-
-                </div>
-
-                <div class="catalog-card coming-soon-card" data-name="Roblox">
-
-                    <div class="logo-card">R</div>
-
+            <div class="az-poster-grid">
+                <a href="roblox.html" class="az-poster-card">
+                    <img src="/assets/games/roblox.webp" alt="Roblox">
                     <h3>Roblox</h3>
-                    <p>Coming Soon</p>
+                    <p>Robux Top Up</p>
+                </a>
 
-                </div>
+                <a href="freefire.html" class="az-poster-card">
+                    <img src="/assets/games/freefire.webp" alt="Free Fire">
+                    <h3>Free Fire</h3>
+                    <p>Diamonds Top Up</p>
+                </a>
 
-                <div class="catalog-card coming-soon-card" data-name="Clash Of Clans">
+                <a href="pubg.html" class="az-poster-card">
+                    <img src="/assets/games/pubg.webp" alt="PUBG Mobile">
+                    <h3>PUBG Mobile</h3>
+                    <p>UC Top Up</p>
+                </a>
 
-                    <div class="logo-card">COC</div>
+                <a href="pubg-rp.html" class="az-poster-card">
+                    <img src="/assets/games/pubg-rp.webp" alt="PUBG RP">
+                    <h3>PUBG Royale Pass</h3>
+                    <p>RP Pack</p>
+                </a>
 
-                    <h3>Clash Of Clans</h3>
-                    <p>Coming Soon</p>
+                <a href="genshin.html" class="az-poster-card">
+                    <img src="/assets/games/genshin.webp" alt="Genshin Impact">
+                    <h3>Genshin Impact</h3>
+                    <p>Genesis Crystals</p>
+                </a>
 
-                </div>
+                <a href="aov-id.html" class="az-poster-card">
+                    <img src="/assets/games/aov-id.webp" alt="Arena of Valor">
+                    <h3>Arena of Valor ID</h3>
+                    <p>Vouchers Top Up</p>
+                </a>
 
-                <div class="catalog-card coming-soon-card" data-name="Clash Royale">
-
-                    <div class="logo-card">CR</div>
-
-                    <h3>Clash Royale</h3>
-                    <p>Coming Soon</p>
-
-                </div>
-
-                <div class="catalog-card coming-soon-card" data-name="Arena Breakout">
-
-                    <div class="logo-card">AB</div>
-
-                    <h3>Arena Breakout</h3>
-                    <p>Coming Soon</p>
-
-                </div>
-
-                <div class="catalog-card coming-soon-card" data-name="Call Of Duty Mobile">
-
-                    <div class="logo-card">COD</div>
-
-                    <h3>COD Mobile</h3>
-                    <p>Coming Soon</p>
-
-                </div>
-
+                <a href="telegram.html" class="az-poster-card">
+                    <img src="/assets/giftcards/telegram.webp" alt="Telegram Top Up">
+                    <h3>Telegram</h3>
+                    <p>Stars & Premium</p>
+                </a>
             </div>
 
         </section>
-
     </main>
 
     <footer>
         © 2026 AZIEL 1Tap Shop
     </footer>
 
-    <script src="js/site-settings.js"></script>
-    <script src="js/user-state.js?v=2026062905"></script>
-    <script src="js/auth-check.js"></script>
-    <script src="js/header-loader.js?v=20260702"></script>
-    <script src="js/header.js?v=20260702"></script>
-    <script src="js/locale-switcher.js"></script>
-    <script src="js/theme.js?v=20260702"></script>
+    <script src="/js/site-settings.js"></script>
+    <script src="/js/user-state.js?v=2026062905"></script>
+    <script src="/js/auth-check.js"></script>
+    <script src="/js/header-loader.js?v=20260702"></script>
+    <script src="/js/header.js?v=20260702"></script>
+    <script src="/js/locale-switcher.js"></script>
+    <script src="/js/theme.js?v=20260702"></script>
+    <script src="/js/pwa-fix.js"></script>
 </body>
 
 </html>

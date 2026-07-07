@@ -9,7 +9,7 @@
 }
 
 .az-header {
-    position: sticky;
+    position: fixed;
     top: 0;
     z-index: 99999;
     width: 100%;
@@ -342,5 +342,273 @@
         width: 40px !important;
         height: 40px !important;
         min-width: 40px !important;
+    }
+}
+
+/* ===========================================
+   AZIEL Games Dropdown - Theme Adaptive
+=========================================== */
+
+.az-nav {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    overflow: visible;
+}
+
+.az-nav>a,
+.az-nav-drop-btn {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--az-text);
+    text-decoration: none;
+    transition: .25s ease;
+}
+
+.az-nav>a:hover,
+.az-nav>a.active,
+.az-nav-drop-btn:hover,
+.az-nav-drop-btn.active,
+.az-nav-dropdown.show .az-nav-drop-btn {
+    color: var(--az-primary);
+}
+
+.az-nav-dropdown {
+    position: relative;
+}
+
+.az-nav-drop-btn i {
+    font-size: 11px;
+    color: currentColor;
+    transition: .25s ease;
+}
+
+.az-nav-dropdown.show .az-nav-drop-btn i {
+    transform: rotate(180deg);
+}
+
+.az-nav-dropdown.show .az-nav-drop-btn::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: -18px;
+    width: 100%;
+    height: 3px;
+    border-radius: 20px;
+    background: linear-gradient(90deg, #8b5cf6, #7c3aed);
+}
+
+/* Dropdown */
+
+.az-nav-drop-menu {
+    position: absolute;
+    top: calc(100% + 18px);
+    left: 50%;
+    width: 270px;
+    padding: 10px;
+    border-radius: 22px;
+
+    background: rgba(255, 255, 255, .88);
+    border: 1px solid rgba(15, 23, 42, .08);
+
+    backdrop-filter: blur(26px) saturate(160%);
+    -webkit-backdrop-filter: blur(26px) saturate(160%);
+
+    box-shadow:
+        0 24px 70px rgba(15, 23, 42, .16),
+        0 0 0 1px rgba(255, 255, 255, .35) inset;
+
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+
+    transform: translateX(-50%) translateY(14px) scale(.96);
+    transition: .25s ease;
+
+    z-index: 99999;
+}
+
+.az-nav-dropdown.show .az-nav-drop-menu {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateX(-50%) translateY(0) scale(1);
+}
+
+.az-nav-drop-menu::before {
+    content: "";
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    width: 16px;
+    height: 16px;
+    transform: translateX(-50%) rotate(45deg);
+    background: inherit;
+    border-left: 1px solid rgba(15, 23, 42, .08);
+    border-top: 1px solid rgba(15, 23, 42, .08);
+}
+
+/* Items */
+
+.az-nav-drop-menu a {
+    height: 48px;
+    padding: 0 12px;
+    margin: 2px 0;
+
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    border-radius: 15px;
+    text-decoration: none;
+
+    color: rgba(17, 24, 39, .82);
+    background: transparent;
+
+    transition: .22s ease;
+}
+
+.az-nav-drop-menu a:hover,
+.az-nav-drop-menu a.active {
+    background: rgba(124, 58, 237, .10);
+    color: var(--az-primary);
+    transform: translateX(3px);
+}
+
+.az-nav-drop-menu a i {
+    width: 32px;
+    height: 32px;
+
+    display: grid;
+    place-items: center;
+
+    border-radius: 12px;
+    background: rgba(124, 58, 237, .12);
+    color: var(--az-primary);
+
+    font-size: 14px;
+    flex: 0 0 32px;
+}
+
+.az-nav-drop-menu span {
+    font-size: 13px;
+    font-weight: 900;
+    color: inherit;
+}
+
+/* Dark theme */
+
+body.dark .az-nav>a,
+body.dark .az-nav-drop-btn,
+body.theme-dark .az-nav>a,
+body.theme-dark .az-nav-drop-btn {
+    color: rgba(255, 255, 255, .92) !important;
+}
+
+body.dark .az-nav>a:hover,
+body.dark .az-nav>a.active,
+body.dark .az-nav-dropdown.show .az-nav-drop-btn,
+body.theme-dark .az-nav>a:hover,
+body.theme-dark .az-nav>a.active,
+body.theme-dark .az-nav-dropdown.show .az-nav-drop-btn {
+    color: #c084fc !important;
+}
+
+body.dark .az-nav-drop-menu,
+body.theme-dark .az-nav-drop-menu {
+    background: rgba(18, 20, 39, .88);
+    border-color: rgba(255, 255, 255, .10);
+
+    box-shadow:
+        0 24px 80px rgba(0, 0, 0, .42),
+        0 0 0 1px rgba(255, 255, 255, .06) inset;
+}
+
+body.dark .az-nav-drop-menu::before,
+body.theme-dark .az-nav-drop-menu::before {
+    border-left-color: rgba(255, 255, 255, .10);
+    border-top-color: rgba(255, 255, 255, .10);
+}
+
+body.dark .az-nav-drop-menu a,
+body.theme-dark .az-nav-drop-menu a {
+    color: rgba(255, 255, 255, .88) !important;
+}
+
+body.dark .az-nav-drop-menu a:hover,
+body.theme-dark .az-nav-drop-menu a:hover {
+    background: rgba(168, 85, 247, .16);
+    color: #c084fc !important;
+}
+
+body.dark .az-nav-drop-menu a i,
+body.theme-dark .az-nav-drop-menu a i {
+    background: rgba(168, 85, 247, .18);
+    color: #c084fc;
+}
+
+/* Mobile */
+
+@media (max-width: 900px) {
+    .az-header {
+        overflow: visible !important;
+        position: sticky;
+        top: 0;
+        z-index: 9998;
+    }
+
+    .az-nav {
+        display: flex !important;
+        position: relative !important;
+        justify-content: center;
+        align-items: center;
+        gap: 18px;
+        overflow: visible !important;
+        z-index: 9999;
+    }
+
+    .az-nav>a,
+    .az-nav-drop-btn {
+        flex-shrink: 0;
+        font-size: 12px !important;
+        font-weight: 900 !important;
+        white-space: nowrap;
+    }
+
+    .az-nav-dropdown {
+        position: relative !important;
+        flex-shrink: 0;
+    }
+
+    .az-nav-drop-menu {
+        position: fixed !important;
+        top: 92px !important;
+        left: 50% !important;
+        width: min(286px, calc(100vw - 32px)) !important;
+        max-height: calc(100vh - 120px);
+        overflow-y: auto;
+
+        transform: translateX(-50%) translateY(12px) scale(.96) !important;
+        z-index: 99999 !important;
+    }
+
+    .az-nav-dropdown.show .az-nav-drop-menu {
+        transform: translateX(-50%) translateY(0) scale(1) !important;
+    }
+
+    .az-nav-drop-menu::before {
+        display: none !important;
+    }
+
+    .az-nav-dropdown.show .az-nav-drop-btn::after {
+        bottom: -10px;
+        height: 2px;
     }
 }

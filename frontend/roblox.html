@@ -7,80 +7,96 @@
     <title>Roblox - AZIEL</title>
 
     <link rel="stylesheet" href="/css/core/main.css">
+    <link rel="stylesheet" href="/css/core/layout.css">
+    <link rel="stylesheet" href="/css/theme/aziel-header.css?v=20260701">
+    <link rel="stylesheet" href="/css/theme/aziel-design-system.css?v=20260701">
     <link rel="stylesheet" href="/css/game/game.css">
     <link rel="stylesheet" href="/css/game/payment-grid.css">
+    <link rel="stylesheet" href="/css/support/live-chat.css">
     <link rel="manifest" href="/manifest.json">
-    <link rel="stylesheet" href="css/theme/aziel-design-system.css?v=20260701">
-    <link rel="stylesheet" href="css/theme/aziel-header.css?v=20260701">
-
     <meta name="theme-color" content="#070716">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="AZIEL">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 
 <body>
-
     <div id="azHeaderMount" data-nav="game"></div>
 
     <main class="game-page">
-
         <section class="game-hero">
             <div class="game-banner">
-                <img src="/assets/games/roblox.webp" alt="Roblox">
+                <img id="gameBanner" alt="Roblox">
 
                 <div class="banner-overlay">
-                    <span class="game-tag">Online Game</span>
-                    <h1>Roblox</h1>
-                    <p>Fast & secure Robux top up for Roblox players.</p>
+                    <span class="game-tag" data-i18n="onlineGame">Online Game</span>
+                    <h1 data-i18n="roblox">Roblox</h1>
+                    <p data-i18n="robloxHeroDescription">
+                        Fast and secure Robux top up for Myanmar and Thailand players.
+                    </p>
                 </div>
             </div>
 
             <div class="game-info">
-                <h2>How to Top Up</h2>
+                <h2 data-i18n="howToTopUp">How to Top Up</h2>
 
-                <div class="step-row"><span>1</span>
-                    <p>Enter your Roblox username or User ID.</p>
+                <div class="step-row">
+                    <span>1</span>
+                    <p data-i18n="stepRobloxUserId">Enter your Roblox username or User ID.</p>
                 </div>
-                <div class="step-row"><span>2</span>
-                    <p>Select Robux package.</p>
+
+                <div class="step-row">
+                    <span>2</span>
+                    <p data-i18n="stepRobloxPackage">Select your Robux package.</p>
                 </div>
-                <div class="step-row"><span>3</span>
-                    <p>Choose payment method.</p>
+
+                <div class="step-row">
+                    <span>3</span>
+                    <p data-i18n="stepPayment">Choose your payment method.</p>
                 </div>
-                <div class="step-row"><span>4</span>
-                    <p>Pay and upload payment screenshot.</p>
+
+                <div class="step-row">
+                    <span>4</span>
+                    <p data-i18n="stepQr">Scan QR and wait for payment confirmation.</p>
                 </div>
 
                 <div class="trust-box">
-                    ⚡ Fast delivery • 🔒 Secure payment • 📦 Order tracking
+                    <span data-i18n="robloxTrust">⚡ Fast Robux delivery • 🔒 Secure payment • 📦 Order tracking</span>
                 </div>
             </div>
         </section>
 
         <section class="order-layout">
-
             <div class="order-left">
-
                 <div class="form-card">
                     <div class="card-title">
                         <span>👤</span>
-                        <h2>Account Information</h2>
+                        <h2 data-i18n="accountInformation">Account Information</h2>
                     </div>
 
-                    <label>Roblox Username / User ID</label>
-                    <input type="text" id="userId" placeholder="Enter Roblox username or User ID">
-
-                    <input type="hidden" id="serverId" value="-">
+                    <label for="userId" data-i18n="robloxUserId">Roblox Username / User ID</label>
+                    <input type="text" id="userId" data-i18n-placeholder="enterRobloxUserId"
+                        placeholder="Enter Roblox username or User ID">
                 </div>
 
                 <div class="form-card">
                     <div class="card-title">
                         <span>🧊</span>
-                        <h2>Select Robux Package</h2>
+                        <h2 data-i18n="selectPackage">Select Package</h2>
                     </div>
+
+                    <button class="mobile-selected-package" id="openPackagePanel" type="button">
+                        <div class="mobile-pack-icon">
+                            <img id="mobilePackageIcon" alt="Roblox">
+                        </div>
+
+                        <div>
+                            <strong id="mobileSelectedPackageName" data-i18n="selectTopupAmount">
+                                Select Top-Up Amount
+                            </strong>
+                            <span id="mobileSelectedPackagePrice" data-i18n="choosePackage">Choose your package</span>
+                        </div>
+
+                        <b>›</b>
+                    </button>
 
                     <div class="packages" id="packages" data-game="roblox"></div>
                 </div>
@@ -88,61 +104,228 @@
                 <div class="form-card">
                     <div class="card-title">
                         <span>💳</span>
-                        <h2>Select Payment</h2>
+                        <h2 data-i18n="selectPayment">Select Payment</h2>
                     </div>
 
                     <div id="paymentGrid" class="payment-grid"></div>
                     <input type="hidden" id="paymentMethod">
                 </div>
-
             </div>
 
             <aside class="order-summary">
-                <h2>Order Summary</h2>
+                <h2 data-i18n="orderSummary">Order Summary</h2>
 
                 <div class="summary-line">
-                    <span>Game</span>
-                    <b>Roblox</b>
+                    <span data-i18n="game">Game</span>
+                    <b data-i18n="roblox">Roblox</b>
                 </div>
 
                 <div class="summary-line">
-                    <span>Package</span>
-                    <b id="summaryPackage">Not selected</b>
+                    <span data-i18n="package">Package</span>
+                    <b id="summaryPackage" data-i18n="notSelected">Not selected</b>
                 </div>
 
                 <div class="summary-line">
-                    <span>Payment</span>
-                    <b id="summaryPayment">Not selected</b>
+                    <span data-i18n="payment">Payment</span>
+                    <b id="summaryPayment" data-i18n="notSelected">Not selected</b>
                 </div>
 
                 <div class="summary-total">
-                    <span>Total</span>
+                    <span data-i18n="total">Total</span>
                     <strong id="summaryAmount">0 Ks</strong>
                 </div>
 
-                <p id="selectedText" class="summary-note">
+                <p id="selectedText" class="summary-note" data-i18n="fillAllInfo">
                     Please fill all information to continue.
                 </p>
 
-                <button id="buyBtn" disabled>Buy Now</button>
+                <button id="buyBtn" disabled data-i18n="continuePayment">Continue To Payment</button>
 
-                <p class="safe-note">Your order will be tracked in your account after payment.</p>
+                <p class="safe-note" data-i18n="safeOrderNote">
+                    Your order will be tracked in your account after payment.
+                </p>
             </aside>
-
         </section>
 
+        <footer class="game-mini-footer">
+            <div>
+                <h3>AZIEL</h3>
+                <p data-i18n="footerDescription">Fast, secure and trusted game top up platform.</p>
+            </div>
+
+            <div>
+                <h4 data-i18n="help">Help</h4>
+                <a href="support.html" data-i18n="nav_support">Support</a>
+                <a href="tracking.html" data-i18n="trackOrder">Track Order</a>
+            </div>
+
+            <div>
+                <h4 data-i18n="paymentMethods">Payment Methods</h4>
+                <div class="payment-logos" id="footerPaymentLogos"></div>
+            </div>
+        </footer>
     </main>
 
-    <script src="/js/auth-check.js"></script>
-    <script src="/js/prices.js"></script>
-    <script src="/js/region-payment.js"></script>
-    <script src="/js/payment-redirect.js"></script>
-    <script src="/js/payment.js"></script>
-    <script src="/js/roblox.js"></script>
-    <script src="/js/pwa-fix.js"></script>
-    <script src="js/site-settings.js"></script>
-    <script src="js/theme.js?v=20260701"></script>
+    <div id="paymentConfirmModal" class="payment-confirm-modal">
+        <div class="payment-confirm-box">
+            <button id="closePaymentModal" class="payment-modal-close" type="button">×</button>
 
+            <h2 data-i18n="scanPay">Scan & Pay</h2>
+
+            <div class="payment-modal-summary">
+                <p><b><span data-i18n="orderId">Order ID</span>:</b> <span id="modalOrderId"></span></p>
+                <p><b><span data-i18n="game">Game</span>:</b> <span id="modalGame"></span></p>
+                <p><b><span data-i18n="package">Package</span>:</b> <span id="modalPackage"></span></p>
+                <p><b><span data-i18n="amount">Amount</span>:</b> <span id="modalAmount"></span></p>
+                <p><b><span data-i18n="payment">Payment</span>:</b> <span id="modalPayment"></span></p>
+                <p><b><span data-i18n="robloxUserId">Roblox ID</span>:</b> <span id="modalUserId"></span></p>
+            </div>
+
+            <div class="payment-modal-qr">
+                <img id="modalPaymentLogo" src="" alt="Payment Logo">
+                <img id="modalQrImage" src="" alt="Payment QR">
+                <p id="modalAccountName"></p>
+                <p id="modalAccountNumber"></p>
+            </div>
+
+            <div class="payment-countdown">
+                <span data-i18n="paymentExpiresIn">Payment expires in</span>
+                <span id="countdown">10:00</span>
+            </div>
+
+            <div id="paymentDynamicArea"></div>
+
+            <button id="confirmPaymentOrderBtn" disabled data-i18n="waitingPayment">Waiting Payment...</button>
+        </div>
+    </div>
+
+    <div class="mobile-package-panel" id="mobilePackagePanel">
+        <div class="mobile-panel-card">
+            <div class="mobile-panel-head">
+                <h3 data-i18n="selectTopupAmount">Select Top-Up Amount</h3>
+                <button id="closePackagePanel" type="button">×</button>
+            </div>
+
+            <div id="mobilePackageList"></div>
+
+            <button id="confirmPackagePanel" type="button" data-i18n="confirm">Confirm</button>
+        </div>
+    </div>
+
+    <div id="orderLoadingOverlay" class="order-loading-overlay">
+        <div class="order-loading-box">
+            <div class="order-loading-dots">
+                <span></span><span></span><span></span><span></span>
+            </div>
+
+            <h3 data-i18n="pleaseWait">Please wait a few seconds...</h3>
+            <p data-i18n="orderSubmitting">Your order is being submitted.</p>
+        </div>
+    </div>
+
+    <div id="successModal" class="success-modal">
+        <div class="success-modal-box">
+            <div class="success-icon">✓</div>
+
+            <h2 data-i18n="paymentSuccess">Payment Success</h2>
+            <p data-i18n="paymentDetected">Your payment has been detected. Admin will process your top-up soon.</p>
+
+            <div class="success-actions">
+                <button id="trackOrderBtn" data-i18n="trackOrder">Track Order</button>
+                <button id="backHomeBtn" data-i18n="backHome">Back Home</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/asset.js"></script>
+    <script src="/js/site-settings.js"></script>
+
+    <script src="/lang/en.js?v=20260706-i18n"></script>
+    <script src="/lang/th.js?v=20260706-i18n"></script>
+    <script src="/lang/my.js?v=20260706-i18n"></script>
+    <script src="/js/i18n.js?v=20260706-i18n"></script>
+
+    <script src="/js/user-state.js"></script>
+    <script src="/js/auth-check.js"></script>
+
+    <script src="/js/header-loader.js?v=20260706-i18n"></script>
+    <script src="/js/header.js?v=20260706-i18n"></script>
+
+    <script src="/js/theme.js?v=20260701"></script>
+    <script src="/js/locale-switcher.js?v=20260706-i18n"></script>
+    <script src="/js/region-payment.js?v=20260629"></script>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/prices.js?v=20260629"></script>
+    <script src="/js/payment.js?v=20260707-wallet"></script>
+
+    <script src="/js/payment/payment-utils.js?v=20260707-v3"></script>
+    <script src="/js/payment/payment-wallet.js?v=20260707-v3"></script>
+    <script src="/js/payment/payment-promptpay.js?v=20260707-v3"></script>
+    <script src="/js/payment/payment-deeplink.js?v=20260707-v3"></script>
+    <script src="/js/payment/payment-manual.js?v=20260707-v3"></script>
+    <script src="/js/payment/payment-engine.js?v=20260707-v3"></script>
+
+    <script src="/js/roblox.js?v=20260707-v3"></script>
+
+    <script src="/js/live-chat.js"></script>
+    <script src="/js/pwa-fix.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const box = document.getElementById("footerPaymentLogos");
+            if (!box) return;
+
+            const logos = {
+                MM: [
+                    window.ASSET?.payment?.("kbzpay.png") || "/assets/payment/kbzpay.png",
+                    window.ASSET?.payment?.("wavepay.png") || "/assets/payment/wavepay.png",
+                    window.ASSET?.payment?.("ayapay.png") || "/assets/payment/ayapay.png"
+                ],
+                TH: [
+                    window.ASSET?.payment?.("promptpay.png") || "/assets/payment/promptpay.png",
+                    window.ASSET?.payment?.("scb.png") || "/assets/payment/scb.png"
+                ]
+            };
+
+            function renderPaymentLogos() {
+                const region =
+                    window.AZIEL?.getRegion?.() ||
+                    window.AZIEL?.getShopRegion?.() ||
+                    localStorage.getItem("selectedRegion") ||
+                    localStorage.getItem("region") ||
+                    "MM";
+
+                box.innerHTML = "";
+
+                (logos[region] || logos.MM).forEach(src => {
+                    const img = document.createElement("img");
+                    img.src = src;
+                    img.alt = "Payment";
+                    box.appendChild(img);
+                });
+            }
+
+            renderPaymentLogos();
+            window.addEventListener("aziel:shopRegionChanged", renderPaymentLogos);
+        });
+    </script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const banner = document.getElementById("gameBanner");
+            if (banner) {
+                banner.src = window.ASSET?.game?.("roblox.webp") || "/assets/games/roblox.webp";
+            }
+
+            const icon = document.getElementById("mobilePackageIcon");
+            if (icon) {
+                icon.src = window.ASSET?.roblox?.("icons/robux.webp") || "/assets/roblox/icons/robux.webp";
+            }
+
+            window.AZIEL_I18N?.translatePage?.(document);
+        });
+    </script>
 </body>
 
 </html>

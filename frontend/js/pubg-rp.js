@@ -1,6 +1,8 @@
-// frontend/js/freefire.js - AZIEL V2.5/V3 Free Fire Flow
+// frontend/js/pubg-rp.js
+// AZIEL V2.5/V3 PUBG Mobile Royale Pass Pack
 
 document.addEventListener("DOMContentLoaded", () => {
+
     const buyBtn = document.getElementById("buyBtn");
     const userIdInput = document.getElementById("userId");
 
@@ -12,10 +14,14 @@ document.addEventListener("DOMContentLoaded", () => {
     let selectedPack = null;
 
     document.addEventListener("click", (e) => {
+
         const pack = e.target.closest(".pack");
         if (!pack) return;
 
-        document.querySelectorAll(".pack").forEach(p => p.classList.remove("active"));
+        document.querySelectorAll(".pack").forEach(p => {
+            p.classList.remove("active");
+        });
+
         pack.classList.add("active");
 
         selectedPack = {
@@ -25,6 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
         };
 
         updateState();
+
     });
 
     userIdInput?.addEventListener("input", updateState);
@@ -40,9 +47,11 @@ document.addEventListener("DOMContentLoaded", () => {
     window.addEventListener("aziel:shopRegionChanged", updateState);
 
     buyBtn?.addEventListener("click", async () => {
+
         if (buyBtn.disabled || !selectedPack) return;
 
-        const username = localStorage.getItem("username") || "guest";
+        const username =
+            localStorage.getItem("username") || "guest";
 
         const region =
             window.AZIEL?.getShopRegion?.() ||
@@ -50,38 +59,63 @@ document.addEventListener("DOMContentLoaded", () => {
             localStorage.getItem("region") ||
             "MM";
 
-        const currency = region === "TH" ? "THB" : "MMK";
-        const paymentMethod = document.getElementById("paymentMethod")?.value || "";
+        const currency =
+            region === "TH"
+                ? "THB"
+                : "MMK";
 
-        const orderId = "AZL-" + Date.now();
+        const paymentMethod =
+            document.getElementById("paymentMethod")?.value || "";
 
         const orderData = {
-            orderId,
-            game: "Free Fire",
-            gameKey: "freefire",
+
+            orderId: "AZL-" + Date.now(),
+
+            game: "PUBG Mobile Royale Pass Pack",
+
+            gameKey: "pubgrp",
+
             packageName: selectedPack.name,
+
             packageCode: selectedPack.code,
+
             amount: selectedPack.amount,
+
             currency,
+
             region,
+
             paymentMethod,
+
             username,
+
             userId: userIdInput.value.trim(),
+
             zoneId: "-",
+
             status: "pending_payment"
+
         };
 
         if (window.AZIEL_PAYMENT?.start) {
+
             window.AZIEL_PAYMENT.start(orderData);
+
             return;
+
         }
 
         alert("Payment system not ready. Please refresh and try again.");
+
     });
 
     function updateState() {
-        const userId = userIdInput?.value.trim();
-        const paymentMethod = document.getElementById("paymentMethod")?.value || "";
+
+        const userId =
+            userIdInput?.value.trim();
+
+        const paymentMethod =
+            document.getElementById("paymentMethod")?.value || "";
 
         const region =
             window.AZIEL?.getShopRegion?.() ||
@@ -89,33 +123,61 @@ document.addEventListener("DOMContentLoaded", () => {
             localStorage.getItem("region") ||
             "MM";
 
-        const currencySymbol = region === "TH" ? "฿" : "Ks";
+        const currencySymbol =
+            region === "TH"
+                ? "฿"
+                : "Ks";
 
         const paymentNameMap = {
+
             wallet: "AZIEL Wallet",
+
             kbzpay: "KBZPay",
+
             wavepay: "WavePay",
+
             ayapay: "AYA Pay",
+
             promptpay: "PromptPay",
+
             scb: "SCB"
+
         };
 
         if (selectedPack) {
-            summaryPackage.innerText = selectedPack.name;
-            summaryAmount.innerText = `${Number(selectedPack.amount || 0).toLocaleString()} ${currencySymbol}`;
-            selectedText.innerText = "Ready to checkout after completing all fields.";
+
+            summaryPackage.innerText =
+                selectedPack.name;
+
+            summaryAmount.innerText =
+                `${Number(selectedPack.amount || 0).toLocaleString()} ${currencySymbol}`;
+
+            selectedText.innerText =
+                "Ready to checkout after completing all fields.";
+
         } else {
-            summaryPackage.innerText = "Not selected";
-            summaryAmount.innerText = `0 ${currencySymbol}`;
-            selectedText.innerText = "Please select a package.";
+
+            summaryPackage.innerText =
+                "Not selected";
+
+            summaryAmount.innerText =
+                `0 ${currencySymbol}`;
+
+            selectedText.innerText =
+                "Please select a package.";
+
         }
 
-        summaryPayment.innerText = paymentMethod
-            ? paymentNameMap[paymentMethod] || paymentMethod
-            : "Not selected";
+        summaryPayment.innerText =
+            paymentMethod
+                ? paymentNameMap[paymentMethod] || paymentMethod
+                : "Not selected";
 
-        buyBtn.disabled = !(userId && selectedPack && paymentMethod);
+        buyBtn.disabled =
+            !(userId && selectedPack && paymentMethod);
+
     }
 
     updateState();
+
 });

@@ -79,6 +79,7 @@ function renderHeader() {
 function renderHeaderNav() {
     const nav = document.getElementById("azHeaderNav");
     if (!nav) return;
+
     if (nav.dataset.rendered === "true") {
         translateHeader();
         return;
@@ -88,7 +89,41 @@ function renderHeaderNav() {
 
     nav.innerHTML = `
         <a href="home.html" data-i18n="nav_home">Home</a>
-        <a href="mobile-games.html" data-i18n="nav_games">Games</a>
+
+        <div class="az-nav-dropdown" id="gamesNavDropdown">
+            <button class="az-nav-drop-btn" type="button">
+                <span data-i18n="nav_games">Games</span>
+                <i class="fa-solid fa-chevron-down"></i>
+            </button>
+
+            <div class="az-nav-drop-menu">
+                <a href="mobile-games.html">
+                    <i class="fa-solid fa-mobile-screen-button"></i>
+                    <span>Mobile Games</span>
+                </a>
+
+                <a href="pc-games.html">
+                    <i class="fa-solid fa-desktop"></i>
+                    <span>PC Games</span>
+                </a>
+
+                <a href="gift-cards.html">
+                    <i class="fa-solid fa-gift"></i>
+                    <span>Gift Cards</span>
+                </a>
+
+                <a href="social-topup.html">
+                    <i class="fa-brands fa-telegram"></i>
+                    <span>Social Top Up</span>
+                </a>
+
+                <a href="coming-soon.html">
+                    <i class="fa-regular fa-clock"></i>
+                    <span>Coming Soon</span>
+                </a>
+            </div>
+        </div>
+
         <a href="wallet.html" data-i18n="nav_wallet">Wallet</a>
         <a href="tracking.html" data-i18n="nav_orders">Orders</a>
         <a href="support.html" data-i18n="nav_support">Support</a>
@@ -96,23 +131,61 @@ function renderHeaderNav() {
 
     const active = document.getElementById("azHeaderMount")?.dataset?.nav;
 
-    if (active) {
-        nav.querySelectorAll("a").forEach(link => {
-            const href = link.getAttribute("href") || "";
+    nav.querySelectorAll("a").forEach(link => {
+        const href = link.getAttribute("href") || "";
 
-            if (
-                (active === "home" && href.includes("home")) ||
-                (active === "games" && href.includes("mobile-games")) ||
-                (active === "wallet" && href.includes("wallet")) ||
-                (active === "orders" && href.includes("tracking")) ||
-                (active === "support" && href.includes("support"))
-            ) {
-                link.classList.add("active");
-            }
-        });
+        if (
+            (active === "home" && href.includes("home")) ||
+            (active === "games" && (
+                href.includes("mobile-games") ||
+                href.includes("pc-games") ||
+                href.includes("gift-cards") ||
+                href.includes("social-topup") ||
+                href.includes("coming-soon")
+            )) ||
+            (active === "wallet" && href.includes("wallet")) ||
+            (active === "orders" && href.includes("tracking")) ||
+            (active === "support" && href.includes("support"))
+        ) {
+            link.classList.add("active");
+        }
+    });
+
+    if (active === "games") {
+        document.querySelector(".az-nav-drop-btn")?.classList.add("active");
     }
 
+    initGamesDropdown();
     translateHeader();
+}
+
+function initGamesDropdown() {
+    const dropdown = document.getElementById("gamesNavDropdown");
+    const btn = dropdown?.querySelector(".az-nav-drop-btn");
+
+    if (!dropdown || !btn) return;
+    if (dropdown.dataset.ready === "true") return;
+
+    dropdown.dataset.ready = "true";
+
+    btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        dropdown.classList.toggle("show");
+    });
+
+    dropdown.addEventListener("click", (e) => {
+        e.stopPropagation();
+    });
+
+    document.addEventListener("click", () => {
+        dropdown.classList.remove("show");
+    });
+
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+            dropdown.classList.remove("show");
+        }
+    });
 }
 
 function translateHeader() {

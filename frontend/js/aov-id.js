@@ -1,4 +1,4 @@
-// frontend/js/freefire.js - AZIEL V2.5/V3 Free Fire Flow
+// frontend/js/aov-id.js - AZIEL V2.5/V3 Arena of Valor (ID) Flow
 
 document.addEventListener("DOMContentLoaded", () => {
     const buyBtn = document.getElementById("buyBtn");
@@ -53,12 +53,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const currency = region === "TH" ? "THB" : "MMK";
         const paymentMethod = document.getElementById("paymentMethod")?.value || "";
 
-        const orderId = "AZL-" + Date.now();
-
         const orderData = {
-            orderId,
-            game: "Free Fire",
-            gameKey: "freefire",
+            orderId: "AZL-" + Date.now(),
+            game: "Arena of Valor (ID)",
+            gameKey: "aovid",
             packageName: selectedPack.name,
             packageCode: selectedPack.code,
             amount: selectedPack.amount,

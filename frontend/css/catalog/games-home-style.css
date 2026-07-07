@@ -1,0 +1,158 @@
+/* frontend/css/catalog/games-home-style.css */
+
+.games-home-page {
+    min-height: 100vh;
+    padding: 96px 14px 54px;
+}
+
+.games-hero-lite {
+    max-width: 1180px;
+    margin: 0 auto 22px;
+}
+
+.games-hero-lite span {
+    color: var(--az-primary);
+    font-weight: 900;
+    font-size: 13px;
+}
+
+.games-hero-lite h1 {
+    margin-top: 8px;
+    font-size: clamp(42px, 6vw, 72px);
+    font-weight: 950;
+    letter-spacing: -0.06em;
+    color: var(--az-text);
+}
+
+.games-hero-lite p {
+    margin-top: 10px;
+    color: var(--az-muted);
+    font-size: 16px;
+}
+
+.games-section {
+    max-width: 1180px;
+    margin: 0 auto;
+}
+
+.games-section-head {
+    margin-bottom: 18px;
+}
+
+.games-section-head h2 {
+    font-size: 30px;
+    font-weight: 950;
+    letter-spacing: -0.04em;
+    color: var(--az-text);
+}
+
+.home-game-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 20px;
+}
+
+.home-game-card {
+    overflow: hidden;
+    border-radius: 18px;
+    text-decoration: none;
+    color: var(--az-text);
+    background: var(--az-card);
+    border: 1px solid var(--az-border);
+    box-shadow: var(--az-shadow-sm);
+    transition: .25s ease;
+}
+
+.home-game-card:hover {
+    transform: translateY(-6px);
+    box-shadow: var(--az-shadow);
+}
+
+.home-game-card img {
+    width: 100%;
+    height: 150px;
+    object-fit: cover;
+    display: block;
+}
+
+.home-game-card div {
+    padding: 14px 16px 18px;
+}
+
+.home-game-card h3 {
+    font-size: 16px;
+    font-weight: 900;
+    color: var(--az-text);
+}
+
+.home-game-card p {
+    margin-top: 6px;
+    font-size: 13px;
+    color: var(--az-muted);
+}
+
+/* Tablet */
+@media (max-width: 1080px) {
+    .home-game-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+/* Desktop */
+@media (min-width: 721px) {
+    .games-home-page {
+        padding: 125px 24px 80px;
+    }
+}
+
+/* Mobile */
+@media (max-width: 720px) {
+    .games-home-page {
+        padding: 28px 14px 54px;
+    }
+
+    .games-hero-lite {
+        margin: 0 auto 12px;
+    }
+
+    .games-hero-lite span,
+    .games-hero-lite h1,
+    .games-hero-lite p {
+        display: none;
+    }
+
+    .games-section-head {
+        margin-bottom: 12px;
+    }
+
+    .games-section-head h2 {
+        display: none;
+    }
+}
+
+/* Small phones */
+@media (max-width: 380px) {
+    .home-game-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    .home-game-card img {
+        height: 110px;
+    }
+}
+
+@media (max-width: 720px) {
+    .games-home-page {
+        padding-top: -110px !important;
+        margin-top: -82px !important;
+    }
+
+    .games-hero-lite {
+        display: none !important;
+    }
+
+    .games-section {
+        margin-top: 0 !important;
+    }
+}

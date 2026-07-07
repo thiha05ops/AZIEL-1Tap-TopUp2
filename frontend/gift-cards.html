@@ -6,131 +6,120 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gift Cards - AZIEL</title>
 
-    <link rel="stylesheet" href="/css/main.css">
-    <link rel="stylesheet" href="/css/home.css">
-    <link rel="manifest" href="/manifest.json">
-    <link rel="stylesheet" href="/css/theme/aziel-header.css?v=20260701">
+    <!-- Design System -->
     <link rel="stylesheet" href="/css/theme/aziel-design-system.css?v=20260701">
+    <link rel="stylesheet" href="/css/theme/aziel-header.css?v=20260701">
+
+    <!-- Core -->
+    <link rel="stylesheet" href="/css/core/main.css">
+    <link rel="stylesheet" href="/css/core/layout.css">
+    <link rel="stylesheet" href="/css/core/components.css">
+    <link rel="stylesheet" href="/css/core/footer.css">
+
+    <!-- Theme -->
+    <link rel="stylesheet" href="/css/theme/wave-background.css">
+    <link rel="stylesheet" href="/css/theme/desktop.css">
+    <link rel="stylesheet" href="/css/theme/mobile.css">
+
+    <!-- Games Style -->
+    <link rel="stylesheet" href="/css/catalog/games-home-style.css?v=20260707">
+
+    <link rel="manifest" href="/manifest.json">
 
     <meta name="theme-color" content="#070716">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="AZIEL">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 
 <body>
 
-    <header class="home-header">
+    <!-- Shared Header -->
+    <div id="azHeaderMount" data-nav="games"></div>
 
-        <div class="logo">AZIEL</div>
+    <main class="games-home-page">
 
-        <nav class="nav-links">
-            <a href="/home.html">Home</a>
-            <a href="/gift-cards.html">Gift Cards</a>
-        </nav>
+        <section class="games-hero-lite">
+            <span>AZIEL Gift Cards</span>
+            <h1>Gift Cards</h1>
+            <p>Digital Gift Cards and Online Cards available on AZIEL.</p>
+        </section>
 
-        <div class="header-right">
+        <section class="games-section">
 
-            <input type="text" id="searchInput" placeholder="Search cards">
-
-            <div class="profile-box" id="profileBox">
-                <div class="avatar" id="avatarText">👤</div>
-                <span id="usernameText">Login</span>
-
-                <div class="profile-dropdown" id="profileDropdown">
-                    <a href="/account.html">Account</a>
-                    <a href="/notifications.html">Notifications</a>
-                    <button id="logoutBtn">Logout</button>
-                </div>
+            <div class="games-section-head">
+                <h2>Gift Cards</h2>
             </div>
 
-        </div>
+            <div class="home-game-grid">
 
-    </header>
+                <div class="home-game-card">
+                    <img src="/assets/giftcards/telegram.webp" alt="Telegram Top Up">
+                    <div>
+                        <h3>Telegram Gift Card</h3>
+                        <a href="telegram.html">
+                            <p>Top Up</p>
+                        </a>
+                    </div>
+                </div>
 
-    <main id="mainHome">
-
-        <section class="home-section">
-
-            <div class="section-head">
-                <h2>Gift Cards / Online Cards</h2>
+                <!-- <div class="home-game-card">
+                    <img src="/assets/giftcards/apple.webp" alt="Apple Gift Card    ">
+                    <div>
+                        <h3>Apple Gift Card</h3>
+                        <p>Coming Soon</p>
+                    </div> -->
             </div>
 
-            <div class="catalog-grid">
+            <!-- <div class="home-game-card">
+                    <img src="/assets/giftcards/psn.webp" alt="PlayStation PSN Gift Card">
+                    <div>
+                        <h3>PlayStation PSN</h3>
+                        <p>Coming Soon</p>
+                    </div> -->
+            </div>
 
-                <div class="catalog-card coming-soon-card" data-name="Google Play Gift Card">
+            <!-- <div class="home-game-card">
+                    <img src="/assets/giftcards/netflix.webp" alt="Netflix Gift Card">
+                    <div>
+                        <h3>Netflix</h3>
+                        <p>Coming Soon</p>
+                    </div> -->
+            </div>
 
-                    <div class="logo-card">GP</div>
-
-                    <h3>Google Play</h3>
-                    <p>Coming Soon</p>
-
-                </div>
-
-                <div class="catalog-card coming-soon-card" data-name="Apple Gift Card">
-
-                    <div class="logo-card"></div>
-
-                    <h3>Apple Gift Card</h3>
-                    <p>Coming Soon</p>
-
-                </div>
-
-                <div class="catalog-card coming-soon-card" data-name="PlayStation PSN Card">
-
-                    <div class="logo-card">PS</div>
-
-                    <h3>PSN Card</h3>
-                    <p>Coming Soon</p>
-
-                </div>
-
-                <div class="catalog-card coming-soon-card" data-name="Netflix Gift Card">
-
-                    <div class="logo-card">N</div>
-
-                    <h3>Netflix</h3>
-                    <p>Coming Soon</p>
-
-                </div>
-
-                <div class="catalog-card coming-soon-card" data-name="Xbox Gift Card">
-
-                    <div class="logo-card">XB</div>
-
+            <!-- <div class="home-game-card">
+                <img src="/assets/giftcards/xbox.webp" alt="Xbox Gift Card">
+                <div>
                     <h3>Xbox Gift Card</h3>
                     <p>Coming Soon</p>
+                </div> -->
+            </div>
 
-                </div>
-
-                <div class="catalog-card coming-soon-card" data-name="Nintendo eShop">
-
-                    <div class="logo-card">NS</div>
-
+            <!-- <div class="home-game-card">
+                <img src="/assets/giftcards/nintendo.webp" alt="Nintendo eShop Gift Card">
+                <div>
                     <h3>Nintendo eShop</h3>
                     <p>Coming Soon</p>
+                </div> -->
+            </div>
 
+            <!-- <div class="home-game-card">
+                    <img src="/assets/giftcards/razer.webp" alt="Razer Gold Gift Card">
+                    <div>
+                        <h3>Razer Gold</h3>
+                        <p>Coming Soon</p>
+                    </div>
                 </div>
 
-                <div class="catalog-card coming-soon-card" data-name="Razer Gold">
-
-                    <div class="logo-card">RG</div>
-
-                    <h3>Razer Gold</h3>
-                    <p>Coming Soon</p>
-
-                </div>
-
-                <div class="catalog-card coming-soon-card" data-name="Amazon Gift Card">
-
-                    <div class="logo-card">AM</div>
-
-                    <h3>Amazon Gift Card</h3>
-                    <p>Coming Soon</p>
-
-                </div>
+                <div class="home-game-card">
+                    <img src="/assets/giftcards/amazon.webp" alt="Amazon Gift Card">
+                    <div>
+                        <h3>Amazon Gift Card</h3>
+                        <p>Coming Soon</p>
+                    </div>
+                </div-->
 
             </div>
 
@@ -142,11 +131,19 @@
         © 2026 AZIEL 1Tap Shop
     </footer>
 
-    <script src="/js/auth-check.js"></script>
-    <script src="/js/home.js"></script>
-    <script src="/js/pwa-fix.js"></script>
+    <!-- JS -->
+
     <script src="/js/site-settings.js"></script>
-    <script src="/js/theme.js?v=20260701"></script>
+    <script src="/js/user-state.js?v=2026062905"></script>
+    <script src="/js/auth-check.js"></script>
+
+    <script src="/js/header-loader.js?v=20260702"></script>
+    <script src="/js/header.js?v=20260702"></script>
+
+    <script src="/js/locale-switcher.js"></script>
+    <script src="/js/theme.js?v=20260702"></script>
+    <script src="/js/pwa-fix.js"></script>
+
 </body>
 
 </html>

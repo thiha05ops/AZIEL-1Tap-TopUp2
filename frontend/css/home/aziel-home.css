@@ -15,7 +15,7 @@ html {
 /* PAGE WRAPPER */
 .az-home {
     width: min(var(--home-max), calc(100% - 32px));
-    margin: 24px auto 0;
+    margin: 104px auto 0;
 }
 
 /* BANNER */

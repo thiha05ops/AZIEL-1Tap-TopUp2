@@ -1,0 +1,192 @@
+/* frontend/css/catalog/games.css */
+
+.az-catalog-page {
+    min-height: 100vh;
+    padding: 10px 20px 80px;
+}
+
+.az-catalog-shell {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 28px;
+    border-radius: 28px;
+    background: var(--az-card);
+    border: 1px solid var(--az-border);
+    box-shadow: var(--az-shadow);
+}
+
+.az-catalog-breadcrumb {
+    margin-bottom: 26px;
+    font-size: 13px;
+    color: var(--az-muted);
+}
+
+.az-featured-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+    margin-bottom: 34px;
+}
+
+.az-featured-card {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    min-height: 155px;
+    overflow: hidden;
+    border-radius: 18px;
+    text-decoration: none;
+    color: #fff;
+    background: #1f2937;
+    transition: .25s ease;
+}
+
+.az-featured-card:hover {
+    transform: translateY(-5px);
+}
+
+.az-featured-card img {
+    width: 120px;
+    height: 100%;
+    object-fit: cover;
+}
+
+.az-featured-card div {
+    padding: 26px 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.az-featured-card h3 {
+    font-size: 18px;
+    font-weight: 900;
+    line-height: 1.25;
+}
+
+.az-featured-card p {
+    margin-top: 10px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, .72);
+}
+
+.az-featured-card.purple {
+    background: linear-gradient(135deg, #3b2b8f, #6574d9);
+}
+
+.az-featured-card.blue {
+    background: linear-gradient(135deg, #16345f, #0f172a);
+}
+
+.az-featured-card.pink {
+    background: linear-gradient(135deg, #8b3f74, #c084fc);
+}
+
+.az-poster-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 26px 24px;
+}
+
+.az-poster-card {
+    text-decoration: none;
+    color: var(--az-text);
+    transition: .22s ease;
+}
+
+.az-poster-card:hover {
+    transform: translateY(-5px);
+}
+
+.az-poster-card img {
+    width: 100%;
+    aspect-ratio: 1 / 1.25;
+    object-fit: cover;
+    display: block;
+    border-radius: 16px;
+    background: var(--az-soft);
+    box-shadow: var(--az-shadow-sm);
+}
+
+.az-poster-card h3 {
+    margin-top: 12px;
+    font-size: 14px;
+    font-weight: 850;
+    line-height: 1.25;
+    color: var(--az-text);
+}
+
+.az-poster-card p {
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--az-muted);
+}
+
+/* Dark mode handled by theme variables */
+body.dark .az-catalog-shell {
+    background: rgba(18, 20, 39, .72);
+    border-color: rgba(255, 255, 255, .08);
+}
+
+@media (max-width: 1100px) {
+    .az-featured-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .az-poster-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+@media (max-width: 720px) {
+    .az-catalog-page {
+        padding: 96px 12px 50px;
+    }
+
+    .az-catalog-shell {
+        padding: 18px;
+        border-radius: 22px;
+    }
+
+    .az-poster-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px 14px;
+    }
+
+    .az-featured-card {
+        grid-template-columns: 96px 1fr;
+        min-height: 130px;
+    }
+
+    .az-featured-card img {
+        width: 96px;
+    }
+
+    .az-featured-card div {
+        padding: 18px 16px;
+    }
+
+    .az-poster-card h3 {
+        font-size: 12px;
+    }
+
+    .az-poster-card p {
+        font-size: 11px;
+    }
+}
+
+@media (max-width: 720px) {
+    .az-catalog-page {
+        padding-top: 0 !important;
+        margin-top: -5px !important;
+    }
+
+    .az-catalog-shell {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+    }
+
+    .az-catalog-breadcrumb {
+        margin-top: 0 !important;
+        margin-bottom: 14px !important;
+    }
+}

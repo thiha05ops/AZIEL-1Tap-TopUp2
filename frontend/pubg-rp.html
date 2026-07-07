@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Genshin Impact - AZIEL</title>
+    <title>PUBG Mobile Royale Pass Pack - AZIEL</title>
 
     <link rel="stylesheet" href="/css/core/main.css">
     <link rel="stylesheet" href="/css/core/layout.css">
@@ -15,7 +15,6 @@
     <link rel="stylesheet" href="/css/support/live-chat.css">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#070716">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 
 <body>
@@ -24,13 +23,13 @@
     <main class="game-page">
         <section class="game-hero">
             <div class="game-banner">
-                <img id="gameBanner" alt="Genshin Impact">
+                <img id="gameBanner" alt="PUBG Mobile Royale Pass Pack">
 
                 <div class="banner-overlay">
-                    <span class="game-tag" data-i18n="animeGame">Anime Game</span>
-                    <h1 data-i18n="genshinImpact">Genshin Impact</h1>
-                    <p data-i18n="genshinHeroDescription">
-                        Fast and secure Genesis Crystal top up for Myanmar and Thailand players.
+                    <span class="game-tag" data-i18n="mobileGame">Mobile Game</span>
+                    <h1 data-i18n="pubgRoyalePass">PUBG Mobile Royale Pass Pack</h1>
+                    <p data-i18n="pubgRpHeroDescription">
+                        Fast and secure Royale Pass Pack top up for Global PUBG Mobile players.
                     </p>
                 </div>
             </div>
@@ -40,12 +39,12 @@
 
                 <div class="step-row">
                     <span>1</span>
-                    <p data-i18n="stepGenshinUid">Enter your Genshin UID and server.</p>
+                    <p data-i18n="stepPubgPlayerId">Enter your PUBG Mobile Player ID.</p>
                 </div>
 
                 <div class="step-row">
                     <span>2</span>
-                    <p data-i18n="stepGenshinPackage">Select your crystal package.</p>
+                    <p data-i18n="stepPubgRpPackage">Select your Royale Pass package.</p>
                 </div>
 
                 <div class="step-row">
@@ -59,8 +58,15 @@
                 </div>
 
                 <div class="trust-box">
-                    <span data-i18n="genshinTrust">⚡ Fast crystal delivery • 🔒 Secure payment • 📦 Order
-                        tracking</span>
+                    <span data-i18n="pubgRpTrust">
+                        ⚡ Fast RP delivery • 🔒 Secure payment • 📦 Order tracking
+                    </span>
+                </div>
+
+                <div class="trust-box">
+                    <span>
+                        🌍 Global only • Not for Japanese / Korean / Taiwan / Vietnam servers
+                    </span>
                 </div>
             </div>
         </section>
@@ -73,42 +79,35 @@
                         <h2 data-i18n="accountInformation">Account Information</h2>
                     </div>
 
-                    <label for="userId" data-i18n="uid">UID</label>
-                    <input type="text" id="userId" data-i18n-placeholder="enterGenshinUid"
-                        placeholder="Enter Genshin UID">
-
-                    <label for="serverId" data-i18n="server">Server</label>
-                    <select id="serverId">
-                        <option value="" data-i18n="selectServer">Select Server</option>
-                        <option value="Asia">Asia</option>
-                        <option value="Europe">Europe</option>
-                        <option value="America">America</option>
-                        <option value="TW/HK/MO">TW/HK/MO</option>
-                    </select>
+                    <label for="userId" data-i18n="playerId">Player ID</label>
+                    <input type="text" id="userId" data-i18n-placeholder="enterPubgPlayerId"
+                        placeholder="Enter PUBG Mobile Player ID">
                 </div>
 
                 <div class="form-card">
                     <div class="card-title">
-                        <span>💎</span>
+                        <span>🎟️</span>
                         <h2 data-i18n="selectPackage">Select Package</h2>
                     </div>
 
                     <button class="mobile-selected-package" id="openPackagePanel" type="button">
                         <div class="mobile-pack-icon">
-                            <img id="mobilePackageIcon" alt="Genshin Impact">
+                            <img id="mobilePackageIcon" alt="PUBG RP">
                         </div>
 
                         <div>
                             <strong id="mobileSelectedPackageName" data-i18n="selectTopupAmount">
                                 Select Top-Up Amount
                             </strong>
-                            <span id="mobileSelectedPackagePrice" data-i18n="choosePackage">Choose your package</span>
+                            <span id="mobileSelectedPackagePrice" data-i18n="choosePackage">
+                                Choose your package
+                            </span>
                         </div>
 
                         <b>›</b>
                     </button>
 
-                    <div class="packages" id="packages" data-game="genshin"></div>
+                    <div class="packages" id="packages" data-game="pubgrp"></div>
                 </div>
 
                 <div class="form-card">
@@ -127,7 +126,7 @@
 
                 <div class="summary-line">
                     <span data-i18n="game">Game</span>
-                    <b data-i18n="genshinImpact">Genshin Impact</b>
+                    <b data-i18n="pubgRoyalePass">PUBG Mobile Royale Pass Pack</b>
                 </div>
 
                 <div class="summary-line">
@@ -151,8 +150,8 @@
 
                 <button id="buyBtn" disabled data-i18n="continuePayment">Continue To Payment</button>
 
-                <p class="safe-note" data-i18n="safeOrderNote">
-                    Your order will be tracked in your account after payment.
+                <p class="safe-note">
+                    Global version only. Please check your server before ordering.
                 </p>
             </aside>
         </section>
@@ -188,8 +187,7 @@
                 <p><b><span data-i18n="package">Package</span>:</b> <span id="modalPackage"></span></p>
                 <p><b><span data-i18n="amount">Amount</span>:</b> <span id="modalAmount"></span></p>
                 <p><b><span data-i18n="payment">Payment</span>:</b> <span id="modalPayment"></span></p>
-                <p><b><span data-i18n="uid">UID</span>:</b> <span id="modalUserId"></span></p>
-                <p><b><span data-i18n="server">Server</span>:</b> <span id="modalZoneId"></span></p>
+                <p><b><span data-i18n="playerId">Player ID</span>:</b> <span id="modalUserId"></span></p>
             </div>
 
             <div class="payment-modal-qr">
@@ -267,7 +265,7 @@
     <script src="/js/region-payment.js?v=20260629"></script>
 
     <script src="/js/api.js"></script>
-    <script src="/js/prices.js?v=20260629"></script>
+    <script src="/js/prices.js?v=20260707-pubgrp"></script>
     <script src="/js/payment.js?v=20260707-wallet"></script>
 
     <script src="/js/payment/payment-utils.js?v=20260707-v3"></script>
@@ -277,7 +275,7 @@
     <script src="/js/payment/payment-manual.js?v=20260707-v3"></script>
     <script src="/js/payment/payment-engine.js?v=20260707-v3"></script>
 
-    <script src="/js/genshin.js?v=20260707-v3"></script>
+    <script src="/js/pubg-rp.js?v=20260707-v3"></script>
 
     <script src="/js/live-chat.js"></script>
     <script src="/js/pwa-fix.js"></script>
@@ -326,12 +324,12 @@
         document.addEventListener("DOMContentLoaded", () => {
             const banner = document.getElementById("gameBanner");
             if (banner) {
-                banner.src = window.ASSET?.game?.("genshin.webp") || "/assets/games/genshin.webp";
+                banner.src = window.ASSET?.game?.("pubg-rp.webp") || "/assets/games/pubg-rp.webp";
             }
 
             const icon = document.getElementById("mobilePackageIcon");
             if (icon) {
-                icon.src = window.ASSET?.genshin?.("icons/crystal.webp") || "/assets/genshin/icons/crystal.webp";
+                icon.src = window.ASSET?.pubgrp?.("icons/rp.webp") || "/assets/pubgrp/icons/rp.webp";
             }
 
             window.AZIEL_I18N?.translatePage?.(document);

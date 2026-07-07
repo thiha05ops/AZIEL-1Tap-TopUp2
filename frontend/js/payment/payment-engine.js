@@ -64,4 +64,5 @@
         start,
         createPaymentSession
     };
+
 })();

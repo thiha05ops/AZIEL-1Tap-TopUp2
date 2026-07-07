@@ -1,0 +1,231 @@
+/* AZIEL Typography Game Catalog */
+
+.az-games-page {
+    min-height: 100vh;
+    padding: 120px 24px 80px;
+}
+
+.az-games-wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+}
+
+.az-games-top {
+    margin-bottom: 48px;
+}
+
+.az-breadcrumb {
+    font-size: 13px;
+    color: var(--az-muted);
+    margin-bottom: 22px;
+}
+
+.az-games-title {
+    max-width: 780px;
+}
+
+.az-games-title span {
+    display: inline-flex;
+    margin-bottom: 14px;
+    padding: 7px 12px;
+    border-radius: 999px;
+    background: var(--az-primary-soft);
+    color: var(--az-primary);
+    font-size: 12px;
+    font-weight: 900;
+}
+
+.az-games-title h1 {
+    font-size: clamp(52px, 8vw, 96px);
+    line-height: .92;
+    letter-spacing: -0.075em;
+    font-weight: 950;
+    color: var(--az-text);
+}
+
+.az-games-title p {
+    max-width: 540px;
+    margin-top: 18px;
+    color: var(--az-muted);
+    font-size: 16px;
+    line-height: 1.7;
+}
+
+/* FEATURED */
+
+.az-featured-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 22px;
+    margin-bottom: 54px;
+}
+
+.az-featured-card {
+    position: relative;
+    min-height: 180px;
+    border-radius: 26px;
+    overflow: hidden;
+    display: flex;
+    text-decoration: none;
+    background: var(--az-card);
+    border: 1px solid var(--az-border);
+    box-shadow: var(--az-shadow);
+}
+
+.az-featured-card img {
+    width: 132px;
+    height: 100%;
+    object-fit: cover;
+}
+
+.az-featured-info {
+    flex: 1;
+    padding: 26px 22px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.az-featured-info small {
+    color: var(--az-primary);
+    font-weight: 900;
+    margin-bottom: 10px;
+}
+
+.az-featured-info h3 {
+    color: var(--az-text);
+    font-size: 22px;
+    line-height: 1.15;
+    letter-spacing: -0.04em;
+    font-weight: 950;
+}
+
+.az-featured-info p {
+    margin-top: 8px;
+    color: var(--az-muted);
+    font-size: 13px;
+}
+
+/* NORMAL GRID */
+
+.az-catalog-title {
+    margin-bottom: 20px;
+}
+
+.az-catalog-title span {
+    color: var(--az-primary);
+    font-size: 12px;
+    font-weight: 900;
+}
+
+.az-catalog-title h2 {
+    margin-top: 8px;
+    color: var(--az-text);
+    font-size: clamp(30px, 4vw, 48px);
+    line-height: .98;
+    letter-spacing: -0.055em;
+    font-weight: 950;
+}
+
+.az-game-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 26px 22px;
+}
+
+.az-game-card {
+    text-decoration: none;
+    color: inherit;
+    transition: transform .22s ease;
+}
+
+.az-game-card:hover {
+    transform: translateY(-6px);
+}
+
+.az-game-thumb {
+    aspect-ratio: 1 / 1.24;
+    border-radius: 18px;
+    overflow: hidden;
+    background: var(--az-card);
+    border: 1px solid var(--az-border);
+    box-shadow: var(--az-shadow-sm);
+}
+
+.az-game-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform .3s ease;
+}
+
+.az-game-card:hover img {
+    transform: scale(1.06);
+}
+
+.az-game-card h3 {
+    margin-top: 12px;
+    color: var(--az-text);
+    font-size: 15px;
+    font-weight: 850;
+    line-height: 1.25;
+}
+
+.az-game-card p {
+    margin-top: 5px;
+    color: var(--az-muted);
+    font-size: 12px;
+}
+
+.az-coming-thumb {
+    display: grid;
+    place-items: center;
+    color: var(--az-primary);
+    font-size: 28px;
+    font-weight: 950;
+    letter-spacing: -0.05em;
+}
+
+/* RESPONSIVE */
+
+@media (max-width: 1080px) {
+    .az-featured-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .az-game-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+@media (max-width: 720px) {
+    .az-games-page {
+        padding: 94px 14px 56px;
+    }
+
+    .az-games-title h1 {
+        font-size: 54px;
+    }
+
+    .az-featured-card {
+        min-height: 150px;
+    }
+
+    .az-featured-card img {
+        width: 110px;
+    }
+
+    .az-game-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 22px 14px;
+    }
+
+    .az-game-card h3 {
+        font-size: 13px;
+    }
+
+    .az-game-card p {
+        font-size: 11px;
+    }
+}

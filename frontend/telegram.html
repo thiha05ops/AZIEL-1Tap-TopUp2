@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Genshin Impact - AZIEL</title>
+    <title>Telegram Top Up - AZIEL</title>
 
     <link rel="stylesheet" href="/css/core/main.css">
     <link rel="stylesheet" href="/css/core/layout.css">
@@ -14,8 +14,8 @@
     <link rel="stylesheet" href="/css/game/payment-grid.css">
     <link rel="stylesheet" href="/css/support/live-chat.css">
     <link rel="manifest" href="/manifest.json">
+
     <meta name="theme-color" content="#070716">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 
 <body>
@@ -24,13 +24,14 @@
     <main class="game-page">
         <section class="game-hero">
             <div class="game-banner">
-                <img id="gameBanner" alt="Genshin Impact">
+                <img id="giftcards" src="/assets/giftcards/telegram.webp" alt="Telegram Top Up">
+
 
                 <div class="banner-overlay">
-                    <span class="game-tag" data-i18n="animeGame">Anime Game</span>
-                    <h1 data-i18n="genshinImpact">Genshin Impact</h1>
-                    <p data-i18n="genshinHeroDescription">
-                        Fast and secure Genesis Crystal top up for Myanmar and Thailand players.
+                    <span class="game-tag" data-i18n="socialTopup">Social Top Up</span>
+                    <h1 data-i18n="telegramTopup">Telegram Top Up</h1>
+                    <p data-i18n="telegramHeroDescription">
+                        Fast and secure Telegram Stars and Premium top up for global users.
                     </p>
                 </div>
             </div>
@@ -40,12 +41,12 @@
 
                 <div class="step-row">
                     <span>1</span>
-                    <p data-i18n="stepGenshinUid">Enter your Genshin UID and server.</p>
+                    <p data-i18n="stepTelegramUser">Enter your Telegram username or phone number.</p>
                 </div>
 
                 <div class="step-row">
                     <span>2</span>
-                    <p data-i18n="stepGenshinPackage">Select your crystal package.</p>
+                    <p data-i18n="stepTelegramPackage">Select Stars or Premium package.</p>
                 </div>
 
                 <div class="step-row">
@@ -59,8 +60,9 @@
                 </div>
 
                 <div class="trust-box">
-                    <span data-i18n="genshinTrust">⚡ Fast crystal delivery • 🔒 Secure payment • 📦 Order
-                        tracking</span>
+                    <span data-i18n="telegramTrust">
+                        ⚡ Fast delivery • 🔒 Secure payment • 📦 Order tracking
+                    </span>
                 </div>
             </div>
         </section>
@@ -73,42 +75,35 @@
                         <h2 data-i18n="accountInformation">Account Information</h2>
                     </div>
 
-                    <label for="userId" data-i18n="uid">UID</label>
-                    <input type="text" id="userId" data-i18n-placeholder="enterGenshinUid"
-                        placeholder="Enter Genshin UID">
-
-                    <label for="serverId" data-i18n="server">Server</label>
-                    <select id="serverId">
-                        <option value="" data-i18n="selectServer">Select Server</option>
-                        <option value="Asia">Asia</option>
-                        <option value="Europe">Europe</option>
-                        <option value="America">America</option>
-                        <option value="TW/HK/MO">TW/HK/MO</option>
-                    </select>
+                    <label for="userId" data-i18n="telegramAccount">Telegram Username / Phone Number</label>
+                    <input type="text" id="userId" data-i18n-placeholder="enterTelegramAccount"
+                        placeholder="Enter Telegram username or phone number">
                 </div>
 
                 <div class="form-card">
                     <div class="card-title">
-                        <span>💎</span>
+                        <span>⭐</span>
                         <h2 data-i18n="selectPackage">Select Package</h2>
                     </div>
 
                     <button class="mobile-selected-package" id="openPackagePanel" type="button">
                         <div class="mobile-pack-icon">
-                            <img id="mobilePackageIcon" alt="Genshin Impact">
+                            <img id="mobilePackageIcon" alt="Telegram">
                         </div>
 
                         <div>
                             <strong id="mobileSelectedPackageName" data-i18n="selectTopupAmount">
                                 Select Top-Up Amount
                             </strong>
-                            <span id="mobileSelectedPackagePrice" data-i18n="choosePackage">Choose your package</span>
+                            <span id="mobileSelectedPackagePrice" data-i18n="choosePackage">
+                                Choose your package
+                            </span>
                         </div>
 
                         <b>›</b>
                     </button>
 
-                    <div class="packages" id="packages" data-game="genshin"></div>
+                    <div class="packages" id="packages" data-game="telegram"></div>
                 </div>
 
                 <div class="form-card">
@@ -126,8 +121,8 @@
                 <h2 data-i18n="orderSummary">Order Summary</h2>
 
                 <div class="summary-line">
-                    <span data-i18n="game">Game</span>
-                    <b data-i18n="genshinImpact">Genshin Impact</b>
+                    <span data-i18n="product">Product</span>
+                    <b data-i18n="telegramTopup">Telegram Top Up</b>
                 </div>
 
                 <div class="summary-line">
@@ -184,12 +179,11 @@
 
             <div class="payment-modal-summary">
                 <p><b><span data-i18n="orderId">Order ID</span>:</b> <span id="modalOrderId"></span></p>
-                <p><b><span data-i18n="game">Game</span>:</b> <span id="modalGame"></span></p>
+                <p><b><span data-i18n="product">Product</span>:</b> <span id="modalGame"></span></p>
                 <p><b><span data-i18n="package">Package</span>:</b> <span id="modalPackage"></span></p>
                 <p><b><span data-i18n="amount">Amount</span>:</b> <span id="modalAmount"></span></p>
                 <p><b><span data-i18n="payment">Payment</span>:</b> <span id="modalPayment"></span></p>
-                <p><b><span data-i18n="uid">UID</span>:</b> <span id="modalUserId"></span></p>
-                <p><b><span data-i18n="server">Server</span>:</b> <span id="modalZoneId"></span></p>
+                <p><b><span data-i18n="telegramAccount">Telegram Account</span>:</b> <span id="modalUserId"></span></p>
             </div>
 
             <div class="payment-modal-qr">
@@ -239,7 +233,9 @@
             <div class="success-icon">✓</div>
 
             <h2 data-i18n="paymentSuccess">Payment Success</h2>
-            <p data-i18n="paymentDetected">Your payment has been detected. Admin will process your top-up soon.</p>
+            <p data-i18n="paymentDetected">
+                Your payment has been detected. Admin will process your top-up soon.
+            </p>
 
             <div class="success-actions">
                 <button id="trackOrderBtn" data-i18n="trackOrder">Track Order</button>
@@ -267,7 +263,7 @@
     <script src="/js/region-payment.js?v=20260629"></script>
 
     <script src="/js/api.js"></script>
-    <script src="/js/prices.js?v=20260629"></script>
+    <script src="/js/prices.js?v=20260707-telegram"></script>
     <script src="/js/payment.js?v=20260707-wallet"></script>
 
     <script src="/js/payment/payment-utils.js?v=20260707-v3"></script>
@@ -277,7 +273,7 @@
     <script src="/js/payment/payment-manual.js?v=20260707-v3"></script>
     <script src="/js/payment/payment-engine.js?v=20260707-v3"></script>
 
-    <script src="/js/genshin.js?v=20260707-v3"></script>
+    <script src="/js/telegram.js?v=20260707-v3"></script>
 
     <script src="/js/live-chat.js"></script>
     <script src="/js/pwa-fix.js"></script>
@@ -326,12 +322,12 @@
         document.addEventListener("DOMContentLoaded", () => {
             const banner = document.getElementById("gameBanner");
             if (banner) {
-                banner.src = window.ASSET?.game?.("genshin.webp") || "/assets/games/genshin.webp";
+                banner.src = window.ASSET?.game?.("telegram.webp") || "/assets/games/telegram.webp";
             }
 
             const icon = document.getElementById("mobilePackageIcon");
             if (icon) {
-                icon.src = window.ASSET?.genshin?.("icons/crystal.webp") || "/assets/genshin/icons/crystal.webp";
+                icon.src = window.ASSET?.telegram?.("icons/stars.webp") || "/assets/telegram/icons/stars.webp";
             }
 
             window.AZIEL_I18N?.translatePage?.(document);
