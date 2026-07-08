@@ -36,16 +36,7 @@ document.addEventListener("DOMContentLoaded", () => {
             amount: Number(pack.dataset.price || 0)
         };
 
-        const selectedIcon =
-            pack.querySelector(".pack-icon img")?.src ||
-            "assets/mlbb/icons/small.webp";
 
-        const mobilePreviewIcon =
-            document.querySelector(".mobile-pack-icon img");
-
-        if (mobilePreviewIcon) {
-            mobilePreviewIcon.src = selectedIcon;
-        }
 
         updateState();
     });
@@ -178,7 +169,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function initMobilePackagePanel() {
-        const openBtn = document.getElementById("openPackagePanel");
+        const openBtn = document.getElementById("selectedPackagePreview");
         const closeBtn = document.getElementById("closePackagePanel");
         const confirmBtn = document.getElementById("confirmPackagePanel");
         const panel = document.getElementById("mobilePackagePanel");
@@ -241,24 +232,62 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function updateMobileSelectedPackage() {
         const active = document.querySelector("#packages .pack.active");
-        const nameEl = document.getElementById("mobileSelectedPackageName");
-        const priceEl = document.getElementById("mobileSelectedPackagePrice");
+
+        const preview = document.getElementById("selectedPackagePreview");
+
+        const iconEl =
+            document.getElementById("selectedPackageIcon") ||
+            document.getElementById("mobilePackageIcon");
+
+        const nameEl =
+            document.getElementById("selectedPackageTitle") ||
+            document.getElementById("mobileSelectedPackageName");
+
+        const priceEl =
+            document.getElementById("selectedPackageSubtitle") ||
+            document.getElementById("mobileSelectedPackagePrice");
+
+        const codeEl = document.getElementById("selectedPackageCode");
 
         if (!nameEl || !priceEl) return;
 
         if (!active) {
+            preview?.classList.remove("selected", "has-package");
+
+            if (iconEl) {
+                iconEl.src = "/assets/mlbb/icons/small.webp";
+            }
+
             nameEl.innerText = "Select Top-Up Amount";
             priceEl.innerText = "Choose your package";
+
+            if (codeEl) codeEl.innerText = "";
+
             return;
         }
 
-        nameEl.innerText =
+        const name =
             active.dataset.name ||
             active.querySelector(".pack-name")?.innerText ||
             "Selected Package";
 
-        priceEl.innerText =
-            active.querySelector(".pack-price")?.innerText || "";
+        const price =
+            active.querySelector(".pack-price")?.innerText ||
+            "";
+
+        const icon =
+            active.dataset.icon ||
+            active.querySelector(".pack-icon img")?.src ||
+            "/assets/mlbb/icons/small.webp";
+
+        preview?.classList.add("selected", "has-package");
+
+        if (iconEl) iconEl.src = icon;
+
+        nameEl.innerText = name;
+        priceEl.innerText = price;
+
+        if (codeEl) codeEl.innerText = "";
     }
 
     function scrollToBuyNowOnce() {

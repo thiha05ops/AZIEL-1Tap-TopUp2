@@ -1,33 +1,60 @@
 /* =========================
+   AZIEL COMPONENTS V2.5
+   Theme-safe Shared Components
+========================= */
+
+/* =========================
    SECTION
 ========================= */
 
 .az-section {
     margin-top: 42px;
+    position: relative;
+    z-index: 2;
 }
 
 .az-section-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 16px;
     margin-bottom: 18px;
+    padding: 0 4px;
 }
 
 .az-section-head h2 {
+    margin: 0;
+    color: var(--text, #0f172a);
     font-size: 28px;
-    font-weight: 800;
-    color: #0f172a;
+    font-weight: 950;
+    letter-spacing: -0.04em;
 }
 
 .az-section-head p {
-    color: #64748b;
-    margin-top: 4px;
+    margin: 4px 0 0;
+    color: var(--text-muted, #64748b);
 }
 
-.az-section-head a {
-    color: #7c3aed;
-    font-weight: 700;
+.az-section-head a,
+.az-view-all {
+    color: var(--primary, #7c3aed);
+    font-size: 13px;
+    font-weight: 900;
     text-decoration: none;
+}
+
+.az-section-head a:hover,
+.az-view-all:hover {
+    opacity: .82;
+}
+
+/* =========================
+   CONTAINER
+========================= */
+
+.az-container {
+    width: min(1400px, 96%);
+    margin-inline: auto;
 }
 
 /* =========================
@@ -35,9 +62,9 @@
 ========================= */
 
 .az-game-grid {
+    width: 100%;
     display: grid;
-    grid-template-columns:
-        repeat(auto-fill, minmax(240px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
     gap: 18px;
 }
 
@@ -46,49 +73,71 @@
 ========================= */
 
 .az-game-card {
-    background: rgba(21, 29, 49, .92);
+    position: relative;
+    overflow: hidden;
 
-    border: 1px solid var(--border);
+    border-radius: 22px;
+    background: rgba(255, 255, 255, .66);
+    border: 1px solid rgba(255, 255, 255, .70);
 
-    box-shadow: var(--shadow);
+    color: var(--text, #0f172a);
+    text-decoration: none;
+
+    box-shadow:
+        0 18px 50px rgba(31, 41, 55, .10),
+        inset 0 1px 0 rgba(255, 255, 255, .60);
+
+    backdrop-filter: blur(20px) saturate(170%);
+    -webkit-backdrop-filter: blur(20px) saturate(170%);
+
+    transition:
+        transform .25s ease,
+        box-shadow .25s ease,
+        border-color .25s ease;
 }
 
 .az-game-card:hover {
     transform: translateY(-6px);
-
+    border-color: rgba(139, 92, 246, .42);
     box-shadow:
-        0 18px 40px rgba(15, 23, 42, 0.12);
+        0 28px 70px rgba(139, 92, 246, .18),
+        inset 0 1px 0 rgba(255, 255, 255, .72);
 }
 
-/* =========================
-   GAME IMAGE
-========================= */
+.az-game-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+        linear-gradient(135deg,
+            rgba(255, 255, 255, .22),
+            transparent 34%);
+}
 
 .az-game-card img {
     width: 100%;
     height: 150px;
     object-fit: cover;
-
     display: block;
+    background: rgba(255, 255, 255, .12);
 }
-
-/* =========================
-   GAME INFO
-========================= */
 
 .az-game-info {
     padding: 16px;
 }
 
 .az-game-info h3 {
-    color: #0f172a;
+    margin: 0 0 6px;
+    color: var(--text, #0f172a);
     font-size: 18px;
-    font-weight: 800;
-    margin-bottom: 6px;
+    font-weight: 950;
+    line-height: 1.15;
 }
 
 .az-game-info p {
-    color: #64748b;
+    margin: 0;
+    color: var(--text-muted, #64748b);
     font-size: 14px;
 }
 
@@ -98,23 +147,20 @@
 
 .az-game-badge {
     position: absolute;
-
     top: 14px;
     right: 14px;
-
-    background: #22c55e;
-
-    color: white;
-
-    font-size: 12px;
-
-    font-weight: 700;
+    z-index: 3;
 
     padding: 6px 12px;
-
     border-radius: 999px;
 
-    z-index: 2;
+    background: #22c55e;
+    color: #fff;
+
+    font-size: 12px;
+    font-weight: 900;
+
+    box-shadow: 0 10px 24px rgba(34, 197, 94, .28);
 }
 
 /* =========================
@@ -123,71 +169,82 @@
 
 .az-hero {
     position: relative;
-
     height: 420px;
-
-    border-radius: 30px;
+    margin-top: 22px;
 
     overflow: hidden;
+    border-radius: 30px;
 
     background:
-        linear-gradient(135deg,
-            #0f172a,
-            #020617);
+        linear-gradient(135deg, #111827, #020617);
 
-    margin-top: 22px;
+    border: 1px solid rgba(255, 255, 255, .08);
+
+    box-shadow:
+        0 25px 60px rgba(0, 0, 0, .35);
+
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+}
+
+.az-hero::before {
+    content: "";
+    position: absolute;
+    width: 420px;
+    height: 420px;
+    right: -140px;
+    top: -140px;
+    pointer-events: none;
+
+    background:
+        radial-gradient(circle,
+            rgba(124, 58, 237, .32),
+            transparent 70%);
 }
 
 .az-hero img {
     width: 100%;
     height: 100%;
     object-fit: cover;
-
-    opacity: 0.55;
+    opacity: .55;
 }
 
 .az-hero-overlay {
     position: absolute;
     inset: 0;
-
     background:
         linear-gradient(90deg,
-            rgba(2, 6, 23, 0.92),
-            rgba(2, 6, 23, 0.25));
+            rgba(2, 6, 23, .92),
+            rgba(2, 6, 23, .25));
 }
 
 .az-hero-content {
     position: absolute;
-
     top: 50%;
     left: 60px;
-
-    transform: translateY(-50%);
+    z-index: 2;
 
     max-width: 520px;
 
-    z-index: 2;
+    transform: translateY(-50%);
 }
 
 .az-hero-content h1 {
+    margin: 18px 0;
+
+    color: #fff;
     font-size: 62px;
     line-height: 1.02;
-
-    font-weight: 900;
-
-    color: white;
-
-    margin: 18px 0;
+    font-weight: 950;
+    letter-spacing: -0.055em;
 }
 
 .az-hero-content p {
-    color: rgba(255, 255, 255, 0.82);
+    margin: 0 0 28px;
 
+    color: rgba(255, 255, 255, .76);
     font-size: 18px;
-
     line-height: 1.7;
-
-    margin-bottom: 28px;
 }
 
 /* =========================
@@ -196,52 +253,76 @@
 
 .az-badge {
     display: inline-flex;
-
     align-items: center;
 
-    background:
-        rgba(255, 255, 255, 0.12);
-
-    color: white;
-
-    border:
-        1px solid rgba(255, 255, 255, 0.16);
-
-    backdrop-filter: blur(14px);
-
     padding: 10px 18px;
-
     border-radius: 999px;
 
-    font-size: 13px;
+    color: #fff;
+    background: rgba(255, 255, 255, .12);
+    border: 1px solid rgba(255, 255, 255, .16);
 
-    font-weight: 700;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+
+    font-size: 13px;
+    font-weight: 850;
 }
 
 /* =========================
-   SEARCH DROPDOWN
+   SEARCH
 ========================= */
+
+.az-search {
+    position: relative;
+}
+
+.az-search input {
+    width: 100%;
+    min-height: 48px;
+
+    padding: 0 16px;
+    border-radius: 16px;
+
+    background: rgba(255, 255, 255, .68);
+    border: 1px solid rgba(255, 255, 255, .72);
+
+    color: var(--text, #0f172a);
+
+    outline: none;
+
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+}
+
+.az-search input::placeholder {
+    color: var(--text-muted, #64748b);
+}
 
 .search-dropdown {
     position: absolute;
     top: 58px;
     left: 0;
+    z-index: 9999;
+
     width: 100%;
 
-    background: rgba(255, 255, 255, .96);
-    backdrop-filter: blur(18px);
-
-    border-radius: 20px;
     overflow: hidden;
+    border-radius: 20px;
+
+    background: rgba(255, 255, 255, .92);
+    border: 1px solid rgba(255, 255, 255, .72);
 
     box-shadow: 0 20px 45px rgba(15, 23, 42, .14);
+
+    backdrop-filter: blur(20px) saturate(170%);
+    -webkit-backdrop-filter: blur(20px) saturate(170%);
 
     opacity: 0;
     pointer-events: none;
     transform: translateY(10px);
-    transition: .22s ease;
 
-    z-index: 9999;
+    transition: .22s ease;
 }
 
 .search-dropdown.show {
@@ -256,7 +337,8 @@
     gap: 12px;
 
     padding: 12px;
-    color: var(--text);
+
+    color: var(--text, #0f172a);
     text-decoration: none;
 
     transition: .2s ease;
@@ -269,36 +351,61 @@
 .search-item img {
     width: 48px;
     height: 48px;
+
     border-radius: 14px;
     object-fit: cover;
 }
 
 .search-item h4 {
+    margin: 0 0 4px;
     font-size: 14px;
-    margin-bottom: 4px;
 }
 
 .search-item p {
+    margin: 0;
+    color: var(--text-muted, #64748b);
     font-size: 12px;
-    color: var(--muted);
 }
 
 .no-search {
     padding: 15px;
+
     text-align: center;
-    color: var(--muted);
+    color: var(--text-muted, #64748b);
     font-size: 13px;
 }
 
 /* =========================
-   FOOTER MARKETPLACE POLISH
+   BUTTON HELPERS
+========================= */
+
+.az-btn-light,
+.notification-btn,
+.az-mini-card,
+.az-card {
+    background: rgba(255, 255, 255, .66);
+    border: 1px solid rgba(255, 255, 255, .72);
+    color: var(--text, #0f172a);
+
+    box-shadow:
+        0 18px 50px rgba(31, 41, 55, .10),
+        inset 0 1px 0 rgba(255, 255, 255, .60);
+
+    backdrop-filter: blur(18px) saturate(170%);
+    -webkit-backdrop-filter: blur(18px) saturate(170%);
+}
+
+/* =========================
+   FOOTER
 ========================= */
 
 .az-footer {
-    margin-top: 20px;
-    background: #ffffff;
-    border-top: 1px solid var(--border);
-    padding: 42px 0 24px;
+    margin-top: 46px;
+    padding: 42px 0 95px;
+
+    background: transparent;
+    border-top: 1px solid var(--border, rgba(148, 163, 184, .22));
+    color: var(--text, #0f172a);
 }
 
 .az-footer-container {
@@ -313,18 +420,24 @@
 }
 
 .az-footer-box h3 {
+    margin: 0 0 16px;
+    color: var(--text, #0f172a);
     font-size: 18px;
-    margin-bottom: 16px;
-    color: var(--text);
 }
 
 .az-footer-box a,
 .az-footer-box p {
     display: block;
-    color: var(--muted);
-    margin-bottom: 10px;
-    line-height: 1.6;
+
+    margin: 0 0 10px;
+
+    color: var(--text-muted, #64748b);
     font-size: 14px;
+    line-height: 1.6;
+}
+
+.az-footer-box a {
+    text-decoration: none;
 }
 
 .payment-logos {
@@ -337,314 +450,104 @@
 .payment-logos img {
     height: 42px;
     max-width: 115px;
-    object-fit: contain;
-    background: #f9fafb;
+
     padding: 8px 12px;
+
+    object-fit: contain;
+
     border-radius: 12px;
-    border: 1px solid var(--border);
-}
-
-@media (max-width: 768px) {
-    .az-footer {
-        padding-bottom: 120px;
-    }
-
-    .az-footer-grid {
-        grid-template-columns: 1fr;
-        gap: 26px;
-    }
+    background: rgba(255, 255, 255, .68);
+    border: 1px solid rgba(255, 255, 255, .72);
 }
 
 /* =========================
-   DARK HERO
+   DARK THEME SAFE
 ========================= */
 
-.az-hero {
-    background:
-        linear-gradient(135deg,
-            #111827,
-            #020617);
-
-    border:
-        1px solid rgba(255, 255, 255, .05);
+body.theme-dark .az-game-card,
+body.dark .az-game-card,
+body.theme-dark .az-card,
+body.dark .az-card,
+body.theme-dark .az-mini-card,
+body.dark .az-mini-card,
+body.theme-dark .notification-btn,
+body.dark .notification-btn,
+body.theme-dark .az-btn-light,
+body.dark .az-btn-light {
+    background: rgba(18, 22, 38, .82);
+    border-color: rgba(255, 255, 255, .10);
+    color: #fff;
 
     box-shadow:
-        0 25px 60px rgba(0, 0, 0, .45);
+        0 24px 70px rgba(0, 0, 0, .36),
+        inset 0 1px 0 rgba(255, 255, 255, .10);
 }
 
-.az-hero img {
-    opacity: .52;
+body.theme-dark .az-game-info h3,
+body.dark .az-game-info h3,
+body.theme-dark .az-section-head h2,
+body.dark .az-section-head h2,
+body.theme-dark .az-footer-box h3,
+body.dark .az-footer-box h3 {
+    color: #fff;
 }
 
-.az-hero-overlay {
-    background:
-        linear-gradient(90deg,
-            rgba(2, 6, 23, .92),
-            rgba(2, 6, 23, .25));
+body.theme-dark .az-game-info p,
+body.dark .az-game-info p,
+body.theme-dark .az-section-head p,
+body.dark .az-section-head p,
+body.theme-dark .az-footer-box a,
+body.dark .az-footer-box a,
+body.theme-dark .az-footer-box p,
+body.dark .az-footer-box p {
+    color: rgba(255, 255, 255, .68);
 }
 
-.az-hero-content h1 {
-    color: #ffffff;
+body.theme-dark .az-search input,
+body.dark .az-search input {
+    background: rgba(255, 255, 255, .07);
+    border-color: rgba(255, 255, 255, .10);
+    color: #fff;
 }
 
-.az-hero-content p {
-    color:
-        rgba(255, 255, 255, .72);
+body.theme-dark .az-search input::placeholder,
+body.dark .az-search input::placeholder {
+    color: rgba(255, 255, 255, .42);
 }
 
-/* =========================
-   SEARCH
-========================= */
-
-.az-search input {
-    background:
-        rgba(255, 255, 255, .05);
-
-    border:
-        1px solid rgba(255, 255, 255, .06);
-
-    color: #ffffff;
+body.theme-dark .search-dropdown,
+body.dark .search-dropdown {
+    background: rgba(18, 22, 38, .92);
+    border-color: rgba(255, 255, 255, .10);
 }
 
-.az-search input::placeholder {
-    color:
-        rgba(255, 255, 255, .42);
+body.theme-dark .search-item,
+body.dark .search-item {
+    color: #fff;
 }
 
-
-
-/* FORCE DARK THEME */
-body {
-    background:
-        radial-gradient(circle at top right, rgba(124, 58, 237, .18), transparent 30%),
-        linear-gradient(180deg, #0b1020, #0f172a) !important;
-    color: #f8fafc !important;
+body.theme-dark .search-item p,
+body.dark .search-item p,
+body.theme-dark .no-search,
+body.dark .no-search {
+    color: rgba(255, 255, 255, .62);
 }
 
-.az-page,
-#mainHome {
-    background: transparent !important;
+body.theme-dark .az-footer,
+body.dark .az-footer {
+    border-top-color: rgba(255, 255, 255, .08);
 }
 
-
-.az-section-head p,
-.az-game-info p {
-    color: #94a3b8 !important;
-}
-
-.az-game-card,
-.az-card,
-.az-mini-card,
-
-.notification-btn,
-.az-btn-light {
-    background: rgba(21, 29, 49, .95) !important;
-    border: 1px solid rgba(255, 255, 255, .07) !important;
-    color: #ffffff !important;
-}
-
-
-
-.az-search input {
-    background: rgba(255, 255, 255, .06) !important;
-    color: #ffffff !important;
-    border: 1px solid rgba(255, 255, 255, .08) !important;
-}
-
-/* =========================
-   FOOTER DARK
-========================= */
-
-.az-footer {
-    background:
-        linear-gradient(to bottom,
-            #0f172a,
-            #020617) !important;
-
-    border-top:
-        1px solid rgba(255, 255, 255, .06);
-
-    color: #ffffff;
-}
-
-.az-footer a,
-.az-footer p,
-.az-footer span {
-    color:
-        rgba(255, 255, 255, .68) !important;
-}
-
-/* =========================
-   FULL WIDTH LAYOUT
-========================= */
-
-.az-container {
-    width: min(1400px, 96%) !important;
-}
-
-.az-game-grid {
-    width: 100%;
-}
-
-/* =========================
-   SECTION SPACE
-========================= */
-
-.az-section {
-    margin-top: 42px;
-}
-
-.az-section-head {
-    margin-bottom: 18px;
-}
-
-/* =========================
-   VIEW ALL
-========================= */
-
-.az-view-all {
-    color: #a855f7 !important;
-    font-weight: 700;
-}
-
-/* =========================
-   MARKETPLACE SECTION POLISH
-========================= */
-
-.az-section-head {
-    padding: 0 4px;
-}
-
-.az-section-head h2 {
-    letter-spacing: .2px;
-}
-
-.az-section-head a {
-    color: #a855f7 !important;
-    font-weight: 800;
-}
-
-.az-game-card {
-    background:
-        linear-gradient(135deg,
-            rgba(30, 41, 59, .95),
-            rgba(15, 23, 42, .95)) !important;
-}
-
-.az-game-card img {
+body.theme-dark .payment-logos img,
+body.dark .payment-logos img {
     background: rgba(255, 255, 255, .08);
-}
-
-.az-game-card:hover {
-    border-color: rgba(168, 85, 247, .35) !important;
-    box-shadow:
-        0 18px 45px rgba(124, 58, 237, .18) !important;
-}
-
-/* Payment logo dark fix */
-.payment-logos img {
-    background: rgba(255, 255, 255, .08) !important;
-    border: 1px solid rgba(255, 255, 255, .08) !important;
+    border-color: rgba(255, 255, 255, .10);
 }
 
 /* =========================
-   PREMIUM GLASS EFFECT
+   MOBILE BOTTOM NAV
 ========================= */
 
-.az-game-card,
-.az-hero,
-
-.az-search input,
-.az-btn-light,
-.az-footer,
-.az-mini-card {
-    backdrop-filter: blur(18px);
-}
-
-/* =========================
-   FLOATING SECTIONS
-========================= */
-
-.az-section {
-    position: relative;
-    z-index: 2;
-}
-
-.az-section::before {
-    content: "";
-
-    position: absolute;
-
-    inset: -10px;
-
-    background:
-        radial-gradient(circle,
-            rgba(124, 58, 237, .08),
-            transparent 70%);
-
-    opacity: .7;
-
-    z-index: -1;
-
-    pointer-events: none;
-}
-
-/* =========================
-   PREMIUM CARD EDGE
-========================= */
-
-.az-game-card::after {
-    content: "";
-
-    position: absolute;
-
-    inset: 0;
-
-    background:
-        linear-gradient(135deg,
-            rgba(255, 255, 255, .05),
-            transparent 30%);
-
-    pointer-events: none;
-}
-
-/* =========================
-   HERO GLOW
-========================= */
-
-.az-hero::before {
-    content: "";
-
-    position: absolute;
-
-    width: 400px;
-    height: 400px;
-
-    right: -120px;
-    top: -120px;
-
-    background:
-        radial-gradient(circle,
-            rgba(124, 58, 237, .28),
-            transparent 70%);
-
-    pointer-events: none;
-}
-
-/* =========================
-   HOVER FEEL
-========================= */
-
-.az-game-card:hover {
-    transform:
-        translateY(-8px) scale(1.01);
-
-    transition: .28s ease;
-}
-
-
-
-/* GLOBAL MOBILE BOTTOM NAV */
 .az-bottom-nav {
     display: none;
 }
@@ -655,27 +558,50 @@ body {
         left: 12px;
         right: 12px;
         bottom: 14px;
+        z-index: 99999;
+
         height: 72px;
-        background: rgba(255, 255, 255, .92);
-        backdrop-filter: blur(18px);
-        border-radius: 24px;
+
         display: flex;
         align-items: center;
         justify-content: space-around;
-        z-index: 99999;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, .18);
+
+        border-radius: 24px;
+
+        background: rgba(255, 255, 255, .84);
+        border: 1px solid rgba(255, 255, 255, .74);
+
+        box-shadow:
+            0 18px 45px rgba(31, 41, 55, .16),
+            inset 0 1px 0 rgba(255, 255, 255, .64);
+
+        backdrop-filter: blur(22px) saturate(170%);
+        -webkit-backdrop-filter: blur(22px) saturate(170%);
+    }
+
+    body.theme-dark .az-bottom-nav,
+    body.dark .az-bottom-nav {
+        background: rgba(18, 22, 38, .84);
+        border-color: rgba(255, 255, 255, .10);
+
+        box-shadow:
+            0 20px 60px rgba(0, 0, 0, .36),
+            inset 0 1px 0 rgba(255, 255, 255, .10);
     }
 
     .az-bottom-nav a {
         flex: 1;
-        text-decoration: none;
-        color: #7b8191;
+
         display: flex;
         flex-direction: column;
         align-items: center;
         gap: 4px;
+
+        color: var(--text-muted, #7b8191);
+        text-decoration: none;
+
         font-size: 11px;
-        font-weight: 800;
+        font-weight: 850;
     }
 
     .az-bottom-nav a i {
@@ -683,10 +609,57 @@ body {
     }
 
     .az-bottom-nav a.active {
-        color: #7c3aed;
+        color: var(--primary, #7c3aed);
     }
 
     body {
         padding-bottom: 96px;
+    }
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 768px) {
+    .az-section {
+        margin-top: 32px;
+    }
+
+    .az-section-head h2 {
+        font-size: 22px;
+    }
+
+    .az-game-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 14px;
+    }
+
+    .az-hero {
+        height: 320px;
+        border-radius: 24px;
+    }
+
+    .az-hero-content {
+        left: 24px;
+        right: 24px;
+        max-width: none;
+    }
+
+    .az-hero-content h1 {
+        font-size: 38px;
+    }
+
+    .az-hero-content p {
+        font-size: 14px;
+    }
+
+    .az-footer {
+        padding-bottom: 120px;
+    }
+
+    .az-footer-grid {
+        grid-template-columns: 1fr;
+        gap: 26px;
     }
 }

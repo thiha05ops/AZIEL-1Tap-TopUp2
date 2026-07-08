@@ -17,6 +17,7 @@
     display: grid;
     grid-template-columns: 1.55fr 1fr;
     gap: 22px;
+    margin-top: 55px;
     margin-bottom: 22px;
 }
 
@@ -688,7 +689,7 @@
 ========================= */
 
 .game-mini-footer {
-    margin-top: 60px;
+    margin-top: 20px;
 }
 
 /* =========================
@@ -698,7 +699,7 @@
 @media (max-width: 900px) {
     .game-page {
         width: calc(100% - 24px);
-        padding-top: 18px;
+        padding-top: -0%;
     }
 
     .game-hero,

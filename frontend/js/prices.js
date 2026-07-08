@@ -1,4 +1,4 @@
-// frontend/js/prices.js - AZIEL V2.5 Shop Region Prices + Asset Manager
+// frontend/js/prices.js - AZIEL V2.5 Shop Region Prices + Package Select Engine
 
 function assetFallback(path) {
   return path.replace(/^\/+/, "");
@@ -23,6 +23,7 @@ function hokIcon(file) {
 function aovidIcon(file) {
   return window.ASSET?.aovid?.(`icons/${file}`) || assetFallback(`assets/aovid/icons/${file}`);
 }
+
 function pubgrpIcon(file) {
   return window.ASSET?.pubgrp?.(`icons/${file}`) || assetFallback(`assets/pubgrp/icons/${file}`);
 }
@@ -30,12 +31,12 @@ function pubgrpIcon(file) {
 function telegramIcon(file) {
   return window.ASSET?.telegram?.(`icons/${file}`) || assetFallback(`assets/telegram/icons/${file}`);
 }
+
 function genshinIcon(file) {
   return window.ASSET?.genshin?.(`icons/${file}`) || assetFallback(`assets/genshin/icons/${file}`);
 }
+
 const GAME_PRICES = {
-
-
   mlbb: [
     { name: "Weekly Pass 1x", mmk: 6800, thb: 55, code: "MLBB_WEEKLY_1X", icon: mlbbIcon("weekly.webp") },
     { name: "13+1 Diamonds", mmk: 1100, thb: 10, code: "MLBB_13_1", icon: mlbbIcon("small.webp") },
@@ -80,6 +81,7 @@ const GAME_PRICES = {
     { name: "1080 Diamonds", mmk: 42797, thb: 331.76, code: "FF_1080_DIA", icon: freefireIcon("diamond.webp") },
     { name: "2,180 Diamonds", mmk: 72997, thb: 565.87, code: "FF_2180_DIA", icon: freefireIcon("diamond.webp") }
   ],
+
   pubgrp: [
     { name: "Elite Pass (LV1-100)", mmk: 46364, thb: 359.41, code: "PUBGRP_ELITE_1_100", icon: pubgrpIcon("rp.webp") },
     { name: "Elite Pass Plus (LV1-100)", mmk: 115967, thb: 898.97, code: "PUBGRP_ELITE_PLUS_1_100", icon: pubgrpIcon("rp.webp") },
@@ -111,6 +113,7 @@ const GAME_PRICES = {
     { name: "800 + 30 Tokens", mmk: 38530, thb: 298.68, code: "HOK_800_30_TOKENS", icon: hokIcon("token.webp") },
     { name: "1200 + 45 Tokens", mmk: 57814, thb: 448.17, code: "HOK_1200_45_TOKENS", icon: hokIcon("token.webp") }
   ],
+
   aovid: [
     { name: "40 Vouchers", mmk: 2414, thb: 18.71, code: "AOVID_40", icon: aovidIcon("voucher.webp") },
     { name: "90 Vouchers", mmk: 4826, thb: 37.41, code: "AOVID_90", icon: aovidIcon("voucher.webp") },
@@ -123,6 +126,7 @@ const GAME_PRICES = {
     { name: "24050 Vouchers", mmk: 1206627, thb: 9353.70, code: "AOVID_24050", icon: aovidIcon("voucher.webp") },
     { name: "48200 Vouchers", mmk: 2413255, thb: 18707.40, code: "AOVID_48200", icon: aovidIcon("voucher.webp") }
   ],
+
   telegram: [
     { name: "50 Stars", mmk: 3433, thb: 26.61, code: "TG_50_STARS", icon: telegramIcon("stars.webp") },
     { name: "75 Stars", mmk: 5195, thb: 40.27, code: "TG_75_STARS", icon: telegramIcon("stars.webp") },
@@ -147,10 +151,18 @@ const GAME_PRICES = {
   valorant: []
 };
 
+let selectedPackage = null;
+
 document.addEventListener("DOMContentLoaded", () => {
   renderGamePrices();
 
-  window.addEventListener("aziel:shopRegionChanged", renderGamePrices);
+  document.addEventListener("pricesRendered", bindPackageSelection);
+  window.addEventListener("aziel:shopRegionChanged", () => {
+    selectedPackage = null;
+    window.selectedPackage = null;
+    renderGamePrices();
+    resetSelectedPackagePreview();
+  });
 });
 
 function getShopRegion() {
@@ -163,6 +175,10 @@ function getShopSymbol() {
 
 function getPriceByRegion(item) {
   return getShopRegion() === "TH" ? item.thb : item.mmk;
+}
+
+function formatPackagePrice(price) {
+  return `${Number(price || 0).toLocaleString()} ${getShopSymbol()}`;
 }
 
 function renderGamePrices() {
@@ -183,26 +199,129 @@ function renderGamePrices() {
     const price = getPriceByRegion(item);
 
     return `
-            <div class="pack"
-                 data-name="${item.name}"
-                 data-price="${price}"
-                 data-code="${item.code}">
-                <div class="pack-icon">
-                    <img src="${item.icon}" alt="${item.name}">
-                </div>
+      <div class="pack"
+           data-name="${escapeAttr(item.name)}"
+           data-price="${price}"
+           data-code="${escapeAttr(item.code)}"
+           data-icon="${escapeAttr(item.icon)}">
+        <div class="pack-icon">
+          <img src="${item.icon}" alt="${escapeAttr(item.name)}">
+        </div>
 
-                <div class="pack-info">
-                    <strong class="pack-name">${item.name}</strong>
-                    <span class="pack-price">
-                        ${Number(price || 0).toLocaleString()} ${symbol}
-                    </span>
-                </div>
-            </div>
-        `;
+        <div class="pack-info">
+          <strong class="pack-name">${item.name}</strong>
+          <span class="pack-price">
+            ${Number(price || 0).toLocaleString()} ${symbol}
+          </span>
+        </div>
+      </div>
+    `;
   }).join("");
 
   document.dispatchEvent(new Event("pricesRendered"));
 }
 
+function bindPackageSelection() {
+  document.querySelectorAll(".pack").forEach(pack => {
+    pack.onclick = () => selectPackage(pack);
+  });
+}
+
+function selectPackage(packEl) {
+  if (!packEl) return;
+
+  document.querySelectorAll(".pack").forEach(item => {
+    item.classList.remove("active");
+  });
+
+  packEl.classList.add("active");
+
+  selectedPackage = {
+    name: packEl.dataset.name,
+    price: Number(packEl.dataset.price || 0),
+    code: packEl.dataset.code,
+    icon: packEl.dataset.icon,
+    formattedPrice: formatPackagePrice(packEl.dataset.price)
+  };
+
+  window.selectedPackage = selectedPackage;
+
+  updateSelectedPackagePreview(selectedPackage);
+
+  document.dispatchEvent(
+    new CustomEvent("packageSelected", {
+      detail: selectedPackage
+    })
+  );
+}
+
+function updateSelectedPackagePreview(pkg) {
+  if (!pkg) return;
+
+  const preview =
+    document.getElementById("selectedPackagePreview") ||
+    document.querySelector("[data-selected-package-preview]") ||
+    document.querySelector(".selected-package-preview");
+
+  const icon =
+    document.getElementById("selectedPackageIcon") ||
+    document.querySelector("[data-selected-package-icon]");
+
+  const title =
+    document.getElementById("selectedPackageTitle") ||
+    document.getElementById("selectedPackageName") ||
+    document.querySelector("[data-selected-package-title]");
+
+  const subtitle =
+    document.getElementById("selectedPackageSubtitle") ||
+    document.getElementById("selectedPackagePrice") ||
+    document.querySelector("[data-selected-package-subtitle]");
+
+  const code =
+    document.getElementById("selectedPackageCode") ||
+    document.querySelector("[data-selected-package-code]");
+
+  if (preview) preview.classList.add("selected", "has-package");
+  if (icon && pkg.icon) icon.src = pkg.icon;
+  if (title) title.textContent = pkg.name;
+  if (subtitle) subtitle.textContent = pkg.formattedPrice;
+  if (code) code.textContent = pkg.code;
+}
+
+function resetSelectedPackagePreview() {
+  const preview =
+    document.getElementById("selectedPackagePreview") ||
+    document.querySelector("[data-selected-package-preview]") ||
+    document.querySelector(".selected-package-preview");
+
+  const title =
+    document.getElementById("selectedPackageTitle") ||
+    document.getElementById("selectedPackageName") ||
+    document.querySelector("[data-selected-package-title]");
+
+  const subtitle =
+    document.getElementById("selectedPackageSubtitle") ||
+    document.getElementById("selectedPackagePrice") ||
+    document.querySelector("[data-selected-package-subtitle]");
+
+  if (preview) preview.classList.remove("selected", "has-package");
+  if (title) title.textContent = "Select Top-Up Amount";
+  if (subtitle) subtitle.textContent = "Choose your package";
+}
+
+function getSelectedPackage() {
+  return selectedPackage;
+}
+
+function escapeAttr(value = "") {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
 window.GAME_PRICES = GAME_PRICES;
 window.renderGamePrices = renderGamePrices;
+window.getSelectedPackage = getSelectedPackage;
+window.selectPackage = selectPackage;

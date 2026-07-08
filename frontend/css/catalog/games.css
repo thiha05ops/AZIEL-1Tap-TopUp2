@@ -1,100 +1,124 @@
-/* frontend/css/catalog/games.css */
+/* ======================================
+   AZIEL Games Catalog Page V2.5
+   Glass Header Compatible
+====================================== */
+
+html,
+body {
+    margin: 0;
+    min-height: 100%;
+}
+
+body {
+    overflow-x: hidden;
+    background:
+        radial-gradient(circle at top right, rgba(139, 92, 246, .22), transparent 34%),
+        radial-gradient(circle at top left, rgba(59, 130, 246, .12), transparent 32%),
+        #f7f5ff;
+    color: #111827;
+}
+
+/* PAGE */
 
 .az-catalog-page {
-    min-height: 100vh;
-    padding: 10px 20px 80px;
+    min-height: 100svh;
+    padding: calc(28px + env(safe-area-inset-top)) 20px 90px;
+    margin: 0;
+    background: transparent;
 }
 
 .az-catalog-shell {
-    max-width: 1180px;
+    width: min(1180px, calc(100% - 32px));
     margin: 0 auto;
-    padding: 28px;
-    border-radius: 28px;
-    background: var(--az-card);
-    border: 1px solid var(--az-border);
-    box-shadow: var(--az-shadow);
 }
 
 .az-catalog-breadcrumb {
-    margin-bottom: 26px;
+    margin: 0 0 24px;
+    color: rgba(17, 24, 39, .58);
     font-size: 13px;
-    color: var(--az-muted);
+    font-weight: 900;
 }
+
+/* FEATURED */
 
 .az-featured-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 18px;
+    gap: 22px;
     margin-bottom: 34px;
 }
 
 .az-featured-card {
+    min-height: 150px;
     display: grid;
-    grid-template-columns: 120px 1fr;
-    min-height: 155px;
+    grid-template-columns: 130px 1fr;
+    align-items: center;
+
     overflow: hidden;
-    border-radius: 18px;
+    border-radius: 22px;
     text-decoration: none;
-    color: #fff;
-    background: #1f2937;
-    transition: .25s ease;
+
+    background: rgba(255, 255, 255, .48);
+    border: 1px solid rgba(255, 255, 255, .65);
+
+    box-shadow:
+        0 18px 45px rgba(31, 41, 55, .08),
+        inset 0 1px 0 rgba(255, 255, 255, .72);
+
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+
+    transition: .22s ease;
 }
 
 .az-featured-card:hover {
-    transform: translateY(-5px);
+    transform: translateY(-3px);
+    box-shadow:
+        0 24px 60px rgba(31, 41, 55, .12),
+        inset 0 1px 0 rgba(255, 255, 255, .8);
 }
 
 .az-featured-card img {
-    width: 120px;
-    height: 100%;
+    width: 130px;
+    height: 150px;
     object-fit: cover;
 }
 
 .az-featured-card div {
-    padding: 26px 20px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
+    padding: 0 20px;
 }
 
 .az-featured-card h3 {
+    margin: 0 0 8px;
+    color: #111827;
     font-size: 18px;
-    font-weight: 900;
-    line-height: 1.25;
+    font-weight: 950;
+    line-height: 1.1;
 }
 
 .az-featured-card p {
-    margin-top: 10px;
-    font-size: 12px;
-    color: rgba(255, 255, 255, .72);
+    margin: 0;
+    color: rgba(17, 24, 39, .62);
+    font-size: 13px;
+    font-weight: 700;
 }
 
-.az-featured-card.purple {
-    background: linear-gradient(135deg, #3b2b8f, #6574d9);
-}
-
-.az-featured-card.blue {
-    background: linear-gradient(135deg, #16345f, #0f172a);
-}
-
-.az-featured-card.pink {
-    background: linear-gradient(135deg, #8b3f74, #c084fc);
-}
+/* POSTERS */
 
 .az-poster-grid {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
-    gap: 26px 24px;
+    gap: 32px 22px;
 }
 
 .az-poster-card {
+    color: #111827;
     text-decoration: none;
-    color: var(--az-text);
     transition: .22s ease;
 }
 
 .az-poster-card:hover {
-    transform: translateY(-5px);
+    transform: translateY(-3px);
 }
 
 .az-poster-card img {
@@ -102,91 +126,267 @@
     aspect-ratio: 1 / 1.25;
     object-fit: cover;
     display: block;
-    border-radius: 16px;
-    background: var(--az-soft);
-    box-shadow: var(--az-shadow-sm);
+    border-radius: 20px;
+    box-shadow: 0 18px 45px rgba(31, 41, 55, .10);
 }
 
 .az-poster-card h3 {
-    margin-top: 12px;
-    font-size: 14px;
-    font-weight: 850;
-    line-height: 1.25;
-    color: var(--az-text);
+    margin: 14px 0 5px;
+    color: #111827;
+    font-size: 20px;
+    line-height: 1.08;
+    font-weight: 950;
+    letter-spacing: -.4px;
 }
 
 .az-poster-card p {
-    margin-top: 6px;
-    font-size: 12px;
-    color: var(--az-muted);
+    margin: 0;
+    color: rgba(17, 24, 39, .62);
+    font-size: 14px;
+    font-weight: 650;
 }
 
-/* Dark mode handled by theme variables */
-body.dark .az-catalog-shell {
-    background: rgba(18, 20, 39, .72);
-    border-color: rgba(255, 255, 255, .08);
+/* FOOTER FIX */
+
+footer {
+    position: static !important;
+    width: 100%;
+    min-height: 92px;
+
+    display: flex;
+    align-items: center;
+
+    padding: 0 max(20px, calc((100vw - 1180px) / 2));
+
+    background: #070b1a;
+    color: #ffffff;
+
+    font-size: 14px;
+    font-weight: 800;
 }
+
+/* DARK MODE */
+
+body.dark,
+body.theme-dark {
+    background:
+        radial-gradient(circle at top right, rgba(139, 92, 246, .24), transparent 34%),
+        radial-gradient(circle at top left, rgba(59, 130, 246, .12), transparent 32%),
+        #070716;
+    color: #ffffff;
+}
+
+body.dark .az-catalog-breadcrumb,
+body.theme-dark .az-catalog-breadcrumb {
+    color: rgba(255, 255, 255, .55);
+}
+
+body.dark .az-featured-card,
+body.theme-dark .az-featured-card {
+    background: rgba(255, 255, 255, .08);
+    border-color: rgba(255, 255, 255, .10);
+    box-shadow:
+        0 18px 55px rgba(0, 0, 0, .24),
+        inset 0 1px 0 rgba(255, 255, 255, .10);
+}
+
+body.dark .az-featured-card h3,
+body.dark .az-poster-card h3,
+body.theme-dark .az-featured-card h3,
+body.theme-dark .az-poster-card h3 {
+    color: #ffffff;
+}
+
+body.dark .az-featured-card p,
+body.dark .az-poster-card p,
+body.theme-dark .az-featured-card p,
+body.theme-dark .az-poster-card p {
+    color: rgba(255, 255, 255, .66);
+}
+
+body.dark .az-poster-card,
+body.theme-dark .az-poster-card {
+    color: #ffffff;
+}
+
+/* TABLET */
 
 @media (max-width: 1100px) {
-    .az-featured-grid {
-        grid-template-columns: 1fr;
-    }
-
     .az-poster-grid {
         grid-template-columns: repeat(4, 1fr);
     }
+
+    .az-featured-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
-@media (max-width: 720px) {
+/* MOBILE */
+
+/* Mobile */
+@media (max-width: 900px) {
     .az-catalog-page {
-        padding: 96px 12px 50px;
+        padding-top: calc(24px + env(safe-area-inset-top));
     }
 
     .az-catalog-shell {
-        padding: 18px;
-        border-radius: 22px;
+        width: 100%;
     }
 
-    .az-poster-grid {
-        grid-template-columns: repeat(3, 1fr);
-        gap: 20px 14px;
+    .az-catalog-breadcrumb {
+        margin-bottom: 18px;
+        font-size: 12px;
+    }
+
+    .az-featured-grid {
+        grid-template-columns: 1fr;
+        gap: 14px;
+        margin-bottom: 30px;
     }
 
     .az-featured-card {
         grid-template-columns: 96px 1fr;
-        min-height: 130px;
+        min-height: 96px;
+        border-radius: 18px;
     }
 
     .az-featured-card img {
         width: 96px;
+        height: 96px;
     }
 
     .az-featured-card div {
-        padding: 18px 16px;
+        padding: 0 14px;
     }
 
-    .az-poster-card h3 {
+    .az-featured-card h3 {
+        font-size: 17px;
+        margin-bottom: 7px;
+    }
+
+    .az-featured-card p {
         font-size: 12px;
     }
 
+    .az-poster-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 32px 12px;
+    }
+
+    .az-poster-card img {
+        border-radius: 16px;
+    }
+
+    .az-poster-card h3 {
+        margin-top: 12px;
+        font-size: 18px;
+        line-height: 1.05;
+    }
+
     .az-poster-card p {
-        font-size: 11px;
+        font-size: 12px;
+        line-height: 1.35;
+    }
+
+    footer {
+        min-height: 80px;
+        padding: 0 26px;
     }
 }
 
-@media (max-width: 720px) {
+/* SMALL MOBILE */
+
+@media (max-width: 420px) {
     .az-catalog-page {
-        padding-top: 0 !important;
-        margin-top: -5px !important;
+        padding-left: 26px;
+        padding-right: 18px;
     }
 
-    .az-catalog-shell {
-        padding-top: 0 !important;
-        margin-top: 0 !important;
+    .az-poster-grid {
+        gap: 30px 11px;
     }
 
-    .az-catalog-breadcrumb {
-        margin-top: 0 !important;
-        margin-bottom: 14px !important;
+    .az-poster-card h3 {
+        font-size: 17px;
     }
+}
+
+/* ======================================
+   EMERGENCY OVERRIDE - Games Page Only
+   Force correct light / dark background
+====================================== */
+
+html.theme-light,
+body.theme-light {
+    background: #f7f5ff !important;
+}
+
+html.theme-light body,
+body.theme-light {
+    color: #111827 !important;
+}
+
+html.theme-light .az-catalog-page,
+body.theme-light .az-catalog-page {
+    background:
+        radial-gradient(circle at top right, rgba(139, 92, 246, .22), transparent 36%),
+        radial-gradient(circle at top left, rgba(59, 130, 246, .12), transparent 34%),
+        #f7f5ff !important;
+
+    color: #111827 !important;
+}
+
+html.theme-light .az-featured-card,
+body.theme-light .az-featured-card {
+    background: rgba(255, 255, 255, .62) !important;
+    border: 1px solid rgba(255, 255, 255, .75) !important;
+}
+
+html.theme-light .az-featured-card h3,
+html.theme-light .az-featured-card p,
+html.theme-light .az-poster-card h3,
+html.theme-light .az-poster-card p,
+body.theme-light .az-featured-card h3,
+body.theme-light .az-featured-card p,
+body.theme-light .az-poster-card h3,
+body.theme-light .az-poster-card p {
+    color: #111827 !important;
+    opacity: 1 !important;
+}
+
+html.theme-light .az-header,
+body.theme-light .az-header {
+    background:
+        linear-gradient(180deg,
+            rgba(255, 255, 255, .72),
+            rgba(255, 255, 255, .42)) !important;
+
+    border-bottom: 1px solid rgba(255, 255, 255, .55) !important;
+}
+
+/* Dark only */
+html.theme-dark,
+body.theme-dark,
+body.dark {
+    background: #070716 !important;
+}
+
+html.theme-dark .az-catalog-page,
+body.theme-dark .az-catalog-page,
+body.dark .az-catalog-page {
+    background:
+        radial-gradient(circle at top right, rgba(139, 92, 246, .24), transparent 36%),
+        radial-gradient(circle at top left, rgba(59, 130, 246, .12), transparent 34%),
+        #070716 !important;
+
+    color: #ffffff !important;
+}
+
+html.theme-dark .az-featured-card h3,
+html.theme-dark .az-poster-card h3,
+body.theme-dark .az-featured-card h3,
+body.theme-dark .az-poster-card h3,
+body.dark .az-featured-card h3,
+body.dark .az-poster-card h3 {
+    color: #ffffff !important;
 }

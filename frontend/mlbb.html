@@ -86,15 +86,20 @@
                         <h2 data-i18n="selectPackage">Select Package</h2>
                     </div>
 
-                    <button class="mobile-selected-package" id="openPackagePanel" type="button">
+                    <button class="mobile-selected-package" id="selectedPackagePreview" type="button">
+
                         <div class="mobile-pack-icon">
-                            <img id="mobilePackageIcon" alt="MLBB">
+                            <img id="selectedPackageIcon" src="/assets/mlbb/icons/small.webp" alt="Selected Package">
                         </div>
 
-                        <div>
-                            <strong id="mobileSelectedPackageName" data-i18n="selectTopupAmount">Select Top-Up
-                                Amount</strong>
-                            <span id="mobileSelectedPackagePrice" data-i18n="choosePackage">Choose your package</span>
+                        <div class="mobile-pack-content">
+                            <strong id="selectedPackageTitle">
+                                Select Top-Up Amount
+                            </strong>
+
+                            <span id="selectedPackageSubtitle">
+                                Choose your package
+                            </span>
                         </div>
 
                         <b>›</b>
@@ -257,7 +262,7 @@
     <script src="/js/region-payment.js?v=20260629"></script>
 
     <script src="/js/api.js"></script>
-    <script src="/js/prices.js?v=20260629"></script>
+    <script src="/js/prices.js?v=20260708-select-preview"></script>
     <script src="/js/payment.js?v=20260707-wallet"></script>
 
     <script src="/js/payment/payment-utils.js?v=20260707-v3"></script>
@@ -267,7 +272,7 @@
     <script src="/js/payment/payment-manual.js?v=20260707-v3"></script>
     <script src="/js/payment/payment-engine.js?v=20260707-v3"></script>
 
-    <script src="/js/mlbb.js?v=20260707-v3"></script>
+    <script src="/js/mlbb.js?v=20260709-package-preview-fix"></script>
 
     <script src="/js/live-chat.js"></script>
     <script src="/js/pwa-fix.js"></script>

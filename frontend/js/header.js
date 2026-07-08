@@ -297,3 +297,9 @@ function initAutoRevealNav() {
         lastScrollY = currentY;
     }, { passive: true });
 }
+window.addEventListener("scroll", () => {
+    const header = document.querySelector(".az-header");
+    if (!header) return;
+
+    header.classList.toggle("scrolled", window.scrollY > 12);
+});
