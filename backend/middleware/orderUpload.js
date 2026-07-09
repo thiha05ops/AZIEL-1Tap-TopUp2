@@ -1,6 +1,11 @@
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const {
+    imageUploadFileFilter,
+    safeUploadFileName,
+    uploadFileSizeLimit
+} = require("../config/security");
 
 const uploadDir = path.join(__dirname, "../uploads/orders");
 
@@ -14,9 +19,15 @@ const storage = multer.diskStorage({
     },
 
     filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname);
+        const ext = path.extname(safeUploadFileName(file.originalname));
         cb(null, `SLIP-${Date.now()}${ext}`);
     }
 });
 
-module.exports = multer({ storage });
+module.exports = multer({
+    storage,
+    limits: {
+        fileSize: uploadFileSizeLimit
+    },
+    fileFilter: imageUploadFileFilter
+});

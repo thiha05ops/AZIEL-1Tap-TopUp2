@@ -1,6 +1,11 @@
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const {
+    imageUploadFileFilter,
+    safeUploadFileName,
+    uploadFileSizeLimit
+} = require("../config/security");
 
 const uploadDir =
     path.join(
@@ -23,7 +28,7 @@ const storage = multer.diskStorage({
 
         const ext =
             path.extname(
-                file.originalname
+                safeUploadFileName(file.originalname)
             );
 
         cb(
@@ -34,5 +39,9 @@ const storage = multer.diskStorage({
 });
 
 module.exports = multer({
-    storage
+    storage,
+    limits: {
+        fileSize: uploadFileSizeLimit
+    },
+    fileFilter: imageUploadFileFilter
 });

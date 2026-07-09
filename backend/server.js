@@ -5,7 +5,9 @@ const express = require("express");
 const cors = require("cors");
 const session = require("express-session");
 const http = require("http");
+const multer = require("multer");
 const { Server } = require("socket.io");
+const rateLimit = require("express-rate-limit");
 
 dotenv.config({
     path: path.join(__dirname, "../.env")
@@ -13,6 +15,16 @@ dotenv.config({
 
 const connectDB = require("./config/db");
 const passport = require("./config/passport");
+const {
+    corsOptions,
+    formBodyLimit,
+    isProduction,
+    jsonBodyLimit,
+    socketCorsOptions,
+    validateProductionSecurityConfig
+} = require("./config/security");
+
+validateProductionSecurityConfig();
 
 // ROUTES
 const authRoutes = require("./routes/auth");
@@ -39,10 +51,7 @@ const app = express();
 const server = http.createServer(app);
 
 const io = new Server(server, {
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    }
+    cors: socketCorsOptions
 });
 
 app.set("io", io);
@@ -96,14 +105,43 @@ app.use(helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(cors(corsOptions));
+
+const generalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: Number(process.env.RATE_LIMIT_GENERAL || 600),
+    standardHeaders: true,
+    legacyHeaders: false
+});
+
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: Number(process.env.RATE_LIMIT_AUTH || 60),
+    standardHeaders: true,
+    legacyHeaders: false
+});
+
+app.use("/api", generalLimiter);
+app.use("/api/login", authLimiter);
+app.use("/api/register", authLimiter);
+app.use("/api/verify-email", authLimiter);
+app.use("/api/password", authLimiter);
+
+app.use(express.json({ limit: jsonBodyLimit }));
+app.use(express.urlencoded({
+    extended: true,
+    limit: formBodyLimit
+}));
 
 app.use(session({
     secret: process.env.SESSION_SECRET || "aziel_secret",
     resave: false,
-    saveUninitialized: false
+    saveUninitialized: false,
+    cookie: {
+        httpOnly: true,
+        sameSite: isProduction ? "none" : "lax",
+        secure: isProduction
+    }
 }));
 
 app.use(passport.initialize());
@@ -134,6 +172,36 @@ app.use("/api", supportRoutes);
 app.use("/api", settingsRoutes);
 app.use("/api", paymentMethodsRoutes);
 app.use("/api/live-chat", liveChatRoutes);
+
+// API ERROR HANDLER
+app.use("/api", (err, req, res, next) => {
+    if (!err) return next();
+
+    if (err instanceof multer.MulterError) {
+        return res.status(400).json({
+            success: false,
+            message: err.message || "Upload failed"
+        });
+    }
+
+    if (
+        err.type === "entity.too.large" ||
+        err.message?.includes("Origin not allowed") ||
+        err.message?.includes("Only JPG")
+    ) {
+        return res.status(400).json({
+            success: false,
+            message: err.message || "Invalid request"
+        });
+    }
+
+    console.log("API error:", err);
+
+    return res.status(500).json({
+        success: false,
+        message: "Server error"
+    });
+});
 
 // HOME
 app.get("/", (req, res) => {
