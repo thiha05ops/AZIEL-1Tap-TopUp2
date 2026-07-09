@@ -25,9 +25,29 @@ const walletTopupSchema = new mongoose.Schema({
         default: "MMK"
     },
 
+    region: {
+        type: String,
+        default: "MM"
+    },
+
     paymentMethod: {
         type: String,
         required: true
+    },
+
+    paymentProvider: {
+        type: String,
+        default: ""
+    },
+
+    transactionId: {
+        type: String,
+        default: ""
+    },
+
+    qrImage: {
+        type: String,
+        default: ""
     },
 
     paymentSlip: {
@@ -52,6 +72,11 @@ const walletTopupSchema = new mongoose.Schema({
     note: {
         type: String,
         default: "Waiting for approval"
+    },
+
+    paidAt: {
+        type: Date,
+        default: null
     }
 
 }, { timestamps: true });

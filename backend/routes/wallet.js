@@ -13,6 +13,7 @@ const WalletTopup = require("../models/WalletTopup");
 const WalletTransaction = require("../models/WalletTransaction");
 const Notification = require("../models/Notification");
 const adminMiddleware = require("../middleware/adminMiddleware");
+const Omise = require("../services/opnService");
 
 // ======================
 // UPLOAD SETUP
@@ -63,6 +64,48 @@ function normalizeMethod(method) {
 
 function isPromptPay(method) {
     return normalizeMethod(method) === "promptpay";
+}
+
+function shouldUsePromptPayAuto(region, method) {
+    return String(region || "").toUpperCase() === "TH" && isPromptPay(method);
+}
+
+function createPromptPayCharge(amount, metadata = {}) {
+    return new Promise((resolve, reject) => {
+        Omise.sources.create(
+            {
+                type: "promptpay",
+                amount: Number(amount) * 100,
+                currency: "THB"
+            },
+            (err, source) => {
+                if (err) return reject(err);
+
+                Omise.charges.create(
+                    {
+                        amount: Number(amount) * 100,
+                        currency: "THB",
+                        source: source.id,
+                        metadata
+                    },
+                    (err, charge) => {
+                        if (err) return reject(err);
+                        resolve({ source, charge });
+                    }
+                );
+            }
+        );
+    });
+}
+
+function getQrUrl(source, charge) {
+    return (
+        source?.scannable_code?.image?.download_uri ||
+        source?.scannable_code?.image?.uri ||
+        charge?.source?.scannable_code?.image?.download_uri ||
+        charge?.source?.scannable_code?.image?.uri ||
+        ""
+    );
 }
 
 function getQrByMethod(paymentMethod) {
@@ -181,27 +224,82 @@ router.post("/wallet/create", async (req, res) => {
         }
 
         const currencyKey = getCurrencyKey(currency);
-        const method = normalizeMethod(provider || paymentMethod);
+        const paymentMethodKey = normalizeMethod(paymentMethod);
+        const providerKey = normalizeMethod(provider);
+        const method = isPromptPay(paymentMethodKey)
+            ? paymentMethodKey
+            : providerKey || paymentMethodKey;
         const topupId = "WALLET-" + Date.now();
+        const topupRegion = region || (currencyKey === "THB" ? "TH" : "MM");
 
         const account = getAccountByMethod(method);
-        const autoQr = isPromptPay(method);
-        const qrImage = autoQr ? getQrByMethod(method) : "";
+        const autoQr = shouldUsePromptPayAuto(topupRegion, method);
+        const qrImage = isPromptPay(method) ? getQrByMethod(method) : "";
 
         const topup = await WalletTopup.create({
             topupId,
             username,
             amount: Number(amount),
             currency: currencyKey,
-            region: region || (currencyKey === "THB" ? "TH" : "MM"),
+            region: topupRegion,
             paymentMethod: method,
             status: "pending",
             qrImage,
             paymentSlip: "",
             note: autoQr
-                ? "PromptPay QR generated. Waiting for payment."
+                ? "Waiting for PromptPay wallet confirmation."
                 : "Manual payment. Waiting for slip upload."
         });
+
+        if (autoQr) {
+            const result = await createPromptPayCharge(Number(amount), {
+                type: "wallet_topup",
+                topupId,
+                username
+            });
+
+            const charge = result.charge;
+            const source = result.source;
+            const qrUrl = getQrUrl(source, charge);
+
+            topup.transactionId = charge.id;
+            topup.paymentProvider = "omise";
+            topup.qrImage = qrUrl;
+            topup.note = "Waiting for PromptPay wallet confirmation.";
+            await topup.save();
+
+            const io = req.app.get("io");
+
+            if (io) {
+                io.to("admins").emit("adminNewUpdate", {
+                    type: "wallet_topup_created",
+                    topupId,
+                    username,
+                    amount: Number(amount),
+                    currency: currencyKey,
+                    paymentMethod: method,
+                    provider: "omise",
+                    status: topup.status
+                });
+            }
+
+            return res.json({
+                success: true,
+                message: "Wallet QR created",
+                provider: "omise",
+                paymentType: "auto",
+                paymentName: "PromptPay",
+                topupId,
+                topup,
+                qrImage: qrUrl,
+                qrUrl,
+                transactionId: charge.id,
+                chargeId: charge.id,
+                status: charge.status,
+                accountName: account.accountName,
+                accountNumber: account.accountNumber
+            });
+        }
 
         const io = req.app.get("io");
 
@@ -224,7 +322,8 @@ router.post("/wallet/create", async (req, res) => {
                 : "Wallet manual payment created",
             topupId,
             topup,
-            paymentType: autoQr ? "auto_qr" : "manual",
+            provider: "manual",
+            paymentType: "manual",
             qrImage,
             qrUrl: qrImage,
             accountName: account.accountName,
