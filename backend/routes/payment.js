@@ -12,10 +12,10 @@ const Order = require("../models/Order");
 const User = require("../models/User");
 const WalletTopup = require("../models/WalletTopup");
 const WalletTransaction = require("../models/WalletTransaction");
-const Notification = require("../models/Notification");
 
 const wavepayService = require("../services/wavepayService");
 const realtime = require("../services/realtime");
+const notificationService = require("../services/notificationService");
 
 const isProduction = process.env.NODE_ENV === "production";
 
@@ -109,12 +109,19 @@ async function markWalletTopupPaid(req, topupId, transactionId = "") {
         description: `Wallet topup via ${topup.paymentMethod}`
     });
 
-    const notification = await Notification.create({
+    await notificationService.createUserNotification({
         username: topup.username,
         title: "Wallet Top-Up Successful",
         message: `${Number(topup.amount).toLocaleString()} ${currencyKey} has been added to your wallet.`,
         type: "system",
-        category: "wallet"
+        category: "wallet",
+        topupId: topup.topupId,
+        metadata: {
+            topupId: topup.topupId,
+            amount: topup.amount,
+            currency: currencyKey
+        },
+        source: "wallet_topup_paid"
     });
 
     await realtime.emitWalletUpdate(topup.username, {
@@ -131,8 +138,6 @@ async function markWalletTopupPaid(req, topupId, transactionId = "") {
         currency: currencyKey,
         paymentMethod: topup.paymentMethod
     });
-
-    await realtime.emitNotification(topup.username, notification);
 
     realtime.emitAdminWalletUpdate({
         type: "wallet_topup_paid",
@@ -289,16 +294,27 @@ router.post("/payment/submit", authMiddleware, upload.single("slip"), async (req
 
         await order.save();
 
-        const notification = await Notification.create({
+        await notificationService.createUserNotification({
             username: order.username,
             title: "Payment Slip Submitted",
             message: `${order.game} - ${order.packageName} payment slip has been submitted.`,
             type: "order",
             category: "orders",
-            orderId: order.orderId
+            orderId: order.orderId,
+            action: {
+                type: "navigate",
+                label: "View Order",
+                url: `/tracking.html?orderId=${encodeURIComponent(order.orderId)}`
+            },
+            metadata: {
+                orderId: order.orderId,
+                game: order.game,
+                amount: order.amount,
+                currency: order.currency
+            },
+            source: "payment_submit"
         });
 
-        await realtime.emitNotification(order.username, notification);
         await realtime.emitOrderUpdate(order.username, order);
 
         realtime.emitAdminOrderUpdate({

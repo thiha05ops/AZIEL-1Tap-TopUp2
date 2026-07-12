@@ -24,14 +24,22 @@ function projectNotification(notification) {
     const item = asObject(notification);
 
     return {
+        id: item.id || (item._id ? String(item._id) : undefined),
         _id: item._id ? String(item._id) : undefined,
+        userId: item.userId ? String(item.userId) : "",
+        username: item.username || "",
         title: item.title || "Notification",
         message: item.message || "",
         type: item.type || "general",
         category: item.category || "system",
+        status: item.status || "active",
         orderId: item.orderId || "",
-        isRead: Boolean(item.isRead),
-        createdAt: item.createdAt || new Date()
+        read: Boolean(item.read || item.isRead),
+        isRead: Boolean(item.read || item.isRead),
+        createdAt: item.createdAt || new Date(),
+        updatedAt: item.updatedAt || item.createdAt || new Date(),
+        action: item.action || null,
+        metadata: item.metadata || {}
     };
 }
 
@@ -235,13 +243,24 @@ async function emitToUsername(username, eventName, payload = {}) {
         .emit(eventName, payload);
 }
 
-async function emitNotification(username, notification) {
+async function emitNotification(username, notification, options = {}) {
     const payload = projectNotification(notification);
+    const unreadCount = Number(options.unreadCount || 0);
 
-    await emitToUsername(username, "notification:new", payload);
+    await emitToUsername(username, "notification:new", {
+        notification: payload,
+        unreadCount
+    });
     await emitToUsername(username, "newNotification", payload);
     await emitToUsername(username, "notification:count-changed", {
-        delta: payload.isRead ? 0 : 1,
+        unreadCount,
+        updatedAt: new Date()
+    });
+}
+
+async function emitNotificationCount(username, unreadCount) {
+    await emitToUsername(username, "notification:count-changed", {
+        unreadCount: Number(unreadCount || 0),
         updatedAt: new Date()
     });
 }
@@ -318,6 +337,7 @@ module.exports = {
     emitAdminUpdate,
     emitAdminWalletUpdate,
     emitNotification,
+    emitNotificationCount,
     emitOrderUpdate,
     emitSupportUpdate,
     emitToAdmin,

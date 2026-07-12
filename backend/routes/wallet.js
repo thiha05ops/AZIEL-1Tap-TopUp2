@@ -11,11 +11,11 @@ const User = require("../models/User");
 const Order = require("../models/Order");
 const WalletTopup = require("../models/WalletTopup");
 const WalletTransaction = require("../models/WalletTransaction");
-const Notification = require("../models/Notification");
 const adminMiddleware = require("../middleware/adminMiddleware");
 const authMiddleware = require("../middleware/authMiddleware");
 const Omise = require("../services/opnService");
 const realtime = require("../services/realtime");
+const notificationService = require("../services/notificationService");
 
 // ======================
 // UPLOAD SETUP
@@ -169,18 +169,23 @@ async function emitWalletUpdate(username, payload) {
 
 async function createWalletNotification(req, topup, title, message, type = "wallet") {
     try {
-        const notification = await Notification.create({
+        const result = await notificationService.createUserNotification({
             username: topup.username,
             title,
             message,
             type,
             category: "wallet",
-            isRead: false
+            topupId: topup.topupId,
+            metadata: {
+                topupId: topup.topupId,
+                amount: topup.amount,
+                currency: topup.currency,
+                paymentMethod: topup.paymentMethod
+            },
+            source: "wallet"
         });
 
-        await realtime.emitNotification(topup.username, notification);
-
-        return notification;
+        return result.notification;
     } catch (error) {
         console.log("Wallet notification error:", error.message);
         return null;

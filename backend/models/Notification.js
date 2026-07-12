@@ -3,6 +3,13 @@ const mongoose = require("mongoose");
 const notificationSchema =
     new mongoose.Schema(
         {
+            userId: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "User",
+                default: null,
+                index: true
+            },
+
             username: {
                 type: String,
                 required: true
@@ -39,17 +46,39 @@ const notificationSchema =
                 type: String,
                 enum: [
                     "orders",
+                    "payments",
                     "wallet",
                     "refunds",
                     "support",
                     "announcements",
                     "promotions",
+                    "security",
                     "system"
                 ],
                 default: "system"
             },
 
+            status: {
+                type: String,
+                default: "active"
+            },
+
             orderId: {
+                type: String,
+                default: ""
+            },
+
+            action: {
+                type: mongoose.Schema.Types.Mixed,
+                default: null
+            },
+
+            metadata: {
+                type: mongoose.Schema.Types.Mixed,
+                default: {}
+            },
+
+            source: {
                 type: String,
                 default: ""
             },
@@ -71,17 +100,18 @@ const notificationSchema =
 
             expiresAt: {
                 type: Date,
-                default: () => {
-                    return new Date(
-                        Date.now() + 90 * 24 * 60 * 60 * 1000
-                    );
-                }
+                default: null
             }
         },
         {
             timestamps: true
         }
     );
+
+notificationSchema.index({ userId: 1, createdAt: -1 });
+notificationSchema.index({ userId: 1, isRead: 1, createdAt: -1 });
+notificationSchema.index({ username: 1, createdAt: -1 });
+notificationSchema.index({ username: 1, isRead: 1, createdAt: -1 });
 
 module.exports =
     mongoose.model(

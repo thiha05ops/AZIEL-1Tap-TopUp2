@@ -3,126 +3,60 @@
 const express = require("express");
 const router = express.Router();
 
-const Notification = require("../models/Notification");
 const authMiddleware = require("../middleware/authMiddleware");
 const adminMiddleware = require("../middleware/adminMiddleware");
-const realtime = require("../services/realtime");
+const notificationService = require("../services/notificationService");
 
-// GET /api/notifications/:username
-router.get("/notifications/:username", authMiddleware, async (req, res) => {
+// CANONICAL: GET /api/notifications
+router.get("/notifications", authMiddleware, async (req, res) => {
     try {
-        const username = req.user.username;
-
-        const activeFilter = {
-            username,
-            deletedByUser: false,
-            $or: [
-                { expiresAt: { $exists: false } },
-                { expiresAt: null },
-                { expiresAt: { $gt: new Date() } }
-            ]
-        };
-
-        const notifications = await Notification.find(activeFilter)
-            .sort({ isRead: 1, createdAt: -1 });
-
-        const unreadCount = await Notification.countDocuments({
-            ...activeFilter,
-            isRead: false
+        const result = await notificationService.getUserNotifications(req.user, {
+            limit: req.query.limit,
+            cursor: req.query.cursor
         });
 
         res.json({
             success: true,
-            notifications,
-            unreadCount
+            ...result
         });
     } catch (error) {
         console.log("Notification load error:", error);
-
-        res.json({
-            success: false,
-            message: "Server error"
-        });
+        res.status(500).json({ success: false, message: "Server error" });
     }
 });
 
-// PUT /api/notifications/:id/read
-router.put("/notifications/:id/read", authMiddleware, async (req, res) => {
+// CANONICAL: GET /api/notifications/unread-count
+router.get("/notifications/unread-count", authMiddleware, async (req, res) => {
     try {
-        const notification = await Notification.findOneAndUpdate(
-            {
-                _id: req.params.id,
-                username: req.user.username,
-                deletedByUser: false
-            },
-            { isRead: true },
-            { new: true }
-        );
-
-        if (!notification) {
-            return res.status(404).json({
-                success: false,
-                message: "Notification not found"
-            });
-        }
-
-        res.json({
-            success: true,
-            notification
-        });
+        const unreadCount = await notificationService.getUnreadCount(req.user);
+        res.json({ success: true, unreadCount });
     } catch (error) {
-        console.log("Mark read error:", error);
-
-        res.json({
-            success: false,
-            message: "Server error"
-        });
+        console.log("Unread count error:", error);
+        res.status(500).json({ success: false, message: "Server error" });
     }
 });
 
-// PUT /api/notifications/:username/read-all
-router.put("/notifications/:username/read-all", authMiddleware, async (req, res) => {
+// CANONICAL: PATCH /api/notifications/read-all
+router.patch("/notifications/read-all", authMiddleware, async (req, res) => {
     try {
-        await Notification.updateMany(
-            {
-                username: req.user.username,
-                deletedByUser: false
-            },
-            {
-                isRead: true
-            }
-        );
-
+        const result = await notificationService.markAllNotificationsRead(req.user);
         res.json({
             success: true,
-            message: "All notifications marked as read"
+            message: "All notifications marked as read",
+            ...result
         });
     } catch (error) {
         console.log("Mark all read error:", error);
-
-        res.json({
-            success: false,
-            message: "Server error"
-        });
+        res.status(500).json({ success: false, message: "Server error" });
     }
 });
 
-// DELETE /api/notifications/:id
-router.delete("/notifications/:id", authMiddleware, async (req, res) => {
+// CANONICAL: PATCH /api/notifications/:id/read
+router.patch("/notifications/:id/read", authMiddleware, async (req, res) => {
     try {
-        const notification = await Notification.findOneAndUpdate(
-            {
-                _id: req.params.id,
-                username: req.user.username
-            },
-            {
-                deletedByUser: true,
-                isRead: true
-            },
-            { new: true }
-        );
+        const result = await notificationService.markNotificationRead(req.user, req.params.id);
 
-        if (!notification) {
+        if (!result) {
             return res.status(404).json({
                 success: false,
                 message: "Notification not found"
@@ -131,142 +65,160 @@ router.delete("/notifications/:id", authMiddleware, async (req, res) => {
 
         res.json({
             success: true,
-            message: "Notification deleted"
+            notification: result.normalized,
+            unreadCount: result.unreadCount
+        });
+    } catch (error) {
+        console.log("Mark read error:", error);
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+});
+
+// COMPATIBILITY: GET /api/notifications/:username
+router.get("/notifications/:username", authMiddleware, async (req, res) => {
+    try {
+        const result = await notificationService.getUserNotifications(req.user, {
+            limit: req.query.limit || 50,
+            cursor: req.query.cursor
+        });
+
+        res.json({
+            success: true,
+            ...result
+        });
+    } catch (error) {
+        console.log("Legacy notification load error:", error);
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+});
+
+// COMPATIBILITY: PUT /api/notifications/:id/read
+router.put("/notifications/:id/read", authMiddleware, async (req, res) => {
+    try {
+        const result = await notificationService.markNotificationRead(req.user, req.params.id);
+
+        if (!result) {
+            return res.status(404).json({
+                success: false,
+                message: "Notification not found"
+            });
+        }
+
+        res.json({
+            success: true,
+            notification: result.normalized,
+            unreadCount: result.unreadCount
+        });
+    } catch (error) {
+        console.log("Legacy mark read error:", error);
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+});
+
+// COMPATIBILITY: PUT /api/notifications/:username/read-all
+router.put("/notifications/:username/read-all", authMiddleware, async (req, res) => {
+    try {
+        const result = await notificationService.markAllNotificationsRead(req.user);
+        res.json({
+            success: true,
+            message: "All notifications marked as read",
+            ...result
+        });
+    } catch (error) {
+        console.log("Legacy mark all read error:", error);
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+});
+
+// COMPATIBILITY: DELETE /api/notifications/:id
+router.delete("/notifications/:id", authMiddleware, async (req, res) => {
+    try {
+        const result = await notificationService.deleteNotification(req.user, req.params.id);
+
+        if (!result) {
+            return res.status(404).json({
+                success: false,
+                message: "Notification not found"
+            });
+        }
+
+        res.json({
+            success: true,
+            message: "Notification deleted",
+            unreadCount: result.unreadCount
         });
     } catch (error) {
         console.log("Notification delete error:", error);
-
-        res.json({
-            success: false,
-            message: "Server error"
-        });
+        res.status(500).json({ success: false, message: "Server error" });
     }
 });
 
-// DELETE /api/notifications/:username/read
+// COMPATIBILITY: DELETE /api/notifications/:username/read
 router.delete("/notifications/:username/read", authMiddleware, async (req, res) => {
     try {
-        await Notification.updateMany(
-            {
-                username: req.user.username,
-                isRead: true
-            },
-            {
-                deletedByUser: true
-            }
-        );
-
+        const result = await notificationService.markAllNotificationsRead(req.user);
         res.json({
             success: true,
-            message: "Read notifications cleared"
+            message: "Read notifications cleared",
+            ...result
         });
     } catch (error) {
         console.log("Clear read error:", error);
-
-        res.json({
-            success: false,
-            message: "Server error"
-        });
+        res.status(500).json({ success: false, message: "Server error" });
     }
 });
 
-// POST /api/notifications/create
+// ADMIN: POST /api/notifications/create
 router.post("/notifications/create", adminMiddleware, async (req, res) => {
     try {
-        const {
-            username,
-            title,
-            message,
-            type,
-            category,
-            orderId
-        } = req.body;
-
-        if (!username || !title) {
-            return res.json({
-                success: false,
-                message: "Username and title are required"
-            });
-        }
-
-        const notification = await Notification.create({
-            username,
-            title,
-            message: message || "",
-            type: type || "general",
-            category: category || "system",
-            orderId: orderId || "",
-            deletedByUser: false,
-            isRead: false
+        const result = await notificationService.createUserNotification({
+            username: req.body.username,
+            title: req.body.title,
+            message: req.body.message || "",
+            type: req.body.type || "general",
+            category: req.body.category || "system",
+            orderId: req.body.orderId || "",
+            action: req.body.action,
+            metadata: req.body.metadata,
+            source: "admin_create"
         });
-
-        await realtime.emitNotification(username, notification);
 
         res.json({
             success: true,
-            notification
+            notification: result.normalized,
+            unreadCount: result.unreadCount
         });
     } catch (error) {
         console.log("Create notification error:", error);
-
-        res.json({
+        res.status(400).json({
             success: false,
-            message: "Server error"
+            message: error.message || "Server error"
         });
     }
 });
 
-// POST /api/notifications/broadcast
+// ADMIN: POST /api/notifications/broadcast
 router.post("/notifications/broadcast", adminMiddleware, async (req, res) => {
     try {
-        const {
-            usernames,
-            title,
-            message,
-            type,
-            category
-        } = req.body;
-
-        if (!Array.isArray(usernames) || !usernames.length) {
-            return res.json({
-                success: false,
-                message: "Usernames are required"
-            });
-        }
-
-        if (!title || !message) {
-            return res.json({
-                success: false,
-                message: "Title and message are required"
-            });
-        }
-
-        const notifications = await Notification.insertMany(
-            usernames.map(username => ({
-                username,
-                title,
-                message,
-                type: type || "announcement",
-                category: category || "announcements",
-                deletedByUser: false,
-                isRead: false
-            }))
-        );
-
-        await Promise.all(
-            notifications.map(noti => realtime.emitNotification(noti.username, noti))
-        );
+        const result = await notificationService.createBroadcastNotifications({
+            usernames: req.body.usernames,
+            title: req.body.title,
+            message: req.body.message,
+            type: req.body.type || "announcement",
+            category: req.body.category || "announcements",
+            action: req.body.action,
+            metadata: req.body.metadata
+        });
 
         res.json({
             success: true,
-            count: notifications.length
+            count: result.count
         });
     } catch (error) {
         console.log("Broadcast notification error:", error);
-
-        res.json({
+        res.status(400).json({
             success: false,
-            message: "Server error"
+            message: error.message || "Server error"
         });
     }
 });

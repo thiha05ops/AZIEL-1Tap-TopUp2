@@ -182,7 +182,6 @@ router.post("/order/:orderId/refund-request", authMiddleware, async (req, res) =
             orderId: order.orderId
         });
 
-        await realtime.emitNotification(order.username, notification);
         await realtime.emitOrderUpdate(order.username, order);
 
         realtime.emitAdminOrderUpdate({
@@ -307,12 +306,6 @@ router.put("/admin/orders/:id/status", adminMiddleware, async (req, res) => {
             orderId: order.orderId
         });
 
-        await realtime.emitNotification(order.username, notification || {
-            title: "Order Updated",
-            message: `${order.game} is now ${order.status}`,
-            orderId: order.orderId,
-            isRead: false
-        });
         await realtime.emitOrderUpdate(order.username, order);
 
         realtime.emitAdminOrderUpdate({
@@ -452,7 +445,6 @@ router.post("/admin/orders/:id/refund/approve", adminMiddleware, async (req, res
             status: "refund"
         });
 
-        await realtime.emitNotification(order.username, notification);
         await realtime.emitOrderUpdate(order.username, order);
 
         realtime.emitAdminOrderUpdate({
@@ -553,7 +545,6 @@ router.post("/admin/orders/:id/refund/reject", adminMiddleware, async (req, res)
             orderId: order.orderId
         });
 
-        await realtime.emitNotification(order.username, notification);
         await realtime.emitOrderUpdate(order.username, order);
 
         realtime.emitAdminOrderUpdate({

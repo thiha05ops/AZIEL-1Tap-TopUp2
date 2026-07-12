@@ -12,6 +12,7 @@ const Order = require("../models/Order");
 const authMiddleware = require("../middleware/authMiddleware");
 const adminMiddleware = require("../middleware/adminMiddleware");
 const realtime = require("../services/realtime");
+const notificationService = require("../services/notificationService");
 
 // UPLOAD SETUP
 
@@ -187,11 +188,24 @@ router.put("/admin/support/tickets/:id/reply", adminMiddleware, async (req, res)
         const payload = {
             title: "Support Reply",
             message: `Admin replied to your support ticket: ${ticket.subject}`,
-            isRead: false,
-            ticketId: ticket.ticketId
+            type: "support",
+            category: "support",
+            ticketId: ticket.ticketId,
+            metadata: {
+                ticketId: ticket.ticketId
+            },
+            action: {
+                type: "navigate",
+                label: "View Support",
+                url: "/support.html"
+            },
+            source: "support_reply"
         };
 
-        await realtime.emitNotification(ticket.username, payload);
+        await notificationService.createUserNotification({
+            username: ticket.username,
+            ...payload
+        });
         await realtime.emitSupportUpdate(ticket.username, {
             message: payload.message,
             ticketId: ticket.ticketId,

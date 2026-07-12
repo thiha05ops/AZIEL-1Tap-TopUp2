@@ -1,25 +1,26 @@
-const Notification =
-    require("../models/Notification");
+const notificationService = require("./notificationService");
 
 async function createNotification(data) {
     try {
-        const notification =
-            await Notification.create({
-                username: data.username,
-                title: data.title,
-                message: data.message || "",
-                type: data.type || "general",
-                orderId: data.orderId || ""
-            });
+        const result = await notificationService.createUserNotification({
+            username: data.username,
+            userId: data.userId,
+            user: data.user,
+            title: data.title,
+            message: data.message || "",
+            type: data.type || "general",
+            category: data.category,
+            orderId: data.orderId || "",
+            ticketId: data.ticketId || "",
+            topupId: data.topupId || "",
+            action: data.action,
+            metadata: data.metadata,
+            source: data.source || "legacy_helper"
+        });
 
-        return notification;
-
+        return result.notification;
     } catch (error) {
-        console.log(
-            "Create notification error:",
-            error
-        );
-
+        console.log("Create notification error:", error.message);
         return null;
     }
 }

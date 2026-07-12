@@ -7,6 +7,9 @@ document.addEventListener("DOMContentLoaded", () => {
     window.addEventListener("aziel:ready", renderHeader);
     window.addEventListener("aziel:userChanged", renderHeader);
     window.addEventListener("aziel:walletChanged", renderHeader);
+    window.addEventListener("aziel:notificationsChanged", event => {
+        renderNotificationBadge(event.detail?.unreadCount || 0);
+    });
 
     window.addEventListener("aziel:languageChanged", () => {
         translateHeader();
@@ -26,6 +29,7 @@ document.addEventListener("DOMContentLoaded", () => {
 function initHeader() {
     renderHeader();
     renderHeaderNav();
+    initNotificationBadge();
     initProfileDropdown();
     initThemeButton();
     initHeaderLogout();
@@ -74,6 +78,57 @@ function renderHeader() {
     }
 
     translateHeader();
+}
+
+function initNotificationBadge() {
+    ensureNotificationStore(() => {
+        if (!window.AZIEL_NOTIFICATIONS) return;
+
+        if (window.__azielHeaderNotificationSubscribed) {
+            renderNotificationBadge(window.AZIEL_NOTIFICATIONS.getState().unreadCount);
+            return;
+        }
+
+        window.__azielHeaderNotificationSubscribed = true;
+
+        window.AZIEL_NOTIFICATIONS.subscribe(state => {
+            renderNotificationBadge(state.unreadCount);
+        });
+
+        window.AZIEL_NOTIFICATIONS.init();
+    });
+}
+
+function ensureNotificationStore(callback) {
+    if (window.AZIEL_NOTIFICATIONS) {
+        callback();
+        return;
+    }
+
+    if (document.querySelector('script[data-aziel-notification-store="true"]')) {
+        window.addEventListener("aziel:notificationStoreLoaded", callback, { once: true });
+        return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "/js/notification-store.js?v=20260712-m5";
+    script.dataset.azielNotificationStore = "true";
+    script.onload = () => {
+        window.dispatchEvent(new Event("aziel:notificationStoreLoaded"));
+        callback();
+    };
+
+    document.head.appendChild(script);
+}
+
+function renderNotificationBadge(unreadCount) {
+    const badge = document.getElementById("headerNotificationCount");
+    if (!badge) return;
+
+    const count = Number(unreadCount || 0);
+
+    badge.textContent = count > 99 ? "99+" : String(count);
+    badge.style.display = count > 0 ? "flex" : "none";
 }
 
 function renderHeaderNav() {

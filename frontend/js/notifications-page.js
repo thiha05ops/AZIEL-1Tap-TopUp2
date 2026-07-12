@@ -1,237 +1,249 @@
 // frontend/js/notifications-page.js
+// Notification Center consumes AZIEL_NOTIFICATIONS.
+
+let activeNotificationFilter = "all";
+
+const notificationFilters = [
+    ["all", "All"],
+    ["unread", "Unread"],
+    ["orders", "Orders"],
+    ["payments", "Payments"],
+    ["wallet", "Wallet"],
+    ["support", "Support"],
+    ["system", "System"]
+];
 
 document.addEventListener("DOMContentLoaded", () => {
-    loadNotificationPage();
-    initNotificationActions();
+    initNotificationPage();
 });
 
-let pageNotifications = [];
+function initNotificationPage() {
+    renderNotificationFilters();
+    bindNotificationPageActions();
 
-function notificationApiUrl(path) {
-    if (window.AZIEL?.apiUrl) {
-        return window.AZIEL.apiUrl(path);
-    }
-
-    const base =
-        location.port === "5500"
-            ? "http://localhost:3000"
-            : "";
-
-    return `${base}${path}`;
-}
-
-async function loadNotificationPage() {
-    const username =
-        window.AZIEL?.user?.username ||
-        localStorage.getItem("username");
-
-    const list = document.getElementById("notificationsList");
-    if (!list) return;
-
-    if (!username) {
-        list.innerHTML = `<div class="empty-noti">Please login first.</div>`;
+    if (!window.AZIEL_NOTIFICATIONS) {
+        renderNotificationError("Notification system is unavailable.");
         return;
     }
 
-    try {
-        const res = await fetch(
-            notificationApiUrl(`/api/notifications/${encodeURIComponent(username)}`),
-            {
-                headers: getNotificationAuthHeaders()
-            }
-        );
+    window.AZIEL_NOTIFICATIONS.subscribe(renderNotificationPage);
+    window.AZIEL_NOTIFICATIONS.init();
+}
 
-        const data = await res.json();
+function bindNotificationPageActions() {
+    document.getElementById("markAllReadBtn")?.addEventListener("click", () => {
+        window.AZIEL_NOTIFICATIONS?.markAllRead();
+    });
 
-        if (!data.success) {
-            list.innerHTML = `<div class="empty-noti">Failed to load notifications.</div>`;
-            return;
+    document.getElementById("loadMoreNotificationsBtn")?.addEventListener("click", () => {
+        window.AZIEL_NOTIFICATIONS?.loadMore();
+    });
+}
+
+function renderNotificationFilters() {
+    const box = document.getElementById("notificationFilters");
+    if (!box) return;
+
+    box.innerHTML = notificationFilters.map(([key, label]) => `
+        <button class="noti-filter ${key === activeNotificationFilter ? "active" : ""}" type="button" data-filter="${key}">
+            ${escapeHTML(label)}
+        </button>
+    `).join("");
+
+    box.querySelectorAll(".noti-filter").forEach(btn => {
+        btn.addEventListener("click", () => {
+            activeNotificationFilter = btn.dataset.filter || "all";
+            renderNotificationFilters();
+            renderNotificationPage(window.AZIEL_NOTIFICATIONS?.getState?.() || {});
+        });
+    });
+}
+
+function renderNotificationPage(state) {
+    const list = document.getElementById("notificationsList");
+    const unread = document.getElementById("notificationUnreadContext");
+    const loadMore = document.getElementById("loadMoreNotificationsBtn");
+
+    if (unread) {
+        const count = Number(state.unreadCount || 0);
+        unread.textContent = count === 1
+            ? "1 unread notification"
+            : `${count.toLocaleString()} unread notifications`;
+    }
+
+    if (!list) return;
+
+    if (state.loading && !state.notifications?.length) {
+        list.innerHTML = renderNotificationSkeleton();
+        return;
+    }
+
+    if (state.error) {
+        renderNotificationError(state.error);
+        return;
+    }
+
+    const filtered = filterNotifications(state.notifications || []);
+
+    if (!filtered.length) {
+        list.innerHTML = `
+            <div class="noti-empty-state">
+                <i class="fa-regular fa-bell"></i>
+                <h2>${activeNotificationFilter === "all" ? "No notifications yet" : "No matching notifications"}</h2>
+                <p>Order, wallet, payment, support and system updates will appear here.</p>
+            </div>
+        `;
+    } else {
+        list.innerHTML = filtered.map(renderNotificationItem).join("");
+    }
+
+    bindNotificationItems();
+
+    if (loadMore) {
+        loadMore.hidden = !state.pagination?.hasMore;
+        loadMore.disabled = Boolean(state.loading);
+        loadMore.textContent = state.loading ? "Loading..." : "Load More";
+    }
+}
+
+function filterNotifications(notifications) {
+    if (activeNotificationFilter === "all") return notifications;
+    if (activeNotificationFilter === "unread") {
+        return notifications.filter(item => !item.read);
+    }
+
+    return notifications.filter(item => {
+        if (activeNotificationFilter === "system") {
+            return ["system", "announcements", "promotions", "security"].includes(item.category);
         }
 
-        pageNotifications = data.notifications || [];
-        renderNotificationGroups();
-    } catch (error) {
-        console.log("Notification page error:", error);
-        list.innerHTML = `<div class="empty-noti">Failed to load notifications.</div>`;
-    }
+        return item.category === activeNotificationFilter;
+    });
 }
 
-function renderNotificationGroups() {
+function renderNotificationItem(item) {
+    const action = getSafeAction(item.action);
+
+    return `
+        <article class="noti-card ${item.read ? "" : "unread"}" data-id="${escapeHTML(item.id)}">
+            <div class="noti-icon">${getCategoryIcon(item.category, item.type)}</div>
+
+            <div class="noti-content">
+                <div class="noti-card-head">
+                    <span class="noti-category">${escapeHTML(formatCategory(item.category))}</span>
+                    <time>${escapeHTML(formatNotificationTime(item.createdAt))}</time>
+                </div>
+
+                <h2>${escapeHTML(item.title)}</h2>
+                <p>${escapeHTML(item.message)}</p>
+
+                <div class="noti-card-actions">
+                    ${action ? `
+                        <a class="noti-action-link" href="${escapeHTML(action.url)}" data-action-read="${escapeHTML(item.id)}">
+                            ${escapeHTML(action.label || "Open")}
+                        </a>
+                    ` : ""}
+
+                    ${item.read ? `
+                        <span class="noti-read-state">Read</span>
+                    ` : `
+                        <button class="noti-read-btn" type="button" data-mark-read="${escapeHTML(item.id)}">
+                            Mark read
+                        </button>
+                    `}
+                </div>
+            </div>
+        </article>
+    `;
+}
+
+function bindNotificationItems() {
+    document.querySelectorAll("[data-mark-read]").forEach(btn => {
+        btn.addEventListener("click", () => {
+            window.AZIEL_NOTIFICATIONS?.markRead(btn.dataset.markRead);
+        });
+    });
+
+    document.querySelectorAll("[data-action-read]").forEach(link => {
+        link.addEventListener("click", () => {
+            window.AZIEL_NOTIFICATIONS?.markRead(link.dataset.actionRead);
+        });
+    });
+}
+
+function getSafeAction(action) {
+    if (!action?.url) return null;
+
+    const url = String(action.url || "");
+
+    if (/^\s*javascript:/i.test(url)) return null;
+    if (!url.startsWith("/") && !/^[a-z0-9_-]+\.html/i.test(url)) return null;
+
+    return {
+        label: action.label || "Open",
+        url
+    };
+}
+
+function getCategoryIcon(category, type) {
+    if (category === "orders" || type === "order") return '<i class="fa-solid fa-box"></i>';
+    if (category === "payments") return '<i class="fa-solid fa-credit-card"></i>';
+    if (category === "wallet") return '<i class="fa-solid fa-wallet"></i>';
+    if (category === "support") return '<i class="fa-solid fa-headset"></i>';
+    if (category === "promotions") return '<i class="fa-solid fa-gift"></i>';
+    if (category === "announcements") return '<i class="fa-solid fa-bullhorn"></i>';
+    return '<i class="fa-regular fa-bell"></i>';
+}
+
+function formatCategory(category) {
+    return {
+        orders: "Orders",
+        payments: "Payments",
+        wallet: "Wallet",
+        support: "Support",
+        announcements: "Announcement",
+        promotions: "Promotion",
+        security: "Security",
+        system: "System"
+    }[category] || "Notification";
+}
+
+function renderNotificationSkeleton() {
+    return Array.from({ length: 5 }).map(() => `
+        <div class="noti-card skeleton">
+            <div class="noti-icon"></div>
+            <div class="noti-content">
+                <span></span>
+                <h2></h2>
+                <p></p>
+            </div>
+        </div>
+    `).join("");
+}
+
+function renderNotificationError(message) {
     const list = document.getElementById("notificationsList");
     if (!list) return;
 
-    const visible = pageNotifications.filter(n => !n.deletedByUser);
-
-    if (!visible.length) {
-        list.innerHTML = `<div class="empty-noti">No notifications yet.</div>`;
-        return;
-    }
-
-    const groups = [
-        { key: "orders", title: "Order Updates" },
-        { key: "announcements", title: "Admin Announcements" },
-        { key: "promotions", title: "Promotions & Discounts" },
-        { key: "system", title: "System" }
-    ];
-
-    list.innerHTML = groups.map(group => {
-        const items = visible.filter(n =>
-            (n.category || "system") === group.key
-        );
-
-        if (!items.length) return "";
-
-        return `
-            <section class="category-block">
-                <h2 class="category-title">${escapeHTML(group.title)}</h2>
-                ${items.map(renderNotificationItem).join("")}
-            </section>
-        `;
-    }).join("");
-}
-
-function renderNotificationItem(n) {
-    const status = n.isRead ? "" : "unread";
-    const id = String(n._id || "");
-
-    return `
-        <div class="notif-item ${status}" data-id="${escapeHTML(id)}">
-            <div class="notif-main"
-                 onclick="openNotification('${escapeHTML(id)}')">
-                <h3>
-                    ${getTypeIcon(n.type)} ${escapeHTML(n.title || "Notification")}
-                </h3>
-
-                <p>${escapeHTML(n.message || "")}</p>
-
-                <small>${escapeHTML(formatNotificationTime(n.createdAt))}</small>
-            </div>
-
-            <div class="notif-actions">
-                <button onclick="markOneRead('${escapeHTML(id)}')" title="Mark as read">
-                    ✓
-                </button>
-
-                <button onclick="deleteNotification('${escapeHTML(id)}')" title="Delete">
-                    ×
-                </button>
-            </div>
+    list.innerHTML = `
+        <div class="noti-empty-state error">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <h2>Could not load notifications</h2>
+            <p>${escapeHTML(message || "Please try again.")}</p>
         </div>
     `;
 }
 
-async function openNotification(id) {
-    const n = pageNotifications.find(item => String(item._id) === String(id));
-    if (!n) return;
-
-    await markOneRead(id);
-
-    if (n.orderId) {
-        window.location.href =
-            `tracking.html?orderId=${encodeURIComponent(n.orderId)}`;
-    }
-}
-
-async function markOneRead(id) {
-    const n = pageNotifications.find(item => String(item._id) === String(id));
-
-    if (n) n.isRead = true;
-
-    renderNotificationGroups();
-
-    try {
-        await fetch(notificationApiUrl(`/api/notifications/${encodeURIComponent(id)}/read`), {
-            method: "PUT",
-            headers: getNotificationAuthHeaders()
-        });
-    } catch (error) {
-        console.log("Mark read error:", error);
-    }
-}
-
-async function deleteNotification(id) {
-    pageNotifications = pageNotifications.filter(
-        item => String(item._id) !== String(id)
-    );
-
-    renderNotificationGroups();
-
-    try {
-        await fetch(notificationApiUrl(`/api/notifications/${encodeURIComponent(id)}`), {
-            method: "DELETE",
-            headers: getNotificationAuthHeaders()
-        });
-    } catch (error) {
-        console.log("Delete notification error:", error);
-    }
-}
-
-function initNotificationActions() {
-    const markAllBtn = document.getElementById("markAllReadBtn");
-
-    if (markAllBtn) {
-        markAllBtn.addEventListener("click", markAllRead);
-    }
-}
-
-async function markAllRead() {
-    const username =
-        window.AZIEL?.user?.username ||
-        localStorage.getItem("username");
-
-    if (!username) return;
-
-    pageNotifications.forEach(n => {
-        n.isRead = true;
-    });
-
-    renderNotificationGroups();
-
-    try {
-        await fetch(
-            notificationApiUrl(`/api/notifications/${encodeURIComponent(username)}/read-all`),
-            {
-                method: "PUT",
-                headers: getNotificationAuthHeaders()
-            }
-        );
-    } catch (error) {
-        console.log("Mark all read error:", error);
-    }
-}
-
-function getTypeIcon(type) {
-    const map = {
-        order_completed: "✅",
-        topup_delayed: "⚠️",
-        announcement: "📢",
-        promo: "🎁",
-        system: "🔔",
-        general: "🔔"
-    };
-
-    return map[type] || "🔔";
-}
-
 function formatNotificationTime(date) {
-    if (!date) return "";
-    return new Date(date).toLocaleString();
-}
+    const parsed = new Date(date);
+    if (Number.isNaN(parsed.getTime())) return "";
 
-// Live socket can call this
-function prependLiveNotification(data) {
-    pageNotifications.unshift({
-        _id: data._id || Date.now(),
-        title: data.title || "Notification",
-        message: data.message || "",
-        type: data.type || "general",
-        category: data.category || "system",
-        orderId: data.orderId || "",
-        isRead: false,
-        createdAt: new Date()
+    return parsed.toLocaleString([], {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
     });
-
-    renderNotificationGroups();
 }
 
 function escapeHTML(value) {
@@ -241,8 +253,4 @@ function escapeHTML(value) {
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#039;");
-}
-
-function getNotificationAuthHeaders() {
-    return window.AZIEL?.authHeaders?.() || {};
 }

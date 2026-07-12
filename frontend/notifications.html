@@ -3,14 +3,13 @@
 
 <head>
     <meta charset="UTF-8">
-
     <title>Notifications - AZIEL</title>
 
     <link rel="stylesheet" href="/css/core/main.css">
-    <link rel="stylesheet" href="/css/components.css">
-    <link rel="stylesheet" href="/css/support/notifications.css">
-    <link rel="stylesheet" href="/css/notifications/notification.css">
+    <link rel="stylesheet" href="/css/core/components.css">
     <link rel="stylesheet" href="/css/theme/aziel-design-system.css">
+    <link rel="stylesheet" href="/css/theme/aziel-header.css">
+    <link rel="stylesheet" href="/css/notifications/notification.css">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="manifest" href="/manifest.json">
@@ -19,31 +18,41 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="AZIEL">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 </head>
 
 <body>
-
-    <header class="az-topbar">
-        <a href="home.html" class="az-topbar-brand">AZIEL</a>
-
-        <div class="az-topbar-actions">
-            <a href="home.html">Home</a>
-            <a href="account.html">Account</a>
-            <button id="markAllReadBtn">Mark all read</button>
-        </div>
-    </header>
+    <div id="azHeaderMount" data-nav="account"></div>
 
     <main class="noti-page">
         <section class="noti-hero">
-            <span>Notification Center</span>
-            <h1>Notifications</h1>
-            <p>Order updates, admin announcements and promotions will appear here.</p>
+            <div>
+                <span>Notification Center</span>
+                <h1>Notifications</h1>
+                <p>Order, payment, wallet, support and system updates in one secure inbox.</p>
+            </div>
+
+            <div class="noti-hero-actions">
+                <strong id="notificationUnreadContext">0 unread notifications</strong>
+                <button id="markAllReadBtn" type="button">
+                    <i class="fa-solid fa-check-double"></i>
+                    Mark all read
+                </button>
+            </div>
         </section>
 
-        <div id="notificationsList" class="notifications-list">
+        <section class="noti-toolbar">
+            <div id="notificationFilters" class="noti-filters"></div>
+        </section>
+
+        <section id="notificationsList" class="notifications-list">
             Loading...
+        </section>
+
+        <div class="noti-load-more">
+            <button id="loadMoreNotificationsBtn" type="button" hidden>
+                Load More
+            </button>
         </div>
     </main>
 
@@ -70,13 +79,17 @@
     </nav>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="js/user-state.js"></script>
-    <script src="js/socket-client.js"></script>
-    <script src="js/api.js"></script>
-    <script src="js/notifications-page.js"></script>
-    <script src="js/notification-live.js?v=10"></script>
-    <script src="js/pwa-fix.js"></script>
-    <script src="js/site-settings.js"></script>
+    <script src="/js/theme.js?v=20260712-notifications"></script>
+    <script src="/js/user-state.js"></script>
+    <script src="/js/socket-client.js?v=20260712"></script>
+    <script src="/js/notification-store.js?v=20260712-m5"></script>
+    <script src="/js/header-loader.js?v=20260712-m5"></script>
+    <script src="/js/header.js?v=20260712-m5"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/notifications-page.js?v=20260712-m5"></script>
+    <script src="/js/notification-live.js?v=20260712-m5"></script>
+    <script src="/js/pwa-fix.js"></script>
+    <script src="/js/site-settings.js"></script>
 </body>
 
 </html>
