@@ -122,6 +122,7 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             const res = await fetch(apiUrl("/api/payment/submit"), {
                 method: "POST",
+                headers: window.AZIEL?.authHeaders?.() || {},
                 body: formData
             });
 

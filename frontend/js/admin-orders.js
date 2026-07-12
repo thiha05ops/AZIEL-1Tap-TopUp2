@@ -332,7 +332,7 @@ function openOrderModal(order) {
         ${slip ? `
             <div class="order-screenshot-box">
                 <small>Payment Slip</small>
-                <img src="${escapeHTML(getUploadUrl(slip))}" alt="Payment Slip">
+                <img src="${escapeHTML(getUploadUrl(slip))}" alt="Payment Slip" onerror="handleAdminOrderImageError(this)">
             </div>
         ` : ""}
 
@@ -354,6 +354,13 @@ function openOrderModal(order) {
 
 function closeOrderModal() {
     document.getElementById("orderDetailModal")?.classList.remove("show");
+}
+
+function handleAdminOrderImageError(img) {
+    const fallback = document.createElement("p");
+    fallback.className = "admin-missing-image";
+    fallback.textContent = "Payment slip image unavailable";
+    img.replaceWith(fallback);
 }
 
 function detailItem(label, value) {
@@ -404,7 +411,8 @@ function formatDate(date) {
 
 function getUploadUrl(path) {
     if (!path) return "";
-    if (path.startsWith("http://") || path.startsWith("https://")) return path;
+    if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("/uploads/")) return path;
+    if (path.startsWith("SLIP-")) return `/uploads/orders/${path}`;
     return path;
 }
 

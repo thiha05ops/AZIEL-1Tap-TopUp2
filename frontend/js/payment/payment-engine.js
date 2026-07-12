@@ -6,7 +6,8 @@
         const res = await fetch(PaymentUtils.apiUrl("/api/payment/create"), {
             method: "POST",
             headers: {
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                ...PaymentUtils.authHeaders()
             },
             body: JSON.stringify(orderData)
         });

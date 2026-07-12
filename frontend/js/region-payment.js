@@ -59,11 +59,14 @@ async function loadDynamicPaymentMethods(region) {
             const name = pay.method || "Payment";
             const key = pay.key || name.toLowerCase();
 
-            const logo = normalizeAssetPath(
-                pay.logo || pay.qrImage || getPaymentLogo(key)
+            const logo = getPaymentLogo(key);
+            const qrImage = normalizeAssetPath(
+                pay.finalQrImage ||
+                pay.uploadedQrImage ||
+                pay.qrImageUrl ||
+                pay.qrImage ||
+                ""
             );
-
-            const qrImage = normalizeAssetPath(pay.qrImage || "");
 
             const card = document.createElement("div");
             card.className = `pay-card ${index === 0 ? "active" : ""}`;
@@ -131,22 +134,37 @@ function selectPaymentCard(card) {
 }
 
 function getPaymentLogo(key) {
+    const normalizedKey = normalizePaymentKey(key);
     const logos = {
-        kbzpay: ASSET.payment("kbzpay.png"),
-        wavepay: ASSET.payment("wavepay.png"),
-        ayapay: ASSET.payment("ayapay.png"),
-        promptpay: ASSET.payment("promptpay.png"),
-        scb: ASSET.payment("scb.png"),
-        wallet: ASSET.payment("wallet.png")
+        kbzpay: "assets/payment/kbzpay.png",
+        wavepay: "assets/payment/wavepay.png",
+        ayapay: "assets/payment/ayapay.png",
+        promptpay: "assets/payment/promptpay.png",
+        scb: "assets/payment/scb.png",
+        wallet: "assets/logo.png"
     };
 
-    return logos[key] || ASSET.root("logo.png");
+    return logos[normalizedKey] || "assets/logo.png";
+}
+
+function normalizePaymentKey(value) {
+    return String(value || "")
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, "")
+        .replaceAll("-", "")
+        .replaceAll("_", "")
+        .replace(/[^a-z0-9]/g, "");
 }
 
 function normalizeAssetPath(path) {
     if (!path) return "";
     if (path.startsWith("http")) return path;
     if (path.startsWith("data:")) return path;
+
+    if (path.startsWith("/uploads/") && location.port === "5500") {
+        return `http://localhost:3000${path}`;
+    }
 
     path = path.replace(/^\/+/, "");
     path = path.replace(/^frontend\//, "");

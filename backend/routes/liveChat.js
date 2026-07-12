@@ -1,15 +1,17 @@
 const express = require("express");
 const router = express.Router();
 const LiveChat = require("../models/LiveChat");
+const authMiddleware = require("../middleware/authMiddleware");
+const adminMiddleware = require("../middleware/adminMiddleware");
 
 function makeChatId() {
     return "CHAT-" + Date.now() + "-" + Math.floor(Math.random() * 9999);
 }
 
 // USER SEND MESSAGE
-router.post("/send", async (req, res) => {
+router.post("/send", authMiddleware, async (req, res) => {
     try {
-        const username = (req.body.username || "Guest").trim();
+        const username = req.user.username;
         const message = (req.body.message || "").trim();
 
         if (!message) {
@@ -58,10 +60,10 @@ router.post("/send", async (req, res) => {
 });
 
 // USER GET OWN CHAT
-router.get("/user/:username", async (req, res) => {
+router.get("/user/:username", authMiddleware, async (req, res) => {
     try {
         const chat = await LiveChat.findOne({
-            username: req.params.username,
+            username: req.user.username,
             status: "active"
         });
 
@@ -73,10 +75,10 @@ router.get("/user/:username", async (req, res) => {
 });
 
 // USER UNREAD COUNT
-router.get("/user/:username/unread", async (req, res) => {
+router.get("/user/:username/unread", authMiddleware, async (req, res) => {
     try {
         const chat = await LiveChat.findOne({
-            username: req.params.username,
+            username: req.user.username,
             status: "active"
         });
 
@@ -95,10 +97,10 @@ router.get("/user/:username/unread", async (req, res) => {
 });
 
 // USER MARK ADMIN MESSAGES AS READ
-router.put("/user/:username/read", async (req, res) => {
+router.put("/user/:username/read", authMiddleware, async (req, res) => {
     try {
         const chat = await LiveChat.findOne({
-            username: req.params.username,
+            username: req.user.username,
             status: "active"
         });
 
@@ -118,7 +120,7 @@ router.put("/user/:username/read", async (req, res) => {
 });
 
 // ADMIN GET ALL ACTIVE CHATS
-router.get("/admin", async (req, res) => {
+router.get("/admin", adminMiddleware, async (req, res) => {
     try {
         const chats = await LiveChat.find({ status: "active" }).sort({
             lastMessageAt: -1
@@ -132,7 +134,7 @@ router.get("/admin", async (req, res) => {
 });
 
 // ADMIN REPLY
-router.post("/admin/reply/:chatId", async (req, res) => {
+router.post("/admin/reply/:chatId", adminMiddleware, async (req, res) => {
     try {
         const message = (req.body.message || "").trim();
 
@@ -173,7 +175,7 @@ router.post("/admin/reply/:chatId", async (req, res) => {
 });
 
 // ADMIN MARK USER MESSAGES AS READ
-router.put("/admin/read/:chatId", async (req, res) => {
+router.put("/admin/read/:chatId", adminMiddleware, async (req, res) => {
     try {
         const chat = await LiveChat.findOne({
             chatId: req.params.chatId,
@@ -199,7 +201,7 @@ router.put("/admin/read/:chatId", async (req, res) => {
 });
 
 // ADMIN DELETE
-router.delete("/admin/delete/:chatId", async (req, res) => {
+router.delete("/admin/delete/:chatId", adminMiddleware, async (req, res) => {
     try {
         const chat = await LiveChat.findOneAndUpdate(
             { chatId: req.params.chatId },
@@ -222,7 +224,7 @@ router.delete("/admin/delete/:chatId", async (req, res) => {
 });
 
 // AUTO CLEAN 1 HOUR
-router.delete("/auto-clean", async (req, res) => {
+router.delete("/auto-clean", adminMiddleware, async (req, res) => {
     try {
         const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
 

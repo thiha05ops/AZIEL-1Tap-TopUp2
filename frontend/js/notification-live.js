@@ -64,7 +64,10 @@ function startNotificationSystem() {
 async function loadNotifications(username) {
     try {
         const res = await fetch(
-            notificationLiveApiUrl(`/api/notifications/${encodeURIComponent(username)}`)
+            notificationLiveApiUrl(`/api/notifications/${encodeURIComponent(username)}`),
+            {
+                headers: getNotificationLiveAuthHeaders()
+            }
         );
 
         const data = await res.json();
@@ -147,7 +150,10 @@ async function markAsRead(id) {
     try {
         await fetch(
             notificationLiveApiUrl(`/api/notifications/${encodeURIComponent(id)}/read`),
-            { method: "PUT" }
+            {
+                method: "PUT",
+                headers: getNotificationLiveAuthHeaders()
+            }
         );
     } catch (error) {
         console.log("Mark notification read error:", error);
@@ -203,6 +209,10 @@ function showNotificationPopup(data) {
             popup.remove();
         }, 400);
     }, 5000);
+}
+
+function getNotificationLiveAuthHeaders() {
+    return window.AZIEL?.authHeaders?.() || {};
 }
 
 function unlockNotificationSound() {

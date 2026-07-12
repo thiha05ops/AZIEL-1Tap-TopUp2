@@ -8,6 +8,7 @@ const User = require("../models/User");
 const WalletTransaction = require("../models/WalletTransaction");
 
 const upload = require("../middleware/orderUpload");
+const authMiddleware = require("../middleware/authMiddleware");
 
 const {
     sendTelegramMessage,
@@ -29,11 +30,43 @@ function createTransactionId(prefix = "WTX") {
     return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 }
 
+function getAuthenticatedUsername(req) {
+    return req.user?.username || "";
+}
+
+function publicTrackingOrder(order) {
+    return {
+        orderId: order.orderId,
+        game: order.game,
+        userId: order.userId,
+        zoneId: order.zoneId || "",
+        packageName: order.packageName,
+        selectedPackage: order.packageName,
+        amount: order.amount,
+        currency: order.currency,
+        region: order.region,
+        paymentMethod: order.paymentMethod,
+        status: order.status,
+        note: order.note,
+        refundRequested: order.refundRequested,
+        refundRequestReason: order.refundRequestReason,
+        refundRequestedAt: order.refundRequestedAt,
+        refunded: order.refunded,
+        refundAmount: order.refundAmount,
+        refundReason: order.refundReason,
+        refundRejectedReason: order.refundRejectedReason,
+        refundMethod: order.refundMethod,
+        refundedAt: order.refundedAt,
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt
+    };
+}
+
 // CUSTOMER ORDER HISTORY
-router.get("/history/:username", async (req, res) => {
+router.get("/history/:username", authMiddleware, async (req, res) => {
     try {
         const orders = await Order.find({
-            username: req.params.username
+            username: getAuthenticatedUsername(req)
         }).sort({ createdAt: -1 });
 
         res.json({ success: true, orders });
@@ -45,10 +78,10 @@ router.get("/history/:username", async (req, res) => {
 });
 
 // CUSTOMER RECENT ORDERS
-router.get("/order/user/:username", async (req, res) => {
+router.get("/order/user/:username", authMiddleware, async (req, res) => {
     try {
         const orders = await Order.find({
-            username: req.params.username
+            username: getAuthenticatedUsername(req)
         }).sort({ createdAt: -1 });
 
         res.json({ success: true, orders });
@@ -73,7 +106,10 @@ router.get("/order/track/:orderId", async (req, res) => {
             });
         }
 
-        res.json({ success: true, order });
+        res.json({
+            success: true,
+            order: publicTrackingOrder(order)
+        });
 
     } catch (error) {
         console.log("Track error:", error);
@@ -83,9 +119,10 @@ router.get("/order/track/:orderId", async (req, res) => {
 
 // CUSTOMER REQUEST REFUND
 // POST /api/order/:orderId/refund-request
-router.post("/order/:orderId/refund-request", async (req, res) => {
+router.post("/order/:orderId/refund-request", authMiddleware, async (req, res) => {
     try {
-        const { username, reason } = req.body;
+        const { reason } = req.body;
+        const username = getAuthenticatedUsername(req);
 
         if (!reason || !String(reason).trim()) {
             return res.json({
@@ -95,20 +132,14 @@ router.post("/order/:orderId/refund-request", async (req, res) => {
         }
 
         const order = await Order.findOne({
-            orderId: req.params.orderId
+            orderId: req.params.orderId,
+            username
         });
 
         if (!order) {
-            return res.json({
+            return res.status(404).json({
                 success: false,
                 message: "Order not found"
-            });
-        }
-
-        if (username && order.username !== username) {
-            return res.json({
-                success: false,
-                message: "This order does not belong to your account"
             });
         }
 
@@ -607,11 +638,11 @@ router.post("/admin/orders/:id/refund", adminMiddleware, async (req, res) => {
 });
 
 // LEGACY / MANUAL ORDER CREATE
-router.post("/orders", upload.single("paymentSlip"), async (req, res) => {
+router.post("/orders", authMiddleware, upload.single("paymentSlip"), async (req, res) => {
     try {
         const order = await Order.create({
             orderId: req.body.orderId,
-            username: req.body.username || "guest",
+            username: getAuthenticatedUsername(req),
             game: req.body.game,
             userId: req.body.userId,
             zoneId: req.body.zoneId || "",

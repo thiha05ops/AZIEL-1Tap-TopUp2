@@ -13,18 +13,27 @@ function adminMiddleware(req, res, next) {
             });
         }
 
-        const token = authHeader.split(" ")[1];
+        const token = authHeader.slice("Bearer ".length).trim();
+
+        if (!token) {
+            return res.status(401).json({
+                success: false,
+                message: "Admin token missing"
+            });
+        }
+
         const decoded = jwt.verify(token, JWT_SECRET);
 
         if (decoded.role !== "admin") {
             return res.status(403).json({
                 success: false,
-                message: "Unauthorized admin request"
+                message: "Forbidden"
             });
         }
 
         req.admin = {
-            role: "admin"
+            role: "admin",
+            username: decoded.username || "admin"
         };
 
         next();

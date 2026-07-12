@@ -150,9 +150,7 @@ function renderOrders() {
             order.slip ||
             "";
 
-        const slipUrl = slip.startsWith("/uploads/")
-            ? slip
-            : `/uploads/${slip}`;
+        const slipUrl = getAdminUploadUrl(slip);
 
         return `
             <tr>
@@ -183,7 +181,7 @@ function renderOrders() {
 
                 <td>
                     ${slip
-                ? `<img src="${slipUrl}" class="slip-img" data-slip="${slipUrl}">`
+                ? `<img src="${slipUrl}" class="slip-img" data-slip="${slipUrl}" onerror="handleLegacyAdminImageError(this)">`
                 : "-"
             }
                 </td>
@@ -211,6 +209,21 @@ function renderOrders() {
             updateStatus(btn.dataset.id, btn.dataset.status);
         });
     });
+}
+
+function getAdminUploadUrl(path) {
+    if (!path) return "";
+    if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("/uploads/")) return path;
+    if (path.startsWith("SLIP-")) return `/uploads/orders/${path}`;
+    if (path.startsWith("wallet-")) return `/uploads/slips/${path}`;
+    return `/uploads/${path}`;
+}
+
+function handleLegacyAdminImageError(img) {
+    const fallback = document.createElement("span");
+    fallback.className = "admin-missing-image";
+    fallback.textContent = "Image unavailable";
+    img.replaceWith(fallback);
 }
 
 async function updateStatus(id, status) {

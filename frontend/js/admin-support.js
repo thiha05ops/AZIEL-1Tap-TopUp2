@@ -187,6 +187,7 @@ function renderTicketCard(ticket) {
                 <img
                     src="${screenshot}"
                     class="ticket-image-admin"
+                    onerror="handleAdminSupportImageError(this)"
                     onclick="window.open('${screenshot}','_blank')"
                 >
             `
@@ -246,6 +247,13 @@ function renderTicketCard(ticket) {
 
         </div>
     `;
+}
+
+function handleAdminSupportImageError(img) {
+    const fallback = document.createElement("p");
+    fallback.className = "admin-missing-image";
+    fallback.textContent = "Support image unavailable";
+    img.replaceWith(fallback);
 }
 
 // ======================================

@@ -13,12 +13,11 @@ let activeChat = null;
 
 async function loadChats() {
     try {
-        const res = await fetch("/api/live-chat/admin");
-        const data = await res.json();
+        const data = await adminFetch("/api/live-chat/admin");
 
         console.log("ADMIN CHATS:", data);
 
-        if (!data.success) {
+        if (!data?.success) {
             chatList.innerHTML = `<p class="empty">Failed to load chats</p>`;
             return;
         }
@@ -94,15 +93,13 @@ replyForm.addEventListener("submit", async e => {
     const message = replyInput.value.trim();
     if (!message) return;
 
-    const res = await fetch(`/api/live-chat/admin/reply/${activeChat.chatId}`, {
+    const data = await adminFetch(`/api/live-chat/admin/reply/${activeChat.chatId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message })
     });
 
-    const data = await res.json();
-
-    if (data.success) {
+    if (data?.success) {
         replyInput.value = "";
         activeChat = data.chat;
         renderMessages(activeChat);
@@ -113,7 +110,7 @@ replyForm.addEventListener("submit", async e => {
 deleteChatBtn.addEventListener("click", async () => {
     if (!activeChat) return;
 
-    await fetch(`/api/live-chat/admin/delete/${activeChat.chatId}`, {
+    await adminFetch(`/api/live-chat/admin/delete/${activeChat.chatId}`, {
         method: "DELETE"
     });
 

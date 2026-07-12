@@ -24,6 +24,10 @@ function trackingApiUrl(path) {
     return `${base}${path}`;
 }
 
+function getTrackingAuthHeaders(extra = {}) {
+    return window.AZIEL?.authHeaders?.(extra) || extra;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     const params = new URLSearchParams(window.location.search);
     const orderIdFromUrl = params.get("orderId");
@@ -420,9 +424,9 @@ async function submitRefundRequest() {
             trackingApiUrl(`/api/order/${encodeURIComponent(order.orderId)}/refund-request`),
             {
                 method: "POST",
-                headers: {
+                headers: getTrackingAuthHeaders({
                     "Content-Type": "application/json"
-                },
+                }),
                 body: JSON.stringify({
                     username,
                     reason
@@ -670,7 +674,10 @@ async function loadRecentOrders() {
 
     try {
         const res = await fetch(
-            trackingApiUrl(`/api/order/user/${encodeURIComponent(username)}`)
+            trackingApiUrl(`/api/order/user/${encodeURIComponent(username)}`),
+            {
+                headers: getTrackingAuthHeaders()
+            }
         );
 
         const data = await res.json();

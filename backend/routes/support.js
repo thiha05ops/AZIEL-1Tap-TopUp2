@@ -8,6 +8,8 @@ const path = require("path");
 const fs = require("fs");
 
 const SupportTicket = require("../models/SupportTicket");
+const Order = require("../models/Order");
+const authMiddleware = require("../middleware/authMiddleware");
 const adminMiddleware = require("../middleware/adminMiddleware");
 
 // UPLOAD SETUP
@@ -52,15 +54,30 @@ const upload = multer({
 // CREATE TICKET
 // POST /api/support/ticket
 
-router.post("/support/ticket", upload.single("screenshot"), async (req, res) => {
+router.post("/support/ticket", authMiddleware, upload.single("screenshot"), async (req, res) => {
     try {
-        const { username, type, subject, message, orderId } = req.body;
+        const { type, subject, message, orderId } = req.body;
+        const username = req.user.username;
 
-        if (!username || !subject || !message) {
+        if (!subject || !message) {
             return res.json({
                 success: false,
                 message: "Missing required fields"
             });
+        }
+
+        if (orderId) {
+            const ownedOrder = await Order.findOne({
+                orderId,
+                username
+            }).select("_id");
+
+            if (!ownedOrder) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Order not found"
+                });
+            }
         }
 
         const ticket = await SupportTicket.create({
@@ -103,10 +120,10 @@ router.post("/support/ticket", upload.single("screenshot"), async (req, res) => 
 // GET USER TICKETS
 // GET /api/support/my/:username
 
-router.get("/support/my/:username", async (req, res) => {
+router.get("/support/my/:username", authMiddleware, async (req, res) => {
     try {
         const tickets = await SupportTicket.find({
-            username: req.params.username
+            username: req.user.username
         }).sort({ createdAt: -1 });
 
         res.json({

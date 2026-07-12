@@ -13,6 +13,7 @@ const WalletTopup = require("../models/WalletTopup");
 const WalletTransaction = require("../models/WalletTransaction");
 const Notification = require("../models/Notification");
 const adminMiddleware = require("../middleware/adminMiddleware");
+const authMiddleware = require("../middleware/authMiddleware");
 const Omise = require("../services/opnService");
 
 // ======================
@@ -196,18 +197,18 @@ async function createWalletNotification(req, topup, title, message, type = "wall
 // POST /api/wallet/create
 // ======================
 
-router.post("/wallet/create", async (req, res) => {
+router.post("/wallet/create", authMiddleware, async (req, res) => {
     try {
         const {
-            username,
             amount,
             currency,
             region,
             paymentMethod,
             provider
         } = req.body;
+        const username = req.user.username;
 
-        if (!username || !amount || Number(amount) <= 0 || !paymentMethod) {
+        if (!amount || Number(amount) <= 0 || !paymentMethod) {
             return res.json({
                 success: false,
                 message: "Missing wallet topup data"
@@ -346,9 +347,9 @@ router.post("/wallet/create", async (req, res) => {
 // GET /api/wallet/:username
 // ======================
 
-router.get("/wallet/:username", async (req, res) => {
+router.get("/wallet/:username", authMiddleware, async (req, res) => {
     try {
-        const username = req.params.username;
+        const username = req.user.username;
         const currency = getCurrencyKey(req.query.currency || "MMK");
 
         const user = await User.findOne({ username });
@@ -393,14 +394,15 @@ router.get("/wallet/:username", async (req, res) => {
 // GET /api/wallet/status/:topupId
 // ======================
 
-router.get("/wallet/status/:topupId", async (req, res) => {
+router.get("/wallet/status/:topupId", authMiddleware, async (req, res) => {
     try {
         const topup = await WalletTopup.findOne({
-            topupId: req.params.topupId
+            topupId: req.params.topupId,
+            username: req.user.username
         });
 
         if (!topup) {
-            return res.json({
+            return res.status(404).json({
                 success: false,
                 message: "Topup not found"
             });
@@ -430,14 +432,15 @@ router.get("/wallet/status/:topupId", async (req, res) => {
 // POST /api/wallet/slip/:topupId
 // ======================
 
-router.post("/wallet/slip/:topupId", upload.single("slip"), async (req, res) => {
+async function uploadWalletSlip(req, res) {
     try {
         const topup = await WalletTopup.findOne({
-            topupId: req.params.topupId
+            topupId: req.params.topupId,
+            username: req.user.username
         });
 
         if (!topup) {
-            return res.json({
+            return res.status(404).json({
                 success: false,
                 message: "Topup not found"
             });
@@ -492,18 +495,14 @@ router.post("/wallet/slip/:topupId", upload.single("slip"), async (req, res) => 
             message: "Server error"
         });
     }
-});
+}
+
+router.post("/wallet/slip/:topupId", authMiddleware, upload.single("slip"), uploadWalletSlip);
 
 // alias routes for frontend fallback
-router.post("/wallet/topup/:topupId/slip", upload.single("slip"), async (req, res) => {
-    req.url = `/wallet/slip/${req.params.topupId}`;
-    router.handle(req, res);
-});
+router.post("/wallet/topup/:topupId/slip", authMiddleware, upload.single("slip"), uploadWalletSlip);
 
-router.post("/wallet/upload-slip/:topupId", upload.single("slip"), async (req, res) => {
-    req.url = `/wallet/slip/${req.params.topupId}`;
-    router.handle(req, res);
-});
+router.post("/wallet/upload-slip/:topupId", authMiddleware, upload.single("slip"), uploadWalletSlip);
 
 // ======================
 // ADMIN WALLET TOPUPS
@@ -729,11 +728,10 @@ async function markWalletTopupPaid(req, topupId) {
 // POST /api/wallet/pay
 // ======================
 
-router.post("/wallet/pay", async (req, res) => {
+router.post("/wallet/pay", authMiddleware, async (req, res) => {
     try {
         const {
             orderId,
-            username,
             userId,
             zoneId,
             game,
@@ -742,8 +740,9 @@ router.post("/wallet/pay", async (req, res) => {
             currency,
             region
         } = req.body;
+        const username = req.user.username;
 
-        if (!username || !amount || !game || !packageName) {
+        if (!amount || !game || !packageName) {
             return res.json({
                 success: false,
                 message: "Missing wallet payment data"

@@ -12,6 +12,19 @@
         return `${API_BASE}${path}`;
     }
 
+    function authHeaders(extra = {}) {
+        const token =
+            window.AZIEL?.getToken?.() ||
+            localStorage.getItem("token") ||
+            sessionStorage.getItem("token") ||
+            "";
+
+        return {
+            ...extra,
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+        };
+    }
+
     function normalizeUrl(path) {
         if (!path) return "";
         if (path.startsWith("http") || path.startsWith("data:")) return path;
@@ -254,6 +267,7 @@
         try {
             const res = await fetch(apiUrl("/api/payment/submit"), {
                 method: "POST",
+                headers: authHeaders(),
                 body: fd
             });
 
@@ -344,6 +358,7 @@
         hideQr,
         showQr,
         submitSlip,
+        authHeaders,
         bindSlipPreview,
         setMsg
     };

@@ -182,7 +182,10 @@ async function loadWallet() {
 
     try {
         const res = await fetch(
-            walletApiUrl(`/api/wallet/${encodeURIComponent(user.username)}?currency=${currency}`)
+            walletApiUrl(`/api/wallet/${encodeURIComponent(user.username)}?currency=${currency}`),
+            {
+                headers: AZIEL.authHeaders?.() || {}
+            }
         );
 
         const data = await res.json();
@@ -483,7 +486,9 @@ async function submitTopup() {
 
         const res = await fetch(walletApiUrl("/api/wallet/create"), {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: AZIEL.authHeaders?.({ "Content-Type": "application/json" }) || {
+                "Content-Type": "application/json"
+            },
             body: JSON.stringify({
                 username: user.username,
                 amount,
@@ -818,6 +823,7 @@ async function submitWalletSlip(topupId, file, btn, msgBox) {
             try {
                 const res = await fetch(walletApiUrl(endpoint), {
                     method: "POST",
+                    headers: AZIEL.authHeaders?.() || {},
                     body: formData
                 });
 
@@ -924,7 +930,10 @@ function startPaymentStatusPolling(topupId) {
 
         try {
             const res = await fetch(
-                walletApiUrl(`/api/wallet/status/${topupId}`)
+                walletApiUrl(`/api/wallet/status/${topupId}`),
+                {
+                    headers: AZIEL.authHeaders?.() || {}
+                }
             );
 
             const data = await res.json();

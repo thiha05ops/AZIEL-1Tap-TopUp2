@@ -12,6 +12,10 @@ function apiUrl(path) {
     return `${API_BASE}${path}`;
 }
 
+function getLiveChatAuthHeaders(extra = {}) {
+    return window.AZIEL?.authHeaders?.(extra) || extra;
+}
+
 const AZIEL_CHAT = {
     username:
         localStorage.getItem("username") ||
@@ -88,6 +92,15 @@ function createLiveChatUI() {
 }
 
 function initLiveChatSystem() {
+    if (!window.AZIEL?.getToken?.()) {
+        addChatMessage(
+            "bot",
+            "Please login to use live chat support.",
+            false
+        );
+        return;
+    }
+
     addChatMessage(
         "bot",
         "Hello 👋 Welcome to AZIEL Assistant. How can we help you today?",
@@ -133,9 +146,9 @@ async function sendLiveChatMessage() {
     try {
         const res = await fetch(apiUrl("/api/live-chat/send"), {
             method: "POST",
-            headers: {
+            headers: getLiveChatAuthHeaders({
                 "Content-Type": "application/json"
-            },
+            }),
             body: JSON.stringify({
                 username: AZIEL_CHAT.username,
                 message
@@ -170,7 +183,10 @@ async function sendLiveChatMessage() {
 async function loadLiveChatHistory() {
     try {
         const res = await fetch(
-            apiUrl(`/api/live-chat/user/${encodeURIComponent(AZIEL_CHAT.username)}`)
+            apiUrl(`/api/live-chat/user/${encodeURIComponent(AZIEL_CHAT.username)}`),
+            {
+                headers: getLiveChatAuthHeaders()
+            }
         );
 
         const data = await res.json();
@@ -209,7 +225,10 @@ async function loadLiveChatHistory() {
 async function loadUnreadCount() {
     try {
         const res = await fetch(
-            apiUrl(`/api/live-chat/user/${encodeURIComponent(AZIEL_CHAT.username)}/unread`)
+            apiUrl(`/api/live-chat/user/${encodeURIComponent(AZIEL_CHAT.username)}/unread`),
+            {
+                headers: getLiveChatAuthHeaders()
+            }
         );
 
         const data = await res.json();
@@ -227,7 +246,8 @@ async function markUserRead() {
         await fetch(
             apiUrl(`/api/live-chat/user/${encodeURIComponent(AZIEL_CHAT.username)}/read`),
             {
-                method: "PUT"
+                method: "PUT",
+                headers: getLiveChatAuthHeaders()
             }
         );
     } catch (error) {

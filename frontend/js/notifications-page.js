@@ -35,7 +35,10 @@ async function loadNotificationPage() {
 
     try {
         const res = await fetch(
-            notificationApiUrl(`/api/notifications/${encodeURIComponent(username)}`)
+            notificationApiUrl(`/api/notifications/${encodeURIComponent(username)}`),
+            {
+                headers: getNotificationAuthHeaders()
+            }
         );
 
         const data = await res.json();
@@ -138,7 +141,8 @@ async function markOneRead(id) {
 
     try {
         await fetch(notificationApiUrl(`/api/notifications/${encodeURIComponent(id)}/read`), {
-            method: "PUT"
+            method: "PUT",
+            headers: getNotificationAuthHeaders()
         });
     } catch (error) {
         console.log("Mark read error:", error);
@@ -154,7 +158,8 @@ async function deleteNotification(id) {
 
     try {
         await fetch(notificationApiUrl(`/api/notifications/${encodeURIComponent(id)}`), {
-            method: "DELETE"
+            method: "DELETE",
+            headers: getNotificationAuthHeaders()
         });
     } catch (error) {
         console.log("Delete notification error:", error);
@@ -185,7 +190,10 @@ async function markAllRead() {
     try {
         await fetch(
             notificationApiUrl(`/api/notifications/${encodeURIComponent(username)}/read-all`),
-            { method: "PUT" }
+            {
+                method: "PUT",
+                headers: getNotificationAuthHeaders()
+            }
         );
     } catch (error) {
         console.log("Mark all read error:", error);
@@ -233,4 +241,8 @@ function escapeHTML(value) {
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#039;");
+}
+
+function getNotificationAuthHeaders() {
+    return window.AZIEL?.authHeaders?.() || {};
 }

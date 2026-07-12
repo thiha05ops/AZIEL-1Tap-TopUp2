@@ -55,7 +55,7 @@ function renderTopups(topups) {
                 <p><b>Amount:</b> ${Number(item.amount || 0).toLocaleString()} ${escapeHTML(item.currency || "")}</p>
                 <p><b>Payment:</b> ${escapeHTML(item.paymentMethod || "-")}</p>
 
-                ${slip ? `<img class="topup-slip" src="${escapeHTML(slipUrl)}" data-slip="${escapeHTML(slipUrl)}">` : `<p>No slip uploaded</p>`}
+                ${slip ? `<img class="topup-slip" src="${escapeHTML(slipUrl)}" data-slip="${escapeHTML(slipUrl)}" onerror="handleAdminWalletImageError(this)">` : `<p>No slip uploaded</p>`}
 
                 <div class="topup-actions">
                     <button class="approve-btn" data-id="${escapeHTML(item._id)}" data-status="approved" ${!pending ? "disabled" : ""}>Approve</button>
@@ -125,7 +125,15 @@ function closeSlipModal() {
 function getSlipUrl(slip) {
     if (!slip) return "";
     if (slip.startsWith("http") || slip.startsWith("/uploads/")) return slip;
+    if (slip.startsWith("wallet-")) return `/uploads/slips/${slip}`;
     return `/uploads/${slip}`;
+}
+
+function handleAdminWalletImageError(img) {
+    const fallback = document.createElement("p");
+    fallback.className = "admin-missing-image";
+    fallback.textContent = "Slip image unavailable";
+    img.replaceWith(fallback);
 }
 
 function normalizeTopupStatus(status) {

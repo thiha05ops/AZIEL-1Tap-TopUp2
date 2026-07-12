@@ -118,7 +118,7 @@ function paymentCardHTML(method) {
 
             <div class="pm-preview-wrap">
                 ${qr
-            ? `<img class="pm-qr-preview" src="${escapeHTML(qr)}" alt="QR Preview">`
+            ? `<img class="pm-qr-preview" src="${escapeHTML(getAdminSettingsPaymentUploadUrl(qr))}" alt="QR Preview" onerror="handleAdminSettingsImageError(this)">`
             : `<div class="pm-empty-preview">No QR preview</div>`
         }
             </div>
@@ -184,6 +184,20 @@ function previewLocalQR(input) {
     wrap.innerHTML = `<img class="pm-qr-preview" src="${url}" alt="QR Preview">`;
 }
 
+function getAdminSettingsPaymentUploadUrl(path) {
+    if (!path) return "";
+    if (path.startsWith("http") || path.startsWith("/uploads/")) return path;
+    if (path.startsWith("QR-")) return `/uploads/payments/${path}`;
+    return path;
+}
+
+function handleAdminSettingsImageError(img) {
+    const fallback = document.createElement("div");
+    fallback.className = "pm-empty-preview";
+    fallback.textContent = "QR image unavailable";
+    img.replaceWith(fallback);
+}
+
 async function savePaymentMethod(id) {
     const card = document.querySelector(`.payment-method-card[data-id="${id}"]`);
     if (!card) return;
@@ -241,7 +255,7 @@ async function uploadPaymentQR(id) {
 
     const wrap = card.querySelector(".pm-preview-wrap");
     if (wrap) {
-        wrap.innerHTML = `<img class="pm-qr-preview" src="${escapeHTML(data.image)}" alt="QR Preview">`;
+        wrap.innerHTML = `<img class="pm-qr-preview" src="${escapeHTML(data.image)}" alt="QR Preview" onerror="handleAdminSettingsImageError(this)">`;
     }
 
     showAdminToast?.("QR uploaded. Click Save payment method.", "success");

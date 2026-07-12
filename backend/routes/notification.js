@@ -4,11 +4,13 @@ const express = require("express");
 const router = express.Router();
 
 const Notification = require("../models/Notification");
+const authMiddleware = require("../middleware/authMiddleware");
+const adminMiddleware = require("../middleware/adminMiddleware");
 
 // GET /api/notifications/:username
-router.get("/notifications/:username", async (req, res) => {
+router.get("/notifications/:username", authMiddleware, async (req, res) => {
     try {
-        const username = req.params.username;
+        const username = req.user.username;
 
         const activeFilter = {
             username,
@@ -44,16 +46,20 @@ router.get("/notifications/:username", async (req, res) => {
 });
 
 // PUT /api/notifications/:id/read
-router.put("/notifications/:id/read", async (req, res) => {
+router.put("/notifications/:id/read", authMiddleware, async (req, res) => {
     try {
-        const notification = await Notification.findByIdAndUpdate(
-            req.params.id,
+        const notification = await Notification.findOneAndUpdate(
+            {
+                _id: req.params.id,
+                username: req.user.username,
+                deletedByUser: false
+            },
             { isRead: true },
             { new: true }
         );
 
         if (!notification) {
-            return res.json({
+            return res.status(404).json({
                 success: false,
                 message: "Notification not found"
             });
@@ -74,11 +80,11 @@ router.put("/notifications/:id/read", async (req, res) => {
 });
 
 // PUT /api/notifications/:username/read-all
-router.put("/notifications/:username/read-all", async (req, res) => {
+router.put("/notifications/:username/read-all", authMiddleware, async (req, res) => {
     try {
         await Notification.updateMany(
             {
-                username: req.params.username,
+                username: req.user.username,
                 deletedByUser: false
             },
             {
@@ -101,10 +107,13 @@ router.put("/notifications/:username/read-all", async (req, res) => {
 });
 
 // DELETE /api/notifications/:id
-router.delete("/notifications/:id", async (req, res) => {
+router.delete("/notifications/:id", authMiddleware, async (req, res) => {
     try {
-        const notification = await Notification.findByIdAndUpdate(
-            req.params.id,
+        const notification = await Notification.findOneAndUpdate(
+            {
+                _id: req.params.id,
+                username: req.user.username
+            },
             {
                 deletedByUser: true,
                 isRead: true
@@ -113,7 +122,7 @@ router.delete("/notifications/:id", async (req, res) => {
         );
 
         if (!notification) {
-            return res.json({
+            return res.status(404).json({
                 success: false,
                 message: "Notification not found"
             });
@@ -134,11 +143,11 @@ router.delete("/notifications/:id", async (req, res) => {
 });
 
 // DELETE /api/notifications/:username/read
-router.delete("/notifications/:username/read", async (req, res) => {
+router.delete("/notifications/:username/read", authMiddleware, async (req, res) => {
     try {
         await Notification.updateMany(
             {
-                username: req.params.username,
+                username: req.user.username,
                 isRead: true
             },
             {
@@ -161,7 +170,7 @@ router.delete("/notifications/:username/read", async (req, res) => {
 });
 
 // POST /api/notifications/create
-router.post("/notifications/create", async (req, res) => {
+router.post("/notifications/create", adminMiddleware, async (req, res) => {
     try {
         const {
             username,
@@ -211,7 +220,7 @@ router.post("/notifications/create", async (req, res) => {
 });
 
 // POST /api/notifications/broadcast
-router.post("/notifications/broadcast", async (req, res) => {
+router.post("/notifications/broadcast", adminMiddleware, async (req, res) => {
     try {
         const {
             usernames,

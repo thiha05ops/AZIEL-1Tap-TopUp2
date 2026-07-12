@@ -368,7 +368,8 @@
             const res = await fetch("/api/wallet/pay", {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
+                    ...getAuthHeader()
                 },
                 body: JSON.stringify(orderData)
             });
@@ -539,6 +540,16 @@
             localStorage.getItem("token") ||
             sessionStorage.getItem("token")
         );
+    }
+
+    function getAuthHeader() {
+        const token =
+            window.AZIEL?.getToken?.() ||
+            localStorage.getItem("token") ||
+            sessionStorage.getItem("token") ||
+            "";
+
+        return token ? { Authorization: `Bearer ${token}` } : {};
     }
 
     function readStoredUser() {

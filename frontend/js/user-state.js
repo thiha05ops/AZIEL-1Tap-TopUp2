@@ -19,6 +19,65 @@ AZIEL.getToken = function () {
     return localStorage.getItem("token") || sessionStorage.getItem("token");
 };
 
+AZIEL.clearAuthState = function () {
+    [
+        "token",
+        "username",
+        "displayName",
+        "email",
+        "role",
+        "user",
+        "azielUser"
+    ].forEach(key => localStorage.removeItem(key));
+
+    sessionStorage.removeItem("token");
+    AZIEL.user = null;
+    AZIEL.wallet = null;
+    window.dispatchEvent(new Event("aziel:userChanged"));
+    window.dispatchEvent(new Event("aziel:walletChanged"));
+};
+
+AZIEL.authHeaders = function (extra = {}) {
+    const token = AZIEL.getToken();
+
+    return {
+        ...extra,
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+    };
+};
+
+AZIEL.handleAuthFailure = function (message = "Session expired. Please login again.") {
+    AZIEL.clearAuthState();
+    localStorage.setItem("authMessage", message);
+
+    if (!/login\.html$/.test(window.location.pathname)) {
+        window.location.href = "login.html";
+    }
+};
+
+AZIEL.authFetch = async function (url, options = {}) {
+    const headers = AZIEL.authHeaders(options.headers || {});
+
+    const res = await fetch(AZIEL.apiUrl(url), {
+        ...options,
+        headers
+    });
+
+    if (res.status === 401) {
+        let data = {};
+
+        try {
+            data = await res.clone().json();
+        } catch {
+            data = {};
+        }
+
+        AZIEL.handleAuthFailure(data.message);
+    }
+
+    return res;
+};
+
 // SHOP REGION / CURRENCY
 AZIEL.getShopRegion = function () {
     return (
@@ -110,6 +169,11 @@ AZIEL.loadUser = async function () {
 
         const data = await res.json();
 
+        if (res.status === 401 || data.forceLogout) {
+            AZIEL.handleAuthFailure(data.message);
+            return null;
+        }
+
         if (data.success && data.user) {
             AZIEL.user = data.user;
 
@@ -168,8 +232,8 @@ AZIEL.loadWallet = async function () {
     }
 
     try {
-        const res = await fetch(
-            AZIEL.apiUrl(`/api/wallet/${encodeURIComponent(user.username)}?currency=${currency}`)
+        const res = await AZIEL.authFetch(
+            `/api/wallet/${encodeURIComponent(user.username)}?currency=${currency}`
         );
 
         const data = await res.json();

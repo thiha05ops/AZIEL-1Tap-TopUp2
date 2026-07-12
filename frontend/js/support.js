@@ -18,6 +18,10 @@ function supportApiUrl(path) {
     return `${base}${path}`;
 }
 
+function getSupportAuthHeaders() {
+    return window.AZIEL?.authHeaders?.() || {};
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     initSupportForm();
     initCategoryCards();
@@ -189,6 +193,7 @@ async function submitSupportTicket(e) {
 
         const res = await fetch(supportApiUrl("/api/support/ticket"), {
             method: "POST",
+            headers: getSupportAuthHeaders(),
             body: formData
         });
 
@@ -267,7 +272,10 @@ async function loadMyTickets() {
         box.innerHTML = renderTicketSkeleton();
 
         const res = await fetch(
-            supportApiUrl(`/api/support/my/${encodeURIComponent(username)}`)
+            supportApiUrl(`/api/support/my/${encodeURIComponent(username)}`),
+            {
+                headers: getSupportAuthHeaders()
+            }
         );
 
         const data = await safeJson(res);

@@ -2,10 +2,7 @@
 // AZIEL Admin V2.5 API Helper
 
 function getAdminToken() {
-    return (
-        localStorage.getItem("adminToken") ||
-        localStorage.getItem("token")
-    );
+    return localStorage.getItem("adminToken");
 }
 
 function adminLogout(message = "") {
@@ -71,7 +68,7 @@ async function adminFetch(url, options = {}) {
         data = {};
     }
 
-    if (res.status === 401 || data.forceLogout) {
+    if (res.status === 401 || res.status === 403 || data.forceLogout) {
         adminLogout(data.message || "Admin session expired.");
         return null;
     }

@@ -104,7 +104,7 @@ function renderAdminPaymentMethods(methods) {
 
                 ${qr ? `
                     <div class="payment-qr-preview">
-                        <img src="${escapeAdminHTML(qr)}" alt="QR Preview">
+                        <img src="${escapeAdminHTML(getAdminPaymentUploadUrl(qr))}" alt="QR Preview" onerror="handleAdminPaymentImageError(this)">
                     </div>
                 ` : `
                     <div class="pm-empty-preview">No QR preview</div>
@@ -320,6 +320,20 @@ function escapeAdminHTML(value) {
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#039;");
+}
+
+function getAdminPaymentUploadUrl(path) {
+    if (!path) return "";
+    if (path.startsWith("http") || path.startsWith("/uploads/")) return path;
+    if (path.startsWith("QR-")) return `/uploads/payments/${path}`;
+    return path;
+}
+
+function handleAdminPaymentImageError(img) {
+    const fallback = document.createElement("div");
+    fallback.className = "pm-empty-preview";
+    fallback.textContent = "QR image unavailable";
+    img.closest(".payment-qr-preview")?.replaceWith(fallback);
 }
 function autoPaymentConfig(card) {
 

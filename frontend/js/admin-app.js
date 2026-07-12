@@ -246,10 +246,9 @@ function initAdminBroadcast() {
         btn.innerText = "Sending...";
 
         try {
-            const usersRes = await fetch("/api/admin/users");
-            const usersData = await usersRes.json();
+            const usersData = await adminFetch("/api/admin/users");
 
-            if (!usersData.success || !Array.isArray(usersData.users)) {
+            if (!usersData?.success || !Array.isArray(usersData.users)) {
                 throw new Error("Failed to load users");
             }
 
@@ -264,7 +263,7 @@ function initAdminBroadcast() {
             if (type === "order_completed") category = "orders";
             if (type === "system") category = "system";
 
-            const res = await fetch("/api/notifications/broadcast", {
+            const data = await adminFetch("/api/notifications/broadcast", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
@@ -278,10 +277,8 @@ function initAdminBroadcast() {
                 })
             });
 
-            const data = await res.json();
-
-            if (!data.success) {
-                throw new Error(data.message || "Broadcast failed");
+            if (!data?.success) {
+                throw new Error(data?.message || "Broadcast failed");
             }
 
             showAdminToast(`Broadcast sent to ${data.count || usernames.length} users`, "success");

@@ -151,6 +151,7 @@ async function confirmPaymentOrder() {
 
         const res = await fetch("/api/orders", {
             method: "POST",
+            headers: window.AZIEL?.authHeaders?.() || {},
             body: formData
         });
 

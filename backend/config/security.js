@@ -2,6 +2,13 @@ const path = require("path");
 
 const isProduction = process.env.NODE_ENV === "production";
 
+const developmentOrigins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5500",
+    "http://127.0.0.1:5500"
+];
+
 function splitList(value) {
     return String(value || "")
         .split(",")
@@ -17,14 +24,18 @@ function getAllowedOrigins() {
         process.env.CLIENT_URL
     );
 
-    return configured;
+    if (isProduction) return configured;
+
+    return Array.from(new Set([
+        ...configured,
+        ...developmentOrigins
+    ]));
 }
 
 const allowedOrigins = getAllowedOrigins();
 
 function isOriginAllowed(origin) {
     if (!origin) return true;
-    if (!isProduction && allowedOrigins.length === 0) return true;
     return allowedOrigins.includes(origin);
 }
 
@@ -40,7 +51,13 @@ const corsOptions = {
 };
 
 const socketCorsOptions = {
-    origin: allowedOrigins.length || isProduction ? allowedOrigins : "*",
+    origin(origin, callback) {
+        if (isOriginAllowed(origin)) {
+            return callback(null, true);
+        }
+
+        return callback(new Error("Origin not allowed by AZIEL CORS policy"));
+    },
     methods: ["GET", "POST"],
     credentials: true
 };
@@ -100,6 +117,7 @@ module.exports = {
     allowedImageMimeTypes,
     allowedOrigins,
     corsOptions,
+    developmentOrigins,
     formBodyLimit,
     imageUploadFileFilter,
     isProduction,

@@ -5,6 +5,8 @@ const router = express.Router();
 
 const Omise = require("../services/opnService");
 const upload = require("../middleware/orderUpload");
+const authMiddleware = require("../middleware/authMiddleware");
+const adminMiddleware = require("../middleware/adminMiddleware");
 
 const Order = require("../models/Order");
 const User = require("../models/User");
@@ -142,7 +144,7 @@ async function markWalletTopupPaid(req, topupId, transactionId = "") {
 }
 
 // GAME PAYMENT CREATE
-router.post("/payment/create", async (req, res) => {
+router.post("/payment/create", authMiddleware, async (req, res) => {
     try {
         devLog("PAYMENT CREATE BODY =", req.body);
 
@@ -154,10 +156,10 @@ router.post("/payment/create", async (req, res) => {
             currency,
             region,
             paymentMethod,
-            username,
             userId,
             zoneId
         } = req.body;
+        const username = req.user.username;
 
         if (!orderId || !game || !packageName || !amount || !paymentMethod || !userId) {
             return res.json({
@@ -244,7 +246,7 @@ router.post("/payment/create", async (req, res) => {
 
 // MANUAL / DEEPLINK PAYMENT SLIP SUBMIT
 // POST /api/payment/submit
-router.post("/payment/submit", upload.single("slip"), async (req, res) => {
+router.post("/payment/submit", authMiddleware, upload.single("slip"), async (req, res) => {
     try {
         const { orderId } = req.body;
 
@@ -262,10 +264,13 @@ router.post("/payment/submit", upload.single("slip"), async (req, res) => {
             });
         }
 
-        const order = await Order.findOne({ orderId });
+        const order = await Order.findOne({
+            orderId,
+            username: req.user.username
+        });
 
         if (!order) {
-            return res.json({
+            return res.status(404).json({
                 success: false,
                 message: "Order not found"
             });
@@ -387,7 +392,7 @@ router.post("/payment/webhook", async (req, res) => {
 
 // DEV ONLY ROUTES
 if (!isProduction) {
-    router.get("/payment/test-paid/:orderId", async (req, res) => {
+    router.get("/payment/test-paid/:orderId", adminMiddleware, async (req, res) => {
         const order = await Order.findOne({
             orderId: req.params.orderId
         });
@@ -411,7 +416,7 @@ if (!isProduction) {
         });
     });
 
-    router.post("/wallet/test-paid/:topupId", async (req, res) => {
+    router.post("/wallet/test-paid/:topupId", adminMiddleware, async (req, res) => {
         try {
             const result = await markWalletTopupPaid(
                 req,

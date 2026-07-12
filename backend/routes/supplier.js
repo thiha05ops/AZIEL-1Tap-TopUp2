@@ -1,9 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const Order = require("../models/Order");
+const adminMiddleware = require("../middleware/adminMiddleware");
 
 // POST /api/supplier/mock-topup/:id
-router.post("/supplier/mock-topup/:id", async (req, res) => {
+router.post("/supplier/mock-topup/:id", adminMiddleware, async (req, res) => {
     try {
         const order = await Order.findById(req.params.id);
 
