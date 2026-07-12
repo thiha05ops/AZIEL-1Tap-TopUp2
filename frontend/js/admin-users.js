@@ -77,7 +77,7 @@ function bindUserActions() {
     });
 
     document.querySelectorAll('[data-action="delete-user"]').forEach(btn => {
-        btn.addEventListener("click", () => deleteUser(btn.dataset.id));
+        btn.addEventListener("click", () => deleteUser(btn.dataset.id, btn));
     });
 }
 
@@ -95,21 +95,35 @@ async function toggleUserBlock(userId) {
     loadAdminUsers();
 }
 
-async function deleteUser(userId) {
-    if (!confirm("Delete this user?")) return;
+async function deleteUser(userId, btn = null) {
+    const confirmed = window.AZIEL_UI?.confirm
+        ? await window.AZIEL_UI.confirm({
+            title: "Delete user",
+            message: "Delete this user?",
+            confirmText: "Delete"
+        })
+        : confirm("Delete this user?");
 
-    const data = await adminFetch(`/api/admin/users/${userId}`, {
-        method: "DELETE"
-    });
+    if (!confirmed) return;
 
-    if (!data || !data.success) {
-        showAdminToast?.(data?.message || "Delete failed", "error");
-        return;
+    try {
+        window.AZIEL_UI?.button?.setLoading(btn, { text: "Deleting..." });
+
+        const data = await adminFetch(`/api/admin/users/${userId}`, {
+            method: "DELETE"
+        });
+
+        if (!data || !data.success) {
+            showAdminToast?.(data?.message || "Delete failed", "error");
+            return;
+        }
+
+        showAdminToast?.("User deleted", "success");
+        loadAdminUsers();
+        loadAdminDashboard?.(false);
+    } finally {
+        window.AZIEL_UI?.button?.reset(btn);
     }
-
-    showAdminToast?.("User deleted", "success");
-    loadAdminUsers();
-    loadAdminDashboard?.(false);
 }
 
 function escapeHTML(value) {

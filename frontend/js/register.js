@@ -83,7 +83,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             localStorage.setItem("verifyEmail", email);
 
-            showMessage("OTP sent ✅ Check your Gmail...", "success");
+            showMessage("OTP sent. Check your Gmail.", "success");
 
             setTimeout(() => {
                 window.location.href = "verify-email.html";
@@ -97,6 +97,15 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     function setLoading(isLoading) {
+        if (window.AZIEL_UI?.button) {
+            if (isLoading) {
+                window.AZIEL_UI.button.setLoading(btn, { text: "Sending OTP..." });
+            } else {
+                window.AZIEL_UI.button.reset(btn);
+            }
+            return;
+        }
+
         btn.disabled = isLoading;
         btn.textContent = isLoading ? "Sending OTP..." : "Create Account";
     }
@@ -111,6 +120,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 ${escapeHTML(text)}
             </div>
         `;
+
+        if (window.AZIEL_UI?.toast) {
+            window.AZIEL_UI.toast[type === "success" ? "success" : "error"](text);
+        }
     }
 
     function escapeHTML(value) {

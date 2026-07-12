@@ -250,8 +250,12 @@ function initAdminBroadcast() {
             return;
         }
 
-        btn.disabled = true;
-        btn.innerText = "Sending...";
+        if (window.AZIEL_UI?.button) {
+            window.AZIEL_UI.button.setLoading(btn, { text: "Sending..." });
+        } else {
+            btn.disabled = true;
+            btn.innerText = "Sending...";
+        }
 
         try {
             const usersData = await adminFetch("/api/admin/users");
@@ -299,8 +303,12 @@ function initAdminBroadcast() {
             showAdminToast("Broadcast failed", "error");
         }
 
-        btn.disabled = false;
-        btn.innerText = "Send Broadcast";
+        if (window.AZIEL_UI?.button) {
+            window.AZIEL_UI.button.reset(btn);
+        } else {
+            btn.disabled = false;
+            btn.innerText = "Send Broadcast";
+        }
     });
 }
 
@@ -345,6 +353,19 @@ function initQuickBroadcastButtons() {
 }
 
 function showAdminToast(message, type = "success") {
+    if (window.AZIEL_UI?.toast) {
+        const method = type === "error"
+            ? "error"
+            : type === "warning"
+                ? "warning"
+                : type === "info"
+                    ? "info"
+                    : "success";
+
+        window.AZIEL_UI.toast[method](message);
+        return;
+    }
+
     const old = document.getElementById("adminToast");
     if (old) old.remove();
 

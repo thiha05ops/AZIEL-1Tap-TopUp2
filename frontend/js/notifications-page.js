@@ -31,12 +31,31 @@ function initNotificationPage() {
 }
 
 function bindNotificationPageActions() {
-    document.getElementById("markAllReadBtn")?.addEventListener("click", () => {
-        window.AZIEL_NOTIFICATIONS?.markAllRead();
+    document.getElementById("markAllReadBtn")?.addEventListener("click", async event => {
+        const btn = event.currentTarget;
+
+        try {
+            window.AZIEL_UI?.button?.setLoading(btn, { text: "Marking..." });
+            await window.AZIEL_NOTIFICATIONS?.markAllRead();
+            window.AZIEL_UI?.toast?.success("Notifications marked read.");
+        } catch (error) {
+            const message = window.AZIEL_UI?.error?.normalize?.(error, "Could not mark notifications read.") ||
+                "Could not mark notifications read.";
+            window.AZIEL_UI?.toast?.error(message);
+        } finally {
+            window.AZIEL_UI?.button?.reset(btn);
+        }
     });
 
-    document.getElementById("loadMoreNotificationsBtn")?.addEventListener("click", () => {
-        window.AZIEL_NOTIFICATIONS?.loadMore();
+    document.getElementById("loadMoreNotificationsBtn")?.addEventListener("click", async event => {
+        const btn = event.currentTarget;
+
+        try {
+            window.AZIEL_UI?.button?.setLoading(btn, { text: "Loading..." });
+            await window.AZIEL_NOTIFICATIONS?.loadMore();
+        } finally {
+            window.AZIEL_UI?.button?.reset(btn);
+        }
     });
 }
 
@@ -74,7 +93,11 @@ function renderNotificationPage(state) {
     if (!list) return;
 
     if (state.loading && !state.notifications?.length) {
-        list.innerHTML = renderNotificationSkeleton();
+        if (window.AZIEL_UI?.state?.skeletonList) {
+            window.AZIEL_UI.state.skeletonList(list, { rows: 5, lines: 3 });
+        } else {
+            list.innerHTML = renderNotificationSkeleton();
+        }
         return;
     }
 
@@ -86,13 +109,21 @@ function renderNotificationPage(state) {
     const filtered = filterNotifications(state.notifications || []);
 
     if (!filtered.length) {
-        list.innerHTML = `
-            <div class="noti-empty-state">
-                <i class="fa-regular fa-bell"></i>
-                <h2>${activeNotificationFilter === "all" ? "No notifications yet" : "No matching notifications"}</h2>
-                <p>Order, wallet, payment, support and system updates will appear here.</p>
-            </div>
-        `;
+        if (window.AZIEL_UI?.state?.render) {
+            window.AZIEL_UI.state.render(list, {
+                type: "empty",
+                title: activeNotificationFilter === "all" ? "No notifications yet" : "No matching notifications",
+                message: "Order, wallet, payment, support and system updates will appear here."
+            });
+        } else {
+            list.innerHTML = `
+                <div class="noti-empty-state">
+                    <i class="fa-regular fa-bell"></i>
+                    <h2>${activeNotificationFilter === "all" ? "No notifications yet" : "No matching notifications"}</h2>
+                    <p>Order, wallet, payment, support and system updates will appear here.</p>
+                </div>
+            `;
+        }
     } else {
         list.innerHTML = filtered.map(renderNotificationItem).join("");
     }
@@ -224,6 +255,16 @@ function renderNotificationSkeleton() {
 function renderNotificationError(message) {
     const list = document.getElementById("notificationsList");
     if (!list) return;
+
+    if (window.AZIEL_UI?.state?.render) {
+        window.AZIEL_UI.state.render(list, {
+            type: "error",
+            title: "Could not load notifications",
+            message: message || "Please try again.",
+            retry: () => window.AZIEL_NOTIFICATIONS?.init?.()
+        });
+        return;
+    }
 
     list.innerHTML = `
         <div class="noti-empty-state error">

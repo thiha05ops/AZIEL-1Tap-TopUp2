@@ -18,7 +18,8 @@
             PaymentUtils.hideLoading();
 
             if (!res.ok || !data.success) {
-                alert(data.message || "Wallet payment failed.");
+                window.AZIEL_UI?.toast?.error(data.message || "Wallet payment failed.") ||
+                    PaymentUtils.showToast(data.message || "Wallet payment failed.");
                 return;
             }
 
@@ -31,7 +32,8 @@
         } catch (error) {
             console.log("Wallet payment error:", error);
             PaymentUtils.hideLoading();
-            alert("Server error");
+            window.AZIEL_UI?.toast?.error("Server error") ||
+                PaymentUtils.showToast("Server error");
         }
     }
 

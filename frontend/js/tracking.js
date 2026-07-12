@@ -76,6 +76,9 @@ async function trackOrder(orderId) {
         </div>
     `;
 
+    const trackBtn = document.getElementById("trackBtn");
+    window.AZIEL_UI?.button?.setLoading(trackBtn, { text: t("trackingChecking", "Checking...") });
+
     try {
         const res = await fetch(
             trackingApiUrl(`/api/order/track/${encodeURIComponent(orderId)}`)
@@ -177,6 +180,8 @@ async function trackOrder(orderId) {
     } catch (error) {
         console.log("Track order error:", error);
         showError(t("serverError", "Server error."));
+    } finally {
+        window.AZIEL_UI?.button?.reset(trackBtn);
     }
 }
 
@@ -416,8 +421,12 @@ async function submitRefundRequest() {
 
     try {
         if (btn) {
-            btn.disabled = true;
-            btn.innerText = t("submitting", "Submitting...");
+            if (window.AZIEL_UI?.button) {
+                window.AZIEL_UI.button.setLoading(btn, { text: t("submitting", "Submitting...") });
+            } else {
+                btn.disabled = true;
+                btn.innerText = t("submitting", "Submitting...");
+            }
         }
 
         const res = await fetch(
@@ -460,8 +469,12 @@ async function submitRefundRequest() {
         setRefundMsg(t("serverError", "Server error."), "error");
     } finally {
         if (btn) {
-            btn.disabled = false;
-            btn.innerText = t("refundSubmit", "Submit Refund Request");
+            if (window.AZIEL_UI?.button) {
+                window.AZIEL_UI.button.reset(btn);
+            } else {
+                btn.disabled = false;
+                btn.innerText = t("refundSubmit", "Submit Refund Request");
+            }
         }
     }
 }
@@ -475,6 +488,9 @@ function setRefundMsg(message, type = "success") {
             ${escapeHTML(message)}
         </p>
     `;
+
+    const method = type === "error" ? "error" : "success";
+    window.AZIEL_UI?.toast?.[method]?.(message);
 }
 
 function canRequestRefund(order, status) {
@@ -653,6 +669,8 @@ function showError(message) {
             ${escapeHTML(message)}
         </div>
     `;
+
+    window.AZIEL_UI?.toast?.error?.(message);
 }
 
 async function loadRecentOrders() {

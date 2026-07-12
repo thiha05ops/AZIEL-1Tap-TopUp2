@@ -223,6 +223,15 @@ function setSubmitLoading(isLoading) {
     const btn = document.getElementById("submitTicketBtn");
     if (!btn) return;
 
+    if (window.AZIEL_UI?.button) {
+        if (isLoading) {
+            window.AZIEL_UI.button.setLoading(btn, { text: "Submitting..." });
+        } else {
+            window.AZIEL_UI.button.reset(btn);
+        }
+        return;
+    }
+
     btn.disabled = isLoading;
 
     btn.innerHTML = isLoading
@@ -248,6 +257,14 @@ function showFormMessage(text, type = "info") {
 
     msg.innerText = text;
     msg.className = `support-msg ${type}`;
+
+    const method = type === "success"
+        ? "success"
+        : type === "error"
+            ? "error"
+            : "info";
+
+    window.AZIEL_UI?.toast?.[method]?.(text);
 }
 
 /* ===============================
@@ -269,7 +286,11 @@ async function loadMyTickets() {
     }
 
     try {
-        box.innerHTML = renderTicketSkeleton();
+        if (window.AZIEL_UI?.state?.skeletonList) {
+            window.AZIEL_UI.state.skeletonList(box, { rows: 2, lines: 2 });
+        } else {
+            box.innerHTML = renderTicketSkeleton();
+        }
 
         const res = await fetch(
             supportApiUrl(`/api/support/my/${encodeURIComponent(username)}`),
@@ -292,10 +313,19 @@ async function loadMyTickets() {
     } catch (error) {
         console.log("Load tickets error:", error);
 
-        box.innerHTML = renderEmptyState(
-            "Failed to load tickets",
-            "Please check your connection and try again later."
-        );
+        if (window.AZIEL_UI?.state?.render) {
+            window.AZIEL_UI.state.render(box, {
+                type: "error",
+                title: "Failed to load tickets",
+                message: "Please check your connection and try again later.",
+                retry: loadMyTickets
+            });
+        } else {
+            box.innerHTML = renderEmptyState(
+                "Failed to load tickets",
+                "Please check your connection and try again later."
+            );
+        }
     }
 }
 
@@ -312,10 +342,18 @@ function renderTickets() {
     }
 
     if (!tickets.length) {
-        box.innerHTML = renderEmptyState(
-            "No tickets found",
-            "Your support tickets will appear here after you submit a ticket."
-        );
+        if (window.AZIEL_UI?.state?.render) {
+            window.AZIEL_UI.state.render(box, {
+                type: "empty",
+                title: "No tickets found",
+                message: "Your support tickets will appear here after you submit a ticket."
+            });
+        } else {
+            box.innerHTML = renderEmptyState(
+                "No tickets found",
+                "Your support tickets will appear here after you submit a ticket."
+            );
+        }
         return;
     }
 
@@ -553,6 +591,8 @@ function getSupportSocket() {
 }
 
 function showSupportPopup(message) {
+    window.AZIEL_UI?.toast?.info?.(message);
+
     const old = document.querySelector(".support-live-popup");
     if (old) old.remove();
 

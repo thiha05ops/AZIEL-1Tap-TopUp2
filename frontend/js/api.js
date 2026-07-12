@@ -101,8 +101,10 @@ function showAdminLogoutMessage() {
     setTimeout(() => {
         if (typeof showAdminToast === "function") {
             showAdminToast(msg, "error");
+        } else if (window.AZIEL_UI?.toast) {
+            window.AZIEL_UI.toast.error(msg);
         } else {
-            alert(msg);
+            console.error(msg);
         }
     }, 300);
 }

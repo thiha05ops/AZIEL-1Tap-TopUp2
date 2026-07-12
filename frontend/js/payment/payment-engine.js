@@ -57,7 +57,8 @@
         } catch (error) {
             console.log("Payment engine error:", error);
             PaymentUtils.hideLoading();
-            alert(error.message || "Payment failed");
+            window.AZIEL_UI?.toast?.error(error.message || "Payment failed") ||
+                PaymentUtils.showToast(error.message || "Payment failed");
         }
     }
 

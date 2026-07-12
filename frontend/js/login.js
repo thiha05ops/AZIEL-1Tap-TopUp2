@@ -115,7 +115,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 sessionStorage.setItem("username", data.user.username);
             }
 
-            showMessage("Login success ✅ Redirecting...", "success");
+            showMessage("Login success. Redirecting...", "success");
 
             const redirectUrl =
                 localStorage.getItem("redirectAfterLogin") || "home.html";
@@ -134,6 +134,15 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     function setLoading(isLoading) {
+        if (window.AZIEL_UI?.button) {
+            if (isLoading) {
+                window.AZIEL_UI.button.setLoading(btn, { text: "Signing in..." });
+            } else {
+                window.AZIEL_UI.button.reset(btn);
+            }
+            return;
+        }
+
         btn.disabled = isLoading;
         btn.textContent = isLoading ? "Signing in..." : "Sign In";
     }
@@ -144,6 +153,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 ${escapeHTML(text)}
             </div>
         `;
+
+        if (window.AZIEL_UI?.toast) {
+            window.AZIEL_UI.toast[type === "success" ? "success" : "error"](text);
+        }
     }
 
     function escapeHTML(value) {

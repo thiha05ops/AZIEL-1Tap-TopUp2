@@ -10,7 +10,7 @@ document.addEventListener("DOMContentLoaded", () => {
         localStorage.removeItem("adminToken");
         localStorage.removeItem("adminUsername");
         localStorage.removeItem("adminRole");
-        alert("Admin session reset ✅");
+        showAdminLoginMessage("Admin session reset.", "success");
     });
 });
 
@@ -22,12 +22,16 @@ async function adminLogin(e) {
     const btn = document.getElementById("adminLoginBtn");
 
     if (!username || !password) {
-        alert("Fill all fields");
+        showAdminLoginMessage("Fill all fields", "error");
         return;
     }
 
-    btn.disabled = true;
-    btn.innerText = "Logging in...";
+    if (window.AZIEL_UI?.button) {
+        window.AZIEL_UI.button.setLoading(btn, { text: "Logging in..." });
+    } else {
+        btn.disabled = true;
+        btn.innerText = "Logging in...";
+    }
 
     try {
         const res = await fetch("/api/admin/login", {
@@ -41,7 +45,7 @@ async function adminLogin(e) {
         const data = await res.json();
 
         if (!res.ok || !data.success) {
-            alert(data.message || "Login failed");
+            showAdminLoginMessage(data.message || "Login failed", "error");
             return;
         }
 
@@ -50,9 +54,28 @@ async function adminLogin(e) {
 
     } catch (error) {
         console.log("Admin login error:", error);
-        alert("Server error");
+        showAdminLoginMessage("Server error", "error");
     } finally {
-        btn.disabled = false;
-        btn.innerText = "LOGIN";
+        if (window.AZIEL_UI?.button) {
+            window.AZIEL_UI.button.reset(btn);
+        } else {
+            btn.disabled = false;
+            btn.innerText = "LOGIN";
+        }
     }
+}
+
+function showAdminLoginMessage(message, type = "info") {
+    const msg = document.getElementById("adminMsg");
+    if (msg) {
+        msg.textContent = message;
+    }
+
+    const method = type === "success"
+        ? "success"
+        : type === "error"
+            ? "error"
+            : "info";
+
+    window.AZIEL_UI?.toast?.[method]?.(message);
 }

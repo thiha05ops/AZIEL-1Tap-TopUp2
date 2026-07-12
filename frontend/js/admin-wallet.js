@@ -93,7 +93,7 @@ function renderTopups(topups) {
 
 function bindTopupActions() {
     document.querySelectorAll(".topup-actions button").forEach(btn => {
-        btn.addEventListener("click", () => updateTopupStatus(btn.dataset.id, btn.dataset.status));
+        btn.addEventListener("click", () => updateTopupStatus(btn.dataset.id, btn.dataset.status, btn));
     });
 
     document.querySelectorAll(".topup-slip").forEach(img => {
@@ -101,23 +101,37 @@ function bindTopupActions() {
     });
 }
 
-async function updateTopupStatus(id, status) {
-    if (!confirm(`Are you sure to ${status} this topup?`)) return;
+async function updateTopupStatus(id, status, btn = null) {
+    const confirmed = window.AZIEL_UI?.confirm
+        ? await window.AZIEL_UI.confirm({
+            title: "Update topup",
+            message: `Are you sure to ${status} this topup?`,
+            confirmText: formatTopupStatus(status)
+        })
+        : confirm(`Are you sure to ${status} this topup?`);
 
-    const data = await adminFetch(`/api/admin/wallet/topups/${id}/status`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status })
-    });
+    if (!confirmed) return;
 
-    if (!data || !data.success) {
-        showAdminToast?.(data?.message || "Update failed", "error");
-        return;
+    try {
+        window.AZIEL_UI?.button?.setLoading(btn, { text: "Updating..." });
+
+        const data = await adminFetch(`/api/admin/wallet/topups/${id}/status`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status })
+        });
+
+        if (!data || !data.success) {
+            showAdminToast?.(data?.message || "Update failed", "error");
+            return;
+        }
+
+        showAdminToast?.(`Topup ${status}`, "success");
+        await loadWalletTopups();
+        loadAdminDashboard?.(false);
+    } finally {
+        window.AZIEL_UI?.button?.reset(btn);
     }
-
-    showAdminToast?.(`Topup ${status}`, "success");
-    await loadWalletTopups();
-    loadAdminDashboard?.(false);
 }
 
 function initSlipZoom() {

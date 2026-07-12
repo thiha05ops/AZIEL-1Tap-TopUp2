@@ -31,14 +31,14 @@ document.addEventListener("DOMContentLoaded", () => {
 async function loadOrders() {
     try {
         if (typeof adminFetch !== "function") {
-            alert("admin-api.js not loaded");
+            showLegacyAdminMessage("admin-api.js not loaded", "error");
             return;
         }
 
         const data = await adminFetch("/api/admin/orders");
 
         if (!data || !data.success) {
-            alert(data?.message || "Failed to load orders");
+            showLegacyAdminMessage(data?.message || "Failed to load orders", "error");
             return;
         }
 
@@ -80,7 +80,7 @@ async function loadOrders() {
         }
     } catch (error) {
         console.log("Load orders error:", error);
-        alert("Server error");
+        showLegacyAdminMessage("Server error", "error");
     }
 }
 
@@ -208,7 +208,7 @@ function renderOrders() {
 
     document.querySelectorAll(".action-grid button").forEach(btn => {
         btn.addEventListener("click", () => {
-            updateStatus(btn.dataset.id, btn.dataset.status);
+            updateStatus(btn.dataset.id, btn.dataset.status, btn);
         });
     });
 }
@@ -221,13 +221,15 @@ function handleLegacyAdminImageError(img) {
     handleAdminUploadedImageError(img, "Image unavailable");
 }
 
-async function updateStatus(id, status) {
+async function updateStatus(id, status, btn = null) {
     if (!id) {
-        alert("Missing order ID");
+        showLegacyAdminMessage("Missing order ID", "error");
         return;
     }
 
     try {
+        window.AZIEL_UI?.button?.setLoading(btn, { text: "Updating..." });
+
         const data = await adminFetch(
             `/api/admin/orders/${id}/status`,
             {
@@ -240,15 +242,37 @@ async function updateStatus(id, status) {
         );
 
         if (!data || !data.success) {
-            alert(data?.message || "Update failed");
+            showLegacyAdminMessage(data?.message || "Update failed", "error");
             return;
         }
 
         await loadOrders();
+        showLegacyAdminMessage("Order updated", "success");
 
     } catch (error) {
         console.log("Update order error:", error);
-        alert("Server error");
+        showLegacyAdminMessage("Server error", "error");
+    } finally {
+        window.AZIEL_UI?.button?.reset(btn);
+    }
+}
+
+function showLegacyAdminMessage(message, type = "info") {
+    if (typeof showAdminToast === "function") {
+        showAdminToast(message, type);
+        return;
+    }
+
+    const method = type === "success"
+        ? "success"
+        : type === "error"
+            ? "error"
+            : "info";
+
+    if (window.AZIEL_UI?.toast?.[method]) {
+        window.AZIEL_UI.toast[method](message);
+    } else {
+        console.error(message);
     }
 }
 

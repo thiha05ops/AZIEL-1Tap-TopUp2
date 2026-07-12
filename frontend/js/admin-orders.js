@@ -164,13 +164,13 @@ function bindOrderActions() {
 
     document.querySelectorAll('[data-action="approve-refund"]').forEach(btn => {
         btn.addEventListener("click", () => {
-            approveRefundToWallet(btn.dataset.id);
+            approveRefundToWallet(btn.dataset.id, btn);
         });
     });
 
     document.querySelectorAll('[data-action="reject-refund"]').forEach(btn => {
         btn.addEventListener("click", () => {
-            rejectRefund(btn.dataset.id);
+            rejectRefund(btn.dataset.id, btn);
         });
     });
 }
@@ -218,7 +218,7 @@ function canApproveRefund(order) {
     );
 }
 
-async function approveRefundToWallet(orderId) {
+async function approveRefundToWallet(orderId, btn = null) {
     const order = allAdminOrders.find(o => String(o._id) === String(orderId));
 
     if (!order) {
@@ -235,11 +235,21 @@ async function approveRefundToWallet(orderId) {
         return;
     }
 
-    if (!confirm("Confirm approve refund to wallet? This action cannot be repeated.")) {
+    const confirmed = window.AZIEL_UI?.confirm
+        ? await window.AZIEL_UI.confirm({
+            title: "Approve refund",
+            message: "Confirm approve refund to wallet? This action cannot be repeated.",
+            confirmText: "Approve"
+        })
+        : confirm("Confirm approve refund to wallet? This action cannot be repeated.");
+
+    if (!confirmed) {
         return;
     }
 
     try {
+        window.AZIEL_UI?.button?.setLoading(btn, { text: "Approving..." });
+
         const data = await adminFetch(`/api/admin/orders/${orderId}/refund/approve`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -259,10 +269,12 @@ async function approveRefundToWallet(orderId) {
     } catch (error) {
         console.log("Approve refund error:", error);
         showAdminToast?.("Server error", "error");
+    } finally {
+        window.AZIEL_UI?.button?.reset(btn);
     }
 }
 
-async function rejectRefund(orderId) {
+async function rejectRefund(orderId, btn = null) {
     const order = allAdminOrders.find(o => String(o._id) === String(orderId));
 
     if (!order) {
@@ -277,11 +289,21 @@ async function rejectRefund(orderId) {
         return;
     }
 
-    if (!confirm("Reject this refund request?")) {
+    const confirmed = window.AZIEL_UI?.confirm
+        ? await window.AZIEL_UI.confirm({
+            title: "Reject refund",
+            message: "Reject this refund request?",
+            confirmText: "Reject"
+        })
+        : confirm("Reject this refund request?");
+
+    if (!confirmed) {
         return;
     }
 
     try {
+        window.AZIEL_UI?.button?.setLoading(btn, { text: "Rejecting..." });
+
         const data = await adminFetch(`/api/admin/orders/${orderId}/refund/reject`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -301,6 +323,8 @@ async function rejectRefund(orderId) {
     } catch (error) {
         console.log("Reject refund error:", error);
         showAdminToast?.("Server error", "error");
+    } finally {
+        window.AZIEL_UI?.button?.reset(btn);
     }
 }
 

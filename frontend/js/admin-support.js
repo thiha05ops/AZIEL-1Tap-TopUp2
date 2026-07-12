@@ -321,9 +321,10 @@ async function replyTicket(
 
         if (!data?.success) {
 
-            alert(
+            showAdminToast?.(
                 data?.message ||
-                "Reply failed"
+                "Reply failed",
+                "error"
             );
 
             return;
@@ -361,8 +362,9 @@ async function replyTicket(
             error
         );
 
-        alert(
-            "Server error"
+        showAdminToast?.(
+            "Server error",
+            "error"
         );
 
     }
@@ -439,6 +441,10 @@ function showLiveIncomingMessage(data) {
 function showAdminSuccess(
     message
 ) {
+    if (window.AZIEL_UI?.toast) {
+        window.AZIEL_UI.toast.success(message);
+        return;
+    }
 
     const old =
         document.getElementById(

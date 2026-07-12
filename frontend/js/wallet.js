@@ -454,12 +454,12 @@ async function submitTopup() {
     console.log("Wallet provider:", provider);
 
     if (!amount || amount <= 0) {
-        alert(wt("enterAmountAlert", "Please enter amount."));
+        showWalletToast(wt("enterAmountAlert", "Please enter amount."), "error");
         return;
     }
 
     if (!paymentMethod) {
-        alert(wt("selectPaymentAlert", "Please select payment method."));
+        showWalletToast(wt("selectPaymentAlert", "Please select payment method."), "error");
         return;
     }
 
@@ -467,10 +467,16 @@ async function submitTopup() {
 
     try {
         if (btn) {
-            btn.disabled = true;
-            btn.innerText = provider === "promptpay"
+            const loadingText = provider === "promptpay"
                 ? wt("generatingQr", "Generating QR...")
                 : wt("creatingPayment", "Creating Payment...");
+
+            if (window.AZIEL_UI?.button) {
+                window.AZIEL_UI.button.setLoading(btn, { text: loadingText });
+            } else {
+                btn.disabled = true;
+                btn.innerText = loadingText;
+            }
         }
 
         showLoading(true);
@@ -502,7 +508,7 @@ async function submitTopup() {
         const data = await res.json();
 
         if (!data.success) {
-            alert(data.message || wt("walletCreateFailed", "Create wallet payment failed."));
+            showWalletToast(data.message || wt("walletCreateFailed", "Create wallet payment failed."), "error");
             return;
         }
 
@@ -528,12 +534,16 @@ async function submitTopup() {
 
     } catch (error) {
         console.log("Wallet create error:", error);
-        alert(wt("serverError", "Server error"));
+        showWalletToast(wt("serverError", "Server error"), "error");
     } finally {
         showLoading(false);
 
         if (btn) {
-            btn.disabled = false;
+            if (window.AZIEL_UI?.button) {
+                window.AZIEL_UI.button.reset(btn);
+            } else {
+                btn.disabled = false;
+            }
             updateTopupButtonByMethod();
         }
     }
@@ -790,9 +800,11 @@ function copyWalletText(text) {
         .then(() => {
             const msg = document.getElementById("walletManualMsg");
             setWalletMsg(msg, "Copied.", "success");
+            showWalletToast("Copied.", "success");
         })
         .catch(() => {
-            alert(text);
+            showWalletToast("Copy failed. Please copy manually.", "error");
+            console.log("Copy text:", text);
         });
 }
 
@@ -807,8 +819,12 @@ async function submitWalletSlip(topupId, file, btn, msgBox) {
     formData.append("topupId", topupId);
 
     try {
-        btn.disabled = true;
-        btn.innerText = "Submitting...";
+        if (window.AZIEL_UI?.button) {
+            window.AZIEL_UI.button.setLoading(btn, { text: "Submitting..." });
+        } else {
+            btn.disabled = true;
+            btn.innerText = "Submitting...";
+        }
 
         const endpoints = [
             `/api/wallet/slip/${encodeURIComponent(topupId)}`,
@@ -852,6 +868,7 @@ async function submitWalletSlip(topupId, file, btn, msgBox) {
             "Payment slip submitted. Please wait for admin verification.",
             "success"
         );
+        showWalletToast("Payment slip submitted. Please wait for admin verification.", "success");
 
         await loadWallet();
 
@@ -863,9 +880,14 @@ async function submitWalletSlip(topupId, file, btn, msgBox) {
     } catch (error) {
         console.log("Wallet slip upload error:", error);
         setWalletMsg(msgBox, "Server error", "error");
+        showWalletToast("Server error", "error");
     } finally {
-        btn.disabled = false;
-        btn.innerText = "Submit Payment Slip";
+        if (window.AZIEL_UI?.button) {
+            window.AZIEL_UI.button.reset(btn);
+        } else {
+            btn.disabled = false;
+            btn.innerText = "Submit Payment Slip";
+        }
     }
 }
 
@@ -900,11 +922,12 @@ function startWalletCountdown(seconds) {
             stopWalletPolling();
             closeWalletQrModal();
 
-            alert(
+            showWalletToast(
                 wt(
                     "paymentSessionExpired",
                     "Payment session expired. Please generate a new QR."
-                )
+                ),
+                "warning"
             );
         }
     }, 1000);
@@ -1022,6 +1045,14 @@ function showWalletPopup(amount, symbol) {
 }
 
 function showLoading(show) {
+    if (window.AZIEL_UI?.loading) {
+        if (show) {
+            window.AZIEL_UI.loading.show({ text: wt("creatingPayment", "Creating Payment...") });
+        } else {
+            window.AZIEL_UI.loading.hide();
+        }
+    }
+
     const overlay = document.getElementById("orderLoadingOverlay");
     if (!overlay) return;
 
@@ -1070,4 +1101,16 @@ function resetTopupForm() {
     payCards.forEach(card => card.classList.remove("active"));
 
     updateTopupButtonByMethod();
+}
+
+function showWalletToast(message, type = "info") {
+    const method = type === "success"
+        ? "success"
+        : type === "error"
+            ? "error"
+            : type === "warning"
+                ? "warning"
+                : "info";
+
+    window.AZIEL_UI?.toast?.[method]?.(message);
 }

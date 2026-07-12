@@ -1,0 +1,283 @@
+/* frontend/css/core/ui-feedback.css */
+/* Shared presentation-only feedback primitives for AZIEL. */
+
+:root {
+    --az-ui-surface: rgba(18, 24, 38, 0.96);
+    --az-ui-text: #f8fafc;
+    --az-ui-muted: #cbd5e1;
+    --az-ui-border: rgba(148, 163, 184, 0.24);
+    --az-ui-shadow: 0 20px 55px rgba(0, 0, 0, 0.28);
+    --az-ui-success: #22c55e;
+    --az-ui-error: #ef4444;
+    --az-ui-warning: #f59e0b;
+    --az-ui-info: #38bdf8;
+}
+
+body.theme-light {
+    --az-ui-surface: rgba(255, 255, 255, 0.98);
+    --az-ui-text: #0f172a;
+    --az-ui-muted: #475569;
+    --az-ui-border: rgba(15, 23, 42, 0.12);
+    --az-ui-shadow: 0 20px 55px rgba(15, 23, 42, 0.16);
+}
+
+.az-ui-toast-stack {
+    position: fixed;
+    top: calc(var(--az-header-height, 72px) + 16px);
+    right: 18px;
+    z-index: 999999;
+    display: grid;
+    gap: 10px;
+    width: min(380px, calc(100vw - 28px));
+    pointer-events: none;
+}
+
+.az-ui-toast {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: start;
+    padding: 14px 14px 14px 16px;
+    color: var(--az-ui-text);
+    background: var(--az-ui-surface);
+    border: 1px solid var(--az-ui-border);
+    border-left: 4px solid var(--az-ui-info);
+    border-radius: 8px;
+    box-shadow: var(--az-ui-shadow);
+    opacity: 0;
+    transform: translateY(-8px);
+    transition: opacity 180ms ease, transform 180ms ease;
+    pointer-events: auto;
+}
+
+.az-ui-toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.az-ui-toast-success {
+    border-left-color: var(--az-ui-success);
+}
+
+.az-ui-toast-error {
+    border-left-color: var(--az-ui-error);
+}
+
+.az-ui-toast-warning {
+    border-left-color: var(--az-ui-warning);
+}
+
+.az-ui-toast-info {
+    border-left-color: var(--az-ui-info);
+}
+
+.az-ui-toast-content {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+
+.az-ui-toast-content strong {
+    font-size: 0.94rem;
+    line-height: 1.25;
+}
+
+.az-ui-toast-content span {
+    color: var(--az-ui-muted);
+    font-size: 0.9rem;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.az-ui-toast-action,
+.az-ui-toast-close,
+.az-ui-state-action,
+.az-ui-confirm-actions button {
+    border: 0;
+    border-radius: 8px;
+    font: inherit;
+    cursor: pointer;
+}
+
+.az-ui-toast-action {
+    align-self: center;
+    padding: 7px 10px;
+    color: #0f172a;
+    background: #e2e8f0;
+    font-size: 0.84rem;
+    font-weight: 700;
+}
+
+.az-ui-toast-close {
+    width: 28px;
+    height: 28px;
+    color: var(--az-ui-muted);
+    background: transparent;
+    font-size: 1rem;
+}
+
+.az-ui-button-loading {
+    cursor: wait !important;
+    opacity: 0.78;
+}
+
+.az-ui-loading-overlay,
+.az-ui-confirm-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 999998;
+    display: none;
+    place-items: center;
+    background: rgba(2, 6, 23, 0.46);
+}
+
+.az-ui-loading-overlay.show,
+.az-ui-confirm-backdrop.show {
+    display: grid;
+}
+
+.az-ui-loading-card,
+.az-ui-confirm {
+    color: var(--az-ui-text);
+    background: var(--az-ui-surface);
+    border: 1px solid var(--az-ui-border);
+    border-radius: 8px;
+    box-shadow: var(--az-ui-shadow);
+}
+
+.az-ui-loading-card {
+    display: inline-flex;
+    gap: 12px;
+    align-items: center;
+    min-width: 180px;
+    padding: 18px 20px;
+    font-weight: 800;
+}
+
+.az-ui-spinner {
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(148, 163, 184, 0.35);
+    border-top-color: var(--az-ui-info);
+    border-radius: 999px;
+    animation: az-ui-spin 800ms linear infinite;
+}
+
+.az-ui-state {
+    display: grid;
+    place-items: center;
+    gap: 10px;
+    min-height: 150px;
+    padding: 28px 18px;
+    color: var(--az-ui-text);
+    text-align: center;
+    border: 1px solid var(--az-ui-border);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--az-ui-surface), transparent 8%);
+}
+
+.az-ui-state strong {
+    font-size: 1rem;
+}
+
+.az-ui-state p {
+    max-width: 440px;
+    margin: 0;
+    color: var(--az-ui-muted);
+    line-height: 1.45;
+}
+
+.az-ui-state-action {
+    padding: 9px 14px;
+    color: #fff;
+    background: linear-gradient(135deg, #7c3aed, #2563eb);
+    font-weight: 800;
+}
+
+.az-ui-skeleton-card {
+    display: grid;
+    gap: 10px;
+    padding: 16px;
+    margin-bottom: 12px;
+    border: 1px solid var(--az-ui-border);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--az-ui-surface), transparent 10%);
+}
+
+.az-ui-skeleton-line {
+    display: block;
+    height: 12px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(148, 163, 184, 0.18), rgba(148, 163, 184, 0.38), rgba(148, 163, 184, 0.18));
+    background-size: 220% 100%;
+    animation: az-ui-skeleton 1.2s ease-in-out infinite;
+}
+
+.az-ui-skeleton-line-1 {
+    width: 42%;
+}
+
+.az-ui-skeleton-line-2 {
+    width: 76%;
+}
+
+.az-ui-skeleton-line-3 {
+    width: 58%;
+}
+
+.az-ui-confirm {
+    width: min(420px, calc(100vw - 32px));
+    padding: 20px;
+}
+
+.az-ui-confirm strong {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 1.05rem;
+}
+
+.az-ui-confirm p {
+    margin: 0 0 18px;
+    color: var(--az-ui-muted);
+    line-height: 1.45;
+}
+
+.az-ui-confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.az-ui-confirm-cancel {
+    padding: 10px 14px;
+    color: var(--az-ui-text);
+    background: rgba(148, 163, 184, 0.16);
+}
+
+.az-ui-confirm-ok {
+    padding: 10px 14px;
+    color: #fff;
+    background: linear-gradient(135deg, #7c3aed, #2563eb);
+    font-weight: 800;
+}
+
+@keyframes az-ui-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes az-ui-skeleton {
+    to {
+        background-position-x: -220%;
+    }
+}
+
+@media (max-width: 640px) {
+    .az-ui-toast-stack {
+        top: calc(var(--az-header-height, 64px) + 10px);
+        right: 10px;
+        left: 10px;
+        width: auto;
+    }
+}

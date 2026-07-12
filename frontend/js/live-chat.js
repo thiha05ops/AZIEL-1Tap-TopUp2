@@ -146,6 +146,7 @@ function initLiveChatRealtimeAssist() {
 
 async function sendLiveChatMessage() {
     const input = document.getElementById("liveChatInput");
+    const sendBtn = document.getElementById("sendLiveChatBtn");
     if (!input) return;
 
     const message = input.value.trim();
@@ -154,6 +155,7 @@ async function sendLiveChatMessage() {
     input.value = "";
     addChatMessage("user", message, true);
     showTyping(true);
+    window.AZIEL_UI?.button?.setLoading(sendBtn, { text: "..." });
 
     try {
         const res = await fetch(apiUrl("/api/live-chat/send"), {
@@ -173,6 +175,7 @@ async function sendLiveChatMessage() {
 
         if (!data.success) {
             addChatMessage("bot", data.message || "Send failed.", true);
+            window.AZIEL_UI?.toast?.error(data.message || "Send failed.");
             return;
         }
 
@@ -189,6 +192,9 @@ async function sendLiveChatMessage() {
         showTyping(false);
         console.error("Live chat send error:", error);
         addChatMessage("bot", "Server connection error. Please try again.", true);
+        window.AZIEL_UI?.toast?.error("Server connection error. Please try again.");
+    } finally {
+        window.AZIEL_UI?.button?.reset(sendBtn);
     }
 }
 

@@ -54,10 +54,20 @@
     }
 
     function showLoading() {
+        if (window.AZIEL_UI?.loading) {
+            window.AZIEL_UI.loading.show({ text: "Creating payment..." });
+            return;
+        }
+
         document.getElementById("orderLoadingOverlay")?.classList.add("show");
     }
 
     function hideLoading() {
+        if (window.AZIEL_UI?.loading) {
+            window.AZIEL_UI.loading.hide();
+            return;
+        }
+
         document.getElementById("orderLoadingOverlay")?.classList.remove("show");
     }
 
@@ -87,6 +97,11 @@
     }
 
     function showToast(message) {
+        if (window.AZIEL_UI?.toast) {
+            window.AZIEL_UI.toast.info(message);
+            return;
+        }
+
         let toast = document.getElementById("paymentToast");
 
         if (!toast) {
@@ -145,7 +160,7 @@
     function prepareModal(orderData, paymentSession = {}) {
         const modal = document.getElementById("paymentConfirmModal");
         if (!modal) {
-            alert("Payment modal not found");
+            showToast("Payment modal not found");
             return null;
         }
 
@@ -256,8 +271,12 @@
         }
 
         if (btnEl) {
-            btnEl.disabled = true;
-            btnEl.innerText = "Submitting...";
+            if (window.AZIEL_UI?.button) {
+                window.AZIEL_UI.button.setLoading(btnEl, { text: "Submitting..." });
+            } else {
+                btnEl.disabled = true;
+                btnEl.innerText = "Submitting...";
+            }
         }
 
         const fd = new FormData();
@@ -277,8 +296,12 @@
                 setMsg(msgEl, data.message || "Slip submit failed.", "error");
 
                 if (btnEl) {
-                    btnEl.disabled = false;
-                    btnEl.innerText = "Submit Payment Slip";
+                    if (window.AZIEL_UI?.button) {
+                        window.AZIEL_UI.button.reset(btnEl);
+                    } else {
+                        btnEl.disabled = false;
+                        btnEl.innerText = "Submit Payment Slip";
+                    }
                 }
 
                 return false;
@@ -293,8 +316,12 @@
             setMsg(msgEl, "Server error", "error");
 
             if (btnEl) {
-                btnEl.disabled = false;
-                btnEl.innerText = "Submit Payment Slip";
+                if (window.AZIEL_UI?.button) {
+                    window.AZIEL_UI.button.reset(btnEl);
+                } else {
+                    btnEl.disabled = false;
+                    btnEl.innerText = "Submit Payment Slip";
+                }
             }
 
             return false;

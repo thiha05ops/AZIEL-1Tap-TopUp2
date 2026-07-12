@@ -256,7 +256,7 @@ async function saveProfile() {
         document.getElementById("displayName")?.value.trim() || "";
 
     if (!displayName) {
-        alert(t("displayNameRequired", "Display name is required"));
+        showAccountToast(t("displayNameRequired", "Display name is required"), "error");
         return;
     }
 
@@ -273,7 +273,7 @@ async function saveProfile() {
         const data = await res.json();
 
         if (!data.success || !data.user) {
-            alert(data.message || t("profileSaveFailed", "Profile save failed"));
+            showAccountToast(data.message || t("profileSaveFailed", "Profile save failed"), "error");
             return;
         }
 
@@ -287,11 +287,21 @@ async function saveProfile() {
 
         renderAccount();
 
-        alert(t("profileSaved", "Profile saved ✅"));
+        showAccountToast(t("profileSaved", "Profile saved"), "success");
     } catch (error) {
         console.log("Save profile error:", error);
-        alert(t("serverError", "Server error"));
+        showAccountToast(t("serverError", "Server error"), "error");
     }
+}
+
+function showAccountToast(message, type = "info") {
+    const method = type === "success"
+        ? "success"
+        : type === "error"
+            ? "error"
+            : "info";
+
+    window.AZIEL_UI?.toast?.[method]?.(message);
 }
 
 async function loadHistory() {
