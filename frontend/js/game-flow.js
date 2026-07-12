@@ -245,28 +245,36 @@
         const payment = getSelectedPayment();
         const readiness = getReadiness(flow);
         const symbol = getSymbol();
+        const wasReady = Boolean(flow.lastReadinessReady);
 
-        setText(
+        setMotionText(
             flow.config.packageSummarySelector,
             pkg?.name || "Not selected"
         );
 
-        setText(
+        setMotionText(
             flow.config.amountSummarySelector,
             pkg
                 ? `${Number(pkg.price || 0).toLocaleString()} ${symbol}`
                 : `0 ${symbol}`
         );
 
-        setText(
+        setMotionText(
             flow.config.paymentSummarySelector,
             payment?.method || "Not selected"
         );
 
-        setText(flow.config.noteSelector, readiness.reason);
+        setMotionText(flow.config.noteSelector, readiness.reason);
 
         const buyBtn = getEl(flow.config.buyButtonSelector);
-        if (buyBtn) buyBtn.disabled = !readiness.ready;
+        if (buyBtn) {
+            buyBtn.disabled = !readiness.ready;
+            if (readiness.ready && !wasReady) {
+                window.AZIEL_MOTION?.emphasize(buyBtn, "ready");
+            }
+        }
+
+        flow.lastReadinessReady = readiness.ready;
 
         document.dispatchEvent(
             new CustomEvent("order-summary:changed", {
@@ -487,6 +495,7 @@
                             .forEach(item => item.classList.remove("active"));
 
                         row.classList.add("active");
+                        window.AZIEL_MOTION?.emphasize(row, "selected");
                         selectedPackEl = pack;
                     });
 
@@ -494,6 +503,7 @@
                 });
 
             panel.classList.add("show");
+            panel.classList.add("az-motion-panel");
             document.body.classList.add("panel-open");
         }
 
@@ -527,10 +537,14 @@
         flow.hasAutoScrolledToBuy = true;
 
         setTimeout(() => {
-            buyBtn.scrollIntoView({
-                behavior: "smooth",
-                block: "center"
-            });
+            if (window.AZIEL_MOTION?.scrollTo) {
+                window.AZIEL_MOTION.scrollTo(buyBtn, { block: "center" });
+            } else {
+                buyBtn.scrollIntoView({
+                    behavior: "smooth",
+                    block: "center"
+                });
+            }
         }, 250);
     }
 
@@ -612,6 +626,20 @@
 
         el.textContent = text;
         el.dataset.summaryOwner = "game-flow";
+    }
+
+    function setMotionText(selector, text) {
+        const el = getEl(selector);
+        if (!el) return;
+
+        el.dataset.summaryOwner = "game-flow";
+
+        if (window.AZIEL_MOTION?.swapText) {
+            window.AZIEL_MOTION.swapText(el, text);
+            return;
+        }
+
+        el.textContent = text;
     }
 
     function cssEscape(value = "") {

@@ -88,6 +88,8 @@ function renderTopups(topups) {
         `;
     }).join("");
 
+    window.AZIEL_MOTION?.enter(box, "fast");
+
     bindTopupActions();
 }
 

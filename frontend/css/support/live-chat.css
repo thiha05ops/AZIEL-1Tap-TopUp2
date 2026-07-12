@@ -34,7 +34,9 @@
         0 12px 28px rgba(124, 58, 237, .38),
         0 0 0 6px rgba(139, 92, 246, .13) !important;
 
-    transition: transform .25s ease, box-shadow .25s ease !important;
+    transition:
+        transform var(--motion-duration-normal, .25s) var(--motion-ease-standard, ease),
+        box-shadow var(--motion-duration-normal, .25s) var(--motion-ease-standard, ease) !important;
 }
 
 .aziel-support-tab:hover,
@@ -105,7 +107,9 @@
     opacity: 0 !important;
     pointer-events: none !important;
     transform: translateY(18px) scale(.96) !important;
-    transition: .25s ease !important;
+    transition:
+        opacity var(--motion-duration-normal, .25s) var(--motion-ease-enter, ease),
+        transform var(--motion-duration-normal, .25s) var(--motion-ease-enter, ease) !important;
 }
 
 .live-chat-panel.open {
@@ -213,10 +217,10 @@
     line-height: 1.45;
     word-break: break-word;
 
-    animation: chatPop .18s ease;
+    animation: az-motion-chat-pop var(--motion-duration-fast, .18s) var(--motion-ease-enter, ease);
 }
 
-@keyframes chatPop {
+@keyframes az-motion-chat-pop {
     from {
         opacity: 0;
         transform: translateY(5px);

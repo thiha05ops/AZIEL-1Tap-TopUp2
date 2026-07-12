@@ -358,6 +358,7 @@ function renderTickets() {
     }
 
     box.innerHTML = tickets.map(renderTicket).join("");
+    window.AZIEL_MOTION?.enter(box, "fast");
 }
 
 /* ===============================
@@ -601,6 +602,7 @@ function showSupportPopup(message) {
     popup.innerHTML = escapeHTML(message);
 
     document.body.appendChild(popup);
+    window.AZIEL_MOTION?.enter(popup, "fast");
 
     setTimeout(() => {
         popup.classList.add("show");

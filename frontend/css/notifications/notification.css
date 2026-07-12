@@ -315,6 +315,10 @@ body.theme-dark {
     opacity: 0;
     visibility: hidden;
     transform: translateY(12px);
+    transition:
+        opacity var(--motion-duration-normal, .25s) var(--motion-ease-enter, ease),
+        transform var(--motion-duration-normal, .25s) var(--motion-ease-enter, ease),
+        visibility var(--motion-duration-normal, .25s) var(--motion-ease-standard, ease);
 }
 
 #notificationDropdown.show {

@@ -284,6 +284,7 @@ function selectPackage(packEl) {
   });
 
   packEl.classList.add("active");
+  window.AZIEL_MOTION?.emphasize(packEl, "selected");
 
   selectedPackage = {
     name: packEl.dataset.name,
@@ -339,9 +340,20 @@ function updateSelectedPackagePreview(pkg) {
 
   if (preview) preview.classList.add("selected", "has-package");
   if (icon && pkg.icon) icon.src = pkg.icon;
-  if (title) title.textContent = pkg.name;
-  if (subtitle) subtitle.textContent = pkg.formattedPrice;
-  if (code) code.textContent = pkg.code;
+  if (title) {
+    window.AZIEL_MOTION?.swapText(title, pkg.name) ||
+      (title.textContent = pkg.name);
+  }
+  if (subtitle) {
+    window.AZIEL_MOTION?.swapText(subtitle, pkg.formattedPrice) ||
+      (subtitle.textContent = pkg.formattedPrice);
+  }
+  if (code) {
+    window.AZIEL_MOTION?.swapText(code, pkg.code) ||
+      (code.textContent = pkg.code);
+  }
+
+  window.AZIEL_MOTION?.emphasize(preview, "updated");
 }
 
 function resetSelectedPackagePreview() {

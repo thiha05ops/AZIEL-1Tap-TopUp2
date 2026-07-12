@@ -294,6 +294,10 @@ function addChatMessage(type, text, saveScroll = true, createdAt = null) {
     body.appendChild(msg);
 
     if (saveScroll) {
+        window.AZIEL_MOTION?.enter(msg, "fast");
+    }
+
+    if (saveScroll) {
         body.scrollTop = body.scrollHeight;
     } else {
         requestAnimationFrame(() => {
@@ -308,8 +312,15 @@ function updateBadge(count) {
 
     const number = Number(count || 0);
 
-    badge.textContent = number > 99 ? "99+" : number;
+    const nextText = number > 99 ? "99+" : String(number);
+    const changed = badge.textContent !== nextText;
+
+    badge.textContent = nextText;
     badge.style.display = number > 0 ? "flex" : "none";
+
+    if (changed && number > 0) {
+        window.AZIEL_MOTION?.emphasize(badge, "badge");
+    }
 }
 
 function showTyping(show) {

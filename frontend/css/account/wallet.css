@@ -263,7 +263,11 @@ body {
     font-weight: 950;
 
     cursor: pointer;
-    transition: .2s ease;
+    transition:
+        transform var(--motion-duration-fast, .2s) var(--motion-ease-standard, ease),
+        border-color var(--motion-duration-fast, .2s) var(--motion-ease-standard, ease),
+        background-color var(--motion-duration-fast, .2s) var(--motion-ease-standard, ease),
+        box-shadow var(--motion-duration-fast, .2s) var(--motion-ease-standard, ease);
 }
 
 .quick-amounts button:hover,
@@ -629,7 +633,9 @@ body {
     transform: translateY(18px);
     pointer-events: none;
 
-    transition: .25s ease;
+    transition:
+        opacity var(--motion-duration-normal, .25s) var(--motion-ease-enter, ease),
+        transform var(--motion-duration-normal, .25s) var(--motion-ease-enter, ease);
 }
 
 #walletLivePopup.show {
@@ -766,7 +772,7 @@ body {
     border-radius: 50%;
     background: var(--primary);
 
-    animation: walletDot 1s infinite ease-in-out;
+    animation: az-motion-wallet-dot 1s var(--motion-ease-standard, ease-in-out) infinite;
 }
 
 .order-loading-dots span:nth-child(2) {
@@ -781,7 +787,7 @@ body {
     animation-delay: .36s;
 }
 
-@keyframes walletDot {
+@keyframes az-motion-wallet-dot {
 
     0%,
     100% {

@@ -380,7 +380,7 @@ body {
 #adminLiveMessagePopup {
 
     animation:
-        adminPopupIn .35s ease;
+        az-motion-enter var(--motion-duration-normal, .35s) var(--motion-ease-enter, ease);
 
     backdrop-filter: blur(18px);
 

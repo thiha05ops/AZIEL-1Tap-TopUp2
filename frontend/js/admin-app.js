@@ -126,6 +126,7 @@ function openAdminSection(sectionName, updateHash = true) {
 
     if (activeSection) {
         activeSection.classList.add("active");
+        window.AZIEL_MOTION?.enter(activeSection, "fast");
     } else {
         showAdminToast(`Section "${sectionName}" is not ready yet.`, "error");
         return;

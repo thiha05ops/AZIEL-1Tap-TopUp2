@@ -15,6 +15,14 @@ body {
     height: 100vh;
 }
 
+.admin-chat-page-embedded {
+    height: min(680px, calc(100vh - 190px));
+    min-height: 520px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 18px;
+    overflow: hidden;
+}
+
 .chat-sidebar {
     background: #0f1b2d;
     border-right: 1px solid rgba(255, 255, 255, 0.1);

@@ -71,8 +71,15 @@ function updateLegacyBadge(unreadCount) {
     if (!badge) return;
 
     const count = Number(unreadCount || 0);
-    badge.innerText = count > 99 ? "99+" : String(count);
+    const nextText = count > 99 ? "99+" : String(count);
+    const changed = badge.innerText !== nextText;
+
+    badge.innerText = nextText;
     badge.style.display = count > 0 ? "flex" : "none";
+
+    if (changed && count > 0) {
+        window.AZIEL_MOTION?.emphasize(badge, "badge");
+    }
 }
 
 function showNotificationPopup(data) {
@@ -89,6 +96,7 @@ function showNotificationPopup(data) {
 
     document.body.appendChild(popup);
     popup.classList.add("show");
+    window.AZIEL_MOTION?.enter(popup, "fast");
 
     setTimeout(() => {
         popup.classList.remove("show");

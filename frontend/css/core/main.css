@@ -2,6 +2,7 @@
    AZIEL V2.5 CORE MAIN CSS
 ========================= */
 
+@import url("/css/core/motion.css");
 @import url("/css/core/ui-feedback.css");
 
 * {

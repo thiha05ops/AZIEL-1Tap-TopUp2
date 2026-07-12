@@ -1,0 +1,280 @@
+/* frontend/css/core/motion.css */
+/* AZIEL V2.5 shared motion and micro-interaction system. */
+
+:root {
+    --motion-duration-instant: 110ms;
+    --motion-duration-fast: 180ms;
+    --motion-duration-normal: 260ms;
+    --motion-duration-slow: 420ms;
+
+    --motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+    --motion-ease-enter: cubic-bezier(0, 0, 0.2, 1);
+    --motion-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+    --motion-ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+
+    --motion-press-scale: 0.985;
+    --motion-raise-y: -2px;
+    --motion-enter-y: 10px;
+    --motion-live-ring: rgba(139, 92, 246, 0.28);
+}
+
+body.theme-light {
+    --motion-live-ring: rgba(124, 58, 237, 0.18);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    :root {
+        --motion-duration-instant: 1ms;
+        --motion-duration-fast: 1ms;
+        --motion-duration-normal: 1ms;
+        --motion-duration-slow: 1ms;
+        --motion-press-scale: 1;
+        --motion-raise-y: 0;
+        --motion-enter-y: 0;
+    }
+
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 1ms !important;
+        animation-duration: 1ms !important;
+        animation-iteration-count: 1 !important;
+    }
+}
+
+button,
+[role="button"],
+.auth-main-btn,
+.wallet-submit-btn,
+.payment-open-bank,
+.wallet-submit-slip-btn,
+.pay-card,
+.pack,
+.category-card,
+.ticket-tab,
+.admin-nav,
+.quick-action,
+.quick-amounts button,
+.noti-filter {
+    transition:
+        transform var(--motion-duration-fast) var(--motion-ease-standard),
+        opacity var(--motion-duration-fast) var(--motion-ease-standard),
+        background-color var(--motion-duration-fast) var(--motion-ease-standard),
+        border-color var(--motion-duration-fast) var(--motion-ease-standard),
+        box-shadow var(--motion-duration-fast) var(--motion-ease-standard),
+        color var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+button:not(:disabled):active,
+[role="button"]:not([aria-disabled="true"]):active,
+.auth-main-btn:not(:disabled):active,
+.wallet-submit-btn:not(:disabled):active,
+.payment-open-bank:not(:disabled):active,
+.wallet-submit-slip-btn:not(:disabled):active,
+.pay-card:not(.disabled):active,
+.pack:active,
+.category-card:active,
+.ticket-tab:active,
+.admin-nav:active,
+.quick-action:active,
+.quick-amounts button:not(:disabled):active,
+.noti-filter:active {
+    transform: scale(var(--motion-press-scale));
+}
+
+button:focus-visible,
+[role="button"]:focus-visible,
+.pay-card:focus-visible,
+.pack:focus-visible,
+.admin-nav:focus-visible,
+.noti-filter:focus-visible {
+    outline: 3px solid rgba(139, 92, 246, 0.55);
+    outline-offset: 3px;
+}
+
+button:disabled,
+.az-ui-button-loading {
+    transform: none !important;
+}
+
+.az-motion-enter {
+    animation: az-motion-enter var(--motion-duration-normal) var(--motion-ease-enter) both;
+}
+
+.az-motion-enter-fast {
+    animation: az-motion-enter var(--motion-duration-fast) var(--motion-ease-enter) both;
+}
+
+.az-motion-exit {
+    animation: az-motion-exit var(--motion-duration-fast) var(--motion-ease-exit) both;
+}
+
+.az-motion-updated,
+.az-value-changed,
+.az-live-updated {
+    animation: az-motion-updated var(--motion-duration-slow) var(--motion-ease-emphasized) both;
+}
+
+.az-value-updating {
+    animation: az-motion-value-swap var(--motion-duration-normal) var(--motion-ease-emphasized) both;
+    will-change: opacity, transform;
+}
+
+.az-motion-ready {
+    animation: az-motion-ready var(--motion-duration-normal) var(--motion-ease-emphasized) both;
+}
+
+.az-motion-selected {
+    animation: az-motion-selected var(--motion-duration-fast) var(--motion-ease-emphasized) both;
+}
+
+.az-motion-list > * {
+    animation: az-motion-enter var(--motion-duration-normal) var(--motion-ease-enter) both;
+}
+
+.az-motion-panel {
+    transition:
+        opacity var(--motion-duration-normal) var(--motion-ease-enter),
+        transform var(--motion-duration-normal) var(--motion-ease-enter),
+        visibility var(--motion-duration-normal) var(--motion-ease-standard);
+}
+
+.az-motion-panel:not(.show) {
+    opacity: 0;
+}
+
+.pack,
+.pay-card {
+    will-change: transform;
+}
+
+.pack.active,
+.pay-card.active,
+.mobile-pack-row.active {
+    animation: az-motion-selected var(--motion-duration-fast) var(--motion-ease-emphasized) both;
+}
+
+#summaryPackage,
+#summaryAmount,
+#summaryPayment,
+#selectedText {
+    display: inline-block;
+}
+
+.noti-card,
+.ticket-item,
+.wallet-history-item,
+.admin-user-card,
+.topup-card,
+.support-ticket-card {
+    animation: az-motion-enter var(--motion-duration-normal) var(--motion-ease-enter) both;
+}
+
+.noti-card.unread {
+    transition:
+        background-color var(--motion-duration-normal) var(--motion-ease-standard),
+        border-color var(--motion-duration-normal) var(--motion-ease-standard),
+        box-shadow var(--motion-duration-normal) var(--motion-ease-standard),
+        opacity var(--motion-duration-normal) var(--motion-ease-standard);
+}
+
+.az-notification-badge-bump {
+    animation: az-motion-badge var(--motion-duration-normal) var(--motion-ease-emphasized) both;
+}
+
+@keyframes az-motion-enter {
+    from {
+        opacity: 0;
+        transform: translateY(var(--motion-enter-y));
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes az-motion-exit {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    to {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+}
+
+@keyframes az-motion-value-swap {
+    0% {
+        opacity: 0.58;
+        transform: translateY(4px);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes az-motion-updated {
+    0% {
+        box-shadow: 0 0 0 0 var(--motion-live-ring);
+    }
+
+    45% {
+        box-shadow: 0 0 0 6px var(--motion-live-ring);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 transparent;
+    }
+}
+
+@keyframes az-motion-ready {
+    0% {
+        transform: scale(0.985);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+@keyframes az-motion-selected {
+    0% {
+        transform: scale(0.992);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+@keyframes az-motion-badge {
+    0% {
+        transform: scale(1);
+    }
+
+    45% {
+        transform: scale(1.12);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+@keyframes az-motion-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes az-motion-skeleton {
+    to {
+        background-position-x: -220%;
+    }
+}

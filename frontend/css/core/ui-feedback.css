@@ -46,7 +46,9 @@ body.theme-light {
     box-shadow: var(--az-ui-shadow);
     opacity: 0;
     transform: translateY(-8px);
-    transition: opacity 180ms ease, transform 180ms ease;
+    transition:
+        opacity var(--motion-duration-fast, 180ms) var(--motion-ease-enter, ease),
+        transform var(--motion-duration-fast, 180ms) var(--motion-ease-enter, ease);
     pointer-events: auto;
 }
 
@@ -119,6 +121,9 @@ body.theme-light {
 .az-ui-button-loading {
     cursor: wait !important;
     opacity: 0.78;
+    transition:
+        opacity var(--motion-duration-fast, 180ms) var(--motion-ease-standard, ease),
+        transform var(--motion-duration-fast, 180ms) var(--motion-ease-standard, ease);
 }
 
 .az-ui-loading-overlay,
@@ -129,11 +134,16 @@ body.theme-light {
     display: none;
     place-items: center;
     background: rgba(2, 6, 23, 0.46);
+    opacity: 0;
+    transition:
+        opacity var(--motion-duration-normal, 260ms) var(--motion-ease-enter, ease),
+        visibility var(--motion-duration-normal, 260ms) var(--motion-ease-standard, ease);
 }
 
 .az-ui-loading-overlay.show,
 .az-ui-confirm-backdrop.show {
     display: grid;
+    opacity: 1;
 }
 
 .az-ui-loading-card,
@@ -143,6 +153,15 @@ body.theme-light {
     border: 1px solid var(--az-ui-border);
     border-radius: 8px;
     box-shadow: var(--az-ui-shadow);
+    transform: translateY(8px) scale(0.985);
+    transition:
+        opacity var(--motion-duration-normal, 260ms) var(--motion-ease-enter, ease),
+        transform var(--motion-duration-normal, 260ms) var(--motion-ease-emphasized, ease);
+}
+
+.az-ui-loading-overlay.show .az-ui-loading-card,
+.az-ui-confirm-backdrop.show .az-ui-confirm {
+    transform: translateY(0) scale(1);
 }
 
 .az-ui-loading-card {
@@ -160,7 +179,7 @@ body.theme-light {
     border: 3px solid rgba(148, 163, 184, 0.35);
     border-top-color: var(--az-ui-info);
     border-radius: 999px;
-    animation: az-ui-spin 800ms linear infinite;
+    animation: az-motion-spin 800ms linear infinite;
 }
 
 .az-ui-state {
@@ -210,7 +229,7 @@ body.theme-light {
     border-radius: 999px;
     background: linear-gradient(90deg, rgba(148, 163, 184, 0.18), rgba(148, 163, 184, 0.38), rgba(148, 163, 184, 0.18));
     background-size: 220% 100%;
-    animation: az-ui-skeleton 1.2s ease-in-out infinite;
+    animation: az-motion-skeleton 1.2s var(--motion-ease-standard, ease-in-out) infinite;
 }
 
 .az-ui-skeleton-line-1 {
@@ -261,15 +280,15 @@ body.theme-light {
     font-weight: 800;
 }
 
-@keyframes az-ui-spin {
-    to {
-        transform: rotate(360deg);
+@media (prefers-reduced-motion: reduce) {
+    .az-ui-toast,
+    .az-ui-loading-card,
+    .az-ui-confirm {
+        transform: none !important;
     }
-}
 
-@keyframes az-ui-skeleton {
-    to {
-        background-position-x: -220%;
+    .az-ui-skeleton-line {
+        animation: none;
     }
 }
 

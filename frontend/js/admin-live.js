@@ -58,6 +58,7 @@ function handleAdminUpdate(data) {
 
         prependAdminActivity("Live Chat", data.username || "Guest");
         playAdminSound();
+        refreshLiveChatPage();
         return;
     }
 
@@ -229,6 +230,12 @@ function playAdminSound() {
 function refreshSupportPage() {
     if (isAdminSectionActive("support") && typeof loadSupportTickets === "function") {
         loadSupportTickets();
+    }
+}
+
+function refreshLiveChatPage() {
+    if (isAdminSectionActive("chat") && typeof loadAdminLiveChats === "function") {
+        loadAdminLiveChats({ preserveActive: true, source: "realtime" });
     }
 }
 

@@ -1,153 +1,380 @@
-const chatList = document.getElementById("chatList");
-const messagesBox = document.getElementById("messagesBox");
-const selectedUsername = document.getElementById("selectedUsername");
-const selectedChatId = document.getElementById("selectedChatId");
-const replyForm = document.getElementById("replyForm");
-const replyInput = document.getElementById("replyInput");
-const sendReplyBtn = document.getElementById("sendReplyBtn");
-const deleteChatBtn = document.getElementById("deleteChatBtn");
-const refreshBtn = document.getElementById("refreshBtn");
+// frontend/js/admin-live-chat.js
+// Admin Live Chat controller. Supports standalone page and admin.html#chat.
 
-let chats = [];
-let activeChat = null;
+(function () {
+    let chats = [];
+    let activeChat = null;
+    let initialized = false;
+    let loading = false;
+    let hasLoadedOnce = false;
+    let pollingTimer = null;
 
-async function loadChats() {
-    try {
-        const data = await adminFetch("/api/live-chat/admin");
+    document.addEventListener("DOMContentLoaded", initAdminLiveChat);
 
-        console.log("ADMIN CHATS:", data);
+    function initAdminLiveChat() {
+        if (initialized) return;
 
-        if (!data?.success) {
-            chatList.innerHTML = `<p class="empty">Failed to load chats</p>`;
+        const dom = getDom();
+        if (!dom.root) return;
+
+        initialized = true;
+        ensureEmbeddedShell();
+        bindEvents();
+        bindSectionLifecycle();
+        bindRealtimeRefresh();
+
+        if (isChatSectionActive()) {
+            loadAdminLiveChats();
+        }
+
+        startPolling();
+    }
+
+    function getDom() {
+        const embeddedRoot = document.getElementById("adminLiveChatList");
+        const standaloneList = document.getElementById("chatList");
+
+        return {
+            root: embeddedRoot || standaloneList,
+            embeddedRoot,
+            chatList: document.getElementById("adminLiveChatConversations") || standaloneList,
+            messagesBox: document.getElementById("adminLiveChatMessages") || document.getElementById("messagesBox"),
+            selectedUsername: document.getElementById("adminLiveChatSelectedUsername") || document.getElementById("selectedUsername"),
+            selectedChatId: document.getElementById("adminLiveChatSelectedChatId") || document.getElementById("selectedChatId"),
+            replyForm: document.getElementById("adminLiveChatReplyForm") || document.getElementById("replyForm"),
+            replyInput: document.getElementById("adminLiveChatReplyInput") || document.getElementById("replyInput"),
+            sendReplyBtn: document.getElementById("adminLiveChatSendReplyBtn") || document.getElementById("sendReplyBtn"),
+            deleteChatBtn: document.getElementById("adminLiveChatDeleteBtn") || document.getElementById("deleteChatBtn"),
+            refreshBtn: document.getElementById("adminLiveChatRefreshBtn") || document.getElementById("refreshBtn")
+        };
+    }
+
+    function ensureEmbeddedShell() {
+        const root = document.getElementById("adminLiveChatList");
+        if (!root || root.dataset.adminLiveChatReady === "true") return;
+
+        root.classList.remove("admin-list-empty");
+        root.dataset.adminLiveChatReady = "true";
+        root.innerHTML = `
+            <div class="admin-chat-page admin-chat-page-embedded">
+                <aside class="chat-sidebar">
+                    <div class="sidebar-header">
+                        <h2>Conversations</h2>
+                        <button id="adminLiveChatRefreshBtn" type="button">Refresh</button>
+                    </div>
+
+                    <div id="adminLiveChatConversations" class="chat-list">
+                        <p class="empty">Loading chats...</p>
+                    </div>
+                </aside>
+
+                <main class="chat-panel">
+                    <div class="chat-panel-header">
+                        <div>
+                            <h2 id="adminLiveChatSelectedUsername">Select a user</h2>
+                            <p id="adminLiveChatSelectedChatId">No chat selected</p>
+                        </div>
+
+                        <button id="adminLiveChatDeleteBtn" class="delete-btn" type="button" disabled>
+                            Delete
+                        </button>
+                    </div>
+
+                    <div id="adminLiveChatMessages" class="messages-box">
+                        <p class="empty">Choose a user chat from the left side.</p>
+                    </div>
+
+                    <form id="adminLiveChatReplyForm" class="reply-form">
+                        <input id="adminLiveChatReplyInput" type="text" placeholder="Write admin reply..." disabled>
+                        <button id="adminLiveChatSendReplyBtn" type="submit" disabled>Send</button>
+                    </form>
+                </main>
+            </div>
+        `;
+    }
+
+    function bindEvents() {
+        const dom = getDom();
+
+        dom.replyForm?.addEventListener("submit", sendAdminReply);
+        dom.deleteChatBtn?.addEventListener("click", deleteActiveChat);
+        dom.refreshBtn?.addEventListener("click", () => loadAdminLiveChats({ force: true }));
+    }
+
+    function bindSectionLifecycle() {
+        window.addEventListener("aziel:admin-section-opened", event => {
+            if (event.detail?.section === "chat") {
+                loadAdminLiveChats({ force: true });
+            }
+        });
+    }
+
+    function bindRealtimeRefresh() {
+        if (!window.AZIEL?.realtime) return;
+
+        window.AZIEL.realtime.on("liveChatMessage", () => {
+            if (isChatSectionActive()) {
+                loadAdminLiveChats({ preserveActive: true, source: "realtime" });
+            }
+        }, { role: "admin" });
+    }
+
+    function startPolling() {
+        if (pollingTimer) return;
+
+        pollingTimer = setInterval(() => {
+            if (isChatSectionActive()) {
+                loadAdminLiveChats({ preserveActive: true, silent: true });
+            }
+        }, 5000);
+    }
+
+    async function loadAdminLiveChats(options = {}) {
+        const dom = getDom();
+        if (!dom.chatList || loading) return;
+
+        loading = true;
+
+        if (!hasLoadedOnce && !options.silent) {
+            dom.chatList.innerHTML = `<p class="empty">Loading chats...</p>`;
+        }
+
+        try {
+            const data = await adminFetch("/api/live-chat/admin");
+
+            if (!data?.success) {
+                dom.chatList.innerHTML = `<p class="empty">${escapeHTML(data?.message || "Failed to load chats")}</p>`;
+                return;
+            }
+
+            chats = Array.isArray(data.chats)
+                ? data.chats.filter(chat => chat.status !== "deleted")
+                : [];
+
+            hasLoadedOnce = true;
+            renderChatList(options);
+            reconcileActiveChat(options);
+        } catch (error) {
+            console.error("Load admin live chats error:", error);
+            dom.chatList.innerHTML = `<p class="empty">Server connection error</p>`;
+        } finally {
+            loading = false;
+        }
+    }
+
+    function renderChatList(options = {}) {
+        const dom = getDom();
+        if (!dom.chatList) return;
+
+        if (!chats.length) {
+            dom.chatList.innerHTML = `<p class="empty">No active live chats</p>`;
+            resetActiveChat();
             return;
         }
 
-        chats = (data.chats || []).filter(chat => chat.status !== "deleted");
-        renderChatList();
-    } catch (error) {
-        console.error("Load chats error:", error);
-        chatList.innerHTML = `<p class="empty">Server connection error</p>`;
-    }
-}
+        dom.chatList.innerHTML = "";
 
-function renderChatList() {
-    if (!chats.length) {
-        chatList.innerHTML = `<p class="empty">No active live chats</p>`;
-        return;
-    }
+        chats.forEach(chat => {
+            const lastMsg = getLastMessage(chat);
+            const card = document.createElement("button");
+            card.type = "button";
+            card.className = `chat-user-card ${activeChat?.chatId === chat.chatId ? "active" : ""}`;
+            card.dataset.chatId = chat.chatId || "";
 
-    chatList.innerHTML = "";
+            card.innerHTML = `
+                <h3>${escapeHTML(chat.username || "Guest")}</h3>
+                <p>${escapeHTML(lastMsg?.text || "No message")}</p>
+                <span class="chat-time">${escapeHTML(formatTime(chat.lastMessageAt || lastMsg?.createdAt))}</span>
+            `;
 
-    chats.forEach(chat => {
-        const lastMsg = chat.messages && chat.messages.length
-            ? chat.messages[chat.messages.length - 1]
-            : null;
+            card.addEventListener("click", () => {
+                activeChat = chat;
+                renderChatList({ silent: true });
+                renderMessages(chat, { animateNewOnly: true });
+                markAdminRead(chat.chatId);
+            });
 
-        const card = document.createElement("div");
-        card.className = "chat-user-card";
-
-        card.innerHTML = `
-      <h3>${chat.username || "Guest"}</h3>
-      <p>${lastMsg ? lastMsg.text : "No message"}</p>
-      <span class="chat-time">${formatTime(chat.lastMessageAt)}</span>
-    `;
-
-        card.addEventListener("click", () => {
-            activeChat = chat;
-            renderMessages(chat);
+            dom.chatList.appendChild(card);
         });
 
-        chatList.appendChild(card);
-    });
-}
-
-function renderMessages(chat) {
-    selectedUsername.textContent = chat.username || "Guest";
-    selectedChatId.textContent = chat.chatId || "No chat ID";
-
-    replyInput.disabled = false;
-    sendReplyBtn.disabled = false;
-    deleteChatBtn.disabled = false;
-
-    messagesBox.innerHTML = "";
-
-    (chat.messages || []).forEach(msg => {
-        const div = document.createElement("div");
-        div.className = `message ${msg.sender || "user"}`;
-
-        div.innerHTML = `
-      ${msg.text || ""}
-      <small>${msg.sender || "user"} • ${formatTime(msg.createdAt)}</small>
-    `;
-
-        messagesBox.appendChild(div);
-    });
-
-    messagesBox.scrollTop = messagesBox.scrollHeight;
-}
-
-replyForm.addEventListener("submit", async e => {
-    e.preventDefault();
-    if (!activeChat) return;
-
-    const message = replyInput.value.trim();
-    if (!message) return;
-
-    const data = await adminFetch(`/api/live-chat/admin/reply/${activeChat.chatId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message })
-    });
-
-    if (data?.success) {
-        replyInput.value = "";
-        activeChat = data.chat;
-        renderMessages(activeChat);
-        loadChats();
+        if (!options.silent) {
+            window.AZIEL_MOTION?.enter(dom.chatList, "fast");
+        }
     }
-});
 
-deleteChatBtn.addEventListener("click", async () => {
-    if (!activeChat) return;
+    function reconcileActiveChat(options = {}) {
+        if (!activeChat) return;
 
-    await adminFetch(`/api/live-chat/admin/delete/${activeChat.chatId}`, {
-        method: "DELETE"
-    });
+        const updated = chats.find(chat => chat.chatId === activeChat.chatId);
+        if (!updated) {
+            resetActiveChat();
+            return;
+        }
 
-    activeChat = null;
-    selectedUsername.textContent = "Select a user";
-    selectedChatId.textContent = "No chat selected";
-    messagesBox.innerHTML = `<p class="empty">Choose a user chat from the left side.</p>`;
-
-    replyInput.disabled = true;
-    sendReplyBtn.disabled = true;
-    deleteChatBtn.disabled = true;
-
-    loadChats();
-});
-
-refreshBtn.addEventListener("click", loadChats);
-
-function formatTime(date) {
-    if (!date) return "";
-    return new Date(date).toLocaleString();
-}
-document.addEventListener("click", e => {
-    const link = e.target.closest("a");
-    if (!link) return;
-
-    const href = link.getAttribute("href");
-    if (!href) return;
-
-    if (href.startsWith("#")) return;
-
-    const url = new URL(href, window.location.href);
-
-    if (url.origin === window.location.origin) {
-        e.preventDefault();
-        window.location.href = url.pathname + url.search + url.hash;
+        const previousMessageCount = activeChat.messages?.length || 0;
+        activeChat = updated;
+        renderMessages(updated, {
+            animateNewOnly: Boolean(options.source === "realtime" || options.preserveActive),
+            previousMessageCount
+        });
     }
-});
 
-loadChats();
-setInterval(loadChats, 5000);
+    function renderMessages(chat, options = {}) {
+        const dom = getDom();
+        if (!dom.messagesBox) return;
+
+        if (dom.selectedUsername) dom.selectedUsername.textContent = chat.username || "Guest";
+        if (dom.selectedChatId) dom.selectedChatId.textContent = chat.chatId || "No chat ID";
+        if (dom.replyInput) dom.replyInput.disabled = false;
+        if (dom.sendReplyBtn) dom.sendReplyBtn.disabled = false;
+        if (dom.deleteChatBtn) dom.deleteChatBtn.disabled = false;
+
+        dom.messagesBox.innerHTML = "";
+
+        const messages = Array.isArray(chat.messages) ? chat.messages : [];
+        const animateFrom = options.animateNewOnly
+            ? Number(options.previousMessageCount ?? messages.length - 1)
+            : messages.length;
+
+        messages.forEach((msg, index) => {
+            const div = document.createElement("div");
+            div.className = `message ${escapeClass(msg.sender || "user")}`;
+            div.innerHTML = `
+                ${escapeHTML(msg.text || "")}
+                <small>${escapeHTML(msg.sender || "user")} • ${escapeHTML(formatTime(msg.createdAt))}</small>
+            `;
+
+            dom.messagesBox.appendChild(div);
+
+            if (index >= animateFrom) {
+                window.AZIEL_MOTION?.enter(div, "fast");
+            }
+        });
+
+        dom.messagesBox.scrollTop = dom.messagesBox.scrollHeight;
+    }
+
+    async function sendAdminReply(event) {
+        event.preventDefault();
+
+        const dom = getDom();
+        if (!activeChat || !dom.replyInput) return;
+
+        const message = dom.replyInput.value.trim();
+        if (!message) return;
+
+        try {
+            window.AZIEL_UI?.button?.setLoading(dom.sendReplyBtn, { text: "Sending..." });
+
+            const data = await adminFetch(`/api/live-chat/admin/reply/${encodeURIComponent(activeChat.chatId)}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ message })
+            });
+
+            if (!data?.success) {
+                showAdminToast?.(data?.message || "Reply failed", "error");
+                return;
+            }
+
+            dom.replyInput.value = "";
+            const previousMessageCount = activeChat.messages?.length || 0;
+            activeChat = data.chat;
+            renderMessages(activeChat, { animateNewOnly: true, previousMessageCount });
+            await loadAdminLiveChats({ preserveActive: true, silent: true });
+            showAdminToast?.("Reply sent", "success");
+        } catch (error) {
+            console.error("Admin live chat reply error:", error);
+            showAdminToast?.("Server error", "error");
+        } finally {
+            window.AZIEL_UI?.button?.reset(dom.sendReplyBtn);
+        }
+    }
+
+    async function deleteActiveChat() {
+        if (!activeChat) return;
+
+        const confirmed = window.AZIEL_UI?.confirm
+            ? await window.AZIEL_UI.confirm({
+                title: "Delete chat",
+                message: "Delete this live chat conversation?",
+                confirmText: "Delete"
+            })
+            : confirm("Delete this live chat conversation?");
+
+        if (!confirmed) return;
+
+        const chatId = activeChat.chatId;
+        const data = await adminFetch(`/api/live-chat/admin/delete/${encodeURIComponent(chatId)}`, {
+            method: "DELETE"
+        });
+
+        if (!data?.success) {
+            showAdminToast?.(data?.message || "Delete failed", "error");
+            return;
+        }
+
+        activeChat = null;
+        resetActiveChat();
+        await loadAdminLiveChats({ force: true });
+        showAdminToast?.("Chat deleted", "success");
+    }
+
+    async function markAdminRead(chatId) {
+        if (!chatId) return;
+
+        try {
+            await adminFetch(`/api/live-chat/admin/read/${encodeURIComponent(chatId)}`, {
+                method: "PUT"
+            });
+        } catch (error) {
+            console.log("Mark admin chat read error:", error);
+        }
+    }
+
+    function resetActiveChat() {
+        const dom = getDom();
+        activeChat = null;
+
+        if (dom.selectedUsername) dom.selectedUsername.textContent = "Select a user";
+        if (dom.selectedChatId) dom.selectedChatId.textContent = "No chat selected";
+        if (dom.messagesBox) dom.messagesBox.innerHTML = `<p class="empty">Choose a user chat from the left side.</p>`;
+        if (dom.replyInput) {
+            dom.replyInput.value = "";
+            dom.replyInput.disabled = true;
+        }
+        if (dom.sendReplyBtn) dom.sendReplyBtn.disabled = true;
+        if (dom.deleteChatBtn) dom.deleteChatBtn.disabled = true;
+    }
+
+    function getLastMessage(chat) {
+        const messages = Array.isArray(chat?.messages) ? chat.messages : [];
+        return messages.length ? messages[messages.length - 1] : null;
+    }
+
+    function isChatSectionActive() {
+        const section = document.getElementById("section-chat");
+        return !section || section.classList.contains("active") || window.location.hash === "#chat";
+    }
+
+    function formatTime(date) {
+        if (!date) return "";
+        const parsed = new Date(date);
+        return Number.isNaN(parsed.getTime()) ? "" : parsed.toLocaleString();
+    }
+
+    function escapeHTML(value) {
+        return String(value ?? "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#039;");
+    }
+
+    function escapeClass(value) {
+        return String(value || "user").replace(/[^a-z0-9_-]/gi, "");
+    }
+
+    window.loadAdminLiveChats = loadAdminLiveChats;
+})();

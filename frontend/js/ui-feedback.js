@@ -286,6 +286,12 @@
         confirmDialog.querySelector(".az-ui-confirm-ok")
             ?.addEventListener("click", () => resolveConfirm(true));
 
+        document.addEventListener("keydown", event => {
+            if (event.key === "Escape" && confirmDialog?.classList.contains("show")) {
+                resolveConfirm(false);
+            }
+        });
+
         document.body.appendChild(confirmDialog);
         return confirmDialog;
     }

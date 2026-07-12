@@ -37,7 +37,10 @@
     backdrop-filter: blur(18px);
     box-shadow: var(--shadow-sm);
 
-    transition: .28s ease;
+    transition:
+        transform var(--motion-duration-normal, .28s) var(--motion-ease-standard, ease),
+        box-shadow var(--motion-duration-normal, .28s) var(--motion-ease-standard, ease),
+        border-color var(--motion-duration-normal, .28s) var(--motion-ease-standard, ease);
 }
 
 .support-card:hover {

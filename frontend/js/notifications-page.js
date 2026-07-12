@@ -126,6 +126,7 @@ function renderNotificationPage(state) {
         }
     } else {
         list.innerHTML = filtered.map(renderNotificationItem).join("");
+        window.AZIEL_MOTION?.enter(list, "fast");
     }
 
     bindNotificationItems();
@@ -192,12 +193,14 @@ function bindNotificationItems() {
     document.querySelectorAll("[data-mark-read]").forEach(btn => {
         btn.addEventListener("click", () => {
             window.AZIEL_NOTIFICATIONS?.markRead(btn.dataset.markRead);
+            window.AZIEL_MOTION?.emphasize(btn.closest(".noti-card"), "updated");
         });
     });
 
     document.querySelectorAll("[data-action-read]").forEach(link => {
         link.addEventListener("click", () => {
             window.AZIEL_NOTIFICATIONS?.markRead(link.dataset.actionRead);
+            window.AZIEL_MOTION?.emphasize(link.closest(".noti-card"), "updated");
         });
     });
 }

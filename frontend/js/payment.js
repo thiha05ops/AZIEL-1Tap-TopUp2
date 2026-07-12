@@ -166,6 +166,7 @@ function selectPaymentCard(card) {
 
     document.querySelectorAll(".pay-card").forEach(c => c.classList.remove("active"));
     card.classList.add("active");
+    window.AZIEL_MOTION?.emphasize(card, "selected");
 
     if (paymentInput) {
         paymentInput.value = card.dataset.method || "";

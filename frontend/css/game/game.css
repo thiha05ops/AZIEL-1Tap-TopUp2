@@ -240,7 +240,11 @@
     cursor: pointer !important;
     overflow: hidden !important;
 
-    transition: .22s ease !important;
+    transition:
+        transform var(--motion-duration-fast, .22s) var(--motion-ease-standard, ease),
+        border-color var(--motion-duration-fast, .22s) var(--motion-ease-standard, ease),
+        background-color var(--motion-duration-fast, .22s) var(--motion-ease-standard, ease),
+        box-shadow var(--motion-duration-fast, .22s) var(--motion-ease-standard, ease) !important;
 }
 
 .pack:hover {
@@ -278,7 +282,9 @@
     opacity: 0;
     transform: scale(.75);
 
-    transition: .2s ease;
+    transition:
+        opacity var(--motion-duration-fast, .2s) var(--motion-ease-enter, ease),
+        transform var(--motion-duration-fast, .2s) var(--motion-ease-enter, ease);
 }
 
 .pack.active::after {
@@ -609,6 +615,19 @@
 .order-loading-overlay.show,
 .success-modal.show {
     display: flex;
+}
+
+.order-loading-box,
+.success-modal-box {
+    transform: translateY(10px) scale(.985);
+    transition:
+        transform var(--motion-duration-normal, .25s) var(--motion-ease-emphasized, ease),
+        opacity var(--motion-duration-normal, .25s) var(--motion-ease-enter, ease);
+}
+
+.order-loading-overlay.show .order-loading-box,
+.success-modal.show .success-modal-box {
+    transform: translateY(0) scale(1);
 }
 
 .order-loading-box,

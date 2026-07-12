@@ -235,7 +235,11 @@ function updateWalletBalanceUI(amount, symbol) {
         "headerWalletText"
     ].forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.innerText = text;
+        if (el) {
+            const changed = el.innerText !== text;
+            el.innerText = text;
+            if (changed) window.AZIEL_MOTION?.emphasize(el, "value");
+        }
     });
 }
 
@@ -293,6 +297,8 @@ function renderWalletHistory(history) {
             </div>
         `;
     }).join("");
+
+    window.AZIEL_MOTION?.enter(box, "fast");
 
     window.AZIEL_I18N?.translatePage?.(document);
 }

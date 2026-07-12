@@ -31,7 +31,11 @@
     justify-content: center;
     gap: 10px;
 
-    transition: .22s ease;
+    transition:
+        transform var(--motion-duration-fast, .22s) var(--motion-ease-standard, ease),
+        border-color var(--motion-duration-fast, .22s) var(--motion-ease-standard, ease),
+        background-color var(--motion-duration-fast, .22s) var(--motion-ease-standard, ease),
+        box-shadow var(--motion-duration-fast, .22s) var(--motion-ease-standard, ease);
 }
 
 .pay-card:hover {
@@ -146,6 +150,17 @@
 
 .payment-confirm-modal.show {
     display: flex;
+}
+
+.payment-confirm-box {
+    transform: translateY(10px) scale(.985);
+    transition:
+        transform var(--motion-duration-normal, .25s) var(--motion-ease-emphasized, ease),
+        opacity var(--motion-duration-normal, .25s) var(--motion-ease-enter, ease);
+}
+
+.payment-confirm-modal.show .payment-confirm-box {
+    transform: translateY(0) scale(1);
 }
 
 .payment-confirm-box {
@@ -306,14 +321,14 @@
     font-weight: 900;
     cursor: default;
 
-    animation: azPulse 1.4s infinite;
+    animation: az-motion-soft-pulse 1.4s var(--motion-ease-standard, ease) infinite;
 }
 
 #confirmPaymentOrderBtn:disabled {
     opacity: .85;
 }
 
-@keyframes azPulse {
+@keyframes az-motion-soft-pulse {
 
     0%,
     100% {

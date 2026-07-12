@@ -68,6 +68,8 @@ function renderUsers(users) {
         `;
     }).join("");
 
+    window.AZIEL_MOTION?.enter(box, "fast");
+
     bindUserActions();
 }
 

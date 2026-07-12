@@ -21,7 +21,7 @@
     --radius-lg: 24px;
     --radius-xl: 32px;
 
-    --transition: .25s ease;
+    --transition: var(--motion-duration-normal, .25s) var(--motion-ease-standard, ease);
 
     --az-container: 1180px;
     --az-page-x: 92%;

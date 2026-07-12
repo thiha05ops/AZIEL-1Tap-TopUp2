@@ -145,6 +145,8 @@ function renderOrders(orders) {
         `;
     }).join("");
 
+    window.AZIEL_MOTION?.enter(body, "fast");
+
     bindOrderActions();
 }
 

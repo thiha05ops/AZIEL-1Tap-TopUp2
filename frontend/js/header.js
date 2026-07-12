@@ -126,9 +126,15 @@ function renderNotificationBadge(unreadCount) {
     if (!badge) return;
 
     const count = Number(unreadCount || 0);
+    const nextText = count > 99 ? "99+" : String(count);
+    const changed = badge.textContent !== nextText;
 
-    badge.textContent = count > 99 ? "99+" : String(count);
+    badge.textContent = nextText;
     badge.style.display = count > 0 ? "flex" : "none";
+
+    if (changed && count > 0) {
+        window.AZIEL_MOTION?.emphasize(badge, "badge");
+    }
 }
 
 function renderHeaderNav() {
