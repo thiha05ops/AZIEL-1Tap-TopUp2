@@ -154,14 +154,19 @@ const GAME_PRICES = {
 let selectedPackage = null;
 
 document.addEventListener("DOMContentLoaded", () => {
+  document.addEventListener("pricesRendered", bindPackageSelection);
+
   renderGamePrices();
 
-  document.addEventListener("pricesRendered", bindPackageSelection);
   window.addEventListener("aziel:shopRegionChanged", () => {
-    selectedPackage = null;
-    window.selectedPackage = null;
-    renderGamePrices();
-    resetSelectedPackagePreview();
+    const selectedCode =
+      selectedPackage?.code ||
+      document.querySelector(".pack.active")?.dataset.code ||
+      "";
+
+    renderGamePrices({
+      reselectCode: selectedCode
+    });
   });
 });
 
@@ -181,7 +186,27 @@ function formatPackagePrice(price) {
   return `${Number(price || 0).toLocaleString()} ${getShopSymbol()}`;
 }
 
-function renderGamePrices() {
+function emitPackageEvent(name, detail = {}) {
+  document.dispatchEvent(
+    new CustomEvent(name, {
+      detail
+    })
+  );
+}
+
+function emitPricesRendered(detail = {}) {
+  document.dispatchEvent(new Event("pricesRendered"));
+  emitPackageEvent("prices:rendered", detail);
+}
+
+function clearSelectedPackage(reason = "cleared") {
+  selectedPackage = null;
+  window.selectedPackage = null;
+  resetSelectedPackagePreview();
+  emitPackageEvent("package:cleared", { reason });
+}
+
+function renderGamePrices(options = {}) {
   const packageContainer = document.getElementById("packages");
   if (!packageContainer) return;
 
@@ -191,7 +216,11 @@ function renderGamePrices() {
 
   if (!packages || !packages.length) {
     packageContainer.innerHTML = `<p style="color:#aaa;">No packages available.</p>`;
-    document.dispatchEvent(new Event("pricesRendered"));
+    clearSelectedPackage("catalog_unavailable");
+    emitPricesRendered({
+      game,
+      hasPackages: false
+    });
     return;
   }
 
@@ -218,7 +247,27 @@ function renderGamePrices() {
     `;
   }).join("");
 
-  document.dispatchEvent(new Event("pricesRendered"));
+  emitPricesRendered({
+    game,
+    hasPackages: true
+  });
+
+  if (options.reselectCode) {
+    const escapedCode = cssEscape(options.reselectCode);
+    const packToSelect = document.querySelector(
+      `.pack[data-code="${escapedCode}"]`
+    );
+
+    if (packToSelect) {
+      selectPackage(packToSelect);
+      return;
+    }
+
+    clearSelectedPackage("package_missing_after_region_change");
+    return;
+  }
+
+  clearSelectedPackage("prices_rendered");
 }
 
 function bindPackageSelection() {
@@ -239,6 +288,7 @@ function selectPackage(packEl) {
   selectedPackage = {
     name: packEl.dataset.name,
     price: Number(packEl.dataset.price || 0),
+    amount: Number(packEl.dataset.price || 0),
     code: packEl.dataset.code,
     icon: packEl.dataset.icon,
     formattedPrice: formatPackagePrice(packEl.dataset.price)
@@ -253,6 +303,8 @@ function selectPackage(packEl) {
       detail: selectedPackage
     })
   );
+
+  emitPackageEvent("package:selected", selectedPackage);
 }
 
 function updateSelectedPackagePreview(pkg) {
@@ -260,21 +312,25 @@ function updateSelectedPackagePreview(pkg) {
 
   const preview =
     document.getElementById("selectedPackagePreview") ||
+    document.getElementById("openPackagePanel") ||
     document.querySelector("[data-selected-package-preview]") ||
     document.querySelector(".selected-package-preview");
 
   const icon =
     document.getElementById("selectedPackageIcon") ||
+    document.getElementById("mobilePackageIcon") ||
     document.querySelector("[data-selected-package-icon]");
 
   const title =
     document.getElementById("selectedPackageTitle") ||
     document.getElementById("selectedPackageName") ||
+    document.getElementById("mobileSelectedPackageName") ||
     document.querySelector("[data-selected-package-title]");
 
   const subtitle =
     document.getElementById("selectedPackageSubtitle") ||
     document.getElementById("selectedPackagePrice") ||
+    document.getElementById("mobileSelectedPackagePrice") ||
     document.querySelector("[data-selected-package-subtitle]");
 
   const code =
@@ -291,20 +347,29 @@ function updateSelectedPackagePreview(pkg) {
 function resetSelectedPackagePreview() {
   const preview =
     document.getElementById("selectedPackagePreview") ||
+    document.getElementById("openPackagePanel") ||
     document.querySelector("[data-selected-package-preview]") ||
     document.querySelector(".selected-package-preview");
+
+  const icon =
+    document.getElementById("selectedPackageIcon") ||
+    document.getElementById("mobilePackageIcon") ||
+    document.querySelector("[data-selected-package-icon]");
 
   const title =
     document.getElementById("selectedPackageTitle") ||
     document.getElementById("selectedPackageName") ||
+    document.getElementById("mobileSelectedPackageName") ||
     document.querySelector("[data-selected-package-title]");
 
   const subtitle =
     document.getElementById("selectedPackageSubtitle") ||
     document.getElementById("selectedPackagePrice") ||
+    document.getElementById("mobileSelectedPackagePrice") ||
     document.querySelector("[data-selected-package-subtitle]");
 
   if (preview) preview.classList.remove("selected", "has-package");
+  if (icon) icon.removeAttribute("src");
   if (title) title.textContent = "Select Top-Up Amount";
   if (subtitle) subtitle.textContent = "Choose your package";
 }
@@ -321,7 +386,16 @@ function escapeAttr(value = "") {
     .replaceAll(">", "&gt;");
 }
 
+function cssEscape(value = "") {
+  if (window.CSS?.escape) return CSS.escape(String(value));
+
+  return String(value)
+    .replaceAll("\\", "\\\\")
+    .replaceAll('"', '\\"');
+}
+
 window.GAME_PRICES = GAME_PRICES;
 window.renderGamePrices = renderGamePrices;
 window.getSelectedPackage = getSelectedPackage;
 window.selectPackage = selectPackage;
+window.clearSelectedPackage = clearSelectedPackage;

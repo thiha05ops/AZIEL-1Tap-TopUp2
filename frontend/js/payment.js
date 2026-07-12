@@ -3,6 +3,10 @@
 
 document.addEventListener("DOMContentLoaded", () => {
     loadPaymentMethods();
+
+    window.addEventListener("aziel:shopRegionChanged", () => {
+        loadPaymentMethods();
+    });
 });
 
 window.selectedPaymentData = null;
@@ -21,6 +25,7 @@ async function loadPaymentMethods() {
     paymentGrid.innerHTML = `<p class="pay-loading">Loading payment methods...</p>`;
     paymentInput.value = "";
     window.selectedPaymentData = null;
+    document.dispatchEvent(new Event("paymentChanged"));
 
     try {
         const API_BASE = location.port === "5500" ? "http://localhost:3000" : "";
@@ -40,6 +45,7 @@ async function loadPaymentMethods() {
 
         if (!methods.length) {
             paymentGrid.innerHTML = `<p class="pay-empty">No payment methods available.</p>`;
+            document.dispatchEvent(new Event("paymentChanged"));
             return;
         }
 
@@ -53,6 +59,7 @@ async function loadPaymentMethods() {
     } catch (error) {
         console.error("Load payment methods error:", error);
         paymentGrid.innerHTML = `<p class="pay-error">Payment methods failed to load.</p>`;
+        document.dispatchEvent(new Event("paymentChanged"));
     }
 }
 
