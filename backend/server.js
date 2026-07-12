@@ -43,6 +43,7 @@ const supportRoutes = require("./routes/support");
 const settingsRoutes = require("./routes/settings");
 const paymentMethodsRoutes = require("./routes/paymentMethods");
 const liveChatRoutes = require("./routes/liveChat");
+const realtime = require("./services/realtime");
 
 // EXPRESS APP
 const app = express();
@@ -55,46 +56,10 @@ const io = new Server(server, {
 });
 
 app.set("io", io);
+app.set("realtime", realtime);
 
 // SOCKET EVENTS
-io.on("connection", socket => {
-    console.log("⚡ Socket connected:", socket.id);
-
-    socket.on("joinAdmin", () => {
-        socket.join("admins");
-        console.log("✅ Admin joined admins room");
-    });
-
-    socket.on("joinAdminRoom", () => {
-        socket.join("admins");
-        console.log("✅ Admin joined admins room");
-    });
-
-    socket.on("joinUser", username => {
-        if (!username) return;
-        socket.join(String(username));
-        console.log("✅ User joined:", username);
-    });
-
-    socket.on("joinUserRoom", username => {
-        if (!username) return;
-        socket.join(String(username));
-        console.log("✅ User room joined:", username);
-    });
-
-    socket.on("liveChatMessage", data => {
-        socket.to("admins").emit("liveChatMessage", data);
-    });
-
-    socket.on("adminLiveReply", data => {
-        if (!data.username) return;
-        io.to(String(data.username)).emit("adminLiveReply", data);
-    });
-
-    socket.on("disconnect", () => {
-        console.log("❌ Socket disconnected:", socket.id);
-    });
-});
+realtime.configureSocketServer(io);
 
 // CONNECT DB
 connectDB();

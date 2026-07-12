@@ -3,16 +3,33 @@
 
 let allAdminOrders = [];
 let ordersAutoRefreshTimer = null;
+let adminOrdersInitialized = false;
 
 document.addEventListener("DOMContentLoaded", () => {
+    initAdminOrdersController();
+});
+
+function initAdminOrdersController() {
+    if (adminOrdersInitialized) return;
+    adminOrdersInitialized = true;
+
     initOrderFilters();
     initOrderModal();
-    loadOrders();
+
+    if (isAdminSectionActive("orders") || !document.getElementById("section-orders")) {
+        loadOrders();
+    }
+
+    window.addEventListener("aziel:admin-section-opened", event => {
+        if (event.detail?.section === "orders") {
+            loadOrders(false);
+        }
+    });
 
     ordersAutoRefreshTimer = setInterval(() => {
-        if (!document.hidden) loadOrders(false);
+        if (!document.hidden && isAdminSectionActive("orders")) loadOrders(false);
     }, 20000);
-});
+}
 
 async function loadOrders(showLoading = true) {
     const body = document.getElementById("adminOrdersBody");
@@ -329,12 +346,7 @@ function openOrderModal(order) {
             ${detailItem("Created", formatDate(order.createdAt))}
         </div>
 
-        ${slip ? `
-            <div class="order-screenshot-box">
-                <small>Payment Slip</small>
-                <img src="${escapeHTML(getUploadUrl(slip))}" alt="Payment Slip" onerror="handleAdminOrderImageError(this)">
-            </div>
-        ` : ""}
+        ${renderAdminOrderSlip(slip)}
 
         ${canApproveRefund(order) ? `
             <div class="order-modal-actions">
@@ -357,10 +369,7 @@ function closeOrderModal() {
 }
 
 function handleAdminOrderImageError(img) {
-    const fallback = document.createElement("p");
-    fallback.className = "admin-missing-image";
-    fallback.textContent = "Payment slip image unavailable";
-    img.replaceWith(fallback);
+    handleAdminUploadedImageError(img, "Payment slip image unavailable");
 }
 
 function detailItem(label, value) {
@@ -410,10 +419,31 @@ function formatDate(date) {
 }
 
 function getUploadUrl(path) {
-    if (!path) return "";
-    if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("/uploads/")) return path;
-    if (path.startsWith("SLIP-")) return `/uploads/orders/${path}`;
-    return path;
+    return getAdminUploadedImageUrl(path, { folder: "orders" });
+}
+
+function renderAdminOrderSlip(slip) {
+    if (!slip) return "";
+
+    const url = getUploadUrl(slip);
+
+    if (!url) return "";
+
+    if (isAdminUploadedImageFailed(url)) {
+        return adminMissingImageHTML("Payment slip image unavailable");
+    }
+
+    return `
+        <div class="order-screenshot-box">
+            <small>Payment Slip</small>
+            <img src="${escapeHTML(url)}" data-src="${escapeHTML(url)}" alt="Payment Slip" onerror="handleAdminOrderImageError(this)">
+        </div>
+    `;
+}
+
+function isAdminSectionActive(section) {
+    const sectionEl = document.getElementById(`section-${section}`);
+    return !sectionEl || sectionEl.classList.contains("active");
 }
 
 function escapeHTML(value) {

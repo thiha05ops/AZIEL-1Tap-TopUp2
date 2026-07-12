@@ -151,6 +151,11 @@ function renderOrders() {
             "";
 
         const slipUrl = getAdminUploadUrl(slip);
+        const slipHTML = slipUrl && !isAdminUploadedImageFailed(slipUrl)
+            ? `<img src="${slipUrl}" data-src="${slipUrl}" class="slip-img" data-slip="${slipUrl}" onerror="handleLegacyAdminImageError(this)">`
+            : slipUrl
+                ? adminMissingImageHTML("Image unavailable", "span")
+                : "-";
 
         return `
             <tr>
@@ -180,10 +185,7 @@ function renderOrders() {
                 </td>
 
                 <td>
-                    ${slip
-                ? `<img src="${slipUrl}" class="slip-img" data-slip="${slipUrl}" onerror="handleLegacyAdminImageError(this)">`
-                : "-"
-            }
+                    ${slipHTML}
                 </td>
 
                 <td>
@@ -212,18 +214,11 @@ function renderOrders() {
 }
 
 function getAdminUploadUrl(path) {
-    if (!path) return "";
-    if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("/uploads/")) return path;
-    if (path.startsWith("SLIP-")) return `/uploads/orders/${path}`;
-    if (path.startsWith("wallet-")) return `/uploads/slips/${path}`;
-    return `/uploads/${path}`;
+    return getAdminUploadedImageUrl(path);
 }
 
 function handleLegacyAdminImageError(img) {
-    const fallback = document.createElement("span");
-    fallback.className = "admin-missing-image";
-    fallback.textContent = "Image unavailable";
-    img.replaceWith(fallback);
+    handleAdminUploadedImageError(img, "Image unavailable");
 }
 
 async function updateStatus(id, status) {

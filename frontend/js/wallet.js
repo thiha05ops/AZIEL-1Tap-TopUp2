@@ -967,19 +967,13 @@ function stopWalletPolling() {
 
 function initWalletSocket() {
     if (walletSocketReady) return;
-    if (typeof io === "undefined") return;
 
     const user = getWalletUser();
     if (!user?.username) return;
 
-    const socket =
-        location.port === "5500"
-            ? io("http://localhost:3000")
-            : io();
+    if (!window.AZIEL?.realtime) return;
 
-    socket.emit("joinUser", user.username);
-
-    socket.on("walletUpdated", async data => {
+    window.AZIEL.realtime.on("walletUpdated", async data => {
         const currency = data.currency || getWalletCurrency();
         const symbol = currency === "THB" ? "฿" : "Ks";
         const amount = Number(data.amount || data.balance || 0);
@@ -996,6 +990,10 @@ function initWalletSocket() {
         showSubmitSuccessModal();
         resetTopupForm();
 
+        await loadWallet();
+    });
+
+    window.AZIEL.realtime.on("wallet:topup-updated", async () => {
         await loadWallet();
     });
 

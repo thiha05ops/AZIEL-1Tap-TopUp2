@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const Order = require("../models/Order");
 const adminMiddleware = require("../middleware/adminMiddleware");
+const realtime = require("../services/realtime");
 
 // POST /api/supplier/mock-topup/:id
 router.post("/supplier/mock-topup/:id", adminMiddleware, async (req, res) => {
@@ -15,9 +16,7 @@ router.post("/supplier/mock-topup/:id", adminMiddleware, async (req, res) => {
         // Step 1: processing
         order.status = "processing";
         await order.save();
-        const io = req.app.get("io");
-
-        io.emit("adminNewUpdate", {
+        realtime.emitAdminOrderUpdate({
             type: "order_status",
             orderId: order.orderId,
             username: order.username,
@@ -26,7 +25,7 @@ router.post("/supplier/mock-topup/:id", adminMiddleware, async (req, res) => {
             packageName: order.packageName
         });
 
-        io.to(order.username).emit("userOrderUpdate", {
+        await realtime.emitOrderUpdate(order.username, {
             orderId: order.orderId,
             status: order.status,
             game: order.game,
@@ -38,10 +37,17 @@ router.post("/supplier/mock-topup/:id", adminMiddleware, async (req, res) => {
             order.status = "completed";
             await order.save();
             console.log("Auto topup completed:", order.orderId);
-            io.emit("adminNewUpdate", {
+            realtime.emitAdminOrderUpdate({
                 type: "order_status",
                 orderId: order.orderId,
                 username: order.username,
+                status: order.status,
+                game: order.game,
+                packageName: order.packageName
+            });
+
+            await realtime.emitOrderUpdate(order.username, {
+                orderId: order.orderId,
                 status: order.status,
                 game: order.game,
                 packageName: order.packageName

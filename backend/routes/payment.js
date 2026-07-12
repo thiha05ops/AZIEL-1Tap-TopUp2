@@ -15,6 +15,7 @@ const WalletTransaction = require("../models/WalletTransaction");
 const Notification = require("../models/Notification");
 
 const wavepayService = require("../services/wavepayService");
+const realtime = require("../services/realtime");
 
 const isProduction = process.env.NODE_ENV === "production";
 
@@ -116,24 +117,29 @@ async function markWalletTopupPaid(req, topupId, transactionId = "") {
         category: "wallet"
     });
 
-    const io = req.app.get("io");
+    await realtime.emitWalletUpdate(topup.username, {
+        amount: updatedUser.wallet?.[currencyKey] || 0,
+        currency: currencyKey,
+        status: "paid",
+        topupId: topup.topupId
+    });
 
-    if (io) {
-        io.to(topup.username).emit("walletUpdated", {
-            amount: updatedUser.wallet?.[currencyKey] || 0,
-            currency: currencyKey,
-            status: "paid"
-        });
+    await realtime.emitWalletTopupUpdate(topup.username, {
+        topupId: topup.topupId,
+        status: topup.status,
+        amount: topup.amount,
+        currency: currencyKey,
+        paymentMethod: topup.paymentMethod
+    });
 
-        io.to(topup.username).emit("newNotification", notification);
+    await realtime.emitNotification(topup.username, notification);
 
-        io.to("admins").emit("adminNewUpdate", {
-            type: "wallet_topup_paid",
-            username: topup.username,
-            amount: topup.amount,
-            currency: currencyKey
-        });
-    }
+    realtime.emitAdminWalletUpdate({
+        type: "wallet_topup_paid",
+        username: topup.username,
+        amount: topup.amount,
+        currency: currencyKey
+    });
 
     return {
         success: true,
@@ -292,21 +298,18 @@ router.post("/payment/submit", authMiddleware, upload.single("slip"), async (req
             orderId: order.orderId
         });
 
-        const io = req.app.get("io");
+        await realtime.emitNotification(order.username, notification);
+        await realtime.emitOrderUpdate(order.username, order);
 
-        if (io) {
-            io.to(order.username).emit("newNotification", notification);
-
-            io.to("admins").emit("adminNewUpdate", {
-                type: "payment_slip_uploaded",
-                orderId: order.orderId,
-                username: order.username,
-                game: order.game,
-                amount: order.amount,
-                currency: order.currency,
-                status: order.status
-            });
-        }
+        realtime.emitAdminOrderUpdate({
+            type: "payment_slip_uploaded",
+            orderId: order.orderId,
+            username: order.username,
+            game: order.game,
+            amount: order.amount,
+            currency: order.currency,
+            status: order.status
+        });
 
         return res.json({
             success: true,

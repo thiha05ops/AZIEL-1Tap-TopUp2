@@ -83,6 +83,7 @@ function renderPaymentMethods(methods) {
 
 function paymentCardHTML(method) {
     const qr = method.uploadedQrImage || method.qrImageUrl || method.qrImage || "";
+    const qrUrl = getAdminSettingsPaymentUploadUrl(qr);
 
     return `
         <div class="payment-method-card" data-id="${escapeHTML(method._id)}">
@@ -117,9 +118,11 @@ function paymentCardHTML(method) {
             <input class="pm-uploaded-qr" type="text" value="${escapeHTML(method.uploadedQrImage || "")}" placeholder="/uploads/payments/qr.png">
 
             <div class="pm-preview-wrap">
-                ${qr
-            ? `<img class="pm-qr-preview" src="${escapeHTML(getAdminSettingsPaymentUploadUrl(qr))}" alt="QR Preview" onerror="handleAdminSettingsImageError(this)">`
-            : `<div class="pm-empty-preview">No QR preview</div>`
+                ${qrUrl && !isAdminUploadedImageFailed(qrUrl)
+            ? `<img class="pm-qr-preview" src="${escapeHTML(qrUrl)}" data-src="${escapeHTML(qrUrl)}" alt="QR Preview" onerror="handleAdminSettingsImageError(this)">`
+            : qrUrl
+                ? `<div class="pm-empty-preview">QR image unavailable</div>`
+                : `<div class="pm-empty-preview">No QR preview</div>`
         }
             </div>
 
@@ -185,13 +188,13 @@ function previewLocalQR(input) {
 }
 
 function getAdminSettingsPaymentUploadUrl(path) {
-    if (!path) return "";
-    if (path.startsWith("http") || path.startsWith("/uploads/")) return path;
-    if (path.startsWith("QR-")) return `/uploads/payments/${path}`;
-    return path;
+    return getAdminUploadedImageUrl(path, { folder: "payments" });
 }
 
 function handleAdminSettingsImageError(img) {
+    const src = img?.dataset?.src || img?.currentSrc || img?.src || "";
+    markAdminUploadedImageFailed(src);
+
     const fallback = document.createElement("div");
     fallback.className = "pm-empty-preview";
     fallback.textContent = "QR image unavailable";

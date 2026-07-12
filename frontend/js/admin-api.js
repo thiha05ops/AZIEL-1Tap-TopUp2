@@ -92,6 +92,49 @@ function showAdminLogoutMessage() {
     }, 300);
 }
 
+const adminUploadFailedUrls = new Set();
+
+function getAdminUploadedImageUrl(path, options = {}) {
+    const value = String(path || "").trim();
+    if (!value) return "";
+
+    if (value.startsWith("http://") || value.startsWith("https://") || value.startsWith("/uploads/")) {
+        return value;
+    }
+
+    if (value.startsWith("QR-")) return `/uploads/payments/${value}`;
+    if (value.startsWith("SLIP-")) return `/uploads/orders/${value}`;
+    if (value.startsWith("wallet-")) return `/uploads/slips/${value}`;
+
+    if (options.folder) {
+        return `/uploads/${options.folder}/${value}`;
+    }
+
+    return `/uploads/${value}`;
+}
+
+function isAdminUploadedImageFailed(url) {
+    return Boolean(url && adminUploadFailedUrls.has(url));
+}
+
+function markAdminUploadedImageFailed(url) {
+    if (url) adminUploadFailedUrls.add(url);
+}
+
+function adminMissingImageHTML(message = "Image unavailable", tag = "p") {
+    return `<${tag} class="admin-missing-image">${message}</${tag}>`;
+}
+
+function handleAdminUploadedImageError(img, message = "Image unavailable") {
+    const src = img?.dataset?.src || img?.currentSrc || img?.src || "";
+    markAdminUploadedImageFailed(src);
+
+    const fallback = document.createElement("p");
+    fallback.className = "admin-missing-image";
+    fallback.textContent = message;
+    img.replaceWith(fallback);
+}
+
 setInterval(checkAdminToken, 60000);
 checkAdminToken();
 

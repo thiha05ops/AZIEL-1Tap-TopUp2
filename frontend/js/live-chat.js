@@ -109,6 +109,7 @@ function initLiveChatSystem() {
 
     loadLiveChatHistory();
     loadUnreadCount();
+    initLiveChatRealtimeAssist();
 
     document
         .getElementById("sendLiveChatBtn")
@@ -130,6 +131,17 @@ function initLiveChatSystem() {
         loadLiveChatHistory();
         loadUnreadCount();
     }, 5000);
+}
+
+function initLiveChatRealtimeAssist() {
+    if (!window.AZIEL?.realtime || window.__azielLiveChatRealtimeStarted) return;
+
+    window.__azielLiveChatRealtimeStarted = true;
+
+    window.AZIEL.realtime.on("adminLiveReply", async () => {
+        await loadLiveChatHistory();
+        await loadUnreadCount();
+    });
 }
 
 async function sendLiveChatMessage() {

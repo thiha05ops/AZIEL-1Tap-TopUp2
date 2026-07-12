@@ -10,28 +10,23 @@ function startAdminLiveSystem() {
     if (window.__adminLiveStarted) return;
     window.__adminLiveStarted = true;
 
-    if (typeof io === "undefined") {
-        console.log("Socket.IO not loaded");
+    if (!window.AZIEL?.realtime) {
+        console.log("Realtime client not loaded");
         return;
     }
 
-    const socket = io();
-
-    socket.emit("joinAdminRoom");
-    socket.emit("joinAdmin");
-
-    socket.on("adminNewUpdate", data => {
+    window.AZIEL.realtime.on("adminNewUpdate", data => {
         console.log("🔥 Admin Update:", data);
         handleAdminUpdate(data);
-    });
+    }, { role: "admin" });
 
-    socket.on("liveChatMessage", data => {
+    window.AZIEL.realtime.on("liveChatMessage", data => {
         handleAdminUpdate({
             type: "live_chat",
             username: data.username || "Guest",
             message: data.message || data.text || ""
         });
-    });
+    }, { role: "admin" });
 
     unlockAdminSound();
 }
@@ -232,15 +227,20 @@ function playAdminSound() {
 }
 
 function refreshSupportPage() {
-    if (typeof loadSupportTickets === "function") {
+    if (isAdminSectionActive("support") && typeof loadSupportTickets === "function") {
         loadSupportTickets();
     }
 }
 
 function refreshOrdersPage() {
-    if (typeof loadOrders === "function") {
+    if (isAdminSectionActive("orders") && typeof loadOrders === "function") {
         loadOrders();
     }
+}
+
+function isAdminSectionActive(section) {
+    const sectionEl = document.getElementById(`section-${section}`);
+    return !sectionEl || sectionEl.classList.contains("active");
 }
 
 function refreshAdminStats() {

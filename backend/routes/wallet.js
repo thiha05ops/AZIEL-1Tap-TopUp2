@@ -15,6 +15,7 @@ const Notification = require("../models/Notification");
 const adminMiddleware = require("../middleware/adminMiddleware");
 const authMiddleware = require("../middleware/authMiddleware");
 const Omise = require("../services/opnService");
+const realtime = require("../services/realtime");
 
 // ======================
 // UPLOAD SETUP
@@ -155,13 +156,11 @@ function getAccountByMethod(paymentMethod) {
     };
 }
 
-function emitWalletUpdate(req, username, payload) {
-    const io = req.app.get("io");
+async function emitWalletUpdate(username, payload) {
+    if (!username) return;
 
-    if (!io || !username) return;
-
-    io.to(username).emit("walletUpdated", payload);
-    io.to("admins").emit("adminNewUpdate", {
+    await realtime.emitWalletUpdate(username, payload);
+    realtime.emitAdminWalletUpdate({
         type: "wallet",
         username,
         ...payload
@@ -179,11 +178,7 @@ async function createWalletNotification(req, topup, title, message, type = "wall
             isRead: false
         });
 
-        const io = req.app.get("io");
-
-        if (io) {
-            io.to(topup.username).emit("newNotification", notification);
-        }
+        await realtime.emitNotification(topup.username, notification);
 
         return notification;
     } catch (error) {
@@ -269,20 +264,16 @@ router.post("/wallet/create", authMiddleware, async (req, res) => {
             topup.note = "Waiting for PromptPay wallet confirmation.";
             await topup.save();
 
-            const io = req.app.get("io");
-
-            if (io) {
-                io.to("admins").emit("adminNewUpdate", {
-                    type: "wallet_topup_created",
-                    topupId,
-                    username,
-                    amount: Number(amount),
-                    currency: currencyKey,
-                    paymentMethod: method,
-                    provider: "omise",
-                    status: topup.status
-                });
-            }
+            realtime.emitAdminWalletUpdate({
+                type: "wallet_topup_created",
+                topupId,
+                username,
+                amount: Number(amount),
+                currency: currencyKey,
+                paymentMethod: method,
+                provider: "omise",
+                status: topup.status
+            });
 
             return res.json({
                 success: true,
@@ -302,19 +293,15 @@ router.post("/wallet/create", authMiddleware, async (req, res) => {
             });
         }
 
-        const io = req.app.get("io");
-
-        if (io) {
-            io.to("admins").emit("adminNewUpdate", {
-                type: "wallet_topup_created",
-                topupId,
-                username,
-                amount: Number(amount),
-                currency: currencyKey,
-                paymentMethod: method,
-                status: topup.status
-            });
-        }
+        realtime.emitAdminWalletUpdate({
+            type: "wallet_topup_created",
+            topupId,
+            username,
+            amount: Number(amount),
+            currency: currencyKey,
+            paymentMethod: method,
+            status: topup.status
+        });
 
         return res.json({
             success: true,
@@ -467,19 +454,15 @@ async function uploadWalletSlip(req, res) {
             `Your ${Number(topup.amount || 0).toLocaleString()} ${getCurrencyKey(topup.currency)} wallet top-up slip has been submitted.`
         );
 
-        const io = req.app.get("io");
-
-        if (io) {
-            io.to("admins").emit("adminNewUpdate", {
-                type: "wallet_slip_uploaded",
-                topupId: topup.topupId,
-                username: topup.username,
-                amount: topup.amount,
-                currency: topup.currency,
-                paymentMethod: topup.paymentMethod,
-                paymentSlip: slipPath
-            });
-        }
+        realtime.emitAdminWalletUpdate({
+            type: "wallet_slip_uploaded",
+            topupId: topup.topupId,
+            username: topup.username,
+            amount: topup.amount,
+            currency: topup.currency,
+            paymentMethod: topup.paymentMethod,
+            paymentSlip: slipPath
+        });
 
         return res.json({
             success: true,
@@ -589,16 +572,12 @@ router.put("/admin/wallet/topups/:id/status", adminMiddleware, async (req, res) 
                 `Your ${Number(topup.amount || 0).toLocaleString()} ${getCurrencyKey(topup.currency)} wallet top-up was rejected.`
             );
 
-            const io = req.app.get("io");
-
-            if (io) {
-                io.to("admins").emit("adminNewUpdate", {
-                    type: "wallet_topup_rejected",
-                    username: topup.username,
-                    amount: topup.amount,
-                    currency: topup.currency
-                });
-            }
+            realtime.emitAdminWalletUpdate({
+                type: "wallet_topup_rejected",
+                username: topup.username,
+                amount: topup.amount,
+                currency: topup.currency
+            });
 
             return res.json({
                 success: true,
@@ -680,22 +659,27 @@ async function completeWalletTopup(req, topup) {
         "system"
     );
 
-    const io = req.app.get("io");
+    await realtime.emitWalletUpdate(topup.username, {
+        amount: updatedUser.wallet?.[currencyKey] || 0,
+        currency: currencyKey,
+        status: "approved",
+        topupId: topup.topupId
+    });
 
-    if (io) {
-        io.to(topup.username).emit("walletUpdated", {
-            amount: updatedUser.wallet?.[currencyKey] || 0,
-            currency: currencyKey,
-            status: "approved"
-        });
+    await realtime.emitWalletTopupUpdate(topup.username, {
+        topupId: topup.topupId,
+        status: topup.status,
+        amount: topup.amount,
+        currency: currencyKey,
+        paymentMethod: topup.paymentMethod
+    });
 
-        io.to("admins").emit("adminNewUpdate", {
-            type: "wallet_topup_approved",
-            username: topup.username,
-            amount: topup.amount,
-            currency: currencyKey
-        });
-    }
+    realtime.emitAdminWalletUpdate({
+        type: "wallet_topup_approved",
+        username: topup.username,
+        amount: topup.amount,
+        currency: currencyKey
+    });
 
     return {
         success: true,
@@ -799,24 +783,20 @@ router.post("/wallet/pay", authMiddleware, async (req, res) => {
             note: "Paid with wallet"
         });
 
-        emitWalletUpdate(req, username, {
+        await emitWalletUpdate(username, {
             amount: user.wallet[currencyKey],
             currency: currencyKey,
             status: "payment"
         });
 
-        const io = req.app.get("io");
-
-        if (io) {
-            io.to("admins").emit("adminNewUpdate", {
-                type: "wallet_payment",
-                orderId: order.orderId,
-                username,
-                status: "paid",
-                game,
-                packageName
-            });
-        }
+        realtime.emitAdminWalletUpdate({
+            type: "wallet_payment",
+            orderId: order.orderId,
+            username,
+            status: "paid",
+            game,
+            packageName
+        });
 
         res.json({
             success: true,

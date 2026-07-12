@@ -2,16 +2,27 @@
 // AZIEL Admin Payment Methods Manager V2.5
 
 let adminPaymentMethods = [];
+let adminPaymentsInitialized = false;
 
 document.addEventListener("DOMContentLoaded", () => {
-    loadAdminPaymentMethods();
+    initAdminPaymentsController();
+});
 
-    document.addEventListener("click", e => {
-        if (e.target.closest('[data-section="payments"]')) {
+function initAdminPaymentsController() {
+    if (adminPaymentsInitialized) return;
+    adminPaymentsInitialized = true;
+
+    if (isAdminSectionActive("payments") || !document.getElementById("section-payments")) {
+        loadAdminPaymentMethods();
+    }
+
+    window.addEventListener("aziel:admin-section-opened", event => {
+        if (event.detail?.section === "payments") {
             loadAdminPaymentMethods();
         }
     });
-});
+
+}
 
 async function loadAdminPaymentMethods() {
     const box = document.getElementById("paymentMethodsContainer");
@@ -47,6 +58,7 @@ function renderAdminPaymentMethods(methods) {
 
     box.innerHTML = methods.map(method => {
         const qr = method.uploadedQrImage || method.qrImageUrl || method.qrImage || "";
+        const qrUrl = getAdminPaymentUploadUrl(qr);
         const type = method.paymentType || "manual";
         const provider = method.provider || "manual";
 
@@ -102,11 +114,11 @@ function renderAdminPaymentMethods(methods) {
 
                 <input class="pm-uploaded-qr" type="hidden" value="${escapeAdminHTML(method.uploadedQrImage || "")}">
 
-                ${qr ? `
+                ${qrUrl && !isAdminUploadedImageFailed(qrUrl) ? `
                     <div class="payment-qr-preview">
-                        <img src="${escapeAdminHTML(getAdminPaymentUploadUrl(qr))}" alt="QR Preview" onerror="handleAdminPaymentImageError(this)">
+                        <img src="${escapeAdminHTML(qrUrl)}" data-src="${escapeAdminHTML(qrUrl)}" alt="QR Preview" onerror="handleAdminPaymentImageError(this)">
                     </div>
-                ` : `
+                ` : qrUrl ? adminMissingImageHTML("QR image unavailable", "div") : `
                     <div class="pm-empty-preview">No QR preview</div>
                 `}
 
@@ -323,17 +335,22 @@ function escapeAdminHTML(value) {
 }
 
 function getAdminPaymentUploadUrl(path) {
-    if (!path) return "";
-    if (path.startsWith("http") || path.startsWith("/uploads/")) return path;
-    if (path.startsWith("QR-")) return `/uploads/payments/${path}`;
-    return path;
+    return getAdminUploadedImageUrl(path, { folder: "payments" });
 }
 
 function handleAdminPaymentImageError(img) {
+    const src = img?.dataset?.src || img?.currentSrc || img?.src || "";
+    markAdminUploadedImageFailed(src);
+
     const fallback = document.createElement("div");
     fallback.className = "pm-empty-preview";
     fallback.textContent = "QR image unavailable";
     img.closest(".payment-qr-preview")?.replaceWith(fallback);
+}
+
+function isAdminSectionActive(section) {
+    const sectionEl = document.getElementById(`section-${section}`);
+    return !sectionEl || sectionEl.classList.contains("active");
 }
 function autoPaymentConfig(card) {
 

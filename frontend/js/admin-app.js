@@ -94,8 +94,12 @@ function initAdminNavigation() {
     });
 
     function setDefaultSection() {
+        const hashSection = window.location.hash
+            ? window.location.hash.replace("#", "")
+            : "";
+
         const firstActive = document.querySelector(".admin-nav.active");
-        const section = firstActive?.dataset.section || "dashboard";
+        const section = hashSection || firstActive?.dataset.section || "dashboard";
         openAdminSection(section, false);
     }
 
@@ -137,6 +141,10 @@ function openAdminSection(sectionName, updateHash = true) {
     if (updateHash) {
         history.replaceState(null, "", `#${sectionName}`);
     }
+
+    window.dispatchEvent(new CustomEvent("aziel:admin-section-opened", {
+        detail: { section: sectionName }
+    }));
 }
 
 function initAdminMobileSidebar() {

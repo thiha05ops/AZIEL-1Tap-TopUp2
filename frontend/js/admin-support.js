@@ -1,6 +1,8 @@
 // frontend/js/admin-support.js
 
 let supportSocket = null;
+let adminSupportInitialized = false;
+let adminSupportLoaded = false;
 
 document.addEventListener("DOMContentLoaded", () => {
 
@@ -13,13 +15,31 @@ document.addEventListener("DOMContentLoaded", () => {
 // ======================================
 
 function initAdminSupport() {
+    if (adminSupportInitialized) return;
+    adminSupportInitialized = true;
 
-    loadSupportTickets();
-
+    setupAdminSupportLazyLoad();
     setupRefreshButton();
-
     startAdminLiveSupport();
 
+}
+
+function setupAdminSupportLazyLoad() {
+    maybeLoadAdminSupportForActiveSection();
+
+    window.addEventListener("aziel:admin-section-opened", event => {
+        if (event.detail?.section === "support") {
+            loadSupportTickets();
+        }
+    });
+}
+
+function maybeLoadAdminSupportForActiveSection() {
+    const section = document.getElementById("section-support");
+
+    if (!section || section.classList.contains("active")) {
+        loadSupportTickets();
+    }
 }
 
 // ======================================
@@ -28,19 +48,17 @@ function initAdminSupport() {
 
 function startAdminLiveSupport() {
 
-    if (typeof io === "undefined") return;
+    if (!window.AZIEL?.realtime) return;
 
-    supportSocket = io();
-
-    supportSocket.emit("joinAdmin");
-    supportSocket.emit("joinAdminRoom");
+    supportSocket = window.AZIEL.realtime.connect({ role: "admin" });
+    if (!supportSocket) return;
 
     // LIVE CHAT MESSAGE
-    supportSocket.on("liveChatMessage", data => {
+    window.AZIEL.realtime.on("liveChatMessage", data => {
 
         showLiveIncomingMessage(data);
 
-    });
+    }, { role: "admin" });
 
 }
 
@@ -72,11 +90,11 @@ function setupRefreshButton() {
 async function loadSupportTickets() {
 
     const box =
-        document.getElementById(
-            "supportTickets"
-        );
+        getAdminSupportContainer();
 
     if (!box) return;
+
+    adminSupportLoaded = true;
 
     box.innerHTML =
         `<p>Loading support tickets...</p>`;
@@ -136,7 +154,21 @@ function renderTicketCard(ticket) {
 
     const screenshot =
         ticket.screenshot
-            ? `/uploads/support/${ticket.screenshot}`
+            ? getAdminUploadedImageUrl(ticket.screenshot, { folder: "support" })
+            : "";
+
+    const screenshotHTML = screenshot && !isAdminUploadedImageFailed(screenshot)
+        ? `
+                <img
+                    src="${escapeAdminSupportHTML(screenshot)}"
+                    data-src="${escapeAdminSupportHTML(screenshot)}"
+                    class="ticket-image-admin"
+                    onerror="handleAdminSupportImageError(this)"
+                    onclick="window.open('${escapeAdminSupportHTML(screenshot)}','_blank')"
+                >
+            `
+        : screenshot
+            ? adminMissingImageHTML("Support image unavailable")
             : "";
 
     return `
@@ -182,17 +214,7 @@ function renderTicketCard(ticket) {
                 ${ticket.message || ""}
             </div>
 
-            ${screenshot
-            ? `
-                <img
-                    src="${screenshot}"
-                    class="ticket-image-admin"
-                    onerror="handleAdminSupportImageError(this)"
-                    onclick="window.open('${screenshot}','_blank')"
-                >
-            `
-            : ""
-        }
+            ${screenshotHTML}
 
             ${ticket.adminReply
             ? `
@@ -250,10 +272,7 @@ function renderTicketCard(ticket) {
 }
 
 function handleAdminSupportImageError(img) {
-    const fallback = document.createElement("p");
-    fallback.className = "admin-missing-image";
-    fallback.textContent = "Support image unavailable";
-    img.replaceWith(fallback);
+    handleAdminUploadedImageError(img, "Support image unavailable");
 }
 
 // ======================================
@@ -321,6 +340,7 @@ async function replyTicket(
                 "adminLiveReply",
                 {
                     username,
+                    message: reply,
                     reply,
                     status
                 }
@@ -501,3 +521,19 @@ window.replyTicket =
 
 window.loadSupportTickets =
     loadSupportTickets;
+
+function getAdminSupportContainer() {
+    return (
+        document.getElementById("supportTickets") ||
+        document.getElementById("adminSupportList")
+    );
+}
+
+function escapeAdminSupportHTML(value) {
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}

@@ -521,8 +521,6 @@ function startSupportSocket() {
     const socket = getSupportSocket();
     if (!socket) return;
 
-    socket.emit("joinUser", username);
-
     socket.on("newNotification", data => {
         if (data?.title !== "Support Reply") return;
 
@@ -537,8 +535,12 @@ function startSupportSocket() {
 }
 
 function getSupportSocket() {
-    if (window.AZIEL?.socket) {
-        return window.AZIEL.socket;
+    if (window.AZIEL?.realtime) {
+        return {
+            on(eventName, handler) {
+                window.AZIEL.realtime.on(eventName, handler);
+            }
+        };
     }
 
     if (typeof io === "undefined") {
@@ -546,9 +548,8 @@ function getSupportSocket() {
         return null;
     }
 
-    return location.port === "5500"
-        ? io("http://localhost:3000")
-        : io();
+    console.log("Realtime client not loaded for support");
+    return null;
 }
 
 function showSupportPopup(message) {

@@ -33,15 +33,8 @@ function startNotificationSystem() {
         return;
     }
 
-    if (typeof io !== "undefined") {
-        const socket =
-            location.port === "5500"
-                ? io("http://localhost:3000")
-                : io();
-
-        socket.emit("joinUser", username);
-
-        socket.on("newNotification", data => {
+    if (window.AZIEL?.realtime) {
+        window.AZIEL.realtime.on("newNotification", data => {
             console.log("🔔 Notification:", data);
 
             addNotification(data);
@@ -52,6 +45,8 @@ function startNotificationSystem() {
                 prependLiveNotification(data);
             }
         });
+    } else if (typeof io !== "undefined") {
+        console.log("Realtime client not loaded");
     } else {
         console.log("Socket.IO not loaded");
     }

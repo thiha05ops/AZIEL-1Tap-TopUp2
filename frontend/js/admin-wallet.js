@@ -1,9 +1,27 @@
 // frontend/js/admin-wallet.js
 
+let adminWalletInitialized = false;
+
 document.addEventListener("DOMContentLoaded", () => {
-    loadWalletTopups();
-    initSlipZoom();
+    initAdminWalletController();
 });
+
+function initAdminWalletController() {
+    if (adminWalletInitialized) return;
+    adminWalletInitialized = true;
+
+    initSlipZoom();
+
+    if (isAdminSectionActive("wallet") || !document.getElementById("section-wallet")) {
+        loadWalletTopups();
+    }
+
+    window.addEventListener("aziel:admin-section-opened", event => {
+        if (event.detail?.section === "wallet") {
+            loadWalletTopups();
+        }
+    });
+}
 
 async function loadWalletTopups() {
     const box = document.getElementById("adminWalletList");
@@ -39,8 +57,13 @@ function renderTopups(topups) {
     box.innerHTML = topups.map(item => {
         const status = String(item.status || "pending").toLowerCase();
         const slip = item.paymentSlip || item.slip || item.filename || "";
-        const slipUrl = getSlipUrl(slip);
         const pending = status === "pending";
+        const slipUrl = getSlipUrl(slip);
+        const slipHTML = slipUrl && !isAdminUploadedImageFailed(slipUrl)
+            ? `<img class="topup-slip" src="${escapeHTML(slipUrl)}" data-src="${escapeHTML(slipUrl)}" data-slip="${escapeHTML(slipUrl)}" onerror="handleAdminWalletImageError(this)">`
+            : slipUrl
+                ? adminMissingImageHTML("Slip image unavailable")
+                : `<p>No slip uploaded</p>`;
 
         return `
             <div class="topup-card">
@@ -55,7 +78,7 @@ function renderTopups(topups) {
                 <p><b>Amount:</b> ${Number(item.amount || 0).toLocaleString()} ${escapeHTML(item.currency || "")}</p>
                 <p><b>Payment:</b> ${escapeHTML(item.paymentMethod || "-")}</p>
 
-                ${slip ? `<img class="topup-slip" src="${escapeHTML(slipUrl)}" data-slip="${escapeHTML(slipUrl)}" onerror="handleAdminWalletImageError(this)">` : `<p>No slip uploaded</p>`}
+                ${slipHTML}
 
                 <div class="topup-actions">
                     <button class="approve-btn" data-id="${escapeHTML(item._id)}" data-status="approved" ${!pending ? "disabled" : ""}>Approve</button>
@@ -123,17 +146,16 @@ function closeSlipModal() {
 }
 
 function getSlipUrl(slip) {
-    if (!slip) return "";
-    if (slip.startsWith("http") || slip.startsWith("/uploads/")) return slip;
-    if (slip.startsWith("wallet-")) return `/uploads/slips/${slip}`;
-    return `/uploads/${slip}`;
+    return getAdminUploadedImageUrl(slip, { folder: "slips" });
 }
 
 function handleAdminWalletImageError(img) {
-    const fallback = document.createElement("p");
-    fallback.className = "admin-missing-image";
-    fallback.textContent = "Slip image unavailable";
-    img.replaceWith(fallback);
+    handleAdminUploadedImageError(img, "Slip image unavailable");
+}
+
+function isAdminSectionActive(section) {
+    const sectionEl = document.getElementById(`section-${section}`);
+    return !sectionEl || sectionEl.classList.contains("active");
 }
 
 function normalizeTopupStatus(status) {

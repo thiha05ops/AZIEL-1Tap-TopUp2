@@ -17,6 +17,7 @@ const {
 
 const createNotification = require("../services/createNotification");
 const adminMiddleware = require("../middleware/adminMiddleware");
+const realtime = require("../services/realtime");
 
 function getCurrencyKey(currency) {
     return String(currency || "").toUpperCase() === "THB" ? "THB" : "MMK";
@@ -181,19 +182,16 @@ router.post("/order/:orderId/refund-request", authMiddleware, async (req, res) =
             orderId: order.orderId
         });
 
-        const io = req.app.get("io");
+        await realtime.emitNotification(order.username, notification);
+        await realtime.emitOrderUpdate(order.username, order);
 
-        if (io) {
-            io.to(order.username).emit("newNotification", notification);
-
-            io.to("admins").emit("adminNewUpdate", {
-                type: "refund_requested",
-                orderId: order.orderId,
-                username: order.username,
-                amount: order.amount,
-                currency: order.currency
-            });
-        }
+        realtime.emitAdminOrderUpdate({
+            type: "refund_requested",
+            orderId: order.orderId,
+            username: order.username,
+            amount: order.amount,
+            currency: order.currency
+        });
 
         await sendTelegramMessage(
             `💸 REFUND REQUESTED
@@ -309,24 +307,21 @@ router.put("/admin/orders/:id/status", adminMiddleware, async (req, res) => {
             orderId: order.orderId
         });
 
-        const io = req.app.get("io");
+        await realtime.emitNotification(order.username, notification || {
+            title: "Order Updated",
+            message: `${order.game} is now ${order.status}`,
+            orderId: order.orderId,
+            isRead: false
+        });
+        await realtime.emitOrderUpdate(order.username, order);
 
-        if (io) {
-            io.to(order.username).emit("newNotification", notification || {
-                title: "Order Updated",
-                message: `${order.game} is now ${order.status}`,
-                orderId: order.orderId,
-                isRead: false
-            });
-
-            io.to("admins").emit("adminNewUpdate", {
-                type: "order_status",
-                orderId: order.orderId,
-                username: order.username,
-                status: order.status,
-                game: order.game
-            });
-        }
+        realtime.emitAdminOrderUpdate({
+            type: "order_status",
+            orderId: order.orderId,
+            username: order.username,
+            status: order.status,
+            game: order.game
+        });
 
         await sendTelegramMessage(
             `📦 ORDER STATUS UPDATED
@@ -451,25 +446,22 @@ router.post("/admin/orders/:id/refund/approve", adminMiddleware, async (req, res
             orderId: order.orderId
         });
 
-        const io = req.app.get("io");
+        await realtime.emitWalletUpdate(order.username, {
+            amount: user.wallet?.[currencyKey] || 0,
+            currency: currencyKey,
+            status: "refund"
+        });
 
-        if (io) {
-            io.to(order.username).emit("walletUpdated", {
-                amount: user.wallet?.[currencyKey] || 0,
-                currency: currencyKey,
-                status: "refund"
-            });
+        await realtime.emitNotification(order.username, notification);
+        await realtime.emitOrderUpdate(order.username, order);
 
-            io.to(order.username).emit("newNotification", notification);
-
-            io.to("admins").emit("adminNewUpdate", {
-                type: "order_refunded",
-                orderId: order.orderId,
-                username: order.username,
-                amount: refundAmount,
-                currency: currencyKey
-            });
-        }
+        realtime.emitAdminOrderUpdate({
+            type: "order_refunded",
+            orderId: order.orderId,
+            username: order.username,
+            amount: refundAmount,
+            currency: currencyKey
+        });
 
         await sendTelegramMessage(
             `✅ REFUND APPROVED TO WALLET
@@ -561,17 +553,14 @@ router.post("/admin/orders/:id/refund/reject", adminMiddleware, async (req, res)
             orderId: order.orderId
         });
 
-        const io = req.app.get("io");
+        await realtime.emitNotification(order.username, notification);
+        await realtime.emitOrderUpdate(order.username, order);
 
-        if (io) {
-            io.to(order.username).emit("newNotification", notification);
-
-            io.to("admins").emit("adminNewUpdate", {
-                type: "refund_rejected",
-                orderId: order.orderId,
-                username: order.username
-            });
-        }
+        realtime.emitAdminOrderUpdate({
+            type: "refund_rejected",
+            orderId: order.orderId,
+            username: order.username
+        });
 
         await sendTelegramMessage(
             `❌ REFUND REJECTED

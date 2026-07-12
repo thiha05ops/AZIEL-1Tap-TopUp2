@@ -6,6 +6,7 @@ const router = express.Router();
 const Notification = require("../models/Notification");
 const authMiddleware = require("../middleware/authMiddleware");
 const adminMiddleware = require("../middleware/adminMiddleware");
+const realtime = require("../services/realtime");
 
 // GET /api/notifications/:username
 router.get("/notifications/:username", authMiddleware, async (req, res) => {
@@ -199,11 +200,7 @@ router.post("/notifications/create", adminMiddleware, async (req, res) => {
             isRead: false
         });
 
-        const io = req.app.get("io");
-
-        if (io) {
-            io.to(String(username)).emit("newNotification", notification);
-        }
+        await realtime.emitNotification(username, notification);
 
         res.json({
             success: true,
@@ -256,13 +253,9 @@ router.post("/notifications/broadcast", adminMiddleware, async (req, res) => {
             }))
         );
 
-        const io = req.app.get("io");
-
-        if (io) {
-            notifications.forEach(noti => {
-                io.to(String(noti.username)).emit("newNotification", noti);
-            });
-        }
+        await Promise.all(
+            notifications.map(noti => realtime.emitNotification(noti.username, noti))
+        );
 
         res.json({
             success: true,

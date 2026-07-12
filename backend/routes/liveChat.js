@@ -3,6 +3,7 @@ const router = express.Router();
 const LiveChat = require("../models/LiveChat");
 const authMiddleware = require("../middleware/authMiddleware");
 const adminMiddleware = require("../middleware/adminMiddleware");
+const realtime = require("../services/realtime");
 
 function makeChatId() {
     return "CHAT-" + Date.now() + "-" + Math.floor(Math.random() * 9999);
@@ -48,6 +49,13 @@ router.post("/send", authMiddleware, async (req, res) => {
             chat.lastMessageAt = new Date();
             await chat.save();
         }
+
+        realtime.emitAdminUpdate({
+            type: "live_chat",
+            username,
+            message,
+            chatId: chat.chatId
+        });
 
         res.json({ success: true, chat });
     } catch (error) {
@@ -166,6 +174,13 @@ router.post("/admin/reply/:chatId", adminMiddleware, async (req, res) => {
 
         chat.lastMessageAt = new Date();
         await chat.save();
+
+        await realtime.emitToUsername(chat.username, "adminLiveReply", {
+            username: chat.username,
+            message,
+            chatId: chat.chatId,
+            createdAt: new Date()
+        });
 
         res.json({ success: true, chat });
     } catch (error) {

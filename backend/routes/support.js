@@ -11,6 +11,7 @@ const SupportTicket = require("../models/SupportTicket");
 const Order = require("../models/Order");
 const authMiddleware = require("../middleware/authMiddleware");
 const adminMiddleware = require("../middleware/adminMiddleware");
+const realtime = require("../services/realtime");
 
 // UPLOAD SETUP
 
@@ -91,16 +92,12 @@ router.post("/support/ticket", authMiddleware, upload.single("screenshot"), asyn
             status: "open"
         });
 
-        const io = req.app.get("io");
-
-        if (io) {
-            io.to("admins").emit("adminNewUpdate", {
-                type: "support_ticket",
-                ticketId: ticket.ticketId,
-                username,
-                subject
-            });
-        }
+        realtime.emitAdminUpdate({
+            type: "support_ticket",
+            ticketId: ticket.ticketId,
+            username,
+            subject
+        });
 
         res.json({
             success: true,
@@ -187,24 +184,19 @@ router.put("/admin/support/tickets/:id/reply", adminMiddleware, async (req, res)
 
         await ticket.save();
 
-        const io = req.app.get("io");
+        const payload = {
+            title: "Support Reply",
+            message: `Admin replied to your support ticket: ${ticket.subject}`,
+            isRead: false,
+            ticketId: ticket.ticketId
+        };
 
-        if (io) {
-            const payload = {
-                title: "Support Reply",
-                message: `Admin replied to your support ticket: ${ticket.subject}`,
-                isRead: false,
-                ticketId: ticket.ticketId
-            };
-
-            io.to(ticket.username).emit("newNotification", payload);
-
-            io.to(ticket.username).emit("supportUpdated", {
-                message: payload.message,
-                ticketId: ticket.ticketId,
-                status: ticket.status
-            });
-        }
+        await realtime.emitNotification(ticket.username, payload);
+        await realtime.emitSupportUpdate(ticket.username, {
+            message: payload.message,
+            ticketId: ticket.ticketId,
+            status: ticket.status
+        });
 
         res.json({
             success: true,
