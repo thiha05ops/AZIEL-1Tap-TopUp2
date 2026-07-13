@@ -33,7 +33,7 @@ document.addEventListener("DOMContentLoaded", () => {
         setLoading(true);
 
         try {
-            const res = await fetch("http://localhost:3000/api/verify-email", {
+            const res = await fetch("/api/verify-email", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"

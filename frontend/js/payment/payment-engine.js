@@ -39,20 +39,21 @@
             }
 
             const paymentSession = await createPaymentSession(orderData);
+            const canonicalOrder = paymentSession.order || orderData;
 
             PaymentUtils.hideLoading();
 
             if (type === "auto") {
-                PaymentPromptPay.show(orderData, paymentSession);
+                PaymentPromptPay.show(canonicalOrder, paymentSession);
                 return;
             }
 
             if (type === "deeplink") {
-                PaymentDeepLink.show(orderData, paymentSession);
+                PaymentDeepLink.show(canonicalOrder, paymentSession);
                 return;
             }
 
-            PaymentManual.show(orderData, paymentSession);
+            PaymentManual.show(canonicalOrder, paymentSession);
 
         } catch (error) {
             console.log("Payment engine error:", error);

@@ -3,60 +3,27 @@
 const express = require("express");
 const router = express.Router();
 
-const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
-
 const SupportTicket = require("../models/SupportTicket");
 const Order = require("../models/Order");
+const upload = require("../middleware/imageMemoryUpload");
 const authMiddleware = require("../middleware/authMiddleware");
 const adminMiddleware = require("../middleware/adminMiddleware");
 const realtime = require("../services/realtime");
 const notificationService = require("../services/notificationService");
-
-// UPLOAD SETUP
-
-const uploadDir = path.join(__dirname, "../uploads/support");
-
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-function safeFileName(name) {
-    return String(name || "screenshot")
-        .replace(/[^a-zA-Z0-9._-]/g, "_");
-}
-
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, uploadDir);
-    },
-
-    filename: (req, file, cb) => {
-        cb(null, `${Date.now()}-${safeFileName(file.originalname)}`);
-    }
-});
-
-const upload = multer({
-    storage,
-    limits: {
-        fileSize: 5 * 1024 * 1024
-    },
-    fileFilter: (req, file, cb) => {
-        const allowed = ["image/jpeg", "image/png", "image/webp"];
-
-        if (!allowed.includes(file.mimetype)) {
-            return cb(new Error("Only JPG, PNG and WEBP images are allowed"));
-        }
-
-        cb(null, true);
-    }
-});
+const {
+    StorageError,
+    cleanupAfterFailedPersistence,
+    logStorageError,
+    uploadFile
+} = require("../services/storageService");
 
 // CREATE TICKET
 // POST /api/support/ticket
 
 router.post("/support/ticket", authMiddleware, upload.single("screenshot"), async (req, res) => {
+    let evidence = null;
+    let evidencePersisted = false;
+
     try {
         const { type, subject, message, orderId } = req.body;
         const username = req.user.username;
@@ -82,16 +49,28 @@ router.post("/support/ticket", authMiddleware, upload.single("screenshot"), asyn
             }
         }
 
+        const ticketId = "SUP-" + Date.now();
+
+        if (req.file) {
+            evidence = await uploadFile({
+                file: req.file,
+                category: "supportEvidence",
+                ownerReference: ticketId
+            });
+        }
+
         const ticket = await SupportTicket.create({
-            ticketId: "SUP-" + Date.now(),
+            ticketId,
             username,
             type: type || "general",
             subject,
             message,
             orderId: orderId || "",
-            screenshot: req.file ? req.file.filename : "",
+            screenshot: evidence?.url || "",
+            screenshotEvidence: evidence || undefined,
             status: "open"
         });
+        evidencePersisted = true;
 
         realtime.emitAdminUpdate({
             type: "support_ticket",
@@ -108,7 +87,24 @@ router.post("/support/ticket", authMiddleware, upload.single("screenshot"), asyn
     } catch (error) {
         console.log("Create support ticket error:", error);
 
-        res.json({
+        if (evidence && !evidencePersisted) {
+            await cleanupAfterFailedPersistence(evidence);
+        }
+
+        if (error instanceof StorageError) {
+            logStorageError(error.code, {
+                provider: error.provider,
+                category: "supportEvidence"
+            });
+
+            return res.status(error.statusCode).json({
+                success: false,
+                code: error.code,
+                message: error.message
+            });
+        }
+
+        res.status(500).json({
             success: false,
             message: error.message || "Server error"
         });

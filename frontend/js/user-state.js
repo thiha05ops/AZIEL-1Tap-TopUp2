@@ -13,6 +13,7 @@ AZIEL.apiUrl = function (path) {
 
 AZIEL.user = null;
 AZIEL.wallet = null;
+AZIEL.walletRealtimeReady = false;
 
 // TOKEN
 AZIEL.getToken = function () {
@@ -262,6 +263,36 @@ AZIEL.loadWallet = async function () {
     }
 };
 
+AZIEL.applyWalletUpdate = function (data = {}) {
+    const currency = data.currency || AZIEL.wallet?.currency || AZIEL.getShopCurrency();
+    const symbol = currency === "THB" ? "฿" : "Ks";
+    const balance = Number(data.balance ?? data.amount ?? 0);
+
+    AZIEL.wallet = {
+        balance,
+        currency,
+        symbol,
+        latestTransaction: data.latestTransaction || null,
+        updatedAt: data.updatedAt || new Date()
+    };
+
+    window.dispatchEvent(new Event("aziel:walletChanged"));
+    return AZIEL.wallet;
+};
+
+AZIEL.initWalletRealtime = function () {
+    if (AZIEL.walletRealtimeReady || !AZIEL.realtime?.on || !AZIEL.getToken()) return;
+
+    const handler = data => {
+        AZIEL.applyWalletUpdate(data);
+    };
+
+    AZIEL.realtime.on("wallet:updated", handler);
+    AZIEL.realtime.on("wallet:balance-changed", handler);
+    AZIEL.realtime.on("walletUpdated", handler);
+    AZIEL.walletRealtimeReady = true;
+};
+
 // TARGETED REGION HELPERS
 AZIEL.shouldShowForShopRegion = function (targetRegion) {
     const region = AZIEL.getShopRegion();
@@ -286,6 +317,7 @@ AZIEL.init = async function () {
 
     await AZIEL.loadUser();
     await AZIEL.loadWallet();
+    AZIEL.initWalletRealtime();
 
     window.dispatchEvent(new Event("aziel:ready"));
 };

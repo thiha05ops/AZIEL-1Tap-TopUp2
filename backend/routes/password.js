@@ -2,9 +2,15 @@
 
 const express = require("express");
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 
 const User = require("../models/User");
 const { sendResetOTP } = require("../services/mail");
+const {
+    createSecurityNotification,
+    recordSecurityEvent,
+    revokeAllUserSessions
+} = require("../services/authSessionService");
 
 const router = express.Router();
 
@@ -16,6 +22,28 @@ function isValidGmail(email) {
 
 function makeOTP() {
     return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+const PASSWORD_MIN_LENGTH = 8;
+const RESET_OTP_MAX_ATTEMPTS = 5;
+const RESET_OTP_TTL_MS = 10 * 60 * 1000;
+const RESET_OTP_COOLDOWN_MS = 60 * 1000;
+
+function hashOTP(otp) {
+    return crypto
+        .createHash("sha256")
+        .update(String(otp || ""))
+        .digest("hex");
+}
+
+function clearResetOTP(user) {
+    user.resetOTP = "";
+    user.resetOTPHash = "";
+    user.resetOTPExpire = null;
+    user.resetOTPVerified = false;
+    user.resetOTPVerifiedAt = null;
+    user.resetOTPAttempts = 0;
+    user.resetOTPResendAvailableAt = null;
 }
 
 /* =========================
@@ -41,15 +69,27 @@ router.post("/send-otp", async (req, res) => {
             });
         }
 
+        if (
+            user.resetOTPResendAvailableAt &&
+            user.resetOTPResendAvailableAt > new Date()
+        ) {
+            return res.json({
+                success: false,
+                message: "Please wait before requesting another OTP."
+            });
+        }
+
         const otp = makeOTP();
 
-        user.resetOTP = otp;
-        user.resetOTPExpire = new Date(Date.now() + 10 * 60 * 1000);
+        user.resetOTP = "";
+        user.resetOTPHash = hashOTP(otp);
+        user.resetOTPExpire = new Date(Date.now() + RESET_OTP_TTL_MS);
         user.resetOTPVerified = false;
+        user.resetOTPVerifiedAt = null;
+        user.resetOTPAttempts = 0;
+        user.resetOTPResendAvailableAt = new Date(Date.now() + RESET_OTP_COOLDOWN_MS);
 
         await user.save();
-
-        console.log("AZIEL RESET OTP:", email, otp);
 
         await sendResetOTP(email, otp);
 
@@ -85,7 +125,7 @@ router.post("/verify-otp", async (req, res) => {
 
         const user = await User.findOne({ email });
 
-        if (!user || !user.resetOTP || !user.resetOTPExpire) {
+        if (!user || !user.resetOTPHash || !user.resetOTPExpire) {
             return res.json({
                 success: false,
                 message: "OTP not found. Please request again."
@@ -93,9 +133,7 @@ router.post("/verify-otp", async (req, res) => {
         }
 
         if (user.resetOTPExpire < new Date()) {
-            user.resetOTP = "";
-            user.resetOTPExpire = null;
-            user.resetOTPVerified = false;
+            clearResetOTP(user);
             await user.save();
 
             return res.json({
@@ -104,7 +142,25 @@ router.post("/verify-otp", async (req, res) => {
             });
         }
 
-        if (user.resetOTP !== otp) {
+        if (Number(user.resetOTPAttempts || 0) >= RESET_OTP_MAX_ATTEMPTS) {
+            clearResetOTP(user);
+            await user.save();
+
+            return res.json({
+                success: false,
+                message: "Too many invalid attempts. Please request a new OTP."
+            });
+        }
+
+        if (user.resetOTPHash !== hashOTP(otp)) {
+            user.resetOTPAttempts = Number(user.resetOTPAttempts || 0) + 1;
+
+            if (user.resetOTPAttempts >= RESET_OTP_MAX_ATTEMPTS) {
+                clearResetOTP(user);
+            }
+
+            await user.save();
+
             return res.json({
                 success: false,
                 message: "Invalid OTP"
@@ -112,6 +168,7 @@ router.post("/verify-otp", async (req, res) => {
         }
 
         user.resetOTPVerified = true;
+        user.resetOTPVerifiedAt = new Date();
         await user.save();
 
         return res.json({
@@ -146,10 +203,10 @@ router.post("/reset", async (req, res) => {
             });
         }
 
-        if (newPassword.length < 6) {
+        if (newPassword.length < PASSWORD_MIN_LENGTH) {
             return res.json({
                 success: false,
-                message: "Password must be at least 6 characters"
+                message: `Password must be at least ${PASSWORD_MIN_LENGTH} characters`
             });
         }
 
@@ -157,9 +214,10 @@ router.post("/reset", async (req, res) => {
 
         if (
             !user ||
-            !user.resetOTP ||
+            !user.resetOTPHash ||
             !user.resetOTPExpire ||
-            !user.resetOTPVerified
+            !user.resetOTPVerified ||
+            !user.resetOTPVerifiedAt
         ) {
             return res.json({
                 success: false,
@@ -168,9 +226,7 @@ router.post("/reset", async (req, res) => {
         }
 
         if (user.resetOTPExpire < new Date()) {
-            user.resetOTP = "";
-            user.resetOTPExpire = null;
-            user.resetOTPVerified = false;
+            clearResetOTP(user);
             await user.save();
 
             return res.json({
@@ -180,16 +236,24 @@ router.post("/reset", async (req, res) => {
         }
 
         user.password = await bcrypt.hash(newPassword, 10);
+        user.passwordChangedAt = new Date();
+        user.authProvider = user.authProvider === "google" ? "hybrid" : (user.authProvider || "local");
 
-        user.resetOTP = "";
-        user.resetOTPExpire = null;
-        user.resetOTPVerified = false;
-
-        // Password reset ပြီးရင် device အဟောင်းတွေ logout ဖြစ်စေမယ်
-        user.currentSessionToken = "";
-        user.sessionUpdatedAt = new Date();
+        clearResetOTP(user);
 
         await user.save();
+
+        await revokeAllUserSessions(user, "password_reset");
+
+        await recordSecurityEvent(user, {
+            type: "password.reset",
+            title: "Password reset completed"
+        });
+
+        await createSecurityNotification(user, {
+            title: "Password reset completed",
+            message: "Your AZIEL password was reset. Please sign in again."
+        });
 
         return res.json({
             success: true,

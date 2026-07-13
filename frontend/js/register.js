@@ -48,8 +48,8 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        if (password.length < 6) {
-            showMessage("Password must be at least 6 characters.", "error");
+        if (password.length < 8) {
+            showMessage("Password must be at least 8 characters.", "error");
             return;
         }
 
@@ -61,7 +61,7 @@ document.addEventListener("DOMContentLoaded", () => {
         setLoading(true);
 
         try {
-            const res = await fetch("http://localhost:3000/api/register", {
+            const res = await fetch("/api/register", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"

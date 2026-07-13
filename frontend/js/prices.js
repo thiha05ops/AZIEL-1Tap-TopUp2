@@ -153,6 +153,19 @@ const GAME_PRICES = {
 
 let selectedPackage = null;
 
+const PACKAGE_PREVIEW_PLACEHOLDERS = {
+  mlbb: "/assets/mlbb/icons/small.webp",
+  pubg: "/assets/games/pubg.webp",
+  freefire: "/assets/games/freefire.webp",
+  hok: "/assets/games/hok.webp",
+  aovid: "/assets/games/aov-id.webp",
+  pubgrp: "/assets/games/pubg-rp.webp",
+  telegram: "/assets/giftcards/telegram.webp",
+  genshin: "/assets/games/genshin.webp",
+  roblox: "/assets/games/roblox.webp",
+  valorant: "/assets/games/valorant.webp"
+};
+
 document.addEventListener("DOMContentLoaded", () => {
   document.addEventListener("pricesRendered", bindPackageSelection);
 
@@ -184,6 +197,58 @@ function getPriceByRegion(item) {
 
 function formatPackagePrice(price) {
   return `${Number(price || 0).toLocaleString()} ${getShopSymbol()}`;
+}
+
+function getCurrentGameKey() {
+  return document.getElementById("packages")?.dataset.game || "";
+}
+
+function getPreviewPlaceholderIcon() {
+  return PACKAGE_PREVIEW_PLACEHOLDERS[getCurrentGameKey()] || "";
+}
+
+function rememberDefaultPackageIcon(icon, preview) {
+  if (!icon) return "";
+
+  const currentSrc = icon.getAttribute("src") || "";
+  const isShowingPackage = preview?.classList.contains("has-package");
+
+  if (!icon.dataset.defaultSrc && currentSrc && !isShowingPackage) {
+    icon.dataset.defaultSrc = currentSrc;
+  }
+
+  if (!icon.dataset.defaultSrc) {
+    icon.dataset.defaultSrc = getPreviewPlaceholderIcon();
+  }
+
+  return icon.dataset.defaultSrc || "";
+}
+
+function setPackagePreviewIcon(icon, src, fallbackSrc = "") {
+  if (!icon) return;
+
+  const fallback = fallbackSrc || icon.dataset.defaultSrc || getPreviewPlaceholderIcon();
+  if (fallback) icon.dataset.fallbackSrc = fallback;
+
+  icon.onerror = function handlePackagePreviewIconError() {
+    const safeSrc = this.dataset.fallbackSrc || this.dataset.defaultSrc || "";
+
+    if (safeSrc && this.getAttribute("src") !== safeSrc) {
+      this.src = safeSrc;
+      return;
+    }
+
+    this.onerror = null;
+  };
+
+  if (src) {
+    icon.src = src;
+    return;
+  }
+
+  if (fallback) {
+    icon.src = fallback;
+  }
 }
 
 function emitPackageEvent(name, detail = {}) {
@@ -338,8 +403,10 @@ function updateSelectedPackagePreview(pkg) {
     document.getElementById("selectedPackageCode") ||
     document.querySelector("[data-selected-package-code]");
 
+  const defaultIcon = rememberDefaultPackageIcon(icon, preview);
+
   if (preview) preview.classList.add("selected", "has-package");
-  if (icon && pkg.icon) icon.src = pkg.icon;
+  setPackagePreviewIcon(icon, pkg.icon, defaultIcon);
   if (title) {
     window.AZIEL_MOTION?.swapText(title, pkg.name) ||
       (title.textContent = pkg.name);
@@ -380,8 +447,10 @@ function resetSelectedPackagePreview() {
     document.getElementById("mobileSelectedPackagePrice") ||
     document.querySelector("[data-selected-package-subtitle]");
 
+  const defaultIcon = rememberDefaultPackageIcon(icon, preview);
+
   if (preview) preview.classList.remove("selected", "has-package");
-  if (icon) icon.removeAttribute("src");
+  if (icon) setPackagePreviewIcon(icon, defaultIcon, defaultIcon);
   if (title) title.textContent = "Select Top-Up Amount";
   if (subtitle) subtitle.textContent = "Choose your package";
 }

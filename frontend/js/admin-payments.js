@@ -113,6 +113,7 @@ function renderAdminPaymentMethods(methods) {
                 </button>
 
                 <input class="pm-uploaded-qr" type="hidden" value="${escapeAdminHTML(method.uploadedQrImage || "")}">
+                <input class="pm-uploaded-qr-evidence" type="hidden" value="${escapeAdminHTML(JSON.stringify(method.uploadedQrImageEvidence || null))}">
 
                 ${qrUrl && !isAdminUploadedImageFailed(qrUrl) ? `
                     <div class="payment-qr-preview">
@@ -235,6 +236,7 @@ async function saveAdminPaymentMethod(id) {
         accountNumber: card.querySelector(".pm-number")?.value || "",
         qrImageUrl: card.querySelector(".pm-qr")?.value || "",
         uploadedQrImage: card.querySelector(".pm-uploaded-qr")?.value || "",
+        uploadedQrImageEvidence: parseAdminPaymentEvidence(card.querySelector(".pm-uploaded-qr-evidence")?.value),
         maintenanceMessage: card.querySelector(".pm-message")?.value || "",
         paymentType: card.querySelector(".pm-type")?.value || "manual",
         provider: card.querySelector(".pm-provider")?.value || "manual"
@@ -299,6 +301,9 @@ async function uploadAdminPaymentQR(id) {
         const input = card.querySelector(".pm-uploaded-qr");
         if (input) input.value = data.image;
 
+        const evidenceInput = card.querySelector(".pm-uploaded-qr-evidence");
+        if (evidenceInput) evidenceInput.value = JSON.stringify(data.evidence || null);
+
         showAdminToast?.("QR uploaded. Saving method...", "success");
 
         await saveAdminPaymentMethod(id);
@@ -336,6 +341,17 @@ function escapeAdminHTML(value) {
 
 function getAdminPaymentUploadUrl(path) {
     return getAdminUploadedImageUrl(path, { folder: "payments" });
+}
+
+function parseAdminPaymentEvidence(value) {
+    if (!value) return undefined;
+
+    try {
+        const parsed = JSON.parse(value);
+        return parsed && typeof parsed === "object" ? parsed : undefined;
+    } catch (error) {
+        return undefined;
+    }
 }
 
 function handleAdminPaymentImageError(img) {

@@ -24,7 +24,7 @@
             }
 
             PaymentUtils.showSuccess(
-                orderData.orderId,
+                data.order?.orderId || orderData.orderId,
                 "Wallet Payment Success",
                 "Paid with AZIEL Wallet. Admin will process your top-up soon."
             );

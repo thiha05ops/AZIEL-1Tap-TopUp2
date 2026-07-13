@@ -157,7 +157,7 @@ async function trackOrder(orderId) {
                     </div>
 
                     <div class="track-timeline">
-                        ${renderTimeline(status)}
+                        ${renderTimeline(status, order)}
                     </div>
                 </div>
 
@@ -185,12 +185,41 @@ async function trackOrder(orderId) {
     }
 }
 
-function renderTimeline(status) {
+function renderTimeline(status, order = null) {
+    if (Array.isArray(order?.timeline) && order.timeline.length) {
+        return renderServerTimeline(order.timeline);
+    }
+
     if (isRefundFlow(status)) {
         return renderRefundTimeline(status);
     }
 
     return renderOrderTimeline(status);
+}
+
+function renderServerTimeline(timeline) {
+    return timeline.slice(-8).map(entry => {
+        const status = normalizeStatus(entry.status);
+        const title = formatStatus(status);
+        const when = entry.at || entry.createdAt || entry.timestamp || "";
+        const detail = entry.reason || entry.source || getDefaultNote(status);
+
+        return timelineStep(
+            status,
+            title,
+            `${detail}${when ? ` • ${formatDateTime(when)}` : ""}`,
+            status
+        );
+    }).join("");
+}
+
+function formatDateTime(value) {
+    if (!value) return "";
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+
+    return date.toLocaleString();
 }
 
 function isRefundFlow(status) {

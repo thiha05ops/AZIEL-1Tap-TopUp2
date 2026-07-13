@@ -4,6 +4,11 @@ const router = express.Router();
 const PaymentMethod = require("../models/PaymentMethod");
 const adminMiddleware = require("../middleware/adminMiddleware");
 const paymentQrUpload = require("../middleware/paymentQrUpload");
+const {
+    StorageError,
+    logStorageError,
+    uploadFile
+} = require("../services/storageService");
 
 const defaultMethods = [
     {
@@ -124,6 +129,7 @@ router.put("/admin/payment-methods/:id", adminMiddleware, async (req, res) => {
             "accountNumber",
             "qrImageUrl",
             "uploadedQrImage",
+            "uploadedQrImageEvidence",
             "maintenanceMessage",
             "paymentType",
             "provider"
@@ -167,13 +173,33 @@ router.post(
                 });
             }
 
+            const evidence = await uploadFile({
+                file: req.file,
+                category: "paymentAsset",
+                ownerReference: "payment-method"
+            });
+
             res.json({
                 success: true,
-                image: `/uploads/payments/${req.file.filename}`
+                image: evidence.url,
+                evidence
             });
 
         } catch (error) {
             console.log("QR upload error:", error);
+
+            if (error instanceof StorageError) {
+                logStorageError(error.code, {
+                    provider: error.provider,
+                    category: "paymentAsset"
+                });
+
+                return res.status(error.statusCode).json({
+                    success: false,
+                    code: error.code,
+                    message: error.message
+                });
+            }
 
             res.status(500).json({
                 success: false,

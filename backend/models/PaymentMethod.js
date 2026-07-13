@@ -44,6 +44,16 @@ const paymentMethodSchema = new mongoose.Schema(
             default: ""
         },
 
+        uploadedQrImageEvidence: {
+            provider: { type: String, default: "" },
+            key: { type: String, default: "" },
+            url: { type: String, default: "" },
+            mimeType: { type: String, default: "" },
+            size: { type: Number, default: 0 },
+            originalName: { type: String, default: "" },
+            uploadedAt: { type: Date, default: null }
+        },
+
         maintenanceMessage: {
             type: String,
             default: ""

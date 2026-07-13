@@ -210,8 +210,9 @@
 
                         <div>
                             <h3 data-i18n="password">Password</h3>
-                            <p data-i18n="passwordInfo">Reset your password using Gmail OTP verification.</p>
-                            <a href="forgot-password.html" class="security-btn" data-i18n="resetPassword">Reset
+                            <p id="passwordStatusText" data-i18n="passwordInfo">Password security status.</p>
+                            <button id="changePasswordBtn" class="security-btn" type="button">Change Password</button>
+                            <a href="forgot-password.html" class="security-btn secondary" data-i18n="resetPassword">Reset
                                 Password</a>
                         </div>
                     </div>
@@ -224,8 +225,7 @@
                         <div>
                             <h3 data-i18n="googleLogin">Google Login</h3>
                             <p id="googleLinkedText" data-i18n="googleLinkedInfo">Google account link status.</p>
-                            <span id="googleLinkedStatus" class="security-status" data-i18n="comingSoon">Coming
-                                Soon</span>
+                            <span id="googleLinkedStatus" class="security-status">Checking...</span>
                         </div>
                     </div>
 
@@ -236,10 +236,125 @@
 
                         <div>
                             <h3 data-i18n="twoFactorAuth">Two-Factor Authentication</h3>
-                            <p data-i18n="twoFactorAuthInfo">Extra account protection for future AZIEL accounts.</p>
-                            <span class="security-status" data-i18n="comingSoon">Coming Soon</span>
+                            <p id="twoFactorText" data-i18n="twoFactorAuthInfo">Extra account protection for your AZIEL account.</p>
+                            <span id="twoFactorStatus" class="security-status">Not enabled</span>
+                            <div class="security-actions compact">
+                                <button id="startTwoFactorSetupBtn" class="security-btn" type="button">Enable 2FA</button>
+                                <button id="manageTwoFactorBtn" class="security-btn secondary" type="button" hidden>
+                                    Manage 2FA
+                                </button>
+                            </div>
                         </div>
                     </div>
+                </div>
+
+                <div class="security-section">
+                    <div class="section-title">
+                        <h2>Active Sessions</h2>
+                        <div class="security-actions">
+                            <button id="revokeOtherSessionsBtn" class="security-btn secondary" type="button">
+                                Log out other devices
+                            </button>
+                            <button id="revokeAllSessionsBtn" class="security-btn danger" type="button">
+                                Log out all devices
+                            </button>
+                        </div>
+                    </div>
+                    <div id="securitySessionsList" class="security-list">Loading sessions...</div>
+                </div>
+
+                <div class="security-section">
+                    <div class="section-title">
+                        <h2>Recent Security Activity</h2>
+                    </div>
+                    <div id="securityEventsList" class="security-list">Loading activity...</div>
+                </div>
+            </div>
+
+            <div id="changePasswordModal" class="security-modal" hidden>
+                <div class="security-modal-card">
+                    <button id="closeChangePasswordModal" class="security-modal-close" type="button"
+                        aria-label="Close">×</button>
+                    <h2>Change Password</h2>
+                    <form id="changePasswordForm">
+                        <label for="currentPassword">Current Password</label>
+                        <input id="currentPassword" type="password" autocomplete="current-password" required>
+
+                        <label for="newPassword">New Password</label>
+                        <input id="newPassword" type="password" autocomplete="new-password" minlength="8" required>
+
+                        <label for="confirmNewPassword">Confirm New Password</label>
+                        <input id="confirmNewPassword" type="password" autocomplete="new-password" minlength="8"
+                            required>
+
+                        <button id="submitChangePasswordBtn" class="security-btn" type="submit">
+                            Update Password
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <div id="twoFactorModal" class="security-modal" hidden>
+                <div class="security-modal-card two-factor-modal-card">
+                    <button id="closeTwoFactorModal" class="security-modal-close" type="button"
+                        aria-label="Close">×</button>
+                    <h2 id="twoFactorModalTitle">Two-Factor Authentication</h2>
+
+                    <section id="twoFactorSetupView" class="two-factor-view" hidden>
+                        <p class="security-modal-copy">
+                            Add this AZIEL account to your authenticator app, then enter the 6-digit code.
+                        </p>
+
+                        <label for="twoFactorManualKey">Manual setup key</label>
+                        <input id="twoFactorManualKey" type="text" readonly>
+
+                        <label for="twoFactorProvisioningUri">Authenticator URI</label>
+                        <textarea id="twoFactorProvisioningUri" readonly></textarea>
+
+                        <label for="twoFactorSetupCode">Authenticator code</label>
+                        <input id="twoFactorSetupCode" type="text" inputmode="numeric" autocomplete="one-time-code"
+                            placeholder="123456">
+
+                        <button id="verifyTwoFactorSetupBtn" class="security-btn" type="button">
+                            Verify and Enable
+                        </button>
+                    </section>
+
+                    <section id="twoFactorRecoveryView" class="two-factor-view" hidden>
+                        <p class="security-modal-copy">
+                            Save these recovery codes now. They will not be shown again.
+                        </p>
+                        <div id="twoFactorRecoveryCodes" class="recovery-code-list"></div>
+                        <label class="security-check">
+                            <input id="ackRecoveryCodes" type="checkbox">
+                            <span>I have saved these recovery codes.</span>
+                        </label>
+                        <button id="closeTwoFactorAfterCodesBtn" class="security-btn" type="button" disabled>
+                            Done
+                        </button>
+                    </section>
+
+                    <section id="twoFactorManageView" class="two-factor-view" hidden>
+                        <p id="twoFactorManageStatus" class="security-modal-copy">
+                            Two-factor authentication is enabled.
+                        </p>
+
+                        <label for="twoFactorCurrentPassword">Current password</label>
+                        <input id="twoFactorCurrentPassword" type="password" autocomplete="current-password">
+
+                        <label for="twoFactorManageCode">Authenticator or recovery code</label>
+                        <input id="twoFactorManageCode" type="text" autocomplete="one-time-code"
+                            placeholder="123456 or recovery code">
+
+                        <div class="security-actions">
+                            <button id="regenerateRecoveryCodesBtn" class="security-btn secondary" type="button">
+                                New Recovery Codes
+                            </button>
+                            <button id="disableTwoFactorBtn" class="security-btn danger" type="button">
+                                Disable 2FA
+                            </button>
+                        </div>
+                    </section>
                 </div>
             </div>
 

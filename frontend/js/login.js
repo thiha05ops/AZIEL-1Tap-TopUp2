@@ -1,15 +1,12 @@
 // frontend/js/login.js
 
-const API_BASE =
-    location.port === "5500"
-        ? "http://localhost:3000"
-        : "";
-
 function apiUrl(path) {
-    return `${API_BASE}${path}`;
+    return path;
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+    let pendingTwoFactorChallengeId = "";
+
     const token =
         localStorage.getItem("token") ||
         sessionStorage.getItem("token");
@@ -29,6 +26,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const togglePassword = document.getElementById("togglePassword");
     const rememberMe = document.getElementById("rememberMe");
     const googleLoginBtn = document.getElementById("googleLoginBtn");
+    const twoFactorBox = document.createElement("div");
+    twoFactorBox.className = "auth-2fa-box";
+    twoFactorBox.hidden = true;
+    twoFactorBox.innerHTML = `
+        <label class="auth-label" for="twoFactorCode">Authenticator or recovery code</label>
+        <input id="twoFactorCode" type="text" inputmode="numeric" autocomplete="one-time-code"
+            placeholder="Enter 6-digit code or recovery code">
+    `;
+    msg?.before(twoFactorBox);
 
     if (googleLoginBtn) {
         googleLoginBtn.addEventListener("click", (e) => {
@@ -68,6 +74,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const username = usernameInput.value.trim();
         const password = passwordInput.value;
+        const twoFactorCode = document.getElementById("twoFactorCode")?.value.trim() || "";
+
+        if (pendingTwoFactorChallengeId) {
+            if (!twoFactorCode) {
+                showMessage("Please enter your authenticator or recovery code.", "error");
+                return;
+            }
+
+            await verifyTwoFactorLogin(twoFactorCode);
+            return;
+        }
 
         if (!username || !password) {
             showMessage("Please enter username/email and password.", "error");
@@ -96,35 +113,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            localStorage.removeItem("token");
-            localStorage.removeItem("username");
-            sessionStorage.removeItem("token");
-            sessionStorage.removeItem("username");
-
-            localStorage.setItem("isLogin", "true");
-            localStorage.setItem("displayName", data.user.displayName || data.user.username);
-            localStorage.setItem("region", data.user.region || "MM");
-            localStorage.setItem("email", data.user.email || "");
-            localStorage.setItem("role", data.user.role || "user");
-
-            if (rememberMe && rememberMe.checked) {
-                localStorage.setItem("token", data.token);
-                localStorage.setItem("username", data.user.username);
-            } else {
-                sessionStorage.setItem("token", data.token);
-                sessionStorage.setItem("username", data.user.username);
+            if (data.twoFactorRequired && data.challengeId) {
+                pendingTwoFactorChallengeId = data.challengeId;
+                twoFactorBox.hidden = false;
+                passwordInput.value = "";
+                btn.textContent = "Verify Code";
+                showMessage(data.message || "Two-factor verification required.", "success");
+                setLoading(false);
+                document.getElementById("twoFactorCode")?.focus();
+                return;
             }
 
-            showMessage("Login success. Redirecting...", "success");
-
-            const redirectUrl =
-                localStorage.getItem("redirectAfterLogin") || "home.html";
-
-            localStorage.removeItem("redirectAfterLogin");
-
-            setTimeout(() => {
-                window.location.href = redirectUrl;
-            }, 500);
+            completeLogin(data);
 
         } catch (error) {
             console.log("Login error:", error);
@@ -133,18 +133,85 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
+    async function verifyTwoFactorLogin(twoFactorCode) {
+        setLoading(true);
+
+        try {
+            const recoveryMode = /[A-Za-z0-9]{8}-[A-Za-z0-9]{8}/.test(twoFactorCode);
+            const res = await fetch(apiUrl("/api/auth/2fa/verify"), {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    challengeId: pendingTwoFactorChallengeId,
+                    ...(recoveryMode ? { recoveryCode: twoFactorCode } : { code: twoFactorCode })
+                })
+            });
+            const data = await res.json();
+
+            if (!data.success) {
+                showMessage(data.message || "Two-factor verification failed", "error");
+                setLoading(false);
+                return;
+            }
+
+            pendingTwoFactorChallengeId = "";
+            completeLogin(data);
+        } catch (error) {
+            console.log("2FA login error:", error);
+            showMessage("Server error. Please try again.", "error");
+            setLoading(false);
+        }
+    }
+
+    function completeLogin(data) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("username");
+        sessionStorage.removeItem("token");
+        sessionStorage.removeItem("username");
+
+        localStorage.setItem("isLogin", "true");
+        localStorage.setItem("displayName", data.user.displayName || data.user.username);
+        localStorage.setItem("region", data.user.region || "MM");
+        localStorage.setItem("email", data.user.email || "");
+        localStorage.setItem("role", data.user.role || "user");
+
+        if (rememberMe && rememberMe.checked) {
+            localStorage.setItem("token", data.token);
+            localStorage.setItem("username", data.user.username);
+        } else {
+            sessionStorage.setItem("token", data.token);
+            sessionStorage.setItem("username", data.user.username);
+        }
+
+        showMessage("Login success. Redirecting...", "success");
+
+        const redirectUrl =
+            localStorage.getItem("redirectAfterLogin") || "home.html";
+
+        localStorage.removeItem("redirectAfterLogin");
+
+        setTimeout(() => {
+            window.location.href = redirectUrl;
+        }, 500);
+    }
+
     function setLoading(isLoading) {
         if (window.AZIEL_UI?.button) {
             if (isLoading) {
-                window.AZIEL_UI.button.setLoading(btn, { text: "Signing in..." });
+                window.AZIEL_UI.button.setLoading(btn, { text: pendingTwoFactorChallengeId ? "Verifying..." : "Signing in..." });
             } else {
                 window.AZIEL_UI.button.reset(btn);
+                btn.textContent = pendingTwoFactorChallengeId ? "Verify Code" : "Sign In";
             }
             return;
         }
 
         btn.disabled = isLoading;
-        btn.textContent = isLoading ? "Signing in..." : "Sign In";
+        btn.textContent = isLoading
+            ? (pendingTwoFactorChallengeId ? "Verifying..." : "Signing in...")
+            : (pendingTwoFactorChallengeId ? "Verify Code" : "Sign In");
     }
 
     function showMessage(text, type) {

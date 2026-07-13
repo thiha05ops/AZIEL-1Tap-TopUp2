@@ -310,6 +310,7 @@
             orderId: "AZL-" + Date.now(),
             game: flow.config.game,
             gameKey: flow.config.gameKey,
+            productCode: flow.config.productCode || flow.config.gameKey,
             packageName: pkg.name,
             packageCode: pkg.code || "",
             amount: Number(pkg.price || 0),
@@ -326,6 +327,8 @@
     }
 
     async function submitOrder(flow) {
+        if (flow.isSubmitting) return;
+
         const readiness = getReadiness(flow);
 
         if (!readiness.ready) {
@@ -340,35 +343,44 @@
         }
 
         const orderData = buildOrderData(flow);
+        const buyBtn = getEl(flow.config.buyButtonSelector);
 
-        if (!orderData.amount || orderData.amount <= 0) {
-            setText(flow.config.noteSelector, "This package is not available yet.");
-            return;
+        flow.isSubmitting = true;
+        if (buyBtn) buyBtn.disabled = true;
+
+        try {
+            if (!orderData.amount || orderData.amount <= 0) {
+                setText(flow.config.noteSelector, "This package is not available yet.");
+                return;
+            }
+
+            if (
+                flow.config.directWallet &&
+                orderData.paymentMethod === "wallet"
+            ) {
+                await payWithWalletDirect(orderData, flow);
+                return;
+            }
+
+            if (
+                flow.config.legacyPaymentPreferred &&
+                typeof window.createPaymentAndRedirect === "function"
+            ) {
+                window.createPaymentAndRedirect(orderData);
+                return;
+            }
+
+            if (!window.AZIEL_PAYMENT?.start) {
+                setText(flow.config.noteSelector, "Payment system not ready. Please refresh and try again.");
+                window.PaymentUtils?.showToast?.("Payment system not ready");
+                return;
+            }
+
+            await window.AZIEL_PAYMENT.start(orderData);
+        } finally {
+            flow.isSubmitting = false;
+            updateSummary(flow);
         }
-
-        if (
-            flow.config.directWallet &&
-            orderData.paymentMethod === "wallet"
-        ) {
-            await payWithWalletDirect(orderData, flow);
-            return;
-        }
-
-        if (
-            flow.config.legacyPaymentPreferred &&
-            typeof window.createPaymentAndRedirect === "function"
-        ) {
-            window.createPaymentAndRedirect(orderData);
-            return;
-        }
-
-        if (!window.AZIEL_PAYMENT?.start) {
-            setText(flow.config.noteSelector, "Payment system not ready. Please refresh and try again.");
-            window.PaymentUtils?.showToast?.("Payment system not ready");
-            return;
-        }
-
-        await window.AZIEL_PAYMENT.start(orderData);
     }
 
     async function payWithWalletDirect(orderData, flow) {
@@ -392,7 +404,7 @@
             }
 
             window.PaymentUtils?.showToast?.("Paid with wallet");
-            window.location.href = `tracking.html?orderId=${orderData.orderId}`;
+            window.location.href = `tracking.html?orderId=${data.order?.orderId || orderData.orderId}`;
         } catch (error) {
             console.log("Wallet payment error:", error);
             setText(flow.config.noteSelector, "Server error");

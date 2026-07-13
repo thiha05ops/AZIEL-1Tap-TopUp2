@@ -61,6 +61,7 @@
                 <div class="auth-input">
                     <i class="fa-solid fa-lock auth-icon"></i>
                     <input id="password" type="password" placeholder="Create password" autocomplete="new-password"
+                        minlength="8"
                         required>
                     <button type="button" id="togglePassword" class="password-eye">
                         <i class="fa-regular fa-eye"></i>
@@ -71,7 +72,7 @@
                 <div class="auth-input">
                     <i class="fa-solid fa-shield-halved auth-icon"></i>
                     <input id="confirmPassword" type="password" placeholder="Confirm password"
-                        autocomplete="new-password" required>
+                        autocomplete="new-password" minlength="8" required>
                 </div>
 
                 <button type="submit" id="registerBtn" class="auth-main-btn">

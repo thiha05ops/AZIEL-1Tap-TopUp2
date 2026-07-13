@@ -116,6 +116,7 @@ function paymentCardHTML(method) {
             </button>
 
             <input class="pm-uploaded-qr" type="text" value="${escapeHTML(method.uploadedQrImage || "")}" placeholder="/uploads/payments/qr.png">
+            <input class="pm-uploaded-qr-evidence" type="hidden" value="${escapeHTML(JSON.stringify(method.uploadedQrImageEvidence || null))}">
 
             <div class="pm-preview-wrap">
                 ${qrUrl && !isAdminUploadedImageFailed(qrUrl)
@@ -211,6 +212,7 @@ async function savePaymentMethod(id) {
         accountNumber: card.querySelector(".pm-number")?.value.trim() || "",
         qrImageUrl: card.querySelector(".pm-qr")?.value.trim() || "",
         uploadedQrImage: card.querySelector(".pm-uploaded-qr")?.value.trim() || "",
+        uploadedQrImageEvidence: parseAdminSettingsPaymentEvidence(card.querySelector(".pm-uploaded-qr-evidence")?.value),
         maintenanceMessage: card.querySelector(".pm-message")?.value.trim() || "",
         paymentType: card.querySelector(".pm-type")?.value || "manual",
         provider: card.querySelector(".pm-provider")?.value || "manual"
@@ -256,12 +258,26 @@ async function uploadPaymentQR(id) {
     const uploadedInput = card.querySelector(".pm-uploaded-qr");
     if (uploadedInput) uploadedInput.value = data.image;
 
+    const evidenceInput = card.querySelector(".pm-uploaded-qr-evidence");
+    if (evidenceInput) evidenceInput.value = JSON.stringify(data.evidence || null);
+
     const wrap = card.querySelector(".pm-preview-wrap");
     if (wrap) {
         wrap.innerHTML = `<img class="pm-qr-preview" src="${escapeHTML(data.image)}" alt="QR Preview" onerror="handleAdminSettingsImageError(this)">`;
     }
 
     showAdminToast?.("QR uploaded. Click Save payment method.", "success");
+}
+
+function parseAdminSettingsPaymentEvidence(value) {
+    if (!value) return undefined;
+
+    try {
+        const parsed = JSON.parse(value);
+        return parsed && typeof parsed === "object" ? parsed : undefined;
+    } catch (error) {
+        return undefined;
+    }
 }
 
 async function saveSettings() {

@@ -73,8 +73,23 @@ const userSchema = new mongoose.Schema(
             default: "user"
         },
 
+        tokenVersion: {
+            type: Number,
+            default: 0
+        },
+
+        passwordChangedAt: {
+            type: Date,
+            default: null
+        },
+
         // Forgot password
         resetOTP: {
+            type: String,
+            default: ""
+        },
+
+        resetOTPHash: {
             type: String,
             default: ""
         },
@@ -88,7 +103,33 @@ const userSchema = new mongoose.Schema(
             default: false
         },
 
+        resetOTPVerifiedAt: {
+            type: Date,
+            default: null
+        },
+
+        resetOTPAttempts: {
+            type: Number,
+            default: 0
+        },
+
+        resetOTPResendAvailableAt: {
+            type: Date,
+            default: null
+        },
+
         // Email verification
+        emailVerified: {
+            type: Boolean,
+            default: false
+        },
+
+        emailVerifiedAt: {
+            type: Date,
+            default: null
+        },
+
+        // Legacy email verification adapter. Keep during V2.5 transition.
         isVerified: {
             type: Boolean,
             default: false
@@ -103,6 +144,61 @@ const userSchema = new mongoose.Schema(
             type: Date,
             default: null
         },
+
+        googleId: {
+            type: String,
+            default: "",
+            index: true,
+            sparse: true
+        },
+
+        authProvider: {
+            type: String,
+            enum: ["local", "google", "hybrid"],
+            default: "local"
+        },
+
+        twoFactorEnabled: {
+            type: Boolean,
+            default: false
+        },
+
+        twoFactorSecretEncrypted: {
+            type: String,
+            default: ""
+        },
+
+        twoFactorEnabledAt: {
+            type: Date,
+            default: null
+        },
+
+        pendingTwoFactorSecretEncrypted: {
+            type: String,
+            default: ""
+        },
+
+        pendingTwoFactorSetupExpiresAt: {
+            type: Date,
+            default: null
+        },
+
+        twoFactorRecoveryCodes: [
+            {
+                hash: {
+                    type: String,
+                    default: ""
+                },
+                usedAt: {
+                    type: Date,
+                    default: null
+                },
+                createdAt: {
+                    type: Date,
+                    default: Date.now
+                }
+            }
+        ],
 
         // Login security
         currentSessionToken: {
@@ -143,6 +239,19 @@ const userSchema = new mongoose.Schema(
     },
     {
         timestamps: true
+    }
+);
+
+userSchema.index(
+    { email: 1 },
+    {
+        unique: true,
+        partialFilterExpression: {
+            email: {
+                $type: "string",
+                $ne: ""
+            }
+        }
     }
 );
 

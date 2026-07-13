@@ -2,6 +2,7 @@
 
 const express = require("express");
 const router = express.Router();
+const rateLimit = require("express-rate-limit");
 
 const Omise = require("../services/opnService");
 const upload = require("../middleware/orderUpload");
@@ -9,15 +10,34 @@ const authMiddleware = require("../middleware/authMiddleware");
 const adminMiddleware = require("../middleware/adminMiddleware");
 
 const Order = require("../models/Order");
-const User = require("../models/User");
 const WalletTopup = require("../models/WalletTopup");
-const WalletTransaction = require("../models/WalletTransaction");
 
 const wavepayService = require("../services/wavepayService");
 const realtime = require("../services/realtime");
 const notificationService = require("../services/notificationService");
+const { ORDER_STATES, PAYMENT_STATES, transitionOrder } = require("../services/orderStateService");
+const { applyPaymentToOrder, mapOmiseChargeStatus } = require("../services/paymentStateService");
+const { CatalogError, resolveOrderCatalog } = require("../services/catalogService");
+const { creditTopup, getWalletBalance } = require("../services/walletService");
+const {
+    OmisePaymentError,
+    assertChargeMatchesRecord,
+    retrieveVerifiedCharge
+} = require("../services/omisePaymentService");
+const {
+    StorageError,
+    cleanupAfterFailedPersistence,
+    logStorageError,
+    uploadFile
+} = require("../services/storageService");
 
 const isProduction = process.env.NODE_ENV === "production";
+const activeOrderCreateLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    limit: Number(process.env.RATE_LIMIT_ORDER_CREATE || 12),
+    standardHeaders: true,
+    legacyHeaders: false
+});
 
 function devLog(...args) {
     if (!isProduction) console.log(...args);
@@ -65,6 +85,54 @@ function getQrUrl(source, charge) {
     );
 }
 
+function safePaymentLog(code, details = {}) {
+    console.warn("OMISE WEBHOOK:", {
+        code,
+        provider: "omise",
+        chargeId: details.chargeId || "",
+        orderId: details.orderId || "",
+        topupId: details.topupId || "",
+        at: new Date().toISOString()
+    });
+}
+
+function extractWebhookChargeId(body = {}) {
+    const eventKey = String(body.key || "").trim();
+
+    if (eventKey !== "charge.complete") {
+        return {
+            supported: false,
+            code: "OMISE_EVENT_UNSUPPORTED",
+            eventKey
+        };
+    }
+
+    const chargeId = String(body.data?.id || "").trim();
+
+    if (!chargeId) {
+        throw new OmisePaymentError(
+            "OMISE_CHARGE_ID_MISSING",
+            "Webhook is missing provider charge ID.",
+            400
+        );
+    }
+
+    return {
+        supported: true,
+        eventKey,
+        chargeId
+    };
+}
+
+function verifiedPaymentEventId(charge) {
+    return [
+        "omise",
+        charge.chargeId,
+        charge.status,
+        charge.providerUpdatedAt || "verified"
+    ].join(":");
+}
+
 async function markWalletTopupPaid(req, topupId, transactionId = "") {
     const topup = await WalletTopup.findOne({ topupId });
 
@@ -72,25 +140,21 @@ async function markWalletTopupPaid(req, topupId, transactionId = "") {
         return { success: false, message: "Topup not found" };
     }
 
-    if (topup.status === "paid" || topup.status === "completed") {
-        return { success: true, message: "Already paid", topup };
-    }
-
     const currencyKey = getCurrencyKey(topup.currency);
 
-    const updatedUser = await User.findOneAndUpdate(
-        { username: topup.username },
-        {
-            $inc: {
-                [`wallet.${currencyKey}`]: Number(topup.amount || 0)
-            }
-        },
-        { new: true }
-    );
-
-    if (!updatedUser) {
-        return { success: false, message: "User not found" };
+    if (["approved", "paid", "completed"].includes(topup.status)) {
+        return {
+            success: true,
+            message: "Wallet topup already credited",
+            topup,
+            balance: await getWalletBalance(topup.username, currencyKey),
+            duplicate: true
+        };
     }
+
+    const creditResult = await creditTopup(topup, {
+        performedBy: "payment_provider"
+    });
 
     topup.status = "paid";
     topup.transactionId = transactionId || topup.transactionId || "";
@@ -99,36 +163,38 @@ async function markWalletTopupPaid(req, topupId, transactionId = "") {
 
     await topup.save();
 
-    await WalletTransaction.create({
-        transactionId: "TXN-" + Date.now(),
-        username: topup.username,
-        type: "topup",
-        amount: Number(topup.amount),
-        currency: currencyKey,
-        status: "completed",
-        description: `Wallet topup via ${topup.paymentMethod}`
-    });
-
-    await notificationService.createUserNotification({
-        username: topup.username,
-        title: "Wallet Top-Up Successful",
-        message: `${Number(topup.amount).toLocaleString()} ${currencyKey} has been added to your wallet.`,
-        type: "system",
-        category: "wallet",
-        topupId: topup.topupId,
-        metadata: {
+    if (!creditResult.duplicate) {
+        await notificationService.createUserNotification({
+            username: topup.username,
+            title: "Wallet Top-Up Successful",
+            message: `${Number(topup.amount).toLocaleString()} ${currencyKey} has been added to your wallet.`,
+            type: "system",
+            category: "wallet",
             topupId: topup.topupId,
-            amount: topup.amount,
-            currency: currencyKey
-        },
-        source: "wallet_topup_paid"
-    });
+            metadata: {
+                topupId: topup.topupId,
+                amount: topup.amount,
+                currency: currencyKey
+            },
+            source: "wallet_topup_paid"
+        });
+    }
 
     await realtime.emitWalletUpdate(topup.username, {
-        amount: updatedUser.wallet?.[currencyKey] || 0,
+        amount: creditResult.balance,
+        balance: creditResult.balance,
         currency: currencyKey,
         status: "paid",
-        topupId: topup.topupId
+        topupId: topup.topupId,
+        latestTransaction: {
+            type: creditResult.transaction?.type || "",
+            direction: creditResult.transaction?.direction || "",
+            amount: Number(creditResult.transaction?.amount || 0),
+            balanceAfter: Number(creditResult.transaction?.balanceAfter ?? creditResult.balance),
+            referenceType: creditResult.transaction?.referenceType || "",
+            referenceId: creditResult.transaction?.referenceId || topup.topupId,
+            createdAt: creditResult.transaction?.createdAt || new Date()
+        }
     });
 
     await realtime.emitWalletTopupUpdate(topup.username, {
@@ -150,19 +216,24 @@ async function markWalletTopupPaid(req, topupId, transactionId = "") {
         success: true,
         message: "Wallet topup paid",
         topup,
-        balance: updatedUser.wallet?.[currencyKey] || 0
+        balance: creditResult.balance,
+        transaction: creditResult.transaction,
+        duplicate: Boolean(creditResult.duplicate)
     };
 }
 
 // GAME PAYMENT CREATE
-router.post("/payment/create", authMiddleware, async (req, res) => {
+router.post("/payment/create", authMiddleware, activeOrderCreateLimiter, async (req, res) => {
     try {
         devLog("PAYMENT CREATE BODY =", req.body);
 
         const {
             orderId,
             game,
+            gameKey,
+            productCode,
             packageName,
+            packageCode,
             amount,
             currency,
             region,
@@ -172,36 +243,85 @@ router.post("/payment/create", authMiddleware, async (req, res) => {
         } = req.body;
         const username = req.user.username;
 
-        if (!orderId || !game || !packageName || !amount || !paymentMethod || !userId) {
-            return res.json({
+        if (!orderId || !paymentMethod || !userId) {
+            return res.status(400).json({
                 success: false,
                 message: "Missing order data"
+            });
+        }
+
+        const catalogItem = resolveOrderCatalog({
+            productCode: productCode || gameKey,
+            gameKey,
+            game,
+            packageCode,
+            packageName,
+            amount,
+            currency,
+            region
+        });
+
+        const pendingCount = await Order.countDocuments({
+            username,
+            status: "pending_payment",
+            createdAt: { $gte: new Date(Date.now() - 30 * 60 * 1000) }
+        });
+
+        if (pendingCount >= Number(process.env.MAX_PENDING_ORDERS_PER_USER || 5)) {
+            return res.status(429).json({
+                success: false,
+                code: "TOO_MANY_PENDING_ORDERS",
+                message: "You have too many pending orders. Please complete or wait before creating another."
+            });
+        }
+
+        const existingOrder = await Order.findOne({ orderId });
+        if (existingOrder) {
+            return res.status(409).json({
+                success: false,
+                code: "DUPLICATE_ORDER_ID",
+                message: "Order already exists"
             });
         }
 
         const order = await Order.create({
             orderId,
             username: username || "guest",
-            game,
+            game: catalogItem.productName,
+            productCode: catalogItem.productCode,
+            productName: catalogItem.productName,
             userId,
             zoneId: zoneId || "",
-            packageName,
-            amount: Number(amount),
-            currency,
-            region,
+            packageName: catalogItem.packageName,
+            packageCode: catalogItem.packageCode,
+            amount: catalogItem.amount,
+            currency: catalogItem.currency,
+            region: catalogItem.region,
             paymentMethod,
-            status: "pending_payment",
+            status: ORDER_STATES.PENDING_PAYMENT,
+            paymentStatus: PAYMENT_STATES.PENDING,
             paymentSlip: "",
             transactionId: "",
-            paymentProvider: ""
+            paymentProvider: "",
+            timeline: [{
+                status: ORDER_STATES.PENDING_PAYMENT,
+                previousStatus: "",
+                paymentStatus: PAYMENT_STATES.PENDING,
+                source: "user",
+                actorType: "user",
+                actor: username || "guest",
+                reason: "Order created",
+                idempotencyKey: `order:create:${orderId}`,
+                at: new Date()
+            }]
         });
 
         const methodKey = String(paymentMethod || "")
             .toLowerCase()
             .replace(/\s+/g, "");
 
-        if (String(region).toUpperCase() === "TH" && methodKey.includes("promptpay")) {
-            const result = await createPromptPayCharge(Number(amount), {
+        if (catalogItem.region === "TH" && methodKey.includes("promptpay")) {
+            const result = await createPromptPayCharge(catalogItem.amount, {
                 type: "game_order",
                 orderId,
                 username: username || "guest"
@@ -225,11 +345,21 @@ router.post("/payment/create", authMiddleware, async (req, res) => {
                 qrImage: qrUrl,
                 transactionId: charge.id,
                 chargeId: charge.id,
-                status: charge.status
+                status: charge.status,
+                order
             });
         }
 
-        const paymentSession = await wavepayService.createPayment(req.body);
+        const paymentSession = await wavepayService.createPayment({
+            ...req.body,
+            game: catalogItem.productName,
+            packageName: catalogItem.packageName,
+            amount: catalogItem.amount,
+            currency: catalogItem.currency,
+            region: catalogItem.region,
+            productCode: catalogItem.productCode,
+            packageCode: catalogItem.packageCode
+        });
 
         await Order.updateOne(
             { orderId },
@@ -242,13 +372,22 @@ router.post("/payment/create", authMiddleware, async (req, res) => {
             paymentType: "manual",
             paymentUrl: paymentSession.paymentUrl,
             qrUrl: paymentSession.qrUrl,
-            transactionId: paymentSession.transactionId
+            transactionId: paymentSession.transactionId,
+            order
         });
 
     } catch (error) {
         console.log("Payment create error:", error);
 
-        return res.json({
+        if (error instanceof CatalogError) {
+            return res.status(error.statusCode).json({
+                success: false,
+                code: error.code,
+                message: error.message
+            });
+        }
+
+        return res.status(500).json({
             success: false,
             message: error.message || "Payment server error"
         });
@@ -258,6 +397,9 @@ router.post("/payment/create", authMiddleware, async (req, res) => {
 // MANUAL / DEEPLINK PAYMENT SLIP SUBMIT
 // POST /api/payment/submit
 router.post("/payment/submit", authMiddleware, upload.single("slip"), async (req, res) => {
+    let evidence = null;
+    let evidencePersisted = false;
+
     try {
         const { orderId } = req.body;
 
@@ -287,12 +429,19 @@ router.post("/payment/submit", authMiddleware, upload.single("slip"), async (req
             });
         }
 
-        order.paymentSlip = `/uploads/orders/${req.file.filename}`;
-        order.status = "paid";
+        evidence = await uploadFile({
+            file: req.file,
+            category: "paymentSlip",
+            ownerReference: order.orderId
+        });
+
+        order.paymentSlip = evidence.url;
+        order.paymentEvidence = evidence;
+        order.paymentStatus = order.paymentStatus || PAYMENT_STATES.PENDING;
         order.note = "Payment slip uploaded. Waiting for admin verification.";
-        order.paidAt = new Date();
 
         await order.save();
+        evidencePersisted = true;
 
         await notificationService.createUserNotification({
             username: order.username,
@@ -324,7 +473,8 @@ router.post("/payment/submit", authMiddleware, upload.single("slip"), async (req
             game: order.game,
             amount: order.amount,
             currency: order.currency,
-            status: order.status
+            status: order.status,
+            paymentStatus: order.paymentStatus
         });
 
         return res.json({
@@ -336,7 +486,25 @@ router.post("/payment/submit", authMiddleware, upload.single("slip"), async (req
     } catch (error) {
         console.log("Payment submit error:", error);
 
-        return res.json({
+        if (evidence && !evidencePersisted) {
+            await cleanupAfterFailedPersistence(evidence);
+        }
+
+        if (error instanceof StorageError) {
+            logStorageError(error.code, {
+                provider: error.provider,
+                category: "paymentSlip",
+                orderId: req.body?.orderId
+            });
+
+            return res.status(error.statusCode).json({
+                success: false,
+                code: error.code,
+                message: error.message
+            });
+        }
+
+        return res.status(500).json({
             success: false,
             message: error.message || "Payment submit server error"
         });
@@ -359,7 +527,9 @@ router.get("/payment/status/:orderId", async (req, res) => {
         res.json({
             success: true,
             orderId: order.orderId,
-            status: order.status
+            status: order.status,
+            paymentStatus: order.paymentStatus || (order.status === "paid" ? "paid" : "pending"),
+            updatedAt: order.updatedAt
         });
 
     } catch (error) {
@@ -374,38 +544,101 @@ router.get("/payment/status/:orderId", async (req, res) => {
 
 // WEBHOOK
 router.post("/payment/webhook", async (req, res) => {
-    devLog("WEBHOOK =", req.body);
-
     try {
-        const data = req.body.data;
+        const envelope = extractWebhookChargeId(req.body);
 
-        if (req.body.key === "charge.complete" && data.status === "successful") {
-            const metadata = data.metadata || {};
-
-            if (metadata.type === "wallet_topup") {
-                await markWalletTopupPaid(req, metadata.topupId, data.id);
-                return res.sendStatus(200);
-            }
-
-            const order = await Order.findOne({
-                transactionId: data.id
+        if (!envelope.supported) {
+            safePaymentLog(envelope.code, {});
+            return res.status(200).json({
+                success: true,
+                code: envelope.code,
+                message: "Webhook event ignored"
             });
-
-            if (order) {
-                order.status = "paid";
-                order.paidAt = new Date();
-                order.note = "Payment received. Waiting for admin processing.";
-                await order.save();
-
-                devLog("GAME PAYMENT SUCCESS:", order.orderId);
-            }
         }
 
-        res.sendStatus(200);
+        const charge = await retrieveVerifiedCharge(envelope.chargeId);
+        const [topup, order] = await Promise.all([
+            WalletTopup.findOne({ transactionId: charge.chargeId }),
+            Order.findOne({ transactionId: charge.chargeId })
+        ]);
+
+        if (topup && order) {
+            throw new OmisePaymentError(
+                "OMISE_REFERENCE_AMBIGUOUS",
+                "Provider charge is linked to multiple payment records.",
+                409
+            );
+        }
+
+        if (topup) {
+            assertChargeMatchesRecord(charge, topup, { referenceType: "wallet_topup" });
+
+            const result = await markWalletTopupPaid(req, topup.topupId, charge.chargeId);
+
+            return res.status(200).json({
+                success: true,
+                code: result.duplicate ? "OMISE_WALLET_TOPUP_ALREADY_PAID" : "OMISE_WALLET_TOPUP_PAID",
+                duplicate: Boolean(result.duplicate)
+            });
+        }
+
+        if (order) {
+            assertChargeMatchesRecord(charge, order, { referenceType: "order" });
+
+            const amount = Number(charge.amountMinor) / 100;
+            const paymentStatus = mapOmiseChargeStatus("charge.complete", {
+                status: charge.status
+            });
+
+            const transition = await applyPaymentToOrder(order, {
+                status: paymentStatus,
+                transactionId: charge.chargeId,
+                eventId: verifiedPaymentEventId(charge),
+                amount,
+                currency: charge.currency,
+                orderId: order.orderId
+            }, {
+                source: "payment_provider",
+                actorType: "system",
+                reason: "Omise PromptPay payment confirmed"
+            });
+
+            if (transition.changed) {
+                devLog("GAME PAYMENT SUCCESS:", order.orderId);
+            }
+
+            return res.status(200).json({
+                success: true,
+                code: transition.idempotent ? "OMISE_ORDER_PAYMENT_DUPLICATE" : "OMISE_ORDER_PAYMENT_APPLIED",
+                duplicate: Boolean(transition.idempotent)
+            });
+        }
+
+        throw new OmisePaymentError(
+            "OMISE_REFERENCE_NOT_FOUND",
+            "No order or wallet top-up is linked to provider charge.",
+            404
+        );
 
     } catch (err) {
-        console.log("Webhook error:", err);
-        res.sendStatus(500);
+        const statusCode = err instanceof OmisePaymentError
+            ? err.statusCode
+            : 500;
+        const code = err instanceof OmisePaymentError
+            ? err.code
+            : "OMISE_WEBHOOK_ERROR";
+
+        safePaymentLog(code, {
+            chargeId: req.body?.data?.id
+        });
+
+        return res.status(statusCode).json({
+            success: false,
+            code,
+            message: err instanceof OmisePaymentError
+                ? err.message
+                : "Webhook verification failed"
+        });
     }
 });
 
@@ -423,10 +656,14 @@ if (!isProduction) {
             });
         }
 
-        order.status = "paid";
-        order.paidAt = new Date();
-        order.note = "Payment received. Waiting for admin processing.";
-        await order.save();
+        await transitionOrder(order, ORDER_STATES.PAID, {
+            source: "admin",
+            actorType: "admin",
+            actor: req.admin?.username || req.user?.username || "admin",
+            reason: "Developer test payment confirmation",
+            paymentStatus: PAYMENT_STATES.PAID,
+            idempotencyKey: `dev:test-paid:${order.orderId}`
+        });
 
         res.json({
             success: true,

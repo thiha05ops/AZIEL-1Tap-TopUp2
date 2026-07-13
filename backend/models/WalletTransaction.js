@@ -26,9 +26,21 @@ const walletTransactionSchema =
             enum: [
                 "topup",
                 "payment",
-                "refund"
+                "refund",
+                "wallet.topup",
+                "wallet.payment",
+                "wallet.refund",
+                "wallet.reversal",
+                "wallet.adjustment",
+                "wallet.migration"
             ],
             required: true
+        },
+
+        direction: {
+            type: String,
+            enum: ["credit", "debit", ""],
+            default: ""
         },
 
         amount: {
@@ -43,7 +55,51 @@ const walletTransactionSchema =
 
         status: {
             type: String,
+            enum: ["completed", "committed", "reversed", "failed", "pending"],
             default: "completed"
+        },
+
+        balanceBefore: {
+            type: Number,
+            default: null
+        },
+
+        balanceAfter: {
+            type: Number,
+            default: null
+        },
+
+        source: {
+            type: String,
+            default: "legacy"
+        },
+
+        referenceId: {
+            type: String,
+            default: ""
+        },
+
+        topupId: {
+            type: String,
+            default: ""
+        },
+
+        idempotencyKey: {
+            type: String,
+            index: {
+                unique: true,
+                sparse: true
+            }
+        },
+
+        reversalOf: {
+            type: String,
+            default: ""
+        },
+
+        metadata: {
+            type: mongoose.Schema.Types.Mixed,
+            default: {}
         },
 
         description: {
@@ -57,7 +113,11 @@ const walletTransactionSchema =
                 "topup",
                 "order",
                 "refund",
-                "bonus"
+                "bonus",
+                "adjustment",
+                "reversal",
+                "wallet_migration",
+                "admin_adjustment"
             ],
             default: "order"
         },
@@ -70,6 +130,11 @@ const walletTransactionSchema =
     }, {
         timestamps: true
     });
+
+walletTransactionSchema.index({ username: 1, createdAt: -1 });
+walletTransactionSchema.index({ orderId: 1 });
+walletTransactionSchema.index({ topupId: 1 });
+walletTransactionSchema.index({ referenceType: 1, referenceId: 1 });
 
 module.exports =
     mongoose.model(

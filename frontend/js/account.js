@@ -9,6 +9,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
 let currentUser = null;
 let accountRefreshTimer = null;
+let securityState = {
+    overview: null,
+    sessions: [],
+    events: [],
+    legacySession: false,
+    loading: false,
+    pendingTwoFactorSetup: null
+};
 
 function t(key, fallback = "") {
     if (window.AZIEL_I18N?.t) {
@@ -50,17 +58,20 @@ async function initAccount() {
 
     renderAccount();
     await refreshAccountData();
+    await loadSecurityData();
 
     window.addEventListener("aziel:ready", async () => {
         currentUser = window.AZIEL?.user || currentUser;
         renderAccount();
         await refreshAccountData();
+        await loadSecurityData();
     });
 
     window.addEventListener("aziel:userChanged", async () => {
         currentUser = window.AZIEL?.user || currentUser;
         renderAccount();
         await refreshAccountData();
+        await loadSecurityData();
     });
 
     window.addEventListener("aziel:walletChanged", () => {
@@ -75,6 +86,9 @@ async function initAccount() {
     window.addEventListener("aziel:languageChanged", () => {
         renderAccount();
         refreshAccountData();
+        if (location.hash === "#security") {
+            loadSecurityData();
+        }
         window.AZIEL_I18N?.translatePage?.(document);
     });
 
@@ -93,6 +107,14 @@ window.addEventListener("beforeunload", () => {
 });
 
 async function refreshAccountData() {
+    if (!window.AZIEL?.getToken?.()) {
+        if (accountRefreshTimer) {
+            clearInterval(accountRefreshTimer);
+            accountRefreshTimer = null;
+        }
+        return;
+    }
+
     await loadHistory();
     await loadBellOrders();
 }
@@ -161,11 +183,7 @@ function formatDate(dateValue) {
 }
 
 function isVerified(user = currentUser) {
-    return Boolean(user?.emailVerified || user?.isEmailVerified || user?.verified);
-}
-
-function isGoogleLinked(user = currentUser) {
-    return Boolean(user?.googleId || user?.googleLinked || user?.provider === "google");
+    return Boolean(user?.emailVerified || user?.isVerified || user?.isEmailVerified || user?.verified);
 }
 
 function renderAccount() {
@@ -213,14 +231,31 @@ function renderProfile() {
 }
 
 function renderSecurity() {
+    const overview = securityState.overview || {};
     const user = currentUser;
-    const verified = isVerified(user);
-    const googleLinked = isGoogleLinked(user);
+    const verified = Boolean(overview.emailVerified ?? isVerified(user));
+    const googleLinked = Boolean(overview.google?.linked ?? overview.googleLinked);
+    const hasPassword = Boolean(overview.hasPassword);
+    const twoFactor = overview.twoFactor || {};
+    const twoFactorEnabled = Boolean(twoFactor.enabled ?? overview.twoFactorEnabled);
+    const recoveryCodesRemaining = Number(twoFactor.recoveryCodesRemaining || 0);
 
-    setText("securityEmailText", user?.email || "-");
+    setText(
+        "securityEmailText",
+        overview.emailVerifiedAt
+            ? `${overview.email || user?.email || "-"} • Verified ${formatDate(overview.emailVerifiedAt)}`
+            : (overview.email || user?.email || "-")
+    );
     setText(
         "emailVerifiedStatus",
         verified ? t("verified", "Verified") : t("notVerified", "Not Verified")
+    );
+
+    setText(
+        "passwordStatusText",
+        hasPassword
+            ? "Password configured for this account."
+            : "Password is managed by your sign-in provider."
     );
 
     setText(
@@ -234,6 +269,158 @@ function renderSecurity() {
         "googleLinkedStatus",
         googleLinked ? t("linked", "Linked") : t("notLinked", "Not Linked")
     );
+
+    setText(
+        "twoFactorText",
+        twoFactorEnabled
+            ? `Authenticator app enabled${twoFactor.enabledAt ? ` on ${formatDate(twoFactor.enabledAt)}` : ""}.`
+            : "Require an authenticator code when signing in."
+    );
+    setText(
+        "twoFactorStatus",
+        twoFactorEnabled
+            ? `Enabled • ${recoveryCodesRemaining} recovery code${recoveryCodesRemaining === 1 ? "" : "s"} left`
+            : "Not enabled"
+    );
+
+    const changeBtn = document.getElementById("changePasswordBtn");
+    if (changeBtn) {
+        changeBtn.hidden = !hasPassword;
+    }
+
+    const startTwoFactorBtn = document.getElementById("startTwoFactorSetupBtn");
+    if (startTwoFactorBtn) {
+        startTwoFactorBtn.hidden = twoFactorEnabled;
+    }
+
+    const manageTwoFactorBtn = document.getElementById("manageTwoFactorBtn");
+    if (manageTwoFactorBtn) {
+        manageTwoFactorBtn.hidden = !twoFactorEnabled;
+    }
+
+    renderSecuritySessions();
+    renderSecurityEvents();
+}
+
+async function loadSecurityData() {
+    if (!window.AZIEL?.getToken?.()) return;
+
+    securityState.loading = true;
+
+    try {
+        const overviewRes = await window.AZIEL.authFetch("/api/security/overview");
+        const overviewData = await overviewRes.json();
+
+        if (overviewRes.status === 401 || overviewData.forceLogout) {
+            return;
+        }
+
+        const [sessionsRes, eventsRes] = await Promise.all([
+            window.AZIEL.authFetch("/api/security/sessions"),
+            window.AZIEL.authFetch("/api/security/events?limit=20")
+        ]);
+
+        const [sessionsData, eventsData] = await Promise.all([
+            sessionsRes.json(),
+            eventsRes.json()
+        ]);
+
+        if (overviewData.success) securityState.overview = overviewData.overview;
+        if (sessionsData.success) {
+            securityState.sessions = sessionsData.sessions || [];
+            securityState.legacySession = Boolean(sessionsData.legacySession || sessionsData.legacyAuth);
+        }
+        if (overviewData.success) {
+            securityState.legacySession = Boolean(
+                securityState.legacySession ||
+                overviewData.overview?.legacySession ||
+                overviewData.overview?.legacyAuth
+            );
+        }
+        if (eventsData.success) securityState.events = eventsData.events || [];
+
+        renderSecurity();
+    } catch (error) {
+        console.log("Security data error:", error);
+    } finally {
+        securityState.loading = false;
+    }
+}
+
+function renderSecuritySessions() {
+    const box = document.getElementById("securitySessionsList");
+    if (!box) return;
+
+    if (securityState.legacySession && !securityState.sessions.length) {
+        box.innerHTML = `
+            <p>
+                This sign-in was created before device management was enabled.
+                Sign out and sign in again to register this device.
+            </p>
+        `;
+        return;
+    }
+
+    if (!securityState.sessions.length) {
+        box.innerHTML = `<p>No active session records yet.</p>`;
+        return;
+    }
+
+    box.innerHTML = securityState.sessions.map(session => `
+        <div class="security-list-item">
+            <div>
+                <strong>${escapeHTML(session.deviceName || "Unknown Device")}</strong>
+                ${session.isCurrentSession ? `<span class="security-current">Current device</span>` : ""}
+                <small>
+                    ${escapeHTML([session.browser, session.platform].filter(Boolean).join(" • ") || "Browser session")}
+                </small>
+                <small>Last active ${escapeHTML(formatDateTime(session.lastSeenAt))}</small>
+            </div>
+            ${session.isCurrentSession ? "" : `
+                <button class="security-btn danger" type="button" data-revoke-session="${escapeHTML(session.sessionId)}">
+                    Revoke
+                </button>
+            `}
+        </div>
+    `).join("");
+
+    box.querySelectorAll("[data-revoke-session]").forEach(btn => {
+        btn.addEventListener("click", () => revokeSession(btn.dataset.revokeSession));
+    });
+}
+
+function renderSecurityEvents() {
+    const box = document.getElementById("securityEventsList");
+    if (!box) return;
+
+    if (!securityState.events.length) {
+        box.innerHTML = `<p>No recent security activity yet.</p>`;
+        return;
+    }
+
+    box.innerHTML = securityState.events.map(event => `
+        <div class="security-list-item">
+            <div>
+                <strong>${escapeHTML(event.title || formatEventType(event.type))}</strong>
+                <small>${escapeHTML(formatDateTime(event.createdAt))}</small>
+            </div>
+        </div>
+    `).join("");
+}
+
+function formatDateTime(value) {
+    if (!value) return "-";
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "-";
+
+    return date.toLocaleString();
+}
+
+function formatEventType(type) {
+    return String(type || "")
+        .replaceAll(".", " ")
+        .replace(/\b\w/g, char => char.toUpperCase());
 }
 
 function renderWallet() {
@@ -308,8 +495,8 @@ async function loadHistory() {
     if (!currentUser?.username) return;
 
     try {
-        const res = await fetch(
-            accountApiUrl(`/api/history/${encodeURIComponent(currentUser.username)}`)
+        const res = await window.AZIEL.authFetch(
+            `/api/history/${encodeURIComponent(currentUser.username)}`
         );
 
         const data = await res.json();
@@ -448,8 +635,8 @@ async function loadBellOrders() {
     if (!panel || !count) return;
 
     try {
-        const res = await fetch(
-            accountApiUrl(`/api/history/${encodeURIComponent(currentUser.username)}`)
+        const res = await window.AZIEL.authFetch(
+            `/api/history/${encodeURIComponent(currentUser.username)}`
         );
 
         const data = await res.json();
@@ -490,6 +677,407 @@ async function loadBellOrders() {
                 ${t("serverError", "Server error")}
             </div>
         `;
+    }
+}
+
+async function confirmSecurityAction(title, message, confirmText = "Confirm") {
+    if (window.AZIEL_UI?.confirm) {
+        return window.AZIEL_UI.confirm({
+            title,
+            message,
+            confirmText,
+            cancelText: "Cancel"
+        });
+    }
+
+    return window.confirm(message);
+}
+
+async function revokeSession(sessionId) {
+    if (!sessionId) return;
+
+    const confirmed = await confirmSecurityAction(
+        "Revoke session?",
+        "This device will be signed out of AZIEL.",
+        "Revoke"
+    );
+
+    if (!confirmed) return;
+
+    try {
+        const res = await window.AZIEL.authFetch(`/api/security/sessions/${encodeURIComponent(sessionId)}`, {
+            method: "DELETE"
+        });
+        const data = await res.json();
+
+        if (!data.success) {
+            showAccountToast(data.message || "Could not revoke session", "error");
+            return;
+        }
+
+        showAccountToast(data.message || "Session revoked", "success");
+
+        if (data.forceLogout) {
+            window.AZIEL.handleAuthFailure?.("Session revoked. Please sign in again.");
+            return;
+        }
+
+        await loadSecurityData();
+    } catch (error) {
+        console.log("Revoke session error:", error);
+        showAccountToast("Server error", "error");
+    }
+}
+
+async function revokeOtherSessions() {
+    const confirmed = await confirmSecurityAction(
+        "Log out other devices?",
+        "All other active AZIEL sessions will be revoked.",
+        "Log out others"
+    );
+
+    if (!confirmed) return;
+
+    await postSecurityAction("/api/security/sessions/revoke-others", false);
+}
+
+async function revokeAllSessions() {
+    const confirmed = await confirmSecurityAction(
+        "Log out all devices?",
+        "All AZIEL sessions, including this one, will be revoked.",
+        "Log out all"
+    );
+
+    if (!confirmed) return;
+
+    await postSecurityAction("/api/security/sessions/revoke-all", true);
+}
+
+async function postSecurityAction(path, forceLogoutOnSuccess) {
+    try {
+        const res = await window.AZIEL.authFetch(path, { method: "POST" });
+        const data = await res.json();
+
+        if (!data.success) {
+            showAccountToast(data.message || "Security action failed", "error");
+            return;
+        }
+
+        showAccountToast(data.message || "Security action complete", "success");
+
+        if (forceLogoutOnSuccess || data.forceLogout) {
+            window.AZIEL.handleAuthFailure?.("Please sign in again.");
+            return;
+        }
+
+        await loadSecurityData();
+    } catch (error) {
+        console.log("Security action error:", error);
+        showAccountToast("Server error", "error");
+    }
+}
+
+function getTwoFactorModal() {
+    return document.getElementById("twoFactorModal");
+}
+
+function setTwoFactorView(viewName) {
+    document.querySelectorAll(".two-factor-view").forEach(view => {
+        view.hidden = true;
+    });
+
+    const view = document.getElementById(`twoFactor${viewName}View`);
+    if (view) view.hidden = false;
+}
+
+function setButtonLoading(btn, isLoading, text) {
+    if (!btn) return;
+
+    if (isLoading) {
+        window.AZIEL_UI?.button?.setLoading?.(btn, { text });
+        if (!window.AZIEL_UI?.button) btn.disabled = true;
+        return;
+    }
+
+    window.AZIEL_UI?.button?.reset?.(btn);
+    if (!window.AZIEL_UI?.button) btn.disabled = false;
+}
+
+function openTwoFactorModal(viewName) {
+    const modal = getTwoFactorModal();
+    if (!modal) return;
+
+    setTwoFactorView(viewName);
+    modal.hidden = false;
+}
+
+function closeTwoFactorModal() {
+    const modal = getTwoFactorModal();
+    if (modal) modal.hidden = true;
+
+    securityState.pendingTwoFactorSetup = null;
+    setValue("twoFactorSetupCode", "");
+    setValue("twoFactorCurrentPassword", "");
+    setValue("twoFactorManageCode", "");
+}
+
+async function startTwoFactorSetup() {
+    const btn = document.getElementById("startTwoFactorSetupBtn");
+    setButtonLoading(btn, true, "Starting...");
+
+    try {
+        const res = await window.AZIEL.authFetch("/api/security/2fa/setup", {
+            method: "POST"
+        });
+        const data = await res.json();
+
+        if (!data.success || !data.setup) {
+            showAccountToast(data.message || "Could not start two-factor setup", "error");
+            return;
+        }
+
+        securityState.pendingTwoFactorSetup = data.setup;
+        setValue("twoFactorManualKey", data.setup.manualKey || "");
+        const uri = document.getElementById("twoFactorProvisioningUri");
+        if (uri) uri.value = data.setup.provisioningUri || "";
+        setValue("twoFactorSetupCode", "");
+
+        setText("twoFactorModalTitle", "Enable Two-Factor Authentication");
+        openTwoFactorModal("Setup");
+        document.getElementById("twoFactorSetupCode")?.focus();
+    } catch (error) {
+        console.log("2FA setup start error:", error);
+        showAccountToast("Server error", "error");
+    } finally {
+        setButtonLoading(btn, false);
+    }
+}
+
+async function verifyTwoFactorSetup() {
+    const btn = document.getElementById("verifyTwoFactorSetupBtn");
+    const code = document.getElementById("twoFactorSetupCode")?.value.trim() || "";
+
+    if (!code) {
+        showAccountToast("Enter the authenticator code", "error");
+        return;
+    }
+
+    setButtonLoading(btn, true, "Verifying...");
+
+    try {
+        const res = await window.AZIEL.authFetch("/api/security/2fa/verify-setup", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ code })
+        });
+        const data = await res.json();
+
+        if (!data.success) {
+            showAccountToast(data.message || "Invalid authenticator code", "error");
+            return;
+        }
+
+        showRecoveryCodes(data.recoveryCodes || []);
+        showAccountToast(data.message || "Two-factor authentication enabled", "success");
+        await loadSecurityData();
+    } catch (error) {
+        console.log("2FA setup verify error:", error);
+        showAccountToast("Server error", "error");
+    } finally {
+        setButtonLoading(btn, false);
+    }
+}
+
+function showRecoveryCodes(codes) {
+    const list = document.getElementById("twoFactorRecoveryCodes");
+    if (list) {
+        list.innerHTML = codes.map(code => `
+            <code>${escapeHTML(code)}</code>
+        `).join("");
+    }
+
+    const ack = document.getElementById("ackRecoveryCodes");
+    const done = document.getElementById("closeTwoFactorAfterCodesBtn");
+    if (ack) ack.checked = false;
+    if (done) done.disabled = true;
+
+    setText("twoFactorModalTitle", "Save Recovery Codes");
+    openTwoFactorModal("Recovery");
+}
+
+function openTwoFactorManage() {
+    const overview = securityState.overview || {};
+    const twoFactor = overview.twoFactor || {};
+    const remaining = Number(twoFactor.recoveryCodesRemaining || 0);
+
+    setText(
+        "twoFactorManageStatus",
+        `Two-factor authentication is enabled. ${remaining} recovery code${remaining === 1 ? "" : "s"} remaining.`
+    );
+    setValue("twoFactorCurrentPassword", "");
+    setValue("twoFactorManageCode", "");
+
+    setText("twoFactorModalTitle", "Manage Two-Factor Authentication");
+    openTwoFactorModal("Manage");
+}
+
+function getTwoFactorManagePayload() {
+    const currentPassword = document.getElementById("twoFactorCurrentPassword")?.value || "";
+    const value = document.getElementById("twoFactorManageCode")?.value.trim() || "";
+    const recoveryMode = /^[A-Za-z0-9]{8}-[A-Za-z0-9]{8}$/.test(value);
+
+    return {
+        currentPassword,
+        ...(recoveryMode ? { recoveryCode: value } : { code: value })
+    };
+}
+
+function validateTwoFactorManagePayload(payload) {
+    if (!payload.currentPassword) {
+        showAccountToast("Current password is required", "error");
+        return false;
+    }
+
+    if (!payload.code && !payload.recoveryCode) {
+        showAccountToast("Authenticator or recovery code is required", "error");
+        return false;
+    }
+
+    return true;
+}
+
+async function regenerateRecoveryCodes() {
+    const payload = getTwoFactorManagePayload();
+    if (!validateTwoFactorManagePayload(payload)) return;
+
+    const confirmed = await confirmSecurityAction(
+        "Generate new recovery codes?",
+        "Your old recovery codes will stop working.",
+        "Generate"
+    );
+
+    if (!confirmed) return;
+
+    const btn = document.getElementById("regenerateRecoveryCodesBtn");
+    setButtonLoading(btn, true, "Generating...");
+
+    try {
+        const res = await window.AZIEL.authFetch("/api/security/2fa/recovery-codes/regenerate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (!data.success) {
+            showAccountToast(data.message || "Could not regenerate recovery codes", "error");
+            return;
+        }
+
+        showRecoveryCodes(data.recoveryCodes || []);
+        showAccountToast("Recovery codes regenerated", "success");
+        await loadSecurityData();
+    } catch (error) {
+        console.log("2FA recovery regenerate error:", error);
+        showAccountToast("Server error", "error");
+    } finally {
+        setButtonLoading(btn, false);
+    }
+}
+
+async function disableTwoFactor() {
+    const payload = getTwoFactorManagePayload();
+    if (!validateTwoFactorManagePayload(payload)) return;
+
+    const confirmed = await confirmSecurityAction(
+        "Disable two-factor authentication?",
+        "Your account will no longer require an authenticator code at sign-in.",
+        "Disable"
+    );
+
+    if (!confirmed) return;
+
+    const btn = document.getElementById("disableTwoFactorBtn");
+    setButtonLoading(btn, true, "Disabling...");
+
+    try {
+        const res = await window.AZIEL.authFetch("/api/security/2fa/disable", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (!data.success) {
+            showAccountToast(data.message || "Could not disable two-factor authentication", "error");
+            return;
+        }
+
+        showAccountToast(data.message || "Two-factor authentication disabled", "success");
+        closeTwoFactorModal();
+        await loadSecurityData();
+    } catch (error) {
+        console.log("2FA disable error:", error);
+        showAccountToast("Server error", "error");
+    } finally {
+        setButtonLoading(btn, false);
+    }
+}
+
+function openChangePasswordModal() {
+    const modal = document.getElementById("changePasswordModal");
+    if (!modal) return;
+
+    document.getElementById("changePasswordForm")?.reset();
+    modal.hidden = false;
+}
+
+function closeChangePasswordModal() {
+    const modal = document.getElementById("changePasswordModal");
+    if (modal) modal.hidden = true;
+}
+
+async function submitChangePassword(event) {
+    event.preventDefault();
+
+    const btn = document.getElementById("submitChangePasswordBtn");
+    const currentPassword = document.getElementById("currentPassword")?.value || "";
+    const newPassword = document.getElementById("newPassword")?.value || "";
+    const confirmPassword = document.getElementById("confirmNewPassword")?.value || "";
+
+    if (newPassword.length < 8) {
+        showAccountToast("Password must be at least 8 characters", "error");
+        return;
+    }
+
+    if (newPassword !== confirmPassword) {
+        showAccountToast("Passwords do not match", "error");
+        return;
+    }
+
+    window.AZIEL_UI?.button?.setLoading?.(btn, { text: "Updating..." });
+
+    try {
+        const res = await window.AZIEL.authFetch("/api/security/change-password", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ currentPassword, newPassword })
+        });
+        const data = await res.json();
+
+        if (!data.success) {
+            showAccountToast(data.message || "Password change failed", "error");
+            window.AZIEL_UI?.button?.reset?.(btn);
+            return;
+        }
+
+        showAccountToast(data.message || "Password changed", "success");
+        closeChangePasswordModal();
+        window.AZIEL.handleAuthFailure?.("Password changed. Please sign in again.");
+    } catch (error) {
+        console.log("Change password error:", error);
+        showAccountToast("Server error", "error");
+        window.AZIEL_UI?.button?.reset?.(btn);
     }
 }
 
@@ -566,6 +1154,10 @@ function showAccountTab(tabName) {
         loadHistory();
     }
 
+    if (tabName === "security") {
+        loadSecurityData();
+    }
+
     window.AZIEL_I18N?.translatePage?.(document);
 }
 
@@ -604,6 +1196,73 @@ function initButtons() {
         ?.addEventListener("click", () => {
             window.location.href = "wallet.html#history";
         });
+
+    document
+        .getElementById("changePasswordBtn")
+        ?.addEventListener("click", openChangePasswordModal);
+
+    document
+        .getElementById("closeChangePasswordModal")
+        ?.addEventListener("click", closeChangePasswordModal);
+
+    document
+        .getElementById("changePasswordModal")
+        ?.addEventListener("click", event => {
+            if (event.target.id === "changePasswordModal") closeChangePasswordModal();
+        });
+
+    document
+        .getElementById("changePasswordForm")
+        ?.addEventListener("submit", submitChangePassword);
+
+    document
+        .getElementById("startTwoFactorSetupBtn")
+        ?.addEventListener("click", startTwoFactorSetup);
+
+    document
+        .getElementById("manageTwoFactorBtn")
+        ?.addEventListener("click", openTwoFactorManage);
+
+    document
+        .getElementById("closeTwoFactorModal")
+        ?.addEventListener("click", closeTwoFactorModal);
+
+    document
+        .getElementById("twoFactorModal")
+        ?.addEventListener("click", event => {
+            if (event.target.id === "twoFactorModal") closeTwoFactorModal();
+        });
+
+    document
+        .getElementById("verifyTwoFactorSetupBtn")
+        ?.addEventListener("click", verifyTwoFactorSetup);
+
+    document
+        .getElementById("ackRecoveryCodes")
+        ?.addEventListener("change", event => {
+            const done = document.getElementById("closeTwoFactorAfterCodesBtn");
+            if (done) done.disabled = !event.target.checked;
+        });
+
+    document
+        .getElementById("closeTwoFactorAfterCodesBtn")
+        ?.addEventListener("click", closeTwoFactorModal);
+
+    document
+        .getElementById("regenerateRecoveryCodesBtn")
+        ?.addEventListener("click", regenerateRecoveryCodes);
+
+    document
+        .getElementById("disableTwoFactorBtn")
+        ?.addEventListener("click", disableTwoFactor);
+
+    document
+        .getElementById("revokeOtherSessionsBtn")
+        ?.addEventListener("click", revokeOtherSessions);
+
+    document
+        .getElementById("revokeAllSessionsBtn")
+        ?.addEventListener("click", revokeAllSessions);
 }
 
 function initMobileMenu() {

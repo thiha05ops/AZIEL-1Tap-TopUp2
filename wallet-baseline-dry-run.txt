@@ -1,0 +1,55 @@
+
+> aziel-1tap-topup@1.0.0 migrate:wallet-baseline
+> node backend/scripts/migrate-wallet-baseline.js
+
+◇ injected env (17) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+Wallet baseline migration dry run
+No User.wallet balances will be modified.
+SKIP_ZERO_BASELINE thiha222 MMK stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE thiha222 THB stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE Phyoei05 MMK stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE Phyoei05 THB stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE Nikky MMK stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE Nikky THB stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE Aung MMK stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE Aung THB stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE Aung123@ MMK stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE Aung123@ THB stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE Nyein21 MMK stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE Nyein21 THB stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE Thwe Thazin MMK stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE Thwe Thazin THB stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+CREATE_BASELINE ko5551489@gmail.com MMK stored=100 canonicalNet=0 baseline=100 expected=100 diffAfter=0 currentStatus=LEGACY_BASELINE_REQUIRED
+CREATE_BASELINE ko5551489@gmail.com THB stored=224 canonicalNet=0 baseline=224 expected=224 diffAfter=0 currentStatus=LEGACY_BASELINE_REQUIRED
+SKIP_ZERO_BASELINE aziel1tapshop@gmail.com MMK stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE aziel1tapshop@gmail.com THB stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE thiha05 MMK stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE thiha05 THB stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE test111 MMK stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE test111 THB stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE Test1112 MMK stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE Test1112 THB stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE this MMK stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE this THB stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE Test1 MMK stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE Test1 THB stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+CREATE_BASELINE thiha2 MMK stored=42875 canonicalNet=0 baseline=42875 expected=42875 diffAfter=0 currentStatus=LEGACY_BASELINE_REQUIRED
+CREATE_BASELINE thiha2 THB stored=1645.3 canonicalNet=0 baseline=1645.3 expected=1645.3 diffAfter=0 currentStatus=LEGACY_BASELINE_REQUIRED
+SKIP_ZERO_BASELINE Hsu Yadanar MMK stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE Hsu Yadanar THB stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE Saw Ray Htoo MMK stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE Saw Ray Htoo THB stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE Waiphyo MMK stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE Waiphyo THB stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE test2 MMK stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE test2 THB stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE test1 MMK stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE test1 THB stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE fgjds MMK stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+CREATE_BASELINE fgjds THB stored=10 canonicalNet=0 baseline=10 expected=10 diffAfter=0 currentStatus=LEGACY_BASELINE_REQUIRED
+SKIP_ZERO_BASELINE kyawkokoloveme62 MMK stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE kyawkokoloveme62 THB stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE thiha MMK stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+SKIP_ZERO_BASELINE thiha THB stored=0 canonicalNet=0 baseline=0 expected=0 diffAfter=0 currentStatus=RECONCILED
+CREATE_BASELINE dawcho MMK stored=100 canonicalNet=0 baseline=100 expected=100 diffAfter=0 currentStatus=LEGACY_BASELINE_REQUIRED
+CREATE_BASELINE dawcho THB stored=140 canonicalNet=0 baseline=140 expected=140 diffAfter=0 currentStatus=LEGACY_BASELINE_REQUIRED

@@ -478,9 +478,10 @@ async function safeJson(res) {
 function getTicketScreenshot(ticket) {
     if (!ticket?.screenshot) return "";
 
-    const path = ticket.screenshot.startsWith("/uploads")
+    const value = String(ticket.screenshot || "").trim();
+    const path = value.startsWith("http") || value.startsWith("/uploads")
         ? ticket.screenshot
-        : `/uploads/support/${ticket.screenshot}`;
+        : `/uploads/support/${value}`;
 
     return normalizeUploadPath(path);
 }

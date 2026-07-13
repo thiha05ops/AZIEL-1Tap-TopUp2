@@ -195,13 +195,21 @@ async function loadWallet() {
             return;
         }
 
-        AZIEL.wallet = {
-            balance: Number(data.balance || 0),
-            currency,
-            symbol: getWalletSymbol()
-        };
+        if (AZIEL.applyWalletUpdate) {
+            AZIEL.applyWalletUpdate({
+                balance: Number(data.balance || 0),
+                currency,
+                updatedAt: new Date()
+            });
+        } else {
+            AZIEL.wallet = {
+                balance: Number(data.balance || 0),
+                currency,
+                symbol: getWalletSymbol()
+            };
 
-        window.dispatchEvent(new Event("aziel:walletChanged"));
+            window.dispatchEvent(new Event("aziel:walletChanged"));
+        }
 
         const history = [
             ...(data.transactions || []),
@@ -258,24 +266,26 @@ function renderWalletHistory(history) {
     }
 
     box.innerHTML = history.map(item => {
-        const isPayment = item.type === "payment";
-        const isTopup = item.type === "topup" || Boolean(item.paymentMethod);
-        const isRefund = item.type === "refund";
+        const direction = getWalletDirection(item);
+        const isPayment = direction === "debit";
 
-        const sign = isPayment ? "-" : isTopup || isRefund ? "+" : "";
+        const sign = direction === "debit" ? "-" : direction === "credit" ? "+" : "";
         const color = isPayment ? "#ff6868" : "#32d583";
 
         const statusRaw = normalizeWalletStatus(item.status);
         const prettyStatus = formatWalletStatus(statusRaw);
+        const amount = Number(item.amount || 0).toLocaleString();
+        const currency = item.currency || getWalletCurrency();
+
+        const balanceAfter = item.balanceAfter != null
+            ? `<small>${wt("walletBalanceAfter", "Balance")}: ${Number(item.balanceAfter || 0).toLocaleString()} ${currency}</small>`
+            : "";
 
         const title =
             item.description ||
             item.paymentMethod ||
             formatWalletType(item.type) ||
             wt("walletTransaction", "Wallet transaction");
-
-        const amount = Number(item.amount || 0).toLocaleString();
-        const currency = item.currency || getWalletCurrency();
 
         return `
             <div class="wallet-history-item">
@@ -289,6 +299,8 @@ function renderWalletHistory(history) {
                     <small>
                         ${formatWalletDate(item.createdAt)}
                     </small>
+
+                    ${balanceAfter}
                 </div>
 
                 <span class="wallet-status status-${statusRaw}">
@@ -303,12 +315,25 @@ function renderWalletHistory(history) {
     window.AZIEL_I18N?.translatePage?.(document);
 }
 
+function getWalletDirection(item) {
+    const direction = String(item.direction || "").toLowerCase();
+    if (direction === "credit" || direction === "debit") return direction;
+
+    const type = String(item.type || "").toLowerCase();
+    if (type.includes("payment")) return "debit";
+    if (type.includes("topup") || type.includes("refund")) return "credit";
+    if (item.paymentMethod) return "credit";
+
+    return "";
+}
+
 function normalizeWalletStatus(status) {
     const value = String(status || "pending").toLowerCase();
 
     if (value === "paid") return "paid";
     if (value === "completed") return "completed";
     if (value === "approved") return "approved";
+    if (value === "committed") return "completed";
     if (value === "rejected") return "rejected";
     if (value === "expired") return "expired";
     if (value === "failed") return "failed";
@@ -334,7 +359,12 @@ function formatWalletType(type) {
     const map = {
         topup: wt("walletTopup", "Wallet Topup"),
         payment: wt("walletPayment", "Wallet Payment"),
-        refund: wt("walletRefund", "Wallet Refund")
+        refund: wt("walletRefund", "Wallet Refund"),
+        "wallet.topup": wt("walletTopup", "Wallet Topup"),
+        "wallet.payment": wt("walletPayment", "Wallet Payment"),
+        "wallet.refund": wt("walletRefund", "Wallet Refund"),
+        "wallet.reversal": wt("walletReversal", "Wallet Reversal"),
+        "wallet.adjustment": wt("walletAdjustment", "Wallet Adjustment")
     };
 
     return map[type] || "";
@@ -1007,13 +1037,17 @@ function initWalletSocket() {
         const symbol = currency === "THB" ? "฿" : "Ks";
         const amount = Number(data.amount || data.balance || 0);
 
-        AZIEL.wallet = {
-            balance: amount,
-            currency,
-            symbol
-        };
+        if (AZIEL.applyWalletUpdate) {
+            AZIEL.applyWalletUpdate(data);
+        } else {
+            AZIEL.wallet = {
+                balance: amount,
+                currency,
+                symbol
+            };
 
-        window.dispatchEvent(new Event("aziel:walletChanged"));
+            window.dispatchEvent(new Event("aziel:walletChanged"));
+        }
 
         showWalletPopup(amount, symbol);
         showSubmitSuccessModal();

@@ -2,33 +2,49 @@
 
 const express = require("express");
 const router = express.Router();
+const rateLimit = require("express-rate-limit");
 
 const Order = require("../models/Order");
-const User = require("../models/User");
-const WalletTransaction = require("../models/WalletTransaction");
 
 const upload = require("../middleware/orderUpload");
 const authMiddleware = require("../middleware/authMiddleware");
 
-const {
-    sendTelegramMessage,
-    sendTelegramPhoto
-} = require("../services/telegram");
+const { sendTelegramMessage } = require("../services/telegram");
 
 const createNotification = require("../services/createNotification");
 const adminMiddleware = require("../middleware/adminMiddleware");
 const realtime = require("../services/realtime");
+const {
+    NOTE_BY_STATUS,
+    ORDER_STATES,
+    PAYMENT_STATES,
+    OrderStateError,
+    getAllowedNextStatuses,
+    projectOrderStatus,
+    transitionOrder
+} = require("../services/orderStateService");
+const { CatalogError, resolveOrderCatalog } = require("../services/catalogService");
+const { WalletError, creditRefund } = require("../services/walletService");
+const {
+    StorageError,
+    cleanupAfterFailedPersistence,
+    logStorageError,
+    uploadFile
+} = require("../services/storageService");
 
 function getCurrencyKey(currency) {
     return String(currency || "").toUpperCase() === "THB" ? "THB" : "MMK";
 }
 
+const orderCreateLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    limit: Number(process.env.RATE_LIMIT_ORDER_CREATE || 12),
+    standardHeaders: true,
+    legacyHeaders: false
+});
+
 function getRefundAllowedStatus(status) {
     return ["failed", "cancelled"].includes(String(status || "").toLowerCase());
-}
-
-function createTransactionId(prefix = "WTX") {
-    return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 }
 
 function getAuthenticatedUsername(req) {
@@ -48,7 +64,9 @@ function publicTrackingOrder(order) {
         region: order.region,
         paymentMethod: order.paymentMethod,
         status: order.status,
+        paymentStatus: order.paymentStatus || (order.status === "paid" ? "paid" : "pending"),
         note: order.note,
+        timeline: Array.isArray(order.timeline) ? order.timeline : [],
         refundRequested: order.refundRequested,
         refundRequestReason: order.refundRequestReason,
         refundRequestedAt: order.refundRequestedAt,
@@ -96,7 +114,7 @@ router.get("/order/user/:username", authMiddleware, async (req, res) => {
 // TRACK SINGLE ORDER
 router.get("/order/track/:orderId", async (req, res) => {
     try {
-        const order = await Order.findOne({
+        let order = await Order.findOne({
             orderId: req.params.orderId
         });
 
@@ -115,6 +133,36 @@ router.get("/order/track/:orderId", async (req, res) => {
     } catch (error) {
         console.log("Track error:", error);
         res.json({ success: false, message: "Server error" });
+    }
+});
+
+// AUTHENTICATED CANONICAL ORDER STATUS
+router.get("/order/status/:orderId", authMiddleware, async (req, res) => {
+    try {
+        const order = await Order.findOne({
+            orderId: req.params.orderId,
+            username: getAuthenticatedUsername(req)
+        });
+
+        if (!order) {
+            return res.status(404).json({
+                success: false,
+                code: "ORDER_NOT_FOUND",
+                message: "Order not found"
+            });
+        }
+
+        return res.json({
+            success: true,
+            order: projectOrderStatus(order),
+            allowedNextStatuses: getAllowedNextStatuses(order.status)
+        });
+    } catch (error) {
+        console.log("Order status error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Server error"
+        });
     }
 });
 
@@ -165,13 +213,17 @@ router.post("/order/:orderId/refund-request", authMiddleware, async (req, res) =
             });
         }
 
-        order.status = "refund_requested";
         order.refundRequested = true;
         order.refundRequestReason = String(reason).trim();
         order.refundRequestedAt = new Date();
-        order.note = "Refund request submitted. Admin will review your request.";
-
-        await order.save();
+        const transition = await transitionOrder(order, ORDER_STATES.REFUND_REQUESTED, {
+            source: "user",
+            actorType: "user",
+            actor: username,
+            reason: "Customer refund request",
+            idempotencyKey: `refund:request:${order.orderId}`
+        });
+        order = transition.order;
 
         const notification = await createNotification({
             username: order.username,
@@ -181,8 +233,6 @@ router.post("/order/:orderId/refund-request", authMiddleware, async (req, res) =
             category: "refunds",
             orderId: order.orderId
         });
-
-        await realtime.emitOrderUpdate(order.username, order);
 
         realtime.emitAdminOrderUpdate({
             type: "refund_requested",
@@ -247,48 +297,7 @@ router.get("/admin/orders", adminMiddleware, async (req, res) => {
 router.put("/admin/orders/:id/status", adminMiddleware, async (req, res) => {
     try {
         const { status } = req.body;
-
-        const allowedStatus = [
-            "pending_payment",
-            "paid",
-            "processing",
-            "completed",
-            "cancelled",
-            "failed",
-            "refund_requested",
-            "refund_pending",
-            "refund_rejected",
-            "refunded"
-        ];
-
-        if (!allowedStatus.includes(status)) {
-            return res.json({
-                success: false,
-                message: "Invalid status"
-            });
-        }
-
-        const noteMap = {
-            pending_payment: "Waiting for payment confirmation.",
-            paid: "Payment received. Waiting for processing.",
-            processing: "Your order is processing.",
-            completed: "✅ Your order has been completed.",
-            cancelled: "❌ Your order has been cancelled.",
-            failed: "❌ Your order failed. You may request a wallet refund.",
-            refund_requested: "Refund request submitted. Admin will review your request.",
-            refund_pending: "Refund is being reviewed.",
-            refund_rejected: "Refund request was rejected.",
-            refunded: "✅ This order has been refunded to your wallet."
-        };
-
-        const order = await Order.findByIdAndUpdate(
-            req.params.id,
-            {
-                status,
-                note: noteMap[status] || ""
-            },
-            { new: true }
-        );
+        const order = await Order.findById(req.params.id);
 
         if (!order) {
             return res.json({
@@ -297,52 +306,63 @@ router.put("/admin/orders/:id/status", adminMiddleware, async (req, res) => {
             });
         }
 
-        const notification = await createNotification({
-            username: order.username,
-            title: "Order Status Updated",
-            message: `${order.game} - ${order.packageName} is now ${formatStatusText(order.status)}`,
-            type: "order",
-            category: "orders",
-            orderId: order.orderId
+        const transition = await transitionOrder(order, status, {
+            source: "admin",
+            actorType: "admin",
+            actor: req.admin?.username || req.user?.username || "admin",
+            reason: "Admin status update",
+            paymentStatus: status === ORDER_STATES.PAID ? PAYMENT_STATES.PAID : undefined,
+            idempotencyKey: `admin:status:${order.orderId}:${status}`
         });
 
-        await realtime.emitOrderUpdate(order.username, order);
+        if (!transition.changed) {
+            return res.json({
+                success: true,
+                order: transition.order,
+                allowedNextStatuses: getAllowedNextStatuses(transition.order.status)
+            });
+        }
 
-        realtime.emitAdminOrderUpdate({
-            type: "order_status",
-            orderId: order.orderId,
-            username: order.username,
-            status: order.status,
-            game: order.game
+        const updatedOrder = transition.order;
+
+        const notification = await createNotification({
+            username: updatedOrder.username,
+            title: "Order Status Updated",
+            message: `${updatedOrder.game} - ${updatedOrder.packageName} is now ${formatStatusText(updatedOrder.status)}`,
+            type: "order",
+            category: "orders",
+            orderId: updatedOrder.orderId
         });
 
         await sendTelegramMessage(
             `📦 ORDER STATUS UPDATED
 
 🎮 Game:
-${order.game}
+${updatedOrder.game}
 
 📦 Package:
-${order.packageName}
+${updatedOrder.packageName}
 
 👤 User:
-${order.username}
+${updatedOrder.username}
 
 📌 Status:
-${order.status}`
+${updatedOrder.status}`
         );
 
         res.json({
             success: true,
-            order
+            order: updatedOrder,
+            allowedNextStatuses: getAllowedNextStatuses(updatedOrder.status)
         });
 
     } catch (error) {
         console.log("Update status error:", error);
 
-        res.json({
+        res.status(error instanceof OrderStateError ? error.status : 500).json({
             success: false,
-            message: "Server error"
+            code: error.code || "ORDER_STATUS_UPDATE_FAILED",
+            message: error instanceof OrderStateError ? error.message : "Server error"
         });
     }
 });
@@ -386,37 +406,6 @@ router.post("/admin/orders/:id/refund/approve", adminMiddleware, async (req, res
             });
         }
 
-        const user = await User.findOneAndUpdate(
-            { username: order.username },
-            {
-                $inc: {
-                    [`wallet.${currencyKey}`]: refundAmount
-                }
-            },
-            { new: true }
-        );
-
-        if (!user) {
-            return res.json({
-                success: false,
-                message: "User not found"
-            });
-        }
-
-        await WalletTransaction.create({
-            transactionId: createTransactionId("RF"),
-            username: order.username,
-            orderId: order.orderId,
-            type: "refund",
-            amount: refundAmount,
-            currency: currencyKey,
-            status: "completed",
-            description: `Refund for ${order.game} - ${order.packageName}`,
-            referenceType: "refund",
-            performedBy: "admin"
-        });
-
-        order.status = "refunded";
         order.refunded = true;
         order.refundAmount = refundAmount;
         order.refundReason =
@@ -426,31 +415,51 @@ router.post("/admin/orders/:id/refund/approve", adminMiddleware, async (req, res
         order.refundMethod = "wallet";
         order.refundedBy = "admin";
         order.refundedAt = new Date();
-        order.note = `Refunded to wallet. Reason: ${order.refundReason}`;
-
-        await order.save();
-
-        const notification = await createNotification({
-            username: order.username,
-            title: "Refund Completed",
-            message: `${refundAmount.toLocaleString()} ${currencyKey} has been returned to your AZIEL Wallet.`,
-            type: "refund",
-            category: "refunds",
-            orderId: order.orderId
+        const walletResult = await creditRefund(order, {
+            performedBy: req.admin?.username || req.user?.username || "admin"
         });
+        const transition = await transitionOrder(order, ORDER_STATES.REFUNDED, {
+            source: "admin",
+            actorType: "admin",
+            actor: req.admin?.username || req.user?.username || "admin",
+            reason: order.refundReason,
+            paymentStatus: PAYMENT_STATES.REFUNDED,
+            note: `Refunded to wallet. Reason: ${order.refundReason}`,
+            idempotencyKey: `refund:approve:${order.orderId}`
+        });
+        const updatedOrder = transition.order;
+
+        if (!walletResult.duplicate) {
+            await createNotification({
+                username: updatedOrder.username,
+                title: "Refund Completed",
+                message: `${refundAmount.toLocaleString()} ${currencyKey} has been returned to your AZIEL Wallet.`,
+                type: "refund",
+                category: "refunds",
+                orderId: updatedOrder.orderId
+            });
+        }
 
         await realtime.emitWalletUpdate(order.username, {
-            amount: user.wallet?.[currencyKey] || 0,
+            amount: walletResult.balance,
+            balance: walletResult.balance,
             currency: currencyKey,
-            status: "refund"
+            status: "refund",
+            latestTransaction: {
+                type: walletResult.transaction?.type || "",
+                direction: walletResult.transaction?.direction || "",
+                amount: Number(walletResult.transaction?.amount || 0),
+                balanceAfter: Number(walletResult.transaction?.balanceAfter ?? walletResult.balance),
+                referenceType: walletResult.transaction?.referenceType || "",
+                referenceId: walletResult.transaction?.referenceId || order.orderId,
+                createdAt: walletResult.transaction?.createdAt || new Date()
+            }
         });
-
-        await realtime.emitOrderUpdate(order.username, order);
 
         realtime.emitAdminOrderUpdate({
             type: "order_refunded",
-            orderId: order.orderId,
-            username: order.username,
+            orderId: updatedOrder.orderId,
+            username: updatedOrder.username,
             amount: refundAmount,
             currency: currencyKey
         });
@@ -459,33 +468,43 @@ router.post("/admin/orders/:id/refund/approve", adminMiddleware, async (req, res
             `✅ REFUND APPROVED TO WALLET
 
 📦 Order:
-${order.orderId}
+${updatedOrder.orderId}
 
 🎮 Game:
-${order.game}
+${updatedOrder.game}
 
 📦 Package:
-${order.packageName}
+${updatedOrder.packageName}
 
 👤 User:
-${order.username}
+${updatedOrder.username}
 
 💰 Refund:
 ${refundAmount} ${currencyKey}
 
 📝 Reason:
-${order.refundReason}`
+${updatedOrder.refundReason}`
         );
 
         res.json({
             success: true,
             message: "Refund approved and returned to wallet",
-            order,
-            balance: user.wallet?.[currencyKey] || 0
+            order: updatedOrder,
+            balance: walletResult.balance,
+            transaction: walletResult.transaction,
+            duplicate: Boolean(walletResult.duplicate)
         });
 
     } catch (error) {
         console.log("Approve refund error:", error);
+
+        if (error instanceof WalletError) {
+            return res.status(error.statusCode).json({
+                success: false,
+                code: error.code,
+                message: error.message
+            });
+        }
 
         res.status(500).json({
             success: false,
@@ -530,46 +549,49 @@ router.post("/admin/orders/:id/refund/reject", adminMiddleware, async (req, res)
             });
         }
 
-        order.status = "refund_rejected";
         order.refundRejectedReason = String(reason).trim();
-        order.note = `Refund rejected. Reason: ${order.refundRejectedReason}`;
-
-        await order.save();
+        const transition = await transitionOrder(order, ORDER_STATES.REFUND_REJECTED, {
+            source: "admin",
+            actorType: "admin",
+            actor: req.admin?.username || req.user?.username || "admin",
+            reason: order.refundRejectedReason,
+            note: `Refund rejected. Reason: ${order.refundRejectedReason}`,
+            idempotencyKey: `refund:reject:${order.orderId}`
+        });
+        const updatedOrder = transition.order;
 
         const notification = await createNotification({
-            username: order.username,
+            username: updatedOrder.username,
             title: "Refund Request Rejected",
-            message: order.refundRejectedReason,
+            message: updatedOrder.refundRejectedReason,
             type: "refund",
             category: "refunds",
-            orderId: order.orderId
+            orderId: updatedOrder.orderId
         });
-
-        await realtime.emitOrderUpdate(order.username, order);
 
         realtime.emitAdminOrderUpdate({
             type: "refund_rejected",
-            orderId: order.orderId,
-            username: order.username
+            orderId: updatedOrder.orderId,
+            username: updatedOrder.username
         });
 
         await sendTelegramMessage(
             `❌ REFUND REJECTED
 
 📦 Order:
-${order.orderId}
+${updatedOrder.orderId}
 
 👤 User:
-${order.username}
+${updatedOrder.username}
 
 📝 Reason:
-${order.refundRejectedReason}`
+${updatedOrder.refundRejectedReason}`
         );
 
         res.json({
             success: true,
             message: "Refund request rejected",
-            order
+            order: updatedOrder
         });
 
     } catch (error) {
@@ -618,49 +640,84 @@ router.post("/admin/orders/:id/refund", adminMiddleware, async (req, res) => {
 });
 
 // LEGACY / MANUAL ORDER CREATE
-router.post("/orders", authMiddleware, upload.single("paymentSlip"), async (req, res) => {
+router.post("/orders", authMiddleware, orderCreateLimiter, upload.single("paymentSlip"), async (req, res) => {
+    let evidence = null;
+    let evidencePersisted = false;
+
     try {
-        const order = await Order.create({
-            orderId: req.body.orderId,
-            username: getAuthenticatedUsername(req),
-            game: req.body.game,
-            userId: req.body.userId,
-            zoneId: req.body.zoneId || "",
-            packageName: req.body.packageName,
-            amount: Number(req.body.amount || 0),
-            currency: req.body.currency,
-            region: req.body.region,
-            paymentMethod: req.body.paymentMethod,
-            paymentSlip: req.file
-                ? `/uploads/orders/${req.file.filename}`
-                : "",
-            status: "pending_payment"
+        const username = getAuthenticatedUsername(req);
+
+        if (!req.body.orderId || !req.body.paymentMethod || !req.body.userId) {
+            return res.status(400).json({
+                success: false,
+                message: "Missing order data"
+            });
+        }
+
+        const pendingCount = await Order.countDocuments({
+            username,
+            status: "pending_payment",
+            createdAt: { $gte: new Date(Date.now() - 30 * 60 * 1000) }
         });
 
-        if (req.file) {
-            await sendTelegramPhoto(
-                req.file.path,
-                `🛒 NEW ORDER
-
-🎮 Game: ${order.game}
-
-📦 Package: ${order.packageName}
-
-👤 User: ${order.username}
-
-🆔 User ID: ${order.userId}
-
-🌐 Server ID: ${order.zoneId || "-"}
-
-🌍 Region: ${order.region}
-
-💳 Payment: ${order.paymentMethod}
-
-💰 Amount: ${order.amount} ${order.currency}
-
-📌 Status: ${order.status}`
-            );
+        if (pendingCount >= Number(process.env.MAX_PENDING_ORDERS_PER_USER || 5)) {
+            return res.status(429).json({
+                success: false,
+                code: "TOO_MANY_PENDING_ORDERS",
+                message: "You have too many pending orders. Please complete or wait before creating another."
+            });
         }
+
+        const existingOrder = await Order.findOne({ orderId: req.body.orderId });
+        if (existingOrder) {
+            return res.status(409).json({
+                success: false,
+                code: "DUPLICATE_ORDER_ID",
+                message: "Order already exists"
+            });
+        }
+
+        const catalogItem = resolveOrderCatalog(req.body);
+
+        if (req.file) {
+            evidence = await uploadFile({
+                file: req.file,
+                category: "paymentSlip",
+                ownerReference: req.body.orderId
+            });
+        }
+
+        const order = await Order.create({
+            orderId: req.body.orderId,
+            username,
+            game: catalogItem.productName,
+            productCode: catalogItem.productCode,
+            productName: catalogItem.productName,
+            userId: req.body.userId,
+            zoneId: req.body.zoneId || "",
+            packageName: catalogItem.packageName,
+            packageCode: catalogItem.packageCode,
+            amount: catalogItem.amount,
+            currency: catalogItem.currency,
+            region: catalogItem.region,
+            paymentMethod: req.body.paymentMethod,
+            paymentSlip: evidence?.url || "",
+            paymentEvidence: evidence || undefined,
+            status: ORDER_STATES.PENDING_PAYMENT,
+            paymentStatus: PAYMENT_STATES.PENDING,
+            timeline: [{
+                status: ORDER_STATES.PENDING_PAYMENT,
+                previousStatus: "",
+                paymentStatus: PAYMENT_STATES.PENDING,
+                source: "user",
+                actorType: "user",
+                actor: username,
+                reason: "Order created",
+                idempotencyKey: `order:create:${req.body.orderId}`,
+                at: new Date()
+            }]
+        });
+        evidencePersisted = true;
 
         res.json({
             success: true,
@@ -669,6 +726,32 @@ router.post("/orders", authMiddleware, upload.single("paymentSlip"), async (req,
 
     } catch (error) {
         console.log("Create order error:", error);
+
+        if (evidence && !evidencePersisted) {
+            await cleanupAfterFailedPersistence(evidence);
+        }
+
+        if (error instanceof CatalogError) {
+            return res.status(error.statusCode).json({
+                success: false,
+                code: error.code,
+                message: error.message
+            });
+        }
+
+        if (error instanceof StorageError) {
+            logStorageError(error.code, {
+                provider: error.provider,
+                category: "paymentSlip",
+                orderId: req.body?.orderId
+            });
+
+            return res.status(error.statusCode).json({
+                success: false,
+                code: error.code,
+                message: error.message
+            });
+        }
 
         res.status(500).json({
             success: false,

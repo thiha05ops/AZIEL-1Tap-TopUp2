@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const Order = require("../models/Order");
 const adminMiddleware = require("../middleware/adminMiddleware");
-const realtime = require("../services/realtime");
+const { ORDER_STATES, transitionOrder } = require("../services/orderStateService");
 
 // POST /api/supplier/mock-topup/:id
 router.post("/supplier/mock-topup/:id", adminMiddleware, async (req, res) => {
@@ -13,45 +13,28 @@ router.post("/supplier/mock-topup/:id", adminMiddleware, async (req, res) => {
             return res.json({ success: false, message: "Order not found" });
         }
 
-        // Step 1: processing
-        order.status = "processing";
-        await order.save();
-        realtime.emitAdminOrderUpdate({
-            type: "order_status",
-            orderId: order.orderId,
-            username: order.username,
-            status: order.status,
-            game: order.game,
-            packageName: order.packageName
-        });
-
-        await realtime.emitOrderUpdate(order.username, {
-            orderId: order.orderId,
-            status: order.status,
-            game: order.game,
-            packageName: order.packageName
+        const processing = await transitionOrder(order, ORDER_STATES.PROCESSING, {
+            source: "admin",
+            actorType: "admin",
+            actor: req.admin?.username || req.user?.username || "admin",
+            reason: "Mock supplier top-up started",
+            idempotencyKey: `supplier:mock:processing:${order.orderId}`
         });
 
         // Step 2: simulate delay
         setTimeout(async () => {
-            order.status = "completed";
-            await order.save();
-            console.log("Auto topup completed:", order.orderId);
-            realtime.emitAdminOrderUpdate({
-                type: "order_status",
-                orderId: order.orderId,
-                username: order.username,
-                status: order.status,
-                game: order.game,
-                packageName: order.packageName
-            });
-
-            await realtime.emitOrderUpdate(order.username, {
-                orderId: order.orderId,
-                status: order.status,
-                game: order.game,
-                packageName: order.packageName
-            });
+            try {
+                await transitionOrder(processing.order, ORDER_STATES.COMPLETED, {
+                    source: "admin",
+                    actorType: "admin",
+                    actor: req.admin?.username || req.user?.username || "admin",
+                    reason: "Mock supplier top-up completed",
+                    idempotencyKey: `supplier:mock:completed:${order.orderId}`
+                });
+                console.log("Auto topup completed:", order.orderId);
+            } catch (error) {
+                console.log("Auto topup completion skipped:", error.message);
+            }
         }, 3000);
 
         res.json({ success: true, message: "TopUp started" });

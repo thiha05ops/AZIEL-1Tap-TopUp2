@@ -17,6 +17,11 @@ const orderSchema = new mongoose.Schema({
         required: true
     },
 
+    productCode: {
+        type: String,
+        default: ""
+    },
+
     userId: {
         type: String,
         required: true
@@ -30,6 +35,16 @@ const orderSchema = new mongoose.Schema({
     packageName: {
         type: String,
         required: true
+    },
+
+    packageCode: {
+        type: String,
+        default: ""
+    },
+
+    productName: {
+        type: String,
+        default: ""
     },
 
     amount: {
@@ -57,6 +72,85 @@ const orderSchema = new mongoose.Schema({
         default: ""
     },
 
+    paymentEvidence: {
+        provider: { type: String, default: "" },
+        key: { type: String, default: "" },
+        url: { type: String, default: "" },
+        mimeType: { type: String, default: "" },
+        size: { type: Number, default: 0 },
+        originalName: { type: String, default: "" },
+        uploadedAt: { type: Date, default: null }
+    },
+
+    paymentStatus: {
+        type: String,
+        enum: [
+            "pending",
+            "paid",
+            "failed",
+            "expired",
+            "cancelled",
+            "refunded"
+        ],
+        default: "pending"
+    },
+
+    paymentProvider: {
+        type: String,
+        default: ""
+    },
+
+    transactionId: {
+        type: String,
+        default: ""
+    },
+
+    processedPaymentEvents: {
+        type: [String],
+        default: []
+    },
+
+    timeline: [
+        {
+            status: {
+                type: String,
+                default: ""
+            },
+            previousStatus: {
+                type: String,
+                default: ""
+            },
+            paymentStatus: {
+                type: String,
+                default: ""
+            },
+            source: {
+                type: String,
+                default: "system"
+            },
+            actorType: {
+                type: String,
+                default: "system"
+            },
+            actor: {
+                type: String,
+                default: ""
+            },
+            reason: {
+                type: String,
+                default: ""
+            },
+            idempotencyKey: {
+                type: String,
+                default: ""
+            },
+            at: {
+                type: Date,
+                default: Date.now
+            }
+        }
+    ],
+
     note: {
         type: String,
         default: "Waiting for payment confirmation."
@@ -71,6 +165,7 @@ const orderSchema = new mongoose.Schema({
             "completed",
             "cancelled",
             "failed",
+            "expired",
             "refund_requested",
             "refund_pending",
             "refund_rejected",

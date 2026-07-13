@@ -1,5 +1,6 @@
-const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const { verifyUserToken } = require("./authSessionService");
+const jwt = require("jsonwebtoken");
 
 const JWT_SECRET = process.env.JWT_SECRET || "aziel_jwt_secret";
 
@@ -44,12 +45,25 @@ function projectNotification(notification) {
 }
 
 function projectWallet(payload = {}) {
+    const latest = payload.latestTransaction || null;
+
     return {
         amount: Number(payload.amount || payload.balance || 0),
         balance: Number(payload.balance || payload.amount || 0),
         currency: payload.currency || "MMK",
         status: payload.status || "",
         topupId: payload.topupId || "",
+        latestTransaction: latest
+            ? {
+                type: latest.type || "",
+                direction: latest.direction || "",
+                amount: Number(latest.amount || 0),
+                balanceAfter: Number(latest.balanceAfter || 0),
+                referenceType: latest.referenceType || "",
+                referenceId: latest.referenceId || "",
+                createdAt: latest.createdAt || new Date()
+            }
+            : null,
         updatedAt: new Date()
     };
 }
@@ -58,8 +72,10 @@ function projectOrder(payload = {}) {
     return {
         orderId: payload.orderId || "",
         status: payload.status || "",
+        paymentStatus: payload.paymentStatus || "",
         game: payload.game || "",
         packageName: payload.packageName || "",
+        latestTimelineEntry: payload.latestTimelineEntry || null,
         updatedAt: new Date()
     };
 }
@@ -71,34 +87,6 @@ async function findUserByUsername(username) {
     return User.findOne({ username: normalized }).select(
         "_id username email role region currentSessionToken lastActiveAt updatedAt createdAt"
     );
-}
-
-async function findSocketUser(decoded) {
-    if (!decoded?.id || decoded.role === "admin") return null;
-
-    const user = await User.findById(decoded.id).select(
-        "_id username email role region currentSessionToken lastActiveAt updatedAt createdAt"
-    );
-
-    if (!user) return null;
-
-    if (
-        !decoded.sessionToken ||
-        !user.currentSessionToken ||
-        decoded.sessionToken !== user.currentSessionToken
-    ) {
-        return null;
-    }
-
-    const now = new Date();
-    const lastActive = user.lastActiveAt || user.updatedAt || user.createdAt;
-    const inactiveDays =
-        (now.getTime() - new Date(lastActive).getTime()) /
-        (1000 * 60 * 60 * 24);
-
-    if (inactiveDays >= 15) return null;
-
-    return user;
 }
 
 function getAuthToken(socket) {
@@ -130,7 +118,8 @@ async function authenticateSocket(socket, next) {
             return next();
         }
 
-        const user = await findSocketUser(decoded);
+        const auth = await verifyUserToken(token, { allowLegacy: true });
+        const user = auth.context;
 
         if (!user) {
             return next(new Error("Invalid or expired token"));
@@ -142,7 +131,9 @@ async function authenticateSocket(socket, next) {
             username: user.username,
             email: user.email,
             role: user.role || "user",
-            region: user.region || "MM"
+            region: user.region || "MM",
+            sessionId: user.sessionId || "",
+            legacyAuth: Boolean(user.legacyAuth)
         };
 
         return next();

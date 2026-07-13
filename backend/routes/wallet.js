@@ -3,49 +3,32 @@
 
 const express = require("express");
 const router = express.Router();
-const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
 
 const User = require("../models/User");
 const Order = require("../models/Order");
 const WalletTopup = require("../models/WalletTopup");
-const WalletTransaction = require("../models/WalletTransaction");
+const upload = require("../middleware/imageMemoryUpload");
 const adminMiddleware = require("../middleware/adminMiddleware");
 const authMiddleware = require("../middleware/authMiddleware");
 const Omise = require("../services/opnService");
 const realtime = require("../services/realtime");
 const notificationService = require("../services/notificationService");
-
-// ======================
-// UPLOAD SETUP
-// ======================
-
-const uploadDir = path.join(__dirname, "../uploads/slips");
-
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, uploadDir),
-    filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname || ".jpg");
-        cb(null, `wallet-${Date.now()}${ext}`);
-    }
-});
-
-const upload = multer({
-    storage,
-    limits: { fileSize: 5 * 1024 * 1024 },
-    fileFilter: (req, file, cb) => {
-        if (!file.mimetype.startsWith("image/")) {
-            return cb(new Error("Only image files are allowed"));
-        }
-
-        cb(null, true);
-    }
-});
+const { ORDER_STATES, PAYMENT_STATES, transitionOrder } = require("../services/orderStateService");
+const { CatalogError, resolveOrderCatalog } = require("../services/catalogService");
+const {
+    WalletError,
+    adjustWallet,
+    creditTopup,
+    getWalletBalance,
+    getWalletTimeline,
+    payOrderWithWallet
+} = require("../services/walletService");
+const {
+    StorageError,
+    cleanupAfterFailedPersistence,
+    logStorageError,
+    uploadFile
+} = require("../services/storageService");
 
 // ======================
 // HELPERS
@@ -164,6 +147,46 @@ async function emitWalletUpdate(username, payload) {
         type: "wallet",
         username,
         ...payload
+    });
+}
+
+function latestWalletTransactionPayload(result) {
+    const tx = result?.transaction || {};
+
+    return {
+        type: tx.type || "",
+        direction: tx.direction || "",
+        amount: Number(tx.amount || 0),
+        balanceAfter: Number(tx.balanceAfter ?? result?.balance ?? 0),
+        referenceType: tx.referenceType || "",
+        referenceId: tx.referenceId || tx.orderId || tx.topupId || "",
+        createdAt: tx.createdAt || new Date()
+    };
+}
+
+async function emitCommittedWalletUpdate(username, result, extra = {}) {
+    await emitWalletUpdate(username, {
+        amount: result.balance,
+        balance: result.balance,
+        currency: result.currency,
+        latestTransaction: latestWalletTransactionPayload(result),
+        ...extra
+    });
+}
+
+function sendWalletError(res, error, fallback = "Wallet transaction failed") {
+    if (error instanceof WalletError) {
+        return res.status(error.statusCode).json({
+            success: false,
+            code: error.code,
+            message: error.message
+        });
+    }
+
+    return res.status(500).json({
+        success: false,
+        code: "WALLET_TRANSACTION_FAILED",
+        message: fallback
     });
 }
 
@@ -339,6 +362,30 @@ router.post("/wallet/create", authMiddleware, async (req, res) => {
 // GET /api/wallet/:username
 // ======================
 
+router.get("/wallet/transactions", authMiddleware, async (req, res) => {
+    try {
+        const username = req.user.username;
+        const currency = getCurrencyKey(req.query.currency || "MMK");
+        const timeline = await getWalletTimeline(username, {
+            currency,
+            limit: req.query.limit,
+            cursor: req.query.cursor
+        });
+
+        return res.json({
+            success: true,
+            balance: timeline.balance,
+            currency,
+            transactions: timeline.transactions,
+            nextCursor: timeline.nextCursor
+        });
+
+    } catch (error) {
+        console.log("Wallet timeline error:", error);
+        return sendWalletError(res, error, "Load wallet timeline failed");
+    }
+});
+
 router.get("/wallet/:username", authMiddleware, async (req, res) => {
     try {
         const username = req.user.username;
@@ -353,22 +400,22 @@ router.get("/wallet/:username", authMiddleware, async (req, res) => {
             });
         }
 
-        const balance = user.wallet?.[currency] || 0;
-
         const topups = await WalletTopup.find({ username })
             .sort({ createdAt: -1 })
             .limit(30);
 
-        const transactions = await WalletTransaction.find({ username })
-            .sort({ createdAt: -1 })
-            .limit(30);
+        const timeline = await getWalletTimeline(username, {
+            currency,
+            limit: 30
+        });
 
         res.json({
             success: true,
-            balance,
+            balance: timeline.balance,
             currency,
             topups,
-            transactions
+            transactions: timeline.transactions,
+            nextCursor: timeline.nextCursor
         });
 
     } catch (error) {
@@ -425,6 +472,9 @@ router.get("/wallet/status/:topupId", authMiddleware, async (req, res) => {
 // ======================
 
 async function uploadWalletSlip(req, res) {
+    let evidence = null;
+    let evidencePersisted = false;
+
     try {
         const topup = await WalletTopup.findOne({
             topupId: req.params.topupId,
@@ -445,12 +495,18 @@ async function uploadWalletSlip(req, res) {
             });
         }
 
-        const slipPath = `/uploads/slips/${req.file.filename}`;
+        evidence = await uploadFile({
+            file: req.file,
+            category: "walletSlip",
+            ownerReference: topup.topupId
+        });
 
-        topup.paymentSlip = slipPath;
+        topup.paymentSlip = evidence.url;
+        topup.paymentEvidence = evidence;
         topup.status = "pending";
         topup.note = "Payment slip uploaded. Waiting for admin verification.";
         await topup.save();
+        evidencePersisted = true;
 
         await createWalletNotification(
             req,
@@ -466,7 +522,7 @@ async function uploadWalletSlip(req, res) {
             amount: topup.amount,
             currency: topup.currency,
             paymentMethod: topup.paymentMethod,
-            paymentSlip: slipPath
+            paymentSlip: evidence.url
         });
 
         return res.json({
@@ -477,6 +533,24 @@ async function uploadWalletSlip(req, res) {
 
     } catch (error) {
         console.log("Wallet slip upload error:", error);
+
+        if (evidence && !evidencePersisted) {
+            await cleanupAfterFailedPersistence(evidence);
+        }
+
+        if (error instanceof StorageError) {
+            logStorageError(error.code, {
+                provider: error.provider,
+                category: "walletSlip",
+                topupId: req.params.topupId
+            });
+
+            return res.status(error.statusCode).json({
+                success: false,
+                code: error.code,
+                message: error.message
+            });
+        }
 
         return res.status(500).json({
             success: false,
@@ -515,6 +589,78 @@ router.get("/admin/wallet/topups", adminMiddleware, async (req, res) => {
             success: false,
             message: "Server error"
         });
+    }
+});
+
+router.post("/admin/wallet/adjust", adminMiddleware, async (req, res) => {
+    try {
+        const username = String(req.body.username || "").trim();
+        const currency = getCurrencyKey(req.body.currency || "MMK");
+        const direction = String(req.body.direction || "").trim().toLowerCase();
+        const amount = Number(req.body.amount || 0);
+        const reason = String(req.body.reason || "").trim();
+        const actor = req.admin?.username || req.user?.username || "admin";
+
+        if (!username || !["credit", "debit"].includes(direction) || !amount || amount <= 0 || !reason || reason.length > 240) {
+            return res.status(400).json({
+                success: false,
+                code: "INVALID_WALLET_ADJUSTMENT",
+                message: "Username, currency, direction, positive amount, and reason are required."
+            });
+        }
+
+        const user = await User.findOne({ username }).select("username wallet");
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                code: "WALLET_USER_NOT_FOUND",
+                message: "User not found."
+            });
+        }
+
+        const adjustmentRef = `WADJ-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+        const result = await adjustWallet({
+            username,
+            currency,
+            direction,
+            amount,
+            reason,
+            adjustmentRef
+        }, {
+            performedBy: actor
+        });
+
+        await notificationService.createUserNotification({
+            username,
+            title: "Wallet Balance Adjusted",
+            message: `Your wallet balance was adjusted by ${direction === "credit" ? "+" : "-"}${amount.toLocaleString()} ${currency}.`,
+            type: "wallet",
+            category: "wallet",
+            metadata: {
+                amount,
+                currency,
+                direction,
+                adjustmentRef
+            },
+            source: "wallet_admin_adjustment"
+        });
+
+        await emitCommittedWalletUpdate(username, result, {
+            status: "adjustment"
+        });
+
+        return res.json({
+            success: true,
+            message: "Wallet adjustment committed",
+            adjustmentRef,
+            balance: result.balance,
+            transaction: result.transaction
+        });
+
+    } catch (error) {
+        console.log("Admin wallet adjustment error:", error);
+        return sendWalletError(res, error, "Wallet adjustment failed");
     }
 });
 
@@ -603,10 +749,7 @@ router.put("/admin/wallet/topups/:id/status", adminMiddleware, async (req, res) 
     } catch (error) {
         console.log("Admin wallet status update error:", error);
 
-        res.status(500).json({
-            success: false,
-            message: "Server error"
-        });
+        return sendWalletError(res, error, "Wallet topup update failed");
     }
 });
 
@@ -615,57 +758,38 @@ router.put("/admin/wallet/topups/:id/status", adminMiddleware, async (req, res) 
 // ======================
 
 async function completeWalletTopup(req, topup) {
+    const currencyKey = getCurrencyKey(topup.currency);
+
     if (["approved", "paid", "completed"].includes(topup.status)) {
         return {
             success: true,
-            message: "Already completed",
-            topup
+            message: "Wallet topup already credited",
+            topup,
+            balance: await getWalletBalance(topup.username, currencyKey),
+            duplicate: true
         };
     }
 
-    const currencyKey = getCurrencyKey(topup.currency);
-
-    const updatedUser = await User.findOneAndUpdate(
-        { username: topup.username },
-        {
-            $inc: {
-                [`wallet.${currencyKey}`]: Number(topup.amount || 0)
-            }
-        },
-        { new: true }
-    );
-
-    if (!updatedUser) {
-        return {
-            success: false,
-            message: "User not found"
-        };
-    }
+    const creditResult = await creditTopup(topup, {
+        performedBy: req.admin?.username || req.user?.username || "admin"
+    });
 
     topup.status = "approved";
     topup.note = "Wallet balance added by admin";
+    topup.paidAt = topup.paidAt || new Date();
     await topup.save();
 
-    await WalletTransaction.create({
-        transactionId: "TXN-" + Date.now(),
-        username: topup.username,
-        type: "topup",
-        amount: Number(topup.amount || 0),
-        currency: currencyKey,
-        status: "completed",
-        description: `Wallet topup via ${topup.paymentMethod}`
-    });
+    if (!creditResult.duplicate) {
+        await createWalletNotification(
+            req,
+            topup,
+            "Wallet Top-Up Successful",
+            `${Number(topup.amount || 0).toLocaleString()} ${currencyKey} has been added to your wallet.`,
+            "system"
+        );
+    }
 
-    await createWalletNotification(
-        req,
-        topup,
-        "Wallet Top-Up Successful",
-        `${Number(topup.amount || 0).toLocaleString()} ${currencyKey} has been added to your wallet.`,
-        "system"
-    );
-
-    await realtime.emitWalletUpdate(topup.username, {
-        amount: updatedUser.wallet?.[currencyKey] || 0,
+    await emitCommittedWalletUpdate(topup.username, creditResult, {
         currency: currencyKey,
         status: "approved",
         topupId: topup.topupId
@@ -683,14 +807,17 @@ async function completeWalletTopup(req, topup) {
         type: "wallet_topup_approved",
         username: topup.username,
         amount: topup.amount,
-        currency: currencyKey
+        currency: currencyKey,
+        duplicate: Boolean(creditResult.duplicate)
     });
 
     return {
         success: true,
-        message: "Wallet topup approved",
+        message: creditResult.duplicate ? "Wallet topup already credited" : "Wallet topup approved",
         topup,
-        balance: updatedUser.wallet?.[currencyKey] || 0
+        balance: creditResult.balance,
+        transaction: creditResult.transaction,
+        duplicate: Boolean(creditResult.duplicate)
     };
 }
 
@@ -724,99 +851,139 @@ router.post("/wallet/pay", authMiddleware, async (req, res) => {
             userId,
             zoneId,
             game,
+            gameKey,
+            productCode,
             packageName,
+            packageCode,
             amount,
             currency,
             region
         } = req.body;
         const username = req.user.username;
 
-        if (!amount || !game || !packageName) {
-            return res.json({
+        if (!userId) {
+            return res.status(400).json({
                 success: false,
                 message: "Missing wallet payment data"
             });
         }
 
-        const user = await User.findOne({ username });
-
-        if (!user) {
-            return res.json({
-                success: false,
-                message: "User not found"
-            });
-        }
-
-        const currencyKey = getCurrencyKey(currency || "MMK");
-        const currentBalance = user.wallet?.[currencyKey] || 0;
-
-        if (currentBalance < Number(amount)) {
-            return res.json({
-                success: false,
-                message: "Insufficient wallet balance"
-            });
-        }
-
-        user.wallet[currencyKey] = Number(currentBalance) - Number(amount);
-        user.markModified("wallet");
-        await user.save();
-
-        await WalletTransaction.create({
-            transactionId: "TXN-" + Date.now(),
-            username,
-            type: "payment",
-            amount: Number(amount),
-            currency: currencyKey,
-            status: "completed",
-            description: `Paid for ${game} - ${packageName}`
+        const catalogItem = resolveOrderCatalog({
+            productCode: productCode || gameKey,
+            gameKey,
+            game,
+            packageCode,
+            packageName,
+            amount,
+            currency,
+            region
         });
 
+        const currencyKey = catalogItem.currency;
+
+        const requestedOrderId = orderId || "AZL-" + Date.now();
+        const existingOrder = await Order.findOne({
+            orderId: requestedOrderId,
+            username
+        });
+
+        if (existingOrder) {
+            if (existingOrder.status === ORDER_STATES.PAID || existingOrder.paymentStatus === PAYMENT_STATES.PAID) {
+                const balance = await getWalletBalance(username, existingOrder.currency || currencyKey);
+
+                return res.json({
+                    success: true,
+                    message: "Wallet payment already completed",
+                    order: existingOrder,
+                    balance
+                });
+            }
+
+            return res.status(409).json({
+                success: false,
+                code: "DUPLICATE_ORDER_ID",
+                message: "Order already exists and is not payable by wallet"
+            });
+        }
+
         const order = await Order.create({
-            orderId: orderId || "AZL-" + Date.now(),
+            orderId: requestedOrderId,
             username,
             userId,
             zoneId: zoneId || "-",
-            game,
-            packageName,
-            selectedPackage: packageName,
-            amount: Number(amount),
+            game: catalogItem.productName,
+            productCode: catalogItem.productCode,
+            productName: catalogItem.productName,
+            packageName: catalogItem.packageName,
+            packageCode: catalogItem.packageCode,
+            selectedPackage: catalogItem.packageName,
+            amount: catalogItem.amount,
             currency: currencyKey,
-            region: region || "MM",
+            region: catalogItem.region,
             paymentMethod: "wallet",
-            status: "paid",
+            status: ORDER_STATES.PENDING_PAYMENT,
+            paymentStatus: PAYMENT_STATES.PENDING,
             paymentSlip: "",
-            note: "Paid with wallet"
+            note: "Paid with wallet",
+            timeline: [{
+                status: ORDER_STATES.PENDING_PAYMENT,
+                previousStatus: "",
+                paymentStatus: PAYMENT_STATES.PENDING,
+                source: "user",
+                actorType: "user",
+                actor: username,
+                reason: "Wallet order created",
+                idempotencyKey: `order:create:${requestedOrderId}`,
+                at: new Date()
+            }]
         });
 
-        await emitWalletUpdate(username, {
-            amount: user.wallet[currencyKey],
+        const walletResult = await payOrderWithWallet(order);
+
+        const paidTransition = await transitionOrder(order, ORDER_STATES.PAID, {
+            source: "wallet",
+            actorType: "user",
+            actor: username,
+            reason: "Paid with AZIEL Wallet",
+            paymentStatus: PAYMENT_STATES.PAID,
+            idempotencyKey: `wallet:payment:${requestedOrderId}`
+        });
+
+        await emitCommittedWalletUpdate(username, walletResult, {
             currency: currencyKey,
             status: "payment"
         });
 
         realtime.emitAdminWalletUpdate({
             type: "wallet_payment",
-            orderId: order.orderId,
+            orderId: paidTransition.order.orderId,
             username,
             status: "paid",
-            game,
-            packageName
+            game: catalogItem.productName,
+            packageName: catalogItem.packageName
         });
 
         res.json({
             success: true,
             message: "Paid with wallet",
-            order,
-            balance: user.wallet[currencyKey]
+            order: paidTransition.order,
+            balance: walletResult.balance,
+            transaction: walletResult.transaction,
+            duplicate: Boolean(walletResult.duplicate)
         });
 
     } catch (error) {
         console.log("Wallet pay error:", error);
 
-        res.json({
-            success: false,
-            message: "Server error"
-        });
+        if (error instanceof CatalogError) {
+            return res.status(error.statusCode).json({
+                success: false,
+                code: error.code,
+                message: error.message
+            });
+        }
+
+        return sendWalletError(res, error, "Wallet payment failed");
     }
 });
 

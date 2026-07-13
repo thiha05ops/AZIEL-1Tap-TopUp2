@@ -61,6 +61,16 @@ const supportTicketSchema =
                 default: ""
             },
 
+            screenshotEvidence: {
+                provider: { type: String, default: "" },
+                key: { type: String, default: "" },
+                url: { type: String, default: "" },
+                mimeType: { type: String, default: "" },
+                size: { type: Number, default: 0 },
+                originalName: { type: String, default: "" },
+                uploadedAt: { type: Date, default: null }
+            },
+
             status: {
                 type: String,
                 default: "open"

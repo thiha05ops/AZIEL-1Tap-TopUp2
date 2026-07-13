@@ -199,6 +199,7 @@
     color: var(--text);
 
     border: 1px solid var(--border);
+    font-size: 16px;
 }
 
 .form-card input::placeholder {
@@ -718,7 +719,7 @@
 @media (max-width: 900px) {
     .game-page {
         width: calc(100% - 24px);
-        padding-top: calc(var(--az-header-mobile-height, 112px) + env(safe-area-inset-top) + 18px);
+        padding-top: 18px;
     }
 
     .game-hero,

@@ -30,18 +30,6 @@ const searchItems = [
         desc: "MOBA Top Up",
         img: "assets/games/hok.webp",
         link: "hok.html"
-    },
-    {
-        name: "Genshin Impact",
-        desc: "Genesis Crystal",
-        img: "assets/games/genshin.webp",
-        link: "genshin.html"
-    },
-    {
-        name: "Roblox Robux",
-        desc: "Robux Top Up",
-        img: "assets/games/roblox.webp",
-        link: "roblox.html"
     }
 ];
 

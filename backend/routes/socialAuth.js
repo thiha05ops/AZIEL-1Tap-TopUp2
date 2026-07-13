@@ -1,11 +1,28 @@
 const express = require("express");
-const jwt = require("jsonwebtoken");
 const passport = require("../config/passport");
+const { issueUserSession } = require("../services/authSessionService");
 
 const router = express.Router();
 
+function googleConfigured(req, res, next) {
+    if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+        return next();
+    }
+
+    return res.redirect(`${getFrontendUrl()}/login.html`);
+}
+
+function getFrontendUrl() {
+    return (
+        process.env.FRONTEND_URL ||
+        process.env.CLIENT_URL ||
+        "http://127.0.0.1:5500/frontend"
+    ).replace(/\/$/, "");
+}
+
 router.get(
     "/auth/google",
+    googleConfigured,
     passport.authenticate("google", {
         scope: ["profile", "email"],
         prompt: "consent select_account",
@@ -15,35 +32,37 @@ router.get(
 
 router.get(
     "/auth/google/callback",
+    googleConfigured,
     passport.authenticate("google", {
-        failureRedirect: "/login.html",
+        failureRedirect: `${getFrontendUrl()}/login.html`,
         session: false
     }),
-    (req, res) => {
-        const token = jwt.sign(
-            {
-                id: req.user._id,
-                username: req.user.username,
+    async (req, res) => {
+        try {
+            if (!req.user) {
+                return res.redirect(`${getFrontendUrl()}/login.html`);
+            }
+
+            const issued = await issueUserSession(req.user, req, {
+                provider: "google",
+                eventType: "google.login",
+                eventTitle: "Google sign-in"
+            });
+
+            const params = new URLSearchParams({
+                token: issued.token,
+                username: req.user.username || "",
+                displayName: req.user.displayName || req.user.username || "",
+                email: req.user.email || "",
+                region: req.user.region || "MM",
                 role: req.user.role || "user"
-            },
-            process.env.JWT_SECRET,
-            { expiresIn: "15d" }
-        );
+            });
 
-        const frontendUrl =
-            process.env.FRONTEND_URL ||
-            "https://aziel-1tap-topup2.onrender.com";
-
-        const params = new URLSearchParams({
-            token,
-            username: req.user.username || "",
-            displayName: req.user.displayName || req.user.username || "",
-            email: req.user.email || "",
-            region: req.user.region || "MM",
-            role: req.user.role || "user"
-        });
-
-        res.redirect(`${frontendUrl}/google-success.html?${params.toString()}`);
+            return res.redirect(`${getFrontendUrl()}/google-success.html?${params.toString()}`);
+        } catch (error) {
+            console.log("Google callback error:", error?.message || error);
+            return res.redirect(`${getFrontendUrl()}/login.html`);
+        }
     }
 );
 

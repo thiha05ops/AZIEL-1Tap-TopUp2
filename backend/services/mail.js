@@ -2,9 +2,6 @@
 
 const nodemailer = require("nodemailer");
 
-console.log("EMAIL_USER:", process.env.EMAIL_USER);
-console.log("EMAIL_PASS exists:", !!process.env.EMAIL_PASS);
-
 const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {
@@ -13,13 +10,15 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-transporter.verify((error) => {
-    if (error) {
-        console.log("MAIL VERIFY ERROR:", error);
-    } else {
-        console.log("✅ Mail server ready");
-    }
-});
+if (process.env.NODE_ENV !== "test") {
+    transporter.verify((error) => {
+        if (error) {
+            console.log("MAIL VERIFY ERROR:", error);
+        } else {
+            console.log("✅ Mail service ready");
+        }
+    });
+}
 
 async function sendResetOTP(email, otp) {
     return transporter.sendMail({
