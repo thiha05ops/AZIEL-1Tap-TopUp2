@@ -5,6 +5,7 @@ const router = express.Router();
 const rateLimit = require("express-rate-limit");
 
 const Order = require("../models/Order");
+const PaymentMethod = require("../models/PaymentMethod");
 
 const upload = require("../middleware/orderUpload");
 const authMiddleware = require("../middleware/authMiddleware");
@@ -26,6 +27,7 @@ const {
 const { CatalogError, resolveOrderCatalog } = require("../services/catalogService");
 const { WalletError, creditRefund } = require("../services/walletService");
 const { getActivePendingOrderPolicy } = require("../services/pendingOrderPolicy");
+const { normalizePaymentKey } = require("../services/manualPaymentAttemptService");
 const {
     StorageError,
     cleanupAfterFailedPersistence,
@@ -46,6 +48,10 @@ const orderCreateLimiter = rateLimit({
 
 function getRefundAllowedStatus(status) {
     return ["failed", "cancelled"].includes(String(status || "").toLowerCase());
+}
+
+function isManualPaymentType(value) {
+    return ["manual", "deeplink"].includes(String(value || "").toLowerCase());
 }
 
 function getAuthenticatedUsername(req) {
@@ -655,6 +661,22 @@ router.post("/orders", authMiddleware, orderCreateLimiter, upload.single("paymen
             });
         }
 
+        const catalogItem = resolveOrderCatalog(req.body);
+        const methodKey = normalizePaymentKey(req.body.paymentMethod);
+        const configuredMethod = await PaymentMethod.findOne({
+            key: methodKey,
+            region: catalogItem.region,
+            enabled: true
+        });
+
+        if (configuredMethod && isManualPaymentType(configuredMethod.paymentType) && !req.file) {
+            return res.status(409).json({
+                success: false,
+                code: "USE_MANUAL_PAYMENT_ATTEMPT",
+                message: "Manual payment orders are created after payment slip submission."
+            });
+        }
+
         const pendingPolicy = await getActivePendingOrderPolicy(username);
 
         if (pendingPolicy.activePendingCount >= pendingPolicy.limit) {
@@ -676,8 +698,6 @@ router.post("/orders", authMiddleware, orderCreateLimiter, upload.single("paymen
                 message: "Order already exists"
             });
         }
-
-        const catalogItem = resolveOrderCatalog(req.body);
 
         if (req.file) {
             evidence = await uploadFile({

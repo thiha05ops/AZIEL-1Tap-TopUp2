@@ -369,7 +369,7 @@ function renderSecuritySessions() {
     box.innerHTML = securityState.sessions.map(session => `
         <div class="security-list-item">
             <div>
-                <strong>${escapeHTML(session.deviceName || "Unknown Device")}</strong>
+                <strong>${escapeHTML(session.deviceLabel || session.deviceName || "Unknown Device")}</strong>
                 ${session.isCurrentSession ? `<span class="security-current">Current device</span>` : ""}
                 <small>
                     ${escapeHTML([session.browser, session.platform].filter(Boolean).join(" • ") || "Browser session")}

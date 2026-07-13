@@ -1,6 +1,7 @@
 // backend/routes/payment.js
 
 const express = require("express");
+const mongoose = require("mongoose");
 const router = express.Router();
 const rateLimit = require("express-rate-limit");
 
@@ -10,6 +11,8 @@ const authMiddleware = require("../middleware/authMiddleware");
 const adminMiddleware = require("../middleware/adminMiddleware");
 
 const Order = require("../models/Order");
+const ManualPaymentAttempt = require("../models/ManualPaymentAttempt");
+const PaymentMethod = require("../models/PaymentMethod");
 const WalletTopup = require("../models/WalletTopup");
 
 const wavepayService = require("../services/wavepayService");
@@ -20,6 +23,15 @@ const { applyPaymentToOrder, mapOmiseChargeStatus } = require("../services/payme
 const { CatalogError, resolveOrderCatalog } = require("../services/catalogService");
 const { creditTopup, getWalletBalance } = require("../services/walletService");
 const { getActivePendingOrderPolicy } = require("../services/pendingOrderPolicy");
+const {
+    createAttemptId,
+    createManualReference,
+    getManualAttemptLimit,
+    getManualAttemptTtlMs,
+    isTransactionUnsupported,
+    normalizePaymentKey,
+    projectPaymentInstructions
+} = require("../services/manualPaymentAttemptService");
 const {
     OmisePaymentError,
     assertChargeMatchesRecord,
@@ -40,12 +52,107 @@ const activeOrderCreateLimiter = rateLimit({
     legacyHeaders: false
 });
 
+const manualAttemptLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    limit: Number(process.env.RATE_LIMIT_MANUAL_ATTEMPT || 20),
+    standardHeaders: true,
+    legacyHeaders: false
+});
+
 function devLog(...args) {
     if (!isProduction) console.log(...args);
 }
 
 function getCurrencyKey(currency) {
     return currency === "THB" ? "THB" : "MMK";
+}
+
+function isManualPaymentType(value) {
+    return ["manual", "deeplink"].includes(String(value || "").toLowerCase());
+}
+
+function manualAttemptOrderSnapshot(attempt) {
+    return {
+        orderId: attempt.reference,
+        manualPaymentAttemptId: attempt.attemptId,
+        game: attempt.productName,
+        productCode: attempt.productCode,
+        productName: attempt.productName,
+        packageName: attempt.packageName,
+        packageCode: attempt.packageCode,
+        amount: attempt.canonicalAmount,
+        currency: attempt.canonicalCurrency,
+        region: attempt.region,
+        paymentMethod: attempt.paymentMethod,
+        paymentType: attempt.paymentType,
+        provider: attempt.provider,
+        userId: attempt.gameUserData?.userId || "",
+        zoneId: attempt.gameUserData?.zoneId || "-"
+    };
+}
+
+function publicManualAttempt(attempt) {
+    const instructions = {
+        method: attempt.instructions?.method || "Payment",
+        key: attempt.instructions?.key || attempt.paymentMethod,
+        accountName: attempt.instructions?.accountName || "",
+        accountNumber: attempt.instructions?.accountNumber || "",
+        qrImage: attempt.instructions?.qrImage || "",
+        reference: attempt.reference
+    };
+
+    return {
+        attemptId: attempt.attemptId,
+        reference: attempt.reference,
+        expiresAt: attempt.expiresAt,
+        paymentType: attempt.paymentType,
+        provider: attempt.provider,
+        paymentName: instructions.method,
+        accountName: instructions.accountName,
+        accountNumber: instructions.accountNumber,
+        qrImage: instructions.qrImage,
+        qrUrl: instructions.qrImage,
+        amount: attempt.canonicalAmount,
+        currency: attempt.canonicalCurrency,
+        productName: attempt.productName,
+        packageName: attempt.packageName,
+        paymentMethod: attempt.paymentMethod,
+        instructions,
+        order: manualAttemptOrderSnapshot(attempt)
+    };
+}
+
+async function getEnabledManualPaymentMethod(paymentMethod, region) {
+    const methodKey = normalizePaymentKey(paymentMethod);
+    if (!methodKey) return null;
+
+    const method = await PaymentMethod.findOne({
+        key: methodKey,
+        region,
+        enabled: true
+    });
+
+    if (!method || !isManualPaymentType(method.paymentType)) return null;
+    return method;
+}
+
+async function createManualAttemptRecord(payload) {
+    let lastError = null;
+
+    for (let i = 0; i < 3; i++) {
+        try {
+            return await ManualPaymentAttempt.create({
+                ...payload,
+                attemptId: i === 0 && payload.attemptId ? payload.attemptId : createAttemptId(),
+                reference: i === 0 && payload.reference ? payload.reference : createManualReference()
+            });
+        } catch (error) {
+            lastError = error;
+            if (error?.code !== 11000) break;
+        }
+    }
+
+    throw lastError;
 }
 
 function createPromptPayCharge(amount, metadata = {}) {
@@ -223,6 +330,499 @@ async function markWalletTopupPaid(req, topupId, transactionId = "") {
     };
 }
 
+async function createOrderFromManualAttempt(attempt, evidence, username) {
+    const existing = await Order.findOne({
+        manualPaymentAttemptId: attempt.attemptId
+    });
+
+    if (existing) {
+        return {
+            order: existing,
+            duplicate: true
+        };
+    }
+
+    const now = new Date();
+    const orderPayload = {
+        orderId: attempt.reference,
+        username,
+        game: attempt.productName,
+        productCode: attempt.productCode,
+        productName: attempt.productName,
+        userId: attempt.gameUserData.userId,
+        zoneId: attempt.gameUserData.zoneId || "",
+        packageName: attempt.packageName,
+        packageCode: attempt.packageCode,
+        amount: attempt.canonicalAmount,
+        currency: attempt.canonicalCurrency,
+        region: attempt.region,
+        paymentMethod: attempt.paymentMethod,
+        status: ORDER_STATES.PENDING_PAYMENT,
+        paymentStatus: PAYMENT_STATES.PENDING,
+        paymentSlip: evidence.url,
+        paymentEvidence: evidence,
+        transactionId: "",
+        paymentProvider: attempt.provider || "manual",
+        manualPaymentAttemptId: attempt.attemptId,
+        note: "Payment slip uploaded. Waiting for admin verification.",
+        timeline: [{
+            status: ORDER_STATES.PENDING_PAYMENT,
+            previousStatus: "",
+            paymentStatus: PAYMENT_STATES.PENDING,
+            source: "user",
+            actorType: "user",
+            actor: username,
+            reason: "Manual payment slip submitted",
+            idempotencyKey: `manual:submit:${attempt.attemptId}`,
+            at: now
+        }]
+    };
+
+    const session = await mongoose.startSession();
+
+    try {
+        let createdOrder = null;
+        let duplicateOrder = false;
+
+        await session.withTransaction(async () => {
+            const activeAttempt = await ManualPaymentAttempt.findOne({
+                _id: attempt._id,
+                username,
+                status: "active",
+                consumedAt: null,
+                expiresAt: { $gt: new Date() }
+            }).session(session);
+
+            if (!activeAttempt) {
+                const existingOrder = await Order.findOne({
+                    manualPaymentAttemptId: attempt.attemptId
+                }).session(session);
+
+                if (existingOrder) {
+                    createdOrder = existingOrder;
+                    duplicateOrder = true;
+                    return;
+                }
+
+                const consumed = await ManualPaymentAttempt.findById(attempt._id).session(session);
+                const code = consumed?.status === "consumed"
+                    ? "MANUAL_PAYMENT_ATTEMPT_CONSUMED"
+                    : "MANUAL_PAYMENT_ATTEMPT_EXPIRED";
+                throw Object.assign(new Error(code), {
+                    code,
+                    statusCode: code === "MANUAL_PAYMENT_ATTEMPT_EXPIRED" ? 410 : 409
+                });
+            }
+
+            const [order] = await Order.create([orderPayload], { session });
+            createdOrder = order;
+
+            activeAttempt.status = "consumed";
+            activeAttempt.consumedAt = now;
+            activeAttempt.orderId = order.orderId;
+            activeAttempt.evidence = evidence;
+            await activeAttempt.save({ session });
+        });
+
+        return {
+            order: createdOrder,
+            duplicate: duplicateOrder
+        };
+    } catch (error) {
+        if (error?.code === 11000) {
+            const duplicate = await Order.findOne({
+                manualPaymentAttemptId: attempt.attemptId
+            });
+
+            if (duplicate) {
+                return {
+                    order: duplicate,
+                    duplicate: true
+                };
+            }
+        }
+
+        if (isTransactionUnsupported(error)) {
+            return createOrderFromManualAttemptWithoutTransaction(
+                attempt,
+                evidence,
+                username,
+                orderPayload
+            );
+        }
+
+        throw error;
+    } finally {
+        await session.endSession();
+    }
+}
+
+async function createOrderFromManualAttemptWithoutTransaction(attempt, evidence, username, orderPayload) {
+    const existing = await Order.findOne({
+        manualPaymentAttemptId: attempt.attemptId
+    });
+
+    if (existing) {
+        return {
+            order: existing,
+            duplicate: true
+        };
+    }
+
+    const activeAttempt = await ManualPaymentAttempt.findOne({
+        _id: attempt._id,
+        username,
+        status: "active",
+        consumedAt: null,
+        expiresAt: { $gt: new Date() }
+    });
+
+    if (!activeAttempt) {
+        throw Object.assign(new Error("MANUAL_PAYMENT_ATTEMPT_EXPIRED"), {
+            code: "MANUAL_PAYMENT_ATTEMPT_EXPIRED",
+            statusCode: 410
+        });
+    }
+
+    let createdOrder = null;
+
+    try {
+        createdOrder = await Order.create(orderPayload);
+
+        const update = await ManualPaymentAttempt.updateOne(
+            {
+                _id: attempt._id,
+                username,
+                status: "active",
+                consumedAt: null,
+                expiresAt: { $gt: new Date() }
+            },
+            {
+                $set: {
+                    status: "consumed",
+                    consumedAt: new Date(),
+                    orderId: createdOrder.orderId,
+                    evidence
+                }
+            }
+        );
+
+        if (update.modifiedCount === 1) {
+            return {
+                order: createdOrder,
+                duplicate: false
+            };
+        }
+
+        await Order.deleteOne({ _id: createdOrder._id });
+
+        const duplicate = await Order.findOne({
+            manualPaymentAttemptId: attempt.attemptId
+        });
+
+        if (duplicate) {
+            return {
+                order: duplicate,
+                duplicate: true
+            };
+        }
+
+        throw Object.assign(new Error("MANUAL_PAYMENT_ATTEMPT_CONSUMED"), {
+            code: "MANUAL_PAYMENT_ATTEMPT_CONSUMED",
+            statusCode: 409
+        });
+    } catch (error) {
+        if (error?.code === 11000) {
+            const duplicate = await Order.findOne({
+                manualPaymentAttemptId: attempt.attemptId
+            });
+
+            if (duplicate) {
+                return {
+                    order: duplicate,
+                    duplicate: true
+                };
+            }
+        }
+
+        if (createdOrder?._id) {
+            await Order.deleteOne({ _id: createdOrder._id });
+        }
+
+        throw error;
+    }
+}
+
+async function emitManualOrderSubmitted(req, order, duplicate = false) {
+    if (duplicate) return;
+
+    await notificationService.createUserNotification({
+        username: order.username,
+        title: "Payment Slip Submitted",
+        message: `${order.game} - ${order.packageName} payment slip has been submitted.`,
+        type: "order",
+        category: "orders",
+        orderId: order.orderId,
+        action: {
+            type: "navigate",
+            label: "View Order",
+            url: `/tracking.html?orderId=${encodeURIComponent(order.orderId)}`
+        },
+        metadata: {
+            orderId: order.orderId,
+            game: order.game,
+            amount: order.amount,
+            currency: order.currency
+        },
+        source: "manual_payment_submit"
+    });
+
+    await realtime.emitOrderUpdate(order.username, order);
+
+    realtime.emitAdminOrderUpdate({
+        type: "payment_slip_uploaded",
+        orderId: order.orderId,
+        username: order.username,
+        game: order.game,
+        amount: order.amount,
+        currency: order.currency,
+        status: order.status,
+        paymentStatus: order.paymentStatus
+    });
+}
+
+// MANUAL / DEEPLINK PAYMENT ATTEMPT
+// POST /api/payment/manual/attempt
+router.post("/payment/manual/attempt", authMiddleware, manualAttemptLimiter, async (req, res) => {
+    try {
+        const {
+            game,
+            gameKey,
+            productCode,
+            packageName,
+            packageCode,
+            region,
+            paymentMethod,
+            userId,
+            zoneId
+        } = req.body;
+        const username = req.user.username;
+
+        if (!paymentMethod || !userId) {
+            return res.status(400).json({
+                success: false,
+                code: "MANUAL_PAYMENT_ATTEMPT_INVALID",
+                message: "Missing manual payment data"
+            });
+        }
+
+        const catalogItem = resolveOrderCatalog({
+            productCode: productCode || gameKey,
+            gameKey,
+            game,
+            packageCode,
+            packageName,
+            region
+        });
+
+        const method = await getEnabledManualPaymentMethod(paymentMethod, catalogItem.region);
+
+        if (!method) {
+            return res.status(400).json({
+                success: false,
+                code: "MANUAL_PAYMENT_METHOD_UNAVAILABLE",
+                message: "This manual payment method is not available."
+            });
+        }
+
+        const activeCount = await ManualPaymentAttempt.countDocuments({
+            username,
+            status: "active",
+            expiresAt: { $gt: new Date() }
+        });
+        const attemptLimit = getManualAttemptLimit();
+
+        if (activeCount >= attemptLimit) {
+            return res.status(429).json({
+                success: false,
+                code: "MANUAL_PAYMENT_ATTEMPT_LIMIT",
+                message: "You have several active payment attempts. Please complete one or wait for an older attempt to expire.",
+                activeAttemptCount: activeCount,
+                limit: attemptLimit
+            });
+        }
+
+        const expiresAt = new Date(Date.now() + getManualAttemptTtlMs());
+        const attemptSeed = {
+            username,
+            productCode: catalogItem.productCode,
+            packageCode: catalogItem.packageCode,
+            region: catalogItem.region,
+            canonicalAmount: catalogItem.amount,
+            canonicalCurrency: catalogItem.currency,
+            productName: catalogItem.productName,
+            packageName: catalogItem.packageName,
+            paymentMethod: method.key,
+            paymentType: method.paymentType,
+            provider: method.provider || "manual",
+            gameUserData: {
+                userId: String(userId || "").trim(),
+                zoneId: String(zoneId || "").trim() || "-"
+            },
+            expiresAt
+        };
+        const reference = createManualReference();
+        const instructions = projectPaymentInstructions(method.toObject(), reference);
+        const attempt = await createManualAttemptRecord({
+            ...attemptSeed,
+            reference,
+            instructions: {
+                method: instructions.method,
+                key: instructions.key,
+                accountName: instructions.accountName,
+                accountNumber: instructions.accountNumber,
+                qrImage: instructions.qrImage
+            }
+        });
+
+        return res.json({
+            success: true,
+            ...publicManualAttempt(attempt)
+        });
+    } catch (error) {
+        console.log("Manual payment attempt error:", error);
+
+        if (error instanceof CatalogError) {
+            return res.status(error.statusCode).json({
+                success: false,
+                code: error.code,
+                message: error.message
+            });
+        }
+
+        return res.status(500).json({
+            success: false,
+            code: "MANUAL_PAYMENT_ATTEMPT_FAILED",
+            message: "Manual payment attempt failed"
+        });
+    }
+});
+
+// MANUAL / DEEPLINK PAYMENT SLIP SUBMIT
+// POST /api/payment/manual/attempt/:attemptId/slip
+router.post("/payment/manual/attempt/:attemptId/slip", authMiddleware, upload.single("slip"), async (req, res) => {
+    let evidence = null;
+    let orderCreated = false;
+
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                code: "MANUAL_PAYMENT_SLIP_REQUIRED",
+                message: "Please upload payment slip"
+            });
+        }
+
+        const attempt = await ManualPaymentAttempt.findOne({
+            attemptId: req.params.attemptId,
+            username: req.user.username
+        });
+
+        if (!attempt) {
+            return res.status(404).json({
+                success: false,
+                code: "MANUAL_PAYMENT_ATTEMPT_NOT_FOUND",
+                message: "Payment attempt not found"
+            });
+        }
+
+        if (attempt.status === "consumed") {
+            const existingOrder = await Order.findOne({
+                manualPaymentAttemptId: attempt.attemptId,
+                username: req.user.username
+            });
+
+            if (existingOrder) {
+                return res.json({
+                    success: true,
+                    code: "MANUAL_PAYMENT_ORDER_ALREADY_CREATED",
+                    duplicate: true,
+                    message: "Payment slip already submitted",
+                    order: existingOrder
+                });
+            }
+
+            return res.status(409).json({
+                success: false,
+                code: "MANUAL_PAYMENT_ATTEMPT_CONSUMED",
+                message: "Payment attempt has already been used"
+            });
+        }
+
+        if (attempt.status !== "active" || attempt.expiresAt <= new Date()) {
+            if (attempt.status === "active") {
+                attempt.status = "expired";
+                await attempt.save();
+            }
+
+            return res.status(410).json({
+                success: false,
+                code: "MANUAL_PAYMENT_ATTEMPT_EXPIRED",
+                message: "Payment attempt expired. Please start again."
+            });
+        }
+
+        evidence = await uploadFile({
+            file: req.file,
+            category: "paymentSlip",
+            ownerReference: attempt.reference
+        });
+
+        const result = await createOrderFromManualAttempt(attempt, evidence, req.user.username);
+        orderCreated = true;
+
+        await emitManualOrderSubmitted(req, result.order, result.duplicate);
+
+        return res.json({
+            success: true,
+            code: result.duplicate
+                ? "MANUAL_PAYMENT_ORDER_ALREADY_CREATED"
+                : "MANUAL_PAYMENT_SLIP_SUBMITTED",
+            duplicate: Boolean(result.duplicate),
+            message: "Payment slip submitted",
+            order: result.order
+        });
+    } catch (error) {
+        console.log("Manual payment slip error:", error?.code || error?.message || error);
+
+        if (evidence && !orderCreated) {
+            await cleanupAfterFailedPersistence(evidence);
+        }
+
+        if (error instanceof StorageError) {
+            logStorageError(error.code, {
+                provider: error.provider,
+                category: "paymentSlip",
+                attemptId: req.params.attemptId
+            });
+
+            return res.status(error.statusCode).json({
+                success: false,
+                code: error.code,
+                message: error.message
+            });
+        }
+
+        return res.status(error.statusCode || 500).json({
+            success: false,
+            code: error.code || "MANUAL_PAYMENT_ORDER_CREATE_FAILED",
+            message: error.code
+                ? "Manual payment submission failed"
+                : "Manual payment order creation failed"
+        });
+    }
+});
+
 // GAME PAYMENT CREATE
 router.post("/payment/create", authMiddleware, activeOrderCreateLimiter, async (req, res) => {
     try {
@@ -261,6 +861,21 @@ router.post("/payment/create", authMiddleware, activeOrderCreateLimiter, async (
             currency,
             region
         });
+
+        const methodKey = normalizePaymentKey(paymentMethod);
+        const configuredMethod = await PaymentMethod.findOne({
+            key: methodKey,
+            region: catalogItem.region,
+            enabled: true
+        });
+
+        if (configuredMethod && isManualPaymentType(configuredMethod.paymentType)) {
+            return res.status(409).json({
+                success: false,
+                code: "USE_MANUAL_PAYMENT_ATTEMPT",
+                message: "Manual payment orders are created after payment slip submission."
+            });
+        }
 
         const pendingPolicy = await getActivePendingOrderPolicy(username);
 
@@ -315,10 +930,6 @@ router.post("/payment/create", authMiddleware, activeOrderCreateLimiter, async (
                 at: new Date()
             }]
         });
-
-        const methodKey = String(paymentMethod || "")
-            .toLowerCase()
-            .replace(/\s+/g, "");
 
         if (catalogItem.region === "TH" && methodKey.includes("promptpay")) {
             const result = await createPromptPayCharge(catalogItem.amount, {

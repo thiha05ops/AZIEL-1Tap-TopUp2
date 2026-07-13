@@ -6,6 +6,7 @@ const User = require("../models/User");
 const Session = require("../models/Session");
 const SecurityEvent = require("../models/SecurityEvent");
 const authMiddleware = require("../middleware/authMiddleware");
+const { normalizePersistedDeviceInfo } = require("../services/deviceInfoService");
 const {
     createSecurityNotification,
     isEmailVerified,
@@ -63,11 +64,16 @@ function hasLocalPassword(user) {
 }
 
 function projectSession(session, currentSessionId = "") {
+    const device = normalizePersistedDeviceInfo(session);
+
     return {
         sessionId: session.sessionId,
-        deviceName: session.deviceName || "Unknown Device",
-        platform: session.platform || "",
-        browser: session.browser || "",
+        current: session.sessionId === currentSessionId,
+        deviceType: device.deviceType,
+        deviceLabel: device.deviceLabel,
+        deviceName: device.deviceName,
+        platform: device.platform,
+        browser: device.browser,
         createdAt: session.createdAt,
         lastSeenAt: session.lastSeenAt,
         expiresAt: session.expiresAt,

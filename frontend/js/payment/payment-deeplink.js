@@ -72,31 +72,18 @@
 
         const confirmBtn = document.getElementById("confirmPaymentOrderBtn");
         if (confirmBtn) {
-            confirmBtn.disabled = false;
-            confirmBtn.innerText = "Upload Payment Slip";
-            confirmBtn.onclick = () => {
-                const file = document.getElementById("manualPaymentSlip")?.files?.[0];
-
-                if (!file) {
-                    PaymentUtils.setMsg(
-                        document.getElementById("manualPaymentMsg"),
-                        "Please upload your payment slip first.",
-                        "error"
-                    );
-                    return;
-                }
-
-                PaymentUtils.submitSlip(
-                    orderData,
-                    file,
-                    document.getElementById("manualPaymentMsg"),
-                    confirmBtn
-                );
-            };
+            PaymentUtils.configureManualSlipButton(
+                orderData,
+                document.getElementById("manualPaymentMsg"),
+                confirmBtn
+            );
         }
 
         PaymentUtils.startCountdown(600);
         modal.classList.add("show");
+        requestAnimationFrame(() => {
+            PaymentUtils.setManualSlipButtonState(confirmBtn, "initial");
+        });
     }
 
     function copyCard(label, value, copyValue) {

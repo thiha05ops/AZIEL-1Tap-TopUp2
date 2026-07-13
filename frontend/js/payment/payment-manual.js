@@ -35,22 +35,18 @@
 
         const confirmBtn = document.getElementById("confirmPaymentOrderBtn");
         if (confirmBtn) {
-            confirmBtn.disabled = false;
-            confirmBtn.innerText = "Upload Payment Slip";
-            confirmBtn.onclick = () => {
-                const file = document.getElementById("manualPaymentSlip")?.files?.[0];
-
-                PaymentUtils.submitSlip(
-                    orderData,
-                    file,
-                    document.getElementById("manualPaymentMsg"),
-                    confirmBtn
-                );
-            };
+            PaymentUtils.configureManualSlipButton(
+                orderData,
+                document.getElementById("manualPaymentMsg"),
+                confirmBtn
+            );
         }
 
         PaymentUtils.startCountdown(600);
         modal.classList.add("show");
+        requestAnimationFrame(() => {
+            PaymentUtils.setManualSlipButtonState(confirmBtn, "initial");
+        });
     }
 
     function slipUploaderHTML() {

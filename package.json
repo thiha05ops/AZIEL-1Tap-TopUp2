@@ -8,6 +8,8 @@
     "audit:duplicate-emails": "node backend/scripts/audit-duplicate-emails.js",
     "repair:duplicate-email": "node backend/scripts/repair-duplicate-email.js",
     "verify:catalog": "node backend/scripts/verify-catalog.js",
+    "verify:device-detection": "node backend/scripts/verify-device-detection.js",
+    "verify:manual-payment": "node backend/scripts/verify-manual-payment-flow.js",
     "verify:omise-webhook": "node backend/scripts/verify-omise-webhook.js",
     "verify:production-readiness": "node backend/scripts/verify-production-readiness.js",
     "verify:registration-otp": "node backend/scripts/verify-registration-otp.js",

@@ -59,6 +59,27 @@
         return data;
     }
 
+    async function createManualAttempt(orderData) {
+        const res = await fetch(PaymentUtils.apiUrl("/api/payment/manual/attempt"), {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                ...PaymentUtils.authHeaders()
+            },
+            body: JSON.stringify(orderData)
+        });
+
+        const data = await res.json();
+
+        console.log("MANUAL PAYMENT ATTEMPT DATA:", data);
+
+        if (!res.ok || !data.success) {
+            throw createPaymentError(data);
+        }
+
+        return data;
+    }
+
     async function start(orderData) {
         const selectedPayment = window.selectedPaymentData || {};
         const type =
@@ -71,6 +92,29 @@
         try {
             if (type === "wallet" || selectedPayment.key === "wallet") {
                 await PaymentWallet.pay(orderData);
+                return;
+            }
+
+            if (type === "manual" || type === "deeplink") {
+                const attemptSession = await createManualAttempt(orderData);
+                const attemptOrder = attemptSession.order || {
+                    ...orderData,
+                    orderId: attemptSession.reference,
+                    manualPaymentAttemptId: attemptSession.attemptId,
+                    amount: attemptSession.amount,
+                    currency: attemptSession.currency,
+                    packageName: attemptSession.packageName,
+                    game: attemptSession.productName
+                };
+
+                PaymentUtils.hideLoading();
+
+                if (type === "deeplink") {
+                    PaymentDeepLink.show(attemptOrder, attemptSession);
+                    return;
+                }
+
+                PaymentManual.show(attemptOrder, attemptSession);
                 return;
             }
 
@@ -100,7 +144,8 @@
 
     window.AZIEL_PAYMENT = {
         start,
-        createPaymentSession
+        createPaymentSession,
+        createManualAttempt
     };
 
 })();

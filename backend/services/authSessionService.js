@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const Session = require("../models/Session");
 const SecurityEvent = require("../models/SecurityEvent");
+const { parseDeviceInfoFromRequest } = require("./deviceInfoService");
 
 const JWT_SECRET = process.env.JWT_SECRET || "aziel_jwt_secret";
 const JWT_EXPIRES_IN = "15d";
@@ -19,40 +20,8 @@ function getRequestIp(req) {
 }
 
 function getDeviceMetadata(req) {
-    const userAgent = String(req?.headers?.["user-agent"] || "");
-    const lower = userAgent.toLowerCase();
-
-    const platform = /iphone|ipad|ios/.test(lower)
-        ? "iOS"
-        : /android/.test(lower)
-            ? "Android"
-            : /windows/.test(lower)
-                ? "Windows"
-                : /mac os|macintosh/.test(lower)
-                    ? "macOS"
-                    : /linux/.test(lower)
-                        ? "Linux"
-                        : "";
-
-    const browser = /edg\//.test(lower)
-        ? "Edge"
-        : /chrome|crios/.test(lower)
-            ? "Chrome"
-            : /safari/.test(lower)
-                ? "Safari"
-                : /firefox/.test(lower)
-                    ? "Firefox"
-                    : "";
-
-    const deviceName = /mobile|iphone|android/.test(lower)
-        ? "Mobile Device"
-        : "Desktop Device";
-
     return {
-        userAgent,
-        deviceName,
-        platform,
-        browser,
+        ...parseDeviceInfoFromRequest(req),
         ipAddress: getRequestIp(req)
     };
 }
@@ -162,7 +131,9 @@ async function createSessionForUser(user, req, options = {}) {
     user.lastActiveAt = now;
     user.lastLoginDevice = {
         deviceName: metadata.deviceName,
-        browser: metadata.userAgent,
+        deviceType: metadata.deviceType,
+        browser: metadata.browser,
+        platform: metadata.platform,
         ip: metadata.ipAddress,
         loginAt: now
     };
@@ -177,7 +148,10 @@ async function createSessionForUser(user, req, options = {}) {
         userAgent: metadata.userAgent,
         deviceName: metadata.deviceName,
         metadata: {
-            provider: options.provider || user.authProvider || "local"
+            provider: options.provider || user.authProvider || "local",
+            deviceType: metadata.deviceType,
+            browser: metadata.browser,
+            platform: metadata.platform
         }
     });
 
@@ -186,7 +160,9 @@ async function createSessionForUser(user, req, options = {}) {
         message: `${metadata.deviceName}${metadata.platform ? ` on ${metadata.platform}` : ""}`,
         metadata: {
             sessionId: session.sessionId,
+            deviceType: metadata.deviceType,
             deviceName: metadata.deviceName,
+            browser: metadata.browser,
             platform: metadata.platform
         }
     });

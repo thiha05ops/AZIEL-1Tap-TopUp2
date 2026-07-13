@@ -221,7 +221,15 @@ const userSchema = new mongoose.Schema(
                 type: String,
                 default: ""
             },
+            deviceType: {
+                type: String,
+                default: ""
+            },
             browser: {
+                type: String,
+                default: ""
+            },
+            platform: {
                 type: String,
                 default: ""
             },

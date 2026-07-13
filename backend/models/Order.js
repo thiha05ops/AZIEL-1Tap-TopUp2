@@ -110,6 +110,11 @@ const orderSchema = new mongoose.Schema({
         default: []
     },
 
+    manualPaymentAttemptId: {
+        type: String,
+        default: ""
+    },
+
     timeline: [
         {
             status: {
@@ -228,5 +233,15 @@ const orderSchema = new mongoose.Schema({
 }, {
     timestamps: true
 });
+
+orderSchema.index(
+    { manualPaymentAttemptId: 1 },
+    {
+        unique: true,
+        partialFilterExpression: {
+            manualPaymentAttemptId: { $type: "string", $gt: "" }
+        }
+    }
+);
 
 module.exports = mongoose.model("Order", orderSchema);

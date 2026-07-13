@@ -25,6 +25,17 @@ const sessionSchema = new mongoose.Schema(
             default: "Unknown Device"
         },
 
+        deviceType: {
+            type: String,
+            enum: ["mobile", "tablet", "desktop", "unknown", ""],
+            default: "unknown"
+        },
+
+        deviceLabel: {
+            type: String,
+            default: "Unknown Device"
+        },
+
         platform: {
             type: String,
             default: ""

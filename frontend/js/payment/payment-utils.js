@@ -267,24 +267,28 @@
     async function submitSlip(orderData, file, msgEl, btnEl) {
         if (!file) {
             setMsg(msgEl, "Please upload payment slip.", "error");
+            setManualSlipButtonState(btnEl, "initial");
             return false;
         }
 
         if (btnEl) {
-            if (window.AZIEL_UI?.button) {
-                window.AZIEL_UI.button.setLoading(btnEl, { text: "Uploading Slip..." });
-            } else {
-                btnEl.disabled = true;
-                btnEl.innerText = "Uploading Slip...";
-            }
+            setManualSlipButtonState(btnEl, "uploading");
         }
 
         const fd = new FormData();
-        fd.append("orderId", orderData.orderId);
         fd.append("slip", file);
 
+        const isManualAttempt = Boolean(orderData.manualPaymentAttemptId);
+        const endpoint = isManualAttempt
+            ? `/api/payment/manual/attempt/${encodeURIComponent(orderData.manualPaymentAttemptId)}/slip`
+            : "/api/payment/submit";
+
+        if (!isManualAttempt) {
+            fd.append("orderId", orderData.orderId);
+        }
+
         try {
-            const res = await fetch(apiUrl("/api/payment/submit"), {
+            const res = await fetch(apiUrl(endpoint), {
                 method: "POST",
                 headers: authHeaders(),
                 body: fd
@@ -296,20 +300,21 @@
                 setMsg(msgEl, data.message || "Slip submit failed.", "error");
 
                 if (btnEl) {
-                    if (window.AZIEL_UI?.button) {
-                        window.AZIEL_UI.button.reset(btnEl);
-                    } else {
-                        btnEl.disabled = false;
-                        btnEl.innerText = "Upload Payment Slip";
-                    }
+                    setManualSlipButtonState(btnEl, file ? "selected" : "initial");
                 }
 
                 return false;
             }
 
             stopCountdown();
+            setManualSlipButtonState(btnEl, "success");
+            setMsg(
+                msgEl,
+                "Waiting for Verification. Your payment slip has been submitted. We'll notify you after verification.",
+                "success"
+            );
             showSuccess(
-                orderData.orderId,
+                data.order?.orderId || orderData.orderId,
                 "Slip Submitted",
                 "Waiting for Verification. Your payment slip has been submitted. We'll notify you after verification."
             );
@@ -320,16 +325,68 @@
             setMsg(msgEl, "Server error", "error");
 
             if (btnEl) {
-                if (window.AZIEL_UI?.button) {
-                    window.AZIEL_UI.button.reset(btnEl);
-                } else {
-                    btnEl.disabled = false;
-                    btnEl.innerText = "Upload Payment Slip";
-                }
+                setManualSlipButtonState(btnEl, file ? "selected" : "initial");
             }
 
             return false;
         }
+    }
+
+    function claimManualSlipButton(btn) {
+        if (!btn) return;
+        btn.removeAttribute("data-i18n");
+        btn.setAttribute("data-i18n-skip", "true");
+        btn.dataset.paymentButtonMode = "manual-slip";
+    }
+
+    function setManualSlipButtonState(btn, state = "initial") {
+        if (!btn) return;
+
+        claimManualSlipButton(btn);
+
+        const states = {
+            initial: {
+                text: "Upload Payment Slip",
+                disabled: false
+            },
+            selected: {
+                text: "Submit Payment Slip",
+                disabled: false
+            },
+            uploading: {
+                text: "Uploading Slip...",
+                disabled: true
+            },
+            success: {
+                text: "Slip Submitted",
+                disabled: true
+            }
+        };
+        const next = states[state] || states.initial;
+
+        btn.disabled = next.disabled;
+        btn.innerText = next.text;
+        btn.dataset.manualSlipState = state;
+    }
+
+    function configureManualSlipButton(orderData, msgEl, btnEl) {
+        if (!btnEl) return;
+
+        const input = document.getElementById("manualPaymentSlip");
+        setManualSlipButtonState(btnEl, input?.files?.[0] ? "selected" : "initial");
+
+        btnEl.onclick = () => {
+            const file = document.getElementById("manualPaymentSlip")?.files?.[0];
+
+            if (!file) {
+                document.getElementById("manualPaymentSlip")?.click();
+                setMsg(msgEl, "Please upload your payment slip first.", "error");
+                setManualSlipButtonState(btnEl, "initial");
+                return;
+            }
+
+            submitSlip(orderData, file, msgEl, btnEl);
+        };
     }
 
     function bindSlipPreview() {
@@ -337,9 +394,11 @@
         const previewBox = document.getElementById("manualSlipPreviewBox");
         const previewImg = document.getElementById("manualSlipPreviewImage");
         const removeBtn = document.getElementById("removeManualSlipBtn");
+        const confirmBtn = document.getElementById("confirmPaymentOrderBtn");
 
         input?.addEventListener("change", () => {
             const file = input.files?.[0];
+            setManualSlipButtonState(confirmBtn, file ? "selected" : "initial");
             if (!file) return;
 
             const reader = new FileReader();
@@ -356,6 +415,7 @@
             if (input) input.value = "";
             if (previewImg) previewImg.src = "";
             if (previewBox) previewBox.style.display = "none";
+            setManualSlipButtonState(confirmBtn, "initial");
         });
     }
 
@@ -391,6 +451,9 @@
         submitSlip,
         authHeaders,
         bindSlipPreview,
+        claimManualSlipButton,
+        configureManualSlipButton,
+        setManualSlipButtonState,
         setMsg
     };
 })();
