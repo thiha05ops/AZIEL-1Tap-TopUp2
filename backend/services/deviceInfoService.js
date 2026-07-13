@@ -1,8 +1,19 @@
 const DEVICE_LABELS = Object.freeze({
-    mobile: "Mobile Device",
-    tablet: "Tablet Device",
-    desktop: "Desktop Device",
+    windows: "Windows Device",
+    macos: "macOS Device",
+    ios: "iOS Device",
+    android: "Android Device",
+    linux: "Linux Device",
     unknown: "Unknown Device"
+});
+
+const PLATFORM_DISPLAY = Object.freeze({
+    windows: "Windows",
+    macos: "macOS",
+    ios: "iOS",
+    android: "Android",
+    linux: "Linux",
+    unknown: "Other"
 });
 
 function headerValue(headers = {}, key) {
@@ -27,40 +38,27 @@ function getClientContext(input = {}) {
     const context = input.clientContext && typeof input.clientContext === "object"
         ? input.clientContext
         : {};
+    const userAgentData = context.userAgentData && typeof context.userAgentData === "object"
+        ? context.userAgentData
+        : {};
 
     return {
         platform: normalizePlatformValue(context.platform),
         userAgent: String(context.userAgent || ""),
-        maxTouchPoints: Number(context.maxTouchPoints || 0)
+        userAgentData: {
+            mobile: Boolean(userAgentData.mobile),
+            platform: normalizePlatformValue(userAgentData.platform),
+            brands: Array.isArray(userAgentData.brands) ? userAgentData.brands : []
+        }
     };
 }
 
-function hasAppleMobileClientEvidence(input = {}) {
+function getAppleFamilyFromClientContext(input = {}) {
     const context = getClientContext(input);
-    const combined = `${context.platform} ${context.userAgent}`;
+    const combined = `${context.platform} ${context.userAgent} ${context.userAgentData.platform}`;
 
-    if (/iphone|ipod/i.test(combined)) {
-        return {
-            platform: "iOS",
-            deviceType: "mobile"
-        };
-    }
-
-    if (/ipad/i.test(combined)) {
-        return {
-            platform: "iPadOS",
-            deviceType: "tablet"
-        };
-    }
-
-    if (
-        /^macintel$/i.test(context.platform) &&
-        context.maxTouchPoints > 1
-    ) {
-        return {
-            platform: "iPadOS",
-            deviceType: "tablet"
-        };
+    if (/iphone|ipod|ipad|\bios\b/i.test(combined)) {
+        return "ios";
     }
 
     return null;
@@ -82,64 +80,54 @@ function parseBrowser(userAgent = "") {
     return "Other";
 }
 
-function parsePlatform(userAgent = "", headers = {}, input = {}) {
+function parsePlatformFamily(userAgent = "", headers = {}, input = {}) {
     const ua = String(userAgent || "");
     const chPlatform = normalizeClientHint(headerValue(headers, "sec-ch-ua-platform"));
-    const chMobile = normalizeClientHint(headerValue(headers, "sec-ch-ua-mobile"));
-    const appleClientEvidence = hasAppleMobileClientEvidence(input);
+    const context = getClientContext(input);
+    const appleFamily = getAppleFamilyFromClientContext(input);
+    const clientPlatform = context.userAgentData.platform || context.platform;
 
-    if (/iphone|ipod/i.test(ua)) return "iOS";
-    if (/ipad/i.test(ua)) return "iPadOS";
-    if (/android/i.test(ua)) return "Android";
-    if (appleClientEvidence?.platform) return appleClientEvidence.platform;
-    if (/windows/i.test(ua) || /^windows$/i.test(chPlatform)) return "Windows";
-    if (/linux/i.test(ua) && !/android/i.test(ua)) return "Linux";
+    if (/iphone|ipod|ipad/i.test(ua)) return "ios";
+    if (/android/i.test(ua)) return "android";
+    if (appleFamily) return appleFamily;
+    if (/windows/i.test(ua) || /^windows$/i.test(chPlatform) || /^windows$/i.test(clientPlatform)) return "windows";
+    if (/linux/i.test(ua) && !/android/i.test(ua)) return "linux";
 
-    if (/^android$/i.test(chPlatform)) return "Android";
-    if (/^ios$/i.test(chPlatform)) return chMobile === "?1" ? "iOS" : "iPadOS";
-    if (/^macos$/i.test(chPlatform)) return "macOS";
-    if (/^linux$/i.test(chPlatform)) return "Linux";
+    if (/^android$/i.test(chPlatform) || /^android$/i.test(clientPlatform)) return "android";
+    if (/^ios$/i.test(chPlatform) || /^ios$/i.test(clientPlatform)) return "ios";
+    if (/^macos$/i.test(chPlatform) || /^macos$/i.test(clientPlatform)) return "macos";
+    if (/^linux$/i.test(chPlatform) || /^linux$/i.test(clientPlatform)) return "linux";
 
     if (/macintosh|mac os x|mac_powerpc/i.test(ua)) {
-        return "macOS";
-    }
-
-    return "Other";
-}
-
-function parseDeviceType(userAgent = "", headers = {}, platform = "", input = {}) {
-    const ua = String(userAgent || "");
-    const chMobile = normalizeClientHint(headerValue(headers, "sec-ch-ua-mobile"));
-    const appleClientEvidence = hasAppleMobileClientEvidence(input);
-
-    if (/ipad/i.test(ua)) return "tablet";
-    if (/iphone|ipod/i.test(ua)) return "mobile";
-    if (/android/i.test(ua)) {
-        return /mobile/i.test(ua) ? "mobile" : "tablet";
-    }
-
-    if (chMobile === "?1") return "mobile";
-    if (appleClientEvidence?.deviceType) return appleClientEvidence.deviceType;
-
-    if (platform === "Windows" || platform === "macOS" || platform === "Linux") {
-        return "desktop";
+        return "macos";
     }
 
     return "unknown";
+}
+
+function parsePlatform(userAgent = "", headers = {}, input = {}) {
+    return PLATFORM_DISPLAY[parsePlatformFamily(userAgent, headers, input)] || PLATFORM_DISPLAY.unknown;
+}
+
+function parseDeviceType(userAgent = "", headers = {}, platform = "", input = {}) {
+    const family = parsePlatformFamily(userAgent, headers, input);
+    return DEVICE_LABELS[family] ? family : "unknown";
 }
 
 function parseDeviceInfo(input = {}) {
     const userAgent = String(input.userAgent || "");
     const headers = input.headers || {};
     const browser = parseBrowser(userAgent);
-    const platform = parsePlatform(userAgent, headers, input);
-    const deviceType = parseDeviceType(userAgent, headers, platform, input);
+    const platformFamily = parsePlatformFamily(userAgent, headers, input);
+    const platform = PLATFORM_DISPLAY[platformFamily] || PLATFORM_DISPLAY.unknown;
+    const deviceType = DEVICE_LABELS[platformFamily] ? platformFamily : "unknown";
+    const deviceLabel = DEVICE_LABELS[deviceType] || DEVICE_LABELS.unknown;
 
     return {
         userAgent,
         deviceType,
-        deviceLabel: DEVICE_LABELS[deviceType] || DEVICE_LABELS.unknown,
-        deviceName: DEVICE_LABELS[deviceType] || DEVICE_LABELS.unknown,
+        deviceLabel,
+        deviceName: deviceLabel,
         browser,
         platform
     };
@@ -154,34 +142,47 @@ function parseDeviceInfoFromRequest(req) {
 }
 
 function normalizePersistedDeviceInfo(session = {}) {
-    const deviceType = ["mobile", "tablet", "desktop", "unknown"].includes(session.deviceType)
-        ? session.deviceType
-        : inferLegacyDeviceType(session.deviceName);
+    const platformFamily = normalizePlatformFamily(session.platform) ||
+        normalizeDeviceTypeFamily(session.deviceType);
+    const deviceType = platformFamily || "unknown";
+    const deviceLabel = DEVICE_LABELS[deviceType] || DEVICE_LABELS.unknown;
+    const platform = PLATFORM_DISPLAY[deviceType] || PLATFORM_DISPLAY.unknown;
 
     return {
         deviceType,
-        deviceLabel: session.deviceLabel || session.deviceName || DEVICE_LABELS[deviceType] || DEVICE_LABELS.unknown,
-        deviceName: session.deviceName || session.deviceLabel || DEVICE_LABELS[deviceType] || DEVICE_LABELS.unknown,
-        browser: session.browser || "",
-        platform: session.platform || ""
+        deviceLabel,
+        deviceName: deviceLabel,
+        browser: session.browser || "Other",
+        platform
     };
 }
 
-function inferLegacyDeviceType(deviceName = "") {
-    const value = String(deviceName || "").toLowerCase();
-    if (value.includes("mobile")) return "mobile";
-    if (value.includes("tablet")) return "tablet";
-    if (value.includes("desktop")) return "desktop";
-    return "unknown";
+function normalizePlatformFamily(value = "") {
+    const normalized = String(value || "").trim().toLowerCase();
+
+    if (normalized === "windows") return "windows";
+    if (normalized === "macos" || normalized === "mac os" || normalized === "mac") return "macos";
+    if (normalized === "ios" || normalized === "ipados") return "ios";
+    if (normalized === "android") return "android";
+    if (normalized === "linux") return "linux";
+
+    return "";
+}
+
+function normalizeDeviceTypeFamily(value = "") {
+    const normalized = String(value || "").trim().toLowerCase();
+    return DEVICE_LABELS[normalized] ? normalized : "";
 }
 
 module.exports = {
     DEVICE_LABELS,
+    PLATFORM_DISPLAY,
     parseBrowser,
     parseDeviceInfo,
     parseDeviceInfoFromRequest,
     parseDeviceType,
+    parsePlatformFamily,
     parsePlatform,
-    hasAppleMobileClientEvidence,
+    getAppleFamilyFromClientContext,
     normalizePersistedDeviceInfo
 };

@@ -229,10 +229,23 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function getLoginDeviceContext() {
+        const userAgentData = navigator.userAgentData;
+
         return {
             userAgent: navigator.userAgent || "",
             platform: navigator.platform || "",
-            maxTouchPoints: Number(navigator.maxTouchPoints || 0)
+            userAgentData: userAgentData
+                ? {
+                    mobile: Boolean(userAgentData.mobile),
+                    platform: userAgentData.platform || "",
+                    brands: Array.isArray(userAgentData.brands)
+                        ? userAgentData.brands.map((brand) => ({
+                            brand: brand.brand || "",
+                            version: brand.version || ""
+                        }))
+                        : []
+                }
+                : null
         };
     }
 

@@ -30,10 +30,22 @@ function getHeader(req, key) {
     return Array.isArray(value) ? value.join(", ") : String(value || "");
 }
 
+function sanitizeUserAgentBrands(brands) {
+    if (!Array.isArray(brands)) return [];
+
+    return brands.slice(0, 6).map((brand) => ({
+        brand: sanitizeHeader(brand?.brand),
+        version: sanitizeHeader(brand?.version)
+    }));
+}
+
 function logDeviceInfoDebug(req, metadata) {
     if (process.env.DEVICE_INFO_DEBUG !== "true") return;
 
     const context = req?.body?.deviceContext || {};
+    const userAgentData = context.userAgentData && typeof context.userAgentData === "object"
+        ? context.userAgentData
+        : {};
 
     console.log("DEVICE_INFO_DEBUG", {
         userAgentPresent: Boolean(getHeader(req, "user-agent")),
@@ -45,7 +57,11 @@ function logDeviceInfoDebug(req, metadata) {
             platform: sanitizeHeader(context.platform),
             userAgentPresent: Boolean(context.userAgent),
             userAgent: sanitizeHeader(context.userAgent),
-            maxTouchPoints: Number(context.maxTouchPoints || 0)
+            userAgentData: {
+                mobile: Boolean(userAgentData.mobile),
+                platform: sanitizeHeader(userAgentData.platform),
+                brands: sanitizeUserAgentBrands(userAgentData.brands)
+            }
         },
         parserResult: {
             deviceType: metadata.deviceType,
