@@ -36,7 +36,7 @@
         const confirmBtn = document.getElementById("confirmPaymentOrderBtn");
         if (confirmBtn) {
             confirmBtn.disabled = false;
-            confirmBtn.innerText = "Submit Payment Slip";
+            confirmBtn.innerText = "Upload Payment Slip";
             confirmBtn.onclick = () => {
                 const file = document.getElementById("manualPaymentSlip")?.files?.[0];
 

@@ -272,10 +272,10 @@
 
         if (btnEl) {
             if (window.AZIEL_UI?.button) {
-                window.AZIEL_UI.button.setLoading(btnEl, { text: "Submitting..." });
+                window.AZIEL_UI.button.setLoading(btnEl, { text: "Uploading Slip..." });
             } else {
                 btnEl.disabled = true;
-                btnEl.innerText = "Submitting...";
+                btnEl.innerText = "Uploading Slip...";
             }
         }
 
@@ -300,7 +300,7 @@
                         window.AZIEL_UI.button.reset(btnEl);
                     } else {
                         btnEl.disabled = false;
-                        btnEl.innerText = "Submit Payment Slip";
+                        btnEl.innerText = "Upload Payment Slip";
                     }
                 }
 
@@ -308,7 +308,11 @@
             }
 
             stopCountdown();
-            showSuccess(orderData.orderId);
+            showSuccess(
+                orderData.orderId,
+                "Slip Submitted",
+                "Waiting for Verification. Your payment slip has been submitted. We'll notify you after verification."
+            );
             return true;
 
         } catch (error) {
@@ -320,7 +324,7 @@
                     window.AZIEL_UI.button.reset(btnEl);
                 } else {
                     btnEl.disabled = false;
-                    btnEl.innerText = "Submit Payment Slip";
+                    btnEl.innerText = "Upload Payment Slip";
                 }
             }
 

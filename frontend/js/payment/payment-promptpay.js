@@ -30,7 +30,7 @@
         const confirmBtn = document.getElementById("confirmPaymentOrderBtn");
         if (confirmBtn) {
             confirmBtn.disabled = true;
-            confirmBtn.innerText = "Waiting Payment...";
+            confirmBtn.innerText = "Waiting for Payment";
         }
 
         PaymentUtils.startCountdown(600);

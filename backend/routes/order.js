@@ -25,6 +25,7 @@ const {
 } = require("../services/orderStateService");
 const { CatalogError, resolveOrderCatalog } = require("../services/catalogService");
 const { WalletError, creditRefund } = require("../services/walletService");
+const { getActivePendingOrderPolicy } = require("../services/pendingOrderPolicy");
 const {
     StorageError,
     cleanupAfterFailedPersistence,
@@ -654,17 +655,16 @@ router.post("/orders", authMiddleware, orderCreateLimiter, upload.single("paymen
             });
         }
 
-        const pendingCount = await Order.countDocuments({
-            username,
-            status: "pending_payment",
-            createdAt: { $gte: new Date(Date.now() - 30 * 60 * 1000) }
-        });
+        const pendingPolicy = await getActivePendingOrderPolicy(username);
 
-        if (pendingCount >= Number(process.env.MAX_PENDING_ORDERS_PER_USER || 5)) {
+        if (pendingPolicy.activePendingCount >= pendingPolicy.limit) {
             return res.status(429).json({
                 success: false,
                 code: "TOO_MANY_PENDING_ORDERS",
-                message: "You have too many pending orders. Please complete or wait before creating another."
+                title: "You have several unfinished orders.",
+                message: "Complete or wait for an older order to expire before creating another.",
+                activePendingCount: pendingPolicy.activePendingCount,
+                limit: pendingPolicy.limit
             });
         }
 

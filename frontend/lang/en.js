@@ -157,7 +157,7 @@ window.AZIEL_LANG.en = {
     scanPay: "Scan & Pay",
     orderId: "Order ID",
     amount: "Amount",
-    waitingPayment: "Waiting Payment...",
+    waitingPayment: "Waiting for Payment",
     paymentExpiresIn: "Payment expires in",
 
     pleaseWait: "Please wait a few seconds...",
@@ -458,7 +458,7 @@ window.AZIEL_LANG.en = {
     walletHistoryEmptyText: "Your wallet transactions will appear here.",
 
     topupId: "Topup ID",
-    waitingPayment: "Waiting Payment...",
+    waitingPayment: "Waiting for Payment",
     creatingQrPayment: "Creating QR Payment...",
     pleaseWaitSeconds: "Please wait a few seconds.",
     walletUpdated: "Wallet Updated",
