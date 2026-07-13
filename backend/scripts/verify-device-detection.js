@@ -8,6 +8,7 @@ const {
     parseDeviceInfoFromRequest,
     normalizePersistedDeviceInfo
 } = require("../services/deviceInfoService");
+const { getDeviceMetadata } = require("../services/authSessionService");
 
 const ROOT = path.join(__dirname, "../..");
 
@@ -103,6 +104,54 @@ function verifyUaFixtures() {
     assert.strictEqual(hinted.platform, "iOS", "Client hints platform should classify iOS");
 }
 
+function verifyRuntimeIntegration() {
+    const realIphoneSafariUa = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
+    const metadata = getDeviceMetadata({
+        headers: {
+            "user-agent": realIphoneSafariUa
+        },
+        socket: {
+            remoteAddress: "127.0.0.1"
+        }
+    });
+
+    assert.strictEqual(metadata.deviceType, "mobile", "issue path should classify iPhone UA as mobile");
+    assert.strictEqual(metadata.deviceLabel, "Mobile Device", "issue path should classify iPhone UA label");
+    assert.strictEqual(metadata.browser, "Safari", "issue path should classify Safari");
+    assert.strictEqual(metadata.platform, "iOS", "issue path should classify iOS before Mac OS X");
+
+    const desktopMasked = getDeviceMetadata({
+        headers: {
+            "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15"
+        },
+        body: {
+            deviceContext: {
+                userAgent: realIphoneSafariUa,
+                platform: "iPhone",
+                maxTouchPoints: 5
+            }
+        },
+        socket: {
+            remoteAddress: "127.0.0.1"
+        }
+    });
+
+    assert.strictEqual(desktopMasked.deviceType, "mobile", "desktop-masked iPhone context should classify mobile");
+    assert.strictEqual(desktopMasked.deviceLabel, "Mobile Device", "desktop-masked iPhone context should classify Mobile Device");
+    assert.strictEqual(desktopMasked.browser, "Safari", "desktop-masked iPhone context should preserve Safari");
+    assert.strictEqual(desktopMasked.platform, "iOS", "desktop-masked iPhone context should classify iOS");
+
+    const missingUa = getDeviceMetadata({
+        headers: {},
+        socket: {
+            remoteAddress: "127.0.0.1"
+        }
+    });
+
+    assert.strictEqual(missingUa.deviceType, "unknown", "missing UA must not default to desktop");
+    assert.strictEqual(missingUa.deviceLabel, "Unknown Device", "missing UA label must be neutral");
+}
+
 function verifySchemasAndProjection() {
     assert(Session.schema.path("deviceType"), "Session must persist deviceType");
     assert(Session.schema.path("deviceLabel"), "Session must persist deviceLabel");
@@ -139,8 +188,10 @@ function verifySourceOwnership() {
     const socialRoute = read("backend/routes/socialAuth.js");
     const authRoute = read("backend/routes/auth.js");
     const account = read("frontend/js/account.js");
+    const login = read("frontend/js/login.js");
 
     assert(authService.includes("parseDeviceInfoFromRequest"), "authSessionService must own canonical parser integration");
+    assert(authService.includes("DEVICE_INFO_DEBUG"), "authSessionService should include gated diagnostics");
     assert(authService.includes("deviceType: metadata.deviceType"), "issueUserSession must persist deviceType metadata");
     assert(authService.includes("browser: metadata.browser"), "security event metadata should use normalized browser");
     assert(securityRoute.includes("normalizePersistedDeviceInfo"), "security sessions API must project normalized metadata");
@@ -148,11 +199,13 @@ function verifySourceOwnership() {
     assert(!securityRoute.includes("userAgent:"), "security sessions API must not expose raw userAgent");
     assert(socialRoute.includes("issueUserSession(req.user, req"), "Google login must use canonical session issuer");
     assert(authRoute.includes("issueUserSession(user, req"), "local/2FA login must use canonical session issuer");
+    assert(login.includes("getLoginDeviceContext()"), "login should pass advisory device context");
     assert(account.includes("session.deviceLabel || session.deviceName"), "frontend must render backend device label");
 }
 
 function main() {
     verifyUaFixtures();
+    verifyRuntimeIntegration();
     verifySchemasAndProjection();
     verifySourceOwnership();
     console.log("Device detection verification passed.");

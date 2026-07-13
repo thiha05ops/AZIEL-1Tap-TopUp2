@@ -17,6 +17,55 @@ function normalizeClientHint(value) {
         .trim();
 }
 
+function normalizePlatformValue(value) {
+    return String(value || "")
+        .replaceAll("\"", "")
+        .trim();
+}
+
+function getClientContext(input = {}) {
+    const context = input.clientContext && typeof input.clientContext === "object"
+        ? input.clientContext
+        : {};
+
+    return {
+        platform: normalizePlatformValue(context.platform),
+        userAgent: String(context.userAgent || ""),
+        maxTouchPoints: Number(context.maxTouchPoints || 0)
+    };
+}
+
+function hasAppleMobileClientEvidence(input = {}) {
+    const context = getClientContext(input);
+    const combined = `${context.platform} ${context.userAgent}`;
+
+    if (/iphone|ipod/i.test(combined)) {
+        return {
+            platform: "iOS",
+            deviceType: "mobile"
+        };
+    }
+
+    if (/ipad/i.test(combined)) {
+        return {
+            platform: "iPadOS",
+            deviceType: "tablet"
+        };
+    }
+
+    if (
+        /^macintel$/i.test(context.platform) &&
+        context.maxTouchPoints > 1
+    ) {
+        return {
+            platform: "iPadOS",
+            deviceType: "tablet"
+        };
+    }
+
+    return null;
+}
+
 function parseBrowser(userAgent = "") {
     const ua = String(userAgent || "");
 
@@ -33,15 +82,16 @@ function parseBrowser(userAgent = "") {
     return "Other";
 }
 
-function parsePlatform(userAgent = "", headers = {}) {
+function parsePlatform(userAgent = "", headers = {}, input = {}) {
     const ua = String(userAgent || "");
-    const lower = ua.toLowerCase();
     const chPlatform = normalizeClientHint(headerValue(headers, "sec-ch-ua-platform"));
     const chMobile = normalizeClientHint(headerValue(headers, "sec-ch-ua-mobile"));
+    const appleClientEvidence = hasAppleMobileClientEvidence(input);
 
     if (/iphone|ipod/i.test(ua)) return "iOS";
     if (/ipad/i.test(ua)) return "iPadOS";
     if (/android/i.test(ua)) return "Android";
+    if (appleClientEvidence?.platform) return appleClientEvidence.platform;
     if (/windows/i.test(ua) || /^windows$/i.test(chPlatform)) return "Windows";
     if (/linux/i.test(ua) && !/android/i.test(ua)) return "Linux";
 
@@ -57,9 +107,10 @@ function parsePlatform(userAgent = "", headers = {}) {
     return "Other";
 }
 
-function parseDeviceType(userAgent = "", headers = {}, platform = "") {
+function parseDeviceType(userAgent = "", headers = {}, platform = "", input = {}) {
     const ua = String(userAgent || "");
     const chMobile = normalizeClientHint(headerValue(headers, "sec-ch-ua-mobile"));
+    const appleClientEvidence = hasAppleMobileClientEvidence(input);
 
     if (/ipad/i.test(ua)) return "tablet";
     if (/iphone|ipod/i.test(ua)) return "mobile";
@@ -68,6 +119,7 @@ function parseDeviceType(userAgent = "", headers = {}, platform = "") {
     }
 
     if (chMobile === "?1") return "mobile";
+    if (appleClientEvidence?.deviceType) return appleClientEvidence.deviceType;
 
     if (platform === "Windows" || platform === "macOS" || platform === "Linux") {
         return "desktop";
@@ -80,8 +132,8 @@ function parseDeviceInfo(input = {}) {
     const userAgent = String(input.userAgent || "");
     const headers = input.headers || {};
     const browser = parseBrowser(userAgent);
-    const platform = parsePlatform(userAgent, headers);
-    const deviceType = parseDeviceType(userAgent, headers, platform);
+    const platform = parsePlatform(userAgent, headers, input);
+    const deviceType = parseDeviceType(userAgent, headers, platform, input);
 
     return {
         userAgent,
@@ -96,7 +148,8 @@ function parseDeviceInfo(input = {}) {
 function parseDeviceInfoFromRequest(req) {
     return parseDeviceInfo({
         userAgent: headerValue(req?.headers || {}, "user-agent"),
-        headers: req?.headers || {}
+        headers: req?.headers || {},
+        clientContext: req?.body?.deviceContext
     });
 }
 
@@ -129,5 +182,6 @@ module.exports = {
     parseDeviceInfoFromRequest,
     parseDeviceType,
     parsePlatform,
+    hasAppleMobileClientEvidence,
     normalizePersistedDeviceInfo
 };

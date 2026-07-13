@@ -101,7 +101,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 },
                 body: JSON.stringify({
                     username,
-                    password
+                    password,
+                    deviceContext: getLoginDeviceContext()
                 })
             });
 
@@ -145,6 +146,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 },
                 body: JSON.stringify({
                     challengeId: pendingTwoFactorChallengeId,
+                    deviceContext: getLoginDeviceContext(),
                     ...(recoveryMode ? { recoveryCode: twoFactorCode } : { code: twoFactorCode })
                 })
             });
@@ -224,6 +226,14 @@ document.addEventListener("DOMContentLoaded", () => {
         if (window.AZIEL_UI?.toast) {
             window.AZIEL_UI.toast[type === "success" ? "success" : "error"](text);
         }
+    }
+
+    function getLoginDeviceContext() {
+        return {
+            userAgent: navigator.userAgent || "",
+            platform: navigator.platform || "",
+            maxTouchPoints: Number(navigator.maxTouchPoints || 0)
+        };
     }
 
     function escapeHTML(value) {

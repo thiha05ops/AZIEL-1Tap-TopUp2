@@ -19,11 +19,52 @@ function getRequestIp(req) {
     );
 }
 
+function sanitizeHeader(value = "") {
+    return String(value || "")
+        .replace(/[^\x20-\x7E]/g, "")
+        .slice(0, 240);
+}
+
+function getHeader(req, key) {
+    const value = req?.headers?.[key] || req?.headers?.[key.toLowerCase()] || "";
+    return Array.isArray(value) ? value.join(", ") : String(value || "");
+}
+
+function logDeviceInfoDebug(req, metadata) {
+    if (process.env.DEVICE_INFO_DEBUG !== "true") return;
+
+    const context = req?.body?.deviceContext || {};
+
+    console.log("DEVICE_INFO_DEBUG", {
+        userAgentPresent: Boolean(getHeader(req, "user-agent")),
+        userAgent: sanitizeHeader(getHeader(req, "user-agent")),
+        secChUa: sanitizeHeader(getHeader(req, "sec-ch-ua")),
+        secChUaMobile: sanitizeHeader(getHeader(req, "sec-ch-ua-mobile")),
+        secChUaPlatform: sanitizeHeader(getHeader(req, "sec-ch-ua-platform")),
+        clientContext: {
+            platform: sanitizeHeader(context.platform),
+            userAgentPresent: Boolean(context.userAgent),
+            userAgent: sanitizeHeader(context.userAgent),
+            maxTouchPoints: Number(context.maxTouchPoints || 0)
+        },
+        parserResult: {
+            deviceType: metadata.deviceType,
+            deviceLabel: metadata.deviceLabel,
+            browser: metadata.browser,
+            platform: metadata.platform
+        }
+    });
+}
+
 function getDeviceMetadata(req) {
-    return {
+    const metadata = {
         ...parseDeviceInfoFromRequest(req),
         ipAddress: getRequestIp(req)
     };
+
+    logDeviceInfoDebug(req, metadata);
+
+    return metadata;
 }
 
 function isEmailVerified(user) {
