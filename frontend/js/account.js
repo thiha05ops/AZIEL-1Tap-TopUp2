@@ -366,15 +366,25 @@ function renderSecuritySessions() {
         return;
     }
 
-    box.innerHTML = securityState.sessions.map(session => `
-        <div class="security-list-item">
-            <div>
-                <strong>${escapeHTML(session.deviceLabel || session.deviceName || "Unknown Device")}</strong>
-                ${session.isCurrentSession ? `<span class="security-current">Current device</span>` : ""}
+    box.innerHTML = securityState.sessions.map(session => {
+        const icon = getSessionDeviceIcon(session);
+
+        return `
+        <div class="security-list-item session-item">
+            <div class="security-session-main">
+                <span class="security-session-icon${session.isCurrentSession ? " is-current" : ""}" aria-hidden="true">
+                    <i class="${icon}"></i>
+                </span>
+                <div class="security-session-details">
+                    <div class="security-session-title">
+                        <strong>${escapeHTML(session.deviceLabel || session.deviceName || "Unknown Device")}</strong>
+                        ${session.isCurrentSession ? `<span class="security-current">Current device</span>` : ""}
+                    </div>
                 <small>
                     ${escapeHTML([session.browser, session.platform].filter(Boolean).join(" • ") || "Browser session")}
                 </small>
                 <small>Last active ${escapeHTML(formatDateTime(session.lastSeenAt))}</small>
+                </div>
             </div>
             ${session.isCurrentSession ? "" : `
                 <button class="security-btn danger" type="button" data-revoke-session="${escapeHTML(session.sessionId)}">
@@ -382,11 +392,27 @@ function renderSecuritySessions() {
                 </button>
             `}
         </div>
-    `).join("");
+    `;
+    }).join("");
 
     box.querySelectorAll("[data-revoke-session]").forEach(btn => {
         btn.addEventListener("click", () => revokeSession(btn.dataset.revokeSession));
     });
+}
+
+function getSessionDeviceIcon(session = {}) {
+    const deviceType = String(session.deviceType || "").toLowerCase();
+    const deviceLabel = String(session.deviceLabel || session.deviceName || "").toLowerCase();
+    const platform = String(session.platform || "").toLowerCase();
+    const canonical = `${deviceType} ${deviceLabel} ${platform}`;
+
+    if (canonical.includes("windows")) return "fa-brands fa-windows";
+    if (canonical.includes("macos")) return "fa-solid fa-desktop";
+    if (canonical.includes("ios")) return "fa-solid fa-mobile-screen-button";
+    if (canonical.includes("android")) return "fa-brands fa-android";
+    if (canonical.includes("linux")) return "fa-solid fa-terminal";
+
+    return "fa-solid fa-circle-question";
 }
 
 function renderSecurityEvents() {
