@@ -532,6 +532,12 @@ window.AZIEL_LANG.en = {
     ordersAppearHere: "Your recent top-up orders will appear here.",
     startTopUp: "Start Top Up",
     noOrderNotifications: "No order notifications",
+    catalogPricesUnavailable: "Prices are temporarily unavailable. Please try again shortly.",
+    catalogRetry: "Retry",
+    catalogProductUnavailable: "This product is temporarily unavailable.",
+    catalogPackageUnavailable: "This package is no longer available. Please select another package.",
+    catalogPriceUpdated: "Price updated to the latest catalog price. Please review the new total.",
+    catalogPackagesUnavailable: "Packages temporarily unavailable.",
     user: "User"
 
 

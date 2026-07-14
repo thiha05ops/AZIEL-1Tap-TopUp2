@@ -3,6 +3,7 @@
 let supportSocket = null;
 let adminSupportInitialized = false;
 let adminSupportLoaded = false;
+let currentSupportContext = {};
 
 document.addEventListener("DOMContentLoaded", () => {
 
@@ -29,6 +30,7 @@ function setupAdminSupportLazyLoad() {
 
     window.addEventListener("aziel:admin-section-opened", event => {
         if (event.detail?.section === "support") {
+            currentSupportContext = event.detail.context || {};
             loadSupportTickets();
         }
     });
@@ -38,6 +40,7 @@ function maybeLoadAdminSupportForActiveSection() {
     const section = document.getElementById("section-support");
 
     if (!section || section.classList.contains("active")) {
+        currentSupportContext = getAdminHashContext("support");
         loadSupportTickets();
     }
 }
@@ -103,7 +106,7 @@ async function loadSupportTickets() {
 
         const data =
             await adminFetch(
-                "/api/admin/support/tickets"
+                buildSupportTicketsEndpoint()
             );
 
         if (!data?.success) {
@@ -144,6 +147,30 @@ async function loadSupportTickets() {
 
     }
 
+}
+
+function buildSupportTicketsEndpoint() {
+    const params = new URLSearchParams();
+
+    if (currentSupportContext.filter) {
+        params.set("filter", currentSupportContext.filter);
+    }
+
+    if (currentSupportContext.status) {
+        params.set("status", currentSupportContext.status);
+    }
+
+    const query = params.toString();
+    return query ? `/api/admin/support/tickets?${query}` : "/api/admin/support/tickets";
+}
+
+function getAdminHashContext(sectionName) {
+    const raw = window.location.hash ? window.location.hash.slice(1) : "";
+    const [section = "", query = ""] = raw.split("?");
+
+    if (section !== sectionName) return {};
+
+    return Object.fromEntries(new URLSearchParams(query));
 }
 
 // ======================================

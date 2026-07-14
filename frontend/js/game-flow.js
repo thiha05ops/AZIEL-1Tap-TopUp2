@@ -124,6 +124,10 @@
 
         return {
             ...selected,
+            productCode: selected.productCode || "",
+            packageCode: selected.packageCode || selected.code || "",
+            currency: selected.currency || "",
+            region: selected.region || "",
             name: selected.name || selected.packageName || "",
             price: Number(selected.price || selected.amount || 0),
             amount: Number(selected.amount || selected.price || 0),
@@ -187,6 +191,10 @@
         );
     }
 
+    function t(key, fallback) {
+        return window.AZIEL_I18N?.t?.(key) || window.i18n?.t?.(key) || fallback;
+    }
+
     function getFieldValue(selector) {
         const el = getEl(selector);
         return String(el?.value || "").trim();
@@ -203,6 +211,13 @@
             return {
                 ready: false,
                 reason: "Please select a package."
+            };
+        }
+
+        if (window.AZIEL_CATALOG && !window.AZIEL_CATALOG.isFresh()) {
+            return {
+                ready: false,
+                reason: t("catalogPricesUnavailable", "Prices are temporarily unavailable. Please try again shortly.")
             };
         }
 
@@ -312,10 +327,10 @@
             gameKey: flow.config.gameKey,
             productCode: flow.config.productCode || flow.config.gameKey,
             packageName: pkg.name,
-            packageCode: pkg.code || "",
+            packageCode: pkg.packageCode || pkg.code || "",
             amount: Number(pkg.price || 0),
-            currency,
-            region,
+            currency: pkg.currency || currency,
+            region: pkg.region || region,
             paymentMethod: payment.key,
             username,
             userId: getFieldValue(flow.config.userIdSelector),
@@ -349,6 +364,41 @@
         if (buyBtn) buyBtn.disabled = true;
 
         try {
+            if (window.AZIEL_CATALOG) {
+                try {
+                    await window.AZIEL_CATALOG.ensureFreshForPurchase();
+                    const freshPackage = window.AZIEL_CATALOG.getPackage(
+                        flow.config.productCode || flow.config.gameKey,
+                        orderData.packageCode,
+                        orderData.region
+                    );
+
+                    if (!freshPackage) {
+                        window.clearSelectedPackage?.("package_unavailable");
+                        const message = t("catalogPackageUnavailable", "This package is no longer available. Please select another package.");
+                        setText(flow.config.noteSelector, message);
+                        window.PaymentUtils?.showToast?.(message);
+                        window.renderGamePrices?.();
+                        return;
+                    }
+
+                    if (Math.abs(Number(freshPackage.amount) - Number(orderData.amount)) > 0.000001) {
+                        const message = t("catalogPriceUpdated", "Price updated to the latest catalog price. Please review the new total.");
+                        setText(flow.config.noteSelector, message);
+                        window.PaymentUtils?.showToast?.(message);
+                        await window.renderGamePrices?.({
+                            reselectCode: orderData.packageCode
+                        });
+                        return;
+                    }
+                } catch (error) {
+                    const message = t("catalogPricesUnavailable", "Prices are temporarily unavailable. Please try again shortly.");
+                    setText(flow.config.noteSelector, message);
+                    window.PaymentUtils?.showToast?.(message);
+                    return;
+                }
+            }
+
             if (!orderData.amount || orderData.amount <= 0) {
                 setText(flow.config.noteSelector, "This package is not available yet.");
                 return;
@@ -422,6 +472,7 @@
                 game: flow.config.game,
                 gameKey: flow.config.gameKey,
                 packageCode: pkg?.code || "",
+                productCode: pkg?.productCode || flow.config.productCode || flow.config.gameKey,
                 selectedPackage: pkg,
                 userId: getFieldValue(flow.config.userIdSelector),
                 zoneId: getFieldValue(flow.config.zoneIdSelector),
@@ -623,9 +674,13 @@
 
     function packageFromElement(packEl) {
         return {
+            productCode: packEl.dataset.productCode || "",
+            packageCode: packEl.dataset.code || "",
             name: packEl.dataset.name || "",
             price: Number(packEl.dataset.price || 0),
             amount: Number(packEl.dataset.price || 0),
+            currency: packEl.dataset.currency || "",
+            region: packEl.dataset.region || "",
             code: packEl.dataset.code || "",
             icon: packEl.dataset.icon || "",
             formattedPrice: packEl.querySelector(".pack-price")?.textContent?.trim() || ""

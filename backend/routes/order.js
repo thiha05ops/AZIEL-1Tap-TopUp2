@@ -88,6 +88,56 @@ function publicTrackingOrder(order) {
     };
 }
 
+function hasManualPaymentEvidence(order = {}) {
+    return Boolean(
+        order.paymentSlip ||
+        order.paymentEvidence?.url ||
+        order.paymentEvidence?.key ||
+        order.paymentEvidence?.storageKey
+    );
+}
+
+function projectAdminOrder(order) {
+    return {
+        _id: order._id,
+        orderId: order.orderId,
+        username: order.username,
+        game: order.game,
+        productCode: order.productCode || "",
+        productName: order.productName || order.game || "",
+        userId: order.userId,
+        zoneId: order.zoneId || "",
+        packageName: order.packageName,
+        packageCode: order.packageCode || "",
+        amount: order.amount,
+        currency: order.currency,
+        region: order.region,
+        paymentMethod: order.paymentMethod,
+        paymentSlip: order.paymentSlip || "",
+        paymentEvidence: order.paymentEvidence || {},
+        paymentStatus: order.paymentStatus || "",
+        paymentProvider: order.paymentProvider || "",
+        transactionId: order.transactionId || "",
+        manualPaymentAttemptId: order.manualPaymentAttemptId || "",
+        note: order.note || "",
+        status: order.status,
+        refundRequested: Boolean(order.refundRequested),
+        refundRequestReason: order.refundRequestReason || "",
+        refundRequestedAt: order.refundRequestedAt || null,
+        refunded: Boolean(order.refunded),
+        refundAmount: order.refundAmount || 0,
+        refundReason: order.refundReason || "",
+        refundRejectedReason: order.refundRejectedReason || "",
+        refundMethod: order.refundMethod || "",
+        refundedAt: order.refundedAt || null,
+        timeline: Array.isArray(order.timeline) ? order.timeline : [],
+        allowedNextStatuses: getAllowedNextStatuses(order.status),
+        hasPaymentEvidence: hasManualPaymentEvidence(order),
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt
+    };
+}
+
 // CUSTOMER ORDER HISTORY
 router.get("/history/:username", authMiddleware, async (req, res) => {
     try {
@@ -290,9 +340,59 @@ ${order.refundRequestReason}`
 // ADMIN GET ALL ORDERS
 router.get("/admin/orders", adminMiddleware, async (req, res) => {
     try {
-        const orders = await Order.find().sort({ createdAt: -1 });
+        const query = {};
+        const status = String(req.query.status || "").trim();
+        const filter = String(req.query.filter || "").trim();
+        const search = String(req.query.q || "").trim();
 
-        res.json({ success: true, orders });
+        if (filter === "manual_review") {
+            query.status = "pending_payment";
+            query.$or = [
+                { paymentSlip: { $type: "string", $ne: "" } },
+                { "paymentEvidence.url": { $type: "string", $ne: "" } },
+                { "paymentEvidence.key": { $type: "string", $ne: "" } },
+                { "paymentEvidence.storageKey": { $type: "string", $ne: "" } }
+            ];
+        } else if ([
+            "pending_payment",
+            "paid",
+            "processing",
+            "completed",
+            "cancelled",
+            "failed",
+            "expired",
+            "refund_requested",
+            "refund_pending",
+            "refund_rejected",
+            "refunded"
+        ].includes(status)) {
+            query.status = status;
+        }
+
+        if (search) {
+            const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const searchOr = [
+                { orderId: { $regex: escaped, $options: "i" } },
+                { username: { $regex: escaped, $options: "i" } },
+                { game: { $regex: escaped, $options: "i" } },
+                { productName: { $regex: escaped, $options: "i" } },
+                { packageName: { $regex: escaped, $options: "i" } }
+            ];
+
+            if (query.$or) {
+                query.$and = [{ $or: query.$or }, { $or: searchOr }];
+                delete query.$or;
+            } else {
+                query.$or = searchOr;
+            }
+        }
+
+        const orders = await Order.find(query).sort({ createdAt: -1 });
+
+        res.json({
+            success: true,
+            orders: orders.map(projectAdminOrder)
+        });
 
     } catch (error) {
         console.log("Admin orders error:", error);
@@ -661,7 +761,7 @@ router.post("/orders", authMiddleware, orderCreateLimiter, upload.single("paymen
             });
         }
 
-        const catalogItem = resolveOrderCatalog(req.body);
+        const catalogItem = await resolveOrderCatalog(req.body);
         const methodKey = normalizePaymentKey(req.body.paymentMethod);
         const configuredMethod = await PaymentMethod.findOne({
             key: methodKey,

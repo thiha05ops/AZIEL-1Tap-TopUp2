@@ -139,7 +139,20 @@ router.get("/support/my/:username", authMiddleware, async (req, res) => {
 
 router.get("/admin/support/tickets", adminMiddleware, async (req, res) => {
     try {
-        const tickets = await SupportTicket.find().sort({
+        const filter = String(req.query.filter || "").trim();
+        const status = String(req.query.status || "").trim();
+        const query = {};
+
+        if (filter === "unreadByAdmin") {
+            query.unreadByAdmin = true;
+            query.status = { $nin: ["solved", "closed"] };
+        } else if (filter === "open") {
+            query.status = "open";
+        } else if (status) {
+            query.status = status;
+        }
+
+        const tickets = await SupportTicket.find(query).sort({
             createdAt: -1
         });
 

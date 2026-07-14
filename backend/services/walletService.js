@@ -442,6 +442,7 @@ function projectLedger(transaction = {}) {
     return {
         id: item._id ? String(item._id) : "",
         transactionId: item.transactionId || "",
+        username: item.username || "",
         type: item.type || "wallet.transaction",
         direction,
         amount: Number(item.amount || 0),

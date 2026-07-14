@@ -75,6 +75,7 @@ function main() {
     assert.strictEqual(absentGoogle.features.googleOAuth, "disabled");
 
     expectCode("malformed production origin", baseProductionEnv({ ALLOWED_ORIGINS: "not-a-url" }), "PROD_ORIGIN_INVALID");
+    expectCode("invalid catalog source", baseProductionEnv({ CATALOG_SOURCE: "browser" }), "PROD_CATALOG_SOURCE_INVALID");
 
     expectCode("production local storage mode", baseProductionEnv({ STORAGE_MODE: "local" }), "PROD_STORAGE_LOCAL_UNSAFE");
     expectCode(
@@ -84,6 +85,7 @@ function main() {
     );
 
     assert.doesNotThrow(() => validateProductionReadiness(baseProductionEnv()));
+    assert.doesNotThrow(() => validateProductionReadiness(baseProductionEnv({ CATALOG_SOURCE: "database" })));
     assert.throws(
         () => validateProductionReadiness(baseProductionEnv({ EMAIL_PASS: "" })),
         /PROD_EMAIL_CONFIG_MISSING/

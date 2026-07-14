@@ -43,6 +43,7 @@ const supportRoutes = require("./routes/support");
 const settingsRoutes = require("./routes/settings");
 const paymentMethodsRoutes = require("./routes/paymentMethods");
 const liveChatRoutes = require("./routes/liveChat");
+const catalogRoutes = require("./routes/catalog");
 const realtime = require("./services/realtime");
 
 // EXPRESS APP
@@ -139,6 +140,7 @@ function configureApplication(mongoConnection) {
     app.use("/api", settingsRoutes);
     app.use("/api", paymentMethodsRoutes);
     app.use("/api/live-chat", liveChatRoutes);
+    app.use("/api", catalogRoutes);
 
     app.use("/api", (err, req, res, next) => {
         if (!err) return next();

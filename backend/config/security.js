@@ -302,6 +302,17 @@ function validateStorage(result, env) {
     result.features.storage = "ready";
 }
 
+function validateCatalogSource(result, env) {
+    const source = String(env.CATALOG_SOURCE || "static").trim().toLowerCase();
+
+    if (!["static", "database"].includes(source)) {
+        addError(result, "PROD_CATALOG_SOURCE_INVALID", "CATALOG_SOURCE must be static or database.", "catalog");
+        return;
+    }
+
+    result.features.catalog = source;
+}
+
 function buildProductionReadiness(env = process.env) {
     const production = env.NODE_ENV === "production";
     const result = {
@@ -318,7 +329,8 @@ function buildProductionReadiness(env = process.env) {
             googleOAuth: "disabled",
             cors: production ? "ready" : "development",
             realtime: production ? "ready" : "development",
-            storage: production ? "ready" : "warning"
+            storage: production ? "ready" : "warning",
+            catalog: String(env.CATALOG_SOURCE || "static").trim().toLowerCase()
         },
         errors: [],
         warnings: []
@@ -351,6 +363,7 @@ function buildProductionReadiness(env = process.env) {
     validateTwoFactorKey(result, env);
     validateGoogleOAuth(result, env);
     validateProductionOrigins(result, env);
+    validateCatalogSource(result, env);
 
     result.ready = result.errors.length === 0;
 

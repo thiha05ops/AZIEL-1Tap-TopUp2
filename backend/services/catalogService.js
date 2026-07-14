@@ -1,4 +1,17 @@
 const catalog = require("../catalog/catalog");
+const MediaAsset = require("../models/MediaAsset");
+const CatalogProduct = require("../models/CatalogProduct");
+const CatalogPackage = require("../models/CatalogPackage");
+const {
+    REGION_CURRENCIES,
+    getStaticCatalogSnapshot,
+    normalizeCurrency,
+    normalizePackageCode,
+    normalizeProductCode,
+    normalizeRegion,
+    priceForRegion
+} = require("../catalog/catalogProjection");
+const { projectMediaAsset, projectPublicMediaAsset } = require("./mediaService");
 
 class CatalogError extends Error {
     constructor(code, message, statusCode = 400) {
@@ -21,19 +34,6 @@ catalog.products.forEach(product => {
         .forEach(alias => aliasIndex.set(normalizeProductCode(alias), normalizedProductCode));
 });
 
-function normalizeProductCode(value = "") {
-    return String(value || "")
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "");
-}
-
-function normalizePackageCode(value = "") {
-    return String(value || "")
-        .trim()
-        .toUpperCase();
-}
-
 function normalizePackageName(value = "") {
     return String(value || "")
         .trim()
@@ -41,12 +41,18 @@ function normalizePackageName(value = "") {
         .replace(/\s+/g, " ");
 }
 
-function normalizeRegion(value = "") {
-    return String(value || "MM").trim().toUpperCase();
-}
+function getCatalogSource(env = process.env) {
+    const source = String(env.CATALOG_SOURCE || "static").trim().toLowerCase();
 
-function normalizeCurrency(value = "") {
-    return String(value || "").trim().toUpperCase();
+    if (source === "static" || source === "database") {
+        return source;
+    }
+
+    throw new CatalogError(
+        "CATALOG_SOURCE_INVALID",
+        "Catalog source configuration is invalid.",
+        500
+    );
 }
 
 function getProduct(productCodeOrAlias) {
@@ -66,58 +72,6 @@ function getPackage(productCodeOrAlias, packageCodeOrName) {
         normalizePackageCode(item.packageCode) === packageCode ||
         normalizePackageName(item.name) === packageName
     )) || null;
-}
-
-function getProductFromPayload(payload = {}) {
-    const product =
-        getProduct(payload.productCode) ||
-        getProduct(payload.gameKey) ||
-        getProduct(payload.game);
-
-    if (!product) {
-        throw new CatalogError(
-            "PRODUCT_NOT_FOUND",
-            "Product is not available."
-        );
-    }
-
-    if (!product.enabled) {
-        throw new CatalogError(
-            "PRODUCT_DISABLED",
-            "This product is not available for purchase."
-        );
-    }
-
-    return product;
-}
-
-function getPackageFromPayload(product, payload = {}) {
-    const packageRef = payload.packageCode || payload.selectedPackageCode || payload.packageName || payload.package;
-
-    if (!packageRef) {
-        throw new CatalogError(
-            "PACKAGE_NOT_FOUND",
-            "Package is required."
-        );
-    }
-
-    const item = getPackage(product.productCode, packageRef);
-
-    if (!item) {
-        throw new CatalogError(
-            "PACKAGE_NOT_FOUND",
-            "Package is not available."
-        );
-    }
-
-    if (!item.enabled) {
-        throw new CatalogError(
-            "PACKAGE_DISABLED",
-            "This package is not available for purchase."
-        );
-    }
-
-    return item;
 }
 
 function assertClientCompatibility(payload, canonical) {
@@ -151,9 +105,61 @@ function assertClientCompatibility(payload, canonical) {
     }
 }
 
-function resolvePackagePrice(payload = {}) {
-    const product = getProductFromPayload(payload);
-    const item = getPackageFromPayload(product, payload);
+function getStaticProductFromPayload(payload = {}) {
+    const product =
+        getProduct(payload.productCode) ||
+        getProduct(payload.gameKey) ||
+        getProduct(payload.game);
+
+    if (!product) {
+        throw new CatalogError(
+            "PRODUCT_NOT_FOUND",
+            "Product is not available."
+        );
+    }
+
+    if (!product.enabled) {
+        throw new CatalogError(
+            "PRODUCT_DISABLED",
+            "This product is not available for purchase."
+        );
+    }
+
+    return product;
+}
+
+function getStaticPackageFromPayload(product, payload = {}) {
+    const packageRef = payload.packageCode || payload.selectedPackageCode || payload.packageName || payload.package;
+
+    if (!packageRef) {
+        throw new CatalogError(
+            "PACKAGE_NOT_FOUND",
+            "Package is required."
+        );
+    }
+
+    const item = getPackage(product.productCode, packageRef);
+
+    if (!item) {
+        throw new CatalogError(
+            "PACKAGE_NOT_FOUND",
+            "Package is not available."
+        );
+    }
+
+    if (!item.enabled) {
+        throw new CatalogError(
+            "PACKAGE_DISABLED",
+            "This package is not available for purchase."
+        );
+    }
+
+    return item;
+}
+
+function resolveStaticPackagePrice(payload = {}) {
+    const product = getStaticProductFromPayload(payload);
+    const item = getStaticPackageFromPayload(product, payload);
     const region = normalizeRegion(payload.region);
     const price = item.prices?.[region];
 
@@ -179,8 +185,154 @@ function resolvePackagePrice(payload = {}) {
     return canonical;
 }
 
-function resolveOrderCatalog(payload = {}) {
-    const canonical = resolvePackagePrice({
+function getDatabaseProductFromRows(payload = {}, products = []) {
+    const refs = [payload.productCode, payload.gameKey, payload.game]
+        .filter(Boolean)
+        .map(value => normalizeProductCode(value));
+
+    if (!refs.length) {
+        throw new CatalogError(
+            "PRODUCT_NOT_FOUND",
+            "Product is not available."
+        );
+    }
+
+    const product = products.find(item => {
+        const aliases = [item.productCode, item.name, ...(item.aliases || [])];
+        return aliases.some(alias => refs.includes(normalizeProductCode(alias)));
+    });
+
+    if (!product) {
+        throw new CatalogError(
+            "PRODUCT_NOT_FOUND",
+            "Product is not available."
+        );
+    }
+
+    if (!product.enabled) {
+        throw new CatalogError(
+            "PRODUCT_DISABLED",
+            "This product is not available for purchase."
+        );
+    }
+
+    return product;
+}
+
+function getDatabasePackageFromRows(product, payload = {}, packages = []) {
+    const packageRef = payload.packageCode || payload.selectedPackageCode || payload.packageName || payload.package;
+
+    if (!packageRef) {
+        throw new CatalogError(
+            "PACKAGE_NOT_FOUND",
+            "Package is required."
+        );
+    }
+
+    const packageCode = normalizePackageCode(packageRef);
+    const packageName = normalizePackageName(packageRef);
+    const item = packages.find(row => (
+        row.productCode === product.productCode &&
+        (
+            normalizePackageCode(row.packageCode) === packageCode ||
+            normalizePackageName(row.name) === packageName
+        )
+    ));
+
+    if (!item) {
+        throw new CatalogError(
+            "PACKAGE_NOT_FOUND",
+            "Package is not available."
+        );
+    }
+
+    if (!item.enabled) {
+        throw new CatalogError(
+            "PACKAGE_DISABLED",
+            "This package is not available for purchase."
+        );
+    }
+
+    return item;
+}
+
+function resolveDatabasePackagePriceFromRows(payload = {}, rows = {}) {
+    const product = getDatabaseProductFromRows(payload, rows.products || []);
+    const item = getDatabasePackageFromRows(product, payload, rows.packages || []);
+    const region = normalizeRegion(payload.region);
+    const price = priceForRegion(item, region);
+
+    if (
+        !product.supportedRegions?.includes(region) ||
+        !price ||
+        price.enabled === false
+    ) {
+        throw new CatalogError(
+            "REGION_NOT_SUPPORTED",
+            "This package is not available in the selected region."
+        );
+    }
+
+    const expectedCurrency = REGION_CURRENCIES[region];
+
+    if (price.currency !== expectedCurrency) {
+        throw new CatalogError(
+            "CATALOG_PRICE_INVALID",
+            "Catalog price configuration is invalid.",
+            500
+        );
+    }
+
+    const canonical = {
+        productCode: product.productCode,
+        productName: product.name,
+        packageCode: item.packageCode,
+        packageName: item.name,
+        region,
+        currency: price.currency,
+        amount: Number(price.amount)
+    };
+
+    assertClientCompatibility(payload, canonical);
+
+    return canonical;
+}
+
+async function resolveDatabasePackagePrice(payload = {}) {
+    let products;
+    let packages;
+
+    try {
+        products = await CatalogProduct.find().sort({ sortOrder: 1, productCode: 1 }).lean();
+        const product = getDatabaseProductFromRows(payload, products);
+        packages = await CatalogPackage.find({ productCode: product.productCode })
+            .sort({ sortOrder: 1, packageCode: 1 })
+            .lean();
+
+        return resolveDatabasePackagePriceFromRows(payload, { products: [product], packages });
+    } catch (error) {
+        if (error instanceof CatalogError) throw error;
+
+        throw new CatalogError(
+            "CATALOG_UNAVAILABLE",
+            "Catalog is temporarily unavailable.",
+            500
+        );
+    }
+}
+
+async function resolvePackagePrice(payload = {}, options = {}) {
+    const source = options.source || getCatalogSource();
+
+    if (source === "database") {
+        return resolveDatabasePackagePrice(payload);
+    }
+
+    return resolveStaticPackagePrice(payload);
+}
+
+async function resolveOrderCatalog(payload = {}, options = {}) {
+    const canonical = await resolvePackagePrice({
         productCode: payload.productCode || payload.gameKey,
         gameKey: payload.gameKey,
         game: payload.game,
@@ -190,7 +342,7 @@ function resolveOrderCatalog(payload = {}) {
         region: payload.region,
         clientAmount: payload.amount,
         clientCurrency: payload.currency
-    });
+    }, options);
 
     return {
         ...canonical,
@@ -199,29 +351,194 @@ function resolveOrderCatalog(payload = {}) {
     };
 }
 
-function toPublicCatalog() {
-    return catalog.products.map(product => ({
+function collectMediaAssetIds(products = [], packages = []) {
+    const ids = new Set();
+
+    products.forEach(product => {
+        if (product?.presentation?.imageAssetId) ids.add(product.presentation.imageAssetId);
+        if (product?.presentation?.bannerAssetId) ids.add(product.presentation.bannerAssetId);
+    });
+
+    packages.forEach(item => {
+        if (item?.iconAssetId) ids.add(item.iconAssetId);
+    });
+
+    return Array.from(ids);
+}
+
+async function loadMediaAssetMap(products = [], packages = []) {
+    const ids = collectMediaAssetIds(products, packages);
+    if (!ids.length) return new Map();
+
+    const assets = await MediaAsset.find({
+        assetId: { $in: ids },
+        status: "active"
+    }).lean();
+
+    return new Map(assets.map(asset => [asset.assetId, asset]));
+}
+
+function mediaUrl(asset) {
+    return asset?.secureUrl || asset?.url || "";
+}
+
+function projectCatalogPackage(item = {}, { includeDisabled = true, mediaMap = new Map(), includeAssetProjection = false } = {}) {
+    if (!includeDisabled && item.enabled === false) return null;
+
+    const prices = {};
+
+    Object.entries(REGION_CURRENCIES).forEach(([region, currency]) => {
+        const price = priceForRegion(item, region);
+
+        if (!price || (!includeDisabled && price.enabled === false)) return;
+
+        prices[region] = {
+            amount: Number(price.amount),
+            currency: price.currency || currency,
+            enabled: price.enabled !== false
+        };
+    });
+
+    const iconAsset = item.iconAssetId ? mediaMap.get(item.iconAssetId) : null;
+    const projection = {
+        productCode: item.productCode,
+        packageCode: item.packageCode,
+        name: item.name,
+        enabled: item.enabled !== false,
+        prices,
+        sortOrder: Number(item.sortOrder || 0),
+        iconUrl: mediaUrl(iconAsset),
+        iconAltText: iconAsset?.altText || "",
+        updatedAt: item.updatedAt || null
+    };
+
+    if (includeAssetProjection) {
+        projection.iconAsset = projectMediaAsset(iconAsset);
+    }
+
+    return projection;
+}
+
+function projectCatalogProduct(product = {}, packages = [], { includeDisabled = true, mediaMap = new Map(), includeAssetProjection = false } = {}) {
+    if (!includeDisabled && product.enabled === false) return null;
+
+    const publicPackages = packages
+        .map(item => projectCatalogPackage(item, { includeDisabled, mediaMap, includeAssetProjection }))
+        .filter(Boolean);
+    const imageAsset = product.presentation?.imageAssetId
+        ? mediaMap.get(product.presentation.imageAssetId)
+        : null;
+    const bannerAsset = product.presentation?.bannerAssetId
+        ? mediaMap.get(product.presentation.bannerAssetId)
+        : null;
+
+    const projection = {
         productCode: product.productCode,
         name: product.name,
-        enabled: Boolean(product.enabled),
-        regions: catalog.supportedRegions,
-        packages: (product.packages || []).map(item => ({
-            packageCode: item.packageCode,
-            name: item.name,
-            enabled: Boolean(item.enabled),
-            prices: item.prices
-        }))
-    }));
+        enabled: product.enabled !== false,
+        supportedRegions: Array.isArray(product.supportedRegions)
+            ? product.supportedRegions
+            : Object.keys(REGION_CURRENCIES),
+        packageCount: packages.length,
+        packages: publicPackages,
+        sortOrder: Number(product.sortOrder || 0),
+        imageUrl: mediaUrl(imageAsset),
+        imageAltText: imageAsset?.altText || "",
+        bannerUrl: mediaUrl(bannerAsset),
+        bannerAltText: bannerAsset?.altText || "",
+        updatedAt: product.updatedAt || null
+    };
+
+    if (includeAssetProjection) {
+        projection.imageAsset = projectMediaAsset(imageAsset);
+        projection.bannerAsset = projectMediaAsset(bannerAsset);
+    } else {
+        const publicImageAsset = projectPublicMediaAsset(imageAsset);
+        const publicBannerAsset = projectPublicMediaAsset(bannerAsset);
+        if (publicImageAsset) projection.publicImageAsset = publicImageAsset;
+        if (publicBannerAsset) projection.publicBannerAsset = publicBannerAsset;
+    }
+
+    return projection;
+}
+
+function toStaticPublicCatalog({ includeDisabled = true } = {}) {
+    const snapshot = getStaticCatalogSnapshot();
+
+    return snapshot.products
+        .map(product => {
+            const packages = snapshot.packages.filter(item => item.productCode === product.productCode);
+            return projectCatalogProduct(product, packages, { includeDisabled });
+        })
+        .filter(Boolean);
+}
+
+async function toDatabasePublicCatalog({ includeDisabled = true, includeAssetProjection = false } = {}) {
+    const [products, packages] = await Promise.all([
+        CatalogProduct.find().sort({ sortOrder: 1, productCode: 1 }).lean(),
+        CatalogPackage.find().sort({ productCode: 1, sortOrder: 1, packageCode: 1 }).lean()
+    ]);
+    const mediaMap = await loadMediaAssetMap(products, packages);
+
+    return products
+        .map(product => {
+            const productPackages = packages.filter(item => item.productCode === product.productCode);
+            return projectCatalogProduct(product, productPackages, {
+                includeDisabled,
+                mediaMap,
+                includeAssetProjection
+            });
+        })
+        .filter(Boolean);
+}
+
+async function toPublicCatalog(options = {}) {
+    const source = options.source || getCatalogSource();
+
+    if (source === "database") {
+        return toDatabasePublicCatalog({
+            includeDisabled: options.includeDisabled !== false,
+            includeAssetProjection: Boolean(options.includeAssetProjection)
+        });
+    }
+
+    return toStaticPublicCatalog({ includeDisabled: options.includeDisabled !== false });
+}
+
+async function getCatalogProductDetail(productCode, options = {}) {
+    const source = options.source || getCatalogSource();
+    const normalizedCode = normalizeProductCode(productCode);
+
+    if (source === "database") {
+        const product = await CatalogProduct.findOne({ productCode: normalizedCode }).lean();
+        if (!product) return null;
+        const packages = await CatalogPackage.find({ productCode: normalizedCode })
+            .sort({ sortOrder: 1, packageCode: 1 })
+            .lean();
+        const mediaMap = await loadMediaAssetMap([product], packages);
+        return projectCatalogProduct(product, packages, {
+            includeDisabled: options.includeDisabled !== false,
+            mediaMap,
+            includeAssetProjection: Boolean(options.includeAssetProjection)
+        });
+    }
+
+    const product = toStaticPublicCatalog({ includeDisabled: options.includeDisabled !== false })
+        .find(item => item.productCode === normalizedCode);
+    return product || null;
 }
 
 module.exports = {
     CatalogError,
-    getProduct,
+    getCatalogProductDetail,
+    getCatalogSource,
     getPackage,
-    resolvePackagePrice,
-    resolveOrderCatalog,
-    toPublicCatalog,
-    normalizeProductCode,
+    getProduct,
     normalizePackageCode,
-    normalizeRegion
+    normalizeProductCode,
+    normalizeRegion,
+    resolveDatabasePackagePriceFromRows,
+    resolveOrderCatalog,
+    resolvePackagePrice,
+    toPublicCatalog
 };

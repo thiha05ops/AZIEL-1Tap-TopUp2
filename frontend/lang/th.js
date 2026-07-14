@@ -532,6 +532,12 @@ window.AZIEL_LANG.th = {
     ordersAppearHere: "คำสั่งซื้อเติมเกมล่าสุดของคุณจะแสดงที่นี่",
     startTopUp: "เริ่มเติมเงิน",
     noOrderNotifications: "ไม่มีการแจ้งเตือนคำสั่งซื้อ",
+    catalogPricesUnavailable: "ราคายังไม่พร้อมใช้งานชั่วคราว โปรดลองอีกครั้งในภายหลัง",
+    catalogRetry: "ลองอีกครั้ง",
+    catalogProductUnavailable: "สินค้านี้ไม่พร้อมใช้งานชั่วคราว",
+    catalogPackageUnavailable: "แพ็กเกจนี้ไม่พร้อมใช้งานแล้ว โปรดเลือกแพ็กเกจอื่น",
+    catalogPriceUpdated: "อัปเดตราคาเป็นราคาล่าสุดแล้ว โปรดตรวจสอบยอดรวมใหม่",
+    catalogPackagesUnavailable: "แพ็กเกจไม่พร้อมใช้งานชั่วคราว",
     user: "ผู้ใช้"
 
 };

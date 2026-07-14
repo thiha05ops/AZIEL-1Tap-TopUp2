@@ -22,12 +22,12 @@
     <link rel="stylesheet" href="/css/admin/admin-wallet.css?v=20260706-2">
     <link rel="stylesheet" href="/css/admin/admin-support.css?v=20260706-2">
     <link rel="stylesheet" href="/css/admin/admin-live-chat.css?v=20260706-2">
+    <link rel="stylesheet" href="/css/admin/admin-design-system.css?v=20260714-phase6">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
-<body>
+<body class="admin-body">
 
     <div id="adminSidebarOverlay" class="admin-sidebar-overlay"></div>
 
@@ -46,95 +46,90 @@
                 </button>
             </div>
 
-            <nav class="admin-menu">
+            <nav class="admin-menu" aria-label="Admin navigation">
 
-                <button class="admin-nav active" data-section="dashboard">
+                <div class="admin-nav-group">
+                    <span class="admin-nav-label" data-admin-i18n="command">Command</span>
+
+                    <button class="admin-nav active" data-section="dashboard" type="button">
                     <i class="fa-solid fa-chart-line"></i>
-                    <span>Dashboard</span>
-                </button>
+                        <span data-admin-i18n="dashboard">Dashboard</span>
+                    </button>
+                </div>
 
-                <button class="admin-nav" data-section="orders">
+                <div class="admin-nav-group">
+                    <span class="admin-nav-label" data-admin-i18n="operations">Operations</span>
+
+                    <button class="admin-nav" data-section="orders" type="button">
                     <i class="fa-solid fa-box"></i>
-                    <span>Orders</span>
+                        <span data-admin-i18n="orders">Orders</span>
                 </button>
 
-                <button class="admin-nav" data-section="payments">
-                    <i class="fa-solid fa-credit-card"></i>
-                    <span>Payments</span>
-                </button>
-
-                <button class="admin-nav" data-section="wallet">
+                    <button class="admin-nav" data-section="wallet" type="button">
                     <i class="fa-solid fa-wallet"></i>
-                    <span>Wallet</span>
+                        <span data-admin-i18n="wallet">Wallet</span>
                 </button>
 
-                <button class="admin-nav" data-section="users">
-                    <i class="fa-solid fa-users"></i>
-                    <span>Users</span>
-                </button>
-
-                <button class="admin-nav" data-section="games">
-                    <i class="fa-solid fa-gamepad"></i>
-                    <span>Products</span>
-                </button>
-
-                <button class="admin-nav" data-section="suppliers">
-                    <i class="fa-solid fa-truck-fast"></i>
-                    <span>Suppliers</span>
-                </button>
-
-                <button class="admin-nav" data-section="coupons">
-                    <i class="fa-solid fa-ticket"></i>
-                    <span>Coupons</span>
-                </button>
-
-                <button class="admin-nav" data-section="support">
+                    <button class="admin-nav" data-section="support" type="button">
                     <i class="fa-solid fa-headset"></i>
-                    <span>Support</span>
+                        <span data-admin-i18n="support">Support</span>
                 </button>
 
-                <button class="admin-nav" data-section="chat">
+                    <button class="admin-nav" data-section="chat" type="button">
                     <i class="fa-solid fa-comments"></i>
-                    <span>Live Chat</span>
+                        <span data-admin-i18n="live_chat">Live Chat</span>
+                </button>
+                </div>
+
+                <div class="admin-nav-group">
+                    <span class="admin-nav-label" data-admin-i18n="commerce">Commerce</span>
+
+                    <button class="admin-nav" data-section="catalog" type="button">
+                        <i class="fa-solid fa-layer-group"></i>
+                        <span data-admin-i18n="catalog">Catalog</span>
+                    </button>
+
+                    <button class="admin-nav" data-section="media" type="button">
+                        <i class="fa-solid fa-photo-film"></i>
+                        <span data-admin-i18n="media_library">Media Library</span>
+                    </button>
+                </div>
+
+                <div class="admin-nav-group">
+                    <span class="admin-nav-label" data-admin-i18n="customers">Customers</span>
+
+                    <button class="admin-nav" data-section="users" type="button">
+                        <i class="fa-solid fa-users"></i>
+                        <span data-admin-i18n="users">Users</span>
                 </button>
 
-                <button class="admin-nav" data-section="notifications">
-                    <i class="fa-solid fa-bell"></i>
-                    <span>Notifications</span>
+                    <button class="admin-nav" data-section="broadcast" type="button">
+                        <i class="fa-solid fa-bullhorn"></i>
+                        <span data-admin-i18n="broadcast">Broadcast</span>
+                </button>
+                </div>
+
+                <div class="admin-nav-group">
+                    <span class="admin-nav-label" data-admin-i18n="platform">Platform</span>
+
+                    <button class="admin-nav" data-section="payments" type="button">
+                    <i class="fa-solid fa-credit-card"></i>
+                        <span data-admin-i18n="payment_methods">Payment Methods</span>
                 </button>
 
-                <button class="admin-nav" data-section="broadcast">
-                    <i class="fa-solid fa-bullhorn"></i>
-                    <span>Broadcast</span>
+                    <button class="admin-nav" data-section="settings" type="button">
+                        <i class="fa-solid fa-gear"></i>
+                        <span data-admin-i18n="site_settings">Site Settings</span>
                 </button>
-
-                <button class="admin-nav" data-section="analytics">
-                    <i class="fa-solid fa-chart-pie"></i>
-                    <span>Analytics</span>
-                </button>
-
-                <button class="admin-nav" data-section="settings">
-                    <i class="fa-solid fa-gear"></i>
-                    <span>Settings</span>
-                </button>
-
-                <button class="admin-nav" data-section="admins">
-                    <i class="fa-solid fa-user-shield"></i>
-                    <span>Admins</span>
-                </button>
-
-                <button class="admin-nav" data-section="logs">
-                    <i class="fa-solid fa-clipboard-list"></i>
-                    <span>Logs</span>
-                </button>
+                </div>
 
             </nav>
 
             <div class="admin-user-box">
                 <div class="admin-avatar">A</div>
-                <div>
-                    <strong>Admin AZIEL</strong>
-                    <small>Super Admin</small>
+                    <div>
+                        <strong>Admin AZIEL</strong>
+                        <small data-admin-i18n="admin">Admin</small>
                 </div>
             </div>
 
@@ -150,207 +145,206 @@
                     </button>
 
                     <div>
-                        <h2 id="adminPageTitle">Dashboard</h2>
-                        <p id="adminPageSub">Live control center for AZIEL 1Tap Shop.</p>
+                        <h2 id="adminPageTitle" data-admin-i18n="dashboard">Dashboard</h2>
+                        <p id="adminPageSub" data-admin-i18n="dashboard_sub">Real operational snapshot for AZIEL today.</p>
                     </div>
                 </div>
 
                 <div class="top-actions">
-                    <input id="adminGlobalSearch" type="text" placeholder="Search order, user, wallet..." />
+                    <input id="adminGlobalSearch" type="text" placeholder="Search order, user, wallet..."
+                        data-admin-i18n-placeholder="search_placeholder" />
 
-                    <button class="top-icon-btn" type="button">
-                        <i class="fa-solid fa-bell"></i>
-                    </button>
+                    <div class="admin-topbar-controls">
+                        <select id="adminLocaleSelect" class="admin-locale-select" aria-label="Admin language">
+                            <option value="en">English</option>
+                            <option value="my">မြန်မာ</option>
+                        </select>
 
-                    <a href="home.html">Back Home</a>
+                        <button id="adminLogoutBtn" class="admin-logout-btn" type="button" data-admin-i18n="logout">
+                            Logout
+                        </button>
+
+                        <a href="home.html" data-admin-i18n="back_home">Back Home</a>
+                    </div>
                 </div>
 
             </header>
 
             <section class="admin-section active" id="section-dashboard">
 
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <span>Total Orders</span>
-                        <strong id="totalOrders">0</strong>
-                        <small class="up">Live synced</small>
+                <div class="panel admin-action-panel">
+                    <div class="panel-head">
+                        <h3 data-admin-i18n="action_required">Action Required</h3>
+                        <button id="refreshDashboardBtn" class="admin-secondary-btn" type="button" data-admin-i18n="refresh">Refresh</button>
                     </div>
 
-                    <div class="stat-card">
-                        <span>Pending</span>
-                        <strong id="pendingOrders">0</strong>
-                        <small class="warn">Needs action</small>
-                    </div>
-
-                    <div class="stat-card">
-                        <span>Processing</span>
-                        <strong id="processingOrders">0</strong>
-                        <small>In progress</small>
-                    </div>
-
-                    <div class="stat-card">
-                        <span>Completed</span>
-                        <strong id="completedOrders">0</strong>
-                        <small class="up">Delivered</small>
-                    </div>
-
-                    <div class="stat-card">
-                        <span>Users</span>
-                        <strong id="totalUsers">0</strong>
-                        <small>Registered</small>
-                    </div>
-
-                    <div class="stat-card">
-                        <span>Revenue</span>
-                        <strong id="revenue">0</strong>
-                        <small class="up">MMK / THB</small>
+                    <div id="actionRequiredList" class="admin-action-grid" aria-live="polite">
+                        <div class="admin-dashboard-skeleton"></div>
+                        <div class="admin-dashboard-skeleton"></div>
+                        <div class="admin-dashboard-skeleton"></div>
                     </div>
                 </div>
 
-                <div class="dashboard-grid">
-
-                    <div class="panel wide">
-                        <div class="panel-head">
-                            <h3>Revenue Overview</h3>
-                            <span>This Week</span>
-                        </div>
-                        <canvas id="revenueChart"></canvas>
+                <div class="panel admin-today-panel">
+                    <div class="panel-head">
+                        <h3 data-admin-i18n="today">Today</h3>
+                        <span id="dashboardLastUpdated" data-admin-i18n="last_updated">Last updated</span>
                     </div>
 
-                    <div class="panel">
-                        <div class="panel-head">
-                            <h3>Orders Status</h3>
-                            <span>Live</span>
-                        </div>
-                        <canvas id="ordersChart"></canvas>
-                    </div>
-
-                    <div class="panel">
-                        <div class="panel-head">
-                            <h3>Top Games</h3>
-                            <span>Today</span>
+                    <div class="stats-grid admin-today-grid">
+                        <div class="stat-card">
+                            <span data-admin-i18n="orders_today">Orders Today</span>
+                            <strong id="ordersToday">0</strong>
+                            <small data-admin-i18n="timezone_bangkok">Asia/Bangkok</small>
                         </div>
 
-                        <div class="mini-list">
-                            <p><span>Mobile Legends</span><b>45%</b></p>
-                            <p><span>PUBG Mobile</span><b>25%</b></p>
-                            <p><span>Free Fire</span><b>15%</b></p>
-                            <p><span>Honor Of Kings</span><b>10%</b></p>
-                        </div>
-                    </div>
-
-                    <div class="panel">
-                        <div class="panel-head">
-                            <h3>Recent Activity</h3>
-                            <span>Realtime</span>
+                        <div class="stat-card">
+                            <span data-admin-i18n="completed_today">Completed Today</span>
+                            <strong id="completedToday">0</strong>
+                            <small class="up" data-admin-i18n="completed">Completed</small>
                         </div>
 
-                        <div id="recentActivity" class="activity-list">
-                            <p>Waiting for live activity...</p>
+                        <div class="stat-card">
+                            <span data-admin-i18n="failed_today">Failed Today</span>
+                            <strong id="failedToday">0</strong>
+                            <small class="warn" data-admin-i18n="failed">Failed</small>
+                        </div>
+
+                        <div class="stat-card">
+                            <span data-admin-i18n="new_users_today">New Users</span>
+                            <strong id="newUsersToday">0</strong>
+                            <small data-admin-i18n="users">Users</small>
                         </div>
                     </div>
 
+                    <div class="admin-revenue-lines">
+                        <p><span data-admin-i18n="completed_order_value_mmk">Completed Order Value MMK</span><b id="completedValueMMK">0 MMK</b></p>
+                        <p><span data-admin-i18n="completed_order_value_thb">Completed Order Value THB</span><b id="completedValueTHB">0 THB</b></p>
+                    </div>
                 </div>
 
-                <div class="dashboard-bottom-grid">
-
-                    <div class="panel">
-                        <div class="panel-head">
-                            <h3>Pending Payments</h3>
-                            <span>Live Queue</span>
-                        </div>
-
-                        <div class="payment-live-list">
-                            <div class="payment-live-item">
-                                <div>
-                                    <strong>Waiting Orders</strong>
-                                    <small>Auto / Manual payment queue</small>
-                                </div>
-                                <span class="status-pill pending">Pending</span>
-                            </div>
-
-                            <div class="payment-live-item">
-                                <div>
-                                    <strong>PromptPay</strong>
-                                    <small>Webhook ready</small>
-                                </div>
-                                <span class="status-pill completed">Online</span>
-                            </div>
-                        </div>
+                <div class="panel admin-recent-panel">
+                    <div class="panel-head">
+                        <h3 data-admin-i18n="recent_operations">Recent Operations</h3>
+                        <span data-admin-i18n="real_order_events">Real order updates</span>
                     </div>
 
-                    <div class="panel quick-broadcast-panel">
-                        <div class="panel-head">
-                            <h3>Broadcast Quick Send</h3>
-                            <span>Realtime</span>
-                        </div>
-
-                        <div class="quick-broadcast-grid">
-                            <button class="quick-action purple">📢 <span>Announcement</span></button>
-                            <button class="quick-action pink">🎁 <span>Promotion</span></button>
-                            <button class="quick-action orange">⚠️ <span>Delay</span></button>
-                            <button class="quick-action green">✅ <span>Completed</span></button>
-                        </div>
+                    <div id="recentOperationsList" class="activity-list admin-recent-list">
+                        <p data-admin-i18n="loading">Loading</p>
                     </div>
-
-                    <div class="panel">
-                        <div class="panel-head">
-                            <h3>System Status</h3>
-                            <span>Live</span>
-                        </div>
-
-                        <div class="system-status-list">
-                            <div class="system-status-item"><span>Website</span><b class="online">Online</b></div>
-                            <div class="system-status-item"><span>Database</span><b class="online">Online</b></div>
-                            <div class="system-status-item"><span>Socket Server</span><b class="online">Online</b></div>
-                            <div class="system-status-item"><span>Payment API</span><b class="online">Online</b></div>
-                        </div>
-                    </div>
-
                 </div>
 
             </section>
 
             <section class="admin-section" id="section-orders">
-                <div class="panel">
-                    <div class="panel-head">
-                        <h3>Orders</h3>
-                        <span>Live orders</span>
+                <div class="orders-command-center">
+                    <div class="panel orders-command-panel">
+                        <div class="panel-head">
+                            <h3 data-admin-i18n="orders">Orders</h3>
+                            <span data-admin-i18n="orders_sub">Review and manage AZIEL customer orders.</span>
+                        </div>
+
+                        <div class="orders-queue-tabs" role="tablist" aria-label="Order queues">
+                            <button class="orders-queue-tab active" type="button" data-order-filter="all" data-admin-i18n="all">All</button>
+                            <button class="orders-queue-tab" type="button" data-order-filter="manual_review" data-admin-i18n="manual_review">Manual Review</button>
+                            <button class="orders-queue-tab" type="button" data-order-filter="paid" data-admin-i18n="paid">Paid</button>
+                            <button class="orders-queue-tab" type="button" data-order-filter="processing" data-admin-i18n="processing">Processing</button>
+                            <button class="orders-queue-tab" type="button" data-order-filter="refund_requested" data-admin-i18n="refund_requests">Refund Requests</button>
+                            <button class="orders-queue-tab" type="button" data-order-filter="completed" data-admin-i18n="completed">Completed</button>
+                            <button class="orders-queue-tab" type="button" data-order-filter="failed" data-admin-i18n="failed">Failed</button>
+                        </div>
+
+                        <div class="admin-filter-bar">
+                            <input id="orderSearchInput" type="text" placeholder="Search order or username..."
+                                data-admin-i18n-placeholder="search_order_placeholder">
+                            <button id="orderSearchBtn" class="admin-secondary-btn" type="button" data-admin-i18n="search">Search</button>
+                            <button id="orderClearSearchBtn" class="admin-secondary-btn" type="button" data-admin-i18n="clear">Clear</button>
+                        </div>
+
+                        <div id="adminOrdersQueue" class="orders-queue-list" aria-live="polite">
+                            <div class="admin-dashboard-skeleton"></div>
+                            <div class="admin-dashboard-skeleton"></div>
+                            <div class="admin-dashboard-skeleton"></div>
+                        </div>
                     </div>
 
-                    <div class="admin-filter-bar">
-                        <input id="orderSearchInput" type="text" placeholder="Search order, user, game...">
+                    <aside id="adminOrderDetailPanel" class="panel order-detail-panel" aria-live="polite">
+                        <div class="order-detail-empty">
+                            <strong data-admin-i18n="select_order_to_review">Select an order to review.</strong>
+                        </div>
+                    </aside>
+                </div>
+            </section>
 
-                        <select id="orderStatusFilter">
-                            <option value="all">All Status</option>
-                            <option value="pending_payment">Pending</option>
-                            <option value="paid">Paid</option>
-                            <option value="processing">Processing</option>
-                            <option value="completed">Completed</option>
-                            <option value="cancelled">Cancelled</option>
-                            <option value="failed">Failed</option>
-                        </select>
+            <section class="admin-section" id="section-catalog">
+                <div class="catalog-command-center">
+                    <div class="panel catalog-products-panel">
+                        <div class="panel-head">
+                            <div>
+                                <h3 data-admin-i18n="catalog">Catalog</h3>
+                                <span data-admin-i18n="catalog_readonly_sub">Read-only canonical catalog foundation.</span>
+                            </div>
+                            <button id="refreshCatalogBtn" class="admin-secondary-btn" type="button" data-admin-i18n="refresh">Refresh</button>
+                        </div>
+
+                        <div class="catalog-source-row">
+                            <span data-admin-i18n="database_catalog_data">Database Catalog Data</span>
+                            <b id="catalogSourceLabel">-</b>
+                        </div>
+
+                        <div class="catalog-source-row">
+                            <span data-admin-i18n="active_runtime_source">Active Runtime Source</span>
+                            <b id="catalogActiveSourceLabel">-</b>
+                        </div>
+
+                        <div id="adminCatalogProducts" class="catalog-product-list" aria-live="polite">
+                            <div class="admin-dashboard-skeleton"></div>
+                            <div class="admin-dashboard-skeleton"></div>
+                            <div class="admin-dashboard-skeleton"></div>
+                        </div>
                     </div>
 
-                    <div class="admin-table-wrap">
-                        <table class="admin-table">
-                            <thead>
-                                <tr>
-                                    <th>Order ID</th>
-                                    <th>User</th>
-                                    <th>Game</th>
-                                    <th>Package</th>
-                                    <th>Status</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
+                    <aside id="adminCatalogDetailPanel" class="panel catalog-detail-panel" aria-live="polite">
+                        <div class="catalog-detail-empty">
+                            <strong data-admin-i18n="select_product">Select a product</strong>
+                        </div>
+                    </aside>
+                </div>
+            </section>
 
-                            <tbody id="adminOrdersBody">
-                                <tr>
-                                    <td colspan="6">Loading orders...</td>
-                                </tr>
-                            </tbody>
-                        </table>
+            <section class="admin-section" id="section-media">
+                <div class="media-library-center">
+                    <div class="panel media-library-panel">
+                        <div class="panel-head">
+                            <div>
+                                <h3 data-admin-i18n="media_library">Media Library</h3>
+                                <span data-admin-i18n="media_library_sub">Durable presentation assets for catalog content.</span>
+                            </div>
+                            <button id="uploadMediaBtn" class="admin-secondary-btn" type="button" data-admin-i18n="upload_asset">Upload Asset</button>
+                        </div>
+
+                        <div class="admin-filter-bar media-filter-bar">
+                            <select id="mediaCategoryFilter">
+                                <option value="" data-admin-i18n="all">All</option>
+                                <option value="product_image" data-admin-i18n="product_image">Product Image</option>
+                                <option value="product_banner" data-admin-i18n="product_banner">Product Banner</option>
+                                <option value="package_icon" data-admin-i18n="package_icon">Package Icon</option>
+                                <option value="campaign" data-admin-i18n="campaign">Campaign</option>
+                                <option value="promotion" data-admin-i18n="promotion">Promotion</option>
+                                <option value="announcement" data-admin-i18n="announcement">Announcement</option>
+                                <option value="other" data-admin-i18n="other">Other</option>
+                            </select>
+                            <input id="mediaSearchInput" type="text" placeholder="Search media..."
+                                data-admin-i18n-placeholder="search_media_placeholder">
+                            <button id="mediaSearchBtn" class="admin-secondary-btn" type="button" data-admin-i18n="search">Search</button>
+                            <button id="mediaRefreshBtn" class="admin-secondary-btn" type="button" data-admin-i18n="refresh">Refresh</button>
+                        </div>
+
+                        <div id="adminMediaGrid" class="media-asset-grid" aria-live="polite">
+                            <div class="admin-dashboard-skeleton"></div>
+                            <div class="admin-dashboard-skeleton"></div>
+                            <div class="admin-dashboard-skeleton"></div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -385,15 +379,86 @@
             </section>
 
             <section class="admin-section" id="section-wallet">
-                <div class="panel">
-                    <div class="panel-head">
-                        <h3>Wallet Topups</h3>
-                        <span>Pending approvals</span>
+                <div class="wallet-command-center">
+                    <div class="panel wallet-command-panel">
+                        <div class="panel-head">
+                            <h3 data-admin-i18n="wallet_command_center">Wallet Command Center</h3>
+                            <span data-admin-i18n="wallet_sub">Review wallet top-ups and wallet operations.</span>
+                        </div>
+
+                        <div class="wallet-command-tabs" role="tablist" aria-label="Wallet views">
+                            <button class="wallet-command-tab active" type="button" data-wallet-view="pending" data-admin-i18n="pending_topups">Pending Top-ups</button>
+                            <button class="wallet-command-tab" type="button" data-wallet-view="all" data-admin-i18n="all_topups">All Top-ups</button>
+                            <button class="wallet-command-tab" type="button" data-wallet-view="transactions" data-admin-i18n="transactions">Transactions</button>
+                            <button class="wallet-command-tab" type="button" data-wallet-view="adjustments" data-admin-i18n="adjustments">Adjustments</button>
+                        </div>
+
+                        <div id="walletTopupWorkspace" class="wallet-view-panel active">
+                            <div id="adminWalletList" class="wallet-queue-list">
+                                <div class="admin-dashboard-skeleton"></div>
+                                <div class="admin-dashboard-skeleton"></div>
+                            </div>
+                        </div>
+
+                        <div id="walletTransactionsWorkspace" class="wallet-view-panel">
+                            <div class="admin-filter-bar">
+                                <input id="walletTransactionSearch" type="text" placeholder="Search transaction or user..."
+                                    data-admin-i18n-placeholder="wallet_transaction_search">
+                                <select id="walletTransactionType">
+                                    <option value="" data-admin-i18n="all">All</option>
+                                    <option value="wallet.topup" data-admin-i18n="credit">Credit</option>
+                                    <option value="wallet.payment" data-admin-i18n="debit">Debit</option>
+                                    <option value="wallet.refund" data-admin-i18n="refund">Refund</option>
+                                    <option value="wallet.adjustment" data-admin-i18n="adjustment">Adjustment</option>
+                                </select>
+                                <select id="walletTransactionCurrency">
+                                    <option value="">MMK / THB</option>
+                                    <option value="MMK">MMK</option>
+                                    <option value="THB">THB</option>
+                                </select>
+                                <button id="walletTransactionSearchBtn" class="admin-secondary-btn" type="button" data-admin-i18n="search">Search</button>
+                            </div>
+                            <div id="adminWalletTransactions" class="wallet-ledger-list"></div>
+                            <div class="wallet-pagination">
+                                <button id="walletPrevPage" class="admin-secondary-btn" type="button" data-admin-i18n="previous">Previous</button>
+                                <span id="walletPageInfo">1 / 1</span>
+                                <button id="walletNextPage" class="admin-secondary-btn" type="button" data-admin-i18n="next">Next</button>
+                            </div>
+                        </div>
+
+                        <div id="walletAdjustmentWorkspace" class="wallet-view-panel">
+                            <div class="wallet-adjustment-form">
+                                <label data-admin-i18n="customer">Customer</label>
+                                <input id="walletAdjustUsername" type="text" placeholder="username">
+
+                                <label data-admin-i18n="adjustment_type">Adjustment Type</label>
+                                <select id="walletAdjustDirection">
+                                    <option value="credit" data-admin-i18n="credit_wallet">Credit Wallet</option>
+                                    <option value="debit" data-admin-i18n="debit_wallet">Debit Wallet</option>
+                                </select>
+
+                                <label data-admin-i18n="amount">Amount</label>
+                                <input id="walletAdjustAmount" type="number" min="0" step="0.01" placeholder="0">
+
+                                <label data-admin-i18n="currency">Currency</label>
+                                <select id="walletAdjustCurrency">
+                                    <option value="MMK">MMK</option>
+                                    <option value="THB">THB</option>
+                                </select>
+
+                                <label data-admin-i18n="reason">Reason</label>
+                                <textarea id="walletAdjustReason" placeholder="Required reason"></textarea>
+
+                                <button id="walletAdjustSubmitBtn" class="order-primary-action" type="button" data-admin-i18n="submit_adjustment">Submit Adjustment</button>
+                            </div>
+                        </div>
                     </div>
 
-                    <div id="adminWalletList" class="admin-list-empty">
-                        Wallet topups will appear here.
-                    </div>
+                    <aside id="adminWalletDetailPanel" class="panel wallet-detail-panel" aria-live="polite">
+                        <div class="order-detail-empty">
+                            <strong data-admin-i18n="select_topup_to_review">Select a top-up to review.</strong>
+                        </div>
+                    </aside>
                 </div>
             </section>
 
@@ -406,66 +471,6 @@
 
                     <div id="adminUsersList">
                         Loading users...
-                    </div>
-                </div>
-            </section>
-
-            <section class="admin-section" id="section-games">
-                <div class="panel">
-                    <div class="panel-head">
-                        <h3>Products & Prices</h3>
-                        <span>Manage packages</span>
-                    </div>
-
-                    <div class="mini-list">
-                        <p><span>Mobile Legends</span><b>Active</b></p>
-                        <p><span>PUBG Mobile</span><b>Active</b></p>
-                        <p><span>Free Fire</span><b>Active</b></p>
-                        <p><span>Honor Of Kings</span><b>Active</b></p>
-                        <p><span>Roblox</span><b>Coming</b></p>
-                        <p><span>Gift Cards</span><b>Coming</b></p>
-                    </div>
-                </div>
-            </section>
-
-            <section class="admin-section" id="section-suppliers">
-                <div class="panel">
-                    <div class="panel-head">
-                        <h3>Suppliers</h3>
-                        <span>Manual / API</span>
-                    </div>
-
-                    <div class="mini-list">
-                        <p><span>Manual Supplier</span><b>Active</b></p>
-                        <p><span>Supplier API</span><b>Coming Next</b></p>
-                        <p><span>Supplier Balance</span><b>Not Connected</b></p>
-                        <p><span>Fulfillment Logs</span><b>Coming Next</b></p>
-                    </div>
-                </div>
-            </section>
-
-            <section class="admin-section" id="section-coupons">
-                <div class="panel">
-                    <div class="panel-head">
-                        <h3>Coupons</h3>
-                        <span>Promotions</span>
-                    </div>
-
-                    <div class="broadcast-form">
-                        <label>Coupon Code</label>
-                        <input type="text" placeholder="AZIEL10">
-
-                        <label>Discount</label>
-                        <input type="text" placeholder="10% or 500 MMK">
-
-                        <label>Status</label>
-                        <select>
-                            <option>Draft</option>
-                            <option>Active</option>
-                            <option>Expired</option>
-                        </select>
-
-                        <button type="button">Save Coupon</button>
                     </div>
                 </div>
             </section>
@@ -496,22 +501,6 @@
                 </div>
             </section>
 
-            <section class="admin-section" id="section-notifications">
-                <div class="panel">
-                    <div class="panel-head">
-                        <h3>Notification Center</h3>
-                        <span>System / Order / Wallet</span>
-                    </div>
-
-                    <div class="mini-list">
-                        <p><span>Order Notifications</span><b>Enabled</b></p>
-                        <p><span>Wallet Notifications</span><b>Enabled</b></p>
-                        <p><span>Promotion Notifications</span><b>Enabled</b></p>
-                        <p><span>System Notices</span><b>Enabled</b></p>
-                    </div>
-                </div>
-            </section>
-
             <section class="admin-section" id="section-broadcast">
                 <div class="panel">
                     <div class="panel-head">
@@ -538,22 +527,6 @@
                         <button id="sendBroadcastBtn" type="button">
                             Send Broadcast
                         </button>
-                    </div>
-                </div>
-            </section>
-
-            <section class="admin-section" id="section-analytics">
-                <div class="panel">
-                    <div class="panel-head">
-                        <h3>Analytics</h3>
-                        <span>Coming Next</span>
-                    </div>
-
-                    <div class="mini-list">
-                        <p><span>Daily Sales</span><b>Coming</b></p>
-                        <p><span>Monthly Sales</span><b>Coming</b></p>
-                        <p><span>Top Regions</span><b>Coming</b></p>
-                        <p><span>Best Selling Games</span><b>Coming</b></p>
                     </div>
                 </div>
             </section>
@@ -615,21 +588,6 @@
                                     </select>
                                 </div>
 
-                                <div class="settings-row">
-                                    <div>
-                                        <label>Support Email</label>
-                                        <small>Support email for users</small>
-                                    </div>
-                                    <input id="supportEmail" type="email" placeholder="support@azielshop.com">
-                                </div>
-
-                                <div class="settings-row">
-                                    <div>
-                                        <label>Telegram Group Link</label>
-                                        <small>Your Telegram group or channel link</small>
-                                    </div>
-                                    <input id="telegramLink" type="text" placeholder="https://t.me/azielshop">
-                                </div>
                             </div>
                         </div>
 
@@ -662,14 +620,6 @@
                                         </span>
                                         <input id="liveChatEnabled" type="checkbox">
                                     </label>
-
-                                    <label class="switch-item">
-                                        <span>
-                                            <b>User Registration</b>
-                                            <small>Allow new users to register</small>
-                                        </span>
-                                        <input id="registrationEnabled" type="checkbox" checked>
-                                    </label>
                                 </div>
                             </div>
                         </div>
@@ -684,38 +634,6 @@
                             </button>
                         </div>
 
-                    </div>
-                </div>
-            </section>
-
-            <section class="admin-section" id="section-admins">
-                <div class="panel">
-                    <div class="panel-head">
-                        <h3>Admin Accounts</h3>
-                        <span>Roles</span>
-                    </div>
-
-                    <div class="mini-list">
-                        <p><span>Super Admin</span><b>Full Access</b></p>
-                        <p><span>Operator</span><b>Orders / Wallet</b></p>
-                        <p><span>Support</span><b>Tickets / Chat</b></p>
-                        <p><span>Marketing</span><b>Broadcast / Coupons</b></p>
-                    </div>
-                </div>
-            </section>
-
-            <section class="admin-section" id="section-logs">
-                <div class="panel">
-                    <div class="panel-head">
-                        <h3>Logs</h3>
-                        <span>Audit</span>
-                    </div>
-
-                    <div class="mini-list">
-                        <p><span>Admin Logs</span><b>Coming</b></p>
-                        <p><span>Payment Logs</span><b>Coming</b></p>
-                        <p><span>Login Logs</span><b>Coming</b></p>
-                        <p><span>Error Logs</span><b>Coming</b></p>
                     </div>
                 </div>
             </section>
@@ -752,17 +670,24 @@
     <script src="/js/ui-feedback.js?v=20260712-m6"></script>
     <script src="/js/admin-api.js?v=20260707"></script>
     <script src="/js/socket-client.js?v=20260712"></script>
-    <script src="/js/admin-app.js?v=20260707"></script>
-    <script src="/js/admin-stats.js?v=20260707"></script>
-    <script src="/js/admin-orders.js?v=20260707"></script>
-    <script src="/js/admin-support.js?v=20260712-support"></script>
+    <script src="/lang/admin/en.js?v=20260714-phase6"></script>
+    <script src="/lang/admin/my.js?v=20260714-phase6"></script>
+    <script src="/js/admin/admin-i18n.js?v=20260713-phase1"></script>
+    <script src="/js/admin/admin-action-modal.js?v=20260714-phase4"></script>
+    <script src="/js/admin-app.js?v=20260714-phase5"></script>
+    <script src="/js/admin-stats.js?v=20260713-phase3"></script>
+    <script src="/js/admin-orders.js?v=20260713-phase3"></script>
+    <script src="/js/admin/admin-media-selector.js?v=20260714-phase8"></script>
+    <script src="/js/admin-media.js?v=20260714-phase8"></script>
+    <script src="/js/admin-catalog.js?v=20260714-phase6"></script>
+    <script src="/js/admin-support.js?v=20260713-phase2"></script>
     <script src="/js/admin-live-chat.js?v=20260712-live-chat-fix"></script>
 
     <script src="/js/admin-payments.js?v=20260707"></script>
 
-    <script src="/js/admin-wallet.js?v=20260707"></script>
+    <script src="/js/admin-wallet.js?v=20260714-phase4"></script>
     <script src="/js/admin-users.js?v=20260707"></script>
-    <script src="/js/admin-settings.js?v=20260707"></script>
+    <script src="/js/admin-settings.js?v=20260713-phase1"></script>
 
     <script src="/js/pwa-fix.js"></script>
 

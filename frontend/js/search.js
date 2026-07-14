@@ -1,43 +1,53 @@
 /* =========================
-   LIVE SEARCH
+   CATALOG-BACKED LIVE SEARCH
 ========================= */
 
 document.addEventListener("DOMContentLoaded", () => {
     initLiveSearch();
 });
 
-const searchItems = [
-    {
-        name: "Mobile Legends Diamonds",
-        desc: "Instant Top Up",
-        img: "assets/games/mlbb.webp",
-        link: "mlbb.html"
-    },
-    {
-        name: "PUBG Mobile UC",
-        desc: "Global / Thailand",
-        img: "assets/games/pubg.webp",
-        link: "pubg.html"
-    },
-    {
-        name: "Free Fire Diamonds",
-        desc: "Fast Delivery",
-        img: "assets/games/freefire.webp",
-        link: "freefire.html"
-    },
-    {
-        name: "Honor of Kings Tokens",
-        desc: "MOBA Top Up",
-        img: "assets/games/hok.webp",
-        link: "hok.html"
-    }
-];
+function escapeSearchHtml(value = "") {
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+}
 
-function initLiveSearch() {
+async function getSearchItems() {
+    if (!window.AZIEL_CATALOG) return [];
+
+    try {
+        await window.AZIEL_CATALOG.load();
+    } catch {
+        return [];
+    }
+
+    return window.AZIEL_CATALOG.getProducts()
+        .filter(item => item.route)
+        .map(item => ({
+            name: item.name,
+            desc: item.searchDescription || item.description || "Top Up",
+            img: window.AZIEL_CATALOG_PRESENTATION?.resolveProductImage?.(item) || item.image,
+            fallbackImg: item.fallbackImage || window.AZIEL_CATALOG_PRESENTATION?.getProductImage?.(item.productCode) || "",
+            link: item.route,
+            productCode: item.productCode
+        }));
+}
+
+async function initLiveSearch() {
     const input = document.getElementById("searchInput");
     const dropdown = document.getElementById("searchDropdown");
 
     if (!input || !dropdown) return;
+
+    let searchItems = await getSearchItems();
+
+    document.addEventListener("aziel:catalog-updated", async event => {
+        if (event.detail?.status === "ready") {
+            searchItems = await getSearchItems();
+        }
+    });
 
     input.addEventListener("input", () => {
         const keyword = input.value.toLowerCase().trim();
@@ -50,7 +60,8 @@ function initLiveSearch() {
 
         const results = searchItems.filter(item =>
             item.name.toLowerCase().includes(keyword) ||
-            item.desc.toLowerCase().includes(keyword)
+            item.desc.toLowerCase().includes(keyword) ||
+            item.productCode.toLowerCase().includes(keyword)
         );
 
         if (!results.length) {
@@ -60,16 +71,17 @@ function initLiveSearch() {
         }
 
         dropdown.innerHTML = results.map(item => `
-            <a href="${item.link}" class="search-item">
-                <img src="${item.img}" alt="${item.name}">
+            <a href="${escapeSearchHtml(item.link)}" class="search-item" data-product-code="${escapeSearchHtml(item.productCode)}">
+                <img src="${escapeSearchHtml(item.img)}" alt="${escapeSearchHtml(item.name)}"${window.AZIEL_CATALOG_PRESENTATION?.imageFallbackAttributes?.(item.fallbackImg) || ""}>
                 <div>
-                    <h4>${item.name}</h4>
-                    <p>${item.desc}</p>
+                    <h4>${escapeSearchHtml(item.name)}</h4>
+                    <p>${escapeSearchHtml(item.desc)}</p>
                 </div>
             </a>
         `).join("");
 
         dropdown.classList.add("show");
+        window.AZIEL_CATALOG_PRESENTATION?.bindImageFallbacks?.(dropdown);
     });
 
     document.addEventListener("click", e => {

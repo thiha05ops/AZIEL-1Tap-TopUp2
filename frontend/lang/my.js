@@ -532,5 +532,11 @@ window.AZIEL_LANG.my = {
     ordersAppearHere: "သင့် recent top-up orders များကို ဒီနေရာမှာ ပြပါမည်။",
     startTopUp: "Top Up စမည်",
     noOrderNotifications: "Order notification မရှိပါ",
+    catalogPricesUnavailable: "စျေးနှုန်းများ ယာယီမရနိုင်ပါ။ ခဏနေပြီး ထပ်စမ်းပါ။",
+    catalogRetry: "ပြန်စမ်းမည်",
+    catalogProductUnavailable: "ဤ product ကို ယာယီမရနိုင်ပါ။",
+    catalogPackageUnavailable: "ဤ package ကို မရနိုင်တော့ပါ။ အခြား package တစ်ခု ရွေးပါ။",
+    catalogPriceUpdated: "နောက်ဆုံး catalog စျေးနှုန်းသို့ ပြောင်းလဲထားပါသည်။ စုစုပေါင်းအသစ်ကို စစ်ဆေးပါ။",
+    catalogPackagesUnavailable: "Package များ ယာယီမရနိုင်ပါ။",
     user: "User"
 };

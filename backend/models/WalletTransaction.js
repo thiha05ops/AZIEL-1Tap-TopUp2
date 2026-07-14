@@ -135,6 +135,7 @@ walletTransactionSchema.index({ username: 1, createdAt: -1 });
 walletTransactionSchema.index({ orderId: 1 });
 walletTransactionSchema.index({ topupId: 1 });
 walletTransactionSchema.index({ referenceType: 1, referenceId: 1 });
+walletTransactionSchema.index({ type: 1, currency: 1, createdAt: -1 });
 
 module.exports =
     mongoose.model(

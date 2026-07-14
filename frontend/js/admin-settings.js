@@ -6,6 +6,7 @@ let allPaymentMethods = [];
 document.addEventListener("DOMContentLoaded", () => {
     initSettingsTabs();
     initSettingsSave();
+    loadSettings();
 });
 
 function initSettingsTabs() {
@@ -24,6 +25,36 @@ function initSettingsTabs() {
 
 function initSettingsSave() {
     document.getElementById("saveSettingsBtn")?.addEventListener("click", saveSettings);
+}
+
+async function loadSettings() {
+    try {
+        const data = await adminFetch("/api/settings");
+
+        if (!data || !data.success) {
+            return;
+        }
+
+        const settings = data.settings || {};
+        setSettingsValue("siteName", settings.siteName || "");
+        setSettingsValue("announcement", settings.announcement || "");
+        setSettingsValue("defaultRegion", settings.defaultRegion || "MM");
+        setSettingsChecked("maintenanceMode", Boolean(settings.maintenanceMode));
+        setSettingsChecked("supportEnabled", settings.supportEnabled !== false);
+        setSettingsChecked("liveChatEnabled", settings.liveChatEnabled !== false);
+    } catch (error) {
+        console.log("Load admin settings error:", error);
+    }
+}
+
+function setSettingsValue(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.value = value;
+}
+
+function setSettingsChecked(id, checked) {
+    const el = document.getElementById(id);
+    if (el) el.checked = checked;
 }
 
 async function loadPaymentMethods() {
@@ -285,12 +316,9 @@ async function saveSettings() {
         siteName: document.getElementById("siteName")?.value || "",
         announcement: document.getElementById("announcement")?.value || "",
         defaultRegion: document.getElementById("defaultRegion")?.value || "MM",
-        supportEmail: document.getElementById("supportEmail")?.value || "",
-        telegramLink: document.getElementById("telegramLink")?.value || "",
         maintenanceMode: document.getElementById("maintenanceMode")?.checked || false,
         supportEnabled: document.getElementById("supportEnabled")?.checked || false,
-        liveChatEnabled: document.getElementById("liveChatEnabled")?.checked || false,
-        registrationEnabled: document.getElementById("registrationEnabled")?.checked || true
+        liveChatEnabled: document.getElementById("liveChatEnabled")?.checked || false
     };
 
     const data = await adminFetch("/api/admin/settings", {
@@ -308,3 +336,4 @@ async function saveSettings() {
 }
 
 window.loadPaymentMethods = loadPaymentMethods;
+window.loadSettings = loadSettings;

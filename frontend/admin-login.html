@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
-    <title>Admin Login</title>
+    <title>AZIEL Control Center Login</title>
 
     <link rel="manifest" href="/manifest.json">
     <link rel="stylesheet" href="/css/core/motion.css?v=20260712-m7">
@@ -37,6 +37,25 @@
         #adminLoginForm h1 {
             color: #ffd700;
             margin-top: 0;
+            margin-bottom: 4px;
+            letter-spacing: .08em;
+        }
+
+        #adminLoginForm .admin-login-kicker {
+            display: block;
+            color: rgba(255, 255, 255, .68);
+            font-size: 12px;
+            font-weight: 900;
+            letter-spacing: .12em;
+            margin-bottom: 18px;
+            text-transform: uppercase;
+        }
+
+        #adminLoginForm .admin-login-note {
+            color: rgba(255, 255, 255, .72);
+            font-size: 13px;
+            line-height: 1.5;
+            margin: 0 0 14px;
         }
 
         #adminLoginForm input,
@@ -75,19 +94,24 @@
 <body>
 
     <form id="adminLoginForm">
-        <h1>ADMIN LOGIN</h1>
+        <h1>AZIEL</h1>
+        <span class="admin-login-kicker" data-admin-i18n="control_center">Control Center</span>
+        <p class="admin-login-note" data-admin-i18n="restricted_access">Restricted operational access</p>
 
-        <input type="text" id="adminUsername" placeholder="Username">
-        <input type="password" id="adminPassword" placeholder="Password">
+        <input type="text" id="adminUsername" placeholder="Username" data-admin-i18n-placeholder="username">
+        <input type="password" id="adminPassword" placeholder="Password" data-admin-i18n-placeholder="password">
 
-        <button type="submit" id="adminLoginBtn">LOGIN</button>
-        <button type="button" id="resetAdminSessionBtn">Reset Admin Session</button>
+        <button type="submit" id="adminLoginBtn" data-admin-i18n="login">Login</button>
+        <button type="button" id="resetAdminSessionBtn" data-admin-i18n="reset_admin_session">Reset Admin Session</button>
 
         <p id="adminMsg"></p>
     </form>
 
     <script src="/js/motion.js?v=20260712-m7"></script>
     <script src="/js/ui-feedback.js?v=20260712-m6"></script>
+    <script src="/lang/admin/en.js?v=20260713-phase1"></script>
+    <script src="/lang/admin/my.js?v=20260713-phase1"></script>
+    <script src="/js/admin/admin-i18n.js?v=20260713-phase1"></script>
     <script src="/js/admin-login.js?v=20260706-5"></script>
 </body>
 

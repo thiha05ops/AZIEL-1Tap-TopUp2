@@ -7,72 +7,54 @@ document.addEventListener("DOMContentLoaded", () => {
     initAdminSearch();
     initAdminBroadcast();
     initQuickBroadcastButtons();
+    initAdminLogout();
+    initAdminLocaleRefresh();
 });
 
 const adminSectionTitles = {
     dashboard: {
-        title: "Dashboard",
-        sub: "Live control center for AZIEL 1Tap Shop."
+        titleKey: "dashboard",
+        subKey: "dashboard_sub"
     },
     orders: {
-        title: "Orders",
-        sub: "Manage user orders without leaving the admin app."
+        titleKey: "orders",
+        subKey: "orders_sub"
     },
     payments: {
-        title: "Payments",
-        sub: "Control PromptPay, SCB, KBZPay, WavePay, AYA Pay and Wallet payments."
+        titleKey: "payment_methods",
+        subKey: "payment_methods_sub"
     },
     wallet: {
-        title: "Wallet Topups",
-        sub: "Review and approve wallet balance requests."
+        titleKey: "wallet",
+        subKey: "wallet_sub"
+    },
+    catalog: {
+        titleKey: "catalog",
+        subKey: "catalog_sub"
+    },
+    media: {
+        titleKey: "media_library",
+        subKey: "media_library_sub"
     },
     users: {
-        title: "Users",
-        sub: "Customer accounts and activity overview."
-    },
-    games: {
-        title: "Products",
-        sub: "Manage game packages, regional prices and visibility."
-    },
-    suppliers: {
-        title: "Suppliers",
-        sub: "Manual supplier workflow, API status and supplier balance."
-    },
-    coupons: {
-        title: "Coupons",
-        sub: "Create promotions, giveaways and discount codes."
+        titleKey: "users",
+        subKey: "users_sub"
     },
     support: {
-        title: "Support Tickets",
-        sub: "Handle user problems, screenshots and requests."
+        titleKey: "support",
+        subKey: "support_sub"
     },
     chat: {
-        title: "Live Chat",
-        sub: "Realtime customer messages."
-    },
-    notifications: {
-        title: "Notifications",
-        sub: "Order, wallet, system and promotion notifications."
+        titleKey: "live_chat",
+        subKey: "live_chat_sub"
     },
     broadcast: {
-        title: "Broadcast",
-        sub: "Send announcements, promos and system messages."
-    },
-    analytics: {
-        title: "Analytics",
-        sub: "Revenue, users, games and regional performance."
+        titleKey: "broadcast",
+        subKey: "broadcast_sub"
     },
     settings: {
-        title: "Settings",
-        sub: "Admin controls and system preferences."
-    },
-    admins: {
-        title: "Admin Accounts",
-        sub: "Manage operator, support and super admin roles."
-    },
-    logs: {
-        title: "Logs",
-        sub: "Admin logs, payment logs, login logs and system events."
+        titleKey: "site_settings",
+        subKey: "settings_sub"
     }
 };
 
@@ -94,20 +76,49 @@ function initAdminNavigation() {
     });
 
     function setDefaultSection() {
-        const hashSection = window.location.hash
-            ? window.location.hash.replace("#", "")
-            : "";
+        const hashTarget = parseAdminHash();
 
         const firstActive = document.querySelector(".admin-nav.active");
-        const section = hashSection || firstActive?.dataset.section || "dashboard";
-        openAdminSection(section, false);
+        const section = document.getElementById(`section-${hashTarget.section}`)
+            ? hashTarget.section
+            : firstActive?.dataset.section || "dashboard";
+        openAdminSection(section, false, hashTarget.params);
     }
 
     setDefaultSection();
 }
 
-function openAdminSection(sectionName, updateHash = true) {
+function parseAdminHash() {
+    const raw = window.location.hash ? window.location.hash.slice(1) : "";
+    const [section = "", query = ""] = raw.split("?");
+    const params = Object.fromEntries(new URLSearchParams(query));
+
+    return {
+        section,
+        params
+    };
+}
+
+function buildAdminHash(sectionName, params = {}) {
+    const query = new URLSearchParams();
+
+    Object.entries(params || {}).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== "") {
+            query.set(key, value);
+        }
+    });
+
+    const suffix = query.toString();
+    return suffix ? `#${sectionName}?${suffix}` : `#${sectionName}`;
+}
+
+function openAdminSection(sectionName, updateHash = true, context = {}) {
     if (!sectionName) return;
+    if (!adminSectionTitles[sectionName]) {
+        sectionName = "dashboard";
+        updateHash = false;
+        context = {};
+    }
 
     const navButtons = document.querySelectorAll(".admin-nav");
     const sections = document.querySelectorAll(".admin-section");
@@ -135,17 +146,51 @@ function openAdminSection(sectionName, updateHash = true) {
     const pageInfo = adminSectionTitles[sectionName];
 
     if (pageInfo) {
-        if (title) title.innerText = pageInfo.title;
-        if (sub) sub.innerText = pageInfo.sub;
+        if (title) {
+            title.dataset.adminI18n = pageInfo.titleKey;
+            title.innerText = adminT(pageInfo.titleKey);
+        }
+        if (sub) {
+            sub.dataset.adminI18n = pageInfo.subKey;
+            sub.innerText = adminT(pageInfo.subKey);
+        }
     }
 
     if (updateHash) {
-        history.replaceState(null, "", `#${sectionName}`);
+        history.replaceState(null, "", buildAdminHash(sectionName, context));
     }
 
     window.dispatchEvent(new CustomEvent("aziel:admin-section-opened", {
-        detail: { section: sectionName }
+        detail: {
+            section: sectionName,
+            context
+        }
     }));
+}
+
+function adminT(key, fallback = "") {
+    return window.AZIEL_ADMIN_I18N?.t?.(key, fallback) || fallback || key;
+}
+
+function initAdminLogout() {
+    document.getElementById("adminLogoutBtn")?.addEventListener("click", () => {
+        if (typeof adminLogout === "function") {
+            adminLogout();
+        }
+    });
+}
+
+function initAdminLocaleRefresh() {
+    window.addEventListener("aziel:admin-locale-changed", () => {
+        const activeSection = document.querySelector(".admin-section.active");
+        const sectionName = activeSection?.id?.replace("section-", "") || "dashboard";
+        const pageInfo = adminSectionTitles[sectionName] || adminSectionTitles.dashboard;
+        const title = document.getElementById("adminPageTitle");
+        const sub = document.getElementById("adminPageSub");
+
+        if (title) title.innerText = adminT(pageInfo.titleKey);
+        if (sub) sub.innerText = adminT(pageInfo.subKey);
+    });
 }
 
 function initAdminMobileSidebar() {
@@ -205,6 +250,18 @@ function initAdminSearch() {
             keyword.includes("topup")
         ) {
             openAdminSection("wallet");
+            return;
+        }
+
+        if (
+            keyword.includes("catalog") ||
+            keyword.includes("media") ||
+            keyword.includes("asset") ||
+            keyword.includes("image") ||
+            keyword.includes("package") ||
+            keyword.includes("game")
+        ) {
+            openAdminSection(keyword.includes("media") || keyword.includes("asset") || keyword.includes("image") ? "media" : "catalog");
             return;
         }
 
@@ -318,25 +375,8 @@ function initQuickBroadcastButtons() {
 
     buttons.forEach(btn => {
         btn.addEventListener("click", () => {
-            const text = btn.innerText.toLowerCase();
-
-            let type = "announcement";
-            let title = "Admin Announcement";
-
-            if (text.includes("promotion")) {
-                type = "promo";
-                title = "Special Promotion";
-            }
-
-            if (text.includes("delay")) {
-                type = "topup_delayed";
-                title = "Top-up Delay Notice";
-            }
-
-            if (text.includes("completed")) {
-                type = "order_completed";
-                title = "Order Completed";
-            }
+            const type = btn.dataset.broadcastType || "announcement";
+            const title = btn.dataset.broadcastTitle || "Admin Announcement";
 
             openAdminSection("broadcast");
 
@@ -386,3 +426,5 @@ function showAdminToast(message, type = "success") {
         setTimeout(() => toast.remove(), 300);
     }, 2800);
 }
+
+window.openAdminSection = openAdminSection;

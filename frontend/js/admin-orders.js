@@ -1,9 +1,22 @@
 // frontend/js/admin-orders.js
-// AZIEL Admin V2.5 Orders Controller + Customer Refund Request Flow
+// AZIEL Admin V2.5 Orders Command Center
 
 let allAdminOrders = [];
+let selectedAdminOrderId = "";
 let ordersAutoRefreshTimer = null;
+let ordersRefreshDebounce = null;
 let adminOrdersInitialized = false;
+let currentOrderContext = {};
+
+const ORDER_QUEUE_FILTERS = new Set([
+    "all",
+    "manual_review",
+    "paid",
+    "processing",
+    "refund_requested",
+    "completed",
+    "failed"
+]);
 
 document.addEventListener("DOMContentLoaded", () => {
     initAdminOrdersController();
@@ -13,211 +26,413 @@ function initAdminOrdersController() {
     if (adminOrdersInitialized) return;
     adminOrdersInitialized = true;
 
-    initOrderFilters();
+    bindOrderCommandControls();
     initOrderModal();
+    bindOrderRealtimeRefresh();
 
     if (isAdminSectionActive("orders") || !document.getElementById("section-orders")) {
+        applyOrderNavigationContext(getAdminHashContext("orders"));
         loadOrders();
     }
 
     window.addEventListener("aziel:admin-section-opened", event => {
         if (event.detail?.section === "orders") {
+            applyOrderNavigationContext(event.detail.context || {});
             loadOrders(false);
         }
     });
 
     ordersAutoRefreshTimer = setInterval(() => {
         if (!document.hidden && isAdminSectionActive("orders")) loadOrders(false);
-    }, 20000);
+    }, 30000);
+
+    window.addEventListener("aziel:admin-locale-changed", () => {
+        renderOrderQueue(allAdminOrders);
+        renderSelectedOrder();
+    });
+}
+
+function bindOrderCommandControls() {
+    document.querySelectorAll(".orders-queue-tab").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const filter = btn.dataset.orderFilter || "all";
+            currentOrderContext = contextForFilter(filter);
+            selectedAdminOrderId = "";
+            updateOrderHash();
+            syncOrderTabs();
+        });
+    });
+
+    document.getElementById("orderSearchBtn")?.addEventListener("click", () => {
+        currentOrderContext.q = document.getElementById("orderSearchInput")?.value.trim() || "";
+        selectedAdminOrderId = "";
+        updateOrderHash();
+    });
+
+    document.getElementById("orderClearSearchBtn")?.addEventListener("click", () => {
+        const input = document.getElementById("orderSearchInput");
+        if (input) input.value = "";
+        delete currentOrderContext.q;
+        selectedAdminOrderId = "";
+        updateOrderHash();
+    });
+
+    document.getElementById("orderSearchInput")?.addEventListener("keydown", event => {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            document.getElementById("orderSearchBtn")?.click();
+        }
+    });
+}
+
+function bindOrderRealtimeRefresh() {
+    window.addEventListener("aziel:admin-dashboard-refresh", scheduleOrdersRefresh);
+
+    if (window.AZIEL?.realtime) {
+        ["admin:order-updated", "adminNewUpdate"].forEach(eventName => {
+            window.AZIEL.realtime.on(eventName, scheduleOrdersRefresh, { role: "admin" });
+        });
+    }
+}
+
+function scheduleOrdersRefresh() {
+    if (!isAdminSectionActive("orders")) return;
+
+    clearTimeout(ordersRefreshDebounce);
+    ordersRefreshDebounce = setTimeout(() => loadOrders(false), 700);
 }
 
 async function loadOrders(showLoading = true) {
-    const body = document.getElementById("adminOrdersBody");
-    if (!body) return;
+    const box = document.getElementById("adminOrdersQueue");
+    if (!box) return;
 
     if (showLoading) {
-        body.innerHTML = `<tr><td colspan="6">Loading orders...</td></tr>`;
+        box.innerHTML = `
+            <div class="admin-dashboard-skeleton"></div>
+            <div class="admin-dashboard-skeleton"></div>
+            <div class="admin-dashboard-skeleton"></div>
+        `;
     }
 
     try {
-        const data = await adminFetch("/api/admin/orders");
+        const data = await adminFetch(buildOrdersEndpoint());
 
         if (!data || !data.success) {
-            body.innerHTML = `<tr><td colspan="6">${escapeHTML(data?.message || "Failed to load orders")}</td></tr>`;
+            renderOrdersError(data?.message || adminT("something_went_wrong"));
             return;
         }
 
         allAdminOrders = Array.isArray(data.orders) ? data.orders : [];
-        applyOrderFilter();
-
+        reconcileSelectedOrder();
+        renderOrderQueue(allAdminOrders);
+        renderSelectedOrder();
     } catch (error) {
         console.log("Load orders error:", error);
-        body.innerHTML = `<tr><td colspan="6">Server error while loading orders</td></tr>`;
+        renderOrdersError(adminT("something_went_wrong"));
     }
 }
 
-function initOrderFilters() {
-    document.getElementById("orderSearchInput")?.addEventListener("input", applyOrderFilter);
-    document.getElementById("orderStatusFilter")?.addEventListener("change", applyOrderFilter);
-}
-
-function applyOrderFilter() {
-    const keyword = (document.getElementById("orderSearchInput")?.value || "").trim().toLowerCase();
-    const status = document.getElementById("orderStatusFilter")?.value || "all";
-
-    const filtered = allAdminOrders.filter(order => {
-        const text = `
-            ${order.orderId || ""}
-            ${order.username || ""}
-            ${order.game || ""}
-            ${order.packageName || ""}
-            ${order.userId || ""}
-            ${order.zoneId || ""}
-            ${order.paymentMethod || ""}
-            ${order.region || ""}
-            ${order.currency || ""}
-            ${order.status || ""}
-        `.toLowerCase();
-
-        return (!keyword || text.includes(keyword)) &&
-            (status === "all" || order.status === status);
-    });
-
-    renderOrders(filtered);
-}
-
-function renderOrders(orders) {
-    const body = document.getElementById("adminOrdersBody");
-    if (!body) return;
-
-    if (!orders.length) {
-        body.innerHTML = `<tr><td colspan="6">No orders found</td></tr>`;
+function reconcileSelectedOrder() {
+    if (selectedAdminOrderId && allAdminOrders.some(order => String(order._id) === String(selectedAdminOrderId))) {
         return;
     }
 
-    body.innerHTML = orders.map(order => {
-        const id = escapeHTML(order._id || "");
-        const status = order.status || "pending_payment";
+    selectedAdminOrderId = allAdminOrders[0]?._id || "";
+}
+
+function renderOrderQueue(orders) {
+    const box = document.getElementById("adminOrdersQueue");
+    if (!box) return;
+
+    syncOrderTabs();
+
+    if (!orders.length) {
+        box.innerHTML = `
+            <div class="admin-empty-box orders-empty-state">
+                ${escapeHTML(emptyMessageForCurrentFilter())}
+            </div>
+        `;
+        return;
+    }
+
+    box.innerHTML = orders.map(order => {
+        const selected = String(order._id) === String(selectedAdminOrderId);
+        const evidenceText = order.hasPaymentEvidence ? adminT("slip_attached") : adminT("no_payment_evidence");
 
         return `
-            <tr>
-                <td>
-                    <button class="order-link-btn" data-action="view-order" data-id="${id}">
-                        ${escapeHTML(order.orderId || "-")}
-                    </button>
-                </td>
+            <button class="orders-queue-row ${selected ? "active" : ""}" type="button" data-id="${escapeHTML(order._id)}">
+                <span class="orders-row-main">
+                    <strong>${escapeHTML(order.orderId || "-")}</strong>
+                    <small>${escapeHTML(order.username || "-")} · ${escapeHTML(order.game || "-")}</small>
+                </span>
 
-                <td>${escapeHTML(order.username || "-")}</td>
-                <td>${escapeHTML(order.game || "-")}</td>
-                <td>${escapeHTML(order.packageName || "-")}</td>
+                <span class="orders-row-package">
+                    <b>${escapeHTML(order.packageName || "-")}</b>
+                    <small>${escapeHTML(order.paymentMethod || "-")} · ${escapeHTML(evidenceText)}</small>
+                </span>
 
-                <td>
-                    <span class="admin-status ${normalizeStatus(status)}">
-                        ${formatStatus(status)}
-                    </span>
-                </td>
+                <span class="orders-row-amount">
+                    <b>${Number(order.amount || 0).toLocaleString()} ${escapeHTML(order.currency || "")}</b>
+                    <small>${escapeHTML(formatRelativeTime(order.createdAt))}</small>
+                </span>
 
-                <td>
-                    <select class="admin-status-select" data-action="status-change" data-id="${id}">
-                        <option value="pending_payment" ${status === "pending_payment" ? "selected" : ""}>Pending</option>
-                        <option value="paid" ${status === "paid" ? "selected" : ""}>Paid</option>
-                        <option value="processing" ${status === "processing" ? "selected" : ""}>Processing</option>
-                        <option value="completed" ${status === "completed" ? "selected" : ""}>Completed</option>
-                        <option value="cancelled" ${status === "cancelled" ? "selected" : ""}>Cancelled</option>
-                        <option value="failed" ${status === "failed" ? "selected" : ""}>Failed</option>
-                        <option value="refund_requested" ${status === "refund_requested" ? "selected" : ""}>Refund Requested</option>
-                        <option value="refund_pending" ${status === "refund_pending" ? "selected" : ""}>Refund Pending</option>
-                        <option value="refund_rejected" ${status === "refund_rejected" ? "selected" : ""}>Refund Rejected</option>
-                        <option value="refunded" ${status === "refunded" ? "selected" : ""}>Refunded</option>
-                    </select>
-
-                    ${canApproveRefund(order) ? `
-                        <button class="refund-order-btn" data-action="approve-refund" data-id="${id}">
-                            Approve Refund
-                        </button>
-
-                        <button class="reject-refund-btn" data-action="reject-refund" data-id="${id}">
-                            Reject
-                        </button>
-                    ` : ""}
-                </td>
-            </tr>
+                <span class="admin-status ${escapeHTML(normalizeStatus(order.status))}">
+                    ${escapeHTML(formatStatus(order.status))}
+                </span>
+            </button>
         `;
     }).join("");
 
-    window.AZIEL_MOTION?.enter(body, "fast");
-
-    bindOrderActions();
-}
-
-function bindOrderActions() {
-    document.querySelectorAll('[data-action="view-order"]').forEach(btn => {
-        btn.addEventListener("click", () => {
-            const order = allAdminOrders.find(o => String(o._id) === String(btn.dataset.id));
-            if (order) openOrderModal(order);
-        });
-    });
-
-    document.querySelectorAll('[data-action="status-change"]').forEach(select => {
-        select.addEventListener("change", () => {
-            updateOrderStatus(select.dataset.id, select.value, select);
-        });
-    });
-
-    document.querySelectorAll('[data-action="approve-refund"]').forEach(btn => {
-        btn.addEventListener("click", () => {
-            approveRefundToWallet(btn.dataset.id, btn);
-        });
-    });
-
-    document.querySelectorAll('[data-action="reject-refund"]').forEach(btn => {
-        btn.addEventListener("click", () => {
-            rejectRefund(btn.dataset.id, btn);
+    box.querySelectorAll(".orders-queue-row").forEach(row => {
+        row.addEventListener("click", () => {
+            selectedAdminOrderId = row.dataset.id || "";
+            renderOrderQueue(allAdminOrders);
+            renderSelectedOrder();
         });
     });
 }
 
-async function updateOrderStatus(orderId, status, selectEl = null) {
-    if (!orderId || !status) return;
+function renderSelectedOrder() {
+    const panel = document.getElementById("adminOrderDetailPanel");
+    if (!panel) return;
 
-    const oldValue = allAdminOrders.find(o => String(o._id) === String(orderId))?.status;
+    const order = getSelectedOrder();
+
+    if (!order) {
+        panel.innerHTML = `
+            <div class="order-detail-empty">
+                <strong>${escapeHTML(adminT("select_order_to_review"))}</strong>
+            </div>
+        `;
+        return;
+    }
+
+    panel.innerHTML = `
+        <div class="order-detail-head">
+            <div>
+                <span>${escapeHTML(adminT("order_details"))}</span>
+                <h3>${escapeHTML(order.orderId || "-")}</h3>
+            </div>
+            <span class="admin-status ${escapeHTML(normalizeStatus(order.status))}">
+                ${escapeHTML(formatStatus(order.status))}
+            </span>
+        </div>
+
+        ${renderOrderActions(order)}
+
+        <div class="order-detail-grid">
+            ${renderDetailSection("order_identity", [
+        ["order_id", order.orderId],
+        ["status", formatStatus(order.status)],
+        ["payment_status", formatStatus(order.paymentStatus || "-")],
+        ["created", formatDate(order.createdAt)],
+        ["updated", formatDate(order.updatedAt)]
+    ])}
+            ${renderDetailSection("customer", [
+        ["username", order.username],
+        ["user_id", order.userId],
+        ["region", order.region]
+    ])}
+            ${renderDetailSection("product", [
+        ["product", order.productName || order.game],
+        ["package", order.packageName],
+        ["package_code", order.packageCode || "-"],
+        ["server_id", order.zoneId || "-"]
+    ])}
+            ${renderDetailSection("financial", [
+        ["amount", Number(order.amount || 0).toLocaleString()],
+        ["currency", order.currency],
+        ["payment_method", order.paymentMethod],
+        ["reference", order.transactionId || order.manualPaymentAttemptId || "-"]
+    ])}
+        </div>
+
+        <div class="order-detail-section">
+            <h4>${escapeHTML(adminT("payment_evidence"))}</h4>
+            ${renderEvidence(order)}
+        </div>
+
+        <div class="order-detail-section">
+            <h4>${escapeHTML(adminT("order_timeline"))}</h4>
+            ${renderTimeline(order.timeline || [])}
+        </div>
+    `;
+
+    bindDetailActions(panel, order);
+}
+
+function renderDetailSection(titleKey, rows) {
+    return `
+        <section class="order-detail-section">
+            <h4>${escapeHTML(adminT(titleKey))}</h4>
+            ${rows.map(([labelKey, value]) => `
+                <p>
+                    <span>${escapeHTML(adminT(labelKey))}</span>
+                    <b>${escapeHTML(value || "-")}</b>
+                </p>
+            `).join("")}
+        </section>
+    `;
+}
+
+function renderEvidence(order) {
+    const url = getOrderEvidenceUrl(order);
+
+    if (!url) {
+        return `<div class="order-evidence-empty">${escapeHTML(adminT("no_payment_evidence"))}</div>`;
+    }
+
+    if (isAdminUploadedImageFailed(url)) {
+        return `<div class="order-evidence-empty">${escapeHTML(adminT("payment_evidence_unavailable"))}</div>`;
+    }
+
+    return `
+        <div class="order-evidence-preview">
+            <img src="${escapeHTML(url)}" data-src="${escapeHTML(url)}" alt="${escapeHTML(adminT("payment_evidence"))}" onerror="handleAdminOrderImageError(this)">
+            <button type="button" data-action="view-evidence" data-src="${escapeHTML(url)}">
+                ${escapeHTML(adminT("view_full_image"))}
+            </button>
+        </div>
+    `;
+}
+
+function renderTimeline(timeline) {
+    if (!timeline.length) {
+        return `<div class="order-evidence-empty">${escapeHTML(adminT("no_timeline_entries"))}</div>`;
+    }
+
+    return `
+        <div class="order-timeline-list">
+            ${timeline.slice().reverse().map(item => `
+                <div class="order-timeline-item">
+                    <span class="admin-status ${escapeHTML(normalizeStatus(item.status))}">
+                        ${escapeHTML(formatStatus(item.status))}
+                    </span>
+                    <p>
+                        ${item.previousStatus ? `${escapeHTML(formatStatus(item.previousStatus))} → ` : ""}
+                        ${escapeHTML(formatStatus(item.status))}
+                    </p>
+                    <small>
+                        ${escapeHTML(adminT("payment_status"))}: ${escapeHTML(formatStatus(item.paymentStatus || "-"))}
+                        · ${escapeHTML(item.source || "-")}
+                        · ${escapeHTML(item.actorType || "-")}
+                        ${item.reason ? `· ${escapeHTML(item.reason)}` : ""}
+                    </small>
+                    <time>${escapeHTML(formatDate(item.at))}</time>
+                </div>
+            `).join("")}
+        </div>
+    `;
+}
+
+function renderOrderActions(order) {
+    const actions = getOrderActions(order);
+
+    if (!actions.length) {
+        return `<div class="order-action-row muted">${escapeHTML(adminT("view_details_only"))}</div>`;
+    }
+
+    return `
+        <div class="order-action-row">
+            ${actions.map(action => `
+                <button class="${escapeHTML(action.className)}" type="button" data-action="${escapeHTML(action.action)}">
+                    ${escapeHTML(adminT(action.labelKey))}
+                </button>
+            `).join("")}
+        </div>
+    `;
+}
+
+function getOrderActions(order) {
+    const allowed = new Set(order.allowedNextStatuses || []);
+    const status = String(order.status || "");
+    const actions = [];
+
+    if (status === "pending_payment" && order.hasPaymentEvidence && allowed.has("paid")) {
+        actions.push({ action: "confirm-paid", labelKey: "confirm_paid", className: "order-primary-action" });
+    }
+
+    if (status === "paid" && allowed.has("processing")) {
+        actions.push({ action: "start-processing", labelKey: "start_processing", className: "order-primary-action" });
+    }
+
+    if (status === "processing" && allowed.has("completed")) {
+        actions.push({ action: "complete-order", labelKey: "complete_order", className: "order-primary-action" });
+    }
+
+    if ((status === "paid" || status === "processing") && allowed.has("failed")) {
+        actions.push({ action: "fail-order", labelKey: "fail_order", className: "order-danger-action" });
+    }
+
+    if (status === "refund_requested") {
+        actions.push({ action: "approve-refund", labelKey: "approve_refund", className: "order-primary-action" });
+        actions.push({ action: "reject-refund", labelKey: "reject_refund", className: "order-danger-action" });
+    }
+
+    return actions;
+}
+
+function bindDetailActions(panel, order) {
+    panel.querySelector('[data-action="view-evidence"]')?.addEventListener("click", event => {
+        openSlipModal(event.currentTarget.dataset.src || "");
+    });
+
+    panel.querySelector('[data-action="confirm-paid"]')?.addEventListener("click", () => confirmOrderPaid(order));
+    panel.querySelector('[data-action="start-processing"]')?.addEventListener("click", () => transitionSelectedOrder(order, "processing"));
+    panel.querySelector('[data-action="complete-order"]')?.addEventListener("click", () => transitionSelectedOrder(order, "completed"));
+    panel.querySelector('[data-action="fail-order"]')?.addEventListener("click", () => transitionSelectedOrder(order, "failed"));
+    panel.querySelector('[data-action="approve-refund"]')?.addEventListener("click", () => approveRefundToWallet(order._id));
+    panel.querySelector('[data-action="reject-refund"]')?.addEventListener("click", () => rejectRefund(order._id));
+}
+
+async function confirmOrderPaid(order) {
+    const confirmed = await confirmOrderAction({
+        title: adminT("confirm_payment"),
+        message: `${adminT("mark_this_order_paid")}\n\n${order.orderId}\n${Number(order.amount || 0).toLocaleString()} ${order.currency || ""}\n${order.paymentMethod || "-"}`
+    });
+
+    if (!confirmed) return;
+
+    await transitionSelectedOrder(order, "paid", { skipConfirm: true });
+}
+
+async function transitionSelectedOrder(order, status, options = {}) {
+    if (!order?._id || !status) return;
+
+    if (!options.skipConfirm) {
+        const confirmed = await confirmOrderAction({
+            title: adminT(status === "failed" ? "fail_order" : "update_order"),
+            message: `${adminT("update_order_to")} ${formatStatus(status)}?\n\n${order.orderId}`
+        });
+
+        if (!confirmed) return;
+    }
+
+    const btn = document.querySelector(`#adminOrderDetailPanel [data-action]`);
 
     try {
-        if (selectEl) selectEl.disabled = true;
+        window.AZIEL_UI?.button?.setLoading(btn, { text: adminT("loading") });
 
-        const data = await adminFetch(`/api/admin/orders/${orderId}/status`, {
+        const data = await adminFetch(`/api/admin/orders/${encodeURIComponent(order._id)}/status`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ status })
         });
 
-        if (!data || !data.success) {
-            showAdminToast?.(data?.message || "Update failed", "error");
-            if (selectEl && oldValue) selectEl.value = oldValue;
+        if (!data?.success) {
+            showAdminToast?.(data?.message || adminT("something_went_wrong"), "error");
             return;
         }
 
-        showAdminToast?.(`Order changed to ${formatStatus(status)}`, "success");
-
+        showAdminToast?.(adminT("order_updated"), "success");
+        dispatchDashboardRefresh();
         await loadOrders(false);
-        loadAdminDashboard?.(false);
-
     } catch (error) {
-        console.log("Update order error:", error);
-        showAdminToast?.("Server error", "error");
-        if (selectEl && oldValue) selectEl.value = oldValue;
+        console.log("Transition order error:", error);
+        showAdminToast?.(adminT("something_went_wrong"), "error");
     } finally {
-        if (selectEl) selectEl.disabled = false;
+        window.AZIEL_UI?.button?.reset(btn);
     }
-}
-
-function canApproveRefund(order) {
-    if (!order) return false;
-
-    return (
-        !order.refunded &&
-        String(order.status || "").toLowerCase() === "refund_requested"
-    );
 }
 
 async function approveRefundToWallet(orderId, btn = null) {
@@ -237,17 +452,12 @@ async function approveRefundToWallet(orderId, btn = null) {
         return;
     }
 
-    const confirmed = window.AZIEL_UI?.confirm
-        ? await window.AZIEL_UI.confirm({
-            title: "Approve refund",
-            message: "Confirm approve refund to wallet? This action cannot be repeated.",
-            confirmText: "Approve"
-        })
-        : confirm("Confirm approve refund to wallet? This action cannot be repeated.");
+    const confirmed = await confirmOrderAction({
+        title: adminT("approve_refund"),
+        message: `${adminT("approve_refund")}?\n\n${order.orderId}`
+    });
 
-    if (!confirmed) {
-        return;
-    }
+    if (!confirmed) return;
 
     try {
         window.AZIEL_UI?.button?.setLoading(btn, { text: "Approving..." });
@@ -264,10 +474,8 @@ async function approveRefundToWallet(orderId, btn = null) {
         }
 
         showAdminToast?.("Refund approved to wallet", "success");
-
+        dispatchDashboardRefresh();
         await loadOrders(false);
-        loadAdminDashboard?.(false);
-
     } catch (error) {
         console.log("Approve refund error:", error);
         showAdminToast?.("Server error", "error");
@@ -291,17 +499,12 @@ async function rejectRefund(orderId, btn = null) {
         return;
     }
 
-    const confirmed = window.AZIEL_UI?.confirm
-        ? await window.AZIEL_UI.confirm({
-            title: "Reject refund",
-            message: "Reject this refund request?",
-            confirmText: "Reject"
-        })
-        : confirm("Reject this refund request?");
+    const confirmed = await confirmOrderAction({
+        title: adminT("reject_refund"),
+        message: `${adminT("reject_refund")}?\n\n${order.orderId}`
+    });
 
-    if (!confirmed) {
-        return;
-    }
+    if (!confirmed) return;
 
     try {
         window.AZIEL_UI?.button?.setLoading(btn, { text: "Rejecting..." });
@@ -318,10 +521,8 @@ async function rejectRefund(orderId, btn = null) {
         }
 
         showAdminToast?.("Refund rejected", "success");
-
+        dispatchDashboardRefresh();
         await loadOrders(false);
-        loadAdminDashboard?.(false);
-
     } catch (error) {
         console.log("Reject refund error:", error);
         showAdminToast?.("Server error", "error");
@@ -330,63 +531,146 @@ async function rejectRefund(orderId, btn = null) {
     }
 }
 
+async function confirmOrderAction({ title, message }) {
+    if (window.AZIEL_UI?.confirm) {
+        return window.AZIEL_UI.confirm({
+            title,
+            message,
+            confirmText: title,
+            cancelText: adminT("cancel")
+        });
+    }
+
+    showAdminToast?.(message || title, "info");
+    return false;
+}
+
+function dispatchDashboardRefresh() {
+    window.dispatchEvent(new CustomEvent("aziel:admin-dashboard-refresh"));
+    loadAdminDashboard?.(false);
+}
+
+function renderOrdersError(message) {
+    const box = document.getElementById("adminOrdersQueue");
+    if (!box) return;
+
+    box.innerHTML = `
+        <div class="admin-dashboard-error">
+            <strong>${escapeHTML(message)}</strong>
+            <button type="button" id="retryOrdersBtn">${escapeHTML(adminT("retry"))}</button>
+        </div>
+    `;
+
+    document.getElementById("retryOrdersBtn")?.addEventListener("click", () => loadOrders(true));
+}
+
+function applyOrderNavigationContext(context = {}) {
+    const next = context.filter === "manual_review"
+        ? "manual_review"
+        : context.status || "all";
+
+    currentOrderContext = context.filter === "manual_review"
+        ? { filter: "manual_review", q: context.q || "" }
+        : context.status
+            ? { status: context.status, q: context.q || "" }
+            : { q: context.q || "" };
+
+    if (!currentOrderContext.q) delete currentOrderContext.q;
+
+    const input = document.getElementById("orderSearchInput");
+    if (input) input.value = currentOrderContext.q || "";
+
+    setActiveQueueTab(ORDER_QUEUE_FILTERS.has(next) ? next : "all");
+}
+
+function buildOrdersEndpoint() {
+    const params = new URLSearchParams();
+
+    if (currentOrderContext.filter) params.set("filter", currentOrderContext.filter);
+    if (currentOrderContext.status) params.set("status", currentOrderContext.status);
+    if (currentOrderContext.q) params.set("q", currentOrderContext.q);
+
+    const query = params.toString();
+    return query ? `/api/admin/orders?${query}` : "/api/admin/orders";
+}
+
+function contextForFilter(filter) {
+    const q = document.getElementById("orderSearchInput")?.value.trim() || currentOrderContext.q || "";
+    const context = {};
+
+    if (filter === "manual_review") {
+        context.filter = "manual_review";
+    } else if (filter !== "all") {
+        context.status = filter;
+    }
+
+    if (q) context.q = q;
+    return context;
+}
+
+function updateOrderHash() {
+    window.openAdminSection?.("orders", true, currentOrderContext);
+}
+
+function syncOrderTabs() {
+    const current = currentOrderContext.filter === "manual_review"
+        ? "manual_review"
+        : currentOrderContext.status || "all";
+
+    setActiveQueueTab(current);
+}
+
+function setActiveQueueTab(current) {
+    document.querySelectorAll(".orders-queue-tab").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.orderFilter === current);
+    });
+}
+
+function emptyMessageForCurrentFilter() {
+    if (currentOrderContext.filter === "manual_review") return adminT("no_manual_payments_waiting");
+    if (currentOrderContext.status === "paid") return adminT("no_paid_orders");
+    if (currentOrderContext.status === "refund_requested") return adminT("no_refund_requests");
+    return adminT("no_orders_found");
+}
+
+function getSelectedOrder() {
+    return allAdminOrders.find(order => String(order._id) === String(selectedAdminOrderId));
+}
+
+function getOrderEvidenceUrl(order) {
+    const evidence = order?.paymentEvidence || {};
+    const raw = evidence.url || evidence.key || evidence.storageKey || order?.paymentSlip || "";
+
+    return getAdminUploadedImageUrl(raw, { folder: "orders" });
+}
+
 function initOrderModal() {
     document.getElementById("closeOrderModal")?.addEventListener("click", closeOrderModal);
+    document.getElementById("closeSlipModal")?.addEventListener("click", closeSlipModal);
 
     document.getElementById("orderDetailModal")?.addEventListener("click", e => {
         if (e.target.id === "orderDetailModal") closeOrderModal();
     });
 
+    document.getElementById("slipModal")?.addEventListener("click", e => {
+        if (e.target.id === "slipModal") closeSlipModal();
+    });
+
     document.addEventListener("keydown", e => {
-        if (e.key === "Escape") closeOrderModal();
+        if (e.key === "Escape") {
+            closeOrderModal();
+            closeSlipModal();
+        }
     });
 }
 
-function openOrderModal(order) {
-    const modal = document.getElementById("orderDetailModal");
-    const content = document.getElementById("orderDetailContent");
-    if (!modal || !content) return;
+function openSlipModal(src) {
+    const modal = document.getElementById("slipModal");
+    const img = document.getElementById("slipModalImg");
 
-    const slip = order.paymentSlip || order.screenshot || "";
+    if (!modal || !img || !src) return;
 
-    content.innerHTML = `
-        <div class="order-detail-grid">
-            ${detailItem("Order ID", order.orderId)}
-            ${detailItem("Username", order.username)}
-            ${detailItem("Game", order.game)}
-            ${detailItem("Package", order.packageName)}
-            ${detailItem("User ID", order.userId || "-")}
-            ${detailItem("Server ID", order.zoneId || "-")}
-            ${detailItem("Amount", `${Number(order.amount || 0).toLocaleString()} ${order.currency || ""}`)}
-            ${detailItem("Region", order.region || "-")}
-            ${detailItem("Payment", order.paymentMethod || "-")}
-            ${detailItem("Status", formatStatus(order.status))}
-            ${detailItem("Note", order.note || "-")}
-            ${order.refundRequested ? detailItem("Refund Request Reason", order.refundRequestReason || "-") : ""}
-            ${order.refundRequestedAt ? detailItem("Refund Requested At", formatDate(order.refundRequestedAt)) : ""}
-            ${order.refunded ? detailItem("Refund Amount", `${Number(order.refundAmount || 0).toLocaleString()} ${order.currency || ""}`) : ""}
-            ${order.refunded ? detailItem("Refund Reason", order.refundReason || "-") : ""}
-            ${order.refundRejectedReason ? detailItem("Reject Reason", order.refundRejectedReason || "-") : ""}
-            ${order.refunded ? detailItem("Refund Method", order.refundMethod || "-") : ""}
-            ${order.refunded ? detailItem("Refunded At", formatDate(order.refundedAt)) : ""}
-            ${detailItem("Created", formatDate(order.createdAt))}
-        </div>
-
-        ${renderAdminOrderSlip(slip)}
-
-        ${canApproveRefund(order) ? `
-            <div class="order-modal-actions">
-                <button class="refund-order-btn" type="button" onclick="approveRefundToWallet('${escapeHTML(order._id)}')">
-                    Approve Refund to Wallet
-                </button>
-
-                <button class="reject-refund-btn" type="button" onclick="rejectRefund('${escapeHTML(order._id)}')">
-                    Reject Refund
-                </button>
-            </div>
-        ` : ""}
-    `;
-
+    img.src = src;
     modal.classList.add("show");
 }
 
@@ -394,17 +678,12 @@ function closeOrderModal() {
     document.getElementById("orderDetailModal")?.classList.remove("show");
 }
 
-function handleAdminOrderImageError(img) {
-    handleAdminUploadedImageError(img, "Payment slip image unavailable");
+function closeSlipModal() {
+    document.getElementById("slipModal")?.classList.remove("show");
 }
 
-function detailItem(label, value) {
-    return `
-        <div class="order-detail-item">
-            <small>${escapeHTML(label)}</small>
-            <strong>${escapeHTML(value || "-")}</strong>
-        </div>
-    `;
+function handleAdminOrderImageError(img) {
+    handleAdminUploadedImageError(img, adminT("payment_evidence_unavailable"));
 }
 
 function normalizeStatus(status) {
@@ -418,58 +697,66 @@ function normalizeStatus(status) {
     if (s === "failed") return "cancelled";
     if (s === "refunded") return "completed";
 
-    return s;
+    return s || "info";
 }
 
 function formatStatus(status) {
-    return {
-        pending_payment: "Pending",
-        paid: "Paid",
-        processing: "Processing",
-        completed: "Completed",
-        cancelled: "Cancelled",
-        canceled: "Cancelled",
-        failed: "Failed",
-        refund_requested: "Refund Requested",
-        refund_pending: "Refund Pending",
-        refund_rejected: "Refund Rejected",
-        refunded: "Refunded"
-    }[status] || status || "-";
+    const keyByStatus = {
+        pending_payment: "pending_payment",
+        paid: "paid",
+        processing: "processing",
+        completed: "completed",
+        cancelled: "cancelled",
+        canceled: "cancelled",
+        failed: "failed",
+        expired: "expired",
+        refund_requested: "refund_requested",
+        refund_pending: "refund_pending",
+        refund_rejected: "refund_rejected",
+        refunded: "refunded",
+        pending: "pending"
+    };
+    const key = keyByStatus[String(status || "").toLowerCase()] || "";
+
+    return window.AZIEL_ADMIN_I18N?.t?.(key, status) || status || "-";
 }
 
 function formatDate(date) {
     if (!date) return "-";
-
     const parsed = new Date(date);
     return Number.isNaN(parsed.getTime()) ? "-" : parsed.toLocaleString();
 }
 
-function getUploadUrl(path) {
-    return getAdminUploadedImageUrl(path, { folder: "orders" });
-}
+function formatRelativeTime(date) {
+    if (!date) return "-";
+    const parsed = new Date(date);
+    if (Number.isNaN(parsed.getTime())) return "-";
 
-function renderAdminOrderSlip(slip) {
-    if (!slip) return "";
-
-    const url = getUploadUrl(slip);
-
-    if (!url) return "";
-
-    if (isAdminUploadedImageFailed(url)) {
-        return adminMissingImageHTML("Payment slip image unavailable");
-    }
-
-    return `
-        <div class="order-screenshot-box">
-            <small>Payment Slip</small>
-            <img src="${escapeHTML(url)}" data-src="${escapeHTML(url)}" alt="Payment Slip" onerror="handleAdminOrderImageError(this)">
-        </div>
-    `;
+    const seconds = Math.max(0, Math.floor((Date.now() - parsed.getTime()) / 1000));
+    if (seconds < 60) return adminT("just_now");
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h`;
+    return parsed.toLocaleDateString();
 }
 
 function isAdminSectionActive(section) {
     const sectionEl = document.getElementById(`section-${section}`);
     return !sectionEl || sectionEl.classList.contains("active");
+}
+
+function getAdminHashContext(sectionName) {
+    const raw = window.location.hash ? window.location.hash.slice(1) : "";
+    const [section = "", query = ""] = raw.split("?");
+
+    if (section !== sectionName) return {};
+
+    return Object.fromEntries(new URLSearchParams(query));
+}
+
+function adminT(key, fallback = "") {
+    return window.AZIEL_ADMIN_I18N?.t?.(key, fallback) || fallback || key;
 }
 
 function escapeHTML(value) {
@@ -484,3 +771,4 @@ function escapeHTML(value) {
 window.loadOrders = loadOrders;
 window.approveRefundToWallet = approveRefundToWallet;
 window.rejectRefund = rejectRefund;
+window.handleAdminOrderImageError = handleAdminOrderImageError;

@@ -1,6 +1,15 @@
 // frontend/js/admin-wallet.js
+// AZIEL Admin V2.5 Wallet Command Center
 
 let adminWalletInitialized = false;
+let currentWalletContext = {};
+let currentWalletView = "pending";
+let allWalletTopups = [];
+let selectedTopupId = "";
+let selectedTopupContext = null;
+let walletTransactionPage = 1;
+let walletTransactionTotalPages = 1;
+let walletRefreshTimer = null;
 
 document.addEventListener("DOMContentLoaded", () => {
     initAdminWalletController();
@@ -11,111 +20,445 @@ function initAdminWalletController() {
     adminWalletInitialized = true;
 
     initSlipZoom();
+    bindWalletTabs();
+    bindWalletTransactions();
+    bindWalletAdjustment();
+    bindWalletRealtime();
 
     if (isAdminSectionActive("wallet") || !document.getElementById("section-wallet")) {
-        loadWalletTopups();
+        currentWalletContext = getAdminHashContext("wallet");
+        applyWalletContext(currentWalletContext);
+        loadWalletView();
     }
 
     window.addEventListener("aziel:admin-section-opened", event => {
         if (event.detail?.section === "wallet") {
-            loadWalletTopups();
+            currentWalletContext = event.detail.context || {};
+            applyWalletContext(currentWalletContext);
+            loadWalletView();
         }
+    });
+
+    window.addEventListener("aziel:admin-locale-changed", () => {
+        renderWalletTopups(allWalletTopups);
+        renderSelectedTopup();
     });
 }
 
-async function loadWalletTopups() {
-    const box = document.getElementById("adminWalletList");
-    if (!box) return;
+function bindWalletTabs() {
+    document.querySelectorAll(".wallet-command-tab").forEach(btn => {
+        btn.addEventListener("click", () => {
+            currentWalletView = btn.dataset.walletView || "pending";
+            selectedTopupId = "";
+            selectedTopupContext = null;
+            walletTransactionPage = 1;
+            updateWalletHash();
+        });
+    });
+}
 
-    box.innerHTML = `<div class="admin-list-empty">Loading wallet topups...</div>`;
+function bindWalletTransactions() {
+    document.getElementById("walletTransactionSearchBtn")?.addEventListener("click", () => {
+        walletTransactionPage = 1;
+        loadWalletTransactions();
+    });
 
-    try {
-        const data = await adminFetch("/api/admin/wallet/topups");
-
-        if (!data || !data.success) {
-            box.innerHTML = `<div class="admin-list-empty">${data?.message || "Failed to load wallet topups"}</div>`;
-            return;
+    document.getElementById("walletTransactionSearch")?.addEventListener("keydown", event => {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            walletTransactionPage = 1;
+            loadWalletTransactions();
         }
+    });
 
-        renderTopups(data.topups || []);
+    document.getElementById("walletTransactionType")?.addEventListener("change", () => {
+        walletTransactionPage = 1;
+        loadWalletTransactions();
+    });
 
-    } catch (error) {
-        console.log("Wallet topup load error:", error);
-        box.innerHTML = `<div class="admin-list-empty">Wallet topups load error.</div>`;
+    document.getElementById("walletTransactionCurrency")?.addEventListener("change", () => {
+        walletTransactionPage = 1;
+        loadWalletTransactions();
+    });
+
+    document.getElementById("walletPrevPage")?.addEventListener("click", () => {
+        walletTransactionPage = Math.max(walletTransactionPage - 1, 1);
+        loadWalletTransactions();
+    });
+
+    document.getElementById("walletNextPage")?.addEventListener("click", () => {
+        walletTransactionPage = Math.min(walletTransactionPage + 1, walletTransactionTotalPages);
+        loadWalletTransactions();
+    });
+}
+
+function bindWalletAdjustment() {
+    document.getElementById("walletAdjustSubmitBtn")?.addEventListener("click", submitWalletAdjustment);
+}
+
+function bindWalletRealtime() {
+    if (window.AZIEL?.realtime) {
+        ["admin:wallet-updated", "wallet:updated", "wallet:topup-updated", "adminNewUpdate"].forEach(eventName => {
+            window.AZIEL.realtime.on(eventName, scheduleWalletRefresh, { role: "admin" });
+        });
     }
 }
 
-function renderTopups(topups) {
+function scheduleWalletRefresh() {
+    if (!isAdminSectionActive("wallet")) return;
+    clearTimeout(walletRefreshTimer);
+    walletRefreshTimer = setTimeout(() => loadWalletView(false), 900);
+}
+
+function applyWalletContext(context = {}) {
+    if (context.view) {
+        currentWalletView = context.view;
+    } else if (context.status === "pending") {
+        currentWalletView = "pending";
+    }
+
+    if (!["pending", "all", "transactions", "adjustments"].includes(currentWalletView)) {
+        currentWalletView = "pending";
+    }
+}
+
+function loadWalletView(showLoading = true) {
+    syncWalletTabs();
+
+    document.querySelectorAll(".wallet-view-panel").forEach(panel => panel.classList.remove("active"));
+    document.getElementById(currentWalletView === "transactions"
+        ? "walletTransactionsWorkspace"
+        : currentWalletView === "adjustments"
+            ? "walletAdjustmentWorkspace"
+            : "walletTopupWorkspace")?.classList.add("active");
+
+    if (currentWalletView === "transactions") {
+        loadWalletTransactions(showLoading);
+        renderSelectedTopup();
+        return;
+    }
+
+    if (currentWalletView === "adjustments") {
+        renderAdjustmentDetail();
+        return;
+    }
+
+    loadWalletTopups(showLoading);
+}
+
+async function loadWalletTopups(showLoading = true) {
+    const box = document.getElementById("adminWalletList");
+    if (!box) return;
+
+    if (showLoading) {
+        box.innerHTML = `<div class="admin-dashboard-skeleton"></div><div class="admin-dashboard-skeleton"></div>`;
+    }
+
+    try {
+        const data = await adminFetch(buildWalletTopupsEndpoint());
+
+        if (!data || !data.success) {
+            renderWalletError(data?.message || adminT("something_went_wrong"));
+            return;
+        }
+
+        allWalletTopups = Array.isArray(data.topups) ? data.topups : [];
+        reconcileSelectedTopup();
+        renderWalletTopups(allWalletTopups);
+        await loadSelectedTopupContext();
+    } catch (error) {
+        console.log("Wallet topup load error:", error);
+        renderWalletError(adminT("something_went_wrong"));
+    }
+}
+
+function buildWalletTopupsEndpoint() {
+    const params = new URLSearchParams();
+    if (currentWalletView === "pending") params.set("status", "pending");
+    const query = params.toString();
+    return query ? `/api/admin/wallet/topups?${query}` : "/api/admin/wallet/topups";
+}
+
+function reconcileSelectedTopup() {
+    if (selectedTopupId && allWalletTopups.some(item => String(item._id) === String(selectedTopupId))) return;
+    selectedTopupId = allWalletTopups[0]?._id || "";
+    selectedTopupContext = null;
+}
+
+function renderWalletTopups(topups) {
     const box = document.getElementById("adminWalletList");
     if (!box) return;
 
     if (!topups.length) {
-        box.innerHTML = `<div class="admin-list-empty">No wallet topups found.</div>`;
+        box.innerHTML = `
+            <div class="admin-empty-box wallet-empty-state">
+                ${escapeHTML(currentWalletView === "pending" ? adminT("no_pending_wallet_topups") : adminT("no_wallet_topups_found"))}
+            </div>
+        `;
         return;
     }
 
     box.innerHTML = topups.map(item => {
+        const selected = String(item._id) === String(selectedTopupId);
         const status = String(item.status || "pending").toLowerCase();
-        const slip = item.paymentSlip || item.slip || item.filename || "";
-        const pending = status === "pending";
-        const slipUrl = getSlipUrl(slip);
-        const slipHTML = slipUrl && !isAdminUploadedImageFailed(slipUrl)
-            ? `<img class="topup-slip" src="${escapeHTML(slipUrl)}" data-src="${escapeHTML(slipUrl)}" data-slip="${escapeHTML(slipUrl)}" onerror="handleAdminWalletImageError(this)">`
-            : slipUrl
-                ? adminMissingImageHTML("Slip image unavailable")
-                : `<p>No slip uploaded</p>`;
+        const evidence = item.hasPaymentEvidence ? adminT("slip_attached") : adminT("no_payment_evidence");
 
         return `
-            <div class="topup-card">
-                <div class="topup-card-head">
-                    <div>
-                        <h2>${escapeHTML(item.username || "Unknown User")}</h2>
-                        <small>${formatDate(item.createdAt)}</small>
-                    </div>
-                    <span class="admin-status ${normalizeTopupStatus(status)}">${formatTopupStatus(status)}</span>
-                </div>
-
-                <p><b>Amount:</b> ${Number(item.amount || 0).toLocaleString()} ${escapeHTML(item.currency || "")}</p>
-                <p><b>Payment:</b> ${escapeHTML(item.paymentMethod || "-")}</p>
-
-                ${slipHTML}
-
-                <div class="topup-actions">
-                    <button class="approve-btn" data-id="${escapeHTML(item._id)}" data-status="approved" ${!pending ? "disabled" : ""}>Approve</button>
-                    <button class="reject-btn" data-id="${escapeHTML(item._id)}" data-status="rejected" ${!pending ? "disabled" : ""}>Reject</button>
-                </div>
-            </div>
+            <button class="wallet-queue-row ${selected ? "active" : ""}" type="button" data-id="${escapeHTML(item._id)}">
+                <span>
+                    <strong>${escapeHTML(item.username || "-")}</strong>
+                    <small>${escapeHTML(item.topupId || "-")} · ${escapeHTML(formatRelativeTime(item.createdAt))}</small>
+                </span>
+                <span>
+                    <b>${Number(item.amount || 0).toLocaleString()} ${escapeHTML(item.currency || "")}</b>
+                    <small>${escapeHTML(item.paymentMethod || "-")} · ${escapeHTML(evidence)}</small>
+                </span>
+                <span class="admin-status ${escapeHTML(normalizeTopupStatus(status))}">
+                    ${escapeHTML(formatTopupStatus(status))}
+                </span>
+            </button>
         `;
     }).join("");
 
-    window.AZIEL_MOTION?.enter(box, "fast");
-
-    bindTopupActions();
-}
-
-function bindTopupActions() {
-    document.querySelectorAll(".topup-actions button").forEach(btn => {
-        btn.addEventListener("click", () => updateTopupStatus(btn.dataset.id, btn.dataset.status, btn));
-    });
-
-    document.querySelectorAll(".topup-slip").forEach(img => {
-        img.addEventListener("click", () => openSlipModal(img.dataset.slip || img.src));
+    box.querySelectorAll(".wallet-queue-row").forEach(row => {
+        row.addEventListener("click", async () => {
+            selectedTopupId = row.dataset.id || "";
+            selectedTopupContext = null;
+            renderWalletTopups(allWalletTopups);
+            await loadSelectedTopupContext();
+        });
     });
 }
 
-async function updateTopupStatus(id, status, btn = null) {
-    const confirmed = window.AZIEL_UI?.confirm
-        ? await window.AZIEL_UI.confirm({
-            title: "Update topup",
-            message: `Are you sure to ${status} this topup?`,
-            confirmText: formatTopupStatus(status)
-        })
-        : confirm(`Are you sure to ${status} this topup?`);
+async function loadSelectedTopupContext() {
+    if (!selectedTopupId) {
+        selectedTopupContext = null;
+        renderSelectedTopup();
+        return;
+    }
+
+    try {
+        const data = await adminFetch(`/api/admin/wallet/topups/${encodeURIComponent(selectedTopupId)}/context`);
+        if (!data?.success) {
+            selectedTopupContext = null;
+            renderSelectedTopup(data?.message || adminT("something_went_wrong"));
+            return;
+        }
+
+        selectedTopupContext = data;
+        renderSelectedTopup();
+    } catch (error) {
+        console.log("Wallet context load error:", error);
+        selectedTopupContext = null;
+        renderSelectedTopup(adminT("something_went_wrong"));
+    }
+}
+
+function renderSelectedTopup(errorMessage = "") {
+    const panel = document.getElementById("adminWalletDetailPanel");
+    if (!panel) return;
+
+    if (currentWalletView === "transactions") {
+        panel.innerHTML = `<div class="order-detail-empty"><strong>${escapeHTML(adminT("transaction_ledger"))}</strong></div>`;
+        return;
+    }
+
+    if (currentWalletView === "adjustments") {
+        renderAdjustmentDetail();
+        return;
+    }
+
+    if (errorMessage) {
+        panel.innerHTML = `<div class="admin-dashboard-error"><strong>${escapeHTML(errorMessage)}</strong></div>`;
+        return;
+    }
+
+    const topup = selectedTopupContext?.topup;
+    const wallet = selectedTopupContext?.wallet;
+    const transactions = selectedTopupContext?.recentTransactions || [];
+
+    if (!topup) {
+        panel.innerHTML = `<div class="order-detail-empty"><strong>${escapeHTML(adminT("select_topup_to_review"))}</strong></div>`;
+        return;
+    }
+
+    const currency = topup.currency || "MMK";
+    const currentBalance = Number(wallet?.wallet?.[currency] || 0);
+    const expectedBalance = currentBalance + Number(topup.amount || 0);
+
+    panel.innerHTML = `
+        <div class="order-detail-head">
+            <div>
+                <span>${escapeHTML(adminT("topup_review"))}</span>
+                <h3>${escapeHTML(topup.topupId || "-")}</h3>
+            </div>
+            <span class="admin-status ${escapeHTML(normalizeTopupStatus(topup.status))}">
+                ${escapeHTML(formatTopupStatus(topup.status))}
+            </span>
+        </div>
+
+        ${renderTopupActions(topup, currentBalance, expectedBalance)}
+
+        <div class="order-detail-grid">
+            ${renderWalletDetailSection("topup_identity", [
+        ["topup_id", topup.topupId],
+        ["status", formatTopupStatus(topup.status)],
+        ["created", formatDate(topup.createdAt)],
+        ["updated", formatDate(topup.updatedAt)]
+    ])}
+            ${renderWalletDetailSection("customer", [
+        ["username", topup.username],
+        ["region", topup.region || wallet?.region || "-"],
+        ["current_wallet_balance", `${currentBalance.toLocaleString()} ${currency}`],
+        ["wallet_currency", currency]
+    ])}
+            ${renderWalletDetailSection("topup_request", [
+        ["requested_amount", Number(topup.amount || 0).toLocaleString()],
+        ["currency", currency],
+        ["payment_method", topup.paymentMethod],
+        ["reference", topup.transactionId || topup.topupId || "-"]
+    ])}
+        </div>
+
+        <div class="order-detail-section">
+            <h4>${escapeHTML(adminT("payment_evidence"))}</h4>
+            ${renderTopupEvidence(topup)}
+        </div>
+
+        <div class="order-detail-section">
+            <h4>${escapeHTML(adminT("wallet_context"))}</h4>
+            ${renderRecentTransactions(transactions)}
+        </div>
+    `;
+
+    bindTopupDetailActions(panel, topup, currentBalance, expectedBalance);
+}
+
+function renderTopupActions(topup, currentBalance, expectedBalance) {
+    if (String(topup.status || "") !== "pending") {
+        return `<div class="order-action-row muted">${escapeHTML(adminT("view_details_only"))}</div>`;
+    }
+
+    return `
+        <div class="order-action-row">
+            <button class="order-primary-action" type="button" data-wallet-action="approve">
+                ${escapeHTML(adminT("approve_topup"))}
+            </button>
+            <button class="order-danger-action" type="button" data-wallet-action="reject">
+                ${escapeHTML(adminT("reject_topup"))}
+            </button>
+            <small class="wallet-expected-balance">
+                ${escapeHTML(adminT("expected_balance"))}: ${expectedBalance.toLocaleString()} ${escapeHTML(topup.currency || "")}
+            </small>
+        </div>
+    `;
+}
+
+function renderWalletDetailSection(titleKey, rows) {
+    return `
+        <section class="order-detail-section">
+            <h4>${escapeHTML(adminT(titleKey))}</h4>
+            ${rows.map(([labelKey, value]) => `
+                <p>
+                    <span>${escapeHTML(adminT(labelKey))}</span>
+                    <b>${escapeHTML(value || "-")}</b>
+                </p>
+            `).join("")}
+        </section>
+    `;
+}
+
+function renderTopupEvidence(topup) {
+    const url = getTopupEvidenceUrl(topup);
+    if (!url) return `<div class="order-evidence-empty">${escapeHTML(adminT("no_payment_evidence"))}</div>`;
+    if (isAdminUploadedImageFailed(url)) return `<div class="order-evidence-empty">${escapeHTML(adminT("payment_evidence_unavailable"))}</div>`;
+
+    return `
+        <div class="order-evidence-preview">
+            <img src="${escapeHTML(url)}" data-src="${escapeHTML(url)}" alt="${escapeHTML(adminT("payment_evidence"))}" onerror="handleAdminWalletImageError(this)">
+            <button type="button" data-wallet-action="view-evidence" data-src="${escapeHTML(url)}">
+                ${escapeHTML(adminT("view_full_image"))}
+            </button>
+        </div>
+    `;
+}
+
+function renderRecentTransactions(transactions) {
+    if (!transactions.length) {
+        return `<div class="order-evidence-empty">${escapeHTML(adminT("no_wallet_transactions_found"))}</div>`;
+    }
+
+    return `
+        <div class="wallet-context-transactions">
+            ${transactions.map(renderTransactionRow).join("")}
+        </div>
+    `;
+}
+
+function renderTransactionRow(item) {
+    const direction = getTransactionDirection(item);
+    const sign = direction === "debit" ? "-" : "+";
+    const amountClass = direction === "debit" ? "debit" : "credit";
+
+    return `
+        <div class="wallet-transaction-row">
+            <span>
+                <strong>${escapeHTML(formatWalletType(item.type))}</strong>
+                <small>${escapeHTML(item.transactionId || item.referenceId || "-")}</small>
+            </span>
+            <b class="${amountClass}">${sign}${Number(item.amount || 0).toLocaleString()} ${escapeHTML(item.currency || "")}</b>
+            <small>
+                ${escapeHTML(adminT("balance_before"))}: ${escapeHTML(formatRecordedBalance(item.balanceBefore, item.currency))}
+                · ${escapeHTML(adminT("balance_after"))}: ${escapeHTML(formatRecordedBalance(item.balanceAfter, item.currency))}
+                · ${escapeHTML(formatDate(item.createdAt))}
+            </small>
+        </div>
+    `;
+}
+
+function bindTopupDetailActions(panel, topup, currentBalance, expectedBalance) {
+    panel.querySelector('[data-wallet-action="view-evidence"]')?.addEventListener("click", event => {
+        openSlipModal(event.currentTarget.dataset.src || "");
+    });
+
+    panel.querySelector('[data-wallet-action="approve"]')?.addEventListener("click", event => {
+        approveTopup(topup, currentBalance, expectedBalance, event.currentTarget);
+    });
+
+    panel.querySelector('[data-wallet-action="reject"]')?.addEventListener("click", event => {
+        rejectTopup(topup, event.currentTarget);
+    });
+}
+
+async function approveTopup(topup, currentBalance, expectedBalance, btn) {
+    const confirmed = await confirmWalletAction({
+        title: adminT("approve_wallet_topup"),
+        message: `${adminT("credit_this_amount")}\n\n${topup.username}\n${Number(topup.amount || 0).toLocaleString()} ${topup.currency}\n${adminT("current_balance")}: ${currentBalance.toLocaleString()} ${topup.currency}\n${adminT("expected_balance")}: ${expectedBalance.toLocaleString()} ${topup.currency}`,
+        confirmText: adminT("approve_topup")
+    });
 
     if (!confirmed) return;
 
+    await updateTopupStatus(topup._id, "approved", btn);
+}
+
+async function rejectTopup(topup, btn) {
+    const confirmed = await confirmWalletAction({
+        title: adminT("reject_topup"),
+        message: `${adminT("reject_topup")}?\n\n${topup.topupId || ""}\n${topup.username || ""}`,
+        confirmText: adminT("reject_topup"),
+        danger: true
+    });
+
+    if (!confirmed) return;
+
+    await updateTopupStatus(topup._id, "rejected", btn);
+}
+
+async function updateTopupStatus(id, status, btn = null) {
     try {
-        window.AZIEL_UI?.button?.setLoading(btn, { text: "Updating..." });
+        window.AZIEL_UI?.button?.setLoading(btn, { text: adminT("loading") });
+        disableTopupActionButtons(true);
 
         const data = await adminFetch(`/api/admin/wallet/topups/${id}/status`, {
             method: "PUT",
@@ -124,16 +467,215 @@ async function updateTopupStatus(id, status, btn = null) {
         });
 
         if (!data || !data.success) {
-            showAdminToast?.(data?.message || "Update failed", "error");
+            showAdminToast?.(data?.message || adminT("something_went_wrong"), "error");
             return;
         }
 
-        showAdminToast?.(`Topup ${status}`, "success");
-        await loadWalletTopups();
-        loadAdminDashboard?.(false);
+        showAdminToast?.(status === "approved" ? adminT("topup_approved") : adminT("topup_rejected"), "success");
+        dispatchWalletDashboardRefresh();
+        await loadWalletTopups(false);
+    } catch (error) {
+        console.log("Wallet topup update error:", error);
+        showAdminToast?.(adminT("something_went_wrong"), "error");
+    } finally {
+        disableTopupActionButtons(false);
+        window.AZIEL_UI?.button?.reset(btn);
+    }
+}
+
+function disableTopupActionButtons(disabled) {
+    document.querySelectorAll('#adminWalletDetailPanel [data-wallet-action="approve"], #adminWalletDetailPanel [data-wallet-action="reject"]')
+        .forEach(button => {
+            button.disabled = disabled;
+        });
+}
+
+async function loadWalletTransactions(showLoading = true) {
+    const box = document.getElementById("adminWalletTransactions");
+    if (!box) return;
+
+    if (showLoading) box.innerHTML = `<div class="admin-dashboard-skeleton"></div><div class="admin-dashboard-skeleton"></div>`;
+
+    try {
+        const data = await adminFetch(buildTransactionsEndpoint());
+        if (!data?.success) {
+            box.innerHTML = `<div class="admin-dashboard-error"><strong>${escapeHTML(data?.message || adminT("something_went_wrong"))}</strong></div>`;
+            return;
+        }
+
+        walletTransactionPage = data.page || 1;
+        walletTransactionTotalPages = data.totalPages || 1;
+        renderWalletTransactions(data.transactions || []);
+        updateWalletPagination();
+    } catch (error) {
+        console.log("Wallet transaction load error:", error);
+        box.innerHTML = `<div class="admin-dashboard-error"><strong>${escapeHTML(adminT("something_went_wrong"))}</strong></div>`;
+    }
+}
+
+function buildTransactionsEndpoint() {
+    const params = new URLSearchParams();
+    const q = document.getElementById("walletTransactionSearch")?.value.trim() || "";
+    const type = document.getElementById("walletTransactionType")?.value || "";
+    const currency = document.getElementById("walletTransactionCurrency")?.value || "";
+
+    params.set("page", walletTransactionPage);
+    params.set("limit", 50);
+    if (q) params.set("q", q);
+    if (type) params.set("type", type);
+    if (currency) params.set("currency", currency);
+
+    return `/api/admin/wallet/transactions?${params.toString()}`;
+}
+
+function renderWalletTransactions(transactions) {
+    const box = document.getElementById("adminWalletTransactions");
+    if (!box) return;
+
+    if (!transactions.length) {
+        box.innerHTML = `<div class="admin-empty-box">${escapeHTML(adminT("no_wallet_transactions_found"))}</div>`;
+        return;
+    }
+
+    box.innerHTML = transactions.map(item => `
+        <div class="wallet-ledger-row">
+            <span>
+                <strong>${escapeHTML(item.username || "-")}</strong>
+                <small>${escapeHTML(formatDate(item.createdAt))}</small>
+            </span>
+            ${renderTransactionRow(item)}
+        </div>
+    `).join("");
+}
+
+function updateWalletPagination() {
+    setText("walletPageInfo", `${walletTransactionPage} / ${walletTransactionTotalPages}`);
+    const prev = document.getElementById("walletPrevPage");
+    const next = document.getElementById("walletNextPage");
+    if (prev) prev.disabled = walletTransactionPage <= 1;
+    if (next) next.disabled = walletTransactionPage >= walletTransactionTotalPages;
+}
+
+async function submitWalletAdjustment() {
+    const btn = document.getElementById("walletAdjustSubmitBtn");
+    const username = document.getElementById("walletAdjustUsername")?.value.trim() || "";
+    const direction = document.getElementById("walletAdjustDirection")?.value || "credit";
+    const amount = Number(document.getElementById("walletAdjustAmount")?.value || 0);
+    const currency = document.getElementById("walletAdjustCurrency")?.value || "MMK";
+    let reason = document.getElementById("walletAdjustReason")?.value.trim() || "";
+
+    if (!username || !amount || amount <= 0) {
+        showAdminToast?.(adminT("wallet_adjustment_required"), "error");
+        return;
+    }
+
+    if (!reason && window.AZIEL_ADMIN_ACTION_MODAL) {
+        const result = await window.AZIEL_ADMIN_ACTION_MODAL.open({
+            title: adminT("wallet_adjustment"),
+            message: `${direction === "credit" ? adminT("credit_wallet") : adminT("debit_wallet")}: ${amount.toLocaleString()} ${currency} ${username}`,
+            label: adminT("reason"),
+            placeholder: adminT("reason"),
+            required: true,
+            confirmText: direction === "credit" ? adminT("confirm_credit") : adminT("confirm_debit")
+        });
+
+        if (!result.confirmed) return;
+        reason = result.value;
+    }
+
+    const confirmed = await confirmWalletAction({
+        title: direction === "credit" ? adminT("confirm_credit") : adminT("confirm_debit"),
+        message: `${username}\n${direction === "credit" ? "+" : "-"}${amount.toLocaleString()} ${currency}\n${reason}`,
+        confirmText: direction === "credit" ? adminT("confirm_credit") : adminT("confirm_debit"),
+        danger: direction === "debit"
+    });
+
+    if (!confirmed) return;
+
+    try {
+        window.AZIEL_UI?.button?.setLoading(btn, { text: adminT("loading") });
+
+        const data = await adminFetch("/api/admin/wallet/adjust", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, direction, amount, currency, reason })
+        });
+
+        if (!data?.success) {
+            showAdminToast?.(data?.message || adminT("something_went_wrong"), "error");
+            return;
+        }
+
+        showAdminToast?.(adminT("wallet_adjustment_saved"), "success");
+        document.getElementById("walletAdjustAmount").value = "";
+        document.getElementById("walletAdjustReason").value = "";
+        dispatchWalletDashboardRefresh();
+        if (currentWalletView === "transactions") loadWalletTransactions(false);
+    } catch (error) {
+        console.log("Wallet adjustment error:", error);
+        showAdminToast?.(adminT("something_went_wrong"), "error");
     } finally {
         window.AZIEL_UI?.button?.reset(btn);
     }
+}
+
+function renderAdjustmentDetail() {
+    const panel = document.getElementById("adminWalletDetailPanel");
+    if (!panel || currentWalletView !== "adjustments") return;
+
+    panel.innerHTML = `
+        <div class="order-detail-empty">
+            <strong>${escapeHTML(adminT("wallet_adjustment"))}</strong>
+            <small>${escapeHTML(adminT("wallet_adjustment_backend_owned"))}</small>
+        </div>
+    `;
+}
+
+async function confirmWalletAction(options = {}) {
+    if (window.AZIEL_UI?.confirm) {
+        return window.AZIEL_UI.confirm({
+            title: options.title || "",
+            message: options.message || "",
+            confirmText: options.confirmText || adminT("save"),
+            cancelText: adminT("cancel"),
+            danger: Boolean(options.danger)
+        });
+    }
+
+    showAdminToast?.(options.message || options.title || "", "info");
+    return false;
+}
+
+function dispatchWalletDashboardRefresh() {
+    window.dispatchEvent(new CustomEvent("aziel:admin-dashboard-refresh"));
+    loadAdminDashboard?.(false);
+}
+
+function renderWalletError(message) {
+    const box = document.getElementById("adminWalletList");
+    if (!box) return;
+
+    box.innerHTML = `
+        <div class="admin-dashboard-error">
+            <strong>${escapeHTML(message)}</strong>
+            <button type="button" id="retryWalletBtn">${escapeHTML(adminT("retry"))}</button>
+        </div>
+    `;
+
+    document.getElementById("retryWalletBtn")?.addEventListener("click", () => loadWalletTopups(true));
+}
+
+function syncWalletTabs() {
+    document.querySelectorAll(".wallet-command-tab").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.walletView === currentWalletView);
+    });
+}
+
+function updateWalletHash() {
+    const context = currentWalletView === "pending"
+        ? { status: "pending" }
+        : { view: currentWalletView };
+    window.openAdminSection?.("wallet", true, context);
 }
 
 function initSlipZoom() {
@@ -148,10 +690,7 @@ function openSlipModal(src) {
     const modal = document.getElementById("slipModal");
     const img = document.getElementById("slipModalImg");
 
-    if (!modal || !img) {
-        window.open(src, "_blank");
-        return;
-    }
+    if (!modal || !img || !src) return;
 
     img.src = src;
     modal.classList.add("show");
@@ -161,12 +700,14 @@ function closeSlipModal() {
     document.getElementById("slipModal")?.classList.remove("show");
 }
 
-function getSlipUrl(slip) {
-    return getAdminUploadedImageUrl(slip, { folder: "slips" });
+function getTopupEvidenceUrl(topup) {
+    const evidence = topup?.paymentEvidence || {};
+    const raw = evidence.url || evidence.key || evidence.storageKey || topup?.paymentSlip || "";
+    return getAdminUploadedImageUrl(raw, { folder: "slips" });
 }
 
 function handleAdminWalletImageError(img) {
-    handleAdminUploadedImageError(img, "Slip image unavailable");
+    handleAdminUploadedImageError(img, adminT("payment_evidence_unavailable"));
 }
 
 function isAdminSectionActive(section) {
@@ -174,19 +715,85 @@ function isAdminSectionActive(section) {
     return !sectionEl || sectionEl.classList.contains("active");
 }
 
+function getAdminHashContext(sectionName) {
+    const raw = window.location.hash ? window.location.hash.slice(1) : "";
+    const [section = "", query = ""] = raw.split("?");
+
+    if (section !== sectionName) return {};
+
+    return Object.fromEntries(new URLSearchParams(query));
+}
+
 function normalizeTopupStatus(status) {
-    if (status === "approved") return "completed";
-    if (status === "rejected") return "cancelled";
-    return status;
+    if (status === "approved" || status === "completed" || status === "paid") return "completed";
+    if (status === "rejected" || status === "cancelled" || status === "failed") return "cancelled";
+    return status || "pending";
 }
 
 function formatTopupStatus(status) {
-    return { pending: "Pending", approved: "Approved", rejected: "Rejected" }[status] || status;
+    return {
+        pending: adminT("pending"),
+        approved: adminT("approved"),
+        rejected: adminT("rejected"),
+        paid: adminT("paid"),
+        completed: adminT("completed"),
+        cancelled: adminT("cancelled"),
+        failed: adminT("failed")
+    }[status] || status || "-";
+}
+
+function formatWalletType(type) {
+    return {
+        topup: adminT("credit"),
+        payment: adminT("debit"),
+        refund: adminT("refund"),
+        "wallet.topup": adminT("credit"),
+        "wallet.payment": adminT("debit"),
+        "wallet.refund": adminT("refund"),
+        "wallet.reversal": adminT("wallet_reversal"),
+        "wallet.adjustment": adminT("adjustment"),
+        "wallet.migration": adminT("wallet_migration")
+    }[type] || type || "-";
+}
+
+function getTransactionDirection(item) {
+    if (item.direction === "credit" || item.direction === "debit") return item.direction;
+    const type = String(item.type || "").toLowerCase();
+    if (type.includes("payment")) return "debit";
+    return "credit";
+}
+
+function formatRecordedBalance(value, currency) {
+    return value === null || value === undefined
+        ? adminT("not_recorded")
+        : `${Number(value || 0).toLocaleString()} ${currency || ""}`;
 }
 
 function formatDate(date) {
     const parsed = new Date(date);
     return Number.isNaN(parsed.getTime()) ? "-" : parsed.toLocaleString();
+}
+
+function formatRelativeTime(date) {
+    if (!date) return "-";
+    const parsed = new Date(date);
+    if (Number.isNaN(parsed.getTime())) return "-";
+    const seconds = Math.max(0, Math.floor((Date.now() - parsed.getTime()) / 1000));
+    if (seconds < 60) return adminT("just_now");
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h`;
+    return parsed.toLocaleDateString();
+}
+
+function setText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+}
+
+function adminT(key, fallback = "") {
+    return window.AZIEL_ADMIN_I18N?.t?.(key, fallback) || fallback || key;
 }
 
 function escapeHTML(value) {
@@ -199,3 +806,4 @@ function escapeHTML(value) {
 }
 
 window.loadWalletTopups = loadWalletTopups;
+window.handleAdminWalletImageError = handleAdminWalletImageError;

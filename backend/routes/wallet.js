@@ -7,6 +7,7 @@ const router = express.Router();
 const User = require("../models/User");
 const Order = require("../models/Order");
 const WalletTopup = require("../models/WalletTopup");
+const WalletTransaction = require("../models/WalletTransaction");
 const upload = require("../middleware/imageMemoryUpload");
 const adminMiddleware = require("../middleware/adminMiddleware");
 const authMiddleware = require("../middleware/authMiddleware");
@@ -21,7 +22,8 @@ const {
     creditTopup,
     getWalletBalance,
     getWalletTimeline,
-    payOrderWithWallet
+    payOrderWithWallet,
+    projectLedger
 } = require("../services/walletService");
 const {
     StorageError,
@@ -188,6 +190,102 @@ function sendWalletError(res, error, fallback = "Wallet transaction failed") {
         code: "WALLET_TRANSACTION_FAILED",
         message: fallback
     });
+}
+
+function hasTopupEvidence(topup = {}) {
+    return Boolean(
+        topup.paymentSlip ||
+        topup.paymentEvidence?.url ||
+        topup.paymentEvidence?.key ||
+        topup.paymentEvidence?.storageKey
+    );
+}
+
+function projectAdminWalletTopup(topup = {}) {
+    const item = typeof topup.toObject === "function" ? topup.toObject() : topup;
+
+    return {
+        _id: item._id,
+        topupId: item.topupId,
+        username: item.username,
+        amount: item.amount,
+        currency: getCurrencyKey(item.currency),
+        region: item.region || "",
+        paymentMethod: item.paymentMethod || "",
+        paymentProvider: item.paymentProvider || "",
+        transactionId: item.transactionId || "",
+        paymentSlip: item.paymentSlip || "",
+        paymentEvidence: item.paymentEvidence || {},
+        status: item.status || "pending",
+        note: item.note || "",
+        paidAt: item.paidAt || null,
+        hasPaymentEvidence: hasTopupEvidence(item),
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt
+    };
+}
+
+function projectWalletUser(user = {}) {
+    return {
+        username: user.username,
+        region: user.region || "",
+        wallet: {
+            MMK: Number(user.wallet?.MMK || 0),
+            THB: Number(user.wallet?.THB || 0)
+        }
+    };
+}
+
+function parsePagination(query = {}) {
+    const page = Math.max(Number(query.page || 1), 1);
+    const requestedLimit = Math.max(Number(query.limit || 50), 1);
+    const limit = Math.min(requestedLimit, 100);
+    const skip = (page - 1) * limit;
+
+    return { page, limit, skip };
+}
+
+function transactionFilter(query = {}) {
+    const filter = {};
+    const type = String(query.type || "").trim();
+    const direction = String(query.direction || "").trim();
+    const currency = String(query.currency || "").trim();
+    const search = String(query.q || "").trim();
+
+    if (type && [
+        "topup",
+        "payment",
+        "refund",
+        "wallet.topup",
+        "wallet.payment",
+        "wallet.refund",
+        "wallet.reversal",
+        "wallet.adjustment",
+        "wallet.migration"
+    ].includes(type)) {
+        filter.type = type;
+    }
+
+    if (["credit", "debit"].includes(direction)) {
+        filter.direction = direction;
+    }
+
+    if (currency) {
+        filter.currency = getCurrencyKey(currency);
+    }
+
+    if (search) {
+        const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        filter.$or = [
+            { username: { $regex: escaped, $options: "i" } },
+            { transactionId: { $regex: escaped, $options: "i" } },
+            { referenceId: { $regex: escaped, $options: "i" } },
+            { orderId: { $regex: escaped, $options: "i" } },
+            { topupId: { $regex: escaped, $options: "i" } }
+        ];
+    }
+
+    return filter;
 }
 
 async function createWalletNotification(req, topup, title, message, type = "wallet") {
@@ -573,13 +671,28 @@ router.post("/wallet/upload-slip/:topupId", authMiddleware, upload.single("slip"
 
 router.get("/admin/wallet/topups", adminMiddleware, async (req, res) => {
     try {
-        const topups = await WalletTopup.find()
+        const status = String(req.query.status || "").trim().toLowerCase();
+        const query = {};
+
+        if ([
+            "pending",
+            "paid",
+            "completed",
+            "approved",
+            "rejected",
+            "cancelled",
+            "failed"
+        ].includes(status)) {
+            query.status = status;
+        }
+
+        const topups = await WalletTopup.find(query)
             .sort({ createdAt: -1 })
             .limit(200);
 
         res.json({
             success: true,
-            topups
+            topups: topups.map(projectAdminWalletTopup)
         });
 
     } catch (error) {
@@ -589,6 +702,72 @@ router.get("/admin/wallet/topups", adminMiddleware, async (req, res) => {
             success: false,
             message: "Server error"
         });
+    }
+});
+
+router.get("/admin/wallet/topups/:id/context", adminMiddleware, async (req, res) => {
+    try {
+        const topup = await WalletTopup.findById(req.params.id);
+
+        if (!topup) {
+            return res.status(404).json({
+                success: false,
+                message: "Topup not found"
+            });
+        }
+
+        const user = await User.findOne({ username: topup.username })
+            .select("username region wallet")
+            .lean();
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        const timeline = await getWalletTimeline(topup.username, {
+            currency: getCurrencyKey(topup.currency),
+            limit: 10
+        });
+
+        return res.json({
+            success: true,
+            topup: projectAdminWalletTopup(topup),
+            wallet: projectWalletUser(user),
+            recentTransactions: timeline.transactions
+        });
+    } catch (error) {
+        console.log("Admin wallet topup context error:", error);
+        return sendWalletError(res, error, "Load wallet context failed");
+    }
+});
+
+router.get("/admin/wallet/transactions", adminMiddleware, async (req, res) => {
+    try {
+        const { page, limit, skip } = parsePagination(req.query);
+        const filter = transactionFilter(req.query);
+
+        const [items, total] = await Promise.all([
+            WalletTransaction.find(filter)
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit),
+            WalletTransaction.countDocuments(filter)
+        ]);
+
+        return res.json({
+            success: true,
+            transactions: items.map(projectLedger),
+            page,
+            limit,
+            total,
+            totalPages: Math.max(Math.ceil(total / limit), 1)
+        });
+    } catch (error) {
+        console.log("Admin wallet transactions error:", error);
+        return sendWalletError(res, error, "Load wallet transactions failed");
     }
 });
 
@@ -868,7 +1047,7 @@ router.post("/wallet/pay", authMiddleware, async (req, res) => {
             });
         }
 
-        const catalogItem = resolveOrderCatalog({
+        const catalogItem = await resolveOrderCatalog({
             productCode: productCode || gameKey,
             gameKey,
             game,

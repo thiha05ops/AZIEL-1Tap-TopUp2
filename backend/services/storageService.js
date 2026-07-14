@@ -31,6 +31,7 @@ const CATEGORY_FOLDERS = {
     walletSlip: "wallet-slips",
     supportEvidence: "support",
     paymentAsset: "payment-assets",
+    mediaAsset: "media-assets",
     profilePhoto: "profile"
 };
 

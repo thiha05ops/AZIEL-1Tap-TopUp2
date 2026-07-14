@@ -616,7 +616,7 @@ router.post("/payment/manual/attempt", authMiddleware, manualAttemptLimiter, asy
             });
         }
 
-        const catalogItem = resolveOrderCatalog({
+        const catalogItem = await resolveOrderCatalog({
             productCode: productCode || gameKey,
             gameKey,
             game,
@@ -851,7 +851,7 @@ router.post("/payment/create", authMiddleware, activeOrderCreateLimiter, async (
             });
         }
 
-        const catalogItem = resolveOrderCatalog({
+        const catalogItem = await resolveOrderCatalog({
             productCode: productCode || gameKey,
             gameKey,
             game,
