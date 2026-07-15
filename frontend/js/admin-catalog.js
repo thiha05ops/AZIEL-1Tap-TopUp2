@@ -7,6 +7,7 @@ let selectedCatalogProductCode = "";
 let catalogSource = "";
 let catalogActiveSource = "";
 let selectedCatalogProduct = null;
+let selectedCatalogBanners = [];
 let catalogPackageEditDraft = null;
 let catalogPackageSavePending = false;
 
@@ -127,6 +128,7 @@ function renderCatalogProducts() {
     list.querySelectorAll("[data-product-code]").forEach(btn => {
         btn.addEventListener("click", () => {
             selectCatalogProduct(btn.dataset.productCode);
+            window.AZIEL_ADMIN_LAYOUT?.showDetail?.("catalog");
         });
     });
 }
@@ -153,6 +155,10 @@ async function selectCatalogProduct(productCode, rerenderList = true) {
     catalogActiveSource = data.activeSource || catalogActiveSource;
     setCatalogSource(catalogSource || "-");
     setCatalogActiveSource(catalogActiveSource || "-");
+    const bannerData = await adminFetch(`/api/admin/catalog/products/${encodeURIComponent(selectedCatalogProductCode)}/banners`);
+    selectedCatalogBanners = bannerData?.success && Array.isArray(bannerData.banners)
+        ? bannerData.banners
+        : [];
     renderCatalogDetail(data.product);
 }
 
@@ -165,6 +171,9 @@ function renderCatalogDetail(product) {
 
     detail.innerHTML = `
         <div class="catalog-detail-head">
+            <button class="admin-mobile-back-btn" type="button" data-mobile-back="catalog">
+                ← ${adminT("back_to_catalog", "Catalog")}
+            </button>
             <span>${adminT("product", "Product")}</span>
             <h3>${escapeHtml(product.name)}</h3>
             <b class="admin-status-pill ${product.enabled ? "is-ok" : "is-muted"}">
@@ -189,19 +198,36 @@ function renderCatalogDetail(product) {
                 <h3 data-admin-i18n="attached_media">${adminT("attached_media", "Attached Media")}</h3>
             </div>
             ${renderProductImageControl(product)}
+            ${renderMobilePackagePreviewControl(product)}
         </div>
 
         <div class="catalog-package-table-wrap">
             <div class="panel-head catalog-package-head">
                 <h3 data-admin-i18n="packages">${adminT("packages", "Packages")}</h3>
+                <button class="admin-secondary-btn" type="button" data-add-package>${adminT("add_package", "Add Package")}</button>
             </div>
             ${renderPackageTable(packages)}
+        </div>
+
+        <div class="catalog-banners-panel">
+            <div class="panel-head catalog-package-head">
+                <h3 data-admin-i18n="banners">${adminT("banners", "Banners")}</h3>
+                <button class="admin-secondary-btn" type="button" data-add-banner>${adminT("add_banner", "Add Banner")}</button>
+            </div>
+            ${renderBannerList(selectedCatalogBanners)}
         </div>
     `;
 
     detail.querySelector("[data-product-toggle]")?.addEventListener("click", () => toggleProductAvailability(product));
+    detail.querySelector('[data-mobile-back="catalog"]')?.addEventListener("click", () => {
+        window.AZIEL_ADMIN_LAYOUT?.showList?.("catalog");
+    });
     detail.querySelector("[data-change-product-image]")?.addEventListener("click", () => attachProductImage(product));
     detail.querySelector("[data-remove-product-image]")?.addEventListener("click", () => clearProductImage(product));
+    detail.querySelector("[data-change-mobile-preview]")?.addEventListener("click", () => attachMobilePackagePreview(product));
+    detail.querySelector("[data-remove-mobile-preview]")?.addEventListener("click", () => clearMobilePackagePreview(product));
+    detail.querySelector("[data-add-package]")?.addEventListener("click", () => openPackageCreatePanel(product));
+    detail.querySelector("[data-add-banner]")?.addEventListener("click", () => openBannerEditor(product));
     detail.querySelectorAll("[data-edit-package]").forEach(btn => {
         btn.addEventListener("click", () => {
             const pkg = packages.find(item => item.packageCode === btn.dataset.editPackage);
@@ -226,6 +252,7 @@ function renderCatalogDetail(product) {
             if (pkg) clearPackageIcon(product, pkg);
         });
     });
+    bindBannerControls(detail, product);
     window.AZIEL_ADMIN_I18N?.translate?.(detail);
 }
 
@@ -247,6 +274,31 @@ function renderProductImageControl(product) {
             <div class="catalog-package-actions">
                 <button class="admin-icon-btn" type="button" data-change-product-image>${adminT("change_image", "Change Image")}</button>
                 ${asset ? `<button class="admin-icon-btn danger" type="button" data-remove-product-image>${adminT("remove_image", "Remove Image")}</button>` : ""}
+            </div>
+        </div>
+    `;
+}
+
+function renderMobilePackagePreviewControl(product) {
+    const asset = product.mobilePackagePreviewAsset || product.mobilePackagePreview?.asset || null;
+    const imageUrl = asset?.secureUrl || asset?.url || product.mobilePackagePreviewUrl || product.mobilePackagePreview?.url || "";
+
+    return `
+        <div class="catalog-media-control catalog-mobile-preview-control">
+            <div class="catalog-media-preview catalog-media-preview-square">
+                ${imageUrl
+                    ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(asset?.altText || product.name)}">`
+                    : `<span>${adminT("fallback_static_asset", "Static fallback asset")}</span>`}
+            </div>
+            <div>
+                <strong>${adminT("mobile_package_preview", "Mobile Package Preview")}</strong>
+                <small>${asset ? escapeHtml(asset.name) : adminT("fallback_static_asset", "Static fallback asset")}</small>
+                <small>${adminT("mobile_package_preview_helper", "Shown on mobile before a package is selected.")}</small>
+                <small>${adminT("mobile_package_preview_recommendation", "Square PNG or WebP recommended.")}</small>
+            </div>
+            <div class="catalog-package-actions">
+                <button class="admin-icon-btn" type="button" data-change-mobile-preview>${adminT("select_image", "Select Image")}</button>
+                ${asset ? `<button class="admin-icon-btn danger" type="button" data-remove-mobile-preview>${adminT("remove_image", "Remove Image")}</button>` : ""}
             </div>
         </div>
     `;
@@ -288,6 +340,71 @@ function renderPackageTable(packages) {
     `;
 }
 
+function renderBannerList(banners = []) {
+    if (!banners.length) {
+        return `<p class="admin-empty-state">${adminT("no_banners_found", "No banners found")}</p>`;
+    }
+
+    return `
+        <div class="catalog-banner-list">
+            ${banners.map((banner, index) => `
+                <article class="catalog-banner-row" data-banner-id="${escapeHtml(banner.id)}">
+                    <div class="catalog-banner-preview">
+                        ${banner.mediaAsset?.secureUrl || banner.mediaAsset?.url
+                            ? `<img src="${escapeHtml(banner.mediaAsset.secureUrl || banner.mediaAsset.url)}" alt="${escapeHtml(banner.mediaAsset.altText || banner.name)}">`
+                            : `<span>${adminT("banner_image", "Banner Image")}</span>`}
+                    </div>
+                    <div>
+                        <strong>${escapeHtml(banner.name)}</strong>
+                        <small>${adminT(banner.enabled ? "enabled" : "disabled", banner.enabled ? "Enabled" : "Disabled")} · ${adminT("sort_order", "Sort Order")} ${Number(banner.sortOrder || 0)}</small>
+                        <small>${formatBannerSchedule(banner)}</small>
+                    </div>
+                    <div class="catalog-package-actions">
+                        <button class="admin-icon-btn" type="button" data-edit-banner="${escapeHtml(banner.id)}">${adminT("edit", "Edit")}</button>
+                        <button class="admin-icon-btn" type="button" data-toggle-banner="${escapeHtml(banner.id)}">${adminT(banner.enabled ? "disable" : "enable", banner.enabled ? "Disable" : "Enable")}</button>
+                        <button class="admin-icon-btn" type="button" data-move-banner-up="${escapeHtml(banner.id)}" ${index === 0 ? "disabled" : ""}>${adminT("move_up", "Move Up")}</button>
+                        <button class="admin-icon-btn" type="button" data-move-banner-down="${escapeHtml(banner.id)}" ${index === banners.length - 1 ? "disabled" : ""}>${adminT("move_down", "Move Down")}</button>
+                        <button class="admin-icon-btn danger" type="button" data-remove-banner="${escapeHtml(banner.id)}">${adminT("remove", "Remove")}</button>
+                    </div>
+                </article>
+            `).join("")}
+        </div>
+    `;
+}
+
+function bindBannerControls(root, product) {
+    root.querySelectorAll("[data-edit-banner]").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const banner = selectedCatalogBanners.find(item => item.id === btn.dataset.editBanner);
+            if (banner) openBannerEditor(product, banner);
+        });
+    });
+    root.querySelectorAll("[data-toggle-banner]").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const banner = selectedCatalogBanners.find(item => item.id === btn.dataset.toggleBanner);
+            if (banner) saveBanner(product, { ...banner, enabled: !banner.enabled }, banner);
+        });
+    });
+    root.querySelectorAll("[data-remove-banner]").forEach(btn => {
+        btn.addEventListener("click", () => removeBanner(product, btn.dataset.removeBanner));
+    });
+    root.querySelectorAll("[data-move-banner-up]").forEach(btn => {
+        btn.addEventListener("click", () => moveBanner(product, btn.dataset.moveBannerUp, -1));
+    });
+    root.querySelectorAll("[data-move-banner-down]").forEach(btn => {
+        btn.addEventListener("click", () => moveBanner(product, btn.dataset.moveBannerDown, 1));
+    });
+}
+
+function formatBannerSchedule(banner) {
+    const start = banner.startsAt ? new Date(banner.startsAt).toLocaleString() : "";
+    const end = banner.endsAt ? new Date(banner.endsAt).toLocaleString() : "";
+    if (start && end) return `${start} → ${end}`;
+    if (start) return `${adminT("start_date", "Start Date")}: ${start}`;
+    if (end) return `${adminT("end_date", "End Date")}: ${end}`;
+    return adminT("not_scheduled", "Not scheduled");
+}
+
 function renderPackageIconControl(item) {
     const asset = item.iconAsset || null;
     const imageUrl = asset?.secureUrl || asset?.url || item.iconUrl || "";
@@ -321,6 +438,24 @@ async function clearProductImage(product) {
     });
 }
 
+async function attachMobilePackagePreview(product) {
+    const asset = await window.AZIEL_ADMIN_MEDIA_SELECTOR?.open?.({ category: "product_image" });
+    if (!asset) return;
+
+    await mutateCatalog(`/api/admin/catalog/products/${encodeURIComponent(product.productCode)}/presentation/mobile-package-preview`, {
+        assetId: asset.assetId,
+        expectedUpdatedAt: product.updatedAt
+    });
+}
+
+async function clearMobilePackagePreview(product) {
+    await mutateCatalog(`/api/admin/catalog/products/${encodeURIComponent(product.productCode)}/presentation/mobile-package-preview`, {
+        expectedUpdatedAt: product.updatedAt
+    }, {
+        method: "DELETE"
+    });
+}
+
 async function attachPackageIcon(product, pkg) {
     const asset = await window.AZIEL_ADMIN_MEDIA_SELECTOR?.open?.({ category: "package_icon" });
     if (!asset) return;
@@ -337,6 +472,256 @@ async function clearPackageIcon(product, pkg) {
     }, {
         method: "DELETE"
     });
+}
+
+function openPackageCreatePanel(product) {
+    ensurePackageCreateModal();
+    const modal = document.getElementById("catalogPackageCreateModal");
+    modal.querySelector("form")?.reset();
+    modal.dataset.iconAssetId = "";
+    modal.querySelector("#catalogCreateProductName").textContent = product.name;
+    modal.classList.add("show");
+    modal.querySelector("#catalogCreateCancel").onclick = () => modal.classList.remove("show");
+    modal.querySelector("#catalogCreateIcon").onclick = async () => {
+        const asset = await window.AZIEL_ADMIN_MEDIA_SELECTOR?.open?.({ category: "package_icon" });
+        if (!asset) return;
+        modal.dataset.iconAssetId = asset.assetId;
+        modal.querySelector("#catalogCreateIconLabel").textContent = asset.name || asset.assetId;
+    };
+    modal.querySelector("#catalogCreateSave").onclick = () => handlePackageCreateSave(product);
+}
+
+function ensurePackageCreateModal() {
+    if (document.getElementById("catalogPackageCreateModal")) return;
+
+    const modal = document.createElement("div");
+    modal.id = "catalogPackageCreateModal";
+    modal.className = "admin-action-modal catalog-edit-modal";
+    modal.innerHTML = `
+        <div class="admin-action-modal-box">
+            <h3>${adminT("add_package", "Add Package")}</h3>
+            <p><b id="catalogCreateProductName"></b></p>
+            <form>
+                <label>${adminT("package_code", "Package Code")} <input id="catalogCreateCode" type="text" required></label>
+                <label>${adminT("package_name", "Package Name")} <input id="catalogCreateName" type="text" required></label>
+                <label>${adminT("sort_order", "Sort Order")} <input id="catalogCreateSort" type="number" step="1" value="0"></label>
+                <label><input id="catalogCreateEnabled" type="checkbox" checked> ${adminT("enabled", "Enabled")}</label>
+                <label><input id="catalogCreateMMEnabled" type="checkbox" checked> ${adminT("mm_available", "MM Available")}</label>
+                <label>${adminT("mmk_price", "MMK Price")} <input id="catalogCreateMM" type="number" step="0.01" min="0"></label>
+                <label><input id="catalogCreateTHEnabled" type="checkbox"> ${adminT("th_available", "TH Available")}</label>
+                <label>${adminT("thb_price", "THB Price")} <input id="catalogCreateTH" type="number" step="0.01" min="0"></label>
+            </form>
+            <button id="catalogCreateIcon" class="admin-secondary-btn" type="button">${adminT("select_package_icon", "Select Package Icon")}</button>
+            <p id="catalogCreateIconLabel">${adminT("fallback_static_asset", "Static fallback asset")}</p>
+            <div class="admin-action-modal-actions">
+                <button id="catalogCreateCancel" type="button">${adminT("cancel", "Cancel")}</button>
+                <button id="catalogCreateSave" type="button">${adminT("add_package", "Add Package")}</button>
+            </div>
+        </div>
+    `;
+    modal.addEventListener("click", event => {
+        if (event.target === modal) modal.classList.remove("show");
+    });
+    document.body.appendChild(modal);
+}
+
+async function handlePackageCreateSave(product) {
+    const modal = document.getElementById("catalogPackageCreateModal");
+    if (!modal?.classList.contains("show")) return;
+
+    const payload = {
+        packageCode: modal.querySelector("#catalogCreateCode")?.value || "",
+        name: modal.querySelector("#catalogCreateName")?.value || "",
+        enabled: Boolean(modal.querySelector("#catalogCreateEnabled")?.checked),
+        sortOrder: modal.querySelector("#catalogCreateSort")?.value || 0,
+        iconAssetId: modal.dataset.iconAssetId || "",
+        prices: {
+            MM: {
+                enabled: Boolean(modal.querySelector("#catalogCreateMMEnabled")?.checked),
+                amount: modal.querySelector("#catalogCreateMM")?.value || ""
+            },
+            TH: {
+                enabled: Boolean(modal.querySelector("#catalogCreateTHEnabled")?.checked),
+                amount: modal.querySelector("#catalogCreateTH")?.value || ""
+            }
+        }
+    };
+
+    modal.classList.remove("show");
+    const confirmed = await confirmCatalogAction({
+        title: adminT("add_package", "Add Package"),
+        message: `${payload.packageCode}\n${payload.name}\n${adminT("historical_orders_not_changed", "Historical orders will not be changed.")}`,
+        confirmText: adminT("add_package", "Add Package")
+    });
+
+    if (!confirmed) {
+        modal.classList.add("show");
+        return;
+    }
+
+    const result = await mutateCatalog(`/api/admin/catalog/products/${encodeURIComponent(product.productCode)}/packages`, payload, {
+        method: "POST"
+    });
+
+    if (result?.success) {
+        showAdminToast?.(adminT("package_created", "Package created"), "success");
+    }
+}
+
+function openBannerEditor(product, banner = null) {
+    ensureBannerEditorModal();
+    const modal = document.getElementById("catalogBannerEditorModal");
+    modal.dataset.bannerId = banner?.id || "";
+    modal.dataset.mediaAssetId = banner?.mediaAssetId || "";
+    modal.querySelector("#catalogBannerTitle").textContent = banner ? adminT("edit_banner", "Edit Banner") : adminT("add_banner", "Add Banner");
+    modal.querySelector("#catalogBannerName").value = banner?.name || "";
+    modal.querySelector("#catalogBannerEnabled").checked = banner?.enabled !== false;
+    modal.querySelector("#catalogBannerSort").value = banner?.sortOrder ?? 0;
+    modal.querySelector("#catalogBannerCtaLabel").value = banner?.ctaLabel || "";
+    modal.querySelector("#catalogBannerCtaTarget").value = banner?.ctaTarget || "";
+    modal.querySelector("#catalogBannerStarts").value = toDatetimeInputValue(banner?.startsAt);
+    modal.querySelector("#catalogBannerEnds").value = toDatetimeInputValue(banner?.endsAt);
+    modal.querySelector("#catalogBannerMediaLabel").textContent = banner?.mediaAsset?.name || adminT("select_banner_image", "Select Banner Image");
+    modal.classList.add("show");
+
+    modal.querySelector("#catalogBannerMedia").onclick = async () => {
+        const asset = await window.AZIEL_ADMIN_MEDIA_SELECTOR?.open?.({ category: "product_banner" });
+        if (!asset) return;
+        modal.dataset.mediaAssetId = asset.assetId;
+        modal.querySelector("#catalogBannerMediaLabel").textContent = asset.name || asset.assetId;
+    };
+    modal.querySelector("#catalogBannerCancel").onclick = () => modal.classList.remove("show");
+    modal.querySelector("#catalogBannerSave").onclick = () => readAndSaveBanner(product, banner);
+}
+
+function ensureBannerEditorModal() {
+    if (document.getElementById("catalogBannerEditorModal")) return;
+
+    const modal = document.createElement("div");
+    modal.id = "catalogBannerEditorModal";
+    modal.className = "admin-action-modal catalog-edit-modal";
+    modal.innerHTML = `
+        <div class="admin-action-modal-box">
+            <h3 id="catalogBannerTitle"></h3>
+            <label>${adminT("banner_name", "Banner Name")} <input id="catalogBannerName" type="text"></label>
+            <label><input id="catalogBannerEnabled" type="checkbox" checked> ${adminT("enabled", "Enabled")}</label>
+            <label>${adminT("sort_order", "Sort Order")} <input id="catalogBannerSort" type="number" step="1" value="0"></label>
+            <button id="catalogBannerMedia" class="admin-secondary-btn" type="button">${adminT("select_banner_image", "Select Banner Image")}</button>
+            <p id="catalogBannerMediaLabel"></p>
+            <label>${adminT("cta_label", "CTA Label")} <input id="catalogBannerCtaLabel" type="text"></label>
+            <label>${adminT("cta_target", "CTA Target")} <input id="catalogBannerCtaTarget" type="text"></label>
+            <label>${adminT("start_date", "Start Date")} <input id="catalogBannerStarts" type="datetime-local"></label>
+            <label>${adminT("end_date", "End Date")} <input id="catalogBannerEnds" type="datetime-local"></label>
+            <div class="admin-action-modal-actions">
+                <button id="catalogBannerCancel" type="button">${adminT("cancel", "Cancel")}</button>
+                <button id="catalogBannerSave" type="button">${adminT("save_changes", "Save Changes")}</button>
+            </div>
+        </div>
+    `;
+    modal.addEventListener("click", event => {
+        if (event.target === modal) modal.classList.remove("show");
+    });
+    document.body.appendChild(modal);
+}
+
+function readAndSaveBanner(product, existing = null) {
+    const modal = document.getElementById("catalogBannerEditorModal");
+    const payload = {
+        name: modal.querySelector("#catalogBannerName")?.value || "",
+        mediaAssetId: modal.dataset.mediaAssetId || "",
+        enabled: Boolean(modal.querySelector("#catalogBannerEnabled")?.checked),
+        sortOrder: modal.querySelector("#catalogBannerSort")?.value || 0,
+        ctaLabel: modal.querySelector("#catalogBannerCtaLabel")?.value || "",
+        ctaTarget: modal.querySelector("#catalogBannerCtaTarget")?.value || "",
+        startsAt: fromDatetimeInputValue(modal.querySelector("#catalogBannerStarts")?.value),
+        endsAt: fromDatetimeInputValue(modal.querySelector("#catalogBannerEnds")?.value)
+    };
+    modal.classList.remove("show");
+    return saveBanner(product, payload, existing);
+}
+
+async function saveBanner(product, payload, existing = null) {
+    const isEdit = Boolean(existing?.id);
+    const confirmed = await confirmCatalogAction({
+        title: isEdit ? adminT("edit_banner", "Edit Banner") : adminT("add_banner", "Add Banner"),
+        message: `${payload.name || existing?.name || ""}\n${adminT("new_banner_runtime_message", "Customer game pages will use this banner when eligible.")}`,
+        confirmText: adminT("save_changes", "Save Changes")
+    });
+
+    if (!confirmed) return null;
+
+    const url = isEdit
+        ? `/api/admin/catalog/products/${encodeURIComponent(product.productCode)}/banners/${encodeURIComponent(existing.id)}`
+        : `/api/admin/catalog/products/${encodeURIComponent(product.productCode)}/banners`;
+    const data = await adminFetch(url, {
+        method: isEdit ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    });
+
+    if (!data?.success) {
+        showAdminToast?.(data?.message || adminT("catalog_update_failed", "Catalog update failed"), "error");
+        return data;
+    }
+
+    selectedCatalogBanners = data.banners || [];
+    showAdminToast?.(adminT("banner_saved", "Banner saved"), "success");
+    await selectCatalogProduct(product.productCode, false);
+    return data;
+}
+
+async function removeBanner(product, bannerId) {
+    const confirmed = await confirmCatalogAction({
+        title: adminT("remove_banner", "Remove Banner"),
+        message: adminT("remove_banner_message", "Remove this banner record? The media asset will remain in the Media Library."),
+        confirmText: adminT("remove", "Remove"),
+        danger: true
+    });
+    if (!confirmed) return;
+
+    const data = await adminFetch(`/api/admin/catalog/products/${encodeURIComponent(product.productCode)}/banners/${encodeURIComponent(bannerId)}`, {
+        method: "DELETE"
+    });
+    if (!data?.success) {
+        showAdminToast?.(data?.message || adminT("catalog_update_failed", "Catalog update failed"), "error");
+        return;
+    }
+    selectedCatalogBanners = data.banners || [];
+    showAdminToast?.(adminT("banner_removed", "Banner removed"), "success");
+    await selectCatalogProduct(product.productCode, false);
+}
+
+async function moveBanner(product, bannerId, direction) {
+    const currentIndex = selectedCatalogBanners.findIndex(item => item.id === bannerId);
+    const nextIndex = currentIndex + direction;
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= selectedCatalogBanners.length) return;
+
+    const next = [...selectedCatalogBanners];
+    [next[currentIndex], next[nextIndex]] = [next[nextIndex], next[currentIndex]];
+    const data = await adminFetch(`/api/admin/catalog/products/${encodeURIComponent(product.productCode)}/banners/order`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderedIds: next.map(item => item.id) })
+    });
+    if (!data?.success) {
+        showAdminToast?.(data?.message || adminT("catalog_update_failed", "Catalog update failed"), "error");
+        return;
+    }
+    selectedCatalogBanners = data.banners || [];
+    await selectCatalogProduct(product.productCode, false);
+}
+
+function toDatetimeInputValue(value) {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toISOString().slice(0, 16);
+}
+
+function fromDatetimeInputValue(value) {
+    if (!value) return "";
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? "" : date.toISOString();
 }
 
 async function toggleProductAvailability(product) {

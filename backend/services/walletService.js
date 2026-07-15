@@ -2,6 +2,11 @@ const mongoose = require("mongoose");
 
 const User = require("../models/User");
 const WalletTransaction = require("../models/WalletTransaction");
+const {
+    applyCursorFilter,
+    pageResult,
+    parseLimit
+} = require("./paginationService");
 
 class WalletError extends Error {
     constructor(code, message, statusCode = 400) {
@@ -120,6 +125,17 @@ async function mutateWallet(input = {}, options = {}) {
             "WALLET_TRANSACTION_FAILED",
             "Wallet transaction identity is required."
         );
+    }
+
+    if (options.session) {
+        return mutateWalletWithinSession({
+            ...input,
+            username,
+            amount,
+            currency,
+            idempotencyKey,
+            direction
+        }, options.session);
     }
 
     if (options.useTransaction === false) {
@@ -470,28 +486,25 @@ function isCanonicalLedgerEntry(item = {}) {
 
 async function getWalletTimeline(username, options = {}) {
     const currency = options.currency ? normalizeCurrency(options.currency) : "";
-    const limit = Math.min(Math.max(Number(options.limit || 30), 1), 100);
+    const limit = parseLimit(options.limit, { defaultLimit: 30, maxLimit: 100 });
     const query = { username };
 
     if (currency) query.currency = currency;
-    if (options.cursor) query.createdAt = { $lt: new Date(options.cursor) };
     if (!options.includeMigration) query.type = { $ne: "wallet.migration" };
 
-    const transactions = await WalletTransaction.find(query)
-        .sort({ createdAt: -1 })
-        .limit(limit + 1);
-
-    const hasMore = transactions.length > limit;
-    const page = hasMore ? transactions.slice(0, limit) : transactions;
+    const transactions = await WalletTransaction.find(applyCursorFilter(query, options.cursor))
+        .sort({ createdAt: -1, _id: -1 })
+        .limit(limit + 1)
+        .lean();
+    const { page, pagination } = pageResult(transactions, limit);
     const balance = currency ? await getWalletBalance(username, currency) : 0;
 
     return {
         balance,
         currency,
         transactions: page.map(projectLedger),
-        nextCursor: hasMore
-            ? page[page.length - 1]?.createdAt?.toISOString?.() || String(page[page.length - 1]?.createdAt || "")
-            : ""
+        nextCursor: pagination.nextCursor,
+        pagination
     };
 }
 

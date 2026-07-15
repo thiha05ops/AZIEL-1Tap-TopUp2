@@ -756,6 +756,86 @@
 }
 
 /* ==========================================
+   PHASE 16.3 LIGHT THEME READABILITY CLOSURE
+========================================== */
+
+body.theme-light .support-page {
+    color: var(--text);
+}
+
+body.theme-light .support-hero,
+body.theme-light .support-card,
+body.theme-light .category-card,
+body.theme-light .faq-item,
+body.theme-light .contact-item,
+body.theme-light .status-item,
+body.theme-light .ticket-item,
+body.theme-light .empty-tickets {
+    background-color: var(--card);
+    border-color: var(--border);
+    color: var(--text);
+}
+
+body.theme-light .support-hero h1,
+body.theme-light .section-heading h2,
+body.theme-light .status-card h2,
+body.theme-light .category-card strong,
+body.theme-light .faq-question,
+body.theme-light .support-form label,
+body.theme-light .contact-item strong,
+body.theme-light .status-item strong,
+body.theme-light .ticket-title,
+body.theme-light .ticket-reply,
+body.theme-light .ticket-reply p {
+    color: var(--text);
+}
+
+body.theme-light .support-subtitle,
+body.theme-light .category-card small,
+body.theme-light .faq-answer,
+body.theme-light .faq-question i,
+body.theme-light .support-form input::placeholder,
+body.theme-light .support-form textarea::placeholder,
+body.theme-light .contact-item small,
+body.theme-light .status-item small,
+body.theme-light .ticket-tab,
+body.theme-light .my-tickets,
+body.theme-light .ticket-meta,
+body.theme-light .ticket-message,
+body.theme-light .empty-tickets,
+body.theme-light .support-footer {
+    color: var(--text-muted);
+}
+
+body.theme-light .support-form input,
+body.theme-light .support-form select,
+body.theme-light .support-form textarea {
+    background: var(--surface-strong);
+    border-color: var(--border);
+    color: var(--text);
+}
+
+body.theme-light .support-form input[type="file"] {
+    color: var(--text-secondary);
+}
+
+body.theme-light .ticket-tab:hover {
+    color: var(--text);
+}
+
+body.theme-light .support-msg {
+    color: var(--text-muted);
+}
+
+body.theme-light .support-msg.success {
+    color: var(--success);
+}
+
+body.theme-light .support-msg.error {
+    color: var(--danger);
+}
+
+/* ==========================================
    RESPONSIVE
 ========================================== */
 

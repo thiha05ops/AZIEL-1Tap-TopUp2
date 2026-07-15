@@ -2,6 +2,7 @@ const assert = require("assert");
 const { spawn } = require("child_process");
 const dotenv = require("dotenv");
 const fs = require("fs");
+const os = require("os");
 const net = require("net");
 const path = require("path");
 
@@ -10,6 +11,51 @@ dotenv.config();
 const { createSessionMiddleware } = require("../config/session");
 
 const ROOT = path.join(__dirname, "../..");
+const PRELOAD_PATH = path.join(os.tmpdir(), "aziel-verify-startup-preload.js");
+
+function ensureStartupPreload() {
+    fs.writeFileSync(PRELOAD_PATH, `
+const Module = require("module");
+const path = require("path");
+const originalLoad = Module._load;
+const dbPathSuffix = path.join("backend", "config", "db.js");
+const sessionPathSuffix = path.join("backend", "config", "session.js");
+
+Module._load = function patchedStartupLoad(request, parent, isMain) {
+    const resolved = Module._resolveFilename(request, parent, isMain);
+
+    if (resolved.endsWith(dbPathSuffix)) {
+        return async function verifyConnectDB() {
+            console.log("VERIFY_MONGO_CONNECT_START");
+            if (process.env.AZIEL_VERIFY_MONGO_MODE === "fail") {
+                console.error("DB connection failed: VERIFY_MONGO_FAILURE");
+                throw new Error("VERIFY_MONGO_FAILURE");
+            }
+            await new Promise(resolve => setTimeout(resolve, Number(process.env.AZIEL_VERIFY_MONGO_DELAY_MS || 25)));
+            console.log("MongoDB Connected");
+            return {
+                getClient() {
+                    return {};
+                }
+            };
+        };
+    }
+
+    if (resolved.endsWith(sessionPathSuffix)) {
+        return {
+            SESSION_MAX_AGE_MS: 604800000,
+            createSessionMiddleware() {
+                return function verifySessionMiddleware(req, res, next) {
+                    next();
+                };
+            }
+        };
+    }
+
+    return originalLoad.apply(this, arguments);
+};
+`, "utf8");
+}
 
 function wait(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -30,8 +76,15 @@ function canConnect(port) {
     });
 }
 
-function spawnServer(env) {
-    const child = spawn(process.execPath, ["backend/server.js"], {
+function spawnServer(env, options = {}) {
+    const args = [];
+    if (options.preload) {
+        ensureStartupPreload();
+        args.push("-r", PRELOAD_PATH);
+    }
+    args.push("backend/server.js");
+
+    const child = spawn(process.execPath, args, {
         cwd: ROOT,
         env: {
             ...process.env,
@@ -68,8 +121,9 @@ async function verifyBadMongoPreventsListen() {
         NODE_ENV: "development",
         PORT: String(port),
         MONGO_URI: "mongodb://127.0.0.1:1/aziel-startup-test",
-        MONGO_SERVER_SELECTION_TIMEOUT_MS: "750"
-    });
+        MONGO_SERVER_SELECTION_TIMEOUT_MS: "750",
+        AZIEL_VERIFY_MONGO_MODE: "fail"
+    }, { preload: true });
 
     const exitCode = await Promise.race([
         new Promise(resolve => child.once("exit", resolve)),
@@ -83,17 +137,15 @@ async function verifyBadMongoPreventsListen() {
 }
 
 async function verifyGoodMongoAllowsListen() {
-    if (!process.env.MONGO_URI) {
-        console.log("Skipping successful startup probe: MONGO_URI is not configured.");
-        return;
-    }
-
     const port = 3042;
     const { child, getOutput } = spawnServer({
         NODE_ENV: "development",
         PORT: String(port),
-        MONGO_SERVER_SELECTION_TIMEOUT_MS: "5000"
-    });
+        MONGO_URI: "mongodb://127.0.0.1:27017/aziel-startup-test",
+        MONGO_SERVER_SELECTION_TIMEOUT_MS: "5000",
+        AZIEL_VERIFY_MONGO_MODE: "success",
+        AZIEL_VERIFY_MONGO_DELAY_MS: "50"
+    }, { preload: true });
 
     try {
         for (let index = 0; index < 30; index++) {
@@ -103,6 +155,10 @@ async function verifyGoodMongoAllowsListen() {
 
         assert(getOutput().includes("MongoDB Connected"), "Mongo should connect before listen");
         assert(getOutput().includes("Server running"), "server should listen after Mongo is ready");
+        assert(
+            getOutput().indexOf("MongoDB Connected") < getOutput().indexOf("Server running"),
+            "Mongo connection success must be logged before listen"
+        );
         assert.strictEqual(await canConnect(port), true, "successful startup port should accept connections");
         child.kill("SIGTERM");
         await Promise.race([
@@ -115,11 +171,43 @@ async function verifyGoodMongoAllowsListen() {
 }
 
 function verifySessionStoreContract() {
+    const sessionSource = fs.readFileSync(path.join(ROOT, "backend/config/session.js"), "utf8");
+
+    assert(sessionSource.includes("connect-mongo"), "production session storage must use connect-mongo");
+    assert(sessionSource.includes("MongoStore.create"), "session middleware must create a MongoStore");
+    assert(!sessionSource.includes("MemoryStore"), "production session middleware must not include a MemoryStore fallback");
     assert.throws(
         () => createSessionMiddleware({ isProduction: true }),
         /PROD_SESSION_STORE_UNAVAILABLE/,
         "production session middleware must not fall back to MemoryStore"
     );
+}
+
+function verifyServerStartupSourceContract() {
+    const serverSource = fs.readFileSync(path.join(ROOT, "backend/server.js"), "utf8");
+    const startMatch = serverSource.match(/async function startServer\(\) \{([\s\S]*?)\n\}/);
+
+    assert(startMatch, "server.js must expose startServer");
+
+    const startBody = startMatch[1];
+    const readinessIndex = startBody.indexOf("validateProductionReadiness()");
+    const connectIndex = startBody.indexOf("await connectDB()");
+    const configureIndex = startBody.indexOf("configureApplication(mongoConnection)");
+    const listenIndex = startBody.indexOf("server.listen");
+
+    assert(readinessIndex >= 0, "startServer must validate production readiness");
+    assert(connectIndex > readinessIndex, "startServer must await Mongo after readiness validation");
+    assert(configureIndex > connectIndex, "application configuration must happen after Mongo connection");
+    assert(listenIndex > configureIndex, "server.listen must happen after application configuration");
+    assert(serverSource.includes("startServer().catch"), "startup failure must be caught at the entrypoint");
+    assert(serverSource.includes("process.exit(1)"), "startup failure must exit non-zero");
+    assert(serverSource.includes("process.once(\"SIGTERM\""), "SIGTERM graceful shutdown hook must exist");
+    assert(serverSource.includes("process.once(\"SIGINT\""), "SIGINT graceful shutdown hook must exist");
+    assert(serverSource.includes("setTimeout(() =>"), "shutdown must keep a bounded timeout");
+    assert(serverSource.includes("io.close()"), "Socket.IO must close during shutdown");
+    assert(serverSource.includes("server.close"), "HTTP server must close during shutdown");
+    assert(serverSource.includes("mongoose.connection.close(false)"), "Mongo connection must close during shutdown");
+    assert(serverSource.includes("app.set(\"trust proxy\", 1)"), "production trust proxy ownership must remain unchanged");
 }
 
 function verifyGoogleRouteOwnership() {
@@ -134,6 +222,7 @@ function verifyGoogleRouteOwnership() {
 
 async function main() {
     verifySessionStoreContract();
+    verifyServerStartupSourceContract();
     verifyGoogleRouteOwnership();
     await verifyBadMongoPreventsListen();
     await verifyGoodMongoAllowsListen();

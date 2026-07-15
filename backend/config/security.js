@@ -224,6 +224,8 @@ function validateAdmin(result, env) {
 
 function validateOmise(result, env) {
     const mode = String(env.OMISE_MODE || "").trim().toLowerCase();
+    const publicKey = String(env.OMISE_PUBLIC_KEY || "").trim();
+    const secretKey = String(env.OMISE_SECRET_KEY || "").trim();
 
     if (!mode) {
         addError(result, "PROD_OMISE_MODE_MISSING", "OMISE_MODE must be explicitly set to test or live.", "payment");
@@ -239,12 +241,39 @@ function validateOmise(result, env) {
         addWarning(result, "PROD_OMISE_TEST_MODE", "Production is configured for Omise test mode.", "payment");
     }
 
-    if (!String(env.OMISE_SECRET_KEY || "").trim()) {
+    if (!secretKey) {
         addError(result, "PROD_OMISE_SECRET_MISSING", "OMISE_SECRET_KEY is required for payment verification.", "payment");
     }
 
-    if (!String(env.OMISE_PUBLIC_KEY || "").trim()) {
+    if (!publicKey) {
         addError(result, "PROD_OMISE_PUBLIC_KEY_MISSING", "OMISE_PUBLIC_KEY is required for payment creation.", "payment");
+    }
+
+    const publicMode = publicKey.startsWith("pkey_live_")
+        ? "live"
+        : publicKey.startsWith("pkey_test_")
+            ? "test"
+            : "";
+    const secretMode = secretKey.startsWith("skey_live_")
+        ? "live"
+        : secretKey.startsWith("skey_test_")
+            ? "test"
+            : "";
+
+    if (mode === "live" && (publicMode === "test" || secretMode === "test")) {
+        addError(result, "PAYMENT_TEST_KEY_IN_PRODUCTION", "Production live mode must not use Omise test keys.", "payment");
+    }
+
+    if (publicMode && secretMode && publicMode !== secretMode) {
+        addError(result, "PAYMENT_KEY_MODE_MISMATCH", "Omise public and secret keys must use the same mode.", "payment");
+    }
+
+    if (mode && publicMode && publicMode !== mode) {
+        addError(result, "PAYMENT_PUBLIC_KEY_MODE_MISMATCH", "OMISE_PUBLIC_KEY mode must match OMISE_MODE.", "payment");
+    }
+
+    if (mode && secretMode && secretMode !== mode) {
+        addError(result, "PAYMENT_SECRET_KEY_MODE_MISMATCH", "OMISE_SECRET_KEY mode must match OMISE_MODE.", "payment");
     }
 }
 
@@ -372,11 +401,11 @@ function buildProductionReadiness(env = process.env) {
 
 function logReadinessResult(result) {
     result.warnings.forEach(warning => {
-        console.warn(`[readiness] WARN ${warning.code}`);
+        console.warn(`[readiness] WARNING ${warning.code}`);
     });
 
     result.errors.forEach(error => {
-        console.error(`[readiness] FAIL ${error.code}`);
+        console.error(`[readiness] BLOCKER ${error.code}`);
     });
 
     if (result.ready) {
@@ -387,7 +416,9 @@ function logReadinessResult(result) {
 function validateProductionReadiness(env = process.env) {
     const result = buildProductionReadiness(env);
 
-    if (env.NODE_ENV === "production") {
+    if (env.AZIEL_SUPPRESS_READINESS_LOGS === "true") {
+        // Test/verifier fixtures can assert failure modes without printing launch-gate blockers.
+    } else if (env.NODE_ENV === "production") {
         logReadinessResult(result);
     } else if (process.env.READINESS_DEBUG === "true") {
         logReadinessResult(result);

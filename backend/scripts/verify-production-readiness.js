@@ -28,6 +28,7 @@ function baseProductionEnv(overrides = {}) {
         CLOUDINARY_CLOUD_NAME: "aziel-test",
         CLOUDINARY_API_KEY: "cloudinary-key",
         CLOUDINARY_API_SECRET: "cloudinary-secret",
+        AZIEL_SUPPRESS_READINESS_LOGS: "true",
         ...overrides
     };
 }
@@ -62,6 +63,16 @@ function main() {
     expectCode("invalid Omise mode", baseProductionEnv({ OMISE_MODE: "sandbox" }), "PROD_OMISE_MODE_INVALID");
     expectCode("live payment missing secret", baseProductionEnv({ OMISE_SECRET_KEY: "" }), "PROD_OMISE_SECRET_MISSING");
     expectCode("payment missing public key", baseProductionEnv({ OMISE_PUBLIC_KEY: "" }), "PROD_OMISE_PUBLIC_KEY_MISSING");
+    expectCode(
+        "test payment key in live production",
+        baseProductionEnv({ OMISE_PUBLIC_KEY: "pkey_test_placeholder", OMISE_SECRET_KEY: "skey_test_placeholder" }),
+        "PAYMENT_TEST_KEY_IN_PRODUCTION"
+    );
+    expectCode(
+        "payment key mode mismatch",
+        baseProductionEnv({ OMISE_PUBLIC_KEY: "pkey_live_placeholder", OMISE_SECRET_KEY: "skey_test_placeholder" }),
+        "PAYMENT_KEY_MODE_MISMATCH"
+    );
     expectCode("missing email", baseProductionEnv({ EMAIL_USER: "", EMAIL_PASS: "" }), "PROD_EMAIL_CONFIG_MISSING");
     expectCode(
         "missing registration OTP pepper",

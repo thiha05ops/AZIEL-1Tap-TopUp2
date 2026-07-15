@@ -4,6 +4,38 @@ const { normalizePackageCode, normalizeProductCode } = require("../catalog/catal
 const { CatalogAdminError } = require("./catalogAdminService");
 const { assertAssetCategory } = require("./mediaService");
 
+const PRODUCT_PRESENTATION_SLOTS = Object.freeze({
+    image: {
+        path: "presentation.imageAssetId",
+        category: "product_image"
+    },
+    banner: {
+        path: "presentation.bannerAssetId",
+        category: "product_banner"
+    },
+    mobilePackagePreview: {
+        path: "presentation.mobilePackagePreview.assetId",
+        category: "product_image"
+    }
+});
+
+function getProductPresentationSlot(slot = "image") {
+    const normalized = String(slot || "image").trim();
+    const config = PRODUCT_PRESENTATION_SLOTS[normalized];
+
+    if (!config) {
+        throw new CatalogAdminError(
+            "CATALOG_PRESENTATION_SLOT_INVALID",
+            "Unsupported product presentation slot."
+        );
+    }
+
+    return {
+        name: normalized,
+        ...config
+    };
+}
+
 function normalizeExpectedUpdatedAt(value) {
     const raw = String(value || "").trim();
     if (!raw) {
@@ -53,10 +85,10 @@ async function setProductPresentationAsset({
 
     assertFresh(product, expectedUpdatedAt);
 
-    const path = slot === "banner" ? "presentation.bannerAssetId" : "presentation.imageAssetId";
-    const expectedCategory = slot === "banner" ? "product_banner" : "product_image";
+    const slotConfig = getProductPresentationSlot(slot);
+    const path = slotConfig.path;
 
-    await assertAssetCategory(assetId, expectedCategory);
+    await assertAssetCategory(assetId, slotConfig.category);
 
     if (product.get(path) === assetId) {
         return { changed: false, product: product.toObject() };
@@ -66,7 +98,7 @@ async function setProductPresentationAsset({
     await product.save();
 
     console.log("Catalog presentation updated:", {
-        action: `catalog.product.${slot}.attach`,
+        action: `catalog.product.${slotConfig.name}.attach`,
         productCode: normalizedProductCode,
         assetId,
         actor,
@@ -91,7 +123,8 @@ async function clearProductPresentationAsset({
 
     assertFresh(product, expectedUpdatedAt);
 
-    const path = slot === "banner" ? "presentation.bannerAssetId" : "presentation.imageAssetId";
+    const slotConfig = getProductPresentationSlot(slot);
+    const path = slotConfig.path;
 
     if (!product.get(path)) {
         return { changed: false, product: product.toObject() };
@@ -101,7 +134,7 @@ async function clearProductPresentationAsset({
     await product.save();
 
     console.log("Catalog presentation updated:", {
-        action: `catalog.product.${slot}.clear`,
+        action: `catalog.product.${slotConfig.name}.clear`,
         productCode: normalizedProductCode,
         actor,
         timestamp: new Date().toISOString()

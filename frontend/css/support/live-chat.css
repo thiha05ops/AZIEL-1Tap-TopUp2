@@ -259,6 +259,59 @@
     font-size: 10px;
 }
 
+body.theme-light .chat-body {
+    background:
+        radial-gradient(circle at top left, rgba(139, 92, 246, .10), transparent 35%),
+        var(--bg-soft);
+}
+
+body.theme-light .chat-message.bot {
+    background: #ffffff;
+    color: #111827;
+    border: 1px solid rgba(17, 24, 39, .10);
+}
+
+body.theme-light .chat-message.user {
+    background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+    color: #ffffff;
+}
+
+body.theme-light .chat-message.bot small {
+    color: #64748b;
+    opacity: 1;
+}
+
+body.theme-light .chat-message.user small {
+    color: rgba(255, 255, 255, .82);
+    opacity: 1;
+}
+
+body.theme-light .typing-indicator {
+    background: var(--bg-soft);
+    color: var(--text-muted);
+}
+
+body.theme-light .chat-input-row {
+    background: var(--surface-strong);
+}
+
+body.theme-light .chat-input-row input {
+    background: #ffffff;
+    color: #111827;
+}
+
+body.theme-light .chat-input-row input::placeholder {
+    color: #64748b;
+}
+
+@media (min-width: 1024px) {
+    body:has(.support-page) .live-chat-panel {
+        right: 18px !important;
+        width: 340px !important;
+        height: min(520px, calc(100dvh - 132px)) !important;
+    }
+}
+
 /* =========================
    TYPING
 ========================= */

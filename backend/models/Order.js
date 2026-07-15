@@ -52,6 +52,39 @@ const orderSchema = new mongoose.Schema({
         required: true
     },
 
+    originalAmount: {
+        type: Number,
+        default: 0
+    },
+
+    discountAmount: {
+        type: Number,
+        default: 0
+    },
+
+    finalAmount: {
+        type: Number,
+        default: 0
+    },
+
+    promoCode: {
+        type: String,
+        trim: true,
+        uppercase: true,
+        default: ""
+    },
+
+    promoSnapshot: {
+        type: mongoose.Schema.Types.Mixed,
+        default: null
+    },
+
+    promoRedemptionId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "PromoRedemption",
+        default: null
+    },
+
     currency: {
         type: String,
         default: "MMK"
@@ -228,6 +261,18 @@ const orderSchema = new mongoose.Schema({
     refundedAt: {
         type: Date,
         default: null
+    },
+
+    financialOutcome: {
+        type: String,
+        enum: ["", "FULFILLMENT_SUCCEEDED", "REFUND_CREDITED"],
+        default: "",
+        index: true
+    },
+
+    financialOutcomeAt: {
+        type: Date,
+        default: null
     }
 
 }, {
@@ -243,5 +288,9 @@ orderSchema.index(
         }
     }
 );
+orderSchema.index({ createdAt: -1, _id: -1 });
+orderSchema.index({ status: 1, createdAt: -1, _id: -1 });
+orderSchema.index({ username: 1, createdAt: -1, _id: -1 });
+orderSchema.index({ orderId: 1, createdAt: -1, _id: -1 });
 
 module.exports = mongoose.model("Order", orderSchema);

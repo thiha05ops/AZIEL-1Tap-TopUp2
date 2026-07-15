@@ -8,6 +8,11 @@
     let loading = false;
     let hasLoadedOnce = false;
     let pollingTimer = null;
+    let activeMessagePaging = {
+        nextCursor: "",
+        hasMore: false,
+        loadingMore: false
+    };
 
     document.addEventListener("DOMContentLoaded", initAdminLiveChat);
 
@@ -71,6 +76,9 @@
                 <main class="chat-panel">
                     <div class="chat-panel-header">
                         <div>
+                            <button id="adminLiveChatBackBtn" class="admin-mobile-back-btn" type="button">
+                                ← ${escapeHTML(window.AZIEL_ADMIN_I18N?.t?.("back_to_chats", "Chats") || "Chats")}
+                            </button>
                             <h2 id="adminLiveChatSelectedUsername">Select a user</h2>
                             <p id="adminLiveChatSelectedChatId">No chat selected</p>
                         </div>
@@ -99,6 +107,9 @@
         dom.replyForm?.addEventListener("submit", sendAdminReply);
         dom.deleteChatBtn?.addEventListener("click", deleteActiveChat);
         dom.refreshBtn?.addEventListener("click", () => loadAdminLiveChats({ force: true }));
+        document.getElementById("adminLiveChatBackBtn")?.addEventListener("click", () => {
+            document.querySelector(".admin-chat-page")?.classList.remove("admin-chat-detail-open");
+        });
     }
 
     function bindSectionLifecycle() {
@@ -169,6 +180,7 @@
         if (!chats.length) {
             dom.chatList.innerHTML = `<p class="empty">No active live chats</p>`;
             resetActiveChat();
+            document.querySelector(".admin-chat-page")?.classList.remove("admin-chat-detail-open");
             return;
         }
 
@@ -189,9 +201,11 @@
 
             card.addEventListener("click", () => {
                 activeChat = chat;
+                syncActiveMessagePaging(chat);
                 renderChatList({ silent: true });
                 renderMessages(chat, { animateNewOnly: true });
                 markAdminRead(chat.chatId);
+                document.querySelector(".admin-chat-page")?.classList.add("admin-chat-detail-open");
             });
 
             dom.chatList.appendChild(card);
@@ -213,6 +227,7 @@
 
         const previousMessageCount = activeChat.messages?.length || 0;
         activeChat = updated;
+        syncActiveMessagePaging(updated);
         renderMessages(updated, {
             animateNewOnly: Boolean(options.source === "realtime" || options.preserveActive),
             previousMessageCount
@@ -229,12 +244,18 @@
         if (dom.sendReplyBtn) dom.sendReplyBtn.disabled = false;
         if (dom.deleteChatBtn) dom.deleteChatBtn.disabled = false;
 
-        dom.messagesBox.innerHTML = "";
-
         const messages = Array.isArray(chat.messages) ? chat.messages : [];
+        syncActiveMessagePaging(chat);
         const animateFrom = options.animateNewOnly
             ? Number(options.previousMessageCount ?? messages.length - 1)
             : messages.length;
+        const loadOlder = activeMessagePaging.hasMore ? `
+            <button class="admin-load-more-btn" type="button" id="adminLiveChatLoadOlderBtn" ${activeMessagePaging.loadingMore ? "disabled" : ""}>
+                ${escapeHTML(activeMessagePaging.loadingMore ? "Loading..." : "Load older messages")}
+            </button>
+        ` : "";
+
+        dom.messagesBox.innerHTML = loadOlder;
 
         messages.forEach((msg, index) => {
             const div = document.createElement("div");
@@ -251,7 +272,62 @@
             }
         });
 
-        dom.messagesBox.scrollTop = dom.messagesBox.scrollHeight;
+        document.getElementById("adminLiveChatLoadOlderBtn")?.addEventListener("click", loadOlderActiveMessages);
+
+        if (!options.preserveScroll) {
+            dom.messagesBox.scrollTop = dom.messagesBox.scrollHeight;
+        }
+    }
+
+    function syncActiveMessagePaging(chat) {
+        const messages = Array.isArray(chat?.messages) ? chat.messages : [];
+        const total = Number(chat?.messagesTotal || messages.length);
+        activeMessagePaging.hasMore = total > messages.length;
+        activeMessagePaging.nextCursor = activeMessagePaging.hasMore ? String(messages[0]?._id || "") : "";
+    }
+
+    async function loadOlderActiveMessages() {
+        if (!activeChat?.chatId || activeMessagePaging.loadingMore || !activeMessagePaging.hasMore) return;
+
+        const dom = getDom();
+        const previousHeight = dom.messagesBox?.scrollHeight || 0;
+        activeMessagePaging.loadingMore = true;
+        renderMessages(activeChat, { preserveScroll: true });
+
+        try {
+            const params = new URLSearchParams({
+                limit: "50",
+                before: activeMessagePaging.nextCursor
+            });
+            const data = await adminFetch(`/api/live-chat/admin/${encodeURIComponent(activeChat.chatId)}/messages?${params.toString()}`);
+            if (!data?.success) {
+                showAdminToast?.(data?.message || "Failed to load messages", "error");
+                return;
+            }
+
+            const older = Array.isArray(data.messages) ? data.messages : [];
+            activeChat.messages = mergeChatMessages(older, activeChat.messages || []);
+            activeChat.messagesTotal = Number(activeChat.messagesTotal || activeChat.messages.length);
+            activeMessagePaging.hasMore = Boolean(data.pagination?.hasMore);
+            activeMessagePaging.nextCursor = data.pagination?.nextCursor || "";
+            renderMessages(activeChat, { preserveScroll: true });
+            if (dom.messagesBox) {
+                dom.messagesBox.scrollTop = Math.max(0, dom.messagesBox.scrollHeight - previousHeight);
+            }
+        } finally {
+            activeMessagePaging.loadingMore = false;
+            renderMessages(activeChat, { preserveScroll: true });
+        }
+    }
+
+    function mergeChatMessages(older = [], current = []) {
+        const seen = new Set();
+        return [...older, ...current].filter(message => {
+            const key = String(message._id || `${message.sender}:${message.createdAt}:${message.text}`);
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
     }
 
     async function sendAdminReply(event) {
@@ -280,6 +356,7 @@
             dom.replyInput.value = "";
             const previousMessageCount = activeChat.messages?.length || 0;
             activeChat = data.chat;
+            syncActiveMessagePaging(activeChat);
             renderMessages(activeChat, { animateNewOnly: true, previousMessageCount });
             await loadAdminLiveChats({ preserveActive: true, silent: true });
             showAdminToast?.("Reply sent", "success");

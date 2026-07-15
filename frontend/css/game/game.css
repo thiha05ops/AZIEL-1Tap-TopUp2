@@ -45,6 +45,92 @@
     object-fit: cover;
 }
 
+.game-banner-managed {
+    overflow: hidden;
+}
+
+.game-banner-managed .game-banner-slider,
+.game-banner-managed .game-banner-slides {
+    position: absolute;
+    inset: 0;
+}
+
+.game-banner-slide {
+    position: absolute;
+    inset: 18px;
+    display: block;
+    overflow: hidden;
+    border-radius: 24px;
+    opacity: .42;
+    transform: translateX(9%) scale(.92);
+    transition: opacity .28s ease, transform .28s ease;
+    pointer-events: none;
+}
+
+.game-banner-slide.prev {
+    transform: translateX(-58%) scale(.86);
+}
+
+.game-banner-slide.next {
+    transform: translateX(58%) scale(.86);
+}
+
+.game-banner-slide.active {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    z-index: 2;
+    pointer-events: auto;
+}
+
+.game-banner-slide img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.game-banner-cta {
+    position: absolute;
+    right: 18px;
+    bottom: 18px;
+    min-height: 40px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    background: rgba(124, 58, 237, .88);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 950;
+}
+
+.game-banner-dots {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 14px;
+    z-index: 3;
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+}
+
+.game-banner-dot {
+    width: 9px;
+    height: 9px;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .45);
+    cursor: pointer;
+}
+
+.game-banner-dot.active {
+    width: 22px;
+    border-radius: 999px;
+    background: #fff;
+}
+
+.game-banner-managed-empty {
+    display: none;
+}
+
 .banner-overlay {
     position: absolute;
     inset: 0;
@@ -933,4 +1019,90 @@ body.dark .transfer-row strong {
 body.dark .transfer-card {
     background: rgba(255, 255, 255, .05);
     border-color: rgba(255, 255, 255, .1);
+}
+
+.aziel-promo-box {
+    display: grid;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(148, 163, 184, .18);
+}
+
+.aziel-promo-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-muted);
+}
+
+.aziel-promo-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 8px;
+    align-items: center;
+}
+
+.aziel-promo-row input {
+    min-width: 0;
+    min-height: 40px;
+    border: 1px solid var(--border-color, var(--border));
+    border-radius: 8px;
+    padding: 0 10px;
+    background: var(--surface);
+    color: var(--text-color, var(--text));
+}
+
+.aziel-promo-row button {
+    min-height: 40px;
+    border: 1px solid rgba(148, 163, 184, .35);
+    border-radius: 8px;
+    padding: 0 12px;
+    background: var(--primary);
+    color: #fff;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.aziel-promo-row button[hidden] {
+    display: none;
+}
+
+.aziel-promo-row button:disabled {
+    cursor: not-allowed;
+    opacity: .7;
+}
+
+.aziel-promo-row #promoRemoveBtn {
+    background: transparent;
+    color: var(--text-color, var(--text));
+}
+
+.aziel-promo-feedback {
+    min-height: 18px;
+    margin: 0;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.aziel-promo-feedback[data-tone="success"] {
+    color: #16a34a;
+}
+
+.aziel-promo-feedback[data-tone="error"] {
+    color: #dc2626;
+}
+
+body.dark .aziel-promo-row input {
+    background: rgba(255, 255, 255, .05);
+    color: #fff;
+}
+
+body.dark .aziel-promo-row #promoRemoveBtn {
+    color: #fff;
+}
+
+@media (max-width: 420px) {
+    .aziel-promo-row {
+        grid-template-columns: 1fr;
+    }
 }

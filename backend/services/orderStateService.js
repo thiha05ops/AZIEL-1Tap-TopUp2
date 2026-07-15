@@ -56,7 +56,9 @@ const ALLOWED_TRANSITIONS = Object.freeze({
         ORDER_STATES.REFUND_REJECTED,
         ORDER_STATES.REFUNDED
     ],
-    [ORDER_STATES.REFUND_REJECTED]: [],
+    [ORDER_STATES.REFUND_REJECTED]: [
+        ORDER_STATES.PROCESSING
+    ],
     [ORDER_STATES.COMPLETED]: [],
     [ORDER_STATES.REFUNDED]: []
 });
@@ -224,8 +226,10 @@ async function transitionOrder(orderOrId, nextStatusInput, options = {}) {
         order.processedPaymentEvents = [...existing].slice(-50);
     }
 
-    await order.save();
-    await emitCommittedTransition(order, entry);
+    await order.save({ session: options.session || null });
+    if (options.emit !== false) {
+        await emitCommittedTransition(order, entry);
+    }
 
     return {
         success: true,
@@ -263,5 +267,6 @@ module.exports = {
     normalizeOrderStatus,
     normalizePaymentStatus,
     projectOrderStatus,
+    emitCommittedTransition,
     transitionOrder
 };

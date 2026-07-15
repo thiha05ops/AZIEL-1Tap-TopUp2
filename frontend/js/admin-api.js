@@ -5,7 +5,20 @@ function getAdminToken() {
     return localStorage.getItem("adminToken");
 }
 
-function adminLogout(message = "") {
+async function adminLogout(message = "") {
+    const token = localStorage.getItem("adminToken");
+
+    if (token) {
+        try {
+            await fetch("/api/admin/logout", {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}` }
+            });
+        } catch (error) {
+            console.warn("Admin server logout failed; clearing local session only.");
+        }
+    }
+
     localStorage.removeItem("adminToken");
     localStorage.removeItem("adminUsername");
     localStorage.removeItem("adminRole");
@@ -40,6 +53,25 @@ function checkAdminToken() {
     }
 }
 
+class AdminApiError extends Error {
+    constructor(options = {}) {
+        super(options.message || "Admin request failed");
+        this.name = "AdminApiError";
+        this.status = Number(options.status || 0);
+        this.code = options.code || "";
+        this.details = options.details || null;
+    }
+}
+
+function normalizeAdminApiError(response = null, body = {}) {
+    return new AdminApiError({
+        status: response?.status || body?.status || 0,
+        code: body?.code || body?.error || "",
+        message: body?.message || "Admin request failed",
+        details: body?.details || null
+    });
+}
+
 async function adminFetch(url, options = {}) {
     checkAdminToken();
 
@@ -68,13 +100,28 @@ async function adminFetch(url, options = {}) {
         data = {};
     }
 
-    if (res.status === 401 || res.status === 403 || data.forceLogout) {
+    if (res.status === 403 && !options.skipPermissionToast) {
+        const message = data.message || "Admin permission denied.";
+        if (window.AZIEL_UI?.toast) {
+            window.AZIEL_UI.toast.error(message);
+        } else {
+            console.error(message);
+        }
+        return data;
+    }
+
+    if (res.status === 401 || data.forceLogout) {
         adminLogout(data.message || "Admin session expired.");
         return null;
     }
 
     return data;
 }
+
+window.AZIEL_ADMIN_API = {
+    AdminApiError,
+    normalizeError: normalizeAdminApiError
+};
 
 function showAdminLogoutMessage() {
     const msg = localStorage.getItem("adminLogoutMessage");

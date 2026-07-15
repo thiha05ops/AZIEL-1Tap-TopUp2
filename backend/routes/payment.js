@@ -9,6 +9,7 @@ const Omise = require("../services/opnService");
 const upload = require("../middleware/orderUpload");
 const authMiddleware = require("../middleware/authMiddleware");
 const adminMiddleware = require("../middleware/adminMiddleware");
+const { PERMISSIONS, requireAdminPermission } = require("../services/adminAuthorizationService");
 
 const Order = require("../models/Order");
 const ManualPaymentAttempt = require("../models/ManualPaymentAttempt");
@@ -20,9 +21,16 @@ const realtime = require("../services/realtime");
 const notificationService = require("../services/notificationService");
 const { ORDER_STATES, PAYMENT_STATES, transitionOrder } = require("../services/orderStateService");
 const { applyPaymentToOrder, mapOmiseChargeStatus } = require("../services/paymentStateService");
-const { CatalogError, resolveOrderCatalog } = require("../services/catalogService");
+const { CatalogError } = require("../services/catalogService");
 const { creditTopup, getWalletBalance } = require("../services/walletService");
 const { getActivePendingOrderPolicy } = require("../services/pendingOrderPolicy");
+const {
+    PromoError,
+    consumePromoRedemption,
+    releasePromoRedemption,
+    reservePromoUse,
+    resolvePurchasePricing
+} = require("../services/promoCodeService");
 const {
     createAttemptId,
     createManualReference,
@@ -80,7 +88,12 @@ function manualAttemptOrderSnapshot(attempt) {
         productName: attempt.productName,
         packageName: attempt.packageName,
         packageCode: attempt.packageCode,
-        amount: attempt.canonicalAmount,
+        amount: attempt.finalAmount || attempt.canonicalAmount,
+        originalAmount: attempt.originalAmount || attempt.canonicalAmount,
+        discountAmount: attempt.discountAmount || 0,
+        finalAmount: attempt.finalAmount || attempt.canonicalAmount,
+        promoCode: attempt.promoCode || "",
+        promoSnapshot: attempt.promoSnapshot || null,
         currency: attempt.canonicalCurrency,
         region: attempt.region,
         paymentMethod: attempt.paymentMethod,
@@ -112,7 +125,12 @@ function publicManualAttempt(attempt) {
         accountNumber: instructions.accountNumber,
         qrImage: instructions.qrImage,
         qrUrl: instructions.qrImage,
-        amount: attempt.canonicalAmount,
+        amount: attempt.finalAmount || attempt.canonicalAmount,
+        originalAmount: attempt.originalAmount || attempt.canonicalAmount,
+        discountAmount: attempt.discountAmount || 0,
+        finalAmount: attempt.finalAmount || attempt.canonicalAmount,
+        promoCode: attempt.promoCode || "",
+        promoSnapshot: attempt.promoSnapshot || null,
         currency: attempt.canonicalCurrency,
         productName: attempt.productName,
         packageName: attempt.packageName,
@@ -353,7 +371,12 @@ async function createOrderFromManualAttempt(attempt, evidence, username) {
         zoneId: attempt.gameUserData.zoneId || "",
         packageName: attempt.packageName,
         packageCode: attempt.packageCode,
-        amount: attempt.canonicalAmount,
+        amount: attempt.finalAmount || attempt.canonicalAmount,
+        originalAmount: attempt.originalAmount || attempt.canonicalAmount,
+        discountAmount: attempt.discountAmount || 0,
+        finalAmount: attempt.finalAmount || attempt.canonicalAmount,
+        promoCode: attempt.promoCode || "",
+        promoSnapshot: attempt.promoSnapshot || null,
         currency: attempt.canonicalCurrency,
         region: attempt.region,
         paymentMethod: attempt.paymentMethod,
@@ -423,6 +446,8 @@ async function createOrderFromManualAttempt(attempt, evidence, username) {
             activeAttempt.evidence = evidence;
             await activeAttempt.save({ session });
         });
+
+        await consumePromoRedemption(attempt.promoRedemptionId, createdOrder?.orderId);
 
         return {
             order: createdOrder,
@@ -508,6 +533,7 @@ async function createOrderFromManualAttemptWithoutTransaction(attempt, evidence,
         );
 
         if (update.modifiedCount === 1) {
+            await consumePromoRedemption(attempt.promoRedemptionId, createdOrder.orderId);
             return {
                 order: createdOrder,
                 duplicate: false
@@ -594,6 +620,7 @@ async function emitManualOrderSubmitted(req, order, duplicate = false) {
 // MANUAL / DEEPLINK PAYMENT ATTEMPT
 // POST /api/payment/manual/attempt
 router.post("/payment/manual/attempt", authMiddleware, manualAttemptLimiter, async (req, res) => {
+    let reservedRedemption = null;
     try {
         const {
             game,
@@ -603,6 +630,7 @@ router.post("/payment/manual/attempt", authMiddleware, manualAttemptLimiter, asy
             packageCode,
             region,
             paymentMethod,
+            promoCode,
             userId,
             zoneId
         } = req.body;
@@ -616,18 +644,35 @@ router.post("/payment/manual/attempt", authMiddleware, manualAttemptLimiter, asy
             });
         }
 
-        const catalogItem = await resolveOrderCatalog({
-            productCode: productCode || gameKey,
-            gameKey,
-            game,
-            packageCode,
-            packageName,
-            region
+        const pricing = await resolvePurchasePricing({
+            payload: {
+                productCode: productCode || gameKey,
+                gameKey,
+                game,
+                packageCode,
+                packageName,
+                region,
+                promoCode
+            },
+            user: req.user,
+            verifyUserLimit: true
         });
+        const catalogItem = pricing.catalogItem;
+
+        const redemption = await reservePromoUse({
+            pricing,
+            user: req.user,
+            manualPaymentAttemptId: "",
+            expiresAt: new Date(Date.now() + getManualAttemptTtlMs())
+        });
+        reservedRedemption = redemption;
+
+        const expiresAt = redemption?.expiresAt || new Date(Date.now() + getManualAttemptTtlMs());
 
         const method = await getEnabledManualPaymentMethod(paymentMethod, catalogItem.region);
 
         if (!method) {
+            await releasePromoRedemption(redemption?._id);
             return res.status(400).json({
                 success: false,
                 code: "MANUAL_PAYMENT_METHOD_UNAVAILABLE",
@@ -643,6 +688,7 @@ router.post("/payment/manual/attempt", authMiddleware, manualAttemptLimiter, asy
         const attemptLimit = getManualAttemptLimit();
 
         if (activeCount >= attemptLimit) {
+            await releasePromoRedemption(redemption?._id);
             return res.status(429).json({
                 success: false,
                 code: "MANUAL_PAYMENT_ATTEMPT_LIMIT",
@@ -652,14 +698,26 @@ router.post("/payment/manual/attempt", authMiddleware, manualAttemptLimiter, asy
             });
         }
 
-        const expiresAt = new Date(Date.now() + getManualAttemptTtlMs());
+        const attemptId = createAttemptId();
+        if (redemption) {
+            redemption.manualPaymentAttemptId = attemptId;
+            await redemption.save();
+        }
+
         const attemptSeed = {
+            attemptId,
             username,
             productCode: catalogItem.productCode,
             packageCode: catalogItem.packageCode,
             region: catalogItem.region,
-            canonicalAmount: catalogItem.amount,
-            canonicalCurrency: catalogItem.currency,
+            canonicalAmount: pricing.finalAmount,
+            canonicalCurrency: pricing.currency,
+            originalAmount: pricing.originalAmount,
+            discountAmount: pricing.discountAmount,
+            finalAmount: pricing.finalAmount,
+            promoCode: pricing.promoCode,
+            promoSnapshot: pricing.promoSnapshot,
+            promoRedemptionId: redemption?._id || null,
             productName: catalogItem.productName,
             packageName: catalogItem.packageName,
             paymentMethod: method.key,
@@ -684,6 +742,7 @@ router.post("/payment/manual/attempt", authMiddleware, manualAttemptLimiter, asy
                 qrImage: instructions.qrImage
             }
         });
+        reservedRedemption = null;
 
         return res.json({
             success: true,
@@ -691,8 +750,9 @@ router.post("/payment/manual/attempt", authMiddleware, manualAttemptLimiter, asy
         });
     } catch (error) {
         console.log("Manual payment attempt error:", error);
+        await releasePromoRedemption(reservedRedemption?._id);
 
-        if (error instanceof CatalogError) {
+        if (error instanceof CatalogError || error instanceof PromoError) {
             return res.status(error.statusCode).json({
                 success: false,
                 code: error.code,
@@ -763,6 +823,7 @@ router.post("/payment/manual/attempt/:attemptId/slip", authMiddleware, upload.si
             if (attempt.status === "active") {
                 attempt.status = "expired";
                 await attempt.save();
+                await releasePromoRedemption(attempt.promoRedemptionId);
             }
 
             return res.status(410).json({
@@ -825,6 +886,7 @@ router.post("/payment/manual/attempt/:attemptId/slip", authMiddleware, upload.si
 
 // GAME PAYMENT CREATE
 router.post("/payment/create", authMiddleware, activeOrderCreateLimiter, async (req, res) => {
+    let reservedRedemption = null;
     try {
         devLog("PAYMENT CREATE BODY =", req.body);
 
@@ -839,6 +901,7 @@ router.post("/payment/create", authMiddleware, activeOrderCreateLimiter, async (
             currency,
             region,
             paymentMethod,
+            promoCode,
             userId,
             zoneId
         } = req.body;
@@ -851,16 +914,22 @@ router.post("/payment/create", authMiddleware, activeOrderCreateLimiter, async (
             });
         }
 
-        const catalogItem = await resolveOrderCatalog({
-            productCode: productCode || gameKey,
-            gameKey,
-            game,
-            packageCode,
-            packageName,
-            amount,
-            currency,
-            region
+        const pricing = await resolvePurchasePricing({
+            payload: {
+                productCode: productCode || gameKey,
+                gameKey,
+                game,
+                packageCode,
+                packageName,
+                amount,
+                currency,
+                region,
+                promoCode
+            },
+            user: req.user,
+            verifyUserLimit: true
         });
+        const catalogItem = pricing.catalogItem;
 
         const methodKey = normalizePaymentKey(paymentMethod);
         const configuredMethod = await PaymentMethod.findOne({
@@ -899,6 +968,12 @@ router.post("/payment/create", authMiddleware, activeOrderCreateLimiter, async (
             });
         }
 
+        reservedRedemption = await reservePromoUse({
+            pricing,
+            user: req.user,
+            orderId
+        });
+
         const order = await Order.create({
             orderId,
             username: username || "guest",
@@ -909,8 +984,14 @@ router.post("/payment/create", authMiddleware, activeOrderCreateLimiter, async (
             zoneId: zoneId || "",
             packageName: catalogItem.packageName,
             packageCode: catalogItem.packageCode,
-            amount: catalogItem.amount,
-            currency: catalogItem.currency,
+            amount: pricing.finalAmount,
+            originalAmount: pricing.originalAmount,
+            discountAmount: pricing.discountAmount,
+            finalAmount: pricing.finalAmount,
+            promoCode: pricing.promoCode,
+            promoSnapshot: pricing.promoSnapshot,
+            promoRedemptionId: reservedRedemption?._id || null,
+            currency: pricing.currency,
             region: catalogItem.region,
             paymentMethod,
             status: ORDER_STATES.PENDING_PAYMENT,
@@ -932,7 +1013,7 @@ router.post("/payment/create", authMiddleware, activeOrderCreateLimiter, async (
         });
 
         if (catalogItem.region === "TH" && methodKey.includes("promptpay")) {
-            const result = await createPromptPayCharge(catalogItem.amount, {
+            const result = await createPromptPayCharge(pricing.finalAmount, {
                 type: "game_order",
                 orderId,
                 username: username || "guest"
@@ -965,8 +1046,8 @@ router.post("/payment/create", authMiddleware, activeOrderCreateLimiter, async (
             ...req.body,
             game: catalogItem.productName,
             packageName: catalogItem.packageName,
-            amount: catalogItem.amount,
-            currency: catalogItem.currency,
+            amount: pricing.finalAmount,
+            currency: pricing.currency,
             region: catalogItem.region,
             productCode: catalogItem.productCode,
             packageCode: catalogItem.packageCode
@@ -989,8 +1070,9 @@ router.post("/payment/create", authMiddleware, activeOrderCreateLimiter, async (
 
     } catch (error) {
         console.log("Payment create error:", error);
+        await releasePromoRedemption(reservedRedemption?._id);
 
-        if (error instanceof CatalogError) {
+        if (error instanceof CatalogError || error instanceof PromoError) {
             return res.status(error.statusCode).json({
                 success: false,
                 code: error.code,
@@ -1215,6 +1297,7 @@ router.post("/payment/webhook", async (req, res) => {
             });
 
             if (transition.changed) {
+                await consumePromoRedemption(order.promoRedemptionId, order.orderId);
                 devLog("GAME PAYMENT SUCCESS:", order.orderId);
             }
 
@@ -1255,7 +1338,7 @@ router.post("/payment/webhook", async (req, res) => {
 
 // DEV ONLY ROUTES
 if (!isProduction) {
-    router.get("/payment/test-paid/:orderId", adminMiddleware, async (req, res) => {
+    router.get("/payment/test-paid/:orderId", adminMiddleware, requireAdminPermission(PERMISSIONS.ORDERS_MANAGE), async (req, res) => {
         const order = await Order.findOne({
             orderId: req.params.orderId
         });
@@ -1283,7 +1366,7 @@ if (!isProduction) {
         });
     });
 
-    router.post("/wallet/test-paid/:topupId", adminMiddleware, async (req, res) => {
+    router.post("/wallet/test-paid/:topupId", adminMiddleware, requireAdminPermission(PERMISSIONS.WALLET_APPROVE), async (req, res) => {
         try {
             const result = await markWalletTopupPaid(
                 req,

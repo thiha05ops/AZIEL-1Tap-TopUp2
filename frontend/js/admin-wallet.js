@@ -10,6 +10,22 @@ let selectedTopupContext = null;
 let walletTransactionPage = 1;
 let walletTransactionTotalPages = 1;
 let walletRefreshTimer = null;
+const adminWalletPaging = {
+    topups: {
+        limit: 50,
+        nextCursor: "",
+        hasMore: false,
+        loadingMore: false,
+        requestId: 0
+    },
+    transactions: {
+        limit: 50,
+        nextCursor: "",
+        hasMore: false,
+        cursorStack: [""],
+        requestId: 0
+    }
+};
 
 document.addEventListener("DOMContentLoaded", () => {
     initAdminWalletController();
@@ -51,7 +67,7 @@ function bindWalletTabs() {
             currentWalletView = btn.dataset.walletView || "pending";
             selectedTopupId = "";
             selectedTopupContext = null;
-            walletTransactionPage = 1;
+            resetWalletTransactionPaging();
             updateWalletHash();
         });
     });
@@ -59,37 +75,50 @@ function bindWalletTabs() {
 
 function bindWalletTransactions() {
     document.getElementById("walletTransactionSearchBtn")?.addEventListener("click", () => {
-        walletTransactionPage = 1;
+        resetWalletTransactionPaging();
         loadWalletTransactions();
     });
 
     document.getElementById("walletTransactionSearch")?.addEventListener("keydown", event => {
         if (event.key === "Enter") {
             event.preventDefault();
-            walletTransactionPage = 1;
+            resetWalletTransactionPaging();
             loadWalletTransactions();
         }
     });
 
     document.getElementById("walletTransactionType")?.addEventListener("change", () => {
-        walletTransactionPage = 1;
+        resetWalletTransactionPaging();
         loadWalletTransactions();
     });
 
     document.getElementById("walletTransactionCurrency")?.addEventListener("change", () => {
-        walletTransactionPage = 1;
+        resetWalletTransactionPaging();
         loadWalletTransactions();
     });
 
     document.getElementById("walletPrevPage")?.addEventListener("click", () => {
+        if (walletTransactionPage <= 1) return;
+        adminWalletPaging.transactions.cursorStack.pop();
+        adminWalletPaging.transactions.nextCursor = "";
         walletTransactionPage = Math.max(walletTransactionPage - 1, 1);
         loadWalletTransactions();
     });
 
     document.getElementById("walletNextPage")?.addEventListener("click", () => {
-        walletTransactionPage = Math.min(walletTransactionPage + 1, walletTransactionTotalPages);
+        if (!adminWalletPaging.transactions.hasMore) return;
+        adminWalletPaging.transactions.cursorStack[walletTransactionPage] = adminWalletPaging.transactions.nextCursor;
+        walletTransactionPage += 1;
         loadWalletTransactions();
     });
+}
+
+function resetWalletTransactionPaging() {
+    walletTransactionPage = 1;
+    walletTransactionTotalPages = 1;
+    adminWalletPaging.transactions.nextCursor = "";
+    adminWalletPaging.transactions.hasMore = false;
+    adminWalletPaging.transactions.cursorStack = [""];
 }
 
 function bindWalletAdjustment() {
@@ -146,37 +175,72 @@ function loadWalletView(showLoading = true) {
     loadWalletTopups(showLoading);
 }
 
-async function loadWalletTopups(showLoading = true) {
+async function loadWalletTopups(showLoading = true, options = {}) {
     const box = document.getElementById("adminWalletList");
     if (!box) return;
 
-    if (showLoading) {
+    const paging = adminWalletPaging.topups;
+    const append = Boolean(options.append);
+    if (append && (paging.loadingMore || !paging.hasMore)) return;
+    if (!append) {
+        paging.nextCursor = "";
+        paging.hasMore = false;
+    }
+    paging.loadingMore = append;
+    const requestId = ++paging.requestId;
+
+    if (showLoading && !append) {
         box.innerHTML = `<div class="admin-dashboard-skeleton"></div><div class="admin-dashboard-skeleton"></div>`;
+    } else if (append) {
+        renderWalletTopups(allWalletTopups);
     }
 
     try {
-        const data = await adminFetch(buildWalletTopupsEndpoint());
+        const data = await adminFetch(buildWalletTopupsEndpoint(append ? paging.nextCursor : ""));
+        if (requestId !== paging.requestId) return;
 
         if (!data || !data.success) {
             renderWalletError(data?.message || adminT("something_went_wrong"));
             return;
         }
 
-        allWalletTopups = Array.isArray(data.topups) ? data.topups : [];
+        const incoming = Array.isArray(data.topups) ? data.topups : Array.isArray(data.items) ? data.items : [];
+        allWalletTopups = append ? mergeWalletTopups(allWalletTopups, incoming) : incoming;
+        paging.hasMore = Boolean(data.pagination?.hasMore);
+        paging.nextCursor = data.pagination?.nextCursor || "";
         reconcileSelectedTopup();
         renderWalletTopups(allWalletTopups);
         await loadSelectedTopupContext();
     } catch (error) {
         console.log("Wallet topup load error:", error);
         renderWalletError(adminT("something_went_wrong"));
+    } finally {
+        if (requestId === paging.requestId) {
+            paging.loadingMore = false;
+            renderWalletTopups(allWalletTopups);
+        }
     }
 }
 
-function buildWalletTopupsEndpoint() {
+function buildWalletTopupsEndpoint(cursor = "") {
     const params = new URLSearchParams();
+    params.set("limit", String(adminWalletPaging.topups.limit));
     if (currentWalletView === "pending") params.set("status", "pending");
+    if (cursor) params.set("cursor", cursor);
     const query = params.toString();
     return query ? `/api/admin/wallet/topups?${query}` : "/api/admin/wallet/topups";
+}
+
+function mergeWalletTopups(current = [], incoming = []) {
+    const seen = new Set(current.map(item => String(item._id)));
+    const merged = current.slice();
+    incoming.forEach(item => {
+        const id = String(item._id || "");
+        if (!id || seen.has(id)) return;
+        seen.add(id);
+        merged.push(item);
+    });
+    return merged;
 }
 
 function reconcileSelectedTopup() {
@@ -198,7 +262,7 @@ function renderWalletTopups(topups) {
         return;
     }
 
-    box.innerHTML = topups.map(item => {
+    const rows = topups.map(item => {
         const selected = String(item._id) === String(selectedTopupId);
         const status = String(item.status || "pending").toLowerCase();
         const evidence = item.hasPaymentEvidence ? adminT("slip_attached") : adminT("no_payment_evidence");
@@ -220,14 +284,26 @@ function renderWalletTopups(topups) {
         `;
     }).join("");
 
+    const paging = adminWalletPaging.topups;
+    const loadMore = paging.hasMore ? `
+        <button class="admin-load-more-btn" type="button" id="walletTopupsLoadMoreBtn" ${paging.loadingMore ? "disabled" : ""}>
+            ${escapeHTML(paging.loadingMore ? adminT("loading") : adminT("load_more", "Load More"))}
+        </button>
+    ` : "";
+
+    box.innerHTML = rows + loadMore;
+
     box.querySelectorAll(".wallet-queue-row").forEach(row => {
         row.addEventListener("click", async () => {
             selectedTopupId = row.dataset.id || "";
             selectedTopupContext = null;
             renderWalletTopups(allWalletTopups);
             await loadSelectedTopupContext();
+            window.AZIEL_ADMIN_LAYOUT?.showDetail?.("wallet");
         });
     });
+
+    document.getElementById("walletTopupsLoadMoreBtn")?.addEventListener("click", () => loadWalletTopups(false, { append: true }));
 }
 
 async function loadSelectedTopupContext() {
@@ -289,6 +365,9 @@ function renderSelectedTopup(errorMessage = "") {
     panel.innerHTML = `
         <div class="order-detail-head">
             <div>
+                <button class="admin-mobile-back-btn" type="button" data-mobile-back="wallet">
+                    ← ${escapeHTML(adminT("back_to_wallet", "Wallet"))}
+                </button>
                 <span>${escapeHTML(adminT("topup_review"))}</span>
                 <h3>${escapeHTML(topup.topupId || "-")}</h3>
             </div>
@@ -331,6 +410,9 @@ function renderSelectedTopup(errorMessage = "") {
         </div>
     `;
 
+    panel.querySelector('[data-mobile-back="wallet"]')?.addEventListener("click", () => {
+        window.AZIEL_ADMIN_LAYOUT?.showList?.("wallet");
+    });
     bindTopupDetailActions(panel, topup, currentBalance, expectedBalance);
 }
 
@@ -493,19 +575,24 @@ function disableTopupActionButtons(disabled) {
 async function loadWalletTransactions(showLoading = true) {
     const box = document.getElementById("adminWalletTransactions");
     if (!box) return;
+    const paging = adminWalletPaging.transactions;
+    const requestId = ++paging.requestId;
 
     if (showLoading) box.innerHTML = `<div class="admin-dashboard-skeleton"></div><div class="admin-dashboard-skeleton"></div>`;
 
     try {
         const data = await adminFetch(buildTransactionsEndpoint());
+        if (requestId !== paging.requestId) return;
+
         if (!data?.success) {
             box.innerHTML = `<div class="admin-dashboard-error"><strong>${escapeHTML(data?.message || adminT("something_went_wrong"))}</strong></div>`;
             return;
         }
 
-        walletTransactionPage = data.page || 1;
-        walletTransactionTotalPages = data.totalPages || 1;
-        renderWalletTransactions(data.transactions || []);
+        paging.hasMore = Boolean(data.pagination?.hasMore);
+        paging.nextCursor = data.pagination?.nextCursor || "";
+        walletTransactionTotalPages = paging.hasMore ? walletTransactionPage + 1 : walletTransactionPage;
+        renderWalletTransactions(data.transactions || data.items || []);
         updateWalletPagination();
     } catch (error) {
         console.log("Wallet transaction load error:", error);
@@ -519,8 +606,9 @@ function buildTransactionsEndpoint() {
     const type = document.getElementById("walletTransactionType")?.value || "";
     const currency = document.getElementById("walletTransactionCurrency")?.value || "";
 
-    params.set("page", walletTransactionPage);
-    params.set("limit", 50);
+    params.set("limit", adminWalletPaging.transactions.limit);
+    const cursor = adminWalletPaging.transactions.cursorStack[walletTransactionPage - 1] || "";
+    if (cursor) params.set("cursor", cursor);
     if (q) params.set("q", q);
     if (type) params.set("type", type);
     if (currency) params.set("currency", currency);
@@ -549,7 +637,7 @@ function renderWalletTransactions(transactions) {
 }
 
 function updateWalletPagination() {
-    setText("walletPageInfo", `${walletTransactionPage} / ${walletTransactionTotalPages}`);
+    setText("walletPageInfo", adminWalletPaging.transactions.hasMore ? `${walletTransactionPage} / …` : `${walletTransactionPage}`);
     const prev = document.getElementById("walletPrevPage");
     const next = document.getElementById("walletNextPage");
     if (prev) prev.disabled = walletTransactionPage <= 1;

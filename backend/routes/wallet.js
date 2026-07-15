@@ -10,12 +10,21 @@ const WalletTopup = require("../models/WalletTopup");
 const WalletTransaction = require("../models/WalletTransaction");
 const upload = require("../middleware/imageMemoryUpload");
 const adminMiddleware = require("../middleware/adminMiddleware");
+const { PERMISSIONS, requireAdminPermission } = require("../services/adminAuthorizationService");
+const { ADMIN_AUDIT_ACTIONS, writeAdminAudit } = require("../services/adminAuditService");
 const authMiddleware = require("../middleware/authMiddleware");
 const Omise = require("../services/opnService");
 const realtime = require("../services/realtime");
 const notificationService = require("../services/notificationService");
 const { ORDER_STATES, PAYMENT_STATES, transitionOrder } = require("../services/orderStateService");
-const { CatalogError, resolveOrderCatalog } = require("../services/catalogService");
+const { CatalogError } = require("../services/catalogService");
+const {
+    PromoError,
+    consumePromoRedemption,
+    releasePromoRedemption,
+    reservePromoUse,
+    resolvePurchasePricing
+} = require("../services/promoCodeService");
 const {
     WalletError,
     adjustWallet,
@@ -31,6 +40,12 @@ const {
     logStorageError,
     uploadFile
 } = require("../services/storageService");
+const {
+    applyCursorFilter,
+    pageResult,
+    parseLimit,
+    sendPaginationError
+} = require("../services/paginationService");
 
 // ======================
 // HELPERS
@@ -475,7 +490,8 @@ router.get("/wallet/transactions", authMiddleware, async (req, res) => {
             balance: timeline.balance,
             currency,
             transactions: timeline.transactions,
-            nextCursor: timeline.nextCursor
+            nextCursor: timeline.nextCursor,
+            pagination: timeline.pagination
         });
 
     } catch (error) {
@@ -513,7 +529,8 @@ router.get("/wallet/:username", authMiddleware, async (req, res) => {
             currency,
             topups,
             transactions: timeline.transactions,
-            nextCursor: timeline.nextCursor
+            nextCursor: timeline.nextCursor,
+            pagination: timeline.pagination
         });
 
     } catch (error) {
@@ -669,9 +686,10 @@ router.post("/wallet/upload-slip/:topupId", authMiddleware, upload.single("slip"
 // GET /api/admin/wallet/topups
 // ======================
 
-router.get("/admin/wallet/topups", adminMiddleware, async (req, res) => {
+router.get("/admin/wallet/topups", adminMiddleware, requireAdminPermission(PERMISSIONS.WALLET_READ), async (req, res) => {
     try {
         const status = String(req.query.status || "").trim().toLowerCase();
+        const limit = parseLimit(req.query.limit, { defaultLimit: 50, maxLimit: 100 });
         const query = {};
 
         if ([
@@ -686,17 +704,24 @@ router.get("/admin/wallet/topups", adminMiddleware, async (req, res) => {
             query.status = status;
         }
 
-        const topups = await WalletTopup.find(query)
-            .sort({ createdAt: -1 })
-            .limit(200);
+        const topupsRaw = await WalletTopup.find(applyCursorFilter(query, req.query.cursor))
+            .sort({ createdAt: -1, _id: -1 })
+            .limit(limit + 1)
+            .lean();
+        const { page, pagination } = pageResult(topupsRaw, limit);
+        const topups = page.map(projectAdminWalletTopup);
 
         res.json({
             success: true,
-            topups: topups.map(projectAdminWalletTopup)
+            items: topups,
+            topups,
+            pagination
         });
 
     } catch (error) {
         console.log("Admin wallet topups error:", error);
+        const paginationResponse = sendPaginationError(res, error);
+        if (paginationResponse) return paginationResponse;
 
         res.status(500).json({
             success: false,
@@ -705,7 +730,7 @@ router.get("/admin/wallet/topups", adminMiddleware, async (req, res) => {
     }
 });
 
-router.get("/admin/wallet/topups/:id/context", adminMiddleware, async (req, res) => {
+router.get("/admin/wallet/topups/:id/context", adminMiddleware, requireAdminPermission(PERMISSIONS.WALLET_READ), async (req, res) => {
     try {
         const topup = await WalletTopup.findById(req.params.id);
 
@@ -744,34 +769,33 @@ router.get("/admin/wallet/topups/:id/context", adminMiddleware, async (req, res)
     }
 });
 
-router.get("/admin/wallet/transactions", adminMiddleware, async (req, res) => {
+router.get("/admin/wallet/transactions", adminMiddleware, requireAdminPermission(PERMISSIONS.WALLET_READ), async (req, res) => {
     try {
-        const { page, limit, skip } = parsePagination(req.query);
+        const limit = parseLimit(req.query.limit, { defaultLimit: 50, maxLimit: 100 });
         const filter = transactionFilter(req.query);
 
-        const [items, total] = await Promise.all([
-            WalletTransaction.find(filter)
-                .sort({ createdAt: -1 })
-                .skip(skip)
-                .limit(limit),
-            WalletTransaction.countDocuments(filter)
-        ]);
+        const raw = await WalletTransaction.find(applyCursorFilter(filter, req.query.cursor))
+            .sort({ createdAt: -1, _id: -1 })
+            .limit(limit + 1)
+            .lean();
+        const result = pageResult(raw, limit);
+        const transactions = result.page.map(projectLedger);
 
         return res.json({
             success: true,
-            transactions: items.map(projectLedger),
-            page,
-            limit,
-            total,
-            totalPages: Math.max(Math.ceil(total / limit), 1)
+            items: transactions,
+            transactions,
+            pagination: result.pagination
         });
     } catch (error) {
         console.log("Admin wallet transactions error:", error);
+        const paginationResponse = sendPaginationError(res, error);
+        if (paginationResponse) return paginationResponse;
         return sendWalletError(res, error, "Load wallet transactions failed");
     }
 });
 
-router.post("/admin/wallet/adjust", adminMiddleware, async (req, res) => {
+router.post("/admin/wallet/adjust", adminMiddleware, requireAdminPermission(PERMISSIONS.WALLET_APPROVE), async (req, res) => {
     try {
         const username = String(req.body.username || "").trim();
         const currency = getCurrencyKey(req.body.currency || "MMK");
@@ -848,7 +872,15 @@ router.post("/admin/wallet/adjust", adminMiddleware, async (req, res) => {
 // PUT /api/admin/wallet/topups/:id/status
 // ======================
 
-router.put("/admin/wallet/topups/:id/status", adminMiddleware, async (req, res) => {
+router.put("/admin/wallet/topups/:id/status", adminMiddleware, async (req, res, next) => {
+    const status = String(req.body?.status || "").toLowerCase();
+    const permission = status === "approved" || status === "approve"
+        ? PERMISSIONS.WALLET_APPROVE
+        : status === "rejected" || status === "reject"
+            ? PERMISSIONS.WALLET_REJECT
+            : PERMISSIONS.WALLET_APPROVE;
+    return requireAdminPermission(permission)(req, res, next);
+}, async (req, res) => {
     try {
         const { status } = req.body;
 
@@ -882,6 +914,19 @@ router.put("/admin/wallet/topups/:id/status", adminMiddleware, async (req, res) 
 
             if (!result.success) return res.json(result);
 
+            await writeAdminAudit({
+                actor: req.admin,
+                req,
+                action: ADMIN_AUDIT_ACTIONS.WALLET_TOPUP_APPROVED,
+                resourceType: "WalletTopup",
+                resourceId: String(result.topup?._id || topup._id),
+                metadata: {
+                    username: topup.username,
+                    amount: Number(topup.amount || 0),
+                    currency: getCurrencyKey(topup.currency)
+                }
+            }).catch(error => console.log("Admin audit failed:", error.message));
+
             return res.json({
                 success: true,
                 message: "Wallet topup approved",
@@ -908,6 +953,19 @@ router.put("/admin/wallet/topups/:id/status", adminMiddleware, async (req, res) 
                 amount: topup.amount,
                 currency: topup.currency
             });
+
+            await writeAdminAudit({
+                actor: req.admin,
+                req,
+                action: ADMIN_AUDIT_ACTIONS.WALLET_TOPUP_REJECTED,
+                resourceType: "WalletTopup",
+                resourceId: String(topup._id),
+                metadata: {
+                    username: topup.username,
+                    amount: Number(topup.amount || 0),
+                    currency: getCurrencyKey(topup.currency)
+                }
+            }).catch(error => console.log("Admin audit failed:", error.message));
 
             return res.json({
                 success: true,
@@ -1024,6 +1082,7 @@ async function markWalletTopupPaid(req, topupId) {
 // ======================
 
 router.post("/wallet/pay", authMiddleware, async (req, res) => {
+    let reservedRedemption = null;
     try {
         const {
             orderId,
@@ -1036,7 +1095,8 @@ router.post("/wallet/pay", authMiddleware, async (req, res) => {
             packageCode,
             amount,
             currency,
-            region
+            region,
+            promoCode
         } = req.body;
         const username = req.user.username;
 
@@ -1047,18 +1107,24 @@ router.post("/wallet/pay", authMiddleware, async (req, res) => {
             });
         }
 
-        const catalogItem = await resolveOrderCatalog({
-            productCode: productCode || gameKey,
-            gameKey,
-            game,
-            packageCode,
-            packageName,
-            amount,
-            currency,
-            region
+        const pricing = await resolvePurchasePricing({
+            payload: {
+                productCode: productCode || gameKey,
+                gameKey,
+                game,
+                packageCode,
+                packageName,
+                amount,
+                currency,
+                region,
+                promoCode
+            },
+            user: req.user,
+            verifyUserLimit: true
         });
+        const catalogItem = pricing.catalogItem;
 
-        const currencyKey = catalogItem.currency;
+        const currencyKey = pricing.currency;
 
         const requestedOrderId = orderId || "AZL-" + Date.now();
         const existingOrder = await Order.findOne({
@@ -1085,6 +1151,12 @@ router.post("/wallet/pay", authMiddleware, async (req, res) => {
             });
         }
 
+        reservedRedemption = await reservePromoUse({
+            pricing,
+            user: req.user,
+            orderId: requestedOrderId
+        });
+
         const order = await Order.create({
             orderId: requestedOrderId,
             username,
@@ -1096,7 +1168,13 @@ router.post("/wallet/pay", authMiddleware, async (req, res) => {
             packageName: catalogItem.packageName,
             packageCode: catalogItem.packageCode,
             selectedPackage: catalogItem.packageName,
-            amount: catalogItem.amount,
+            amount: pricing.finalAmount,
+            originalAmount: pricing.originalAmount,
+            discountAmount: pricing.discountAmount,
+            finalAmount: pricing.finalAmount,
+            promoCode: pricing.promoCode,
+            promoSnapshot: pricing.promoSnapshot,
+            promoRedemptionId: reservedRedemption?._id || null,
             currency: currencyKey,
             region: catalogItem.region,
             paymentMethod: "wallet",
@@ -1118,6 +1196,8 @@ router.post("/wallet/pay", authMiddleware, async (req, res) => {
         });
 
         const walletResult = await payOrderWithWallet(order);
+        await consumePromoRedemption(reservedRedemption?._id, order.orderId);
+        reservedRedemption = null;
 
         const paidTransition = await transitionOrder(order, ORDER_STATES.PAID, {
             source: "wallet",
@@ -1154,7 +1234,9 @@ router.post("/wallet/pay", authMiddleware, async (req, res) => {
     } catch (error) {
         console.log("Wallet pay error:", error);
 
-        if (error instanceof CatalogError) {
+        await releasePromoRedemption(reservedRedemption?._id);
+
+        if (error instanceof CatalogError || error instanceof PromoError) {
             return res.status(error.statusCode).json({
                 success: false,
                 code: error.code,

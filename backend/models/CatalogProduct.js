@@ -50,6 +50,13 @@ const catalogProductSchema = new mongoose.Schema(
                 type: String,
                 trim: true,
                 default: ""
+            },
+            mobilePackagePreview: {
+                assetId: {
+                    type: String,
+                    trim: true,
+                    default: ""
+                }
             }
         }
     },
@@ -62,5 +69,6 @@ catalogProductSchema.index({ productCode: 1 }, { unique: true });
 catalogProductSchema.index({ enabled: 1, sortOrder: 1 });
 catalogProductSchema.index({ "presentation.imageAssetId": 1 });
 catalogProductSchema.index({ "presentation.bannerAssetId": 1 });
+catalogProductSchema.index({ "presentation.mobilePackagePreview.assetId": 1 });
 
 module.exports = mongoose.model("CatalogProduct", catalogProductSchema);

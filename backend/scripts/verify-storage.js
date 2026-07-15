@@ -201,6 +201,10 @@ async function main() {
     assert.strictEqual(projectFileUrl("/uploads/orders/SLIP-2.png", "orders"), "/uploads/orders/SLIP-2.png");
     assert.strictEqual(projectFileUrl("https://cdn.example.com/slip.png", "orders"), "https://cdn.example.com/slip.png");
 
+    const profileRouteSource = await fs.readFile(path.join(__dirname, "../routes/profile.js"), "utf8");
+    assert(!profileRouteSource.includes("multer.diskStorage"), "Profile photo uploads must not use local disk storage.");
+    assert(profileRouteSource.includes("uploadFile") && profileRouteSource.includes("profilePhoto"), "Profile photo uploads must use shared durable storage.");
+
     expectReadinessCode("production local storage", { STORAGE_MODE: "local" }, "PROD_STORAGE_LOCAL_UNSAFE");
     expectReadinessCode("incomplete Cloudinary config", { CLOUDINARY_API_SECRET: "" }, "PROD_STORAGE_CLOUDINARY_CONFIG_MISSING");
 

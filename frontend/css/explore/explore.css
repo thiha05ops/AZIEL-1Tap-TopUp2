@@ -26,7 +26,8 @@
     --shadow: 0 18px 50px rgba(17, 24, 39, .10);
 }
 
-body.dark {
+body.dark,
+body.theme-dark {
     --bg: #080816;
     --bg-soft: #0b0b18;
 
@@ -90,6 +91,7 @@ img {
 
 .explore-page {
     position: relative;
+    padding-top: calc(var(--az-header-height, 78px) + 24px);
 }
 
 section {
@@ -173,7 +175,8 @@ p {
     clip-path: polygon(0 0, 100% 100%, 0 100%);
 }
 
-body.dark .section-title span::after {
+body.dark .section-title span::after,
+body.theme-dark .section-title span::after {
     background: rgba(255, 255, 255, .18);
 }
 
@@ -187,7 +190,8 @@ body.dark .section-title span::after {
             transparent);
 }
 
-body:not(.dark) .section-title div {
+body:not(.dark):not(.theme-dark) .section-title div,
+body.theme-light .section-title div {
     background: linear-gradient(90deg,
             var(--line),
             rgba(17, 24, 39, .16),
@@ -198,8 +202,7 @@ body:not(.dark) .section-title div {
    Buttons
 ================================ */
 
-.hero-btn,
-.header-cta {
+.hero-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -228,12 +231,12 @@ body:not(.dark) .section-title div {
     backdrop-filter: blur(18px);
 }
 
-body.dark .hero-btn.ghost {
+body.dark .hero-btn.ghost,
+body.theme-dark .hero-btn.ghost {
     color: #fff;
 }
 
-.hero-btn:hover,
-.header-cta:hover {
+.hero-btn:hover {
     transform: translateY(-3px);
 }
 
@@ -283,20 +286,4 @@ body.dark .hero-btn.ghost {
 .reveal-item.show {
     opacity: 1;
     transform: translateY(0);
-}
-
-/* ===============================
-   Active Nav
-================================ */
-
-.explore-nav a.active {
-    color: var(--heading);
-}
-
-body.dark .explore-nav a.active {
-    color: #fff;
-}
-
-.explore-nav a.active::after {
-    width: 38px;
 }

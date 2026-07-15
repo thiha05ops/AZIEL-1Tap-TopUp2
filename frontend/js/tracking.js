@@ -306,7 +306,9 @@ function renderRefundTimeline(status) {
 }
 
 function renderRefundAction(order, status) {
-    if (!canRequestRefund(order, status)) return "";
+    if (!canRequestRefund(order, status)) {
+        return renderRefundBlockedReason(order, status);
+    }
 
     return `
         <div class="refund-action-box">
@@ -324,6 +326,31 @@ function renderRefundAction(order, status) {
             </button>
         </div>
     `;
+}
+
+function renderRefundBlockedReason(order, status) {
+    const actions = order?.actions || {};
+    const code = actions.refundBlockedReason || "";
+    if (!code || !["failed", "cancelled"].includes(status)) return "";
+
+    return `
+        <div class="refund-box pending">
+            <strong>${t("refundUnavailable", "Refund unavailable")}</strong>
+            <p>${escapeHTML(refundBlockedReasonText(code))}</p>
+        </div>
+    `;
+}
+
+function refundBlockedReasonText(code = "") {
+    const messages = {
+        ORDER_NOT_PAID: t("refundBlockedNotPaid", "Only paid orders can be refunded."),
+        REFUND_ALREADY_CREDITED: t("refundBlockedCredited", "This order has already been refunded."),
+        REFUND_ALREADY_REQUESTED: t("refundBlockedRequested", "Refund request already submitted."),
+        FULFILLMENT_ACTIVE: t("refundBlockedActiveFulfillment", "Fulfillment is still active for this order."),
+        FULFILLMENT_ALREADY_SUCCEEDED: t("refundBlockedFulfilled", "Completed orders cannot be refunded."),
+        ORDER_NOT_REFUND_ELIGIBLE: t("refundBlockedNotEligible", "This order is not eligible for refund.")
+    };
+    return messages[code] || t("refundBlockedNotEligible", "This order is not eligible for refund.");
 }
 
 function renderRefundStatusBox(order, status) {
@@ -524,6 +551,9 @@ function setRefundMsg(message, type = "success") {
 
 function canRequestRefund(order, status) {
     if (!order) return false;
+    if (typeof order.actions?.canRequestRefund === "boolean") {
+        return order.actions.canRequestRefund;
+    }
 
     return (
         ["failed", "cancelled"].includes(status) &&

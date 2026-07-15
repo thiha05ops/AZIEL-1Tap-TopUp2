@@ -2,6 +2,9 @@ const crypto = require("crypto");
 
 const CatalogPackage = require("../models/CatalogPackage");
 const CatalogProduct = require("../models/CatalogProduct");
+const Campaign = require("../models/Campaign");
+const GameBanner = require("../models/GameBanner");
+const HomeBanner = require("../models/HomeBanner");
 const MediaAsset = require("../models/MediaAsset");
 const {
     cleanupAfterFailedPersistence,
@@ -13,6 +16,7 @@ const {
 const MEDIA_CATEGORIES = Object.freeze([
     "product_image",
     "product_banner",
+    "home_banner",
     "package_icon",
     "campaign",
     "promotion",
@@ -190,17 +194,25 @@ async function assertAssetCategory(assetId, expectedCategory) {
 }
 
 async function getAssetReferenceCounts(assetId) {
-    const [productImages, productBanners, packageIcons] = await Promise.all([
+    const [productImages, productBanners, mobilePackagePreviews, packageIcons, gameBanners, homeBanners, campaigns] = await Promise.all([
         CatalogProduct.countDocuments({ "presentation.imageAssetId": assetId }),
         CatalogProduct.countDocuments({ "presentation.bannerAssetId": assetId }),
-        CatalogPackage.countDocuments({ iconAssetId: assetId })
+        CatalogProduct.countDocuments({ "presentation.mobilePackagePreview.assetId": assetId }),
+        CatalogPackage.countDocuments({ iconAssetId: assetId }),
+        GameBanner.countDocuments({ mediaAssetId: assetId }),
+        HomeBanner.countDocuments({ mediaAssetId: assetId }),
+        Campaign.countDocuments({ mediaAssetId: assetId, archivedAt: null })
     ]);
 
     return {
         productImages,
         productBanners,
+        mobilePackagePreviews,
         packageIcons,
-        total: productImages + productBanners + packageIcons
+        gameBanners,
+        homeBanners,
+        campaigns,
+        total: productImages + productBanners + mobilePackagePreviews + packageIcons + gameBanners + homeBanners + campaigns
     };
 }
 

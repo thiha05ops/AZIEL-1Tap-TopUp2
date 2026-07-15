@@ -21,6 +21,7 @@ const {
     formBodyLimit,
     isProduction,
     jsonBodyLimit,
+    buildProductionReadiness,
     socketCorsOptions,
     validateProductionReadiness
 } = require("./config/security");
@@ -44,6 +45,10 @@ const settingsRoutes = require("./routes/settings");
 const paymentMethodsRoutes = require("./routes/paymentMethods");
 const liveChatRoutes = require("./routes/liveChat");
 const catalogRoutes = require("./routes/catalog");
+const homeBannerRoutes = require("./routes/homeBanners");
+const campaignRoutes = require("./routes/campaigns");
+const promoRoutes = require("./routes/promos");
+const sitePlacementRoutes = require("./routes/sitePlacements");
 const realtime = require("./services/realtime");
 
 // EXPRESS APP
@@ -123,6 +128,33 @@ function configureApplication(mongoConnection) {
         express.static(path.join(__dirname, "uploads"))
     );
 
+    app.get("/health", (req, res) => {
+        res.json({
+            status: "ok",
+            uptimeSeconds: Math.floor(process.uptime())
+        });
+    });
+
+    app.get("/ready", (req, res) => {
+        const readiness = buildProductionReadiness(process.env);
+        const mongoReady = mongoose.connection.readyState === 1;
+        const ready = readiness.ready && mongoReady;
+
+        res.status(ready ? 200 : 503).json({
+            status: ready ? "ready" : "not_ready",
+            components: {
+                configuration: readiness.ready ? "ready" : "blocked",
+                mongo: mongoReady ? "ready" : "not_ready",
+                payment: readiness.features.payment || "unknown",
+                email: readiness.features.email || "unknown",
+                storage: readiness.features.storage || "unknown",
+                cors: readiness.features.cors || "unknown"
+            },
+            blockers: readiness.errors.map(error => error.code),
+            warnings: readiness.warnings.map(warning => warning.code)
+        });
+    });
+
     app.use("/api", authRoutes);
     app.use("/api", adminAuthRoutes);
     app.use("/api", adminUsersRoutes);
@@ -141,6 +173,10 @@ function configureApplication(mongoConnection) {
     app.use("/api", paymentMethodsRoutes);
     app.use("/api/live-chat", liveChatRoutes);
     app.use("/api", catalogRoutes);
+    app.use("/api", homeBannerRoutes);
+    app.use("/api", campaignRoutes);
+    app.use("/api", promoRoutes);
+    app.use("/api", sitePlacementRoutes);
 
     app.use("/api", (err, req, res, next) => {
         if (!err) return next();

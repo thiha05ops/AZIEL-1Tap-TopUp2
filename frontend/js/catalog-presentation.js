@@ -168,6 +168,22 @@
         return mediaFirst(product.bannerUrl || product.banner, "");
     }
 
+    function resolveMobilePackagePreview(product = {}) {
+        const productCode = typeof product === "object" && product !== null
+            ? product.productCode
+            : product;
+        const fallback = getProductImage(productCode);
+        if (typeof product !== "object" || product === null) return fallback;
+
+        return mediaFirst(
+            product.mobilePackagePreviewUrl ||
+            product.mobilePackagePreview?.url ||
+            product.mobilePackagePreview?.asset?.secureUrl ||
+            product.mobilePackagePreview?.asset?.url,
+            fallback
+        );
+    }
+
     function getPackageIcon(productCode, packageCode) {
         const code = String(productCode || "").trim().toLowerCase();
         const packageId = String(packageCode || "").trim().toUpperCase();
@@ -242,6 +258,7 @@
         getProductImage,
         resolveProductImage,
         resolveProductBanner,
+        resolveMobilePackagePreview,
         getPackageIcon,
         resolvePackageIcon,
         imageFallbackAttributes,

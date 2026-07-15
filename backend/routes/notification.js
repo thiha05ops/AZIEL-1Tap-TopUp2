@@ -5,7 +5,9 @@ const router = express.Router();
 
 const authMiddleware = require("../middleware/authMiddleware");
 const adminMiddleware = require("../middleware/adminMiddleware");
+const { PERMISSIONS, requireAdminPermission } = require("../services/adminAuthorizationService");
 const notificationService = require("../services/notificationService");
+const { sendPaginationError } = require("../services/paginationService");
 
 // CANONICAL: GET /api/notifications
 router.get("/notifications", authMiddleware, async (req, res) => {
@@ -21,6 +23,9 @@ router.get("/notifications", authMiddleware, async (req, res) => {
         });
     } catch (error) {
         console.log("Notification load error:", error);
+        const paginationResponse = sendPaginationError(res, error);
+        if (paginationResponse) return paginationResponse;
+
         res.status(500).json({ success: false, message: "Server error" });
     }
 });
@@ -88,6 +93,9 @@ router.get("/notifications/:username", authMiddleware, async (req, res) => {
         });
     } catch (error) {
         console.log("Legacy notification load error:", error);
+        const paginationResponse = sendPaginationError(res, error);
+        if (paginationResponse) return paginationResponse;
+
         res.status(500).json({ success: false, message: "Server error" });
     }
 });
@@ -169,7 +177,7 @@ router.delete("/notifications/:username/read", authMiddleware, async (req, res) 
 });
 
 // ADMIN: POST /api/notifications/create
-router.post("/notifications/create", adminMiddleware, async (req, res) => {
+router.post("/notifications/create", adminMiddleware, requireAdminPermission(PERMISSIONS.SETTINGS_MANAGE), async (req, res) => {
     try {
         const result = await notificationService.createUserNotification({
             username: req.body.username,
@@ -198,7 +206,7 @@ router.post("/notifications/create", adminMiddleware, async (req, res) => {
 });
 
 // ADMIN: POST /api/notifications/broadcast
-router.post("/notifications/broadcast", adminMiddleware, async (req, res) => {
+router.post("/notifications/broadcast", adminMiddleware, requireAdminPermission(PERMISSIONS.SETTINGS_MANAGE), async (req, res) => {
     try {
         const result = await notificationService.createBroadcastNotifications({
             usernames: req.body.usernames,

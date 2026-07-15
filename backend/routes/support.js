@@ -8,6 +8,7 @@ const Order = require("../models/Order");
 const upload = require("../middleware/imageMemoryUpload");
 const authMiddleware = require("../middleware/authMiddleware");
 const adminMiddleware = require("../middleware/adminMiddleware");
+const { PERMISSIONS, requireAdminPermission } = require("../services/adminAuthorizationService");
 const realtime = require("../services/realtime");
 const notificationService = require("../services/notificationService");
 const {
@@ -16,6 +17,12 @@ const {
     logStorageError,
     uploadFile
 } = require("../services/storageService");
+const {
+    applyCursorFilter,
+    pageResult,
+    parseLimit,
+    sendPaginationError
+} = require("../services/paginationService");
 
 // CREATE TICKET
 // POST /api/support/ticket
@@ -116,16 +123,25 @@ router.post("/support/ticket", authMiddleware, upload.single("screenshot"), asyn
 
 router.get("/support/my/:username", authMiddleware, async (req, res) => {
     try {
-        const tickets = await SupportTicket.find({
+        const limit = parseLimit(req.query.limit, { defaultLimit: 50, maxLimit: 100 });
+        const raw = await SupportTicket.find(applyCursorFilter({
             username: req.user.username
-        }).sort({ createdAt: -1 });
+        }, req.query.cursor))
+            .sort({ createdAt: -1, _id: -1 })
+            .limit(limit + 1)
+            .lean();
+        const { page, pagination } = pageResult(raw, limit);
 
         res.json({
             success: true,
-            tickets
+            items: page,
+            tickets: page,
+            pagination
         });
     } catch (error) {
         console.log("Load support tickets error:", error);
+        const paginationResponse = sendPaginationError(res, error);
+        if (paginationResponse) return paginationResponse;
 
         res.json({
             success: false,
@@ -137,10 +153,11 @@ router.get("/support/my/:username", authMiddleware, async (req, res) => {
 // ADMIN GET ALL TICKETS
 // GET /api/admin/support/tickets
 
-router.get("/admin/support/tickets", adminMiddleware, async (req, res) => {
+router.get("/admin/support/tickets", adminMiddleware, requireAdminPermission(PERMISSIONS.SUPPORT_READ), async (req, res) => {
     try {
         const filter = String(req.query.filter || "").trim();
         const status = String(req.query.status || "").trim();
+        const limit = parseLimit(req.query.limit, { defaultLimit: 50, maxLimit: 100 });
         const query = {};
 
         if (filter === "unreadByAdmin") {
@@ -152,16 +169,22 @@ router.get("/admin/support/tickets", adminMiddleware, async (req, res) => {
             query.status = status;
         }
 
-        const tickets = await SupportTicket.find(query).sort({
-            createdAt: -1
-        });
+        const raw = await SupportTicket.find(applyCursorFilter(query, req.query.cursor))
+            .sort({ createdAt: -1, _id: -1 })
+            .limit(limit + 1)
+            .lean();
+        const { page, pagination } = pageResult(raw, limit);
 
         res.json({
             success: true,
-            tickets
+            items: page,
+            tickets: page,
+            pagination
         });
     } catch (error) {
         console.log("Admin support tickets error:", error);
+        const paginationResponse = sendPaginationError(res, error);
+        if (paginationResponse) return paginationResponse;
 
         res.json({
             success: false,
@@ -173,7 +196,7 @@ router.get("/admin/support/tickets", adminMiddleware, async (req, res) => {
 // ADMIN REPLY
 // PUT /api/admin/support/tickets/:id/reply
 
-router.put("/admin/support/tickets/:id/reply", adminMiddleware, async (req, res) => {
+router.put("/admin/support/tickets/:id/reply", adminMiddleware, requireAdminPermission(PERMISSIONS.SUPPORT_MANAGE), async (req, res) => {
     try {
         const { reply, status } = req.body;
 

@@ -117,7 +117,8 @@
     filter: drop-shadow(0 28px 70px rgba(0, 0, 0, .25));
 }
 
-body.dark .hero-macbook {
+body.dark .hero-macbook,
+body.theme-dark .hero-macbook {
     filter:
         drop-shadow(0 35px 90px rgba(0, 0, 0, .65)) drop-shadow(0 0 48px rgba(139, 92, 246, .18));
 }
@@ -169,7 +170,8 @@ body.dark .hero-macbook {
     animation: floatPhone 6s ease-in-out infinite;
 }
 
-body.dark .phone-wrapper {
+body.dark .phone-wrapper,
+body.theme-dark .phone-wrapper {
     box-shadow:
         0 30px 80px rgba(0, 0, 0, .70),
         0 0 50px rgba(139, 92, 246, .25);

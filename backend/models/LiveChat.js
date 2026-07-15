@@ -50,4 +50,7 @@ const liveChatSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
+liveChatSchema.index({ status: 1, lastMessageAt: -1, _id: -1 });
+liveChatSchema.index({ username: 1, status: 1, lastMessageAt: -1 });
+
 module.exports = mongoose.model("LiveChat", liveChatSchema);

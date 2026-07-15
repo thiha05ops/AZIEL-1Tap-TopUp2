@@ -3,6 +3,8 @@ const router = express.Router();
 
 const PaymentMethod = require("../models/PaymentMethod");
 const adminMiddleware = require("../middleware/adminMiddleware");
+const { PERMISSIONS, requireAdminPermission } = require("../services/adminAuthorizationService");
+const { ADMIN_AUDIT_ACTIONS, writeAdminAudit } = require("../services/adminAuditService");
 const paymentQrUpload = require("../middleware/paymentQrUpload");
 const {
     StorageError,
@@ -112,7 +114,7 @@ router.get("/payment-methods", async (req, res) => {
 });
 
 // PUT /api/admin/payment-methods/:id
-router.put("/admin/payment-methods/:id", adminMiddleware, async (req, res) => {
+router.put("/admin/payment-methods/:id", adminMiddleware, requireAdminPermission(PERMISSIONS.PAYMENT_METHODS_MANAGE), async (req, res) => {
     try {
         const method = await PaymentMethod.findById(req.params.id);
 
@@ -142,6 +144,14 @@ router.put("/admin/payment-methods/:id", adminMiddleware, async (req, res) => {
         });
 
         await method.save();
+        await writeAdminAudit({
+            actor: req.admin,
+            req,
+            action: ADMIN_AUDIT_ACTIONS.PAYMENT_METHOD_UPDATED,
+            resourceType: "PaymentMethod",
+            resourceId: String(method._id),
+            metadata: { key: method.key, region: method.region }
+        }).catch(error => console.log("Admin audit failed:", error.message));
 
         res.json({
             success: true,
@@ -163,6 +173,7 @@ router.put("/admin/payment-methods/:id", adminMiddleware, async (req, res) => {
 router.post(
     "/admin/upload-payment-qr",
     adminMiddleware,
+    requireAdminPermission(PERMISSIONS.PAYMENT_METHODS_MANAGE),
     paymentQrUpload.single("qr"),
     async (req, res) => {
         try {

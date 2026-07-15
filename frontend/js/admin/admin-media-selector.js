@@ -2,6 +2,7 @@
     let selectorModal = null;
     let selectorState = {
         category: "",
+        categories: [],
         resolve: null
     };
 
@@ -52,7 +53,7 @@
         const params = new URLSearchParams({
             limit: "80"
         });
-        if (selectorState.category) params.set("category", selectorState.category);
+        if (selectorState.category && !selectorState.categories.length) params.set("category", selectorState.category);
 
         const data = await adminFetch(`/api/admin/media?${params.toString()}`);
 
@@ -61,7 +62,10 @@
             return;
         }
 
-        const assets = Array.isArray(data.assets) ? data.assets : [];
+        const allAssets = Array.isArray(data.assets) ? data.assets : [];
+        const assets = selectorState.categories.length
+            ? allAssets.filter(asset => selectorState.categories.includes(asset.category))
+            : allAssets;
         if (!assets.length) {
             grid.innerHTML = `<p class="admin-empty-state">${adminT("no_media_assets", "No media assets found")}</p>`;
             return;
@@ -95,6 +99,9 @@
     function open(options = {}) {
         ensureSelectorModal();
         selectorState.category = options.category || "";
+        selectorState.categories = Array.isArray(options.categories)
+            ? options.categories.map(item => String(item || "").trim()).filter(Boolean)
+            : [];
         selectorModal.classList.add("show");
         loadSelectorAssets();
 

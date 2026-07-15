@@ -3,10 +3,33 @@
 
 let allAdminOrders = [];
 let selectedAdminOrderId = "";
+let selectedAdminOrderSnapshot = null;
 let ordersAutoRefreshTimer = null;
 let ordersRefreshDebounce = null;
 let adminOrdersInitialized = false;
 let currentOrderContext = {};
+const adminOrdersRequestGate = window.AZIEL_ADMIN_UI?.request?.createRequestGate?.();
+const adminOrdersPaging = window.AZIEL_ADMIN_UI?.pagination?.createPaginatedState?.({
+    getId: order => order?._id,
+    limit: 50
+}) || {
+    items: [],
+    limit: 50,
+    nextCursor: "",
+    hasMore: false,
+    loadingInitial: false,
+    loadingMore: false,
+    replace(items = [], pagination = {}) {
+        this.items = items.slice();
+        this.hasMore = Boolean(pagination.hasMore);
+        this.nextCursor = pagination.nextCursor || "";
+    },
+    append(items = [], pagination = {}) {
+        this.items = mergeAdminOrderRows(this.items, items);
+        this.hasMore = Boolean(pagination.hasMore);
+        this.nextCursor = pagination.nextCursor || "";
+    }
+};
 
 const ORDER_QUEUE_FILTERS = new Set([
     "all",
@@ -58,6 +81,7 @@ function bindOrderCommandControls() {
             const filter = btn.dataset.orderFilter || "all";
             currentOrderContext = contextForFilter(filter);
             selectedAdminOrderId = "";
+            selectedAdminOrderSnapshot = null;
             updateOrderHash();
             syncOrderTabs();
         });
@@ -66,6 +90,7 @@ function bindOrderCommandControls() {
     document.getElementById("orderSearchBtn")?.addEventListener("click", () => {
         currentOrderContext.q = document.getElementById("orderSearchInput")?.value.trim() || "";
         selectedAdminOrderId = "";
+        selectedAdminOrderSnapshot = null;
         updateOrderHash();
     });
 
@@ -74,6 +99,7 @@ function bindOrderCommandControls() {
         if (input) input.value = "";
         delete currentOrderContext.q;
         selectedAdminOrderId = "";
+        selectedAdminOrderSnapshot = null;
         updateOrderHash();
     });
 
@@ -102,42 +128,102 @@ function scheduleOrdersRefresh() {
     ordersRefreshDebounce = setTimeout(() => loadOrders(false), 700);
 }
 
-async function loadOrders(showLoading = true) {
+async function loadOrders(showLoading = true, options = {}) {
     const box = document.getElementById("adminOrdersQueue");
     if (!box) return;
 
-    if (showLoading) {
+    const append = Boolean(options.append);
+    const signature = getOrdersQuerySignature();
+    const cursor = append ? adminOrdersPaging.nextCursor : "";
+    const endpoint = buildOrdersEndpoint({ cursor });
+    const requestKey = `${signature}|${cursor || "initial"}|${adminOrdersPaging.limit}`;
+    const request = adminOrdersRequestGate?.begin(signature, {
+        coalesceKey: append ? "" : requestKey
+    });
+
+    if (request?.coalesced) return request.promise;
+
+    if (!append) {
+        adminOrdersPaging.nextCursor = "";
+        adminOrdersPaging.hasMore = false;
+        adminOrdersPaging.loadingInitial = true;
+    } else if (adminOrdersPaging.loadingMore || !adminOrdersPaging.hasMore) {
+        return;
+    }
+
+    if (append) adminOrdersPaging.loadingMore = true;
+
+    const runRequest = async () => {
+        try {
+            const data = await adminFetch(endpoint);
+
+            if (request && !request.isCurrent()) return;
+            if (!request && signature !== getOrdersQuerySignature()) return;
+
+            if (!data || !data.success) {
+                renderOrdersError(data?.message || adminT("something_went_wrong"));
+                return;
+            }
+
+            const incoming = Array.isArray(data.orders) ? data.orders : Array.isArray(data.items) ? data.items : [];
+            if (append) adminOrdersPaging.append(incoming, data.pagination || {});
+            else adminOrdersPaging.replace(incoming, data.pagination || {});
+            allAdminOrders = adminOrdersPaging.items.slice();
+            reconcileSelectedOrder();
+            renderOrderQueue(allAdminOrders);
+            renderSelectedOrder();
+        } catch (error) {
+            console.log("Load orders error:", error);
+            renderOrdersError(adminT("something_went_wrong"));
+        } finally {
+            if (!request || request.isCurrent()) {
+                adminOrdersPaging.loadingInitial = false;
+                adminOrdersPaging.loadingMore = false;
+                renderOrderQueue(allAdminOrders);
+            }
+        }
+    };
+
+    const requestPromise = runRequest();
+    request?.track?.(requestPromise);
+
+    if (showLoading && !append) {
         box.innerHTML = `
             <div class="admin-dashboard-skeleton"></div>
             <div class="admin-dashboard-skeleton"></div>
             <div class="admin-dashboard-skeleton"></div>
         `;
-    }
-
-    try {
-        const data = await adminFetch(buildOrdersEndpoint());
-
-        if (!data || !data.success) {
-            renderOrdersError(data?.message || adminT("something_went_wrong"));
-            return;
-        }
-
-        allAdminOrders = Array.isArray(data.orders) ? data.orders : [];
-        reconcileSelectedOrder();
+    } else if (append) {
         renderOrderQueue(allAdminOrders);
-        renderSelectedOrder();
-    } catch (error) {
-        console.log("Load orders error:", error);
-        renderOrdersError(adminT("something_went_wrong"));
     }
+
+    return requestPromise;
+}
+
+function mergeAdminOrderRows(current = [], incoming = []) {
+    const seen = new Set(current.map(order => String(order._id)));
+    const merged = current.slice();
+    incoming.forEach(order => {
+        const id = String(order._id || "");
+        if (!id || seen.has(id)) return;
+        seen.add(id);
+        merged.push(order);
+    });
+    return merged;
 }
 
 function reconcileSelectedOrder() {
     if (selectedAdminOrderId && allAdminOrders.some(order => String(order._id) === String(selectedAdminOrderId))) {
+        selectedAdminOrderSnapshot = null;
+        return;
+    }
+
+    if (selectedAdminOrderSnapshot && String(selectedAdminOrderSnapshot._id) === String(selectedAdminOrderId)) {
         return;
     }
 
     selectedAdminOrderId = allAdminOrders[0]?._id || "";
+    selectedAdminOrderSnapshot = null;
 }
 
 function renderOrderQueue(orders) {
@@ -155,7 +241,7 @@ function renderOrderQueue(orders) {
         return;
     }
 
-    box.innerHTML = orders.map(order => {
+    const rows = orders.map(order => {
         const selected = String(order._id) === String(selectedAdminOrderId);
         const evidenceText = order.hasPaymentEvidence ? adminT("slip_attached") : adminT("no_payment_evidence");
 
@@ -183,13 +269,26 @@ function renderOrderQueue(orders) {
         `;
     }).join("");
 
+    const loadMore = adminOrdersPaging.hasMore ? `
+        <button class="admin-load-more-btn" type="button" id="ordersLoadMoreBtn" ${adminOrdersPaging.loadingMore ? "disabled" : ""}>
+            ${escapeHTML(adminOrdersPaging.loadingMore ? adminT("loading") : adminT("load_more", "Load More"))}
+        </button>
+    ` : "";
+
+    box.innerHTML = rows + loadMore;
+
     box.querySelectorAll(".orders-queue-row").forEach(row => {
         row.addEventListener("click", () => {
             selectedAdminOrderId = row.dataset.id || "";
+            selectedAdminOrderSnapshot = null;
             renderOrderQueue(allAdminOrders);
             renderSelectedOrder();
+            if (getSelectedOrder()?.isSummary) refreshAdminOrderDetail(selectedAdminOrderId);
+            window.AZIEL_ADMIN_LAYOUT?.showDetail?.("orders");
         });
     });
+
+    document.getElementById("ordersLoadMoreBtn")?.addEventListener("click", () => loadOrders(false, { append: true }));
 }
 
 function renderSelectedOrder() {
@@ -210,6 +309,9 @@ function renderSelectedOrder() {
     panel.innerHTML = `
         <div class="order-detail-head">
             <div>
+                <button class="admin-mobile-back-btn" type="button" data-mobile-back="orders">
+                    ← ${escapeHTML(adminT("back_to_orders", "Orders"))}
+                </button>
                 <span>${escapeHTML(adminT("order_details"))}</span>
                 <h3>${escapeHTML(order.orderId || "-")}</h3>
             </div>
@@ -247,6 +349,8 @@ function renderSelectedOrder() {
     ])}
         </div>
 
+        ${window.AZIEL_ADMIN_FULFILLMENT?.renderOrderFulfillment?.(order) || ""}
+
         <div class="order-detail-section">
             <h4>${escapeHTML(adminT("payment_evidence"))}</h4>
             ${renderEvidence(order)}
@@ -258,7 +362,11 @@ function renderSelectedOrder() {
         </div>
     `;
 
+    panel.querySelector('[data-mobile-back="orders"]')?.addEventListener("click", () => {
+        window.AZIEL_ADMIN_LAYOUT?.showList?.("orders");
+    });
     bindDetailActions(panel, order);
+    window.AZIEL_ADMIN_FULFILLMENT?.bindOrderFulfillment?.(panel, order);
 }
 
 function renderDetailSection(titleKey, rows) {
@@ -346,6 +454,7 @@ function renderOrderActions(order) {
 function getOrderActions(order) {
     const allowed = new Set(order.allowedNextStatuses || []);
     const status = String(order.status || "");
+    const activeFulfillment = order.fulfillment && ["PENDING", "IN_PROGRESS"].includes(order.fulfillment.status);
     const actions = [];
 
     if (status === "pending_payment" && order.hasPaymentEvidence && allowed.has("paid")) {
@@ -356,7 +465,7 @@ function getOrderActions(order) {
         actions.push({ action: "start-processing", labelKey: "start_processing", className: "order-primary-action" });
     }
 
-    if (status === "processing" && allowed.has("completed")) {
+    if (status === "processing" && allowed.has("completed") && !activeFulfillment) {
         actions.push({ action: "complete-order", labelKey: "complete_order", className: "order-primary-action" });
     }
 
@@ -365,7 +474,9 @@ function getOrderActions(order) {
     }
 
     if (status === "refund_requested") {
-        actions.push({ action: "approve-refund", labelKey: "approve_refund", className: "order-primary-action" });
+        if (order.actions?.canApproveRefund !== false) {
+            actions.push({ action: "approve-refund", labelKey: "approve_refund", className: "order-primary-action" });
+        }
         actions.push({ action: "reject-refund", labelKey: "reject_refund", className: "order-danger-action" });
     }
 
@@ -583,12 +694,22 @@ function applyOrderNavigationContext(context = {}) {
     setActiveQueueTab(ORDER_QUEUE_FILTERS.has(next) ? next : "all");
 }
 
-function buildOrdersEndpoint() {
+function getOrdersQuerySignature() {
+    return JSON.stringify({
+        filter: currentOrderContext.filter || "",
+        status: currentOrderContext.status || "",
+        q: currentOrderContext.q || ""
+    });
+}
+
+function buildOrdersEndpoint(options = {}) {
     const params = new URLSearchParams();
 
     if (currentOrderContext.filter) params.set("filter", currentOrderContext.filter);
     if (currentOrderContext.status) params.set("status", currentOrderContext.status);
     if (currentOrderContext.q) params.set("q", currentOrderContext.q);
+    params.set("limit", String(adminOrdersPaging.limit));
+    if (options.cursor) params.set("cursor", options.cursor);
 
     const query = params.toString();
     return query ? `/api/admin/orders?${query}` : "/api/admin/orders";
@@ -634,7 +755,29 @@ function emptyMessageForCurrentFilter() {
 }
 
 function getSelectedOrder() {
-    return allAdminOrders.find(order => String(order._id) === String(selectedAdminOrderId));
+    return allAdminOrders.find(order => String(order._id) === String(selectedAdminOrderId)) ||
+        (selectedAdminOrderSnapshot && String(selectedAdminOrderSnapshot._id) === String(selectedAdminOrderId)
+            ? selectedAdminOrderSnapshot
+            : null);
+}
+
+async function refreshAdminOrderDetail(orderId) {
+    if (!orderId) return null;
+    const data = await adminFetch(`/api/admin/orders/${encodeURIComponent(orderId)}`);
+    if (!data?.success || !data.order) return null;
+
+    selectedAdminOrderId = data.order._id || orderId;
+    const index = allAdminOrders.findIndex(order => String(order._id) === String(data.order._id));
+    if (index >= 0) {
+        allAdminOrders[index] = data.order;
+        selectedAdminOrderSnapshot = null;
+        renderOrderQueue(allAdminOrders);
+    } else {
+        selectedAdminOrderSnapshot = data.order;
+        renderOrderQueue(allAdminOrders);
+    }
+    renderSelectedOrder();
+    return data.order;
 }
 
 function getOrderEvidenceUrl(order) {
@@ -769,6 +912,7 @@ function escapeHTML(value) {
 }
 
 window.loadOrders = loadOrders;
+window.refreshAdminOrderDetail = refreshAdminOrderDetail;
 window.approveRefundToWallet = approveRefundToWallet;
 window.rejectRefund = rejectRefund;
 window.handleAdminOrderImageError = handleAdminOrderImageError;

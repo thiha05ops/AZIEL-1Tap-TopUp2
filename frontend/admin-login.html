@@ -13,49 +13,157 @@
     <meta name="theme-color" content="#070716">
 
     <style>
+        :root {
+            --admin-entry-bg: #050814;
+            --admin-entry-panel: rgba(15, 23, 42, .78);
+            --admin-entry-panel-strong: rgba(12, 18, 34, .94);
+            --admin-entry-border: rgba(148, 163, 184, .18);
+            --admin-entry-text: #f8fafc;
+            --admin-entry-muted: #9aa7bc;
+            --admin-entry-accent: #8b5cf6;
+            --admin-entry-accent-strong: #a855f7;
+            --admin-entry-danger: #ef4444;
+            --admin-entry-success: #22c55e;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             margin: 0;
-            min-height: 100vh;
-            background: #070716;
-            color: white;
-            font-family: Arial, sans-serif;
-            display: flex;
+            min-height: 100dvh;
+            background:
+                radial-gradient(circle at 16% 8%, rgba(139, 92, 246, .28), transparent 34%),
+                radial-gradient(circle at 84% 18%, rgba(59, 130, 246, .14), transparent 32%),
+                linear-gradient(180deg, #050814 0%, #080d1a 54%, #050814 100%);
+            color: var(--admin-entry-text);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            display: grid;
+            place-items: center;
+            padding: 32px 16px;
+            overflow-x: hidden;
+        }
+
+        .admin-entry-shell {
+            width: min(960px, 100%);
+            display: grid;
+            grid-template-columns: minmax(0, .9fr) minmax(340px, 420px);
             align-items: center;
-            justify-content: center;
+            gap: 34px;
+        }
+
+        .admin-entry-copy {
+            min-width: 0;
+        }
+
+        .admin-entry-brand {
+            margin: 0;
+            color: #facc15;
+            font-size: clamp(42px, 8vw, 74px);
+            line-height: .9;
+            letter-spacing: .04em;
+            font-weight: 950;
+        }
+
+        .admin-entry-kicker {
+            display: block;
+            margin-top: 12px;
+            color: rgba(248, 250, 252, .86);
+            font-size: 13px;
+            font-weight: 950;
+            letter-spacing: .18em;
+            text-transform: uppercase;
+        }
+
+        .admin-entry-title {
+            margin: 32px 0 10px;
+            color: var(--admin-entry-text);
+            font-size: clamp(28px, 4vw, 42px);
+            line-height: 1.05;
+            letter-spacing: -.03em;
+        }
+
+        .admin-entry-description {
+            max-width: 480px;
+            margin: 0;
+            color: var(--admin-entry-muted);
+            font-size: 15px;
+            line-height: 1.7;
+        }
+
+        .admin-entry-assurance {
+            display: grid;
+            gap: 10px;
+            margin-top: 28px;
+            color: var(--admin-entry-muted);
+            font-size: 13px;
+            font-weight: 750;
+        }
+
+        .admin-entry-assurance span {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .admin-entry-assurance i {
+            color: var(--admin-entry-accent-strong);
         }
 
         #adminLoginForm {
-            width: 92%;
-            max-width: 420px;
-            background: linear-gradient(135deg, #101028, #1d1d4d);
-            border: 1px solid rgba(255, 255, 255, .1);
-            border-radius: 26px;
-            padding: 35px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, .45);
+            width: 100%;
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .035)),
+                var(--admin-entry-panel);
+            border: 1px solid var(--admin-entry-border);
+            border-radius: 24px;
+            padding: 28px;
+            box-shadow:
+                0 28px 80px rgba(0, 0, 0, .42),
+                inset 0 1px 0 rgba(255, 255, 255, .10);
+            backdrop-filter: blur(24px) saturate(160%);
+            -webkit-backdrop-filter: blur(24px) saturate(160%);
         }
 
         #adminLoginForm h1 {
-            color: #ffd700;
-            margin-top: 0;
-            margin-bottom: 4px;
-            letter-spacing: .08em;
+            margin: 0;
+            color: var(--admin-entry-text);
+            font-size: 24px;
+            letter-spacing: -.02em;
         }
 
         #adminLoginForm .admin-login-kicker {
             display: block;
-            color: rgba(255, 255, 255, .68);
+            color: var(--admin-entry-muted);
             font-size: 12px;
             font-weight: 900;
             letter-spacing: .12em;
-            margin-bottom: 18px;
+            margin: 6px 0 24px;
             text-transform: uppercase;
         }
 
         #adminLoginForm .admin-login-note {
-            color: rgba(255, 255, 255, .72);
+            color: var(--admin-entry-muted);
             font-size: 13px;
             line-height: 1.5;
-            margin: 0 0 14px;
+            margin: 16px 0 0;
+            padding-top: 16px;
+            border-top: 1px solid var(--admin-entry-border);
+        }
+
+        .admin-login-field {
+            display: grid;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .admin-login-field label {
+            color: rgba(248, 250, 252, .84);
+            font-size: 12px;
+            font-weight: 900;
+            letter-spacing: .04em;
+            text-transform: uppercase;
         }
 
         #adminLoginForm input,
@@ -65,47 +173,160 @@
         }
 
         #adminLoginForm input {
-            padding: 15px;
-            margin: 10px 0;
-            border: none;
-            border-radius: 14px;
-            background: #070716;
-            color: white;
+            min-height: 50px;
+            padding: 0 14px;
+            border: 1px solid var(--admin-entry-border);
+            border-radius: 12px;
+            background: rgba(2, 6, 23, .72);
+            color: var(--admin-entry-text);
+            outline: none;
+            font-size: 15px;
+            transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+        }
+
+        #adminLoginForm input::placeholder {
+            color: rgba(154, 167, 188, .72);
+        }
+
+        #adminLoginForm input:focus {
+            border-color: rgba(168, 85, 247, .68);
+            background: rgba(2, 6, 23, .88);
+            box-shadow: 0 0 0 4px rgba(139, 92, 246, .18);
+        }
+
+        #adminLoginForm input:disabled {
+            opacity: .7;
+            cursor: not-allowed;
+        }
+
+        #adminLoginForm input:-webkit-autofill {
+            -webkit-text-fill-color: var(--admin-entry-text);
+            box-shadow: 0 0 0 1000px #111827 inset;
         }
 
         #adminLoginForm button {
-            padding: 15px;
-            margin-top: 14px;
-            border: none;
-            border-radius: 14px;
-            background: #ffd700;
-            color: #111;
+            min-height: 50px;
+            padding: 0 16px;
+            border-radius: 12px;
             font-weight: 900;
             cursor: pointer;
+            transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease, background .18s ease;
+        }
+
+        #adminLoginForm button:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 4px rgba(139, 92, 246, .24);
+        }
+
+        #adminLoginForm button:disabled {
+            opacity: .68;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        #adminLoginBtn {
+            margin-top: 22px;
+            border: 0;
+            background: linear-gradient(135deg, var(--admin-entry-accent), var(--admin-entry-accent-strong));
+            color: #ffffff;
+            box-shadow: 0 18px 42px rgba(124, 58, 237, .32);
+        }
+
+        #adminLoginBtn:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 22px 52px rgba(124, 58, 237, .40);
+        }
+
+        #resetAdminSessionBtn {
+            margin-top: 10px;
+            border: 1px solid var(--admin-entry-border);
+            background: transparent;
+            color: var(--admin-entry-muted);
+        }
+
+        #resetAdminSessionBtn:hover:not(:disabled) {
+            border-color: rgba(168, 85, 247, .38);
+            color: var(--admin-entry-text);
+            background: rgba(255, 255, 255, .045);
         }
 
         #adminMsg {
             margin-top: 14px;
-            color: #ffd700;
+            min-height: 20px;
+            color: var(--admin-entry-muted);
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        @media (max-width: 760px) {
+            body {
+                place-items: start center;
+                padding-top: 26px;
+            }
+
+            .admin-entry-shell {
+                grid-template-columns: 1fr;
+                gap: 24px;
+            }
+
+            .admin-entry-copy {
+                text-align: left;
+            }
+
+            .admin-entry-title {
+                margin-top: 22px;
+            }
+
+            #adminLoginForm {
+                padding: 22px;
+                border-radius: 20px;
+            }
         }
     </style>
 </head>
 
 <body>
 
-    <form id="adminLoginForm">
-        <h1>AZIEL</h1>
-        <span class="admin-login-kicker" data-admin-i18n="control_center">Control Center</span>
-        <p class="admin-login-note" data-admin-i18n="restricted_access">Restricted operational access</p>
+    <main class="admin-entry-shell" aria-label="AZIEL Control Center secure entry">
+        <section class="admin-entry-copy">
+            <h1 class="admin-entry-brand">AZIEL</h1>
+            <span class="admin-entry-kicker">Control Center</span>
+            <h2 class="admin-entry-title">Secure operations access</h2>
+            <p class="admin-entry-description">
+                Protected administrative area for AZIEL operations. Session, security, and access controls are enforced.
+            </p>
+            <div class="admin-entry-assurance" aria-label="Security notes">
+                <span><i class="fa-solid fa-shield-halved"></i> Admin RBAC protected</span>
+                <span><i class="fa-solid fa-lock"></i> Session controls enforced</span>
+            </div>
+        </section>
 
-        <input type="text" id="adminUsername" placeholder="Username" data-admin-i18n-placeholder="username">
-        <input type="password" id="adminPassword" placeholder="Password" data-admin-i18n-placeholder="password">
+        <form id="adminLoginForm">
+            <h1>Operations Console</h1>
+            <span class="admin-login-kicker" data-admin-i18n="control_center">AZIEL Control Center</span>
 
-        <button type="submit" id="adminLoginBtn" data-admin-i18n="login">Login</button>
-        <button type="button" id="resetAdminSessionBtn" data-admin-i18n="reset_admin_session">Reset Admin Session</button>
+            <div class="admin-login-field">
+                <label for="adminUsername" data-admin-i18n="username">Username</label>
+                <input type="text" id="adminUsername" name="username" placeholder="Username" autocomplete="username" data-admin-i18n-placeholder="username">
+            </div>
 
-        <p id="adminMsg"></p>
-    </form>
+            <div class="admin-login-field">
+                <label for="adminPassword" data-admin-i18n="password">Password</label>
+                <input type="password" id="adminPassword" name="password" placeholder="Password" autocomplete="current-password" data-admin-i18n-placeholder="password">
+            </div>
+
+            <div class="admin-login-field">
+                <label for="adminTwoFactorCode">Verification Code</label>
+                <input type="text" id="adminTwoFactorCode" name="adminTwoFactorCode" placeholder="Verification Code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" hidden>
+            </div>
+
+            <button type="submit" id="adminLoginBtn">Continue to Console</button>
+            <button type="button" id="resetAdminSessionBtn" data-admin-i18n="reset_admin_session">Reset admin session</button>
+
+            <p class="admin-login-note" data-admin-i18n="restricted_access">Protected administrative area. Session and security controls are enforced.</p>
+            <p id="adminMsg" role="status" aria-live="polite"></p>
+        </form>
+    </main>
 
     <script src="/js/motion.js?v=20260712-m7"></script>
     <script src="/js/ui-feedback.js?v=20260712-m6"></script>

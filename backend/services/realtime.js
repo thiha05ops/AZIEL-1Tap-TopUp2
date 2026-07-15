@@ -1,5 +1,6 @@
 const User = require("../models/User");
 const { verifyUserToken } = require("./authSessionService");
+const { resolveAdminRequest } = require("./adminAuthService");
 const jwt = require("jsonwebtoken");
 
 const JWT_SECRET = process.env.JWT_SECRET || "aziel_jwt_secret";
@@ -110,11 +111,9 @@ async function authenticateSocket(socket, next) {
         const decoded = jwt.verify(token, JWT_SECRET);
 
         if (decoded.role === "admin") {
+            const resolved = await resolveAdminRequest(token);
             socket.data.authenticated = true;
-            socket.data.admin = {
-                role: "admin",
-                username: decoded.username || "admin"
-            };
+            socket.data.admin = resolved.admin;
             return next();
         }
 

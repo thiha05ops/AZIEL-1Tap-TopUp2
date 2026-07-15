@@ -2,6 +2,7 @@
 // AZIEL Admin V2.5 Main Controller
 
 document.addEventListener("DOMContentLoaded", () => {
+    initAdminLayoutController();
     initAdminNavigation();
     initAdminMobileSidebar();
     initAdminSearch();
@@ -28,13 +29,29 @@ const adminSectionTitles = {
         titleKey: "wallet",
         subKey: "wallet_sub"
     },
+    fulfillment: {
+        titleKey: "fulfillment",
+        subKey: "fulfillment_sub"
+    },
     catalog: {
         titleKey: "catalog",
         subKey: "catalog_sub"
     },
+    promos: {
+        titleKey: "promo_codes",
+        subKey: "promo_codes_sub"
+    },
     media: {
         titleKey: "media_library",
         subKey: "media_library_sub"
+    },
+    "site-content": {
+        titleKey: "site_content",
+        subKey: "site_content_sub"
+    },
+    campaigns: {
+        titleKey: "campaigns",
+        subKey: "campaigns_sub"
     },
     users: {
         titleKey: "users",
@@ -51,6 +68,10 @@ const adminSectionTitles = {
     broadcast: {
         titleKey: "broadcast",
         subKey: "broadcast_sub"
+    },
+    "admin-security": {
+        titleKey: "admin_team",
+        subKey: "admin_team_sub"
     },
     settings: {
         titleKey: "site_settings",
@@ -70,7 +91,7 @@ function initAdminNavigation() {
             openAdminSection(target);
 
             if (window.innerWidth <= 900) {
-                document.body.classList.remove("admin-sidebar-open");
+                window.AZIEL_ADMIN_LAYOUT?.closeDrawer?.();
             }
         });
     });
@@ -129,6 +150,9 @@ function openAdminSection(sectionName, updateHash = true, context = {}) {
         item.classList.toggle("active", item.dataset.section === sectionName);
     });
 
+    document.body.dataset.adminSection = sectionName;
+    document.body.classList.toggle("admin-orders-active", sectionName === "orders");
+
     sections.forEach(section => {
         section.classList.remove("active");
     });
@@ -160,6 +184,11 @@ function openAdminSection(sectionName, updateHash = true, context = {}) {
         history.replaceState(null, "", buildAdminHash(sectionName, context));
     }
 
+    window.AZIEL_ADMIN_LAYOUT?.showList?.("orders");
+    window.AZIEL_ADMIN_LAYOUT?.showList?.("wallet");
+    window.AZIEL_ADMIN_LAYOUT?.showList?.("catalog");
+    window.AZIEL_ADMIN_LAYOUT?.showList?.("fulfillment");
+
     window.dispatchEvent(new CustomEvent("aziel:admin-section-opened", {
         detail: {
             section: sectionName,
@@ -168,12 +197,73 @@ function openAdminSection(sectionName, updateHash = true, context = {}) {
     }));
 }
 
+function initAdminLayoutController() {
+    const mediaQuery = window.matchMedia("(max-width: 768px)");
+
+    function isMobile() {
+        return mediaQuery.matches;
+    }
+
+    function setDetailMode(sectionName, mode) {
+        const section = document.getElementById(`section-${sectionName}`);
+        if (!section) return;
+        section.classList.toggle("admin-mobile-detail-open", mode === "detail");
+        section.classList.toggle("admin-mobile-list-open", mode !== "detail");
+    }
+
+    function showDetail(sectionName) {
+        if (!isMobile()) return;
+        setDetailMode(sectionName, "detail");
+    }
+
+    function showList(sectionName) {
+        setDetailMode(sectionName, "list");
+    }
+
+    function closeDrawer() {
+        document.body.classList.remove("admin-sidebar-open");
+        document.body.classList.remove("admin-drawer-lock");
+        document.getElementById("adminMenuToggle")?.setAttribute("aria-expanded", "false");
+    }
+
+    function openDrawer() {
+        document.body.classList.add("admin-sidebar-open", "admin-drawer-lock");
+        document.getElementById("adminMenuToggle")?.setAttribute("aria-expanded", "true");
+    }
+
+    mediaQuery.addEventListener?.("change", event => {
+        document.body.classList.toggle("admin-is-mobile", event.matches);
+        if (!event.matches) {
+            closeDrawer();
+            ["orders", "wallet", "catalog", "fulfillment"].forEach(showList);
+        }
+        window.dispatchEvent(new CustomEvent("aziel:admin-layout-change", {
+            detail: { mobile: event.matches }
+        }));
+    });
+
+    document.body.classList.toggle("admin-is-mobile", isMobile());
+
+    window.AZIEL_ADMIN_LAYOUT = {
+        isMobile,
+        openDrawer,
+        closeDrawer,
+        showDetail,
+        showList
+    };
+}
+
 function adminT(key, fallback = "") {
     return window.AZIEL_ADMIN_I18N?.t?.(key, fallback) || fallback || key;
 }
 
 function initAdminLogout() {
     document.getElementById("adminLogoutBtn")?.addEventListener("click", () => {
+        if (typeof adminLogout === "function") {
+            adminLogout();
+        }
+    });
+    document.getElementById("adminMobileLogoutBtn")?.addEventListener("click", () => {
         if (typeof adminLogout === "function") {
             adminLogout();
         }
@@ -199,22 +289,29 @@ function initAdminMobileSidebar() {
     const overlay = document.getElementById("adminSidebarOverlay");
 
     if (toggleBtn) {
+        toggleBtn.setAttribute("aria-expanded", "false");
         toggleBtn.addEventListener("click", () => {
-            document.body.classList.add("admin-sidebar-open");
+            window.AZIEL_ADMIN_LAYOUT?.openDrawer?.();
         });
     }
 
     if (closeBtn) {
         closeBtn.addEventListener("click", () => {
-            document.body.classList.remove("admin-sidebar-open");
+            window.AZIEL_ADMIN_LAYOUT?.closeDrawer?.();
         });
     }
 
     if (overlay) {
         overlay.addEventListener("click", () => {
-            document.body.classList.remove("admin-sidebar-open");
+            window.AZIEL_ADMIN_LAYOUT?.closeDrawer?.();
         });
     }
+
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape") {
+            window.AZIEL_ADMIN_LAYOUT?.closeDrawer?.();
+        }
+    });
 }
 
 function initAdminSearch() {
@@ -258,9 +355,25 @@ function initAdminSearch() {
             keyword.includes("media") ||
             keyword.includes("asset") ||
             keyword.includes("image") ||
+            keyword.includes("banner") ||
+            keyword.includes("home") ||
+            keyword.includes("content") ||
+            keyword.includes("campaign") ||
+            keyword.includes("popup") ||
+            keyword.includes("promotion") ||
             keyword.includes("package") ||
             keyword.includes("game")
         ) {
+            if (keyword.includes("campaign") || keyword.includes("popup") || keyword.includes("promotion")) {
+                openAdminSection("campaigns");
+                return;
+            }
+
+            if (keyword.includes("home") || keyword.includes("content") || keyword.includes("banner")) {
+                openAdminSection("site-content");
+                return;
+            }
+
             openAdminSection(keyword.includes("media") || keyword.includes("asset") || keyword.includes("image") ? "media" : "catalog");
             return;
         }

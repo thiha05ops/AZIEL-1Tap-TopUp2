@@ -201,13 +201,16 @@
    LIGHT MODE EXTRA
 ================================ */
 
-body:not(.dark) .stats-box,
-body:not(.dark) .coming-content {
+body:not(.dark):not(.theme-dark) .stats-box,
+body:not(.dark):not(.theme-dark) .coming-content,
+body.theme-light .stats-box,
+body.theme-light .coming-content {
     background: rgba(255, 255, 255, .86);
     box-shadow: 0 12px 40px rgba(15, 23, 42, .08);
 }
 
-body:not(.dark) .coming-list div {
+body:not(.dark):not(.theme-dark) .coming-list div,
+body.theme-light .coming-list div {
     background: rgba(255, 255, 255, .72);
 }
 

@@ -3,6 +3,7 @@
 const express = require("express");
 const router = express.Router();
 const rateLimit = require("express-rate-limit");
+const mongoose = require("mongoose");
 
 const Order = require("../models/Order");
 const PaymentMethod = require("../models/PaymentMethod");
@@ -14,20 +15,47 @@ const { sendTelegramMessage } = require("../services/telegram");
 
 const createNotification = require("../services/createNotification");
 const adminMiddleware = require("../middleware/adminMiddleware");
+const { PERMISSIONS, requireAdminPermission } = require("../services/adminAuthorizationService");
+const { ADMIN_AUDIT_ACTIONS, writeAdminAudit } = require("../services/adminAuditService");
 const realtime = require("../services/realtime");
 const {
     NOTE_BY_STATUS,
     ORDER_STATES,
     PAYMENT_STATES,
     OrderStateError,
+    emitCommittedTransition,
     getAllowedNextStatuses,
     projectOrderStatus,
     transitionOrder
 } = require("../services/orderStateService");
-const { CatalogError, resolveOrderCatalog } = require("../services/catalogService");
+const { CatalogError } = require("../services/catalogService");
+const {
+    PromoError,
+    releasePromoRedemption,
+    reservePromoUse,
+    resolvePurchasePricing
+} = require("../services/promoCodeService");
 const { WalletError, creditRefund } = require("../services/walletService");
+const {
+    FINANCIAL_OUTCOMES,
+    FinancialIntegrityError,
+    acquireFinancialOutcome,
+    assertRefundApprovalAllowed,
+    assertRefundRequestAllowed,
+    listFinancialFulfillmentAttempts,
+    projectFinancialActions
+} = require("../services/financialIntegrityService");
+const {
+    applyCursorFilter,
+    escapeRegex,
+    normalizeSearch,
+    pageResult,
+    parseLimit,
+    sendPaginationError
+} = require("../services/paginationService");
 const { getActivePendingOrderPolicy } = require("../services/pendingOrderPolicy");
 const { normalizePaymentKey } = require("../services/manualPaymentAttemptService");
+const { getOrderFulfillmentSummary } = require("../services/fulfillmentService");
 const {
     StorageError,
     cleanupAfterFailedPersistence,
@@ -58,7 +86,8 @@ function getAuthenticatedUsername(req) {
     return req.user?.username || "";
 }
 
-function publicTrackingOrder(order) {
+function publicTrackingOrder(order, fulfillmentAttempts = []) {
+    const actions = projectFinancialActions(order, fulfillmentAttempts);
     return {
         orderId: order.orderId,
         game: order.game,
@@ -83,6 +112,7 @@ function publicTrackingOrder(order) {
         refundRejectedReason: order.refundRejectedReason,
         refundMethod: order.refundMethod,
         refundedAt: order.refundedAt,
+        actions,
         createdAt: order.createdAt,
         updatedAt: order.updatedAt
     };
@@ -97,7 +127,9 @@ function hasManualPaymentEvidence(order = {}) {
     );
 }
 
-function projectAdminOrder(order) {
+function projectAdminOrder(order, fulfillmentAttempts = []) {
+    const latestFulfillment = fulfillmentAttempts[0] || null;
+    const actions = projectFinancialActions(order, fulfillmentAttempts);
     return {
         _id: order._id,
         orderId: order.orderId,
@@ -132,7 +164,45 @@ function projectAdminOrder(order) {
         refundedAt: order.refundedAt || null,
         timeline: Array.isArray(order.timeline) ? order.timeline : [],
         allowedNextStatuses: getAllowedNextStatuses(order.status),
+        fulfillment: latestFulfillment,
+        fulfillmentAttempts,
+        actions,
         hasPaymentEvidence: hasManualPaymentEvidence(order),
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt
+    };
+}
+
+function projectAdminOrderSummary(order, fulfillmentAttempts = []) {
+    const latestFulfillment = fulfillmentAttempts[0] || null;
+    const actions = projectFinancialActions(order, fulfillmentAttempts);
+    return {
+        _id: order._id,
+        orderId: order.orderId,
+        username: order.username,
+        game: order.game,
+        productCode: order.productCode || "",
+        productName: order.productName || order.game || "",
+        userId: order.userId,
+        zoneId: order.zoneId || "",
+        packageName: order.packageName,
+        packageCode: order.packageCode || "",
+        amount: order.amount,
+        currency: order.currency,
+        region: order.region,
+        paymentMethod: order.paymentMethod,
+        paymentStatus: order.paymentStatus || "",
+        paymentProvider: order.paymentProvider || "",
+        transactionId: order.transactionId || "",
+        note: order.note || "",
+        status: order.status,
+        refundRequested: Boolean(order.refundRequested),
+        refunded: Boolean(order.refunded),
+        allowedNextStatuses: getAllowedNextStatuses(order.status),
+        fulfillment: latestFulfillment,
+        actions,
+        hasPaymentEvidence: hasManualPaymentEvidence(order),
+        isSummary: true,
         createdAt: order.createdAt,
         updatedAt: order.updatedAt
     };
@@ -182,9 +252,11 @@ router.get("/order/track/:orderId", async (req, res) => {
             });
         }
 
+        const attempts = await listFinancialFulfillmentAttempts(order._id);
+
         res.json({
             success: true,
-            order: publicTrackingOrder(order)
+            order: publicTrackingOrder(order, attempts)
         });
 
     } catch (error) {
@@ -237,7 +309,7 @@ router.post("/order/:orderId/refund-request", authMiddleware, async (req, res) =
             });
         }
 
-        const order = await Order.findOne({
+        let order = await Order.findOne({
             orderId: req.params.orderId,
             username
         });
@@ -249,26 +321,8 @@ router.post("/order/:orderId/refund-request", authMiddleware, async (req, res) =
             });
         }
 
-        if (!getRefundAllowedStatus(order.status)) {
-            return res.json({
-                success: false,
-                message: "Refund can only be requested for failed or cancelled orders"
-            });
-        }
-
-        if (order.refunded || order.status === "refunded") {
-            return res.json({
-                success: false,
-                message: "This order has already been refunded"
-            });
-        }
-
-        if (order.refundRequested || order.status === "refund_requested") {
-            return res.json({
-                success: false,
-                message: "Refund request already submitted"
-            });
-        }
+        const attempts = await listFinancialFulfillmentAttempts(order._id);
+        assertRefundRequestAllowed(order, attempts);
 
         order.refundRequested = true;
         order.refundRequestReason = String(reason).trim();
@@ -330,6 +384,14 @@ ${order.refundRequestReason}`
     } catch (error) {
         console.log("Refund request error:", error);
 
+        if (error instanceof FinancialIntegrityError) {
+            return res.status(error.statusCode).json({
+                success: false,
+                code: error.code,
+                message: error.message
+            });
+        }
+
         res.status(500).json({
             success: false,
             message: "Server error"
@@ -338,12 +400,13 @@ ${order.refundRequestReason}`
 });
 
 // ADMIN GET ALL ORDERS
-router.get("/admin/orders", adminMiddleware, async (req, res) => {
+router.get("/admin/orders", adminMiddleware, requireAdminPermission(PERMISSIONS.ORDERS_READ), async (req, res) => {
     try {
         const query = {};
         const status = String(req.query.status || "").trim();
         const filter = String(req.query.filter || "").trim();
-        const search = String(req.query.q || "").trim();
+        const search = normalizeSearch(req.query.q || "", { maxLength: 80 });
+        const limit = parseLimit(req.query.limit, { defaultLimit: 50, maxLimit: 100 });
 
         if (filter === "manual_review") {
             query.status = "pending_payment";
@@ -370,13 +433,10 @@ router.get("/admin/orders", adminMiddleware, async (req, res) => {
         }
 
         if (search) {
-            const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const escaped = escapeRegex(search);
             const searchOr = [
-                { orderId: { $regex: escaped, $options: "i" } },
-                { username: { $regex: escaped, $options: "i" } },
-                { game: { $regex: escaped, $options: "i" } },
-                { productName: { $regex: escaped, $options: "i" } },
-                { packageName: { $regex: escaped, $options: "i" } }
+                { orderId: { $regex: `^${escaped}`, $options: "i" } },
+                { username: { $regex: `^${escaped}`, $options: "i" } }
             ];
 
             if (query.$or) {
@@ -387,21 +447,56 @@ router.get("/admin/orders", adminMiddleware, async (req, res) => {
             }
         }
 
-        const orders = await Order.find(query).sort({ createdAt: -1 });
+        const pagedQuery = applyCursorFilter(query, req.query.cursor);
+        const orders = await Order.find(pagedQuery)
+            .select("_id orderId username game productCode productName userId zoneId packageName packageCode amount currency region paymentMethod paymentStatus paymentProvider transactionId note status refundRequested refunded createdAt updatedAt paymentSlip paymentEvidence financialOutcome")
+            .sort({ createdAt: -1, _id: -1 })
+            .limit(limit + 1)
+            .lean();
+        const { page, pagination } = pageResult(orders, limit);
+        const fulfillmentByOrder = await getOrderFulfillmentSummary(page.map(order => order._id));
+        const items = page.map(order => projectAdminOrderSummary(order, fulfillmentByOrder.get(String(order._id)) || []));
 
         res.json({
             success: true,
-            orders: orders.map(projectAdminOrder)
+            items,
+            orders: items,
+            pagination
         });
 
     } catch (error) {
         console.log("Admin orders error:", error);
+        const paginationResponse = sendPaginationError(res, error);
+        if (paginationResponse) return paginationResponse;
         res.json({ success: false, message: "Server error" });
     }
 });
 
+router.get("/admin/orders/:id", adminMiddleware, requireAdminPermission(PERMISSIONS.ORDERS_READ), async (req, res) => {
+    try {
+        const order = await Order.findById(req.params.id);
+        if (!order) {
+            return res.status(404).json({
+                success: false,
+                message: "Order not found"
+            });
+        }
+
+        const fulfillmentByOrder = await getOrderFulfillmentSummary([order._id]);
+        const attempts = fulfillmentByOrder.get(String(order._id)) || [];
+
+        return res.json({
+            success: true,
+            order: projectAdminOrder(order, attempts)
+        });
+    } catch (error) {
+        console.log("Admin order detail error:", error);
+        return res.json({ success: false, message: "Server error" });
+    }
+});
+
 // ADMIN UPDATE ORDER STATUS
-router.put("/admin/orders/:id/status", adminMiddleware, async (req, res) => {
+router.put("/admin/orders/:id/status", adminMiddleware, requireAdminPermission(PERMISSIONS.ORDERS_MANAGE), async (req, res) => {
     try {
         const { status } = req.body;
         const order = await Order.findById(req.params.id);
@@ -413,6 +508,20 @@ router.put("/admin/orders/:id/status", adminMiddleware, async (req, res) => {
             });
         }
 
+        if (status === ORDER_STATES.COMPLETED) {
+            const fulfillmentByOrder = await getOrderFulfillmentSummary([order._id]);
+            const attempts = fulfillmentByOrder.get(String(order._id)) || [];
+            const activeAttempt = attempts.find(attempt => ["PENDING", "IN_PROGRESS"].includes(attempt.status));
+            if (activeAttempt) {
+                return res.status(409).json({
+                    success: false,
+                    code: "FULFILLMENT_ACTIVE",
+                    message: "Active fulfillment must be resolved before completing this Order."
+                });
+            }
+        }
+
+        const previousStatus = order.status;
         const transition = await transitionOrder(order, status, {
             source: "admin",
             actorType: "admin",
@@ -431,6 +540,17 @@ router.put("/admin/orders/:id/status", adminMiddleware, async (req, res) => {
         }
 
         const updatedOrder = transition.order;
+        await writeAdminAudit({
+            actor: req.admin,
+            req,
+            action: ADMIN_AUDIT_ACTIONS.ORDER_STATUS_CHANGED,
+            resourceType: "Order",
+            resourceId: updatedOrder.orderId || String(updatedOrder._id),
+            metadata: {
+                fromStatus: previousStatus,
+                toStatus: updatedOrder.status
+            }
+        }).catch(error => console.log("Admin audit failed:", error.message));
 
         const notification = await createNotification({
             username: updatedOrder.username,
@@ -476,65 +596,72 @@ ${updatedOrder.status}`
 
 // ADMIN APPROVE REFUND TO WALLET
 // POST /api/admin/orders/:id/refund/approve
-router.post("/admin/orders/:id/refund/approve", adminMiddleware, async (req, res) => {
+router.post("/admin/orders/:id/refund/approve", adminMiddleware, requireAdminPermission(PERMISSIONS.ORDERS_MANAGE), async (req, res) => {
+    const session = await mongoose.startSession();
+    let updatedOrder = null;
+    let walletResult = null;
+    let timelineEntry = null;
+    let refundAmount = 0;
+    let currencyKey = "MMK";
+
     try {
         const { reason } = req.body;
 
-        const order = await Order.findById(req.params.id);
+        await session.withTransaction(async () => {
+            const order = await Order.findById(req.params.id).session(session);
 
-        if (!order) {
-            return res.json({
-                success: false,
-                message: "Order not found"
+            if (!order) {
+                throw new FinancialIntegrityError("ORDER_NOT_FOUND", "Order not found", 404);
+            }
+
+            const attempts = await listFinancialFulfillmentAttempts(order._id, { session });
+            assertRefundApprovalAllowed(order, attempts);
+
+            refundAmount = Number(order.amount || 0);
+            currencyKey = getCurrencyKey(order.currency);
+
+            if (refundAmount <= 0) {
+                throw new FinancialIntegrityError("INVALID_REFUND_AMOUNT", "Invalid refund amount", 400);
+            }
+
+            const lockedOrder = await acquireFinancialOutcome(order._id, FINANCIAL_OUTCOMES.REFUND_CREDITED, { session });
+
+            order.financialOutcome = lockedOrder.financialOutcome;
+            order.financialOutcomeAt = lockedOrder.financialOutcomeAt;
+            order.refunded = true;
+            order.refundAmount = refundAmount;
+            order.refundReason =
+                String(reason || "").trim() ||
+                order.refundRequestReason ||
+                "Refund approved by admin";
+            order.refundMethod = "wallet";
+            order.refundedBy = "admin";
+            order.refundedAt = new Date();
+
+            walletResult = await creditRefund(order, {
+                performedBy: req.admin?.username || req.user?.username || "admin",
+                session
             });
-        }
 
-        if (order.refunded || order.status === "refunded") {
-            return res.json({
-                success: false,
-                message: "This order has already been refunded"
+            const transition = await transitionOrder(order, ORDER_STATES.REFUNDED, {
+                source: "admin",
+                actorType: "admin",
+                actor: req.admin?.username || req.user?.username || "admin",
+                reason: order.refundReason,
+                paymentStatus: PAYMENT_STATES.REFUNDED,
+                note: `Refunded to wallet. Reason: ${order.refundReason}`,
+                idempotencyKey: `refund:approve:${order.orderId}`,
+                session,
+                emit: false
             });
-        }
 
-        if (!order.refundRequested && order.status !== "refund_requested") {
-            return res.json({
-                success: false,
-                message: "Customer has not requested refund yet"
-            });
-        }
-
-        const refundAmount = Number(order.amount || 0);
-        const currencyKey = getCurrencyKey(order.currency);
-
-        if (refundAmount <= 0) {
-            return res.json({
-                success: false,
-                message: "Invalid refund amount"
-            });
-        }
-
-        order.refunded = true;
-        order.refundAmount = refundAmount;
-        order.refundReason =
-            String(reason || "").trim() ||
-            order.refundRequestReason ||
-            "Refund approved by admin";
-        order.refundMethod = "wallet";
-        order.refundedBy = "admin";
-        order.refundedAt = new Date();
-        const walletResult = await creditRefund(order, {
-            performedBy: req.admin?.username || req.user?.username || "admin"
+            updatedOrder = transition.order;
+            timelineEntry = transition.timelineEntry || null;
         });
-        const transition = await transitionOrder(order, ORDER_STATES.REFUNDED, {
-            source: "admin",
-            actorType: "admin",
-            actor: req.admin?.username || req.user?.username || "admin",
-            reason: order.refundReason,
-            paymentStatus: PAYMENT_STATES.REFUNDED,
-            note: `Refunded to wallet. Reason: ${order.refundReason}`,
-            idempotencyKey: `refund:approve:${order.orderId}`
-        });
-        const updatedOrder = transition.order;
+
+        if (timelineEntry) {
+            await emitCommittedTransition(updatedOrder, timelineEntry);
+        }
 
         if (!walletResult.duplicate) {
             await createNotification({
@@ -547,7 +674,7 @@ router.post("/admin/orders/:id/refund/approve", adminMiddleware, async (req, res
             });
         }
 
-        await realtime.emitWalletUpdate(order.username, {
+        await realtime.emitWalletUpdate(updatedOrder.username, {
             amount: walletResult.balance,
             balance: walletResult.balance,
             currency: currencyKey,
@@ -558,7 +685,7 @@ router.post("/admin/orders/:id/refund/approve", adminMiddleware, async (req, res
                 amount: Number(walletResult.transaction?.amount || 0),
                 balanceAfter: Number(walletResult.transaction?.balanceAfter ?? walletResult.balance),
                 referenceType: walletResult.transaction?.referenceType || "",
-                referenceId: walletResult.transaction?.referenceId || order.orderId,
+                referenceId: walletResult.transaction?.referenceId || updatedOrder.orderId,
                 createdAt: walletResult.transaction?.createdAt || new Date()
             }
         });
@@ -570,6 +697,21 @@ router.post("/admin/orders/:id/refund/approve", adminMiddleware, async (req, res
             amount: refundAmount,
             currency: currencyKey
         });
+
+        await writeAdminAudit({
+            actor: req.admin,
+            req,
+            action: ADMIN_AUDIT_ACTIONS.REFUND_APPROVED,
+            resourceType: "Order",
+            resourceId: updatedOrder.orderId || String(updatedOrder._id),
+            metadata: {
+                financialOutcome: updatedOrder.financialOutcome,
+                refundAmount,
+                currency: currencyKey,
+                walletTransactionId: walletResult.transaction?.transactionId || "",
+                duplicate: Boolean(walletResult.duplicate)
+            }
+        }).catch(error => console.log("Admin audit failed:", error.message));
 
         await sendTelegramMessage(
             `✅ REFUND APPROVED TO WALLET
@@ -605,6 +747,14 @@ ${updatedOrder.refundReason}`
     } catch (error) {
         console.log("Approve refund error:", error);
 
+        if (error instanceof FinancialIntegrityError) {
+            return res.status(error.statusCode).json({
+                success: false,
+                code: error.code,
+                message: error.message
+            });
+        }
+
         if (error instanceof WalletError) {
             return res.status(error.statusCode).json({
                 success: false,
@@ -617,12 +767,14 @@ ${updatedOrder.refundReason}`
             success: false,
             message: "Server error"
         });
+    } finally {
+        await session.endSession();
     }
 });
 
 // ADMIN REJECT REFUND
 // POST /api/admin/orders/:id/refund/reject
-router.post("/admin/orders/:id/refund/reject", adminMiddleware, async (req, res) => {
+router.post("/admin/orders/:id/refund/reject", adminMiddleware, requireAdminPermission(PERMISSIONS.ORDERS_MANAGE), async (req, res) => {
     try {
         const { reason } = req.body;
 
@@ -682,6 +834,18 @@ router.post("/admin/orders/:id/refund/reject", adminMiddleware, async (req, res)
             username: updatedOrder.username
         });
 
+        await writeAdminAudit({
+            actor: req.admin,
+            req,
+            action: ADMIN_AUDIT_ACTIONS.REFUND_REJECTED,
+            resourceType: "Order",
+            resourceId: updatedOrder.orderId || String(updatedOrder._id),
+            metadata: {
+                reason: updatedOrder.refundRejectedReason,
+                nextAllowedStatuses: getAllowedNextStatuses(updatedOrder.status)
+            }
+        }).catch(error => console.log("Admin audit failed:", error.message));
+
         await sendTelegramMessage(
             `❌ REFUND REJECTED
 
@@ -713,7 +877,7 @@ ${updatedOrder.refundRejectedReason}`
 
 // LEGACY DIRECT ADMIN REFUND - Optional compatibility
 // POST /api/admin/orders/:id/refund
-router.post("/admin/orders/:id/refund", adminMiddleware, async (req, res) => {
+router.post("/admin/orders/:id/refund", adminMiddleware, requireAdminPermission(PERMISSIONS.ORDERS_MANAGE), async (req, res) => {
     try {
         const { reason } = req.body;
 
@@ -750,6 +914,7 @@ router.post("/admin/orders/:id/refund", adminMiddleware, async (req, res) => {
 router.post("/orders", authMiddleware, orderCreateLimiter, upload.single("paymentSlip"), async (req, res) => {
     let evidence = null;
     let evidencePersisted = false;
+    let reservedRedemption = null;
 
     try {
         const username = getAuthenticatedUsername(req);
@@ -761,7 +926,12 @@ router.post("/orders", authMiddleware, orderCreateLimiter, upload.single("paymen
             });
         }
 
-        const catalogItem = await resolveOrderCatalog(req.body);
+        const pricing = await resolvePurchasePricing({
+            payload: req.body,
+            user: req.user,
+            verifyUserLimit: true
+        });
+        const catalogItem = pricing.catalogItem;
         const methodKey = normalizePaymentKey(req.body.paymentMethod);
         const configuredMethod = await PaymentMethod.findOne({
             key: methodKey,
@@ -807,6 +977,12 @@ router.post("/orders", authMiddleware, orderCreateLimiter, upload.single("paymen
             });
         }
 
+        reservedRedemption = await reservePromoUse({
+            pricing,
+            user: req.user,
+            orderId: req.body.orderId
+        });
+
         const order = await Order.create({
             orderId: req.body.orderId,
             username,
@@ -817,8 +993,14 @@ router.post("/orders", authMiddleware, orderCreateLimiter, upload.single("paymen
             zoneId: req.body.zoneId || "",
             packageName: catalogItem.packageName,
             packageCode: catalogItem.packageCode,
-            amount: catalogItem.amount,
-            currency: catalogItem.currency,
+            amount: pricing.finalAmount,
+            originalAmount: pricing.originalAmount,
+            discountAmount: pricing.discountAmount,
+            finalAmount: pricing.finalAmount,
+            promoCode: pricing.promoCode,
+            promoSnapshot: pricing.promoSnapshot,
+            promoRedemptionId: reservedRedemption?._id || null,
+            currency: pricing.currency,
             region: catalogItem.region,
             paymentMethod: req.body.paymentMethod,
             paymentSlip: evidence?.url || "",
@@ -837,6 +1019,7 @@ router.post("/orders", authMiddleware, orderCreateLimiter, upload.single("paymen
                 at: new Date()
             }]
         });
+        reservedRedemption = null;
         evidencePersisted = true;
 
         res.json({
@@ -851,7 +1034,9 @@ router.post("/orders", authMiddleware, orderCreateLimiter, upload.single("paymen
             await cleanupAfterFailedPersistence(evidence);
         }
 
-        if (error instanceof CatalogError) {
+        await releasePromoRedemption(reservedRedemption?._id);
+
+        if (error instanceof CatalogError || error instanceof PromoError) {
             return res.status(error.statusCode).json({
                 success: false,
                 code: error.code,

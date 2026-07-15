@@ -1,26 +1,74 @@
 // frontend/js/admin-users.js
 
 let allAdminUsers = [];
+const adminUsersPaging = {
+    limit: 50,
+    nextCursor: "",
+    hasMore: false,
+    loading: false,
+    requestId: 0
+};
 
 document.addEventListener("DOMContentLoaded", () => {
     loadAdminUsers();
 });
 
-async function loadAdminUsers() {
+async function loadAdminUsers(options = {}) {
     const box = document.getElementById("adminUsersList");
     if (!box) return;
 
-    box.innerHTML = `<div class="admin-list-empty">Loading users...</div>`;
-
-    const data = await adminFetch("/api/admin/users");
-
-    if (!data || !data.success) {
-        box.innerHTML = `<div class="admin-list-empty">${data?.message || "Failed to load users"}</div>`;
-        return;
+    const append = Boolean(options.append);
+    if (append && (adminUsersPaging.loading || !adminUsersPaging.hasMore)) return;
+    if (!append) {
+        adminUsersPaging.nextCursor = "";
+        adminUsersPaging.hasMore = false;
     }
 
-    allAdminUsers = Array.isArray(data.users) ? data.users : [];
-    renderUsers(allAdminUsers);
+    adminUsersPaging.loading = true;
+    const requestId = ++adminUsersPaging.requestId;
+
+    if (!append) box.innerHTML = `<div class="admin-list-empty">Loading users...</div>`;
+    else renderUsers(allAdminUsers);
+
+    try {
+        const data = await adminFetch(buildAdminUsersEndpoint(append ? adminUsersPaging.nextCursor : ""));
+
+        if (requestId !== adminUsersPaging.requestId) return;
+
+        if (!data || !data.success) {
+            box.innerHTML = `<div class="admin-list-empty">${data?.message || "Failed to load users"}</div>`;
+            return;
+        }
+
+        const incoming = Array.isArray(data.users) ? data.users : Array.isArray(data.items) ? data.items : [];
+        allAdminUsers = append ? mergeUsers(allAdminUsers, incoming) : incoming;
+        adminUsersPaging.hasMore = Boolean(data.pagination?.hasMore);
+        adminUsersPaging.nextCursor = data.pagination?.nextCursor || "";
+        renderUsers(allAdminUsers);
+    } finally {
+        if (requestId === adminUsersPaging.requestId) {
+            adminUsersPaging.loading = false;
+            renderUsers(allAdminUsers);
+        }
+    }
+}
+
+function buildAdminUsersEndpoint(cursor = "") {
+    const params = new URLSearchParams({ limit: String(adminUsersPaging.limit) });
+    if (cursor) params.set("cursor", cursor);
+    return `/api/admin/users?${params.toString()}`;
+}
+
+function mergeUsers(current = [], incoming = []) {
+    const seen = new Set(current.map(user => String(user._id)));
+    const merged = current.slice();
+    incoming.forEach(user => {
+        const id = String(user._id || "");
+        if (!id || seen.has(id)) return;
+        seen.add(id);
+        merged.push(user);
+    });
+    return merged;
 }
 
 function renderUsers(users) {
@@ -32,7 +80,7 @@ function renderUsers(users) {
         return;
     }
 
-    box.innerHTML = users.map(user => {
+    const cards = users.map(user => {
         const id = escapeHTML(user._id || "");
 
         return `
@@ -68,9 +116,18 @@ function renderUsers(users) {
         `;
     }).join("");
 
+    const loadMore = adminUsersPaging.hasMore ? `
+        <button class="admin-load-more-btn" id="adminUsersLoadMoreBtn" type="button" ${adminUsersPaging.loading ? "disabled" : ""}>
+            ${adminUsersPaging.loading ? "Loading..." : "Load More"}
+        </button>
+    ` : "";
+
+    box.innerHTML = cards + loadMore;
+
     window.AZIEL_MOTION?.enter(box, "fast");
 
     bindUserActions();
+    document.getElementById("adminUsersLoadMoreBtn")?.addEventListener("click", () => loadAdminUsers({ append: true }));
 }
 
 function bindUserActions() {

@@ -2,6 +2,12 @@ const mongoose = require("mongoose");
 const Notification = require("../models/Notification");
 const User = require("../models/User");
 const realtime = require("./realtime");
+const {
+    applyCursorFilter,
+    encodeCursor,
+    pageResult,
+    parseLimit
+} = require("./paginationService");
 
 const VALID_TYPES = new Set([
     "order",
@@ -269,9 +275,9 @@ async function createUserNotification(input = {}) {
 }
 
 async function getUserNotifications(user, options = {}) {
-    const limit = Math.min(Math.max(Number(options.limit || 20), 1), 50);
+    const limit = parseLimit(options.limit, { defaultLimit: 20, maxLimit: 50 });
     const cursor = cleanText(options.cursor || "");
-    const filter = activeFilter(user);
+    let filter = activeFilter(user);
 
     if (cursor && isObjectId(cursor)) {
         const cursorNotification = await Notification.findOne({
@@ -280,26 +286,25 @@ async function getUserNotifications(user, options = {}) {
         }).select("createdAt");
 
         if (cursorNotification?.createdAt) {
-            filter.createdAt = { $lt: cursorNotification.createdAt };
+            filter = applyCursorFilter(filter, encodeCursor(cursorNotification));
         }
+    } else {
+        filter = applyCursorFilter(filter, cursor);
     }
 
     const raw = await Notification.find(filter)
         .sort({ createdAt: -1, _id: -1 })
-        .limit(limit + 1);
+        .limit(limit + 1)
+        .lean();
 
-    const hasMore = raw.length > limit;
-    const page = hasMore ? raw.slice(0, limit) : raw;
+    const { page, pagination } = pageResult(raw, limit);
     const unreadCount = await getUnreadCount(user);
 
     return {
         notifications: page.map(normalizeNotification),
+        items: page.map(normalizeNotification),
         unreadCount,
-        pagination: {
-            limit,
-            hasMore,
-            nextCursor: hasMore ? String(page[page.length - 1]._id) : ""
-        }
+        pagination
     };
 }
 

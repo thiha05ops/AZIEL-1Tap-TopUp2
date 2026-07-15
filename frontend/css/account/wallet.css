@@ -519,6 +519,24 @@ body {
     line-height: 1.5;
 }
 
+.wallet-load-more {
+    width: 100%;
+    min-height: 44px;
+    margin-top: 16px;
+
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text);
+    font-weight: 900;
+    cursor: pointer;
+}
+
+.wallet-load-more:disabled {
+    cursor: not-allowed;
+    opacity: 0.65;
+}
+
 .wallet-empty {
     min-height: 260px;
 

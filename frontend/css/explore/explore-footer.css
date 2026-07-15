@@ -171,7 +171,8 @@
    LIGHT MODE
 ================================ */
 
-body:not(.dark) .footer-social a {
+body:not(.dark):not(.theme-dark) .footer-social a,
+body.theme-light .footer-social a {
     background: rgba(255, 255, 255, .85);
 
     box-shadow:

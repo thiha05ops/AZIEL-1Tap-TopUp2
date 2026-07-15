@@ -140,6 +140,10 @@ const supportTicketSchema =
 
     );
 
+supportTicketSchema.index({ username: 1, createdAt: -1, _id: -1 });
+supportTicketSchema.index({ status: 1, createdAt: -1, _id: -1 });
+supportTicketSchema.index({ unreadByAdmin: 1, status: 1, createdAt: -1, _id: -1 });
+
 module.exports =
     mongoose.model(
         "SupportTicket",

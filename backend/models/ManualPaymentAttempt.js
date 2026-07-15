@@ -28,6 +28,33 @@ const manualPaymentAttemptSchema = new mongoose.Schema(
             type: Number,
             required: true
         },
+        originalAmount: {
+            type: Number,
+            default: 0
+        },
+        discountAmount: {
+            type: Number,
+            default: 0
+        },
+        finalAmount: {
+            type: Number,
+            default: 0
+        },
+        promoCode: {
+            type: String,
+            trim: true,
+            uppercase: true,
+            default: ""
+        },
+        promoSnapshot: {
+            type: mongoose.Schema.Types.Mixed,
+            default: null
+        },
+        promoRedemptionId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "PromoRedemption",
+            default: null
+        },
         canonicalCurrency: {
             type: String,
             required: true
@@ -77,8 +104,7 @@ const manualPaymentAttemptSchema = new mongoose.Schema(
         },
         expiresAt: {
             type: Date,
-            required: true,
-            index: true
+            required: true
         },
         consumedAt: {
             type: Date,

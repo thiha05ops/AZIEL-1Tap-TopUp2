@@ -31,6 +31,37 @@ const userSchema = new mongoose.Schema(
             default: ""
         },
 
+        photoEvidence: {
+            provider: {
+                type: String,
+                default: ""
+            },
+            key: {
+                type: String,
+                default: ""
+            },
+            url: {
+                type: String,
+                default: ""
+            },
+            mimeType: {
+                type: String,
+                default: ""
+            },
+            size: {
+                type: Number,
+                default: 0
+            },
+            originalName: {
+                type: String,
+                default: ""
+            },
+            uploadedAt: {
+                type: Date,
+                default: null
+            }
+        },
+
         telegram: {
             type: String,
             default: ""
@@ -262,5 +293,8 @@ userSchema.index(
         }
     }
 );
+userSchema.index({ createdAt: -1, _id: -1 });
+userSchema.index({ username: 1, createdAt: -1, _id: -1 });
+userSchema.index({ email: 1, createdAt: -1, _id: -1 });
 
 module.exports = mongoose.model("User", userSchema);

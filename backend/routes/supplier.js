@@ -1,46 +1,179 @@
 const express = require("express");
 const router = express.Router();
-const Order = require("../models/Order");
+
 const adminMiddleware = require("../middleware/adminMiddleware");
-const { ORDER_STATES, transitionOrder } = require("../services/orderStateService");
+const { PERMISSIONS, requireAdminPermission } = require("../services/adminAuthorizationService");
+const {
+    FulfillmentError,
+    createMapping,
+    createSupplier,
+    getAttempt,
+    listAttempts,
+    listEligibleMappingsForOrder,
+    listMappings,
+    listSuppliers,
+    resolveFulfillment,
+    startFulfillmentForOrder,
+    updateMapping,
+    updateSupplier
+} = require("../services/fulfillmentService");
 
-// POST /api/supplier/mock-topup/:id
-router.post("/supplier/mock-topup/:id", adminMiddleware, async (req, res) => {
-    try {
-        const order = await Order.findById(req.params.id);
-
-        if (!order) {
-            return res.json({ success: false, message: "Order not found" });
-        }
-
-        const processing = await transitionOrder(order, ORDER_STATES.PROCESSING, {
-            source: "admin",
-            actorType: "admin",
-            actor: req.admin?.username || req.user?.username || "admin",
-            reason: "Mock supplier top-up started",
-            idempotencyKey: `supplier:mock:processing:${order.orderId}`
+function sendFulfillmentError(res, error) {
+    if (error instanceof FulfillmentError || error?.name === "FinancialIntegrityError") {
+        return res.status(error.statusCode || 400).json({
+            success: false,
+            code: error.code,
+            message: error.message
         });
+    }
 
-        // Step 2: simulate delay
-        setTimeout(async () => {
-            try {
-                await transitionOrder(processing.order, ORDER_STATES.COMPLETED, {
-                    source: "admin",
-                    actorType: "admin",
-                    actor: req.admin?.username || req.user?.username || "admin",
-                    reason: "Mock supplier top-up completed",
-                    idempotencyKey: `supplier:mock:completed:${order.orderId}`
-                });
-                console.log("Auto topup completed:", order.orderId);
-            } catch (error) {
-                console.log("Auto topup completion skipped:", error.message);
-            }
-        }, 3000);
+    console.log("Supplier/Fulfillment error:", error?.code || error?.name || "FULFILLMENT_ERROR");
+    return res.status(500).json({
+        success: false,
+        code: "FULFILLMENT_ERROR",
+        message: "Fulfillment operation failed"
+    });
+}
 
-        res.json({ success: true, message: "TopUp started" });
+router.post("/supplier/mock-topup/:id", adminMiddleware, requireAdminPermission(PERMISSIONS.FULFILLMENT_EXECUTE), (req, res) => {
+    return res.status(410).json({
+        success: false,
+        code: "MOCK_SUPPLIER_DISABLED",
+        message: "Mock supplier execution is disabled. Use Admin Fulfillment instead."
+    });
+});
 
-    } catch (err) {
-        res.json({ success: false, message: "Server error" });
+router.get("/admin/suppliers", adminMiddleware, requireAdminPermission(PERMISSIONS.SUPPLIERS_READ), async (req, res) => {
+    try {
+        const suppliers = await listSuppliers();
+        return res.json({ success: true, suppliers });
+    } catch (error) {
+        return sendFulfillmentError(res, error);
+    }
+});
+
+router.post("/admin/suppliers", adminMiddleware, requireAdminPermission(PERMISSIONS.SUPPLIERS_MANAGE), async (req, res) => {
+    try {
+        const supplier = await createSupplier(req.body, { admin: req.admin, req });
+        return res.status(201).json({ success: true, supplier });
+    } catch (error) {
+        return sendFulfillmentError(res, error);
+    }
+});
+
+router.patch("/admin/suppliers/:supplierId", adminMiddleware, requireAdminPermission(PERMISSIONS.SUPPLIERS_MANAGE), async (req, res) => {
+    try {
+        const supplier = await updateSupplier(req.params.supplierId, req.body, { admin: req.admin, req });
+        return res.json({ success: true, supplier });
+    } catch (error) {
+        return sendFulfillmentError(res, error);
+    }
+});
+
+router.get("/admin/suppliers/:supplierId/mappings", adminMiddleware, requireAdminPermission(PERMISSIONS.SUPPLIERS_READ), async (req, res) => {
+    try {
+        const mappings = await listMappings({ supplierId: req.params.supplierId });
+        return res.json({ success: true, mappings });
+    } catch (error) {
+        return sendFulfillmentError(res, error);
+    }
+});
+
+router.post("/admin/suppliers/:supplierId/mappings", adminMiddleware, requireAdminPermission(PERMISSIONS.SUPPLIER_MAPPINGS_MANAGE), async (req, res) => {
+    try {
+        const mapping = await createMapping(req.params.supplierId, req.body, { admin: req.admin, req });
+        return res.status(201).json({ success: true, mapping });
+    } catch (error) {
+        return sendFulfillmentError(res, error);
+    }
+});
+
+router.patch("/admin/suppliers/:supplierId/mappings/:mappingId", adminMiddleware, requireAdminPermission(PERMISSIONS.SUPPLIER_MAPPINGS_MANAGE), async (req, res) => {
+    try {
+        const mapping = await updateMapping(req.params.supplierId, req.params.mappingId, req.body, { admin: req.admin, req });
+        return res.json({ success: true, mapping });
+    } catch (error) {
+        return sendFulfillmentError(res, error);
+    }
+});
+
+router.get("/admin/supplier-mappings", adminMiddleware, requireAdminPermission(PERMISSIONS.SUPPLIERS_READ), async (req, res) => {
+    try {
+        const mappings = await listMappings(req.query);
+        return res.json({ success: true, mappings });
+    } catch (error) {
+        return sendFulfillmentError(res, error);
+    }
+});
+
+router.get("/admin/orders/:orderId/fulfillment-mappings", adminMiddleware, requireAdminPermission(PERMISSIONS.FULFILLMENT_READ), async (req, res) => {
+    try {
+        const mappings = await listEligibleMappingsForOrder(req.params.orderId);
+        return res.json({ success: true, mappings });
+    } catch (error) {
+        return sendFulfillmentError(res, error);
+    }
+});
+
+router.post("/admin/orders/:orderId/fulfillments", adminMiddleware, requireAdminPermission(PERMISSIONS.FULFILLMENT_EXECUTE), async (req, res) => {
+    try {
+        const attempt = await startFulfillmentForOrder(req.params.orderId, req.body, { admin: req.admin, req });
+        return res.status(201).json({ success: true, attempt });
+    } catch (error) {
+        return sendFulfillmentError(res, error);
+    }
+});
+
+router.get("/admin/fulfillments", adminMiddleware, requireAdminPermission(PERMISSIONS.FULFILLMENT_READ), async (req, res) => {
+    try {
+        const result = await listAttempts(req.query);
+        return res.json({ success: true, ...result });
+    } catch (error) {
+        return sendFulfillmentError(res, error);
+    }
+});
+
+router.get("/admin/fulfillments/:fulfillmentId", adminMiddleware, requireAdminPermission(PERMISSIONS.FULFILLMENT_READ), async (req, res) => {
+    try {
+        const attempt = await getAttempt(req.params.fulfillmentId);
+        return res.json({ success: true, attempt });
+    } catch (error) {
+        return sendFulfillmentError(res, error);
+    }
+});
+
+router.post("/admin/fulfillments/:fulfillmentId/start", adminMiddleware, requireAdminPermission(PERMISSIONS.FULFILLMENT_EXECUTE), async (req, res) => {
+    return res.status(409).json({
+        success: false,
+        code: "FULFILLMENT_START_REQUIRES_ORDER",
+        message: "Start fulfillment from a paid Order with a supplier mapping."
+    });
+});
+
+router.post("/admin/fulfillments/:fulfillmentId/succeed", adminMiddleware, requireAdminPermission(PERMISSIONS.FULFILLMENT_RESOLVE), async (req, res) => {
+    try {
+        const attempt = await resolveFulfillment(req.params.fulfillmentId, "succeed", req.body, { admin: req.admin, req });
+        return res.json({ success: true, attempt });
+    } catch (error) {
+        return sendFulfillmentError(res, error);
+    }
+});
+
+router.post("/admin/fulfillments/:fulfillmentId/fail", adminMiddleware, requireAdminPermission(PERMISSIONS.FULFILLMENT_RESOLVE), async (req, res) => {
+    try {
+        const attempt = await resolveFulfillment(req.params.fulfillmentId, "fail", req.body, { admin: req.admin, req });
+        return res.json({ success: true, attempt });
+    } catch (error) {
+        return sendFulfillmentError(res, error);
+    }
+});
+
+router.post("/admin/fulfillments/:fulfillmentId/cancel", adminMiddleware, requireAdminPermission(PERMISSIONS.FULFILLMENT_RESOLVE), async (req, res) => {
+    try {
+        const attempt = await resolveFulfillment(req.params.fulfillmentId, "cancel", req.body, { admin: req.admin, req });
+        return res.json({ success: true, attempt });
+    } catch (error) {
+        return sendFulfillmentError(res, error);
     }
 });
 

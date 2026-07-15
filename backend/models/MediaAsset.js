@@ -19,6 +19,7 @@ const mediaAssetSchema = new mongoose.Schema(
             enum: [
                 "product_image",
                 "product_banner",
+                "home_banner",
                 "package_icon",
                 "campaign",
                 "promotion",

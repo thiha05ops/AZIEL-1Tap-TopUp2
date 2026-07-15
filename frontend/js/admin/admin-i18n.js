@@ -52,6 +52,8 @@
 
         const selector = document.getElementById("adminLocaleSelect");
         if (selector) selector.value = next;
+        const mobileSelector = document.getElementById("adminMobileLocaleSelect");
+        if (mobileSelector) mobileSelector.value = next;
 
         translate(document);
         window.dispatchEvent(new CustomEvent("aziel:admin-locale-changed", {
@@ -68,6 +70,12 @@
         if (selector) {
             selector.value = locale;
             selector.addEventListener("change", () => setLocale(selector.value));
+        }
+
+        const mobileSelector = document.getElementById("adminMobileLocaleSelect");
+        if (mobileSelector) {
+            mobileSelector.value = locale;
+            mobileSelector.addEventListener("change", () => setLocale(mobileSelector.value));
         }
 
         translate(document);

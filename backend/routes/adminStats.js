@@ -10,6 +10,7 @@ const SupportTicket = require("../models/SupportTicket");
 const LiveChat = require("../models/LiveChat");
 
 const adminMiddleware = require("../middleware/adminMiddleware");
+const { PERMISSIONS, requireAdminPermission } = require("../services/adminAuthorizationService");
 
 const DASHBOARD_TIMEZONE = "Asia/Bangkok";
 
@@ -72,7 +73,7 @@ function actionTarget(section, params = {}) {
 // GET /api/admin/stats
 // ============================
 
-router.get("/admin/stats", adminMiddleware, async (req, res) => {
+router.get("/admin/stats", adminMiddleware, requireAdminPermission(PERMISSIONS.DASHBOARD_READ), async (req, res) => {
     try {
         const { start, end } = getBangkokTodayBounds();
         const todayRange = { $gte: start, $lt: end };

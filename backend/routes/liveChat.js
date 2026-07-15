@@ -3,10 +3,70 @@ const router = express.Router();
 const LiveChat = require("../models/LiveChat");
 const authMiddleware = require("../middleware/authMiddleware");
 const adminMiddleware = require("../middleware/adminMiddleware");
+const { PERMISSIONS, requireAdminPermission } = require("../services/adminAuthorizationService");
 const realtime = require("../services/realtime");
+const {
+    PaginationError,
+    parseLimit,
+    sendPaginationError
+} = require("../services/paginationService");
 
 function makeChatId() {
     return "CHAT-" + Date.now() + "-" + Math.floor(Math.random() * 9999);
+}
+
+function encodeLiveChatCursor(chat = {}) {
+    const lastMessageAt = chat.lastMessageAt ? new Date(chat.lastMessageAt) : null;
+    if (!lastMessageAt || Number.isNaN(lastMessageAt.getTime()) || !chat._id) return "";
+    return Buffer.from(JSON.stringify({
+        lastMessageAt: lastMessageAt.toISOString(),
+        id: String(chat._id)
+    })).toString("base64url");
+}
+
+function decodeLiveChatCursor(cursor = "") {
+    const value = String(cursor || "").trim();
+    if (!value) return null;
+    try {
+        const parsed = JSON.parse(Buffer.from(value, "base64url").toString("utf8"));
+        const lastMessageAt = new Date(parsed.lastMessageAt);
+        if (Number.isNaN(lastMessageAt.getTime()) || !parsed.id) {
+            throw new Error("Invalid cursor");
+        }
+        return {
+            lastMessageAt,
+            id: parsed.id
+        };
+    } catch (error) {
+        throw new PaginationError("INVALID_CURSOR", "Invalid pagination cursor.");
+    }
+}
+
+function projectChatMessages(chat, options = {}) {
+    const limit = parseLimit(options.limit, { defaultLimit: 50, maxLimit: 100 });
+    const messages = Array.isArray(chat?.messages) ? chat.messages : [];
+    const before = String(options.before || "").trim();
+    let end = messages.length;
+
+    if (before) {
+        const index = messages.findIndex(message => String(message._id) === before);
+        if (index < 0) {
+            throw new PaginationError("INVALID_CURSOR", "Invalid pagination cursor.");
+        }
+        end = index;
+    }
+
+    const start = Math.max(0, end - limit);
+    const page = messages.slice(start, end);
+
+    return {
+        messages: page,
+        pagination: {
+            limit,
+            hasMore: start > 0,
+            nextCursor: start > 0 ? String(page[0]?._id || "") : ""
+        }
+    };
 }
 
 // USER SEND MESSAGE
@@ -128,21 +188,84 @@ router.put("/user/:username/read", authMiddleware, async (req, res) => {
 });
 
 // ADMIN GET ALL ACTIVE CHATS
-router.get("/admin", adminMiddleware, async (req, res) => {
+router.get("/admin", adminMiddleware, requireAdminPermission(PERMISSIONS.LIVE_CHAT_READ), async (req, res) => {
     try {
-        const chats = await LiveChat.find({ status: "active" }).sort({
-            lastMessageAt: -1
-        });
+        const limit = parseLimit(req.query.limit, { defaultLimit: 50, maxLimit: 100 });
+        const query = { status: "active" };
+        const cursor = decodeLiveChatCursor(req.query.cursor);
+        if (cursor) {
+            query.$or = [
+                { lastMessageAt: { $lt: cursor.lastMessageAt } },
+                { lastMessageAt: cursor.lastMessageAt, _id: { $lt: cursor.id } }
+            ];
+        }
+        const raw = await LiveChat.find(query)
+            .sort({ lastMessageAt: -1, _id: -1 })
+            .limit(limit + 1)
+            .lean();
+        const hasMore = raw.length > limit;
+        const page = (hasMore ? raw.slice(0, limit) : raw).map(chat => ({
+            ...chat,
+            messagesTotal: Array.isArray(chat.messages) ? chat.messages.length : 0,
+            messages: Array.isArray(chat.messages) ? chat.messages.slice(-50) : []
+        }));
 
-        res.json({ success: true, chats });
+        res.json({
+            success: true,
+            items: page,
+            chats: page,
+            pagination: {
+                limit,
+                hasMore,
+                nextCursor: hasMore ? encodeLiveChatCursor(page[page.length - 1]) : ""
+            }
+        });
     } catch (error) {
         console.error("Admin live chat fetch error:", error);
+        const paginationResponse = sendPaginationError(res, error);
+        if (paginationResponse) return paginationResponse;
+
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+});
+
+// ADMIN GET BOUNDED CHAT MESSAGES
+router.get("/admin/:chatId/messages", adminMiddleware, requireAdminPermission(PERMISSIONS.LIVE_CHAT_READ), async (req, res) => {
+    try {
+        const chat = await LiveChat.findOne({
+            chatId: req.params.chatId,
+            status: "active"
+        }).select("chatId username messages");
+
+        if (!chat) {
+            return res.status(404).json({
+                success: false,
+                message: "Chat not found"
+            });
+        }
+
+        const result = projectChatMessages(chat, {
+            before: req.query.before,
+            limit: req.query.limit
+        });
+
+        res.json({
+            success: true,
+            chatId: chat.chatId,
+            username: chat.username,
+            ...result
+        });
+    } catch (error) {
+        const paginationResponse = sendPaginationError(res, error);
+        if (paginationResponse) return paginationResponse;
+
+        console.error("Admin live chat messages fetch error:", error);
         res.status(500).json({ success: false, message: "Server error" });
     }
 });
 
 // ADMIN REPLY
-router.post("/admin/reply/:chatId", adminMiddleware, async (req, res) => {
+router.post("/admin/reply/:chatId", adminMiddleware, requireAdminPermission(PERMISSIONS.LIVE_CHAT_MANAGE), async (req, res) => {
     try {
         const message = (req.body.message || "").trim();
 
@@ -190,7 +313,7 @@ router.post("/admin/reply/:chatId", adminMiddleware, async (req, res) => {
 });
 
 // ADMIN MARK USER MESSAGES AS READ
-router.put("/admin/read/:chatId", adminMiddleware, async (req, res) => {
+router.put("/admin/read/:chatId", adminMiddleware, requireAdminPermission(PERMISSIONS.LIVE_CHAT_MANAGE), async (req, res) => {
     try {
         const chat = await LiveChat.findOne({
             chatId: req.params.chatId,
@@ -216,7 +339,7 @@ router.put("/admin/read/:chatId", adminMiddleware, async (req, res) => {
 });
 
 // ADMIN DELETE
-router.delete("/admin/delete/:chatId", adminMiddleware, async (req, res) => {
+router.delete("/admin/delete/:chatId", adminMiddleware, requireAdminPermission(PERMISSIONS.LIVE_CHAT_MANAGE), async (req, res) => {
     try {
         const chat = await LiveChat.findOneAndUpdate(
             { chatId: req.params.chatId },
@@ -239,7 +362,7 @@ router.delete("/admin/delete/:chatId", adminMiddleware, async (req, res) => {
 });
 
 // AUTO CLEAN 1 HOUR
-router.delete("/auto-clean", adminMiddleware, async (req, res) => {
+router.delete("/auto-clean", adminMiddleware, requireAdminPermission(PERMISSIONS.LIVE_CHAT_MANAGE), async (req, res) => {
     try {
         const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
 

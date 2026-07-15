@@ -112,6 +112,9 @@ notificationSchema.index({ userId: 1, createdAt: -1 });
 notificationSchema.index({ userId: 1, isRead: 1, createdAt: -1 });
 notificationSchema.index({ username: 1, createdAt: -1 });
 notificationSchema.index({ username: 1, isRead: 1, createdAt: -1 });
+notificationSchema.index({ userId: 1, createdAt: -1, _id: -1 });
+notificationSchema.index({ userId: 1, isRead: 1, createdAt: -1, _id: -1 });
+notificationSchema.index({ username: 1, createdAt: -1, _id: -1 });
 
 module.exports =
     mongoose.model(

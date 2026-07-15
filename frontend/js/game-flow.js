@@ -56,6 +56,7 @@
         bindFlowEvents(flow);
         bindBuyButton(flow);
         initMobilePackagePanel(flow);
+        initPromoControls(flow);
         claimSummaryElements(flow);
         restorePendingBuy(flow);
         updateSummary(flow);
@@ -93,10 +94,14 @@
             "prices:rendered",
             "paymentChanged"
         ].forEach(eventName => {
-            document.addEventListener(eventName, () => updateSummary(flow));
+            document.addEventListener(eventName, () => {
+                if (eventName !== "paymentChanged") invalidatePromoIfSelectionChanged(flow);
+                updateSummary(flow);
+            });
         });
 
         window.addEventListener("aziel:shopRegionChanged", () => {
+            clearPromoQuote(flow, false);
             updateSummary(flow);
         });
     }
@@ -206,6 +211,8 @@
         const userId = getFieldValue(flow.config.userIdSelector);
         const zoneId = getFieldValue(flow.config.zoneIdSelector);
         const amount = Number(pkg?.price || 0);
+        const promo = getActivePromoQuote(flow, pkg);
+        const payableAmount = promo?.finalAmount ?? amount;
 
         if (!pkg) {
             return {
@@ -251,7 +258,9 @@
 
         return {
             ready: true,
-            reason: "Ready to continue payment."
+            reason: payableAmount < amount
+                ? "Promo applied. Ready to continue payment."
+                : "Ready to continue payment."
         };
     }
 
@@ -260,6 +269,8 @@
         const payment = getSelectedPayment();
         const readiness = getReadiness(flow);
         const symbol = getSymbol();
+        const promo = getActivePromoQuote(flow, pkg);
+        const displayAmount = promo?.finalAmount ?? Number(pkg?.price || 0);
         const wasReady = Boolean(flow.lastReadinessReady);
 
         setMotionText(
@@ -270,9 +281,11 @@
         setMotionText(
             flow.config.amountSummarySelector,
             pkg
-                ? `${Number(pkg.price || 0).toLocaleString()} ${symbol}`
+                ? `${Number(displayAmount || 0).toLocaleString()} ${symbol}`
                 : `0 ${symbol}`
         );
+
+        renderPromoState(flow, promo);
 
         setMotionText(
             flow.config.paymentSummarySelector,
@@ -331,6 +344,7 @@
             amount: Number(pkg.price || 0),
             currency: pkg.currency || currency,
             region: pkg.region || region,
+            promoCode: getActivePromoQuote(flow, pkg)?.promoCode || "",
             paymentMethod: payment.key,
             username,
             userId: getFieldValue(flow.config.userIdSelector),
@@ -404,6 +418,11 @@
                 return;
             }
 
+            if (orderData.promoCode) {
+                const promoFresh = await refreshPromoBeforeSubmit(flow, orderData);
+                if (!promoFresh) return;
+            }
+
             if (
                 flow.config.directWallet &&
                 orderData.paymentMethod === "wallet"
@@ -460,6 +479,229 @@
             setText(flow.config.noteSelector, "Server error");
             window.PaymentUtils?.showToast?.("Server error");
         }
+    }
+
+    function initPromoControls(flow) {
+        const summaryAmount = getEl(flow.config.amountSummarySelector);
+        const summaryContainer =
+            summaryAmount?.closest(".summary-row, .summary-item, li, p, div")?.parentElement ||
+            summaryAmount?.parentElement;
+        if (!summaryContainer || document.getElementById("azielPromoBox")) return;
+
+        flow.promo = {
+            code: "",
+            quote: null,
+            loading: false
+        };
+
+        const box = document.createElement("div");
+        box.id = "azielPromoBox";
+        box.className = "aziel-promo-box";
+        box.innerHTML = `
+            <label class="aziel-promo-label" for="promoCodeInput">Promo Code</label>
+            <div class="aziel-promo-row">
+                <input id="promoCodeInput" type="text" autocomplete="off" maxlength="32" placeholder="Enter promo code">
+                <button id="promoApplyBtn" type="button">Apply</button>
+                <button id="promoRemoveBtn" type="button" hidden>Remove</button>
+            </div>
+            <p id="promoFeedback" class="aziel-promo-feedback" aria-live="polite"></p>
+        `;
+
+        summaryContainer.appendChild(box);
+
+        box.querySelector("#promoApplyBtn")?.addEventListener("click", () => applyPromoCode(flow));
+        box.querySelector("#promoRemoveBtn")?.addEventListener("click", () => {
+            clearPromoQuote(flow, true);
+            updateSummary(flow);
+        });
+        box.querySelector("#promoCodeInput")?.addEventListener("input", () => {
+            if (flow.promo?.quote) clearPromoQuote(flow, false);
+            updateSummary(flow);
+        });
+    }
+
+    async function applyPromoCode(flow) {
+        const input = document.getElementById("promoCodeInput");
+        const code = String(input?.value || "").trim().toUpperCase();
+        const pkg = getSelectedPackage();
+
+        if (!pkg) {
+            setPromoFeedback("Select a package before applying a promo code.", "error");
+            return;
+        }
+
+        if (!code) {
+            setPromoFeedback("Enter a promo code.", "error");
+            return;
+        }
+
+        flow.promo = {
+            ...(flow.promo || {}),
+            loading: true
+        };
+        renderPromoState(flow, null);
+
+        try {
+            const res = await fetch("/api/promos/quote", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...getAuthHeader()
+                },
+                body: JSON.stringify({
+                    promoCode: code,
+                    productCode: flow.config.productCode || flow.config.gameKey || pkg.productCode,
+                    gameKey: flow.config.gameKey,
+                    game: flow.config.game,
+                    packageCode: pkg.packageCode || pkg.code || "",
+                    packageName: pkg.name,
+                    region: pkg.region || getRegion()
+                })
+            });
+            const data = await res.json();
+
+            if (!res.ok || !data.success) {
+                clearPromoQuote(flow, false);
+                setPromoFeedback(data.message || "Promo code could not be applied.", "error");
+                window.AZIEL_UI?.toast?.error(data.message || "Promo code could not be applied.");
+                return;
+            }
+
+            flow.promo = {
+                code,
+                loading: false,
+                quote: {
+                    ...data.quote,
+                    productCode: data.quote.productCode || flow.config.productCode || flow.config.gameKey,
+                    packageCode: data.quote.packageCode || pkg.packageCode || pkg.code || "",
+                    region: data.quote.region || pkg.region || getRegion(),
+                    promoCode: data.quote.promoCode || code
+                }
+            };
+            setPromoFeedback("Promo applied.", "success");
+            window.AZIEL_UI?.toast?.success("Promo applied.");
+        } catch (error) {
+            console.log("Promo quote error:", error);
+            clearPromoQuote(flow, false);
+            setPromoFeedback("Promo service is unavailable. Please try again.", "error");
+        } finally {
+            if (flow.promo) flow.promo.loading = false;
+            updateSummary(flow);
+        }
+    }
+
+    async function refreshPromoBeforeSubmit(flow, orderData) {
+        const previous = getActivePromoQuote(flow);
+        if (!previous) return true;
+
+        try {
+            const res = await fetch("/api/promos/quote", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...getAuthHeader()
+                },
+                body: JSON.stringify({
+                    promoCode: orderData.promoCode,
+                    productCode: orderData.productCode,
+                    gameKey: orderData.gameKey,
+                    game: orderData.game,
+                    packageCode: orderData.packageCode,
+                    packageName: orderData.packageName,
+                    region: orderData.region
+                })
+            });
+            const data = await res.json();
+
+            if (!res.ok || !data.success) {
+                clearPromoQuote(flow, false);
+                const message = data.message || "Promo code changed. Please review your total and continue again.";
+                setText(flow.config.noteSelector, message);
+                window.AZIEL_UI?.toast?.warning?.(message) || window.PaymentUtils?.showToast?.(message);
+                updateSummary(flow);
+                return false;
+            }
+
+            const quote = {
+                ...data.quote,
+                promoCode: data.quote.promoCode || orderData.promoCode
+            };
+
+            if (
+                Number(quote.finalAmount) !== Number(previous.finalAmount) ||
+                Number(quote.discountAmount) !== Number(previous.discountAmount)
+            ) {
+                flow.promo.quote = quote;
+                const message = "Promo total updated. Please review the new total and continue again.";
+                setText(flow.config.noteSelector, message);
+                window.AZIEL_UI?.toast?.warning?.(message) || window.PaymentUtils?.showToast?.(message);
+                updateSummary(flow);
+                return false;
+            }
+
+            flow.promo.quote = quote;
+            return true;
+        } catch (error) {
+            console.log("Promo refresh error:", error);
+            setText(flow.config.noteSelector, "Promo service is temporarily unavailable. Please try again.");
+            return false;
+        }
+    }
+
+    function getActivePromoQuote(flow, pkg = getSelectedPackage()) {
+        const quote = flow.promo?.quote;
+        if (!quote || !pkg) return null;
+
+        const packageCode = pkg.packageCode || pkg.code || "";
+        const region = pkg.region || getRegion();
+        if (quote.packageCode !== packageCode || quote.region !== region) return null;
+
+        return quote;
+    }
+
+    function invalidatePromoIfSelectionChanged(flow) {
+        if (!flow.promo?.quote) return;
+        if (!getActivePromoQuote(flow)) clearPromoQuote(flow, false);
+    }
+
+    function clearPromoQuote(flow, clearInput) {
+        if (!flow.promo) return;
+        flow.promo.quote = null;
+        flow.promo.code = "";
+        flow.promo.loading = false;
+        if (clearInput) {
+            const input = document.getElementById("promoCodeInput");
+            if (input) input.value = "";
+            setPromoFeedback("", "");
+        }
+    }
+
+    function renderPromoState(flow, promo) {
+        const applyBtn = document.getElementById("promoApplyBtn");
+        const removeBtn = document.getElementById("promoRemoveBtn");
+        const input = document.getElementById("promoCodeInput");
+        if (!applyBtn || !removeBtn || !input) return;
+
+        const loading = Boolean(flow.promo?.loading);
+        applyBtn.disabled = loading;
+        applyBtn.textContent = loading ? "Applying..." : "Apply";
+        removeBtn.hidden = !promo;
+        input.disabled = loading;
+
+        if (promo) {
+            const symbol = promo.currency === "THB" ? "฿" : "Ks";
+            setPromoFeedback(
+                `Discount ${Number(promo.discountAmount || 0).toLocaleString()} ${symbol}. Final ${Number(promo.finalAmount || 0).toLocaleString()} ${symbol}.`,
+                "success"
+            );
+        }
+    }
+
+    function setPromoFeedback(message, tone = "") {
+        const feedback = document.getElementById("promoFeedback");
+        if (!feedback) return;
+        feedback.textContent = message || "";
+        feedback.dataset.tone = tone || "";
     }
 
     function storePendingBuy(flow) {

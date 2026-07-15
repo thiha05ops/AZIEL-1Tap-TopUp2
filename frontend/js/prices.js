@@ -48,8 +48,33 @@ function getCurrentGameKey() {
   return document.getElementById("packages")?.dataset.game || "";
 }
 
-function getPreviewPlaceholderIcon() {
+function getProductMobilePackagePreview() {
+  const product = window.AZIEL_CATALOG?.getProduct?.(getCurrentGameKey());
+  if (!product) return "";
+
+  const configuredPreview =
+    product.mobilePackagePreviewUrl ||
+    product.mobilePackagePreview?.url ||
+    product.mobilePackagePreview?.asset?.secureUrl ||
+    product.mobilePackagePreview?.asset?.url ||
+    "";
+
+  if (!configuredPreview) return "";
+
+  return window.AZIEL_CATALOG_PRESENTATION?.resolveMobilePackagePreview?.(product) || configuredPreview;
+}
+
+function getStaticPreviewFallbackIcon(icon = null) {
+  if (icon?.dataset?.staticFallbackSrc) return icon.dataset.staticFallbackSrc;
+
+  const currentSrc = icon?.getAttribute?.("src") || "";
+  if (currentSrc) return currentSrc;
+
   return window.AZIEL_CATALOG_PRESENTATION?.getProductImage?.(getCurrentGameKey()) || "";
+}
+
+function getPreviewPlaceholderIcon(icon = null) {
+  return getProductMobilePackagePreview() || getStaticPreviewFallbackIcon(icon);
 }
 
 function rememberDefaultPackageIcon(icon, preview) {
@@ -58,12 +83,16 @@ function rememberDefaultPackageIcon(icon, preview) {
   const currentSrc = icon.getAttribute("src") || "";
   const isShowingPackage = preview?.classList.contains("has-package");
 
-  if (!icon.dataset.defaultSrc && currentSrc && !isShowingPackage) {
-    icon.dataset.defaultSrc = currentSrc;
+  if (!icon.dataset.staticFallbackSrc && currentSrc && !isShowingPackage) {
+    icon.dataset.staticFallbackSrc = currentSrc;
   }
 
-  if (!icon.dataset.defaultSrc) {
-    icon.dataset.defaultSrc = getPreviewPlaceholderIcon();
+  const managedPreview = getProductMobilePackagePreview();
+
+  if (managedPreview) {
+    icon.dataset.defaultSrc = managedPreview;
+  } else if (!icon.dataset.defaultSrc) {
+    icon.dataset.defaultSrc = getStaticPreviewFallbackIcon(icon);
   }
 
   return icon.dataset.defaultSrc || "";
@@ -72,7 +101,7 @@ function rememberDefaultPackageIcon(icon, preview) {
 function setPackagePreviewIcon(icon, src, fallbackSrc = "") {
   if (!icon) return;
 
-  const fallback = fallbackSrc || icon.dataset.defaultSrc || getPreviewPlaceholderIcon();
+  const fallback = fallbackSrc || icon.dataset.defaultSrc || getPreviewPlaceholderIcon(icon);
   if (fallback) icon.dataset.fallbackSrc = fallback;
 
   icon.onerror = function handlePackagePreviewIconError() {
@@ -352,9 +381,10 @@ function resetSelectedPackagePreview() {
     document.querySelector("[data-selected-package-subtitle]");
 
   const defaultIcon = rememberDefaultPackageIcon(icon, preview);
+  const staticFallbackIcon = getStaticPreviewFallbackIcon(icon);
 
   if (preview) preview.classList.remove("selected", "has-package");
-  if (icon) setPackagePreviewIcon(icon, defaultIcon, defaultIcon);
+  if (icon) setPackagePreviewIcon(icon, defaultIcon, staticFallbackIcon || defaultIcon);
   if (title) title.textContent = "Select Top-Up Amount";
   if (subtitle) subtitle.textContent = "Choose your package";
 }

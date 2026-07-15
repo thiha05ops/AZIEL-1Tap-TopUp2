@@ -4,6 +4,12 @@
 let walletPollingTimer = null;
 let walletCountdownTimer = null;
 let walletSocketReady = false;
+let walletHistoryItems = [];
+let walletHistoryPagination = {
+    nextCursor: "",
+    hasMore: false,
+    loadingMore: false
+};
 
 const AUTO_QR_METHODS = ["promptpay"];
 const APP_OPEN_METHODS = [
@@ -182,7 +188,7 @@ async function loadWallet() {
 
     try {
         const res = await fetch(
-            walletApiUrl(`/api/wallet/${encodeURIComponent(user.username)}?currency=${currency}`),
+            walletApiUrl(`/api/wallet/${encodeURIComponent(user.username)}?currency=${currency}&limit=30`),
             {
                 headers: AZIEL.authHeaders?.() || {}
             }
@@ -211,17 +217,69 @@ async function loadWallet() {
             window.dispatchEvent(new Event("aziel:walletChanged"));
         }
 
-        const history = [
+        walletHistoryItems = [
             ...(data.transactions || []),
             ...(data.topups || [])
         ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        walletHistoryPagination = {
+            nextCursor: data.pagination?.nextCursor || data.nextCursor || "",
+            hasMore: Boolean(data.pagination?.hasMore || data.nextCursor),
+            loadingMore: false
+        };
 
-        renderWalletHistory(history);
+        renderWalletHistory(walletHistoryItems);
 
     } catch (error) {
         console.log("Wallet load error:", error);
         renderWalletFromState();
     }
+}
+
+async function loadMoreWalletHistory() {
+    const user = getWalletUser();
+    const currency = getWalletCurrency();
+    if (!user?.username || walletHistoryPagination.loadingMore || !walletHistoryPagination.hasMore) return;
+
+    walletHistoryPagination.loadingMore = true;
+    renderWalletHistory(walletHistoryItems);
+
+    try {
+        const params = new URLSearchParams({
+            currency,
+            limit: "30",
+            cursor: walletHistoryPagination.nextCursor
+        });
+        const res = await fetch(walletApiUrl(`/api/wallet/${encodeURIComponent(user.username)}?${params.toString()}`), {
+            headers: AZIEL.authHeaders?.() || {}
+        });
+        const data = await res.json();
+        if (!data?.success) return;
+
+        const incoming = [
+            ...(data.transactions || []),
+            ...(data.topups || [])
+        ];
+        walletHistoryItems = mergeWalletHistory(walletHistoryItems, incoming)
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        walletHistoryPagination.nextCursor = data.pagination?.nextCursor || data.nextCursor || "";
+        walletHistoryPagination.hasMore = Boolean(data.pagination?.hasMore || data.nextCursor);
+    } finally {
+        walletHistoryPagination.loadingMore = false;
+        renderWalletHistory(walletHistoryItems);
+    }
+}
+
+function mergeWalletHistory(current = [], incoming = []) {
+    const keyFor = item => String(item.transactionId || item.topupId || item._id || item.id || `${item.type}:${item.createdAt}:${item.amount}`);
+    const seen = new Set(current.map(keyFor));
+    const merged = current.slice();
+    incoming.forEach(item => {
+        const key = keyFor(item);
+        if (seen.has(key)) return;
+        seen.add(key);
+        merged.push(item);
+    });
+    return merged;
 }
 
 function renderWalletFromState() {
@@ -265,7 +323,7 @@ function renderWalletHistory(history) {
         return;
     }
 
-    box.innerHTML = history.map(item => {
+    const rows = history.map(item => {
         const direction = getWalletDirection(item);
         const isPayment = direction === "debit";
 
@@ -309,6 +367,15 @@ function renderWalletHistory(history) {
             </div>
         `;
     }).join("");
+
+    const loadMore = walletHistoryPagination.hasMore ? `
+        <button class="wallet-load-more" id="walletHistoryLoadMoreBtn" type="button" ${walletHistoryPagination.loadingMore ? "disabled" : ""}>
+            ${escapeWalletHTML(walletHistoryPagination.loadingMore ? wt("loading", "Loading") : wt("loadMore", "Load More"))}
+        </button>
+    ` : "";
+
+    box.innerHTML = rows + loadMore;
+    document.getElementById("walletHistoryLoadMoreBtn")?.addEventListener("click", loadMoreWalletHistory);
 
     window.AZIEL_MOTION?.enter(box, "fast");
 

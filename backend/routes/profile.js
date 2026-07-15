@@ -1,51 +1,18 @@
 // backend/routes/profile.js
 
 const express = require("express");
-const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
 
 const User = require("../models/User");
 const authMiddleware = require("../middleware/authMiddleware");
+const upload = require("../middleware/imageMemoryUpload");
+const {
+    StorageError,
+    cleanupAfterFailedPersistence,
+    logStorageError,
+    uploadFile
+} = require("../services/storageService");
 
 const router = express.Router();
-
-const uploadDir = path.join(__dirname, "../uploads/profile");
-
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-function safeFileName(name) {
-    return String(name || "profile")
-        .replace(/[^a-zA-Z0-9._-]/g, "_");
-}
-
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, uploadDir);
-    },
-
-    filename: function (req, file, cb) {
-        cb(null, `${Date.now()}-${safeFileName(file.originalname)}`);
-    }
-});
-
-const upload = multer({
-    storage,
-    limits: {
-        fileSize: 5 * 1024 * 1024
-    },
-    fileFilter: function (req, file, cb) {
-        const allowed = ["image/jpeg", "image/png", "image/webp"];
-
-        if (!allowed.includes(file.mimetype)) {
-            return cb(new Error("Only JPG, PNG and WEBP images are allowed"));
-        }
-
-        cb(null, true);
-    }
-});
 
 // GET /api/profile/me
 router.get("/profile/me", authMiddleware, async (req, res) => {
@@ -79,6 +46,9 @@ router.put(
     authMiddleware,
     upload.single("photo"),
     async (req, res) => {
+        let photoEvidence = null;
+        let profilePersisted = false;
+
         try {
             const {
                 displayName,
@@ -111,10 +81,17 @@ router.put(
             user.mlbbServerId = mlbbServerId || "";
 
             if (req.file) {
-                user.photo = `/uploads/profile/${req.file.filename}`;
+                photoEvidence = await uploadFile({
+                    file: req.file,
+                    category: "profilePhoto",
+                    ownerReference: req.user.id
+                });
+                user.photo = photoEvidence.url;
+                user.photoEvidence = photoEvidence;
             }
 
             await user.save();
+            profilePersisted = true;
 
             const updatedUser = await User.findById(req.user.id)
                 .select("-password");
@@ -126,6 +103,23 @@ router.put(
             });
         } catch (error) {
             console.log("Update profile error:", error);
+
+            if (photoEvidence && !profilePersisted) {
+                await cleanupAfterFailedPersistence(photoEvidence);
+            }
+
+            if (error instanceof StorageError) {
+                logStorageError(error.code, {
+                    provider: error.provider,
+                    category: "profilePhoto"
+                });
+
+                return res.status(error.statusCode).json({
+                    success: false,
+                    code: error.code,
+                    message: error.message
+                });
+            }
 
             res.json({
                 success: false,

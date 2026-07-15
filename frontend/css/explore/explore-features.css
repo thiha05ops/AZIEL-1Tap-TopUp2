@@ -136,7 +136,8 @@
    LIGHT MODE EXTRA
 ================================ */
 
-body:not(.dark) .feature-card {
+body:not(.dark):not(.theme-dark) .feature-card,
+body.theme-light .feature-card {
 
     background: rgba(255, 255, 255, .85);
 
@@ -144,7 +145,8 @@ body:not(.dark) .feature-card {
         0 12px 40px rgba(15, 23, 42, .08);
 }
 
-body:not(.dark) .feature-card:hover {
+body:not(.dark):not(.theme-dark) .feature-card:hover,
+body.theme-light .feature-card:hover {
 
     box-shadow:
         0 20px 50px rgba(139, 92, 246, .15);

@@ -113,6 +113,7 @@ function ensureMediaUploadModal() {
                     <select name="category" required>
                         <option value="product_image">${adminT("product_image", "Product Image")}</option>
                         <option value="product_banner">${adminT("product_banner", "Product Banner")}</option>
+                        <option value="home_banner">${adminT("home_banner", "Home Banner")}</option>
                         <option value="package_icon">${adminT("package_icon", "Package Icon")}</option>
                         <option value="campaign">${adminT("campaign", "Campaign")}</option>
                         <option value="promotion">${adminT("promotion", "Promotion")}</option>

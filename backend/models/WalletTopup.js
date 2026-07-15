@@ -91,7 +91,9 @@ const walletTopupSchema = new mongoose.Schema({
 
 }, { timestamps: true });
 
-walletTopupSchema.index({ status: 1, createdAt: -1 });
+walletTopupSchema.index({ status: 1, createdAt: -1, _id: -1 });
+walletTopupSchema.index({ username: 1, createdAt: -1, _id: -1 });
+walletTopupSchema.index({ createdAt: -1, _id: -1 });
 
 module.exports = mongoose.model(
     "WalletTopup",

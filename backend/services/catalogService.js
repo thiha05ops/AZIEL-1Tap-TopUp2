@@ -357,6 +357,9 @@ function collectMediaAssetIds(products = [], packages = []) {
     products.forEach(product => {
         if (product?.presentation?.imageAssetId) ids.add(product.presentation.imageAssetId);
         if (product?.presentation?.bannerAssetId) ids.add(product.presentation.bannerAssetId);
+        if (product?.presentation?.mobilePackagePreview?.assetId) {
+            ids.add(product.presentation.mobilePackagePreview.assetId);
+        }
     });
 
     packages.forEach(item => {
@@ -431,6 +434,9 @@ function projectCatalogProduct(product = {}, packages = [], { includeDisabled = 
     const bannerAsset = product.presentation?.bannerAssetId
         ? mediaMap.get(product.presentation.bannerAssetId)
         : null;
+    const mobilePackagePreviewAsset = product.presentation?.mobilePackagePreview?.assetId
+        ? mediaMap.get(product.presentation.mobilePackagePreview.assetId)
+        : null;
 
     const projection = {
         productCode: product.productCode,
@@ -446,17 +452,28 @@ function projectCatalogProduct(product = {}, packages = [], { includeDisabled = 
         imageAltText: imageAsset?.altText || "",
         bannerUrl: mediaUrl(bannerAsset),
         bannerAltText: bannerAsset?.altText || "",
+        mobilePackagePreview: {
+            url: mediaUrl(mobilePackagePreviewAsset),
+            publicId: mobilePackagePreviewAsset?.publicId || "",
+            altText: mobilePackagePreviewAsset?.altText || ""
+        },
+        mobilePackagePreviewUrl: mediaUrl(mobilePackagePreviewAsset),
         updatedAt: product.updatedAt || null
     };
 
     if (includeAssetProjection) {
         projection.imageAsset = projectMediaAsset(imageAsset);
         projection.bannerAsset = projectMediaAsset(bannerAsset);
+        projection.mobilePackagePreviewAsset = projectMediaAsset(mobilePackagePreviewAsset);
     } else {
         const publicImageAsset = projectPublicMediaAsset(imageAsset);
         const publicBannerAsset = projectPublicMediaAsset(bannerAsset);
+        const publicMobilePackagePreviewAsset = projectPublicMediaAsset(mobilePackagePreviewAsset);
         if (publicImageAsset) projection.publicImageAsset = publicImageAsset;
         if (publicBannerAsset) projection.publicBannerAsset = publicBannerAsset;
+        if (publicMobilePackagePreviewAsset) {
+            projection.mobilePackagePreview.asset = publicMobilePackagePreviewAsset;
+        }
     }
 
     return projection;

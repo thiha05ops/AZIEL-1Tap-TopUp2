@@ -22,7 +22,8 @@
     <link rel="stylesheet" href="/css/admin/admin-wallet.css?v=20260706-2">
     <link rel="stylesheet" href="/css/admin/admin-support.css?v=20260706-2">
     <link rel="stylesheet" href="/css/admin/admin-live-chat.css?v=20260706-2">
-    <link rel="stylesheet" href="/css/admin/admin-design-system.css?v=20260714-phase6">
+    <link rel="stylesheet" href="/css/admin/admin-design-system.css?v=20260715-phase13-qa3">
+    <link rel="stylesheet" href="/css/campaign/campaign-popup.css?v=20260715-visual">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
@@ -51,7 +52,7 @@
                 <div class="admin-nav-group">
                     <span class="admin-nav-label" data-admin-i18n="command">Command</span>
 
-                    <button class="admin-nav active" data-section="dashboard" type="button">
+                    <button class="admin-nav active" data-section="dashboard" type="button" data-admin-permission="DASHBOARD_READ">
                     <i class="fa-solid fa-chart-line"></i>
                         <span data-admin-i18n="dashboard">Dashboard</span>
                     </button>
@@ -60,22 +61,27 @@
                 <div class="admin-nav-group">
                     <span class="admin-nav-label" data-admin-i18n="operations">Operations</span>
 
-                    <button class="admin-nav" data-section="orders" type="button">
+                    <button class="admin-nav" data-section="orders" type="button" data-admin-permission="ORDERS_READ">
                     <i class="fa-solid fa-box"></i>
                         <span data-admin-i18n="orders">Orders</span>
                 </button>
 
-                    <button class="admin-nav" data-section="wallet" type="button">
+                    <button class="admin-nav" data-section="wallet" type="button" data-admin-permission="WALLET_READ">
                     <i class="fa-solid fa-wallet"></i>
                         <span data-admin-i18n="wallet">Wallet</span>
                 </button>
 
-                    <button class="admin-nav" data-section="support" type="button">
+                    <button class="admin-nav" data-section="fulfillment" type="button" data-admin-permission="SUPPLIERS_READ,FULFILLMENT_READ">
+                        <i class="fa-solid fa-truck-ramp-box"></i>
+                        <span data-admin-i18n="fulfillment">Fulfillment</span>
+                    </button>
+
+                    <button class="admin-nav" data-section="support" type="button" data-admin-permission="SUPPORT_READ">
                     <i class="fa-solid fa-headset"></i>
                         <span data-admin-i18n="support">Support</span>
                 </button>
 
-                    <button class="admin-nav" data-section="chat" type="button">
+                    <button class="admin-nav" data-section="chat" type="button" data-admin-permission="LIVE_CHAT_READ">
                     <i class="fa-solid fa-comments"></i>
                         <span data-admin-i18n="live_chat">Live Chat</span>
                 </button>
@@ -84,46 +90,88 @@
                 <div class="admin-nav-group">
                     <span class="admin-nav-label" data-admin-i18n="commerce">Commerce</span>
 
-                    <button class="admin-nav" data-section="catalog" type="button">
+                    <button class="admin-nav" data-section="catalog" type="button" data-admin-permission="CATALOG_READ">
                         <i class="fa-solid fa-layer-group"></i>
                         <span data-admin-i18n="catalog">Catalog</span>
                     </button>
 
-                    <button class="admin-nav" data-section="media" type="button">
+                    <button class="admin-nav" data-section="promos" type="button" data-admin-permission="PROMOS_READ">
+                        <i class="fa-solid fa-ticket"></i>
+                        <span data-admin-i18n="promo_codes">Promo Codes</span>
+                    </button>
+
+                    <button class="admin-nav" data-section="media" type="button" data-admin-permission="MEDIA_READ">
                         <i class="fa-solid fa-photo-film"></i>
                         <span data-admin-i18n="media_library">Media Library</span>
                     </button>
                 </div>
 
                 <div class="admin-nav-group">
+                    <span class="admin-nav-label" data-admin-i18n="site_content">Site Content</span>
+
+                    <button class="admin-nav" data-section="site-content" type="button" data-admin-permission="SITE_CONTENT_READ">
+                        <i class="fa-solid fa-images"></i>
+                        <span data-admin-i18n="home_banners">Home Banners</span>
+                    </button>
+
+                    <button class="admin-nav" data-section="campaigns" type="button" data-admin-permission="CAMPAIGNS_READ">
+                        <i class="fa-solid fa-bullseye"></i>
+                        <span data-admin-i18n="campaigns">Campaigns</span>
+                    </button>
+                </div>
+
+                <div class="admin-nav-group">
                     <span class="admin-nav-label" data-admin-i18n="customers">Customers</span>
 
-                    <button class="admin-nav" data-section="users" type="button">
+                    <button class="admin-nav" data-section="users" type="button" data-admin-permission="USERS_READ">
                         <i class="fa-solid fa-users"></i>
                         <span data-admin-i18n="users">Users</span>
                 </button>
 
-                    <button class="admin-nav" data-section="broadcast" type="button">
+                    <button class="admin-nav" data-section="broadcast" type="button" data-admin-permission="SETTINGS_MANAGE">
                         <i class="fa-solid fa-bullhorn"></i>
                         <span data-admin-i18n="broadcast">Broadcast</span>
                 </button>
                 </div>
 
+                <div class="admin-nav-group" data-admin-permission="ADMIN_ACCOUNTS_READ,ADMIN_SESSIONS_READ,AUDIT_LOG_READ">
+                    <span class="admin-nav-label" data-admin-i18n="security">Security</span>
+
+                    <button class="admin-nav" data-section="admin-security" type="button">
+                        <i class="fa-solid fa-user-shield"></i>
+                        <span data-admin-i18n="admin_team">Admin Team</span>
+                    </button>
+                </div>
+
                 <div class="admin-nav-group">
                     <span class="admin-nav-label" data-admin-i18n="platform">Platform</span>
 
-                    <button class="admin-nav" data-section="payments" type="button">
+                    <button class="admin-nav" data-section="payments" type="button" data-admin-permission="PAYMENT_METHODS_READ,PAYMENT_METHODS_MANAGE">
                     <i class="fa-solid fa-credit-card"></i>
                         <span data-admin-i18n="payment_methods">Payment Methods</span>
                 </button>
 
-                    <button class="admin-nav" data-section="settings" type="button">
+                    <button class="admin-nav" data-section="settings" type="button" data-admin-permission="SETTINGS_MANAGE">
                         <i class="fa-solid fa-gear"></i>
                         <span data-admin-i18n="site_settings">Site Settings</span>
                 </button>
                 </div>
 
             </nav>
+
+            <div class="admin-mobile-drawer-actions" aria-label="Mobile admin actions">
+                <label for="adminMobileLocaleSelect" data-admin-i18n="language">Language</label>
+                <select id="adminMobileLocaleSelect" class="admin-locale-select" aria-label="Admin language">
+                    <option value="en">English</option>
+                    <option value="my">မြန်မာ</option>
+                </select>
+
+                <a href="home.html" data-admin-i18n="back_home">Back Home</a>
+
+                <button id="adminMobileLogoutBtn" class="admin-logout-btn" type="button" data-admin-i18n="logout">
+                    Logout
+                </button>
+            </div>
 
             <div class="admin-user-box">
                 <div class="admin-avatar">A</div>
@@ -328,6 +376,7 @@
                                 <option value="" data-admin-i18n="all">All</option>
                                 <option value="product_image" data-admin-i18n="product_image">Product Image</option>
                                 <option value="product_banner" data-admin-i18n="product_banner">Product Banner</option>
+                                <option value="home_banner" data-admin-i18n="home_banner">Home Banner</option>
                                 <option value="package_icon" data-admin-i18n="package_icon">Package Icon</option>
                                 <option value="campaign" data-admin-i18n="campaign">Campaign</option>
                                 <option value="promotion" data-admin-i18n="promotion">Promotion</option>
@@ -342,6 +391,78 @@
 
                         <div id="adminMediaGrid" class="media-asset-grid" aria-live="polite">
                             <div class="admin-dashboard-skeleton"></div>
+                            <div class="admin-dashboard-skeleton"></div>
+                            <div class="admin-dashboard-skeleton"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="admin-section" id="section-promos">
+                <div class="media-library-center">
+                    <div class="panel promo-manager-panel">
+                        <div class="panel-head">
+                            <div>
+                                <h3 data-admin-i18n="promo_codes">Promo Codes</h3>
+                                <span data-admin-i18n="promo_codes_sub">Create server-authoritative one-code purchase discounts.</span>
+                            </div>
+                            <button id="addPromoBtn" class="admin-secondary-btn" type="button" data-admin-i18n="add_promo_code">Add Promo Code</button>
+                        </div>
+
+                        <div id="adminPromoList" class="promo-list" aria-live="polite">
+                            <div class="admin-dashboard-skeleton"></div>
+                            <div class="admin-dashboard-skeleton"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="admin-section" id="section-site-content">
+                <div class="media-library-center">
+                    <div class="panel home-banners-panel">
+                        <div class="panel-head">
+                            <div>
+                                <h3 data-admin-i18n="home_banners">Home Banners</h3>
+                                <span data-admin-i18n="home_banners_sub">Manage the public Home page hero carousel.</span>
+                            </div>
+                            <button id="addHomeBannerBtn" class="admin-secondary-btn" type="button" data-admin-i18n="add_home_banner">Add Banner</button>
+                        </div>
+
+                        <div id="adminHomeBannersList" class="home-banner-list" aria-live="polite">
+                            <div class="admin-dashboard-skeleton"></div>
+                            <div class="admin-dashboard-skeleton"></div>
+                        </div>
+                    </div>
+
+                    <div class="panel site-placements-panel">
+                        <div class="panel-head">
+                            <div>
+                                <h3 data-admin-i18n="home_placements">Home Placements</h3>
+                                <span data-admin-i18n="home_placements_sub">Manage real Home page product and promo placement order.</span>
+                            </div>
+                            <button id="refreshSitePlacementsBtn" class="admin-secondary-btn" type="button" data-admin-i18n="refresh">Refresh</button>
+                        </div>
+
+                        <div id="adminSitePlacementsList" class="site-placement-list" aria-live="polite">
+                            <div class="admin-dashboard-skeleton"></div>
+                            <div class="admin-dashboard-skeleton"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="admin-section" id="section-campaigns">
+                <div class="media-library-center">
+                    <div class="panel campaign-manager-panel">
+                        <div class="panel-head">
+                            <div>
+                                <h3 data-admin-i18n="campaigns">Campaigns</h3>
+                                <span data-admin-i18n="campaigns_sub">Manage ENTRY_POPUP engagement campaigns.</span>
+                            </div>
+                            <button id="addCampaignBtn" class="admin-secondary-btn" type="button" data-admin-i18n="add_campaign">Add Campaign</button>
+                        </div>
+
+                        <div id="adminCampaignList" class="campaign-list" aria-live="polite">
                             <div class="admin-dashboard-skeleton"></div>
                             <div class="admin-dashboard-skeleton"></div>
                         </div>
@@ -531,6 +652,133 @@
                 </div>
             </section>
 
+            <section class="admin-section" id="section-fulfillment">
+                <div class="media-library-center fulfillment-center">
+                    <div class="panel fulfillment-panel">
+                        <div class="panel-head">
+                            <div>
+                                <h3 data-admin-i18n="fulfillment">Fulfillment</h3>
+                                <span data-admin-i18n="fulfillment_sub">Supplier mappings and manual fulfillment operations.</span>
+                            </div>
+                            <button id="refreshFulfillmentBtn" class="admin-secondary-btn" type="button" data-admin-i18n="refresh">Refresh</button>
+                        </div>
+
+                        <div class="admin-security-tabs fulfillment-tabs" role="tablist">
+                            <button class="admin-security-tab active" type="button" data-fulfillment-view="suppliers" data-admin-permission="SUPPLIERS_READ" data-admin-i18n="suppliers">Suppliers</button>
+                            <button class="admin-security-tab" type="button" data-fulfillment-view="mappings" data-admin-permission="SUPPLIERS_READ" data-admin-i18n="mappings">Mappings</button>
+                            <button class="admin-security-tab" type="button" data-fulfillment-view="attempts" data-admin-permission="FULFILLMENT_READ" data-admin-i18n="fulfillment_attempts">Fulfillment Attempts</button>
+                        </div>
+
+                        <div id="fulfillmentSuppliersView" class="fulfillment-view-panel active" data-fulfillment-panel="suppliers">
+                            <div class="fulfillment-form-grid">
+                                <label><span data-admin-i18n="supplier_name">Supplier Name</span><input id="supplierNameInput" type="text"></label>
+                                <label><span data-admin-i18n="supplier_code">Supplier Code</span><input id="supplierCodeInput" type="text"></label>
+                                <label><span data-admin-i18n="supplier_mode">Supplier Mode</span><select id="supplierModeInput"><option value="MANUAL">MANUAL</option><option value="API">API</option></select></label>
+                                <label><span data-admin-i18n="supported_regions">Supported Regions</span><textarea id="supplierRegionsInput" rows="2">MM
+TH</textarea></label>
+                                <label><span data-admin-i18n="balance_source">Balance Source</span><select id="supplierBalanceSourceInput"><option value="UNKNOWN">UNKNOWN</option><option value="MANUAL">MANUAL</option></select></label>
+                                <label><span data-admin-i18n="manual_balance">Manual Balance</span><input id="supplierBalanceAmountInput" type="number" min="0" step="0.01"></label>
+                                <label><span data-admin-i18n="currency">Currency</span><select id="supplierBalanceCurrencyInput"><option value="">-</option><option value="MMK">MMK</option><option value="THB">THB</option></select></label>
+                                <label class="fulfillment-checkbox"><input id="supplierEnabledInput" type="checkbox" checked> <span data-admin-i18n="enabled">Enabled</span></label>
+                            </div>
+                            <div class="admin-security-actions">
+                                <button id="saveSupplierBtn" class="admin-secondary-btn" type="button" data-admin-permission="SUPPLIERS_MANAGE" data-admin-i18n="add_supplier">Add Supplier</button>
+                            </div>
+                            <div id="suppliersList" class="fulfillment-list"></div>
+                        </div>
+
+                        <div id="fulfillmentMappingsView" class="fulfillment-view-panel" data-fulfillment-panel="mappings">
+                            <div class="fulfillment-view-head">
+                                <h4 data-admin-i18n="mappings">Mappings</h4>
+                                <small data-admin-i18n="mapping_empty_hint">Map an AZIEL Catalog package to a supplier package before starting fulfillment.</small>
+                            </div>
+                            <div class="fulfillment-form-grid">
+                                <label><span data-admin-i18n="supplier">Supplier</span><select id="mappingSupplierInput"></select></label>
+                                <label><span data-admin-i18n="product">Product</span><select id="mappingProductInput"></select></label>
+                                <label><span data-admin-i18n="package">Package</span><select id="mappingPackageInput"></select></label>
+                                <label><span data-admin-i18n="region">Region</span><select id="mappingRegionInput"><option value="MM">MM</option><option value="TH">TH</option></select></label>
+                                <label><span data-admin-i18n="supplier_product_code">Supplier Product Code</span><input id="mappingSupplierProductInput" type="text"></label>
+                                <label><span data-admin-i18n="supplier_package_code">Supplier Package Code</span><input id="mappingSupplierPackageInput" type="text"></label>
+                                <label class="fulfillment-checkbox"><input id="mappingEnabledInput" type="checkbox" checked> <span data-admin-i18n="enabled">Enabled</span></label>
+                            </div>
+                            <div class="admin-security-actions">
+                                <button id="saveMappingBtn" class="admin-secondary-btn" type="button" data-admin-permission="SUPPLIER_MAPPINGS_MANAGE" data-admin-i18n="add_mapping">Add Mapping</button>
+                            </div>
+                            <div id="mappingsList" class="fulfillment-list"></div>
+                        </div>
+
+                        <div id="fulfillmentAttemptsView" class="fulfillment-view-panel" data-fulfillment-panel="attempts">
+                            <div class="fulfillment-view-head">
+                                <h4 data-admin-i18n="fulfillment_attempts">Fulfillment Attempts</h4>
+                                <small data-admin-i18n="attempts_empty_hint">Fulfillment attempts appear after fulfillment is started from an eligible paid Order.</small>
+                            </div>
+                            <div class="admin-filter-bar">
+                                <select id="fulfillmentAttemptFilter">
+                                    <option value="ACTIVE" data-admin-i18n="active_attempt">Active Attempt</option>
+                                    <option value="FAILED" data-admin-i18n="failed">Failed</option>
+                                    <option value="SUCCEEDED" data-admin-i18n="succeeded">Succeeded</option>
+                                    <option value="ALL" data-admin-i18n="all">All</option>
+                                </select>
+                            </div>
+                            <div id="fulfillmentAttemptsList" class="fulfillment-list"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="admin-section" id="section-admin-security">
+                <div class="media-library-center admin-security-center">
+                    <div class="panel admin-security-panel">
+                        <div class="panel-head">
+                            <div>
+                                <h3 data-admin-i18n="admin_team">Admin Team</h3>
+                                <span data-admin-i18n="admin_team_sub">Admin identity, 2FA, sessions, and audit accountability.</span>
+                            </div>
+                            <button id="refreshAdminSecurityBtn" class="admin-secondary-btn" type="button" data-admin-i18n="refresh">Refresh</button>
+                        </div>
+
+                        <div class="admin-security-tabs" role="tablist">
+                            <button class="admin-security-tab active" type="button" data-admin-security-view="accounts" data-admin-permission="ADMIN_ACCOUNTS_READ" data-admin-i18n="admin_accounts">Admin Accounts</button>
+                            <button class="admin-security-tab" type="button" data-admin-security-view="sessions" data-admin-permission="ADMIN_SESSIONS_READ" data-admin-i18n="sessions">Sessions</button>
+                            <button class="admin-security-tab" type="button" data-admin-security-view="audit" data-admin-permission="AUDIT_LOG_READ" data-admin-i18n="audit_log">Audit Log</button>
+                        </div>
+
+                        <div id="adminSecurityAccountsView" class="admin-security-view active">
+                            <div class="admin-security-actions">
+                                <button id="addAdminAccountBtn" class="admin-secondary-btn" type="button" data-admin-permission="ADMIN_ACCOUNTS_MANAGE" data-admin-i18n="add_admin">Add Admin</button>
+                            </div>
+                            <div id="adminAccountsList" class="admin-security-list"></div>
+                        </div>
+
+                        <div id="adminSecuritySessionsView" class="admin-security-view">
+                            <div class="admin-security-actions">
+                                <button id="revokeOtherAdminSessionsBtn" class="admin-secondary-btn danger" type="button" data-admin-permission="ADMIN_SESSIONS_REVOKE" data-admin-i18n="revoke_all_other_sessions">Revoke All Other Sessions</button>
+                            </div>
+                            <div id="adminSessionsList" class="admin-security-list"></div>
+                            <div class="admin-security-2fa">
+                                <h4 data-admin-i18n="two_factor_authentication">Two-Factor Authentication</h4>
+                                <button id="startAdmin2FABtn" class="admin-secondary-btn" type="button" data-admin-i18n="enable_2fa">Enable 2FA</button>
+                                <button id="disableAdmin2FABtn" class="admin-secondary-btn danger" type="button" data-admin-i18n="disable_2fa">Disable 2FA</button>
+                            </div>
+                        </div>
+
+                        <div id="adminSecurityAuditView" class="admin-security-view">
+                            <div class="admin-filter-bar admin-audit-filters">
+                                <input id="adminAuditActionFilter" type="text" placeholder="Audit Action" data-admin-i18n-placeholder="audit_action">
+                                <input id="adminAuditActorFilter" type="text" placeholder="Actor" data-admin-i18n-placeholder="actor">
+                                <button id="adminAuditSearchBtn" class="admin-secondary-btn" type="button" data-admin-i18n="search">Search</button>
+                            </div>
+                            <div id="adminAuditLogList" class="admin-security-list"></div>
+                            <div class="wallet-pagination">
+                                <button id="adminAuditPrevBtn" class="admin-secondary-btn" type="button" data-admin-i18n="previous">Previous</button>
+                                <span id="adminAuditPageInfo">1 / 1</span>
+                                <button id="adminAuditNextBtn" class="admin-secondary-btn" type="button" data-admin-i18n="next">Next</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <section class="admin-section" id="section-settings">
                 <div class="settings-page">
 
@@ -670,16 +918,24 @@
     <script src="/js/ui-feedback.js?v=20260712-m6"></script>
     <script src="/js/admin-api.js?v=20260707"></script>
     <script src="/js/socket-client.js?v=20260712"></script>
-    <script src="/lang/admin/en.js?v=20260714-phase6"></script>
-    <script src="/lang/admin/my.js?v=20260714-phase6"></script>
+    <script src="/lang/admin/en.js?v=20260715-phase13-qa4"></script>
+    <script src="/lang/admin/my.js?v=20260715-phase13-qa4"></script>
     <script src="/js/admin/admin-i18n.js?v=20260713-phase1"></script>
+    <script src="/js/admin/admin-ui.js?v=20260715-phase15"></script>
     <script src="/js/admin/admin-action-modal.js?v=20260714-phase4"></script>
+    <script src="/js/admin-auth.js?v=20260715-phase12"></script>
     <script src="/js/admin-app.js?v=20260714-phase5"></script>
     <script src="/js/admin-stats.js?v=20260713-phase3"></script>
-    <script src="/js/admin-orders.js?v=20260713-phase3"></script>
+    <script src="/js/admin-fulfillment.js?v=20260715-phase13-qa4"></script>
+    <script src="/js/admin-orders.js?v=20260715-phase13-qa4"></script>
     <script src="/js/admin/admin-media-selector.js?v=20260714-phase8"></script>
     <script src="/js/admin-media.js?v=20260714-phase8"></script>
     <script src="/js/admin-catalog.js?v=20260714-phase6"></script>
+    <script src="/js/admin-home-banners.js?v=20260715-phase86"></script>
+    <script src="/js/admin-site-placements.js?v=20260715-phase11"></script>
+    <script src="/js/admin-campaigns.js?v=20260715-phase9"></script>
+    <script src="/js/admin-promos.js?v=20260715-phase10"></script>
+    <script src="/js/admin-security.js?v=20260715-phase13-qa2"></script>
     <script src="/js/admin-support.js?v=20260713-phase2"></script>
     <script src="/js/admin-live-chat.js?v=20260712-live-chat-fix"></script>
 

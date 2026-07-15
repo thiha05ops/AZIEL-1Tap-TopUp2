@@ -348,9 +348,19 @@ function verifyRouteOwnership() {
     const order = fs.readFileSync(path.join(ROOT, "backend/routes/order.js"), "utf8");
     const wallet = fs.readFileSync(path.join(ROOT, "backend/routes/wallet.js"), "utf8");
 
-    assert((payment.match(/await resolveOrderCatalog/g) || []).length >= 2, "payment route catalog calls must be awaited");
-    assert((order.match(/await resolveOrderCatalog/g) || []).length >= 1, "order route catalog call must be awaited");
-    assert((wallet.match(/await resolveOrderCatalog/g) || []).length >= 1, "wallet route catalog call must be awaited");
+    const paymentCatalogCalls =
+        (payment.match(/await resolveOrderCatalog/g) || []).length +
+        (payment.match(/await resolvePurchasePricing/g) || []).length;
+    const orderCatalogCalls =
+        (order.match(/await resolveOrderCatalog/g) || []).length +
+        (order.match(/await resolvePurchasePricing/g) || []).length;
+    const walletCatalogCalls =
+        (wallet.match(/await resolveOrderCatalog/g) || []).length +
+        (wallet.match(/await resolvePurchasePricing/g) || []).length;
+
+    assert(paymentCatalogCalls >= 2, "payment route catalog-backed calls must be awaited");
+    assert(orderCatalogCalls >= 1, "order route catalog-backed call must be awaited");
+    assert(walletCatalogCalls >= 1, "wallet route catalog-backed call must be awaited");
 }
 
 function verifySourceConfiguration() {

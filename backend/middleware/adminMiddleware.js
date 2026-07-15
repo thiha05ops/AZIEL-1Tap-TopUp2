@@ -1,8 +1,6 @@
-const jwt = require("jsonwebtoken");
+const { AdminAuthError, resolveAdminRequest } = require("../services/adminAuthService");
 
-const JWT_SECRET = process.env.JWT_SECRET || "aziel_jwt_secret";
-
-function adminMiddleware(req, res, next) {
+async function adminMiddleware(req, res, next) {
     try {
         const authHeader = req.headers.authorization;
 
@@ -22,27 +20,20 @@ function adminMiddleware(req, res, next) {
             });
         }
 
-        const decoded = jwt.verify(token, JWT_SECRET);
-
-        if (decoded.role !== "admin") {
-            return res.status(403).json({
-                success: false,
-                message: "Forbidden"
-            });
-        }
-
-        req.admin = {
-            role: "admin",
-            username: decoded.username || "admin"
-        };
+        const resolved = await resolveAdminRequest(token);
+        req.admin = resolved.admin;
+        req.adminSession = resolved.session;
 
         next();
 
     } catch (error) {
-        console.log("ADMIN TOKEN ERROR:", error.message);
+        if (!(error instanceof AdminAuthError)) {
+            console.log("ADMIN TOKEN ERROR:", error.message);
+        }
 
         return res.status(401).json({
             success: false,
+            error: "ADMIN_SESSION_INVALID",
             message: "Admin session expired"
         });
     }
