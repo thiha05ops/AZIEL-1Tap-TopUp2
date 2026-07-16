@@ -77,6 +77,12 @@ function verifyOtpIntegration() {
 function verifyOrderEmailOwnership() {
     includes("backend/models/EmailDelivery.js", "deliveryKey", "Email delivery model must own semantic delivery key.");
     includes("backend/models/EmailDelivery.js", "unique: true", "Email delivery key must be unique.");
+    includes("backend/models/Order.js", "customerEmail", "Order must snapshot customer email for lifecycle delivery.");
+    includes("backend/models/Order.js", "customerUserId", "Order must snapshot linked customer user id for lifecycle delivery fallback.");
+    includes("backend/models/ManualPaymentAttempt.js", "customerEmail", "Manual payment attempts must carry customer email into deferred Order creation.");
+    includes("backend/routes/payment.js", "buildOrderCustomerSnapshot(req.user)", "Payment order creation paths must snapshot authenticated customer email.");
+    includes("backend/routes/order.js", "buildOrderCustomerSnapshot(req.user)", "Legacy order creation path must snapshot authenticated customer email.");
+    includes("backend/routes/wallet.js", "buildOrderCustomerSnapshot(req.user)", "Wallet order creation path must snapshot authenticated customer email.");
     includes("backend/services/orderEmailService.js", "STATUS_EVENT_MAP", "Order email event map must be centralized.");
     [
         "PAYMENT_SLIP_SUBMITTED",
@@ -94,6 +100,9 @@ function verifyOrderEmailOwnership() {
     includes("backend/services/orderStateService.js", "orderEmailService.notifyOrderTransition(order, entry).catch", "Email failure must be isolated from order transition.");
     includes("backend/routes/payment.js", "notifyManualPaymentSubmitted(order)", "Payment slip submitted email must be sent after slip save.");
     includes("backend/routes/order.js", "notifyManualPaymentSubmitted(order)", "Legacy manual slip path must use same email owner.");
+    includes("backend/services/orderEmailService.js", "order.customerEmail", "Order email recipient must prefer customerEmail snapshot.");
+    includes("backend/services/orderEmailService.js", "User.findById", "Order email recipient must fall back to linked customer user id.");
+    includes("backend/services/orderEmailService.js", "User.findOne({ username: order.username })", "Legacy orders must still resolve recipient by username.");
     includes("backend/services/orderEmailService.js", "status: \"delivered\"", "Delivered lifecycle emails must be marked.");
     includes("backend/services/orderEmailService.js", "status: \"failed\"", "Failed lifecycle emails must be retryable.");
     includes("backend/services/orderEmailService.js", "duplicate_or_pending", "Duplicate semantic lifecycle emails must be skipped.");

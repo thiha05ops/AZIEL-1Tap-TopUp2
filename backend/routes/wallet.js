@@ -28,6 +28,7 @@ const {
     reservePromoUse,
     resolvePurchasePricing
 } = require("../services/promoCodeService");
+const { buildOrderCustomerSnapshot } = require("../services/orderCustomerSnapshotService");
 const {
     WalletError,
     adjustWallet,
@@ -1512,6 +1513,7 @@ router.post("/wallet/pay", authMiddleware, async (req, res) => {
         const order = await Order.create({
             orderId: requestedOrderId,
             username,
+            ...buildOrderCustomerSnapshot(req.user),
             userId,
             zoneId: zoneId || "-",
             game: catalogItem.productName,

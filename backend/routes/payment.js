@@ -32,6 +32,7 @@ const {
     reservePromoUse,
     resolvePurchasePricing
 } = require("../services/promoCodeService");
+const { buildOrderCustomerSnapshot } = require("../services/orderCustomerSnapshotService");
 const {
     createAttemptId,
     createManualReference,
@@ -365,6 +366,8 @@ async function createOrderFromManualAttempt(attempt, evidence, username) {
     const orderPayload = {
         orderId: attempt.reference,
         username,
+        customerEmail: attempt.customerEmail || "",
+        customerUserId: attempt.customerUserId || null,
         game: attempt.productName,
         productCode: attempt.productCode,
         productName: attempt.productName,
@@ -708,6 +711,7 @@ router.post("/payment/manual/attempt", authMiddleware, manualAttemptLimiter, asy
         const attemptSeed = {
             attemptId,
             username,
+            ...buildOrderCustomerSnapshot(req.user),
             productCode: catalogItem.productCode,
             packageCode: catalogItem.packageCode,
             region: catalogItem.region,
@@ -978,6 +982,7 @@ router.post("/payment/create", authMiddleware, activeOrderCreateLimiter, async (
         const order = await Order.create({
             orderId,
             username: username || "guest",
+            ...buildOrderCustomerSnapshot(req.user),
             game: catalogItem.productName,
             productCode: catalogItem.productCode,
             productName: catalogItem.productName,

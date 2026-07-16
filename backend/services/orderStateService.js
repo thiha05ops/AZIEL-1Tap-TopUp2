@@ -168,12 +168,6 @@ async function emitCommittedTransition(order, entry) {
         latestTimelineEntry: entry || null
     });
 
-    console.log("[ORDER] Transition", {
-        orderId: order.orderId,
-        previousStatus: entry?.previousStatus || "",
-        nextStatus: entry?.status || order.status
-    });
-
     orderEmailService.notifyOrderTransition(order, entry).catch(error => {
         console.log("Order lifecycle email dispatch failed:", {
             orderId: order.orderId,

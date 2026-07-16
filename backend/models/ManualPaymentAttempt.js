@@ -12,6 +12,17 @@ const manualPaymentAttemptSchema = new mongoose.Schema(
             required: true,
             index: true
         },
+        customerEmail: {
+            type: String,
+            default: "",
+            trim: true,
+            lowercase: true
+        },
+        customerUserId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            default: null
+        },
         productCode: {
             type: String,
             required: true

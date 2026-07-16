@@ -36,6 +36,7 @@ const {
     reservePromoUse,
     resolvePurchasePricing
 } = require("../services/promoCodeService");
+const { buildOrderCustomerSnapshot } = require("../services/orderCustomerSnapshotService");
 const { WalletError, creditRefund } = require("../services/walletService");
 const {
     FINANCIAL_OUTCOMES,
@@ -987,6 +988,7 @@ router.post("/orders", authMiddleware, orderCreateLimiter, upload.single("paymen
         const order = await Order.create({
             orderId: req.body.orderId,
             username,
+            ...buildOrderCustomerSnapshot(req.user),
             game: catalogItem.productName,
             productCode: catalogItem.productCode,
             productName: catalogItem.productName,

@@ -6,6 +6,13 @@ const ROOT = path.resolve(__dirname, "../..");
 const originalLoad = Module._load;
 const sentMessages = [];
 const deliveries = new Map();
+const usersByUsername = new Map([
+    ["legacy_user", { _id: "66f000000000000000000101", username: "legacy_user", email: "legacy.user@example.com", authProvider: "local" }],
+    ["google_user", { _id: "66f000000000000000000102", username: "google_user", email: "google.user@example.com", authProvider: "google" }],
+    ["local_user", { _id: "66f000000000000000000103", username: "local_user", email: "local.user@example.com", authProvider: "local" }],
+    ["missing_email", { _id: "66f000000000000000000104", username: "missing_email", email: "", authProvider: "local" }]
+]);
+const usersById = new Map([...usersByUsername.values()].map(user => [String(user._id), user]));
 
 function deliveryMatchesCurrentFilter(existing) {
     if (!existing) return true;
@@ -55,14 +62,20 @@ const EmailDeliveryMock = {
 };
 
 const UserMock = {
+    findById(id) {
+        return {
+            select() {
+                return {
+                    lean: async () => usersById.get(String(id)) || null
+                };
+            }
+        };
+    },
     findOne(query) {
         return {
             select() {
                 return {
-                    lean: async () => ({
-                        username: query.username,
-                        email: `${query.username || "customer"}@example.com`
-                    })
+                    lean: async () => usersByUsername.get(String(query.username || "")) || null
                 };
             }
         };
@@ -97,11 +110,13 @@ Module._load = function patchedLoad(request, parent, isMain) {
 };
 
 const orderEmailService = require("../services/orderEmailService");
+const { buildOrderCustomerSnapshot } = require("../services/orderCustomerSnapshotService");
 
 async function verifyLifecycleStatus(status, eventType) {
     const order = {
         orderId: `QA-${status.toUpperCase()}`,
-        username: `customer_${status}`,
+        username: "local_user",
+        ...buildOrderCustomerSnapshot(usersByUsername.get("local_user")),
         game: "Mobile Legends",
         productName: "Mobile Legends",
         packageName: "7740+1548 Diamonds",
@@ -116,6 +131,7 @@ async function verifyLifecycleStatus(status, eventType) {
     assert.strictEqual(sentMessages.length, before + 1, `${status}: provider should receive one message.`);
 
     const sent = sentMessages[sentMessages.length - 1];
+    assert.strictEqual(sent.to, "local.user@example.com", `${status}: customerEmail snapshot should be used.`);
     assert.strictEqual(sent.messageType, eventType, `${status}: wrong message type.`);
     assert(sent.subject && sent.subject.includes(order.orderId), `${status}: subject should include order id.`);
     assert(sent.html.includes("AZIEL 1Tap Shop"), `${status}: branded HTML template missing.`);
@@ -127,6 +143,89 @@ async function verifyLifecycleStatus(status, eventType) {
     assert.strictEqual(second.skipped, true, `${status}: duplicate transition should be skipped.`);
     assert.strictEqual(second.reason, "duplicate_or_pending", `${status}: duplicate reason should be stable.`);
     assert.strictEqual(sentMessages.length, before + 1, `${status}: duplicate should not send again.`);
+}
+
+async function verifyRecipientFallbacks() {
+    assert.deepStrictEqual(
+        buildOrderCustomerSnapshot(usersByUsername.get("google_user")),
+        {
+            customerEmail: "google.user@example.com",
+            customerUserId: "66f000000000000000000102"
+        },
+        "Google-auth user snapshot should include canonical email and user id."
+    );
+    assert.deepStrictEqual(
+        buildOrderCustomerSnapshot(usersByUsername.get("local_user")),
+        {
+            customerEmail: "local.user@example.com",
+            customerUserId: "66f000000000000000000103"
+        },
+        "Username/password user snapshot should include canonical email and user id."
+    );
+
+    const cases = [
+        {
+            label: "legacy_username",
+            order: {
+                orderId: "QA-LEGACY-USERNAME",
+                username: "legacy_user",
+                status: "paid",
+                game: "Mobile Legends",
+                packageName: "Weekly Diamond Pass",
+                amount: 55,
+                currency: "THB"
+            },
+            expectedRecipient: "legacy.user@example.com"
+        },
+        {
+            label: "linked_user_id",
+            order: {
+                orderId: "QA-LINKED-ID",
+                username: "unknown_username",
+                customerUserId: usersByUsername.get("google_user")._id,
+                status: "processing",
+                game: "Mobile Legends",
+                packageName: "Weekly Diamond Pass",
+                amount: 55,
+                currency: "THB"
+            },
+            expectedRecipient: "google.user@example.com"
+        },
+        {
+            label: "legacy_email_field",
+            order: {
+                orderId: "QA-LEGACY-EMAIL",
+                username: "guest",
+                email: "legacy.field@example.com",
+                status: "completed",
+                game: "Mobile Legends",
+                packageName: "Weekly Diamond Pass",
+                amount: 55,
+                currency: "THB"
+            },
+            expectedRecipient: "legacy.field@example.com"
+        }
+    ];
+
+    for (const item of cases) {
+        const before = sentMessages.length;
+        const result = await orderEmailService.notifyOrderTransition(item.order, { status: item.order.status });
+        assert.deepStrictEqual(result, { delivered: true }, `${item.label}: should deliver.`);
+        assert.strictEqual(sentMessages.length, before + 1, `${item.label}: should send once.`);
+        assert.strictEqual(sentMessages[sentMessages.length - 1].to, item.expectedRecipient, `${item.label}: wrong recipient.`);
+    }
+
+    const missing = await orderEmailService.notifyOrderTransition({
+        orderId: "QA-MISSING-EMAIL",
+        username: "missing_email",
+        status: "failed",
+        game: "Mobile Legends",
+        packageName: "Weekly Diamond Pass",
+        amount: 55,
+        currency: "THB"
+    }, { status: "failed" });
+    assert.strictEqual(missing.skipped, true, "Missing email should skip safely.");
+    assert.strictEqual(missing.reason, "missing_recipient", "Missing email skip reason should be stable.");
 }
 
 async function main() {
@@ -149,6 +248,7 @@ async function main() {
     for (const [status, eventType] of statuses) {
         await verifyLifecycleStatus(status, eventType);
     }
+    await verifyRecipientFallbacks();
 
     console.log("Order status email notification verification passed.");
 }

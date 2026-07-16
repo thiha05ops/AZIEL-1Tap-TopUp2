@@ -12,6 +12,19 @@ const orderSchema = new mongoose.Schema({
         default: "guest"
     },
 
+    customerEmail: {
+        type: String,
+        default: "",
+        trim: true,
+        lowercase: true
+    },
+
+    customerUserId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: null
+    },
+
     game: {
         type: String,
         required: true
