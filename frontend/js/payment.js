@@ -28,7 +28,7 @@ async function loadPaymentMethods() {
     document.dispatchEvent(new Event("paymentChanged"));
 
     try {
-        const API_BASE = location.port === "5500" ? "http://localhost:3000" : "";
+        const API_BASE = location.port === "5500" ? `${location.protocol}//${location.hostname === "127.0.0.1" ? "127.0.0.1" : "localhost"}:3000` : "";
         const res = await fetch(`${API_BASE}/api/payment-methods?region=${region}`);
         const data = await res.json();
 

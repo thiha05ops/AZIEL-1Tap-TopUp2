@@ -53,7 +53,8 @@
     "verify:storage": "node backend/scripts/verify-storage.js",
     "verify:wallet": "node backend/scripts/reconcile-wallet.js",
     "migrate:wallet-baseline": "node backend/scripts/migrate-wallet-baseline.js",
-    "seed:catalog": "node backend/scripts/seed-catalog.js"
+    "seed:catalog": "node backend/scripts/seed-catalog.js",
+    "verify:production-hardening": "node backend/scripts/verify-production-hardening-sprint.js"
   },
   "keywords": [],
   "author": "",

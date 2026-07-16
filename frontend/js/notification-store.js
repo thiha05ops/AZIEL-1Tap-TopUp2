@@ -22,7 +22,7 @@
 
     function apiUrl(path) {
         if (window.AZIEL?.apiUrl) return window.AZIEL.apiUrl(path);
-        return `${location.port === "5500" ? "http://localhost:3000" : ""}${path}`;
+        return `${location.port === "5500" ? `${location.protocol}//${location.hostname === "127.0.0.1" ? "127.0.0.1" : "localhost"}:3000` : ""}${path}`;
     }
 
     function authHeaders(extra = {}) {

@@ -3,7 +3,7 @@
 
 const ADMIN_API_BASE =
     window.location.port === "5500"
-        ? `${window.location.protocol}//${window.location.hostname}:3000`
+        ? `${window.location.protocol}//${window.location.hostname === "127.0.0.1" ? "127.0.0.1" : "localhost"}:3000`
         : "";
 
 function adminApiUrl(url) {

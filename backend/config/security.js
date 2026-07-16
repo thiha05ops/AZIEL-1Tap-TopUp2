@@ -9,6 +9,20 @@ const developmentOrigins = [
     "http://127.0.0.1:5500"
 ];
 
+const productionPlatformOrigins = [
+    "https://azielplay.com",
+    "https://www.azielplay.com",
+    "https://admin.azielplay.com",
+    "https://aziel-1tap-topup2.onrender.com"
+];
+
+const adminProductionOrigin = "https://admin.azielplay.com";
+const publicProductionOrigins = [
+    "https://azielplay.com",
+    "https://www.azielplay.com"
+];
+const legacyRenderOrigin = "https://aziel-1tap-topup2.onrender.com";
+
 function splitList(value) {
     return String(value || "")
         .split(",")
@@ -30,9 +44,15 @@ function getConfiguredOrigins(env = process.env) {
 function getAllowedOrigins(env = process.env) {
     const configured = getConfiguredOrigins(env);
 
-    if (env.NODE_ENV === "production") return configured;
+    if (env.NODE_ENV === "production") {
+        return Array.from(new Set([
+            ...productionPlatformOrigins,
+            ...configured
+        ]));
+    }
 
     return Array.from(new Set([
+        ...productionPlatformOrigins,
         ...configured,
         ...developmentOrigins
     ]));
@@ -67,6 +87,41 @@ const socketCorsOptions = {
     methods: ["GET", "POST"],
     credentials: true
 };
+
+function getCspConnectSources(env = process.env) {
+    const origins = getAllowedOrigins(env);
+    const websocketOrigins = origins
+        .filter(origin => /^https?:\/\//i.test(origin))
+        .map(origin => origin.replace(/^http:/i, "ws:").replace(/^https:/i, "wss:"));
+
+    return Array.from(new Set([
+        "'self'",
+        ...origins,
+        ...websocketOrigins
+    ]));
+}
+
+function getHostOrigin(req) {
+    const host = String(req?.headers?.host || "").toLowerCase();
+    if (!host) return "";
+    const proto = req?.protocol || (req?.secure ? "https" : "http");
+    return `${proto}://${host}`;
+}
+
+function isAdminHost(req) {
+    const host = String(req?.headers?.host || "").split(":")[0].toLowerCase();
+    return host === "admin.azielplay.com";
+}
+
+function isPublicProductionHost(req) {
+    const host = String(req?.headers?.host || "").split(":")[0].toLowerCase();
+    return host === "azielplay.com" || host === "www.azielplay.com";
+}
+
+function isLegacyRenderHost(req) {
+    const host = String(req?.headers?.host || "").split(":")[0].toLowerCase();
+    return host === "aziel-1tap-topup2.onrender.com";
+}
 
 const jsonBodyLimit = process.env.JSON_BODY_LIMIT || "1mb";
 const formBodyLimit = process.env.FORM_BODY_LIMIT || "1mb";
@@ -149,7 +204,7 @@ function validateTwoFactorKey(result, env) {
 }
 
 function validateProductionOrigins(result, env) {
-    const origins = getConfiguredOrigins(env);
+    const origins = getAllowedOrigins(env);
 
     if (!origins.length) {
         addError(result, "PROD_ORIGIN_MISSING", "At least one production origin is required.", "cors");
@@ -453,15 +508,24 @@ function validateProductionSecurityConfig() {
 }
 
 module.exports = {
+    adminProductionOrigin,
     allowedImageMimeTypes,
     allowedOrigins,
     buildProductionReadiness,
     corsOptions,
     developmentOrigins,
     formBodyLimit,
+    getAllowedOrigins,
+    getCspConnectSources,
     imageUploadFileFilter,
+    isAdminHost,
+    isLegacyRenderHost,
     isProduction,
+    isPublicProductionHost,
     jsonBodyLimit,
+    legacyRenderOrigin,
+    productionPlatformOrigins,
+    publicProductionOrigins,
     safeUploadFileName,
     socketCorsOptions,
     uploadFileSizeLimit,

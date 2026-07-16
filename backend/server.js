@@ -22,7 +22,11 @@ const {
     isProduction,
     jsonBodyLimit,
     buildProductionReadiness,
+    adminProductionOrigin,
+    getCspConnectSources,
+    isAdminHost,
     socketCorsOptions,
+    isPublicProductionHost,
     validateProductionReadiness
 } = require("./config/security");
 
@@ -81,7 +85,13 @@ function configureApplication(mongoConnection) {
     }
 
     app.use(helmet({
-        contentSecurityPolicy: false,
+        contentSecurityPolicy: {
+            useDefaults: false,
+            directives: {
+                "default-src": helmet.contentSecurityPolicy.dangerouslyDisableDefaultSrc,
+                "connect-src": getCspConnectSources()
+            }
+        },
         crossOriginResourcePolicy: { policy: "cross-origin" }
     }));
 
@@ -120,6 +130,21 @@ function configureApplication(mongoConnection) {
 
     app.use(passport.initialize());
     app.use(passport.session());
+
+    app.get("/", (req, res, next) => {
+        if (!isProduction || !isAdminHost(req)) return next();
+        return res.redirect(302, "/admin-login.html");
+    });
+
+    app.get(["/admin-login.html", "/admin.html"], (req, res, next) => {
+        if (!isProduction || !isPublicProductionHost(req)) return next();
+
+        const safePath = req.path === "/admin.html"
+            ? "/admin.html"
+            : "/admin-login.html";
+
+        return res.redirect(302, `${adminProductionOrigin}${safePath}`);
+    });
 
     app.use(express.static(path.join(__dirname, "../frontend")));
 

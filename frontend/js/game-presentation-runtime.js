@@ -128,13 +128,51 @@
         const root = document.querySelector(".game-banner");
         const productCode = getProductCode();
         if (!root || !productCode) return;
+        root.setAttribute("data-managed-content-state", "resolving");
 
         try {
             const data = await loadBanners(productCode);
-            if (!data.managed) return;
-            renderManagedBanners(root, Array.isArray(data.banners) ? data.banners : []);
+            if (!data.managed) {
+                releaseStaticFallback(root);
+                return;
+            }
+
+            const banners = Array.isArray(data.banners) ? data.banners : [];
+            if (banners.length) {
+                root.setAttribute("data-managed-content-state", "preparing");
+                await preloadImages(banners.map(banner => banner.imageUrl));
+            }
+            renderManagedBanners(root, banners);
+            root.setAttribute("data-managed-content-state", banners.length ? "active" : "empty");
         } catch (error) {
             root.dataset.bannerRuntimeError = "true";
+            releaseStaticFallback(root);
+        }
+    }
+
+    function releaseStaticFallback(root) {
+        root.setAttribute("data-managed-content-state", "fallback");
+    }
+
+    async function preloadImages(urls = []) {
+        const uniqueUrls = [...new Set(urls.filter(Boolean))];
+        await Promise.all(uniqueUrls.map(preloadImage));
+    }
+
+    async function preloadImage(url) {
+        const image = new Image();
+        image.src = url;
+        try {
+            if (image.decode) {
+                await image.decode();
+                return;
+            }
+            await new Promise((resolve, reject) => {
+                image.onload = resolve;
+                image.onerror = reject;
+            });
+        } catch {
+            // Preserve the existing broken-image marker path instead of blocking banner rendering.
         }
     }
 

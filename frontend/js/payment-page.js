@@ -292,7 +292,7 @@ function formatAmount(amount, currency) {
 }
 
 function apiUrl(path) {
-    const base = location.port === "5500" ? "http://localhost:3000" : "";
+    const base = location.port === "5500" ? `${location.protocol}//${location.hostname === "127.0.0.1" ? "127.0.0.1" : "localhost"}:3000` : "";
     return `${base}${path}`;
 }
 

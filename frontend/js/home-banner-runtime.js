@@ -24,6 +24,7 @@
         const dotsBox = document.getElementById("azBannerDots");
 
         if (!zone || !track || !dotsBox) return;
+        zone.setAttribute("data-managed-content-state", "resolving");
 
         try {
             const response = await fetch(API_URL, {
@@ -32,8 +33,10 @@
             });
             const data = await response.json();
 
-            if (!response.ok || !data?.success) return;
-            if (data.managed !== true) return;
+            if (!response.ok || !data?.success || data.managed !== true) {
+                releaseStaticFallback(zone);
+                return;
+            }
 
             const banners = Array.isArray(data.banners) ? data.banners.filter(isRenderableBanner) : [];
 
@@ -41,10 +44,14 @@
                 clearInterval(autoTimer);
                 zone.hidden = true;
                 zone.setAttribute("data-home-banners-managed", "empty");
+                zone.setAttribute("data-managed-content-state", "empty");
                 track.innerHTML = "";
                 dotsBox.innerHTML = "";
                 return;
             }
+
+            zone.setAttribute("data-managed-content-state", "preparing");
+            await preloadImages(banners.map(banner => banner.imageUrl));
 
             const managedTrack = track.cloneNode(false);
             const managedDotsBox = dotsBox.cloneNode(false);
@@ -55,8 +62,37 @@
             zone.setAttribute("data-home-banners-managed", "active");
             renderManagedBanners(managedTrack, managedDotsBox, banners);
             bindManagedCarousel(managedTrack, managedDotsBox);
+            zone.setAttribute("data-managed-content-state", "active");
         } catch (error) {
             // Keep the source-code static fallback when managed data is temporarily unavailable.
+            releaseStaticFallback(zone);
+        }
+    }
+
+    function releaseStaticFallback(zone) {
+        zone.hidden = false;
+        zone.setAttribute("data-managed-content-state", "fallback");
+    }
+
+    async function preloadImages(urls = []) {
+        const uniqueUrls = [...new Set(urls.filter(Boolean))];
+        await Promise.all(uniqueUrls.map(preloadImage));
+    }
+
+    async function preloadImage(url) {
+        const image = new Image();
+        image.src = url;
+        try {
+            if (image.decode) {
+                await image.decode();
+                return;
+            }
+            await new Promise((resolve, reject) => {
+                image.onload = resolve;
+                image.onerror = reject;
+            });
+        } catch {
+            // Rendering can still proceed; broken images keep existing per-image fallback/error handling.
         }
     }
 
