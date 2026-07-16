@@ -272,7 +272,19 @@ async function markFailed(delivery, error) {
 
 async function deliverOrderEmail(order, eventType) {
     const recipient = await resolveRecipient(order);
-    if (!recipient) return { skipped: true, reason: "missing_recipient" };
+    console.log("[EMAIL] recipient resolved", {
+        orderId: order?.orderId || "",
+        eventType,
+        recipient
+    });
+    if (!recipient) {
+        console.log("[EMAIL] return: recipient missing", {
+            orderId: order?.orderId || "",
+            eventType,
+            recipient
+        });
+        return { skipped: true, reason: "missing_recipient" };
+    }
 
     const message = buildOrderEmail(order, eventType);
     console.log("[EMAIL] Preparing lifecycle email", {
@@ -290,9 +302,35 @@ async function deliverOrderEmail(order, eventType) {
         recipient
     });
 
-    if (!delivery) return { skipped: true, reason: "duplicate_or_pending" };
+    console.log("[EMAIL] EmailDelivery lookup result", {
+        orderId: order.orderId,
+        eventType,
+        deliveryKey,
+        found: Boolean(delivery),
+        status: delivery?.status || "",
+        attemptCount: delivery?.attemptCount || 0,
+        recipient
+    });
 
-    if (!message) return { skipped: true, reason: "event_unmapped" };
+    if (!delivery) {
+        console.log("[EMAIL] return: duplicate delivery", {
+            orderId: order.orderId,
+            eventType,
+            deliveryKey,
+            duplicate: true,
+            recipient
+        });
+        return { skipped: true, reason: "duplicate_or_pending" };
+    }
+
+    if (!message) {
+        console.log("[EMAIL] return: template unavailable", {
+            orderId: order.orderId,
+            eventType,
+            recipient
+        });
+        return { skipped: true, reason: "event_unmapped" };
+    }
 
     try {
         console.log("[EMAIL] Sending...");
@@ -325,7 +363,18 @@ async function notifyOrderTransition(order, entry = {}) {
         status: entry?.status || "",
         eventType
     });
-    if (!eventType) return { skipped: true, reason: "status_unmapped" };
+    if (!eventType) {
+        console.log("[EMAIL] return: unknown event", {
+            orderId: order?.orderId || "",
+            status: entry?.status || "",
+            eventType
+        });
+        return { skipped: true, reason: "status_unmapped" };
+    }
+    console.log("[EMAIL] return: dispatching lifecycle email", {
+        orderId: order?.orderId || "",
+        eventType
+    });
     return deliverOrderEmail(order, eventType);
 }
 
