@@ -3,9 +3,13 @@ const dns = require("dns");
 const nodemailer = require("nodemailer");
 
 const SAFE_EMAIL_FAILURE_MESSAGE = "Email service is temporarily unavailable. Please try again shortly.";
-const DEFAULT_SMTP_HOST = "smtp.gmail.com";
-const DEFAULT_SMTP_PORT = 465;
-const DEFAULT_TIMEOUT_MS = Number(process.env.EMAIL_TIMEOUT_MS || 10000);
+const DEFAULT_SMTP_HOST = String(process.env.EMAIL_SMTP_HOST || "smtp.gmail.com").trim();
+const DEFAULT_SMTP_PORT = Number(process.env.EMAIL_SMTP_PORT || 587);
+const SMTP_SECURE_SETTING = String(process.env.EMAIL_SMTP_SECURE || "").trim().toLowerCase();
+const DEFAULT_SMTP_SECURE = SMTP_SECURE_SETTING
+    ? SMTP_SECURE_SETTING === "true"
+    : DEFAULT_SMTP_PORT === 465;
+const DEFAULT_TIMEOUT_MS = Number(process.env.EMAIL_TIMEOUT_MS || 30000);
 
 let transporter = null;
 
@@ -38,11 +42,36 @@ function classifyTransportError(error = {}) {
 
     if (code === "EAUTH" || command === "AUTH" || responseCode === 535) return "EMAIL_AUTH_FAILED";
     if (code === "ETIMEDOUT" || code === "ESOCKETTIMEDOUT" || /timeout/i.test(error.message || "")) return "EMAIL_TIMEOUT";
-    if (["ENETUNREACH", "ECONNREFUSED", "ECONNRESET", "EHOSTUNREACH", "ENOTFOUND", "EAI_AGAIN"].includes(code)) {
+    if (["ESOCKET", "ENETUNREACH", "ECONNREFUSED", "ECONNRESET", "EHOSTUNREACH", "ENOTFOUND", "EAI_AGAIN"].includes(code)) {
         return "EMAIL_NETWORK_UNAVAILABLE";
     }
 
     return "EMAIL_SEND_FAILED";
+}
+
+function sanitizeSmtpField(value = "") {
+    let sanitized = String(value || "");
+    [
+        process.env.EMAIL_PASS,
+        process.env.EMAIL_USER
+    ].filter(Boolean).forEach(secret => {
+        sanitized = sanitized.split(String(secret)).join("[redacted]");
+    });
+    return sanitized.slice(0, 500);
+}
+
+function normalizeSmtpError(error = {}) {
+    return {
+        code: sanitizeSmtpField(error.code || ""),
+        message: sanitizeSmtpField(error.message || ""),
+        command: sanitizeSmtpField(error.command || ""),
+        response: sanitizeSmtpField(error.response || ""),
+        responseCode: error.responseCode || "",
+        errno: sanitizeSmtpField(error.errno || ""),
+        syscall: sanitizeSmtpField(error.syscall || ""),
+        address: sanitizeSmtpField(error.address || ""),
+        port: error.port || ""
+    };
 }
 
 function assertEmailConfig(env = process.env) {
@@ -52,7 +81,9 @@ function assertEmailConfig(env = process.env) {
 }
 
 function lookupIpv4(hostname, options, callback) {
-    return dns.lookup(hostname, { ...options, family: 4 }, callback);
+    const lookupOptions = typeof options === "function" ? {} : { ...(options || {}) };
+    const done = typeof options === "function" ? options : callback;
+    return dns.lookup(hostname, { ...lookupOptions, family: 4, all: false }, done);
 }
 
 function createTransport(env = process.env) {
@@ -61,7 +92,8 @@ function createTransport(env = process.env) {
     return nodemailer.createTransport({
         host: DEFAULT_SMTP_HOST,
         port: DEFAULT_SMTP_PORT,
-        secure: true,
+        secure: DEFAULT_SMTP_SECURE,
+        requireTLS: !DEFAULT_SMTP_SECURE,
         auth: {
             user: env.EMAIL_USER,
             pass: env.EMAIL_PASS
@@ -72,7 +104,9 @@ function createTransport(env = process.env) {
         dnsTimeout: DEFAULT_TIMEOUT_MS,
         lookup: lookupIpv4,
         tls: {
-            servername: DEFAULT_SMTP_HOST
+            servername: DEFAULT_SMTP_HOST,
+            minVersion: "TLSv1.2",
+            rejectUnauthorized: true
         }
     });
 }
@@ -100,6 +134,14 @@ function logEmailFailure({ operation = "email.send", to = "", messageType = "" }
         recipientHash: hashRecipient(to),
         code: normalizedCode,
         providerCode: error?.code || "",
+        smtp: normalizeSmtpError(error),
+        transport: {
+            host: DEFAULT_SMTP_HOST,
+            port: DEFAULT_SMTP_PORT,
+            secure: DEFAULT_SMTP_SECURE,
+            requireTLS: !DEFAULT_SMTP_SECURE,
+            timeoutMs: DEFAULT_TIMEOUT_MS
+        },
         responseCode: error?.responseCode || "",
         at: new Date().toISOString()
     });
@@ -150,6 +192,7 @@ module.exports = {
     hashRecipient,
     lookupIpv4,
     maskEmail,
+    normalizeSmtpError,
     sendEmail,
     verifyTransport
 };
