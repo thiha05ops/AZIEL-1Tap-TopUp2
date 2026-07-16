@@ -37,6 +37,7 @@
     "verify:manual-payment": "node backend/scripts/verify-manual-payment-flow.js",
     "verify:omise-webhook": "node backend/scripts/verify-omise-webhook.js",
     "verify:email-delivery": "node backend/scripts/verify-email-delivery.js",
+    "verify:email-provider-api": "node backend/scripts/verify-email-provider-api.js",
     "verify:production-readiness": "node backend/scripts/verify-production-readiness.js",
     "verify:public-launch": "node backend/scripts/verify-public-launch.js",
     "verify:faq-legal-surface": "node backend/scripts/verify-faq-legal-surface.js",

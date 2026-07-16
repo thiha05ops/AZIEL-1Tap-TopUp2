@@ -32,11 +32,16 @@ function verifyTransportOwnership() {
         .filter(file => read(file).includes("nodemailer.createTransport"));
     assert.deepStrictEqual(createTransportOwners, ["backend/services/emailTransportService.js"], "Exactly one canonical Nodemailer transporter owner is allowed.");
 
-    includes("backend/services/emailTransportService.js", "host: DEFAULT_SMTP_HOST", "Transport must use explicit Gmail SMTP host.");
+    includes("backend/services/emailTransportService.js", "EMAIL_PROVIDER", "Transport must support provider selection.");
+    includes("backend/services/emailTransportService.js", "brevo", "Transport must support Brevo provider.");
+    includes("backend/services/emailTransportService.js", "gmail_smtp", "Transport must retain Gmail SMTP fallback.");
+    includes("backend/services/emailTransportService.js", "BREVO_SEND_EMAIL_URL", "Transport must use Brevo transactional email API.");
+    includes("backend/services/emailTransportService.js", "https://api.brevo.com/v3/smtp/email", "Transport must use Brevo HTTPS endpoint.");
+    includes("backend/services/emailTransportService.js", "node-fetch", "Transport must use HTTPS API client for Brevo.");
+    includes("backend/services/emailTransportService.js", "host: smtpAddress", "Gmail fallback must connect to pre-resolved IPv4.");
     includes("backend/services/emailTransportService.js", "port: DEFAULT_SMTP_PORT", "Transport must use explicit SMTP port.");
-    includes("backend/services/emailTransportService.js", "secure: true", "Gmail 465 transport must be secure.");
-    includes("backend/services/emailTransportService.js", "lookup: lookupIpv4", "Transport must force/prefer IPv4 DNS lookup.");
-    includes("backend/services/emailTransportService.js", "dns.lookup(hostname, { ...options, family: 4 }, callback)", "IPv4 lookup must use dns.lookup family 4.");
+    includes("backend/services/emailTransportService.js", "requireTLS: !DEFAULT_SMTP_SECURE", "Gmail fallback must preserve STARTTLS on 587.");
+    includes("backend/services/emailTransportService.js", "dns.promises.lookup(hostname, { family: 4 })", "Gmail fallback must pre-resolve IPv4.");
     includes("backend/services/emailTransportService.js", "connectionTimeout", "Transport must set connection timeout.");
     includes("backend/services/emailTransportService.js", "socketTimeout", "Transport must set socket timeout.");
     includes("backend/services/emailTransportService.js", "EMAIL_CONFIG_MISSING", "Transport must classify missing config.");
@@ -44,7 +49,13 @@ function verifyTransportOwnership() {
     includes("backend/services/emailTransportService.js", "EMAIL_NETWORK_UNAVAILABLE", "Transport must classify network failure.");
     includes("backend/services/emailTransportService.js", "EMAIL_TIMEOUT", "Transport must classify timeout.");
     includes("backend/services/emailTransportService.js", "EMAIL_SEND_FAILED", "Transport must classify generic send failure.");
+    includes("backend/services/emailTransportService.js", "EMAIL_PROVIDER_UNSUPPORTED", "Transport must reject unsupported providers.");
+    includes("backend/services/emailTransportService.js", "BREVO_API_KEY", "Transport must support Brevo API key.");
+    includes("backend/services/emailTransportService.js", "EMAIL_FROM", "Transport must support EMAIL_FROM.");
+    includes("backend/services/emailTransportService.js", "EMAIL_FROM_NAME", "Transport must support EMAIL_FROM_NAME.");
+    includes("backend/services/emailTransportService.js", "EMAIL_REPLY_TO", "Transport must support EMAIL_REPLY_TO.");
     notMatches("backend/services/emailTransportService.js", /EMAIL_PASS[^,\n]*console|console[^;\n]*EMAIL_PASS/i, "Transport must not log EMAIL_PASS.");
+    notMatches("backend/services/emailTransportService.js", /BREVO_API_KEY[^,\n]*console|console[^;\n]*BREVO_API_KEY/i, "Transport must not log BREVO_API_KEY.");
 }
 
 function verifyOtpIntegration() {

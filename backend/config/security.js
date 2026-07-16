@@ -278,8 +278,24 @@ function validateOmise(result, env) {
 }
 
 function validateEmail(result, env) {
+    const provider = String(env.EMAIL_PROVIDER || "").trim().toLowerCase();
+    const hasBrevo = Boolean(String(env.BREVO_API_KEY || "").trim());
+    const selectedProvider = provider || (hasBrevo ? "brevo" : "gmail_smtp");
+
+    if (!["brevo", "gmail_smtp"].includes(selectedProvider)) {
+        addError(result, "PROD_EMAIL_PROVIDER_INVALID", "EMAIL_PROVIDER must be brevo or gmail_smtp.", "email");
+        return;
+    }
+
+    if (selectedProvider === "brevo") {
+        if (!hasBrevo || !String(env.EMAIL_FROM || "").trim()) {
+            addError(result, "PROD_EMAIL_CONFIG_MISSING", "BREVO_API_KEY and EMAIL_FROM are required for Brevo transactional email.", "email");
+        }
+        return;
+    }
+
     if (!String(env.EMAIL_USER || "").trim() || !String(env.EMAIL_PASS || "").trim()) {
-        addError(result, "PROD_EMAIL_CONFIG_MISSING", "EMAIL_USER and EMAIL_PASS are required for active email flows.", "email");
+        addError(result, "PROD_EMAIL_CONFIG_MISSING", "EMAIL_USER and EMAIL_PASS are required for Gmail SMTP fallback.", "email");
     }
 }
 

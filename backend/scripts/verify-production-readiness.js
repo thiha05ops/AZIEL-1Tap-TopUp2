@@ -19,8 +19,11 @@ function baseProductionEnv(overrides = {}) {
         OMISE_MODE: "live",
         OMISE_PUBLIC_KEY: "pkey_live_placeholder",
         OMISE_SECRET_KEY: "skey_live_placeholder",
-        EMAIL_USER: "aziel@example.com",
-        EMAIL_PASS: "email-app-password",
+        EMAIL_PROVIDER: "brevo",
+        BREVO_API_KEY: "brevo-api-key",
+        EMAIL_FROM: "noreply@aziel.example.com",
+        EMAIL_FROM_NAME: "AZIEL 1Tap Shop",
+        EMAIL_REPLY_TO: "support@aziel.example.com",
         REGISTRATION_OTP_PEPPER: "registration-otp-pepper-production-placeholder",
         TWO_FACTOR_ENCRYPTION_KEY: twoFactorKey,
         ALLOWED_ORIGINS: "https://aziel.example.com",
@@ -73,7 +76,13 @@ function main() {
         baseProductionEnv({ OMISE_PUBLIC_KEY: "pkey_live_placeholder", OMISE_SECRET_KEY: "skey_test_placeholder" }),
         "PAYMENT_KEY_MODE_MISMATCH"
     );
-    expectCode("missing email", baseProductionEnv({ EMAIL_USER: "", EMAIL_PASS: "" }), "PROD_EMAIL_CONFIG_MISSING");
+    expectCode("missing email", baseProductionEnv({ BREVO_API_KEY: "", EMAIL_FROM: "" }), "PROD_EMAIL_CONFIG_MISSING");
+    expectCode("invalid email provider", baseProductionEnv({ EMAIL_PROVIDER: "sendmail" }), "PROD_EMAIL_PROVIDER_INVALID");
+    assert.doesNotThrow(() => validateProductionReadiness(baseProductionEnv({
+        EMAIL_PROVIDER: "gmail_smtp",
+        EMAIL_USER: "aziel@example.com",
+        EMAIL_PASS: "email-app-password"
+    })));
     expectCode(
         "missing registration OTP pepper",
         baseProductionEnv({ REGISTRATION_OTP_PEPPER: "" }),
@@ -98,7 +107,7 @@ function main() {
     assert.doesNotThrow(() => validateProductionReadiness(baseProductionEnv()));
     assert.doesNotThrow(() => validateProductionReadiness(baseProductionEnv({ CATALOG_SOURCE: "database" })));
     assert.throws(
-        () => validateProductionReadiness(baseProductionEnv({ EMAIL_PASS: "" })),
+        () => validateProductionReadiness(baseProductionEnv({ BREVO_API_KEY: "" })),
         /PROD_EMAIL_CONFIG_MISSING/
     );
 

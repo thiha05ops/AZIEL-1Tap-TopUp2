@@ -1,8 +1,12 @@
 const crypto = require("crypto");
 const dns = require("dns");
+const fetch = require("node-fetch");
 const nodemailer = require("nodemailer");
 
 const SAFE_EMAIL_FAILURE_MESSAGE = "Email service is temporarily unavailable. Please try again shortly.";
+const SUPPORTED_EMAIL_PROVIDERS = new Set(["brevo", "gmail_smtp"]);
+const BREVO_SEND_EMAIL_URL = "https://api.brevo.com/v3/smtp/email";
+const BREVO_ACCOUNT_URL = "https://api.brevo.com/v3/account";
 const DEFAULT_SMTP_HOST = String(process.env.EMAIL_SMTP_HOST || "smtp.gmail.com").trim();
 const DEFAULT_SMTP_PORT = Number(process.env.EMAIL_SMTP_PORT || 587);
 const SMTP_SECURE_SETTING = String(process.env.EMAIL_SMTP_SECURE || "").trim().toLowerCase();
@@ -15,6 +19,7 @@ const TLS_SERVERNAME = "smtp.gmail.com";
 let transporter = null;
 let transporterPromise = null;
 let resolvedSmtpAddress = "";
+let activeProvider = "";
 
 class EmailTransportError extends Error {
     constructor(code, message = SAFE_EMAIL_FAILURE_MESSAGE, cause = null) {
@@ -42,9 +47,12 @@ function classifyTransportError(error = {}) {
     const code = String(error.code || "").toUpperCase();
     const command = String(error.command || "").toUpperCase();
     const responseCode = Number(error.responseCode || 0);
+    const status = Number(error.status || error.statusCode || 0);
 
-    if (code === "EAUTH" || command === "AUTH" || responseCode === 535) return "EMAIL_AUTH_FAILED";
+    if (code.startsWith("EMAIL_")) return code;
+    if (code === "EAUTH" || command === "AUTH" || responseCode === 535 || status === 401 || status === 403) return "EMAIL_AUTH_FAILED";
     if (code === "ETIMEDOUT" || code === "ESOCKETTIMEDOUT" || /timeout/i.test(error.message || "")) return "EMAIL_TIMEOUT";
+    if (status === 408 || status === 425 || status === 429 || status >= 500) return "EMAIL_NETWORK_UNAVAILABLE";
     if (["ESOCKET", "ENETUNREACH", "ECONNREFUSED", "ECONNRESET", "EHOSTUNREACH", "ENOTFOUND", "EAI_AGAIN"].includes(code)) {
         return "EMAIL_NETWORK_UNAVAILABLE";
     }
@@ -55,6 +63,7 @@ function classifyTransportError(error = {}) {
 function sanitizeSmtpField(value = "") {
     let sanitized = String(value || "");
     [
+        process.env.BREVO_API_KEY,
         process.env.EMAIL_PASS,
         process.env.EMAIL_USER
     ].filter(Boolean).forEach(secret => {
@@ -74,14 +83,58 @@ function normalizeSmtpError(error = {}) {
         errno: sanitizeSmtpField(original.errno || error.errno || ""),
         syscall: sanitizeSmtpField(original.syscall || error.syscall || ""),
         address: sanitizeSmtpField(original.address || error.address || ""),
-        port: original.port || error.port || ""
+        port: original.port || error.port || "",
+        status: original.status || error.status || error.statusCode || "",
+        provider: error.provider || activeProvider || ""
     };
 }
 
-function assertEmailConfig(env = process.env) {
+function normalizeProvider(value = "") {
+    return String(value || "").trim().toLowerCase();
+}
+
+function getEmailProvider(env = process.env) {
+    const configured = normalizeProvider(env.EMAIL_PROVIDER);
+    if (configured) {
+        if (!SUPPORTED_EMAIL_PROVIDERS.has(configured)) {
+            throw new EmailTransportError("EMAIL_PROVIDER_UNSUPPORTED");
+        }
+        return configured;
+    }
+
+    if (env.NODE_ENV === "production" && String(env.BREVO_API_KEY || "").trim()) return "brevo";
+    if (String(env.BREVO_API_KEY || "").trim() && !String(env.EMAIL_USER || "").trim()) return "brevo";
+    return "gmail_smtp";
+}
+
+function buildFromAddress(env = process.env) {
+    return String(env.EMAIL_FROM || env.EMAIL_USER || "").trim();
+}
+
+function buildFromName(env = process.env) {
+    return String(env.EMAIL_FROM_NAME || "AZIEL 1Tap Shop").trim();
+}
+
+function buildReplyTo(env = process.env) {
+    return String(env.EMAIL_REPLY_TO || "").trim();
+}
+
+function assertBrevoConfig(env = process.env) {
+    if (!String(env.BREVO_API_KEY || "").trim() || !buildFromAddress(env)) {
+        throw new EmailTransportError("EMAIL_CONFIG_MISSING");
+    }
+}
+
+function assertGmailSmtpConfig(env = process.env) {
     if (!String(env.EMAIL_USER || "").trim() || !String(env.EMAIL_PASS || "").trim()) {
         throw new EmailTransportError("EMAIL_CONFIG_MISSING");
     }
+}
+
+function assertEmailConfig(env = process.env) {
+    const provider = getEmailProvider(env);
+    if (provider === "brevo") return assertBrevoConfig(env);
+    return assertGmailSmtpConfig(env);
 }
 
 async function resolveSmtpIpv4(hostname = DEFAULT_SMTP_HOST) {
@@ -108,7 +161,7 @@ async function resolveSmtpIpv4(hostname = DEFAULT_SMTP_HOST) {
 }
 
 async function createTransport(env = process.env) {
-    assertEmailConfig(env);
+    assertGmailSmtpConfig(env);
     const smtpAddress = await resolveSmtpIpv4(DEFAULT_SMTP_HOST);
 
     return nodemailer.createTransport({
@@ -141,7 +194,118 @@ async function getTransporter() {
 }
 
 function buildFrom(env = process.env) {
-    return `"AZIEL 1Tap Shop" <${String(env.EMAIL_USER || "").trim()}>`;
+    return `"${buildFromName(env)}" <${buildFromAddress(env)}>`;
+}
+
+function brevoHeaders(env = process.env) {
+    return {
+        "accept": "application/json",
+        "api-key": String(env.BREVO_API_KEY || "").trim(),
+        "content-type": "application/json"
+    };
+}
+
+function buildBrevoPayload({ to, subject, html, text } = {}, env = process.env) {
+    const payload = {
+        sender: {
+            email: buildFromAddress(env),
+            name: buildFromName(env)
+        },
+        to: [{ email: String(to || "").trim() }],
+        subject: String(subject || ""),
+        htmlContent: String(html || ""),
+        textContent: String(text || "")
+    };
+
+    const replyTo = buildReplyTo(env);
+    if (replyTo) payload.replyTo = { email: replyTo };
+
+    return payload;
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        return await fetch(url, {
+            ...options,
+            signal: controller.signal
+        });
+    } catch (error) {
+        if (error?.name === "AbortError") {
+            const timeoutError = new Error(`Brevo API request timed out after ${timeoutMs}ms`);
+            timeoutError.code = "ETIMEDOUT";
+            timeoutError.provider = "brevo";
+            throw timeoutError;
+        }
+        error.provider = "brevo";
+        throw error;
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+async function parseBrevoError(response) {
+    let responseBody = "";
+    try {
+        responseBody = await response.text();
+    } catch (_error) {
+        responseBody = "";
+    }
+
+    const error = new Error(`Brevo API request failed with HTTP ${response.status}`);
+    error.provider = "brevo";
+    error.status = response.status;
+    error.responseCode = response.status;
+    error.response = responseBody.slice(0, 500);
+    error.code = response.status === 401 || response.status === 403
+        ? "EAUTH"
+        : `BREVO_HTTP_${response.status}`;
+    return error;
+}
+
+async function sendBrevoEmail(message = {}, env = process.env) {
+    assertBrevoConfig(env);
+
+    const response = await fetchWithTimeout(
+        BREVO_SEND_EMAIL_URL,
+        {
+            method: "POST",
+            headers: brevoHeaders(env),
+            body: JSON.stringify(buildBrevoPayload(message, env))
+        },
+        DEFAULT_TIMEOUT_MS
+    );
+
+    if (!response.ok) throw await parseBrevoError(response);
+
+    const data = await response.json().catch(() => ({}));
+    return {
+        messageId: data.messageId || data.messageIds?.[0] || "",
+        provider: "brevo",
+        response: data
+    };
+}
+
+async function verifyBrevoTransport(env = process.env) {
+    assertBrevoConfig(env);
+
+    const response = await fetchWithTimeout(
+        BREVO_ACCOUNT_URL,
+        {
+            method: "GET",
+            headers: brevoHeaders(env)
+        },
+        DEFAULT_TIMEOUT_MS
+    );
+
+    if (!response.ok) throw await parseBrevoError(response);
+
+    return {
+        provider: "brevo",
+        ready: true
+    };
 }
 
 function logEmailFailure({ operation = "email.send", to = "", messageType = "" } = {}, error) {
@@ -158,6 +322,7 @@ function logEmailFailure({ operation = "email.send", to = "", messageType = "" }
         providerCode: error?.code || "",
         smtp: normalizeSmtpError(error),
         transport: {
+            provider: activeProvider || "",
             host: DEFAULT_SMTP_HOST,
             resolvedAddress: resolvedSmtpAddress,
             port: DEFAULT_SMTP_PORT,
@@ -172,20 +337,25 @@ function logEmailFailure({ operation = "email.send", to = "", messageType = "" }
 
 async function sendEmail({ to, subject, html, text, messageType = "transactional", operation = "email.send" } = {}) {
     assertEmailConfig();
+    const provider = getEmailProvider();
+    activeProvider = provider;
 
     try {
-        const activeTransporter = await getTransporter();
-        const result = await activeTransporter.sendMail({
-            from: buildFrom(),
-            to,
-            subject,
-            html,
-            text
-        });
+        const message = { to, subject, html, text };
+        const result = provider === "brevo"
+            ? await sendBrevoEmail(message)
+            : await (await getTransporter()).sendMail({
+                from: buildFrom(),
+                to,
+                subject,
+                html,
+                text
+            });
 
         console.log("Email delivered:", {
             operation,
             messageType,
+            provider,
             recipient: maskEmail(to),
             recipientHash: hashRecipient(to),
             messageId: result?.messageId || "",
@@ -204,6 +374,9 @@ async function sendEmail({ to, subject, html, text, messageType = "transactional
 
 async function verifyTransport() {
     assertEmailConfig();
+    const provider = getEmailProvider();
+    activeProvider = provider;
+    if (provider === "brevo") return verifyBrevoTransport();
     const activeTransporter = await getTransporter();
     return activeTransporter.verify();
 }
@@ -211,12 +384,17 @@ async function verifyTransport() {
 module.exports = {
     EmailTransportError,
     SAFE_EMAIL_FAILURE_MESSAGE,
+    SUPPORTED_EMAIL_PROVIDERS,
+    buildBrevoPayload,
+    buildFrom,
     classifyTransportError,
     createTransport,
+    getEmailProvider,
     getTransporter,
     hashRecipient,
     maskEmail,
     normalizeSmtpError,
+    sendBrevoEmail,
     resolveSmtpIpv4,
     sendEmail,
     verifyTransport

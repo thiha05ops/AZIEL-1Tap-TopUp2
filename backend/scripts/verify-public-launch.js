@@ -82,8 +82,11 @@ function verifyConfiguration(findings) {
         OMISE_MODE: "production-required-payment",
         OMISE_PUBLIC_KEY: "production-required-payment",
         OMISE_SECRET_KEY: "production-required-payment",
-        EMAIL_USER: "production-required-email",
-        EMAIL_PASS: "production-required-email",
+        EMAIL_PROVIDER: "production-required-email-provider",
+        BREVO_API_KEY: "production-required-email",
+        EMAIL_FROM: "production-required-email",
+        EMAIL_FROM_NAME: "production-email-identity",
+        EMAIL_REPLY_TO: "optional-email-reply",
         REGISTRATION_OTP_PEPPER: "production-required-registration",
         TWO_FACTOR_ENCRYPTION_KEY: "production-required-security",
         ALLOWED_ORIGINS: "production-required-origin",
@@ -117,8 +120,9 @@ function verifyEmailPolicy(findings) {
         registration.includes("REGISTRATION_EMAIL_SEND_FAILED") &&
         password.includes("sendResetOTP") &&
         mail.includes("sendEmail") &&
-        transport.includes("nodemailer.createTransport") &&
-        transport.includes("lookupIpv4")
+        transport.includes("BREVO_SEND_EMAIL_URL") &&
+        transport.includes("sendBrevoEmail") &&
+        transport.includes("gmail_smtp")
     ) {
         addFinding(
             findings,
