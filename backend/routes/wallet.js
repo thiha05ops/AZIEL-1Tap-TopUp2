@@ -19,6 +19,7 @@ const authMiddleware = require("../middleware/authMiddleware");
 const Omise = require("../services/opnService");
 const realtime = require("../services/realtime");
 const notificationService = require("../services/notificationService");
+const walletEmailService = require("../services/walletEmailService");
 const { ORDER_STATES, PAYMENT_STATES, transitionOrder } = require("../services/orderStateService");
 const { CatalogError } = require("../services/catalogService");
 const {
@@ -477,6 +478,7 @@ router.post("/wallet/create", authMiddleware, async (req, res) => {
         const topup = await WalletTopup.create({
             topupId,
             username,
+            ...buildOrderCustomerSnapshot(req.user),
             amount: Number(amount),
             currency: currencyKey,
             region: topupRegion,
@@ -615,6 +617,7 @@ router.post("/wallet/manual-intent", authMiddleware, async (req, res) => {
             intentId: createWalletReference("WINT"),
             reference: createWalletReference("WALLET"),
             username,
+            ...buildOrderCustomerSnapshot(req.user),
             amount: Number(amount),
             currency: currencyKey,
             region: topupRegion,
@@ -839,6 +842,8 @@ async function submitWalletIntentSlip(req, res) {
             topupId: intent.reference,
             topupIntentId: intent.intentId,
             username: intent.username,
+            customerEmail: intent.customerEmail || "",
+            customerUserId: intent.customerUserId || null,
             amount: Number(intent.amount),
             currency: getCurrencyKey(intent.currency),
             region: intent.region,
@@ -1307,6 +1312,14 @@ router.put("/admin/wallet/topups/:id/status", adminMiddleware, async (req, res, 
                 currency: topup.currency
             });
 
+            walletEmailService.notifyWalletTopupRejected(topup).catch(error => {
+                console.log("Wallet top-up email dispatch failed:", {
+                    topupId: topup.topupId,
+                    status: topup.status,
+                    code: error?.code || "WALLET_TOPUP_EMAIL_DISPATCH_FAILED"
+                });
+            });
+
             await writeAdminAudit({
                 actor: req.admin,
                 req,
@@ -1399,6 +1412,14 @@ async function completeWalletTopup(req, topup) {
         amount: topup.amount,
         currency: currencyKey,
         duplicate: Boolean(creditResult.duplicate)
+    });
+
+    walletEmailService.notifyWalletTopupApproved(topup).catch(error => {
+        console.log("Wallet top-up email dispatch failed:", {
+            topupId: topup.topupId,
+            status: topup.status,
+            code: error?.code || "WALLET_TOPUP_EMAIL_DISPATCH_FAILED"
+        });
     });
 
     return {

@@ -15,6 +15,19 @@ const walletTopupSchema = new mongoose.Schema({
         required: true
     },
 
+    customerEmail: {
+        type: String,
+        trim: true,
+        lowercase: true,
+        default: ""
+    },
+
+    customerUserId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: null
+    },
+
     amount: {
         type: Number,
         required: true

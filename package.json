@@ -56,7 +56,8 @@
     "seed:catalog": "node backend/scripts/seed-catalog.js",
     "verify:production-hardening": "node backend/scripts/verify-production-hardening-sprint.js",
     "verify:payment-modal-mobile-overflow": "node backend/scripts/verify-payment-modal-mobile-overflow.js",
-    "verify:order-status-emails": "node backend/scripts/verify-order-status-email-notifications.js"
+    "verify:order-status-emails": "node backend/scripts/verify-order-status-email-notifications.js",
+    "verify:wallet-topup-emails": "node backend/scripts/verify-wallet-topup-emails.js"
   },
   "keywords": [],
   "author": "",

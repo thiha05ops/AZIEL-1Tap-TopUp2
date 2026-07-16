@@ -20,6 +20,7 @@ const wavepayService = require("../services/wavepayService");
 const realtime = require("../services/realtime");
 const notificationService = require("../services/notificationService");
 const orderEmailService = require("../services/orderEmailService");
+const walletEmailService = require("../services/walletEmailService");
 const { ORDER_STATES, PAYMENT_STATES, transitionOrder } = require("../services/orderStateService");
 const { applyPaymentToOrder, mapOmiseChargeStatus } = require("../services/paymentStateService");
 const { CatalogError } = require("../services/catalogService");
@@ -338,6 +339,14 @@ async function markWalletTopupPaid(req, topupId, transactionId = "") {
         username: topup.username,
         amount: topup.amount,
         currency: currencyKey
+    });
+
+    walletEmailService.notifyWalletTopupApproved(topup).catch(error => {
+        console.log("Wallet top-up email dispatch failed:", {
+            topupId: topup.topupId,
+            status: topup.status,
+            code: error?.code || "WALLET_TOPUP_EMAIL_DISPATCH_FAILED"
+        });
     });
 
     return {
