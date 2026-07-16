@@ -2,220 +2,102 @@
 <html lang="en">
 
 <head>
-
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+    <meta name="description" content="AZIEL Payment Policy explaining available payment options, confirmation, manual review, evidence, wallet eligibility, and payment safety.">
     <title>Payment Policy | AZIEL 1Tap Shop</title>
 
     <link rel="stylesheet" href="/css/theme/aziel-design-system.css?v=20260701">
     <link rel="stylesheet" href="/css/theme/aziel-header.css?v=20260701">
-
     <link rel="stylesheet" href="/css/core/main.css">
     <link rel="stylesheet" href="/css/core/layout.css">
     <link rel="stylesheet" href="/css/core/components.css">
-
+    <link rel="stylesheet" href="/css/core/footer.css">
     <link rel="stylesheet" href="/css/policy/policy.css">
-
 </head>
 
 <body>
-
     <div id="azHeaderMount" data-nav="account"></div>
 
     <main class="policy-container">
-
-        <div class="policy-header">
-
-            <a href="/home.html" class="back-btn" data-i18n="backHome">
-
-                ← Back Home
-
-            </a>
-
-            <h1 data-i18n="paymentPolicyTitle">
-
-                Payment Policy
-
-            </h1>
-
-            <p data-i18n="policyLastUpdated">
-
-                Last Updated : July 2026
-
-            </p>
-
-        </div>
+        <header class="policy-header">
+            <a href="/home.html" class="back-btn">&larr; Back Home</a>
+            <p class="policy-eyebrow">Legal</p>
+            <h1>Payment Policy</h1>
+            <p class="policy-updated">Last Updated: July 2026</p>
+        </header>
 
         <section class="policy-card">
+            <h2>Available Payment Options</h2>
+            <p>Payment options are shown during checkout and may vary by region, product, currency, account context, provider status, and current platform configuration. Static policy pages describe the model; checkout is the source of current availability.</p>
+        </section>
 
-            <h2 data-i18n="paymentMethodsTitle">
+        <section class="policy-card">
+            <h2>Payment Submitted vs Confirmed</h2>
+            <p>A submitted payment, opened payment request, uploaded evidence, or sent transfer is not the same as confirmed payment. Orders begin processing only after AZIEL receives automatic confirmation or completes manual verification.</p>
+        </section>
 
-                Accepted Payment Methods
-
-            </h2>
-
+        <section class="policy-card">
+            <h2>Automatic and Manual Confirmation</h2>
             <ul>
-
-                <li data-i18n="paymentMethod1">
-                    🇲🇲 KBZPay
-                </li>
-
-                <li data-i18n="paymentMethod2">
-                    🇲🇲 WavePay
-                </li>
-
-                <li data-i18n="paymentMethod3">
-                    🇲🇲 AYA Pay
-                </li>
-
-                <li data-i18n="paymentMethod4">
-                    🇹🇭 PromptPay
-                </li>
-
-                <li data-i18n="paymentMethod5">
-                    🇹🇭 SCB
-                </li>
-
-                <li data-i18n="paymentMethod6">
-                    AZIEL Wallet
-                </li>
-
+                <li>Some payment methods may be confirmed automatically through the configured provider flow.</li>
+                <li>Some payment methods require manual evidence review before an order moves forward.</li>
+                <li>Manual Review may be required when evidence is unclear, the amount differs, duplicate payments exist, or risk controls apply.</li>
             </ul>
-
         </section>
 
         <section class="policy-card">
-
-            <h2 data-i18n="paymentConfirmationTitle">
-
-                Payment Confirmation
-
-            </h2>
-
-            <p data-i18n="paymentConfirmationText">
-
-                Orders begin processing only after successful payment confirmation.
-                Some payment methods are verified automatically while others may require manual verification.
-
-            </p>
-
+            <h2>Regional Providers and Test Mode</h2>
+            <p>Regional payment names can appear only when configured for the current product and region. PromptPay or Omise-related payment flows must not be treated as production-live unless the active environment and provider configuration support live processing.</p>
         </section>
 
         <section class="policy-card">
-
-            <h2 data-i18n="paymentFailedTitle">
-
-                Failed Payment
-
-            </h2>
-
-            <ul>
-
-                <li data-i18n="paymentFailed1">
-                    Payment not completed.
-                </li>
-
-                <li data-i18n="paymentFailed2">
-                    Payment timeout.
-                </li>
-
-                <li data-i18n="paymentFailed3">
-                    Incorrect transfer amount.
-                </li>
-
-                <li data-i18n="paymentFailed4">
-                    Bank or payment provider error.
-                </li>
-
-            </ul>
-
+            <h2>Incorrect Amounts, Duplicate Payments, and Expired Requests</h2>
+            <p>Incorrect transfer amounts, duplicate payments, expired payment sessions, provider timeouts, or mismatched evidence may delay confirmation and require support review. Keep your payment evidence until the order or wallet top-up is resolved.</p>
         </section>
 
         <section class="policy-card">
-
-            <h2 data-i18n="paymentSecurityTitle">
-
-                Security
-
-            </h2>
-
-            <p data-i18n="paymentSecurityText">
-
-                AZIEL never stores your payment credentials.
-                Online payments are securely processed through supported payment providers.
-
-            </p>
-
+            <h2>Wallet Balance and Product Eligibility</h2>
+            <p>AZIEL Wallet may be available for eligible purchases or refund credits. Wallet balance updates only after the relevant top-up, refund, or adjustment is confirmed in platform records.</p>
         </section>
 
         <section class="policy-card">
-
-            <h2 data-i18n="needHelp">
-
-                Need Help?
-
-            </h2>
-
-            <p data-i18n="paymentHelpText">
-
-                If you experience payment issues, please prepare the following information.
-
-            </p>
-
-            <ul>
-
-                <li data-i18n="paymentHelpItem1">
-                    Order ID
-                </li>
-
-                <li data-i18n="paymentHelpItem2">
-                    Payment Method
-                </li>
-
-                <li data-i18n="paymentHelpItem3">
-                    Payment Time
-                </li>
-
-                <li data-i18n="paymentHelpItem4">
-                    Payment Receipt
-                </li>
-
-            </ul>
-
-            <a href="/support.html" class="policy-btn" data-i18n="contactSupport">
-
-                Contact Support
-
-            </a>
-
+            <h2>Payment Safety</h2>
+            <p>AZIEL will never ask for your password, OTP, recovery code, banking password, payment PIN, or private banking login. Public Telegram and Discord channels are not appropriate places to submit private payment evidence.</p>
         </section>
 
+        <section class="policy-card">
+            <h2>Provider Outages and Failed Payments</h2>
+            <p>Payment providers, banks, wallets, network services, or product systems may be unavailable or delayed. If payment cannot be verified or the request expires, the order may remain Payment Pending, move to Manual Review, fail, expire, or require support review.</p>
+        </section>
+
+        <section class="policy-card">
+            <h2>Need Help?</h2>
+            <p>For payment issues, contact the Support Center with your Order ID, payment method, payment time, amount, and evidence when relevant.</p>
+            <a href="/support.html" class="policy-btn">Open Support Center</a>
+        </section>
+
+        <footer class="site-footer trust-footer">
+            <div><h3>AZIEL</h3><p>Game top-ups, order tracking, wallet services, and customer support in one place.</p></div>
+            <div><h4 data-i18n="company">Company</h4><a href="/about.html" data-i18n="aboutAziel">About AZIEL</a><br><a href="/contact.html" data-i18n="contactUs">Contact Us</a></div>
+            <div><h4 data-i18n="support">Support</h4><a href="/support.html" data-i18n="supportCenter">Support Center</a><br><a href="/faq.html" data-i18n="faq">FAQ</a><br><a href="/account.html" data-i18n="myAccount">My Account</a></div>
+            <div><h4 data-i18n="legal">Legal</h4><a href="/policies/privacy.html" data-i18n="privacyPolicy">Privacy Policy</a><br><a href="/policies/terms.html" data-i18n="termsService">Terms of Service</a><br><a href="/policies/payment.html" data-i18n="paymentPolicy">Payment Policy</a><br><a href="/policies/refund.html" data-i18n="refundPolicy">Refund Policy</a><br><a href="/policies/support.html" data-i18n="supportPolicy">Support Policy</a></div>
+            <div><h4 data-i18n="followUs">Follow Us</h4><a href="https://www.facebook.com/share/1DhL7dQ16a/?mibextid=wwXIfr" target="_blank" rel="noopener noreferrer">Facebook</a><br><a href="https://t.me/aziel1tap" target="_blank" rel="noopener noreferrer">Telegram</a><br><a href="https://youtube.com/@aziel1tapshop" target="_blank" rel="noopener noreferrer">YouTube</a><br><a href="https://discord.gg/txTGuTK76" target="_blank" rel="noopener noreferrer">Discord</a></div>
+            <div class="footer-copy"><span data-i18n="footerCopyright">© 2026 AZIEL 1Tap Shop.</span><br><span data-i18n="tagline">1 TAP. TOP UP. DONE.</span></div>
+        </footer>
     </main>
 
-    <!-- Core -->
     <script src="/js/site-settings.js"></script>
-
-    <!-- Language -->
     <script src="/lang/en.js?v=20260706-i18n"></script>
     <script src="/lang/th.js?v=20260706-i18n"></script>
     <script src="/lang/my.js?v=20260706-i18n"></script>
     <script src="/js/i18n.js?v=20260706-i18n"></script>
-
-    <!-- User -->
     <script src="/js/user-state.js"></script>
-
-    <!-- Header -->
     <script src="/js/header-loader.js?v=20260706-i18n"></script>
     <script src="/js/header.js?v=20260706-i18n"></script>
     <script src="/js/header-scroll.js?v=20260706"></script>
-
-    <!-- Theme -->
     <script src="/js/theme.js?v=20260701"></script>
-
-    <!-- Locale -->
     <script src="/js/locale-switcher.js?v=20260706-i18n"></script>
-
 </body>
 
 </html>

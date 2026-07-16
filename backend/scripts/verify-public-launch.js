@@ -110,12 +110,15 @@ function verifyEmailPolicy(findings) {
     const registration = read("backend/services/registrationService.js");
     const password = read("backend/routes/password.js");
     const mail = read("backend/services/mail.js");
+    const transport = read("backend/services/emailTransportService.js");
 
     if (
         registration.includes("sendVerifyOTP") &&
         registration.includes("REGISTRATION_EMAIL_SEND_FAILED") &&
         password.includes("sendResetOTP") &&
-        mail.includes("transporter.sendMail")
+        mail.includes("sendEmail") &&
+        transport.includes("nodemailer.createTransport") &&
+        transport.includes("lookupIpv4")
     ) {
         addFinding(
             findings,

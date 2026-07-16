@@ -35,7 +35,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await res.json();
 
             if (!data.success) {
-                showMessage(data.message || "Failed to send OTP.", "error");
+                showMessage(safeEmailMessage(data.message || "Failed to send OTP."), "error");
                 setLoading(false);
                 return;
             }
@@ -79,5 +79,13 @@ document.addEventListener("DOMContentLoaded", () => {
             .replaceAll(">", "&gt;")
             .replaceAll('"', "&quot;")
             .replaceAll("'", "&#039;");
+    }
+
+    function safeEmailMessage(message) {
+        const text = String(message || "");
+        if (/ENETUNREACH|ECONN|ETIMEDOUT|smtp|465|587|::|stack|nodemailer/i.test(text)) {
+            return "Email service is temporarily unavailable. Please try again shortly.";
+        }
+        return text;
     }
 });

@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <title>FAQ | AZIEL 1Tap Shop</title>
+    <meta name="description" content="AZIEL Help Center answers for orders, payments, wallet refunds, account security, notifications, and support ownership.">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <link rel="stylesheet" href="/css/theme/aziel-design-system.css?v=20260701">
@@ -20,80 +21,257 @@
 
     <main class="faq-page">
         <section class="faq-hero">
-            <a href="/home.html" class="faq-back" data-i18n="backHome">← Back Home</a>
+            <a href="/home.html" class="faq-back">&larr; Back Home</a>
 
-            <h1 data-i18n="faqTitle">Frequently Asked Questions</h1>
+            <h1>AZIEL Help Center</h1>
 
-            <p data-i18n="faqSubtitle">
-                Find answers about orders, payments, refunds, accounts, and support.
+            <p>
+                Find clear answers about orders, payment confirmation, wallet refunds, account safety, notifications,
+                and where to get support.
             </p>
 
-            <input id="faqSearch" class="faq-search" type="text" placeholder="Search questions..."
-                data-i18n-placeholder="faqSearchPlaceholder">
+            <label class="sr-only" for="faqSearch">Search FAQ questions</label>
+            <input id="faqSearch" class="faq-search" type="search" placeholder="Search questions..." autocomplete="off">
         </section>
 
         <section class="faq-list" id="faqList">
 
             <div class="faq-item">
-                <button class="faq-question" data-i18n="faqQ1">What is AZIEL 1Tap Shop?</button>
-                <div class="faq-answer" data-i18n="faqA1">
-                    AZIEL is a game top-up platform for fast and secure digital game purchases.
+                <button class="faq-question" id="faq-q1" aria-expanded="false" aria-controls="faq-a1">What is AZIEL 1Tap Shop?<span class="faq-icon" aria-hidden="true"></span></button>
+                <div class="faq-answer" id="faq-a1" role="region" aria-labelledby="faq-q1" hidden>
+                    AZIEL is a digital commerce platform for game top-ups, order tracking, wallet services, and customer support in one place.
                 </div>
             </div>
 
             <div class="faq-item">
-                <button class="faq-question" data-i18n="faqQ2">Which countries are supported?</button>
-                <div class="faq-answer" data-i18n="faqA2">
-                    AZIEL currently focuses on Myanmar and Thailand users.
+                <button class="faq-question" id="faq-q2" aria-expanded="false" aria-controls="faq-a2">Which regions or countries are currently supported?<span class="faq-icon" aria-hidden="true"></span></button>
+                <div class="faq-answer" id="faq-a2" role="region" aria-labelledby="faq-q2" hidden>
+                    AZIEL currently focuses on Thailand and Myanmar. Availability can vary by product, currency, payment method, and account/order context.
                 </div>
             </div>
 
             <div class="faq-item">
-                <button class="faq-question" data-i18n="faqQ3">Which payment methods are available?</button>
-                <div class="faq-answer" data-i18n="faqA3">
-                    Myanmar users can use KBZPay, WavePay, and AYA Pay. Thailand users can use PromptPay and SCB when
-                    available.
+                <button class="faq-question" id="faq-q3" aria-expanded="false" aria-controls="faq-a3">Which games or products are available?<span class="faq-icon" aria-hidden="true"></span></button>
+                <div class="faq-answer" id="faq-a3" role="region" aria-labelledby="faq-q3" hidden>
+                    Available products may include supported game top-ups and digital products shown in the current catalog. Product availability and packages can change.
                 </div>
             </div>
 
             <div class="faq-item">
-                <button class="faq-question" data-i18n="faqQ4">How long does delivery take?</button>
-                <div class="faq-answer" data-i18n="faqA4">
-                    Most orders are processed as quickly as possible after payment confirmation. Some orders may take
-                    longer during maintenance or high traffic.
+                <button class="faq-question" id="faq-q4" aria-expanded="false" aria-controls="faq-a4">Which payment methods are available?<span class="faq-icon" aria-hidden="true"></span></button>
+                <div class="faq-answer" id="faq-a4" role="region" aria-labelledby="faq-q4" hidden>
+                    Payment options are shown during checkout and may include regional wallets, bank options, online providers, or AZIEL Wallet when eligible. Checkout is the current source of truth.
                 </div>
             </div>
 
             <div class="faq-item">
-                <button class="faq-question" data-i18n="faqQ5">Where can I check my order status?</button>
-                <div class="faq-answer" data-i18n="faqA5">
-                    You can check your order status from the Transactions page.
+                <button class="faq-question" id="faq-q5" aria-expanded="false" aria-controls="faq-a5">Why does payment availability differ by region?<span class="faq-icon" aria-hidden="true"></span></button>
+                <div class="faq-answer" id="faq-a5" role="region" aria-labelledby="faq-q5" hidden>
+                    Payment availability depends on region, currency, product eligibility, provider status, account context, and current platform configuration.
                 </div>
             </div>
 
             <div class="faq-item">
-                <button class="faq-question" data-i18n="faqQ6">Can I request a refund?</button>
-                <div class="faq-answer" data-i18n="faqA6">
-                    Refunds are available only under eligible conditions. Please read the Refund Policy for details.
+                <button class="faq-question" id="faq-q6" aria-expanded="false" aria-controls="faq-a6">How long does an order take?<span class="faq-icon" aria-hidden="true"></span></button>
+                <div class="faq-answer" id="faq-a6" role="region" aria-labelledby="faq-q6" hidden>
+                    Orders begin after payment is confirmed. Timing varies by product, payment verification, third-party availability, maintenance, and review needs.
                 </div>
             </div>
 
             <div class="faq-item">
-                <button class="faq-question" data-i18n="faqQ7">What happens if I enter the wrong Game ID?</button>
-                <div class="faq-answer" data-i18n="faqA7">
-                    Orders with incorrect User ID or Server ID may not be refundable after delivery. Always check your
-                    information before payment.
+                <button class="faq-question" id="faq-q7" aria-expanded="false" aria-controls="faq-a7">Where can I track my order?<span class="faq-icon" aria-hidden="true"></span></button>
+                <div class="faq-answer" id="faq-a7" role="region" aria-labelledby="faq-q7" hidden>
+                    Use the <a href="/tracking.html">Tracking page</a> or your Account area to review order status and refund state where available.
                 </div>
             </div>
 
             <div class="faq-item">
-                <button class="faq-question" data-i18n="faqQ8">How can I contact support?</button>
-                <div class="faq-answer" data-i18n="faqA8">
-                    You can contact AZIEL Support through the Support Center or Live Chat.
+                <button class="faq-question" id="faq-q8" aria-expanded="false" aria-controls="faq-a8">What do order statuses mean?<span class="faq-icon" aria-hidden="true"></span></button>
+                <div class="faq-answer" id="faq-a8" role="region" aria-labelledby="faq-q8" hidden>
+                    Payment Pending means payment is not confirmed. Manual Review means the order needs admin verification. Paid, Processing, Completed, Failed, Refund Requested, Refunded, Rejected, Cancelled, and Expired describe the current order or refund stage.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <button class="faq-question" id="faq-q9" aria-expanded="false" aria-controls="faq-a9">Why is my order still Payment Pending?<span class="faq-icon" aria-hidden="true"></span></button>
+                <div class="faq-answer" id="faq-a9" role="region" aria-labelledby="faq-q9" hidden>
+                    Payment Pending means AZIEL has not confirmed the payment yet. A submitted payment, receipt, or upload is not the same as confirmed payment.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <button class="faq-question" id="faq-q10" aria-expanded="false" aria-controls="faq-a10">What does Manual Review mean?<span class="faq-icon" aria-hidden="true"></span></button>
+                <div class="faq-answer" id="faq-a10" role="region" aria-labelledby="faq-q10" hidden>
+                    Manual Review means AZIEL needs to verify payment, order details, or risk signals before continuing. Support may ask for order context but never passwords, OTPs, or payment PINs.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <button class="faq-question" id="faq-q11" aria-expanded="false" aria-controls="faq-a11">What happens after payment is confirmed?<span class="faq-icon" aria-hidden="true"></span></button>
+                <div class="faq-answer" id="faq-a11" role="region" aria-labelledby="faq-q11" hidden>
+                    The order can move to Paid and then Processing. Completion depends on product delivery and third-party fulfillment availability.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <button class="faq-question" id="faq-q12" aria-expanded="false" aria-controls="faq-a12">What should I do if my top-up is not received?<span class="faq-icon" aria-hidden="true"></span></button>
+                <div class="faq-answer" id="faq-a12" role="region" aria-labelledby="faq-q12" hidden>
+                    Check your order status first. If it is Completed but not received, contact the <a href="/support.html">Support Center</a> with your Order ID and game identifiers.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <button class="faq-question" id="faq-q13" aria-expanded="false" aria-controls="faq-a13">Can I request a refund?<span class="faq-icon" aria-hidden="true"></span></button>
+                <div class="faq-answer" id="faq-a13" role="region" aria-labelledby="faq-q13" hidden>
+                    Refunds can be requested for eligible failed or cancelled orders and are reviewed against platform records. See the <a href="/policies/refund.html">Refund Policy</a>.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <button class="faq-question" id="faq-q14" aria-expanded="false" aria-controls="faq-a14">Where will an approved refund be credited?<span class="faq-icon" aria-hidden="true"></span></button>
+                <div class="faq-answer" id="faq-a14" role="region" aria-labelledby="faq-q14" hidden>
+                    Approved and completed refunds are credited to your AZIEL Wallet according to the current refund flow.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <button class="faq-question" id="faq-q15" aria-expanded="false" aria-controls="faq-a15">What happens if I enter the wrong User ID or Server ID?<span class="faq-icon" aria-hidden="true"></span></button>
+                <div class="faq-answer" id="faq-a15" role="region" aria-labelledby="faq-q15" hidden>
+                    Orders rely on the identifiers you provide. Wrong identifiers may cause delivery to the wrong account and may be non-refundable after successful delivery.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <button class="faq-question" id="faq-q16" aria-expanded="false" aria-controls="faq-a16">Can a completed digital order be cancelled?<span class="faq-icon" aria-hidden="true"></span></button>
+                <div class="faq-answer" id="faq-a16" role="region" aria-labelledby="faq-q16" hidden>
+                    Completed digital orders are usually not reversible because fulfillment may already be delivered through a third-party product system.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <button class="faq-question" id="faq-q17" aria-expanded="false" aria-controls="faq-a17">How does AZIEL Wallet work?<span class="faq-icon" aria-hidden="true"></span></button>
+                <div class="faq-answer" id="faq-a17" role="region" aria-labelledby="faq-q17" hidden>
+                    AZIEL Wallet can hold eligible balance for purchases and approved refunds. Wallet availability and product eligibility may vary.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <button class="faq-question" id="faq-q18" aria-expanded="false" aria-controls="faq-a18">Why is my wallet balance not updated?<span class="faq-icon" aria-hidden="true"></span></button>
+                <div class="faq-answer" id="faq-a18" role="region" aria-labelledby="faq-q18" hidden>
+                    Wallet updates require confirmed top-up, refund, or adjustment records. If a payment is submitted but not confirmed, the balance may not update yet.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <button class="faq-question" id="faq-q19" aria-expanded="false" aria-controls="faq-a19">How can I contact Support?<span class="faq-icon" aria-hidden="true"></span></button>
+                <div class="faq-answer" id="faq-a19" role="region" aria-labelledby="faq-q19" hidden>
+                    Use the <a href="/support.html">Support Center</a> for order, payment, wallet, and account issues so AZIEL can review the right records.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <button class="faq-question" id="faq-q20" aria-expanded="false" aria-controls="faq-a20">What information should I provide to Support?<span class="faq-icon" aria-hidden="true"></span></button>
+                <div class="faq-answer" id="faq-a20" role="region" aria-labelledby="faq-q20" hidden>
+                    Provide your Order ID, game name, User ID or Server ID where relevant, payment method, and a clear description. Attach payment evidence only through the appropriate support or payment flow.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <button class="faq-question" id="faq-q21" aria-expanded="false" aria-controls="faq-a21">Is Live Chat suitable for sending payment evidence?<span class="faq-icon" aria-hidden="true"></span></button>
+                <div class="faq-answer" id="faq-a21" role="region" aria-labelledby="faq-q21" hidden>
+                    Live Chat is useful for quick help, but private payment or account evidence should be submitted through the Support Center or the payment evidence flow when requested.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <button class="faq-question" id="faq-q22" aria-expanded="false" aria-controls="faq-a22">Will AZIEL ever ask for my password, OTP, or payment PIN?<span class="faq-icon" aria-hidden="true"></span></button>
+                <div class="faq-answer" id="faq-a22" role="region" aria-labelledby="faq-q22" hidden>
+                    No. AZIEL will never ask for your password, OTP, recovery code, banking password, or payment PIN.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <button class="faq-question" id="faq-q23" aria-expanded="false" aria-controls="faq-a23">How do I reset my password?<span class="faq-icon" aria-hidden="true"></span></button>
+                <div class="faq-answer" id="faq-a23" role="region" aria-labelledby="faq-q23" hidden>
+                    Use the password reset flow from the login page. Email delivery can take time depending on mailbox or provider conditions.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <button class="faq-question" id="faq-q24" aria-expanded="false" aria-controls="faq-a24">How are email notifications used?<span class="faq-icon" aria-hidden="true"></span></button>
+                <div class="faq-answer" id="faq-a24" role="region" aria-labelledby="faq-q24" hidden>
+                    AZIEL may use email for account verification, password reset, order updates, payment updates, wallet updates, and security notices when configured.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <button class="faq-question" id="faq-q25" aria-expanded="false" aria-controls="faq-a25">Why might an email or OTP be delayed?<span class="faq-icon" aria-hidden="true"></span></button>
+                <div class="faq-answer" id="faq-a25" role="region" aria-labelledby="faq-q25" hidden>
+                    Delays can happen because of email provider queues, spam filtering, network issues, or temporary mail service problems. Check spam folders and wait before requesting again.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <button class="faq-question" id="faq-q26" aria-expanded="false" aria-controls="faq-a26">How can I report an unauthorized account action?<span class="faq-icon" aria-hidden="true"></span></button>
+                <div class="faq-answer" id="faq-a26" role="region" aria-labelledby="faq-q26" hidden>
+                    Contact the Support Center immediately and include the account, time, and action you do not recognize. Do not share passwords, OTPs, or recovery codes.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <button class="faq-question" id="faq-q27" aria-expanded="false" aria-controls="faq-a27">Are prices and product availability permanent?<span class="faq-icon" aria-hidden="true"></span></button>
+                <div class="faq-answer" id="faq-a27" role="region" aria-labelledby="faq-q27" hidden>
+                    No. Prices, currencies, packages, and availability may change based on catalog configuration, region, supplier conditions, provider fees, or product availability.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <button class="faq-question" id="faq-q28" aria-expanded="false" aria-controls="faq-a28">Why might a package or payment method be temporarily unavailable?<span class="faq-icon" aria-hidden="true"></span></button>
+                <div class="faq-answer" id="faq-a28" role="region" aria-labelledby="faq-q28" hidden>
+                    A package or payment method may be unavailable because of maintenance, provider outage, region limits, catalog changes, account eligibility, or manual risk controls.
                 </div>
             </div>
 
         </section>
+
+        <p id="faqNoResults" class="faq-no-results" hidden>No matching questions found.</p>
+
+        <footer class="site-footer trust-footer">
+            <div>
+                <h3>AZIEL</h3>
+                <p>Game top-ups, order tracking, wallet services, and customer support in one place.</p>
+            </div>
+            <div>
+                <h4 data-i18n="company">Company</h4>
+                <a href="/about.html" data-i18n="aboutAziel">About AZIEL</a><br>
+                <a href="/contact.html" data-i18n="contactUs">Contact Us</a>
+            </div>
+            <div>
+                <h4 data-i18n="support">Support</h4>
+                <a href="/support.html" data-i18n="supportCenter">Support Center</a><br>
+                <a href="/faq.html" data-i18n="faq">FAQ</a><br>
+                <a href="/account.html" data-i18n="myAccount">My Account</a>
+            </div>
+            <div>
+                <h4 data-i18n="legal">Legal</h4>
+                <a href="/policies/privacy.html" data-i18n="privacyPolicy">Privacy Policy</a><br>
+                <a href="/policies/terms.html" data-i18n="termsService">Terms of Service</a><br>
+                <a href="/policies/payment.html" data-i18n="paymentPolicy">Payment Policy</a><br>
+                <a href="/policies/refund.html" data-i18n="refundPolicy">Refund Policy</a><br>
+                <a href="/policies/support.html" data-i18n="supportPolicy">Support Policy</a>
+            </div>
+            <div>
+                <h4 data-i18n="followUs">Follow Us</h4>
+                <a href="https://www.facebook.com/share/1DhL7dQ16a/?mibextid=wwXIfr" target="_blank" rel="noopener noreferrer">Facebook</a><br>
+                <a href="https://t.me/aziel1tap" target="_blank" rel="noopener noreferrer">Telegram</a><br>
+                <a href="https://youtube.com/@aziel1tapshop" target="_blank" rel="noopener noreferrer">YouTube</a><br>
+                <a href="https://discord.gg/txTGuTK76" target="_blank" rel="noopener noreferrer">Discord</a>
+            </div>
+            <div class="footer-copy">
+                <span data-i18n="footerCopyright">© 2026 AZIEL 1Tap Shop.</span><br>
+                <span data-i18n="tagline">1 TAP. TOP UP. DONE.</span>
+            </div>
+        </footer>
     </main>
 
     <script src="/js/site-settings.js"></script>

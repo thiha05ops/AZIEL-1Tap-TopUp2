@@ -56,7 +56,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     window.location.href = "login.html";
                 }, 1000);
             } else {
-                msg.innerHTML = `<div class="error-msg">${data.message}</div>`;
+                msg.innerHTML = `<div class="error-msg">${safeEmailMessage(data.message)}</div>`;
                 registerBtn.disabled = false;
                 registerBtn.innerText = "CREATE ACCOUNT";
             }
@@ -70,3 +70,16 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
 });
+
+function safeEmailMessage(message) {
+    const text = String(message || "");
+    if (/ENETUNREACH|ECONN|ETIMEDOUT|smtp|465|587|::|stack|nodemailer/i.test(text)) {
+        return "Email service is temporarily unavailable. Please try again shortly.";
+    }
+    return text
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}

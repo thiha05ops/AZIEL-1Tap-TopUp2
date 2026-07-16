@@ -1,5 +1,6 @@
 const Order = require("../models/Order");
 const realtime = require("./realtime");
+const orderEmailService = require("./orderEmailService");
 
 const ORDER_STATES = Object.freeze({
     PENDING_PAYMENT: "pending_payment",
@@ -165,6 +166,14 @@ async function emitCommittedTransition(order, entry) {
         game: order.game,
         packageName: order.packageName,
         latestTimelineEntry: entry || null
+    });
+
+    orderEmailService.notifyOrderTransition(order, entry).catch(error => {
+        console.log("Order lifecycle email dispatch failed:", {
+            orderId: order.orderId,
+            status: order.status,
+            code: error?.code || "ORDER_EMAIL_DISPATCH_FAILED"
+        });
     });
 }
 

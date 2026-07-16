@@ -219,7 +219,7 @@ async function beginRegistration(input, options = {}) {
 
         throw new RegistrationError(
             "REGISTRATION_EMAIL_SEND_FAILED",
-            "Could not send verification OTP. Please try again later.",
+            "Email service is temporarily unavailable. Please try again shortly.",
             503
         );
     }

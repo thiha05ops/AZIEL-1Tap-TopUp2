@@ -9,9 +9,9 @@ body {
 }
 
 .policy-container {
-    width: min(920px, calc(100% - 28px));
+    width: min(1040px, calc(100% - 28px));
     margin: 0 auto;
-    padding: 52px 0 80px;
+    padding: calc(var(--az-header-h, var(--az-header-height, 78px)) + 38px) 0 80px;
 }
 
 .policy-header {
@@ -26,14 +26,35 @@ body {
     font-weight: 800;
 }
 
-.policy-header h1 {
-    font-size: clamp(42px, 7vw, 76px);
-    line-height: 1;
-    color: var(--text);
-    letter-spacing: -2px;
+.back-btn:focus-visible,
+.policy-btn:focus-visible,
+.policy-card a:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--primary) 65%, transparent);
+    outline-offset: 3px;
 }
 
-.policy-header p {
+.policy-eyebrow {
+    width: fit-content;
+    margin-bottom: 12px;
+    padding: 7px 11px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--primary);
+    font-size: 12px;
+    font-weight: 950;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.policy-header h1 {
+    font-size: clamp(42px, 7vw, 76px);
+    line-height: 1.04;
+    color: var(--text);
+    letter-spacing: 0;
+}
+
+.policy-updated {
     margin-top: 14px;
     color: var(--text-muted);
     font-weight: 700;
@@ -60,22 +81,23 @@ body {
     color: var(--text-secondary);
     line-height: 1.8;
     font-size: 15px;
+    overflow-wrap: anywhere;
 }
 
-.policy-card ul {
-    list-style: none;
-    padding: 0;
+.policy-card ul,
+.policy-card ol {
+    padding-left: 22px;
     margin: 0;
 }
 
-.policy-card li+li {
+.policy-card li + li {
     margin-top: 8px;
 }
 
 .policy-btn {
     margin-top: 18px;
     display: inline-flex;
-    height: 46px;
+    min-height: 46px;
     padding: 0 20px;
     align-items: center;
     border-radius: 16px;
@@ -87,7 +109,8 @@ body {
 
 @media (max-width: 768px) {
     .policy-container {
-        padding-top: 28px;
+        width: min(100% - 24px, 1040px);
+        padding-top: calc(var(--az-header-mobile-height, var(--az-header-h, 72px)) + 26px);
     }
 
     .policy-card {

@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const faqLegalSurface = require("./verify-faq-legal-surface");
 
 const ROOT = path.resolve(__dirname, "../..");
 
@@ -15,7 +16,14 @@ const FOOTER_FILES = [
     "frontend/mobile-games.html",
     "frontend/pc-games.html",
     "frontend/about.html",
-    "frontend/contact.html"
+    "frontend/contact.html",
+    "frontend/support.html",
+    "frontend/faq.html",
+    "frontend/policies/privacy.html",
+    "frontend/policies/terms.html",
+    "frontend/policies/payment.html",
+    "frontend/policies/refund.html",
+    "frontend/policies/support.html"
 ];
 
 function read(relativePath) {
@@ -101,8 +109,9 @@ function verifyContactPage() {
 function verifyFooterDestinations() {
     FOOTER_FILES.forEach(file => {
         const source = read(file);
-        assert(source.includes('href="about.html"'), `${file}: Company footer must link About AZIEL to about.html.`);
-        assert(source.includes('href="contact.html"'), `${file}: Company footer must link Contact Us to contact.html.`);
+        assert(source.includes('href="about.html"') || source.includes('href="/about.html"'), `${file}: Company footer must link About AZIEL.`);
+        assert(source.includes('href="contact.html"') || source.includes('href="/contact.html"'), `${file}: Company footer must link Contact Us.`);
+        assert(source.includes("Game top-ups, order tracking, wallet services, and customer support in one place."), `${file}: Footer must use canonical safe brand statement.`);
         assert(!/<h4[^>]*data-i18n="company"[\s\S]*?href="#"/.test(source), `${file}: Company footer must not contain placeholder href.`);
 
         const followBlock = extractFollowBlock(source);
@@ -138,6 +147,7 @@ function verifyCssAndClaimSafety() {
 }
 
 function main() {
+    faqLegalSurface.main();
     verifyAboutPage();
     verifyContactPage();
     verifyFooterDestinations();

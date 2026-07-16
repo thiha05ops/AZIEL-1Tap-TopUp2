@@ -19,6 +19,7 @@ const WalletTopup = require("../models/WalletTopup");
 const wavepayService = require("../services/wavepayService");
 const realtime = require("../services/realtime");
 const notificationService = require("../services/notificationService");
+const orderEmailService = require("../services/orderEmailService");
 const { ORDER_STATES, PAYMENT_STATES, transitionOrder } = require("../services/orderStateService");
 const { applyPaymentToOrder, mapOmiseChargeStatus } = require("../services/paymentStateService");
 const { CatalogError } = require("../services/catalogService");
@@ -1155,6 +1156,13 @@ router.post("/payment/submit", authMiddleware, upload.single("slip"), async (req
                 currency: order.currency
             },
             source: "payment_submit"
+        });
+
+        orderEmailService.notifyManualPaymentSubmitted(order).catch(error => {
+            console.log("Manual payment email dispatch failed:", {
+                orderId: order.orderId,
+                code: error?.code || "PAYMENT_SLIP_EMAIL_FAILED"
+            });
         });
 
         await realtime.emitOrderUpdate(order.username, order);

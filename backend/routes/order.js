@@ -14,6 +14,7 @@ const authMiddleware = require("../middleware/authMiddleware");
 const { sendTelegramMessage } = require("../services/telegram");
 
 const createNotification = require("../services/createNotification");
+const orderEmailService = require("../services/orderEmailService");
 const adminMiddleware = require("../middleware/adminMiddleware");
 const { PERMISSIONS, requireAdminPermission } = require("../services/adminAuthorizationService");
 const { ADMIN_AUDIT_ACTIONS, writeAdminAudit } = require("../services/adminAuditService");
@@ -1021,6 +1022,15 @@ router.post("/orders", authMiddleware, orderCreateLimiter, upload.single("paymen
         });
         reservedRedemption = null;
         evidencePersisted = true;
+
+        if (order.paymentSlip || order.paymentEvidence?.url) {
+            orderEmailService.notifyManualPaymentSubmitted(order).catch(error => {
+                console.log("Manual order email dispatch failed:", {
+                    orderId: order.orderId,
+                    code: error?.code || "PAYMENT_SLIP_EMAIL_FAILED"
+                });
+            });
+        }
 
         res.json({
             success: true,

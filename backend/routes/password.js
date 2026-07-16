@@ -6,6 +6,7 @@ const crypto = require("crypto");
 
 const User = require("../models/User");
 const { sendResetOTP } = require("../services/mail");
+const { EmailTransportError, SAFE_EMAIL_FAILURE_MESSAGE } = require("../services/emailTransportService");
 const {
     createSecurityNotification,
     recordSecurityEvent,
@@ -91,7 +92,24 @@ router.post("/send-otp", async (req, res) => {
 
         await user.save();
 
-        await sendResetOTP(email, otp);
+        try {
+            await sendResetOTP(email, otp);
+        } catch (error) {
+            clearResetOTP(user);
+            await user.save();
+
+            if (!(error instanceof EmailTransportError)) {
+                console.log("Password reset OTP email failed:", {
+                    code: error?.code || "EMAIL_SEND_FAILED"
+                });
+            }
+
+            return res.status(503).json({
+                success: false,
+                code: "PASSWORD_RESET_EMAIL_SEND_FAILED",
+                message: SAFE_EMAIL_FAILURE_MESSAGE
+            });
+        }
 
         return res.json({
             success: true,
@@ -99,11 +117,13 @@ router.post("/send-otp", async (req, res) => {
         });
 
     } catch (error) {
-        console.log("Send OTP error:", error);
+        console.log("Send OTP error:", {
+            code: error?.code || "PASSWORD_RESET_OTP_FAILED"
+        });
 
         return res.json({
             success: false,
-            message: error.message || "Server error"
+            message: "Server error"
         });
     }
 });
