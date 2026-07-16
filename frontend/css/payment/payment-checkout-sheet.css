@@ -3,11 +3,12 @@
 .az-payment-sheet {
     position: fixed;
     inset: 0;
-    z-index: 100000;
+    z-index: 1000002;
     display: none;
     align-items: center;
     justify-content: center;
     padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    overflow-x: hidden;
     background: rgba(3, 7, 18, .72);
     backdrop-filter: blur(12px);
     --az-pay-sheet-bg: #10162b;
@@ -25,6 +26,14 @@
     --az-pay-sheet-danger: #fca5a5;
     --az-pay-sheet-success: #86efac;
     --az-pay-sheet-shadow: 0 24px 76px rgba(0, 0, 0, .58);
+}
+
+.az-payment-sheet,
+.az-payment-sheet *,
+.az-payment-sheet *::before,
+.az-payment-sheet *::after {
+    box-sizing: border-box;
+    max-width: 100%;
 }
 
 .az-payment-sheet.show {
@@ -73,6 +82,7 @@ body.light .az-payment-sheet {
     position: relative;
     width: min(472px, calc(100vw - 32px));
     max-height: min(780px, calc(100dvh - 32px));
+    min-width: 0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -86,7 +96,10 @@ body.light .az-payment-sheet {
 
 .az-payment-sheet__body {
     min-height: 0;
+    min-width: 0;
+    max-width: 100%;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 30px 28px 18px;
 }
 
@@ -146,6 +159,8 @@ body.light .az-payment-sheet {
     grid-template-columns: minmax(92px, .7fr) minmax(0, 1fr) auto;
     align-items: center;
     gap: 12px;
+    min-width: 0;
+    max-width: 100%;
     padding: 14px 0;
     border-bottom: 1px solid var(--az-pay-sheet-border);
 }
@@ -321,7 +336,10 @@ body.light .az-payment-sheet {
 .az-payment-sheet__submit {
     position: sticky;
     bottom: 0;
+    left: auto;
+    right: auto;
     width: 100%;
+    max-width: 100%;
     min-height: 58px;
     border: 0;
     border-radius: 0;
@@ -350,21 +368,31 @@ body.light .az-payment-sheet {
 @media (max-width: 520px) {
     .az-payment-sheet {
         align-items: flex-end;
-        padding: 0;
+        justify-content: center;
+        padding-top: max(12px, env(safe-area-inset-top));
+        padding-right: max(12px, env(safe-area-inset-right));
+        padding-bottom: env(safe-area-inset-bottom);
+        padding-left: max(12px, env(safe-area-inset-left));
     }
 
     .az-payment-sheet__panel {
-        width: 100vw;
-        max-height: 100dvh;
-        border-right: 0;
-        border-bottom: 0;
-        border-left: 0;
+        width: min(472px, calc(100vw - 24px));
+        max-width: calc(100vw - 24px);
+        max-height: calc(100dvh - max(12px, env(safe-area-inset-top)) - env(safe-area-inset-bottom));
+        margin-inline: auto;
         border-radius: 22px 22px 0 0;
     }
 
     .az-payment-sheet__body {
         padding-right: 20px;
         padding-left: 20px;
+    }
+
+    .az-payment-sheet__submit {
+        width: 100%;
+        max-width: 100%;
+        padding-right: 12px;
+        padding-left: 12px;
     }
 
     .az-payment-sheet__row {

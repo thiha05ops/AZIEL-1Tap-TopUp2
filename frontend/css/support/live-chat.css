@@ -39,6 +39,14 @@
         box-shadow var(--motion-duration-normal, .25s) var(--motion-ease-standard, ease) !important;
 }
 
+body.az-payment-sheet-open .aziel-support-tab,
+body.az-payment-sheet-open .chat-ball,
+body.az-payment-sheet-open .live-chat-panel {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+}
+
 .aziel-support-tab:hover,
 .chat-ball:hover {
     transform: translateY(-3px) !important;

@@ -251,12 +251,14 @@
         bindFilePreview();
         setMessage("", options.error || "");
         modal.classList.add("show");
+        document.body.classList.add("az-payment-sheet-open");
         modal.querySelector("[data-role='close']")?.focus();
     }
 
     function close(reason = "programmatic") {
         const modal = document.getElementById("azPaymentCheckoutSheet");
         modal?.classList.remove("show");
+        document.body.classList.remove("az-payment-sheet-open");
         activeState?.onClose?.(reason);
         activeState = null;
     }
