@@ -83,6 +83,7 @@ function verifyOrderEmailOwnership() {
         "PAYMENT_CONFIRMED",
         "ORDER_PROCESSING",
         "ORDER_COMPLETED",
+        "ORDER_CANCELLED",
         "ORDER_FAILED",
         "REFUND_REQUESTED",
         "REFUND_COMPLETED",

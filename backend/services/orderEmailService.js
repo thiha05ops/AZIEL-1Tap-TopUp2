@@ -13,6 +13,7 @@ const STATUS_EVENT_MAP = Object.freeze({
     paid: "PAYMENT_CONFIRMED",
     processing: "ORDER_PROCESSING",
     completed: "ORDER_COMPLETED",
+    cancelled: "ORDER_CANCELLED",
     failed: "ORDER_FAILED",
     refund_requested: "REFUND_REQUESTED",
     refund_pending: "REFUND_REQUESTED",
@@ -45,6 +46,11 @@ const EVENT_COPY = Object.freeze({
         subject: "Action needed for your order",
         title: "Action needed for your order",
         nextStep: "Your order could not be completed. You may be eligible to request a wallet refund from tracking."
+    },
+    ORDER_CANCELLED: {
+        subject: "Your order was cancelled",
+        title: "Your order was cancelled",
+        nextStep: "Your order was cancelled. If payment was already confirmed, you may be eligible to request a wallet refund from tracking."
     },
     REFUND_REQUESTED: {
         subject: "Refund request received",
@@ -294,7 +300,7 @@ async function deliverOrderEmail(order, eventType) {
         return { delivered: true };
     } catch (error) {
         await markFailed(delivery, error);
-        return { delivered: false, errorCode: classifyTransportError(error) };
+        throw error;
     }
 }
 
