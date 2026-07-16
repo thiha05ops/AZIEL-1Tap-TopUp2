@@ -40,6 +40,11 @@ const walletTopupSchema = new mongoose.Schema({
         default: ""
     },
 
+    topupIntentId: {
+        type: String,
+        default: ""
+    },
+
     transactionId: {
         type: String,
         default: ""
@@ -63,6 +68,17 @@ const walletTopupSchema = new mongoose.Schema({
         size: { type: Number, default: 0 },
         originalName: { type: String, default: "" },
         uploadedAt: { type: Date, default: null }
+    },
+
+    paymentSnapshot: {
+        method: { type: String, default: "" },
+        key: { type: String, default: "" },
+        region: { type: String, default: "" },
+        paymentType: { type: String, default: "" },
+        provider: { type: String, default: "" },
+        accountName: { type: String, default: "" },
+        accountNumber: { type: String, default: "" },
+        qrImage: { type: String, default: "" }
     },
 
     status: {
@@ -94,6 +110,13 @@ const walletTopupSchema = new mongoose.Schema({
 walletTopupSchema.index({ status: 1, createdAt: -1, _id: -1 });
 walletTopupSchema.index({ username: 1, createdAt: -1, _id: -1 });
 walletTopupSchema.index({ createdAt: -1, _id: -1 });
+walletTopupSchema.index(
+    { topupIntentId: 1 },
+    {
+        unique: true,
+        partialFilterExpression: { topupIntentId: { $type: "string", $gt: "" } }
+    }
+);
 
 module.exports = mongoose.model(
     "WalletTopup",

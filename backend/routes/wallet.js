@@ -2,12 +2,15 @@
 // AZIEL Wallet V2.5.1 - PromptPay Auto QR + Manual Slip Ready
 
 const express = require("express");
+const crypto = require("crypto");
 const router = express.Router();
 
 const User = require("../models/User");
 const Order = require("../models/Order");
 const WalletTopup = require("../models/WalletTopup");
+const WalletTopupIntent = require("../models/WalletTopupIntent");
 const WalletTransaction = require("../models/WalletTransaction");
+const PaymentMethod = require("../models/PaymentMethod");
 const upload = require("../middleware/imageMemoryUpload");
 const adminMiddleware = require("../middleware/adminMiddleware");
 const { PERMISSIONS, requireAdminPermission } = require("../services/adminAuthorizationService");
@@ -72,6 +75,140 @@ function shouldUsePromptPayAuto(region, method) {
     return String(region || "").toUpperCase() === "TH" && isPromptPay(method);
 }
 
+function normalizeWalletRegion(region, currency) {
+    const explicit = String(region || "").trim().toUpperCase();
+    if (["MM", "TH"].includes(explicit)) return explicit;
+    return getCurrencyKey(currency) === "THB" ? "TH" : "MM";
+}
+
+function safePublicPaymentAssetUrl(value = "") {
+    const url = String(value || "").trim();
+    if (!url) return "";
+    if (/^[a-zA-Z]:\\|^\/Users\/|^\/private\/|^file:/i.test(url)) return "";
+    if (/^https?:\/\//i.test(url)) return url;
+    if (url.startsWith("/uploads/") || url.startsWith("/assets/")) return url;
+    return "";
+}
+
+function getMethodQrImage(method = {}) {
+    return safePublicPaymentAssetUrl(
+        method.uploadedQrImage ||
+        method.qrImageUrl ||
+        method.qrImage ||
+        ""
+    );
+}
+
+function isMethodInMaintenance(method = {}) {
+    return Boolean(String(method.maintenanceMessage || "").trim());
+}
+
+function isManualLikePaymentMethod(method = {}) {
+    return ["manual", "deeplink"].includes(String(method.paymentType || "manual").toLowerCase());
+}
+
+function isAutoPromptPayMethod(method = {}) {
+    return (
+        String(method.paymentType || "").toLowerCase() === "auto" &&
+        String(method.provider || "").toLowerCase() === "omise" &&
+        normalizeMethod(method.key) === "promptpay"
+    );
+}
+
+function projectWalletPaymentMethod(method = {}) {
+    return {
+        method: method.method || "Payment",
+        key: method.key || "",
+        region: method.region || "",
+        paymentType: method.paymentType || "manual",
+        provider: method.provider || "manual",
+        accountName: method.accountName || "",
+        accountNumber: method.accountNumber || "",
+        qrImage: getMethodQrImage(method),
+        maintenanceMessage: method.maintenanceMessage || "",
+        slipRequired: isManualLikePaymentMethod(method),
+        logoUrl: `/assets/payment/${method.key}.png`
+    };
+}
+
+function createWalletReference(prefix = "WALLET") {
+    return `${prefix}-${Date.now()}-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
+}
+
+function manualIntentExpiresAt() {
+    return new Date(Date.now() + 15 * 60 * 1000);
+}
+
+function isExpiredIntent(intent = {}) {
+    return !intent.expiresAt || new Date(intent.expiresAt).getTime() <= Date.now();
+}
+
+function assertManualIntentUsable(intent) {
+    if (!intent || intent.status !== "active" || intent.consumedAt || isExpiredIntent(intent)) {
+        const error = new Error("This payment session has expired. Please start the top-up again.");
+        error.statusCode = 410;
+        throw error;
+    }
+}
+
+function createPaymentSnapshot(methodPresentation = {}) {
+    return {
+        method: methodPresentation.method || "Payment",
+        key: methodPresentation.key || "",
+        region: methodPresentation.region || "",
+        paymentType: methodPresentation.paymentType || "",
+        provider: methodPresentation.provider || "",
+        accountName: methodPresentation.accountName || "",
+        accountNumber: methodPresentation.accountNumber || "",
+        qrImage: methodPresentation.qrImage || ""
+    };
+}
+
+async function resolveWalletPaymentMethod({ paymentMethod, region, currency }) {
+    const key = normalizeMethod(paymentMethod);
+    const topupRegion = normalizeWalletRegion(region, currency);
+
+    if (!key || key === "wallet") {
+        const error = new Error("Please select a valid wallet top-up payment method.");
+        error.statusCode = 400;
+        throw error;
+    }
+
+    const method = await PaymentMethod.findOne({
+        key,
+        region: topupRegion
+    }).lean();
+
+    if (!method) {
+        const error = new Error("Selected payment method is not available for this region.");
+        error.statusCode = 400;
+        throw error;
+    }
+
+    if (method.enabled !== true) {
+        const error = new Error("Selected payment method is currently unavailable.");
+        error.statusCode = 400;
+        throw error;
+    }
+
+    if (isMethodInMaintenance(method)) {
+        const error = new Error(method.maintenanceMessage || "Selected payment method is under maintenance.");
+        error.statusCode = 400;
+        throw error;
+    }
+
+    if (String(method.paymentType || "").toLowerCase() === "wallet" || String(method.provider || "").toLowerCase() === "wallet") {
+        const error = new Error("AZIEL Wallet cannot be used to top up AZIEL Wallet.");
+        error.statusCode = 400;
+        throw error;
+    }
+
+    return {
+        method,
+        region: topupRegion
+    };
+}
+
 function createPromptPayCharge(amount, metadata = {}) {
     return new Promise((resolve, reject) => {
         Omise.sources.create(
@@ -108,52 +245,6 @@ function getQrUrl(source, charge) {
         charge?.source?.scannable_code?.image?.uri ||
         ""
     );
-}
-
-function getQrByMethod(paymentMethod) {
-    const method = normalizeMethod(paymentMethod);
-
-    const qrMap = {
-        promptpay: "/assets/payment/promptpay-qr.png"
-    };
-
-    return qrMap[method] || "";
-}
-
-function getAccountByMethod(paymentMethod) {
-    const method = normalizeMethod(paymentMethod);
-
-    const accounts = {
-        scb: {
-            accountName: process.env.SCB_ACCOUNT_NAME || "AZIEL",
-            accountNumber: process.env.SCB_ACCOUNT_NUMBER || "-"
-        },
-        wavepay: {
-            accountName: process.env.WAVEPAY_ACCOUNT_NAME || "AZIEL",
-            accountNumber: process.env.WAVEPAY_ACCOUNT_NUMBER || "-"
-        },
-        kbzpay: {
-            accountName: process.env.KBZPAY_ACCOUNT_NAME || "AZIEL",
-            accountNumber: process.env.KBZPAY_ACCOUNT_NUMBER || "-"
-        },
-        ayapay: {
-            accountName: process.env.AYAPAY_ACCOUNT_NAME || "AZIEL",
-            accountNumber: process.env.AYAPAY_ACCOUNT_NUMBER || "-"
-        },
-        cbpay: {
-            accountName: process.env.CBPAY_ACCOUNT_NAME || "AZIEL",
-            accountNumber: process.env.CBPAY_ACCOUNT_NUMBER || "-"
-        },
-        uabpay: {
-            accountName: process.env.UABPAY_ACCOUNT_NAME || "AZIEL",
-            accountNumber: process.env.UABPAY_ACCOUNT_NUMBER || "-"
-        }
-    };
-
-    return accounts[method] || {
-        accountName: process.env.DEFAULT_PAYMENT_ACCOUNT_NAME || "AZIEL",
-        accountNumber: process.env.DEFAULT_PAYMENT_ACCOUNT_NUMBER || "-"
-    };
 }
 
 async function emitWalletUpdate(username, payload) {
@@ -339,8 +430,7 @@ router.post("/wallet/create", authMiddleware, async (req, res) => {
             amount,
             currency,
             region,
-            paymentMethod,
-            provider
+            paymentMethod
         } = req.body;
         const username = req.user.username;
 
@@ -361,17 +451,27 @@ router.post("/wallet/create", authMiddleware, async (req, res) => {
         }
 
         const currencyKey = getCurrencyKey(currency);
-        const paymentMethodKey = normalizeMethod(paymentMethod);
-        const providerKey = normalizeMethod(provider);
-        const method = isPromptPay(paymentMethodKey)
-            ? paymentMethodKey
-            : providerKey || paymentMethodKey;
+        const resolved = await resolveWalletPaymentMethod({
+            paymentMethod,
+            region,
+            currency: currencyKey
+        });
+        const configuredMethod = resolved.method;
+        const method = configuredMethod.key;
         const topupId = "WALLET-" + Date.now();
-        const topupRegion = region || (currencyKey === "THB" ? "TH" : "MM");
+        const topupRegion = resolved.region;
 
-        const account = getAccountByMethod(method);
-        const autoQr = shouldUsePromptPayAuto(topupRegion, method);
-        const qrImage = isPromptPay(method) ? getQrByMethod(method) : "";
+        const methodPresentation = projectWalletPaymentMethod(configuredMethod);
+        const autoQr = shouldUsePromptPayAuto(topupRegion, method) && isAutoPromptPayMethod(configuredMethod);
+        const qrImage = autoQr ? "" : methodPresentation.qrImage;
+
+        if (!autoQr) {
+            return res.status(400).json({
+                success: false,
+                code: "MANUAL_TOPUP_REQUIRES_INTENT",
+                message: "Manual wallet top-ups must be submitted with a payment receipt."
+            });
+        }
 
         const topup = await WalletTopup.create({
             topupId,
@@ -380,6 +480,12 @@ router.post("/wallet/create", authMiddleware, async (req, res) => {
             currency: currencyKey,
             region: topupRegion,
             paymentMethod: method,
+            paymentProvider: configuredMethod.provider || "",
+            paymentSnapshot: createPaymentSnapshot({
+                ...methodPresentation,
+                provider: configuredMethod.provider || "omise",
+                paymentType: "auto"
+            }),
             status: "pending",
             qrImage,
             paymentSlip: "",
@@ -392,7 +498,8 @@ router.post("/wallet/create", authMiddleware, async (req, res) => {
             const result = await createPromptPayCharge(Number(amount), {
                 type: "wallet_topup",
                 topupId,
-                username
+                username,
+                paymentMethod: method
             });
 
             const charge = result.charge;
@@ -421,7 +528,14 @@ router.post("/wallet/create", authMiddleware, async (req, res) => {
                 message: "Wallet QR created",
                 provider: "omise",
                 paymentType: "auto",
-                paymentName: "PromptPay",
+                paymentName: configuredMethod.method || "PromptPay",
+                method: {
+                    ...methodPresentation,
+                    provider: "omise",
+                    paymentType: "auto",
+                    qrImage: qrUrl,
+                    slipRequired: false
+                },
                 topupId,
                 topup,
                 qrImage: qrUrl,
@@ -429,39 +543,115 @@ router.post("/wallet/create", authMiddleware, async (req, res) => {
                 transactionId: charge.id,
                 chargeId: charge.id,
                 status: charge.status,
-                accountName: account.accountName,
-                accountNumber: account.accountNumber
+                accountName: methodPresentation.accountName,
+                accountNumber: methodPresentation.accountNumber
             });
         }
 
-        realtime.emitAdminWalletUpdate({
-            type: "wallet_topup_created",
-            topupId,
+    } catch (error) {
+        console.log("Wallet create error:", error);
+
+        if (error.statusCode) {
+            return res.status(error.statusCode).json({
+                success: false,
+                message: error.message || "Selected payment method is unavailable."
+            });
+        }
+
+        return res.status(500).json({
+            success: false,
+            message: "Server error"
+        });
+    }
+});
+
+// ======================
+// CREATE MANUAL WALLET TOPUP INTENT
+// POST /api/wallet/manual-intent
+// ======================
+
+router.post("/wallet/manual-intent", authMiddleware, async (req, res) => {
+    try {
+        const { amount, currency, region, paymentMethod } = req.body;
+        const username = req.user.username;
+
+        if (!amount || Number(amount) <= 0 || !paymentMethod) {
+            return res.status(400).json({
+                success: false,
+                message: "Amount and payment method are required."
+            });
+        }
+
+        const user = await User.findOne({ username }).select("username");
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        const currencyKey = getCurrencyKey(currency);
+        const resolved = await resolveWalletPaymentMethod({
+            paymentMethod,
+            region,
+            currency: currencyKey
+        });
+        const configuredMethod = resolved.method;
+        const method = configuredMethod.key;
+        const topupRegion = resolved.region;
+
+        if (!isManualLikePaymentMethod(configuredMethod)) {
+            return res.status(400).json({
+                success: false,
+                message: "Selected payment method does not require manual receipt submission."
+            });
+        }
+
+        const methodPresentation = projectWalletPaymentMethod(configuredMethod);
+        const snapshot = createPaymentSnapshot(methodPresentation);
+        const intent = await WalletTopupIntent.create({
+            intentId: createWalletReference("WINT"),
+            reference: createWalletReference("WALLET"),
             username,
             amount: Number(amount),
             currency: currencyKey,
+            region: topupRegion,
             paymentMethod: method,
-            status: topup.status
+            paymentProvider: configuredMethod.provider || "manual",
+            paymentType: configuredMethod.paymentType || "manual",
+            methodSnapshot: snapshot,
+            expiresAt: manualIntentExpiresAt()
         });
 
         return res.json({
             success: true,
-            message: autoQr
-                ? "Wallet QR created"
-                : "Wallet manual payment created",
-            topupId,
-            topup,
-            provider: "manual",
-            paymentType: "manual",
-            qrImage,
-            qrUrl: qrImage,
-            accountName: account.accountName,
-            accountNumber: account.accountNumber,
-            status: topup.status
+            message: "Wallet payment instructions ready",
+            intentId: intent.intentId,
+            reference: intent.reference,
+            expiresAt: intent.expiresAt,
+            amount: intent.amount,
+            currency: intent.currency,
+            region: intent.region,
+            method: snapshot,
+            provider: intent.paymentProvider,
+            paymentType: intent.paymentType,
+            paymentName: snapshot.method,
+            qrImage: snapshot.qrImage,
+            qrUrl: snapshot.qrImage,
+            accountName: snapshot.accountName,
+            accountNumber: snapshot.accountNumber,
+            slipRequired: true
         });
-
     } catch (error) {
-        console.log("Wallet create error:", error);
+        console.log("Wallet manual intent error:", error);
+
+        if (error.statusCode) {
+            return res.status(error.statusCode).json({
+                success: false,
+                message: error.message || "Selected payment method is unavailable."
+            });
+        }
 
         return res.status(500).json({
             success: false,
@@ -580,6 +770,168 @@ router.get("/wallet/status/:topupId", authMiddleware, async (req, res) => {
         });
     }
 });
+
+// ======================
+// SUBMIT MANUAL WALLET TOPUP INTENT
+// POST /api/wallet/manual-intent/:intentId/slip
+// ======================
+
+async function submitWalletIntentSlip(req, res) {
+    let evidence = null;
+    let evidencePersisted = false;
+
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: "Payment receipt is required."
+            });
+        }
+
+        const intent = await WalletTopupIntent.findOne({
+            intentId: req.params.intentId,
+            username: req.user.username
+        });
+
+        assertManualIntentUsable(intent);
+
+        const resolved = await resolveWalletPaymentMethod({
+            paymentMethod: intent.paymentMethod,
+            region: intent.region,
+            currency: intent.currency
+        });
+        const configuredMethod = resolved.method;
+
+        if (!isManualLikePaymentMethod(configuredMethod)) {
+            return res.status(400).json({
+                success: false,
+                message: "Selected payment method no longer accepts manual receipts."
+            });
+        }
+
+        if (resolved.region !== intent.region || configuredMethod.key !== intent.paymentMethod) {
+            return res.status(400).json({
+                success: false,
+                message: "Payment method details changed. Please start the top-up again."
+            });
+        }
+
+        const existing = await WalletTopup.findOne({ topupIntentId: intent.intentId });
+        if (existing) {
+            return res.status(409).json({
+                success: false,
+                message: "This payment receipt has already been submitted.",
+                topupId: existing.topupId
+            });
+        }
+
+        const methodPresentation = projectWalletPaymentMethod(configuredMethod);
+        const snapshot = createPaymentSnapshot(methodPresentation);
+
+        evidence = await uploadFile({
+            file: req.file,
+            category: "walletSlip",
+            ownerReference: intent.reference
+        });
+
+        const topup = await WalletTopup.create({
+            topupId: intent.reference,
+            topupIntentId: intent.intentId,
+            username: intent.username,
+            amount: Number(intent.amount),
+            currency: getCurrencyKey(intent.currency),
+            region: intent.region,
+            paymentMethod: configuredMethod.key,
+            paymentProvider: configuredMethod.provider || "manual",
+            paymentSnapshot: snapshot,
+            qrImage: snapshot.qrImage,
+            paymentSlip: evidence.url,
+            paymentEvidence: evidence,
+            status: "pending",
+            note: "Payment slip uploaded. Waiting for admin verification."
+        });
+        evidencePersisted = true;
+
+        await WalletTopupIntent.updateOne(
+            {
+                _id: intent._id,
+                status: "active",
+                consumedAt: null
+            },
+            {
+                $set: {
+                    status: "consumed",
+                    consumedAt: new Date(),
+                    topupId: topup.topupId
+                }
+            }
+        );
+
+        await createWalletNotification(
+            req,
+            topup,
+            "Wallet Slip Uploaded",
+            `Your ${Number(topup.amount || 0).toLocaleString()} ${getCurrencyKey(topup.currency)} wallet top-up slip has been submitted.`
+        );
+
+        realtime.emitAdminWalletUpdate({
+            type: "wallet_slip_uploaded",
+            topupId: topup.topupId,
+            username: topup.username,
+            amount: topup.amount,
+            currency: topup.currency,
+            paymentMethod: topup.paymentMethod,
+            paymentSlip: evidence.url
+        });
+
+        return res.json({
+            success: true,
+            message: "Payment receipt submitted for verification.",
+            topup
+        });
+    } catch (error) {
+        console.log("Wallet intent slip upload error:", error);
+
+        if (evidence && !evidencePersisted) {
+            await cleanupAfterFailedPersistence(evidence);
+        }
+
+        if (error?.code === 11000) {
+            return res.status(409).json({
+                success: false,
+                message: "This payment receipt has already been submitted."
+            });
+        }
+
+        if (error instanceof StorageError) {
+            logStorageError(error.code, {
+                provider: error.provider,
+                category: "walletSlip",
+                intentId: req.params.intentId
+            });
+
+            return res.status(error.statusCode).json({
+                success: false,
+                code: error.code,
+                message: error.message
+            });
+        }
+
+        if (error.statusCode) {
+            return res.status(error.statusCode).json({
+                success: false,
+                message: error.message || "Payment session expired."
+            });
+        }
+
+        return res.status(500).json({
+            success: false,
+            message: "Server error"
+        });
+    }
+}
+
+router.post("/wallet/manual-intent/:intentId/slip", authMiddleware, upload.single("slip"), submitWalletIntentSlip);
 
 // ======================
 // UPLOAD WALLET SLIP

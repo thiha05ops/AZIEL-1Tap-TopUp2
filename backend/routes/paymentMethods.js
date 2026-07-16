@@ -72,15 +72,38 @@ async function seedPaymentMethods() {
 
 function formatMethod(method) {
     const obj = method.toObject();
+    const qrImage = safePublicAssetUrl(
+        obj.uploadedQrImage ||
+        obj.qrImageUrl ||
+        obj.qrImage ||
+        ""
+    );
 
     return {
-        ...obj,
-        qrImage:
-            obj.uploadedQrImage ||
-            obj.qrImageUrl ||
-            obj.qrImage ||
-            ""
+        _id: obj._id,
+        method: obj.method,
+        key: obj.key,
+        region: obj.region,
+        enabled: obj.enabled === true,
+        accountName: obj.accountName || "",
+        accountNumber: obj.accountNumber || "",
+        qrImage,
+        qrImageUrl: qrImage,
+        uploadedQrImage: qrImage,
+        maintenanceMessage: obj.maintenanceMessage || "",
+        paymentType: obj.paymentType || "manual",
+        provider: obj.provider || "manual",
+        logoUrl: `/assets/payment/${obj.key}.png`
     };
+}
+
+function safePublicAssetUrl(value = "") {
+    const url = String(value || "").trim();
+    if (!url) return "";
+    if (/^[a-zA-Z]:\\|^\/Users\/|^\/private\/|^file:/i.test(url)) return "";
+    if (/^https?:\/\//i.test(url)) return url;
+    if (url.startsWith("/uploads/") || url.startsWith("/assets/")) return url;
+    return "";
 }
 
 // GET /api/payment-methods

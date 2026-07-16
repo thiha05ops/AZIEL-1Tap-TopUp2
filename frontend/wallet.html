@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="/css/theme/wave-background.css">
     <link rel="stylesheet" href="/css/core/components.css">
     <link rel="stylesheet" href="/css/game/payment-grid.css">
+    <link rel="stylesheet" href="/css/payment/payment-checkout-sheet.css">
     <link rel="stylesheet" href="/css/account/wallet.css">
     <link rel="stylesheet" href="/css/support/live-chat.css?v=20260630">
 
@@ -61,8 +62,8 @@
                     <div>
                         <h2 data-i18n="topUpWallet">Top Up Wallet</h2>
 
-                        <span data-i18n="walletTopupDesc">
-                            Select amount and payment method. No slip upload required.
+                        <span id="walletTopupDesc" data-i18n="walletTopupDesc">
+                            Select amount and payment method to continue.
                         </span>
                     </div>
                 </div>
@@ -85,11 +86,11 @@
                 <input type="hidden" id="paymentMethod">
 
                 <button id="submitTopupBtn" class="wallet-submit-btn" type="button" data-i18n="generateQr">
-                    Generate QR
+                    Continue
                 </button>
 
-                <p class="wallet-note" data-i18n="walletAutoPaymentNote">
-                    Auto payment enabled. Scan the QR and your wallet will update after payment is confirmed.
+                <p id="walletPaymentNote" class="wallet-note" data-i18n="walletAutoPaymentNote">
+                    Your wallet updates after payment is confirmed.
                 </p>
             </div>
 
@@ -215,6 +216,7 @@
 
     <script src="/js/motion.js?v=20260712-m7"></script>
     <script src="/js/ui-feedback.js?v=20260712-m6"></script>
+    <script src="/js/payment/payment-checkout-sheet.js?v=20260716-shared"></script>
     <script src="/js/wallet.js?v=20260706-i18n"></script>
     <script src="/js/live-chat.js?v=202606301"></script>
     <script src="/js/pwa-fix.js?v=202606301"></script>

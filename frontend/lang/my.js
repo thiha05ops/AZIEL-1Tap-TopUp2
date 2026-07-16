@@ -438,11 +438,11 @@ window.AZIEL_LANG.my = {
     walletBalanceNote: "Payment successful ဖြစ်ပြီးနောက် wallet balance သည် အလိုအလျောက် update ဖြစ်ပါသည်။",
 
     topUpWallet: "Wallet ဖြည့်မည်",
-    walletTopupDesc: "Amount နှင့် payment method ကိုရွေးပါ။ Slip upload မလိုပါ။",
+    walletTopupDesc: "ဆက်လုပ်ရန် amount နှင့် payment method ကိုရွေးပါ။",
     enterAmount: "Amount ထည့်ပါ",
     generateQr: "QR ထုတ်မည်",
     generatingQr: "QR ထုတ်နေသည်...",
-    walletAutoPaymentNote: "Auto payment ဖွင့်ထားပါသည်။ QR scan လုပ်ပြီး payment confirmed ဖြစ်လျှင် wallet update ဖြစ်ပါမည်။",
+    walletAutoPaymentNote: "Payment confirmed ဖြစ်ပြီးနောက် wallet update ဖြစ်ပါမည်။",
 
     walletHistory: "Wallet မှတ်တမ်း",
     walletHistoryDesc: "လတ်တလော wallet top-up နှင့် transactions",

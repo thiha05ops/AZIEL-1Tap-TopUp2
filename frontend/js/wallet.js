@@ -10,21 +10,10 @@ let walletHistoryPagination = {
     hasMore: false,
     loadingMore: false
 };
+let walletPaymentMethods = [];
+let activeWalletManualIntent = null;
 
 const AUTO_QR_METHODS = ["promptpay"];
-const APP_OPEN_METHODS = [
-    "scb", "scbeasy",
-    "kplus", "kasikorn",
-    "bbl", "bangkok",
-    "ktb", "krungthai",
-    "krungsri", "kma",
-    "ttb",
-    "wavepay", "wave",
-    "kbzpay", "kbz",
-    "ayapay", "aya",
-    "cbpay", "cb",
-    "uabpay", "uab"
-];
 
 function wt(key, fallback = "") {
     if (window.AZIEL_I18N?.t) return window.AZIEL_I18N.t(key, fallback);
@@ -56,6 +45,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     await ensureWalletState();
 
     initQuickAmounts();
+    await loadWalletPaymentMethods();
     initWalletTopup();
     initWalletSocket();
     bindWalletEvents();
@@ -86,6 +76,7 @@ function bindWalletEvents() {
     window.addEventListener("aziel:walletChanged", renderWalletFromState);
 
     window.addEventListener("aziel:shopRegionChanged", async () => {
+        await loadWalletPaymentMethods();
         await loadWallet();
         updateTopupButtonByMethod();
     });
@@ -134,29 +125,23 @@ function normalizePaymentKey(value) {
 
 function getSelectedPaymentMethod() {
     const activeCard = document.querySelector(".pay-card.active");
-    const select = document.getElementById("paymentMethod");
 
-    const provider =
-        activeCard?.dataset.provider ||
-        activeCard?.dataset.key ||
-        activeCard?.dataset.value ||
-        select?.value ||
-        "";
-
-    const method =
-        activeCard?.dataset.name ||
-        activeCard?.querySelector("strong")?.innerText ||
-        activeCard?.innerText?.trim() ||
-        select?.selectedOptions?.[0]?.textContent ||
-        provider;
+    const key = activeCard?.dataset.method || "";
 
     return {
-        raw: provider,
-        key: normalizePaymentKey(provider),
-        provider: normalizePaymentKey(provider),
-        method,
+        raw: key,
+        key: normalizePaymentKey(key),
+        provider: normalizePaymentKey(activeCard?.dataset.provider || ""),
+        method: activeCard?.dataset.name || key,
+        paymentType: activeCard?.dataset.paymentType || "manual",
+        region: activeCard?.dataset.region || "",
+        qrImage: activeCard?.dataset.qr || "",
         accountName: activeCard?.dataset.accountName || "",
-        accountNumber: activeCard?.dataset.accountNumber || ""
+        accountNumber: activeCard?.dataset.accountNumber || "",
+        maintenanceMessage: activeCard?.dataset.maintenanceMessage || "",
+        slipRequired: activeCard?.dataset.slipRequired === "true",
+        deepLink: activeCard?.dataset.deepLink || "",
+        logo: activeCard?.dataset.logo || ""
     };
 }
 
@@ -166,14 +151,122 @@ function isPromptPayPayment(payment) {
     const method = normalizePaymentKey(payment?.method || "");
 
     return (
-        provider === "promptpay" ||
+        payment?.paymentType === "auto" ||
+        provider === "omise" ||
         raw === "promptpay" ||
         method.includes("promptpay")
     );
 }
 
-function isAppOpenMethod(method) {
-    return APP_OPEN_METHODS.includes(normalizePaymentKey(method));
+async function loadWalletPaymentMethods() {
+    const paymentGrid = document.getElementById("paymentGrid");
+    const paymentInput = document.getElementById("paymentMethod");
+    if (!paymentGrid || !paymentInput) return;
+
+    const region = getWalletRegion();
+    paymentGrid.innerHTML = `<p class="pay-loading">Loading payment methods...</p>`;
+    paymentInput.value = "";
+    walletPaymentMethods = [];
+
+    try {
+        const res = await fetch(walletApiUrl(`/api/payment-methods?region=${encodeURIComponent(region)}`), {
+            headers: AZIEL.authHeaders?.() || {}
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+            throw new Error(data.message || "Failed to load payment methods");
+        }
+
+        walletPaymentMethods = (Array.isArray(data.methods) ? data.methods : [])
+            .filter(isWalletFundingMethodAvailable);
+
+        renderWalletPaymentMethods(walletPaymentMethods);
+    } catch (error) {
+        console.log("Wallet payment methods error:", error);
+        paymentGrid.innerHTML = `<p class="pay-error">Payment methods failed to load.</p>`;
+        updateTopupButtonByMethod();
+    }
+}
+
+function isWalletFundingMethodAvailable(method = {}) {
+    const region = String(method.region || "").toUpperCase();
+    const type = normalizePaymentKey(method.paymentType || "");
+    const provider = normalizePaymentKey(method.provider || "");
+    if (method.enabled !== true) return false;
+    if (region !== getWalletRegion()) return false;
+    if (type === "wallet" || provider === "wallet" || normalizePaymentKey(method.key) === "wallet") return false;
+    if (String(method.maintenanceMessage || "").trim()) return false;
+    return true;
+}
+
+function renderWalletPaymentMethods(methods = []) {
+    const paymentGrid = document.getElementById("paymentGrid");
+    if (!paymentGrid) return;
+
+    if (!methods.length) {
+        paymentGrid.innerHTML = `<p class="pay-empty">No wallet top-up payment methods available.</p>`;
+        updateTopupButtonByMethod();
+        return;
+    }
+
+    paymentGrid.innerHTML = "";
+    methods.forEach((method, index) => {
+        paymentGrid.appendChild(buildWalletPaymentCard(method, index));
+    });
+
+    const firstCard = paymentGrid.querySelector(".pay-card");
+    if (firstCard) selectWalletPaymentCard(firstCard);
+}
+
+function buildWalletPaymentCard(method, index) {
+    const key = method.key || normalizePaymentKey(method.method);
+    const displayName = method.method || key || "Payment";
+    const logo = method.logoUrl || `/assets/payment/${key}.png`;
+    const qrImage = method.qrImage || method.uploadedQrImage || method.qrImageUrl || "";
+    const paymentType = method.paymentType || "manual";
+    const provider = method.provider || "manual";
+
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = `pay-card ${index === 0 ? "active" : ""}`;
+    card.dataset.method = key;
+    card.dataset.name = displayName;
+    card.dataset.logo = logo;
+    card.dataset.qr = qrImage;
+    card.dataset.accountName = method.accountName || "";
+    card.dataset.accountNumber = method.accountNumber || "";
+    card.dataset.paymentType = paymentType;
+    card.dataset.provider = provider;
+    card.dataset.region = method.region || "";
+    card.dataset.maintenanceMessage = method.maintenanceMessage || "";
+    card.dataset.slipRequired = String(["manual", "deeplink"].includes(paymentType));
+    card.dataset.deepLink = method.deepLink || method.deepLinkUrl || "";
+
+    card.innerHTML = `
+        <img src="${escapeWalletHTML(logo)}" class="pay-logo" alt="${escapeWalletHTML(displayName)}" onerror="this.src='/assets/logo.png'">
+        <div class="pay-info">
+            <span>${escapeWalletHTML(displayName)}</span>
+            ${getWalletPaymentBadge(paymentType, provider)}
+        </div>
+    `;
+
+    card.addEventListener("click", () => selectWalletPaymentCard(card));
+    return card;
+}
+
+function getWalletPaymentBadge(paymentType, provider) {
+    if (paymentType === "auto" || provider === "omise") return `<small class="auto-pay-badge">Auto</small>`;
+    if (paymentType === "deeplink") return `<small class="manual-pay-badge">Bank App</small>`;
+    return `<small class="manual-pay-badge">Receipt</small>`;
+}
+
+function selectWalletPaymentCard(card) {
+    const paymentInput = document.getElementById("paymentMethod");
+    document.querySelectorAll(".pay-card").forEach(c => c.classList.remove("active"));
+    card.classList.add("active");
+    if (paymentInput) paymentInput.value = card.dataset.method || "";
+    window.AZIEL_MOTION?.emphasize(card, "selected");
+    updateTopupButtonByMethod();
 }
 
 async function loadWallet() {
@@ -477,26 +570,6 @@ function bindPaymentMethodUI() {
 
     select?.addEventListener("change", updateTopupButtonByMethod);
 
-    document.querySelectorAll(".pay-card").forEach(card => {
-        card.addEventListener("click", () => {
-            document.querySelectorAll(".pay-card")
-                .forEach(c => c.classList.remove("active"));
-
-            card.classList.add("active");
-
-            const value =
-                card.dataset.value ||
-                card.dataset.provider ||
-                card.dataset.key ||
-                card.dataset.method ||
-                "";
-
-            if (select && value) select.value = value;
-
-            updateTopupButtonByMethod();
-        });
-    });
-
     updateTopupButtonByMethod();
 }
 
@@ -511,9 +584,12 @@ function initWalletTopup() {
 function updateTopupButtonByMethod() {
     const btn = document.getElementById("submitTopupBtn");
     const note = document.getElementById("walletPaymentNote");
+    const desc = document.getElementById("walletTopupDesc");
     if (!btn) return;
 
     btn.removeAttribute("data-i18n");
+    note?.removeAttribute("data-i18n");
+    desc?.removeAttribute("data-i18n");
 
     const payment = getSelectedPaymentMethod();
     const provider = payment.provider;
@@ -521,21 +597,24 @@ function updateTopupButtonByMethod() {
     if (!provider && !payment.method) {
         btn.innerText = "Select Payment Method";
         if (note) note.innerText = "Please select a payment method.";
+        if (desc) desc.innerText = "Select an amount and payment method to continue.";
         return;
     }
 
     if (isPromptPayPayment(payment)) {
         btn.innerText = "Generate QR";
         if (note) {
-            note.innerText = "Auto payment enabled. Scan the PromptPay QR and your wallet will update after payment is confirmed.";
+            note.innerText = "Your wallet updates after payment is confirmed.";
         }
+        if (desc) desc.innerText = "Automatic payment confirmation is available for this method.";
         return;
     }
 
-    btn.innerText = `Open ${payment.method} App`;
+    btn.innerText = "Continue";
     if (note) {
-        note.innerText = "Manual verification required. Open the app, transfer, then upload your payment slip.";
+        note.innerText = "Transfer the amount and submit your payment receipt for verification.";
     }
+    if (desc) desc.innerText = "Manual top-ups are submitted only after you upload a payment receipt.";
 }
 
 async function submitTopup() {
@@ -548,7 +627,7 @@ async function submitTopup() {
 
     const amount = Number(document.getElementById("topupAmount")?.value);
     const payment = getSelectedPaymentMethod();
-    const paymentMethod = payment.raw || payment.provider;
+    const paymentMethod = payment.key;
     const provider = payment.provider;
     const currency = getWalletCurrency();
     const region = getWalletRegion();
@@ -570,9 +649,9 @@ async function submitTopup() {
 
     try {
         if (btn) {
-            const loadingText = provider === "promptpay"
+            const loadingText = isPromptPayPayment(payment)
                 ? wt("generatingQr", "Generating QR...")
-                : wt("creatingPayment", "Creating Payment...");
+                : "Preparing instructions...";
 
             if (window.AZIEL_UI?.button) {
                 window.AZIEL_UI.button.setLoading(btn, { text: loadingText });
@@ -585,15 +664,10 @@ async function submitTopup() {
         showLoading(true);
         const isPromptPay = isPromptPayPayment(payment);
 
-        const backendPaymentMethod = isPromptPay
-            ? "promptpay"
-            : provider;
-
-        const backendProvider = isPromptPay
-            ? "promptpay"
-            : provider;
-
-        const res = await fetch(walletApiUrl("/api/wallet/create"), {
+        const endpoint = isPromptPay
+            ? "/api/wallet/create"
+            : "/api/wallet/manual-intent";
+        const res = await fetch(walletApiUrl(endpoint), {
             method: "POST",
             headers: AZIEL.authHeaders?.({ "Content-Type": "application/json" }) || {
                 "Content-Type": "application/json"
@@ -603,8 +677,7 @@ async function submitTopup() {
                 amount,
                 currency,
                 region,
-                paymentMethod: backendPaymentMethod,
-                provider: backendProvider
+                paymentMethod
             })
         });
 
@@ -623,17 +696,21 @@ async function submitTopup() {
             });
 
             startPaymentStatusPolling(data.topupId);
+            await loadWallet();
         } else {
             openWalletManualModal(data, {
                 amount,
                 currency,
-                paymentMethod,
-                provider,
-                accountName: payment.accountName || data.accountName,
-                accountNumber: payment.accountNumber || data.accountNumber
+                paymentMethod: data.paymentName || payment.method,
+                provider: data.provider || provider,
+                accountName: data.accountName || payment.accountName,
+                accountNumber: data.accountNumber || payment.accountNumber,
+                qrImage: data.qrImage || data.qrUrl || payment.qrImage,
+                slipRequired: data.slipRequired !== false,
+                deepLink: data.method?.deepLink || payment.deepLink,
+                method: data.method || payment
             });
         }
-        await loadWallet();
 
     } catch (error) {
         console.log("Wallet create error:", error);
@@ -682,199 +759,75 @@ function closeWalletQrModal() {
 }
 
 function openWalletManualModal(data, info) {
-    const modal = ensureWalletManualModal();
-
-    const topupId = data.topupId || data.id || "-";
+    const intentId = data.intentId || data.id || "";
+    const reference = data.reference || data.topupId || "-";
     const appName = info.paymentMethod || info.provider || "Payment";
     const accountName = info.accountName || data.accountName || "-";
     const accountNumber = info.accountNumber || data.accountNumber || "-";
+    const qrImage = info.qrImage || data.qrImage || data.qrUrl || "";
+    const slipRequired = info.slipRequired !== false;
+    const deepLink = info.deepLink || "";
 
-    modal.querySelector("#walletManualTitle").innerText = `${appName} Transfer`;
-    modal.querySelector("#walletManualTopupId").innerText = topupId;
-    modal.querySelector("#walletManualAmount").innerText =
-        `${Number(info.amount || 0).toLocaleString()} ${info.currency || ""}`;
-    modal.querySelector("#walletManualMethod").innerText = appName;
-    modal.querySelector("#walletManualAccountName").innerText = accountName;
-    modal.querySelector("#walletManualAccountNumber").innerText = accountNumber;
-
-    const openBtn = modal.querySelector("#walletOpenPaymentAppBtn");
-    openBtn.innerText = `Open ${appName} App`;
-    openBtn.onclick = () => {
-        openWalletPaymentApp(info.provider || info.paymentMethod);
+    activeWalletManualIntent = {
+        intentId,
+        reference,
+        expiresAt: data.expiresAt || "",
+        amount: info.amount,
+        currency: info.currency,
+        method: appName
     };
 
-    modal.querySelector("#copyWalletAmountBtn").onclick = () => {
-        copyWalletText(String(info.amount || ""));
-    };
+    window.PaymentCheckoutSheet.show({
+        methodCode: data.method?.key || info.method?.key || data.paymentMethod || "",
+        methodName: appName,
+        amount: info.amount,
+        currency: info.currency,
+        accountName,
+        accountNumber,
+        reference,
+        qrImageUrl: qrImage,
+        instructions: "Transfer the exact amount, then upload the payment receipt.",
+        requiresSlip: slipRequired,
+        deepLink,
+        submitLabel: "Submit for Verification",
+        loadingText: "Submitting receipt...",
+        onSubmit: async ({ file, setMessage, close }) => {
+            const formData = new FormData();
+            formData.append("slip", file);
+            formData.append("intentId", intentId);
 
-    modal.querySelector("#copyWalletAccountBtn").onclick = () => {
-        copyWalletText(accountNumber);
-    };
+            const res = await fetch(walletApiUrl(`/api/wallet/manual-intent/${encodeURIComponent(intentId)}/slip`), {
+                method: "POST",
+                headers: AZIEL.authHeaders?.() || {},
+                body: formData
+            });
+            const result = await res.json().catch(() => ({}));
 
-    modal.querySelector("#copyWalletRefBtn").onclick = () => {
-        copyWalletText(topupId);
-    };
+            if (!res.ok || result.success === false) {
+                setMessage("error", result?.message || "Receipt submission failed. Please try again.");
+                return false;
+            }
 
-    const fileInput = modal.querySelector("#walletManualSlip");
-    const previewBox = modal.querySelector("#walletManualSlipPreviewBox");
-    const previewImg = modal.querySelector("#walletManualSlipPreviewImage");
-    const msgBox = modal.querySelector("#walletManualMsg");
-    const submitBtn = modal.querySelector("#walletSubmitSlipBtn");
-
-    fileInput.value = "";
-    previewBox.style.display = "none";
-    previewImg.src = "";
-    msgBox.innerText = "";
-    msgBox.className = "";
-
-    fileInput.onchange = () => {
-        const file = fileInput.files?.[0];
-        if (!file) return;
-
-        previewImg.src = URL.createObjectURL(file);
-        previewBox.style.display = "block";
-    };
-
-    modal.querySelector("#walletRemoveSlipBtn").onclick = () => {
-        fileInput.value = "";
-        previewImg.src = "";
-        previewBox.style.display = "none";
-    };
-
-    submitBtn.onclick = () => {
-        const file = fileInput.files?.[0];
-        submitWalletSlip(topupId, file, submitBtn, msgBox);
-    };
-
-    modal.querySelector("#closeWalletManualModal").onclick = closeWalletManualModal;
-
-    modal.classList.add("show");
-    window.AZIEL_I18N?.translatePage?.(document);
-}
-
-function ensureWalletManualModal() {
-    let modal = document.getElementById("walletManualModal");
-    if (modal) return modal;
-
-    modal = document.createElement("div");
-    modal.id = "walletManualModal";
-    modal.className = "wallet-qr-modal";
-
-    modal.innerHTML = `
-        <div class="wallet-qr-box wallet-manual-box">
-            <button type="button" id="closeWalletManualModal" class="wallet-modal-close">×</button>
-
-            <h3 id="walletManualTitle">Manual Payment</h3>
-
-            <div class="wallet-manual-info">
-                <div class="transfer-card">
-                    <h4>Amount</h4>
-                    <div class="transfer-row">
-                        <strong id="walletManualAmount">-</strong>
-                        <button type="button" id="copyWalletAmountBtn">Copy</button>
-                    </div>
-                </div>
-
-                <div class="transfer-card">
-                    <h4>Account Name</h4>
-                    <div class="transfer-row">
-                        <strong id="walletManualAccountName">-</strong>
-                    </div>
-                </div>
-
-                <div class="transfer-card">
-                    <h4>Account Number</h4>
-                    <div class="transfer-row">
-                        <strong id="walletManualAccountNumber">-</strong>
-                        <button type="button" id="copyWalletAccountBtn">Copy</button>
-                    </div>
-                </div>
-
-                <div class="transfer-card">
-                    <h4>Reference</h4>
-                    <div class="transfer-row">
-                        <strong id="walletManualTopupId">-</strong>
-                        <button type="button" id="copyWalletRefBtn">Copy</button>
-                    </div>
-                </div>
-
-                <div class="transfer-card">
-                    <h4>Payment Method</h4>
-                    <div class="transfer-row">
-                        <strong id="walletManualMethod">-</strong>
-                    </div>
-                </div>
-            </div>
-
-            <button type="button" id="walletOpenPaymentAppBtn" class="payment-open-bank">
-                Open Payment App
-            </button>
-
-            <div class="manual-payment-note">
-                <strong>Already transferred?</strong>
-                <span>Upload your payment slip and wait for admin verification.</span>
-            </div>
-
-            <label class="manual-slip-upload">
-                <span>Upload Payment Slip</span>
-                <input type="file" id="walletManualSlip" accept="image/*">
-            </label>
-
-            <div id="walletManualSlipPreviewBox" class="manual-slip-preview" style="display:none;">
-                <img id="walletManualSlipPreviewImage" src="" alt="Payment Slip">
-                <button type="button" id="walletRemoveSlipBtn">Remove</button>
-            </div>
-
-            <div id="walletManualMsg"></div>
-
-            <button type="button" id="walletSubmitSlipBtn" class="wallet-submit-slip-btn">
-                Submit Payment Slip
-            </button>
-        </div>
-    `;
-
-    document.body.appendChild(modal);
-    return modal;
+            showWalletToast("Payment receipt submitted for verification.", "success");
+            await loadWallet();
+            close("submitted");
+            resetTopupForm();
+            return true;
+        },
+        onClose: () => {
+            activeWalletManualIntent = null;
+        }
+    });
 }
 
 function closeWalletManualModal() {
-    document.getElementById("walletManualModal")?.classList.remove("show");
+    window.PaymentCheckoutSheet?.close?.("programmatic");
+    activeWalletManualIntent = null;
 }
 
-function getWalletDeepLink(provider) {
-    const p = normalizePaymentKey(provider);
-
-    const links = {
-        scb: "scbeasy://",
-        scbeasy: "scbeasy://",
-        kplus: "kplus://",
-        kasikorn: "kplus://",
-        bbl: "bualuangmbanking://",
-        bangkok: "bualuangmbanking://",
-        ktb: "krungthainext://",
-        krungthai: "krungthainext://",
-        krungsri: "kma://",
-        kma: "kma://",
-        ttb: "ttbtouch://",
-
-        wavepay: "wavepay://",
-        wave: "wavepay://",
-        kbzpay: "kbzpay://",
-        kbz: "kbzpay://",
-        ayapay: "ayapay://",
-        aya: "ayapay://",
-        cbpay: "cbpay://",
-        cb: "cbpay://",
-        uabpay: "uabpay://",
-        uab: "uabpay://"
-    };
-
-    return links[p] || "";
-}
-
-function openWalletPaymentApp(provider) {
+function openWalletPaymentApp(deepLink) {
     const msgBox = document.getElementById("walletManualMsg");
-    const link = getWalletDeepLink(provider);
+    const link = String(deepLink || "").trim();
 
     if (!link) {
         setWalletMsg(
@@ -911,15 +864,20 @@ function copyWalletText(text) {
         });
 }
 
-async function submitWalletSlip(topupId, file, btn, msgBox) {
+async function submitWalletSlip(intentId, file, btn, msgBox) {
+    if (!intentId) {
+        setWalletMsg(msgBox, "This payment session has expired. Please start the top-up again.", "error");
+        return;
+    }
+
     if (!file) {
-        setWalletMsg(msgBox, "Please upload your payment slip first.", "error");
+        setWalletMsg(msgBox, "Please choose your payment receipt first.", "error");
         return;
     }
 
     const formData = new FormData();
     formData.append("slip", file);
-    formData.append("topupId", topupId);
+    formData.append("intentId", intentId);
 
     try {
         if (window.AZIEL_UI?.button) {
@@ -929,38 +887,17 @@ async function submitWalletSlip(topupId, file, btn, msgBox) {
             btn.innerText = "Submitting...";
         }
 
-        const endpoints = [
-            `/api/wallet/slip/${encodeURIComponent(topupId)}`,
-            `/api/wallet/topup/${encodeURIComponent(topupId)}/slip`,
-            `/api/wallet/upload-slip/${encodeURIComponent(topupId)}`
-        ];
+        const res = await fetch(walletApiUrl(`/api/wallet/manual-intent/${encodeURIComponent(intentId)}/slip`), {
+            method: "POST",
+            headers: AZIEL.authHeaders?.() || {},
+            body: formData
+        });
+        const data = await res.json().catch(() => ({}));
 
-        let data = null;
-        let success = false;
-
-        for (const endpoint of endpoints) {
-            try {
-                const res = await fetch(walletApiUrl(endpoint), {
-                    method: "POST",
-                    headers: AZIEL.authHeaders?.() || {},
-                    body: formData
-                });
-
-                data = await res.json().catch(() => ({}));
-
-                if (res.ok && data.success !== false) {
-                    success = true;
-                    break;
-                }
-            } catch (_) {
-                // try next endpoint
-            }
-        }
-
-        if (!success) {
+        if (!res.ok || data.success === false) {
             setWalletMsg(
                 msgBox,
-                data?.message || "Slip upload failed. Please check backend wallet slip route.",
+                data?.message || "Receipt submission failed. Please try again.",
                 "error"
             );
             return;
@@ -968,10 +905,10 @@ async function submitWalletSlip(topupId, file, btn, msgBox) {
 
         setWalletMsg(
             msgBox,
-            "Payment slip submitted. Please wait for admin verification.",
+            "Payment receipt submitted. Please wait for admin verification.",
             "success"
         );
-        showWalletToast("Payment slip submitted. Please wait for admin verification.", "success");
+        showWalletToast("Payment receipt submitted for verification.", "success");
 
         await loadWallet();
 
@@ -989,7 +926,7 @@ async function submitWalletSlip(topupId, file, btn, msgBox) {
             window.AZIEL_UI.button.reset(btn);
         } else {
             btn.disabled = false;
-            btn.innerText = "Submit Payment Slip";
+            btn.innerText = "Submit for Verification";
         }
     }
 }

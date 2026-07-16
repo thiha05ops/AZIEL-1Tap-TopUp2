@@ -1,0 +1,385 @@
+/* Shared AZIEL customer payment checkout sheet */
+
+.az-payment-sheet {
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    background: rgba(3, 7, 18, .72);
+    backdrop-filter: blur(12px);
+    --az-pay-sheet-bg: #10162b;
+    --az-pay-sheet-bg-soft: rgba(255, 255, 255, .075);
+    --az-pay-sheet-border: rgba(203, 213, 225, .18);
+    --az-pay-sheet-border-strong: rgba(216, 180, 254, .34);
+    --az-pay-sheet-title: #ffffff;
+    --az-pay-sheet-amount: #ffffff;
+    --az-pay-sheet-subtitle: #dbe4f5;
+    --az-pay-sheet-label: #b9c4d8;
+    --az-pay-sheet-value: #f8fafc;
+    --az-pay-sheet-instruction: #d1dbef;
+    --az-pay-sheet-accent: #d8b4fe;
+    --az-pay-sheet-accent-strong: #f3e8ff;
+    --az-pay-sheet-danger: #fca5a5;
+    --az-pay-sheet-success: #86efac;
+    --az-pay-sheet-shadow: 0 24px 76px rgba(0, 0, 0, .58);
+}
+
+.az-payment-sheet.show {
+    display: flex;
+}
+
+body.theme-dark .az-payment-sheet,
+body.dark .az-payment-sheet {
+    --az-pay-sheet-bg: #10162b;
+    --az-pay-sheet-bg-soft: rgba(255, 255, 255, .075);
+    --az-pay-sheet-border: rgba(203, 213, 225, .18);
+    --az-pay-sheet-border-strong: rgba(216, 180, 254, .34);
+    --az-pay-sheet-title: #ffffff;
+    --az-pay-sheet-amount: #ffffff;
+    --az-pay-sheet-subtitle: #dbe4f5;
+    --az-pay-sheet-label: #b9c4d8;
+    --az-pay-sheet-value: #f8fafc;
+    --az-pay-sheet-instruction: #d1dbef;
+    --az-pay-sheet-accent: #d8b4fe;
+    --az-pay-sheet-accent-strong: #f3e8ff;
+    --az-pay-sheet-danger: #fca5a5;
+    --az-pay-sheet-success: #86efac;
+    --az-pay-sheet-shadow: 0 24px 76px rgba(0, 0, 0, .58);
+}
+
+body.theme-light .az-payment-sheet,
+body.light .az-payment-sheet {
+    --az-pay-sheet-bg: #ffffff;
+    --az-pay-sheet-bg-soft: #f4f0ff;
+    --az-pay-sheet-border: rgba(88, 72, 133, .18);
+    --az-pay-sheet-border-strong: rgba(124, 58, 237, .28);
+    --az-pay-sheet-title: #111827;
+    --az-pay-sheet-amount: #111827;
+    --az-pay-sheet-subtitle: #4b5563;
+    --az-pay-sheet-label: #5b6474;
+    --az-pay-sheet-value: #172033;
+    --az-pay-sheet-instruction: #465366;
+    --az-pay-sheet-accent: #6d28d9;
+    --az-pay-sheet-accent-strong: #4c1d95;
+    --az-pay-sheet-danger: #b91c1c;
+    --az-pay-sheet-success: #15803d;
+    --az-pay-sheet-shadow: 0 24px 64px rgba(17, 24, 39, .22);
+}
+
+.az-payment-sheet__panel {
+    position: relative;
+    width: min(472px, calc(100vw - 32px));
+    max-height: min(780px, calc(100dvh - 32px));
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--az-pay-sheet-border-strong);
+    border-radius: 22px;
+    background: var(--az-pay-sheet-bg);
+    color: var(--az-pay-sheet-title);
+    box-shadow: var(--az-pay-sheet-shadow);
+    scrollbar-gutter: stable;
+}
+
+.az-payment-sheet__body {
+    min-height: 0;
+    overflow-y: auto;
+    padding: 30px 28px 18px;
+}
+
+.az-payment-sheet__close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    z-index: 2;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--az-pay-sheet-border);
+    border-radius: 999px;
+    background: var(--az-pay-sheet-bg-soft);
+    color: var(--az-pay-sheet-title);
+    font-size: 20px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.az-payment-sheet__header {
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--az-pay-sheet-border);
+}
+
+.az-payment-sheet__title {
+    margin: 0 42px 8px 0;
+    color: var(--az-pay-sheet-title);
+    font-size: 24px;
+    line-height: 1.15;
+    font-weight: 900;
+}
+
+.az-payment-sheet__amount {
+    display: block;
+    color: var(--az-pay-sheet-amount);
+    font-size: 34px;
+    line-height: 1.1;
+    font-weight: 950;
+}
+
+.az-payment-sheet__subtitle {
+    display: block;
+    margin-top: 6px;
+    color: var(--az-pay-sheet-subtitle);
+    font-size: 14px;
+    font-weight: 750;
+}
+
+.az-payment-sheet__details {
+    display: grid;
+    gap: 0;
+    padding-top: 8px;
+}
+
+.az-payment-sheet__row {
+    display: grid;
+    grid-template-columns: minmax(92px, .7fr) minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--az-pay-sheet-border);
+}
+
+.az-payment-sheet__row span {
+    color: var(--az-pay-sheet-label);
+    font-size: 12px;
+    font-weight: 850;
+}
+
+.az-payment-sheet__row strong {
+    min-width: 0;
+    color: var(--az-pay-sheet-value);
+    font-size: 15px;
+    font-weight: 900;
+    overflow-wrap: anywhere;
+}
+
+.az-payment-sheet__row button,
+.az-payment-sheet__secondary,
+.az-payment-sheet__preview button {
+    border: 1px solid var(--az-pay-sheet-border);
+    border-radius: 999px;
+    background: var(--az-pay-sheet-bg-soft);
+    color: var(--az-pay-sheet-accent-strong);
+    font-size: 12px;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+.az-payment-sheet__row button {
+    padding: 7px 10px;
+}
+
+.az-payment-sheet__qr {
+    display: grid;
+    place-items: center;
+    gap: 10px;
+    margin: 18px 0 10px;
+}
+
+.az-payment-sheet__qr[hidden],
+.az-payment-sheet__receipt[hidden],
+.az-payment-sheet__secondary[hidden],
+.az-payment-sheet__preview[hidden] {
+    display: none !important;
+}
+
+.az-payment-sheet__qr img {
+    width: min(210px, 100%);
+    aspect-ratio: 1;
+    object-fit: contain;
+    padding: 10px;
+    border: 1px solid var(--az-pay-sheet-border);
+    border-radius: 16px;
+    background: #ffffff;
+}
+
+.az-payment-sheet__qr figcaption,
+.az-payment-sheet__instructions {
+    color: var(--az-pay-sheet-instruction);
+    font-size: 13px;
+    line-height: 1.6;
+    font-weight: 720;
+}
+
+.az-payment-sheet__instructions {
+    margin: 0 0 14px;
+}
+
+.az-payment-sheet__secondary {
+    width: 100%;
+    min-height: 42px;
+    margin: 0 0 16px;
+}
+
+.az-payment-sheet__receipt-copy {
+    margin-bottom: 10px;
+}
+
+.az-payment-sheet__receipt-copy strong {
+    display: block;
+    color: var(--az-pay-sheet-title);
+    font-size: 15px;
+    font-weight: 900;
+}
+
+.az-payment-sheet__receipt-copy span {
+    color: var(--az-pay-sheet-instruction);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.az-payment-sheet__upload {
+    display: block;
+    padding: 15px 16px;
+    border: 1px dashed var(--az-pay-sheet-border-strong);
+    border-radius: 14px;
+    background: var(--az-pay-sheet-bg-soft);
+    color: var(--az-pay-sheet-title);
+    text-align: center;
+    cursor: pointer;
+}
+
+.az-payment-sheet__upload span {
+    display: block;
+    color: var(--az-pay-sheet-accent-strong);
+    font-weight: 900;
+}
+
+.az-payment-sheet__upload small {
+    display: block;
+    margin-top: 4px;
+    color: var(--az-pay-sheet-instruction);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.az-payment-sheet__upload input {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.az-payment-sheet__preview {
+    margin-top: 12px;
+    padding: 12px;
+    border: 1px solid var(--az-pay-sheet-border);
+    border-radius: 14px;
+    background: var(--az-pay-sheet-bg-soft);
+}
+
+.az-payment-sheet__preview span {
+    display: block;
+    margin-bottom: 10px;
+    color: var(--az-pay-sheet-value);
+    font-size: 13px;
+    font-weight: 850;
+    overflow-wrap: anywhere;
+}
+
+.az-payment-sheet__preview img {
+    max-height: 170px;
+    margin: 0 auto;
+    object-fit: contain;
+    border-radius: 12px;
+}
+
+.az-payment-sheet__preview button {
+    display: block;
+    margin: 10px auto 0;
+    color: var(--az-pay-sheet-danger);
+}
+
+.az-payment-sheet__message {
+    min-height: 20px;
+    margin-top: 12px;
+    color: var(--az-pay-sheet-instruction);
+    font-size: 13px;
+    font-weight: 750;
+}
+
+.az-payment-sheet__message.is-success {
+    color: var(--az-pay-sheet-success);
+}
+
+.az-payment-sheet__message.is-error {
+    color: var(--az-pay-sheet-danger);
+}
+
+.az-payment-sheet__submit {
+    position: sticky;
+    bottom: 0;
+    width: 100%;
+    min-height: 58px;
+    border: 0;
+    border-radius: 0;
+    background: linear-gradient(135deg, var(--primary, #8b5cf6), var(--primary-hover, #7c3aed));
+    color: #ffffff;
+    font-weight: 950;
+    cursor: pointer;
+    box-shadow: 0 -1px 0 var(--az-pay-sheet-border);
+}
+
+.az-payment-sheet__submit:disabled {
+    opacity: .78;
+    cursor: progress;
+}
+
+.az-payment-sheet__close:focus-visible,
+.az-payment-sheet__row button:focus-visible,
+.az-payment-sheet__secondary:focus-visible,
+.az-payment-sheet__upload:focus-within,
+.az-payment-sheet__preview button:focus-visible,
+.az-payment-sheet__submit:focus-visible {
+    outline: 3px solid var(--az-pay-sheet-accent);
+    outline-offset: 3px;
+}
+
+@media (max-width: 520px) {
+    .az-payment-sheet {
+        align-items: flex-end;
+        padding: 0;
+    }
+
+    .az-payment-sheet__panel {
+        width: 100vw;
+        max-height: 100dvh;
+        border-right: 0;
+        border-bottom: 0;
+        border-left: 0;
+        border-radius: 22px 22px 0 0;
+    }
+
+    .az-payment-sheet__body {
+        padding-right: 20px;
+        padding-left: 20px;
+    }
+
+    .az-payment-sheet__row {
+        grid-template-columns: 1fr auto;
+    }
+
+    .az-payment-sheet__row span {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .az-payment-sheet,
+    .az-payment-sheet__panel {
+        transition: none !important;
+        animation: none !important;
+    }
+}

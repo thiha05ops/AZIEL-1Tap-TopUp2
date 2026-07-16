@@ -438,11 +438,11 @@ window.AZIEL_LANG.en = {
     walletBalanceNote: "Wallet balance updates automatically after successful payment.",
 
     topUpWallet: "Top Up Wallet",
-    walletTopupDesc: "Select amount and payment method. No slip upload required.",
+    walletTopupDesc: "Select amount and payment method to continue.",
     enterAmount: "Enter amount",
     generateQr: "Generate QR",
     generatingQr: "Generating QR...",
-    walletAutoPaymentNote: "Auto payment enabled. Scan the QR and your wallet will update after payment is confirmed.",
+    walletAutoPaymentNote: "Your wallet updates after payment is confirmed.",
 
     walletHistory: "Wallet History",
     walletHistoryDesc: "Recent wallet top-ups and transactions",

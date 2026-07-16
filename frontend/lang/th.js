@@ -438,11 +438,11 @@ window.AZIEL_LANG.th = {
     walletBalanceNote: "ยอด Wallet จะอัปเดตอัตโนมัติหลังชำระเงินสำเร็จ",
 
     topUpWallet: "เติมเงิน Wallet",
-    walletTopupDesc: "เลือกจำนวนเงินและวิธีชำระเงิน ไม่ต้องอัปโหลดสลิป",
+    walletTopupDesc: "เลือกจำนวนเงินและวิธีชำระเงินเพื่อดำเนินการต่อ",
     enterAmount: "กรอกจำนวนเงิน",
     generateQr: "สร้าง QR",
     generatingQr: "กำลังสร้าง QR...",
-    walletAutoPaymentNote: "เปิดใช้งานการชำระเงินอัตโนมัติ สแกน QR แล้ว Wallet จะอัปเดตหลังยืนยันการชำระเงิน",
+    walletAutoPaymentNote: "Wallet จะอัปเดตหลังยืนยันการชำระเงิน",
 
     walletHistory: "ประวัติ Wallet",
     walletHistoryDesc: "รายการเติมเงินและธุรกรรมล่าสุด",
