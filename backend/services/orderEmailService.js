@@ -291,10 +291,6 @@ async function markFailed(delivery, error) {
 async function deliverOrderEmail(order, eventType) {
     const recipient = await resolveRecipient(order);
     if (!recipient) {
-        console.log("Order lifecycle email skipped: missing recipient", {
-            orderId: order?.orderId || "",
-            eventType
-        });
         return { skipped: true, reason: "missing_recipient" };
     }
 
