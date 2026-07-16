@@ -274,6 +274,14 @@ async function deliverOrderEmail(order, eventType) {
     const recipient = await resolveRecipient(order);
     if (!recipient) return { skipped: true, reason: "missing_recipient" };
 
+    const message = buildOrderEmail(order, eventType);
+    console.log("[EMAIL] Preparing lifecycle email", {
+        orderId: order.orderId,
+        eventType,
+        recipient,
+        subject: message?.subject || ""
+    });
+
     const deliveryKey = `${order.orderId}:${eventType}`;
     const delivery = await acquireDelivery({
         deliveryKey,
@@ -284,10 +292,10 @@ async function deliverOrderEmail(order, eventType) {
 
     if (!delivery) return { skipped: true, reason: "duplicate_or_pending" };
 
-    const message = buildOrderEmail(order, eventType);
     if (!message) return { skipped: true, reason: "event_unmapped" };
 
     try {
+        console.log("[EMAIL] Sending...");
         const result = await sendEmail({
             to: recipient,
             subject: message.subject,
@@ -296,9 +304,11 @@ async function deliverOrderEmail(order, eventType) {
             messageType: eventType,
             operation: "order.lifecycle.email"
         });
+        console.log("[EMAIL] Delivered", result);
         await markDelivered(delivery, result);
         return { delivered: true };
     } catch (error) {
+        console.error("[EMAIL] Failed", error);
         await markFailed(delivery, error);
         throw error;
     }
@@ -310,6 +320,11 @@ function eventTypeForTransition(entry = {}) {
 
 async function notifyOrderTransition(order, entry = {}) {
     const eventType = eventTypeForTransition(entry);
+    console.log("[EMAIL] notifyOrderTransition eventType", {
+        orderId: order?.orderId || "",
+        status: entry?.status || "",
+        eventType
+    });
     if (!eventType) return { skipped: true, reason: "status_unmapped" };
     return deliverOrderEmail(order, eventType);
 }
