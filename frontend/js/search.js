@@ -78,13 +78,15 @@
             <div class="az-search-backdrop" data-search-close></div>
             <section class="az-search-panel" role="dialog" aria-modal="true" aria-labelledby="azSearchTitle" aria-describedby="azSearchHint">
                 <div class="az-search-head">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                    <label id="azSearchTitle" class="sr-only" for="azSearchInput">Search AZIEL</label>
-                    <p id="azSearchHint" class="sr-only">Use arrow keys to move through results, Enter to open a result, and Escape to close search.</p>
-                    <input id="azSearchInput" type="search" autocomplete="off" placeholder="Search games, gift cards, promotions, help..." role="combobox" aria-autocomplete="list" aria-controls="azSearchBody" aria-expanded="false">
-                    <button id="azSearchClearBtn" class="az-search-clear" type="button" aria-label="Clear search">
-                        <i class="fa-solid fa-xmark"></i>
-                    </button>
+                    <div class="az-search-input-shell">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <label id="azSearchTitle" class="sr-only" for="azSearchInput">Search AZIEL</label>
+                        <p id="azSearchHint" class="sr-only">Use arrow keys to move through results, Enter to open a result, and Escape to close search.</p>
+                        <input id="azSearchInput" type="text" inputmode="search" autocomplete="off" spellcheck="false" placeholder="Search games, gift cards..." role="searchbox" aria-autocomplete="list" aria-controls="azSearchBody" aria-expanded="false">
+                        <button id="azSearchClearBtn" class="az-search-clear" type="button" aria-label="Clear search" hidden>
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
                     <button id="azSearchCloseBtn" class="az-search-close" type="button" aria-label="Close search">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
@@ -102,6 +104,16 @@
             state.query = event.target.value.trim();
             scheduleSearch();
         });
+
+        updatePlaceholder(overlay);
+        const compactPlaceholderQuery = typeof window.matchMedia === "function"
+            ? window.matchMedia("(max-width: 360px)")
+            : null;
+        if (compactPlaceholderQuery && compactPlaceholderQuery.addEventListener) {
+            compactPlaceholderQuery.addEventListener("change", () => updatePlaceholder(overlay));
+        } else if (compactPlaceholderQuery && compactPlaceholderQuery.addListener) {
+            compactPlaceholderQuery.addListener(() => updatePlaceholder(overlay));
+        }
 
         overlay.querySelector("#azSearchClearBtn")?.addEventListener("click", () => {
             const input = overlay.querySelector("#azSearchInput");
@@ -261,6 +273,7 @@
         overlay.classList.add("show");
         overlay.setAttribute("aria-hidden", "false");
         const input = overlay.querySelector("#azSearchInput");
+        updatePlaceholder(overlay);
         input.value = "";
         input.setAttribute("aria-expanded", "true");
         input.removeAttribute("aria-activedescendant");
@@ -335,7 +348,10 @@
         const input = document.getElementById("azSearchInput");
         if (!body) return;
 
-        if (clear) clear.hidden = !state.query;
+        if (clear) {
+            clear.hidden = !state.query;
+            clear.setAttribute("aria-label", "Clear search");
+        }
         input?.setAttribute("aria-expanded", state.open ? "true" : "false");
 
         if (state.loading) {
@@ -355,7 +371,7 @@
         state.results = results;
 
         if (!results.length) {
-            body.innerHTML = renderEmptyState("No matching results", "Try a game, category, promotion, or support topic.");
+            body.innerHTML = renderEmptyState();
             input?.removeAttribute("aria-activedescendant");
             return;
         }
@@ -415,15 +431,27 @@
         `;
     }
 
-    function renderEmptyState(title, message) {
+    function renderEmptyState() {
         return `
             <div class="az-empty-state az-search-empty">
-                <i class="fa-regular fa-compass"></i>
-                <strong>${escapeHtml(title)}</strong>
-                <span>${escapeHtml(message)}</span>
-                <a href="support.html">Get help</a>
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <strong>No results found</strong>
+                <span>Try searching for:</span>
+                <ul class="az-search-empty-list">
+                    <li>Mobile Legends</li>
+                    <li>PUBG</li>
+                    <li>Google Play</li>
+                    <li>Weekly Pass</li>
+                </ul>
             </div>
         `;
+    }
+
+    function updatePlaceholder(overlay = document.getElementById("azSearchOverlay")) {
+        const input = overlay ? overlay.querySelector("#azSearchInput") : null;
+        if (!input) return;
+        const compact = typeof window.matchMedia === "function" && window.matchMedia("(max-width: 360px)").matches;
+        input.placeholder = compact ? "Search games..." : "Search games, gift cards...";
     }
 
     function bindRecentButtons() {

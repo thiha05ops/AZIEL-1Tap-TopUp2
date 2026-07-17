@@ -30,6 +30,9 @@
     --az-gutter-desktop: 28px;
     --az-gutter-tablet: 20px;
     --az-gutter-mobile: 14px;
+    --az-mobile-gutter-xs: 8px;
+    --az-mobile-gutter: 12px;
+    --az-mobile-text-gutter: 16px;
     --az-section-gap: 42px;
     --az-section-gap-compact: 22px;
     --az-content-gap: 16px;

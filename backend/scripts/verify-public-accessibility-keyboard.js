@@ -31,7 +31,8 @@ function main() {
     assert(header.includes("Home") && header.includes("End"), "Games dropdown must support Home/End navigation.");
 
     assert(search.includes('role="dialog"') && search.includes('aria-modal="true"'), "Search overlay must remain a modal dialog.");
-    assert(search.includes('role="combobox"'), "Search input must expose combobox semantics.");
+    assert(search.includes('type="text" inputmode="search"') && search.includes('role="searchbox"'), "Search input must expose text searchbox semantics without native search controls.");
+    assert(search.includes('aria-autocomplete="list"'), "Search input must announce list autocomplete behavior.");
     assert(search.includes('aria-controls="azSearchBody"'), "Search input must control the results list.");
     assert(search.includes('aria-activedescendant'), "Search input must expose the active result.");
     assert(search.includes("trapFocus(event, overlay)"), "Search overlay must trap Tab only while active.");

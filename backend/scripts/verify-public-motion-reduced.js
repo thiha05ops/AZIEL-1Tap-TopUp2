@@ -23,7 +23,8 @@ function main() {
     const notificationCss = read("frontend/css/notifications/notification.css");
     const homeBanner = read("frontend/js/home-banner-runtime.js");
 
-    assert(headerCss.includes(".az-search-overlay") && headerCss.includes("opacity var(--az-motion-duration"), "Search overlay must animate with opacity.");
+    assert(headerCss.includes(".az-search-overlay") && /opacity\s+180ms/.test(headerCss), "Search overlay must animate with opacity.");
+    assert(headerCss.includes(".az-search-overlay.show .az-search-panel") && headerCss.includes("transform: translateY(0) scale(1);"), "Search panel must use subtle transform/opacity reveal motion.");
     assert(headerCss.includes(".az-nav-drop-menu") && headerCss.includes("transform: translateX(-50%) translateY(12px) scale(.96)"), "Games dropdown must use transform/opacity open motion.");
     assert(headerCss.includes(".az-search-result:hover") && headerCss.includes("transform: translateY(-1px)"), "Search result hover must use transform.");
     assert(reducedMotionBlock(headerCss).includes(".az-nav-drop-menu"), "Header reduced-motion block must cover dropdown motion.");

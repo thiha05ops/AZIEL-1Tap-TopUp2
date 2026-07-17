@@ -27,6 +27,9 @@ function main() {
         "--public-page-max",
         "--public-gutter-desktop",
         "--public-gutter-mobile",
+        "--az-mobile-gutter-xs",
+        "--az-mobile-gutter",
+        "--az-mobile-text-gutter",
         "--public-content-gap",
         "--type-display",
         "--type-page-title",
@@ -88,12 +91,64 @@ function main() {
     assert(homePromotionRuntime.includes("fa-solid fa-gift") && homePromotionRuntime.indexOf("<div>") < homePromotionRuntime.indexOf("fa-solid fa-gift"), "Latest Promotions must keep text-first rows with the icon on the right.");
     assert(home.includes(".promotion-preview-item") && home.includes("grid-template-columns: minmax(0, 1fr) auto auto"), "Latest Promotions compact row geometry must be preserved.");
 
+    [
+        "@media (max-width: 520px)",
+        "width: calc(100% - (var(--az-mobile-gutter, 12px) * 2)) !important;",
+        "width: calc(100% - (var(--az-mobile-gutter-xs, 8px) * 2)) !important;",
+        "width: calc(100% - 16px) !important;",
+        "width: calc(100% - 24px) !important;",
+        "#popularGames.az-section",
+        "width: 100dvw !important;",
+        "padding-left: max(var(--az-mobile-text-gutter, 16px), env(safe-area-inset-left)) !important;",
+        "padding: 4px max(var(--az-mobile-gutter, 12px), env(safe-area-inset-right)) 10px max(var(--az-mobile-gutter, 12px), env(safe-area-inset-left)) !important;",
+        "scroll-padding-left: max(var(--az-mobile-gutter, 12px), env(safe-area-inset-left)) !important;",
+        "scroll-padding-right: max(var(--az-mobile-gutter, 12px), env(safe-area-inset-right)) !important;"
+    ].forEach(snippet => assert(home.includes(snippet), `Home mobile edge-to-edge width contract missing ${snippet}`));
+
+    const smallPhoneBlock = read("frontend/css/theme/mobile.css").match(/@media \(max-width: 430px\)\s*\{[\s\S]*?\n\}/)?.[0] || "";
+    assert(smallPhoneBlock.includes(".az-home") && smallPhoneBlock.includes("padding-left: 0 !important;"), "Small-phone mobile CSS must neutralize Home shell padding.");
+    assert(!/\.az-page,\s*\.az-home,\s*\.main-content/.test(smallPhoneBlock), "Generic small-phone padding must not double-pad .az-home.");
+    const mobileCss = read("frontend/css/theme/mobile.css");
+    [
+        "body .az-home .az-banner-zone",
+        "width: calc(100% - 16px) !important;",
+        "body .az-home .az-trust-row",
+        "body .az-home .az-section:not(#popularGames)",
+        "width: calc(100% - 24px) !important;"
+    ].forEach(snippet => assert(mobileCss.includes(snippet), `Final mobile Home edge-to-edge owner missing ${snippet}`));
+
     assert(search.includes("window.AZIEL_SEARCH"), "Search JS must expose canonical AZIEL_SEARCH owner.");
     assert(search.includes("window.AZIEL_CATALOG?.load") && search.includes("getProducts"), "Search must reuse the public catalog runtime.");
     assert(search.includes("/api/notifications/promotions/active"), "Search should include active public promotions where available.");
     assert(search.includes("localStorage.setItem(RECENT_KEY"), "Search must persist recent searches locally.");
     assert(search.includes("ArrowDown") && search.includes("ArrowUp") && search.includes("Enter") && search.includes("Escape"), "Search keyboard controls missing.");
+    assert(search.includes('type="text" inputmode="search"'), "Search overlay input must be text/inputmode search to avoid native clear controls.");
+    assert(search.includes('role="searchbox"'), "Search overlay input must expose searchbox semantics.");
+    assert(search.includes('spellcheck="false"'), "Search overlay input must disable spellcheck.");
+    assert((search.match(/id="azSearchClearBtn"/g) || []).length === 1, "Search overlay must create exactly one clear button.");
+    assert((search.match(/id="azSearchCloseBtn"/g) || []).length === 1, "Search overlay must create exactly one close button.");
+    assert(search.includes('class="az-search-clear"') && search.includes('hidden>'), "Search clear button must be hidden in the empty state.");
+    assert(search.includes('class="az-search-close"'), "Search close button must be a distinct always-visible action.");
+    assert(search.includes('placeholder="Search games, gift cards..."'), "Search overlay must use the polished desktop placeholder.");
+    assert(search.includes('"Search games..."'), "Search overlay must shorten placeholder on narrow mobile widths.");
+    assert(search.includes("No results found") && search.includes("Mobile Legends") && search.includes("Weekly Pass"), "Search empty state suggestions missing.");
     assert(!search.includes("tracking.html"), "Search must not include order/private tracking destinations.");
+
+    [
+        "height: 56px;",
+        ".az-search-overlay.show .az-search-panel",
+        "transform: translateY(0) scale(1);",
+        ".az-search-input-shell",
+        ".az-search-input-shell:focus-within",
+        "box-shadow: 0 0 0 1px rgba(139, 92, 246, .18);",
+        ".az-search-panel input:focus-visible",
+        "box-shadow: none;",
+        "grid-template-columns: 50px minmax(0, 1fr) 22px;",
+        ".az-search-result>i",
+        "color: var(--primary, #7c3aed);",
+        ".az-search-empty-list",
+        "@media (max-width: 360px)"
+    ].forEach(snippet => assert(header.includes(snippet), `Search overlay visual polish missing ${snippet}`));
 
     includes("frontend/css/game/game.css", "--game-mobile-gutter: 14px", "Game mobile gutter token missing.");
     includes("frontend/css/game/game.css", ".game-page::before", "Game full-width ambient region missing.");

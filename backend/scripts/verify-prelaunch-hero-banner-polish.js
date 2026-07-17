@@ -49,7 +49,7 @@ function verifyHomeBannerPolish() {
         "commitHomeAmbientBuffer",
         "ensureHomeAmbientBuffers",
         "resolveObjectPosition",
-        "preloadImages(banners.map(banner => banner.imageUrl))"
+        "preloadImages(banners.slice(0, 2).map(banner => banner.imageUrl))"
     ].forEach(snippet => assert(runtime.includes(snippet), `Home banner runtime missing ${snippet}`));
 
     assert(!runtime.includes("createElement(\"canvas\")"), "Home managed banner runtime must not use canvas color extraction.");
@@ -95,7 +95,7 @@ function verifyGameBannerPolish() {
         "page?.style.setProperty(\"--game-banner-active-position\"",
         "commitStaticFallbackState(root)",
         "resolveObjectPosition",
-        "preloadImages(banners.map(banner => banner.imageUrl))"
+        "preloadImages(banners.slice(0, 2).map(banner => banner.imageUrl))"
     ].forEach(snippet => assert(runtime.includes(snippet), `Game banner runtime missing ${snippet}`));
 
     assert(!runtime.includes("createElement(\"canvas\")"), "Game banner runtime must not use canvas color extraction.");
