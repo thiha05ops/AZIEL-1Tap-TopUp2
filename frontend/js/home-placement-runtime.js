@@ -13,11 +13,6 @@
             section: "#topUpCategoriesPanel",
             target: "#topUpCategoryGrid",
             render: renderTopUpShortcuts
-        },
-        HOME_LATEST_PROMOTIONS: {
-            section: "#latestPromotionsPanel",
-            target: "#latestPromotionsList",
-            render: renderLatestPromotions
         }
     };
 
@@ -113,38 +108,6 @@
                 <span>${escapeHtml(product.name)}</span>
             </a>
         `).join("");
-    }
-
-    function renderLatestPromotions(items = []) {
-        return items.map(promo => `
-            <div class="promo-item" data-promo-code="${escapeAttr(promo.promoCode)}">
-                <div>
-                    <strong>${escapeHtml(promo.name || promo.promoCode)}</strong>
-                    <span>${escapeHtml(promo.discountLabel || promo.promoCode || "Promo")}</span>
-                    <small>${escapeHtml(formatPromoWindow(promo))}</small>
-                </div>
-                <i class="fa-solid fa-ticket"></i>
-            </div>
-        `).join("");
-    }
-
-    function formatPromoWindow(promo = {}) {
-        const starts = formatDate(promo.startsAt);
-        const ends = formatDate(promo.endsAt);
-        if (starts && ends) return `${starts} - ${ends}`;
-        if (ends) return `Ends ${ends}`;
-        if (starts) return `Starts ${starts}`;
-        return promo.promoCode || "Active promo";
-    }
-
-    function formatDate(value) {
-        if (!value) return "";
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return "";
-        return date.toLocaleDateString(undefined, {
-            month: "short",
-            day: "numeric"
-        });
     }
 
     function fallbackAttr(fallback = "") {

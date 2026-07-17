@@ -405,6 +405,72 @@ textarea {
   max-width: 620px;
 }
 
+.promotion-publish-form {
+  max-width: 860px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(148, 163, 184, .18);
+}
+
+.admin-form-grid.two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-form-grid label,
+.admin-check-row {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-check-row {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  min-height: 46px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .035);
+}
+
+.admin-check-row input {
+  width: auto;
+}
+
+.admin-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.promotion-preview-card,
+.promotion-notification-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid rgba(139, 92, 246, .28);
+  border-radius: 14px;
+  background: rgba(139, 92, 246, .08);
+  color: #fff;
+  text-align: left;
+}
+
+.promotion-preview-card span,
+.promotion-notification-card span,
+.promotion-notification-card small {
+  color: #cbd5e1;
+}
+
+.promotion-notification-card {
+  margin-top: 10px;
+}
+
+.promotion-notification-card .admin-inline-actions button {
+  height: 38px;
+  border-radius: 10px;
+}
+
 .broadcast-form label {
   color: #94a3b8;
   font-weight: 900;
@@ -436,6 +502,12 @@ textarea {
   color: #fff;
   font-weight: 900;
   cursor: pointer;
+}
+
+@media (max-width: 760px) {
+  .admin-form-grid.two {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ADMIN TOAST */

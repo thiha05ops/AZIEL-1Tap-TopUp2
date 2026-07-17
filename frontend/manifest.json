@@ -1,13 +1,15 @@
 {
-    "name": "AZIEL 1Tap",
+    "id": "/home.html",
+    "name": "AZIEL 1Tap Shop",
     "short_name": "AZIEL",
-    "description": "1 TAP. TOP UP. DONE.",
+    "description": "Game top-ups, order tracking, wallet services, and customer support in one place.",
     "start_url": "/home.html",
     "scope": "/",
     "display": "standalone",
     "orientation": "portrait",
     "background_color": "#070716",
     "theme_color": "#070716",
+    "categories": ["shopping", "games", "utilities"],
     "icons": [
         {
             "src": "/assets/icons/icon-192.png",
@@ -30,6 +32,44 @@
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "maskable"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "Browse Games",
+            "short_name": "Games",
+            "description": "Browse AZIEL game top-ups.",
+            "url": "/mobile-games.html",
+            "icons": [
+                {
+                    "src": "/assets/icons/icon-192.png",
+                    "sizes": "192x192"
+                }
+            ]
+        },
+        {
+            "name": "Track Orders",
+            "short_name": "Orders",
+            "description": "Open order tracking.",
+            "url": "/tracking.html",
+            "icons": [
+                {
+                    "src": "/assets/icons/icon-192.png",
+                    "sizes": "192x192"
+                }
+            ]
+        },
+        {
+            "name": "Support Center",
+            "short_name": "Support",
+            "description": "Open AZIEL Support Center.",
+            "url": "/support.html",
+            "icons": [
+                {
+                    "src": "/assets/icons/icon-192.png",
+                    "sizes": "192x192"
+                }
+            ]
         }
     ]
 }

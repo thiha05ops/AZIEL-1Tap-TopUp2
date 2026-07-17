@@ -411,6 +411,8 @@ function initAdminBroadcast() {
 
     if (!btn) return;
 
+    initPromotionNotificationAdmin();
+
     btn.addEventListener("click", async () => {
         const type = document.getElementById("broadcastType")?.value;
         const title = document.getElementById("broadcastTitle")?.value.trim();
@@ -481,6 +483,292 @@ function initAdminBroadcast() {
             btn.innerText = "Send Broadcast";
         }
     });
+}
+
+function initPromotionNotificationAdmin() {
+    const saveBtn = document.getElementById("savePromotionDraftBtn");
+    const publishBtn = document.getElementById("publishPromotionBtn");
+    const clearBtn = document.getElementById("clearPromotionFormBtn");
+
+    if (!saveBtn || saveBtn.dataset.ready === "true") return;
+    saveBtn.dataset.ready = "true";
+
+    [
+        "promotionTitle",
+        "promotionSummary",
+        "promotionBody",
+        "promotionCtaLabel",
+        "promotionCtaUrl",
+        "promotionPromoCode",
+        "promotionCampaignCode",
+        "promotionImageUrl"
+    ].forEach(id => {
+        document.getElementById(id)?.addEventListener("input", renderPromotionPreview);
+    });
+
+    saveBtn.addEventListener("click", async () => {
+        await savePromotionNotification(false, saveBtn);
+    });
+
+    publishBtn?.addEventListener("click", async () => {
+        await savePromotionNotification(true, publishBtn);
+    });
+
+    clearBtn?.addEventListener("click", () => {
+        clearPromotionNotificationForm();
+        renderPromotionPreview();
+    });
+
+    loadPromotionNotifications();
+    renderPromotionPreview();
+}
+
+function promotionFormPayload(enabled = false) {
+    const regions = [];
+    if (document.getElementById("promotionRegionMM")?.checked) regions.push("MM");
+    if (document.getElementById("promotionRegionTH")?.checked) regions.push("TH");
+
+    return {
+        title: document.getElementById("promotionTitle")?.value.trim() || "",
+        summary: document.getElementById("promotionSummary")?.value.trim() || "",
+        body: document.getElementById("promotionBody")?.value.trim() || "",
+        ctaLabel: document.getElementById("promotionCtaLabel")?.value.trim() || "",
+        ctaUrl: document.getElementById("promotionCtaUrl")?.value.trim() || "",
+        promoCode: document.getElementById("promotionPromoCode")?.value.trim() || "",
+        campaignCode: document.getElementById("promotionCampaignCode")?.value.trim() || "",
+        imageUrl: document.getElementById("promotionImageUrl")?.value.trim() || "",
+        audience: document.getElementById("promotionAudience")?.value || "ALL_VISITORS",
+        priority: Number(document.getElementById("promotionPriority")?.value || 0),
+        startsAt: document.getElementById("promotionStartsAt")?.value || "",
+        endsAt: document.getElementById("promotionEndsAt")?.value || "",
+        regions,
+        enabled
+    };
+}
+
+async function savePromotionNotification(publish = false, btn = null) {
+    const id = document.getElementById("promotionNotificationId")?.value || "";
+    const payload = promotionFormPayload(publish);
+
+    if (!payload.title || !payload.summary) {
+        showAdminToast("Promotion title and summary are required.", "error");
+        return;
+    }
+
+    if (window.AZIEL_UI?.button) {
+        window.AZIEL_UI.button.setLoading(btn, { text: publish ? "Publishing..." : "Saving..." });
+    } else if (btn) {
+        btn.disabled = true;
+    }
+
+    try {
+        const data = await adminFetch(id
+            ? `/api/admin/promotion-notifications/${encodeURIComponent(id)}`
+            : "/api/admin/promotion-notifications", {
+            method: id ? "PATCH" : "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        if (!data?.success) throw new Error(data?.message || "Promotion save failed");
+
+        let promotion = data.promotion;
+        let delivered = null;
+
+        if (publish && promotion?.id) {
+            const published = await adminFetch(`/api/admin/promotion-notifications/${encodeURIComponent(promotion.id)}/publish`, {
+                method: "POST"
+            });
+
+            if (!published?.success) throw new Error(published?.message || "Promotion publish failed");
+            promotion = published.promotion;
+            delivered = published.delivered;
+        }
+
+        document.getElementById("promotionNotificationId").value = promotion?.id || "";
+        showAdminToast(publish
+            ? `Promotion published${delivered ? ` to ${delivered.count || 0} users` : ""}.`
+            : "Promotion draft saved.",
+            "success");
+        await loadPromotionNotifications();
+    } catch (error) {
+        console.log("Promotion notification save error:", error);
+        showAdminToast(error.message || "Promotion notification failed", "error");
+    } finally {
+        if (window.AZIEL_UI?.button) {
+            window.AZIEL_UI.button.reset(btn);
+        } else if (btn) {
+            btn.disabled = false;
+        }
+    }
+}
+
+async function loadPromotionNotifications() {
+    const list = document.getElementById("adminPromotionNotificationList");
+    if (!list) return;
+
+    try {
+        const data = await adminFetch("/api/admin/promotion-notifications");
+        if (!data?.success) throw new Error(data?.message || "Could not load promotions");
+
+        const promotions = data.promotions || [];
+        if (!promotions.length) {
+            list.className = "admin-list-empty";
+            list.textContent = "Promotion announcements will appear here.";
+            return;
+        }
+
+        list.className = "promotion-notification-list";
+        list.innerHTML = promotions.map(renderAdminPromotionNotification).join("");
+        bindPromotionNotificationList(promotions);
+    } catch (error) {
+        list.className = "admin-list-empty";
+        list.textContent = "Could not load promotion announcements.";
+    }
+}
+
+function renderAdminPromotionNotification(item = {}) {
+    return `
+        <article class="promotion-notification-card" data-id="${escapeAdminHtml(item.id)}">
+            <strong>${escapeAdminHtml(item.title)}</strong>
+            <span>${escapeAdminHtml(item.summary)}</span>
+            <small>${escapeAdminHtml(item.state || "DRAFT")} · ${escapeAdminHtml((item.regions || []).join(", "))} · ${escapeAdminHtml(item.audience || "ALL_VISITORS")}</small>
+            ${item.promoCode ? `<small>Promo code: ${escapeAdminHtml(item.promoCode)}</small>` : ""}
+            <div class="admin-inline-actions">
+                <button class="admin-secondary-btn" type="button" data-promotion-edit="${escapeAdminHtml(item.id)}">Edit</button>
+                <button class="admin-secondary-btn" type="button" data-promotion-publish="${escapeAdminHtml(item.id)}">Publish</button>
+                <button class="admin-secondary-btn danger" type="button" data-promotion-disable="${escapeAdminHtml(item.id)}">Disable</button>
+            </div>
+        </article>
+    `;
+}
+
+function bindPromotionNotificationList(promotions = []) {
+    const byId = new Map(promotions.map(item => [String(item.id), item]));
+
+    document.querySelectorAll("[data-promotion-edit]").forEach(btn => {
+        btn.addEventListener("click", () => {
+            fillPromotionNotificationForm(byId.get(btn.dataset.promotionEdit));
+        });
+    });
+
+    document.querySelectorAll("[data-promotion-publish]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+            await publishExistingPromotionNotification(btn.dataset.promotionPublish, btn);
+        });
+    });
+
+    document.querySelectorAll("[data-promotion-disable]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+            await disablePromotionNotification(btn.dataset.promotionDisable, btn);
+        });
+    });
+}
+
+async function publishExistingPromotionNotification(id, btn = null) {
+    if (!id) return;
+    try {
+        window.AZIEL_UI?.button?.setLoading(btn, { text: "Publishing..." });
+        const data = await adminFetch(`/api/admin/promotion-notifications/${encodeURIComponent(id)}/publish`, {
+            method: "POST"
+        });
+        if (!data?.success) throw new Error(data?.message || "Publish failed");
+        showAdminToast(`Promotion published to ${data.delivered?.count || 0} users.`, "success");
+        await loadPromotionNotifications();
+    } catch (error) {
+        showAdminToast(error.message || "Publish failed", "error");
+    } finally {
+        window.AZIEL_UI?.button?.reset(btn);
+    }
+}
+
+async function disablePromotionNotification(id, btn = null) {
+    if (!id) return;
+    try {
+        window.AZIEL_UI?.button?.setLoading(btn, { text: "Disabling..." });
+        const data = await adminFetch(`/api/admin/promotion-notifications/${encodeURIComponent(id)}/disable`, {
+            method: "POST"
+        });
+        if (!data?.success) throw new Error(data?.message || "Disable failed");
+        showAdminToast("Promotion disabled.", "success");
+        await loadPromotionNotifications();
+    } catch (error) {
+        showAdminToast(error.message || "Disable failed", "error");
+    } finally {
+        window.AZIEL_UI?.button?.reset(btn);
+    }
+}
+
+function fillPromotionNotificationForm(item = {}) {
+    if (!item?.id) return;
+
+    document.getElementById("promotionNotificationId").value = item.id || "";
+    document.getElementById("promotionTitle").value = item.title || "";
+    document.getElementById("promotionSummary").value = item.summary || "";
+    document.getElementById("promotionBody").value = item.body || "";
+    document.getElementById("promotionCtaLabel").value = item.ctaLabel || "";
+    document.getElementById("promotionCtaUrl").value = item.ctaUrl || "";
+    document.getElementById("promotionPromoCode").value = item.promoCode || "";
+    document.getElementById("promotionCampaignCode").value = item.campaignCode || "";
+    document.getElementById("promotionImageUrl").value = item.imageUrl || "";
+    document.getElementById("promotionAudience").value = item.audience || "ALL_VISITORS";
+    document.getElementById("promotionPriority").value = item.priority || 0;
+    document.getElementById("promotionStartsAt").value = toDatetimeLocal(item.startsAt);
+    document.getElementById("promotionEndsAt").value = toDatetimeLocal(item.endsAt);
+    document.getElementById("promotionRegionMM").checked = (item.regions || []).includes("MM");
+    document.getElementById("promotionRegionTH").checked = (item.regions || []).includes("TH");
+    renderPromotionPreview();
+}
+
+function clearPromotionNotificationForm() {
+    [
+        "promotionNotificationId",
+        "promotionTitle",
+        "promotionSummary",
+        "promotionBody",
+        "promotionCtaLabel",
+        "promotionCtaUrl",
+        "promotionPromoCode",
+        "promotionCampaignCode",
+        "promotionImageUrl",
+        "promotionStartsAt",
+        "promotionEndsAt"
+    ].forEach(id => {
+        const input = document.getElementById(id);
+        if (input) input.value = "";
+    });
+    document.getElementById("promotionAudience").value = "ALL_VISITORS";
+    document.getElementById("promotionPriority").value = "0";
+    document.getElementById("promotionRegionMM").checked = true;
+    document.getElementById("promotionRegionTH").checked = true;
+}
+
+function renderPromotionPreview() {
+    const preview = document.getElementById("promotionPreviewCard");
+    if (!preview) return;
+
+    const payload = promotionFormPayload(false);
+    preview.innerHTML = `
+        <strong>${escapeAdminHtml(payload.title || "Promotion preview")}</strong>
+        <span>${escapeAdminHtml(payload.summary || "Fill title and summary to preview the Home row.")}</span>
+        ${payload.promoCode ? `<small>Promo code: ${escapeAdminHtml(payload.promoCode.toUpperCase())}</small>` : ""}
+    `;
+}
+
+function toDatetimeLocal(value) {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toISOString().slice(0, 16);
+}
+
+function escapeAdminHtml(value = "") {
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
 }
 
 function initQuickBroadcastButtons() {

@@ -1,42 +1,113 @@
 <?xml version="1.0" encoding="UTF-8"?>
-
-<urlset
-xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-
-<url>
-<loc>
-https://aziel-1tap-topup2.onrender.com/
-</loc>
-</url>
-
-<url>
-<loc>
-https://aziel-1tap-topup2.onrender.com/home.html
-</loc>
-</url>
-
-<url>
-<loc>
-https://aziel-1tap-topup2.onrender.com/mlbb.html
-</loc>
-</url>
-
-<url>
-<loc>
-https://aziel-1tap-topup2.onrender.com/pubg.html
-</loc>
-</url>
-
-<url>
-<loc>
-https://aziel-1tap-topup2.onrender.com/freefire.html
-</loc>
-</url>
-
-<url>
-<loc>
-https://aziel-1tap-topup2.onrender.com/hok.html
-</loc>
-</url>
-
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+        <loc>https://azielplay.com/</loc>
+        <changefreq>daily</changefreq>
+        <priority>1.0</priority>
+    </url>
+    <url>
+        <loc>https://azielplay.com/home.html</loc>
+        <changefreq>daily</changefreq>
+        <priority>1.0</priority>
+    </url>
+    <url>
+        <loc>https://azielplay.com/mobile-games.html</loc>
+        <changefreq>weekly</changefreq>
+        <priority>0.8</priority>
+    </url>
+    <url>
+        <loc>https://azielplay.com/pc-games.html</loc>
+        <changefreq>weekly</changefreq>
+        <priority>0.7</priority>
+    </url>
+    <url>
+        <loc>https://azielplay.com/gift-cards.html</loc>
+        <changefreq>weekly</changefreq>
+        <priority>0.7</priority>
+    </url>
+    <url>
+        <loc>https://azielplay.com/mlbb.html</loc>
+        <changefreq>weekly</changefreq>
+        <priority>0.8</priority>
+    </url>
+    <url>
+        <loc>https://azielplay.com/pubg.html</loc>
+        <changefreq>weekly</changefreq>
+        <priority>0.8</priority>
+    </url>
+    <url>
+        <loc>https://azielplay.com/freefire.html</loc>
+        <changefreq>weekly</changefreq>
+        <priority>0.8</priority>
+    </url>
+    <url>
+        <loc>https://azielplay.com/hok.html</loc>
+        <changefreq>weekly</changefreq>
+        <priority>0.7</priority>
+    </url>
+    <url>
+        <loc>https://azielplay.com/aov-id.html</loc>
+        <changefreq>weekly</changefreq>
+        <priority>0.7</priority>
+    </url>
+    <url>
+        <loc>https://azielplay.com/pubg-rp.html</loc>
+        <changefreq>weekly</changefreq>
+        <priority>0.7</priority>
+    </url>
+    <url>
+        <loc>https://azielplay.com/telegram.html</loc>
+        <changefreq>weekly</changefreq>
+        <priority>0.6</priority>
+    </url>
+    <url>
+        <loc>https://azielplay.com/genshin.html</loc>
+        <changefreq>weekly</changefreq>
+        <priority>0.6</priority>
+    </url>
+    <url>
+        <loc>https://azielplay.com/roblox.html</loc>
+        <changefreq>weekly</changefreq>
+        <priority>0.6</priority>
+    </url>
+    <url>
+        <loc>https://azielplay.com/about.html</loc>
+        <changefreq>monthly</changefreq>
+        <priority>0.5</priority>
+    </url>
+    <url>
+        <loc>https://azielplay.com/contact.html</loc>
+        <changefreq>monthly</changefreq>
+        <priority>0.5</priority>
+    </url>
+    <url>
+        <loc>https://azielplay.com/faq.html</loc>
+        <changefreq>monthly</changefreq>
+        <priority>0.5</priority>
+    </url>
+    <url>
+        <loc>https://azielplay.com/policies/privacy.html</loc>
+        <changefreq>yearly</changefreq>
+        <priority>0.3</priority>
+    </url>
+    <url>
+        <loc>https://azielplay.com/policies/terms.html</loc>
+        <changefreq>yearly</changefreq>
+        <priority>0.3</priority>
+    </url>
+    <url>
+        <loc>https://azielplay.com/policies/payment.html</loc>
+        <changefreq>yearly</changefreq>
+        <priority>0.3</priority>
+    </url>
+    <url>
+        <loc>https://azielplay.com/policies/refund.html</loc>
+        <changefreq>yearly</changefreq>
+        <priority>0.3</priority>
+    </url>
+    <url>
+        <loc>https://azielplay.com/policies/support.html</loc>
+        <changefreq>yearly</changefreq>
+        <priority>0.3</priority>
+    </url>
 </urlset>

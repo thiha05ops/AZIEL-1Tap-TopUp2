@@ -130,8 +130,16 @@ function verifyCredentialRotation() {
 }
 
 function verifyCleanupSafety() {
-    assert(!fs.existsSync(path.join(root, "frontend/sw.js")), "No active service worker should exist without cache hardening.");
-    assert(!/navigator\.serviceWorker\.register/i.test(read("frontend/home.html")), "Home must not register a stale service worker.");
+    const swPath = path.join(root, "frontend/sw.js");
+    assert(fs.existsSync(swPath), "Service worker must exist after PWA cache hardening.");
+    const sw = read("frontend/sw.js");
+    assert(sw.includes("PRIVATE_OR_DYNAMIC_PATHS"), "Service worker must declare private/dynamic cache exclusions.");
+    ["/api/", "/admin", "/account", "/wallet", "/tracking", "/notifications"].forEach(pathPrefix => {
+        assert(sw.includes(`"${pathPrefix}"`), `Service worker must not cache ${pathPrefix}.`);
+    });
+    assert(sw.includes("networkFirstPublicPage"), "Public HTML cache must use network-first ownership.");
+    assert(sw.includes("cacheFirst") && sw.includes("isStaticAsset"), "Static assets must use cache-first ownership only.");
+    assert(read("frontend/js/pwa-fix.js").includes("navigator.serviceWorker.register(\"/sw.js\""), "Shared PWA runtime must register the hardened service worker.");
 }
 
 async function main() {

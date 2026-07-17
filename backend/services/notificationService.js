@@ -66,7 +66,7 @@ function sanitizeAction(action = null) {
 
     const url = cleanText(action.url || "");
 
-    if (url && !url.startsWith("/") && !/^[a-z0-9_-]+\.html/i.test(url)) {
+    if (url && !url.startsWith("/") && !/^[a-z0-9_-]+\.html/i.test(url) && !/^https?:\/\//i.test(url)) {
         return null;
     }
 
@@ -93,7 +93,13 @@ function sanitizeMetadata(metadata = {}) {
         "transactionId",
         "game",
         "currency",
-        "amount"
+        "amount",
+        "promotionNotificationId",
+        "promoCode",
+        "campaignCode",
+        "startsAt",
+        "endsAt",
+        "imageUrl"
     ].forEach(key => {
         if (metadata[key] !== undefined && metadata[key] !== null) {
             safe[key] = metadata[key];
@@ -277,7 +283,16 @@ async function createUserNotification(input = {}) {
 async function getUserNotifications(user, options = {}) {
     const limit = parseLimit(options.limit, { defaultLimit: 20, maxLimit: 50 });
     const cursor = cleanText(options.cursor || "");
+    const category = cleanText(options.category || "").toLowerCase();
     let filter = activeFilter(user);
+
+    if (category && VALID_CATEGORIES.has(category)) {
+        filter.category = category;
+    }
+
+    if (options.unread === true || String(options.unread || "").toLowerCase() === "true") {
+        filter.isRead = false;
+    }
 
     if (cursor && isObjectId(cursor)) {
         const cursorNotification = await Notification.findOne({

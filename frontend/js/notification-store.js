@@ -14,7 +14,8 @@
             limit: 20,
             hasMore: false,
             nextCursor: ""
-        }
+        },
+        filter: "all"
     };
 
     const subscribers = new Set();
@@ -103,7 +104,13 @@
 
         try {
             const limit = options.limit || state.pagination.limit || 20;
-            const url = apiUrl(`/api/notifications?limit=${encodeURIComponent(limit)}`);
+            const filter = options.filter || state.filter || "all";
+            const params = new URLSearchParams({ limit: String(limit) });
+
+            if (filter === "promotions") params.set("category", "promotions");
+            if (filter === "unread") params.set("unread", "true");
+
+            const url = apiUrl(`/api/notifications?${params.toString()}`);
             const res = await fetch(url, { headers: authHeaders() });
             const data = await res.json();
 
@@ -113,6 +120,7 @@
 
             state.notifications = [];
             ids.clear();
+            state.filter = filter;
             (data.notifications || []).forEach(item => mergeNotification(item, "append"));
             state.unreadCount = Number(data.unreadCount || 0);
             state.pagination = data.pagination || {
@@ -144,6 +152,9 @@
                 limit: String(state.pagination.limit || 20),
                 cursor: state.pagination.nextCursor
             });
+
+            if (state.filter === "promotions") params.set("category", "promotions");
+            if (state.filter === "unread") params.set("unread", "true");
 
             const res = await fetch(apiUrl(`/api/notifications?${params.toString()}`), {
                 headers: authHeaders()
@@ -328,6 +339,8 @@
             notifications: state.notifications.slice(),
             unreadCount: state.unreadCount,
             pagination: { ...state.pagination }
+            ,
+            filter: state.filter
         };
     }
 

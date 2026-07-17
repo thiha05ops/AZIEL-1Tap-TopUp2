@@ -15,7 +15,10 @@ function main() {
     const headerJs = read("frontend/js/header.js");
     const headerShim = read("frontend/js/header-scroll.js");
     const home = read("frontend/css/home/aziel-home.css");
+    const homeHtml = read("frontend/home.html");
+    const homePromotionRuntime = read("frontend/js/home-promotion-preview.js");
     const homeRuntime = read("frontend/js/home-banner-runtime.js");
+    const search = read("frontend/js/search.js");
     const game = read("frontend/css/game/game.css");
     const gameRuntime = read("frontend/js/game-presentation-runtime.js");
     const liveChat = read("frontend/css/support/live-chat.css");
@@ -38,17 +41,28 @@ function main() {
     ].forEach(token => assert(design.includes(token), `Shared public token missing ${token}`));
 
     assert(headerJs.includes("initCanonicalHeaderScroll"), "Header JS must own canonical header state.");
+    assert(headerJs.includes("initHeaderSearchTrigger"), "Header JS must initialize the global search trigger.");
+    assert(headerJs.includes("openHeaderSearch"), "Header JS must lazy-open the canonical search overlay.");
+    includes("frontend/components/header.html", "azHeaderSearchBtn", "Shared header must expose the search trigger.");
     assert(headerJs.includes("header.classList.remove(\"nav-hidden\")"), "Header JS must actively prevent legacy nav-hidden ownership.");
     assert(headerJs.includes("az-nav-hidden"), "Header JS must own mobile nav-row auto-hide.");
     assert(!headerJs.includes("az-header-hidden"), "Header JS must not hide the full header.");
     assert(!headerJs.includes("header.classList.add(\"nav-hidden\")"), "Header JS must not use legacy nav-hidden ownership.");
     assert(header.includes("#azHeaderMount") && header.includes("position: sticky;"), "Public header mount must use sticky in-flow ownership.");
     assert(header.includes(".az-header") && header.includes("position: relative;"), "Header element should be relative inside the sticky mount.");
-    assert(!/\.az-header\s*\{[\s\S]*?position:\s*fixed;/.test(header), "Public header must not be fixed.");
+    const headerBlock = header.match(/\.az-header\s*\{[\s\S]*?\}/)?.[0] || "";
+    assert(headerBlock.includes("position: relative;"), "Public header must remain relative.");
+    assert(!headerBlock.includes("position: fixed;"), "Public header must not be fixed.");
     assert(headerShim.includes("compatibility shim"), "Legacy header-scroll.js must be a no-op shim.");
     assert(!headerShim.includes("addEventListener(\"scroll\""), "Legacy header-scroll.js must not bind scroll events.");
     assert(header.includes("#azHeaderMount.az-nav-hidden .az-nav"), "CSS must expose canonical nav-row hidden state.");
     assert(header.includes("#azHeaderMount.az-nav-visible .az-nav"), "CSS must expose canonical nav-row visible state.");
+    assert(header.includes(".az-search-overlay") && header.includes("var(--az-z-search-overlay"), "Global search overlay styling/layer token missing.");
+    assert(header.includes("body.az-search-open") && header.includes("overflow: hidden !important;"), "Global search must lock body scroll while open.");
+    assert(header.includes(".az-empty-state"), "Shared empty-state primitive missing.");
+    assert(header.includes(".az-skeleton-line"), "Shared skeleton primitive missing.");
+    assert(header.includes("#azHeaderMount:has(.az-nav-dropdown.show) .az-nav"), "Open Games dropdown must keep the mobile nav row visible and unclipped.");
+    assert(header.includes("z-index: var(--az-z-header-dropdown, 100000) !important;"), "Games dropdown must use the canonical header dropdown layer.");
     assert(!header.includes("#azHeaderMount.az-header-hidden .az-header"), "CSS must not hide the full header.");
     assert(!headerJs.includes("header.classList.add(\"nav-hidden\")"), "Header JS must not use legacy nav-hidden ownership.");
     assert(!/body:has\(\.az-header\.nav-hidden\)\s*\{[\s\S]*padding-top:\s*calc/.test(header), "Hidden header state must not mutate body padding.");
@@ -68,6 +82,18 @@ function main() {
     assert(home.includes("width: min(900px, 74%) !important;"), "Home desktop carousel V2.6 side-preview geometry missing.");
     assert(home.includes("width: 98% !important;"), "Home mobile dominant slide geometry missing.");
     assert(home.includes(".az-banner-zone,\n.az-trust-row,\n.az-section,\n.az-dashboard-grid,\n.az-footer"), "Home must constrain content inside a full-width hero shell.");
+    assert(homeHtml.includes('id="latestPromotionsPanel"') && homeHtml.includes('id="latestPromotionsList"'), "Home Latest Promotions approved container must remain.");
+    assert(homeHtml.includes('/notifications.html?filter=promotions'), "Home Latest Promotions View All must deep link to Promotions.");
+    assert(homePromotionRuntime.includes("promo-empty-state") && homePromotionRuntime.includes("promo-item skeleton"), "Latest Promotions must preserve compact empty and skeleton states inside the approved container.");
+    assert(homePromotionRuntime.includes("fa-solid fa-gift") && homePromotionRuntime.indexOf("<div>") < homePromotionRuntime.indexOf("fa-solid fa-gift"), "Latest Promotions must keep text-first rows with the icon on the right.");
+    assert(home.includes(".promotion-preview-item") && home.includes("grid-template-columns: minmax(0, 1fr) auto auto"), "Latest Promotions compact row geometry must be preserved.");
+
+    assert(search.includes("window.AZIEL_SEARCH"), "Search JS must expose canonical AZIEL_SEARCH owner.");
+    assert(search.includes("window.AZIEL_CATALOG?.load") && search.includes("getProducts"), "Search must reuse the public catalog runtime.");
+    assert(search.includes("/api/notifications/promotions/active"), "Search should include active public promotions where available.");
+    assert(search.includes("localStorage.setItem(RECENT_KEY"), "Search must persist recent searches locally.");
+    assert(search.includes("ArrowDown") && search.includes("ArrowUp") && search.includes("Enter") && search.includes("Escape"), "Search keyboard controls missing.");
+    assert(!search.includes("tracking.html"), "Search must not include order/private tracking destinations.");
 
     includes("frontend/css/game/game.css", "--game-mobile-gutter: 14px", "Game mobile gutter token missing.");
     includes("frontend/css/game/game.css", ".game-page::before", "Game full-width ambient region missing.");

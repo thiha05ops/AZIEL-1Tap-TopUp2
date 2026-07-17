@@ -648,6 +648,103 @@
                             Send Broadcast
                         </button>
                     </div>
+
+                    <div class="broadcast-form promotion-publish-form">
+                        <div class="panel-head compact">
+                            <div>
+                                <h3>Promotion Inbox Preview</h3>
+                                <span>Create Home preview and Notification Center promotion messages.</span>
+                            </div>
+                        </div>
+
+                        <input id="promotionNotificationId" type="hidden">
+
+                        <label>Title</label>
+                        <input id="promotionTitle" type="text" placeholder="Promotion title">
+
+                        <label>Summary</label>
+                        <input id="promotionSummary" type="text" placeholder="Short Home and inbox summary">
+
+                        <label>Detail</label>
+                        <textarea id="promotionBody" placeholder="Optional promotion detail"></textarea>
+
+                        <div class="admin-form-grid two">
+                            <label>
+                                <span>CTA Label</span>
+                                <input id="promotionCtaLabel" type="text" placeholder="View Offer">
+                            </label>
+                            <label>
+                                <span>CTA URL</span>
+                                <input id="promotionCtaUrl" type="text" placeholder="/notifications.html?filter=promotions">
+                            </label>
+                        </div>
+
+                        <div class="admin-form-grid two">
+                            <label>
+                                <span>Promo Code</span>
+                                <input id="promotionPromoCode" type="text" placeholder="Optional code">
+                            </label>
+                            <label>
+                                <span>Campaign Code</span>
+                                <input id="promotionCampaignCode" type="text" placeholder="Optional campaign">
+                            </label>
+                        </div>
+
+                        <label>Image/Icon URL</label>
+                        <input id="promotionImageUrl" type="text" placeholder="Optional media URL">
+
+                        <div class="admin-form-grid two">
+                            <label>
+                                <span>Audience</span>
+                                <select id="promotionAudience">
+                                    <option value="ALL_VISITORS">All visitors</option>
+                                    <option value="LOGGED_IN">Logged-in users</option>
+                                    <option value="GUESTS">Guests only</option>
+                                </select>
+                            </label>
+                            <label>
+                                <span>Priority</span>
+                                <input id="promotionPriority" type="number" step="1" value="0">
+                            </label>
+                        </div>
+
+                        <div class="admin-form-grid two">
+                            <label>
+                                <span>Starts At</span>
+                                <input id="promotionStartsAt" type="datetime-local">
+                            </label>
+                            <label>
+                                <span>Ends At</span>
+                                <input id="promotionEndsAt" type="datetime-local">
+                            </label>
+                        </div>
+
+                        <div class="admin-form-grid two">
+                            <label class="admin-check-row">
+                                <input id="promotionRegionMM" type="checkbox" checked>
+                                <span>Myanmar</span>
+                            </label>
+                            <label class="admin-check-row">
+                                <input id="promotionRegionTH" type="checkbox" checked>
+                                <span>Thailand</span>
+                            </label>
+                        </div>
+
+                        <div class="promotion-preview-card" id="promotionPreviewCard">
+                            <strong>Promotion preview</strong>
+                            <span>Fill title and summary to preview the Home row.</span>
+                        </div>
+
+                        <div class="admin-inline-actions">
+                            <button id="savePromotionDraftBtn" class="admin-secondary-btn" type="button">Save Draft</button>
+                            <button id="publishPromotionBtn" type="button">Publish Promotion</button>
+                            <button id="clearPromotionFormBtn" class="admin-secondary-btn" type="button">Clear</button>
+                        </div>
+
+                        <div id="adminPromotionNotificationList" class="admin-list-empty">
+                            Promotion announcements will appear here.
+                        </div>
+                    </div>
                 </div>
             </section>
 

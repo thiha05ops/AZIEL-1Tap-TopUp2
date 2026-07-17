@@ -63,7 +63,14 @@
     "verify:header-scroll": "node backend/scripts/verify-header-scroll-ownership.js",
     "verify:mobile-howto": "node backend/scripts/verify-mobile-howto-accordion.js",
     "verify:typography-card-ownership": "node backend/scripts/verify-typography-card-ownership.js",
-    "verify:public-storefront-design-system": "node backend/scripts/verify-public-storefront-design-system.js"
+    "verify:public-storefront-design-system": "node backend/scripts/verify-public-storefront-design-system.js",
+    "verify:promotion-notifications": "node backend/scripts/verify-promotion-notifications.js",
+    "verify:public-accessibility-keyboard": "node backend/scripts/verify-public-accessibility-keyboard.js",
+    "verify:public-motion": "node backend/scripts/verify-public-motion-reduced.js",
+    "verify:public-footer": "node backend/scripts/verify-public-footer.js",
+    "verify:public-performance": "node backend/scripts/verify-public-performance.js",
+    "verify:public-seo": "node backend/scripts/verify-public-seo.js",
+    "verify:public-pwa": "node backend/scripts/verify-public-pwa.js"
   },
   "keywords": [],
   "author": "",

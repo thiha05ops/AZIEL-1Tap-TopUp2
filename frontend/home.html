@@ -11,13 +11,21 @@
 
     <meta name="description"
         content="AZIEL 1Tap Shop - game top-ups, order tracking, wallet services, and customer support for Myanmar and Thailand.">
-    <meta name="keywords" content="AZIEL, Game Top Up, MLBB, PUBG, Free Fire, HOK, Roblox, Valorant, Myanmar, Thailand">
     <meta name="author" content="AZIEL 1Tap Shop">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://azielplay.com/home.html">
 
     <meta property="og:title" content="AZIEL 1Tap Shop">
-    <meta property="og:description" content="1 TAP. TOP UP. DONE.">
-    <meta property="og:image" content="assets/logo/aziel-og.png">
+    <meta property="og:description"
+        content="Game top-ups, order tracking, wallet services, and customer support in one place.">
+    <meta property="og:image" content="https://azielplay.com/assets/logo/aziel-wordmark.webp">
     <meta property="og:type" content="website">
+    <meta property="og:url" content="https://azielplay.com/home.html">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="AZIEL 1Tap Shop">
+    <meta name="twitter:description"
+        content="Game top-ups, order tracking, wallet services, and customer support in one place.">
+    <meta name="twitter:image" content="https://azielplay.com/assets/logo/aziel-wordmark.webp">
 
     <link rel="icon" href="assets/logo/favicon.ico">
     <link rel="apple-touch-icon" href="assets/logo/icon-192.png">
@@ -51,6 +59,36 @@
 
     <meta name="theme-color" content="#070716">
 
+    <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@graph": [
+                {
+                    "@type": "Organization",
+                    "@id": "https://azielplay.com/#organization",
+                    "name": "AZIEL 1Tap Shop",
+                    "url": "https://azielplay.com/",
+                    "logo": "https://azielplay.com/assets/logo/aziel-wordmark.webp",
+                    "sameAs": [
+                        "https://www.facebook.com/share/1DhL7dQ16a/?mibextid=wwXIfr",
+                        "https://t.me/aziel1tap",
+                        "https://youtube.com/@aziel1tapshop",
+                        "https://discord.gg/txTGuTK76"
+                    ]
+                },
+                {
+                    "@type": "WebSite",
+                    "@id": "https://azielplay.com/#website",
+                    "url": "https://azielplay.com/",
+                    "name": "AZIEL 1Tap Shop",
+                    "publisher": {
+                        "@id": "https://azielplay.com/#organization"
+                    }
+                }
+            ]
+        }
+    </script>
+
 </head>
 
 <body>
@@ -63,22 +101,25 @@
         <section class="az-banner-zone" id="bannerZone" data-managed-content-state="resolving">
             <div class="az-banner-track" id="azBannerTrack">
                 <a href="mlbb.html" class="az-banner-card">
-                    <img src="assets/banners/hero.webp" alt="MLBB Banner">
+                    <img src="assets/banners/hero.webp" alt="MLBB Banner" width="860" height="300"
+                        loading="eager" decoding="async" fetchpriority="high">
                 </a>
 
                 <a href="pubg.html" class="az-banner-card">
-                    <img src="assets/banners/pubg-banner.webp" alt="PUBG Banner">
+                    <img src="assets/banners/pubg-banner.webp" alt="PUBG Banner" width="860" height="300"
+                        loading="eager" decoding="async">
                 </a>
 
                 <a href="freefire.html" class="az-banner-card">
-                    <img src="assets/banners/freefire-banner.webp" alt="Free Fire Banner">
+                    <img src="assets/banners/freefire-banner.webp" alt="Free Fire Banner" width="860" height="300"
+                        loading="lazy" decoding="async">
                 </a>
             </div>
 
             <div class="az-banner-dots" id="azBannerDots">
-                <button class="active"></button>
-                <button></button>
-                <button></button>
+                <button class="active" type="button" aria-label="Show MLBB banner" aria-current="true"></button>
+                <button type="button" aria-label="Show PUBG banner" aria-current="false"></button>
+                <button type="button" aria-label="Show Free Fire banner" aria-current="false"></button>
             </div>
         </section>
 
@@ -197,7 +238,7 @@
 
             </div>
 
-            <div class="az-panel" id="latestPromotionsPanel">
+            <div class="az-panel" id="whyChoosePanel">
                 <div class="az-section-head small">
                     <h2 data-i18n="whyChooseAziel">Why Choose AZIEL?</h2>
                 </div>
@@ -226,37 +267,25 @@
                 </div>
             </div>
 
-            <div class="az-panel">
+            <div class="az-panel" id="latestPromotionsPanel" data-promotion-preview-state="loading">
                 <div class="az-section-head small">
-                    <h2 data-i18n="latestPromotions">Latest Promotions</h2>
-                    <a href="#">View All</a>
+                    <h2 data-i18n="latestPromotions">
+                        Latest Promotions
+                        <span id="latestPromotionsCount" class="promotion-count-badge">0</span>
+                    </h2>
+                    <a id="latestPromotionsViewAll" href="/notifications.html?filter=promotions">View All</a>
                 </div>
 
                 <div class="promo-list" id="latestPromotionsList">
-                    <div class="promo-item">
-                        <div>
-                            <strong data-i18n="mlbbDiamondBonus">MLBB Diamond Bonus</strong>
-                            <span data-i18n="upTo10Extra">Up to 10% Extra</span>
-                            <small data-i18n="promoDate1">20 May - 30 May</small>
-                        </div>
-                        <i class="fa-solid fa-gift"></i>
-                    </div>
-
-                    <div class="promo-item">
-                        <div>
-                            <strong data-i18n="pubgUcPromo">PUBG UC Promo</strong>
-                            <span data-i18n="upTo8Extra">Up to 8% Extra</span>
-                            <small data-i18n="promoDate2">16 May - 28 May</small>
-                        </div>
-                        <i class="fa-solid fa-ticket"></i>
-                    </div>
+                    <div class="promo-item skeleton" aria-hidden="true"></div>
+                    <div class="promo-item skeleton" aria-hidden="true"></div>
                 </div>
             </div>
         </section>
 
     </main>
 
-    <footer class="site-footer">
+    <footer class="site-footer" aria-label="AZIEL footer">
         <div>
             <h3>AZIEL</h3>
             <p data-i18n="footerDescription">
@@ -304,7 +333,7 @@
 
         <div>
             <h4 data-i18n="paymentMethods">Payment Methods</h4>
-            <div class="payment-logos" id="footerPaymentLogos"></div>
+            <div class="payment-logos" id="footerPaymentLogos" aria-label="Accepted payment methods"></div>
         </div>
 
         <div class="footer-copy">
@@ -371,7 +400,7 @@
     <!-- =======================================
     Header
     ======================================= -->
-    <script src="/js/header-loader.js?v=20260706-i18n"></script>
+    <script src="/js/header-loader.js?v=20260717-pass3"></script>
     <script src="/js/header.js?v=20260706-i18n"></script>
     <script src="/js/header-scroll.js?v=20260706"></script>
 
@@ -389,6 +418,7 @@
     <script src="/js/catalog-discovery.js?v=20260714-phase7"></script>
     <script src="/js/home.js?v=20260706"></script>
     <script src="/js/home-banner-runtime.js?v=20260715-phase86"></script>
+    <script src="/js/home-promotion-preview.js?v=20260717-v26"></script>
     <script src="/js/home-placement-runtime.js?v=20260715-phase11"></script>
     <script src="/js/search.js?v=20260714-phase7"></script>
     <script src="/js/live-chat.js"></script>

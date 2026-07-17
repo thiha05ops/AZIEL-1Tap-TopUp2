@@ -41,6 +41,8 @@ body.auth-page {
 }
 
 .auth-shell {
+  box-sizing: border-box;
+  min-width: 0;
   min-height: 100vh;
   display: grid;
   grid-template-columns: 1.05fr .95fr;
@@ -137,6 +139,8 @@ body.auth-page {
 }
 
 .auth-card {
+  box-sizing: border-box;
+  min-width: 0;
   width: 100%;
   max-width: 460px;
   justify-self: center;
@@ -295,6 +299,7 @@ body.auth-page {
 }
 
 .google-btn {
+  min-width: 0;
   height: 52px;
   border-radius: 16px;
   border: 1px solid var(--az-border);
@@ -496,6 +501,9 @@ body.auth-page {
 }
 
 .google-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   display: inline-block;
   color: var(--az-text);
   font-size: 15px;

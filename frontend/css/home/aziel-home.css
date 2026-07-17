@@ -1825,6 +1825,128 @@ body.dark .az-home::before {
     box-shadow: none !important;
 }
 
+.promotion-count-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    margin-left: 8px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: rgba(139, 92, 246, .16);
+    color: var(--primary, #7c3aed);
+    font-size: 12px;
+    font-weight: 950;
+    vertical-align: middle;
+}
+
+.promotion-preview-item {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 12px;
+    transition:
+        transform var(--motion-fast, .18s) var(--motion-ease-premium, ease),
+        background-color var(--motion-fast, .18s) ease,
+        border-color var(--motion-fast, .18s) ease;
+}
+
+.promotion-preview-item .promotion-preview-image,
+.promotion-preview-item>i {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    object-fit: cover;
+    flex: 0 0 auto;
+    transition: transform var(--motion-fast, .18s) var(--motion-ease-premium, ease);
+}
+
+.promotion-preview-item .promotion-preview-cta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 32px;
+    max-width: 96px;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: rgba(139, 92, 246, .13);
+    color: var(--primary, #7c3aed);
+    font-size: 12px;
+    font-weight: 900;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.promotion-preview-item:focus-within,
+.promotion-preview-item:hover {
+    border-color: rgba(139, 92, 246, .34) !important;
+}
+
+.promotion-preview-cta:focus-visible,
+.az-banner-track:focus-visible,
+.az-banner-dots button:focus-visible,
+.az-primary-btn:focus-visible,
+.az-secondary-btn:focus-visible,
+.az-view-all:focus-visible,
+.category-grid a:focus-visible,
+.trust-card:focus-visible {
+    outline: 3px solid rgba(139, 92, 246, .72);
+    outline-offset: 3px;
+}
+
+.az-primary-btn:active,
+.az-secondary-btn:active,
+.promotion-preview-cta:active {
+    transform: scale(.98);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .promotion-preview-item:hover {
+        transform: translateY(-1px);
+    }
+
+    .promotion-preview-item:hover .promotion-preview-image,
+    .promotion-preview-item:hover>i {
+        transform: scale(1.04);
+    }
+}
+
+.promo-empty-state {
+    display: grid;
+    gap: 4px;
+    min-height: 68px;
+    padding: 14px;
+    border: 1px dashed color-mix(in srgb, var(--border) 78%, transparent);
+    border-radius: 14px;
+    color: var(--text-secondary);
+}
+
+.promo-empty-state strong {
+    color: var(--text);
+}
+
+.promo-empty-state span {
+    font-size: 13px;
+}
+
+.promo-item.skeleton {
+    min-height: 68px;
+    background: linear-gradient(90deg, rgba(139, 92, 246, .08), rgba(139, 92, 246, .16), rgba(139, 92, 246, .08));
+    background-size: 220% 100%;
+    animation: az-promo-skeleton 1.2s ease-in-out infinite;
+}
+
+@keyframes az-promo-skeleton {
+    from {
+        background-position: 100% 0;
+    }
+
+    to {
+        background-position: -100% 0;
+    }
+}
+
 .az-footer {
     margin-top: 52px !important;
     padding-top: 26px !important;
@@ -1841,6 +1963,24 @@ body.dark .az-home::before {
 
     .az-dashboard-grid {
         grid-template-columns: 1fr !important;
+    }
+}
+
+@media (max-width: 430px) {
+    .promotion-preview-item {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .promotion-preview-item .promotion-preview-cta {
+        grid-column: 1;
+        grid-row: 2;
+        width: fit-content;
+    }
+
+    .promotion-preview-item .promotion-preview-image,
+    .promotion-preview-item>i {
+        grid-column: 2;
+        grid-row: 1 / span 2;
     }
 }
 
@@ -1932,5 +2072,29 @@ body.dark .az-home::before {
 
     .why-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .promotion-preview-item,
+    .promotion-preview-item .promotion-preview-image,
+    .promotion-preview-item>i,
+    .promotion-preview-cta,
+    .az-primary-btn,
+    .az-secondary-btn,
+    .az-banner-card,
+    .az-banner-dots button,
+    .promo-item.skeleton {
+        animation: none !important;
+        transition: none !important;
+    }
+
+    .promotion-preview-item:hover,
+    .promotion-preview-item:hover .promotion-preview-image,
+    .promotion-preview-item:hover>i,
+    .promotion-preview-cta:active,
+    .az-primary-btn:active,
+    .az-secondary-btn:active {
+        transform: none !important;
     }
 }

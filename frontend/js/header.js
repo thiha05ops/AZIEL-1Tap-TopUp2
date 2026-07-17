@@ -31,6 +31,7 @@ function initHeader() {
     renderHeaderNav();
     initNotificationBadge();
     initProfileDropdown();
+    initHeaderSearchTrigger();
     initThemeButton();
     initHeaderLogout();
     initCanonicalHeaderScroll();
@@ -78,6 +79,58 @@ function renderHeader() {
     }
 
     translateHeader();
+}
+
+function initHeaderSearchTrigger() {
+    const btn = document.getElementById("azHeaderSearchBtn");
+
+    if (btn && btn.dataset.ready !== "true") {
+        btn.dataset.ready = "true";
+        btn.addEventListener("click", () => {
+            openHeaderSearch(btn);
+        });
+    }
+
+    if (window.__azielHeaderSearchShortcutReady) return;
+    window.__azielHeaderSearchShortcutReady = true;
+
+    document.addEventListener("keydown", event => {
+        const key = String(event.key || "").toLowerCase();
+        const editable = event.target?.closest?.("input, textarea, select, [contenteditable='true']");
+
+        if ((event.metaKey || event.ctrlKey) && key === "k") {
+            event.preventDefault();
+            openHeaderSearch(document.getElementById("azHeaderSearchBtn"));
+            return;
+        }
+
+        if (key === "/" && !editable && !event.metaKey && !event.ctrlKey && !event.altKey) {
+            event.preventDefault();
+            openHeaderSearch(document.getElementById("azHeaderSearchBtn"));
+        }
+    });
+}
+
+function openHeaderSearch(trigger = null) {
+    if (window.AZIEL_SEARCH?.open) {
+        window.AZIEL_SEARCH.open(trigger || document.activeElement);
+        return;
+    }
+
+    if (document.querySelector('script[data-aziel-search="true"]')) {
+        window.addEventListener("aziel:searchReady", () => {
+            window.AZIEL_SEARCH?.open?.(trigger || document.activeElement);
+        }, { once: true });
+        return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "/js/search.js?v=20260717-v26-search";
+    script.dataset.azielSearch = "true";
+    script.onload = () => {
+        window.AZIEL_SEARCH?.open?.(trigger || document.activeElement);
+    };
+    document.head.appendChild(script);
 }
 
 function initNotificationBadge() {
@@ -152,33 +205,33 @@ function renderHeaderNav() {
         <a href="home.html" data-i18n="nav_home">Home</a>
 
         <div class="az-nav-dropdown" id="gamesNavDropdown">
-            <button class="az-nav-drop-btn" type="button">
+            <button class="az-nav-drop-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="azGamesDropdownMenu">
                 <span data-i18n="nav_games">Games</span>
                 <i class="fa-solid fa-chevron-down"></i>
             </button>
 
-            <div class="az-nav-drop-menu">
-                <a href="mobile-games.html">
+            <div class="az-nav-drop-menu" id="azGamesDropdownMenu" role="menu" aria-label="Game categories">
+                <a href="mobile-games.html" role="menuitem">
                     <i class="fa-solid fa-mobile-screen-button"></i>
                     <span>Mobile Games</span>
                 </a>
 
-                <a href="pc-games.html">
+                <a href="pc-games.html" role="menuitem">
                     <i class="fa-solid fa-desktop"></i>
                     <span>PC Games</span>
                 </a>
 
-                <a href="gift-cards.html">
+                <a href="gift-cards.html" role="menuitem">
                     <i class="fa-solid fa-gift"></i>
                     <span>Gift Cards</span>
                 </a>
 
-                <a href="social-topup.html">
+                <a href="social-topup.html" role="menuitem">
                     <i class="fa-brands fa-telegram"></i>
                     <span>Social Top Up</span>
                 </a>
 
-                <a href="coming-soon.html">
+                <a href="coming-soon.html" role="menuitem">
                     <i class="fa-regular fa-clock"></i>
                     <span>Coming Soon</span>
                 </a>
@@ -223,30 +276,128 @@ function renderHeaderNav() {
 function initGamesDropdown() {
     const dropdown = document.getElementById("gamesNavDropdown");
     const btn = dropdown?.querySelector(".az-nav-drop-btn");
+    const menu = dropdown?.querySelector(".az-nav-drop-menu");
 
-    if (!dropdown || !btn) return;
+    if (!dropdown || !btn || !menu) return;
     if (dropdown.dataset.ready === "true") return;
 
     dropdown.dataset.ready = "true";
+    const menuItems = Array.from(menu.querySelectorAll("a"));
+
+    const syncDropdownA11y = () => {
+        btn.setAttribute("aria-expanded", dropdown.classList.contains("show") ? "true" : "false");
+    };
+
+    const emitDropdownState = () => {
+        window.dispatchEvent(new CustomEvent("aziel:headerSurfaceChanged", {
+            detail: {
+                open: dropdown.classList.contains("show"),
+                source: "games-dropdown"
+            }
+        }));
+    };
+
+    const releaseMobileDropdownFocus = () => {
+        if (!window.matchMedia("(max-width: 900px)").matches) return;
+        if (document.activeElement && dropdown.contains(document.activeElement)) {
+            document.activeElement.blur();
+        }
+    };
+
+    const closeDropdown = ({ restoreFocus = false } = {}) => {
+        const wasOpen = dropdown.classList.contains("show");
+        dropdown.classList.remove("show");
+        syncDropdownA11y();
+        if (wasOpen) {
+            releaseMobileDropdownFocus();
+            emitDropdownState();
+            if (restoreFocus) {
+                btn.focus({ preventScroll: true });
+            }
+        }
+    };
+
+    const openDropdown = ({ focusFirst = false } = {}) => {
+        dropdown.classList.add("show");
+        syncDropdownA11y();
+        emitDropdownState();
+        if (focusFirst) {
+            menuItems[0]?.focus({ preventScroll: true });
+        }
+    };
+
+    const toggleDropdown = () => {
+        if (dropdown.classList.contains("show")) {
+            closeDropdown();
+            return;
+        }
+        openDropdown();
+    };
 
     btn.addEventListener("click", (e) => {
         e.stopPropagation();
-        dropdown.classList.toggle("show");
+        toggleDropdown();
+    });
+
+    btn.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            toggleDropdown();
+            return;
+        }
+
+        if (event.key === "ArrowDown") {
+            event.preventDefault();
+            openDropdown({ focusFirst: true });
+        }
     });
 
     dropdown.addEventListener("click", (e) => {
         e.stopPropagation();
     });
 
+    menuItems.forEach(link => {
+        link.addEventListener("click", closeDropdown);
+    });
+
+    menu.addEventListener("keydown", event => {
+        const currentIndex = menuItems.indexOf(document.activeElement);
+
+        if (event.key === "Escape") {
+            event.preventDefault();
+            closeDropdown({ restoreFocus: true });
+            return;
+        }
+
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            const direction = event.key === "ArrowDown" ? 1 : -1;
+            const fallbackIndex = direction > 0 ? 0 : menuItems.length - 1;
+            const nextIndex = currentIndex >= 0
+                ? (currentIndex + direction + menuItems.length) % menuItems.length
+                : fallbackIndex;
+            menuItems[nextIndex]?.focus({ preventScroll: true });
+            return;
+        }
+
+        if (event.key === "Home" || event.key === "End") {
+            event.preventDefault();
+            const nextIndex = event.key === "Home" ? 0 : menuItems.length - 1;
+            menuItems[nextIndex]?.focus({ preventScroll: true });
+        }
+    });
+
     document.addEventListener("click", () => {
-        dropdown.classList.remove("show");
+        closeDropdown();
     });
 
     document.addEventListener("keydown", (e) => {
         if (e.key === "Escape") {
-            dropdown.classList.remove("show");
+            closeDropdown({ restoreFocus: dropdown.classList.contains("show") });
         }
     });
+
+    syncDropdownA11y();
 }
 
 function translateHeader() {
@@ -460,6 +611,17 @@ function initCanonicalHeaderScroll() {
         window.requestAnimationFrame(() => {
             if (hasOpenHeaderSurface()) forceVisible();
         });
+    });
+
+    window.addEventListener("aziel:headerSurfaceChanged", event => {
+        eventY = Math.max(0, window.scrollY || 0);
+        previousY = eventY;
+        downwardDelta = 0;
+        upwardDelta = 0;
+
+        if (event.detail?.open || hasOpenHeaderSurface()) {
+            forceVisible();
+        }
     });
 
     if (typeof mobileQuery.addEventListener === "function") {

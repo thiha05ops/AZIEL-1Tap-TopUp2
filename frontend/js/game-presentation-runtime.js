@@ -35,9 +35,14 @@
     function createSlideMarkup(banner, index) {
         const href = banner.ctaTarget && isSafeCtaTarget(banner.ctaTarget) ? banner.ctaTarget : "";
         const objectPosition = resolveObjectPosition(banner);
+        const loading = index < 2 ? "eager" : "lazy";
+        const fetchPriority = index === 0 ? "high" : "auto";
         const image = `
             <img src="${escapeHtml(banner.imageUrl)}"
                 alt="${escapeHtml(banner.imageAltText || banner.name || "Game banner")}"
+                loading="${loading}"
+                decoding="async"
+                fetchpriority="${fetchPriority}"
                 style="object-position:${escapeHtml(objectPosition)}"
                 data-game-banner-image>
         `;
@@ -168,7 +173,7 @@
             const banners = Array.isArray(data.banners) ? data.banners : [];
             if (banners.length) {
                 root.setAttribute("data-managed-content-state", "preparing");
-                await preloadImages(banners.map(banner => banner.imageUrl));
+                await preloadImages(banners.slice(0, 2).map(banner => banner.imageUrl));
             }
             renderManagedBanners(root, banners);
             root.setAttribute("data-managed-content-state", banners.length ? "active" : "empty");

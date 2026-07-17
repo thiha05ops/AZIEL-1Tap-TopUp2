@@ -61,7 +61,7 @@
             }
 
             zone.setAttribute("data-managed-content-state", "preparing");
-            await preloadImages(banners.map(banner => banner.imageUrl));
+            await preloadImages(banners.slice(0, 2).map(banner => banner.imageUrl));
 
             const managedTrack = track.cloneNode(false);
             const managedDotsBox = dotsBox.cloneNode(false);
@@ -111,19 +111,21 @@
     }
 
     function renderManagedBanners(track, dotsBox, banners) {
-        track.innerHTML = banners.map(banner => {
+        track.innerHTML = banners.map((banner, index) => {
             const target = normalizeTarget(banner.ctaTarget);
             const label = banner.imageAltText || banner.name || "AZIEL banner";
+            const loading = index < 2 ? "eager" : "lazy";
+            const fetchPriority = index === 0 ? "high" : "auto";
 
             return `
-                <a href="${escapeAttr(target)}" class="az-banner-card" data-home-banner-id="${escapeAttr(banner.id)}" style="--az-banner-object-position: ${escapeAttr(resolveObjectPosition(banner))}">
-                    <img src="${escapeAttr(banner.imageUrl)}" alt="${escapeAttr(label)}" loading="eager" style="object-position: var(--az-banner-object-position)">
+                <a href="${escapeAttr(target)}" class="az-banner-card" data-home-banner-id="${escapeAttr(banner.id)}" aria-label="${escapeAttr(label)}" style="--az-banner-object-position: ${escapeAttr(resolveObjectPosition(banner))}">
+                    <img src="${escapeAttr(banner.imageUrl)}" alt="${escapeAttr(label)}" loading="${loading}" decoding="async" fetchpriority="${fetchPriority}" style="object-position: var(--az-banner-object-position)">
                 </a>
             `;
         }).join("");
 
         dotsBox.innerHTML = banners.map((_, index) => (
-            `<button type="button" aria-label="Show banner ${index + 1}"></button>`
+            `<button type="button" aria-label="Show banner ${index + 1}" aria-current="false"></button>`
         )).join("");
     }
 
@@ -298,6 +300,7 @@
     function updateDots() {
         dots.forEach((dot, index) => {
             dot.classList.toggle("active", index === current);
+            dot.setAttribute("aria-current", index === current ? "true" : "false");
         });
     }
 

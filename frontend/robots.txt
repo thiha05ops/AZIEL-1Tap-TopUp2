@@ -1,5 +1,14 @@
 User-agent: *
 Allow: /
+Disallow: /admin
+Disallow: /account.html
+Disallow: /wallet.html
+Disallow: /tracking.html
+Disallow: /notifications.html
+Disallow: /login.html
+Disallow: /register.html
+Disallow: /reset-password.html
+Disallow: /verify-email.html
+Disallow: /verify-otp.html
 
-Sitemap:
-https://aziel-1tap-topup2.onrender.com/sitemap.xml
+Sitemap: https://azielplay.com/sitemap.xml

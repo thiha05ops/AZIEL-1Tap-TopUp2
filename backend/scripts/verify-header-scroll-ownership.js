@@ -26,6 +26,9 @@ function main() {
         "hasOpenHeaderSurface",
         "forceVisible",
         "hideNavRow",
+        "aziel:headerSurfaceChanged",
+        "games-dropdown",
+        "releaseMobileDropdownFocus",
         "az-nav-hidden",
         "az-nav-visible"
     ].forEach(token => {
@@ -34,6 +37,8 @@ function main() {
     });
 
     assert(!header.includes("initAutoRevealNav();"), "header.js must not call the old duplicate auto reveal controller.");
+    assert(header.includes("initHeaderSearchTrigger") && header.includes("azHeaderSearchBtn"), "Header must own the public search trigger without adding scroll ownership.");
+    assert(read("frontend/components/header.html").includes("azHeaderSearchBtn"), "Header component must include the utility-row search trigger.");
     assert(!header.includes("header.classList.add(\"nav-hidden\")"), "header.js must not use legacy nav-hidden ownership.");
     assert(!header.includes("az-header-hidden"), "header.js must not hide the full header.");
     assert(!header.includes("az-header-visible"), "header.js must not use full-header visible state.");
@@ -43,10 +48,20 @@ function main() {
     assert(css.includes("#azHeaderMount") && css.includes("position: sticky;"), "Header mount must use sticky in-flow public ownership.");
     assert(css.includes("overflow-anchor: none;"), "Header mount should not trigger scroll anchoring jumps.");
     assert(css.includes(".az-header") && css.includes("position: relative;"), "Header element should be relative inside the sticky mount.");
-    assert(!/\.az-header\s*\{[\s\S]*?position:\s*fixed;/.test(css), "Public header must not be fixed.");
+    const headerBlock = css.match(/\.az-header\s*\{[\s\S]*?\}/)?.[0] || "";
+    assert(headerBlock.includes("position: relative;"), "Public header must remain relative.");
+    assert(!headerBlock.includes("position: fixed;"), "Public header must not be fixed.");
     assert(css.includes("transform var(--motion-standard"), "Nav row CSS must animate transform in the canonical path.");
     assert(css.includes("#azHeaderMount.az-nav-hidden .az-nav") && css.includes("transform: translateY(-100%) !important;"), "Mobile hidden state must transform only the nav row.");
     assert(!css.includes("#azHeaderMount.az-header-hidden .az-header"), "CSS must not hide the full header.");
+    assert(css.includes("grid-template-columns: repeat(5, minmax(0, 1fr)) !important;"), "Mobile nav must distribute five destinations into equal slots.");
+    assert(css.includes(".az-nav-dropdown") && css.includes("width: 100% !important;"), "Mobile Games wrapper must be treated as an equal nav slot.");
+    assert(css.includes("overflow-x: clip !important;"), "Mobile nav must not introduce horizontal overflow.");
+    assert(css.includes("--az-z-header-dropdown"), "Header dropdown layer token must exist.");
+    assert(css.includes("#azHeaderMount:has(.az-nav-dropdown.show) .az-nav") && css.includes("overflow: visible !important;"), "Open mobile Games dropdown must release nav overflow clipping.");
+    assert(css.includes("#azHeaderMount:has(.az-nav-dropdown.show) .az-nav") && css.includes("transform: none !important;"), "Open mobile Games dropdown must not be trapped by nav transform stacking.");
+    assert(css.includes("width: min(290px, calc(100vw - 24px)) !important;"), "Mobile Games dropdown must fit the 320px viewport with safe gutters.");
+    assert(css.includes("z-index: var(--az-z-header-dropdown, 100000) !important;"), "Mobile Games dropdown must render above public hero/banner layers.");
     assert(css.includes("@media (min-width: 901px)") && css.includes("#azHeaderMount.az-nav-hidden .az-nav"), "Desktop must force the nav row visible.");
     assert(css.includes("#azHeaderMount:focus-within .az-nav"), "Focused header controls must force nav row visible.");
     assert(css.includes("#azHeaderMount:has(.az-nav-dropdown.show) .az-nav"), "Open nav dropdown must force nav row visible.");
