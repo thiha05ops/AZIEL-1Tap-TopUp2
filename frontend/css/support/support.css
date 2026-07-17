@@ -5,7 +5,7 @@
 
 .support-page {
     width: min(1400px, calc(100% - 40px));
-    margin: 120px auto 60px;
+    margin: 28px auto 60px;
 
     display: grid;
     grid-template-columns: minmax(0, 1.15fr) 420px;
@@ -896,7 +896,7 @@ body.theme-light .support-msg.error {
 @media (max-width: 820px) {
     .support-page {
         width: min(100% - 28px, 720px);
-        margin-top: 96px;
+        margin-top: 20px;
         gap: 22px;
     }
 

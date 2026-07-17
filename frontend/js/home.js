@@ -187,56 +187,31 @@ function initAzielBanner() {
 
         if (!activeImg) return;
 
-        function readColor() {
-            try {
-                const canvas = document.createElement("canvas");
-                const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        const zone = document.getElementById("bannerZone");
+        const home = zone?.closest(".az-home");
+        const imageUrl = activeImg.currentSrc || activeImg.src || "";
+        if (!zone || !imageUrl) return;
 
-                canvas.width = 24;
-                canvas.height = 24;
-
-                ctx.drawImage(activeImg, 0, 0, 24, 24);
-
-                const data = ctx.getImageData(0, 0, 24, 24).data;
-
-                let r = 0;
-                let g = 0;
-                let b = 0;
-                let count = 0;
-
-                for (let i = 0; i < data.length; i += 4) {
-                    const alpha = data[i + 3];
-
-                    if (alpha < 120) continue;
-
-                    r += data[i];
-                    g += data[i + 1];
-                    b += data[i + 2];
-                    count++;
-                }
-
-                if (!count) return;
-
-                r = Math.floor(r / count);
-                g = Math.floor(g / count);
-                b = Math.floor(b / count);
-
-                document.documentElement.style.setProperty(
-                    "--banner-rgb",
-                    `${r}, ${g}, ${b}`
-                );
-            } catch (err) {
-                document.documentElement.style.setProperty(
-                    "--banner-rgb",
-                    "139, 92, 246"
-                );
-            }
+        zone.style.setProperty(
+            "--az-banner-ambient-image",
+            `url("${String(imageUrl).replace(/\\/g, "\\\\").replace(/"/g, "\\\"")}")`
+        );
+        home?.style.setProperty(
+            "--az-banner-ambient-image",
+            `url("${String(imageUrl).replace(/\\/g, "\\\\").replace(/"/g, "\\\"")}")`
+        );
+        if (home && !home.querySelector(".az-home-ambient-buffer")) {
+            ["", ""].forEach(() => {
+                const buffer = document.createElement("div");
+                buffer.className = "az-home-ambient-buffer";
+                buffer.setAttribute("aria-hidden", "true");
+                home.prepend(buffer);
+            });
         }
-
-        if (activeImg.complete) {
-            readColor();
-        } else {
-            activeImg.onload = readColor;
+        const buffer = home?.querySelector(".az-home-ambient-buffer");
+        if (buffer) {
+            buffer.style.backgroundImage = `url("${String(imageUrl).replace(/\\/g, "\\\\").replace(/"/g, "\\\"")}")`;
+            buffer.classList.add("is-active");
         }
     }
 
@@ -383,69 +358,4 @@ function initAzielBanner() {
 
     goTo(0);
     startAuto();
-}
-
-function setAtmosphereColor() {
-    const activeImg = cards[current].querySelector("img");
-    if (!activeImg) return;
-
-    function readColor() {
-        try {
-            const canvas = document.createElement("canvas");
-            const ctx = canvas.getContext("2d", { willReadFrequently: true });
-
-            canvas.width = 64;
-            canvas.height = 64;
-
-            ctx.drawImage(activeImg, 0, 0, 64, 64);
-
-            const data = ctx.getImageData(0, 0, 64, 64).data;
-            const buckets = {};
-
-            for (let i = 0; i < data.length; i += 4) {
-                let r = data[i];
-                let g = data[i + 1];
-                let b = data[i + 2];
-                const a = data[i + 3];
-
-                if (a < 180) continue;
-
-                const max = Math.max(r, g, b);
-                const min = Math.min(r, g, b);
-                const saturation = max - min;
-                const brightness = (r + g + b) / 3;
-
-                if (brightness < 45 || brightness > 225) continue;
-                if (saturation < 35) continue;
-
-                r = Math.round(r / 28) * 28;
-                g = Math.round(g / 28) * 28;
-                b = Math.round(b / 28) * 28;
-
-                const key = `${r},${g},${b}`;
-                buckets[key] = (buckets[key] || 0) + 1;
-            }
-
-            let bestKey = "139,92,246";
-            let bestCount = 0;
-
-            Object.entries(buckets).forEach(([key, count]) => {
-                if (count > bestCount) {
-                    bestKey = key;
-                    bestCount = count;
-                }
-            });
-
-            document.documentElement.style.setProperty("--banner-rgb", bestKey);
-
-        } catch (err) {
-            document.documentElement.style.setProperty("--banner-rgb", "139,92,246");
-        }
-    }
-
-    if (activeImg.complete) {
-        readColor();
-    } else {
-        activeImg.onload = readColor;
-    }
 }

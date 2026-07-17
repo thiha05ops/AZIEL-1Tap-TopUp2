@@ -94,7 +94,6 @@ body::after {
 }
 
 .az-home,
-.az-header,
 main {
   position: relative;
   z-index: 1;

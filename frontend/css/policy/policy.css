@@ -11,7 +11,7 @@ body {
 .policy-container {
     width: min(1040px, calc(100% - 28px));
     margin: 0 auto;
-    padding: calc(var(--az-header-h, var(--az-header-height, 78px)) + 38px) 0 80px;
+    padding: 34px 0 80px;
 }
 
 .policy-header {
@@ -110,7 +110,7 @@ body {
 @media (max-width: 768px) {
     .policy-container {
         width: min(100% - 24px, 1040px);
-        padding-top: calc(var(--az-header-mobile-height, var(--az-header-h, 72px)) + 26px);
+        padding-top: 24px;
     }
 
     .policy-card {

@@ -14,8 +14,11 @@ html {
 
 /* PAGE WRAPPER */
 .az-home {
-    width: min(var(--home-max), calc(100% - 32px));
-    margin: 104px auto 0;
+    width: 100%;
+    margin: 0 auto;
+    padding: 14px 0 0;
+    position: relative;
+    overflow: clip;
 }
 
 /* BANNER */
@@ -56,6 +59,56 @@ html {
     .az-banner-zone[data-managed-content-state="resolving"]::after,
     .az-banner-zone[data-managed-content-state="preparing"]::after {
         animation: none;
+    }
+}
+
+/* ===============================
+   CANONICAL TYPOGRAPHY-FIRST HOME RESET
+================================ */
+
+.az-section-head h2 {
+    font-size: var(--az-type-section-title, 24px) !important;
+    line-height: 1.15 !important;
+    letter-spacing: 0 !important;
+}
+
+.az-section-head p,
+.trust-card span {
+    line-height: 1.45 !important;
+}
+
+.trust-card {
+    min-height: 64px !important;
+    height: auto !important;
+    border-radius: var(--az-radius-surface, 18px) !important;
+    box-shadow: none !important;
+    background: rgba(255, 255, 255, .18) !important;
+}
+
+body.theme-dark .trust-card,
+body.dark .trust-card {
+    background: rgba(255, 255, 255, .045) !important;
+}
+
+@media (max-width: 768px) {
+    .trust-card {
+        min-height: 58px !important;
+        padding: 10px 12px !important;
+        border-radius: 16px !important;
+    }
+
+    .trust-card i {
+        width: 34px !important;
+        height: 34px !important;
+        border-radius: 12px !important;
+    }
+
+    .trust-card strong {
+        font-size: 13px !important;
+    }
+
+    .trust-card span {
+        font-size: 11px !important;
     }
 }
 
@@ -863,7 +916,6 @@ body::after {
 }
 
 .az-home,
-.az-header,
 main {
     position: relative;
     z-index: 1;
@@ -1189,4 +1241,696 @@ body.theme-dark .az-panel {
 body.theme-dark .category-grid a {
     background: rgba(255, 255, 255, .06) !important;
     border-color: rgba(255, 255, 255, .10) !important;
+}
+
+/* ===============================
+   PRE-LAUNCH HERO POLISH
+================================ */
+
+:root {
+    --az-banner-transition-duration: 560ms;
+    --az-banner-transition-ease: cubic-bezier(.22, 1, .36, 1);
+    --az-banner-ambient-image: none;
+    --az-banner-active-position: center center;
+}
+
+body.theme-light,
+body.theme-dark,
+body.dark {
+    background:
+        radial-gradient(circle at 50% 360px, rgba(var(--banner-rgb), .10), transparent 38%),
+        var(--bg) !important;
+}
+
+body::before,
+body::after {
+    background: none !important;
+    opacity: 0 !important;
+}
+
+.az-home {
+    margin-top: calc(var(--az-header-height, 78px) + env(safe-area-inset-top) + 12px) !important;
+    position: relative !important;
+    isolation: isolate !important;
+}
+
+.az-home::before {
+    content: "";
+    position: absolute;
+    top: -72px;
+    left: 50%;
+    width: 100dvw;
+    height: min(620px, calc(100% + 40px));
+    z-index: 0;
+    pointer-events: none;
+    background-image: var(--az-banner-ambient-image);
+    background-size: cover;
+    background-position: var(--az-banner-active-position);
+    filter: blur(42px) saturate(1.28);
+    opacity: .34;
+    transform: translateX(-50%) scale(1.05);
+    mask-image: linear-gradient(180deg, transparent 0%, #000 12%, rgba(0, 0, 0, .9) 46%, rgba(0, 0, 0, .42) 72%, transparent 100%);
+    -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 12%, rgba(0, 0, 0, .9) 46%, rgba(0, 0, 0, .42) 72%, transparent 100%);
+    transition:
+        background-position var(--az-banner-transition-duration) var(--az-banner-transition-ease),
+        opacity var(--az-banner-transition-duration) var(--az-banner-transition-ease),
+        transform var(--az-banner-transition-duration) var(--az-banner-transition-ease);
+}
+
+.az-home-ambient-buffer {
+    position: absolute;
+    top: -72px;
+    left: 50%;
+    width: 100dvw;
+    height: min(620px, calc(100% + 40px));
+    z-index: 0;
+    pointer-events: none;
+    background-size: cover;
+    background-position: var(--az-banner-active-position);
+    filter: blur(42px) saturate(1.28);
+    opacity: 0;
+    transform: translateX(-50%) scale(1.05);
+    mask-image: linear-gradient(180deg, transparent 0%, #000 12%, rgba(0, 0, 0, .9) 46%, rgba(0, 0, 0, .42) 72%, transparent 100%);
+    -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 12%, rgba(0, 0, 0, .9) 46%, rgba(0, 0, 0, .42) 72%, transparent 100%);
+    transition:
+        opacity var(--az-banner-transition-duration) var(--az-banner-transition-ease),
+        background-position var(--az-banner-transition-duration) var(--az-banner-transition-ease),
+        transform var(--az-banner-transition-duration) var(--az-banner-transition-ease);
+}
+
+.az-home-ambient-buffer.is-active {
+    opacity: var(--az-ambient-home-opacity, .34);
+}
+
+body.theme-dark .az-home-ambient-buffer.is-active,
+body.dark .az-home-ambient-buffer.is-active {
+    opacity: .44;
+}
+
+body.theme-dark .az-home::before,
+body.dark .az-home::before {
+    opacity: .44;
+    filter: blur(46px) saturate(1.32);
+}
+
+.az-banner-zone,
+.az-trust-row,
+.az-section,
+.az-dashboard-grid {
+    position: relative;
+    z-index: 1;
+}
+
+.az-banner-zone {
+    height: auto !important;
+    min-height: 210px !important;
+    max-height: 360px !important;
+    aspect-ratio: 16 / 4.45 !important;
+    margin-top: 8px !important;
+    margin-bottom: 8px !important;
+    border-radius: 30px !important;
+    overflow: hidden !important;
+    isolation: isolate !important;
+    box-sizing: border-box !important;
+}
+
+.az-banner-zone::before {
+    content: "";
+    position: absolute;
+    inset: -22% -10% -24%;
+    z-index: 0;
+    pointer-events: none;
+    background-image: var(--az-banner-ambient-image);
+    background-size: cover;
+    background-position: var(--az-banner-active-position);
+    filter: blur(30px) saturate(1.22);
+    opacity: .58;
+    transform: scale(1.12);
+    mask-image: radial-gradient(ellipse at center, #000 0%, rgba(0, 0, 0, .78) 42%, transparent 76%);
+    -webkit-mask-image: radial-gradient(ellipse at center, #000 0%, rgba(0, 0, 0, .78) 42%, transparent 76%);
+    transition:
+        background-position var(--az-banner-transition-duration) var(--az-banner-transition-ease),
+        opacity var(--az-banner-transition-duration) var(--az-banner-transition-ease),
+        transform var(--az-banner-transition-duration) var(--az-banner-transition-ease);
+}
+
+.az-banner-track {
+    position: absolute !important;
+    inset: 0 !important;
+    z-index: 1 !important;
+    height: auto !important;
+    border-radius: inherit !important;
+    overflow: visible !important;
+    cursor: grab !important;
+    user-select: none !important;
+    touch-action: pan-y !important;
+}
+
+.az-banner-track:active {
+    cursor: grabbing !important;
+}
+
+.az-banner-card {
+    top: 0 !important;
+    width: min(920px, 72%) !important;
+    max-width: calc(100% - 40px) !important;
+    height: 100% !important;
+    border-radius: inherit !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    transition:
+        transform var(--az-banner-transition-duration) var(--az-banner-transition-ease),
+        opacity var(--az-banner-transition-duration) var(--az-banner-transition-ease),
+        filter var(--az-banner-transition-duration) var(--az-banner-transition-ease) !important;
+}
+
+.az-banner-card.active img {
+    animation: azHeroKenBurns 6800ms var(--az-banner-transition-ease) both;
+}
+
+.az-banner-card img {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100% !important;
+    object-fit: cover !important;
+    object-position: var(--az-banner-object-position, var(--az-banner-active-position)) !important;
+    border-radius: inherit !important;
+    transition:
+        object-position var(--az-banner-transition-duration) var(--az-banner-transition-ease),
+        transform 6800ms var(--az-banner-transition-ease) !important;
+}
+
+.az-banner-dots {
+    bottom: 14px !important;
+    z-index: 3 !important;
+    gap: 7px !important;
+}
+
+.az-banner-dots button {
+    width: 18px !important;
+    height: 5px !important;
+    background: rgba(255, 255, 255, .56) !important;
+    transition:
+        width var(--az-banner-transition-duration) var(--az-banner-transition-ease),
+        background-color var(--az-banner-transition-duration) var(--az-banner-transition-ease),
+        opacity var(--az-banner-transition-duration) var(--az-banner-transition-ease) !important;
+}
+
+.az-banner-dots button.active {
+    width: 46px !important;
+    background: #ffffff !important;
+}
+
+.az-trust-row {
+    margin-top: 12px !important;
+}
+
+.az-section,
+.az-dashboard-grid {
+    margin-top: 28px !important;
+}
+
+@keyframes azHeroKenBurns {
+    from {
+        transform: scale(1) translate3d(0, 0, 0);
+    }
+
+    to {
+        transform: scale(1.028) translate3d(0, -2px, 0);
+    }
+}
+
+@media (max-width: 1024px) {
+    .az-banner-zone {
+        aspect-ratio: 16 / 5.4 !important;
+        min-height: 190px !important;
+    }
+
+    .az-banner-card {
+        width: 82% !important;
+        max-width: calc(100% - 28px) !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .az-home {
+        margin-top: calc(var(--az-header-mobile-height, 64px) + env(safe-area-inset-top) + 10px) !important;
+    }
+
+    .az-banner-zone {
+        aspect-ratio: 16 / 7.2 !important;
+        min-height: 168px !important;
+        max-height: 230px !important;
+        margin-top: 6px !important;
+        border-radius: 22px !important;
+    }
+
+    .az-banner-zone::before {
+        inset: -18% -8% -18%;
+        filter: blur(22px) saturate(1.16);
+        opacity: .44;
+    }
+
+    .az-home::before {
+        top: -46px;
+        left: 50%;
+        width: 100dvw;
+        height: 420px;
+        filter: blur(30px) saturate(1.22);
+        opacity: .30;
+    }
+
+    .az-home-ambient-buffer {
+        top: -46px;
+        left: 50%;
+        width: 100dvw;
+        height: 420px;
+        filter: blur(30px) saturate(1.22);
+    }
+
+    .az-banner-card {
+        width: 92% !important;
+        max-width: calc(100% - 14px) !important;
+    }
+
+    .az-banner-dots {
+        bottom: 10px !important;
+    }
+
+    .az-banner-dots button {
+        width: 14px !important;
+        height: 4px !important;
+    }
+
+    .az-banner-dots button.active {
+        width: 34px !important;
+    }
+
+    .az-trust-row {
+        margin-top: 10px !important;
+    }
+}
+
+@media (max-width: 420px) {
+    .az-banner-zone {
+        aspect-ratio: 16 / 7.8 !important;
+        min-height: 156px !important;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .az-banner-card,
+    .az-banner-card img,
+    .az-home::before,
+    .az-banner-zone::before,
+    .az-banner-dots button {
+        transition-duration: 1ms !important;
+        animation: none !important;
+    }
+}
+
+/* ===============================
+   AZIEL PUBLIC STOREFRONT V2.6
+   Home visual ownership
+================================ */
+
+.az-home {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 12px 0 0 !important;
+    isolation: isolate !important;
+    overflow-x: clip !important;
+}
+
+.az-banner-zone,
+.az-trust-row,
+.az-section,
+.az-dashboard-grid,
+.az-footer {
+    width: min(var(--public-page-max, 1200px), calc(100% - (var(--public-gutter-desktop, 28px) * 2))) !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+.az-home::before,
+.az-home-ambient-buffer {
+    top: 0 !important;
+    left: 50% !important;
+    width: 100dvw !important;
+    height: min(560px, 70svh) !important;
+    filter: blur(var(--ambient-blur, 42px)) saturate(var(--ambient-saturation, 1.28)) !important;
+    transform: translateX(-50%) scale(1.08) !important;
+    mask-image:
+        linear-gradient(180deg,
+            rgba(0, 0, 0, .84) 0%,
+            #000 22%,
+            rgba(0, 0, 0, .70) 62%,
+            transparent 100%) !important;
+    -webkit-mask-image:
+        linear-gradient(180deg,
+            rgba(0, 0, 0, .84) 0%,
+            #000 22%,
+            rgba(0, 0, 0, .70) 62%,
+            transparent 100%) !important;
+}
+
+.az-home::before {
+    opacity: var(--ambient-home-opacity-light, .34) !important;
+}
+
+body.theme-dark .az-home::before,
+body.dark .az-home::before {
+    opacity: var(--ambient-home-opacity-dark, .44) !important;
+}
+
+.az-banner-zone {
+    aspect-ratio: 16 / 4.75 !important;
+    min-height: 248px !important;
+    max-height: 372px !important;
+    margin-top: 2px !important;
+    margin-bottom: 0 !important;
+    border-radius: var(--az-radius-hero, 24px) !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.az-banner-zone::before {
+    inset: -24% -18% -28% !important;
+    opacity: .44 !important;
+    filter: blur(34px) saturate(1.20) !important;
+}
+
+.az-banner-card {
+    width: min(900px, 74%) !important;
+    max-width: calc(100% - 34px) !important;
+    border-radius: var(--az-radius-hero, 24px) !important;
+}
+
+.az-banner-card.active {
+    filter: none !important;
+}
+
+.az-banner-card:not(.active) {
+    opacity: .46 !important;
+    filter: saturate(.82) brightness(.82) !important;
+}
+
+.az-banner-card img {
+    box-shadow: 0 18px 48px rgba(15, 23, 42, .22) !important;
+}
+
+.az-banner-dots {
+    bottom: 12px !important;
+}
+
+.az-banner-dots button {
+    width: 16px !important;
+    height: 4px !important;
+    opacity: .74 !important;
+}
+
+.az-banner-dots button.active {
+    width: 42px !important;
+}
+
+.az-trust-row {
+    min-height: 64px !important;
+    margin-top: 12px !important;
+    padding: 10px 12px !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    border-radius: 18px !important;
+    background: color-mix(in srgb, var(--surface-liquid, var(--card)) 62%, transparent) !important;
+    border: 1px solid var(--surface-border, var(--border)) !important;
+    box-shadow: 0 10px 28px rgba(15, 23, 42, .08) !important;
+    backdrop-filter: blur(16px) saturate(142%) !important;
+    -webkit-backdrop-filter: blur(16px) saturate(142%) !important;
+}
+
+.trust-card {
+    height: auto !important;
+    min-height: 46px !important;
+    padding: 6px 8px !important;
+    border: 0 !important;
+    border-radius: 12px !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+.trust-card:hover {
+    transform: none !important;
+}
+
+.trust-card i {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 11px !important;
+    box-shadow: none !important;
+}
+
+.trust-card strong {
+    font-size: 13px !important;
+    line-height: 1.18 !important;
+    font-weight: 850 !important;
+}
+
+.trust-card span {
+    font-size: 11px !important;
+    line-height: 1.32 !important;
+}
+
+.az-section,
+.az-dashboard-grid {
+    margin-top: var(--public-section-gap, 42px) !important;
+}
+
+.az-section-head {
+    margin-bottom: 16px !important;
+    gap: 14px !important;
+}
+
+.az-section-head h2,
+.az-section-head.small h2 {
+    font-size: var(--type-section-title, 28px) !important;
+    line-height: 1.12 !important;
+    font-weight: 900 !important;
+    letter-spacing: 0 !important;
+}
+
+.az-section-head a,
+.az-view-all {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    white-space: nowrap !important;
+}
+
+.popular-game-grid {
+    gap: 14px !important;
+}
+
+.popular-game-card {
+    min-height: 176px !important;
+    padding-bottom: 14px !important;
+    border-radius: 16px !important;
+    background: color-mix(in srgb, var(--card) 68%, transparent) !important;
+    border: 1px solid color-mix(in srgb, var(--border) 82%, transparent) !important;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, .07) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+.popular-game-card:hover {
+    transform: translateY(-3px) !important;
+    box-shadow: 0 14px 32px rgba(124, 58, 237, .12) !important;
+}
+
+.popular-game-card img {
+    height: 126px !important;
+    border-radius: 15px 15px 0 0 !important;
+}
+
+.popular-game-card h3 {
+    margin: 12px 12px 3px !important;
+    font-size: var(--type-card-title, 15px) !important;
+    letter-spacing: 0 !important;
+}
+
+.popular-game-card p {
+    margin: 0 12px !important;
+    font-size: var(--type-meta, 12px) !important;
+}
+
+.az-dashboard-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(280px, .82fr) !important;
+    gap: 18px !important;
+}
+
+.az-panel {
+    padding: 18px !important;
+    border-radius: 18px !important;
+    background: transparent !important;
+    border: 1px solid color-mix(in srgb, var(--border) 74%, transparent) !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+#latestPromotionsPanel,
+.az-panel:has(.promo-list) {
+    background: color-mix(in srgb, var(--surface-liquid, var(--card)) 52%, transparent) !important;
+    box-shadow: 0 10px 28px rgba(15, 23, 42, .06) !important;
+}
+
+.category-grid a {
+    min-height: 48px !important;
+    padding: 0 10px !important;
+    border-radius: 12px !important;
+    background: transparent !important;
+    border-color: color-mix(in srgb, var(--border) 74%, transparent) !important;
+}
+
+.category-grid img,
+.category-grid i {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 9px !important;
+}
+
+.why-grid {
+    gap: 8px !important;
+}
+
+.why-grid div {
+    min-height: 76px !important;
+    border-radius: 12px !important;
+}
+
+.why-grid i {
+    width: 34px !important;
+    height: 34px !important;
+    box-shadow: none !important;
+}
+
+.promo-item {
+    min-height: 68px !important;
+    border-radius: 14px !important;
+    box-shadow: none !important;
+}
+
+.az-footer {
+    margin-top: 52px !important;
+    padding-top: 26px !important;
+}
+
+@media (max-width: 1024px) {
+    .az-banner-zone,
+    .az-trust-row,
+    .az-section,
+    .az-dashboard-grid,
+    .az-footer {
+        width: min(var(--public-page-max, 1200px), calc(100% - (var(--public-gutter-tablet, 20px) * 2))) !important;
+    }
+
+    .az-dashboard-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .az-home {
+        padding-top: 10px !important;
+    }
+
+    .az-banner-zone,
+    .az-trust-row,
+    .az-section,
+    .az-dashboard-grid,
+    .az-footer {
+        display: block !important;
+        width: calc(100% - (var(--public-gutter-mobile, 14px) * 2)) !important;
+    }
+
+    .az-home::before,
+    .az-home-ambient-buffer {
+        height: 360px !important;
+        filter: blur(30px) saturate(1.18) !important;
+    }
+
+    .az-banner-zone {
+        aspect-ratio: 16 / 7.05 !important;
+        min-height: 178px !important;
+        max-height: 236px !important;
+        margin-top: 0 !important;
+        border-radius: 18px !important;
+    }
+
+    .az-banner-card {
+        width: 98% !important;
+        max-width: calc(100% - 4px) !important;
+        border-radius: 18px !important;
+    }
+
+    .az-banner-card:not(.active) {
+        opacity: .18 !important;
+    }
+
+    .az-trust-row {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        padding: 8px !important;
+        gap: 4px !important;
+    }
+
+    .trust-card {
+        min-height: 42px !important;
+        gap: 8px !important;
+    }
+
+    .trust-card i {
+        width: 28px !important;
+        height: 28px !important;
+        font-size: 12px !important;
+    }
+
+    .az-section,
+    .az-dashboard-grid {
+        margin-top: var(--public-section-gap, 28px) !important;
+    }
+
+    .az-section-head {
+        align-items: flex-end !important;
+    }
+
+    .popular-game-grid {
+        gap: 12px !important;
+        padding-bottom: 8px !important;
+    }
+
+    .popular-game-card {
+        min-width: 132px !important;
+        min-height: 164px !important;
+        border-radius: 15px !important;
+    }
+
+    .popular-game-card img {
+        height: 98px !important;
+        border-radius: 14px 14px 0 0 !important;
+    }
+
+    .az-panel {
+        padding: 14px !important;
+        border-radius: 16px !important;
+    }
+
+    .why-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
 }

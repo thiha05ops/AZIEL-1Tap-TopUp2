@@ -4,8 +4,8 @@
 ====================================== */
 
 :root {
-    --az-header-height: 78px;
-    --az-header-mobile-height: 112px;
+    --az-header-height: 72px;
+    --az-header-mobile-height: 96px;
 }
 
 html {
@@ -13,10 +13,24 @@ html {
     background: var(--bg, #f7f5ff);
 }
 
+#azHeaderMount {
+    position: sticky;
+    top: 0;
+    z-index: 99999;
+    display: block;
+    overflow-anchor: none;
+}
+
+#azHeaderMount.az-nav-visible .az-nav {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+}
+
 body {
     min-height: 100svh;
     margin: 0;
-    overflow-x: hidden;
+    overflow-x: clip;
     background:
         radial-gradient(circle at top left, rgba(139, 92, 246, .20), transparent 34%),
         radial-gradient(circle at top right, rgba(59, 130, 246, .12), transparent 32%),
@@ -37,36 +51,38 @@ body.theme-dark {
 }
 
 .az-header {
-    position: fixed;
-    top: 0;
+    position: relative;
+    top: auto;
     left: 0;
     right: 0;
-    z-index: 99999;
+    z-index: 1;
 
-    height: calc(var(--az-header-height) + env(safe-area-inset-top));
+    min-height: calc(var(--az-header-height) + env(safe-area-inset-top));
+    height: auto;
     padding:
-        env(safe-area-inset-top) max(28px, calc((100vw - 1280px) / 2)) 0;
+        env(safe-area-inset-top) max(24px, calc((100vw - var(--public-page-max, 1200px)) / 2)) 0;
 
     display: flex;
     align-items: center;
-    gap: 28px;
+    gap: 22px;
 
     background:
         linear-gradient(180deg,
-            rgba(255, 255, 255, .68),
-            rgba(255, 255, 255, .34));
+            rgba(255, 255, 255, .72),
+            rgba(255, 255, 255, .50));
 
-    border-bottom: 1px solid rgba(255, 255, 255, .48);
+    border-bottom: 1px solid rgba(148, 163, 184, .22);
 
-    backdrop-filter: blur(30px) saturate(180%);
-    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    backdrop-filter: blur(22px) saturate(150%);
+    -webkit-backdrop-filter: blur(22px) saturate(150%);
 
     box-shadow:
-        0 18px 55px rgba(31, 41, 55, .10),
-        inset 0 1px 0 rgba(255, 255, 255, .65);
+        0 10px 32px rgba(15, 23, 42, .08),
+        inset 0 1px 0 rgba(255, 255, 255, .55);
 
     transition:
         background .25s ease,
+        transform var(--az-motion-duration, .25s) var(--az-motion-ease, ease),
         box-shadow .25s ease,
         border-color .25s ease;
 }
@@ -75,24 +91,24 @@ body.dark .az-header,
 body.theme-dark .az-header {
     background:
         linear-gradient(180deg,
-            rgba(13, 15, 34, .72),
-            rgba(13, 15, 34, .42));
+            rgba(8, 11, 26, .78),
+            rgba(8, 11, 26, .58));
 
     border-bottom: 1px solid rgba(255, 255, 255, .10);
 
     box-shadow:
-        0 18px 60px rgba(0, 0, 0, .34),
+        0 12px 38px rgba(0, 0, 0, .26),
         inset 0 1px 0 rgba(255, 255, 255, .10);
 }
 
 .az-header.scrolled {
     background:
         linear-gradient(180deg,
-            rgba(255, 255, 255, .86),
-            rgba(255, 255, 255, .60));
+            rgba(255, 255, 255, .84),
+            rgba(255, 255, 255, .64));
 
     box-shadow:
-        0 18px 55px rgba(31, 41, 55, .16),
+        0 12px 34px rgba(15, 23, 42, .12),
         inset 0 1px 0 rgba(255, 255, 255, .75);
 }
 
@@ -100,29 +116,29 @@ body.dark .az-header.scrolled,
 body.theme-dark .az-header.scrolled {
     background:
         linear-gradient(180deg,
-            rgba(13, 15, 34, .88),
-            rgba(13, 15, 34, .66));
+            rgba(8, 11, 26, .90),
+            rgba(8, 11, 26, .72));
 
     box-shadow:
-        0 18px 65px rgba(0, 0, 0, .44),
+        0 14px 42px rgba(0, 0, 0, .36),
         inset 0 1px 0 rgba(255, 255, 255, .12);
 }
 
 /* LOGO */
 
 .az-logo {
-    flex: 0 0 170px;
-    width: 170px;
-    height: 58px;
+    flex: 0 0 156px;
+    width: 156px;
+    height: 54px;
     display: flex;
     align-items: center;
     text-decoration: none;
 }
 
 .az-logo-img {
-    width: 170px;
-    max-width: 170px;
-    max-height: 48px;
+    width: 156px;
+    max-width: 156px;
+    max-height: 44px;
     object-fit: contain;
     display: block;
 }
@@ -628,15 +644,16 @@ body.theme-dark .az-nav-drop-menu a i {
 
 @media (max-width: 900px) {
     :root {
-        --az-header-mobile-height: 112px;
+        --az-header-mobile-height: 96px;
     }
 
     body {
-        padding-top: calc(var(--az-header-mobile-height) + env(safe-area-inset-top)) !important;
+        padding-top: 0 !important;
     }
 
     .az-header {
-        height: calc(var(--az-header-mobile-height) + env(safe-area-inset-top)) !important;
+        min-height: 0 !important;
+        height: auto !important;
 
         display: grid !important;
         grid-template-columns: 1fr auto !important;
@@ -644,10 +661,10 @@ body.theme-dark .az-nav-drop-menu a i {
             "logo actions"
             "nav nav" !important;
 
-        gap: 8px !important;
+        gap: 6px !important;
 
         padding:
-            calc(env(safe-area-inset-top) + 8px) 14px 10px !important;
+            calc(env(safe-area-inset-top) + 7px) 14px 8px !important;
 
         align-items: center !important;
         overflow: visible !important;
@@ -655,15 +672,15 @@ body.theme-dark .az-nav-drop-menu a i {
 
     .az-logo {
         grid-area: logo !important;
-        width: 145px !important;
-        height: 44px !important;
-        flex: 0 0 145px !important;
+        width: 132px !important;
+        height: 40px !important;
+        flex: 0 0 132px !important;
     }
 
     .az-logo-img {
-        width: 145px !important;
-        max-width: 145px !important;
-        max-height: 40px !important;
+        width: 132px !important;
+        max-width: 132px !important;
+        max-height: 36px !important;
     }
 
     .az-header-right {
@@ -675,7 +692,7 @@ body.theme-dark .az-nav-drop-menu a i {
     }
 
     .az-wallet-pill {
-        height: 40px !important;
+        height: 38px !important;
         min-width: 70px !important;
         padding: 0 10px !important;
         font-size: 12px !important;
@@ -684,9 +701,9 @@ body.theme-dark .az-nav-drop-menu a i {
     .az-icon-btn,
     .az-locale-btn,
     .az-profile-btn {
-        width: 40px !important;
-        height: 40px !important;
-        min-width: 40px !important;
+        width: 38px !important;
+        height: 38px !important;
+        min-width: 38px !important;
         padding: 0 !important;
     }
 
@@ -700,16 +717,24 @@ body.theme-dark .az-nav-drop-menu a i {
         grid-area: nav !important;
 
         width: 100% !important;
-        max-height: 48px !important;
+        max-height: 42px !important;
 
         justify-content: flex-start !important;
-        gap: 8px !important;
+        gap: 4px !important;
 
         overflow-x: auto !important;
         overflow-y: hidden !important;
 
         padding: 4px 0 0 !important;
         scrollbar-width: none !important;
+        opacity: 1 !important;
+        transform: translateY(0) !important;
+        transition:
+            max-height var(--motion-standard, var(--az-motion-duration, .25s)) var(--motion-ease-premium, var(--az-motion-ease, ease)),
+            padding-top var(--motion-standard, var(--az-motion-duration, .25s)) var(--motion-ease-premium, var(--az-motion-ease, ease)),
+            opacity var(--motion-fast, .18s) ease,
+            transform var(--motion-standard, var(--az-motion-duration, .25s)) var(--motion-ease-premium, var(--az-motion-ease, ease)) !important;
+        will-change: max-height, opacity, transform;
     }
 
     .az-nav::-webkit-scrollbar {
@@ -719,9 +744,9 @@ body.theme-dark .az-nav-drop-menu a i {
     .az-nav>a,
     .az-nav-drop-btn {
         flex: 0 0 auto !important;
-        min-height: 38px !important;
-        padding: 0 12px !important;
-        font-size: 12px !important;
+        min-height: 32px !important;
+        padding: 0 7px !important;
+        font-size: 11px !important;
         font-weight: 900 !important;
     }
 
@@ -735,11 +760,11 @@ body.theme-dark .az-nav-drop-menu a i {
 
     .az-nav-drop-menu {
         position: fixed !important;
-        top: calc(env(safe-area-inset-top) + 106px) !important;
+        top: calc(env(safe-area-inset-top) + 94px) !important;
         left: 50% !important;
 
         width: min(290px, calc(100vw - 32px)) !important;
-        max-height: calc(100svh - 132px);
+        max-height: calc(100svh - 118px);
 
         overflow-y: auto;
 
@@ -754,20 +779,42 @@ body.theme-dark .az-nav-drop-menu a i {
         display: none !important;
     }
 
-    .az-header.nav-hidden {
-        height: calc(64px + env(safe-area-inset-top)) !important;
-    }
-
-    .az-header.nav-hidden .az-nav {
+    #azHeaderMount.az-nav-hidden .az-nav {
         max-height: 0 !important;
-        opacity: 0 !important;
         padding-top: 0 !important;
-        overflow: hidden !important;
+        opacity: 0 !important;
+        transform: translateY(-100%) !important;
         pointer-events: none !important;
     }
 
+    #azHeaderMount.az-nav-visible .az-nav,
+    #azHeaderMount:focus-within .az-nav,
+    #azHeaderMount:has(.az-nav-dropdown.show) .az-nav,
+    #azHeaderMount:has(.az-profile-dropdown.show) .az-nav {
+        max-height: 42px !important;
+        padding-top: 4px !important;
+        opacity: 1 !important;
+        transform: translateY(0) !important;
+        pointer-events: auto !important;
+    }
+
+    .az-header.nav-hidden .az-nav {
+        max-height: 42px !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+    }
+
     body:has(.az-header.nav-hidden) {
-        padding-top: calc(64px + env(safe-area-inset-top)) !important;
+        padding-top: 0 !important;
+    }
+}
+
+@media (min-width: 901px) {
+    #azHeaderMount.az-nav-hidden .az-nav {
+        max-height: none !important;
+        opacity: 1 !important;
+        transform: translateY(0) !important;
+        pointer-events: auto !important;
     }
 }
 
@@ -807,7 +854,7 @@ body.theme-dark .az-nav-drop-menu a i {
 
     .az-nav>a,
     .az-nav-drop-btn {
-        padding: 0 10px !important;
+        padding: 0 6px !important;
     }
 }
 

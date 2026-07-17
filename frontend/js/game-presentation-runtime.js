@@ -34,9 +34,11 @@
 
     function createSlideMarkup(banner, index) {
         const href = banner.ctaTarget && isSafeCtaTarget(banner.ctaTarget) ? banner.ctaTarget : "";
+        const objectPosition = resolveObjectPosition(banner);
         const image = `
             <img src="${escapeHtml(banner.imageUrl)}"
                 alt="${escapeHtml(banner.imageAltText || banner.name || "Game banner")}"
+                style="object-position:${escapeHtml(objectPosition)}"
                 data-game-banner-image>
         `;
         const cta = banner.ctaLabel && href
@@ -45,8 +47,8 @@
         const content = `${image}${cta}`;
 
         return href
-            ? `<a class="game-banner-slide ${index === 0 ? "active" : ""}" href="${escapeHtml(href)}" data-slide-index="${index}">${content}</a>`
-            : `<div class="game-banner-slide ${index === 0 ? "active" : ""}" data-slide-index="${index}">${content}</div>`;
+            ? `<a class="game-banner-slide ${index === 0 ? "active" : ""}" href="${escapeHtml(href)}" data-slide-index="${index}" data-ambient-image="${escapeHtml(banner.imageUrl)}" data-object-position="${escapeHtml(objectPosition)}">${content}</a>`
+            : `<div class="game-banner-slide ${index === 0 ? "active" : ""}" data-slide-index="${index}" data-ambient-image="${escapeHtml(banner.imageUrl)}" data-object-position="${escapeHtml(objectPosition)}">${content}</div>`;
     }
 
     function setActive(root, index) {
@@ -55,6 +57,7 @@
         const total = slides.length;
         if (!total) return;
         const next = ((index % total) + total) % total;
+        commitBannerVisualState(root, slides[next]);
 
         slides.forEach((slide, slideIndex) => {
             slide.classList.toggle("active", slideIndex === next);
@@ -114,6 +117,30 @@
         bindSlider(root, banners);
     }
 
+    function commitBannerVisualState(root, slide) {
+        const imageUrl = slide?.dataset.ambientImage || slide?.querySelector("[data-game-banner-image]")?.currentSrc || slide?.querySelector("[data-game-banner-image]")?.src || "";
+        const objectPosition = slide?.dataset.objectPosition || "center center";
+        if (!root || !imageUrl) return;
+        const page = root.closest(".game-page");
+        root.style.setProperty("--game-banner-ambient-image", cssUrl(imageUrl));
+        root.style.setProperty("--game-banner-active-position", objectPosition);
+        page?.style.setProperty("--game-banner-ambient-image", cssUrl(imageUrl));
+        page?.style.setProperty("--game-banner-active-position", objectPosition);
+    }
+
+    function resolveObjectPosition(banner = {}) {
+        const raw = banner.objectPosition || banner.focalPoint || banner.focalPosition || banner.position || "";
+        const value = String(raw || "").trim().toLowerCase();
+        if (["left", "center", "right"].includes(value)) return `${value} center`;
+        if (/^(left|center|right)\s+(top|center|bottom)$/.test(value)) return value;
+        if (/^\d{1,3}%\s+\d{1,3}%$/.test(value)) return value;
+        return "center center";
+    }
+
+    function cssUrl(url = "") {
+        return `url("${String(url).replace(/\\/g, "\\\\").replace(/"/g, "\\\"")}")`;
+    }
+
     async function loadBanners(productCode) {
         const response = await fetch(`/api/catalog/${encodeURIComponent(productCode)}/banners`, {
             cache: "no-store",
@@ -125,6 +152,7 @@
     }
 
     async function initGameBanners() {
+        initHowToAccordion();
         const root = document.querySelector(".game-banner");
         const productCode = getProductCode();
         if (!root || !productCode) return;
@@ -150,8 +178,72 @@
         }
     }
 
+    function initHowToAccordion() {
+        const card = document.querySelector(".game-info");
+        if (!card || card.dataset.accordionReady === "true") return;
+
+        const heading = card.querySelector("h2");
+        const contentNodes = Array.from(card.children).filter(node => node !== heading);
+        if (!heading || !contentNodes.length) return;
+
+        card.dataset.accordionReady = "true";
+        card.classList.add("game-howto");
+
+        const panelId = `gameHowToPanel-${Math.random().toString(36).slice(2, 8)}`;
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "game-howto-toggle";
+        button.setAttribute("aria-expanded", "false");
+        button.setAttribute("aria-controls", panelId);
+        button.innerHTML = `
+            <span>${heading.textContent || "How to Top Up"}</span>
+            <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+        `;
+
+        const panel = document.createElement("div");
+        panel.className = "game-howto-panel";
+        panel.id = panelId;
+
+        contentNodes.forEach(node => panel.appendChild(node));
+        heading.replaceWith(button);
+        card.appendChild(panel);
+
+        function setExpanded(expanded) {
+            card.classList.toggle("is-expanded", expanded);
+            button.setAttribute("aria-expanded", expanded ? "true" : "false");
+        }
+
+        const desktopQuery = window.matchMedia("(min-width: 901px)");
+        setExpanded(desktopQuery.matches);
+
+        button.addEventListener("click", () => {
+            setExpanded(button.getAttribute("aria-expanded") !== "true");
+        });
+
+        desktopQuery.addEventListener("change", event => {
+            setExpanded(event.matches);
+        });
+    }
+
     function releaseStaticFallback(root) {
         root.setAttribute("data-managed-content-state", "fallback");
+        window.setTimeout(() => commitStaticFallbackState(root), 0);
+    }
+
+    function commitStaticFallbackState(root) {
+        const img = root?.querySelector("#gameBanner, [data-game-banner-image], img");
+        const imageUrl = img?.currentSrc || img?.src || "";
+        if (!root || !imageUrl) {
+            if (img) {
+                img.addEventListener("load", () => commitStaticFallbackState(root), { once: true });
+            }
+            return;
+        }
+        root.style.setProperty("--game-banner-ambient-image", cssUrl(imageUrl));
+        root.style.setProperty("--game-banner-active-position", img.style.objectPosition || "center center");
+        const page = root.closest(".game-page");
+        page?.style.setProperty("--game-banner-ambient-image", cssUrl(imageUrl));
+        page?.style.setProperty("--game-banner-active-position", img.style.objectPosition || "center center");
     }
 
     async function preloadImages(urls = []) {
@@ -178,6 +270,7 @@
 
     window.AZIEL_GAME_PRESENTATION = {
         initGameBanners,
+        initHowToAccordion,
         renderManagedBanners
     };
 

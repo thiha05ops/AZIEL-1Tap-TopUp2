@@ -10,7 +10,7 @@ body {
 .trust-page {
     width: min(1120px, calc(100% - 32px));
     margin: 0 auto;
-    padding: calc(var(--az-header-h, 78px) + 42px) 0 88px;
+    padding: 34px 0 88px;
 }
 
 .trust-hero {
@@ -198,7 +198,7 @@ body {
 @media (max-width: 640px) {
     .trust-page {
         width: min(100% - 24px, 1120px);
-        padding-top: calc(var(--az-header-h, 78px) + 24px);
+        padding-top: 24px;
     }
 
     .trust-section {

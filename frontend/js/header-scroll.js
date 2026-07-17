@@ -1,35 +1,10 @@
 // frontend/js/header-scroll.js
 
 (function () {
-    let lastScrollY = window.scrollY;
-    let ticking = false;
-
     function bindHeaderScroll() {
-        const header = document.querySelector(".az-header");
-        if (!header) return;
-
-        window.addEventListener("scroll", () => {
-            if (window.innerWidth > 768) return;
-
-            if (!ticking) {
-                window.requestAnimationFrame(() => {
-                    const currentY = window.scrollY;
-
-                    if (currentY < 40) {
-                        header.classList.remove("nav-hidden");
-                    } else if (currentY > lastScrollY) {
-                        header.classList.add("nav-hidden");
-                    } else {
-                        header.classList.remove("nav-hidden");
-                    }
-
-                    lastScrollY = currentY;
-                    ticking = false;
-                });
-
-                ticking = true;
-            }
-        }, { passive: true });
+        // Canonical mobile header scroll ownership lives in frontend/js/header.js.
+        // This file remains as a compatibility shim for older pages that still load it.
+        window.__azielHeaderScrollShimLoaded = true;
     }
 
     document.addEventListener("DOMContentLoaded", bindHeaderScroll);

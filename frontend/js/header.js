@@ -33,7 +33,7 @@ function initHeader() {
     initProfileDropdown();
     initThemeButton();
     initHeaderLogout();
-    initAutoRevealNav();
+    initCanonicalHeaderScroll();
     translateHeader();
 }
 
@@ -333,34 +333,138 @@ function initHeaderLogout() {
     });
 }
 
-function initAutoRevealNav() {
+function initCanonicalHeaderScroll() {
     const header = document.querySelector(".az-header");
-    const nav = document.querySelector(".az-nav");
+    const mount = document.getElementById("azHeaderMount");
 
-    if (!header || !nav) return;
-    if (header.dataset.navRevealReady === "true") return;
+    if (!header || !mount) return;
+    if (window.__azielCanonicalHeaderScrollReady) return;
 
-    header.dataset.navRevealReady = "true";
+    window.__azielCanonicalHeaderScrollReady = true;
+    header.dataset.scrollController = "canonical";
+    mount.dataset.scrollController = "canonical";
 
-    let lastScrollY = window.scrollY;
+    const mobileQuery = window.matchMedia("(max-width: 900px)");
+    const TOP_VISIBLE_Y = 20;
+    const MIN_DELTA = 6;
+    const HIDE_AFTER = 32;
+    const SHOW_AFTER = 8;
+
+    let previousY = Math.max(0, window.scrollY || 0);
+    let eventY = previousY;
+    let downwardDelta = 0;
+    let upwardDelta = 0;
+    let hidden = false;
+
+    let ticking = false;
+
+    const forceVisible = () => {
+        hidden = false;
+        previousY = Math.max(0, eventY);
+        downwardDelta = 0;
+        upwardDelta = 0;
+        mount.classList.add("az-nav-visible");
+        mount.classList.remove("az-nav-hidden");
+        header.classList.remove("nav-hidden");
+    };
+
+    const hideNavRow = () => {
+        if (!mobileQuery.matches) {
+            forceVisible();
+            return;
+        }
+
+        hidden = true;
+        previousY = Math.max(0, eventY);
+        mount.classList.add("az-nav-hidden");
+        mount.classList.remove("az-nav-visible");
+        header.classList.remove("nav-hidden");
+    };
+
+    const hasOpenHeaderSurface = () =>
+        Boolean(
+            mount.querySelector(".az-nav-dropdown.show") ||
+            mount.querySelector(".az-profile-dropdown.show") ||
+            document.querySelector(".az-locale-modal.show, .az-locale-modal[open], .az-locale-modal.active") ||
+            mount.contains(document.activeElement)
+        );
+
+    const updateHeaderScrollState = () => {
+        const currentY = Math.max(0, eventY);
+        previousY = currentY;
+
+        header.classList.toggle("scrolled", currentY > 12);
+        header.classList.remove("nav-hidden");
+
+        if (!mobileQuery.matches || currentY <= TOP_VISIBLE_Y || hasOpenHeaderSurface()) {
+            forceVisible();
+            return;
+        }
+
+        if (!hidden && downwardDelta >= HIDE_AFTER) {
+            hideNavRow();
+            return;
+        }
+
+        if (hidden && upwardDelta >= SHOW_AFTER) {
+            forceVisible();
+        }
+    };
+
+    const scheduleHeaderUpdate = () => {
+        if (ticking) return;
+        ticking = true;
+
+        window.requestAnimationFrame(() => {
+            updateHeaderScrollState();
+            ticking = false;
+        });
+    };
+
+    forceVisible();
 
     window.addEventListener("scroll", () => {
-        const currentY = window.scrollY;
+        const currentY = Math.max(0, window.scrollY || 0);
+        const eventDelta = currentY - eventY;
+        eventY = currentY;
 
-        if (currentY > 80 && currentY > lastScrollY) {
-            header.classList.add("nav-hidden");
+        if (Math.abs(eventDelta) >= MIN_DELTA) {
+            if (eventDelta > 0) {
+                downwardDelta += eventDelta;
+                upwardDelta = 0;
+            } else {
+                upwardDelta += Math.abs(eventDelta);
+                downwardDelta = 0;
+
+                if (hidden && upwardDelta >= SHOW_AFTER) {
+                    forceVisible();
+                    return;
+                }
+            }
         }
 
-        if (currentY < lastScrollY || currentY < 40) {
-            header.classList.remove("nav-hidden");
-        }
-
-        lastScrollY = currentY;
+        scheduleHeaderUpdate();
     }, { passive: true });
-}
-window.addEventListener("scroll", () => {
-    const header = document.querySelector(".az-header");
-    if (!header) return;
 
-    header.classList.toggle("scrolled", window.scrollY > 12);
-});
+    window.addEventListener("resize", () => {
+        eventY = Math.max(0, window.scrollY || 0);
+        previousY = eventY;
+        forceVisible();
+    });
+
+    document.addEventListener("focusin", event => {
+        if (mount.contains(event.target)) forceVisible();
+    });
+
+    document.addEventListener("click", () => {
+        window.requestAnimationFrame(() => {
+            if (hasOpenHeaderSurface()) forceVisible();
+        });
+    });
+
+    if (typeof mobileQuery.addEventListener === "function") {
+        mobileQuery.addEventListener("change", forceVisible);
+    } else if (typeof mobileQuery.addListener === "function") {
+        mobileQuery.addListener(forceVisible);
+    }
+}

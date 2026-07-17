@@ -34,7 +34,7 @@
     body {
         width: 100%;
         max-width: 100%;
-        overflow-x: hidden !important;
+        overflow-x: clip !important;
     }
 
     body {
@@ -211,27 +211,31 @@
 
 @media (max-width: 768px) {
     .az-home {
-        width: calc(100% - 24px) !important;
-        margin-top: 12px !important;
+        width: 100% !important;
+        margin-top: 0 !important;
     }
 
     .az-banner-zone {
-        height: 220px !important;
-        margin-top: 14px !important;
+        width: calc(100% - (var(--public-gutter-mobile, 14px) * 2)) !important;
+        height: auto !important;
+        min-height: 178px !important;
+        aspect-ratio: 16 / 7.05 !important;
+        margin-top: 0 !important;
     }
 
     .az-banner-track {
-        height: 200px !important;
+        height: auto !important;
     }
 
     .az-banner-card {
-        width: 82vw !important;
-        height: 190px !important;
+        width: 98% !important;
+        max-width: calc(100% - 4px) !important;
+        height: 100% !important;
         border-radius: 18px !important;
     }
 
     .az-banner-dots {
-        bottom: 22px !important;
+        bottom: 10px !important;
     }
 
     .popular-game-grid {
@@ -248,36 +252,38 @@
     }
 
     .popular-game-card {
-        min-width: 86px !important;
-        min-height: unset !important;
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
+        min-width: 132px !important;
+        min-height: 164px !important;
+        background: color-mix(in srgb, var(--card) 68%, transparent) !important;
+        border: 1px solid color-mix(in srgb, var(--border) 82%, transparent) !important;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, .07) !important;
         scroll-snap-align: start !important;
-        padding-bottom: 0 !important;
+        padding-bottom: 14px !important;
     }
 
     .popular-game-card img {
-        width: 72px !important;
-        height: 72px !important;
-        margin: 0 auto !important;
-        border-radius: 16px !important;
+        width: 100% !important;
+        height: 98px !important;
+        margin: 0 !important;
+        border-radius: 14px 14px 0 0 !important;
     }
 
     .popular-game-card h3 {
-        margin: 9px 0 3px !important;
-        text-align: center !important;
-        font-size: 11px !important;
+        margin: 12px 12px 3px !important;
+        text-align: left !important;
+        font-size: 14px !important;
     }
 
     .popular-game-card p {
-        margin: 0 !important;
-        text-align: center !important;
-        font-size: 10px !important;
+        margin: 0 12px !important;
+        text-align: left !important;
+        font-size: 11px !important;
     }
 
     .az-trust-row {
-        display: none !important;
+        display: grid !important;
+        width: calc(100% - (var(--public-gutter-mobile, 14px) * 2)) !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     }
 }
 

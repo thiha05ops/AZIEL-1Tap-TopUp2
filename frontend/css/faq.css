@@ -1,7 +1,7 @@
 .faq-page {
     width: min(980px, calc(100% - 28px));
     margin: 0 auto;
-    padding: calc(var(--az-header-h, var(--az-header-height, 78px)) + 38px) 0 90px;
+    padding: 34px 0 90px;
 }
 
 .faq-hero {
@@ -135,7 +135,7 @@
 
 @media (max-width: 768px) {
     .faq-page {
-        padding-top: calc(var(--az-header-mobile-height, var(--az-header-h, 72px)) + 26px);
+        padding-top: 24px;
     }
 
     .faq-question {

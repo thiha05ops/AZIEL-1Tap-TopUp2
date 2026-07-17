@@ -23,9 +23,95 @@
 
     --transition: var(--motion-duration-normal, .25s) var(--motion-ease-standard, ease);
 
-    --az-container: 1180px;
+    --az-container: 1200px;
     --az-page-x: 92%;
-    --az-header-h: 78px;
+    --az-header-h: 72px;
+    --az-page-max: 1200px;
+    --az-gutter-desktop: 28px;
+    --az-gutter-tablet: 20px;
+    --az-gutter-mobile: 14px;
+    --az-section-gap: 42px;
+    --az-section-gap-compact: 22px;
+    --az-content-gap: 16px;
+    --az-control-gap: 10px;
+    --az-header-height: 72px;
+    --az-header-mobile-height: 96px;
+    --az-radius-surface: 16px;
+    --az-radius-hero: 24px;
+    --az-border-subtle: var(--border);
+    --az-shadow-subtle: var(--shadow-sm);
+    --az-type-display: clamp(34px, 5vw, 58px);
+    --az-type-page-title: clamp(28px, 3.4vw, 44px);
+    --az-type-section-title: clamp(22px, 2.1vw, 30px);
+    --az-type-subsection-title: clamp(17px, 1.4vw, 21px);
+    --az-type-card-title: 15px;
+    --az-type-body: 15px;
+    --az-type-label: 13px;
+    --az-type-helper: 13px;
+    --az-type-meta: 12px;
+    --az-type-supporting: 12px;
+    --az-type-value: 19px;
+    --az-motion-duration: var(--motion-duration-normal, .25s);
+    --az-motion-ease: var(--motion-ease-standard, ease);
+    --az-ambient-home-opacity: .34;
+    --az-ambient-game-opacity: .16;
+    --az-safe-action-right: max(14px, env(safe-area-inset-right));
+    --az-safe-action-bottom: max(14px, env(safe-area-inset-bottom));
+    --public-page-max: var(--az-page-max);
+    --public-gutter-desktop: var(--az-gutter-desktop);
+    --public-gutter-tablet: var(--az-gutter-tablet);
+    --public-gutter-mobile: var(--az-gutter-mobile);
+    --public-section-gap: var(--az-section-gap);
+    --public-section-gap-compact: var(--az-section-gap-compact);
+    --public-content-gap: var(--az-content-gap);
+    --public-control-gap: var(--az-control-gap);
+    --public-header-height: var(--az-header-height);
+    --public-header-height-mobile: var(--az-header-mobile-height);
+    --type-display: var(--az-type-display);
+    --type-page-title: var(--az-type-page-title);
+    --type-section-title: var(--az-type-section-title);
+    --type-subsection-title: var(--az-type-subsection-title);
+    --type-card-title: var(--az-type-card-title);
+    --type-body: var(--az-type-body);
+    --type-label: var(--az-type-label);
+    --type-meta: var(--az-type-meta, var(--az-type-supporting));
+    --type-helper: var(--az-type-helper);
+    --type-price: var(--az-type-value);
+    --surface-liquid: var(--card);
+    --surface-liquid-strong: var(--surface-strong);
+    --surface-subtle: var(--surface);
+    --surface-border: var(--border);
+    --surface-radius: var(--az-radius-surface);
+    --surface-radius-small: var(--radius-sm);
+    --surface-blur: 18px;
+    --surface-shadow: var(--az-shadow-subtle);
+    --motion-fast: var(--motion-duration-fast, .18s);
+    --motion-standard: var(--motion-duration-normal, .25s);
+    --motion-slow: var(--motion-duration-slow, .56s);
+    --motion-ease-premium: cubic-bezier(.22, 1, .36, 1);
+    --ambient-home-opacity-light: var(--az-ambient-home-opacity);
+    --ambient-home-opacity-dark: .44;
+    --ambient-game-opacity-light: var(--az-ambient-game-opacity);
+    --ambient-game-opacity-dark: .22;
+    --ambient-blur: 42px;
+    --ambient-saturation: 1.28;
+    --safe-top: env(safe-area-inset-top);
+    --safe-right: env(safe-area-inset-right);
+    --safe-bottom: env(safe-area-inset-bottom);
+    --safe-left: env(safe-area-inset-left);
+}
+
+@media (max-width: 768px) {
+    :root {
+        --az-section-gap: 28px;
+        --az-section-gap-compact: 16px;
+        --az-content-gap: 12px;
+        --az-control-gap: 8px;
+        --az-type-section-title: clamp(20px, 6vw, 24px);
+        --az-type-card-title: 14px;
+        --az-type-body: 14px;
+        --az-type-value: 17px;
+    }
 }
 
 /* =========================
@@ -98,7 +184,7 @@ body {
     font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
     background: var(--bg);
     color: var(--text);
-    overflow-x: hidden;
+    overflow-x: clip;
     transition: background .3s ease, color .3s ease;
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
@@ -146,6 +232,73 @@ h6 {
 p {
     color: var(--text-secondary);
     line-height: 1.7;
+}
+
+.public-container {
+    width: min(var(--public-page-max), calc(100% - (var(--public-gutter-desktop) * 2)));
+    margin-inline: auto;
+}
+
+.public-display {
+    font-size: var(--type-display);
+    line-height: 1.02;
+    letter-spacing: 0;
+    font-weight: 900;
+}
+
+.public-page-title {
+    font-size: var(--type-page-title);
+    line-height: 1.08;
+    letter-spacing: 0;
+    font-weight: 900;
+}
+
+.public-section-title {
+    font-size: var(--type-section-title);
+    line-height: 1.12;
+    letter-spacing: 0;
+    font-weight: 900;
+}
+
+.public-item-title {
+    font-size: var(--type-card-title);
+    line-height: 1.25;
+    letter-spacing: 0;
+    font-weight: 800;
+}
+
+.public-meta,
+.public-helper {
+    font-size: var(--type-meta);
+    line-height: 1.45;
+    color: var(--text-muted);
+}
+
+.public-value {
+    font-size: var(--type-price);
+    line-height: 1.2;
+    font-weight: 900;
+}
+
+.public-liquid-surface {
+    background: color-mix(in srgb, var(--surface-liquid) 72%, transparent);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--surface-radius);
+    box-shadow: var(--surface-shadow);
+    backdrop-filter: blur(var(--surface-blur)) saturate(150%);
+    -webkit-backdrop-filter: blur(var(--surface-blur)) saturate(150%);
+}
+
+@media (max-width: 1024px) {
+    .public-container {
+        width: min(var(--public-page-max), calc(100% - (var(--public-gutter-tablet) * 2)));
+    }
+}
+
+@media (max-width: 768px) {
+    .public-container {
+        width: calc(100% - (var(--public-gutter-mobile) * 2));
+    }
 }
 
 small {

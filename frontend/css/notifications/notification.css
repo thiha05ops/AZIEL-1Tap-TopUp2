@@ -45,7 +45,7 @@ body.theme-dark {
 
 .noti-page {
     width: min(1080px, calc(100% - 32px));
-    margin: calc(var(--az-header-height, 76px) + 28px) auto 104px;
+    margin: 28px auto 104px;
     color: var(--notification-text-primary);
 }
 

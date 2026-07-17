@@ -91,7 +91,7 @@ img {
 
 .explore-page {
     position: relative;
-    padding-top: calc(var(--az-header-height, 78px) + 24px);
+    padding-top: 28px;
 }
 
 section {

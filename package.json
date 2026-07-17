@@ -57,7 +57,13 @@
     "verify:production-hardening": "node backend/scripts/verify-production-hardening-sprint.js",
     "verify:payment-modal-mobile-overflow": "node backend/scripts/verify-payment-modal-mobile-overflow.js",
     "verify:order-status-emails": "node backend/scripts/verify-order-status-email-notifications.js",
-    "verify:wallet-topup-emails": "node backend/scripts/verify-wallet-topup-emails.js"
+    "verify:wallet-topup-emails": "node backend/scripts/verify-wallet-topup-emails.js",
+    "verify:prelaunch-hero-polish": "node backend/scripts/verify-prelaunch-hero-banner-polish.js",
+    "verify:home-carousel-interaction": "node backend/scripts/verify-home-carousel-interaction.js",
+    "verify:header-scroll": "node backend/scripts/verify-header-scroll-ownership.js",
+    "verify:mobile-howto": "node backend/scripts/verify-mobile-howto-accordion.js",
+    "verify:typography-card-ownership": "node backend/scripts/verify-typography-card-ownership.js",
+    "verify:public-storefront-design-system": "node backend/scripts/verify-public-storefront-design-system.js"
   },
   "keywords": [],
   "author": "",

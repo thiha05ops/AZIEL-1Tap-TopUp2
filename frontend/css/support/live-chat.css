@@ -420,27 +420,49 @@ body.theme-light .chat-input-row input::placeholder {
 
     .aziel-support-tab,
     .chat-ball {
-        right: 14px !important;
-        bottom: 16px !important;
+        right: max(14px, env(safe-area-inset-right)) !important;
+        bottom: max(14px, env(safe-area-inset-bottom)) !important;
 
-        width: 118px !important;
-        height: 46px !important;
+        width: 54px !important;
+        height: 54px !important;
 
-        border-radius: 12px !important;
+        border-radius: 18px !important;
+        padding: 0 !important;
+        gap: 0 !important;
     }
 
     .chat-ball::after {
-        font-size: 14px !important;
+        content: "" !important;
+        display: none !important;
+    }
+
+    .aziel-support-tab span,
+    .chat-ball span {
+        display: none !important;
+        width: 0 !important;
+        max-width: 0 !important;
+        overflow: hidden !important;
     }
 
     .live-chat-panel {
         left: 12px !important;
         right: 12px !important;
-        bottom: 78px !important;
+        bottom: calc(76px + env(safe-area-inset-bottom)) !important;
 
         width: auto !important;
-        height: 70vh !important;
+        height: min(70vh, calc(100dvh - 112px - env(safe-area-inset-bottom))) !important;
 
         border-radius: 24px !important;
+    }
+
+    .aziel-support-tab i,
+    .chat-ball i {
+        font-size: 20px !important;
+    }
+
+    .online-dot,
+    .aziel-support-tab b {
+        right: 7px !important;
+        bottom: 7px !important;
     }
 }

@@ -60,7 +60,7 @@ body.account-page::after {
 
 .account-layout {
   margin: 0 auto 100px;
-  padding-top: calc(var(--az-header-height, 78px) + env(safe-area-inset-top) + 34px);
+  padding-top: 28px;
   display: grid;
   grid-template-columns: 250px minmax(0, 1fr);
   gap: 58px;
@@ -69,7 +69,7 @@ body.account-page::after {
 
 .account-sidebar {
   position: sticky;
-  top: 112px;
+  top: 18px;
 }
 
 .profile-card {
