@@ -12,6 +12,10 @@
     let confirmResolver = null;
     let offlineToastOpen = false;
 
+    function tr(key, fallback = "") {
+        return window.AZIEL_I18N?.t?.(key, fallback) || fallback || key;
+    }
+
     function ensureToastContainer() {
         if (toastContainer?.isConnected) return toastContainer;
 
@@ -34,8 +38,8 @@
 
         return {
             type: input?.type || typeFallback,
-            title: input?.title || "",
-            message: input?.message || input?.text || "",
+            title: input?.title ? tr(input.title, input.title) : "",
+            message: input?.message || input?.text ? tr(input.message || input.text, input.message || input.text) : "",
             duration: input?.duration,
             persistent: Boolean(input?.persistent),
             action: input?.action || null
@@ -74,7 +78,7 @@
             const action = document.createElement("button");
             action.type = "button";
             action.className = "az-ui-toast-action";
-            action.textContent = options.action.label;
+            action.textContent = tr(options.action.label, options.action.label);
             action.addEventListener("click", () => {
                 options.action.onClick();
                 closeToast(item);
@@ -85,7 +89,7 @@
         const close = document.createElement("button");
         close.type = "button";
         close.className = "az-ui-toast-close";
-        close.setAttribute("aria-label", "Dismiss notification");
+        close.setAttribute("aria-label", tr("dismissNotification", "Dismiss notification"));
         close.textContent = "x";
         close.addEventListener("click", () => closeToast(item));
         item.appendChild(close);
@@ -123,7 +127,7 @@
             });
         }
 
-        const label = options.text || options.label || "Loading...";
+        const label = tr(options.text || options.label || "Loading...", options.text || options.label || "Loading...");
         button.disabled = true;
         button.setAttribute("aria-busy", "true");
         button.classList.add("az-ui-button-loading");
@@ -160,7 +164,7 @@
         loadingOverlay.innerHTML = `
             <div class="az-ui-loading-card" role="status" aria-live="polite">
                 <span class="az-ui-spinner" aria-hidden="true"></span>
-                <span class="az-ui-loading-text">Loading...</span>
+                <span class="az-ui-loading-text">${tr("Loading...", "Loading...")}</span>
             </div>
         `;
         document.body.appendChild(loadingOverlay);
@@ -171,7 +175,7 @@
     function showLoading(options = {}) {
         const overlay = ensureLoadingOverlay();
         const text = overlay.querySelector(".az-ui-loading-text");
-        if (text) text.textContent = options.message || options.text || "Loading...";
+        if (text) text.textContent = tr(options.message || options.text || "Loading...", options.message || options.text || "Loading...");
         overlay.classList.add("show");
     }
 
@@ -208,12 +212,12 @@
         }
 
         const title = document.createElement("strong");
-        title.textContent = options.title || stateTitle(type);
+        title.textContent = tr(options.title || stateTitle(type), options.title || stateTitle(type));
         state.appendChild(title);
 
         if (options.message) {
             const message = document.createElement("p");
-            message.textContent = options.message;
+            message.textContent = tr(options.message, options.message);
             state.appendChild(message);
         }
 
@@ -222,7 +226,7 @@
             const button = document.createElement("button");
             button.type = "button";
             button.className = "az-ui-state-action";
-            button.textContent = options.retryLabel || "Retry";
+            button.textContent = tr(options.retryLabel || "Retry", options.retryLabel || "Retry");
             button.addEventListener("click", retry);
             state.appendChild(button);
         }
@@ -233,11 +237,11 @@
 
     function stateTitle(type) {
         return {
-            loading: "Loading",
-            empty: "Nothing here yet",
-            error: "Something went wrong",
-            offline: "You are offline"
-        }[type] || "Status";
+            loading: tr("Loading", "Loading"),
+            empty: tr("Nothing here yet", "Nothing here yet"),
+            error: tr("Something went wrong", "Something went wrong"),
+            offline: tr("You are offline", "You are offline")
+        }[type] || tr("Status", "Status");
     }
 
     function renderSkeletonList(container, options = {}) {
@@ -267,11 +271,11 @@
         confirmDialog.className = "az-ui-confirm-backdrop";
         confirmDialog.innerHTML = `
             <div class="az-ui-confirm" role="dialog" aria-modal="true" aria-labelledby="azUiConfirmTitle">
-                <strong id="azUiConfirmTitle">Confirm action</strong>
+                <strong id="azUiConfirmTitle">${tr("Confirm action", "Confirm action")}</strong>
                 <p id="azUiConfirmMessage"></p>
                 <div class="az-ui-confirm-actions">
-                    <button type="button" class="az-ui-confirm-cancel">Cancel</button>
-                    <button type="button" class="az-ui-confirm-ok">Confirm</button>
+                    <button type="button" class="az-ui-confirm-cancel">${tr("Cancel", "Cancel")}</button>
+                    <button type="button" class="az-ui-confirm-ok">${tr("Confirm", "Confirm")}</button>
                 </div>
             </div>
         `;
@@ -300,10 +304,10 @@
         if (confirmResolver) resolveConfirm(false);
 
         const dialog = ensureConfirmDialog();
-        dialog.querySelector("#azUiConfirmTitle").textContent = options.title || "Confirm action";
-        dialog.querySelector("#azUiConfirmMessage").textContent = options.message || "";
-        dialog.querySelector(".az-ui-confirm-ok").textContent = options.confirmText || "Confirm";
-        dialog.querySelector(".az-ui-confirm-cancel").textContent = options.cancelText || "Cancel";
+        dialog.querySelector("#azUiConfirmTitle").textContent = tr(options.title || "Confirm action", options.title || "Confirm action");
+        dialog.querySelector("#azUiConfirmMessage").textContent = options.message ? tr(options.message, options.message) : "";
+        dialog.querySelector(".az-ui-confirm-ok").textContent = tr(options.confirmText || "Confirm", options.confirmText || "Confirm");
+        dialog.querySelector(".az-ui-confirm-cancel").textContent = tr(options.cancelText || "Cancel", options.cancelText || "Cancel");
 
         dialog.classList.add("show");
 
@@ -322,19 +326,19 @@
     }
 
     function normalizeError(error, fallback = "Something went wrong.") {
-        if (!error) return fallback;
-        if (typeof error === "string") return error;
-        if (error.message) return error.message;
-        if (error.error) return error.error;
-        return fallback;
+        if (!error) return tr(fallback, fallback);
+        if (typeof error === "string") return tr(error, error);
+        if (error.message) return tr(error.message, error.message);
+        if (error.error) return tr(error.error, error.error);
+        return tr(fallback, fallback);
     }
 
     function initOfflineFeedback() {
         window.addEventListener("offline", () => {
             offlineToastOpen = true;
             toast.warning({
-                title: "You are offline",
-                message: "Some actions may not complete until your connection returns.",
+                title: tr("You are offline", "You are offline"),
+                message: tr("Some actions may not complete until your connection returns.", "Some actions may not complete until your connection returns."),
                 persistent: true
             });
         });
@@ -342,7 +346,7 @@
         window.addEventListener("online", () => {
             if (offlineToastOpen) {
                 offlineToastOpen = false;
-                toast.success("Back online");
+                toast.success(tr("Back online", "Back online"));
             }
         });
     }

@@ -34,11 +34,9 @@
     }
 
     function getDict(lang = getLang()) {
-        return (
-            window.AZIEL_LANG?.[lang] ||
-            window.AZIEL_LANG?.en ||
-            {}
-        );
+        const english = window.AZIEL_LANG?.en || {};
+        const localized = window.AZIEL_LANG?.[lang] || {};
+        return { ...english, ...localized };
     }
 
     function normalizeText(value) {
@@ -51,11 +49,14 @@
         const dict = getDict();
         const value = normalizeText(keyOrText);
 
+        const english = window.AZIEL_LANG?.en || {};
         return (
             dict[value] ||
             dict[keyOrText] ||
             fallback ||
-            keyOrText
+            english[value] ||
+            english[keyOrText] ||
+            value
         );
     }
 
@@ -103,6 +104,13 @@
             const value = dict[key];
 
             if (value) el.title = value;
+        });
+
+        root.querySelectorAll("[data-i18n-aria-label]").forEach(el => {
+            const key = el.dataset.i18nAriaLabel;
+            const value = dict[key];
+
+            if (value) el.setAttribute("aria-label", value);
         });
     }
 

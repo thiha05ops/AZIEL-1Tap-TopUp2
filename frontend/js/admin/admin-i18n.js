@@ -1,6 +1,6 @@
 (function () {
     const STORAGE_KEY = "aziel_admin_locale";
-    const SUPPORTED = new Set(["en", "my"]);
+    const SUPPORTED = new Set(["en", "my", "th"]);
 
     function getInitialLocale() {
         const saved = localStorage.getItem(STORAGE_KEY);
@@ -17,12 +17,15 @@
     }
 
     function getDictionary(locale = getLocale()) {
-        return window.AZIEL_ADMIN_LANG?.[locale] || window.AZIEL_ADMIN_LANG?.en || {};
+        const english = window.AZIEL_ADMIN_LANG?.en || {};
+        const localized = window.AZIEL_ADMIN_LANG?.[locale] || {};
+        return { ...english, ...localized };
     }
 
     function t(key, fallback = "") {
         const dict = getDictionary();
-        return dict[key] || fallback || key;
+        const english = window.AZIEL_ADMIN_LANG?.en || {};
+        return dict[key] || fallback || english[key] || "";
     }
 
     function translate(root = document) {

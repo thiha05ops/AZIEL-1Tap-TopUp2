@@ -70,7 +70,9 @@
     "verify:public-footer": "node backend/scripts/verify-public-footer.js",
     "verify:public-performance": "node backend/scripts/verify-public-performance.js",
     "verify:public-seo": "node backend/scripts/verify-public-seo.js",
-    "verify:public-pwa": "node backend/scripts/verify-public-pwa.js"
+    "verify:public-pwa": "node backend/scripts/verify-public-pwa.js",
+    "verify:payment-display-labels": "node backend/scripts/verify-payment-display-labels.js",
+    "verify:i18n": "node backend/scripts/verify-i18n-coverage.js"
   },
   "keywords": [],
   "author": "",
