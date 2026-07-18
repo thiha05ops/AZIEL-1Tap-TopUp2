@@ -636,7 +636,7 @@ window.AZIEL_LANG.my = {
     "Simple Checkout": "Simple Checkout",
     "A smoother path from game selection to payment.": "A smoother path from game selection to ငွေပေးချေမှု.",
     "Secure Flows": "Secure Flows",
-    "PromptPay, wallet, and regional payment support.": "PromptPay, ပိုက်ဆံအိတ်, and regional ငွေပေးချေမှု အကူအညီ.",
+    "PromptPay, AZIEL Wallet, and regional payment support.": "PromptPay၊ AZIEL Wallet နှင့် ဒေသအလိုက် ငွေပေးချေမှုများကို ထောက်ပံ့ပေးသည်။",
     "Top up once and checkout faster every time.": "Top up once and checkout faster every time.",
     "Live Notifications": "Live အသိပေးချက်s",
     "Realtime order, wallet, and support updates.": "Realtime အော်ဒါ, ပိုက်ဆံအိတ်, and အကူအညီ updates.",

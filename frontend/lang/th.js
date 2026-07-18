@@ -637,7 +637,7 @@ window.AZIEL_LANG.th = {
     "Simple Checkout": "Simple Checkout",
     "A smoother path from game selection to payment.": "A smoother path from game selection to การชำระเงิน.",
     "Secure Flows": "Secure Flows",
-    "PromptPay, wallet, and regional payment support.": "PromptPay, กระเป๋าเงิน, and regional การชำระเงิน ซัพพอร์ต.",
+    "PromptPay, AZIEL Wallet, and regional payment support.": "รองรับ PromptPay, AZIEL Wallet และช่องทางชำระเงินในภูมิภาค",
     "Top up once and checkout faster every time.": "Top up once and checkout faster every time.",
     "Live Notifications": "Live การแจ้งเตือนs",
     "Realtime order, wallet, and support updates.": "Realtime คำสั่งซื้อ, กระเป๋าเงิน, and ซัพพอร์ต updates.",

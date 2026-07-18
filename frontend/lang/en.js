@@ -638,7 +638,7 @@ window.AZIEL_LANG.en = {
     "Simple Checkout": "Simple Checkout",
     "A smoother path from game selection to payment.": "A smoother path from game selection to payment.",
     "Secure Flows": "Secure Flows",
-    "PromptPay, wallet, and regional payment support.": "PromptPay, wallet, and regional payment support.",
+    "PromptPay, AZIEL Wallet, and regional payment support.": "PromptPay, AZIEL Wallet, and regional payment support.",
     "Top up once and checkout faster every time.": "Top up once and checkout faster every time.",
     "Live Notifications": "Live Notifications",
     "Realtime order, wallet, and support updates.": "Realtime order, wallet, and support updates.",
