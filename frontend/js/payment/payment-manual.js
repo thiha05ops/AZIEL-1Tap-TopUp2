@@ -13,7 +13,10 @@
 
         window.PaymentCheckoutSheet.show({
             methodCode: paymentSession.paymentMethod || payment.key || orderData.paymentMethod,
-            methodName: paymentSession.paymentName || payment.method || orderData.paymentMethod || "Payment",
+            methodName: window.AZIEL_PAYMENT_DISPLAY?.from?.(
+                paymentSession.paymentName || payment.method || orderData.paymentMethod,
+                paymentSession.paymentName || payment.method || orderData.paymentMethod || "Payment"
+            ) || paymentSession.paymentName || payment.method || orderData.paymentMethod || "Payment",
             methodLogo: payment.logo || "",
             amount: paymentSession.amount || orderData.amount,
             currency: paymentSession.currency || orderData.currency,

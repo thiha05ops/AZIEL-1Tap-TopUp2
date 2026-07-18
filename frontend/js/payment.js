@@ -80,7 +80,8 @@ function getWalletMethod(region) {
 
 function buildPaymentCard(method, index) {
     const key = method.key || normalizePaymentKey(method.method);
-    const displayName = method.method || getPaymentDisplayName(key);
+    const displayName = window.AZIEL_PAYMENT_DISPLAY?.method?.({ ...method, key }, getPaymentDisplayName(key)) ||
+        getPaymentDisplayName(key);
     const logo = method.logo || method.logoUrl || method.logoImage || getPaymentLogo(key);
 
     const qrImage =
@@ -210,12 +211,17 @@ function normalizePaymentKey(name) {
 }
 
 function getPaymentDisplayName(key) {
+    if (window.AZIEL_PAYMENT_DISPLAY?.from) {
+        return window.AZIEL_PAYMENT_DISPLAY.from(key, "Payment");
+    }
+
     const names = {
         kbzpay: "KBZPay",
         wavepay: "WavePay",
         ayapay: "AYA Pay",
         promptpay: "PromptPay",
         scb: "SCB",
+        bangkokbank: "Bangkok Bank",
         wallet: "AZIEL Wallet"
     };
 

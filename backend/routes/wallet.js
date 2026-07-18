@@ -51,6 +51,7 @@ const {
     parseLimit,
     sendPaginationError
 } = require("../services/paginationService");
+const { formatPaymentMethod } = require("../services/paymentDisplayNameService");
 
 // ======================
 // HELPERS
@@ -119,7 +120,7 @@ function isAutoPromptPayMethod(method = {}) {
 
 function projectWalletPaymentMethod(method = {}) {
     return {
-        method: method.method || "Payment",
+        method: formatPaymentMethod(method, method.method || "Payment"),
         key: method.key || "",
         region: method.region || "",
         paymentType: method.paymentType || "manual",
@@ -155,7 +156,7 @@ function assertManualIntentUsable(intent) {
 
 function createPaymentSnapshot(methodPresentation = {}) {
     return {
-        method: methodPresentation.method || "Payment",
+        method: formatPaymentMethod(methodPresentation, methodPresentation.method || "Payment"),
         key: methodPresentation.key || "",
         region: methodPresentation.region || "",
         paymentType: methodPresentation.paymentType || "",

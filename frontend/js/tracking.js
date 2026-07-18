@@ -126,7 +126,7 @@ async function trackOrder(orderId) {
                     ${infoItem(t("userId", "User ID"), order.userId || "-")}
                     ${infoItem(t("serverId", "Server ID"), order.zoneId || "-")}
                     ${infoItem(t("amount", "Amount"), `${Number(order.amount || 0).toLocaleString()} ${order.currency || ""}`)}
-                    ${infoItem(t("payment", "Payment"), order.paymentMethod || "-")}
+                    ${infoItem(t("payment", "Payment"), formatPaymentName(order.paymentMethod || "-"))}
 
                     ${status === "refunded"
                 ? infoItem(
@@ -139,7 +139,7 @@ async function trackOrder(orderId) {
                     ${status === "refunded"
                 ? infoItem(
                     t("refundMethod", "Refund Method"),
-                    order.refundMethod || "wallet"
+                    formatPaymentName(order.refundMethod || "wallet")
                 )
                 : ""
             }
@@ -220,6 +220,10 @@ function formatDateTime(value) {
     if (Number.isNaN(date.getTime())) return "";
 
     return date.toLocaleString();
+}
+
+function formatPaymentName(value) {
+    return window.AZIEL_PAYMENT_DISPLAY?.from?.(value, value || "-") || value || "-";
 }
 
 function isRefundFlow(status) {

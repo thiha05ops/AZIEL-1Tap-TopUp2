@@ -132,7 +132,9 @@ function getSelectedPaymentMethod() {
         raw: key,
         key: normalizePaymentKey(key),
         provider: normalizePaymentKey(activeCard?.dataset.provider || ""),
-        method: activeCard?.dataset.name || key,
+        method: window.AZIEL_PAYMENT_DISPLAY?.from?.(activeCard?.dataset.name || key, activeCard?.dataset.name || key) ||
+            activeCard?.dataset.name ||
+            key,
         paymentType: activeCard?.dataset.paymentType || "manual",
         region: activeCard?.dataset.region || "",
         qrImage: activeCard?.dataset.qr || "",
@@ -220,7 +222,10 @@ function renderWalletPaymentMethods(methods = []) {
 
 function buildWalletPaymentCard(method, index) {
     const key = method.key || normalizePaymentKey(method.method);
-    const displayName = method.method || key || "Payment";
+    const displayName = window.AZIEL_PAYMENT_DISPLAY?.method?.({ ...method, key }, method.method || key || "Payment") ||
+        method.method ||
+        key ||
+        "Payment";
     const logo = method.logoUrl || `/assets/payment/${key}.png`;
     const qrImage = method.qrImage || method.uploadedQrImage || method.qrImageUrl || "";
     const paymentType = method.paymentType || "manual";
@@ -741,7 +746,7 @@ function openWalletQrModal(data, info) {
 
     if (topupIdEl) topupIdEl.innerText = data.topupId || "-";
     if (amountEl) amountEl.innerText = `${Number(info.amount).toLocaleString()} ${info.currency}`;
-    if (methodEl) methodEl.innerText = info.paymentMethod || "-";
+    if (methodEl) methodEl.innerText = window.AZIEL_PAYMENT_DISPLAY?.from?.(info.paymentMethod, info.paymentMethod || "-") || info.paymentMethod || "-";
     if (amountText) amountText.innerText = `${Number(info.amount).toLocaleString()} ${info.currency}`;
 
     qrImg.src = data.qrImage || data.qrUrl || data.paymentUrl || "";
@@ -761,7 +766,10 @@ function closeWalletQrModal() {
 function openWalletManualModal(data, info) {
     const intentId = data.intentId || data.id || "";
     const reference = data.reference || data.topupId || "-";
-    const appName = info.paymentMethod || info.provider || "Payment";
+    const appName = window.AZIEL_PAYMENT_DISPLAY?.from?.(info.paymentMethod || info.provider, info.paymentMethod || info.provider || "Payment") ||
+        info.paymentMethod ||
+        info.provider ||
+        "Payment";
     const accountName = info.accountName || data.accountName || "-";
     const accountNumber = info.accountNumber || data.accountNumber || "-";
     const qrImage = info.qrImage || data.qrImage || data.qrUrl || "";

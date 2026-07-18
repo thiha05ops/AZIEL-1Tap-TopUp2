@@ -275,7 +275,7 @@ function renderWalletTopups(topups) {
                 </span>
                 <span>
                     <b>${Number(item.amount || 0).toLocaleString()} ${escapeHTML(item.currency || "")}</b>
-                    <small>${escapeHTML(item.paymentMethod || "-")} · ${escapeHTML(evidence)}</small>
+                    <small>${escapeHTML(formatPaymentName(item.paymentMethod || "-"))} · ${escapeHTML(evidence)}</small>
                 </span>
                 <span class="admin-status ${escapeHTML(normalizeTopupStatus(status))}">
                     ${escapeHTML(formatTopupStatus(status))}
@@ -394,7 +394,7 @@ function renderSelectedTopup(errorMessage = "") {
             ${renderWalletDetailSection("topup_request", [
         ["requested_amount", Number(topup.amount || 0).toLocaleString()],
         ["currency", currency],
-        ["payment_method", topup.paymentMethod],
+        ["payment_method", formatPaymentName(topup.paymentMethod)],
         ["reference", topup.transactionId || topup.topupId || "-"]
     ])}
         </div>
@@ -855,6 +855,10 @@ function formatRecordedBalance(value, currency) {
     return value === null || value === undefined
         ? adminT("not_recorded")
         : `${Number(value || 0).toLocaleString()} ${currency || ""}`;
+}
+
+function formatPaymentName(value) {
+    return window.AZIEL_PAYMENT_DISPLAY?.from?.(value, value || "-") || value || "-";
 }
 
 function formatDate(date) {

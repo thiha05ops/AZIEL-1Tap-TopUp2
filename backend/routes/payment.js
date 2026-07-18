@@ -43,6 +43,7 @@ const {
     normalizePaymentKey,
     projectPaymentInstructions
 } = require("../services/manualPaymentAttemptService");
+const { formatPaymentDisplayName } = require("../services/paymentDisplayNameService");
 const {
     OmisePaymentError,
     assertChargeMatchesRecord,
@@ -109,7 +110,7 @@ function manualAttemptOrderSnapshot(attempt) {
 
 function publicManualAttempt(attempt) {
     const instructions = {
-        method: attempt.instructions?.method || "Payment",
+        method: formatPaymentDisplayName(attempt.instructions?.method || attempt.paymentMethod, attempt.instructions?.method || "Payment"),
         key: attempt.instructions?.key || attempt.paymentMethod,
         accountName: attempt.instructions?.accountName || "",
         accountNumber: attempt.instructions?.accountNumber || "",

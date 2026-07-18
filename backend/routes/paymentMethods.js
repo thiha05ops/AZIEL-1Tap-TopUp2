@@ -11,6 +11,7 @@ const {
     logStorageError,
     uploadFile
 } = require("../services/storageService");
+const { formatPaymentMethod } = require("../services/paymentDisplayNameService");
 
 const defaultMethods = [
     {
@@ -81,7 +82,7 @@ function formatMethod(method) {
 
     return {
         _id: obj._id,
-        method: obj.method,
+        method: formatPaymentMethod(obj, obj.method || "Payment"),
         key: obj.key,
         region: obj.region,
         enabled: obj.enabled === true,

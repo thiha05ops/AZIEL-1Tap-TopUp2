@@ -115,12 +115,13 @@ function renderPaymentMethods(methods) {
 function paymentCardHTML(method) {
     const qr = method.uploadedQrImage || method.qrImageUrl || method.qrImage || "";
     const qrUrl = getAdminSettingsPaymentUploadUrl(qr);
+    const displayName = formatPaymentName(method.method || method.key || "Payment");
 
     return `
         <div class="payment-method-card" data-id="${escapeHTML(method._id)}">
             <div class="payment-header">
                 <h4>
-                    ${escapeHTML(method.method || "-")}
+                    ${escapeHTML(displayName)}
                     <small>${escapeHTML(method.region || "")}</small>
                 </h4>
 
@@ -170,19 +171,23 @@ function paymentCardHTML(method) {
             <label>Provider</label>
             <select class="pm-provider">
                 <option value="manual" ${method.provider === "manual" ? "selected" : ""}>Manual</option>
-                <option value="kbzpay" ${method.provider === "kbzpay" ? "selected" : ""}>KBZPay API</option>
-                <option value="wavepay" ${method.provider === "wavepay" ? "selected" : ""}>WavePay API</option>
+                <option value="kbzpay" ${method.provider === "kbzpay" ? "selected" : ""}>KBZPay</option>
+                <option value="wavepay" ${method.provider === "wavepay" ? "selected" : ""}>WavePay</option>
                 <option value="promptpay" ${method.provider === "promptpay" ? "selected" : ""}>PromptPay</option>
-                <option value="omise" ${method.provider === "omise" ? "selected" : ""}>Omise</option>
+                <option value="omise" ${method.provider === "omise" ? "selected" : ""}>PromptPay</option>
                 <option value="scb" ${method.provider === "scb" ? "selected" : ""}>SCB</option>
                 <option value="aya" ${method.provider === "aya" ? "selected" : ""}>AYA Pay</option>
             </select>
 
             <button class="save-payment-btn" type="button" data-action="save-payment" data-id="${escapeHTML(method._id)}">
-                Save ${escapeHTML(method.method || "Payment")}
+                Save ${escapeHTML(displayName)}
             </button>
         </div>
     `;
+}
+
+function formatPaymentName(value) {
+    return window.AZIEL_PAYMENT_DISPLAY?.from?.(value, value || "Payment") || value || "Payment";
 }
 
 function bindPaymentActions() {

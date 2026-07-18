@@ -7,6 +7,7 @@ const {
     sendEmail
 } = require("./emailTransportService");
 const { normalizeEmail } = require("./orderCustomerSnapshotService");
+const { formatPaymentDisplayName } = require("./paymentDisplayNameService");
 
 const STALE_PENDING_MS = 2 * 60 * 1000;
 
@@ -73,6 +74,10 @@ function statusLabel(status = "") {
         .replace(/\b\w/g, letter => letter.toUpperCase());
 }
 
+function paymentLabel(value = "") {
+    return formatPaymentDisplayName(value, statusLabel(value));
+}
+
 function buildWalletTopupEmail(topup = {}, eventType) {
     const copy = EVENT_COPY[eventType];
     if (!copy) return null;
@@ -83,7 +88,7 @@ function buildWalletTopupEmail(topup = {}, eventType) {
     const fields = [
         ["Top-up ID", topupId],
         ["Amount", formatMoney(topup)],
-        ["Payment method", topup.paymentSnapshot?.method || topup.paymentMethod || ""],
+        ["Payment method", paymentLabel(topup.paymentSnapshot?.method || topup.paymentMethod || "")],
         ["Current status", statusLabel(topup.status)]
     ].filter(([, value]) => String(value || "").trim());
 

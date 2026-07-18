@@ -47,35 +47,11 @@ document.addEventListener("DOMContentLoaded", () => {
             type: "deeplink",
             deepLink: "scbeasy://"
         },
-        kplus: {
-            name: "K PLUS",
-            qr: "assets/payment/kplus-qr.png",
-            type: "deeplink",
-            deepLink: "kplus://"
-        },
-        ktb: {
-            name: "Krungthai NEXT",
-            qr: "assets/payment/ktb-qr.png",
-            type: "deeplink",
-            deepLink: "krungthainext://"
-        },
         bangkok: {
             name: "Bangkok Bank",
             qr: "assets/payment/bangkok-qr.png",
             type: "deeplink",
             deepLink: "bualuangmbanking://"
-        },
-        krungsri: {
-            name: "Krungsri",
-            qr: "assets/payment/krungsri-qr.png",
-            type: "deeplink",
-            deepLink: "kma://"
-        },
-        ttb: {
-            name: "TTB Touch",
-            qr: "assets/payment/ttb-qr.png",
-            type: "deeplink",
-            deepLink: "ttbtouch://"
         }
     };
 
@@ -87,7 +63,7 @@ document.addEventListener("DOMContentLoaded", () => {
     setText("userIdText", userId || "-");
     setText("zoneIdText", zoneId || "-");
     setText("amountText", formatAmount(amount, currency));
-    setText("paymentName", selected.name);
+    setText("paymentName", window.AZIEL_PAYMENT_DISPLAY?.from?.(selected.name, selected.name) || selected.name);
 
     const qrImage = document.getElementById("qrImage");
 

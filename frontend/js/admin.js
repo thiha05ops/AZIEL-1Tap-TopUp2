@@ -2,6 +2,10 @@
 
 let allOrders = [];
 
+function formatPaymentName(value) {
+    return window.AZIEL_PAYMENT_DISPLAY?.from?.(value, value || "-") || value || "-";
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     if (!localStorage.getItem("adminToken")) {
         window.location.href = "admin-login.html";
@@ -176,7 +180,7 @@ function renderOrders() {
 
                 <td>${order.amount || 0} ${order.currency || ""}</td>
 
-                <td>${order.paymentMethod || "-"}</td>
+                <td>${formatPaymentName(order.paymentMethod)}</td>
 
                 <td>
                     <span class="status-badge ${statusClass(order.status)}">

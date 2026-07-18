@@ -7,6 +7,7 @@ const {
     pageResult,
     parseLimit
 } = require("./paginationService");
+const { formatPaymentDisplayName } = require("./paymentDisplayNameService");
 
 class WalletError extends Error {
     constructor(code, message, statusCode = 400) {
@@ -378,7 +379,7 @@ async function creditTopup(topup, options = {}) {
         referenceId: topup.topupId,
         topupId: topup.topupId,
         idempotencyKey: `wallet:topup:${topup.topupId}:credit`,
-        description: `Wallet topup via ${topup.paymentMethod}`,
+        description: `Wallet topup via ${formatPaymentDisplayName(topup.paymentMethod, topup.paymentMethod || "Payment")}`,
         metadata: {
             topupId: topup.topupId,
             paymentMethod: topup.paymentMethod,

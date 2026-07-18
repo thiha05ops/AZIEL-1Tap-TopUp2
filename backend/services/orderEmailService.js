@@ -7,6 +7,7 @@ const {
     sendEmail
 } = require("./emailTransportService");
 const { normalizeEmail } = require("./orderCustomerSnapshotService");
+const { formatPaymentDisplayName } = require("./paymentDisplayNameService");
 
 const STALE_PENDING_MS = 2 * 60 * 1000;
 
@@ -115,6 +116,10 @@ function statusLabel(status = "") {
         .replace(/\b\w/g, letter => letter.toUpperCase());
 }
 
+function paymentLabel(value = "") {
+    return formatPaymentDisplayName(value, statusLabel(value));
+}
+
 function trackingPath(order = {}) {
     return `/tracking.html?orderId=${encodeURIComponent(order.orderId || "")}`;
 }
@@ -127,7 +132,7 @@ function buildOrderEmail(order = {}, eventType) {
     const trackingUrl = absoluteUrl(trackingPath(order));
     const supportUrl = absoluteUrl("/support.html");
     const refundDestination = eventType === "REFUND_COMPLETED"
-        ? `Refund destination: ${order.refundMethod === "wallet" || !order.refundMethod ? "AZIEL Wallet" : statusLabel(order.refundMethod)}`
+        ? `Refund destination: ${order.refundMethod === "wallet" || !order.refundMethod ? "AZIEL Wallet" : paymentLabel(order.refundMethod)}`
         : "";
     const rejectedReason = eventType === "REFUND_REJECTED" && order.refundRejectedReason
         ? `Reason: ${order.refundRejectedReason}`
@@ -138,6 +143,7 @@ function buildOrderEmail(order = {}, eventType) {
         ["Product", order.productName || order.game || ""],
         ["Package", order.packageName || ""],
         ["Amount", formatMoney(order)],
+        ["Payment method", paymentLabel(order.paymentMethod || "")],
         ["Current status", statusLabel(order.status)]
     ].filter(([, value]) => String(value || "").trim());
 

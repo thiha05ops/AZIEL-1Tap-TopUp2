@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const { formatPaymentMethod } = require("./paymentDisplayNameService");
 
 const DEFAULT_MANUAL_ATTEMPT_LIMIT = 5;
 const DEFAULT_MANUAL_ATTEMPT_TTL_MS = 15 * 60 * 1000;
@@ -41,7 +42,7 @@ function normalizePaymentKey(value) {
 
 function projectPaymentInstructions(method = {}, reference = "") {
     return {
-        method: method.method || "Payment",
+        method: formatPaymentMethod(method, method.method || "Payment"),
         key: method.key || "",
         paymentType: method.paymentType || "manual",
         provider: method.provider || "manual",

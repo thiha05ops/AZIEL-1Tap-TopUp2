@@ -217,8 +217,8 @@ function renderNotificationItem(item) {
                     <time>${escapeHTML(formatNotificationTime(item.createdAt))}</time>
                 </div>
 
-                <h2>${escapeHTML(item.title)}</h2>
-                <p>${escapeHTML(item.message)}</p>
+                <h2>${escapeHTML(formatPaymentText(item.title))}</h2>
+                <p>${escapeHTML(formatPaymentText(item.message))}</p>
                 ${renderPromotionMeta(item)}
 
                 <div class="noti-card-actions">
@@ -303,6 +303,10 @@ function getSafeAction(action) {
         url,
         external: /^https?:\/\//i.test(url)
     };
+}
+
+function formatPaymentText(value) {
+    return window.AZIEL_PAYMENT_DISPLAY?.replaceInText?.(value) || value || "";
 }
 
 function getCategoryIcon(category, type) {

@@ -4,7 +4,17 @@
 (function () {
     function show(orderData, paymentSession) {
         const payment = window.selectedPaymentData || {};
-        const methodName =
+        const methodName = window.AZIEL_PAYMENT_DISPLAY?.from?.(
+            paymentSession?.paymentName ||
+            payment.method ||
+            payment.name ||
+            orderData.paymentMethod,
+            paymentSession?.paymentName ||
+            payment.method ||
+            payment.name ||
+            orderData.paymentMethod ||
+            "Payment"
+        ) ||
             paymentSession?.paymentName ||
             payment.method ||
             payment.name ||

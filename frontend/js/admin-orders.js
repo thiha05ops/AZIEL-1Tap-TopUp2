@@ -254,7 +254,7 @@ function renderOrderQueue(orders) {
 
                 <span class="orders-row-package">
                     <b>${escapeHTML(order.packageName || "-")}</b>
-                    <small>${escapeHTML(order.paymentMethod || "-")} · ${escapeHTML(evidenceText)}</small>
+                    <small>${escapeHTML(formatPaymentName(order.paymentMethod || "-"))} · ${escapeHTML(evidenceText)}</small>
                 </span>
 
                 <span class="orders-row-amount">
@@ -344,7 +344,7 @@ function renderSelectedOrder() {
             ${renderDetailSection("financial", [
         ["amount", Number(order.amount || 0).toLocaleString()],
         ["currency", order.currency],
-        ["payment_method", order.paymentMethod],
+        ["payment_method", formatPaymentName(order.paymentMethod)],
         ["reference", order.transactionId || order.manualPaymentAttemptId || "-"]
     ])}
         </div>
@@ -499,7 +499,7 @@ function bindDetailActions(panel, order) {
 async function confirmOrderPaid(order) {
     const confirmed = await confirmOrderAction({
         title: adminT("confirm_payment"),
-        message: `${adminT("mark_this_order_paid")}\n\n${order.orderId}\n${Number(order.amount || 0).toLocaleString()} ${order.currency || ""}\n${order.paymentMethod || "-"}`
+            message: `${adminT("mark_this_order_paid")}\n\n${order.orderId}\n${Number(order.amount || 0).toLocaleString()} ${order.currency || ""}\n${formatPaymentName(order.paymentMethod || "-")}`
     });
 
     if (!confirmed) return;
@@ -868,6 +868,10 @@ function formatDate(date) {
     if (!date) return "-";
     const parsed = new Date(date);
     return Number.isNaN(parsed.getTime()) ? "-" : parsed.toLocaleString();
+}
+
+function formatPaymentName(value) {
+    return window.AZIEL_PAYMENT_DISPLAY?.from?.(value, value || "-") || value || "-";
 }
 
 function formatRelativeTime(date) {

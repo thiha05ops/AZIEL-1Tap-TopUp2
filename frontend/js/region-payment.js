@@ -56,8 +56,10 @@ async function loadDynamicPaymentMethods(region) {
         }
 
         methods.forEach((pay, index) => {
-            const name = pay.method || "Payment";
-            const key = pay.key || name.toLowerCase();
+            const key = pay.key || normalizePaymentKey(pay.method);
+            const name = window.AZIEL_PAYMENT_DISPLAY?.method?.({ ...pay, key }, pay.method || "Payment") ||
+                pay.method ||
+                "Payment";
 
             const logo = getPaymentLogo(key);
             const qrImage = normalizeAssetPath(
@@ -141,6 +143,7 @@ function getPaymentLogo(key) {
         ayapay: "assets/payment/ayapay.png",
         promptpay: "assets/payment/promptpay.png",
         scb: "assets/payment/scb.png",
+        bangkokbank: "assets/payment/scb.png",
         wallet: "assets/logo.png"
     };
 

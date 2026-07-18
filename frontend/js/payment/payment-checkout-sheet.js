@@ -157,7 +157,10 @@
         const amount = Number(options.amount || 0);
         const currency = options.currency || "";
         const requiresSlip = options.requiresSlip !== false;
-        const methodName = options.methodName || options.paymentMethod || "Payment";
+        const methodName = window.AZIEL_PAYMENT_DISPLAY?.from?.(
+            options.methodName || options.paymentMethod,
+            options.methodName || options.paymentMethod || "Payment"
+        ) || options.methodName || options.paymentMethod || "Payment";
         const reference = options.reference || "";
         const qr = normalizeUrl(options.qrImageUrl || options.qrImage || "");
         const submitLabel = options.submitLabel || (requiresSlip ? "Submit for Verification" : "Continue");

@@ -97,8 +97,10 @@
     }
 
     function showToast(message) {
+        const localizedMessage = window.AZIEL_I18N?.t?.(message, message) || message;
+
         if (window.AZIEL_UI?.toast) {
-            window.AZIEL_UI.toast.info(message);
+            window.AZIEL_UI.toast.info(localizedMessage);
             return;
         }
 
@@ -111,7 +113,7 @@
             document.body.appendChild(toast);
         }
 
-        toast.innerText = message;
+        toast.innerText = localizedMessage;
         toast.classList.add("show");
 
         setTimeout(() => {
@@ -170,7 +172,10 @@
         setText("modalGame", orderData.game);
         setText("modalPackage", orderData.packageName);
         setText("modalAmount", `${Number(orderData.amount || 0).toLocaleString()} ${orderData.currency}`);
-        setText("modalPayment", paymentSession.paymentName || payment.method || orderData.paymentMethod);
+        setText("modalPayment", window.AZIEL_PAYMENT_DISPLAY?.from?.(
+            paymentSession.paymentName || payment.method || orderData.paymentMethod,
+            paymentSession.paymentName || payment.method || orderData.paymentMethod
+        ) || paymentSession.paymentName || payment.method || orderData.paymentMethod);
         setText("modalUserId", orderData.userId);
         setText("modalZoneId", orderData.zoneId);
 

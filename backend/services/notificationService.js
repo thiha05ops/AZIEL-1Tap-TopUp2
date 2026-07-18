@@ -8,6 +8,7 @@ const {
     pageResult,
     parseLimit
 } = require("./paginationService");
+const { replacePaymentDisplayNames } = require("./paymentDisplayNameService");
 
 const VALID_TYPES = new Set([
     "order",
@@ -211,8 +212,8 @@ function normalizeNotification(notification) {
         username: item.username || "",
         type,
         category,
-        title: item.title || "Notification",
-        message: item.message || "",
+        title: replacePaymentDisplayNames(item.title || "Notification"),
+        message: replacePaymentDisplayNames(item.message || ""),
         status: item.status || "active",
         read: Boolean(item.isRead || item.read),
         isRead: Boolean(item.isRead || item.read),

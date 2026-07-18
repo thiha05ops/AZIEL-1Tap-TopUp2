@@ -21,7 +21,7 @@ async function createPaymentAndRedirect(orderData) {
         window.pendingOrderData = {
             ...orderData,
             paymentMethod: payment.key,
-            paymentDisplayName: payment.method,
+            paymentDisplayName: window.AZIEL_PAYMENT_DISPLAY?.from?.(payment.method, payment.method) || payment.method,
             paymentType: payment.paymentType,
             provider: payment.provider
         };
@@ -44,7 +44,9 @@ function getPaymentFromActiveCard() {
 
     return {
         key: card.dataset.method || "",
-        method: card.dataset.name || "",
+        method: window.AZIEL_PAYMENT_DISPLAY?.from?.(card.dataset.name || card.dataset.method, card.dataset.name || "") ||
+            card.dataset.name ||
+            "",
         logo: card.dataset.logo || "",
         qrImage: card.dataset.qr || "",
         accountName: card.dataset.accountName || "",
@@ -69,7 +71,7 @@ function openPaymentConfirmModal(order, payment) {
         "modalAmount",
         `${Number(order.amount || 0).toLocaleString()} ${order.currency || ""}`
     );
-    setText("modalPayment", payment.method || order.paymentMethod || "-");
+    setText("modalPayment", window.AZIEL_PAYMENT_DISPLAY?.from?.(payment.method || order.paymentMethod, payment.method || order.paymentMethod || "-") || payment.method || order.paymentMethod || "-");
     setText("modalUserId", order.userId || "-");
     setText("modalZoneId", order.zoneId || "-");
     setText(
