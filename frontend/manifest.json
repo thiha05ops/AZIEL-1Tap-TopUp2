@@ -3,7 +3,7 @@
     "name": "AZIEL 1Tap Shop",
     "short_name": "AZIEL",
     "description": "Game top-ups, order tracking, wallet services, and customer support in one place.",
-    "start_url": "/home.html",
+    "start_url": "/",
     "scope": "/",
     "display": "standalone",
     "orientation": "portrait",
@@ -12,23 +12,25 @@
     "categories": ["shopping", "games", "utilities"],
     "icons": [
         {
-            "src": "/assets/icons/icon-192.png",
+            "src": "/icons/aziel-app-icon-192.png",
             "sizes": "192x192",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any"
         },
         {
-            "src": "/assets/icons/icon-512.png",
+            "src": "/icons/aziel-app-icon-512.png",
             "sizes": "512x512",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any"
         },
         {
-            "src": "/assets/icons/icon-maskable-192.png",
+            "src": "/icons/aziel-app-icon-maskable-192.png",
             "sizes": "192x192",
             "type": "image/png",
             "purpose": "maskable"
         },
         {
-            "src": "/assets/icons/icon-maskable-512.png",
+            "src": "/icons/aziel-app-icon-maskable-512.png",
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "maskable"
@@ -42,7 +44,7 @@
             "url": "/mobile-games.html",
             "icons": [
                 {
-                    "src": "/assets/icons/icon-192.png",
+                    "src": "/icons/aziel-app-icon-192.png",
                     "sizes": "192x192"
                 }
             ]
@@ -54,7 +56,7 @@
             "url": "/tracking.html",
             "icons": [
                 {
-                    "src": "/assets/icons/icon-192.png",
+                    "src": "/icons/aziel-app-icon-192.png",
                     "sizes": "192x192"
                 }
             ]
@@ -66,7 +68,7 @@
             "url": "/support.html",
             "icons": [
                 {
-                    "src": "/assets/icons/icon-192.png",
+                    "src": "/icons/aziel-app-icon-192.png",
                     "sizes": "192x192"
                 }
             ]

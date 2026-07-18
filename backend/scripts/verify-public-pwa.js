@@ -13,7 +13,7 @@ function main() {
 
     assert.strictEqual(manifest.name, "AZIEL 1Tap Shop", "Manifest name must be production brand.");
     assert.strictEqual(manifest.short_name, "AZIEL", "Manifest short_name must be compact.");
-    assert.strictEqual(manifest.start_url, "/home.html", "Manifest start_url must be public.");
+    assert.strictEqual(manifest.start_url, "/", "Manifest start_url must be public root.");
     assert.strictEqual(manifest.scope, "/", "Manifest scope must be root.");
     assert.strictEqual(manifest.display, "standalone", "Manifest display must be standalone.");
     assert.strictEqual(manifest.theme_color, "#070716", "Manifest theme color must match storefront shell.");

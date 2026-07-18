@@ -1,4 +1,4 @@
-const AZIEL_SW_VERSION = "aziel-v26-pass3";
+const AZIEL_SW_VERSION = "aziel-v26-pwa-icons";
 const STATIC_CACHE = `${AZIEL_SW_VERSION}-static`;
 const PUBLIC_PAGE_CACHE = `${AZIEL_SW_VERSION}-pages`;
 
@@ -6,8 +6,11 @@ const STATIC_ASSETS = [
     "/offline.html",
     "/manifest.json",
     "/assets/logo/aziel-wordmark.webp",
-    "/assets/icons/icon-192.png",
-    "/assets/icons/icon-512.png",
+    "/icons/aziel-app-icon-192.png",
+    "/icons/aziel-app-icon-512.png",
+    "/icons/aziel-app-icon-maskable-192.png",
+    "/icons/aziel-app-icon-maskable-512.png",
+    "/icons/apple-touch-icon.png",
     "/css/theme/aziel-design-system.css",
     "/css/theme/aziel-header.css",
     "/css/core/main.css",
