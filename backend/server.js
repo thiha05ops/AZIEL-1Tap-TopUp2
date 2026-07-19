@@ -136,11 +136,11 @@ function configureApplication(mongoConnection) {
         return res.redirect(302, "/admin-login.html");
     });
 
-    app.get(["/admin-login.html", "/admin.html"], (req, res, next) => {
+    app.get(["/admin-login.html", "/admin.html", "/admin-design-studio.html"], (req, res, next) => {
         if (!isProduction || !isPublicProductionHost(req)) return next();
 
-        const safePath = req.path === "/admin.html"
-            ? "/admin.html"
+        const safePath = ["/admin.html", "/admin-design-studio.html"].includes(req.path)
+            ? req.path
             : "/admin-login.html";
 
         return res.redirect(302, `${adminProductionOrigin}${safePath}`);
