@@ -37,7 +37,7 @@ const adminSensitiveLimiter = rateLimit({
     legacyHeaders: false
 });
 
-function sendAdminAuthError(res, error) {
+function sendAdminAuthError(res, error, context = {}) {
     if (error instanceof AdminAuthError) {
         return res.status(error.statusCode || 400).json({
             success: false,
@@ -46,7 +46,20 @@ function sendAdminAuthError(res, error) {
         });
     }
 
-    console.log("Admin auth route error:", error?.code || error?.name || error);
+    const safeError = {
+        route: context.route || "",
+        stage: context.stage || "",
+        name: error?.name || "Error",
+        message: error?.message || "",
+        code: error?.code || "",
+        cause: error?.cause?.message || error?.cause?.code || ""
+    };
+
+    if (process.env.NODE_ENV !== "production") {
+        safeError.stack = error?.stack || "";
+    }
+
+    console.error("Admin auth route error", safeError);
     return res.status(500).json({
         success: false,
         error: "ADMIN_AUTH_SERVER_ERROR",
@@ -74,7 +87,10 @@ router.post("/admin/login", adminLoginLimiter, async (req, res) => {
 
         return res.json({ success: true, ...result });
     } catch (error) {
-        return sendAdminAuthError(res, error);
+        return sendAdminAuthError(res, error, {
+            route: "POST /api/admin/login",
+            stage: "loginAdmin"
+        });
     }
 });
 
@@ -88,7 +104,10 @@ router.post("/admin/login/2fa", adminLoginLimiter, async (req, res) => {
 
         return res.json({ success: true, ...result });
     } catch (error) {
-        return sendAdminAuthError(res, error);
+        return sendAdminAuthError(res, error, {
+            route: "POST /api/admin/login/2fa",
+            stage: "verifyAdminLogin2FA"
+        });
     }
 });
 

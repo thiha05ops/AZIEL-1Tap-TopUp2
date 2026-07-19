@@ -52,6 +52,9 @@ function verifyAuthService() {
     assert(service.includes("verifyTotp"), "TOTP must use maintained otplib-backed service.");
     assert(service.includes("require(\"qrcode\")") && service.includes("QRCode.toDataURL"), "Admin 2FA QR must be generated locally.");
     assert(service.includes("encryptSecret") && service.includes("decryptSecret"), "TOTP secrets must use application encryption.");
+    assert(service.includes("readAdminTotpSecret"), "Admin TOTP secret decryption must be wrapped.");
+    assert(service.includes("ADMIN_2FA_SECRET_UNAVAILABLE"), "Unreadable Admin TOTP secrets must return a controlled auth error.");
+    assert(service.includes("Admin 2FA secret decrypt failed"), "Unreadable Admin TOTP secrets must produce safe server diagnostics.");
     assert(service.includes("FINAL_ACTIVE_OWNER_PROTECTED"), "Final active owner must be server-protected.");
     assert(!/console\.log\(.*password|console\.log\(.*secret|console\.log\(.*token/i.test(service), "Admin auth service must not log secrets.");
 }
@@ -65,6 +68,8 @@ function verifyRoutes() {
     includes("backend/routes/adminAuth.js", "router.get(\"/admin/audit-logs\"", "Audit log API must exist.");
     includes("backend/routes/adminAuth.js", "adminLoginLimiter", "Admin login must be rate limited.");
     includes("backend/routes/adminAuth.js", "adminSensitiveLimiter", "Sensitive Admin routes must be rate limited.");
+    includes("backend/routes/adminAuth.js", "Admin auth route error", "Admin auth route diagnostics must identify unexpected route errors.");
+    includes("backend/routes/adminAuth.js", "process.env.NODE_ENV !== \"production\"", "Admin auth stack traces must be development-only.");
 }
 
 function verifyRoutePermissions() {

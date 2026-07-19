@@ -71,6 +71,30 @@ function projectAdminAccount(admin) {
     };
 }
 
+function maskAdminId(admin) {
+    const value = String(admin?._id || admin?.id || admin?.adminId || "");
+    return value ? `${value.slice(0, 6)}...${value.slice(-4)}` : "";
+}
+
+function readAdminTotpSecret(admin, stage) {
+    try {
+        return decryptSecret(admin.twoFactor?.secretEncrypted || admin.twoFactor?.pendingSecretEncrypted || "");
+    } catch (error) {
+        console.error("Admin 2FA secret decrypt failed", {
+            stage,
+            adminId: maskAdminId(admin),
+            name: error?.name || "Error",
+            message: error?.message || "",
+            code: error?.code || ""
+        });
+        throw new AdminAuthError(
+            "ADMIN_2FA_SECRET_UNAVAILABLE",
+            "Two-factor authentication could not be verified. Contact the account owner.",
+            401
+        );
+    }
+}
+
 async function bootstrapFirstOwnerIfAllowed({ username, password, req }) {
     const count = await AdminAccount.countDocuments();
     if (count > 0) return null;
@@ -210,7 +234,7 @@ async function verifyAdminLogin2FA({ challengeId, code, req }) {
         throw new AdminAuthError("ADMIN_2FA_INVALID", "Invalid verification code.", 401);
     }
 
-    const secret = decryptSecret(admin.twoFactor.secretEncrypted);
+    const secret = readAdminTotpSecret(admin, "admin_login_2fa");
     const valid = await verifyTotp(secret, code);
 
     if (!valid) {
@@ -514,7 +538,12 @@ async function verifyAdmin2FASetup(admin, code, req) {
         throw new AdminAuthError("ADMIN_2FA_INVALID", "Invalid verification code.");
     }
 
-    const secret = decryptSecret(account.twoFactor.pendingSecretEncrypted);
+    const secret = readAdminTotpSecret({
+        ...account.toObject(),
+        twoFactor: {
+            pendingSecretEncrypted: account.twoFactor.pendingSecretEncrypted
+        }
+    }, "admin_2fa_setup");
     if (!(await verifyTotp(secret, code))) {
         throw new AdminAuthError("ADMIN_2FA_INVALID", "Invalid verification code.");
     }
@@ -546,7 +575,7 @@ async function disableAdmin2FA(admin, payload = {}, req) {
     if (!account.twoFactor?.enabled || !account.twoFactor?.secretEncrypted) {
         throw new AdminAuthError("ADMIN_2FA_NOT_ENABLED", "Two-factor authentication is not enabled.");
     }
-    const secret = decryptSecret(account.twoFactor.secretEncrypted);
+    const secret = readAdminTotpSecret(account, "admin_2fa_disable");
     if (!(await verifyTotp(secret, payload.code))) {
         throw new AdminAuthError("ADMIN_2FA_INVALID", "Invalid verification code.");
     }
