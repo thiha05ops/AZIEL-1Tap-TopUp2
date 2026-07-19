@@ -5,3 +5,4 @@ node_modules/
 .env
 client_secret_*.json
 uploads/.env
+.local-admin-recovery/
