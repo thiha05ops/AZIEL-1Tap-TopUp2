@@ -245,6 +245,54 @@ function canonicalMethodDefaults(item = {}) {
     };
 }
 
+function applySeedDefaultIfMissing(method, key, value) {
+    if (value === undefined) return;
+
+    if (typeof value === "boolean") {
+        if (typeof method[key] !== "boolean") method[key] = value;
+        return;
+    }
+
+    if (typeof value === "number") {
+        if (!Number.isFinite(Number(method[key]))) method[key] = value;
+        return;
+    }
+
+    if (method[key] === undefined || method[key] === null) {
+        method[key] = value;
+    }
+}
+
+function applySeedDefaultsWithoutOverwriting(method, item = {}) {
+    method.provider = canonicalProviderForMethod(method, item.provider);
+
+    [
+        "appDisplayName",
+        "enableSaveQr",
+        "enableOpenApp",
+        "enableChecklist",
+        "dynamicQrSupported",
+        "amountPrefillSupported",
+        "referenceSupported",
+        "galleryScanSupported",
+        "slipRequired",
+        "autoVerificationSupported",
+        "webhookSupported",
+        "shortDescription",
+        "badgeText",
+        "qrMode",
+        "receiptUploadEnabled",
+        "confirmationMode",
+        "sortOrder"
+    ].forEach(key => {
+        applySeedDefaultIfMissing(method, key, item[key]);
+    });
+
+    if (!method.checklistSteps?.length) {
+        method.checklistSteps = item.checklistSteps || [];
+    }
+}
+
 function canonicalProviderForMethod(method = {}, fallback = "") {
     const key = String(method.key || "").trim().toLowerCase();
     if (CANONICAL_PROVIDER_BY_KEY[key]) return CANONICAL_PROVIDER_BY_KEY[key];
@@ -354,34 +402,11 @@ async function seedPaymentMethods() {
                 provider: canonicalProviderForMethod(item)
             });
         } else {
-            Object.assign(exists, canonicalMethodDefaults(item));
-
-            [
-                "appDisplayName",
-                "enableSaveQr",
-                "enableOpenApp",
-                "enableChecklist",
-                "dynamicQrSupported",
-                "amountPrefillSupported",
-                "referenceSupported",
-                "galleryScanSupported",
-                "slipRequired",
-                "autoVerificationSupported",
-                "webhookSupported",
-                "shortDescription",
-                "badgeText",
-                "qrMode",
-                "receiptUploadEnabled",
-                "confirmationMode",
-                "sortOrder"
-            ].forEach(key => {
-                if (item[key] !== undefined) exists[key] = item[key];
-            });
-
-            if (!exists.checklistSteps?.length) {
-                exists.checklistSteps = item.checklistSteps || [];
-            }
-
+            Object.assign(exists, canonicalMethodDefaults({
+                ...item,
+                sortOrder: exists.sortOrder
+            }));
+            applySeedDefaultsWithoutOverwriting(exists, item);
             await applyCompatibilityModes(exists).save();
         }
     }
@@ -825,3 +850,9 @@ router.post(
 );
 
 module.exports = router;
+module.exports._test = {
+    applyCompatibilityModes,
+    applyPaymentMethodPatch,
+    applySeedDefaultsWithoutOverwriting,
+    defaultMethods
+};

@@ -6,6 +6,7 @@ const ROOT = path.resolve(__dirname, "../..");
 const {
     paymentMethodReadiness
 } = require("../services/paymentProviderRegistry");
+const paymentMethodsRoute = require("../routes/paymentMethods");
 
 function read(relativePath) {
     return fs.readFileSync(path.join(ROOT, relativePath), "utf8");
@@ -181,6 +182,38 @@ function verifyReadinessRules() {
     assert.strictEqual(wallet.ready, true, "Wallet readiness must remain unchanged");
 }
 
+function verifySeedDoesNotOverwriteSavedFalse() {
+    const scbDefault = paymentMethodsRoute._test.defaultMethods.find(item => item.key === "scb");
+    const storedBefore = {
+        ...validScbBase(),
+        enableOpenApp: true,
+        save() {}
+    };
+    const requestPayload = {
+        method: "SCB",
+        region: "TH",
+        paymentType: "deeplink",
+        provider: "scb",
+        enableOpenApp: false,
+        enableSaveQr: true,
+        enableChecklist: true,
+        receiptUploadEnabled: true,
+        slipRequired: true,
+        confirmationMode: "manual_admin",
+        checklistSteps: [
+            { action: "save_qr", label: "Save QR", enabled: true, sortOrder: 10 },
+            { action: "upload_receipt", label: "Upload Receipt", enabled: true, sortOrder: 20 }
+        ]
+    };
+
+    paymentMethodsRoute._test.applyPaymentMethodPatch(storedBefore, requestPayload);
+    assert.strictEqual(storedBefore.enableOpenApp, false, "PUT patch must persist enableOpenApp:false in memory");
+
+    paymentMethodsRoute._test.applySeedDefaultsWithoutOverwriting(storedBefore, scbDefault);
+    paymentMethodsRoute._test.applyCompatibilityModes(storedBefore);
+    assert.strictEqual(storedBefore.enableOpenApp, false, "seed/reload must not overwrite stored enableOpenApp:false");
+}
+
 function main() {
     verifyProviderRegistry();
     verifyBackendSeedAndProjection();
@@ -188,6 +221,7 @@ function main() {
     verifyPublicRendering();
     verifyWalletRendering();
     verifyReadinessRules();
+    verifySeedDoesNotOverwriteSavedFalse();
     console.log("Payment provider integrity verification passed.");
 }
 
