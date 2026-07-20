@@ -330,6 +330,19 @@
         });
     }
 
+    function dataUrlToBlob(dataUrl) {
+        const match = String(dataUrl || "").match(/^data:([^;,]+);base64,(.+)$/);
+        if (!match) throw new Error("Dynamic QR image is unavailable.");
+        const mimeType = match[1] || "image/png";
+        if (!mimeType.toLowerCase().startsWith("image/")) throw new Error("Dynamic QR image is unavailable.");
+        const binary = atob(match[2]);
+        const bytes = new Uint8Array(binary.length);
+        for (let index = 0; index < binary.length; index += 1) {
+            bytes[index] = binary.charCodeAt(index);
+        }
+        return new Blob([bytes], { type: mimeType });
+    }
+
     async function fetchImageBlob(url) {
         const isLocalObject = /^(data:|blob:)/i.test(String(url || ""));
         const res = await fetch(url, isLocalObject
@@ -369,7 +382,21 @@
         return data;
     }
 
-    async function resolveQrBlob({ href, qrCanvas, options }) {
+    async function resolveQrBlob({ href, qrCanvas, options, sourceType }) {
+        const dynamicSave = isDynamicPromptPayMode(options);
+        if (dynamicSave) {
+            if (sourceType !== "dynamic_response") {
+                throw new Error("Dynamic QR save source ownership violation");
+            }
+            if (/^data:/i.test(String(href || ""))) {
+                return {
+                    blob: dataUrlToBlob(href),
+                    source: "dynamic_data_url"
+                };
+            }
+            throw new Error("Dynamic QR could not be saved. Please try again.");
+        }
+
         if (qrCanvas?.toBlob) {
             return {
                 blob: await blobFromCanvas(qrCanvas),
@@ -522,11 +549,13 @@
 
     async function saveQrAsset(config = {}) {
         const filename = config.filename || `${safeFilePart(config.options?.methodCode || "aziel-payment")}-${safeFilePart(config.options?.reference || "qr")}.png`;
+        const dynamicSave = isDynamicPromptPayMode(config.options || {});
         try {
             const { blob } = await resolveQrBlob({
                 href: config.href || "",
                 qrCanvas: config.qrCanvas,
-                options: config.options || {}
+                options: config.options || {},
+                sourceType: config.sourceType || ""
             });
             await shareOrDownloadQr(blob, filename);
             config.onSuccess?.();
@@ -534,14 +563,30 @@
             showToast("QR ready to save", "success");
         } catch (error) {
             if (error?.name === "AbortError") return;
-            config.setMessage?.("error", "Could not save QR. Long-press the image to save.");
-            showToast("Could not save QR. Long-press the image to save.", "error");
+            const message = dynamicSave
+                ? "Dynamic QR could not be saved. Please try again."
+                : "Could not save QR. Long-press the image to save.";
+            config.setMessage?.("error", message);
+            showToast(message, "error");
         }
     }
 
     async function downloadQr(options = {}) {
         const activeQr = activeState?.activeQr;
         const filename = `${safeFilePart(options.methodCode || options.methodName || "aziel-payment")}-${safeFilePart(options.reference || "qr")}.png`;
+
+        if (isDevelopmentHost()) {
+            console.info("[AZIEL QR SAVE]", {
+                qrMode: options.qrMode || "",
+                sourceType: activeQr?.sourceType || "",
+                sourcePrefix: activeQr?.imageUrlOrDataUrl?.slice(0, 40) || "",
+                fallbackEndpointUsed: false
+            });
+        }
+
+        if (isDynamicPromptPayMode(options) && activeQr?.sourceType !== "dynamic_response") {
+            throw new Error("Dynamic QR save source ownership violation");
+        }
 
         if (!activeQrMatchesCheckout(activeQr, options) || !activeQr.imageUrlOrDataUrl) {
             setMessage("error", "QR image is unavailable.");
@@ -551,6 +596,7 @@
         await saveQrAsset({
             href: activeQr.imageUrlOrDataUrl,
             qrCanvas: null,
+            sourceType: activeQr.sourceType,
             filename,
             options,
             setMessage,
