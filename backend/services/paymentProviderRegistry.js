@@ -97,6 +97,17 @@ function enabledChecklistUses(method = {}, action = "") {
         method.checklistSteps.some(step => step?.action === action && step.enabled !== false && step.enabled !== "false");
 }
 
+function isAzielDynamicPromptPay(method = {}) {
+    return method.qrMode === "aziel_promptpay_dynamic";
+}
+
+function hasPromptPayRecipient(method = {}) {
+    const type = String(method.promptPayRecipientType || "").trim().toUpperCase();
+    const value = String(method.promptPayRecipientValue || "").trim();
+    if (!["PHONE", "NATIONAL_ID", "TAX_ID"].includes(type)) return false;
+    return Boolean(value);
+}
+
 function paymentMethodReadiness(method = {}) {
     const normalizedProvider = normalizeProviderKey(method.provider || method.key || "");
     const paymentType = String(method.paymentType || "manual").toLowerCase();
@@ -114,12 +125,19 @@ function paymentMethodReadiness(method = {}) {
         return { ready: missing.length === 0, missing };
     }
 
-    if (!String(method.accountName || "").trim()) missing.push("account name");
-    if (!String(method.accountNumber || "").trim()) missing.push("account number");
-
+    const dynamicPromptPay = isAzielDynamicPromptPay(method);
+    if (!dynamicPromptPay) {
+        if (!String(method.accountName || "").trim()) missing.push("account name");
+        if (!String(method.accountNumber || "").trim()) missing.push("account number");
+    }
     const expectsQr = isEnabled(method.enableSaveQr) || ["manual", "deeplink"].includes(paymentType);
     const hasQr = Boolean(method.uploadedQrImage || method.qrImageUrl || method.qrImage || method.finalQrImage);
-    if (expectsQr && !hasQr) missing.push("QR image");
+    if (expectsQr && !hasQr && !dynamicPromptPay) missing.push("QR image");
+    if (dynamicPromptPay) {
+        if (!isEnabled(method.dynamicQrSupported)) missing.push("dynamic QR supported");
+        if (!isEnabled(method.amountPrefillSupported)) missing.push("amount prefill supported");
+        if (!hasPromptPayRecipient(method)) missing.push("PromptPay recipient");
+    }
 
     const openAppChecklistEnabled = enabledChecklistUses(method, "open_app");
     const openAppEnabled = isEnabled(method.enableOpenApp);
@@ -127,7 +145,12 @@ function paymentMethodReadiness(method = {}) {
 
     if (openAppEnabled || openAppChecklistEnabled) {
         if (!String(method.appDisplayName || "").trim()) missing.push("app display name");
-        if (!String(method.deepLinkUrl || "").trim()) missing.push("deep link URL");
+        const appLaunchMode = String(method.appLaunchMode || "OFFICIAL_PAYMENT_DEEPLINK").toUpperCase();
+        if (appLaunchMode === "APP_ONLY") {
+            if (!String(method.iosAppLaunchUrl || method.androidAppLaunchUrl || "").trim()) missing.push("app launch URL");
+        } else if (!String(method.deepLinkUrl || "").trim()) {
+            missing.push("deep link URL");
+        }
     }
 
     if (["manual", "deeplink"].includes(paymentType)) {

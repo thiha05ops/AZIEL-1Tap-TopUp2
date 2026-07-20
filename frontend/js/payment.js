@@ -118,8 +118,8 @@ function isPublicPaymentMethodUsable(method = {}) {
     if (key === "wallet" || type === "wallet" || provider === "wallet") return true;
     if (type === "auto" || provider === "omise") return true;
 
-    const hasQr = Boolean(method.qrImage || method.qrImageUrl || method.uploadedQrImage || method.finalQrImage);
-    const hasAccount = Boolean(method.accountName && method.accountNumber);
+    const hasQr = Boolean(method.qrImage || method.qrImageUrl || method.uploadedQrImage || method.finalQrImage || method.qrMode === "aziel_promptpay_dynamic");
+    const hasAccount = method.qrMode === "aziel_promptpay_dynamic" || Boolean(method.accountName && method.accountNumber);
     const validProvider = isKnownPaymentProvider(provider || key);
     return validProvider && hasQr && hasAccount;
 }
@@ -169,7 +169,7 @@ function buildPaymentCard(method, index) {
         provider = "wallet";
     }
 
-    if (String(region).toUpperCase() === "TH" && key === "promptpay") {
+    if (String(region).toUpperCase() === "TH" && key === "promptpay" && method.paymentType !== "manual") {
         paymentType = "auto";
         provider = "promptpay";
     }
@@ -207,6 +207,12 @@ function buildPaymentCard(method, index) {
     card.dataset.deepLink = method.deepLinkUrl || method.deepLink || "";
     card.dataset.appStoreUrl = method.appStoreUrl || "";
     card.dataset.playStoreUrl = method.playStoreUrl || "";
+    card.dataset.appLaunchMode = method.appLaunchMode || "";
+    card.dataset.iosAppLaunchUrl = method.iosAppLaunchUrl || "";
+    card.dataset.androidAppLaunchUrl = method.androidAppLaunchUrl || "";
+    card.dataset.appStoreFallbackUrl = method.appStoreFallbackUrl || "";
+    card.dataset.playStoreFallbackUrl = method.playStoreFallbackUrl || "";
+    card.dataset.qrMode = method.qrMode || "";
     card.dataset.enableSaveQr = String(method.enableSaveQr === true);
     card.dataset.enableOpenApp = String(method.enableOpenApp === true);
     card.dataset.enableChecklist = String(method.enableChecklist === true);
@@ -287,6 +293,12 @@ function selectPaymentCard(card) {
         deepLinkUrl: originalMethod.deepLinkUrl || originalMethod.deepLink || card.dataset.deepLink || "",
         appStoreUrl: originalMethod.appStoreUrl || card.dataset.appStoreUrl || "",
         playStoreUrl: originalMethod.playStoreUrl || card.dataset.playStoreUrl || "",
+        appLaunchMode: originalMethod.appLaunchMode || card.dataset.appLaunchMode || "",
+        iosAppLaunchUrl: originalMethod.iosAppLaunchUrl || card.dataset.iosAppLaunchUrl || "",
+        androidAppLaunchUrl: originalMethod.androidAppLaunchUrl || card.dataset.androidAppLaunchUrl || "",
+        appStoreFallbackUrl: originalMethod.appStoreFallbackUrl || card.dataset.appStoreFallbackUrl || "",
+        playStoreFallbackUrl: originalMethod.playStoreFallbackUrl || card.dataset.playStoreFallbackUrl || "",
+        qrMode: originalMethod.qrMode || card.dataset.qrMode || "",
         enableSaveQr: originalMethod.enableSaveQr === true || card.dataset.enableSaveQr === "true",
         enableOpenApp: originalMethod.enableOpenApp === true || card.dataset.enableOpenApp === "true",
         enableChecklist: originalMethod.enableChecklist === true || card.dataset.enableChecklist === "true",
@@ -334,6 +346,12 @@ function normalizeSelectedPaymentMethod(method = {}, overrides = {}) {
         region: overrides.region || method.region || "",
         deepLink: method.deepLink || method.deepLinkUrl || "",
         deepLinkUrl: method.deepLinkUrl || method.deepLink || "",
+        appLaunchMode: method.appLaunchMode || "",
+        iosAppLaunchUrl: method.iosAppLaunchUrl || "",
+        androidAppLaunchUrl: method.androidAppLaunchUrl || "",
+        appStoreFallbackUrl: method.appStoreFallbackUrl || "",
+        playStoreFallbackUrl: method.playStoreFallbackUrl || "",
+        qrMode: method.qrMode || "",
         receiptUploadEnabled: method.receiptUploadEnabled !== false,
         checklistSteps: Array.isArray(method.checklistSteps) ? method.checklistSteps : []
     };

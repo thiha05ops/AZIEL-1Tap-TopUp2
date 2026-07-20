@@ -3,6 +3,7 @@ const { Readable } = require("stream");
 const router = express.Router();
 
 const PaymentMethod = require("../models/PaymentMethod");
+const ManualPaymentAttempt = require("../models/ManualPaymentAttempt");
 const adminMiddleware = require("../middleware/adminMiddleware");
 const { PERMISSIONS, requireAdminPermission } = require("../services/adminAuthorizationService");
 const { ADMIN_AUDIT_ACTIONS, writeAdminAudit } = require("../services/adminAuditService");
@@ -22,6 +23,11 @@ const {
     paymentMethodReadiness,
     validProvidersFor
 } = require("../services/paymentProviderRegistry");
+const authMiddleware = require("../middleware/authMiddleware");
+const {
+    createPromptPayQr,
+    maskPromptPayRecipient
+} = require("../services/promptPayQrService");
 
 const CANONICAL_PROVIDER_BY_KEY = Object.freeze({
     promptpay: "promptpay",
@@ -236,6 +242,22 @@ function safeUrl(value = "", options = {}) {
     return "";
 }
 
+function safeNumber(value, fallback = 0) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : fallback;
+}
+
+function safePositiveInt(value, fallback = 15, max = 1440) {
+    const number = Math.trunc(Number(value));
+    if (!Number.isFinite(number) || number <= 0) return fallback;
+    return Math.min(number, max);
+}
+
+function safePromptPayRecipientType(value = "") {
+    const type = String(value || "").trim().toUpperCase();
+    return ["PHONE", "NATIONAL_ID", "TAX_ID"].includes(type) ? type : "";
+}
+
 function safeDownloadFilePart(value = "payment") {
     return String(value || "payment")
         .toLowerCase()
@@ -316,6 +338,9 @@ function applySeedDefaultsWithoutOverwriting(method, item = {}) {
         "shortDescription",
         "badgeText",
         "qrMode",
+        "appLaunchMode",
+        "promptPayRecipientType",
+        "promptPayRecipientValue",
         "receiptUploadEnabled",
         "confirmationMode",
         "sortOrder"
@@ -365,7 +390,7 @@ function applyCompatibilityModes(method) {
         method.autoVerificationSupported = false;
         method.webhookSupported = false;
         method.confirmationMode = "manual_admin";
-        if (!["provider_generated", "uploaded_static", "none"].includes(method.qrMode)) {
+        if (!["provider_generated", "uploaded_static", "aziel_promptpay_dynamic", "none"].includes(method.qrMode)) {
             method.qrMode = "uploaded_static";
         }
     }
@@ -404,6 +429,14 @@ function capabilityProjection(obj = {}) {
         deepLinkUrl: obj.deepLinkUrl || "",
         appStoreUrl: obj.appStoreUrl || "",
         playStoreUrl: obj.playStoreUrl || "",
+        appLaunchMode: obj.appLaunchMode || "OFFICIAL_PAYMENT_DEEPLINK",
+        iosAppLaunchUrl: obj.iosAppLaunchUrl || "",
+        androidAppLaunchUrl: obj.androidAppLaunchUrl || "",
+        appStoreFallbackUrl: obj.appStoreFallbackUrl || obj.appStoreUrl || "",
+        playStoreFallbackUrl: obj.playStoreFallbackUrl || obj.playStoreUrl || "",
+        promptPayRecipientType: obj.promptPayRecipientType || "",
+        promptPayRecipientMasked: maskPromptPayRecipient(obj.promptPayRecipientValue || ""),
+        dynamicQrExpiryMinutes: safePositiveInt(obj.dynamicQrExpiryMinutes, 15),
         enableSaveQr: obj.enableSaveQr === true,
         enableOpenApp: obj.enableOpenApp === true,
         enableChecklist: obj.enableChecklist === true,
@@ -496,6 +529,15 @@ function formatAdminMethod(method) {
         deepLinkUrl: obj.deepLinkUrl || "",
         appStoreUrl: obj.appStoreUrl || "",
         playStoreUrl: obj.playStoreUrl || "",
+        appLaunchMode: obj.appLaunchMode || "OFFICIAL_PAYMENT_DEEPLINK",
+        iosAppLaunchUrl: obj.iosAppLaunchUrl || "",
+        androidAppLaunchUrl: obj.androidAppLaunchUrl || "",
+        appStoreFallbackUrl: obj.appStoreFallbackUrl || obj.appStoreUrl || "",
+        playStoreFallbackUrl: obj.playStoreFallbackUrl || obj.playStoreUrl || "",
+        promptPayRecipientType: obj.promptPayRecipientType || "",
+        promptPayRecipientMasked: maskPromptPayRecipient(obj.promptPayRecipientValue || ""),
+        promptPayRecipientValue: obj.promptPayRecipientValue || "",
+        dynamicQrExpiryMinutes: safePositiveInt(obj.dynamicQrExpiryMinutes, 15),
         logoUrl: safePublicAssetUrl(obj.logoUrl) || getPaymentLogo(obj),
         shortDescription: obj.shortDescription || "",
         badgeText: obj.badgeText || "",
@@ -645,6 +687,87 @@ router.get("/payment-methods/:key/qr-download", async (req, res) => {
     }
 });
 
+// POST /api/payment-methods/:key/promptpay-qr
+router.post("/payment-methods/:key/promptpay-qr", authMiddleware, async (req, res) => {
+    try {
+        await seedPaymentMethods();
+
+        const key = safeText(req.params.key, 60)
+            .toLowerCase()
+            .replace(/[^a-z0-9_-]/g, "");
+        const method = await PaymentMethod.findOne({
+            key,
+            enabled: true
+        });
+
+        if (
+            !method ||
+            method.region !== "TH" ||
+            method.qrMode !== "aziel_promptpay_dynamic" ||
+            method.dynamicQrSupported !== true ||
+            method.amountPrefillSupported !== true ||
+            method.receiptUploadEnabled === false ||
+            method.slipRequired === false
+        ) {
+            return res.status(400).json({
+                success: false,
+                code: "PROMPTPAY_DYNAMIC_QR_UNAVAILABLE",
+                message: "Dynamic PromptPay QR is not available for this payment method."
+            });
+        }
+
+        if (!String(req.body.orderReference || "").trim()) {
+            return res.status(400).json({
+                success: false,
+                code: "PROMPTPAY_REFERENCE_INVALID",
+                message: "Payment reference is required."
+            });
+        }
+
+        const result = await createPromptPayQr({
+            method,
+            amount: req.body.amount,
+            currency: req.body.currency,
+            orderReference: req.body.orderReference
+        });
+
+        await ManualPaymentAttempt.updateOne(
+            {
+                reference: result.orderReference,
+                username: req.user.username,
+                status: "active",
+                paymentMethod: method.key
+            },
+            {
+                $set: {
+                    "instructions.dynamicQr.orderReference": result.orderReference,
+                    "instructions.dynamicQr.qrPayload": result.qrPayload,
+                    "instructions.dynamicQr.expiresAt": new Date(result.expiresAt)
+                }
+            }
+        ).catch(error => {
+            if (process.env.NODE_ENV !== "production") {
+                console.log("PromptPay QR attempt snapshot skipped:", error.message);
+            }
+        });
+
+        return res.json({
+            success: true,
+            ...result
+        });
+    } catch (error) {
+        const code = error?.code || "PROMPTPAY_DYNAMIC_QR_FAILED";
+        const status = code.includes("INVALID") ? 400 : 500;
+        return res.status(status).json({
+            success: false,
+            code,
+            message: status === 400
+                ? error.message
+                : "PromptPay QR generation failed"
+        });
+    }
+});
+
 // GET /api/admin/payment-methods
 router.get("/admin/payment-methods", adminMiddleware, requireAdminPermission(PERMISSIONS.PAYMENT_METHODS_MANAGE), async (req, res) => {
     try {
@@ -687,13 +810,18 @@ function applyPaymentMethodPatch(method, body = {}) {
         appDisplayName: 80,
         deepLinkUrl: 500,
         appStoreUrl: 500,
-        playStoreUrl: 500
+        playStoreUrl: 500,
+        iosAppLaunchUrl: 500,
+        androidAppLaunchUrl: 500,
+        appStoreFallbackUrl: 500,
+        playStoreFallbackUrl: 500,
+        promptPayRecipientValue: 80
     };
 
     Object.entries(stringFields).forEach(([key, max]) => {
         if (body[key] === undefined) return;
         if (key === "deepLinkUrl") method[key] = safeUrl(body[key], { deeplink: true });
-        else if (key === "appStoreUrl" || key === "playStoreUrl" || key === "logoUrl") method[key] = safeUrl(body[key]);
+        else if (["appStoreUrl", "playStoreUrl", "logoUrl", "appStoreFallbackUrl", "playStoreFallbackUrl"].includes(key)) method[key] = safeUrl(body[key]);
         else method[key] = safeText(body[key], max);
     });
 
@@ -722,9 +850,16 @@ function applyPaymentMethodPatch(method, body = {}) {
         method.paymentType = String(body.paymentType);
     }
 
-    if (body.qrMode !== undefined && ["provider_generated", "uploaded_static", "none"].includes(String(body.qrMode))) {
+    if (body.qrMode !== undefined && ["provider_generated", "uploaded_static", "aziel_promptpay_dynamic", "none"].includes(String(body.qrMode))) {
         method.qrMode = String(body.qrMode);
     }
+
+    if (body.appLaunchMode !== undefined && ["APP_ONLY", "OFFICIAL_PAYMENT_DEEPLINK"].includes(String(body.appLaunchMode).toUpperCase())) {
+        method.appLaunchMode = String(body.appLaunchMode).toUpperCase();
+    }
+
+    if (body.promptPayRecipientType !== undefined) method.promptPayRecipientType = safePromptPayRecipientType(body.promptPayRecipientType);
+    if (body.dynamicQrExpiryMinutes !== undefined) method.dynamicQrExpiryMinutes = safePositiveInt(body.dynamicQrExpiryMinutes, 15);
 
     if (body.confirmationMode !== undefined && ["manual_admin", "automatic_provider", "wallet_internal"].includes(String(body.confirmationMode))) {
         method.confirmationMode = String(body.confirmationMode);

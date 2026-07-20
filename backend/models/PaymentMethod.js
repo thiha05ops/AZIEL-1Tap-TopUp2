@@ -86,7 +86,7 @@ const paymentMethodSchema = new mongoose.Schema(
 
         qrMode: {
             type: String,
-            enum: ["provider_generated", "uploaded_static", "none"],
+            enum: ["provider_generated", "uploaded_static", "aziel_promptpay_dynamic", "none"],
             default: "uploaded_static"
         },
 
@@ -124,6 +124,48 @@ const paymentMethodSchema = new mongoose.Schema(
         playStoreUrl: {
             type: String,
             default: ""
+        },
+
+        appLaunchMode: {
+            type: String,
+            enum: ["APP_ONLY", "OFFICIAL_PAYMENT_DEEPLINK"],
+            default: "OFFICIAL_PAYMENT_DEEPLINK"
+        },
+
+        iosAppLaunchUrl: {
+            type: String,
+            default: ""
+        },
+
+        androidAppLaunchUrl: {
+            type: String,
+            default: ""
+        },
+
+        appStoreFallbackUrl: {
+            type: String,
+            default: ""
+        },
+
+        playStoreFallbackUrl: {
+            type: String,
+            default: ""
+        },
+
+        promptPayRecipientType: {
+            type: String,
+            enum: ["", "PHONE", "NATIONAL_ID", "TAX_ID"],
+            default: ""
+        },
+
+        promptPayRecipientValue: {
+            type: String,
+            default: ""
+        },
+
+        dynamicQrExpiryMinutes: {
+            type: Number,
+            default: 15
         },
 
         paymentType: {

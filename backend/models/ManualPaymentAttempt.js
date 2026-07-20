@@ -105,7 +105,40 @@ const manualPaymentAttemptSchema = new mongoose.Schema(
             key: { type: String, default: "" },
             accountName: { type: String, default: "" },
             accountNumber: { type: String, default: "" },
-            qrImage: { type: String, default: "" }
+            qrImage: { type: String, default: "" },
+            qrMode: { type: String, default: "" },
+            enableSaveQr: { type: Boolean, default: false },
+            enableOpenApp: { type: Boolean, default: false },
+            enableChecklist: { type: Boolean, default: false },
+            dynamicQrSupported: { type: Boolean, default: false },
+            amountPrefillSupported: { type: Boolean, default: false },
+            referenceSupported: { type: Boolean, default: false },
+            galleryScanSupported: { type: Boolean, default: false },
+            receiptUploadEnabled: { type: Boolean, default: true },
+            slipRequired: { type: Boolean, default: true },
+            appDisplayName: { type: String, default: "" },
+            appLaunchMode: { type: String, default: "" },
+            iosAppLaunchUrl: { type: String, default: "" },
+            androidAppLaunchUrl: { type: String, default: "" },
+            appStoreFallbackUrl: { type: String, default: "" },
+            playStoreFallbackUrl: { type: String, default: "" },
+            checklistSteps: {
+                type: [
+                    {
+                        key: { type: String, default: "" },
+                        label: { type: String, default: "" },
+                        action: { type: String, default: "" },
+                        enabled: { type: Boolean, default: true },
+                        sortOrder: { type: Number, default: 0 }
+                    }
+                ],
+                default: []
+            },
+            dynamicQr: {
+                orderReference: { type: String, default: "" },
+                qrPayload: { type: String, default: "" },
+                expiresAt: { type: Date, default: null }
+            }
         },
         status: {
             type: String,

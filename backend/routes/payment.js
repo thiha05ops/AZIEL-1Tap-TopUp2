@@ -115,7 +115,25 @@ function publicManualAttempt(attempt) {
         accountName: attempt.instructions?.accountName || "",
         accountNumber: attempt.instructions?.accountNumber || "",
         qrImage: attempt.instructions?.qrImage || "",
-        reference: attempt.reference
+        reference: attempt.reference,
+        qrMode: attempt.instructions?.qrMode || "",
+        enableSaveQr: attempt.instructions?.enableSaveQr === true,
+        enableOpenApp: attempt.instructions?.enableOpenApp === true,
+        enableChecklist: attempt.instructions?.enableChecklist === true,
+        dynamicQrSupported: attempt.instructions?.dynamicQrSupported === true,
+        amountPrefillSupported: attempt.instructions?.amountPrefillSupported === true,
+        referenceSupported: attempt.instructions?.referenceSupported === true,
+        galleryScanSupported: attempt.instructions?.galleryScanSupported === true,
+        receiptUploadEnabled: attempt.instructions?.receiptUploadEnabled !== false,
+        slipRequired: attempt.instructions?.slipRequired !== false,
+        appDisplayName: attempt.instructions?.appDisplayName || "",
+        appLaunchMode: attempt.instructions?.appLaunchMode || "",
+        iosAppLaunchUrl: attempt.instructions?.iosAppLaunchUrl || "",
+        androidAppLaunchUrl: attempt.instructions?.androidAppLaunchUrl || "",
+        appStoreFallbackUrl: attempt.instructions?.appStoreFallbackUrl || "",
+        playStoreFallbackUrl: attempt.instructions?.playStoreFallbackUrl || "",
+        checklistSteps: Array.isArray(attempt.instructions?.checklistSteps) ? attempt.instructions.checklistSteps : [],
+        dynamicQr: attempt.instructions?.dynamicQr || null
     };
 
     return {
@@ -139,6 +157,24 @@ function publicManualAttempt(attempt) {
         productName: attempt.productName,
         packageName: attempt.packageName,
         paymentMethod: attempt.paymentMethod,
+        qrMode: instructions.qrMode,
+        enableSaveQr: instructions.enableSaveQr,
+        enableOpenApp: instructions.enableOpenApp,
+        enableChecklist: instructions.enableChecklist,
+        dynamicQrSupported: instructions.dynamicQrSupported,
+        amountPrefillSupported: instructions.amountPrefillSupported,
+        referenceSupported: instructions.referenceSupported,
+        galleryScanSupported: instructions.galleryScanSupported,
+        receiptUploadEnabled: instructions.receiptUploadEnabled,
+        slipRequired: instructions.slipRequired,
+        appDisplayName: instructions.appDisplayName,
+        appLaunchMode: instructions.appLaunchMode,
+        iosAppLaunchUrl: instructions.iosAppLaunchUrl,
+        androidAppLaunchUrl: instructions.androidAppLaunchUrl,
+        appStoreFallbackUrl: instructions.appStoreFallbackUrl,
+        playStoreFallbackUrl: instructions.playStoreFallbackUrl,
+        checklistSteps: instructions.checklistSteps,
+        dynamicQr: instructions.dynamicQr,
         instructions,
         order: manualAttemptOrderSnapshot(attempt)
     };
@@ -401,6 +437,7 @@ async function createOrderFromManualAttempt(attempt, evidence, username) {
         transactionId: "",
         paymentProvider: attempt.provider || "manual",
         manualPaymentAttemptId: attempt.attemptId,
+        manualPaymentQr: attempt.instructions?.dynamicQr || {},
         note: "Payment slip uploaded. Waiting for admin verification.",
         timeline: [{
             status: ORDER_STATES.PENDING_PAYMENT,
@@ -754,7 +791,29 @@ router.post("/payment/manual/attempt", authMiddleware, manualAttemptLimiter, asy
                 key: instructions.key,
                 accountName: instructions.accountName,
                 accountNumber: instructions.accountNumber,
-                qrImage: instructions.qrImage
+                qrImage: instructions.qrImage,
+                qrMode: instructions.qrMode,
+                enableSaveQr: instructions.enableSaveQr,
+                enableOpenApp: instructions.enableOpenApp,
+                enableChecklist: instructions.enableChecklist,
+                dynamicQrSupported: instructions.dynamicQrSupported,
+                amountPrefillSupported: instructions.amountPrefillSupported,
+                referenceSupported: instructions.referenceSupported,
+                galleryScanSupported: instructions.galleryScanSupported,
+                receiptUploadEnabled: instructions.receiptUploadEnabled,
+                slipRequired: instructions.slipRequired,
+                appDisplayName: instructions.appDisplayName,
+                appLaunchMode: instructions.appLaunchMode,
+                iosAppLaunchUrl: instructions.iosAppLaunchUrl,
+                androidAppLaunchUrl: instructions.androidAppLaunchUrl,
+                appStoreFallbackUrl: instructions.appStoreFallbackUrl,
+                playStoreFallbackUrl: instructions.playStoreFallbackUrl,
+                checklistSteps: instructions.checklistSteps,
+                dynamicQr: {
+                    orderReference: reference,
+                    qrPayload: "",
+                    expiresAt: null
+                }
             }
         });
         reservedRedemption = null;
@@ -845,6 +904,14 @@ router.post("/payment/manual/attempt/:attemptId/slip", authMiddleware, upload.si
                 success: false,
                 code: "MANUAL_PAYMENT_ATTEMPT_EXPIRED",
                 message: "Payment attempt expired. Please start again."
+            });
+        }
+
+        if (attempt.instructions?.qrMode === "aziel_promptpay_dynamic" && !attempt.instructions?.dynamicQr?.qrPayload) {
+            return res.status(400).json({
+                success: false,
+                code: "MANUAL_DYNAMIC_QR_REQUIRED",
+                message: "Please generate the payment QR before uploading a receipt."
             });
         }
 

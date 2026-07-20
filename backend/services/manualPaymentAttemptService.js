@@ -41,6 +41,7 @@ function normalizePaymentKey(value) {
 }
 
 function projectPaymentInstructions(method = {}, reference = "") {
+    const dynamicQr = method.qrMode === "aziel_promptpay_dynamic";
     return {
         method: formatPaymentMethod(method, method.method || "Payment"),
         key: method.key || "",
@@ -48,12 +49,31 @@ function projectPaymentInstructions(method = {}, reference = "") {
         provider: method.provider || "manual",
         accountName: method.accountName || "",
         accountNumber: method.accountNumber || "",
-        qrImage:
+        qrImage: dynamicQr
+            ? ""
+            :
             method.uploadedQrImage ||
             method.qrImageUrl ||
             method.qrImage ||
             "",
-        reference
+        reference,
+        qrMode: method.qrMode || "uploaded_static",
+        enableSaveQr: method.enableSaveQr === true,
+        enableOpenApp: method.enableOpenApp === true,
+        enableChecklist: method.enableChecklist === true,
+        dynamicQrSupported: method.dynamicQrSupported === true,
+        amountPrefillSupported: method.amountPrefillSupported === true,
+        referenceSupported: method.referenceSupported === true,
+        galleryScanSupported: method.galleryScanSupported === true,
+        receiptUploadEnabled: method.receiptUploadEnabled !== false,
+        slipRequired: method.slipRequired !== false,
+        appDisplayName: method.appDisplayName || "",
+        appLaunchMode: method.appLaunchMode || "OFFICIAL_PAYMENT_DEEPLINK",
+        iosAppLaunchUrl: method.iosAppLaunchUrl || "",
+        androidAppLaunchUrl: method.androidAppLaunchUrl || "",
+        appStoreFallbackUrl: method.appStoreFallbackUrl || method.appStoreUrl || "",
+        playStoreFallbackUrl: method.playStoreFallbackUrl || method.playStoreUrl || "",
+        checklistSteps: Array.isArray(method.checklistSteps) ? method.checklistSteps : []
     };
 }
 
