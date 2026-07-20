@@ -136,6 +136,7 @@ const manualPaymentAttemptSchema = new mongoose.Schema(
             },
             dynamicQr: {
                 orderReference: { type: String, default: "" },
+                encodedReference: { type: String, default: "" },
                 qrPayload: { type: String, default: "" },
                 expiresAt: { type: Date, default: null }
             }

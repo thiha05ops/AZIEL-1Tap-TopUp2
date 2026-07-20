@@ -107,14 +107,31 @@ function validateCurrency(currency) {
     }
 }
 
-function buildPromptPayPayload({ recipientType, recipientValue, amount }) {
+function normalizePromptPayReference(value = "") {
+    const normalized = String(value || "")
+        .toUpperCase()
+        .replace(/[^A-Z0-9-]/g, "")
+        .replace(/-+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 95);
+    if (!normalized) {
+        throw Object.assign(new Error("PromptPay reference is required"), {
+            code: "PROMPTPAY_REFERENCE_INVALID"
+        });
+    }
+    return normalized;
+}
+
+function buildPromptPayPayload({ recipientType, recipientValue, amount, orderReference }) {
     const recipient = normalizePromptPayRecipient(recipientType, recipientValue);
     const normalizedAmount = normalizeAmount(amount);
+    const encodedReference = normalizePromptPayReference(orderReference);
 
     const merchantAccountInfo = [
         emv("00", "A000000677010111"),
         emv(recipient.proxyTag, recipient.proxyValue)
     ].join("");
+    const additionalData = emv("05", encodedReference);
 
     const payloadWithoutCrc = [
         emv("00", "01"),
@@ -123,6 +140,7 @@ function buildPromptPayPayload({ recipientType, recipientValue, amount }) {
         emv("58", "TH"),
         emv("53", "764"),
         emv("54", normalizedAmount.toFixed(2)),
+        emv("62", additionalData),
         "6304"
     ].join("");
 
@@ -173,6 +191,8 @@ function fieldValue(fields, id) {
 function decodePromptPayPayload(payload = "") {
     const fields = parseEmvPayload(payload);
     const merchantInfo = parseEmvPayload(fieldValue(fields, "29"));
+    const additionalDataRaw = fieldValue(fields, "62");
+    const additionalData = additionalDataRaw ? parseEmvPayload(additionalDataRaw) : [];
     const amountText = fieldValue(fields, "54");
     const amount = amountText ? Number(amountText) : null;
     return {
@@ -188,6 +208,9 @@ function decodePromptPayPayload(payload = "") {
         amountText,
         amount,
         country: fieldValue(fields, "58"),
+        additionalData: {
+            referenceLabel: fieldValue(additionalData, "05")
+        },
         crc: fieldValue(fields, "63"),
         crcValid: validatePromptPayPayloadCrc(payload)
     };
@@ -203,16 +226,19 @@ function validatePromptPayPayloadCrc(payload = "") {
 async function createPromptPayQr({ method, amount, currency, orderReference }) {
     validateCurrency(currency);
     const normalizedAmount = normalizeAmount(amount);
+    const encodedReference = normalizePromptPayReference(orderReference);
     const qrPayload = buildPromptPayPayload({
         recipientType: method.promptPayRecipientType,
         recipientValue: method.promptPayRecipientValue,
-        amount: normalizedAmount
+        amount: normalizedAmount,
+        orderReference: encodedReference
     });
     const decodedPayload = decodePromptPayPayload(qrPayload);
     if (
         decodedPayload.amountText !== normalizedAmount.toFixed(2) ||
         decodedPayload.currency !== "764" ||
         decodedPayload.country !== "TH" ||
+        decodedPayload.additionalData.referenceLabel !== encodedReference ||
         decodedPayload.crcValid !== true
     ) {
         throw Object.assign(new Error("Generated PromptPay QR payload failed validation"), {
@@ -238,6 +264,7 @@ async function createPromptPayQr({ method, amount, currency, orderReference }) {
         amount: normalizedAmount,
         currency: "THB",
         orderReference: String(orderReference || ""),
+        encodedReference,
         qrPayload,
         encodedAmount: decodedPayload.amountText,
         decodedPayload,
@@ -297,6 +324,7 @@ module.exports = {
     decodePromptPayPayload,
     maskPromptPayRecipient,
     normalizeAmount,
+    normalizePromptPayReference,
     normalizePromptPayRecipient,
     qrImageMatchesPayload,
     validatePromptPayPayloadCrc

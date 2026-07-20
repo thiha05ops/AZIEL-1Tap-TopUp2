@@ -7,13 +7,14 @@ const {
     buildPromptPayPayload,
     createPromptPayQr,
     decodePromptPayPayload,
+    normalizePromptPayReference,
     normalizePromptPayRecipient,
     qrImageMatchesPayload,
     validatePromptPayPayloadCrc
 } = require("../services/promptPayQrService");
 const { paymentMethodReadiness } = require("../services/paymentProviderRegistry");
 
-const TRUSTED_PROMPTPAY_GOLDEN_VECTOR = "00020101021229370016A000000677010111011300668123456785802TH530376454071490.006304C4F9";
+const REFERENCED_PROMPTPAY_GOLDEN_VECTOR = "00020101021229370016A000000677010111011300668123456785802TH530376454071490.0062200516AZL-20260721-00163041D64";
 
 function read(file) {
     return fs.readFileSync(path.join(ROOT, file), "utf8");
@@ -98,26 +99,30 @@ async function verifyQrPayload() {
     const payloadA = buildPromptPayPayload({
         recipientType: "PHONE",
         recipientValue: "0812345678",
-        amount: 1490
+        amount: 1490,
+        orderReference: "AZL-20260721-001"
     });
     const payloadB = buildPromptPayPayload({
         recipientType: "PHONE",
         recipientValue: "0812345678",
-        amount: 1491
+        amount: 1491,
+        orderReference: "AZL-20260721-001"
     });
 
     assert.notStrictEqual(payloadA, payloadB, "QR payload must change when amount changes.");
-    assert.strictEqual(payloadA, TRUSTED_PROMPTPAY_GOLDEN_VECTOR, "PromptPay payload must match promptpay-qr@0.5.0 trusted golden vector byte-for-byte.");
-    assert.deepStrictEqual(topLevelTagOrder(payloadA), ["00", "01", "29", "58", "53", "54", "63"], "PromptPay top-level tag order must match trusted promptpay-qr@0.5.0 output.");
+    assert.strictEqual(payloadA, REFERENCED_PROMPTPAY_GOLDEN_VECTOR, "PromptPay payload must match the reference-bearing AZIEL golden vector byte-for-byte.");
+    assert.deepStrictEqual(topLevelTagOrder(payloadA), ["00", "01", "29", "58", "53", "54", "62", "63"], "PromptPay top-level tag order must include Additional Data before CRC.");
     assert(payloadA.includes("0066812345678"), "QR payload must contain the configured normalized PromptPay recipient.");
     assert(payloadA.includes("54071490.00"), "QR payload must contain amount field.");
+    assert(payloadA.includes("62200516AZL-20260721-001"), "QR payload must contain Additional Data Field Template tag 62 with subtag 05 reference label.");
     assert(validatePromptPayPayloadCrc(payloadA), "QR payload CRC must be valid.");
-    assert.strictEqual(decodedCrc(payloadA), "C4F9", "PromptPay golden vector CRC must match trusted promptpay-qr@0.5.0 output.");
+    assert.strictEqual(decodedCrc(payloadA), "1D64", "PromptPay reference-bearing golden vector CRC must match expected output.");
     const decodedA = decodePromptPayPayload(payloadA);
     assert.strictEqual(decodedA.amountText, "1490.00", "Decoded QR payload must contain the exact expected amount.");
     assert.strictEqual(decodedA.amount, 1490, "Decoded QR amount must match finalized amount.");
     assert.strictEqual(decodedA.currency, "764", "Decoded QR currency must be Thai Baht numeric code.");
     assert.strictEqual(decodedA.country, "TH", "Decoded QR country must be Thailand.");
+    assert.strictEqual(decodedA.additionalData.referenceLabel, "AZL-20260721-001", "Decoded QR additional data reference label must match server-owned AZIEL reference.");
     assert.strictEqual(decodedA.merchantAccountInfo.applicationId, "A000000677010111", "Decoded QR must use PromptPay AID.");
     assert.strictEqual(decodedA.merchantAccountInfo.proxyTag, "01", "Phone PromptPay recipient must be encoded directly in merchant subtag 01.");
     assert.strictEqual(decodedA.merchantAccountInfo.proxyValue, "0066812345678", "Decoded QR recipient must match configured recipient.");
@@ -130,26 +135,30 @@ async function verifyQrPayload() {
         proxyTag: "01",
         proxyValue: "0066812345678"
     });
+    assert.strictEqual(normalizePromptPayReference("azl-20260721-001!!"), "AZL-20260721-001", "PromptPay reference normalization must preserve compact AZIEL reference safely.");
 
     const result = await createPromptPayQr({
         method: validDynamicMethod(),
         amount: "1490.00",
         currency: "THB",
-        orderReference: "AZL-TEST"
+        orderReference: "AZL-20260721-001"
     });
     assert(result.qrImage.startsWith("data:image/png;base64,"), "QR image must be generated server-side as a data URL.");
-    assert.strictEqual(result.orderReference, "AZL-TEST");
+    assert.strictEqual(result.orderReference, "AZL-20260721-001");
+    assert.strictEqual(result.encodedReference, "AZL-20260721-001", "Backend QR result must expose safe encoded reference metadata.");
     assert.strictEqual(result.amount, 1490, "Backend QR result must preserve finalized amount unchanged.");
     assert.strictEqual(result.encodedAmount, "1490.00", "Backend QR result must expose decoded encoded amount.");
-    assert.strictEqual(result.qrPayload, TRUSTED_PROMPTPAY_GOLDEN_VECTOR, "Generated QR response payload must match trusted golden vector byte-for-byte.");
+    assert.strictEqual(result.qrPayload, REFERENCED_PROMPTPAY_GOLDEN_VECTOR, "Generated QR response payload must match reference-bearing golden vector byte-for-byte.");
     assert.strictEqual(decodePromptPayPayload(result.qrPayload).amountText, "1490.00", "Generated QR must decode to expected amount before return.");
+    assert.strictEqual(decodePromptPayPayload(result.qrPayload).additionalData.referenceLabel, "AZL-20260721-001", "Generated QR must decode to expected reference before return.");
     assert.strictEqual(result.qrImagePayloadMatches, true, "Backend QR result must prove returned QR image matches qrPayload.");
     assert.strictEqual(qrImageMatchesPayload(result.qrImage, result.qrPayload), true, "Verifier must inspect generated QR image pixels and match them to qrPayload.");
 
     assertThrowsCode(() => buildPromptPayPayload({
         recipientType: "PHONE",
         recipientValue: "0812345678",
-        amount: "10.123"
+        amount: "10.123",
+        orderReference: "AZL-20260721-001"
     }), "PROMPTPAY_AMOUNT_INVALID", "Invalid amount must be rejected.");
 }
 
@@ -179,11 +188,16 @@ function verifyBackendRoute() {
     const route = read("backend/routes/paymentMethods.js");
     includes("backend/routes/paymentMethods.js", 'router.post("/payment-methods/:key/promptpay-qr"', "dynamic PromptPay endpoint must exist.");
     includes("backend/routes/paymentMethods.js", "PaymentMethod.findOne", "endpoint must resolve PaymentMethod from database.");
+    includes("backend/routes/paymentMethods.js", "ManualPaymentAttempt.findOne", "endpoint must resolve server-owned manual payment attempt.");
     includes("backend/routes/paymentMethods.js", "createPromptPayQr({", "endpoint must use centralized QR service.");
-    includes("backend/routes/paymentMethods.js", "req.body.amount", "endpoint must accept amount.");
-    includes("backend/routes/paymentMethods.js", "req.body.currency", "endpoint must validate currency through QR service.");
-    includes("backend/routes/paymentMethods.js", "req.body.orderReference", "endpoint must require generated order reference.");
+    includes("backend/routes/paymentMethods.js", "orderReference: attempt.reference", "endpoint must encode server-owned attempt reference, not arbitrary browser reference.");
+    includes("backend/routes/paymentMethods.js", "amount: attempt.finalAmount || attempt.canonicalAmount || req.body.amount", "endpoint must prefer server-owned finalized amount.");
+    includes("backend/routes/paymentMethods.js", "currency: attempt.canonicalCurrency || req.body.currency", "endpoint must prefer server-owned currency.");
+    includes("backend/routes/paymentMethods.js", "\"instructions.dynamicQr.encodedReference\": result.encodedReference", "endpoint must snapshot encoded reference onto attempt.");
+    includes("backend/models/ManualPaymentAttempt.js", "encodedReference", "ManualPaymentAttempt must persist encoded QR reference.");
+    includes("backend/models/Order.js", "encodedReference", "Order manualPaymentQr snapshot must persist encoded QR reference.");
     assert(!/promptPayRecipient(Value|Type)\s*:\s*req\.body/.test(route), "endpoint must not accept PromptPay recipient from client input.");
+    assert(!/orderReference:\s*req\.body\.orderReference/.test(route), "endpoint must not pass browser-supplied reference into QR payload generation.");
 }
 
 function verifyFrontendFlow() {

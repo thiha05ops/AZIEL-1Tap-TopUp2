@@ -724,11 +724,26 @@ router.post("/payment-methods/:key/promptpay-qr", authMiddleware, async (req, re
             });
         }
 
+        const attempt = await ManualPaymentAttempt.findOne({
+            reference: String(req.body.orderReference || "").trim(),
+            username: req.user.username,
+            status: "active",
+            paymentMethod: method.key
+        });
+
+        if (!attempt) {
+            return res.status(400).json({
+                success: false,
+                code: "PROMPTPAY_REFERENCE_INVALID",
+                message: "Payment reference is unavailable."
+            });
+        }
+
         const result = await createPromptPayQr({
             method,
-            amount: req.body.amount,
-            currency: req.body.currency,
-            orderReference: req.body.orderReference
+            amount: attempt.finalAmount || attempt.canonicalAmount || req.body.amount,
+            currency: attempt.canonicalCurrency || req.body.currency,
+            orderReference: attempt.reference
         });
 
         await ManualPaymentAttempt.updateOne(
@@ -741,6 +756,7 @@ router.post("/payment-methods/:key/promptpay-qr", authMiddleware, async (req, re
             {
                 $set: {
                     "instructions.dynamicQr.orderReference": result.orderReference,
+                    "instructions.dynamicQr.encodedReference": result.encodedReference,
                     "instructions.dynamicQr.qrPayload": result.qrPayload,
                     "instructions.dynamicQr.expiresAt": new Date(result.expiresAt)
                 }

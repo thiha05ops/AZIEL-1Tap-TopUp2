@@ -163,6 +163,7 @@ const orderSchema = new mongoose.Schema({
 
     manualPaymentQr: {
         orderReference: { type: String, default: "" },
+        encodedReference: { type: String, default: "" },
         qrPayload: { type: String, default: "" },
         expiresAt: { type: Date, default: null }
     },
