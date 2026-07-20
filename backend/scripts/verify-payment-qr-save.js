@@ -27,7 +27,8 @@ function verifySharedQrSaver() {
     includes(file, "getQrProxyUrl(options)", "cross-origin failures must fall back to the same-origin QR proxy.");
     includes(file, "QR ready to save", "successful save/share initiation must provide clear feedback.");
     includes(file, "Could not save QR. Long-press the image to save.", "Save QR failure must provide fallback guidance.");
-    includes(file, "onSuccess: () => updateChecklist(\"save_qr\")", "save_qr checklist must update only after save/share initiation.");
+    includes(file, "updateChecklist(\"save_qr\")", "save_qr checklist must update only after save/share initiation.");
+    includes(file, "activeQr.sourceType === \"dynamic_response\"", "dynamic save_qr checklist must only complete for the active dynamic response QR.");
     notMatches(file, /window\.open\(/, "Save QR must never use window.open.");
     notMatches(file, /anchor\.href\s*=\s*href[\s\S]{0,120}anchor\.download/, "Save QR must not download directly from the remote QR URL.");
 }

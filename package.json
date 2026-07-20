@@ -79,6 +79,7 @@
     "verify:payment-provider-integrity": "node backend/scripts/verify-payment-provider-integrity.js",
     "verify:payment-methods-admin-ux": "node backend/scripts/verify-payment-methods-admin-ux.js",
     "verify:payment-qr-mode-integrity": "node backend/scripts/verify-payment-qr-mode-integrity.js",
+    "verify:payment-qr-save-source": "node backend/scripts/verify-payment-qr-save-source.js",
     "verify:payment-qr-save": "node backend/scripts/verify-payment-qr-save.js",
     "verify:manual-dynamic-promptpay-flow": "node backend/scripts/verify-manual-dynamic-promptpay-flow.js",
     "verify:payment-frontend-capability-flow": "node backend/scripts/verify-payment-frontend-capability-flow.js",

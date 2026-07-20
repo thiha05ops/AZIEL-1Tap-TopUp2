@@ -47,12 +47,12 @@ function main() {
 
     includes("frontend/js/payment/payment-checkout-sheet.js", 'function isDynamicPromptPayMode', "Checkout must have explicit dynamic QR mode ownership.");
     includes("frontend/js/payment/payment-checkout-sheet.js", 'return isDynamicPromptPayMode(options);', "Dynamic mode should be driven by qrMode, not by static QR availability.");
-    includes("frontend/js/payment/payment-checkout-sheet.js", 'setQrImage(data.qrImage, "dynamic_response")', "Dynamic endpoint response image must be the rendered QR image.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", 'setQrImage(data.qrImage, "dynamic_response", data.qrPayload)', "Dynamic endpoint response image must be the rendered QR image.");
     includes("frontend/js/payment/payment-checkout-sheet.js", 'renderedQrSourceType(options, qr)', "Checkout must track rendered QR source type.");
     includes("frontend/js/payment/payment-checkout-sheet.js", 'dev: qrMode=${options.qrMode || "unknown"}; source=${sourceType || "none"}', "Development diagnostic must show qrMode and rendered source type.");
     const qrSelection = checkout.match(/const qr = dynamicQr\s*\?\s*([\s\S]*?)\s*:\s*([\s\S]*?);/);
     assert(qrSelection, "Checkout must have an explicit dynamic/static QR selection branch.");
-    assert(qrSelection[1].includes('normalizeUrl(restored.qrImageUrl || "")'), "Dynamic checkout may only restore a validated dynamic QR image.");
+    assert.strictEqual(qrSelection[1].trim(), '""', "Dynamic checkout must start empty and wait for the latest generated QR response.");
     assert(!qrSelection[1].includes("options.qrImageUrl") && !qrSelection[1].includes("options.qrImage"), "Dynamic QR branch must not fall back to uploaded static qrImageUrl.");
     assert(qrSelection[2].includes("options.qrImageUrl || options.qrImage"), "Static/provider QR branch must continue to support configured QR images.");
     includes("frontend/js/payment/payment-checkout-sheet.js", 'setQrLoading(false, error.message || "Could not generate PromptPay QR.")', "Dynamic QR failure must show retry/error state.");
