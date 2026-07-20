@@ -6,6 +6,7 @@ const ROOT = path.resolve(__dirname, "../..");
 const {
     buildPromptPayPayload,
     createPromptPayQr,
+    decodePromptPayPayload,
     normalizePromptPayRecipient,
     validatePromptPayPayloadCrc
 } = require("../services/promptPayQrService");
@@ -84,11 +85,21 @@ async function verifyQrPayload() {
     assert(payloadA.includes("0066812345678"), "QR payload must contain the configured normalized PromptPay recipient.");
     assert(payloadA.includes("54071490.00"), "QR payload must contain amount field.");
     assert(validatePromptPayPayloadCrc(payloadA), "QR payload CRC must be valid.");
+    const decodedA = decodePromptPayPayload(payloadA);
+    assert.strictEqual(decodedA.amountText, "1490.00", "Decoded QR payload must contain the exact expected amount.");
+    assert.strictEqual(decodedA.amount, 1490, "Decoded QR amount must match finalized amount.");
+    assert.strictEqual(decodedA.currency, "764", "Decoded QR currency must be Thai Baht numeric code.");
+    assert.strictEqual(decodedA.country, "TH", "Decoded QR country must be Thailand.");
+    assert.strictEqual(decodedA.merchantAccountInfo.applicationId, "A000000677010111", "Decoded QR must use PromptPay AID.");
+    assert.strictEqual(decodedA.merchantAccountInfo.proxyTag, "01", "Phone PromptPay recipient must be encoded directly in merchant subtag 01.");
+    assert.strictEqual(decodedA.merchantAccountInfo.proxyValue, "0066812345678", "Decoded QR recipient must match configured recipient.");
+    assert.strictEqual(decodedA.crcValid, true, "Decoded QR CRC must be valid.");
+    assert(!payloadA.includes("01020102130066812345678"), "PromptPay merchant account info must not encode a separate proxy type field before the phone.");
 
     const recipient = normalizePromptPayRecipient("PHONE", "0812345678");
     assert.deepStrictEqual(recipient, {
         recipientType: "PHONE",
-        proxyType: "01",
+        proxyTag: "01",
         proxyValue: "0066812345678"
     });
 
@@ -100,6 +111,9 @@ async function verifyQrPayload() {
     });
     assert(result.qrImage.startsWith("data:image/png;base64,"), "QR image must be generated server-side as a data URL.");
     assert.strictEqual(result.orderReference, "AZL-TEST");
+    assert.strictEqual(result.amount, 1490, "Backend QR result must preserve finalized amount unchanged.");
+    assert.strictEqual(result.encodedAmount, "1490.00", "Backend QR result must expose decoded encoded amount.");
+    assert.strictEqual(decodePromptPayPayload(result.qrPayload).amountText, "1490.00", "Generated QR must decode to expected amount before return.");
 
     assertThrowsCode(() => buildPromptPayPayload({
         recipientType: "PHONE",

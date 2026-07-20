@@ -49,7 +49,7 @@ function normalizePromptPayRecipient(type, value) {
         }
         return {
             recipientType,
-            proxyType: "01",
+            proxyTag: "01",
             proxyValue: `0066${phone.slice(1)}`
         };
     }
@@ -62,7 +62,7 @@ function normalizePromptPayRecipient(type, value) {
         }
         return {
             recipientType,
-            proxyType: "02",
+            proxyTag: "02",
             proxyValue: digits
         };
     }
@@ -112,8 +112,7 @@ function buildPromptPayPayload({ recipientType, recipientValue, amount }) {
 
     const merchantAccountInfo = [
         emv("00", "A000000677010111"),
-        emv("01", recipient.proxyType),
-        emv("02", recipient.proxyValue)
+        emv(recipient.proxyTag, recipient.proxyValue)
     ].join("");
 
     const payloadWithoutCrc = [
@@ -127,6 +126,70 @@ function buildPromptPayPayload({ recipientType, recipientValue, amount }) {
     ].join("");
 
     return `${payloadWithoutCrc}${crc16Ccitt(payloadWithoutCrc)}`;
+}
+
+function parseEmvPayload(payload = "") {
+    const text = String(payload || "");
+    const fields = [];
+    let index = 0;
+
+    while (index + 4 <= text.length) {
+        const id = text.slice(index, index + 2);
+        const length = Number(text.slice(index + 2, index + 4));
+        if (!/^\d{2}$/.test(id) || !Number.isFinite(length) || length < 0) {
+            throw Object.assign(new Error("Invalid EMV payload"), {
+                code: "PROMPTPAY_PAYLOAD_INVALID"
+            });
+        }
+        const valueStart = index + 4;
+        const valueEnd = valueStart + length;
+        if (valueEnd > text.length) {
+            throw Object.assign(new Error("Invalid EMV payload length"), {
+                code: "PROMPTPAY_PAYLOAD_INVALID"
+            });
+        }
+        fields.push({
+            id,
+            length,
+            value: text.slice(valueStart, valueEnd)
+        });
+        index = valueEnd;
+    }
+
+    if (index !== text.length) {
+        throw Object.assign(new Error("Invalid EMV payload trailing data"), {
+            code: "PROMPTPAY_PAYLOAD_INVALID"
+        });
+    }
+
+    return fields;
+}
+
+function fieldValue(fields, id) {
+    return fields.find(field => field.id === id)?.value || "";
+}
+
+function decodePromptPayPayload(payload = "") {
+    const fields = parseEmvPayload(payload);
+    const merchantInfo = parseEmvPayload(fieldValue(fields, "29"));
+    const amountText = fieldValue(fields, "54");
+    const amount = amountText ? Number(amountText) : null;
+    return {
+        payloadFormatIndicator: fieldValue(fields, "00"),
+        pointOfInitiationMethod: fieldValue(fields, "01"),
+        merchantAccountInfo: {
+            applicationId: fieldValue(merchantInfo, "00"),
+            proxyType: merchantInfo.some(field => field.id === "01") ? "PHONE" : "NATIONAL_ID_OR_TAX_ID",
+            proxyTag: merchantInfo.find(field => field.id === "01" || field.id === "02")?.id || "",
+            proxyValue: merchantInfo.find(field => field.id === "01" || field.id === "02")?.value || ""
+        },
+        currency: fieldValue(fields, "53"),
+        amountText,
+        amount,
+        country: fieldValue(fields, "58"),
+        crc: fieldValue(fields, "63"),
+        crcValid: validatePromptPayPayloadCrc(payload)
+    };
 }
 
 function validatePromptPayPayloadCrc(payload = "") {
@@ -144,6 +207,17 @@ async function createPromptPayQr({ method, amount, currency, orderReference }) {
         recipientValue: method.promptPayRecipientValue,
         amount: normalizedAmount
     });
+    const decodedPayload = decodePromptPayPayload(qrPayload);
+    if (
+        decodedPayload.amountText !== normalizedAmount.toFixed(2) ||
+        decodedPayload.currency !== "764" ||
+        decodedPayload.country !== "TH" ||
+        decodedPayload.crcValid !== true
+    ) {
+        throw Object.assign(new Error("Generated PromptPay QR payload failed validation"), {
+            code: "PROMPTPAY_PAYLOAD_INVALID"
+        });
+    }
     const qrImage = await QRCode.toDataURL(qrPayload, {
         errorCorrectionLevel: "M",
         margin: 1,
@@ -158,6 +232,7 @@ async function createPromptPayQr({ method, amount, currency, orderReference }) {
         currency: "THB",
         orderReference: String(orderReference || ""),
         qrPayload,
+        encodedAmount: decodedPayload.amountText,
         qrImage,
         expiresAt: expiresAt.toISOString()
     };
@@ -168,6 +243,7 @@ module.exports = {
     buildPromptPayPayload,
     createPromptPayQr,
     crc16Ccitt,
+    decodePromptPayPayload,
     maskPromptPayRecipient,
     normalizeAmount,
     normalizePromptPayRecipient,
