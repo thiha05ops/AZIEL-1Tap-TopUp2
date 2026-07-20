@@ -48,6 +48,7 @@
                         <img id="azPaymentSheetQrImage" alt="Payment QR">
                         <figcaption id="azPaymentSheetQrFallback" hidden>QR image unavailable. Use the account details above.</figcaption>
                         <button type="button" id="azPaymentSheetRetryQr" class="az-payment-sheet__action" hidden>Retry QR</button>
+                        <small id="azPaymentSheetQrDiagnostic" hidden></small>
                     </figure>
 
                     <div id="azPaymentSheetActions" class="az-payment-sheet__actions" hidden>
@@ -144,11 +145,36 @@
         return value === true || value === "true";
     }
 
+    function isDynamicPromptPayMode(options = {}) {
+        return options.qrMode === "aziel_promptpay_dynamic";
+    }
+
     function shouldGenerateDynamicPromptPay(options = {}) {
-        return options.qrMode === "aziel_promptpay_dynamic" &&
-            bool(options.dynamicQrSupported) &&
-            bool(options.amountPrefillSupported) &&
-            options.currency === "THB";
+        return isDynamicPromptPayMode(options);
+    }
+
+    function renderedQrSourceType(options = {}, qr = "") {
+        if (isDynamicPromptPayMode(options)) return qr ? "dynamic_response" : "";
+        if (options.qrMode === "uploaded_static" && qr) return "uploaded_static";
+        if (options.qrMode === "provider_generated" && qr) return "provider_generated";
+        return "";
+    }
+
+    function isDevelopmentHost() {
+        const host = window.location.hostname;
+        return host === ["local", "host"].join("") || host === ["127", "0", "0", "1"].join(".");
+    }
+
+    function setQrDiagnostic(options = {}, sourceType = "") {
+        const el = document.getElementById("azPaymentSheetQrDiagnostic");
+        if (!el) return;
+        if (!isDevelopmentHost()) {
+            el.hidden = true;
+            el.textContent = "";
+            return;
+        }
+        el.textContent = `dev: qrMode=${options.qrMode || "unknown"}; source=${sourceType || "none"}`;
+        el.hidden = false;
     }
 
     function checkoutStorageKey(options = {}) {
@@ -517,9 +543,10 @@
         qrFallback.hidden = false;
         qrFallback.textContent = message || (isLoading ? "Generating Dynamic PromptPay QR..." : "QR image unavailable. Use the account details above.");
         if (retry) retry.hidden = isLoading;
+        setQrDiagnostic(activeState || {}, "");
     }
 
-    function setQrImage(qr) {
+    function setQrImage(qr, sourceType = "") {
         const modal = document.getElementById("azPaymentCheckoutSheet");
         const qrWrap = modal?.querySelector("#azPaymentSheetQrWrap");
         const qrImg = modal?.querySelector("#azPaymentSheetQrImage");
@@ -541,6 +568,7 @@
         };
         if (qrFallback) qrFallback.hidden = true;
         if (retry) retry.hidden = true;
+        setQrDiagnostic(activeState || {}, sourceType);
         qrWrap.hidden = false;
     }
 
@@ -582,7 +610,7 @@
                 expiresAt: data.expiresAt,
                 orderReference: data.orderReference
             };
-            setQrImage(data.qrImage);
+            setQrImage(data.qrImage, "dynamic_response");
             updateActionButtons(activeState);
             persistCheckoutState(activeState);
         } catch (error) {
@@ -713,6 +741,7 @@
         const qr = dynamicQr
             ? normalizeUrl(restored.qrImageUrl || "")
             : normalizeUrl(options.qrImageUrl || options.qrImage || restored.qrImageUrl || "");
+        const qrSourceType = renderedQrSourceType(options, qr);
         const submitLabel = options.submitLabel || (requiresSlip ? "Submit for Verification" : "Continue");
 
         activeState = {
@@ -753,7 +782,7 @@
             retryQr.onclick = () => generateDynamicQrForActiveState();
         }
 
-        if (qr) setQrImage(qr);
+        if (qr) setQrImage(qr, qrSourceType);
         else if (dynamicQr) setQrLoading(true);
         else modal.querySelector("#azPaymentSheetQrWrap").hidden = true;
 

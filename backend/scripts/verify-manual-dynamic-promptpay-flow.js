@@ -194,7 +194,7 @@ function verifyFrontendFlow() {
     includes("frontend/js/payment/payment-checkout-sheet.js", "sessionStorage.setItem", "checkout state must persist in sessionStorage.");
     includes("frontend/js/payment/payment-checkout-sheet.js", "sameCheckoutIdentity", "checkout restore must validate amount, method, currency, reference, and QR mode.");
     includes("frontend/js/payment/payment-checkout-sheet.js", "DYNAMIC_PROMPTPAY_QR_VERSION", "checkout restore must version-bust old dynamic QR payloads.");
-    includes("frontend/js/payment/payment-checkout-sheet.js", "setQrImage(data.qrImage)", "dynamic generation success must render the current response QR image.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "setQrImage(data.qrImage, \"dynamic_response\")", "dynamic generation success must render the current response QR image.");
     includes("frontend/js/payment/payment-checkout-sheet.js", "Please choose your payment receipt first.", "receipt remains required.");
     includes("frontend/js/payment/payment-checkout-sheet.js", "Please generate the payment QR before submitting your receipt.", "dynamic QR generation is required before submit.");
     includes("frontend/js/payment/payment-checkout-sheet.js", "window.PaymentQrSaver", "Save QR must reuse Blob/Web Share/download implementation.");

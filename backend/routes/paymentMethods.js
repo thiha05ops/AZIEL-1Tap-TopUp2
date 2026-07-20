@@ -365,7 +365,7 @@ function applyCompatibilityModes(method) {
     const provider = canonicalProviderForMethod(method);
     method.provider = provider;
 
-    if (key === "promptpay") {
+    if (key === "promptpay" && method.qrMode !== "aziel_promptpay_dynamic") {
         method.paymentType = "auto";
         method.qrMode = "provider_generated";
         method.slipRequired = false;
