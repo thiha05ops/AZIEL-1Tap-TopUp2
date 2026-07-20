@@ -88,6 +88,15 @@ function defaultProviderFor(region, paymentType) {
     return validProvidersFor(region, paymentType)[0]?.key || "";
 }
 
+function isEnabled(value) {
+    return value === true || value === "true";
+}
+
+function enabledChecklistUses(method = {}, action = "") {
+    return Array.isArray(method.checklistSteps) &&
+        method.checklistSteps.some(step => step?.action === action && step.enabled !== false && step.enabled !== "false");
+}
+
 function paymentMethodReadiness(method = {}) {
     const normalizedProvider = normalizeProviderKey(method.provider || method.key || "");
     const paymentType = String(method.paymentType || "manual").toLowerCase();
@@ -108,13 +117,29 @@ function paymentMethodReadiness(method = {}) {
     if (!String(method.accountName || "").trim()) missing.push("account name");
     if (!String(method.accountNumber || "").trim()) missing.push("account number");
 
-    const expectsQr = method.enableSaveQr === true || ["manual", "deeplink"].includes(paymentType);
+    const expectsQr = isEnabled(method.enableSaveQr) || ["manual", "deeplink"].includes(paymentType);
     const hasQr = Boolean(method.uploadedQrImage || method.qrImageUrl || method.qrImage || method.finalQrImage);
     if (expectsQr && !hasQr) missing.push("QR image");
 
-    if (method.enableOpenApp === true) {
+    const openAppChecklistEnabled = enabledChecklistUses(method, "open_app");
+    const openAppEnabled = isEnabled(method.enableOpenApp);
+    if (openAppChecklistEnabled && !openAppEnabled) missing.push("open app enabled");
+
+    if (openAppEnabled || openAppChecklistEnabled) {
         if (!String(method.appDisplayName || "").trim()) missing.push("app display name");
         if (!String(method.deepLinkUrl || "").trim()) missing.push("deep link URL");
+    }
+
+    if (["manual", "deeplink"].includes(paymentType)) {
+        if (method.receiptUploadEnabled === false || method.receiptUploadEnabled === "false") {
+            missing.push("receipt upload enabled");
+        }
+        if (method.slipRequired === false || method.slipRequired === "false") {
+            missing.push("slip required");
+        }
+        if (method.confirmationMode && method.confirmationMode !== "manual_admin") {
+            missing.push("manual admin confirmation mode");
+        }
     }
 
     return { ready: missing.length === 0, missing };

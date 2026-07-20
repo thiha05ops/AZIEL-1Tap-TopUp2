@@ -3,6 +3,9 @@ const fs = require("fs");
 const path = require("path");
 
 const ROOT = path.resolve(__dirname, "../..");
+const {
+    paymentMethodReadiness
+} = require("../services/paymentProviderRegistry");
 
 function read(relativePath) {
     return fs.readFileSync(path.join(ROOT, relativePath), "utf8");
@@ -105,12 +108,86 @@ function verifyWalletRendering() {
     includes("frontend/js/wallet.js", "provider === \"promptpay\"", "wallet top-up must recognize canonical PromptPay provider");
 }
 
+function validScbBase(overrides = {}) {
+    return {
+        method: "SCB",
+        key: "scb",
+        region: "TH",
+        paymentType: "deeplink",
+        provider: "scb",
+        accountName: "AZIEL",
+        accountNumber: "1234567890",
+        uploadedQrImage: "/uploads/payments/scb.png",
+        enableSaveQr: true,
+        enableChecklist: true,
+        enableOpenApp: false,
+        appDisplayName: "SCB EASY",
+        deepLinkUrl: "",
+        receiptUploadEnabled: true,
+        slipRequired: true,
+        confirmationMode: "manual_admin",
+        checklistSteps: [
+            { action: "save_qr", label: "Save QR", enabled: true, sortOrder: 10 },
+            { action: "upload_receipt", label: "Upload Receipt", enabled: true, sortOrder: 20 }
+        ],
+        ...overrides
+    };
+}
+
+function verifyReadinessRules() {
+    const staticQrNoOpenApp = paymentMethodReadiness(validScbBase());
+    assert.strictEqual(staticQrNoOpenApp.ready, true, "manual bank with Open App disabled and no deeplink must be public ready");
+    assert.deepStrictEqual(staticQrNoOpenApp.missing, [], "manual bank without Open App must not require deeplink");
+
+    const openAppNoDeeplink = paymentMethodReadiness(validScbBase({ enableOpenApp: true }));
+    assert.strictEqual(openAppNoDeeplink.ready, false, "manual bank with Open App enabled and no deeplink must not be public ready");
+    assert(openAppNoDeeplink.missing.includes("deep link URL"), "Open App enabled must require deep link URL");
+
+    const checklistOpenAppNoDeeplink = paymentMethodReadiness(validScbBase({
+        checklistSteps: [
+            { action: "save_qr", label: "Save QR", enabled: true, sortOrder: 10 },
+            { action: "open_app", label: "Open SCB EASY", enabled: true, sortOrder: 20 },
+            { action: "upload_receipt", label: "Upload Receipt", enabled: true, sortOrder: 30 }
+        ]
+    }));
+    assert.strictEqual(checklistOpenAppNoDeeplink.ready, false, "enabled open_app checklist step without deeplink must not be public ready");
+    assert(checklistOpenAppNoDeeplink.missing.includes("open app enabled"), "open_app checklist step must require enableOpenApp");
+    assert(checklistOpenAppNoDeeplink.missing.includes("deep link URL"), "open_app checklist step must require deep link URL");
+
+    const disabledChecklistOpenApp = paymentMethodReadiness(validScbBase({
+        checklistSteps: [
+            { action: "open_app", label: "Open SCB EASY", enabled: false, sortOrder: 20 },
+            { action: "upload_receipt", label: "Upload Receipt", enabled: true, sortOrder: 30 }
+        ]
+    }));
+    assert.strictEqual(disabledChecklistOpenApp.ready, true, "disabled open_app checklist step must not require deeplink");
+
+    const promptPay = paymentMethodReadiness({
+        method: "PromptPay",
+        key: "promptpay",
+        region: "TH",
+        paymentType: "auto",
+        provider: "promptpay"
+    });
+    assert.strictEqual(promptPay.ready, true, "PromptPay auto readiness must remain unchanged");
+
+    const wallet = paymentMethodReadiness({
+        method: "AZIEL Wallet",
+        key: "wallet",
+        region: "TH",
+        paymentType: "wallet",
+        provider: "wallet"
+    });
+    assert.strictEqual(wallet.ready, true, "Wallet readiness must remain unchanged");
+}
+
 function main() {
     verifyProviderRegistry();
     verifyBackendSeedAndProjection();
     verifyAdminProviderFiltering();
     verifyPublicRendering();
     verifyWalletRendering();
+    verifyReadinessRules();
     console.log("Payment provider integrity verification passed.");
 }
 
