@@ -75,6 +75,12 @@ async function loadDynamicPaymentMethods(region) {
 
             const card = document.createElement("div");
             card.className = `pay-card ${index === 0 ? "active" : ""}`;
+            card.__paymentMethod = normalizeSelectedRegionPayment(pay, {
+                key,
+                name,
+                logo,
+                qrImage
+            });
             card.dataset.method = key;
             card.dataset.name = name;
             card.dataset.qr = qrImage;
@@ -163,6 +169,9 @@ function isRegionPaymentMethodUsable(method = {}) {
 function selectPaymentCard(card) {
     const paymentMethod = document.getElementById("paymentMethod");
     if (!card || !paymentMethod) return;
+    const originalMethod = card.__paymentMethod && typeof card.__paymentMethod === "object"
+        ? card.__paymentMethod
+        : {};
 
     document
         .querySelectorAll(".pay-card")
@@ -173,35 +182,57 @@ function selectPaymentCard(card) {
     paymentMethod.value = card.dataset.method || "";
 
     window.selectedPaymentData = {
-        method: card.dataset.name || "Payment",
-        key: card.dataset.method || "",
-        logo: card.querySelector("img")?.getAttribute("src") || "",
-        qrImage: card.dataset.qr || "",
-        accountName: card.dataset.accountName || "",
-        accountNumber: card.dataset.accountNumber || "",
-        provider: card.dataset.provider || "manual",
-        paymentType: card.dataset.paymentType || "manual",
-        appDisplayName: card.dataset.appDisplayName || card.dataset.name || "",
-        deepLink: card.dataset.deepLink || "",
-        deepLinkUrl: card.dataset.deepLink || "",
-        appStoreUrl: card.dataset.appStoreUrl || "",
-        playStoreUrl: card.dataset.playStoreUrl || "",
-        enableSaveQr: card.dataset.enableSaveQr === "true",
-        enableOpenApp: card.dataset.enableOpenApp === "true",
-        enableChecklist: card.dataset.enableChecklist === "true",
-        dynamicQrSupported: card.dataset.dynamicQrSupported === "true",
-        amountPrefillSupported: card.dataset.amountPrefillSupported === "true",
-        referenceSupported: card.dataset.referenceSupported === "true",
-        galleryScanSupported: card.dataset.galleryScanSupported === "true",
-        slipRequired: card.dataset.slipRequired === "true",
-        autoVerificationSupported: card.dataset.autoVerificationSupported === "true",
-        webhookSupported: card.dataset.webhookSupported === "true",
-        checklistSteps: parseRegionChecklistSteps(card.dataset.checklistSteps)
+        ...originalMethod,
+        method: originalMethod.method || card.dataset.name || "Payment",
+        key: originalMethod.key || card.dataset.method || "",
+        logo: originalMethod.logo || originalMethod.logoUrl || card.querySelector("img")?.getAttribute("src") || "",
+        logoUrl: originalMethod.logoUrl || originalMethod.logo || card.querySelector("img")?.getAttribute("src") || "",
+        qrImage: originalMethod.qrImage || card.dataset.qr || "",
+        qrImageUrl: originalMethod.qrImageUrl || originalMethod.qrImage || card.dataset.qr || "",
+        accountName: originalMethod.accountName || card.dataset.accountName || "",
+        accountNumber: originalMethod.accountNumber || card.dataset.accountNumber || "",
+        provider: originalMethod.provider || card.dataset.provider || "manual",
+        paymentType: originalMethod.paymentType || card.dataset.paymentType || "manual",
+        appDisplayName: originalMethod.appDisplayName || card.dataset.appDisplayName || card.dataset.name || "",
+        deepLink: originalMethod.deepLink || originalMethod.deepLinkUrl || card.dataset.deepLink || "",
+        deepLinkUrl: originalMethod.deepLinkUrl || originalMethod.deepLink || card.dataset.deepLink || "",
+        appStoreUrl: originalMethod.appStoreUrl || card.dataset.appStoreUrl || "",
+        playStoreUrl: originalMethod.playStoreUrl || card.dataset.playStoreUrl || "",
+        enableSaveQr: originalMethod.enableSaveQr === true || card.dataset.enableSaveQr === "true",
+        enableOpenApp: originalMethod.enableOpenApp === true || card.dataset.enableOpenApp === "true",
+        enableChecklist: originalMethod.enableChecklist === true || card.dataset.enableChecklist === "true",
+        dynamicQrSupported: originalMethod.dynamicQrSupported === true || card.dataset.dynamicQrSupported === "true",
+        amountPrefillSupported: originalMethod.amountPrefillSupported === true || card.dataset.amountPrefillSupported === "true",
+        referenceSupported: originalMethod.referenceSupported === true || card.dataset.referenceSupported === "true",
+        galleryScanSupported: originalMethod.galleryScanSupported === true || card.dataset.galleryScanSupported === "true",
+        receiptUploadEnabled: originalMethod.receiptUploadEnabled !== false,
+        slipRequired: originalMethod.slipRequired !== false && card.dataset.slipRequired !== "false",
+        autoVerificationSupported: originalMethod.autoVerificationSupported === true || card.dataset.autoVerificationSupported === "true",
+        webhookSupported: originalMethod.webhookSupported === true || card.dataset.webhookSupported === "true",
+        checklistSteps: Array.isArray(originalMethod.checklistSteps)
+            ? originalMethod.checklistSteps
+            : parseRegionChecklistSteps(card.dataset.checklistSteps)
     };
 
     updatePaymentPreview(card);
 
     document.dispatchEvent(new Event("paymentChanged"));
+}
+
+function normalizeSelectedRegionPayment(method = {}, overrides = {}) {
+    return {
+        ...method,
+        key: overrides.key || method.key || "",
+        method: overrides.name || method.method || "",
+        logo: overrides.logo || method.logo || method.logoUrl || "",
+        logoUrl: method.logoUrl || overrides.logo || method.logo || "",
+        qrImage: overrides.qrImage || method.qrImage || method.qrImageUrl || method.uploadedQrImage || "",
+        qrImageUrl: method.qrImageUrl || overrides.qrImage || method.qrImage || method.uploadedQrImage || "",
+        deepLink: method.deepLink || method.deepLinkUrl || "",
+        deepLinkUrl: method.deepLinkUrl || method.deepLink || "",
+        receiptUploadEnabled: method.receiptUploadEnabled !== false,
+        checklistSteps: Array.isArray(method.checklistSteps) ? method.checklistSteps : []
+    };
 }
 
 function parseRegionChecklistSteps(value) {

@@ -78,6 +78,7 @@
     "verify:payment-ux-architecture": "node backend/scripts/verify-payment-ux-architecture.js",
     "verify:payment-provider-integrity": "node backend/scripts/verify-payment-provider-integrity.js",
     "verify:payment-methods-admin-ux": "node backend/scripts/verify-payment-methods-admin-ux.js",
+    "verify:payment-frontend-capability-flow": "node backend/scripts/verify-payment-frontend-capability-flow.js",
     "verify:i18n": "node backend/scripts/verify-i18n-coverage.js",
     "verify:pwa-icons": "node backend/scripts/verify-pwa-icons.js"
   },

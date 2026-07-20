@@ -3,7 +3,10 @@
 
 (function () {
     function show(orderData, paymentSession) {
-        const payment = window.selectedPaymentData || {};
+        const payment = {
+            ...(window.selectedPaymentData || {}),
+            ...(paymentSession.selectedPaymentMethod || {})
+        };
         const methodName = window.AZIEL_PAYMENT_DISPLAY?.from?.(
             paymentSession?.paymentName ||
             payment.method ||
@@ -26,11 +29,17 @@
             payment.deepLink ||
             payment.deepLinkUrl ||
             "";
+        const requiresSlip =
+            paymentSession?.receiptUploadEnabled === false ||
+            payment.receiptUploadEnabled === false
+                ? false
+                : paymentSession?.slipRequired !== false && payment.slipRequired !== false;
 
         window.PaymentCheckoutSheet.show({
+            ...payment,
             methodCode: paymentSession?.paymentMethod || payment.key || orderData.paymentMethod,
             methodName,
-            methodLogo: payment.logo || "",
+            methodLogo: payment.logo || payment.logoUrl || "",
             amount: paymentSession?.amount || orderData.amount,
             currency: paymentSession?.currency || orderData.currency,
             accountName: paymentSession?.accountName || payment.accountName || "",
@@ -38,14 +47,17 @@
             reference: paymentSession?.reference || orderData.orderId || orderData.topupId || "",
             qrImageUrl: paymentSession?.qrImage || paymentSession?.qrUrl || payment.qrImage || "",
             instructions: "Transfer the exact amount, then upload the payment receipt.",
-            requiresSlip: paymentSession?.slipRequired !== false && payment.slipRequired !== false,
+            requiresSlip,
             deepLink,
             enableSaveQr: paymentSession?.enableSaveQr === true || payment.enableSaveQr === true,
             enableOpenApp: paymentSession?.enableOpenApp === true || payment.enableOpenApp === true,
             enableChecklist: paymentSession?.enableChecklist === true || payment.enableChecklist === true,
             appDisplayName: paymentSession?.appDisplayName || payment.appDisplayName || methodName,
+            deepLinkUrl: paymentSession?.deepLinkUrl || paymentSession?.deepLink || payment.deepLinkUrl || payment.deepLink || "",
             appStoreUrl: paymentSession?.appStoreUrl || payment.appStoreUrl || "",
             playStoreUrl: paymentSession?.playStoreUrl || payment.playStoreUrl || "",
+            galleryScanSupported: paymentSession?.galleryScanSupported === true || payment.galleryScanSupported === true,
+            receiptUploadEnabled: paymentSession?.receiptUploadEnabled !== false && payment.receiptUploadEnabled !== false,
             checklistSteps: paymentSession?.checklistSteps || payment.checklistSteps || [],
             submitLabel: "Submit for Verification",
             loadingText: "Submitting receipt...",

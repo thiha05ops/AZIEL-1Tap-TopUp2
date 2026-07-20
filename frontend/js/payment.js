@@ -181,6 +181,15 @@ function buildPaymentCard(method, index) {
 
     const card = document.createElement("div");
     card.className = `pay-card ${index === 0 ? "active" : ""}`;
+    card.__paymentMethod = normalizeSelectedPaymentMethod(method, {
+        key,
+        displayName,
+        logo,
+        qrImage,
+        paymentType,
+        provider,
+        region
+    });
 
     card.dataset.method = key;
     card.dataset.name = displayName;
@@ -247,6 +256,9 @@ function getPaymentBadge(paymentType, badgeText = "") {
 
 function selectPaymentCard(card) {
     const paymentInput = document.getElementById("paymentMethod");
+    const originalMethod = card.__paymentMethod && typeof card.__paymentMethod === "object"
+        ? card.__paymentMethod
+        : {};
 
     document.querySelectorAll(".pay-card").forEach(c => c.classList.remove("active"));
     card.classList.add("active");
@@ -257,32 +269,38 @@ function selectPaymentCard(card) {
     }
 
     window.selectedPaymentData = {
-        key: card.dataset.method || "",
-        method: card.dataset.name || "",
-        logo: card.dataset.logo || "",
-        qrImage: card.dataset.qr || "",
-        accountName: card.dataset.accountName || "",
-        accountNumber: card.dataset.accountNumber || "",
-        paymentType: card.dataset.paymentType || "manual",
-        provider: card.dataset.provider || "manual",
-        region: card.dataset.region || "",
-        maintenanceMessage: card.dataset.maintenanceMessage || "",
-        appDisplayName: card.dataset.appDisplayName || card.dataset.name || "",
-        deepLink: card.dataset.deepLink || "",
-        deepLinkUrl: card.dataset.deepLink || "",
-        appStoreUrl: card.dataset.appStoreUrl || "",
-        playStoreUrl: card.dataset.playStoreUrl || "",
-        enableSaveQr: card.dataset.enableSaveQr === "true",
-        enableOpenApp: card.dataset.enableOpenApp === "true",
-        enableChecklist: card.dataset.enableChecklist === "true",
-        dynamicQrSupported: card.dataset.dynamicQrSupported === "true",
-        amountPrefillSupported: card.dataset.amountPrefillSupported === "true",
-        referenceSupported: card.dataset.referenceSupported === "true",
-        galleryScanSupported: card.dataset.galleryScanSupported === "true",
-        slipRequired: card.dataset.slipRequired === "true",
-        autoVerificationSupported: card.dataset.autoVerificationSupported === "true",
-        webhookSupported: card.dataset.webhookSupported === "true",
-        checklistSteps: parseChecklistSteps(card.dataset.checklistSteps)
+        ...originalMethod,
+        key: originalMethod.key || card.dataset.method || "",
+        method: originalMethod.method || card.dataset.name || "",
+        logo: originalMethod.logo || originalMethod.logoUrl || card.dataset.logo || "",
+        logoUrl: originalMethod.logoUrl || originalMethod.logo || card.dataset.logo || "",
+        qrImage: originalMethod.qrImage || card.dataset.qr || "",
+        qrImageUrl: originalMethod.qrImageUrl || originalMethod.qrImage || card.dataset.qr || "",
+        accountName: originalMethod.accountName || card.dataset.accountName || "",
+        accountNumber: originalMethod.accountNumber || card.dataset.accountNumber || "",
+        paymentType: originalMethod.paymentType || card.dataset.paymentType || "manual",
+        provider: originalMethod.provider || card.dataset.provider || "manual",
+        region: originalMethod.region || card.dataset.region || "",
+        maintenanceMessage: originalMethod.maintenanceMessage || card.dataset.maintenanceMessage || "",
+        appDisplayName: originalMethod.appDisplayName || card.dataset.appDisplayName || card.dataset.name || "",
+        deepLink: originalMethod.deepLink || originalMethod.deepLinkUrl || card.dataset.deepLink || "",
+        deepLinkUrl: originalMethod.deepLinkUrl || originalMethod.deepLink || card.dataset.deepLink || "",
+        appStoreUrl: originalMethod.appStoreUrl || card.dataset.appStoreUrl || "",
+        playStoreUrl: originalMethod.playStoreUrl || card.dataset.playStoreUrl || "",
+        enableSaveQr: originalMethod.enableSaveQr === true || card.dataset.enableSaveQr === "true",
+        enableOpenApp: originalMethod.enableOpenApp === true || card.dataset.enableOpenApp === "true",
+        enableChecklist: originalMethod.enableChecklist === true || card.dataset.enableChecklist === "true",
+        dynamicQrSupported: originalMethod.dynamicQrSupported === true || card.dataset.dynamicQrSupported === "true",
+        amountPrefillSupported: originalMethod.amountPrefillSupported === true || card.dataset.amountPrefillSupported === "true",
+        referenceSupported: originalMethod.referenceSupported === true || card.dataset.referenceSupported === "true",
+        galleryScanSupported: originalMethod.galleryScanSupported === true || card.dataset.galleryScanSupported === "true",
+        receiptUploadEnabled: originalMethod.receiptUploadEnabled !== false,
+        slipRequired: originalMethod.slipRequired !== false && card.dataset.slipRequired !== "false",
+        autoVerificationSupported: originalMethod.autoVerificationSupported === true || card.dataset.autoVerificationSupported === "true",
+        webhookSupported: originalMethod.webhookSupported === true || card.dataset.webhookSupported === "true",
+        checklistSteps: Array.isArray(originalMethod.checklistSteps)
+            ? originalMethod.checklistSteps
+            : parseChecklistSteps(card.dataset.checklistSteps)
     };
 
     localStorage.setItem("selectedPaymentMethod", window.selectedPaymentData.key);
@@ -300,6 +318,25 @@ function selectPaymentCard(card) {
             detail: window.selectedPaymentData
         })
     );
+}
+
+function normalizeSelectedPaymentMethod(method = {}, overrides = {}) {
+    return {
+        ...method,
+        key: overrides.key || method.key || "",
+        method: overrides.displayName || method.method || "",
+        logo: overrides.logo || method.logo || method.logoUrl || "",
+        logoUrl: method.logoUrl || overrides.logo || method.logo || "",
+        qrImage: overrides.qrImage || method.qrImage || method.qrImageUrl || method.uploadedQrImage || "",
+        qrImageUrl: method.qrImageUrl || overrides.qrImage || method.qrImage || method.uploadedQrImage || "",
+        paymentType: overrides.paymentType || method.paymentType || "manual",
+        provider: overrides.provider || method.provider || "manual",
+        region: overrides.region || method.region || "",
+        deepLink: method.deepLink || method.deepLinkUrl || "",
+        deepLinkUrl: method.deepLinkUrl || method.deepLink || "",
+        receiptUploadEnabled: method.receiptUploadEnabled !== false,
+        checklistSteps: Array.isArray(method.checklistSteps) ? method.checklistSteps : []
+    };
 }
 
 function parseChecklistSteps(value) {

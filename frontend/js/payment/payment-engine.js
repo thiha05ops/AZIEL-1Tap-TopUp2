@@ -97,6 +97,7 @@
 
             if (type === "manual" || type === "deeplink") {
                 const attemptSession = await createManualAttempt(orderData);
+                attemptSession.selectedPaymentMethod = selectedPayment;
                 const attemptOrder = attemptSession.order || {
                     ...orderData,
                     orderId: attemptSession.reference,
@@ -119,6 +120,7 @@
             }
 
             const paymentSession = await createPaymentSession(orderData);
+            paymentSession.selectedPaymentMethod = selectedPayment;
             const canonicalOrder = paymentSession.order || orderData;
 
             PaymentUtils.hideLoading();
