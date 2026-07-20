@@ -421,12 +421,35 @@
         }
     }
 
-    async function shareOrDownloadQr(blob, filename) {
+    async function shareOrDownloadQr(blob, filename, context = {}) {
+        const options = context.options || {};
+        const activeQr = context.activeQr || null;
+        const dynamicShare = isDynamicPromptPayMode(options);
+        if (dynamicShare) {
+            if (activeQr?.sourceType !== "dynamic_response") {
+                throw new Error("Mobile dynamic QR source ownership violation");
+            }
+            if (!activeQr?.imageUrlOrDataUrl?.startsWith("data:image/")) {
+                throw new Error("Mobile dynamic QR is not a generated data URL");
+            }
+        }
+
         const type = inferImageType(blob);
         const safeFilename = normalizeQrFilename(filename, type);
 
         if (typeof File === "function" && navigator.share) {
             const file = new File([blob], safeFilename, { type });
+            if (isDevelopmentHost()) {
+                console.info("[AZIEL MOBILE QR SHARE]", {
+                    qrMode: options.qrMode || "",
+                    sourceType: activeQr?.sourceType || "",
+                    sourcePrefix: activeQr?.imageUrlOrDataUrl?.slice(0, 80) || "",
+                    fileName: file?.name,
+                    fileType: file?.type,
+                    fileSize: file?.size,
+                    staticQrUrl: options.qrImageUrl || ""
+                });
+            }
             if (navigator.canShare?.({ files: [file] })) {
                 await navigator.share({
                     files: [file],
@@ -557,7 +580,10 @@
                 options: config.options || {},
                 sourceType: config.sourceType || ""
             });
-            await shareOrDownloadQr(blob, filename);
+            await shareOrDownloadQr(blob, filename, {
+                options: config.options || {},
+                activeQr: config.activeQr || null
+            });
             config.onSuccess?.();
             config.setMessage?.("success", "QR ready to save");
             showToast("QR ready to save", "success");
@@ -597,6 +623,7 @@
             href: activeQr.imageUrlOrDataUrl,
             qrCanvas: null,
             sourceType: activeQr.sourceType,
+            activeQr,
             filename,
             options,
             setMessage,
