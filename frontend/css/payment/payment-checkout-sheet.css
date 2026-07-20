@@ -231,6 +231,118 @@ body.light .az-payment-sheet {
     margin: 0 0 14px;
 }
 
+.az-payment-sheet__actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin: 2px 0 14px;
+}
+
+.az-payment-sheet__actions[hidden],
+.az-payment-sheet__action[hidden],
+.az-payment-sheet__fallback[hidden],
+.az-payment-sheet__checklist[hidden] {
+    display: none !important;
+}
+
+.az-payment-sheet__action {
+    min-width: 0;
+    min-height: 44px;
+    border: 1px solid var(--az-pay-sheet-border-strong);
+    border-radius: 999px;
+    background: var(--az-pay-sheet-bg-soft);
+    color: var(--az-pay-sheet-accent-strong);
+    font-size: 13px;
+    font-weight: 950;
+    cursor: pointer;
+}
+
+.az-payment-sheet__action:hover {
+    border-color: var(--az-pay-sheet-accent);
+    transform: translateY(-1px);
+}
+
+.az-payment-sheet__fallback {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: -2px 0 14px;
+    color: var(--az-pay-sheet-instruction);
+    font-size: 12px;
+    font-weight: 750;
+}
+
+.az-payment-sheet__fallback a {
+    color: var(--az-pay-sheet-accent-strong);
+    font-weight: 900;
+    text-decoration: none;
+}
+
+.az-payment-sheet__checklist {
+    margin: 0 0 14px;
+    padding: 12px 14px;
+    border: 1px solid var(--az-pay-sheet-border);
+    border-radius: 16px;
+    background: var(--az-pay-sheet-bg-soft);
+}
+
+.az-payment-sheet__checklist > span {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--az-pay-sheet-label);
+    font-size: 11px;
+    font-weight: 950;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+}
+
+.az-payment-sheet__checklist ol {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.az-payment-sheet__checklist li {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+    color: var(--az-pay-sheet-instruction);
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.az-payment-sheet__checklist li i {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 16px;
+    border: 1px solid var(--az-pay-sheet-border-strong);
+    border-radius: 999px;
+    background: transparent;
+}
+
+.az-payment-sheet__checklist li.is-active {
+    color: var(--az-pay-sheet-value);
+}
+
+.az-payment-sheet__checklist li.is-active i {
+    border-color: var(--az-pay-sheet-accent);
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, .14);
+}
+
+.az-payment-sheet__checklist li.is-complete {
+    color: var(--az-pay-sheet-success);
+}
+
+.az-payment-sheet__checklist li.is-complete i {
+    border-color: var(--az-pay-sheet-success);
+    background: var(--az-pay-sheet-success);
+    box-shadow: inset 0 0 0 4px var(--az-pay-sheet-bg);
+}
+
 .az-payment-sheet__secondary {
     width: 100%;
     min-height: 42px;
@@ -357,6 +469,7 @@ body.light .az-payment-sheet {
 
 .az-payment-sheet__close:focus-visible,
 .az-payment-sheet__row button:focus-visible,
+.az-payment-sheet__action:focus-visible,
 .az-payment-sheet__secondary:focus-visible,
 .az-payment-sheet__upload:focus-within,
 .az-payment-sheet__preview button:focus-visible,
@@ -402,12 +515,18 @@ body.light .az-payment-sheet {
     .az-payment-sheet__row span {
         grid-column: 1 / -1;
     }
+
+    .az-payment-sheet__actions {
+        grid-template-columns: 1fr;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
     .az-payment-sheet,
-    .az-payment-sheet__panel {
+    .az-payment-sheet__panel,
+    .az-payment-sheet__action {
         transition: none !important;
         animation: none !important;
+        transform: none !important;
     }
 }

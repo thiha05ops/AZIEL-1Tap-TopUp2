@@ -59,6 +59,73 @@ const paymentMethodSchema = new mongoose.Schema(
             default: ""
         },
 
+        logoUrl: {
+            type: String,
+            default: ""
+        },
+
+        shortDescription: {
+            type: String,
+            default: ""
+        },
+
+        badgeText: {
+            type: String,
+            default: ""
+        },
+
+        recipientLabel: {
+            type: String,
+            default: ""
+        },
+
+        referenceInstructions: {
+            type: String,
+            default: ""
+        },
+
+        qrMode: {
+            type: String,
+            enum: ["provider_generated", "uploaded_static", "none"],
+            default: "uploaded_static"
+        },
+
+        receiptUploadEnabled: {
+            type: Boolean,
+            default: true
+        },
+
+        confirmationMode: {
+            type: String,
+            enum: ["manual_admin", "automatic_provider", "wallet_internal"],
+            default: "manual_admin"
+        },
+
+        availabilitySchedule: {
+            type: String,
+            default: ""
+        },
+
+        appDisplayName: {
+            type: String,
+            default: ""
+        },
+
+        deepLinkUrl: {
+            type: String,
+            default: ""
+        },
+
+        appStoreUrl: {
+            type: String,
+            default: ""
+        },
+
+        playStoreUrl: {
+            type: String,
+            default: ""
+        },
+
         paymentType: {
             type: String,
             enum: ["manual", "auto", "deeplink", "wallet"],
@@ -82,6 +149,43 @@ const paymentMethodSchema = new mongoose.Schema(
                 type: String,
                 default: ""
             }
+        },
+
+        enableSaveQr: { type: Boolean, default: false },
+        enableOpenApp: { type: Boolean, default: false },
+        enableChecklist: { type: Boolean, default: false },
+        dynamicQrSupported: { type: Boolean, default: false },
+        amountPrefillSupported: { type: Boolean, default: false },
+        referenceSupported: { type: Boolean, default: false },
+        galleryScanSupported: { type: Boolean, default: false },
+        slipRequired: { type: Boolean, default: undefined },
+        autoVerificationSupported: { type: Boolean, default: false },
+        webhookSupported: { type: Boolean, default: false },
+        checklistSteps: {
+            type: [
+                {
+                    key: { type: String, default: "" },
+                    label: { type: String, default: "" },
+                    action: {
+                        type: String,
+                        enum: [
+                            "save_qr",
+                            "open_app",
+                            "upload_receipt",
+                            "wait_for_confirmation",
+                            "confirm_payment"
+                        ],
+                        default: "upload_receipt"
+                    },
+                    enabled: { type: Boolean, default: true },
+                    sortOrder: { type: Number, default: 0 }
+                }
+            ],
+            default: []
+        },
+        sortOrder: {
+            type: Number,
+            default: 0
         }
     },
     {

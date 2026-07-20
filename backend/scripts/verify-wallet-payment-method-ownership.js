@@ -19,7 +19,7 @@ function notMatches(file, pattern, message) {
 function verifyPublicPaymentMethodProjection() {
     const file = "backend/routes/paymentMethods.js";
     includes(file, "safePublicAssetUrl", "Public payment method projection must sanitize asset URLs.");
-    includes(file, "logoUrl: `/assets/payment/${obj.key}.png`", "Public projection must provide stable method logo URL.");
+    includes(file, "logoUrl: safePublicAssetUrl(obj.logoUrl) || getPaymentLogo", "Public projection must provide stable method logo URL.");
     includes(file, "qrImage", "Public projection must include QR image presentation field.");
     includes(file, "paymentType", "Public projection must include payment type.");
     includes(file, "provider", "Public projection must include provider identity.");
@@ -48,7 +48,8 @@ function verifyWalletBackendValidation() {
     const file = "backend/routes/wallet.js";
     includes(file, "const PaymentMethod = require(\"../models/PaymentMethod\")", "Wallet backend must read PaymentMethod model.");
     includes(file, "resolveWalletPaymentMethod", "Wallet backend must centrally validate selected payment method.");
-    includes(file, "PaymentMethod.findOne", "Wallet backend must re-read Admin Payment Method.");
+    includes(file, "PaymentMethod.find({", "Wallet backend must re-read Admin Payment Method records.");
+    includes(file, "methods.find(item => normalizeMethod(item.key) === key)", "Wallet backend must resolve normalized Admin Payment Method keys.");
     includes(file, "key,", "Wallet backend must validate selected method code.");
     includes(file, "region: topupRegion", "Wallet backend must validate region.");
     includes(file, "method.enabled !== true", "Wallet backend must reject disabled methods.");

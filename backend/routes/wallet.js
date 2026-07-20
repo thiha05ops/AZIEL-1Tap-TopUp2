@@ -113,12 +113,16 @@ function isManualLikePaymentMethod(method = {}) {
 function isAutoPromptPayMethod(method = {}) {
     return (
         String(method.paymentType || "").toLowerCase() === "auto" &&
-        String(method.provider || "").toLowerCase() === "omise" &&
+        ["omise", "promptpay"].includes(String(method.provider || "").toLowerCase()) &&
         normalizeMethod(method.key) === "promptpay"
     );
 }
 
 function projectWalletPaymentMethod(method = {}) {
+    const slipRequired = typeof method.slipRequired === "boolean"
+        ? method.slipRequired
+        : isManualLikePaymentMethod(method);
+
     return {
         method: formatPaymentMethod(method, method.method || "Payment"),
         key: method.key || "",
@@ -129,8 +133,22 @@ function projectWalletPaymentMethod(method = {}) {
         accountNumber: method.accountNumber || "",
         qrImage: getMethodQrImage(method),
         maintenanceMessage: method.maintenanceMessage || "",
-        slipRequired: isManualLikePaymentMethod(method),
-        logoUrl: `/assets/payment/${method.key}.png`
+        slipRequired,
+        logoUrl: `/assets/payment/${method.key}.png`,
+        appDisplayName: method.appDisplayName || "",
+        deepLinkUrl: method.deepLinkUrl || "",
+        appStoreUrl: method.appStoreUrl || "",
+        playStoreUrl: method.playStoreUrl || "",
+        enableSaveQr: method.enableSaveQr === true,
+        enableOpenApp: method.enableOpenApp === true,
+        enableChecklist: method.enableChecklist === true,
+        dynamicQrSupported: method.dynamicQrSupported === true,
+        amountPrefillSupported: method.amountPrefillSupported === true,
+        referenceSupported: method.referenceSupported === true,
+        galleryScanSupported: method.galleryScanSupported === true,
+        autoVerificationSupported: method.autoVerificationSupported === true,
+        webhookSupported: method.webhookSupported === true,
+        checklistSteps: Array.isArray(method.checklistSteps) ? method.checklistSteps : []
     };
 }
 
@@ -177,10 +195,10 @@ async function resolveWalletPaymentMethod({ paymentMethod, region, currency }) {
         throw error;
     }
 
-    const method = await PaymentMethod.findOne({
-        key,
+    const methods = await PaymentMethod.find({
         region: topupRegion
     }).lean();
+    const method = methods.find(item => normalizeMethod(item.key) === key);
 
     if (!method) {
         const error = new Error("Selected payment method is not available for this region.");

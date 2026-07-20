@@ -1250,6 +1250,12 @@ textarea {
 }
 
 /* PAYMENT METHODS */
+.admin-payment-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 14px;
+}
+
 .payment-method-card {
   padding: 20px;
   border-radius: 16px;
@@ -1352,6 +1358,356 @@ textarea {
   color: #94a3b8;
   background: rgba(255, 255, 255, .04);
   border: 1px dashed rgba(255, 255, 255, .16);
+}
+
+.payment-capability-details {
+  margin: 16px 0 4px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .035);
+}
+
+.payment-config-section {
+  margin: 16px 0;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, .08);
+}
+
+.payment-config-section h5,
+.payment-capability-details h5 {
+  margin: 0 0 10px;
+  color: #f8fafc;
+  font-size: 13px;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.payment-config-status,
+.payment-config-warning {
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.payment-config-status {
+  display: inline-flex;
+  width: fit-content;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, .12);
+}
+
+.payment-config-status.is-draft {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, .12);
+}
+
+.payment-config-status.is-ready {
+  color: #60a5fa;
+  background: rgba(96, 165, 250, .12);
+}
+
+.payment-config-status.is-enabled {
+  color: #34d399;
+  background: rgba(52, 211, 153, .12);
+}
+
+.payment-config-warning {
+  color: #fbbf24;
+}
+
+.payment-method-summary-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.payment-method-summary-logo,
+.admin-payment-card-preview img {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  object-fit: contain;
+  background: rgba(255, 255, 255, .06);
+  border: 1px solid rgba(255, 255, 255, .08);
+}
+
+.payment-summary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.payment-readiness-meter {
+  margin: 4px 0 0;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.payment-summary-capabilities,
+.payment-inline-actions,
+.pm-checklist-presets,
+.admin-payment-preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.payment-capability-chip {
+  display: inline-flex;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  border: 1px solid rgba(255, 255, 255, .1);
+}
+
+.payment-capability-chip.is-ok {
+  color: #34d399;
+  background: rgba(52, 211, 153, .1);
+}
+
+.payment-capability-chip.is-missing {
+  color: #94a3b8;
+  background: rgba(148, 163, 184, .08);
+}
+
+.payment-method-editor {
+  margin-top: 14px;
+}
+
+.payment-method-editor > summary {
+  cursor: pointer;
+  color: #c4b5fd;
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.admin-payment-card-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .045);
+  border: 1px solid rgba(255, 255, 255, .08);
+}
+
+.admin-payment-card-preview div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.admin-payment-card-preview strong {
+  color: #f8fafc;
+  font-size: 14px;
+}
+
+.admin-payment-card-preview small,
+.admin-payment-card-preview span {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.pm-checklist-preview {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(168, 85, 247, .08);
+}
+
+.pm-checklist-preview strong {
+  display: block;
+  margin-bottom: 8px;
+  color: #f8fafc;
+}
+
+.pm-checklist-preview ol {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  color: #cbd5e1;
+  font-size: 12px;
+}
+
+.payment-editor-savebar {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin: 16px -12px -12px;
+  padding: 12px;
+  background: rgba(15, 23, 42, .92);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid rgba(255, 255, 255, .08);
+}
+
+.admin-payment-preview-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(0, 0, 0, .42);
+}
+
+.admin-payment-preview-modal[hidden] {
+  display: none;
+}
+
+.admin-payment-preview-panel {
+  width: min(720px, 100%);
+  max-height: min(760px, 88vh);
+  overflow-y: auto;
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border-radius: 22px;
+  color: #f8fafc;
+  background: #111827;
+  border: 1px solid rgba(168, 85, 247, .28);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, .45);
+}
+
+.admin-payment-preview-close {
+  justify-self: end;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(255, 255, 255, .1);
+  cursor: pointer;
+}
+
+.admin-payment-preview-sheet {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid rgba(255, 255, 255, .08);
+}
+
+.admin-payment-preview-amount {
+  color: #fbbf24;
+  font-size: 24px;
+}
+
+.admin-payment-preview-qr {
+  display: grid;
+  place-items: center;
+  min-height: 96px;
+  border-radius: 14px;
+  color: #cbd5e1;
+  background: rgba(255, 255, 255, .06);
+}
+
+.payment-section-help {
+  display: block;
+  margin: -4px 0 10px;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.payment-capability-details summary {
+  color: #e2e8f0;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.payment-method-card .capability-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.payment-method-card .payment-capability-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, .78);
+}
+
+.payment-method-card .payment-capability-toggle input {
+  width: auto;
+  margin: 0;
+}
+
+.payment-method-card .payment-capability-toggle span {
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.pm-checklist-builder {
+  display: grid;
+  gap: 10px;
+}
+
+.pm-checklist-steps {
+  display: grid;
+  gap: 8px;
+}
+
+.pm-checklist-step {
+  display: grid;
+  grid-template-columns: minmax(120px, .9fr) minmax(140px, 1fr) auto 72px auto auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, .65);
+}
+
+.payment-method-card .pm-checklist-step input,
+.payment-method-card .pm-checklist-step select {
+  margin-top: 0;
+}
+
+.payment-method-card .payment-capability-toggle.compact {
+  margin: 0;
+  padding: 8px;
+}
+
+.pm-step-up,
+.pm-step-down,
+.pm-step-remove {
+  min-height: 38px;
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 10px;
+  background: rgba(124, 58, 237, .22);
+  color: #fff;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.pm-step-remove {
+  padding: 0 10px;
+  background: rgba(239, 68, 68, .2);
+}
+
+@media (max-width: 760px) {
+  .pm-checklist-step,
+  .payment-method-card .capability-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* RESPONSIVE */

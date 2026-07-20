@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 64" role="img" aria-label="Bank">
+  <defs>
+    <linearGradient id="bankGradient" x1="14" x2="82" y1="10" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A855F7"/>
+      <stop offset="1" stop-color="#6D5DF6"/>
+    </linearGradient>
+  </defs>
+  <rect width="96" height="64" rx="18" fill="#151222"/>
+  <path d="M48 12 78 27H18L48 12Z" fill="url(#bankGradient)"/>
+  <path d="M24 31h8v17h-8V31Zm20 0h8v17h-8V31Zm20 0h8v17h-8V31ZM18 52h60v6H18v-6Z" fill="#F7F2FF"/>
+</svg>

@@ -5,6 +5,10 @@ const LABELS = Object.freeze({
     promptpay: "PromptPay",
     scb: "SCB",
     bangkokbank: "Bangkok Bank",
+    kplus: "K PLUS",
+    krungsri: "Krungsri",
+    mmqr: "MMQR",
+    manualbank: "Manual Bank Transfer",
     wallet: "AZIEL Wallet",
     azielwallet: "AZIEL Wallet"
 });
@@ -15,6 +19,7 @@ function normalizePaymentDisplayKey(value) {
         .trim()
         .replace(/aziel\s*wallet/g, "azielwallet")
         .replace(/bangkok\s*bank/g, "bangkokbank")
+        .replace(/manual\s*bank(\s*transfer)?/g, "manualbank")
         .replace(/prompt\s*pay/g, "promptpay")
         .replace(/\s+/g, "")
         .replace(/[-_]/g, "")
@@ -29,6 +34,10 @@ function formatPaymentDisplayName(value, fallback = "") {
     if (key.includes("wavepay")) return LABELS.wavepay;
     if (key.includes("promptpay")) return LABELS.promptpay;
     if (key.includes("bangkokbank")) return LABELS.bangkokbank;
+    if (key === "kplus" || key.includes("kplus")) return LABELS.kplus;
+    if (key.includes("krungsri")) return LABELS.krungsri;
+    if (key === "mmqr" || key.includes("mmqr")) return LABELS.mmqr;
+    if (key.includes("manualbank")) return LABELS.manualbank;
     if (key === "scb" || key.includes("scb")) return LABELS.scb;
     if (key === "wallet" || key.includes("azielwallet")) return LABELS.wallet;
     return fallback || String(value || "");
@@ -54,6 +63,10 @@ function replacePaymentDisplayNames(value = "") {
         [/\bwave[\s_-]*pay\b/gi, LABELS.wavepay],
         [/\bprompt[\s_-]*pay\b/gi, LABELS.promptpay],
         [/\bbangkok[\s_-]*bank\b/gi, LABELS.bangkokbank],
+        [/\bk[\s_-]*plus\b/gi, LABELS.kplus],
+        [/\bkrungsri\b/gi, LABELS.krungsri],
+        [/\bmmqr\b/gi, LABELS.mmqr],
+        [/\bmanual[\s_-]*bank(\s*transfer)?\b/gi, LABELS.manualbank],
         [/\baziel[\s_-]*wallet\b/gi, LABELS.wallet],
         [/\bwallet\b/gi, LABELS.wallet],
         [/\bscb\b/gi, LABELS.scb]

@@ -935,11 +935,11 @@ router.post("/orders", authMiddleware, orderCreateLimiter, upload.single("paymen
         });
         const catalogItem = pricing.catalogItem;
         const methodKey = normalizePaymentKey(req.body.paymentMethod);
-        const configuredMethod = await PaymentMethod.findOne({
-            key: methodKey,
+        const configuredMethods = await PaymentMethod.find({
             region: catalogItem.region,
             enabled: true
         });
+        const configuredMethod = configuredMethods.find(method => normalizePaymentKey(method.key) === methodKey);
 
         if (configuredMethod && isManualPaymentType(configuredMethod.paymentType) && !req.file) {
             return res.status(409).json({

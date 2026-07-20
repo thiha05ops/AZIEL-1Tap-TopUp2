@@ -37,9 +37,15 @@ async function loadPaymentMethods() {
         }
 
         let methods = Array.isArray(data.methods) ? data.methods : [];
-        methods = methods.filter(method => method.enabled === true);
+        methods = uniquePaymentMethodsByKey(methods)
+            .filter(method => method.enabled === true)
+            .filter(isPublicPaymentMethodUsable)
+            .sort(sortPaymentMethods);
+        window.AZIEL_TH_BANK_APPS = getConfiguredThaiBankApps(methods);
 
-        methods.push(getWalletMethod(region));
+        if (!methods.some(method => normalizePaymentKey(method.key) === "wallet")) {
+            methods.push(getWalletMethod(region));
+        }
 
         paymentGrid.innerHTML = "";
 
@@ -63,6 +69,61 @@ async function loadPaymentMethods() {
     }
 }
 
+function getConfiguredThaiBankApps(methods = []) {
+    return methods
+        .filter(method => String(method.region || "").toUpperCase() === "TH")
+        .filter(method => {
+            const key = normalizePaymentKey(method.key || method.method || "");
+            const type = String(method.paymentType || "").toLowerCase();
+            const provider = normalizePaymentKey(method.provider || "");
+            return key !== "promptpay" &&
+                key !== "wallet" &&
+                provider !== "wallet" &&
+                (type === "deeplink" || method.enableOpenApp === true) &&
+                Boolean(method.deepLinkUrl || method.deepLink);
+        })
+        .map(method => ({
+            key: method.key || normalizePaymentKey(method.method || ""),
+            label: method.appDisplayName || method.method || "Banking App",
+            deepLink: method.deepLinkUrl || method.deepLink || "",
+            appStoreUrl: method.appStoreUrl || "",
+            playStoreUrl: method.playStoreUrl || ""
+        }))
+        .sort((a, b) => String(a.label).localeCompare(String(b.label)));
+}
+
+function sortPaymentMethods(a = {}, b = {}) {
+    const orderA = Number(a.sortOrder || 0);
+    const orderB = Number(b.sortOrder || 0);
+    if (orderA !== orderB) return orderA - orderB;
+    return String(a.method || a.key || "").localeCompare(String(b.method || b.key || ""));
+}
+
+function uniquePaymentMethodsByKey(methods = []) {
+    const seen = new Set();
+    return methods.filter(method => {
+        const key = normalizePaymentKey(method.key || method.method || method.provider || "");
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
+
+function isPublicPaymentMethodUsable(method = {}) {
+    const type = String(method.paymentType || "manual").toLowerCase();
+    const provider = normalizePaymentKey(method.provider || "");
+    const key = normalizePaymentKey(method.key || method.method || "");
+    if (method.publicReady === false) return false;
+    if (String(method.maintenanceMessage || "").trim()) return false;
+    if (key === "wallet" || type === "wallet" || provider === "wallet") return true;
+    if (type === "auto" || provider === "omise") return true;
+
+    const hasQr = Boolean(method.qrImage || method.qrImageUrl || method.uploadedQrImage || method.finalQrImage);
+    const hasAccount = Boolean(method.accountName && method.accountNumber);
+    const validProvider = isKnownPaymentProvider(provider || key);
+    return validProvider && hasQr && hasAccount;
+}
+
 function getWalletMethod(region) {
     return {
         method: "AZIEL Wallet",
@@ -82,7 +143,7 @@ function buildPaymentCard(method, index) {
     const key = method.key || normalizePaymentKey(method.method);
     const displayName = window.AZIEL_PAYMENT_DISPLAY?.method?.({ ...method, key }, getPaymentDisplayName(key)) ||
         getPaymentDisplayName(key);
-    const logo = method.logo || method.logoUrl || method.logoImage || getPaymentLogo(key);
+    const logo = getPaymentCardLogo(method, key);
 
     const qrImage =
         method.finalQrImage ||
@@ -110,7 +171,7 @@ function buildPaymentCard(method, index) {
 
     if (String(region).toUpperCase() === "TH" && key === "promptpay") {
         paymentType = "auto";
-        provider = "omise";
+        provider = "promptpay";
     }
 
     if (String(region).toUpperCase() === "TH" && key === "scb") {
@@ -131,13 +192,31 @@ function buildPaymentCard(method, index) {
     card.dataset.provider = provider;
     card.dataset.region = region;
     card.dataset.maintenanceMessage = method.maintenanceMessage || "";
+    card.dataset.shortDescription = method.shortDescription || "";
+    card.dataset.badgeText = method.badgeText || "";
+    card.dataset.appDisplayName = method.appDisplayName || displayName;
+    card.dataset.deepLink = method.deepLinkUrl || method.deepLink || "";
+    card.dataset.appStoreUrl = method.appStoreUrl || "";
+    card.dataset.playStoreUrl = method.playStoreUrl || "";
+    card.dataset.enableSaveQr = String(method.enableSaveQr === true);
+    card.dataset.enableOpenApp = String(method.enableOpenApp === true);
+    card.dataset.enableChecklist = String(method.enableChecklist === true);
+    card.dataset.dynamicQrSupported = String(method.dynamicQrSupported === true);
+    card.dataset.amountPrefillSupported = String(method.amountPrefillSupported === true);
+    card.dataset.referenceSupported = String(method.referenceSupported === true);
+    card.dataset.galleryScanSupported = String(method.galleryScanSupported === true);
+    card.dataset.slipRequired = String(method.slipRequired !== false && paymentType !== "auto" && paymentType !== "wallet");
+    card.dataset.autoVerificationSupported = String(method.autoVerificationSupported === true);
+    card.dataset.webhookSupported = String(method.webhookSupported === true);
+    card.dataset.checklistSteps = JSON.stringify(Array.isArray(method.checklistSteps) ? method.checklistSteps : []);
 
     card.innerHTML = `
-        <img src="${logo}" class="pay-logo" alt="${displayName}">
+        <img src="${logo}" class="pay-logo" alt="${displayName}" onerror="this.src='assets/payment/payment-neutral.svg'">
 
         <div class="pay-info">
             <span>${displayName}</span>
-            ${getPaymentBadge(paymentType)}
+            ${getPaymentBadge(paymentType, method.badgeText)}
+            ${method.shortDescription ? `<small class="pay-description">${method.shortDescription}</small>` : ""}
             ${method.maintenanceMessage ? `<small class="pay-message">${method.maintenanceMessage}</small>` : ""}
         </div>
     `;
@@ -146,7 +225,11 @@ function buildPaymentCard(method, index) {
     return card;
 }
 
-function getPaymentBadge(paymentType) {
+function getPaymentBadge(paymentType, badgeText = "") {
+    if (badgeText) {
+        return `<small class="manual-pay-badge">${badgeText}</small>`;
+    }
+
     if (paymentType === "auto") {
         return `<small class="auto-pay-badge">Auto</small>`;
     }
@@ -183,7 +266,23 @@ function selectPaymentCard(card) {
         paymentType: card.dataset.paymentType || "manual",
         provider: card.dataset.provider || "manual",
         region: card.dataset.region || "",
-        maintenanceMessage: card.dataset.maintenanceMessage || ""
+        maintenanceMessage: card.dataset.maintenanceMessage || "",
+        appDisplayName: card.dataset.appDisplayName || card.dataset.name || "",
+        deepLink: card.dataset.deepLink || "",
+        deepLinkUrl: card.dataset.deepLink || "",
+        appStoreUrl: card.dataset.appStoreUrl || "",
+        playStoreUrl: card.dataset.playStoreUrl || "",
+        enableSaveQr: card.dataset.enableSaveQr === "true",
+        enableOpenApp: card.dataset.enableOpenApp === "true",
+        enableChecklist: card.dataset.enableChecklist === "true",
+        dynamicQrSupported: card.dataset.dynamicQrSupported === "true",
+        amountPrefillSupported: card.dataset.amountPrefillSupported === "true",
+        referenceSupported: card.dataset.referenceSupported === "true",
+        galleryScanSupported: card.dataset.galleryScanSupported === "true",
+        slipRequired: card.dataset.slipRequired === "true",
+        autoVerificationSupported: card.dataset.autoVerificationSupported === "true",
+        webhookSupported: card.dataset.webhookSupported === "true",
+        checklistSteps: parseChecklistSteps(card.dataset.checklistSteps)
     };
 
     localStorage.setItem("selectedPaymentMethod", window.selectedPaymentData.key);
@@ -203,11 +302,28 @@ function selectPaymentCard(card) {
     );
 }
 
+function parseChecklistSteps(value) {
+    try {
+        const steps = JSON.parse(value || "[]");
+        return Array.isArray(steps) ? steps : [];
+    } catch (error) {
+        return [];
+    }
+}
+
 function normalizePaymentKey(name) {
-    return String(name || "")
+    const key = String(name || "")
         .toLowerCase()
         .replace(/\s+/g, "")
         .replace(/[^a-z0-9]/g, "");
+    const aliases = {
+        azielwallet: "wallet",
+        promptpay: "promptpay",
+        promptpayauto: "promptpay",
+        bangkokbank: "bangkokbank",
+        manualbanktransfer: "manualbank"
+    };
+    return aliases[key] || key;
 }
 
 function getPaymentDisplayName(key) {
@@ -222,10 +338,21 @@ function getPaymentDisplayName(key) {
         promptpay: "PromptPay",
         scb: "SCB",
         bangkokbank: "Bangkok Bank",
+        kplus: "K PLUS",
+        krungsri: "Krungsri",
+        mmqr: "MMQR",
+        manualbank: "Manual Bank Transfer",
         wallet: "AZIEL Wallet"
     };
 
     return names[key] || "Payment";
+}
+
+function getPaymentCardLogo(method = {}, key = "") {
+    if (method.logoUrl || method.logo || method.logoImage) {
+        return method.logoUrl || method.logo || method.logoImage;
+    }
+    return getPaymentLogo(key || method.key || method.provider || method.method);
 }
 
 function getPaymentLogo(key) {
@@ -235,10 +362,31 @@ function getPaymentLogo(key) {
         ayapay: "assets/payment/ayapay.png",
         promptpay: "assets/payment/promptpay.png",
         scb: "assets/payment/scb.png",
+        bangkokbank: "assets/payment/bank-neutral.svg",
+        kplus: "assets/payment/bank-neutral.svg",
+        krungsri: "assets/payment/bank-neutral.svg",
+        mmqr: "assets/payment/payment-neutral.svg",
+        manualbank: "assets/payment/bank-neutral.svg",
         wallet: "assets/logo.png"
     };
 
-    return logos[key] || "assets/logo.png";
+    return logos[normalizePaymentKey(key)] || "assets/payment/payment-neutral.svg";
+}
+
+function isKnownPaymentProvider(key) {
+    return [
+        "kbzpay",
+        "wavepay",
+        "ayapay",
+        "promptpay",
+        "scb",
+        "bangkokbank",
+        "kplus",
+        "krungsri",
+        "mmqr",
+        "manualbank",
+        "wallet"
+    ].includes(normalizePaymentKey(key));
 }
 
 window.loadPaymentMethods = loadPaymentMethods;

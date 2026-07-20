@@ -48,6 +48,18 @@
                         <figcaption id="azPaymentSheetQrFallback" hidden>QR image unavailable. Use the account details above.</figcaption>
                     </figure>
 
+                    <div id="azPaymentSheetActions" class="az-payment-sheet__actions" hidden>
+                        <button type="button" id="azPaymentSheetSaveQr" class="az-payment-sheet__action" hidden>Save QR</button>
+                        <button type="button" id="azPaymentSheetOpenBankApp" class="az-payment-sheet__action" hidden>Open Bank App</button>
+                    </div>
+
+                    <div id="azPaymentSheetAppFallback" class="az-payment-sheet__fallback" hidden></div>
+
+                    <section id="azPaymentSheetChecklist" class="az-payment-sheet__checklist" hidden>
+                        <span>Payment progress</span>
+                        <ol id="azPaymentSheetChecklistSteps"></ol>
+                    </section>
+
                     <p id="azPaymentSheetInstructions" class="az-payment-sheet__instructions"></p>
 
                     <button type="button" id="azPaymentSheetOpenApp" class="az-payment-sheet__secondary" hidden>Open Payment App</button>
@@ -118,6 +130,182 @@
         btn.textContent = isLoading ? (text || "Submitting...") : (activeState?.submitLabel || "Submit for Verification");
     }
 
+    function showToast(message, type = "info") {
+        if (window.AZIEL_UI?.toast?.[type]) {
+            window.AZIEL_UI.toast[type](message);
+            return;
+        }
+        if (window.PaymentUtils?.showToast) window.PaymentUtils.showToast(message);
+    }
+
+    function bool(value) {
+        return value === true || value === "true";
+    }
+
+    function safeFilePart(value = "payment") {
+        return String(value || "payment")
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "")
+            .slice(0, 80) || "payment";
+    }
+
+    function knownChecklistAction(action = "") {
+        return [
+            "save_qr",
+            "open_app",
+            "upload_receipt",
+            "wait_for_confirmation",
+            "confirm_payment"
+        ].includes(action);
+    }
+
+    function defaultChecklistSteps(options = {}) {
+        const steps = [];
+        if (options.enableSaveQr && (options.qrImageUrl || options.qrImage)) {
+            steps.push({ key: "save_qr", label: "Save QR", action: "save_qr", enabled: true, sortOrder: 10 });
+        }
+        if (options.enableOpenApp && options.deepLink) {
+            steps.push({
+                key: "open_app",
+                label: `Open ${options.appDisplayName || options.methodName || "payment app"}`,
+                action: "open_app",
+                enabled: true,
+                sortOrder: 20
+            });
+        }
+        if (options.requiresSlip !== false) {
+            steps.push({ key: "upload_receipt", label: "Upload receipt", action: "upload_receipt", enabled: true, sortOrder: 30 });
+        } else {
+            steps.push({ key: "wait_for_confirmation", label: "Wait for confirmation", action: "wait_for_confirmation", enabled: true, sortOrder: 30 });
+        }
+        return steps;
+    }
+
+    function normalizeChecklistSteps(options = {}) {
+        const configured = Array.isArray(options.checklistSteps) ? options.checklistSteps : [];
+        const source = configured.length ? configured : defaultChecklistSteps(options);
+
+        return source
+            .filter(step => step && step.enabled !== false && knownChecklistAction(step.action))
+            .map((step, index) => ({
+                key: step.key || step.action || `step_${index}`,
+                label: step.label || String(step.action || "").replaceAll("_", " "),
+                action: step.action,
+                sortOrder: Number(step.sortOrder || (index + 1) * 10)
+            }))
+            .sort((a, b) => a.sortOrder - b.sortOrder);
+    }
+
+    function updateChecklist(action, state = "complete") {
+        if (!activeState?.checklistSteps?.length || !action) return;
+
+        const completed = new Set(activeState.completedChecklistActions || []);
+        if (state === "complete") completed.add(action);
+        activeState.completedChecklistActions = completed;
+
+        const list = document.getElementById("azPaymentSheetChecklistSteps");
+        if (!list) return;
+
+        const firstIncomplete = activeState.checklistSteps.find(step => !completed.has(step.action));
+        list.querySelectorAll("[data-action]").forEach(item => {
+            const itemAction = item.getAttribute("data-action") || "";
+            const isComplete = completed.has(itemAction);
+            const isActive = !isComplete && firstIncomplete?.action === itemAction;
+            item.classList.toggle("is-complete", isComplete);
+            item.classList.toggle("is-active", isActive);
+            item.setAttribute("aria-current", isActive ? "step" : "false");
+        });
+    }
+
+    function renderChecklist(modal, options = {}) {
+        const box = modal.querySelector("#azPaymentSheetChecklist");
+        const list = modal.querySelector("#azPaymentSheetChecklistSteps");
+        if (!box || !list) return;
+
+        const steps = bool(options.enableChecklist)
+            ? normalizeChecklistSteps(options)
+            : [];
+
+        activeState.checklistSteps = steps;
+        activeState.completedChecklistActions = new Set();
+
+        if (!steps.length) {
+            box.hidden = true;
+            list.innerHTML = "";
+            return;
+        }
+
+        list.innerHTML = steps.map((step, index) => `
+            <li data-action="${escapeHTML(step.action)}" class="${index === 0 ? "is-active" : ""}" aria-current="${index === 0 ? "step" : "false"}">
+                <i aria-hidden="true"></i>
+                <span>${escapeHTML(step.label)}</span>
+            </li>
+        `).join("");
+        box.hidden = false;
+    }
+
+    async function downloadQr(options = {}) {
+        const modal = document.getElementById("azPaymentCheckoutSheet");
+        const qrImg = modal?.querySelector("#azPaymentSheetQrImage");
+        const qrCanvas = modal?.querySelector("#azPaymentSheetQrWrap canvas");
+        const filename = `${safeFilePart(options.methodCode || options.methodName || "aziel-payment")}-${safeFilePart(options.reference || "qr")}.png`;
+
+        let href = "";
+        if (qrCanvas?.toDataURL) {
+            href = qrCanvas.toDataURL("image/png");
+        } else if (qrImg?.src) {
+            href = qrImg.currentSrc || qrImg.src;
+        }
+
+        if (!href) {
+            setMessage("error", "QR image is unavailable.");
+            return;
+        }
+
+        const anchor = document.createElement("a");
+        anchor.href = href;
+        anchor.download = filename;
+        anchor.rel = "noopener noreferrer";
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+
+        updateChecklist("save_qr");
+        showToast("QR saved", "success");
+    }
+
+    function openPaymentApp(options = {}) {
+        const deepLink = String(options.deepLink || "").trim();
+        if (!deepLink) {
+            setMessage("error", "Payment app link is unavailable.");
+            return;
+        }
+
+        updateChecklist("open_app");
+        setMessage("success", `Opening ${options.appDisplayName || options.methodName || "payment app"}. Return here after transfer and upload your receipt.`);
+        window.location.href = deepLink;
+
+        const fallback = document.getElementById("azPaymentSheetAppFallback");
+        if (!fallback) return;
+
+        window.setTimeout(() => {
+            if (!document.getElementById("azPaymentCheckoutSheet")?.classList.contains("show")) return;
+
+            const links = [
+                options.appStoreUrl ? `<a href="${escapeHTML(options.appStoreUrl)}" target="_blank" rel="noopener noreferrer">App Store</a>` : "",
+                options.playStoreUrl ? `<a href="${escapeHTML(options.playStoreUrl)}" target="_blank" rel="noopener noreferrer">Google Play</a>` : ""
+            ].filter(Boolean);
+
+            if (!links.length) return;
+            fallback.innerHTML = `
+                <span>App did not open?</span>
+                ${links.join("")}
+            `;
+            fallback.hidden = false;
+        }, 1400);
+    }
+
     function selectedFile() {
         return document.getElementById("azPaymentSheetSlipInput")?.files?.[0] || null;
     }
@@ -142,6 +330,7 @@
             image.src = URL.createObjectURL(file);
             preview.hidden = false;
             setMessage("", "");
+            updateChecklist("upload_receipt");
         };
 
         document.getElementById("azPaymentSheetRemoveFile").onclick = () => {
@@ -168,7 +357,9 @@
         activeState = {
             ...options,
             requiresSlip,
-            submitLabel
+            submitLabel,
+            checklistSteps: [],
+            completedChecklistActions: new Set()
         };
 
         modal.querySelector("#azPaymentSheetTitle").textContent = `${methodName} Transfer`;
@@ -208,17 +399,37 @@
             qrWrap.hidden = true;
         }
 
+        const actions = modal.querySelector("#azPaymentSheetActions");
+        const saveQr = modal.querySelector("#azPaymentSheetSaveQr");
+        const openBankApp = modal.querySelector("#azPaymentSheetOpenBankApp");
+        const fallback = modal.querySelector("#azPaymentSheetAppFallback");
+        const canSaveQr = bool(options.enableSaveQr) && Boolean(qr);
+        const canOpenApp = bool(options.enableOpenApp) && Boolean(options.deepLink);
+        if (fallback) {
+            fallback.hidden = true;
+            fallback.innerHTML = "";
+        }
+        if (actions) actions.hidden = !(canSaveQr || canOpenApp);
+        if (saveQr) {
+            saveQr.hidden = !canSaveQr;
+            saveQr.onclick = canSaveQr ? () => downloadQr(activeState) : null;
+        }
+        if (openBankApp) {
+            const appName = options.appDisplayName || methodName;
+            openBankApp.hidden = !canOpenApp;
+            openBankApp.textContent = `Open ${appName}`;
+            openBankApp.onclick = canOpenApp ? () => openPaymentApp(activeState) : null;
+        }
+
+        renderChecklist(modal, {
+            ...options,
+            methodName,
+            qrImageUrl: qr,
+            requiresSlip
+        });
+
         const openApp = modal.querySelector("#azPaymentSheetOpenApp");
-        if (options.deepLink) {
-            openApp.hidden = false;
-            openApp.textContent = `Open ${methodName} App`;
-            openApp.onclick = () => {
-                setMessage("success", "Opening payment app. Return here after transfer and upload your receipt.");
-                setTimeout(() => {
-                    window.location.href = options.deepLink;
-                }, 250);
-            };
-        } else {
+        if (openApp) {
             openApp.hidden = true;
             openApp.onclick = null;
         }

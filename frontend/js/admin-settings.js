@@ -58,6 +58,10 @@ function setSettingsChecked(id, checked) {
 }
 
 async function loadPaymentMethods() {
+    if (typeof window.loadAdminPaymentMethods === "function") {
+        return window.loadAdminPaymentMethods();
+    }
+
     const box = document.getElementById("paymentMethodsContainer");
     if (!box) return;
 
@@ -170,13 +174,17 @@ function paymentCardHTML(method) {
 
             <label>Provider</label>
             <select class="pm-provider">
-                <option value="manual" ${method.provider === "manual" ? "selected" : ""}>Manual</option>
                 <option value="kbzpay" ${method.provider === "kbzpay" ? "selected" : ""}>KBZPay</option>
                 <option value="wavepay" ${method.provider === "wavepay" ? "selected" : ""}>WavePay</option>
                 <option value="promptpay" ${method.provider === "promptpay" ? "selected" : ""}>PromptPay</option>
-                <option value="omise" ${method.provider === "omise" ? "selected" : ""}>PromptPay</option>
                 <option value="scb" ${method.provider === "scb" ? "selected" : ""}>SCB</option>
-                <option value="aya" ${method.provider === "aya" ? "selected" : ""}>AYA Pay</option>
+                <option value="bangkok_bank" ${method.provider === "bangkok_bank" ? "selected" : ""}>Bangkok Bank</option>
+                <option value="kplus" ${method.provider === "kplus" ? "selected" : ""}>K PLUS</option>
+                <option value="krungsri" ${method.provider === "krungsri" ? "selected" : ""}>Krungsri</option>
+                <option value="ayapay" ${method.provider === "ayapay" ? "selected" : ""}>AYA Pay</option>
+                <option value="mmqr" ${method.provider === "mmqr" ? "selected" : ""}>MMQR</option>
+                <option value="manual_bank" ${method.provider === "manual_bank" ? "selected" : ""}>Manual Bank Transfer</option>
+                <option value="wallet" ${method.provider === "wallet" ? "selected" : ""}>AZIEL Wallet</option>
             </select>
 
             <button class="save-payment-btn" type="button" data-action="save-payment" data-id="${escapeHTML(method._id)}">

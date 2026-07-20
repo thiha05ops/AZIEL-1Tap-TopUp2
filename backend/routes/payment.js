@@ -148,11 +148,11 @@ async function getEnabledManualPaymentMethod(paymentMethod, region) {
     const methodKey = normalizePaymentKey(paymentMethod);
     if (!methodKey) return null;
 
-    const method = await PaymentMethod.findOne({
-        key: methodKey,
+    const methods = await PaymentMethod.find({
         region,
         enabled: true
     });
+    const method = methods.find(item => normalizePaymentKey(item.key) === methodKey);
 
     if (!method || !isManualPaymentType(method.paymentType)) return null;
     return method;
@@ -947,11 +947,11 @@ router.post("/payment/create", authMiddleware, activeOrderCreateLimiter, async (
         const catalogItem = pricing.catalogItem;
 
         const methodKey = normalizePaymentKey(paymentMethod);
-        const configuredMethod = await PaymentMethod.findOne({
-            key: methodKey,
+        const configuredMethods = await PaymentMethod.find({
             region: catalogItem.region,
             enabled: true
         });
+        const configuredMethod = configuredMethods.find(method => normalizePaymentKey(method.key) === methodKey);
 
         if (configuredMethod && isManualPaymentType(configuredMethod.paymentType)) {
             return res.status(409).json({

@@ -100,6 +100,14 @@
     font-weight: 900;
 }
 
+.pay-description,
+.pay-message {
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 750;
+    line-height: 1.35;
+}
+
 .auto-pay-badge,
 .manual-pay-badge {
     padding: 4px 8px;
@@ -306,6 +314,139 @@
     font-weight: 950;
 }
 
+.promptpay-guide {
+    margin-top: 14px;
+}
+
+.promptpay-guide .manual-payment-note {
+    margin: 0;
+}
+
+.promptpay-guide .manual-payment-note span {
+    display: block;
+    margin-top: 4px;
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.promptpay-guide-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.promptpay-guide-action {
+    min-height: 42px;
+    padding: 10px 12px;
+    border: 1px solid rgba(168, 85, 247, .3);
+    border-radius: 14px;
+    background: rgba(168, 85, 247, .12);
+    color: var(--text);
+    font-weight: 900;
+    cursor: pointer;
+    transition:
+        transform var(--motion-duration-fast, .18s) var(--motion-ease-standard, ease),
+        border-color var(--motion-duration-fast, .18s) var(--motion-ease-standard, ease),
+        background-color var(--motion-duration-fast, .18s) var(--motion-ease-standard, ease);
+}
+
+.promptpay-guide-action:hover {
+    transform: translateY(-1px);
+    border-color: rgba(168, 85, 247, .58);
+    background: rgba(168, 85, 247, .18);
+}
+
+.promptpay-app-fallback {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.promptpay-app-fallback[hidden] {
+    display: none;
+}
+
+.promptpay-app-fallback a {
+    color: var(--primary);
+    font-weight: 900;
+    text-decoration: none;
+}
+
+.promptpay-guide-checklist {
+    margin-top: 14px;
+    text-align: left;
+}
+
+.promptpay-guide-checklist > span {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.promptpay-guide-checklist ol {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.promptpay-guide-checklist li {
+    display: grid;
+    grid-template-columns: 18px 1fr;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.promptpay-guide-checklist li i {
+    width: 18px;
+    height: 18px;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: var(--surface);
+}
+
+.promptpay-guide-checklist li.is-active {
+    color: var(--text);
+}
+
+.promptpay-guide-checklist li.is-active i {
+    border-color: rgba(168, 85, 247, .65);
+    box-shadow: 0 0 0 3px rgba(168, 85, 247, .12);
+}
+
+.promptpay-guide-checklist li.is-complete {
+    color: var(--success);
+}
+
+.promptpay-guide-checklist li.is-complete i {
+    display: grid;
+    place-items: center;
+    border-color: var(--success);
+    background: rgba(34, 197, 94, .14);
+}
+
+.promptpay-guide-checklist li.is-complete i::before {
+    content: "✓";
+    color: var(--success);
+    font-size: 11px;
+    font-weight: 950;
+}
+
 #confirmPaymentOrderBtn {
     width: 100%;
     height: 52px;
@@ -404,5 +545,9 @@
     #modalQrImage {
         width: 210px;
         height: 210px;
+    }
+
+    .promptpay-guide-actions {
+        grid-template-columns: 1fr;
     }
 }

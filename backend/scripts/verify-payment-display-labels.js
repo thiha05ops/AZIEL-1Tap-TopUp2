@@ -27,7 +27,11 @@ function main() {
         "AZIEL Wallet",
         "AZIEL Wallet",
         "Bangkok Bank",
+        "K PLUS",
         "KBZPay",
+        "Krungsri",
+        "MMQR",
+        "Manual Bank Transfer",
         "PromptPay",
         "SCB",
         "WavePay"
@@ -47,7 +51,11 @@ function main() {
         ["wallet", "AZIEL Wallet"],
         ["aziel_wallet", "AZIEL Wallet"],
         ["scb", "SCB"],
-        ["bangkok_bank", "Bangkok Bank"]
+        ["bangkok_bank", "Bangkok Bank"],
+        ["kplus", "K PLUS"],
+        ["krungsri", "Krungsri"],
+        ["mmqr", "MMQR"],
+        ["manual_bank", "Manual Bank Transfer"]
     ].forEach(([input, expected]) => {
         assert.strictEqual(formatPaymentDisplayName(input), expected, `${input} must render as ${expected}`);
     });
@@ -63,6 +71,10 @@ function main() {
         "PromptPay",
         "SCB",
         "Bangkok Bank",
+        "K PLUS",
+        "Krungsri",
+        "MMQR",
+        "Manual Bank Transfer",
         "AZIEL Wallet",
         "replaceInText"
     ].forEach(token => assert(frontendFormatter.includes(token), `Frontend formatter missing ${token}`));
