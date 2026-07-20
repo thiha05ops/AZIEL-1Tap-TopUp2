@@ -3,6 +3,7 @@
 
 (function () {
     let activeState = null;
+    const DYNAMIC_PROMPTPAY_QR_VERSION = "promptpay-emv-merchant-proxy-v2";
 
     function escapeHTML(value) {
         const utilEscape = window.PaymentUtils?.escapeHTML;
@@ -155,9 +156,27 @@
         return `aziel:payment-checkout:${reference}`;
     }
 
+    function normalizedComparableAmount(value) {
+        const number = Number(value);
+        return Number.isFinite(number) ? number.toFixed(2) : "";
+    }
+
+    function sameCheckoutIdentity(snapshot = {}, options = {}) {
+        const methodCode = String(options.methodCode || options.key || options.paymentMethod || "").trim().toLowerCase();
+        const snapshotMethod = String(snapshot.methodCode || "").trim().toLowerCase();
+        return Boolean(snapshot) &&
+            snapshot.schemaVersion === DYNAMIC_PROMPTPAY_QR_VERSION &&
+            String(snapshot.reference || "") === String(options.reference || "") &&
+            snapshotMethod === methodCode &&
+            normalizedComparableAmount(snapshot.amount) === normalizedComparableAmount(options.amount) &&
+            String(snapshot.currency || "").toUpperCase() === String(options.currency || "").toUpperCase() &&
+            String(snapshot.qrMode || "") === String(options.qrMode || "");
+    }
+
     function persistCheckoutState(options = {}) {
         try {
             const snapshot = {
+                schemaVersion: DYNAMIC_PROMPTPAY_QR_VERSION,
                 methodCode: options.methodCode || options.key || "",
                 methodName: options.methodName || "",
                 amount: options.amount,
@@ -178,7 +197,10 @@
         try {
             const raw = sessionStorage.getItem(checkoutStorageKey(options));
             const snapshot = raw ? JSON.parse(raw) : null;
-            if (!snapshot || snapshot.reference !== options.reference) return {};
+            if (!sameCheckoutIdentity(snapshot, options)) {
+                sessionStorage.removeItem(checkoutStorageKey(options));
+                return {};
+            }
             return snapshot;
         } catch (error) {
             return {};

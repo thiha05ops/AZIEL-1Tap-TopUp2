@@ -1,4 +1,5 @@
 const QRCode = require("qrcode");
+const { PNG } = require("pngjs");
 
 const RECIPIENT_TYPES = Object.freeze({
     PHONE: "PHONE",
@@ -223,6 +224,12 @@ async function createPromptPayQr({ method, amount, currency, orderReference }) {
         margin: 1,
         width: 640
     });
+    const qrImagePayloadMatches = qrImageMatchesPayload(qrImage, qrPayload);
+    if (!qrImagePayloadMatches) {
+        throw Object.assign(new Error("Generated PromptPay QR image does not match payload"), {
+            code: "PROMPTPAY_QR_IMAGE_MISMATCH"
+        });
+    }
     const minutes = Number(method.dynamicQrExpiryMinutes || 15);
     const expiresAt = new Date(Date.now() + (Number.isFinite(minutes) && minutes > 0 ? minutes : 15) * 60 * 1000);
 
@@ -233,9 +240,53 @@ async function createPromptPayQr({ method, amount, currency, orderReference }) {
         orderReference: String(orderReference || ""),
         qrPayload,
         encodedAmount: decodedPayload.amountText,
+        decodedPayload,
+        qrImagePayloadMatches,
         qrImage,
         expiresAt: expiresAt.toISOString()
     };
+}
+
+function parsePngDataUrl(dataUrl = "") {
+    const match = String(dataUrl || "").match(/^data:image\/png;base64,(.+)$/);
+    if (!match) {
+        throw Object.assign(new Error("QR image must be a PNG data URL"), {
+            code: "PROMPTPAY_QR_IMAGE_INVALID"
+        });
+    }
+    return PNG.sync.read(Buffer.from(match[1], "base64"));
+}
+
+function pixelIsDark(png, x, y) {
+    const clampedX = Math.max(0, Math.min(png.width - 1, Math.round(x)));
+    const clampedY = Math.max(0, Math.min(png.height - 1, Math.round(y)));
+    const idx = (png.width * clampedY + clampedX) << 2;
+    const alpha = png.data[idx + 3];
+    if (alpha === 0) return false;
+    const luminance = (png.data[idx] * 0.299) + (png.data[idx + 1] * 0.587) + (png.data[idx + 2] * 0.114);
+    return luminance < 128;
+}
+
+function qrImageMatchesPayload(dataUrl, payload) {
+    const png = parsePngDataUrl(dataUrl);
+    const qr = QRCode.create(payload, { errorCorrectionLevel: "M" });
+    const matrixSize = qr.modules.size;
+    const quietZone = 1;
+    const totalModules = matrixSize + quietZone * 2;
+    const scaleX = png.width / totalModules;
+    const scaleY = png.height / totalModules;
+    if (!Number.isFinite(scaleX) || !Number.isFinite(scaleY) || scaleX <= 0 || scaleY <= 0) return false;
+
+    for (let row = 0; row < matrixSize; row++) {
+        for (let col = 0; col < matrixSize; col++) {
+            const expected = qr.modules.data[row * matrixSize + col] === 1;
+            const x = (quietZone + col + 0.5) * scaleX;
+            const y = (quietZone + row + 0.5) * scaleY;
+            if (pixelIsDark(png, x, y) !== expected) return false;
+        }
+    }
+
+    return true;
 }
 
 module.exports = {
@@ -247,5 +298,6 @@ module.exports = {
     maskPromptPayRecipient,
     normalizeAmount,
     normalizePromptPayRecipient,
+    qrImageMatchesPayload,
     validatePromptPayPayloadCrc
 };

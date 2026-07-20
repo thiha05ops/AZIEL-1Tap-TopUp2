@@ -8,6 +8,7 @@ const {
     createPromptPayQr,
     decodePromptPayPayload,
     normalizePromptPayRecipient,
+    qrImageMatchesPayload,
     validatePromptPayPayloadCrc
 } = require("../services/promptPayQrService");
 const { paymentMethodReadiness } = require("../services/paymentProviderRegistry");
@@ -114,6 +115,8 @@ async function verifyQrPayload() {
     assert.strictEqual(result.amount, 1490, "Backend QR result must preserve finalized amount unchanged.");
     assert.strictEqual(result.encodedAmount, "1490.00", "Backend QR result must expose decoded encoded amount.");
     assert.strictEqual(decodePromptPayPayload(result.qrPayload).amountText, "1490.00", "Generated QR must decode to expected amount before return.");
+    assert.strictEqual(result.qrImagePayloadMatches, true, "Backend QR result must prove returned QR image matches qrPayload.");
+    assert.strictEqual(qrImageMatchesPayload(result.qrImage, result.qrPayload), true, "Verifier must inspect generated QR image pixels and match them to qrPayload.");
 
     assertThrowsCode(() => buildPromptPayPayload({
         recipientType: "PHONE",
@@ -161,11 +164,15 @@ function verifyFrontendFlow() {
     includes("frontend/js/payment/payment-checkout-sheet.js", "setQrLoading(true)", "checkout sheet must show QR loading state.");
     includes("frontend/js/payment/payment-checkout-sheet.js", "azPaymentSheetRetryQr", "checkout sheet must provide retry state.");
     includes("frontend/js/payment/payment-checkout-sheet.js", "sessionStorage.setItem", "checkout state must persist in sessionStorage.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "sameCheckoutIdentity", "checkout restore must validate amount, method, currency, reference, and QR mode.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "DYNAMIC_PROMPTPAY_QR_VERSION", "checkout restore must version-bust old dynamic QR payloads.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "setQrImage(data.qrImage)", "dynamic generation success must render the current response QR image.");
     includes("frontend/js/payment/payment-checkout-sheet.js", "Please choose your payment receipt first.", "receipt remains required.");
     includes("frontend/js/payment/payment-checkout-sheet.js", "Please generate the payment QR before submitting your receipt.", "dynamic QR generation is required before submit.");
     includes("frontend/js/payment/payment-checkout-sheet.js", "window.PaymentQrSaver", "Save QR must reuse Blob/Web Share/download implementation.");
     includes("frontend/js/payment/payment-checkout-sheet.js", "resolveAppLaunchTarget", "Open App must use capability-owned launcher URLs.");
     includes("frontend/js/payment/payment-checkout-sheet.js", "Bank app could not be opened.", "Open App failure must be non-blocking.");
+    assert(/const qr = dynamicQr\s*\?\s*normalizeUrl\(restored\.qrImageUrl \|\| \"\"\)\s*:\s*normalizeUrl\(options\.qrImageUrl/.test(read("frontend/js/payment/payment-checkout-sheet.js")), "Dynamic mode must not fall back to configured static QR before generation.");
     notIncludes("frontend/js/payment/payment-checkout-sheet.js", "paymentStatus: \"paid\"", "checkout sheet must not mark payments paid.");
 }
 
