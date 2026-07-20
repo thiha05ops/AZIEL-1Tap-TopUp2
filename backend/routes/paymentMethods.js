@@ -1,4 +1,5 @@
 const express = require("express");
+const { Readable } = require("stream");
 const router = express.Router();
 
 const PaymentMethod = require("../models/PaymentMethod");
@@ -233,6 +234,40 @@ function safeUrl(value = "", options = {}) {
 
     if (/^https:\/\//i.test(url)) return url;
     return "";
+}
+
+function safeDownloadFilePart(value = "payment") {
+    return String(value || "payment")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 80) || "payment";
+}
+
+function isTrustedCloudinaryQrUrl(value = "", env = process.env) {
+    try {
+        const parsed = new URL(String(value || ""));
+        if (parsed.protocol !== "https:") return false;
+        if (parsed.hostname !== "res.cloudinary.com") return false;
+
+        const cloudName = String(env.CLOUDINARY_CLOUD_NAME || "").trim();
+        if (!cloudName) return true;
+
+        const firstPathPart = parsed.pathname.split("/").filter(Boolean)[0] || "";
+        return firstPathPart === cloudName;
+    } catch (error) {
+        return false;
+    }
+}
+
+function qrDownloadFilename(method = {}, reference = "") {
+    const methodKey = safeDownloadFilePart(method.key || method.provider || method.method || "payment");
+    const referencePart = safeDownloadFilePart(reference || "qr");
+    return `aziel-${methodKey}-${referencePart}.png`;
+}
+
+function getConfiguredQrUrl(method = {}) {
+    return method.uploadedQrImage || method.qrImageUrl || method.qrImage || "";
 }
 
 function canonicalMethodDefaults(item = {}) {
@@ -524,6 +559,88 @@ router.get("/payment-methods", async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Server error"
+        });
+    }
+});
+
+// GET /api/payment-methods/:key/qr-download
+router.get("/payment-methods/:key/qr-download", async (req, res) => {
+    try {
+        await seedPaymentMethods();
+
+        const key = safeText(req.params.key, 60)
+            .toLowerCase()
+            .replace(/[^a-z0-9_-]/g, "");
+        const region = String(req.query.region || "").trim().toUpperCase();
+        const filter = { key, enabled: true };
+        if (["MM", "TH"].includes(region)) filter.region = region;
+
+        const method = await PaymentMethod.findOne(filter);
+        const qrUrl = getConfiguredQrUrl(method || {});
+        if (!method || !qrUrl) {
+            return res.status(404).json({
+                success: false,
+                message: "QR image not found"
+            });
+        }
+
+        if (!isTrustedCloudinaryQrUrl(qrUrl)) {
+            return res.status(400).json({
+                success: false,
+                message: "QR image cannot be proxied"
+            });
+        }
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000);
+        let upstream;
+
+        try {
+            upstream = await fetch(qrUrl, {
+                signal: controller.signal,
+                headers: {
+                    Accept: "image/*"
+                },
+                redirect: "follow"
+            });
+        } finally {
+            clearTimeout(timeout);
+        }
+
+        if (!upstream.ok || !isTrustedCloudinaryQrUrl(upstream.url || qrUrl)) {
+            return res.status(502).json({
+                success: false,
+                message: "QR image unavailable"
+            });
+        }
+
+        const contentType = String(upstream.headers.get("content-type") || "").toLowerCase();
+        if (!contentType.startsWith("image/")) {
+            return res.status(415).json({
+                success: false,
+                message: "QR image type is not supported"
+            });
+        }
+
+        res.setHeader("Content-Type", contentType);
+        res.setHeader("Content-Disposition", `attachment; filename="${qrDownloadFilename(method, req.query.reference)}"`);
+        res.setHeader("Cache-Control", "no-store");
+
+        const body = upstream.body;
+        if (!body) return res.status(502).end();
+        return Readable.fromWeb(body).pipe(res);
+    } catch (error) {
+        if (error?.name === "AbortError") {
+            return res.status(504).json({
+                success: false,
+                message: "QR image request timed out"
+            });
+        }
+
+        console.log("Payment QR download proxy error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "QR image download failed"
         });
     }
 });

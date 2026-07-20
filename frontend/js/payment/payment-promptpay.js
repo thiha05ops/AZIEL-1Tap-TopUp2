@@ -206,7 +206,7 @@
         });
     }
 
-    function savePromptPayQr(state) {
+    async function savePromptPayQr(state) {
         const qr = document.getElementById("modalQrImage");
         const href = qr?.currentSrc || qr?.src || state.qr || "";
         if (!href) {
@@ -214,15 +214,23 @@
             return;
         }
 
-        const link = document.createElement("a");
-        link.href = href;
-        link.download = `${safeFilePart(state.methodCode)}-${safeFilePart(state.orderId)}.png`;
-        link.rel = "noopener noreferrer";
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        completeGuideStep("save_qr");
-        PaymentUtils.showToast?.("QR saved");
+        if (window.PaymentQrSaver?.save) {
+            await window.PaymentQrSaver.save({
+                href,
+                filename: `${safeFilePart(state.methodCode)}-${safeFilePart(state.orderId)}.png`,
+                options: {
+                    methodCode: state.methodCode,
+                    paymentMethod: state.methodCode,
+                    reference: state.orderId,
+                    region: state.region
+                },
+                setMessage: (type, message) => PaymentUtils.showToast?.(message, type),
+                onSuccess: () => completeGuideStep("save_qr")
+            });
+            return;
+        }
+
+        PaymentUtils.showToast?.("Could not save QR. Long-press the image to save.", "error");
     }
 
     function openPromptPayApp(state, app = {}) {

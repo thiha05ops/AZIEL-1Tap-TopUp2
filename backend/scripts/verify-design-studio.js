@@ -138,8 +138,47 @@ function verifyPresets() {
 function verifyExportAndMediaIntegration() {
     const canvas = read("frontend/js/design-studio/design-studio-canvas.js");
     const app = read("frontend/js/design-studio/design-studio-app.js");
+    const page = read("frontend/admin-design-studio.html");
+    const css = read("frontend/css/admin/design-studio.css");
     assert.ok(canvas.includes("exportMode"), "Canvas renderer must support export mode");
     assert.ok(canvas.includes("if (!exportMode && this.state.showSafeAreas)"), "Safe-area overlays must be excluded from export rendering");
+    assert.ok(canvas.includes("syncCanvasEmptyState"), "Canvas empty-state visibility must use one state synchronizer");
+    assert.ok(canvas.includes("this.empty.hidden = hasSourceImage"), "Canvas empty state must hide when a source image exists");
+    assert.ok(canvas.includes("aria-hidden"), "Hidden canvas empty state must leave the accessibility tree");
+    assert.ok(app.includes("preserveSourceImage: true"), "Project restore must preserve decoded source image while restoring editor state");
+    assert.ok(css.includes(".ds-canvas-empty[hidden]"), "Canvas empty state must have a defensive hidden selector");
+    assert.ok(css.includes("display: none !important"), "Hidden canvas empty state must not be overridden by display styles");
+    assert.ok(css.includes("pointer-events: none"), "Hidden canvas empty state must not intercept pointer events");
+    assert.ok(!canvas.includes('fillStyle = "rgba(168, 85, 247, .12)"'), "Safe-area guide must not use a heavy filled purple wash");
+    assert.ok(!canvas.includes("fillRect(x, y, width, height);"), "Safe-area guide must be outline-only");
+    assert.ok(canvas.includes("schemaVersion: 2"), "Editor document model must be schema versioned");
+    assert.ok(canvas.includes("layers: []"), "Editor document model must own serializable layers");
+    assert.ok(canvas.includes("migrateState"), "Editor must include legacy project migration");
+    assert.ok(canvas.includes("selectedLayerIds"), "Editor must support selected layer state");
+    assert.ok(canvas.includes("hitTest"), "Editor must support canvas hit testing");
+    assert.ok(canvas.includes("transformHandles"), "Editor must render transform handles");
+    assert.ok(canvas.includes("addTextLayer"), "Editor must create text layers");
+    assert.ok(canvas.includes("addLogoLayer"), "Editor must create logo layers");
+    assert.ok(canvas.includes("addShapeLayer"), "Editor must create shape layers");
+    assert.ok(canvas.includes("duplicateSelectedLayer"), "Layer duplication must be implemented");
+    assert.ok(canvas.includes("deleteSelectedLayer"), "Layer deletion must be implemented");
+    assert.ok(canvas.includes("reorderLayer"), "Layer reorder must be implemented");
+    assert.ok(canvas.includes("setLayerVisibility"), "Layer visibility must be implemented");
+    assert.ok(canvas.includes("setLayerLocked"), "Layer locking must be implemented");
+    assert.ok(canvas.includes("adjustments"), "Image adjustments must persist on layers");
+    assert.ok(canvas.includes("ctx.filter"), "Image adjustments must render through canvas filter support");
+    assert.ok(canvas.includes("HISTORY_LIMIT = 100"), "History must be capped");
+    assert.ok(app.includes("renderLayerPanel"), "Layer panel must reflect real project layers");
+    assert.ok(app.includes("renderHistoryPanel"), "History panel must render real history");
+    assert.ok(app.includes("bindInspectorControls"), "Inspector controls must be wired");
+    assert.ok(app.includes("toolShortcuts"), "Keyboard tool shortcuts must be implemented");
+    assert.ok(page.includes("ds-tool-rail"), "Studio must expose the permanent tool rail");
+    assert.ok(page.includes("ds-asset-panel"), "Studio must expose the asset panel");
+    assert.ok(page.includes("dsLayerPanelList"), "Studio must expose real Layers panel");
+    assert.ok(page.includes("dsHistoryList"), "Studio must expose History panel");
+    assert.ok(page.includes("dsAdjustBrightness"), "Studio must expose image adjustment controls");
+    assert.ok(page.includes("dsTextContent"), "Studio must expose text editing controls");
+    assert.ok(page.includes("dsLogoColor"), "Studio must expose logo color controls");
     assert.ok(app.includes("AZIEL_ADMIN_MEDIA_SELECTOR.open"), "Media Library import must use existing selector");
     assert.ok(app.includes('adminFetch("/api/admin/media"'), "Media Library upload must use existing Admin media API");
     assert.ok(app.includes("FormData"), "Media Library upload must use existing multipart FormData contract");
@@ -172,6 +211,134 @@ function verifyPhaseOneSettingsSurface() {
     assert.ok(!/api[-_ ]?key/i.test(page), "Phase 1 settings must not request API keys");
 }
 
+function verifyEditorV21Controls() {
+    const canvas = read("frontend/js/design-studio/design-studio-canvas.js");
+    const app = read("frontend/js/design-studio/design-studio-app.js");
+    const page = read("frontend/admin-design-studio.html");
+    const css = read("frontend/css/admin/design-studio.css");
+
+    [
+        "currentTool",
+        "setActiveTool(tool)",
+        "updateCursor",
+        "cursorForHandle",
+        "spacePanning",
+        "fitViewport",
+        "setZoom(value)",
+        "zoomAt",
+        "SUPPORTED_TOOLS",
+        "crop",
+        "ensureCrop",
+        "applyCrop",
+        "resetCrop",
+        "groupSelection",
+        "ungroupSelection",
+        "applyGroupTransform",
+        "applyFilterPreset",
+        "setFilterIntensity",
+        "beginInlineTextEdit",
+        "rotateSelection",
+        "getSelectionBounds",
+        "toggleLayerSelection",
+        "marqueeRect",
+        "applyMarqueeSelection",
+        "isEffectivelyLocked",
+        "isEffectivelyVisible",
+        "nudgeSelection"
+    ].forEach(fragment => assert.ok(canvas.includes(fragment), `Missing Studio V2.1 canvas contract: ${fragment}`));
+
+    [
+        "data-ds-tool=\"select\"",
+        "data-ds-tool=\"hand\"",
+        "data-ds-tool=\"zoom\"",
+        "data-ds-tool=\"text\"",
+        "data-ds-tool=\"image\"",
+        "data-ds-tool=\"logo\"",
+        "data-ds-tool=\"shape\"",
+        "data-ds-tool=\"crop\"",
+        "dsZoomFit",
+        "dsZoomActual",
+        "dsGroupLayers",
+        "dsUngroupLayers",
+        "dsLayerFront",
+        "dsLayerBack",
+        "dsFilterPresetGrid",
+        "dsFilterIntensity",
+        "dsContextMenu",
+        "dsEnterCrop",
+        "dsApplyCrop",
+        "dsResetCrop",
+        "dsToolStatus",
+        "dsZoomStatus",
+        "dsSelectionStatus"
+    ].forEach(fragment => assert.ok(page.includes(fragment), `Missing Studio V2.1 page control: ${fragment}`));
+
+    [
+        "setActiveTool(tool)",
+        "syncActiveToolButtons",
+        "formatToolName",
+        "dsToolStatus",
+        "dsZoomStatus",
+        "toolShortcuts",
+        "groupSelectedLayers",
+        "ungroupSelectedLayers",
+        "renderFilterPresets",
+        "openContextMenu",
+        "runContextAction",
+        "hasCommandModifier && event.key.toLowerCase() === \"g\"",
+        "nudgeSelection"
+    ].forEach(fragment => assert.ok(app.includes(fragment), `Missing Studio V2.1 app behavior: ${fragment}`));
+
+    [
+        "--ds-background",
+        "--ds-surface-0",
+        "--ds-surface-1",
+        "--ds-surface-2",
+        "--ds-surface-3",
+        "--ds-text-primary",
+        "--ds-text-secondary",
+        "--ds-text-muted",
+        "--ds-text-disabled",
+        "--ds-border",
+        "--ds-hover",
+        "--ds-selected",
+        "--ds-accent",
+        "--ds-danger",
+        "--ds-warning",
+        "--ds-success",
+        "--ds-input-bg",
+        "--ds-input-border",
+        "--ds-panel-bg",
+        "--ds-toolbar-bg",
+        "--ds-inspector-bg",
+        "--ds-canvas-bg",
+        "--ds-layer-selected",
+        "--ds-history-selected",
+        "--ds-focus-ring",
+        "--ds-button-bg",
+        "--ds-checkbox-bg",
+        "--ds-dropdown-bg",
+        "--ds-range-track",
+        "--ds-tab-bg",
+        ".ds-context-menu",
+        ".ds-filter-grid",
+        ".ds-inspector-multiple",
+        ".ds-inspector-group",
+        ".ds-inline-text-editor",
+        ".design-studio-body.ds-selection-locked"
+    ].forEach(fragment => assert.ok(css.includes(fragment), `Missing Studio V2.1 CSS/token: ${fragment}`));
+
+    [
+        "Brush",
+        "AI Tools"
+    ].forEach(fragment => assert.ok(!page.includes(fragment), `Forbidden non-V2.1 Studio control still rendered: ${fragment}`));
+
+    assert.strictEqual(count(page, 'id="dsContextMenu"'), 1, "Context menu ID must not be duplicated");
+    assert.strictEqual(count(page, 'id="dsToolStatus"'), 1, "Tool status ID must not be duplicated");
+    assert.strictEqual(count(page, 'id="dsZoomStatus"'), 1, "Zoom status ID must not be duplicated");
+    assert.strictEqual(count(page, 'id="dsLayerPanelList"'), 1, "Layer panel ID must not be duplicated");
+}
+
 function main() {
     verifyFiles();
     verifyAdminNavigation();
@@ -183,6 +350,7 @@ function main() {
     verifyExportAndMediaIntegration();
     verifyServiceWorkerUnchanged();
     verifyPhaseOneSettingsSurface();
+    verifyEditorV21Controls();
     console.log("verify-design-studio: ok");
 }
 

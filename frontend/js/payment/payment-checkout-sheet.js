@@ -150,6 +150,125 @@
             .slice(0, 80) || "payment";
     }
 
+    function getQrProxyUrl(options = {}) {
+        const methodKey = safeFilePart(options.methodCode || options.key || options.paymentMethod || "");
+        if (!methodKey) return "";
+
+        const params = new URLSearchParams();
+        const region = String(options.region || "").trim().toUpperCase();
+        const reference = String(options.reference || "").trim();
+        if (region) params.set("region", region);
+        if (reference) params.set("reference", reference);
+
+        return `/api/payment-methods/${encodeURIComponent(methodKey)}/qr-download${params.toString() ? `?${params}` : ""}`;
+    }
+
+    function inferImageType(blob, fallbackUrl = "") {
+        const type = String(blob?.type || "").toLowerCase();
+        if (type.startsWith("image/")) return type;
+        if (/\.jpe?g($|\?)/i.test(fallbackUrl)) return "image/jpeg";
+        if (/\.webp($|\?)/i.test(fallbackUrl)) return "image/webp";
+        return "image/png";
+    }
+
+    function fileExtensionForType(type = "") {
+        if (type.includes("jpeg") || type.includes("jpg")) return "jpg";
+        if (type.includes("webp")) return "webp";
+        if (type.includes("gif")) return "gif";
+        return "png";
+    }
+
+    function normalizeQrFilename(filename = "aziel-payment-qr.png", type = "image/png") {
+        const clean = String(filename || "aziel-payment-qr")
+            .toLowerCase()
+            .replace(/[^a-z0-9._-]+/g, "-")
+            .replace(/^-+|-+$/g, "")
+            .slice(0, 120) || "aziel-payment-qr";
+        const withoutExtension = clean.replace(/\.(png|jpe?g|webp|gif)$/i, "");
+        return `${withoutExtension}.${fileExtensionForType(type)}`;
+    }
+
+    async function blobFromCanvas(canvas) {
+        return new Promise((resolve, reject) => {
+            canvas.toBlob(blob => {
+                if (blob) resolve(blob);
+                else reject(new Error("QR image is unavailable."));
+            }, "image/png");
+        });
+    }
+
+    async function fetchImageBlob(url) {
+        const isLocalObject = /^(data:|blob:)/i.test(String(url || ""));
+        const res = await fetch(url, isLocalObject
+            ? {}
+            : {
+                credentials: "same-origin",
+                cache: "no-store"
+            });
+        if (!res.ok) throw new Error("QR image download failed.");
+
+        const blob = await res.blob();
+        const type = inferImageType(blob, url);
+        if (!type.startsWith("image/")) throw new Error("QR image download failed.");
+        return blob.type === type ? blob : blob.slice(0, blob.size, type);
+    }
+
+    async function resolveQrBlob({ href, qrCanvas, options }) {
+        if (qrCanvas?.toBlob) {
+            return {
+                blob: await blobFromCanvas(qrCanvas),
+                source: "canvas"
+            };
+        }
+
+        if (!href) throw new Error("QR image is unavailable.");
+
+        try {
+            return {
+                blob: await fetchImageBlob(href),
+                source: "direct"
+            };
+        } catch (error) {
+            const proxyUrl = getQrProxyUrl(options);
+            if (!proxyUrl) throw error;
+            return {
+                blob: await fetchImageBlob(proxyUrl),
+                source: "proxy"
+            };
+        }
+    }
+
+    async function shareOrDownloadQr(blob, filename) {
+        const type = inferImageType(blob);
+        const safeFilename = normalizeQrFilename(filename, type);
+
+        if (typeof File === "function" && navigator.share) {
+            const file = new File([blob], safeFilename, { type });
+            if (navigator.canShare?.({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    title: "AZIEL payment QR",
+                    text: "Save this payment QR"
+                });
+                return "share";
+            }
+        }
+
+        const url = URL.createObjectURL(blob);
+        try {
+            const anchor = document.createElement("a");
+            anchor.href = url;
+            anchor.download = safeFilename;
+            anchor.rel = "noopener noreferrer";
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            return "download";
+        } finally {
+            window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+    }
+
     function knownChecklistAction(action = "") {
         return [
             "save_qr",
@@ -245,6 +364,25 @@
         box.hidden = false;
     }
 
+    async function saveQrAsset(config = {}) {
+        const filename = config.filename || `${safeFilePart(config.options?.methodCode || "aziel-payment")}-${safeFilePart(config.options?.reference || "qr")}.png`;
+        try {
+            const { blob } = await resolveQrBlob({
+                href: config.href || "",
+                qrCanvas: config.qrCanvas,
+                options: config.options || {}
+            });
+            await shareOrDownloadQr(blob, filename);
+            config.onSuccess?.();
+            config.setMessage?.("success", "QR ready to save");
+            showToast("QR ready to save", "success");
+        } catch (error) {
+            if (error?.name === "AbortError") return;
+            config.setMessage?.("error", "Could not save QR. Long-press the image to save.");
+            showToast("Could not save QR. Long-press the image to save.", "error");
+        }
+    }
+
     async function downloadQr(options = {}) {
         const modal = document.getElementById("azPaymentCheckoutSheet");
         const qrImg = modal?.querySelector("#azPaymentSheetQrImage");
@@ -252,27 +390,23 @@
         const filename = `${safeFilePart(options.methodCode || options.methodName || "aziel-payment")}-${safeFilePart(options.reference || "qr")}.png`;
 
         let href = "";
-        if (qrCanvas?.toDataURL) {
-            href = qrCanvas.toDataURL("image/png");
-        } else if (qrImg?.src) {
+        if (qrImg?.src) {
             href = qrImg.currentSrc || qrImg.src;
         }
 
-        if (!href) {
+        if (!href && !qrCanvas?.toBlob) {
             setMessage("error", "QR image is unavailable.");
             return;
         }
 
-        const anchor = document.createElement("a");
-        anchor.href = href;
-        anchor.download = filename;
-        anchor.rel = "noopener noreferrer";
-        document.body.appendChild(anchor);
-        anchor.click();
-        anchor.remove();
-
-        updateChecklist("save_qr");
-        showToast("QR saved", "success");
+        await saveQrAsset({
+            href,
+            qrCanvas,
+            filename,
+            options,
+            setMessage,
+            onSuccess: () => updateChecklist("save_qr")
+        });
     }
 
     function openPaymentApp(options = {}) {
@@ -482,5 +616,10 @@
         close,
         setMessage,
         setLoading
+    };
+
+    window.PaymentQrSaver = {
+        save: saveQrAsset,
+        safeFilePart
     };
 })();

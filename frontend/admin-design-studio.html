@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="robots" content="noindex,nofollow">
     <meta name="theme-color" content="#070b1d">
-    <title>AZIEL Design Studio</title>
+    <title>AZIEL Studio</title>
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/png" href="/icons/aziel-app-icon-192.png">
     <link rel="stylesheet" href="/css/theme/aziel-design-system.css?v=20260718-i18n">
@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="/css/admin/admin-design-system.css?v=20260715-phase15">
     <link rel="stylesheet" href="/css/core/ui-feedback.css?v=20260712-m6">
     <link rel="stylesheet" href="/css/core/motion.css?v=20260712-m7">
-    <link rel="stylesheet" href="/css/admin/design-studio.css?v=20260719-auth-gate">
+    <link rel="stylesheet" href="/css/admin/design-studio.css?v=20260719-studio-22">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
 
@@ -31,7 +31,7 @@
                     <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
                 </button>
                 <div>
-                    <p>AZIEL Creative</p>
+                    <p>AZIEL Studio</p>
                     <h1>Studio</h1>
                 </div>
             </div>
@@ -42,47 +42,136 @@
             </label>
 
             <div class="design-studio-top-actions">
+                <button id="dsTopNewProject" class="ds-secondary-button" type="button">
+                    <i class="fa-regular fa-file" aria-hidden="true"></i>
+                    <span>New</span>
+                </button>
+                <button id="dsOpenProjects" class="ds-secondary-button" type="button">
+                    <i class="fa-regular fa-folder-open" aria-hidden="true"></i>
+                    <span>Open</span>
+                </button>
+                <button id="dsSaveProject" class="ds-secondary-button" type="button">
+                    <i class="fa-regular fa-floppy-disk" aria-hidden="true"></i>
+                    <span>Save</span>
+                </button>
+                <button id="dsCommandToggle" class="ds-secondary-button ds-command-button" type="button" aria-label="Open command palette">
+                    <i class="fa-solid fa-command" aria-hidden="true"></i>
+                    <span>Command</span>
+                </button>
+                <label class="ds-tool-button ds-secondary-button">
+                    <input id="dsDeviceImport" type="file" accept="image/jpeg,image/png,image/webp">
+                    <i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i>
+                    <span>Import</span>
+                </label>
                 <button id="dsUndo" class="ds-icon-button" type="button" aria-label="Undo">
                     <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
                 </button>
                 <button id="dsRedo" class="ds-icon-button" type="button" aria-label="Redo">
                     <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
                 </button>
-                <button id="dsProjectsToggle" class="ds-secondary-button" type="button">
-                    <i class="fa-solid fa-folder-open" aria-hidden="true"></i>
-                    <span>Projects</span>
+                <button id="dsToggleLogo" class="ds-secondary-button" type="button">
+                    <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+                    <span>Logo</span>
                 </button>
-                <button id="dsMediaToggle" class="ds-secondary-button" type="button">
-                    <i class="fa-solid fa-photo-film" aria-hidden="true"></i>
-                    <span>Media</span>
+                <button id="dsPreviewToggle" class="ds-secondary-button" type="button">
+                    <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                    <span>Preview</span>
                 </button>
-                <button id="dsPropertiesToggle" class="ds-secondary-button" type="button">
-                    <i class="fa-solid fa-sliders" aria-hidden="true"></i>
-                    <span>Properties</span>
-                </button>
-                <button id="dsSaveProject" class="ds-secondary-button" type="button">
-                    <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
-                    <span>Save</span>
-                </button>
-                <button id="dsExportDownload" class="ds-primary-button" type="button">
+                <button id="dsExportToggle" class="ds-primary-button" type="button">
                     <i class="fa-solid fa-download" aria-hidden="true"></i>
                     <span>Export</span>
-                </button>
-                <button id="dsSettingsToggle" class="ds-icon-button" type="button" aria-label="Open settings">
-                    <i class="fa-solid fa-gear" aria-hidden="true"></i>
                 </button>
             </div>
         </header>
 
         <section class="design-studio-workspace" aria-label="Design Studio workspace">
+            <nav class="ds-tool-rail" aria-label="Editor tools">
+                <button class="active" type="button" data-ds-tool="select" aria-label="Select tool" aria-pressed="true">
+                    <i class="fa-solid fa-arrow-pointer" aria-hidden="true"></i><span>Select</span>
+                </button>
+                <button type="button" data-ds-tool="hand" aria-label="Hand tool" aria-pressed="false">
+                    <i class="fa-solid fa-hand" aria-hidden="true"></i><span>Hand</span>
+                </button>
+                <button type="button" data-ds-tool="zoom" aria-label="Zoom tool" aria-pressed="false">
+                    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><span>Zoom</span>
+                </button>
+                <button type="button" data-ds-tool="text" aria-label="Text tool" aria-pressed="false">
+                    <i class="fa-solid fa-font" aria-hidden="true"></i><span>Text</span>
+                </button>
+                <button type="button" data-ds-tool="image" aria-label="Image tool" aria-pressed="false">
+                    <i class="fa-solid fa-image" aria-hidden="true"></i><span>Image</span>
+                </button>
+                <button type="button" data-ds-tool="logo" aria-label="Logo tool" aria-pressed="false">
+                    <i class="fa-solid fa-a" aria-hidden="true"></i><span>Logo</span>
+                </button>
+                <button type="button" data-ds-tool="shape" aria-label="Shape tool" aria-pressed="false">
+                    <i class="fa-solid fa-shapes" aria-hidden="true"></i><span>Shape</span>
+                </button>
+                <button type="button" data-ds-tool="crop" aria-label="Crop tool" aria-pressed="false">
+                    <i class="fa-solid fa-crop-simple" aria-hidden="true"></i><span>Crop</span>
+                </button>
+            </nav>
+
+            <aside class="ds-asset-panel" aria-label="Assets">
+                <div class="ds-panel-heading">
+                    <h2>Assets</h2>
+                    <button id="dsAssetMediaButton" class="ds-mini-button" type="button">Media</button>
+                </div>
+                <label class="ds-asset-search">
+                    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                    <input type="search" placeholder="Search assets..." autocomplete="off">
+                </label>
+                <div class="ds-asset-tabs" aria-label="Asset filters">
+                    <button class="active" type="button">All</button>
+                    <button type="button">Images</button>
+                    <button type="button">Logos</button>
+                    <button type="button">Shapes</button>
+                </div>
+                <section>
+                    <div class="ds-panel-heading">
+                        <h3>Quick Add</h3>
+                    </div>
+                    <div class="ds-quick-assets">
+                        <label>
+                            <input type="file" accept="image/jpeg,image/png,image/webp" data-ds-asset-import>
+                            <i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i>
+                            <span>Image</span>
+                        </label>
+                        <button type="button" id="dsAddTextLayer"><i class="fa-solid fa-font" aria-hidden="true"></i><span>Text</span></button>
+                        <button type="button" id="dsAddLogoLayer"><i class="fa-solid fa-a" aria-hidden="true"></i><span>AZIEL</span></button>
+                        <button type="button" id="dsAddShapeLayer"><i class="fa-solid fa-square" aria-hidden="true"></i><span>Shape</span></button>
+                    </div>
+                </section>
+                <section>
+                    <div class="ds-panel-heading">
+                        <h3>Templates</h3>
+                        <button id="dsOpenExportPresets" class="ds-mini-button" type="button">View</button>
+                    </div>
+                    <div class="ds-template-list">
+                        <button type="button" data-ds-template="home-hero">Home Hero <small>2560 x 900</small></button>
+                        <button type="button" data-ds-template="game-hero">Game Banner <small>2560 x 900</small></button>
+                        <button type="button" data-ds-template="campaign-popup">Campaign <small>1600 x 1200</small></button>
+                    </div>
+                </section>
+            </aside>
+
             <section class="design-studio-canvas-zone">
                 <div class="ds-canvas-toolbar">
+                    <button class="active" type="button" data-ds-tool="select">Select</button>
+                    <button type="button" data-ds-tool="hand">Move</button>
+                    <button type="button" data-ds-tool="text">Text</button>
+                    <span class="ds-toolbar-divider"></span>
                     <div class="ds-segmented" aria-label="Image fit mode">
                         <button type="button" data-ds-fit="fit">Fit</button>
                         <button class="active" type="button" data-ds-fit="cover">Fill</button>
                     </div>
-                    <button id="dsResetImage" class="ds-secondary-button" type="button">Reset image</button>
+                    <button type="button" data-ds-align="left">Align L</button>
+                    <button type="button" data-ds-align="center-x">Center X</button>
+                    <button type="button" data-ds-align="right">Align R</button>
+                    <button id="dsZoomFit" class="ds-secondary-button" type="button">Fit view</button>
+                    <button id="dsZoomActual" class="ds-secondary-button" type="button">100%</button>
                     <button id="dsCenterImage" class="ds-secondary-button" type="button">Center</button>
+                    <button id="dsResetImage" class="ds-secondary-button" type="button">Reset</button>
                     <label class="ds-toolbar-check">
                         <input id="dsSafeAreasToggle" type="checkbox" checked>
                         <span>Safe areas</span>
@@ -112,31 +201,100 @@
                         <small>Drag and drop support can be layered in later without changing the Phase 1 workflow.</small>
                     </div>
                 </div>
+                <section class="ds-layers-dock" aria-label="Layers">
+                    <div class="ds-panel-heading">
+                        <h2>Layers</h2>
+                        <div class="ds-layer-actions">
+                            <button id="dsDuplicateLayer" class="ds-icon-button" type="button" aria-label="Duplicate layer"><i class="fa-regular fa-copy" aria-hidden="true"></i></button>
+                            <button id="dsDeleteLayer" class="ds-icon-button" type="button" aria-label="Delete layer"><i class="fa-regular fa-trash-can" aria-hidden="true"></i></button>
+                            <button id="dsGroupLayers" class="ds-icon-button" type="button" aria-label="Group selected layers"><i class="fa-solid fa-object-group" aria-hidden="true"></i></button>
+                            <button id="dsUngroupLayers" class="ds-icon-button" type="button" aria-label="Ungroup selected group"><i class="fa-solid fa-object-ungroup" aria-hidden="true"></i></button>
+                            <button id="dsLayerFront" class="ds-icon-button" type="button" aria-label="Bring to front"><i class="fa-solid fa-angles-up" aria-hidden="true"></i></button>
+                            <button id="dsLayerForward" class="ds-icon-button" type="button" aria-label="Bring forward"><i class="fa-solid fa-arrow-up" aria-hidden="true"></i></button>
+                            <button id="dsLayerBackward" class="ds-icon-button" type="button" aria-label="Send backward"><i class="fa-solid fa-arrow-down" aria-hidden="true"></i></button>
+                            <button id="dsLayerBack" class="ds-icon-button" type="button" aria-label="Send to back"><i class="fa-solid fa-angles-down" aria-hidden="true"></i></button>
+                        </div>
+                    </div>
+                    <div id="dsLayerPanelList" class="ds-layer-panel-list" role="listbox" aria-label="Project layers"></div>
+                </section>
             </section>
 
             <aside id="dsRightPanel" class="design-studio-panel design-studio-right-panel">
+                <div class="ds-inspector-tabs" role="tablist" aria-label="Inspector tabs">
+                    <button class="active" type="button" data-ds-inspector-tab="inspector">Inspector</button>
+                    <button type="button" data-ds-inspector-tab="adjust">Adjust</button>
+                    <button type="button" data-ds-inspector-tab="effects">Effects</button>
+                </div>
                 <div class="ds-panel-section ds-properties-intro">
-                    <h2>Properties</h2>
-                    <p>Focused controls for the active composition.</p>
+                    <h2>Inspector</h2>
+                    <p id="dsInspectorHint">Canvas information and live controls for the selected artwork.</p>
                 </div>
 
-                <div class="ds-panel-section">
-                    <h2>Position</h2>
+                <div class="ds-panel-section ds-inspector-canvas">
+                    <h2>Canvas</h2>
+                    <p>Preset <b id="dsInspectorPreset">Open Graph</b></p>
+                    <p>Size <b id="dsInspectorSize">1200 x 630</b></p>
+                    <label><input id="dsShowGrid" type="checkbox"> Grid</label>
+                </div>
+
+                <div class="ds-panel-section ds-inspector-multiple">
+                    <h2>Multiple Selection</h2>
+                    <p><b id="dsMultiCount">0</b> layers selected.</p>
+                    <div class="ds-action-grid">
+                        <button id="dsMultiGroup" class="ds-secondary-button" type="button">Group</button>
+                        <button id="dsMultiLock" class="ds-secondary-button" type="button">Lock</button>
+                        <button id="dsMultiHide" class="ds-secondary-button" type="button">Hide</button>
+                        <button id="dsMultiDuplicate" class="ds-secondary-button" type="button">Duplicate</button>
+                    </div>
+                </div>
+
+                <div class="ds-panel-section ds-inspector-group">
+                    <h2>Group</h2>
+                    <label>Name <input id="dsGroupName" type="text"></label>
+                    <div class="ds-two-inputs">
+                        <label>X <input id="dsGroupX" type="number" step="1"></label>
+                        <label>Y <input id="dsGroupY" type="number" step="1"></label>
+                    </div>
+                    <div class="ds-two-inputs">
+                        <label>Width <input id="dsGroupWidth" type="number" min="8" step="1"></label>
+                        <label>Height <input id="dsGroupHeight" type="number" min="8" step="1"></label>
+                    </div>
+                    <label>Rotation <input id="dsGroupRotation" type="number" step="1"></label>
+                    <label>Opacity <input id="dsGroupOpacity" type="range" min="0" max="1" step="0.01"></label>
+                    <div class="ds-action-grid">
+                        <button id="dsGroupLock" class="ds-secondary-button" type="button">Lock</button>
+                        <button id="dsGroupVisibility" class="ds-secondary-button" type="button">Hide</button>
+                        <button id="dsGroupUngroup" class="ds-secondary-button" type="button">Ungroup</button>
+                    </div>
+                </div>
+
+                <div class="ds-panel-section ds-inspector-image">
+                    <h2>Artwork</h2>
+                    <label>Name <input id="dsLayerName" type="text"></label>
                     <label>Scale <input id="dsImageScale" type="range" min="0.1" max="4" step="0.01"></label>
                     <div class="ds-two-inputs">
                         <label>X <input id="dsImageX" type="number" step="1"></label>
                         <label>Y <input id="dsImageY" type="number" step="1"></label>
                     </div>
                     <button id="dsFlipImage" class="ds-secondary-button ds-full-button" type="button">Flip horizontal</button>
+                    <button id="dsFlipVertical" class="ds-secondary-button ds-full-button" type="button">Flip vertical</button>
+                    <button id="dsEnterCrop" class="ds-secondary-button ds-full-button" type="button">Crop image</button>
+                    <div class="ds-action-grid ds-crop-actions">
+                        <button id="dsApplyCrop" class="ds-secondary-button" type="button">Apply crop</button>
+                        <button id="dsResetCrop" class="ds-secondary-button" type="button">Reset crop</button>
+                    </div>
+                    <label>Rotation <input id="dsLayerRotation" type="number" step="1" value="0"></label>
+                    <label>Opacity <input id="dsLayerOpacity" type="range" min="0" max="1" step="0.01"></label>
                 </div>
 
-                <div class="ds-panel-section">
+                <div class="ds-panel-section ds-inspector-logo">
                     <div class="ds-panel-heading">
                         <h2>Logo</h2>
-                        <button id="dsToggleLogo" class="ds-mini-button" type="button">Add</button>
+                        <span id="dsLogoMeta">Optional brand layer</span>
                     </div>
                     <label>Scale <input id="dsLogoScale" type="range" min="0.05" max="1.2" step="0.01"></label>
                     <label>Opacity <input id="dsLogoOpacity" type="range" min="0.1" max="1" step="0.01"></label>
+                    <label>Color <input id="dsLogoColor" type="color" value="#ffffff"></label>
                     <div class="ds-logo-positions">
                         <button type="button" data-ds-logo-position="top-left">Top left</button>
                         <button type="button" data-ds-logo-position="top-right">Top right</button>
@@ -145,36 +303,58 @@
                     </div>
                     <button id="dsResetLogo" class="ds-secondary-button ds-full-button" type="button">Reset logo</button>
                 </div>
-
-                <div class="ds-panel-section">
-                    <h2>Export</h2>
-                    <label>Format
-                        <select id="dsExportFormat">
-                            <option value="image/webp">WebP</option>
-                            <option value="image/png">PNG</option>
-                            <option value="image/jpeg">JPEG</option>
+                <div class="ds-panel-section ds-inspector-text">
+                    <h2>Text</h2>
+                    <label>Content <textarea id="dsTextContent" rows="3"></textarea></label>
+                    <label>Size <input id="dsTextSize" type="number" min="8" max="240" step="1"></label>
+                    <label>Color <input id="dsTextColor" type="color" value="#ffffff"></label>
+                    <label>Weight
+                        <select id="dsTextWeight">
+                            <option value="400">Regular</option>
+                            <option value="700">Bold</option>
+                            <option value="900">Black</option>
                         </select>
                     </label>
-                    <label>Quality <input id="dsExportQuality" type="range" min="0.65" max="0.95" step="0.01" value="0.86"></label>
-                    <label>Media category
-                        <select id="dsMediaCategory">
-                            <option value="home_banner">Home Banner</option>
-                            <option value="product_banner">Product Banner</option>
-                            <option value="product_image">Product Image</option>
-                            <option value="campaign">Campaign</option>
-                            <option value="promotion">Promotion</option>
-                            <option value="announcement">Announcement</option>
-                            <option value="package_icon">Package Icon</option>
-                        </select>
-                    </label>
-                    <button id="dsUploadExport" class="ds-secondary-button ds-full-button" type="button">Upload export to Media Library</button>
+                </div>
+                <div class="ds-panel-section ds-inspector-shape">
+                    <h2>Shape</h2>
+                    <label>Fill <input id="dsShapeFill" type="color" value="#8b5cf6"></label>
+                    <label>Stroke <input id="dsShapeStroke" type="color" value="#ffffff"></label>
+                    <label>Stroke width <input id="dsShapeStrokeWidth" type="number" min="0" max="40" step="1"></label>
+                    <label>Radius <input id="dsShapeRadius" type="number" min="0" max="120" step="1"></label>
+                </div>
+                <div class="ds-panel-section ds-inspector-adjust">
+                    <h2>Filters</h2>
+                    <div id="dsFilterPresetGrid" class="ds-filter-grid" aria-label="Photo filter presets"></div>
+                    <label>Intensity <input id="dsFilterIntensity" type="range" min="0" max="100" step="1" value="100"></label>
+                    <h2>Adjust</h2>
+                    <label>Brightness <input id="dsAdjustBrightness" type="range" min="-100" max="100" step="1"></label>
+                    <label>Contrast <input id="dsAdjustContrast" type="range" min="-100" max="100" step="1"></label>
+                    <label>Saturation <input id="dsAdjustSaturation" type="range" min="-100" max="100" step="1"></label>
+                    <label>Temperature <input id="dsAdjustTemperature" type="range" min="-100" max="100" step="1"></label>
+                    <label>Grayscale <input id="dsAdjustGrayscale" type="range" min="0" max="100" step="1"></label>
+                    <label>Sepia <input id="dsAdjustSepia" type="range" min="0" max="100" step="1"></label>
+                    <label>Blur <input id="dsAdjustBlur" type="range" min="0" max="20" step="1"></label>
+                    <button id="dsResetAdjustments" class="ds-secondary-button ds-full-button" type="button">Reset adjustments</button>
+                </div>
+                <div class="ds-panel-section ds-inspector-effects">
+                    <h2>Effects</h2>
+                    <label><input id="dsEffectShadow" type="checkbox"> Shadow</label>
+                    <label><input id="dsEffectGlow" type="checkbox"> Glow</label>
+                </div>
+                <div class="ds-panel-section ds-history-panel">
+                    <div class="ds-panel-heading">
+                        <h2>History</h2>
+                    </div>
+                    <div id="dsHistoryList" class="ds-history-list"></div>
                 </div>
             </aside>
         </section>
 
         <footer class="design-studio-statusbar">
             <span><i class="fa-solid fa-circle" aria-hidden="true"></i><b id="dsStatusText">Ready</b></span>
-            <span>Zoom <b>Fit</b></span>
+            <span>Tool <b id="dsToolStatus">Select</b></span>
+            <span>Zoom <b id="dsZoomStatus">100%</b></span>
             <span>Canvas <b id="dsCanvasStatus">1200 x 630</b></span>
             <span>Preset <b id="dsPresetStatus">Open Graph</b></span>
             <span>Auto Save <b id="dsSaveStatus">Not saved yet</b></span>
@@ -183,6 +363,22 @@
             <span>Selection <b id="dsSelectionStatus">Image</b></span>
         </footer>
     </main>
+
+    <div id="dsContextMenu" class="ds-context-menu" hidden role="menu" aria-label="Layer actions">
+        <button type="button" data-ds-context-action="rename" role="menuitem">Rename</button>
+        <button type="button" data-ds-context-action="duplicate" role="menuitem">Duplicate</button>
+        <button type="button" data-ds-context-action="group" role="menuitem">Group</button>
+        <button type="button" data-ds-context-action="ungroup" role="menuitem">Ungroup</button>
+        <button type="button" data-ds-context-action="lock" role="menuitem">Lock</button>
+        <button type="button" data-ds-context-action="unlock" role="menuitem">Unlock</button>
+        <button type="button" data-ds-context-action="hide" role="menuitem">Hide</button>
+        <button type="button" data-ds-context-action="show" role="menuitem">Show</button>
+        <button type="button" data-ds-context-action="front" role="menuitem">Bring to Front</button>
+        <button type="button" data-ds-context-action="forward" role="menuitem">Bring Forward</button>
+        <button type="button" data-ds-context-action="backward" role="menuitem">Send Backward</button>
+        <button type="button" data-ds-context-action="back" role="menuitem">Send to Back</button>
+        <button type="button" data-ds-context-action="delete" role="menuitem">Delete</button>
+    </div>
 
     <aside id="dsProjectsDrawer" class="ds-drawer ds-projects-drawer" hidden aria-label="Design Studio projects">
         <div class="ds-drawer-panel">
@@ -217,7 +413,7 @@
                     </button>
                     <button type="button" data-ds-layer="logo">
                         <span>AZIEL logo</span>
-                        <small id="dsLogoMeta">Optional brand layer</small>
+                        <small id="dsLogoLayerMeta">Optional brand layer</small>
                     </button>
                 </div>
             </section>
@@ -249,7 +445,7 @@
             <section class="ds-panel-section">
                 <h3>Upload</h3>
                 <label class="ds-upload-drop">
-                    <input id="dsDeviceImport" type="file" accept="image/jpeg,image/png,image/webp">
+                    <input type="file" accept="image/jpeg,image/png,image/webp" data-ds-drawer-import>
                     <i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i>
                     <span>Import from device</span>
                     <small>JPEG, PNG, or WebP up to 5 MB</small>
@@ -259,8 +455,103 @@
                 <h3>Brand Kit</h3>
                 <p>Official AZIEL logo layer and safe-margin controls are available in Properties.</p>
             </section>
+        </div>
+    </aside>
+
+    <aside id="dsCommandPalette" class="ds-drawer ds-command-palette" hidden aria-label="AZIEL Studio command palette">
+        <div class="ds-drawer-panel ds-command-panel">
+            <div class="ds-panel-heading">
+                <div>
+                    <p class="ds-drawer-kicker">Workflow</p>
+                    <h2>Command</h2>
+                </div>
+                <button id="dsCommandClose" class="ds-icon-button" type="button" aria-label="Close command palette">
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                </button>
+            </div>
+            <section class="ds-command-list" aria-label="Studio commands">
+                <button type="button" data-ds-command="projects">
+                    <i class="fa-solid fa-folder-open" aria-hidden="true"></i>
+                    <span><b>Open Project</b><small>Recent, duplicate, archive</small></span>
+                </button>
+                <button type="button" data-ds-command="media">
+                    <i class="fa-solid fa-photo-film" aria-hidden="true"></i>
+                    <span><b>Asset Browser</b><small>Device import and Media Library</small></span>
+                </button>
+                <button type="button" data-ds-command="prompt">
+                    <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+                    <span><b>Prompt Tool</b><small>Generate, copy, close</small></span>
+                </button>
+                <button type="button" data-ds-command="settings">
+                    <i class="fa-solid fa-gear" aria-hidden="true"></i>
+                    <span><b>Preferences</b><small>Theme, autosave, storage</small></span>
+                </button>
+            </section>
+        </div>
+    </aside>
+
+    <aside id="dsExportDrawer" class="ds-drawer ds-export-drawer" hidden aria-label="Export artwork">
+        <div class="ds-drawer-panel">
+            <div class="ds-panel-heading">
+                <div>
+                    <p class="ds-drawer-kicker">Publish</p>
+                    <h2>Export</h2>
+                </div>
+                <button id="dsExportClose" class="ds-icon-button" type="button" aria-label="Close export">
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                </button>
+            </div>
             <section class="ds-panel-section">
-                <h3>Prompt Builder</h3>
+                <h3>Preset</h3>
+                <label>Export preset <select id="dsPresetSelect"></select></label>
+                <div id="dsPresetMeta" class="ds-preset-meta"></div>
+                <div id="dsCustomPresetFields" class="ds-custom-preset-fields" hidden>
+                    <label>Width <input id="dsCustomWidth" type="number" min="256" max="4096" step="1"></label>
+                    <label>Height <input id="dsCustomHeight" type="number" min="256" max="4096" step="1"></label>
+                </div>
+            </section>
+            <section class="ds-panel-section">
+                <h3>Output</h3>
+                <label>Format
+                    <select id="dsExportFormat">
+                        <option value="image/webp">WebP</option>
+                        <option value="image/png">PNG</option>
+                        <option value="image/jpeg">JPEG</option>
+                    </select>
+                </label>
+                <label>Quality <input id="dsExportQuality" type="range" min="0.65" max="0.95" step="0.01" value="0.86"></label>
+                <label>Media category
+                    <select id="dsMediaCategory">
+                        <option value="home_banner">Home Banner</option>
+                        <option value="product_banner">Product Banner</option>
+                        <option value="product_image">Product Image</option>
+                        <option value="campaign">Campaign</option>
+                        <option value="promotion">Promotion</option>
+                        <option value="announcement">Announcement</option>
+                        <option value="package_icon">Package Icon</option>
+                    </select>
+                </label>
+            </section>
+            <section class="ds-panel-section">
+                <h3>Finish</h3>
+                <button id="dsExportDownload" class="ds-primary-button ds-full-button" type="button">Download</button>
+                <button id="dsUploadExport" class="ds-secondary-button ds-full-button" type="button">Publish to Media Library</button>
+            </section>
+        </div>
+    </aside>
+
+    <aside id="dsPromptDrawer" class="ds-drawer ds-prompt-drawer" hidden aria-label="Prompt tool">
+        <div class="ds-drawer-panel">
+            <div class="ds-panel-heading">
+                <div>
+                    <p class="ds-drawer-kicker">Tool</p>
+                    <h2>Prompt</h2>
+                </div>
+                <button id="dsPromptClose" class="ds-icon-button" type="button" aria-label="Close prompt tool">
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                </button>
+            </div>
+            <section class="ds-panel-section">
                 <div class="ds-prompt-builder">
                     <fieldset>
                         <legend>Remove</legend>
@@ -320,6 +611,7 @@
                 </label>
                 <label><input id="dsAutosaveEnabled" type="checkbox" checked> Auto-save enabled</label>
                 <label>Auto-save interval <input id="dsAutosaveInterval" type="number" min="5" max="120" value="12"> seconds</label>
+                <label><input id="dsPerformanceMode" type="checkbox"> Performance mode</label>
                 <label><input id="dsConfirmDestructive" type="checkbox" checked> Confirm before destructive actions</label>
             </section>
             <section>
@@ -327,24 +619,6 @@
                 <p id="dsStorageStatus">IndexedDB status: checking...</p>
                 <p id="dsProjectCount">Local project count: 0</p>
                 <button id="dsClearLocalData" class="ds-secondary-button danger ds-full-button" type="button">Clear local Design Studio data</button>
-            </section>
-            <section>
-                <h3>Canvas & Editor</h3>
-                <label>Export preset <select id="dsPresetSelect"></select></label>
-                <div id="dsPresetMeta" class="ds-preset-meta"></div>
-                <div id="dsCustomPresetFields" class="ds-custom-preset-fields" hidden>
-                    <label>Width <input id="dsCustomWidth" type="number" min="256" max="4096" step="1"></label>
-                    <label>Height <input id="dsCustomHeight" type="number" min="256" max="4096" step="1"></label>
-                </div>
-                <label><input id="dsShowGrid" type="checkbox"> Show grid</label>
-                <label><input id="dsSnapEnabled" type="checkbox"> Snap enabled</label>
-                <label><input id="dsPerformanceMode" type="checkbox"> Performance mode</label>
-                <label>Default zoom
-                    <select id="dsDefaultZoom">
-                        <option value="fit">Fit canvas</option>
-                        <option value="100">100%</option>
-                    </select>
-                </label>
             </section>
             <section>
                 <h3>Export Defaults</h3>
@@ -408,8 +682,8 @@
     <script src="/js/admin/admin-media-selector.js?v=20260714-phase8"></script>
     <script src="/js/design-studio/design-studio-presets.js?v=20260719-phase1"></script>
     <script src="/js/design-studio/design-studio-drafts.js?v=20260719-phase1"></script>
-    <script src="/js/design-studio/design-studio-canvas.js?v=20260719-phase1"></script>
-    <script src="/js/design-studio/design-studio-app.js?v=20260719-auth-gate"></script>
+    <script src="/js/design-studio/design-studio-canvas.js?v=20260719-studio-22"></script>
+    <script src="/js/design-studio/design-studio-app.js?v=20260719-studio-22"></script>
 </body>
 
 </html>
