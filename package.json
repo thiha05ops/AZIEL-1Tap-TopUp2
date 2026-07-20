@@ -80,6 +80,7 @@
     "verify:payment-methods-admin-ux": "node backend/scripts/verify-payment-methods-admin-ux.js",
     "verify:dynamic-qr-save-runtime-path": "node backend/scripts/verify-dynamic-qr-save-runtime-path.js",
     "verify:mobile-dynamic-qr-share": "node backend/scripts/verify-mobile-dynamic-qr-share.js",
+    "verify:dynamic-qr-hard-isolation": "node backend/scripts/verify-dynamic-qr-hard-isolation.js",
     "verify:payment-qr-mode-integrity": "node backend/scripts/verify-payment-qr-mode-integrity.js",
     "verify:payment-qr-save-source": "node backend/scripts/verify-payment-qr-save-source.js",
     "verify:payment-qr-save": "node backend/scripts/verify-payment-qr-save.js",

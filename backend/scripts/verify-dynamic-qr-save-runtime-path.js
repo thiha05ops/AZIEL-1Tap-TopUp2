@@ -31,27 +31,18 @@ function main() {
     assert(checkout.includes("atob(match[2])"), "dataUrlToBlob must decode the base64 QR payload directly.");
     assert(checkout.includes("return new Blob([bytes], { type: mimeType });"), "dataUrlToBlob must return an image Blob.");
     assert(checkout.includes("setQrImage(data.qrImage, \"dynamic_response\", data.qrPayload)"), "dynamic response image and payload must be stored together.");
-    assert(checkout.includes("payload: payload || \"\""), "activeQr must keep the dynamic response payload.");
+    assert(checkout.includes("payload: String(response.qrPayload || \"\")"), "activeDynamicQr must keep the dynamic response payload.");
 
-    assert(resolveQrBlob.includes("const dynamicSave = isDynamicPromptPayMode(options);"), "resolveQrBlob must branch explicitly for dynamic PromptPay.");
-    assert(resolveQrBlob.includes("if (sourceType !== \"dynamic_response\")"), "dynamic Save QR must assert dynamic_response source ownership.");
-    assert(resolveQrBlob.includes("blob: dataUrlToBlob(href)"), "dynamic Save QR must convert data URL directly to Blob.");
-    assert(resolveQrBlob.includes("source: \"dynamic_data_url\""), "dynamic Save QR must identify local data URL conversion.");
-    assert(resolveQrBlob.includes("throw new Error(\"Dynamic QR could not be saved. Please try again.\");"), "dynamic Save QR must fail closed without fallback.");
-
-    const dynamicBranch = resolveQrBlob.slice(
-        resolveQrBlob.indexOf("const dynamicSave = isDynamicPromptPayMode(options);"),
-        resolveQrBlob.indexOf("if (qrCanvas?.toBlob)")
-    );
-    assert(!dynamicBranch.includes("getQrProxyUrl"), "dynamic Save QR must never call /qr-download proxy.");
-    assert(!dynamicBranch.includes("fetchImageBlob"), "dynamic Save QR data URL must not use fetch/proxy.");
-    assert(!dynamicBranch.includes("qrImageUrl"), "dynamic Save QR must not reference configured static QR fields.");
+    assert(!resolveQrBlob.includes("isDynamicPromptPayMode"), "resolveQrBlob must not branch for dynamic PromptPay.");
+    const saveDynamicQr = functionBody(checkout, "saveDynamicQr", "saveUploadedStaticQr");
+    assert(saveDynamicQr.includes("const blob = dataUrlToBlob(activeDynamicQr.imageDataUrl);"), "dynamic Save QR must convert data URL directly to Blob.");
+    assert(!saveDynamicQr.includes("getQrProxyUrl"), "dynamic Save QR must never call /qr-download proxy.");
+    assert(!saveDynamicQr.includes("fetchImageBlob"), "dynamic Save QR data URL must not use fetch/proxy.");
+    assert(!saveDynamicQr.includes("qrImageUrl"), "dynamic Save QR must not reference configured static QR fields.");
 
     assert(downloadQr[1].includes("console.info(\"[AZIEL QR SAVE]\""), "Save QR click boundary must include development diagnostics.");
     assert(downloadQr[1].includes("fallbackEndpointUsed: false"), "Save QR diagnostics must show proxy fallback is not used.");
-    assert(downloadQr[1].includes("throw new Error(\"Dynamic QR save source ownership violation\")"), "dynamic Save QR must assert source ownership at click boundary.");
-    assert(downloadQr[1].includes("href: activeQr.imageUrlOrDataUrl"), "Save QR must use only activeQr.imageUrlOrDataUrl.");
-    assert(downloadQr[1].includes("sourceType: activeQr.sourceType"), "Save QR must pass active source type into blob resolution.");
+    assert(downloadQr[1].includes("await saveDynamicQr(activeDynamicQr);"), "dynamic Save QR must use dedicated saveDynamicQr path.");
     assert(!downloadQr[1].includes("qrImg") && !downloadQr[1].includes("currentSrc") && !downloadQr[1].includes("querySelector"), "Save QR must not read the DOM image source.");
     assert(!downloadQr[1].includes("options.qrImageUrl") && !downloadQr[1].includes("options.qrImage"), "Save QR must not read configured QR fields.");
     assert(!downloadQr[1].includes("getQrProxyUrl"), "Save QR click path must not call proxy directly.");
@@ -59,7 +50,7 @@ function main() {
     assert(saveQrAsset[1].includes("? \"Dynamic QR could not be saved. Please try again.\""), "dynamic save failure must show dynamic-specific error.");
     assert(!saveQrAsset[1].includes("updateChecklist(\"save_qr\")"), "saveQrAsset must not complete checklist directly.");
 
-    assert(checkout.includes("if (!isDynamicPromptPayMode(options) || activeQr.sourceType === \"dynamic_response\")"), "save_qr checklist must only complete after dynamic response save starts.");
+    assert(checkout.includes("await saveDynamicQr(activeDynamicQr);"), "save_qr checklist must only complete after dynamic response save starts.");
     assert(checkout.includes("activeState.qrImageUrl = \"\";"), "dynamic retry must invalidate old QR image URL.");
     assert(checkout.includes("activeState.dynamicQr = null;"), "dynamic retry must invalidate old payload state.");
     assert(checkout.includes("const qr = dynamicQr\n            ? \"\""), "dynamic checkout must not restore or read static QR before fresh generation.");

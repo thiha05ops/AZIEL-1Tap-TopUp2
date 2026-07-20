@@ -483,12 +483,14 @@ async function seedPaymentMethods() {
 function formatMethod(method) {
     const obj = method.toObject();
     const provider = normalizeProviderKey(obj.provider || obj.key || "");
-    const qrImage = safePublicAssetUrl(
+    const isDynamicPromptPayQr = obj.qrMode === "aziel_promptpay_dynamic";
+    const configuredQrImage = safePublicAssetUrl(
         obj.uploadedQrImage ||
         obj.qrImageUrl ||
         obj.qrImage ||
         ""
     );
+    const qrImage = isDynamicPromptPayQr ? null : configuredQrImage;
     const displaySource = Object.assign({}, obj, { provider });
     const readiness = paymentMethodReadiness(displaySource);
 
@@ -523,8 +525,17 @@ function formatMethod(method) {
 
 function formatAdminMethod(method) {
     const obj = typeof method.toObject === "function" ? method.toObject() : method;
+    const configuredQrImage = safePublicAssetUrl(
+        obj.uploadedQrImage ||
+        obj.qrImageUrl ||
+        obj.qrImage ||
+        ""
+    );
     return {
         ...formatMethod(method),
+        qrImage: configuredQrImage,
+        qrImageUrl: configuredQrImage,
+        uploadedQrImage: configuredQrImage,
         appDisplayName: obj.appDisplayName || "",
         deepLinkUrl: obj.deepLinkUrl || "",
         appStoreUrl: obj.appStoreUrl || "",
