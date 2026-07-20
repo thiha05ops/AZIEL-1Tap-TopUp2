@@ -13,6 +13,8 @@ const {
 } = require("../services/promptPayQrService");
 const { paymentMethodReadiness } = require("../services/paymentProviderRegistry");
 
+const TRUSTED_PROMPTPAY_GOLDEN_VECTOR = "00020101021229370016A000000677010111011300668123456785802TH530376454071490.006304C4F9";
+
 function read(file) {
     return fs.readFileSync(path.join(ROOT, file), "utf8");
 }
@@ -33,6 +35,28 @@ function assertThrowsCode(fn, code, message) {
         return;
     }
     assert.fail(message);
+}
+
+function topLevelTagOrder(payload = "") {
+    const order = [];
+    let index = 0;
+    while (index + 4 <= payload.length) {
+        const id = payload.slice(index, index + 2);
+        const length = Number(payload.slice(index + 2, index + 4));
+        assert(/^\d{2}$/.test(id), "Payload tag IDs must be two numeric digits.");
+        assert(Number.isFinite(length) && length >= 0, "Payload tag lengths must be valid.");
+        const end = index + 4 + length;
+        assert(end <= payload.length, "Payload tag length must not exceed payload length.");
+        order.push(id);
+        index = end;
+    }
+    assert.strictEqual(index, payload.length, "Payload must not contain trailing bytes.");
+    return order;
+}
+
+function decodedCrc(payload = "") {
+    const match = String(payload || "").match(/6304([0-9A-F]{4})$/i);
+    return match ? match[1].toUpperCase() : "";
 }
 
 function validDynamicMethod(overrides = {}) {
@@ -83,9 +107,12 @@ async function verifyQrPayload() {
     });
 
     assert.notStrictEqual(payloadA, payloadB, "QR payload must change when amount changes.");
+    assert.strictEqual(payloadA, TRUSTED_PROMPTPAY_GOLDEN_VECTOR, "PromptPay payload must match promptpay-qr@0.5.0 trusted golden vector byte-for-byte.");
+    assert.deepStrictEqual(topLevelTagOrder(payloadA), ["00", "01", "29", "58", "53", "54", "63"], "PromptPay top-level tag order must match trusted promptpay-qr@0.5.0 output.");
     assert(payloadA.includes("0066812345678"), "QR payload must contain the configured normalized PromptPay recipient.");
     assert(payloadA.includes("54071490.00"), "QR payload must contain amount field.");
     assert(validatePromptPayPayloadCrc(payloadA), "QR payload CRC must be valid.");
+    assert.strictEqual(decodedCrc(payloadA), "C4F9", "PromptPay golden vector CRC must match trusted promptpay-qr@0.5.0 output.");
     const decodedA = decodePromptPayPayload(payloadA);
     assert.strictEqual(decodedA.amountText, "1490.00", "Decoded QR payload must contain the exact expected amount.");
     assert.strictEqual(decodedA.amount, 1490, "Decoded QR amount must match finalized amount.");
@@ -114,6 +141,7 @@ async function verifyQrPayload() {
     assert.strictEqual(result.orderReference, "AZL-TEST");
     assert.strictEqual(result.amount, 1490, "Backend QR result must preserve finalized amount unchanged.");
     assert.strictEqual(result.encodedAmount, "1490.00", "Backend QR result must expose decoded encoded amount.");
+    assert.strictEqual(result.qrPayload, TRUSTED_PROMPTPAY_GOLDEN_VECTOR, "Generated QR response payload must match trusted golden vector byte-for-byte.");
     assert.strictEqual(decodePromptPayPayload(result.qrPayload).amountText, "1490.00", "Generated QR must decode to expected amount before return.");
     assert.strictEqual(result.qrImagePayloadMatches, true, "Backend QR result must prove returned QR image matches qrPayload.");
     assert.strictEqual(qrImageMatchesPayload(result.qrImage, result.qrPayload), true, "Verifier must inspect generated QR image pixels and match them to qrPayload.");

@@ -120,9 +120,9 @@ function buildPromptPayPayload({ recipientType, recipientValue, amount }) {
         emv("00", "01"),
         emv("01", "12"),
         emv("29", merchantAccountInfo),
+        emv("58", "TH"),
         emv("53", "764"),
         emv("54", normalizedAmount.toFixed(2)),
-        emv("58", "TH"),
         "6304"
     ].join("");
 
