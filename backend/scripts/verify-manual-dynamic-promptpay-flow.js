@@ -175,9 +175,14 @@ function verifyReadiness() {
 
     const needsDeeplink = paymentMethodReadiness(validDynamicMethod({
         appLaunchMode: "OFFICIAL_PAYMENT_DEEPLINK",
-        deepLinkUrl: ""
+        deepLinkUrl: "",
+        iosAppLaunchUrl: "",
+        androidAppLaunchUrl: "",
+        androidPackageName: "",
+        appStoreFallbackUrl: "",
+        playStoreFallbackUrl: ""
     }));
-    assert(needsDeeplink.missing.includes("deep link URL"), "Official payment deeplink mode must still require deep link URL.");
+    assert(needsDeeplink.missing.includes("app launch URL"), "Direct Open App must still require a platform launch capability.");
 
     const noRecipient = paymentMethodReadiness(validDynamicMethod({
         promptPayRecipientValue: ""

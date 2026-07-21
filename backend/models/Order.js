@@ -182,7 +182,14 @@ const orderSchema = new mongoose.Schema({
         promptPayRecipientType: { type: String, default: "" },
         promptPayRecipientMasked: { type: String, default: "" },
         reference: { type: String, default: "" },
-        appDisplayName: { type: String, default: "" }
+        appDisplayName: { type: String, default: "" },
+        deepLinkUrl: { type: String, default: "" },
+        appLaunchMode: { type: String, default: "" },
+        iosAppLaunchUrl: { type: String, default: "" },
+        androidAppLaunchUrl: { type: String, default: "" },
+        androidPackageName: { type: String, default: "" },
+        appStoreFallbackUrl: { type: String, default: "" },
+        playStoreFallbackUrl: { type: String, default: "" }
     },
 
     timeline: [

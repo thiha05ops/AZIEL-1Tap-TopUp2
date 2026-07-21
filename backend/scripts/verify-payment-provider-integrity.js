@@ -146,7 +146,14 @@ function verifyReadinessRules() {
 
     const openAppNoDeeplink = paymentMethodReadiness(validScbBase({ enableOpenApp: true }));
     assert.strictEqual(openAppNoDeeplink.ready, false, "manual bank with Open App enabled and no deeplink must not be public ready");
-    assert(openAppNoDeeplink.missing.includes("deep link URL"), "Open App enabled must require deep link URL");
+    assert(openAppNoDeeplink.missing.includes("app launch URL"), "Open App enabled must require a platform launch capability");
+
+    const openAppWithAndroidPackage = paymentMethodReadiness(validScbBase({
+        enableOpenApp: true,
+        androidPackageName: "com.bbl.mobilebanking",
+        playStoreFallbackUrl: "https://play.google.com/store/apps/details?id=com.bbl.mobilebanking"
+    }));
+    assert.strictEqual(openAppWithAndroidPackage.ready, true, "Android package plus Play Store fallback must satisfy Open App readiness without deeplink");
 
     const checklistOpenAppNoDeeplink = paymentMethodReadiness(validScbBase({
         checklistSteps: [
@@ -157,7 +164,7 @@ function verifyReadinessRules() {
     }));
     assert.strictEqual(checklistOpenAppNoDeeplink.ready, false, "enabled open_app checklist step without deeplink must not be public ready");
     assert(checklistOpenAppNoDeeplink.missing.includes("open app enabled"), "open_app checklist step must require enableOpenApp");
-    assert(checklistOpenAppNoDeeplink.missing.includes("deep link URL"), "open_app checklist step must require deep link URL");
+    assert(checklistOpenAppNoDeeplink.missing.includes("app launch URL"), "open_app checklist step must require a platform launch capability");
 
     const disabledChecklistOpenApp = paymentMethodReadiness(validScbBase({
         checklistSteps: [

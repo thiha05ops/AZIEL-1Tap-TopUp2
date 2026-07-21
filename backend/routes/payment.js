@@ -460,7 +460,14 @@ async function createOrderFromManualAttempt(attempt, evidence, username) {
             promptPayRecipientType: attempt.instructions?.promptPayRecipientType || "",
             promptPayRecipientMasked: attempt.instructions?.promptPayRecipientMasked || "",
             reference: attempt.reference,
-            appDisplayName: attempt.instructions?.appDisplayName || ""
+            appDisplayName: attempt.instructions?.appDisplayName || "",
+            deepLinkUrl: attempt.instructions?.deepLinkUrl || "",
+            appLaunchMode: attempt.instructions?.appLaunchMode || "",
+            iosAppLaunchUrl: attempt.instructions?.iosAppLaunchUrl || "",
+            androidAppLaunchUrl: attempt.instructions?.androidAppLaunchUrl || "",
+            androidPackageName: attempt.instructions?.androidPackageName || "",
+            appStoreFallbackUrl: attempt.instructions?.appStoreFallbackUrl || "",
+            playStoreFallbackUrl: attempt.instructions?.playStoreFallbackUrl || ""
         },
         note: "Payment slip uploaded. Waiting for admin verification.",
         timeline: [{
