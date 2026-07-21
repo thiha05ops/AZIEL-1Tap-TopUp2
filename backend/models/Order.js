@@ -168,6 +168,23 @@ const orderSchema = new mongoose.Schema({
         expiresAt: { type: Date, default: null }
     },
 
+    paymentExecutionPolicy: {
+        paymentMethodKey: { type: String, default: "" },
+        paymentMethodDisplayName: { type: String, default: "" },
+        provider: { type: String, default: "" },
+        qrMode: { type: String, default: "" },
+        confirmationMode: { type: String, default: "" },
+        openAppMode: { type: String, default: "disabled" },
+        receiptUploadEnabled: { type: Boolean, default: true },
+        region: { type: String, default: "" },
+        currency: { type: String, default: "" },
+        finalAmount: { type: Number, default: 0 },
+        promptPayRecipientType: { type: String, default: "" },
+        promptPayRecipientMasked: { type: String, default: "" },
+        reference: { type: String, default: "" },
+        appDisplayName: { type: String, default: "" }
+    },
+
     timeline: [
         {
             status: {

@@ -79,15 +79,24 @@ function getConfiguredThaiBankApps(methods = []) {
             return key !== "promptpay" &&
                 key !== "wallet" &&
                 provider !== "wallet" &&
-                (type === "deeplink" || method.enableOpenApp === true) &&
-                Boolean(method.deepLinkUrl || method.deepLink);
+                method.enableOpenApp === true &&
+                (method.openAppMode || "direct") !== "disabled" &&
+                (type === "deeplink" || type === "manual" || method.enableOpenApp === true);
         })
         .map(method => ({
             key: method.key || normalizePaymentKey(method.method || ""),
             label: method.appDisplayName || method.method || "Banking App",
+            logo: method.logoUrl || method.logo || getPaymentLogo(method.key || method.provider || method.method),
+            enabled: method.enabled === true,
+            openAppMode: method.openAppMode || "direct",
             deepLink: method.deepLinkUrl || method.deepLink || "",
+            appLaunchMode: method.appLaunchMode || "",
+            iosAppLaunchUrl: method.iosAppLaunchUrl || "",
+            androidAppLaunchUrl: method.androidAppLaunchUrl || "",
             appStoreUrl: method.appStoreUrl || "",
-            playStoreUrl: method.playStoreUrl || ""
+            playStoreUrl: method.playStoreUrl || "",
+            appStoreFallbackUrl: method.appStoreFallbackUrl || "",
+            playStoreFallbackUrl: method.playStoreFallbackUrl || ""
         }))
         .sort((a, b) => String(a.label).localeCompare(String(b.label)));
 }
@@ -174,11 +183,6 @@ function buildPaymentCard(method, index) {
         provider = "promptpay";
     }
 
-    if (String(region).toUpperCase() === "TH" && key === "scb") {
-        paymentType = "deeplink";
-        provider = "scb";
-    }
-
     const card = document.createElement("div");
     card.className = `pay-card ${index === 0 ? "active" : ""}`;
     card.__paymentMethod = normalizeSelectedPaymentMethod(method, {
@@ -204,6 +208,7 @@ function buildPaymentCard(method, index) {
     card.dataset.shortDescription = method.shortDescription || "";
     card.dataset.badgeText = method.badgeText || "";
     card.dataset.appDisplayName = method.appDisplayName || displayName;
+    card.dataset.openAppMode = method.openAppMode || "";
     card.dataset.deepLink = method.deepLinkUrl || method.deepLink || "";
     card.dataset.appStoreUrl = method.appStoreUrl || "";
     card.dataset.playStoreUrl = method.playStoreUrl || "";
@@ -289,6 +294,7 @@ function selectPaymentCard(card) {
         region: originalMethod.region || card.dataset.region || "",
         maintenanceMessage: originalMethod.maintenanceMessage || card.dataset.maintenanceMessage || "",
         appDisplayName: originalMethod.appDisplayName || card.dataset.appDisplayName || card.dataset.name || "",
+        openAppMode: originalMethod.openAppMode || card.dataset.openAppMode || "disabled",
         deepLink: originalMethod.deepLink || originalMethod.deepLinkUrl || card.dataset.deepLink || "",
         deepLinkUrl: originalMethod.deepLinkUrl || originalMethod.deepLink || card.dataset.deepLink || "",
         appStoreUrl: originalMethod.appStoreUrl || card.dataset.appStoreUrl || "",
@@ -346,6 +352,7 @@ function normalizeSelectedPaymentMethod(method = {}, overrides = {}) {
         region: overrides.region || method.region || "",
         deepLink: method.deepLink || method.deepLinkUrl || "",
         deepLinkUrl: method.deepLinkUrl || method.deepLink || "",
+        openAppMode: method.openAppMode || "disabled",
         appLaunchMode: method.appLaunchMode || "",
         iosAppLaunchUrl: method.iosAppLaunchUrl || "",
         androidAppLaunchUrl: method.androidAppLaunchUrl || "",
@@ -420,6 +427,7 @@ function getPaymentLogo(key) {
         bangkokbank: "assets/payment/bank-neutral.svg",
         kplus: "assets/payment/bank-neutral.svg",
         krungsri: "assets/payment/bank-neutral.svg",
+        krungthai: "assets/payment/bank-neutral.svg",
         mmqr: "assets/payment/payment-neutral.svg",
         manualbank: "assets/payment/bank-neutral.svg",
         wallet: "assets/logo.png"
@@ -438,6 +446,7 @@ function isKnownPaymentProvider(key) {
         "bangkokbank",
         "kplus",
         "krungsri",
+        "krungthai",
         "mmqr",
         "manualbank",
         "wallet"

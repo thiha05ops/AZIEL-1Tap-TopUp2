@@ -10,6 +10,7 @@ const ADMIN_PAYMENT_PROVIDERS = Object.freeze({
     bangkok_bank: { key: "bangkok_bank", label: "Bangkok Bank", region: "TH" },
     kplus: { key: "kplus", label: "K PLUS", region: "TH" },
     krungsri: { key: "krungsri", label: "Krungsri", region: "TH" },
+    krungthai: { key: "krungthai", label: "Krungthai NEXT", region: "TH" },
     kbzpay: { key: "kbzpay", label: "KBZPay", region: "MM" },
     wavepay: { key: "wavepay", label: "WavePay", region: "MM" },
     ayapay: { key: "ayapay", label: "AYA Pay", region: "MM" },
@@ -21,8 +22,8 @@ const ADMIN_PAYMENT_PROVIDERS = Object.freeze({
 const ADMIN_PROVIDER_BY_REGION_TYPE = Object.freeze({
     TH: {
         auto: ["promptpay"],
-        deeplink: ["scb", "bangkok_bank", "kplus", "krungsri"],
-        manual: ["promptpay", "scb", "bangkok_bank", "kplus", "krungsri"],
+        deeplink: ["scb", "bangkok_bank", "kplus", "krungsri", "krungthai"],
+        manual: ["promptpay", "scb", "bangkok_bank", "kplus", "krungsri", "krungthai"],
         wallet: ["wallet"]
     },
     MM: {
@@ -394,13 +395,25 @@ function renderAdminPaymentMethods(methods) {
                 <div class="payment-capability-details">
                     <h5>Bank App</h5>
 
-                    <div class="settings-row">
-                        <div>
-                            <label>App Display Name</label>
-                            <small>Used for Open App button labels</small>
-                        </div>
-                        <input class="pm-app-name" type="text" value="${escapeAdminHTML(method.appDisplayName || "")}" placeholder="SCB EASY">
-                    </div>
+	                    <div class="settings-row">
+	                        <div>
+	                            <label>App Display Name</label>
+	                            <small>Used for Open App button labels</small>
+	                        </div>
+	                        <input class="pm-app-name" type="text" value="${escapeAdminHTML(method.appDisplayName || "")}" placeholder="SCB EASY">
+	                    </div>
+
+	                    <div class="settings-row">
+	                        <div>
+	                            <label>Open App Mode</label>
+	                            <small>Direct opens this method's app; bank chooser lets PromptPay users choose an app</small>
+	                        </div>
+	                        <select class="pm-open-app-mode">
+	                            <option value="direct" ${method.openAppMode === "direct" ? "selected" : ""}>Direct</option>
+	                            <option value="bank_chooser" ${method.openAppMode === "bank_chooser" ? "selected" : ""}>Bank Chooser</option>
+	                            <option value="disabled" ${method.openAppMode === "disabled" || !method.openAppMode ? "selected" : ""}>Disabled</option>
+	                        </select>
+	                    </div>
 
 	                    <div class="settings-row">
 	                        <div>
@@ -485,7 +498,8 @@ function renderAdminPaymentMethods(methods) {
                         </div>
                         <select class="pm-confirmation-mode">
                             <option value="manual_admin" ${method.confirmationMode === "manual_admin" || !method.confirmationMode ? "selected" : ""}>Manual Admin Verification</option>
-                            <option value="automatic_provider" ${method.confirmationMode === "automatic_provider" ? "selected" : ""}>Automatic Provider Confirmation</option>
+                            <option value="provider_webhook" ${method.confirmationMode === "provider_webhook" ? "selected" : ""}>Provider Webhook Confirmation</option>
+                            <option value="automatic_provider" ${method.confirmationMode === "automatic_provider" ? "selected" : ""}>Automatic Provider Confirmation (Legacy)</option>
                             <option value="wallet_internal" ${method.confirmationMode === "wallet_internal" ? "selected" : ""}>AZIEL Wallet Internal Confirmation</option>
                         </select>
                     </div>
@@ -563,6 +577,9 @@ function normalizeAdminProvider(value = "") {
         bangkokbank: "bangkok_bank",
         bbl: "bangkok_bank",
         k_plus: "kplus",
+        krungthai_next: "krungthai",
+        krungthainext: "krungthai",
+        ktb: "krungthai",
         azielwallet: "wallet",
         manual: "manual_bank"
     };
@@ -609,9 +626,11 @@ function getAdminPaymentReadiness(method = {}) {
             if (!method.promptPayRecipientType || !method.promptPayRecipientValue) missing.push("PromptPay recipient");
         }
     }
-    if (method.enableOpenApp === true) {
+    if (method.enableOpenApp === true && method.openAppMode !== "disabled") {
         if (!String(method.appDisplayName || "").trim()) missing.push("app display name");
-        if (method.appLaunchMode === "APP_ONLY") {
+        if (method.openAppMode === "bank_chooser") {
+            // The chooser can still provide a safe instruction fallback when no direct app profile is configured.
+        } else if (method.appLaunchMode === "APP_ONLY") {
             if (!String(method.iosAppLaunchUrl || method.androidAppLaunchUrl || "").trim()) missing.push("app launch URL");
         } else if (!String(method.deepLinkUrl || "").trim()) {
             missing.push("deep link URL");
@@ -987,6 +1006,7 @@ async function saveAdminPaymentMethod(id) {
         paymentType: card.querySelector(".pm-type")?.value || "manual",
         provider: normalizeAdminProvider(card.querySelector(".pm-provider")?.value || ""),
 	        appDisplayName: card.querySelector(".pm-app-name")?.value || "",
+	        openAppMode: card.querySelector(".pm-open-app-mode")?.value || "disabled",
 	        deepLinkUrl: card.querySelector(".pm-deeplink")?.value || "",
 	        appLaunchMode: card.querySelector(".pm-app-launch-mode")?.value || "OFFICIAL_PAYMENT_DEEPLINK",
 	        iosAppLaunchUrl: card.querySelector(".pm-ios-app-launch")?.value || "",
@@ -1018,7 +1038,7 @@ async function saveAdminPaymentMethod(id) {
         payload.paymentType = "auto";
     }
 
-    if (["scb", "bangkok_bank", "kplus", "krungsri"].includes(payload.provider) && payload.region === "TH" && payload.paymentType !== "manual") {
+    if (["scb", "bangkok_bank", "kplus", "krungsri", "krungthai"].includes(payload.provider) && payload.region === "TH" && payload.paymentType !== "manual") {
         payload.paymentType = "deeplink";
     }
 
@@ -1068,6 +1088,7 @@ function collectAdminPaymentFormState(card) {
         qrImageUrl: card?.querySelector(".pm-qr")?.value || "",
         uploadedQrImage: card?.querySelector(".pm-uploaded-qr")?.value || "",
 	        appDisplayName: card?.querySelector(".pm-app-name")?.value || "",
+	        openAppMode: card?.querySelector(".pm-open-app-mode")?.value || "disabled",
 	        deepLinkUrl: card?.querySelector(".pm-deeplink")?.value || "",
 	        appLaunchMode: card?.querySelector(".pm-app-launch-mode")?.value || "OFFICIAL_PAYMENT_DEEPLINK",
 	        iosAppLaunchUrl: card?.querySelector(".pm-ios-app-launch")?.value || "",
@@ -1134,7 +1155,7 @@ async function addAdminPaymentMethod() {
                 slipRequired: ["manual", "deeplink"].includes(paymentType),
                 receiptUploadEnabled: ["manual", "deeplink"].includes(paymentType),
                 qrMode: paymentType === "auto" ? "provider_generated" : paymentType === "wallet" ? "none" : "uploaded_static",
-                confirmationMode: paymentType === "auto" ? "automatic_provider" : paymentType === "wallet" ? "wallet_internal" : "manual_admin"
+            confirmationMode: paymentType === "auto" ? "provider_webhook" : paymentType === "wallet" ? "wallet_internal" : "manual_admin"
             })
         });
 
@@ -1302,20 +1323,23 @@ function refreshPaymentEditorVisibility(card) {
     });
 
     const enableOpenApp = card.querySelector(".pm-enable-open-app")?.checked === true;
+    const openAppMode = card.querySelector(".pm-open-app-mode")?.value || "disabled";
     const appLaunchMode = card.querySelector(".pm-app-launch-mode")?.value || "OFFICIAL_PAYMENT_DEEPLINK";
     card.querySelectorAll(".pm-app-launch-field").forEach(el => {
-        el.hidden = !enableOpenApp || appLaunchMode !== "APP_ONLY";
+        el.hidden = !enableOpenApp || openAppMode !== "direct" || appLaunchMode !== "APP_ONLY";
     });
     card.querySelectorAll(".pm-official-deeplink-field").forEach(el => {
-        el.hidden = !enableOpenApp || appLaunchMode === "APP_ONLY";
+        el.hidden = !enableOpenApp || openAppMode !== "direct" || appLaunchMode === "APP_ONLY";
     });
 
     const appName = card.querySelector(".pm-app-name")?.value || "Banking App";
     const openWarning = card.querySelector(".pm-open-app-warning");
     if (openWarning) {
-        const canOpen = appLaunchMode === "APP_ONLY"
-            ? Boolean(card.querySelector(".pm-ios-app-launch")?.value || card.querySelector(".pm-android-app-launch")?.value)
-            : Boolean(card.querySelector(".pm-deeplink")?.value && appName);
+        const canOpen = openAppMode === "disabled" ||
+            openAppMode === "bank_chooser" ||
+            (appLaunchMode === "APP_ONLY"
+                ? Boolean(card.querySelector(".pm-ios-app-launch")?.value || card.querySelector(".pm-android-app-launch")?.value)
+                : Boolean(card.querySelector(".pm-deeplink")?.value && appName));
         openWarning.hidden = !card.querySelector(".pm-enable-open-app")?.checked || canOpen;
     }
 }

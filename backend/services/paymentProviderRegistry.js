@@ -4,6 +4,7 @@ const PROVIDERS = Object.freeze({
     bangkok_bank: { key: "bangkok_bank", label: "Bangkok Bank", region: "TH", logo: "/assets/payment/bank-neutral.svg" },
     kplus: { key: "kplus", label: "K PLUS", region: "TH", logo: "/assets/payment/bank-neutral.svg" },
     krungsri: { key: "krungsri", label: "Krungsri", region: "TH", logo: "/assets/payment/bank-neutral.svg" },
+    krungthai: { key: "krungthai", label: "Krungthai NEXT", region: "TH", logo: "/assets/payment/bank-neutral.svg" },
     kbzpay: { key: "kbzpay", label: "KBZPay", region: "MM", logo: "/assets/payment/kbzpay.png" },
     wavepay: { key: "wavepay", label: "WavePay", region: "MM", logo: "/assets/payment/wavepay.png" },
     ayapay: { key: "ayapay", label: "AYA Pay", region: "MM", logo: "/assets/payment/ayapay.png" },
@@ -27,6 +28,9 @@ const ALIASES = Object.freeze({
     k_plus: "kplus",
     kasikorn: "kplus",
     krungsriapp: "krungsri",
+    krungthai_next: "krungthai",
+    krungthainext: "krungthai",
+    ktb: "krungthai",
     manual: "manual_bank",
     bank: "manual_bank",
     aziel_wallet: "wallet",
@@ -36,8 +40,8 @@ const ALIASES = Object.freeze({
 const PROVIDERS_BY_REGION_TYPE = Object.freeze({
     TH: {
         auto: ["promptpay"],
-        deeplink: ["scb", "bangkok_bank", "kplus", "krungsri"],
-        manual: ["promptpay", "scb", "bangkok_bank", "kplus", "krungsri"],
+        deeplink: ["scb", "bangkok_bank", "kplus", "krungsri", "krungthai"],
+        manual: ["promptpay", "scb", "bangkok_bank", "kplus", "krungsri", "krungthai"],
         wallet: ["wallet"]
     },
     MM: {
@@ -126,6 +130,7 @@ function paymentMethodReadiness(method = {}) {
     }
 
     const dynamicPromptPay = isAzielDynamicPromptPay(method);
+    const confirmationMode = String(method.confirmationMode || "").trim();
     if (!dynamicPromptPay) {
         if (!String(method.accountName || "").trim()) missing.push("account name");
         if (!String(method.accountNumber || "").trim()) missing.push("account number");
@@ -134,6 +139,9 @@ function paymentMethodReadiness(method = {}) {
     const hasQr = Boolean(method.uploadedQrImage || method.qrImageUrl || method.qrImage || method.finalQrImage);
     if (expectsQr && !hasQr && !dynamicPromptPay) missing.push("QR image");
     if (dynamicPromptPay) {
+        if (String(method.region || "").toUpperCase() !== "TH") missing.push("Thailand region");
+        if (confirmationMode && confirmationMode !== "manual_admin") missing.push("manual admin confirmation mode");
+        if (paymentType === "auto") missing.push("manual payment type");
         if (!isEnabled(method.dynamicQrSupported)) missing.push("dynamic QR supported");
         if (!isEnabled(method.amountPrefillSupported)) missing.push("amount prefill supported");
         if (!hasPromptPayRecipient(method)) missing.push("PromptPay recipient");
@@ -144,12 +152,15 @@ function paymentMethodReadiness(method = {}) {
     if (openAppChecklistEnabled && !openAppEnabled) missing.push("open app enabled");
 
     if (openAppEnabled || openAppChecklistEnabled) {
-        if (!String(method.appDisplayName || "").trim()) missing.push("app display name");
-        const appLaunchMode = String(method.appLaunchMode || "OFFICIAL_PAYMENT_DEEPLINK").toUpperCase();
-        if (appLaunchMode === "APP_ONLY") {
-            if (!String(method.iosAppLaunchUrl || method.androidAppLaunchUrl || "").trim()) missing.push("app launch URL");
-        } else if (!String(method.deepLinkUrl || "").trim()) {
-            missing.push("deep link URL");
+        const openAppMode = String(method.openAppMode || "direct").toLowerCase();
+        if (openAppMode === "direct") {
+            if (!String(method.appDisplayName || "").trim()) missing.push("app display name");
+            const appLaunchMode = String(method.appLaunchMode || "OFFICIAL_PAYMENT_DEEPLINK").toUpperCase();
+            if (appLaunchMode === "APP_ONLY") {
+                if (!String(method.iosAppLaunchUrl || method.androidAppLaunchUrl || "").trim()) missing.push("app launch URL");
+            } else if (!String(method.deepLinkUrl || "").trim()) {
+                missing.push("deep link URL");
+            }
         }
     }
 

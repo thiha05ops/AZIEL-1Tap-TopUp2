@@ -97,7 +97,7 @@ const paymentMethodSchema = new mongoose.Schema(
 
         confirmationMode: {
             type: String,
-            enum: ["manual_admin", "automatic_provider", "wallet_internal"],
+            enum: ["manual_admin", "provider_webhook", "automatic_provider", "wallet_internal"],
             default: "manual_admin"
         },
 
@@ -109,6 +109,12 @@ const paymentMethodSchema = new mongoose.Schema(
         appDisplayName: {
             type: String,
             default: ""
+        },
+
+        openAppMode: {
+            type: String,
+            enum: ["direct", "bank_chooser", "disabled"],
+            default: "disabled"
         },
 
         deepLinkUrl: {

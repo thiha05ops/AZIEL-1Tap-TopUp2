@@ -86,6 +86,7 @@
     "verify:payment-qr-save": "node backend/scripts/verify-payment-qr-save.js",
     "verify:manual-dynamic-promptpay-flow": "node backend/scripts/verify-manual-dynamic-promptpay-flow.js",
     "verify:payment-frontend-capability-flow": "node backend/scripts/verify-payment-frontend-capability-flow.js",
+    "verify:thailand-payment-normalization": "node backend/scripts/verify-thailand-payment-normalization.js",
     "verify:i18n": "node backend/scripts/verify-i18n-coverage.js",
     "verify:pwa-icons": "node backend/scripts/verify-pwa-icons.js"
   },

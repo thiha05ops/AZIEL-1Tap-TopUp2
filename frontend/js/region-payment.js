@@ -49,6 +49,7 @@ async function loadDynamicPaymentMethods(region) {
                 .filter(isRegionPaymentMethodUsable)
                 .sort(sortRegionPaymentMethods)
             : [];
+        window.AZIEL_TH_BANK_APPS = getConfiguredRegionThaiBankApps(methods);
 
         paymentGrid.innerHTML = "";
 
@@ -89,6 +90,7 @@ async function loadDynamicPaymentMethods(region) {
             card.dataset.provider = pay.provider || "manual";
             card.dataset.paymentType = pay.paymentType || "manual";
             card.dataset.appDisplayName = pay.appDisplayName || name;
+            card.dataset.openAppMode = pay.openAppMode || "";
             card.dataset.deepLink = pay.deepLinkUrl || pay.deepLink || "";
             card.dataset.appStoreUrl = pay.appStoreUrl || "";
             card.dataset.playStoreUrl = pay.playStoreUrl || "";
@@ -158,6 +160,38 @@ function uniqueRegionPaymentMethodsByKey(methods = []) {
     });
 }
 
+function getConfiguredRegionThaiBankApps(methods = []) {
+    return methods
+        .filter(method => String(method.region || "").toUpperCase() === "TH")
+        .filter(method => {
+            const key = normalizePaymentKey(method.key || method.method || "");
+            const type = String(method.paymentType || "").toLowerCase();
+            const provider = normalizePaymentKey(method.provider || "");
+            return key !== "promptpay" &&
+                key !== "wallet" &&
+                provider !== "wallet" &&
+                method.enableOpenApp === true &&
+                (method.openAppMode || "direct") !== "disabled" &&
+                (type === "deeplink" || type === "manual" || method.enableOpenApp === true);
+        })
+        .map(method => ({
+            key: method.key || normalizePaymentKey(method.method || ""),
+            label: method.appDisplayName || method.method || "Banking App",
+            logo: method.logoUrl || method.logo || getPaymentLogo(method.key || method.provider || method.method),
+            enabled: method.enabled === true,
+            openAppMode: method.openAppMode || "direct",
+            deepLink: method.deepLinkUrl || method.deepLink || "",
+            appLaunchMode: method.appLaunchMode || "",
+            iosAppLaunchUrl: method.iosAppLaunchUrl || "",
+            androidAppLaunchUrl: method.androidAppLaunchUrl || "",
+            appStoreUrl: method.appStoreUrl || "",
+            playStoreUrl: method.playStoreUrl || "",
+            appStoreFallbackUrl: method.appStoreFallbackUrl || "",
+            playStoreFallbackUrl: method.playStoreFallbackUrl || ""
+        }))
+        .sort((a, b) => String(a.label).localeCompare(String(b.label)));
+}
+
 function isRegionPaymentMethodUsable(method = {}) {
     const type = String(method.paymentType || "manual").toLowerCase();
     const provider = normalizePaymentKey(method.provider || "");
@@ -200,6 +234,7 @@ function selectPaymentCard(card) {
         provider: originalMethod.provider || card.dataset.provider || "manual",
         paymentType: originalMethod.paymentType || card.dataset.paymentType || "manual",
         appDisplayName: originalMethod.appDisplayName || card.dataset.appDisplayName || card.dataset.name || "",
+        openAppMode: originalMethod.openAppMode || card.dataset.openAppMode || "disabled",
         deepLink: originalMethod.deepLink || originalMethod.deepLinkUrl || card.dataset.deepLink || "",
         deepLinkUrl: originalMethod.deepLinkUrl || originalMethod.deepLink || card.dataset.deepLink || "",
         appStoreUrl: originalMethod.appStoreUrl || card.dataset.appStoreUrl || "",
@@ -242,6 +277,7 @@ function normalizeSelectedRegionPayment(method = {}, overrides = {}) {
         qrImageUrl: method.qrImageUrl || overrides.qrImage || method.qrImage || method.uploadedQrImage || "",
         deepLink: method.deepLink || method.deepLinkUrl || "",
         deepLinkUrl: method.deepLinkUrl || method.deepLink || "",
+        openAppMode: method.openAppMode || "disabled",
         appLaunchMode: method.appLaunchMode || "",
         iosAppLaunchUrl: method.iosAppLaunchUrl || "",
         androidAppLaunchUrl: method.androidAppLaunchUrl || "",
@@ -273,6 +309,7 @@ function getPaymentLogo(key) {
         bangkokbank: "assets/payment/bank-neutral.svg",
         kplus: "assets/payment/bank-neutral.svg",
         krungsri: "assets/payment/bank-neutral.svg",
+        krungthai: "assets/payment/bank-neutral.svg",
         mmqr: "assets/payment/payment-neutral.svg",
         manualbank: "assets/payment/bank-neutral.svg",
         wallet: "assets/logo.png"
@@ -291,6 +328,7 @@ function isKnownRegionPaymentProvider(key) {
         "bangkokbank",
         "kplus",
         "krungsri",
+        "krungthai",
         "mmqr",
         "manualbank",
         "wallet"

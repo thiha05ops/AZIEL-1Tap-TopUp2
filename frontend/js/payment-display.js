@@ -10,6 +10,7 @@
         bangkokbank: "Bangkok Bank",
         kplus: "K PLUS",
         krungsri: "Krungsri",
+        krungthai: "Krungthai NEXT",
         mmqr: "MMQR",
         manualbank: "Manual Bank Transfer",
         wallet: "AZIEL Wallet",
@@ -39,6 +40,7 @@
         if (key.includes("bangkokbank")) return LABELS.bangkokbank;
         if (key === "kplus" || key.includes("kplus")) return LABELS.kplus;
         if (key.includes("krungsri")) return LABELS.krungsri;
+        if (key.includes("krungthai") || key === "ktb") return LABELS.krungthai;
         if (key === "mmqr" || key.includes("mmqr")) return LABELS.mmqr;
         if (key.includes("manualbank")) return LABELS.manualbank;
         if (key === "scb" || key.includes("scb")) return LABELS.scb;
@@ -68,6 +70,7 @@
             [/\bbangkok[\s_-]*bank\b/gi, LABELS.bangkokbank],
             [/\bk[\s_-]*plus\b/gi, LABELS.kplus],
             [/\bkrungsri\b/gi, LABELS.krungsri],
+            [/\bkrungthai(\s*next)?\b/gi, LABELS.krungthai],
             [/\bmmqr\b/gi, LABELS.mmqr],
             [/\bmanual[\s_-]*bank(\s*transfer)?\b/gi, LABELS.manualbank],
             [/\baziel[\s_-]*wallet\b/gi, LABELS.wallet],

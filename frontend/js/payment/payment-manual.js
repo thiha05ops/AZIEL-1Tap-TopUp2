@@ -40,6 +40,7 @@
             enableOpenApp: paymentSession.enableOpenApp === true || payment.enableOpenApp === true,
             enableChecklist: paymentSession.enableChecklist === true || payment.enableChecklist === true,
             appDisplayName: paymentSession.appDisplayName || payment.appDisplayName || paymentSession.paymentName || payment.method || "",
+            openAppMode: paymentSession.openAppMode || payment.openAppMode || "disabled",
             deepLink: paymentSession.deepLink || paymentSession.deepLinkUrl || payment.deepLink || payment.deepLinkUrl || "",
             deepLinkUrl: paymentSession.deepLinkUrl || paymentSession.deepLink || payment.deepLinkUrl || payment.deepLink || "",
             appLaunchMode: paymentSession.appLaunchMode || payment.appLaunchMode || "",

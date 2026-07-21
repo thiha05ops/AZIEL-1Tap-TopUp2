@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const { formatPaymentMethod } = require("./paymentDisplayNameService");
+const { maskPromptPayRecipient } = require("./promptPayQrService");
 
 const DEFAULT_MANUAL_ATTEMPT_LIMIT = 5;
 const DEFAULT_MANUAL_ATTEMPT_TTL_MS = 15 * 60 * 1000;
@@ -47,6 +48,7 @@ function projectPaymentInstructions(method = {}, reference = "") {
         key: method.key || "",
         paymentType: method.paymentType || "manual",
         provider: method.provider || "manual",
+        confirmationMode: method.confirmationMode || "manual_admin",
         accountName: method.accountName || "",
         accountNumber: method.accountNumber || "",
         qrImage: dynamicQr
@@ -68,11 +70,15 @@ function projectPaymentInstructions(method = {}, reference = "") {
         receiptUploadEnabled: method.receiptUploadEnabled !== false,
         slipRequired: method.slipRequired !== false,
         appDisplayName: method.appDisplayName || "",
+        openAppMode: method.enableOpenApp === true ? (method.openAppMode || "direct") : "disabled",
+        deepLinkUrl: method.deepLinkUrl || method.deepLink || "",
         appLaunchMode: method.appLaunchMode || "OFFICIAL_PAYMENT_DEEPLINK",
         iosAppLaunchUrl: method.iosAppLaunchUrl || "",
         androidAppLaunchUrl: method.androidAppLaunchUrl || "",
         appStoreFallbackUrl: method.appStoreFallbackUrl || method.appStoreUrl || "",
         playStoreFallbackUrl: method.playStoreFallbackUrl || method.playStoreUrl || "",
+        promptPayRecipientType: method.promptPayRecipientType || "",
+        promptPayRecipientMasked: maskPromptPayRecipient(method.promptPayRecipientValue || ""),
         checklistSteps: Array.isArray(method.checklistSteps) ? method.checklistSteps : []
     };
 }

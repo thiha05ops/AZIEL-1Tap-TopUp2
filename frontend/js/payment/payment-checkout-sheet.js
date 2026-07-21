@@ -562,10 +562,12 @@
         if (options.enableSaveQr && (options.qrImageUrl || options.qrImage)) {
             steps.push({ key: "save_qr", label: "Save QR", action: "save_qr", enabled: true, sortOrder: 10 });
         }
-        if (options.enableOpenApp && options.deepLink) {
+        if (options.enableOpenApp && (options.deepLink || options.deepLinkUrl || options.openAppMode === "bank_chooser")) {
             steps.push({
                 key: "open_app",
-                label: `Open ${options.appDisplayName || options.methodName || "payment app"}`,
+                label: options.openAppMode === "bank_chooser"
+                    ? "Open banking app"
+                    : `Open ${options.appDisplayName || options.methodName || "payment app"}`,
                 action: "open_app",
                 enabled: true,
                 sortOrder: 20
@@ -800,18 +802,27 @@
             : (activeQrMatchesCheckout(activeState?.activeQr, options) ? activeState.activeQr.imageUrlOrDataUrl : "");
         const appTarget = resolveAppLaunchTarget(options);
         const canSaveQr = bool(options.enableSaveQr) && Boolean(qr);
-        const canOpenApp = bool(options.enableOpenApp) && Boolean(appTarget.url);
+        const canOpenApp = bool(options.enableOpenApp) &&
+            (String(options.openAppMode || "direct") === "bank_chooser" || Boolean(appTarget.url));
         if (actions) actions.hidden = !(canSaveQr || canOpenApp);
         if (saveQr) {
             saveQr.hidden = !canSaveQr;
             saveQr.onclick = canSaveQr ? () => downloadQr(activeState) : null;
         }
         if (openBankApp) {
-            const appName = options.appDisplayName || options.methodName || "Bank App";
+            const appName = String(options.openAppMode || "direct") === "bank_chooser"
+                ? "Bank App"
+                : options.appDisplayName || options.methodName || "Bank App";
             openBankApp.hidden = !canOpenApp;
             openBankApp.textContent = `Open ${appName}`;
             openBankApp.onclick = canOpenApp ? () => openPaymentApp(activeState) : null;
         }
+    }
+
+    function configuredThaiBankApps() {
+        return Array.isArray(window.AZIEL_TH_BANK_APPS)
+            ? window.AZIEL_TH_BANK_APPS.filter(app => app && app.enabled !== false)
+            : [];
     }
 
     async function generateDynamicQrForActiveState() {
@@ -877,7 +888,85 @@
         };
     }
 
+    function resolveBankProfileLaunchTarget(profile = {}) {
+        return resolveAppLaunchTarget({
+            appLaunchMode: profile.appLaunchMode || "OFFICIAL_PAYMENT_DEEPLINK",
+            deepLink: profile.deepLink || profile.deepLinkUrl || "",
+            deepLinkUrl: profile.deepLinkUrl || profile.deepLink || "",
+            iosAppLaunchUrl: profile.iosAppLaunchUrl || "",
+            androidAppLaunchUrl: profile.androidAppLaunchUrl || "",
+            appStoreFallbackUrl: profile.appStoreFallbackUrl || profile.appStoreUrl || "",
+            playStoreFallbackUrl: profile.playStoreFallbackUrl || profile.playStoreUrl || "",
+            appStoreUrl: profile.appStoreUrl || "",
+            playStoreUrl: profile.playStoreUrl || ""
+        });
+    }
+
+    function showBankChooser(options = {}) {
+        const fallback = document.getElementById("azPaymentSheetAppFallback");
+        if (!fallback) return;
+
+        const apps = configuredThaiBankApps();
+        if (!apps.length) {
+            fallback.innerHTML = "<span>Open your banking app and import the saved QR.</span>";
+            fallback.hidden = false;
+            setMessage("success", "Open your banking app and import the saved QR. Return here after transfer and upload your receipt.");
+            return;
+        }
+
+        fallback.innerHTML = `
+            <span>Choose a banking app. This only opens the app; it does not change the payment.</span>
+            <div class="az-payment-sheet__bank-list">
+                ${apps.map((app, index) => {
+                    const target = resolveBankProfileLaunchTarget(app);
+                    const disabled = !target.url;
+                    return `
+                        <button type="button" data-bank-index="${index}" ${disabled ? "disabled" : ""}>
+                            ${app.logo ? `<img src="${escapeHTML(app.logo)}" alt="" aria-hidden="true">` : ""}
+                            <span>${escapeHTML(app.label || app.appDisplayName || "Banking App")}</span>
+                        </button>
+                    `;
+                }).join("")}
+                <button type="button" data-bank-fallback="other">
+                    <span>Other Bank</span>
+                </button>
+            </div>
+        `;
+        fallback.hidden = false;
+        fallback.querySelectorAll("[data-bank-index]").forEach(button => {
+            button.addEventListener("click", () => {
+                const profile = apps[Number(button.getAttribute("data-bank-index") || 0)];
+                launchBankProfile(profile, options);
+            });
+        });
+        fallback.querySelector("[data-bank-fallback='other']")?.addEventListener("click", () => {
+            setMessage("success", "Open your banking app and import the saved QR. Return here after transfer and upload your receipt.");
+        });
+    }
+
+    function launchBankProfile(profile = {}, options = {}) {
+        const target = resolveBankProfileLaunchTarget(profile);
+        if (!target.url) {
+            setMessage("error", "This banking app link is unavailable. Open your banking app and import the saved QR.");
+            return;
+        }
+        updateChecklist("open_app");
+        persistCheckoutState(activeState || options);
+        setMessage("success", `Opening ${profile.label || profile.appDisplayName || "banking app"}. Return here after transfer and upload your receipt.`);
+        window.location.href = target.url;
+    }
+
     function openPaymentApp(options = {}) {
+        const openAppMode = String(options.openAppMode || "direct");
+        if (openAppMode === "disabled") {
+            setMessage("error", "Payment app opening is disabled for this method.");
+            return;
+        }
+        if (openAppMode === "bank_chooser") {
+            showBankChooser(options);
+            return;
+        }
+
         const target = resolveAppLaunchTarget(options);
         if (!target.url) {
             setMessage("error", "Payment app link is unavailable.");

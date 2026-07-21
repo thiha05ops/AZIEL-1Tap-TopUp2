@@ -71,7 +71,16 @@ function verifyProjection() {
         }
     }, "AZL-REFERENCE");
 
-    assert.deepStrictEqual(projected, {
+    assert.deepStrictEqual({
+        method: projected.method,
+        key: projected.key,
+        paymentType: projected.paymentType,
+        provider: projected.provider,
+        accountName: projected.accountName,
+        accountNumber: projected.accountNumber,
+        qrImage: projected.qrImage,
+        reference: projected.reference
+    }, {
         method: "SCB",
         key: "scb",
         paymentType: "deeplink",
@@ -81,6 +90,10 @@ function verifyProjection() {
         qrImage: "/uploads/payment-assets/scb.png",
         reference: "AZL-REFERENCE"
     });
+    assert.strictEqual(projected.confirmationMode, "manual_admin");
+    assert.strictEqual(projected.openAppMode, "disabled");
+    assert.strictEqual(projected.receiptUploadEnabled, true);
+    assert.strictEqual(projected.slipRequired, true);
 }
 
 function verifySchemas() {
@@ -88,6 +101,7 @@ function verifySchemas() {
     assert(ManualPaymentAttempt.schema.path("expiresAt"), "attempt schema should include expiresAt");
     assert(ManualPaymentAttempt.schema.path("consumedAt"), "attempt schema should include consumedAt");
     assert(Order.schema.path("manualPaymentAttemptId"), "order schema should include manualPaymentAttemptId");
+    assert(Order.schema.path("paymentExecutionPolicy.confirmationMode"), "order schema should snapshot payment execution policy");
 
     const orderIndexes = Order.schema.indexes();
     assert(

@@ -35,6 +35,7 @@ const CANONICAL_PROVIDER_BY_KEY = Object.freeze({
     bangkok_bank: "bangkok_bank",
     kplus: "kplus",
     krungsri: "krungsri",
+    krungthai: "krungthai",
     wallet: "wallet",
     kbzpay: "kbzpay",
     wavepay: "wavepay",
@@ -50,6 +51,8 @@ const CHECKLIST_ACTIONS = new Set([
     "wait_for_confirmation",
     "confirm_payment"
 ]);
+
+const OPEN_APP_MODES = new Set(["direct", "bank_chooser", "disabled"]);
 
 const defaultMethods = [
     {
@@ -81,7 +84,8 @@ const defaultMethods = [
         provider: "promptpay",
         qrMode: "provider_generated",
         receiptUploadEnabled: false,
-        confirmationMode: "automatic_provider",
+        confirmationMode: "provider_webhook",
+        openAppMode: "disabled",
         badgeText: "Auto",
         shortDescription: "Pay with PromptPay QR",
         appDisplayName: "Banking App",
@@ -109,16 +113,22 @@ const defaultMethods = [
         paymentType: "deeplink",
         provider: "scb",
         appDisplayName: "SCB EASY",
-        qrMode: "uploaded_static",
+        qrMode: "aziel_promptpay_dynamic",
         receiptUploadEnabled: true,
         confirmationMode: "manual_admin",
+        openAppMode: "direct",
         badgeText: "Bank App",
         shortDescription: "Pay using SCB EASY",
         enableSaveQr: true,
         enableOpenApp: true,
         enableChecklist: true,
+        dynamicQrSupported: true,
+        amountPrefillSupported: true,
+        referenceSupported: true,
         galleryScanSupported: true,
         slipRequired: true,
+        autoVerificationSupported: false,
+        webhookSupported: false,
         checklistSteps: [
             { key: "save_qr", label: "Save QR", action: "save_qr", enabled: true, sortOrder: 10 },
             { key: "open_app", label: "Open SCB EASY", action: "open_app", enabled: true, sortOrder: 20 },
@@ -133,16 +143,22 @@ const defaultMethods = [
         paymentType: "deeplink",
         provider: "bangkok_bank",
         appDisplayName: "Bangkok Bank Mobile Banking",
-        qrMode: "uploaded_static",
+        qrMode: "aziel_promptpay_dynamic",
         receiptUploadEnabled: true,
         confirmationMode: "manual_admin",
+        openAppMode: "direct",
         badgeText: "Bank App",
         shortDescription: "Pay using Bangkok Bank Mobile Banking",
         enableSaveQr: true,
         enableOpenApp: true,
         enableChecklist: true,
+        dynamicQrSupported: true,
+        amountPrefillSupported: true,
+        referenceSupported: true,
         galleryScanSupported: true,
         slipRequired: true,
+        autoVerificationSupported: false,
+        webhookSupported: false,
         checklistSteps: [
             { key: "save_qr", label: "Save QR", action: "save_qr", enabled: true, sortOrder: 10 },
             { key: "open_app", label: "Open Bangkok Bank Mobile Banking", action: "open_app", enabled: true, sortOrder: 20 },
@@ -157,16 +173,22 @@ const defaultMethods = [
         paymentType: "deeplink",
         provider: "kplus",
         appDisplayName: "K PLUS",
-        qrMode: "uploaded_static",
+        qrMode: "aziel_promptpay_dynamic",
         receiptUploadEnabled: true,
         confirmationMode: "manual_admin",
+        openAppMode: "direct",
         badgeText: "Bank App",
         shortDescription: "Pay using the K PLUS mobile app",
         enableSaveQr: true,
         enableOpenApp: true,
         enableChecklist: true,
+        dynamicQrSupported: true,
+        amountPrefillSupported: true,
+        referenceSupported: true,
         galleryScanSupported: true,
         slipRequired: true,
+        autoVerificationSupported: false,
+        webhookSupported: false,
         checklistSteps: [
             { key: "save_qr", label: "Save QR", action: "save_qr", enabled: true, sortOrder: 10 },
             { key: "open_app", label: "Open K PLUS", action: "open_app", enabled: true, sortOrder: 20 },
@@ -181,22 +203,58 @@ const defaultMethods = [
         paymentType: "deeplink",
         provider: "krungsri",
         appDisplayName: "Krungsri app",
-        qrMode: "uploaded_static",
+        qrMode: "aziel_promptpay_dynamic",
         receiptUploadEnabled: true,
         confirmationMode: "manual_admin",
+        openAppMode: "direct",
         badgeText: "Bank App",
         shortDescription: "Pay using the Krungsri app",
         enableSaveQr: true,
         enableOpenApp: true,
         enableChecklist: true,
+        dynamicQrSupported: true,
+        amountPrefillSupported: true,
+        referenceSupported: true,
         galleryScanSupported: true,
         slipRequired: true,
+        autoVerificationSupported: false,
+        webhookSupported: false,
         checklistSteps: [
             { key: "save_qr", label: "Save QR", action: "save_qr", enabled: true, sortOrder: 10 },
             { key: "open_app", label: "Open Krungsri app", action: "open_app", enabled: true, sortOrder: 20 },
             { key: "upload_receipt", label: "Upload receipt", action: "upload_receipt", enabled: true, sortOrder: 30 }
         ],
         sortOrder: 50
+    },
+    {
+        method: "Krungthai NEXT",
+        key: "krungthai",
+        region: "TH",
+        paymentType: "deeplink",
+        provider: "krungthai",
+        appDisplayName: "Krungthai NEXT",
+        qrMode: "aziel_promptpay_dynamic",
+        receiptUploadEnabled: true,
+        confirmationMode: "manual_admin",
+        openAppMode: "direct",
+        badgeText: "Bank App",
+        shortDescription: "Pay using Krungthai NEXT",
+        enableSaveQr: true,
+        enableOpenApp: true,
+        enableChecklist: true,
+        dynamicQrSupported: true,
+        amountPrefillSupported: true,
+        referenceSupported: true,
+        galleryScanSupported: true,
+        slipRequired: true,
+        autoVerificationSupported: false,
+        webhookSupported: false,
+        checklistSteps: [
+            { key: "save_qr", label: "Save QR", action: "save_qr", enabled: true, sortOrder: 10 },
+            { key: "open_app", label: "Open Krungthai NEXT", action: "open_app", enabled: true, sortOrder: 20 },
+            { key: "upload_receipt", label: "Upload receipt", action: "upload_receipt", enabled: true, sortOrder: 30 }
+        ],
+        sortOrder: 60
     },
     {
         method: "AZIEL Wallet",
@@ -338,6 +396,7 @@ function applySeedDefaultsWithoutOverwriting(method, item = {}) {
         "shortDescription",
         "badgeText",
         "qrMode",
+        "openAppMode",
         "appLaunchMode",
         "promptPayRecipientType",
         "promptPayRecipientValue",
@@ -360,6 +419,11 @@ function canonicalProviderForMethod(method = {}, fallback = "") {
     return normalized || defaultProviderFor(method.region, method.paymentType) || "";
 }
 
+function safeOpenAppMode(value = "", fallback = "disabled") {
+    const mode = String(value || "").trim().toLowerCase();
+    return OPEN_APP_MODES.has(mode) ? mode : fallback;
+}
+
 function applyCompatibilityModes(method) {
     const key = String(method.key || "").toLowerCase();
     const provider = canonicalProviderForMethod(method);
@@ -372,7 +436,10 @@ function applyCompatibilityModes(method) {
         method.receiptUploadEnabled = false;
         method.autoVerificationSupported = true;
         method.webhookSupported = true;
-        method.confirmationMode = "automatic_provider";
+        method.confirmationMode = ["provider_webhook", "automatic_provider"].includes(method.confirmationMode)
+            ? method.confirmationMode
+            : "provider_webhook";
+        method.openAppMode = method.enableOpenApp === true ? safeOpenAppMode(method.openAppMode, "bank_chooser") : "disabled";
     } else if (provider === "wallet") {
         method.paymentType = "wallet";
         method.qrMode = "none";
@@ -384,12 +451,14 @@ function applyCompatibilityModes(method) {
         method.autoVerificationSupported = false;
         method.webhookSupported = false;
         method.confirmationMode = "wallet_internal";
+        method.openAppMode = "disabled";
     } else if (["manual", "deeplink"].includes(String(method.paymentType || "").toLowerCase())) {
         method.receiptUploadEnabled = method.receiptUploadEnabled !== false;
         method.slipRequired = method.slipRequired !== false;
         method.autoVerificationSupported = false;
         method.webhookSupported = false;
         method.confirmationMode = "manual_admin";
+        method.openAppMode = method.enableOpenApp === true ? safeOpenAppMode(method.openAppMode, "direct") : "disabled";
         if (!["provider_generated", "uploaded_static", "aziel_promptpay_dynamic", "none"].includes(method.qrMode)) {
             method.qrMode = "uploaded_static";
         }
@@ -426,6 +495,7 @@ function sanitizeChecklistSteps(value = []) {
 function capabilityProjection(obj = {}) {
     return {
         appDisplayName: obj.appDisplayName || "",
+        openAppMode: safeOpenAppMode(obj.openAppMode, obj.enableOpenApp === true ? "direct" : "disabled"),
         deepLinkUrl: obj.deepLinkUrl || "",
         appStoreUrl: obj.appStoreUrl || "",
         playStoreUrl: obj.playStoreUrl || "",
@@ -537,6 +607,7 @@ function formatAdminMethod(method) {
         qrImageUrl: configuredQrImage,
         uploadedQrImage: configuredQrImage,
         appDisplayName: obj.appDisplayName || "",
+        openAppMode: safeOpenAppMode(obj.openAppMode, obj.enableOpenApp === true ? "direct" : "disabled"),
         deepLinkUrl: obj.deepLinkUrl || "",
         appStoreUrl: obj.appStoreUrl || "",
         playStoreUrl: obj.playStoreUrl || "",
@@ -715,6 +786,7 @@ router.post("/payment-methods/:key/promptpay-qr", authMiddleware, async (req, re
             !method ||
             method.region !== "TH" ||
             method.qrMode !== "aziel_promptpay_dynamic" ||
+            method.confirmationMode !== "manual_admin" ||
             method.dynamicQrSupported !== true ||
             method.amountPrefillSupported !== true ||
             method.receiptUploadEnabled === false ||
@@ -891,7 +963,11 @@ function applyPaymentMethodPatch(method, body = {}) {
     if (body.promptPayRecipientType !== undefined) method.promptPayRecipientType = safePromptPayRecipientType(body.promptPayRecipientType);
     if (body.dynamicQrExpiryMinutes !== undefined) method.dynamicQrExpiryMinutes = safePositiveInt(body.dynamicQrExpiryMinutes, 15);
 
-    if (body.confirmationMode !== undefined && ["manual_admin", "automatic_provider", "wallet_internal"].includes(String(body.confirmationMode))) {
+    if (body.openAppMode !== undefined) {
+        method.openAppMode = safeOpenAppMode(body.openAppMode, method.openAppMode || "disabled");
+    }
+
+    if (body.confirmationMode !== undefined && ["manual_admin", "provider_webhook", "automatic_provider", "wallet_internal"].includes(String(body.confirmationMode))) {
         method.confirmationMode = String(body.confirmationMode);
     }
 
@@ -910,6 +986,95 @@ function applyPaymentMethodPatch(method, body = {}) {
     if (body.checklistSteps !== undefined) method.checklistSteps = sanitizeChecklistSteps(body.checklistSteps);
 
     return applyCompatibilityModes(method);
+}
+
+function normalizedPromptPayRecipient(method = {}) {
+    return {
+        type: safePromptPayRecipientType(method.promptPayRecipientType || ""),
+        value: safeText(method.promptPayRecipientValue || "", 80)
+            .toUpperCase()
+            .replace(/\s+/g, "")
+    };
+}
+
+function isThailandManualDynamicMethod(method = {}) {
+    return method.enabled === true &&
+        String(method.region || "").toUpperCase() === "TH" &&
+        ["manual", "deeplink"].includes(String(method.paymentType || "").toLowerCase()) &&
+        method.qrMode === "aziel_promptpay_dynamic";
+}
+
+function configError(message) {
+    const error = new Error(message);
+    error.statusCode = 400;
+    return error;
+}
+
+async function validatePaymentMethodConfiguration(method) {
+    const paymentType = String(method.paymentType || "manual").toLowerCase();
+    const openAppMode = safeOpenAppMode(method.openAppMode, method.enableOpenApp === true ? "direct" : "disabled");
+
+    if (method.qrMode === "aziel_promptpay_dynamic") {
+        if (String(method.region || "").toUpperCase() !== "TH") {
+            throw configError("AZIEL Dynamic PromptPay QR is only available for Thailand methods.");
+        }
+        if (!["manual", "deeplink"].includes(paymentType)) {
+            throw configError("AZIEL Dynamic PromptPay QR requires a manual or deeplink payment type.");
+        }
+        if (method.confirmationMode !== "manual_admin") {
+            throw configError("AZIEL Dynamic PromptPay QR requires manual admin confirmation.");
+        }
+        if (method.receiptUploadEnabled === false || method.slipRequired === false) {
+            throw configError("AZIEL Dynamic PromptPay QR requires receipt upload and payment slip verification.");
+        }
+        if (method.autoVerificationSupported === true || method.webhookSupported === true) {
+            throw configError("Manual Dynamic PromptPay methods cannot enable automatic verification or webhooks.");
+        }
+        const recipient = normalizedPromptPayRecipient(method);
+        if (!recipient.type || !recipient.value) {
+            throw configError("AZIEL Dynamic PromptPay QR requires a valid PromptPay recipient.");
+        }
+        if (method.enabled === true) {
+            const existing = await PaymentMethod.find({
+                _id: { $ne: method._id },
+                enabled: true,
+                region: "TH",
+                qrMode: "aziel_promptpay_dynamic"
+            }).select("key method paymentType promptPayRecipientType promptPayRecipientValue").lean();
+            const conflict = existing.find(item => {
+                if (!["manual", "deeplink"].includes(String(item.paymentType || "").toLowerCase())) return false;
+                const other = normalizedPromptPayRecipient(item);
+                return other.type &&
+                    other.value &&
+                    (other.type !== recipient.type || other.value !== recipient.value);
+            });
+            if (conflict) {
+                throw configError(`Enabled Thailand manual Dynamic PromptPay methods must use the same AZIEL receiving account. Conflict: ${conflict.method || conflict.key}.`);
+            }
+        }
+    }
+
+    if (method.qrMode === "provider_generated") {
+        if (!["provider_webhook", "automatic_provider"].includes(String(method.confirmationMode || ""))) {
+            throw configError("Provider-generated QR requires provider webhook confirmation.");
+        }
+        if (!method.autoVerificationSupported && !method.webhookSupported && paymentType === "auto") {
+            throw configError("Provider-generated auto payments require provider verification support.");
+        }
+    }
+
+    if (method.enableOpenApp === true && openAppMode === "direct") {
+        if (!String(method.appDisplayName || "").trim()) {
+            throw configError("Direct app opening requires an app display name.");
+        }
+        const appLaunchMode = String(method.appLaunchMode || "OFFICIAL_PAYMENT_DEEPLINK").toUpperCase();
+        const hasLaunch = appLaunchMode === "APP_ONLY"
+            ? Boolean(method.iosAppLaunchUrl || method.androidAppLaunchUrl)
+            : Boolean(method.deepLinkUrl);
+        if (!hasLaunch) {
+            throw configError("Direct app opening requires a configured app launch URL or deeplink.");
+        }
+    }
 }
 
 // POST /api/admin/payment-methods
@@ -942,6 +1107,7 @@ router.post("/admin/payment-methods", adminMiddleware, requireAdminPermission(PE
         });
 
         applyPaymentMethodPatch(method, req.body);
+        await validatePaymentMethodConfiguration(method);
         await method.save();
 
         await writeAdminAudit({
@@ -995,6 +1161,7 @@ router.put("/admin/payment-methods/:id", adminMiddleware, requireAdminPermission
         }
 
         applyPaymentMethodPatch(method, req.body);
+        await validatePaymentMethodConfiguration(method);
 
         await method.save();
         await writeAdminAudit({

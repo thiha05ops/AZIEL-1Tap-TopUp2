@@ -4,7 +4,8 @@ const path = require("path");
 
 const ROOT = path.resolve(__dirname, "../..");
 const {
-    paymentMethodReadiness
+    paymentMethodReadiness,
+    validProvidersFor
 } = require("../services/paymentProviderRegistry");
 const paymentMethodsRoute = require("../routes/paymentMethods");
 
@@ -32,6 +33,7 @@ function verifyProviderRegistry() {
         "bangkok_bank",
         "kplus",
         "krungsri",
+        "krungthai",
         "kbzpay",
         "wavepay",
         "ayapay",
@@ -42,9 +44,9 @@ function verifyProviderRegistry() {
 
     includes("backend/services/paymentProviderRegistry.js", "TH: {", "registry must define Thailand provider rules");
     includes("backend/services/paymentProviderRegistry.js", "MM: {", "registry must define Myanmar provider rules");
-    includes("backend/services/paymentProviderRegistry.js", "auto: [\"promptpay\"]", "Thailand auto must only allow PromptPay");
-    includes("backend/services/paymentProviderRegistry.js", "deeplink: [\"scb\", \"bangkok_bank\", \"kplus\", \"krungsri\"]", "Thailand deeplink must exclude Myanmar providers");
-    includes("backend/services/paymentProviderRegistry.js", "manual: [\"kbzpay\", \"wavepay\", \"ayapay\", \"mmqr\", \"manual_bank\"]", "Myanmar manual must exclude Thai banks");
+    assert.deepStrictEqual(validProvidersFor("TH", "auto").map(item => item.key), ["promptpay"], "Thailand auto must only allow PromptPay");
+    assert.deepStrictEqual(validProvidersFor("TH", "deeplink").map(item => item.key), ["scb", "bangkok_bank", "kplus", "krungsri", "krungthai"], "Thailand deeplink must exclude Myanmar providers");
+    assert.deepStrictEqual(validProvidersFor("MM", "manual").map(item => item.key), ["kbzpay", "wavepay", "ayapay", "mmqr", "manual_bank"], "Myanmar manual must exclude Thai banks");
     includes("backend/services/paymentProviderRegistry.js", "omise: \"promptpay\"", "legacy Omise provider must normalize to PromptPay");
 }
 
@@ -61,6 +63,8 @@ function verifyBackendSeedAndProjection() {
         'provider: "kplus"',
         'key: "krungsri"',
         'provider: "krungsri"',
+        'key: "krungthai"',
+        'provider: "krungthai"',
         'key: "wallet"',
         'provider: "wallet"'
     ].forEach(snippet => assert(routes.includes(snippet), `seed/projection missing ${snippet}`));

@@ -279,6 +279,46 @@ body.light .az-payment-sheet {
     text-decoration: none;
 }
 
+.az-payment-sheet__bank-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+    margin-top: 4px;
+}
+
+.az-payment-sheet__bank-list button,
+.az-payment-sheet__fallback button {
+    min-height: 42px;
+    border: 1px solid var(--az-pay-sheet-border-strong);
+    border-radius: 14px;
+    background: var(--az-pay-sheet-bg-soft);
+    color: var(--az-pay-sheet-text);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 850;
+    cursor: pointer;
+}
+
+.az-payment-sheet__bank-list button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 10px;
+}
+
+.az-payment-sheet__bank-list button:disabled {
+    cursor: not-allowed;
+    opacity: .45;
+}
+
+.az-payment-sheet__bank-list img {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+}
+
 .az-payment-sheet__checklist {
     margin: 0 0 14px;
     padding: 12px 14px;
@@ -470,6 +510,8 @@ body.light .az-payment-sheet {
 .az-payment-sheet__close:focus-visible,
 .az-payment-sheet__row button:focus-visible,
 .az-payment-sheet__action:focus-visible,
+.az-payment-sheet__fallback button:focus-visible,
+.az-payment-sheet__bank-list button:focus-visible,
 .az-payment-sheet__secondary:focus-visible,
 .az-payment-sheet__upload:focus-within,
 .az-payment-sheet__preview button:focus-visible,

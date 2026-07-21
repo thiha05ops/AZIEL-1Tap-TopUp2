@@ -58,6 +58,11 @@ function assertPaymentMatchesOrder(order, payment = {}) {
     }
 }
 
+function isManualAdminConfirmedOrder(order = {}) {
+    return String(order.paymentExecutionPolicy?.confirmationMode || "") === "manual_admin" ||
+        Boolean(order.manualPaymentAttemptId && String(order.manualPaymentAttemptId).trim());
+}
+
 async function applyPaymentToOrder(orderOrQuery, payment = {}, options = {}) {
     const order = typeof orderOrQuery === "object" && orderOrQuery.orderId && typeof orderOrQuery.save !== "function"
         ? await Order.findOne(orderOrQuery)
@@ -79,6 +84,12 @@ async function applyPaymentToOrder(orderOrQuery, payment = {}, options = {}) {
     const paymentStatus = normalizePaymentStatus(payment.status);
 
     if (paymentStatus === PAYMENT_STATES.PAID) {
+        if (isManualAdminConfirmedOrder(order)) {
+            throw new OrderStateError(
+                "MANUAL_PAYMENT_REQUIRES_ADMIN_APPROVAL",
+                "Manual payment orders require admin approval before paid status."
+            );
+        }
         return transitionOrder(order, ORDER_STATES.PAID, {
             source: options.source || "payment_provider",
             actorType: options.actorType || "system",

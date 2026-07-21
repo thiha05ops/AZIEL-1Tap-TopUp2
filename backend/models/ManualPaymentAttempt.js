@@ -107,6 +107,7 @@ const manualPaymentAttemptSchema = new mongoose.Schema(
             accountNumber: { type: String, default: "" },
             qrImage: { type: String, default: "" },
             qrMode: { type: String, default: "" },
+            confirmationMode: { type: String, default: "" },
             enableSaveQr: { type: Boolean, default: false },
             enableOpenApp: { type: Boolean, default: false },
             enableChecklist: { type: Boolean, default: false },
@@ -117,11 +118,15 @@ const manualPaymentAttemptSchema = new mongoose.Schema(
             receiptUploadEnabled: { type: Boolean, default: true },
             slipRequired: { type: Boolean, default: true },
             appDisplayName: { type: String, default: "" },
+            openAppMode: { type: String, default: "disabled" },
+            deepLinkUrl: { type: String, default: "" },
             appLaunchMode: { type: String, default: "" },
             iosAppLaunchUrl: { type: String, default: "" },
             androidAppLaunchUrl: { type: String, default: "" },
             appStoreFallbackUrl: { type: String, default: "" },
             playStoreFallbackUrl: { type: String, default: "" },
+            promptPayRecipientType: { type: String, default: "" },
+            promptPayRecipientMasked: { type: String, default: "" },
             checklistSteps: {
                 type: [
                     {
