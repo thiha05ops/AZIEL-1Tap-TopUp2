@@ -808,9 +808,11 @@
             ? (activeDynamicQrMatchesCheckout(activeState?.activeDynamicQr, options) ? activeState.activeDynamicQr.imageDataUrl : "")
             : (activeQrMatchesCheckout(activeState?.activeQr, options) ? activeState.activeQr.imageUrlOrDataUrl : "");
         const appTarget = resolveAppLaunchTarget(options);
+        const directOpenAppMode = String(options.openAppMode || "direct") !== "bank_chooser";
+        const androidPackageCapability = directOpenAppMode && hasAndroidLaunchCapability(options);
         const canSaveQr = bool(options.enableSaveQr) && Boolean(qr);
         const canOpenApp = bool(options.enableOpenApp) &&
-            (String(options.openAppMode || "direct") === "bank_chooser" || Boolean(appTarget.url));
+            (String(options.openAppMode || "direct") === "bank_chooser" || Boolean(appTarget.url) || androidPackageCapability);
         if (actions) actions.hidden = !(canSaveQr || canOpenApp);
         if (saveQr) {
             saveQr.hidden = !canSaveQr;
@@ -873,16 +875,27 @@
             androidAppLaunchUrl: options.androidAppLaunchUrl || "",
             playStoreFallbackUrl: options.playStoreFallbackUrl || options.playStoreUrl || ""
         }) || "";
+        const androidExplicitUrl = helper?.isSafeLaunchUrl?.(options.androidAppLaunchUrl || "")
+            ? options.androidAppLaunchUrl
+            : "";
         const iosDirectUrl = options.iosAppLaunchUrl || "";
         const iosStoreUrl = options.appStoreFallbackUrl || options.appStoreUrl || "";
         const androidStoreUrl = options.playStoreFallbackUrl || options.playStoreUrl || "";
 
+        if (isAndroid) {
+            return {
+                mode,
+                platform,
+                url: androidExplicitUrl || androidIntentUrl || androidStoreUrl,
+                storeUrl: androidStoreUrl,
+                source: androidExplicitUrl ? "android_explicit" : androidIntentUrl ? "android_intent" : "store"
+            };
+        }
+
         if (mode === "APP_ONLY") {
             const url = isIOS
                 ? (iosDirectUrl || iosStoreUrl)
-                : isAndroid
-                    ? (androidIntentUrl || options.androidAppLaunchUrl || androidStoreUrl)
-                    : "";
+                : "";
             return {
                 mode,
                 platform,
@@ -892,7 +905,7 @@
                     : isAndroid
                         ? androidStoreUrl
                         : iosStoreUrl || androidStoreUrl,
-                source: isAndroid && androidIntentUrl ? "android_intent" : iosDirectUrl ? "direct" : "store"
+                source: isAndroid && androidExplicitUrl ? "android_explicit" : isAndroid && androidIntentUrl ? "android_intent" : iosDirectUrl ? "direct" : "store"
             };
         }
         return {
@@ -923,6 +936,16 @@
         });
     }
 
+    function hasAndroidLaunchCapability(options = {}) {
+        const helper = window.AZIEL_ANDROID_APP_LAUNCH;
+        if (helper?.resolvePlatform?.() !== "android") return false;
+        return helper?.hasAndroidLaunchCapability?.({
+            androidPackageName: options.androidPackageName || "",
+            androidAppLaunchUrl: options.androidAppLaunchUrl || "",
+            playStoreFallbackUrl: options.playStoreFallbackUrl || options.playStoreUrl || ""
+        }) === true;
+    }
+
     function showBankChooser(options = {}) {
         const fallback = document.getElementById("azPaymentSheetAppFallback");
         if (!fallback) return;
@@ -940,7 +963,7 @@
             <div class="az-payment-sheet__bank-list">
                 ${apps.map((app, index) => {
                     const target = resolveBankProfileLaunchTarget(app);
-                    const disabled = !target.url;
+                    const disabled = !target.url && !hasAndroidLaunchCapability(app);
                     const labelPrefix = target.source === "store" ? "Open / Install" : "Open";
                     const appName = app.label || app.appDisplayName || "Banking App";
                     return `

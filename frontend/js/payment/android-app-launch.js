@@ -54,6 +54,13 @@
         return `intent://open#Intent;package=${encodeURIComponent(packageName)};S.browser_fallback_url=${encodeURIComponent(fallbackUrl)};end`;
     }
 
+    function hasAndroidLaunchCapability(options = {}) {
+        const explicitUrl = safeText(options.androidLaunchUrl || options.androidAppLaunchUrl);
+        if (explicitUrl && isSafeLaunchUrl(explicitUrl)) return true;
+        return isAndroidPackageName(options.androidPackageName) &&
+            isHttpsUrl(options.playStoreFallbackUrl || options.playStoreUrl);
+    }
+
     function resolvePlatform() {
         const nav = window.navigator || {};
         const userAgent = nav.userAgent || "";
@@ -67,6 +74,7 @@
 
     window.AZIEL_ANDROID_APP_LAUNCH = Object.freeze({
         buildAndroidIntentUrl,
+        hasAndroidLaunchCapability,
         isAndroidPackageName,
         isHttpsUrl,
         isSafeLaunchUrl,

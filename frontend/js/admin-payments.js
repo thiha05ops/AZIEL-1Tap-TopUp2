@@ -676,10 +676,11 @@ function getAdminPaymentReadiness(method = {}) {
         if (!String(method.appDisplayName || "").trim()) missing.push("app display name");
         if (method.openAppMode === "bank_chooser") {
             // The chooser can still provide a safe instruction fallback when no direct app profile is configured.
-        } else if (method.appLaunchMode === "APP_ONLY") {
-            if (!String(method.iosAppLaunchUrl || method.androidAppLaunchUrl || "").trim()) missing.push("app launch URL");
-        } else if (!String(method.deepLinkUrl || "").trim()) {
-            missing.push("deep link URL");
+        } else {
+            const hasIosLaunchOrStore = Boolean(String(method.iosAppLaunchUrl || method.appStoreFallbackUrl || method.appStoreUrl || "").trim());
+            if (!String(method.deepLinkUrl || "").trim() && !hasIosLaunchOrStore && !hasAdminAndroidLaunchCapability(method)) {
+                missing.push("app launch URL");
+            }
         }
     }
     return { ready: missing.length === 0, missing };
@@ -839,6 +840,15 @@ function buildAdminAndroidIntentPreview(source = {}) {
         androidAppLaunchUrl: source.androidAppLaunchUrl || "",
         playStoreFallbackUrl: source.playStoreFallbackUrl || source.playStoreUrl || ""
     });
+}
+
+function hasAdminAndroidLaunchCapability(source = {}) {
+    const helper = window.AZIEL_ANDROID_APP_LAUNCH;
+    return helper?.hasAndroidLaunchCapability?.({
+        androidPackageName: source.androidPackageName || "",
+        androidAppLaunchUrl: source.androidAppLaunchUrl || "",
+        playStoreFallbackUrl: source.playStoreFallbackUrl || source.playStoreUrl || ""
+    }) === true;
 }
 
 function hasPaymentQr(method = {}) {
@@ -1845,13 +1855,12 @@ function refreshPaymentEditorVisibility(card) {
     });
 
     const appName = card.querySelector(".pm-app-name")?.value || "Banking App";
+    const formState = collectAdminPaymentFormState(card);
     const openWarning = card.querySelector(".pm-open-app-warning");
     if (openWarning) {
         const canOpen = openAppMode === "disabled" ||
             openAppMode === "bank_chooser" ||
-            (appLaunchMode === "APP_ONLY"
-                ? Boolean(card.querySelector(".pm-ios-app-launch")?.value || card.querySelector(".pm-android-app-launch")?.value || card.querySelector(".pm-android-package-name")?.value)
-                : Boolean(card.querySelector(".pm-deeplink")?.value && appName));
+            (Boolean(card.querySelector(".pm-deeplink")?.value || card.querySelector(".pm-ios-app-launch")?.value || card.querySelector(".pm-app-store")?.value || hasAdminAndroidLaunchCapability(formState)) && appName);
         openWarning.hidden = !card.querySelector(".pm-enable-open-app")?.checked || canOpen;
     }
 }

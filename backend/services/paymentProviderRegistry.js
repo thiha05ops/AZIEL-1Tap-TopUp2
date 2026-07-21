@@ -112,10 +112,11 @@ function hasPromptPayRecipient(method = {}) {
     return Boolean(value);
 }
 
-function hasAndroidLaunchConfiguration(method = {}) {
+function hasAndroidLaunchCapability(method = {}) {
+    if (String(method.androidAppLaunchUrl || "").trim()) return true;
     return Boolean(
-        String(method.androidPackageName || "").trim() ||
-        String(method.androidAppLaunchUrl || "").trim()
+        String(method.androidPackageName || "").trim() &&
+        String(method.playStoreFallbackUrl || method.playStoreUrl || "").trim()
     );
 }
 
@@ -162,14 +163,11 @@ function paymentMethodReadiness(method = {}) {
         const openAppMode = String(method.openAppMode || "direct").toLowerCase();
         if (openAppMode === "direct") {
             if (!String(method.appDisplayName || "").trim()) missing.push("app display name");
-            const appLaunchMode = String(method.appLaunchMode || "OFFICIAL_PAYMENT_DEEPLINK").toUpperCase();
-            if (appLaunchMode === "APP_ONLY") {
-                if (!String(method.iosAppLaunchUrl || "").trim() && !hasAndroidLaunchConfiguration(method)) missing.push("app launch URL");
-                if (hasAndroidLaunchConfiguration(method) && !String(method.playStoreFallbackUrl || method.playStoreUrl || "").trim()) {
-                    missing.push("Play Store fallback URL");
-                }
-            } else if (!String(method.deepLinkUrl || "").trim()) {
-                missing.push("deep link URL");
+            const hasIosLaunchOrStore = Boolean(String(method.iosAppLaunchUrl || method.appStoreFallbackUrl || method.appStoreUrl || "").trim());
+            const hasLegacyDeeplink = Boolean(String(method.deepLinkUrl || "").trim());
+            if (!hasLegacyDeeplink && !hasIosLaunchOrStore && !hasAndroidLaunchCapability(method)) missing.push("app launch URL");
+            if (String(method.androidPackageName || "").trim() && !String(method.androidAppLaunchUrl || "").trim() && !String(method.playStoreFallbackUrl || method.playStoreUrl || "").trim()) {
+                missing.push("Play Store fallback URL");
             }
         }
     }

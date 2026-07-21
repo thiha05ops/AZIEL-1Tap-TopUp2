@@ -1045,10 +1045,11 @@ function configError(message) {
     return error;
 }
 
-function hasAndroidLaunchConfiguration(method = {}) {
+function hasAndroidLaunchCapability(method = {}) {
+    if (String(method.androidAppLaunchUrl || "").trim()) return true;
     return Boolean(
-        String(method.androidPackageName || "").trim() ||
-        String(method.androidAppLaunchUrl || "").trim()
+        String(method.androidPackageName || "").trim() &&
+        String(method.playStoreFallbackUrl || method.playStoreUrl || "").trim()
     );
 }
 
@@ -1109,14 +1110,12 @@ async function validatePaymentMethodConfiguration(method) {
         if (!String(method.appDisplayName || "").trim()) {
             throw configError("Direct app opening requires an app display name.");
         }
-        const appLaunchMode = String(method.appLaunchMode || "OFFICIAL_PAYMENT_DEEPLINK").toUpperCase();
-        const hasLaunch = appLaunchMode === "APP_ONLY"
-            ? Boolean(method.iosAppLaunchUrl || method.androidAppLaunchUrl || method.androidPackageName)
-            : Boolean(method.deepLinkUrl);
+        const hasIosLaunchOrStore = Boolean(String(method.iosAppLaunchUrl || method.appStoreFallbackUrl || method.appStoreUrl || "").trim());
+        const hasLaunch = Boolean(method.deepLinkUrl || hasIosLaunchOrStore || hasAndroidLaunchCapability(method));
         if (!hasLaunch) {
             throw configError("Direct app opening requires a configured app launch URL or deeplink.");
         }
-        if (hasAndroidLaunchConfiguration(method) && !String(method.playStoreFallbackUrl || method.playStoreUrl || "").trim()) {
+        if (String(method.androidPackageName || "").trim() && !String(method.androidAppLaunchUrl || "").trim() && !String(method.playStoreFallbackUrl || method.playStoreUrl || "").trim()) {
             throw configError("Android app opening requires a Play Store fallback URL.");
         }
     }
