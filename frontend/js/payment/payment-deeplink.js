@@ -59,6 +59,7 @@
             appLaunchMode: paymentSession?.appLaunchMode || payment.appLaunchMode || "",
             iosAppLaunchUrl: paymentSession?.iosAppLaunchUrl || payment.iosAppLaunchUrl || "",
             androidAppLaunchUrl: paymentSession?.androidAppLaunchUrl || payment.androidAppLaunchUrl || "",
+            androidPackageName: paymentSession?.androidPackageName || payment.androidPackageName || "",
             appStoreUrl: paymentSession?.appStoreUrl || payment.appStoreUrl || "",
             playStoreUrl: paymentSession?.playStoreUrl || payment.playStoreUrl || "",
             appStoreFallbackUrl: paymentSession?.appStoreFallbackUrl || payment.appStoreFallbackUrl || "",

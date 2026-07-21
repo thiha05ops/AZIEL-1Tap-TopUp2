@@ -123,6 +123,7 @@ const manualPaymentAttemptSchema = new mongoose.Schema(
             appLaunchMode: { type: String, default: "" },
             iosAppLaunchUrl: { type: String, default: "" },
             androidAppLaunchUrl: { type: String, default: "" },
+            androidPackageName: { type: String, default: "" },
             appStoreFallbackUrl: { type: String, default: "" },
             playStoreFallbackUrl: { type: String, default: "" },
             promptPayRecipientType: { type: String, default: "" },

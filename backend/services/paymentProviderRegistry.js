@@ -112,6 +112,13 @@ function hasPromptPayRecipient(method = {}) {
     return Boolean(value);
 }
 
+function hasAndroidLaunchConfiguration(method = {}) {
+    return Boolean(
+        String(method.androidPackageName || "").trim() ||
+        String(method.androidAppLaunchUrl || "").trim()
+    );
+}
+
 function paymentMethodReadiness(method = {}) {
     const normalizedProvider = normalizeProviderKey(method.provider || method.key || "");
     const paymentType = String(method.paymentType || "manual").toLowerCase();
@@ -157,7 +164,10 @@ function paymentMethodReadiness(method = {}) {
             if (!String(method.appDisplayName || "").trim()) missing.push("app display name");
             const appLaunchMode = String(method.appLaunchMode || "OFFICIAL_PAYMENT_DEEPLINK").toUpperCase();
             if (appLaunchMode === "APP_ONLY") {
-                if (!String(method.iosAppLaunchUrl || method.androidAppLaunchUrl || "").trim()) missing.push("app launch URL");
+                if (!String(method.iosAppLaunchUrl || "").trim() && !hasAndroidLaunchConfiguration(method)) missing.push("app launch URL");
+                if (hasAndroidLaunchConfiguration(method) && !String(method.playStoreFallbackUrl || method.playStoreUrl || "").trim()) {
+                    missing.push("Play Store fallback URL");
+                }
             } else if (!String(method.deepLinkUrl || "").trim()) {
                 missing.push("deep link URL");
             }

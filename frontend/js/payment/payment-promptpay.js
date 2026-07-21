@@ -117,9 +117,12 @@
             return configuredApps.map(app => ({
                 label: app.label || "Banking App",
                 deepLink: app.deepLink || "",
+                androidPackageName: app.androidPackageName || "",
+                androidAppLaunchUrl: app.androidAppLaunchUrl || "",
+                iosAppLaunchUrl: app.iosAppLaunchUrl || "",
                 appStoreUrl: app.appStoreUrl || "",
-                playStoreUrl: app.playStoreUrl || ""
-            })).filter(app => app.deepLink);
+                playStoreUrl: app.playStoreUrl || app.playStoreFallbackUrl || ""
+            })).filter(app => app.deepLink || app.androidPackageName || app.androidAppLaunchUrl || app.iosAppLaunchUrl);
         }
 
         if (!deepLink) return [];
@@ -234,9 +237,20 @@
     }
 
     function openPromptPayApp(state, app = {}) {
-        if (!app.deepLink) return;
+        const platform = window.AZIEL_ANDROID_APP_LAUNCH?.resolvePlatform?.() || "desktop";
+        const androidIntent = window.AZIEL_ANDROID_APP_LAUNCH?.buildAndroidIntentUrl?.({
+            androidPackageName: app.androidPackageName || "",
+            androidAppLaunchUrl: app.androidAppLaunchUrl || app.deepLink || "",
+            playStoreFallbackUrl: app.playStoreUrl || ""
+        }) || "";
+        const target = platform === "android"
+            ? (androidIntent || app.androidAppLaunchUrl || app.playStoreUrl || "")
+            : platform === "ios"
+                ? (app.iosAppLaunchUrl || app.deepLink || app.appStoreUrl || "")
+                : (app.deepLink || "");
+        if (!target) return;
         completeGuideStep("open_app");
-        window.location.href = app.deepLink;
+        window.location.href = target;
 
         setTimeout(() => {
             const box = document.getElementById("promptPayAppFallback");

@@ -148,6 +148,11 @@ const paymentMethodSchema = new mongoose.Schema(
             default: ""
         },
 
+        androidPackageName: {
+            type: String,
+            default: ""
+        },
+
         appStoreFallbackUrl: {
             type: String,
             default: ""

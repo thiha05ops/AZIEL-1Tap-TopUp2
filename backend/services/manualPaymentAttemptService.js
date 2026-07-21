@@ -75,6 +75,7 @@ function projectPaymentInstructions(method = {}, reference = "") {
         appLaunchMode: method.appLaunchMode || "OFFICIAL_PAYMENT_DEEPLINK",
         iosAppLaunchUrl: method.iosAppLaunchUrl || "",
         androidAppLaunchUrl: method.androidAppLaunchUrl || "",
+        androidPackageName: method.androidPackageName || "",
         appStoreFallbackUrl: method.appStoreFallbackUrl || method.appStoreUrl || "",
         playStoreFallbackUrl: method.playStoreFallbackUrl || method.playStoreUrl || "",
         promptPayRecipientType: method.promptPayRecipientType || "",

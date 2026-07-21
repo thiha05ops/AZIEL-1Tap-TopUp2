@@ -79,6 +79,7 @@ function validDynamicMethod(overrides = {}) {
         appLaunchMode: "APP_ONLY",
         iosAppLaunchUrl: "scbeasy://",
         androidAppLaunchUrl: "scbeasy://",
+        playStoreFallbackUrl: "https://play.google.com/store/apps/details?id=com.scb.phone",
         enableChecklist: true,
         dynamicQrSupported: true,
         amountPrefillSupported: true,

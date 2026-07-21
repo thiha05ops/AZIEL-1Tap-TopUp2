@@ -93,6 +93,7 @@ function getConfiguredThaiBankApps(methods = []) {
             appLaunchMode: method.appLaunchMode || "",
             iosAppLaunchUrl: method.iosAppLaunchUrl || "",
             androidAppLaunchUrl: method.androidAppLaunchUrl || "",
+            androidPackageName: method.androidPackageName || "",
             appStoreUrl: method.appStoreUrl || "",
             playStoreUrl: method.playStoreUrl || "",
             appStoreFallbackUrl: method.appStoreFallbackUrl || "",
@@ -215,6 +216,7 @@ function buildPaymentCard(method, index) {
     card.dataset.appLaunchMode = method.appLaunchMode || "";
     card.dataset.iosAppLaunchUrl = method.iosAppLaunchUrl || "";
     card.dataset.androidAppLaunchUrl = method.androidAppLaunchUrl || "";
+    card.dataset.androidPackageName = method.androidPackageName || "";
     card.dataset.appStoreFallbackUrl = method.appStoreFallbackUrl || "";
     card.dataset.playStoreFallbackUrl = method.playStoreFallbackUrl || "";
     card.dataset.qrMode = method.qrMode || "";
@@ -302,6 +304,7 @@ function selectPaymentCard(card) {
         appLaunchMode: originalMethod.appLaunchMode || card.dataset.appLaunchMode || "",
         iosAppLaunchUrl: originalMethod.iosAppLaunchUrl || card.dataset.iosAppLaunchUrl || "",
         androidAppLaunchUrl: originalMethod.androidAppLaunchUrl || card.dataset.androidAppLaunchUrl || "",
+        androidPackageName: originalMethod.androidPackageName || card.dataset.androidPackageName || "",
         appStoreFallbackUrl: originalMethod.appStoreFallbackUrl || card.dataset.appStoreFallbackUrl || "",
         playStoreFallbackUrl: originalMethod.playStoreFallbackUrl || card.dataset.playStoreFallbackUrl || "",
         qrMode: originalMethod.qrMode || card.dataset.qrMode || "",
@@ -356,6 +359,7 @@ function normalizeSelectedPaymentMethod(method = {}, overrides = {}) {
         appLaunchMode: method.appLaunchMode || "",
         iosAppLaunchUrl: method.iosAppLaunchUrl || "",
         androidAppLaunchUrl: method.androidAppLaunchUrl || "",
+        androidPackageName: method.androidPackageName || "",
         appStoreFallbackUrl: method.appStoreFallbackUrl || "",
         playStoreFallbackUrl: method.playStoreFallbackUrl || "",
         qrMode: method.qrMode || "",

@@ -117,6 +117,7 @@ const defaultMethods = [
         receiptUploadEnabled: true,
         confirmationMode: "manual_admin",
         openAppMode: "direct",
+        iosAppLaunchUrl: "scbeasy://",
         badgeText: "Bank App",
         shortDescription: "Pay using SCB EASY",
         enableSaveQr: true,
@@ -147,6 +148,8 @@ const defaultMethods = [
         receiptUploadEnabled: true,
         confirmationMode: "manual_admin",
         openAppMode: "direct",
+        androidPackageName: "com.bbl.mobilebanking",
+        playStoreFallbackUrl: "https://play.google.com/store/apps/details?id=com.bbl.mobilebanking",
         badgeText: "Bank App",
         shortDescription: "Pay using Bangkok Bank Mobile Banking",
         enableSaveQr: true,
@@ -177,6 +180,8 @@ const defaultMethods = [
         receiptUploadEnabled: true,
         confirmationMode: "manual_admin",
         openAppMode: "direct",
+        androidPackageName: "com.kasikorn.retail.mbanking.wap",
+        playStoreFallbackUrl: "https://play.google.com/store/apps/details?id=com.kasikorn.retail.mbanking.wap",
         badgeText: "Bank App",
         shortDescription: "Pay using the K PLUS mobile app",
         enableSaveQr: true,
@@ -207,6 +212,8 @@ const defaultMethods = [
         receiptUploadEnabled: true,
         confirmationMode: "manual_admin",
         openAppMode: "direct",
+        androidPackageName: "com.krungsri.kma",
+        playStoreFallbackUrl: "https://play.google.com/store/apps/details?id=com.krungsri.kma",
         badgeText: "Bank App",
         shortDescription: "Pay using the Krungsri app",
         enableSaveQr: true,
@@ -237,6 +244,9 @@ const defaultMethods = [
         receiptUploadEnabled: true,
         confirmationMode: "manual_admin",
         openAppMode: "direct",
+        iosAppLaunchUrl: "ktbnext://",
+        androidPackageName: "ktbcs.netbank",
+        playStoreFallbackUrl: "https://play.google.com/store/apps/details?id=ktbcs.netbank",
         badgeText: "Bank App",
         shortDescription: "Pay using Krungthai NEXT",
         enableSaveQr: true,
@@ -298,6 +308,12 @@ function safeUrl(value = "", options = {}) {
 
     if (/^https:\/\//i.test(url)) return url;
     return "";
+}
+
+function safeAndroidPackageName(value = "") {
+    const packageName = safeText(value, 160).toLowerCase();
+    if (!packageName) return "";
+    return /^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$/.test(packageName) ? packageName : "";
 }
 
 function safeNumber(value, fallback = 0) {
@@ -398,6 +414,11 @@ function applySeedDefaultsWithoutOverwriting(method, item = {}) {
         "qrMode",
         "openAppMode",
         "appLaunchMode",
+        "iosAppLaunchUrl",
+        "androidAppLaunchUrl",
+        "androidPackageName",
+        "appStoreFallbackUrl",
+        "playStoreFallbackUrl",
         "promptPayRecipientType",
         "promptPayRecipientValue",
         "receiptUploadEnabled",
@@ -502,6 +523,7 @@ function capabilityProjection(obj = {}) {
         appLaunchMode: obj.appLaunchMode || "OFFICIAL_PAYMENT_DEEPLINK",
         iosAppLaunchUrl: obj.iosAppLaunchUrl || "",
         androidAppLaunchUrl: obj.androidAppLaunchUrl || "",
+        androidPackageName: obj.androidPackageName || "",
         appStoreFallbackUrl: obj.appStoreFallbackUrl || obj.appStoreUrl || "",
         playStoreFallbackUrl: obj.playStoreFallbackUrl || obj.playStoreUrl || "",
         promptPayRecipientType: obj.promptPayRecipientType || "",
@@ -614,6 +636,7 @@ function formatAdminMethod(method) {
         appLaunchMode: obj.appLaunchMode || "OFFICIAL_PAYMENT_DEEPLINK",
         iosAppLaunchUrl: obj.iosAppLaunchUrl || "",
         androidAppLaunchUrl: obj.androidAppLaunchUrl || "",
+        androidPackageName: obj.androidPackageName || "",
         appStoreFallbackUrl: obj.appStoreFallbackUrl || obj.appStoreUrl || "",
         playStoreFallbackUrl: obj.playStoreFallbackUrl || obj.playStoreUrl || "",
         promptPayRecipientType: obj.promptPayRecipientType || "",
@@ -915,6 +938,7 @@ function applyPaymentMethodPatch(method, body = {}) {
         playStoreUrl: 500,
         iosAppLaunchUrl: 500,
         androidAppLaunchUrl: 500,
+        androidPackageName: 160,
         appStoreFallbackUrl: 500,
         playStoreFallbackUrl: 500,
         promptPayRecipientValue: 80
@@ -923,6 +947,17 @@ function applyPaymentMethodPatch(method, body = {}) {
     Object.entries(stringFields).forEach(([key, max]) => {
         if (body[key] === undefined) return;
         if (key === "deepLinkUrl") method[key] = safeUrl(body[key], { deeplink: true });
+        else if (key === "androidPackageName") {
+            const packageName = safeAndroidPackageName(body[key]);
+            if (safeText(body[key], max) && !packageName) {
+                const error = new Error("Android package name is malformed.");
+                error.statusCode = 400;
+                throw error;
+            }
+            method[key] = packageName;
+        }
+        else if (key === "androidAppLaunchUrl") method[key] = safeUrl(body[key], { deeplink: true });
+        else if (key === "iosAppLaunchUrl") method[key] = safeUrl(body[key], { deeplink: true });
         else if (["appStoreUrl", "playStoreUrl", "logoUrl", "appStoreFallbackUrl", "playStoreFallbackUrl"].includes(key)) method[key] = safeUrl(body[key]);
         else method[key] = safeText(body[key], max);
     });
@@ -1010,6 +1045,13 @@ function configError(message) {
     return error;
 }
 
+function hasAndroidLaunchConfiguration(method = {}) {
+    return Boolean(
+        String(method.androidPackageName || "").trim() ||
+        String(method.androidAppLaunchUrl || "").trim()
+    );
+}
+
 async function validatePaymentMethodConfiguration(method) {
     const paymentType = String(method.paymentType || "manual").toLowerCase();
     const openAppMode = safeOpenAppMode(method.openAppMode, method.enableOpenApp === true ? "direct" : "disabled");
@@ -1069,10 +1111,13 @@ async function validatePaymentMethodConfiguration(method) {
         }
         const appLaunchMode = String(method.appLaunchMode || "OFFICIAL_PAYMENT_DEEPLINK").toUpperCase();
         const hasLaunch = appLaunchMode === "APP_ONLY"
-            ? Boolean(method.iosAppLaunchUrl || method.androidAppLaunchUrl)
+            ? Boolean(method.iosAppLaunchUrl || method.androidAppLaunchUrl || method.androidPackageName)
             : Boolean(method.deepLinkUrl);
         if (!hasLaunch) {
             throw configError("Direct app opening requires a configured app launch URL or deeplink.");
+        }
+        if (hasAndroidLaunchConfiguration(method) && !String(method.playStoreFallbackUrl || method.playStoreUrl || "").trim()) {
+            throw configError("Android app opening requires a Play Store fallback URL.");
         }
     }
 }

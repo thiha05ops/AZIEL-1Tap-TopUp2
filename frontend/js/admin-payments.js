@@ -144,7 +144,7 @@ function renderAdminPaymentMethods(methods) {
                             <p class="payment-readiness-meter">${escapeAdminHTML(readinessSummary(readiness))}</p>
                             <div class="payment-summary-capabilities">
                                 ${capabilityChip("QR", hasPaymentQr(method))}
-                                ${capabilityChip("App", method.enableOpenApp === true && Boolean(method.deepLinkUrl))}
+                                ${capabilityChip("App", method.enableOpenApp === true && Boolean(method.deepLinkUrl || method.iosAppLaunchUrl || method.androidAppLaunchUrl || method.androidPackageName))}
                                 ${capabilityChip("Receipt", method.receiptUploadEnabled !== false && method.slipRequired !== false)}
                             </div>
                         </div>
@@ -478,6 +478,22 @@ function renderAdminPaymentMethods(methods) {
 	                        <input class="pm-android-app-launch" type="text" value="${escapeAdminHTML(method.androidAppLaunchUrl || "")}">
 	                    </div>
 
+	                    <div class="settings-row pm-app-launch-field">
+	                        <div>
+	                            <label>Android Package Name</label>
+	                            <small>Used to build Android Chrome intent links with Play Store fallback</small>
+	                        </div>
+	                        <input class="pm-android-package-name" type="text" value="${escapeAdminHTML(method.androidPackageName || "")}" placeholder="com.kasikorn.retail.mbanking.wap">
+	                    </div>
+
+	                    <div class="settings-row pm-app-launch-field">
+	                        <div>
+	                            <label>Generated Android Intent Preview</label>
+	                            <small>Read-only preview; package-only intents are best-effort and device/browser dependent</small>
+	                        </div>
+	                        <textarea class="pm-android-intent-preview" readonly>${escapeAdminHTML(buildAdminAndroidIntentPreview(method))}</textarea>
+	                    </div>
+
                     ${renderOwnerDeepLinkTester(method)}
 
                     <div class="settings-row">
@@ -764,6 +780,7 @@ function renderOwnerDeepLinkTester(method = {}) {
                         <div><dt>Official deeplink</dt><dd>${escapeAdminHTML(method.deepLinkUrl || "Not set")}</dd></div>
                         <div><dt>iOS launch URL</dt><dd>${escapeAdminHTML(method.iosAppLaunchUrl || "Not set")}</dd></div>
                         <div><dt>Android launch URL</dt><dd>${escapeAdminHTML(method.androidAppLaunchUrl || "Not set")}</dd></div>
+                        <div><dt>Android package</dt><dd>${escapeAdminHTML(method.androidPackageName || "Not set")}</dd></div>
                     </dl>
                 </div>
                 <div class="pm-deeplink-controls">
@@ -812,6 +829,16 @@ function renderOwnerDeepLinkTester(method = {}) {
             </div>
         </details>
     `;
+}
+
+function buildAdminAndroidIntentPreview(source = {}) {
+    const helper = window.AZIEL_ANDROID_APP_LAUNCH;
+    if (!helper?.buildAndroidIntentUrl) return "";
+    return helper.buildAndroidIntentUrl({
+        androidPackageName: source.androidPackageName || "",
+        androidAppLaunchUrl: source.androidAppLaunchUrl || "",
+        playStoreFallbackUrl: source.playStoreFallbackUrl || source.playStoreUrl || ""
+    });
 }
 
 function hasPaymentQr(method = {}) {
@@ -1490,6 +1517,7 @@ async function saveAdminPaymentMethod(id) {
 	        appLaunchMode: card.querySelector(".pm-app-launch-mode")?.value || "OFFICIAL_PAYMENT_DEEPLINK",
 	        iosAppLaunchUrl: card.querySelector(".pm-ios-app-launch")?.value || "",
 	        androidAppLaunchUrl: card.querySelector(".pm-android-app-launch")?.value || "",
+	        androidPackageName: card.querySelector(".pm-android-package-name")?.value || "",
 	        appStoreUrl: card.querySelector(".pm-app-store")?.value || "",
 	        playStoreUrl: card.querySelector(".pm-play-store")?.value || "",
 	        appStoreFallbackUrl: card.querySelector(".pm-app-store")?.value || "",
@@ -1572,6 +1600,7 @@ function collectAdminPaymentFormState(card) {
 	        appLaunchMode: card?.querySelector(".pm-app-launch-mode")?.value || "OFFICIAL_PAYMENT_DEEPLINK",
 	        iosAppLaunchUrl: card?.querySelector(".pm-ios-app-launch")?.value || "",
 	        androidAppLaunchUrl: card?.querySelector(".pm-android-app-launch")?.value || "",
+	        androidPackageName: card?.querySelector(".pm-android-package-name")?.value || "",
 	        appStoreFallbackUrl: card?.querySelector(".pm-app-store")?.value || "",
 	        playStoreFallbackUrl: card?.querySelector(".pm-play-store")?.value || "",
 	        promptPayRecipientType: card?.querySelector(".pm-promptpay-recipient-type")?.value || "",
@@ -1804,6 +1833,10 @@ function refreshPaymentEditorVisibility(card) {
     const enableOpenApp = card.querySelector(".pm-enable-open-app")?.checked === true;
     const openAppMode = card.querySelector(".pm-open-app-mode")?.value || "disabled";
     const appLaunchMode = card.querySelector(".pm-app-launch-mode")?.value || "OFFICIAL_PAYMENT_DEEPLINK";
+    const intentPreview = card.querySelector(".pm-android-intent-preview");
+    if (intentPreview) {
+        intentPreview.value = buildAdminAndroidIntentPreview(collectAdminPaymentFormState(card));
+    }
     card.querySelectorAll(".pm-app-launch-field").forEach(el => {
         el.hidden = !enableOpenApp || openAppMode !== "direct" || appLaunchMode !== "APP_ONLY";
     });
@@ -1817,7 +1850,7 @@ function refreshPaymentEditorVisibility(card) {
         const canOpen = openAppMode === "disabled" ||
             openAppMode === "bank_chooser" ||
             (appLaunchMode === "APP_ONLY"
-                ? Boolean(card.querySelector(".pm-ios-app-launch")?.value || card.querySelector(".pm-android-app-launch")?.value)
+                ? Boolean(card.querySelector(".pm-ios-app-launch")?.value || card.querySelector(".pm-android-app-launch")?.value || card.querySelector(".pm-android-package-name")?.value)
                 : Boolean(card.querySelector(".pm-deeplink")?.value && appName));
         openWarning.hidden = !card.querySelector(".pm-enable-open-app")?.checked || canOpen;
     }

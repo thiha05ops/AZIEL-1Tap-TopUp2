@@ -562,7 +562,14 @@
         if (options.enableSaveQr && (options.qrImageUrl || options.qrImage)) {
             steps.push({ key: "save_qr", label: "Save QR", action: "save_qr", enabled: true, sortOrder: 10 });
         }
-        if (options.enableOpenApp && (options.deepLink || options.deepLinkUrl || options.openAppMode === "bank_chooser")) {
+        if (options.enableOpenApp && (
+            options.deepLink ||
+            options.deepLinkUrl ||
+            options.iosAppLaunchUrl ||
+            options.androidAppLaunchUrl ||
+            options.androidPackageName ||
+            options.openAppMode === "bank_chooser"
+        )) {
             steps.push({
                 key: "open_app",
                 label: options.openAppMode === "bank_chooser"
@@ -814,7 +821,7 @@
                 ? "Bank App"
                 : options.appDisplayName || options.methodName || "Bank App";
             openBankApp.hidden = !canOpenApp;
-            openBankApp.textContent = `Open ${appName}`;
+            openBankApp.textContent = appTarget.source === "store" ? `Open / Install ${appName}` : `Open ${appName}`;
             openBankApp.onclick = canOpenApp ? () => openPaymentApp(activeState) : null;
         }
     }
@@ -857,34 +864,47 @@
 
     function resolveAppLaunchTarget(options = {}) {
         const mode = String(options.appLaunchMode || "OFFICIAL_PAYMENT_DEEPLINK").toUpperCase();
-        const userAgent = navigator.userAgent || "";
-        const isIOS = /iPad|iPhone|iPod/i.test(userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-        const isAndroid = /Android/i.test(userAgent);
+        const helper = window.AZIEL_ANDROID_APP_LAUNCH;
+        const platform = helper?.resolvePlatform?.() || "desktop";
+        const isIOS = platform === "ios";
+        const isAndroid = platform === "android";
+        const androidIntentUrl = helper?.buildAndroidIntentUrl?.({
+            androidPackageName: options.androidPackageName || "",
+            androidAppLaunchUrl: options.androidAppLaunchUrl || "",
+            playStoreFallbackUrl: options.playStoreFallbackUrl || options.playStoreUrl || ""
+        }) || "";
+        const iosDirectUrl = options.iosAppLaunchUrl || "";
+        const iosStoreUrl = options.appStoreFallbackUrl || options.appStoreUrl || "";
+        const androidStoreUrl = options.playStoreFallbackUrl || options.playStoreUrl || "";
+
         if (mode === "APP_ONLY") {
+            const url = isIOS
+                ? (iosDirectUrl || iosStoreUrl)
+                : isAndroid
+                    ? (androidIntentUrl || options.androidAppLaunchUrl || androidStoreUrl)
+                    : "";
             return {
                 mode,
-                platform: isIOS ? "ios" : isAndroid ? "android" : "desktop",
-                url: isIOS
-                    ? options.iosAppLaunchUrl || ""
-                    : isAndroid
-                        ? options.androidAppLaunchUrl || ""
-                        : options.iosAppLaunchUrl || options.androidAppLaunchUrl || "",
+                platform,
+                url,
                 storeUrl: isIOS
-                    ? options.appStoreFallbackUrl || options.appStoreUrl || ""
+                    ? iosStoreUrl
                     : isAndroid
-                        ? options.playStoreFallbackUrl || options.playStoreUrl || ""
-                        : ""
+                        ? androidStoreUrl
+                        : iosStoreUrl || androidStoreUrl,
+                source: isAndroid && androidIntentUrl ? "android_intent" : iosDirectUrl ? "direct" : "store"
             };
         }
         return {
             mode,
-            platform: isIOS ? "ios" : isAndroid ? "android" : "desktop",
+            platform,
             url: options.deepLink || options.deepLinkUrl || "",
             storeUrl: isIOS
-                ? options.appStoreFallbackUrl || options.appStoreUrl || ""
+                ? iosStoreUrl
                 : isAndroid
-                    ? options.playStoreFallbackUrl || options.playStoreUrl || ""
-                    : ""
+                    ? androidStoreUrl
+                    : iosStoreUrl || androidStoreUrl,
+            source: "deeplink"
         };
     }
 
@@ -895,6 +915,7 @@
             deepLinkUrl: profile.deepLinkUrl || profile.deepLink || "",
             iosAppLaunchUrl: profile.iosAppLaunchUrl || "",
             androidAppLaunchUrl: profile.androidAppLaunchUrl || "",
+            androidPackageName: profile.androidPackageName || "",
             appStoreFallbackUrl: profile.appStoreFallbackUrl || profile.appStoreUrl || "",
             playStoreFallbackUrl: profile.playStoreFallbackUrl || profile.playStoreUrl || "",
             appStoreUrl: profile.appStoreUrl || "",
@@ -920,10 +941,12 @@
                 ${apps.map((app, index) => {
                     const target = resolveBankProfileLaunchTarget(app);
                     const disabled = !target.url;
+                    const labelPrefix = target.source === "store" ? "Open / Install" : "Open";
+                    const appName = app.label || app.appDisplayName || "Banking App";
                     return `
                         <button type="button" data-bank-index="${index}" ${disabled ? "disabled" : ""}>
                             ${app.logo ? `<img src="${escapeHTML(app.logo)}" alt="" aria-hidden="true">` : ""}
-                            <span>${escapeHTML(app.label || app.appDisplayName || "Banking App")}</span>
+                            <span>${escapeHTML(`${labelPrefix} ${appName}`)}</span>
                         </button>
                     `;
                 }).join("")}
