@@ -34,6 +34,34 @@ const ADMIN_PROVIDER_BY_REGION_TYPE = Object.freeze({
     }
 });
 
+const ADMIN_DEEPLINK_TEST_PRESETS = Object.freeze([
+    { label: "SCB EASY", candidates: ["scbeasy://"] },
+    { label: "K PLUS", candidates: ["kplus://", "kbank://", "kplusmobile://", "kmobilebanking://", "kasikorn://"] },
+    { label: "Bangkok Bank Mobile", candidates: ["bangkokbank://", "bangkokbankmobile://", "bualuang://", "bbl://", "bblmobile://"] },
+    { label: "Krungsri", candidates: ["krungsri://", "krungsriapp://", "kma://", "krungsrimobile://"] },
+    { label: "Krungthai NEXT", candidates: ["ktbnext://", "ktb://", "krungthai://"] },
+    { label: "TTB", candidates: ["ttb://", "ttbtouch://", "ttbtouchmobile://"] },
+    { label: "UOB", candidates: ["uob://", "uobthai://", "uobtmr://"] },
+    { label: "CIMB Thai", candidates: ["cimb://", "cimbthai://", "cimbclicks://"] },
+    { label: "GSB MyMo", candidates: ["mymo://", "gsb://", "gsbmymo://"] },
+    { label: "BAAC", candidates: ["baac://", "baacmobile://"] }
+]);
+
+const ADMIN_DEEPLINK_TEST_TARGETS = Object.freeze({
+    official: {
+        label: "Official Payment Deeplink URL",
+        selector: ".pm-deeplink"
+    },
+    ios: {
+        label: "iOS App Launch URL",
+        selector: ".pm-ios-app-launch"
+    },
+    android: {
+        label: "Android App Launch URL",
+        selector: ".pm-android-app-launch"
+    }
+});
+
 document.addEventListener("DOMContentLoaded", () => {
     initAdminPaymentsController();
 });
@@ -450,6 +478,8 @@ function renderAdminPaymentMethods(methods) {
 	                        <input class="pm-android-app-launch" type="text" value="${escapeAdminHTML(method.androidAppLaunchUrl || "")}">
 	                    </div>
 
+                    ${renderOwnerDeepLinkTester(method)}
+
                     <div class="settings-row">
                         <div>
 	                            <label>App Store Fallback</label>
@@ -697,6 +727,93 @@ function capabilityChip(label, ok) {
     return `<span class="payment-capability-chip ${ok ? "is-ok" : "is-missing"}">${escapeAdminHTML(label)} ${ok ? "✓" : "○"}</span>`;
 }
 
+function isAdminOwner() {
+    const role = String(
+        window.AZIEL_ADMIN_AUTH?.state?.admin?.role ||
+        localStorage.getItem("adminRole") ||
+        ""
+    ).toUpperCase();
+    return role === "OWNER";
+}
+
+function deepLinkPresetOptionsHTML() {
+    return `
+        <option value="">Choose candidate preset...</option>
+        ${ADMIN_DEEPLINK_TEST_PRESETS.map(group => `
+            <optgroup label="${escapeAdminHTML(group.label)}">
+                ${group.candidates.map(candidate => `
+                    <option value="${escapeAdminHTML(candidate)}">${escapeAdminHTML(candidate)}</option>
+                `).join("")}
+            </optgroup>
+        `).join("")}
+    `;
+}
+
+function renderOwnerDeepLinkTester(method = {}) {
+    if (!isAdminOwner()) return "";
+
+    return `
+        <details class="payment-capability-details pm-deeplink-tester" data-owner-only="true">
+            <summary>Developer Tools · Deep Link Tester</summary>
+            <div class="pm-deeplink-tester-grid">
+                <div class="pm-deeplink-context">
+                    <strong>Current Payment Method</strong>
+                    <dl>
+                        <div><dt>Method</dt><dd>${escapeAdminHTML(method.method || method.key || "Payment method")}</dd></div>
+                        <div><dt>App display name</dt><dd>${escapeAdminHTML(method.appDisplayName || "Not set")}</dd></div>
+                        <div><dt>Official deeplink</dt><dd>${escapeAdminHTML(method.deepLinkUrl || "Not set")}</dd></div>
+                        <div><dt>iOS launch URL</dt><dd>${escapeAdminHTML(method.iosAppLaunchUrl || "Not set")}</dd></div>
+                        <div><dt>Android launch URL</dt><dd>${escapeAdminHTML(method.androidAppLaunchUrl || "Not set")}</dd></div>
+                    </dl>
+                </div>
+                <div class="pm-deeplink-controls">
+                    <label>
+                        Candidate preset
+                        <select class="pm-deeplink-test-preset">
+                            ${deepLinkPresetOptionsHTML()}
+                        </select>
+                    </label>
+                    <label>
+                        Candidate Scheme
+                        <input class="pm-deeplink-test-candidate" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="scbeasy://">
+                    </label>
+                    <label>
+                        Save target
+                        <select class="pm-deeplink-test-target">
+                            <option value="official">Official Payment Deeplink URL</option>
+                            <option value="ios">iOS App Launch URL</option>
+                            <option value="android">Android App Launch URL</option>
+                            <option value="all">All applicable launch fields</option>
+                        </select>
+                    </label>
+                    <p class="pm-deeplink-device-note">Desktop testing is inconclusive. Use a real iPhone or Android device before confirming.</p>
+                    <div class="pm-deeplink-actions">
+                        <button type="button" class="admin-small-btn" data-action="test-deeplink-launch">Test Launch</button>
+                        <button type="button" class="admin-small-btn" data-action="confirm-deeplink-opened" disabled>Confirm App Opened</button>
+                        <button type="button" class="admin-small-btn" data-action="reject-deeplink-opened" disabled>No, it did not open</button>
+                        <button type="button" class="admin-small-btn" data-action="wrong-deeplink-opened" disabled>A different app opened</button>
+                        <button type="button" class="admin-small-btn" data-action="save-deeplink-to-editor" disabled>Save to Current Payment Method</button>
+                        <button type="button" class="admin-small-btn" data-action="clear-deeplink-test">Clear</button>
+                    </div>
+                    <div class="pm-deeplink-status" role="status" aria-live="polite">
+                        <strong>Not tested</strong>
+                        <ul>
+                            <li>Candidate value: Not set</li>
+                            <li>Device/platform: ${escapeAdminHTML(getDeepLinkDeviceLabel())}</li>
+                            <li>Last test time: Not tested</li>
+                            <li>Launch attempted: No</li>
+                            <li>Possible handoff detected: No</li>
+                            <li>Owner confirmed: No</li>
+                            <li>Saved: Not saved</li>
+                            <li>Browser note: Custom scheme success cannot be detected reliably.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </details>
+    `;
+}
+
 function hasPaymentQr(method = {}) {
     if (method.qrMode === "provider_generated") return true;
     if (method.qrMode === "aziel_promptpay_dynamic") return true;
@@ -862,6 +979,7 @@ function bindAdminPaymentActions() {
 
     bindChecklistBuilderActions();
     bindChecklistPresetActions();
+    bindDeepLinkTesterActions();
     bindPaymentPreviewInputs();
 }
 
@@ -952,6 +1070,365 @@ function applyChecklistPreset(card, steps = []) {
     updateChecklistPreview(card);
 }
 
+function bindDeepLinkTesterActions() {
+    document.querySelectorAll(".pm-deeplink-tester").forEach(tester => {
+        const card = tester.closest(".payment-method-card");
+        if (!card || !isAdminOwner()) {
+            tester.remove();
+            return;
+        }
+
+        initializeDeepLinkTesterState(card);
+
+        tester.querySelector(".pm-deeplink-test-preset")?.addEventListener("change", event => {
+            const candidateInput = tester.querySelector(".pm-deeplink-test-candidate");
+            if (candidateInput && event.target.value) candidateInput.value = event.target.value;
+            resetDeepLinkConfirmation(card, { keepCandidate: true });
+            renderDeepLinkTesterStatus(card);
+        });
+
+        tester.querySelector(".pm-deeplink-test-candidate")?.addEventListener("input", () => {
+            resetDeepLinkConfirmation(card, { keepCandidate: true });
+            renderDeepLinkTesterStatus(card);
+        });
+
+        tester.querySelector('[data-action="test-deeplink-launch"]')?.addEventListener("click", () => testDeepLinkLaunch(card));
+        tester.querySelector('[data-action="confirm-deeplink-opened"]')?.addEventListener("click", () => confirmDeepLinkResult(card, "confirmed"));
+        tester.querySelector('[data-action="reject-deeplink-opened"]')?.addEventListener("click", () => confirmDeepLinkResult(card, "rejected"));
+        tester.querySelector('[data-action="wrong-deeplink-opened"]')?.addEventListener("click", () => confirmDeepLinkResult(card, "wrong_app"));
+        tester.querySelector('[data-action="save-deeplink-to-editor"]')?.addEventListener("click", () => saveTestedDeepLinkToEditor(card));
+        tester.querySelector('[data-action="clear-deeplink-test"]')?.addEventListener("click", () => clearDeepLinkTester(card));
+    });
+}
+
+function initializeDeepLinkTesterState(card) {
+    if (!card.__deepLinkTesterState) {
+        card.__deepLinkTesterState = {
+            candidate: "",
+            status: "Not tested",
+            lastTestAt: "",
+            launchAttempted: false,
+            possibleHandoff: false,
+            ownerConfirmed: false,
+            saved: false,
+            browserNote: "Custom scheme success cannot be detected reliably.",
+            cleanup: null
+        };
+    }
+    renderDeepLinkTesterStatus(card);
+}
+
+function resetDeepLinkConfirmation(card, options = {}) {
+    const state = initializeAndGetDeepLinkTesterState(card);
+    if (typeof state.cleanup === "function") state.cleanup();
+    const candidate = options.keepCandidate
+        ? card?.querySelector(".pm-deeplink-test-candidate")?.value || ""
+        : "";
+    Object.assign(state, {
+        candidate,
+        status: "Not tested",
+        lastTestAt: "",
+        launchAttempted: false,
+        possibleHandoff: false,
+        ownerConfirmed: false,
+        saved: false,
+        browserNote: "Custom scheme success cannot be detected reliably.",
+        cleanup: null
+    });
+}
+
+function initializeAndGetDeepLinkTesterState(card) {
+    initializeDeepLinkTesterState(card);
+    return card.__deepLinkTesterState;
+}
+
+function clearDeepLinkTester(card) {
+    if (!isAdminOwner()) return;
+    const tester = card?.querySelector(".pm-deeplink-tester");
+    const preset = tester?.querySelector(".pm-deeplink-test-preset");
+    const candidate = tester?.querySelector(".pm-deeplink-test-candidate");
+    if (preset) preset.value = "";
+    if (candidate) candidate.value = "";
+    resetDeepLinkConfirmation(card);
+    renderDeepLinkTesterStatus(card);
+}
+
+function validateDeepLinkCandidate(value) {
+    const raw = String(value || "");
+    const trimmed = raw.trim();
+    if (!trimmed) return { ok: false, message: "Enter a candidate launch URL." };
+    if (raw !== trimmed || /\s/.test(trimmed) || /[\u0000-\u001f\u007f]/.test(trimmed)) {
+        return { ok: false, message: "Candidate must not contain whitespace or control characters." };
+    }
+
+    const schemeMatch = trimmed.match(/^([a-z][a-z0-9+.-]*):\/\//i);
+    if (!schemeMatch) return { ok: false, message: "Use a custom scheme:// or HTTPS URL." };
+
+    const scheme = schemeMatch[1].toLowerCase();
+    if (["javascript", "data", "file", "blob"].includes(scheme)) {
+        return { ok: false, message: `${scheme}: URLs are not allowed.` };
+    }
+
+    if (scheme === "http") {
+        return { ok: false, message: "Use HTTPS for universal links." };
+    }
+
+    if (scheme === "https") {
+        try {
+            const url = new URL(trimmed);
+            if (!url.hostname) return { ok: false, message: "HTTPS URL must include a host." };
+        } catch (error) {
+            return { ok: false, message: "Malformed HTTPS URL." };
+        }
+    }
+
+    return { ok: true, value: trimmed, scheme };
+}
+
+function getDeepLinkDeviceLabel() {
+    const nav = window.navigator || {};
+    const ua = nav.userAgent || "";
+    const platform = nav.platform || "Unknown platform";
+    const isIOS = /iPad|iPhone|iPod/i.test(ua) || (platform === "MacIntel" && nav.maxTouchPoints > 1);
+    const isAndroid = /Android/i.test(ua);
+    const browser = /Safari/i.test(ua) && !/Chrome|CriOS|Edg/i.test(ua)
+        ? "Safari"
+        : /Chrome|CriOS/i.test(ua)
+            ? "Chrome"
+            : "Browser";
+    const device = isIOS ? "iOS" : isAndroid ? "Android" : "Desktop";
+    return `${device} · ${browser} · ${platform}`;
+}
+
+function getDeepLinkCandidate(card) {
+    return card?.querySelector(".pm-deeplink-test-candidate")?.value || "";
+}
+
+function updateDeepLinkTesterButtons(card) {
+    const tester = card?.querySelector(".pm-deeplink-tester");
+    const state = card?.__deepLinkTesterState || {};
+    const hasAttempt = state.launchAttempted === true;
+    const confirmed = state.ownerConfirmed === true;
+    const setDisabled = (selector, disabled) => {
+        const button = tester?.querySelector(selector);
+        if (button) button.disabled = disabled;
+    };
+    setDisabled('[data-action="confirm-deeplink-opened"]', !hasAttempt);
+    setDisabled('[data-action="reject-deeplink-opened"]', !hasAttempt);
+    setDisabled('[data-action="wrong-deeplink-opened"]', !hasAttempt);
+    setDisabled('[data-action="save-deeplink-to-editor"]', !confirmed);
+}
+
+function renderDeepLinkTesterStatus(card) {
+    const tester = card?.querySelector(".pm-deeplink-tester");
+    const panel = tester?.querySelector(".pm-deeplink-status");
+    if (!panel) return;
+
+    const state = card.__deepLinkTesterState || {};
+    const candidate = state.candidate || getDeepLinkCandidate(card);
+    panel.innerHTML = `
+        <strong>${escapeAdminHTML(state.status || "Not tested")}</strong>
+        <ul>
+            <li>Candidate value: ${escapeAdminHTML(candidate || "Not set")}</li>
+            <li>Device/platform: ${escapeAdminHTML(getDeepLinkDeviceLabel())}</li>
+            <li>Last test time: ${escapeAdminHTML(state.lastTestAt || "Not tested")}</li>
+            <li>Launch attempted: ${state.launchAttempted ? "Yes" : "No"}</li>
+            <li>Possible handoff detected: ${state.possibleHandoff ? "Yes" : "No"}</li>
+            <li>Owner confirmed: ${state.ownerConfirmed ? "Yes" : "No"}</li>
+            <li>Saved: ${state.saved ? "Saved to editor fields; normal Payment Method Save is still required." : "Not saved"}</li>
+            <li>Browser note: ${escapeAdminHTML(state.browserNote || "Custom scheme success cannot be detected reliably.")}</li>
+        </ul>
+    `;
+    updateDeepLinkTesterButtons(card);
+}
+
+function testDeepLinkLaunch(card) {
+    if (!isAdminOwner()) {
+        showAdminToast?.("Deep Link Tester is OWNER-only.", "error");
+        return;
+    }
+
+    const state = initializeAndGetDeepLinkTesterState(card);
+    const validation = validateDeepLinkCandidate(getDeepLinkCandidate(card));
+    if (!validation.ok) {
+        Object.assign(state, {
+            candidate: getDeepLinkCandidate(card),
+            status: "Unsupported or inconclusive on this device",
+            launchAttempted: false,
+            possibleHandoff: false,
+            ownerConfirmed: false,
+            saved: false,
+            browserNote: validation.message
+        });
+        renderDeepLinkTesterStatus(card);
+        showAdminToast?.(validation.message, "error");
+        return;
+    }
+
+    if (typeof state.cleanup === "function") state.cleanup();
+
+    const now = new Date();
+    Object.assign(state, {
+        candidate: validation.value,
+        status: "Launch attempted",
+        lastTestAt: now.toLocaleString(),
+        launchAttempted: true,
+        possibleHandoff: false,
+        ownerConfirmed: false,
+        saved: false,
+        browserNote: validation.scheme === "https"
+            ? "HTTPS universal links are opened in a new tab when possible to preserve this editor."
+            : "Custom scheme handoff signals are hints only; owner confirmation is required."
+    });
+
+    let completed = false;
+    const markPossibleHandoff = reason => {
+        if (completed) return;
+        state.possibleHandoff = true;
+        state.status = "Possible app handoff detected";
+        state.browserNote = `${reason}; this is not proof that the correct banking app opened.`;
+        renderDeepLinkTesterStatus(card);
+    };
+    const cleanup = () => {
+        completed = true;
+        window.removeEventListener("blur", onBlur);
+        window.removeEventListener("pagehide", onPageHide);
+        document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+    const onBlur = () => markPossibleHandoff("Browser lost focus");
+    const onPageHide = () => markPossibleHandoff("Page hide was observed");
+    const onVisibilityChange = () => {
+        if (document.visibilityState === "hidden") markPossibleHandoff("Page visibility changed");
+    };
+
+    state.cleanup = cleanup;
+    window.addEventListener("blur", onBlur, { once: true });
+    window.addEventListener("pagehide", onPageHide, { once: true });
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    renderDeepLinkTesterStatus(card);
+
+    window.setTimeout(() => {
+        if (state.possibleHandoff || !state.launchAttempted) return;
+        state.status = "No handoff detected";
+        state.browserNote = "No browser handoff signal was observed. This result is inconclusive, especially on desktop.";
+        renderDeepLinkTesterStatus(card);
+    }, 1800);
+
+    try {
+        if (validation.scheme === "https") {
+            const opened = window.open(validation.value, "_blank", "noopener,noreferrer");
+            if (!opened) {
+                state.status = "Unsupported or inconclusive on this device";
+                state.browserNote = "Popup was blocked. Try a direct user gesture on a real device.";
+                renderDeepLinkTesterStatus(card);
+            }
+        } else {
+            window.location.href = validation.value;
+        }
+    } catch (error) {
+        state.status = "Unsupported or inconclusive on this device";
+        state.browserNote = error?.message || "Browser blocked the launch attempt.";
+        renderDeepLinkTesterStatus(card);
+    }
+}
+
+function confirmDeepLinkResult(card, result) {
+    if (!isAdminOwner()) return;
+    const state = initializeAndGetDeepLinkTesterState(card);
+    if (!state.launchAttempted) {
+        showAdminToast?.("Test the candidate before confirming.", "error");
+        return;
+    }
+
+    if (result === "confirmed") {
+        state.ownerConfirmed = true;
+        state.status = "Owner confirmed";
+        state.browserNote = "Owner confirmed that the correct banking app opened. Save only populates editor fields.";
+    } else {
+        state.ownerConfirmed = false;
+        state.saved = false;
+        state.status = result === "wrong_app" ? "Unsupported or inconclusive on this device" : "No handoff detected";
+        state.browserNote = result === "wrong_app"
+            ? "A different app opened. Run a new test before saving."
+            : "Owner reported that the banking app did not open. Run a new test before saving.";
+    }
+    renderDeepLinkTesterStatus(card);
+}
+
+function selectedDeepLinkTargets(card) {
+    const value = card?.querySelector(".pm-deeplink-test-target")?.value || "official";
+    if (value === "all") return Object.values(ADMIN_DEEPLINK_TEST_TARGETS);
+    return [ADMIN_DEEPLINK_TEST_TARGETS[value] || ADMIN_DEEPLINK_TEST_TARGETS.official];
+}
+
+async function confirmDeepLinkOverwrite(changes) {
+    if (!changes.length) return true;
+    const message = `Overwrite existing launch URL fields?\n\n${changes.map(change =>
+        `${change.label}\nOld: ${change.oldValue || "(empty)"}\nNew: ${change.newValue}`
+    ).join("\n\n")}`;
+
+    if (window.AZIEL_ADMIN_UI?.confirm) {
+        return window.AZIEL_ADMIN_UI.confirm({
+            title: "Overwrite launch URL?",
+            message,
+            confirmText: "Overwrite",
+            cancelText: "Cancel",
+            tone: "warning"
+        });
+    }
+
+    return window.confirm(message);
+}
+
+async function saveTestedDeepLinkToEditor(card) {
+    if (!isAdminOwner()) {
+        showAdminToast?.("Deep Link Tester is OWNER-only.", "error");
+        return;
+    }
+
+    const state = initializeAndGetDeepLinkTesterState(card);
+    if (!state.ownerConfirmed) {
+        showAdminToast?.("Confirm the correct app opened before saving to editor fields.", "error");
+        return;
+    }
+
+    const validation = validateDeepLinkCandidate(state.candidate || getDeepLinkCandidate(card));
+    if (!validation.ok) {
+        showAdminToast?.(validation.message, "error");
+        return;
+    }
+
+    const targets = selectedDeepLinkTargets(card);
+    const changes = targets.map(target => {
+        const input = card?.querySelector(target.selector);
+        return {
+            ...target,
+            input,
+            oldValue: input?.value || "",
+            newValue: validation.value
+        };
+    }).filter(change => change.input);
+
+    const overwrites = changes.filter(change => change.oldValue && change.oldValue !== change.newValue);
+    if (!(await confirmDeepLinkOverwrite(overwrites))) return;
+
+    changes.forEach(change => {
+        change.input.value = change.newValue;
+        change.input.dispatchEvent(new Event("input", { bubbles: true }));
+        change.input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    state.saved = true;
+    state.status = "Saved to payment method";
+    state.browserNote = "Saved to editor fields only. Use the normal Payment Method Save button to write to the database.";
+    renderDeepLinkTesterStatus(card);
+    refreshPaymentEditorVisibility(card);
+    updateInlineCardPreview(card);
+    updateChecklistPreview(card);
+    showAdminToast?.("Launch URL copied to editor fields. Save the payment method to publish it.", "success");
+}
+
 function updateChecklistPreview(card) {
     const preview = card?.querySelector(".pm-checklist-preview ol");
     if (!preview) return;
@@ -961,12 +1438,14 @@ function updateChecklistPreview(card) {
 function bindPaymentPreviewInputs() {
     document.querySelectorAll(".payment-method-card input, .payment-method-card select, .payment-method-card textarea").forEach(input => {
         input.addEventListener("input", () => {
+            if (input.closest(".pm-deeplink-tester")) return;
             const card = input.closest(".payment-method-card");
             refreshPaymentEditorVisibility(card);
             updateInlineCardPreview(card);
             updateChecklistPreview(card);
         });
         input.addEventListener("change", () => {
+            if (input.closest(".pm-deeplink-tester")) return;
             const card = input.closest(".payment-method-card");
             refreshPaymentEditorVisibility(card);
             updateInlineCardPreview(card);
