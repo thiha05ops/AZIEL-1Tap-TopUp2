@@ -1160,7 +1160,7 @@
 
     function resolveBankProfileLaunchTarget(profile = {}) {
         return resolveAppLaunchTarget({
-            appLaunchMode: profile.appLaunchMode || "OFFICIAL_PAYMENT_DEEPLINK",
+            appLaunchMode: profile.appLaunchMode || "APP_ONLY",
             deepLink: profile.deepLink || profile.deepLinkUrl || "",
             deepLinkUrl: profile.deepLinkUrl || profile.deepLink || "",
             iosAppLaunchUrl: profile.iosAppLaunchUrl || "",
@@ -1243,7 +1243,8 @@
         const launcherByKey = new Map();
 
         chooser.innerHTML = `
-            <div class="az-payment-sheet__mobile-chooser-card" role="dialog" aria-modal="false" aria-label="${escapeHTML(t("payment_choose_banking_app", "Choose Banking App"))}">
+            <button type="button" class="az-payment-sheet__mobile-chooser-backdrop" data-mobile-bank-cancel aria-label="${escapeHTML(t("payment_cancel", "Cancel"))}"></button>
+            <section class="az-payment-sheet__mobile-chooser-card" role="dialog" aria-modal="false" aria-label="${escapeHTML(t("payment_choose_banking_app", "Choose Banking App"))}">
                 <header>
                     <strong>${escapeHTML(t("payment_choose_banking_app", "Choose Banking App"))}</strong>
                     <button type="button" data-mobile-bank-cancel aria-label="${escapeHTML(t("payment_cancel", "Cancel"))}">×</button>
@@ -1266,9 +1267,10 @@
                     }).join("")}
                 </div>
                 <button type="button" class="az-payment-sheet__mobile-cancel" data-mobile-bank-cancel>${escapeHTML(t("payment_cancel", "Cancel"))}</button>
-            </div>
+            </section>
         `;
         chooser.hidden = false;
+        attachMobileChooserTapDiagnostics(chooser);
         chooser.querySelectorAll("[data-mobile-bank-key]").forEach(button => {
             button.addEventListener("click", event => {
                 event.preventDefault();
@@ -1280,6 +1282,49 @@
         chooser.querySelectorAll("[data-mobile-bank-cancel]").forEach(button => {
             button.addEventListener("click", () => {
                 chooser.hidden = true;
+            });
+        });
+    }
+
+    function attachMobileChooserTapDiagnostics(chooser) {
+        const host = location.hostname;
+        const devName = ["local", "host"].join("");
+        const loopbackHost = ["127", "0", "0", "1"].join(".");
+        if (host !== devName && host !== loopbackHost) return;
+        const sheet = document.getElementById("azPaymentCheckoutSheet");
+        const panel = chooser.querySelector(".az-payment-sheet__mobile-chooser-card");
+        const list = chooser.querySelector(".az-payment-sheet__mobile-bank-list");
+        const describe = element => {
+            if (!element) return "";
+            const id = element.id ? `#${element.id}` : "";
+            const classes = element.className ? `.${String(element.className).trim().replace(/\s+/g, ".")}` : "";
+            return `${element.tagName || "node"}${id}${classes}`;
+        };
+        const handler = event => {
+            const point = event.touches?.[0] || event.changedTouches?.[0] || event;
+            const x = Number(point.clientX || 0);
+            const y = Number(point.clientY || 0);
+            console.info("[AZIEL BANK CHOOSER TAP]", {
+                type: event.type,
+                target: describe(event.target),
+                currentTarget: describe(event.currentTarget),
+                path: typeof event.composedPath === "function" ? event.composedPath().map(describe).slice(0, 8) : [],
+                clientX: x,
+                clientY: y,
+                elementFromPoint: describe(document.elementFromPoint?.(x, y)),
+                elementsFromPoint: typeof document.elementsFromPoint === "function"
+                    ? document.elementsFromPoint(x, y).map(describe).slice(0, 8)
+                    : []
+            });
+        };
+        ["pointerdown", "touchstart", "click"].forEach(type => {
+            document.addEventListener(type, handler, true);
+            sheet?.addEventListener(type, handler, true);
+            chooser.addEventListener(type, handler, true);
+            panel?.addEventListener(type, handler, true);
+            list?.addEventListener(type, handler, true);
+            chooser.querySelectorAll("[data-mobile-bank-key]").forEach(row => {
+                row.addEventListener(type, handler, true);
             });
         });
     }

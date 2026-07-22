@@ -828,18 +828,32 @@ body.light .az-payment-sheet {
     }
 
     .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__mobile-chooser {
+        position: fixed;
+        inset: 0;
+        z-index: 80;
+        display: block;
+        padding: 12px 12px max(12px, env(safe-area-inset-bottom));
+        pointer-events: auto;
+    }
+
+    .az-payment-sheet__mobile-chooser-backdrop {
         position: absolute;
         inset: 0;
-        z-index: 6;
-        display: flex;
-        align-items: flex-end;
-        justify-content: center;
-        padding: 12px 12px max(12px, env(safe-area-inset-bottom));
-        background: rgba(3, 7, 18, .28);
+        z-index: 0;
+        width: 100%;
+        height: 100%;
+        border: 0;
+        background: rgba(3, 7, 18, .18);
+        pointer-events: auto;
     }
 
     .az-payment-sheet__mobile-chooser-card {
-        width: 100%;
+        position: absolute;
+        right: 12px;
+        bottom: max(12px, env(safe-area-inset-bottom));
+        left: 12px;
+        z-index: 2;
+        max-width: calc(100vw - 24px);
         max-height: min(420px, calc(100dvh - 96px));
         overflow-y: auto;
         border: 1px solid var(--az-pay-sheet-border-strong);
@@ -847,6 +861,14 @@ body.light .az-payment-sheet {
         background: var(--az-pay-sheet-bg);
         box-shadow: var(--az-pay-sheet-shadow);
         padding: 14px;
+        pointer-events: auto;
+    }
+
+    .az-payment-sheet__mobile-chooser-card::before,
+    .az-payment-sheet__mobile-chooser-card::after,
+    .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__mobile-chooser::before,
+    .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__mobile-chooser::after {
+        pointer-events: none;
     }
 
     .az-payment-sheet__mobile-chooser-card header {
@@ -875,11 +897,16 @@ body.light .az-payment-sheet {
     }
 
     .az-payment-sheet__mobile-bank-list {
+        position: relative;
+        z-index: 3;
         display: grid;
         gap: 8px;
+        pointer-events: auto;
     }
 
     .az-payment-sheet__mobile-bank-list button {
+        position: relative;
+        z-index: 1;
         display: grid;
         grid-template-columns: 34px minmax(0, 1fr) auto;
         align-items: center;
@@ -895,6 +922,8 @@ body.light .az-payment-sheet {
         text-align: left;
         pointer-events: auto;
         touch-action: manipulation;
+        user-select: none;
+        -webkit-user-select: none;
         -webkit-tap-highlight-color: rgba(139, 92, 246, .18);
     }
 

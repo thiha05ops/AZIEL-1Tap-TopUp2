@@ -122,6 +122,7 @@
                     logoUrl: logo,
                     logo,
                     enabled: true,
+                    appLaunchMode: item.appLaunchMode || "APP_ONLY",
                     sortOrder: Number(item.sortOrder || item.trustDisplay?.sortOrder || 0),
                     trustDisplay: {
                         enabled: true,
