@@ -296,6 +296,15 @@ function main() {
     includes("frontend/js/payment/payment-checkout-sheet.js", "hasAndroidLaunchCapability(options)", "Checkout Open App visibility must use Android package capability.");
     includes("frontend/js/payment/payment-checkout-sheet.js", "androidExplicitUrl || androidIntentUrl", "Explicit Android launch URL must take precedence over generated intent.");
     includes("frontend/js/payment/payment-checkout-sheet.js", "android_intent", "Checkout must classify Android intent launch source.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "data-mobile-bank-key", "mobile bank rows must bind by stable launcher key.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "const launcherByKey = new Map();", "mobile bank chooser must resolve launchers from an in-memory map.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "event.preventDefault();", "mobile bank row click must preserve a controlled gesture handler.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "event.stopPropagation();", "mobile bank row click must not bubble into chooser/backdrop handlers.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "launchBankProfileFromGesture", "mobile bank row must use a gesture-safe launch path.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "window.location.href = iosUrl;", "iOS custom-scheme navigation must be synchronous in the row click path.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "setTimeout(() => {\n                updateChecklist(\"open_app\");", "iOS post-launch bookkeeping must be deferred until after scheme navigation.");
+    includes("frontend/css/payment/payment-checkout-sheet.css", "touch-action: manipulation;", "mobile bank rows must use direct tap handling.");
+    includes("frontend/css/payment/payment-checkout-sheet.css", "pointer-events: none;", "mobile bank row children must not absorb taps.");
     assert(!read("frontend/js/payment/payment-checkout-sheet.js").includes("pm-android-intent-preview"), "Checkout must not read Admin generated intent preview DOM text.");
     includes("frontend/js/payment/payment-checkout-sheet.js", "Open / Install", "Store-only iOS behavior must not claim direct open.");
     includes("frontend/js/payment/payment-checkout-sheet.js", ': "";', "Desktop launch resolution must not pretend to be Android.");

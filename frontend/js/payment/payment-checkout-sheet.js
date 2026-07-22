@@ -1240,6 +1240,7 @@
             setMessage("success", t("payment_open_app_manual_guidance", "Open your banking app and import the saved QR. Return here after transfer and upload your receipt."));
             return;
         }
+        const launcherByKey = new Map();
 
         chooser.innerHTML = `
             <div class="az-payment-sheet__mobile-chooser-card" role="dialog" aria-modal="false" aria-label="${escapeHTML(t("payment_choose_banking_app", "Choose Banking App"))}">
@@ -1249,11 +1250,14 @@
                 </header>
                 <div class="az-payment-sheet__mobile-bank-list">
                     ${apps.map((app, index) => {
+                        const launcherKey = app.key || `bank-${index}`;
+                        launcherByKey.set(launcherKey, app);
                         const target = resolveBankProfileLaunchTarget(app);
                         const disabled = !target.url && !hasAndroidLaunchCapability(app);
                         const appName = app.label || app.appDisplayName || "Banking App";
+                        logMobileBankLauncher(app);
                         return `
-                            <button type="button" data-mobile-bank-index="${index}" ${disabled ? "disabled" : ""}>
+                            <button type="button" class="az-payment-sheet__mobile-bank-launcher-row" data-mobile-bank-key="${escapeHTML(launcherKey)}" ${disabled ? "disabled" : ""}>
                                 <i aria-hidden="true">${app.logo ? `<img src="${escapeHTML(app.logo)}" alt="">` : ""}</i>
                                 <span>${escapeHTML(appName)}</span>
                                 <b aria-hidden="true">›</b>
@@ -1265,11 +1269,12 @@
             </div>
         `;
         chooser.hidden = false;
-        chooser.querySelectorAll("[data-mobile-bank-index]").forEach(button => {
-            button.addEventListener("click", () => {
-                const profile = apps[Number(button.getAttribute("data-mobile-bank-index") || 0)];
-                chooser.hidden = true;
-                launchBankProfile(profile, options);
+        chooser.querySelectorAll("[data-mobile-bank-key]").forEach(button => {
+            button.addEventListener("click", event => {
+                event.preventDefault();
+                event.stopPropagation();
+                const profile = launcherByKey.get(button.getAttribute("data-mobile-bank-key") || "");
+                launchBankProfileFromGesture(profile, options, { chooser });
             });
         });
         chooser.querySelectorAll("[data-mobile-bank-cancel]").forEach(button => {
@@ -1277,6 +1282,45 @@
                 chooser.hidden = true;
             });
         });
+    }
+
+    function logMobileBankLauncher(profile = {}) {
+        const host = location.hostname;
+        const devName = ["local", "host"].join("");
+        const loopbackHost = ["127", "0", "0", "1"].join(".");
+        if (host !== devName && host !== loopbackHost) return;
+        console.info("[AZIEL MOBILE BANK LAUNCHER]", {
+            key: profile.key || "",
+            displayName: profile.label || profile.displayName || profile.appDisplayName || "",
+            iosAppLaunchUrl: profile.iosAppLaunchUrl || "",
+            androidPackageName: profile.androidPackageName || "",
+            androidAppLaunchUrl: profile.androidAppLaunchUrl || "",
+            enabled: profile.enabled !== false,
+            verificationStatus: profile.verificationStatus || ""
+        });
+    }
+
+    function launchBankProfileFromGesture(profile = {}, options = {}, ui = {}) {
+        const helper = window.AZIEL_ANDROID_APP_LAUNCH;
+        const platform = helper?.resolvePlatform?.() || "desktop";
+        if (platform === "ios") {
+            const iosUrl = profile?.iosAppLaunchUrl || "";
+            if (!iosUrl) {
+                setMessage("error", t("payment_bank_app_unavailable", "Bank app unavailable. Open your banking app and import the saved QR."));
+                return;
+            }
+            window.location.href = iosUrl;
+            setTimeout(() => {
+                updateChecklist("open_app");
+                persistCheckoutState(activeState || options);
+                setMessage("success", `${t("payment_opening_bank_app", "Opening")} ${profile.label || profile.appDisplayName || "banking app"}. ${t("payment_return_upload_receipt", "Return here after transfer and upload your receipt.")}`);
+                if (ui.chooser) ui.chooser.hidden = true;
+            }, 0);
+            return;
+        }
+
+        launchBankProfile(profile, options);
+        if (ui.chooser) ui.chooser.hidden = true;
     }
 
     function launchBankProfile(profile = {}, options = {}) {
