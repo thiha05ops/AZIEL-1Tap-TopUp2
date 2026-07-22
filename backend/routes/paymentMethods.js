@@ -646,6 +646,8 @@ function sanitizeBankLaunchers(value = []) {
                 iosAppLaunchUrl,
                 appStoreFallbackUrl,
                 verificationStatus: verificationStatus || "verified",
+                sourcePaymentMethodKey: key,
+                legacyPaymentMethodId: safeText(item?.legacyPaymentMethodId || "", 80),
                 operatorNotes: safeText(item?.operatorNotes || "", 240)
             };
         })
@@ -669,6 +671,8 @@ function launcherFromPaymentMethod(method = {}, fallback = {}) {
         iosAppLaunchUrl: obj.iosAppLaunchUrl || fallback.iosAppLaunchUrl || "",
         appStoreFallbackUrl: obj.appStoreFallbackUrl || obj.appStoreUrl || fallback.appStoreFallbackUrl || "",
         verificationStatus: obj.launcherVerificationStatus || fallback.verificationStatus || "verified",
+        sourcePaymentMethodKey: key,
+        legacyPaymentMethodId: obj._id ? String(obj._id) : "",
         operatorNotes: obj.launcherOperatorNotes || fallback.operatorNotes || ""
     }])[0] || null;
 }
@@ -685,7 +689,7 @@ function mergePromptPayLaunchers(existing = [], derived = []) {
         byKey.set(item.key, { ...byKey.get(item.key), ...item });
     });
     return sanitizeBankLaunchers(Array.from(byKey.values()))
-        .filter(item => item.key !== "kplus" && item.enabled === true && item.verificationStatus !== "failed");
+        .filter(item => item.key !== "kplus");
 }
 
 async function syncPromptPayBankLaunchers() {
@@ -1665,6 +1669,7 @@ module.exports._test = {
     applySeedDefaultsWithoutOverwriting,
     defaultMethods,
     isLegacyThailandBankMethod,
+    mergePromptPayLaunchers,
     publicBankLaunchersProjection,
     publicTrustDisplayForMethod,
     sanitizeBankLaunchers

@@ -251,6 +251,8 @@ const paymentMethodSchema = new mongoose.Schema(
                     iosAppLaunchUrl: { type: String, default: "" },
                     appStoreFallbackUrl: { type: String, default: "" },
                     verificationStatus: { type: String, default: "verified" },
+                    sourcePaymentMethodKey: { type: String, default: "" },
+                    legacyPaymentMethodId: { type: String, default: "" },
                     operatorNotes: { type: String, default: "" }
                 }
             ],

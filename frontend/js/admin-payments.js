@@ -131,17 +131,31 @@ function renderAdminPaymentMethods(methods) {
         const displayName = formatPaymentName(method.method || method.key || "Payment");
         const logoUrl = method.logoUrl || getAdminPaymentLogo(method);
         const readiness = getAdminPaymentReadiness(method);
-        const status = getAdminPaymentStatus(method, readiness);
+        const legacyThaiBank = isLegacyThailandBankAdminMethod(method);
+        const status = legacyThaiBank
+            ? getLegacyThailandBankStatus(method)
+            : getAdminPaymentStatus(method, readiness);
+        const legacyNotice = legacyThaiBank ? legacyThailandBankNotice(method) : "";
+        const readinessLine = legacyThaiBank
+            ? "Customer storefront visibility is controlled by PromptPay child launcher settings."
+            : readinessSummary(readiness);
+        const editorActionLabel = legacyThaiBank ? "View" : "Edit";
+        const saveButton = legacyThaiBank
+            ? `<button class="save-payment-btn" type="button" disabled title="Manage this bank under PromptPay Supported Banking Apps">Managed under PromptPay</button>`
+            : `<button class="save-payment-btn" type="button" data-action="save-payment-method" data-id="${escapeAdminHTML(method._id)}">
+                        Save ${escapeAdminHTML(displayName)}
+                    </button>`;
 
         return `
-            <div class="payment-method-card" data-id="${escapeAdminHTML(method._id)}" data-key="${escapeAdminHTML(method.key || "")}" data-region="${escapeAdminHTML(method.region || "")}">
+            <div class="payment-method-card ${legacyThaiBank ? "is-legacy-thai-bank" : ""}" data-id="${escapeAdminHTML(method._id)}" data-key="${escapeAdminHTML(method.key || "")}" data-region="${escapeAdminHTML(method.region || "")}" data-legacy-thai-bank="${legacyThaiBank ? "true" : "false"}">
                 <div class="payment-header">
                     <div class="payment-method-summary-main">
                         <img class="payment-method-summary-logo" src="${escapeAdminHTML(logoUrl)}" alt="${escapeAdminHTML(displayName)} logo" onerror="this.src='/assets/payment/payment-neutral.svg'">
                         <div>
                             <h4>${escapeAdminHTML(displayName)} <small>${escapeAdminHTML(getRegionLabel(method.region))} · ${escapeAdminHTML(getPaymentTypeLabel(type))}</small></h4>
                             <p>${escapeAdminHTML(method.shortDescription || getPaymentTypeDescription(method.key, type, provider))}</p>
-                            <p class="payment-readiness-meter">${escapeAdminHTML(readinessSummary(readiness))}</p>
+                            ${legacyNotice}
+                            <p class="payment-readiness-meter">${escapeAdminHTML(readinessLine)}</p>
                             <div class="payment-summary-capabilities">
                                 ${capabilityChip("QR", hasPaymentQr(method))}
                                 ${capabilityChip("App", method.enableOpenApp === true && Boolean(method.deepLinkUrl || method.iosAppLaunchUrl || method.androidAppLaunchUrl || method.androidPackageName))}
@@ -155,11 +169,11 @@ function renderAdminPaymentMethods(methods) {
                             <p class="payment-config-warning">Missing: ${escapeAdminHTML(readiness.missing.join(", "))}</p>
                         ` : ""}
                         <button class="admin-small-btn" type="button" data-action="preview-payment-method" data-id="${escapeAdminHTML(method._id)}">Preview</button>
-                        <button class="admin-small-btn" type="button" data-action="edit-payment-method" data-id="${escapeAdminHTML(method._id)}">Edit</button>
+                        <button class="admin-small-btn" type="button" data-action="edit-payment-method" data-id="${escapeAdminHTML(method._id)}">${editorActionLabel}</button>
                     </div>
 
                     <label class="switch">
-                        <input class="pm-enabled" type="checkbox" ${method.enabled ? "checked" : ""}>
+                        <input class="pm-enabled" type="checkbox" ${method.enabled ? "checked" : ""} ${legacyThaiBank ? "disabled" : ""}>
                         <span>Enabled</span>
                     </label>
                 </div>
@@ -215,7 +229,7 @@ function renderAdminPaymentMethods(methods) {
                 <div class="settings-row">
                     <div>
                         <label>Current State</label>
-                        <small>${escapeAdminHTML(readinessSummary(readiness))}</small>
+                        <small>${escapeAdminHTML(readinessLine)}</small>
                     </div>
                     <span class="payment-config-status ${escapeAdminHTML(status.className)}">${escapeAdminHTML(status.label)}</span>
                 </div>
@@ -590,9 +604,7 @@ function renderAdminPaymentMethods(methods) {
                 </details>
 
                 <div class="payment-editor-savebar">
-                    <button class="save-payment-btn" type="button" data-action="save-payment-method" data-id="${escapeAdminHTML(method._id)}">
-                        Save ${escapeAdminHTML(displayName)}
-                    </button>
+                    ${saveButton}
                 </div>
                 </details>
             </div>
@@ -827,6 +839,45 @@ function getAdminPaymentStatus(method = {}, readiness = { ready: false }) {
     if (!readiness.ready) return { label: "Draft", className: "is-draft" };
     if (method.enabled) return { label: "Enabled", className: "is-enabled" };
     return { label: "Ready", className: "is-ready" };
+}
+
+function isLegacyThailandBankAdminMethod(method = {}) {
+    return String(method.region || "").toUpperCase() === "TH" &&
+        ["scb", "bangkok_bank", "kplus", "krungsri", "krungthai"].includes(
+            normalizeAdminProvider(method.key || method.provider || method.method || "")
+        );
+}
+
+function getLegacyThailandBankStatus(method = {}) {
+    if (normalizeAdminProvider(method.key || method.provider || method.method || "") === "kplus") {
+        return { label: "Unsupported / Broken", className: "is-draft" };
+    }
+    return { label: "Legacy / Hidden from storefront", className: "is-ready" };
+}
+
+function legacyThailandBankNotice(method = {}) {
+    const key = normalizeAdminProvider(method.key || method.provider || method.method || "");
+    if (key === "kplus") {
+        return `
+            <p class="payment-legacy-notice">
+                Status: Unsupported / Broken · Customer visibility: Forced off · Reason: Error 116.
+            </p>
+        `;
+    }
+    return `
+        <p class="payment-legacy-notice">
+            Legacy / Hidden from storefront. Manage customer logo, display name, enabled state, and sort order under PromptPay → Supported Banking Apps.
+        </p>
+    `;
+}
+
+function lockLegacyThailandBankEditor(card) {
+    if (!card || card.dataset.legacyThaiBank !== "true") return;
+    card.querySelectorAll("input, select, textarea, button").forEach(control => {
+        if (control.closest(".payment-summary-actions") || control.closest("summary")) return;
+        if (control.getAttribute("data-action") === "preview-payment-method") return;
+        control.disabled = true;
+    });
 }
 
 function capabilityToggle(className, label, checked) {
@@ -1131,6 +1182,7 @@ function bindAdminPaymentActions() {
         .forEach(card => {
 
             refreshPaymentEditorVisibility(card);
+            lockLegacyThailandBankEditor(card);
 
         });
 
@@ -1638,6 +1690,10 @@ function renumberChecklistRows(list) {
 async function saveAdminPaymentMethod(id) {
     const card = document.querySelector(`.payment-method-card[data-id="${CSS.escape(id)}"]`);
     if (!card) return;
+    if (card.dataset.legacyThaiBank === "true") {
+        showAdminToast?.("Legacy bank records are hidden from storefront. Manage this bank under PromptPay Supported Banking Apps.", "info");
+        return;
+    }
 
     const payload = {
         method: card.querySelector(".pm-method")?.value || "",
@@ -1928,6 +1984,10 @@ async function uploadAdminPaymentQR(id) {
 
 async function uploadAdminPaymentLogo(id) {
     const card = document.querySelector(`.payment-method-card[data-id="${CSS.escape(id)}"]`);
+    if (card?.dataset.legacyThaiBank === "true") {
+        showAdminToast?.("Launcher logos are managed under PromptPay Supported Banking Apps.", "info");
+        return;
+    }
     const file = card?.querySelector(".pm-logo-file")?.files?.[0];
 
     if (!file) {

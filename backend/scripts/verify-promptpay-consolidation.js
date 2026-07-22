@@ -95,6 +95,19 @@ function main() {
         ["bangkok_bank"],
         "public PromptPay launcher projection must exclude disabled, failed, and K PLUS launchers"
     );
+    const mergedLaunchers = internals.mergePromptPayLaunchers([
+        { ...launchers[0], enabled: false, logoUrl: "/uploads/admin-scb.png", sortOrder: 99 },
+        { ...launchers[1], displayName: "Custom BBL", enabled: true, sortOrder: 5 }
+    ], [
+        { ...launchers[0], enabled: true, logoUrl: "/assets/payment/scb.png", sortOrder: 10 },
+        { ...launchers[1], displayName: "Legacy BBL", enabled: true, sortOrder: 20 }
+    ]);
+    const mergedScb = mergedLaunchers.find(item => item.key === "scb");
+    const mergedBbl = mergedLaunchers.find(item => item.key === "bangkok_bank");
+    assert.strictEqual(mergedScb.enabled, false, "PromptPay child disabled state must survive seed/sync merge");
+    assert.strictEqual(mergedScb.logoUrl, "/uploads/admin-scb.png", "PromptPay child uploaded logo must win over legacy/default sync data");
+    assert.strictEqual(mergedBbl.displayName, "Custom BBL", "PromptPay child display name must win over legacy/default sync data");
+    assert.strictEqual(mergedBbl.sortOrder, 5, "PromptPay child sort order must win over legacy/default sync data");
 
     ["scb", "bangkok_bank", "kplus", "krungsri", "krungthai"].forEach(key => {
         assert.strictEqual(
@@ -253,6 +266,12 @@ function main() {
     includes("backend/routes/payment.js", "bankLaunchers: instructions.bankLaunchers", "manual attempt public payload must expose bank launchers");
     includes("frontend/js/admin-payments.js", "Supported Banking Apps", "admin PromptPay editor must expose bank launcher children");
     includes("frontend/js/admin-payments.js", "collectBankLaunchers", "admin must save bank launchers");
+    includes("frontend/js/admin-payments.js", "Legacy / Hidden from storefront", "admin legacy standalone Thai bank rows must be labeled as hidden");
+    includes("frontend/js/admin-payments.js", "Managed under PromptPay", "admin legacy standalone Thai bank rows must point to PromptPay child launchers");
+    includes("frontend/js/admin-payments.js", "Unsupported / Broken", "admin must clearly mark K PLUS as unsupported");
+    includes("frontend/js/admin-payments.js", "Error 116", "admin must explain K PLUS customer visibility is forced off");
+    includes("frontend/js/admin-payments.js", "lockLegacyThailandBankEditor", "admin must prevent legacy standalone banks from competing as storefront controls");
+    includes("frontend/css/admin/admin.css", ".payment-method-card.is-legacy-thai-bank", "admin legacy payment rows must have visible legacy treatment");
 
     [
         "frontend/lang/en.js",

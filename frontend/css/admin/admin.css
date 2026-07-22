@@ -1264,6 +1264,11 @@ textarea {
   margin-bottom: 18px;
 }
 
+.payment-method-card.is-legacy-thai-bank {
+  border-style: dashed;
+  border-color: rgba(96, 165, 250, .26);
+}
+
 .payment-header {
   display: flex;
   justify-content: space-between;
@@ -1442,6 +1447,14 @@ textarea {
 
 .payment-config-warning {
   color: #fbbf24;
+}
+
+.payment-legacy-notice {
+  margin: 8px 0 0;
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.45;
 }
 
 .payment-method-summary-main {
