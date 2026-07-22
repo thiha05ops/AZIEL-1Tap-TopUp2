@@ -40,6 +40,10 @@
     display: flex;
 }
 
+body.az-payment-sheet-open {
+    overflow: hidden;
+}
+
 body.theme-dark .az-payment-sheet,
 body.dark .az-payment-sheet {
     --az-pay-sheet-bg: #10162b;
@@ -92,6 +96,12 @@ body.light .az-payment-sheet {
     color: var(--az-pay-sheet-title);
     box-shadow: var(--az-pay-sheet-shadow);
     scrollbar-gutter: stable;
+}
+
+@media (min-width: 760px) {
+    .az-payment-sheet__panel {
+        width: min(640px, calc(100vw - 48px));
+    }
 }
 
 .az-payment-sheet__body {
@@ -195,6 +205,19 @@ body.light .az-payment-sheet {
     padding: 7px 10px;
 }
 
+.az-payment-sheet__fallback-details {
+    margin: 14px 0 0;
+    border-bottom: 1px solid var(--az-pay-sheet-border);
+}
+
+.az-payment-sheet__fallback-details summary {
+    min-height: 38px;
+    color: var(--az-pay-sheet-accent-strong);
+    font-size: 12px;
+    font-weight: 900;
+    cursor: pointer;
+}
+
 .az-payment-sheet__qr {
     display: grid;
     place-items: center;
@@ -210,13 +233,19 @@ body.light .az-payment-sheet {
 }
 
 .az-payment-sheet__qr img {
-    width: min(210px, 100%);
+    width: min(240px, 100%);
     aspect-ratio: 1;
     object-fit: contain;
     padding: 10px;
     border: 1px solid var(--az-pay-sheet-border);
     border-radius: 16px;
     background: #ffffff;
+}
+
+.az-payment-sheet__qr-expiry {
+    color: var(--az-pay-sheet-accent-strong);
+    font-size: 12px;
+    font-weight: 900;
 }
 
 .az-payment-sheet__qr figcaption,
@@ -293,7 +322,7 @@ body.light .az-payment-sheet {
     border: 1px solid var(--az-pay-sheet-border-strong);
     border-radius: 14px;
     background: var(--az-pay-sheet-bg-soft);
-    color: var(--az-pay-sheet-text);
+    color: var(--az-pay-sheet-value);
     font: inherit;
     font-size: 12px;
     font-weight: 850;
@@ -502,6 +531,77 @@ body.light .az-payment-sheet {
     box-shadow: 0 -1px 0 var(--az-pay-sheet-border);
 }
 
+.az-payment-sheet__submit[hidden],
+.az-payment-sheet__mobile-nav[hidden],
+.az-payment-sheet__receipt-summary[hidden],
+.az-payment-sheet__mobile-chooser[hidden],
+.az-payment-sheet__mobile-nav button[hidden] {
+    display: none !important;
+}
+
+.az-payment-sheet__mobile-nav,
+.az-payment-sheet__receipt-summary,
+.az-payment-sheet__mobile-chooser,
+.az-payment-sheet__desktop-banks {
+    display: none;
+}
+
+.az-payment-sheet.is-desktop-promptpay .az-payment-sheet__actions {
+    display: flex;
+    justify-content: center;
+    margin: 4px 0 14px;
+}
+
+.az-payment-sheet.is-desktop-promptpay .az-payment-sheet__action {
+    width: min(220px, 100%);
+}
+
+.az-payment-sheet.is-desktop-promptpay #azPaymentSheetOpenBankApp {
+    display: none !important;
+}
+
+.az-payment-sheet.is-desktop-promptpay .az-payment-sheet__desktop-banks {
+    display: grid;
+    gap: 8px;
+    place-items: center;
+    margin: 0 0 16px;
+    padding: 12px;
+    border: 1px solid var(--az-pay-sheet-border);
+    border-radius: 16px;
+    background: var(--az-pay-sheet-bg-soft);
+}
+
+.az-payment-sheet__desktop-banks > span {
+    color: var(--az-pay-sheet-label);
+    font-size: 11px;
+    font-weight: 950;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.az-payment-sheet__desktop-bank-logos {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.az-payment-sheet__desktop-bank-logos span {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 30px;
+    border: 1px solid var(--az-pay-sheet-border);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .08);
+}
+
+.az-payment-sheet__desktop-bank-logos img {
+    width: 24px;
+    height: 20px;
+    object-fit: contain;
+}
+
 .az-payment-sheet__submit:disabled {
     opacity: .78;
     cursor: progress;
@@ -520,7 +620,7 @@ body.light .az-payment-sheet {
     outline-offset: 3px;
 }
 
-@media (max-width: 520px) {
+@media (max-width: 600px) {
     .az-payment-sheet {
         align-items: flex-end;
         justify-content: center;
@@ -528,6 +628,10 @@ body.light .az-payment-sheet {
         padding-right: max(12px, env(safe-area-inset-right));
         padding-bottom: env(safe-area-inset-bottom);
         padding-left: max(12px, env(safe-area-inset-left));
+    }
+
+    .az-payment-sheet.is-mobile-promptpay {
+        padding-top: max(10px, env(safe-area-inset-top));
     }
 
     .az-payment-sheet__panel {
@@ -538,9 +642,83 @@ body.light .az-payment-sheet {
         border-radius: 22px 22px 0 0;
     }
 
+    .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__panel {
+        width: calc(100vw - 24px);
+        max-width: calc(100vw - 24px);
+        max-height: calc(100dvh - max(10px, env(safe-area-inset-top)) - env(safe-area-inset-bottom));
+    }
+
     .az-payment-sheet__body {
         padding-right: 20px;
         padding-left: 20px;
+    }
+
+    .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__body {
+        padding: 0 18px calc(18px + env(safe-area-inset-bottom));
+        overscroll-behavior: contain;
+    }
+
+    .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__header {
+        position: sticky;
+        top: 0;
+        z-index: 3;
+        margin: 0 -18px 12px;
+        padding: 14px 54px 12px 18px;
+        background: color-mix(in srgb, var(--az-pay-sheet-bg) 94%, transparent);
+        backdrop-filter: blur(14px);
+    }
+
+    .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__title {
+        margin: 0 0 3px;
+        font-size: 18px;
+    }
+
+    .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__amount {
+        font-size: 24px;
+    }
+
+    .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__subtitle {
+        margin-top: 3px;
+        font-size: 12px;
+        line-height: 1.35;
+    }
+
+    .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__close {
+        position: absolute;
+        top: 13px;
+        right: 14px;
+        z-index: 5;
+    }
+
+    .az-payment-sheet.is-mobile-step-qr .az-payment-sheet__details,
+    .az-payment-sheet.is-mobile-step-qr .az-payment-sheet__receipt,
+    .az-payment-sheet.is-mobile-step-qr .az-payment-sheet__receipt-summary,
+    .az-payment-sheet.is-mobile-step-qr .az-payment-sheet__instructions,
+    .az-payment-sheet.is-mobile-step-qr .az-payment-sheet__submit {
+        display: none !important;
+    }
+
+    .az-payment-sheet.is-mobile-step-receipt .az-payment-sheet__details,
+    .az-payment-sheet.is-mobile-step-receipt .az-payment-sheet__qr,
+    .az-payment-sheet.is-mobile-step-receipt .az-payment-sheet__actions,
+    .az-payment-sheet.is-mobile-step-receipt .az-payment-sheet__fallback,
+    .az-payment-sheet.is-mobile-step-receipt .az-payment-sheet__checklist {
+        display: none !important;
+    }
+
+    .az-payment-sheet.is-mobile-step-receipt .az-payment-sheet__body {
+        padding-bottom: calc(92px + env(safe-area-inset-bottom));
+    }
+
+    .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__mobile-nav {
+        display: grid;
+        gap: 10px;
+        margin: 10px 0 14px;
+    }
+
+    .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__mobile-nav .az-payment-sheet__action,
+    .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__mobile-nav .az-payment-sheet__secondary {
+        margin: 0;
     }
 
     .az-payment-sheet__submit {
@@ -548,6 +726,11 @@ body.light .az-payment-sheet {
         max-width: 100%;
         padding-right: 12px;
         padding-left: 12px;
+    }
+
+    .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__submit {
+        min-height: calc(58px + env(safe-area-inset-bottom));
+        padding-bottom: max(12px, env(safe-area-inset-bottom));
     }
 
     .az-payment-sheet__row {
@@ -560,6 +743,196 @@ body.light .az-payment-sheet {
 
     .az-payment-sheet__actions {
         grid-template-columns: 1fr;
+    }
+
+    .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+
+    .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__action {
+        min-height: 44px;
+        padding-inline: 8px;
+        font-size: 12px;
+        white-space: normal;
+    }
+
+    .az-payment-sheet__qr img {
+        width: min(232px, 100%);
+    }
+
+    .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__qr {
+        gap: 7px;
+        margin: 10px 0 10px;
+    }
+
+    .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__qr img {
+        width: clamp(190px, 58vw, 220px);
+        padding: 8px;
+        border-radius: 14px;
+    }
+
+    .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__checklist {
+        margin-bottom: 10px;
+        padding: 10px 12px;
+        border-radius: 14px;
+    }
+
+    .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__checklist ol {
+        gap: 6px;
+    }
+
+    .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__checklist li {
+        align-items: flex-start;
+        font-size: 12px;
+        line-height: 1.35;
+    }
+
+    .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__receipt-summary {
+        display: grid;
+        gap: 8px;
+        margin: 10px 0 14px;
+        padding: 12px;
+        border: 1px solid var(--az-pay-sheet-border);
+        border-radius: 14px;
+        background: var(--az-pay-sheet-bg-soft);
+    }
+
+    .az-payment-sheet__receipt-summary div {
+        display: grid;
+        grid-template-columns: minmax(70px, .65fr) minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
+    }
+
+    .az-payment-sheet__receipt-summary span {
+        color: var(--az-pay-sheet-label);
+        font-size: 11px;
+        font-weight: 850;
+    }
+
+    .az-payment-sheet__receipt-summary strong {
+        color: var(--az-pay-sheet-value);
+        font-size: 12px;
+        font-weight: 900;
+        overflow-wrap: anywhere;
+    }
+
+    .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__receipt-copy strong {
+        font-size: 16px;
+    }
+
+    .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__upload {
+        padding: 14px;
+    }
+
+    .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__mobile-chooser {
+        position: absolute;
+        inset: 0;
+        z-index: 6;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        padding: 12px 12px max(12px, env(safe-area-inset-bottom));
+        background: rgba(3, 7, 18, .28);
+    }
+
+    .az-payment-sheet__mobile-chooser-card {
+        width: 100%;
+        max-height: min(420px, calc(100dvh - 96px));
+        overflow-y: auto;
+        border: 1px solid var(--az-pay-sheet-border-strong);
+        border-radius: 18px;
+        background: var(--az-pay-sheet-bg);
+        box-shadow: var(--az-pay-sheet-shadow);
+        padding: 14px;
+    }
+
+    .az-payment-sheet__mobile-chooser-card header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+
+    .az-payment-sheet__mobile-chooser-card header strong {
+        color: var(--az-pay-sheet-title);
+        font-size: 15px;
+        font-weight: 950;
+    }
+
+    .az-payment-sheet__mobile-chooser-card header button {
+        width: 34px;
+        height: 34px;
+        border: 1px solid var(--az-pay-sheet-border);
+        border-radius: 999px;
+        background: var(--az-pay-sheet-bg-soft);
+        color: var(--az-pay-sheet-title);
+        font-size: 18px;
+        font-weight: 900;
+    }
+
+    .az-payment-sheet__mobile-bank-list {
+        display: grid;
+        gap: 8px;
+    }
+
+    .az-payment-sheet__mobile-bank-list button {
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 12px;
+        min-height: 56px;
+        padding: 10px 14px;
+        border: 1px solid var(--az-pay-sheet-border);
+        border-radius: 14px;
+        background: var(--az-pay-sheet-bg-soft);
+        color: var(--az-pay-sheet-value);
+        font-size: 13px;
+        font-weight: 900;
+        text-align: left;
+    }
+
+    .az-payment-sheet__mobile-bank-list i {
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        border: 1px solid var(--az-pay-sheet-border);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, .08);
+        font-style: normal;
+    }
+
+    .az-payment-sheet__mobile-bank-list img {
+        width: 24px;
+        height: 24px;
+        object-fit: contain;
+    }
+
+    .az-payment-sheet__mobile-bank-list span {
+        min-width: 0;
+        line-height: 1.25;
+        overflow-wrap: anywhere;
+    }
+
+    .az-payment-sheet__mobile-bank-list b {
+        color: var(--az-pay-sheet-accent-strong);
+        font-size: 20px;
+        line-height: 1;
+    }
+
+    .az-payment-sheet__mobile-cancel {
+        width: 100%;
+        min-height: 44px;
+        margin-top: 10px;
+        border: 1px solid var(--az-pay-sheet-border);
+        border-radius: 14px;
+        background: transparent;
+        color: var(--az-pay-sheet-accent-strong);
+        font-weight: 950;
     }
 }
 

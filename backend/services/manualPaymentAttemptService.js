@@ -80,7 +80,8 @@ function projectPaymentInstructions(method = {}, reference = "") {
         playStoreFallbackUrl: method.playStoreFallbackUrl || method.playStoreUrl || "",
         promptPayRecipientType: method.promptPayRecipientType || "",
         promptPayRecipientMasked: maskPromptPayRecipient(method.promptPayRecipientValue || ""),
-        checklistSteps: Array.isArray(method.checklistSteps) ? method.checklistSteps : []
+        checklistSteps: Array.isArray(method.checklistSteps) ? method.checklistSteps : [],
+        bankLaunchers: Array.isArray(method.bankLaunchers) ? method.bankLaunchers : []
     };
 }
 

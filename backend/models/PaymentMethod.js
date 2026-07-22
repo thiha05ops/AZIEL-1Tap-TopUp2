@@ -224,6 +224,7 @@ const paymentMethodSchema = new mongoose.Schema(
                         enum: [
                             "save_qr",
                             "open_app",
+                            "scan_saved_qr",
                             "upload_receipt",
                             "wait_for_confirmation",
                             "confirm_payment"
@@ -232,6 +233,25 @@ const paymentMethodSchema = new mongoose.Schema(
                     },
                     enabled: { type: Boolean, default: true },
                     sortOrder: { type: Number, default: 0 }
+                }
+            ],
+            default: []
+        },
+        bankLaunchers: {
+            type: [
+                {
+                    key: { type: String, default: "" },
+                    displayName: { type: String, default: "" },
+                    logoUrl: { type: String, default: "" },
+                    enabled: { type: Boolean, default: true },
+                    sortOrder: { type: Number, default: 0 },
+                    androidPackageName: { type: String, default: "" },
+                    androidAppLaunchUrl: { type: String, default: "" },
+                    playStoreFallbackUrl: { type: String, default: "" },
+                    iosAppLaunchUrl: { type: String, default: "" },
+                    appStoreFallbackUrl: { type: String, default: "" },
+                    verificationStatus: { type: String, default: "verified" },
+                    operatorNotes: { type: String, default: "" }
                 }
             ],
             default: []

@@ -1,4 +1,5 @@
 initAzielFooterPolish();
+scheduleAzielTrustLogoRender();
 registerAzielServiceWorker();
 
 document.addEventListener("click", e => {
@@ -63,6 +64,27 @@ function initAzielFooterPolish() {
         if (copy) {
             copy.textContent = copy.textContent.replace(/©\s*\d{4}/, `© ${year}`);
         }
+    });
+}
+
+function scheduleAzielTrustLogoRender() {
+    const render = (options = {}) => {
+        window.AZIEL_PAYMENT_TRUST?.renderFooterTrustLogos?.(options).catch(error => {
+            if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
+                console.warn("Footer payment trust logos failed to render:", error.message);
+            }
+        });
+    };
+
+    render();
+    document.addEventListener("DOMContentLoaded", () => {
+        render();
+        setTimeout(() => render(), 0);
+        setTimeout(() => render(), 120);
+    });
+    window.addEventListener("load", () => render());
+    window.addEventListener("aziel:shopRegionChanged", event => {
+        render({ region: event?.detail?.region, refresh: true });
     });
 }
 

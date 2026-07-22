@@ -83,6 +83,39 @@ function isManualPaymentType(value) {
     return ["manual", "deeplink"].includes(String(value || "").toLowerCase());
 }
 
+const PROMPTPAY_MANUAL_CHECKLIST_STEPS = Object.freeze([
+    { key: "save_qr", label: "Save QR", action: "save_qr", enabled: true, sortOrder: 10 },
+    { key: "open_app", label: "Open Banking App", action: "open_app", enabled: true, sortOrder: 20 },
+    { key: "scan_saved_qr", label: "Scan the saved QR and pay", action: "scan_saved_qr", enabled: true, sortOrder: 30 },
+    { key: "upload_receipt", label: "Upload payment receipt", action: "upload_receipt", enabled: true, sortOrder: 40 }
+]);
+
+function normalizePromptPayAttemptMethod(method) {
+    if (!method || String(method.region || "").toUpperCase() !== "TH" || normalizePaymentKey(method.key) !== "promptpay") {
+        return method;
+    }
+    method.method = "PromptPay QR";
+    method.paymentType = "manual";
+    method.provider = "promptpay";
+    method.qrMode = "aziel_promptpay_dynamic";
+    method.receiptUploadEnabled = true;
+    method.confirmationMode = "manual_admin";
+    method.openAppMode = "bank_chooser";
+    method.appLaunchMode = "APP_ONLY";
+    method.enableSaveQr = true;
+    method.enableOpenApp = true;
+    method.enableChecklist = true;
+    method.dynamicQrSupported = true;
+    method.amountPrefillSupported = true;
+    method.referenceSupported = true;
+    method.galleryScanSupported = true;
+    method.slipRequired = true;
+    method.autoVerificationSupported = false;
+    method.webhookSupported = false;
+    method.checklistSteps = PROMPTPAY_MANUAL_CHECKLIST_STEPS.map(step => ({ ...step }));
+    return method;
+}
+
 function manualAttemptOrderSnapshot(attempt) {
     return {
         orderId: attempt.reference,
@@ -136,6 +169,7 @@ function publicManualAttempt(attempt) {
         androidPackageName: attempt.instructions?.androidPackageName || "",
         appStoreFallbackUrl: attempt.instructions?.appStoreFallbackUrl || "",
         playStoreFallbackUrl: attempt.instructions?.playStoreFallbackUrl || "",
+        bankLaunchers: Array.isArray(attempt.instructions?.bankLaunchers) ? attempt.instructions.bankLaunchers : [],
         checklistSteps: Array.isArray(attempt.instructions?.checklistSteps) ? attempt.instructions.checklistSteps : [],
         dynamicQr: attempt.instructions?.dynamicQr || null
     };
@@ -181,6 +215,7 @@ function publicManualAttempt(attempt) {
         androidPackageName: instructions.androidPackageName,
         appStoreFallbackUrl: instructions.appStoreFallbackUrl,
         playStoreFallbackUrl: instructions.playStoreFallbackUrl,
+        bankLaunchers: instructions.bankLaunchers,
         checklistSteps: instructions.checklistSteps,
         dynamicQr: instructions.dynamicQr,
         instructions,
@@ -197,6 +232,8 @@ async function getEnabledManualPaymentMethod(paymentMethod, region) {
         enabled: true
     });
     const method = methods.find(item => normalizePaymentKey(item.key) === methodKey);
+
+    normalizePromptPayAttemptMethod(method);
 
     if (!method || !isManualPaymentType(method.paymentType)) return null;
     return method;
@@ -843,6 +880,7 @@ router.post("/payment/manual/attempt", authMiddleware, manualAttemptLimiter, asy
                 androidPackageName: instructions.androidPackageName,
                 appStoreFallbackUrl: instructions.appStoreFallbackUrl,
                 playStoreFallbackUrl: instructions.playStoreFallbackUrl,
+                bankLaunchers: instructions.bankLaunchers,
                 promptPayRecipientType: instructions.promptPayRecipientType,
                 promptPayRecipientMasked: instructions.promptPayRecipientMasked,
                 checklistSteps: instructions.checklistSteps,

@@ -317,7 +317,7 @@ function main() {
         "frontend/wallet.html"
     ].forEach(file => {
         includes(file, "/js/payment/android-app-launch.js", "shared Android launch helper must be loaded.");
-        includes(file, "/js/payment/payment-checkout-sheet.js?v=20260722-open-app", "public checkout pages must cache-bust the fixed checkout sheet.");
+        includes(file, "/js/payment/payment-checkout-sheet.js?v=20260722-promptpay-platform", "public checkout pages must cache-bust the fixed checkout sheet.");
         includes(file, "/js/payment/android-app-launch.js?v=20260722-open-app", "public checkout pages must cache-bust the Android launch helper.");
     });
 

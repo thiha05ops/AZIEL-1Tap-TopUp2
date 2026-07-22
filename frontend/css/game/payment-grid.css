@@ -108,6 +108,69 @@
     line-height: 1.35;
 }
 
+.pay-bank-chips {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    max-width: 100%;
+    margin-top: 8px;
+    overflow: hidden;
+}
+
+.pay-bank-chip {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 26px;
+    padding: 4px 6px;
+    border: 1px solid rgba(168, 85, 247, .24);
+    border-radius: 999px;
+    background: rgba(168, 85, 247, .08);
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.pay-bank-chips img {
+    width: 22px;
+    height: 18px;
+    object-fit: contain;
+    filter: none;
+}
+
+.pay-bank-chip--mobile-more {
+    display: none;
+    width: auto;
+    min-width: 32px;
+    padding-inline: 6px;
+    color: var(--text);
+}
+
+@media (max-width: 520px) {
+    .pay-card.active {
+        padding-right: 30px;
+        padding-left: 14px;
+    }
+
+    .pay-card.active .pay-bank-chips {
+        max-width: calc(100% - 12px);
+    }
+
+    .pay-bank-chips .pay-bank-chip:nth-of-type(n+4):not(.pay-bank-chip--mobile-more) {
+        display: none;
+    }
+
+    .pay-bank-chips .pay-bank-chip--mobile-more {
+        display: inline-flex;
+    }
+
+}
+
 .auto-pay-badge,
 .manual-pay-badge {
     padding: 4px 8px;

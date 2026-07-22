@@ -29,8 +29,8 @@
     <link rel="stylesheet" href="/css/theme/aziel-header.css?v=20260701">
     <link rel="stylesheet" href="/css/theme/aziel-design-system.css?v=20260701">
     <link rel="stylesheet" href="/css/game/game.css?v=20260712-summary-sync">
-    <link rel="stylesheet" href="/css/game/payment-grid.css">
-    <link rel="stylesheet" href="/css/payment/payment-checkout-sheet.css">
+    <link rel="stylesheet" href="/css/game/payment-grid.css?v=20260722-promptpay-platform">
+    <link rel="stylesheet" href="/css/payment/payment-checkout-sheet.css?v=20260722-promptpay-platform">
     <link rel="stylesheet" href="/css/support/live-chat.css">
 <meta name="theme-color" content="#070716">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -183,7 +183,7 @@
             </div>
 
             <div>
-                <h4 data-i18n="paymentMethods">Payment Methods</h4>
+                <h4 data-i18n="footer_supported_payments">Supported Payments</h4>
                 <div class="payment-logos" id="footerPaymentLogos" aria-label="Accepted payment methods"></div>
             </div>
         </footer>
@@ -286,64 +286,24 @@
     <script src="/js/prices.js?v=20260714-phase7"></script>
     <script src="/js/game-flow.js?v=20260714-phase7"></script>
     <script src="/js/payment-display.js?v=20260718-labels"></script>
-    <script src="/js/payment.js?v=20260712-summary-sync"></script>
+    <script src="/js/payment-trust-display.js?v=20260722-region-trust"></script>
+    <script src="/js/payment.js?v=20260722-promptpay-qa"></script>
 
     <script src="/js/ui-feedback.js?v=20260712-m6"></script>
     <script src="/js/payment/payment-utils.js?v=20260707-v3"></script>
     <script src="/js/payment/android-app-launch.js?v=20260722-open-app"></script>
-    <script src="/js/payment/payment-checkout-sheet.js?v=20260722-open-app"></script>
+    <script src="/js/payment/payment-checkout-sheet.js?v=20260722-promptpay-platform"></script>
     <script src="/js/payment/payment-wallet.js?v=20260707-v3"></script>
     <script src="/js/payment/payment-promptpay.js?v=20260707-v3"></script>
     <script src="/js/payment/payment-deeplink.js?v=20260707-v3"></script>
-    <script src="/js/payment/payment-manual.js?v=20260707-v3"></script>
+    <script src="/js/payment/payment-manual.js?v=20260722-promptpay-mobile"></script>
     <script src="/js/payment/payment-engine.js?v=20260707-v3"></script>
 
     <script src="/js/mlbb.js?v=20260709-package-preview-fix"></script>
 
     <script src="/js/live-chat.js"></script>
     <script src="/js/pwa-fix.js"></script>
-
-    <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            const box = document.getElementById("footerPaymentLogos");
-            if (!box) return;
-
-            const logos = {
-                MM: [
-                    window.ASSET?.payment?.("kbzpay.png") || "/assets/payment/kbzpay.png",
-                    window.ASSET?.payment?.("wavepay.png") || "/assets/payment/wavepay.png",
-                    window.ASSET?.payment?.("ayapay.png") || "/assets/payment/ayapay.png"
-                ],
-                TH: [
-                    window.ASSET?.payment?.("promptpay.png") || "/assets/payment/promptpay.png",
-                    window.ASSET?.payment?.("scb.png") || "/assets/payment/scb.png"
-                ]
-            };
-
-            function renderPaymentLogos() {
-                const region =
-                    window.AZIEL?.getRegion?.() ||
-                    window.AZIEL?.getShopRegion?.() ||
-                    localStorage.getItem("selectedRegion") ||
-                    localStorage.getItem("region") ||
-                    "MM";
-
-                box.innerHTML = "";
-
-                (logos[region] || logos.MM).forEach(src => {
-                    const img = document.createElement("img");
-                    img.src = src;
-                    img.alt = "Payment";
-                    box.appendChild(img);
-                });
-            }
-
-            renderPaymentLogos();
-            window.addEventListener("aziel:shopRegionChanged", renderPaymentLogos);
-        });
-    </script>
-
-    <script>
+<script>
         document.addEventListener("DOMContentLoaded", () => {
             const banner = document.getElementById("gameBanner");
             if (banner) {

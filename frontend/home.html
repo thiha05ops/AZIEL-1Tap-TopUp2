@@ -329,7 +329,7 @@
         </div>
 
         <div>
-            <h4 data-i18n="paymentMethods">Payment Methods</h4>
+            <h4 data-i18n="footer_supported_payments">Supported Payments</h4>
             <div class="payment-logos" id="footerPaymentLogos" aria-label="Accepted payment methods"></div>
         </div>
 
@@ -423,65 +423,8 @@
     <!-- =======================================
     PWA
     ======================================= -->
+    <script src="/js/payment-trust-display.js?v=20260722-region-trust"></script>
     <script src="/js/pwa-fix.js"></script>
-
-    <!-- Footer Payment Logos -->
-    <script>
-        document.addEventListener("DOMContentLoaded", () => {
-
-            const box = document.getElementById("footerPaymentLogos");
-            if (!box) return;
-
-            const region =
-                window.AZIEL?.getRegion?.() ||
-                localStorage.getItem("selectedRegion") ||
-                localStorage.getItem("region") ||
-                "MM";
-
-            const logos = {
-                MM: [
-                    window.ASSET?.payment?.("kbzpay.png") || "assets/payment/kbzpay.png",
-                    window.ASSET?.payment?.("wavepay.png") || "assets/payment/wavepay.png",
-                    window.ASSET?.payment?.("ayapay.png") || "assets/payment/ayapay.png"
-                ],
-                TH: [
-                    window.ASSET?.payment?.("promptpay.png") || "assets/payment/promptpay.png",
-                    window.ASSET?.payment?.("scb.png") || "assets/payment/scb.png"
-                ]
-            };
-
-            function renderPaymentLogos() {
-
-                const currentRegion =
-                    window.AZIEL?.getRegion?.() ||
-                    localStorage.getItem("selectedRegion") ||
-                    localStorage.getItem("region") ||
-                    "MM";
-
-                box.innerHTML = "";
-
-                (logos[currentRegion] || logos.MM).forEach(src => {
-
-                    const img = document.createElement("img");
-
-                    img.src = src;
-                    img.alt = "Payment";
-
-                    box.appendChild(img);
-
-                });
-
-            }
-
-            renderPaymentLogos();
-
-            window.addEventListener(
-                "aziel:shopRegionChanged",
-                renderPaymentLogos
-            );
-
-        });
-    </script>
 
 
 </body>

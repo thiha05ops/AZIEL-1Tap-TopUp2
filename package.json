@@ -89,6 +89,7 @@
     "verify:admin-payment-deeplink-tester": "node backend/scripts/verify-admin-payment-deeplink-tester.js",
     "verify:android-bank-app-launch": "node backend/scripts/verify-android-bank-app-launch.js",
     "verify:thailand-payment-normalization": "node backend/scripts/verify-thailand-payment-normalization.js",
+    "verify:promptpay-consolidation": "node backend/scripts/verify-promptpay-consolidation.js",
     "verify:i18n": "node backend/scripts/verify-i18n-coverage.js",
     "verify:pwa-icons": "node backend/scripts/verify-pwa-icons.js"
   },

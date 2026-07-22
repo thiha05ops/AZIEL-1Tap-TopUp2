@@ -30,6 +30,7 @@ function main() {
         "K PLUS",
         "KBZPay",
         "Krungsri",
+        "Krungthai NEXT",
         "MMQR",
         "Manual Bank Transfer",
         "PromptPay",
@@ -54,6 +55,7 @@ function main() {
         ["bangkok_bank", "Bangkok Bank"],
         ["kplus", "K PLUS"],
         ["krungsri", "Krungsri"],
+        ["krungthai", "Krungthai NEXT"],
         ["mmqr", "MMQR"],
         ["manual_bank", "Manual Bank Transfer"]
     ].forEach(([input, expected]) => {
@@ -73,6 +75,7 @@ function main() {
         "Bangkok Bank",
         "K PLUS",
         "Krungsri",
+        "Krungthai NEXT",
         "MMQR",
         "Manual Bank Transfer",
         "AZIEL Wallet",

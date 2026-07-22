@@ -36,12 +36,14 @@ async function loadPaymentMethods() {
             throw new Error(data.message || "Failed to load payment methods");
         }
 
-        let methods = Array.isArray(data.methods) ? data.methods : [];
+        const rawMethods = Array.isArray(data.methods) ? data.methods : [];
+        let methods = rawMethods;
         methods = uniquePaymentMethodsByKey(methods)
             .filter(method => method.enabled === true)
+            .filter(method => !isStandaloneThaiBankPaymentMethod(method))
             .filter(isPublicPaymentMethodUsable)
             .sort(sortPaymentMethods);
-        window.AZIEL_TH_BANK_APPS = getConfiguredThaiBankApps(methods);
+        window.AZIEL_TH_BANK_APPS = getConfiguredThaiBankApps(rawMethods);
 
         if (!methods.some(method => normalizePaymentKey(method.key) === "wallet")) {
             methods.push(getWalletMethod(region));
@@ -70,6 +72,19 @@ async function loadPaymentMethods() {
 }
 
 function getConfiguredThaiBankApps(methods = []) {
+    const promptPay = methods.find(method =>
+        String(method.region || "").toUpperCase() === "TH" &&
+        normalizePaymentKey(method.key || method.method || "") === "promptpay"
+    );
+    const promptPayLaunchers = window.AZIEL_PAYMENT_TRUST?.normalizePromptPayLaunchers?.(
+        promptPay?.bankLaunchers || [],
+        promptPay || { region: "TH" }
+    ) || [];
+
+    if (promptPayLaunchers.length) {
+        return promptPayLaunchers;
+    }
+
     return methods
         .filter(method => String(method.region || "").toUpperCase() === "TH")
         .filter(method => {
@@ -77,6 +92,7 @@ function getConfiguredThaiBankApps(methods = []) {
             const type = String(method.paymentType || "").toLowerCase();
             const provider = normalizePaymentKey(method.provider || "");
             return key !== "promptpay" &&
+            key !== "kplus" &&
                 key !== "wallet" &&
                 provider !== "wallet" &&
                 method.enableOpenApp === true &&
@@ -94,12 +110,21 @@ function getConfiguredThaiBankApps(methods = []) {
             iosAppLaunchUrl: method.iosAppLaunchUrl || "",
             androidAppLaunchUrl: method.androidAppLaunchUrl || "",
             androidPackageName: method.androidPackageName || "",
-            appStoreUrl: method.appStoreUrl || "",
-            playStoreUrl: method.playStoreUrl || "",
-            appStoreFallbackUrl: method.appStoreFallbackUrl || "",
-            playStoreFallbackUrl: method.playStoreFallbackUrl || ""
-        }))
-        .sort((a, b) => String(a.label).localeCompare(String(b.label)));
+                appStoreUrl: method.appStoreUrl || "",
+                playStoreUrl: method.playStoreUrl || "",
+                appStoreFallbackUrl: method.appStoreFallbackUrl || "",
+                playStoreFallbackUrl: method.playStoreFallbackUrl || "",
+                sortOrder: Number(method.sortOrder || 0)
+            }))
+        .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0) || String(a.label).localeCompare(String(b.label)));
+}
+
+function isStandaloneThaiBankPaymentMethod(method = {}) {
+    const region = String(method.region || "").toUpperCase();
+    if (region !== "TH") return false;
+    return ["scb", "bangkokbank", "kplus", "krungsri", "krungthai"].includes(
+        normalizePaymentKey(method.key || method.provider || method.method || "")
+    );
 }
 
 function sortPaymentMethods(a = {}, b = {}) {
@@ -231,14 +256,25 @@ function buildPaymentCard(method, index) {
     card.dataset.autoVerificationSupported = String(method.autoVerificationSupported === true);
     card.dataset.webhookSupported = String(method.webhookSupported === true);
     card.dataset.checklistSteps = JSON.stringify(Array.isArray(method.checklistSteps) ? method.checklistSteps : []);
+    card.dataset.bankLaunchers = JSON.stringify(Array.isArray(method.bankLaunchers) ? method.bankLaunchers : []);
+
+    const isPromptPay = String(region).toUpperCase() === "TH" && key === "promptpay";
+    const title = isPromptPay
+        ? translatePaymentText("payment_promptpay_qr", "PromptPay QR")
+        : displayName;
+    const description = isPromptPay
+        ? translatePaymentText("payment_promptpay_any_thai_bank", method.shortDescription || "Pay with any Thai banking app")
+        : method.shortDescription;
+    const bankChips = isPromptPay ? renderPromptPayBankChips(method.bankLaunchers || [], method) : "";
 
     card.innerHTML = `
-        <img src="${logo}" class="pay-logo" alt="${displayName}" onerror="this.src='assets/payment/payment-neutral.svg'">
+        <img src="${logo}" class="pay-logo" alt="${title}" onerror="this.src='assets/payment/payment-neutral.svg'">
 
         <div class="pay-info">
-            <span>${displayName}</span>
+            <span>${title}</span>
             ${getPaymentBadge(paymentType, method.badgeText)}
-            ${method.shortDescription ? `<small class="pay-description">${method.shortDescription}</small>` : ""}
+            ${description ? `<small class="pay-description">${description}</small>` : ""}
+            ${bankChips}
             ${method.maintenanceMessage ? `<small class="pay-message">${method.maintenanceMessage}</small>` : ""}
         </div>
     `;
@@ -319,6 +355,9 @@ function selectPaymentCard(card) {
         slipRequired: originalMethod.slipRequired !== false && card.dataset.slipRequired !== "false",
         autoVerificationSupported: originalMethod.autoVerificationSupported === true || card.dataset.autoVerificationSupported === "true",
         webhookSupported: originalMethod.webhookSupported === true || card.dataset.webhookSupported === "true",
+        bankLaunchers: Array.isArray(originalMethod.bankLaunchers)
+            ? originalMethod.bankLaunchers
+            : parseChecklistSteps(card.dataset.bankLaunchers),
         checklistSteps: Array.isArray(originalMethod.checklistSteps)
             ? originalMethod.checklistSteps
             : parseChecklistSteps(card.dataset.checklistSteps)
@@ -364,8 +403,53 @@ function normalizeSelectedPaymentMethod(method = {}, overrides = {}) {
         playStoreFallbackUrl: method.playStoreFallbackUrl || "",
         qrMode: method.qrMode || "",
         receiptUploadEnabled: method.receiptUploadEnabled !== false,
+        bankLaunchers: Array.isArray(method.bankLaunchers) ? method.bankLaunchers : [],
         checklistSteps: Array.isArray(method.checklistSteps) ? method.checklistSteps : []
     };
+}
+
+function translatePaymentText(key, fallback = "") {
+    const translated = window.AZIEL_I18N?.t?.(key, fallback);
+    if (translated && translated !== key) return translated;
+    const storage = window.localStorage;
+    const lang =
+        storage?.getItem("azielLanguage") ||
+        storage?.getItem("azielLang") ||
+        storage?.getItem("aziel_lang") ||
+        storage?.getItem("language") ||
+        storage?.getItem("selectedLanguage") ||
+        document.documentElement?.lang ||
+        "en";
+    return window.AZIEL_LANG?.[lang]?.[key] || window.AZIEL_LANG?.en?.[key] || fallback;
+}
+
+function renderPromptPayBankChips(launchers = [], parent = {}) {
+    const enabled = window.AZIEL_PAYMENT_TRUST?.normalizePromptPayLaunchers?.(launchers, parent) ||
+        (Array.isArray(launchers)
+            ? launchers.filter(app => app && app.enabled !== false && normalizePaymentKey(app.key) !== "kplus")
+            : []);
+    const visible = enabled;
+    const mobileOverflow = Math.max(0, enabled.length - 3);
+    if (!visible.length) return "";
+    return `
+        <div class="pay-bank-chips" aria-label="${translatePaymentText("payment_supported_banks", "Supported banks")}">
+            ${visible.map(app => `
+                <span class="pay-bank-chip" title="${escapeHTML(app.label || app.displayName || app.appDisplayName || "Bank")}">
+                    ${app.logoUrl || app.logo ? `<img src="${escapeHTML(app.logoUrl || app.logo)}" alt="" aria-hidden="true">` : ""}
+                </span>
+            `).join("")}
+            ${mobileOverflow ? `<span class="pay-bank-chip pay-bank-chip--mobile-more" aria-label="${mobileOverflow} more supported bank">+${mobileOverflow}</span>` : ""}
+        </div>
+    `;
+}
+
+function escapeHTML(value) {
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
 }
 
 function parseChecklistSteps(value) {

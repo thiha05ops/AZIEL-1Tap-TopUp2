@@ -53,8 +53,12 @@ function main() {
     includes("frontend/js/payment/payment-checkout-sheet.js", "Open your banking app and import the saved QR", "Bank chooser must provide safe fallback instructions.");
     notIncludes("frontend/js/payment/payment-checkout-sheet.js", 'paymentStatus: "paid"', "Checkout sheet must not mark manual payments paid.");
 
-    assert(paymentMethodsRoute.includes('qrMode: "aziel_promptpay_dynamic"'), "Thailand bank defaults must support AZIEL dynamic PromptPay mode.");
-    assert(paymentMethodsRoute.includes('confirmationMode: "provider_webhook"'), "Provider-generated PromptPay mode must use provider webhook confirmation.");
+    assert(paymentMethodsRoute.includes('method: "PromptPay QR"'), "PromptPay must be the customer-facing Thailand payment method.");
+    assert(paymentMethodsRoute.includes('openAppMode: "bank_chooser"'), "PromptPay must own bank chooser mode.");
+    assert(paymentMethodsRoute.includes('appLaunchMode: "APP_ONLY"'), "Bank launches must be app-only scan guidance.");
+    assert(paymentMethodsRoute.includes('qrMode: "aziel_promptpay_dynamic"'), "PromptPay must support AZIEL dynamic PromptPay mode.");
+    assert(paymentMethodsRoute.includes('confirmationMode: "manual_admin"'), "PromptPay manual dynamic flow must use admin verification.");
+    assert(paymentMethodsRoute.includes("THAI_STANDALONE_BANK_KEYS"), "Legacy standalone bank methods must be hidden from storefront.");
 
     console.log("Thailand payment normalization verification passed.");
 }

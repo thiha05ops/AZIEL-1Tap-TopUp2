@@ -513,6 +513,8 @@ function renderAdminPaymentMethods(methods) {
                     </div>
                 </div>
 
+                ${method.key === "promptpay" ? renderPromptPayBankLauncherEditor(method) : ""}
+
                 <div class="payment-capability-details">
                     <h5>Customer Actions</h5>
 
@@ -598,6 +600,141 @@ function renderAdminPaymentMethods(methods) {
     }).join("");
 
     bindAdminPaymentActions();
+}
+
+function renderPromptPayBankLauncherEditor(method = {}) {
+    const launchers = Array.isArray(method.bankLaunchers) && method.bankLaunchers.length
+        ? method.bankLaunchers
+        : defaultPromptPayBankLaunchers();
+
+    return `
+        <section class="payment-config-section pm-bank-launcher-section">
+            <h5>Supported Banking Apps</h5>
+            <p class="payment-section-help">PromptPay remains the payment method. These banks are app launchers for QR gallery scanning only.</p>
+            <div class="pm-bank-launcher-list">
+                ${launchers.map(renderBankLauncherRow).join("")}
+            </div>
+            <div class="pm-bank-launcher-preview">
+                <strong>Customer bank chooser</strong>
+                <span>Only enabled verified banking apps appear. K PLUS remains hidden.</span>
+            </div>
+        </section>
+    `;
+}
+
+function defaultPromptPayBankLaunchers() {
+    return [
+        {
+            key: "scb",
+            displayName: "SCB EASY",
+            logoUrl: "/assets/payment/scb.png",
+            enabled: true,
+            sortOrder: 10,
+            androidPackageName: "com.scb.phone",
+            androidAppLaunchUrl: "intent://#Intent;scheme=scbeasy;package=com.scb.phone;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.scb.phone;end",
+            playStoreFallbackUrl: "https://play.google.com/store/apps/details?id=com.scb.phone",
+            iosAppLaunchUrl: "scbeasy://",
+            appStoreFallbackUrl: "",
+            verificationStatus: "verified",
+            operatorNotes: ""
+        },
+        {
+            key: "bangkok_bank",
+            displayName: "Bangkok Bank Mobile Banking",
+            logoUrl: "/assets/payment/bank-neutral.svg",
+            enabled: true,
+            sortOrder: 20,
+            androidPackageName: "com.bbl.mobilebanking",
+            androidAppLaunchUrl: "intent://#Intent;scheme=bualuangmbanking;package=com.bbl.mobilebanking;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.bbl.mobilebanking;end",
+            playStoreFallbackUrl: "https://play.google.com/store/apps/details?id=com.bbl.mobilebanking",
+            iosAppLaunchUrl: "bualuangmbanking://",
+            appStoreFallbackUrl: "",
+            verificationStatus: "verified",
+            operatorNotes: ""
+        },
+        {
+            key: "krungsri",
+            displayName: "Krungsri",
+            logoUrl: "/assets/payment/bank-neutral.svg",
+            enabled: true,
+            sortOrder: 30,
+            androidPackageName: "com.krungsri.kma",
+            androidAppLaunchUrl: "intent://openpage-landing#Intent;scheme=krungsri-kma;package=com.krungsri.kma;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.krungsri.kma;end",
+            playStoreFallbackUrl: "https://play.google.com/store/apps/details?id=com.krungsri.kma",
+            iosAppLaunchUrl: "krungsri-kma://openpage-landing",
+            appStoreFallbackUrl: "",
+            verificationStatus: "verified",
+            operatorNotes: ""
+        },
+        {
+            key: "krungthai",
+            displayName: "Krungthai NEXT",
+            logoUrl: "/assets/payment/bank-neutral.svg",
+            enabled: true,
+            sortOrder: 40,
+            androidPackageName: "ktbcs.netbank",
+            androidAppLaunchUrl: "intent://#Intent;scheme=ktb-next;package=ktbcs.netbank;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dktbcs.netbank;end",
+            playStoreFallbackUrl: "https://play.google.com/store/apps/details?id=ktbcs.netbank",
+            iosAppLaunchUrl: "ktbnext://",
+            appStoreFallbackUrl: "",
+            verificationStatus: "verified",
+            operatorNotes: ""
+        }
+    ];
+}
+
+function renderBankLauncherRow(launcher = {}) {
+    return `
+        <div class="pm-bank-launcher-row" data-bank-launcher="${escapeAdminHTML(launcher.key || "")}">
+            <div class="settings-row capability-grid">
+                ${capabilityToggle("pm-bank-launcher-enabled", `${escapeAdminHTML(launcher.displayName || launcher.key || "Bank")} Enabled`, launcher.enabled !== false)}
+            </div>
+            <div class="settings-row">
+                <div><label>Display Name</label><small>Customer-facing app name</small></div>
+                <input class="pm-bank-launcher-name" type="text" value="${escapeAdminHTML(launcher.displayName || "")}">
+            </div>
+            <div class="settings-row">
+                <div><label>Logo URL</label><small>Small bank logo shown in chooser</small></div>
+                <input class="pm-bank-launcher-logo" type="text" value="${escapeAdminHTML(launcher.logoUrl || "")}">
+            </div>
+            <div class="settings-row">
+                <div><label>Sort Order</label><small>Lower numbers appear first</small></div>
+                <input class="pm-bank-launcher-sort" type="number" step="1" value="${escapeAdminHTML(launcher.sortOrder || 0)}">
+            </div>
+            <div class="settings-row">
+                <div><label>Android Package</label><small>Package identity for generated intents</small></div>
+                <input class="pm-bank-launcher-android-package" type="text" value="${escapeAdminHTML(launcher.androidPackageName || "")}">
+            </div>
+            <div class="settings-row">
+                <div><label>Android Launch URL</label><small>Explicit Android intent or app URL</small></div>
+                <input class="pm-bank-launcher-android-url" type="text" value="${escapeAdminHTML(launcher.androidAppLaunchUrl || "")}">
+            </div>
+            <div class="settings-row">
+                <div><label>Play Store Fallback</label><small>HTTPS fallback when app is unavailable</small></div>
+                <input class="pm-bank-launcher-play-store" type="text" value="${escapeAdminHTML(launcher.playStoreFallbackUrl || "")}">
+            </div>
+            <div class="settings-row">
+                <div><label>iOS Launch URL</label><small>Verified iOS app launcher URL</small></div>
+                <input class="pm-bank-launcher-ios-url" type="text" value="${escapeAdminHTML(launcher.iosAppLaunchUrl || "")}">
+            </div>
+            <div class="settings-row">
+                <div><label>App Store Fallback</label><small>Optional iOS store fallback</small></div>
+                <input class="pm-bank-launcher-app-store" type="text" value="${escapeAdminHTML(launcher.appStoreFallbackUrl || "")}">
+            </div>
+            <div class="settings-row">
+                <div><label>Verification Status</label><small>Only verified/enabled apps appear publicly</small></div>
+                <select class="pm-bank-launcher-status">
+                    <option value="verified" ${launcher.verificationStatus !== "unverified" && launcher.verificationStatus !== "failed" ? "selected" : ""}>Verified</option>
+                    <option value="unverified" ${launcher.verificationStatus === "unverified" ? "selected" : ""}>Unverified</option>
+                    <option value="failed" ${launcher.verificationStatus === "failed" ? "selected" : ""}>Failed</option>
+                </select>
+            </div>
+            <div class="settings-row">
+                <div><label>Operator Notes</label><small>Internal launcher notes</small></div>
+                <textarea class="pm-bank-launcher-notes">${escapeAdminHTML(launcher.operatorNotes || "")}</textarea>
+            </div>
+        </div>
+    `;
 }
 
 function formatPaymentName(value) {
@@ -1548,11 +1685,28 @@ async function saveAdminPaymentMethod(id) {
         webhookSupported: card.querySelector(".pm-webhook")?.checked || false,
         confirmationMode: card.querySelector(".pm-confirmation-mode")?.value || "manual_admin",
         checklistSteps: collectChecklistSteps(card),
+        bankLaunchers: collectBankLaunchers(card),
         sortOrder: Number(card.querySelector(".pm-sort-order")?.value || 0)
     };
 
-    if (card.dataset.key === "promptpay" && payload.provider === "promptpay" && payload.region === "TH" && payload.qrMode !== "aziel_promptpay_dynamic") {
-        payload.paymentType = "auto";
+    if (card.dataset.key === "promptpay" && payload.provider === "promptpay" && payload.region === "TH") {
+        payload.method = payload.method || "PromptPay QR";
+        payload.paymentType = "manual";
+        payload.qrMode = "aziel_promptpay_dynamic";
+        payload.openAppMode = "bank_chooser";
+        payload.appLaunchMode = "APP_ONLY";
+        payload.confirmationMode = "manual_admin";
+        payload.receiptUploadEnabled = true;
+        payload.slipRequired = true;
+        payload.enableSaveQr = true;
+        payload.enableOpenApp = true;
+        payload.enableChecklist = true;
+        payload.dynamicQrSupported = true;
+        payload.amountPrefillSupported = true;
+        payload.referenceSupported = true;
+        payload.galleryScanSupported = true;
+        payload.autoVerificationSupported = false;
+        payload.webhookSupported = false;
     }
 
     if (["scb", "bangkok_bank", "kplus", "krungsri", "krungthai"].includes(payload.provider) && payload.region === "TH" && payload.paymentType !== "manual") {
@@ -1622,8 +1776,28 @@ function collectAdminPaymentFormState(card) {
         slipRequired: card?.querySelector(".pm-slip-required")?.checked || false,
         receiptUploadEnabled: card?.querySelector(".pm-receipt-upload")?.checked || false,
         confirmationMode: card?.querySelector(".pm-confirmation-mode")?.value || "manual_admin",
+        bankLaunchers: collectBankLaunchers(card),
         checklistSteps: collectChecklistSteps(card)
     };
+}
+
+function collectBankLaunchers(card) {
+    return Array.from(card?.querySelectorAll(".pm-bank-launcher-row") || [])
+        .map(row => ({
+            key: row.getAttribute("data-bank-launcher") || "",
+            displayName: row.querySelector(".pm-bank-launcher-name")?.value || "",
+            logoUrl: row.querySelector(".pm-bank-launcher-logo")?.value || "",
+            enabled: row.querySelector(".pm-bank-launcher-enabled")?.checked || false,
+            sortOrder: Number(row.querySelector(".pm-bank-launcher-sort")?.value || 0),
+            androidPackageName: row.querySelector(".pm-bank-launcher-android-package")?.value || "",
+            androidAppLaunchUrl: row.querySelector(".pm-bank-launcher-android-url")?.value || "",
+            playStoreFallbackUrl: row.querySelector(".pm-bank-launcher-play-store")?.value || "",
+            iosAppLaunchUrl: row.querySelector(".pm-bank-launcher-ios-url")?.value || "",
+            appStoreFallbackUrl: row.querySelector(".pm-bank-launcher-app-store")?.value || "",
+            verificationStatus: row.querySelector(".pm-bank-launcher-status")?.value || "verified",
+            operatorNotes: row.querySelector(".pm-bank-launcher-notes")?.value || ""
+        }))
+        .filter(item => item.key && item.key !== "kplus");
 }
 
 async function addAdminPaymentMethod() {
@@ -1693,11 +1867,12 @@ async function addAdminPaymentMethod() {
 function getMethodChoices(region) {
     const choices = {
         TH: [
-            { key: "promptpay", label: "PromptPay", paymentType: "auto" },
+            { key: "promptpay", label: "PromptPay QR", paymentType: "manual" },
             { key: "scb", label: "SCB", paymentType: "deeplink" },
             { key: "bangkok_bank", label: "Bangkok Bank", paymentType: "deeplink" },
             { key: "kplus", label: "K PLUS", paymentType: "deeplink" },
             { key: "krungsri", label: "Krungsri", paymentType: "deeplink" },
+            { key: "krungthai", label: "Krungthai NEXT", paymentType: "deeplink" },
             { key: "wallet", label: "AZIEL Wallet", paymentType: "wallet" }
         ],
         MM: [
@@ -1788,7 +1963,7 @@ async function uploadAdminPaymentLogo(id) {
 
 function getPaymentTypeDescription(key, type, provider) {
     if (key === "promptpay" || normalizeAdminProvider(provider) === "promptpay") {
-        return "PromptPay auto payment via provider webhook.";
+        return "PromptPay QR with manual receipt upload and bank app chooser.";
     }
 
     if (type === "deeplink") {

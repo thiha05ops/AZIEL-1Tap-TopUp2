@@ -120,6 +120,20 @@ function hasAndroidLaunchCapability(method = {}) {
     );
 }
 
+function hasEnabledBankLauncher(method = {}) {
+    return Array.isArray(method.bankLaunchers) &&
+        method.bankLaunchers.some(item =>
+            item &&
+            item.enabled !== false &&
+            String(item.key || "").toLowerCase() !== "kplus" &&
+            String(item.verificationStatus || "verified").toLowerCase() !== "failed" &&
+            (
+                String(item.androidAppLaunchUrl || item.androidPackageName || "").trim() ||
+                String(item.iosAppLaunchUrl || "").trim()
+            )
+        );
+}
+
 function paymentMethodReadiness(method = {}) {
     const normalizedProvider = normalizeProviderKey(method.provider || method.key || "");
     const paymentType = String(method.paymentType || "manual").toLowerCase();
@@ -169,6 +183,8 @@ function paymentMethodReadiness(method = {}) {
             if (String(method.androidPackageName || "").trim() && !String(method.androidAppLaunchUrl || "").trim() && !String(method.playStoreFallbackUrl || method.playStoreUrl || "").trim()) {
                 missing.push("Play Store fallback URL");
             }
+        } else if (openAppMode === "bank_chooser" && !hasEnabledBankLauncher(method)) {
+            missing.push("bank launcher options");
         }
     }
 

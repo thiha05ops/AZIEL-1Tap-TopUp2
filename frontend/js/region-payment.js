@@ -43,13 +43,15 @@ async function loadDynamicPaymentMethods(region) {
         const res = await fetch(`${API_BASE}/api/payment-methods?region=${region}`);
         const data = await res.json();
 
+        const rawMethods = Array.isArray(data.methods) ? data.methods : [];
         const methods = Array.isArray(data.methods)
-            ? uniqueRegionPaymentMethodsByKey(data.methods)
+            ? uniqueRegionPaymentMethodsByKey(rawMethods)
                 .filter(method => method.enabled)
+                .filter(method => !isStandaloneThaiBankPaymentMethod(method))
                 .filter(isRegionPaymentMethodUsable)
                 .sort(sortRegionPaymentMethods)
             : [];
-        window.AZIEL_TH_BANK_APPS = getConfiguredRegionThaiBankApps(methods);
+        window.AZIEL_TH_BANK_APPS = getConfiguredRegionThaiBankApps(rawMethods);
 
         paymentGrid.innerHTML = "";
 
@@ -112,14 +114,24 @@ async function loadDynamicPaymentMethods(region) {
             card.dataset.autoVerificationSupported = String(pay.autoVerificationSupported === true);
             card.dataset.webhookSupported = String(pay.webhookSupported === true);
             card.dataset.checklistSteps = JSON.stringify(Array.isArray(pay.checklistSteps) ? pay.checklistSteps : []);
+            card.dataset.bankLaunchers = JSON.stringify(Array.isArray(pay.bankLaunchers) ? pay.bankLaunchers : []);
             card.dataset.shortDescription = pay.shortDescription || "";
             card.dataset.badgeText = pay.badgeText || "";
 
+            const isPromptPay = String(region).toUpperCase() === "TH" && key === "promptpay";
+            const title = isPromptPay
+                ? translatePaymentText("payment_promptpay_qr", "PromptPay QR")
+                : name;
+            const description = isPromptPay
+                ? translatePaymentText("payment_promptpay_any_thai_bank", pay.shortDescription || "Pay with any Thai banking app")
+                : pay.shortDescription;
+
             card.innerHTML = `
-                <img src="${logo}" alt="${name}">
-                <span>${name}</span>
+                <img src="${logo}" alt="${title}">
+                <span>${title}</span>
                 ${pay.badgeText ? `<small>${pay.badgeText}</small>` : ""}
-                ${pay.shortDescription ? `<small>${pay.shortDescription}</small>` : ""}
+                ${description ? `<small>${description}</small>` : ""}
+                ${isPromptPay ? renderPromptPayBankChips(pay.bankLaunchers || [], pay) : ""}
                 ${pay.maintenanceMessage
                     ? `<small>${pay.maintenanceMessage}</small>`
                     : ""
@@ -162,6 +174,19 @@ function uniqueRegionPaymentMethodsByKey(methods = []) {
 }
 
 function getConfiguredRegionThaiBankApps(methods = []) {
+    const promptPay = methods.find(method =>
+        String(method.region || "").toUpperCase() === "TH" &&
+        normalizePaymentKey(method.key || method.method || "") === "promptpay"
+    );
+    const promptPayLaunchers = window.AZIEL_PAYMENT_TRUST?.normalizePromptPayLaunchers?.(
+        promptPay?.bankLaunchers || [],
+        promptPay || { region: "TH" }
+    ) || [];
+
+    if (promptPayLaunchers.length) {
+        return promptPayLaunchers;
+    }
+
     return methods
         .filter(method => String(method.region || "").toUpperCase() === "TH")
         .filter(method => {
@@ -169,6 +194,7 @@ function getConfiguredRegionThaiBankApps(methods = []) {
             const type = String(method.paymentType || "").toLowerCase();
             const provider = normalizePaymentKey(method.provider || "");
             return key !== "promptpay" &&
+                key !== "kplus" &&
                 key !== "wallet" &&
                 provider !== "wallet" &&
                 method.enableOpenApp === true &&
@@ -189,9 +215,18 @@ function getConfiguredRegionThaiBankApps(methods = []) {
             appStoreUrl: method.appStoreUrl || "",
             playStoreUrl: method.playStoreUrl || "",
             appStoreFallbackUrl: method.appStoreFallbackUrl || "",
-            playStoreFallbackUrl: method.playStoreFallbackUrl || ""
+            playStoreFallbackUrl: method.playStoreFallbackUrl || "",
+            sortOrder: Number(method.sortOrder || 0)
         }))
-        .sort((a, b) => String(a.label).localeCompare(String(b.label)));
+        .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0) || String(a.label).localeCompare(String(b.label)));
+}
+
+function isStandaloneThaiBankPaymentMethod(method = {}) {
+    const region = String(method.region || "").toUpperCase();
+    if (region !== "TH") return false;
+    return ["scb", "bangkokbank", "kplus", "krungsri", "krungthai"].includes(
+        normalizePaymentKey(method.key || method.provider || method.method || "")
+    );
 }
 
 function isRegionPaymentMethodUsable(method = {}) {
@@ -259,6 +294,9 @@ function selectPaymentCard(card) {
         slipRequired: originalMethod.slipRequired !== false && card.dataset.slipRequired !== "false",
         autoVerificationSupported: originalMethod.autoVerificationSupported === true || card.dataset.autoVerificationSupported === "true",
         webhookSupported: originalMethod.webhookSupported === true || card.dataset.webhookSupported === "true",
+        bankLaunchers: Array.isArray(originalMethod.bankLaunchers)
+            ? originalMethod.bankLaunchers
+            : parseRegionChecklistSteps(card.dataset.bankLaunchers),
         checklistSteps: Array.isArray(originalMethod.checklistSteps)
             ? originalMethod.checklistSteps
             : parseRegionChecklistSteps(card.dataset.checklistSteps)
@@ -289,8 +327,44 @@ function normalizeSelectedRegionPayment(method = {}, overrides = {}) {
         playStoreFallbackUrl: method.playStoreFallbackUrl || "",
         qrMode: method.qrMode || "",
         receiptUploadEnabled: method.receiptUploadEnabled !== false,
+        bankLaunchers: Array.isArray(method.bankLaunchers) ? method.bankLaunchers : [],
         checklistSteps: Array.isArray(method.checklistSteps) ? method.checklistSteps : []
     };
+}
+
+function translatePaymentText(key, fallback = "") {
+    const translated = window.AZIEL_I18N?.t?.(key, fallback);
+    if (translated && translated !== key) return translated;
+    const storage = window.localStorage;
+    const lang =
+        storage?.getItem("azielLanguage") ||
+        storage?.getItem("azielLang") ||
+        storage?.getItem("aziel_lang") ||
+        storage?.getItem("language") ||
+        storage?.getItem("selectedLanguage") ||
+        document.documentElement?.lang ||
+        "en";
+    return window.AZIEL_LANG?.[lang]?.[key] || window.AZIEL_LANG?.en?.[key] || fallback;
+}
+
+function renderPromptPayBankChips(launchers = [], parent = {}) {
+    const enabled = window.AZIEL_PAYMENT_TRUST?.normalizePromptPayLaunchers?.(launchers, parent) ||
+        (Array.isArray(launchers)
+            ? launchers.filter(app => app && app.enabled !== false && normalizePaymentKey(app.key) !== "kplus")
+            : []);
+    const visible = enabled;
+    const mobileOverflow = Math.max(0, enabled.length - 3);
+    if (!visible.length) return "";
+    return `
+        <div class="pay-bank-chips" aria-label="${translatePaymentText("payment_supported_banks", "Supported banks")}">
+            ${visible.map(app => `
+                <span class="pay-bank-chip" title="${escapeHTML(app.label || app.displayName || app.appDisplayName || "Bank")}">
+                    ${app.logoUrl || app.logo ? `<img src="${escapeHTML(app.logoUrl || app.logo)}" alt="" aria-hidden="true">` : ""}
+                </span>
+            `).join("")}
+            ${mobileOverflow ? `<span class="pay-bank-chip pay-bank-chip--mobile-more" aria-label="${mobileOverflow} more supported bank">+${mobileOverflow}</span>` : ""}
+        </div>
+    `;
 }
 
 function parseRegionChecklistSteps(value) {
@@ -367,6 +441,15 @@ function normalizeAssetPath(path) {
     path = path.replace(/^frontend\//, "");
 
     return path;
+}
+
+function escapeHTML(value) {
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
 }
 
 function updatePaymentPreview(card) {

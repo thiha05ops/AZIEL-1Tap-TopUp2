@@ -47,12 +47,75 @@ const CANONICAL_PROVIDER_BY_KEY = Object.freeze({
 const CHECKLIST_ACTIONS = new Set([
     "save_qr",
     "open_app",
+    "scan_saved_qr",
     "upload_receipt",
     "wait_for_confirmation",
     "confirm_payment"
 ]);
 
 const OPEN_APP_MODES = new Set(["direct", "bank_chooser", "disabled"]);
+const THAI_PROMPTPAY_LAUNCHER_KEYS = new Set(["scb", "bangkok_bank", "krungsri", "krungthai"]);
+const THAI_STANDALONE_BANK_KEYS = new Set(["scb", "bangkok_bank", "kplus", "krungsri", "krungthai"]);
+const PUBLIC_LAUNCHER_STATUSES = new Set(["", "verified", "usable", "ready", "active"]);
+
+const defaultPromptPayBankLaunchers = Object.freeze([
+    {
+        key: "scb",
+        displayName: "SCB EASY",
+        logoUrl: "/assets/payment/scb.png",
+        enabled: true,
+        sortOrder: 10,
+        androidPackageName: "com.scb.phone",
+        androidAppLaunchUrl: "intent://#Intent;scheme=scbeasy;package=com.scb.phone;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.scb.phone;end",
+        playStoreFallbackUrl: "https://play.google.com/store/apps/details?id=com.scb.phone",
+        iosAppLaunchUrl: "scbeasy://",
+        appStoreFallbackUrl: "",
+        verificationStatus: "verified",
+        operatorNotes: "Launcher opens SCB EASY for gallery QR scan guidance."
+    },
+    {
+        key: "bangkok_bank",
+        displayName: "Bangkok Bank Mobile Banking",
+        logoUrl: "/assets/payment/bank-neutral.svg",
+        enabled: true,
+        sortOrder: 20,
+        androidPackageName: "com.bbl.mobilebanking",
+        androidAppLaunchUrl: "intent://#Intent;scheme=bualuangmbanking;package=com.bbl.mobilebanking;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.bbl.mobilebanking;end",
+        playStoreFallbackUrl: "https://play.google.com/store/apps/details?id=com.bbl.mobilebanking",
+        iosAppLaunchUrl: "bualuangmbanking://",
+        appStoreFallbackUrl: "",
+        verificationStatus: "verified",
+        operatorNotes: "Launcher opens Bangkok Bank app for gallery QR scan guidance."
+    },
+    {
+        key: "krungsri",
+        displayName: "Krungsri",
+        logoUrl: "/assets/payment/bank-neutral.svg",
+        enabled: true,
+        sortOrder: 30,
+        androidPackageName: "com.krungsri.kma",
+        androidAppLaunchUrl: "intent://openpage-landing#Intent;scheme=krungsri-kma;package=com.krungsri.kma;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.krungsri.kma;end",
+        playStoreFallbackUrl: "https://play.google.com/store/apps/details?id=com.krungsri.kma",
+        iosAppLaunchUrl: "krungsri-kma://openpage-landing",
+        appStoreFallbackUrl: "",
+        verificationStatus: "verified",
+        operatorNotes: "Launcher opens Krungsri for gallery QR scan guidance."
+    },
+    {
+        key: "krungthai",
+        displayName: "Krungthai NEXT",
+        logoUrl: "/assets/payment/bank-neutral.svg",
+        enabled: true,
+        sortOrder: 40,
+        androidPackageName: "ktbcs.netbank",
+        androidAppLaunchUrl: "intent://#Intent;scheme=ktb-next;package=ktbcs.netbank;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dktbcs.netbank;end",
+        playStoreFallbackUrl: "https://play.google.com/store/apps/details?id=ktbcs.netbank",
+        iosAppLaunchUrl: "ktbnext://",
+        appStoreFallbackUrl: "",
+        verificationStatus: "verified",
+        operatorNotes: "Launcher opens Krungthai NEXT for gallery QR scan guidance."
+    }
+]);
 
 const defaultMethods = [
     {
@@ -77,33 +140,36 @@ const defaultMethods = [
         provider: "ayapay"
     },
     {
-        method: "PromptPay",
+        method: "PromptPay QR",
         key: "promptpay",
         region: "TH",
-        paymentType: "auto",
+        paymentType: "manual",
         provider: "promptpay",
-        qrMode: "provider_generated",
-        receiptUploadEnabled: false,
-        confirmationMode: "provider_webhook",
-        openAppMode: "disabled",
-        badgeText: "Auto",
-        shortDescription: "Pay with PromptPay QR",
+        qrMode: "aziel_promptpay_dynamic",
+        receiptUploadEnabled: true,
+        confirmationMode: "manual_admin",
+        openAppMode: "bank_chooser",
+        appLaunchMode: "APP_ONLY",
+        badgeText: "QR",
+        shortDescription: "Pay with any Thai banking app",
         appDisplayName: "Banking App",
         enableSaveQr: true,
-        enableOpenApp: false,
+        enableOpenApp: true,
         enableChecklist: true,
         dynamicQrSupported: true,
         amountPrefillSupported: true,
         referenceSupported: true,
         galleryScanSupported: true,
-        slipRequired: false,
-        autoVerificationSupported: true,
-        webhookSupported: true,
+        slipRequired: true,
+        autoVerificationSupported: false,
+        webhookSupported: false,
         checklistSteps: [
             { key: "save_qr", label: "Save QR", action: "save_qr", enabled: true, sortOrder: 10 },
-            { key: "open_app", label: "Open banking app", action: "open_app", enabled: true, sortOrder: 20 },
-            { key: "wait_for_confirmation", label: "Wait for payment confirmation", action: "wait_for_confirmation", enabled: true, sortOrder: 30 }
+            { key: "open_app", label: "Open Banking App", action: "open_app", enabled: true, sortOrder: 20 },
+            { key: "scan_saved_qr", label: "Scan the saved QR and pay", action: "scan_saved_qr", enabled: true, sortOrder: 30 },
+            { key: "upload_receipt", label: "Upload payment receipt", action: "upload_receipt", enabled: true, sortOrder: 40 }
         ],
+        bankLaunchers: defaultPromptPayBankLaunchers,
         sortOrder: 10
     },
     {
@@ -173,6 +239,7 @@ const defaultMethods = [
         method: "K PLUS",
         key: "kplus",
         region: "TH",
+        enabled: false,
         paymentType: "deeplink",
         provider: "kplus",
         appDisplayName: "K PLUS",
@@ -423,6 +490,7 @@ function applySeedDefaultsWithoutOverwriting(method, item = {}) {
         "promptPayRecipientValue",
         "receiptUploadEnabled",
         "confirmationMode",
+        "bankLaunchers",
         "sortOrder"
     ].forEach(key => {
         applySeedDefaultIfMissing(method, key, item[key]);
@@ -488,6 +556,41 @@ function applyCompatibilityModes(method) {
     return method;
 }
 
+function applyPromptPayConsolidation(method) {
+    if (String(method.key || "").toLowerCase() !== "promptpay" || String(method.region || "").toUpperCase() !== "TH") {
+        return method;
+    }
+
+    method.method = "PromptPay QR";
+    method.paymentType = "manual";
+    method.provider = "promptpay";
+    method.qrMode = "aziel_promptpay_dynamic";
+    method.receiptUploadEnabled = true;
+    method.confirmationMode = "manual_admin";
+    method.openAppMode = "bank_chooser";
+    method.appLaunchMode = "APP_ONLY";
+    method.badgeText = method.badgeText || "QR";
+    method.shortDescription = method.shortDescription || "Pay with any Thai banking app";
+    method.appDisplayName = method.appDisplayName || "Banking App";
+    method.enableSaveQr = true;
+    method.enableOpenApp = true;
+    method.enableChecklist = true;
+    method.dynamicQrSupported = true;
+    method.amountPrefillSupported = true;
+    method.referenceSupported = true;
+    method.galleryScanSupported = true;
+    method.slipRequired = true;
+    method.autoVerificationSupported = false;
+    method.webhookSupported = false;
+    method.checklistSteps = [
+        { key: "save_qr", label: "Save QR", action: "save_qr", enabled: true, sortOrder: 10 },
+        { key: "open_app", label: "Open Banking App", action: "open_app", enabled: true, sortOrder: 20 },
+        { key: "scan_saved_qr", label: "Scan the saved QR and pay", action: "scan_saved_qr", enabled: true, sortOrder: 30 },
+        { key: "upload_receipt", label: "Upload payment receipt", action: "upload_receipt", enabled: true, sortOrder: 40 }
+    ];
+    return method;
+}
+
 function sanitizeChecklistSteps(value = []) {
     if (!Array.isArray(value)) return [];
 
@@ -511,6 +614,164 @@ function sanitizeChecklistSteps(value = []) {
         })
         .filter(Boolean)
         .sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+function sanitizeBankLaunchers(value = []) {
+    if (!Array.isArray(value)) return [];
+
+    const seen = new Set();
+    return value
+        .slice(0, 12)
+        .map(item => {
+            const key = normalizeProviderKey(item?.key || "");
+            if (!THAI_PROMPTPAY_LAUNCHER_KEYS.has(key) || seen.has(key)) return null;
+            seen.add(key);
+
+            const androidPackageName = safeAndroidPackageName(item?.androidPackageName || "");
+            const androidAppLaunchUrl = safeUrl(item?.androidAppLaunchUrl || "", { deeplink: true });
+            const playStoreFallbackUrl = safeUrl(item?.playStoreFallbackUrl || item?.playStoreUrl || "");
+            const iosAppLaunchUrl = safeUrl(item?.iosAppLaunchUrl || "", { deeplink: true });
+            const appStoreFallbackUrl = safeUrl(item?.appStoreFallbackUrl || item?.appStoreUrl || "");
+            const verificationStatus = safeText(item?.verificationStatus || "verified", 40).toLowerCase();
+
+            return {
+                key,
+                displayName: safeText(item?.displayName || item?.appDisplayName || getProviderLabel(key, "Banking App"), 80),
+                logoUrl: safePublicAssetUrl(item?.logoUrl || item?.logo || "") || getPaymentLogo({ key, provider: key }),
+                enabled: item?.enabled !== false && item?.enabled !== "false",
+                sortOrder: safeSortOrder(item?.sortOrder),
+                androidPackageName,
+                androidAppLaunchUrl,
+                playStoreFallbackUrl,
+                iosAppLaunchUrl,
+                appStoreFallbackUrl,
+                verificationStatus: verificationStatus || "verified",
+                operatorNotes: safeText(item?.operatorNotes || "", 240)
+            };
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.displayName.localeCompare(b.displayName));
+}
+
+function launcherFromPaymentMethod(method = {}, fallback = {}) {
+    const obj = typeof method.toObject === "function" ? method.toObject() : method;
+    const key = normalizeProviderKey(obj.key || obj.provider || fallback.key || "");
+    const fallbackUrl = fallback.playStoreFallbackUrl || "";
+    return sanitizeBankLaunchers([{
+        key,
+        displayName: obj.appDisplayName || obj.method || fallback.displayName || getProviderLabel(key, "Banking App"),
+        logoUrl: obj.logoUrl || fallback.logoUrl || "",
+        enabled: key !== "kplus" && obj.enabled === true && obj.enableOpenApp === true,
+        sortOrder: obj.sortOrder || fallback.sortOrder || 0,
+        androidPackageName: obj.androidPackageName || fallback.androidPackageName || "",
+        androidAppLaunchUrl: obj.androidAppLaunchUrl || fallback.androidAppLaunchUrl || "",
+        playStoreFallbackUrl: obj.playStoreFallbackUrl || obj.playStoreUrl || fallbackUrl,
+        iosAppLaunchUrl: obj.iosAppLaunchUrl || fallback.iosAppLaunchUrl || "",
+        appStoreFallbackUrl: obj.appStoreFallbackUrl || obj.appStoreUrl || fallback.appStoreFallbackUrl || "",
+        verificationStatus: obj.launcherVerificationStatus || fallback.verificationStatus || "verified",
+        operatorNotes: obj.launcherOperatorNotes || fallback.operatorNotes || ""
+    }])[0] || null;
+}
+
+function mergePromptPayLaunchers(existing = [], derived = []) {
+    const byKey = new Map();
+    sanitizeBankLaunchers(defaultPromptPayBankLaunchers).forEach(item => {
+        byKey.set(item.key, { ...item });
+    });
+    sanitizeBankLaunchers(derived).forEach(item => {
+        byKey.set(item.key, { ...byKey.get(item.key), ...item });
+    });
+    sanitizeBankLaunchers(existing).forEach(item => {
+        byKey.set(item.key, { ...byKey.get(item.key), ...item });
+    });
+    return sanitizeBankLaunchers(Array.from(byKey.values()))
+        .filter(item => item.key !== "kplus" && item.enabled === true && item.verificationStatus !== "failed");
+}
+
+async function syncPromptPayBankLaunchers() {
+    const promptPay = await PaymentMethod.findOne({ key: "promptpay", region: "TH" });
+    if (!promptPay) return;
+
+    const beforeState = JSON.stringify({
+        method: promptPay.method,
+        paymentType: promptPay.paymentType,
+        provider: promptPay.provider,
+        qrMode: promptPay.qrMode,
+        receiptUploadEnabled: promptPay.receiptUploadEnabled,
+        confirmationMode: promptPay.confirmationMode,
+        openAppMode: promptPay.openAppMode,
+        appLaunchMode: promptPay.appLaunchMode,
+        enableSaveQr: promptPay.enableSaveQr,
+        enableOpenApp: promptPay.enableOpenApp,
+        enableChecklist: promptPay.enableChecklist,
+        dynamicQrSupported: promptPay.dynamicQrSupported,
+        amountPrefillSupported: promptPay.amountPrefillSupported,
+        referenceSupported: promptPay.referenceSupported,
+        galleryScanSupported: promptPay.galleryScanSupported,
+        slipRequired: promptPay.slipRequired,
+        autoVerificationSupported: promptPay.autoVerificationSupported,
+        webhookSupported: promptPay.webhookSupported,
+        promptPayRecipientType: promptPay.promptPayRecipientType,
+        promptPayRecipientValue: promptPay.promptPayRecipientValue,
+        bankLaunchers: sanitizeBankLaunchers(promptPay.bankLaunchers || [])
+    });
+
+    const legacyBanks = await PaymentMethod.find({
+        region: "TH",
+        key: { $in: Array.from(THAI_PROMPTPAY_LAUNCHER_KEYS) }
+    });
+
+    const derived = legacyBanks
+        .map(bank => {
+            const fallback = defaultPromptPayBankLaunchers.find(item => item.key === bank.key) || {};
+            return launcherFromPaymentMethod(bank, fallback);
+        })
+        .filter(Boolean);
+
+    const merged = mergePromptPayLaunchers(promptPay.bankLaunchers || [], derived);
+    const recipientSource = legacyBanks.find(bank =>
+        String(bank.qrMode || "") === "aziel_promptpay_dynamic" &&
+        String(bank.promptPayRecipientType || "").trim() &&
+        String(bank.promptPayRecipientValue || "").trim()
+    );
+
+    if (!String(promptPay.promptPayRecipientType || "").trim() && recipientSource?.promptPayRecipientType) {
+        promptPay.promptPayRecipientType = recipientSource.promptPayRecipientType;
+    }
+    if (!String(promptPay.promptPayRecipientValue || "").trim() && recipientSource?.promptPayRecipientValue) {
+        promptPay.promptPayRecipientValue = recipientSource.promptPayRecipientValue;
+    }
+
+    applyPromptPayConsolidation(promptPay);
+    promptPay.bankLaunchers = merged;
+
+    const afterState = JSON.stringify({
+        method: promptPay.method,
+        paymentType: promptPay.paymentType,
+        provider: promptPay.provider,
+        qrMode: promptPay.qrMode,
+        receiptUploadEnabled: promptPay.receiptUploadEnabled,
+        confirmationMode: promptPay.confirmationMode,
+        openAppMode: promptPay.openAppMode,
+        appLaunchMode: promptPay.appLaunchMode,
+        enableSaveQr: promptPay.enableSaveQr,
+        enableOpenApp: promptPay.enableOpenApp,
+        enableChecklist: promptPay.enableChecklist,
+        dynamicQrSupported: promptPay.dynamicQrSupported,
+        amountPrefillSupported: promptPay.amountPrefillSupported,
+        referenceSupported: promptPay.referenceSupported,
+        galleryScanSupported: promptPay.galleryScanSupported,
+        slipRequired: promptPay.slipRequired,
+        autoVerificationSupported: promptPay.autoVerificationSupported,
+        webhookSupported: promptPay.webhookSupported,
+        promptPayRecipientType: promptPay.promptPayRecipientType,
+        promptPayRecipientValue: promptPay.promptPayRecipientValue,
+        bankLaunchers: sanitizeBankLaunchers(promptPay.bankLaunchers || [])
+    });
+
+    if (beforeState !== afterState) {
+        await promptPay.save();
+    }
 }
 
 function capabilityProjection(obj = {}) {
@@ -540,8 +801,44 @@ function capabilityProjection(obj = {}) {
         autoVerificationSupported: obj.autoVerificationSupported === true,
         webhookSupported: obj.webhookSupported === true,
         checklistSteps: sanitizeChecklistSteps(obj.checklistSteps || []),
+        bankLaunchers: publicBankLaunchersProjection(obj),
         sortOrder: safeSortOrder(obj.sortOrder)
     };
+}
+
+function publicTrustDisplayForMethod(obj = {}, readiness = { ready: false }) {
+    const provider = normalizeProviderKey(obj.provider || obj.key || "");
+    const key = String(obj.key || provider || "").trim().toLowerCase();
+    if (obj.enabled !== true || readiness.ready !== true) return null;
+
+    const logo = safePublicAssetUrl(obj.logoUrl) || getPaymentLogo({ key, provider });
+    if (!logo) return null;
+
+    return {
+        enabled: true,
+        logo,
+        label: obj.region === "TH" && key === "promptpay" && obj.qrMode === "aziel_promptpay_dynamic"
+            ? "PromptPay"
+            : formatPaymentMethod({ ...obj, provider }, getProviderLabel(provider, obj.method || "Payment")),
+        sortOrder: safeSortOrder(obj.sortOrder),
+        group: provider === "wallet" || key === "wallet" ? "wallet" : "payment_method"
+    };
+}
+
+function publicBankLaunchersProjection(obj = {}) {
+    return sanitizeBankLaunchers(obj.bankLaunchers || [])
+        .filter(item => item.enabled === true && item.key !== "kplus" && PUBLIC_LAUNCHER_STATUSES.has(String(item.verificationStatus || "").toLowerCase()))
+        .map(item => ({
+            ...item,
+            region: "TH",
+            trustDisplay: {
+                enabled: true,
+                logo: item.logoUrl,
+                label: item.displayName,
+                sortOrder: safeSortOrder(item.sortOrder),
+                group: "bank_launcher"
+            }
+        }));
 }
 
 async function seedPaymentMethods() {
@@ -567,9 +864,15 @@ async function seedPaymentMethods() {
                 sortOrder: exists.sortOrder
             }));
             applySeedDefaultsWithoutOverwriting(exists, item);
-            await applyCompatibilityModes(exists).save();
+            await applyCompatibilityModes(applyPromptPayConsolidation(exists)).save();
         }
     }
+    await syncPromptPayBankLaunchers();
+}
+
+function isLegacyThailandBankMethod(method = {}) {
+    return String(method.region || "").toUpperCase() === "TH" &&
+        THAI_STANDALONE_BANK_KEYS.has(String(method.key || "").toLowerCase());
 }
 
 function formatMethod(method) {
@@ -586,9 +889,14 @@ function formatMethod(method) {
     const displaySource = Object.assign({}, obj, { provider });
     const readiness = paymentMethodReadiness(displaySource);
 
+    const publicMethodName = obj.region === "TH" && obj.key === "promptpay" && isDynamicPromptPayQr
+        ? "PromptPay QR"
+        : formatPaymentMethod(displaySource, getProviderLabel(provider, obj.method || "Payment"));
+    const trustDisplay = publicTrustDisplayForMethod(obj, readiness);
+
     return {
         _id: obj._id,
-        method: formatPaymentMethod(displaySource, getProviderLabel(provider, obj.method || "Payment")),
+        method: publicMethodName,
         key: obj.key,
         region: obj.region,
         enabled: obj.enabled === true,
@@ -609,6 +917,7 @@ function formatMethod(method) {
         paymentType: obj.paymentType || "manual",
         provider,
         logoUrl: safePublicAssetUrl(obj.logoUrl) || getPaymentLogo(displaySource),
+        trustDisplay,
         publicReady: readiness.ready,
         missingConfiguration: readiness.missing,
         ...capabilityProjection(obj)
@@ -663,6 +972,7 @@ function formatAdminMethod(method) {
         autoVerificationSupported: obj.autoVerificationSupported === true,
         webhookSupported: obj.webhookSupported === true,
         checklistSteps: sanitizeChecklistSteps(obj.checklistSteps || []),
+        bankLaunchers: sanitizeBankLaunchers(obj.bankLaunchers || []),
         sortOrder: safeSortOrder(obj.sortOrder),
         providerOptions: validProvidersFor(obj.region, obj.paymentType).map(item => ({
             key: item.key,
@@ -697,7 +1007,9 @@ router.get("/payment-methods", async (req, res) => {
 
         res.json({
             success: true,
-            methods: methods.map(formatMethod)
+            methods: methods
+                .filter(method => !isLegacyThailandBankMethod(method))
+                .map(formatMethod)
         });
 
     } catch (error) {
@@ -983,6 +1295,10 @@ function applyPaymentMethodPatch(method, body = {}) {
         method.uploadedQrImageEvidence = body.uploadedQrImageEvidence || {};
     }
 
+    if (body.bankLaunchers !== undefined) {
+        method.bankLaunchers = sanitizeBankLaunchers(body.bankLaunchers);
+    }
+
     if (body.paymentType !== undefined && ["manual", "auto", "deeplink", "wallet"].includes(String(body.paymentType))) {
         method.paymentType = String(body.paymentType);
     }
@@ -1020,7 +1336,7 @@ function applyPaymentMethodPatch(method, body = {}) {
     if (body.sortOrder !== undefined) method.sortOrder = safeSortOrder(body.sortOrder);
     if (body.checklistSteps !== undefined) method.checklistSteps = sanitizeChecklistSteps(body.checklistSteps);
 
-    return applyCompatibilityModes(method);
+    return applyCompatibilityModes(applyPromptPayConsolidation(method));
 }
 
 function normalizedPromptPayRecipient(method = {}) {
@@ -1347,5 +1663,9 @@ module.exports._test = {
     applyCompatibilityModes,
     applyPaymentMethodPatch,
     applySeedDefaultsWithoutOverwriting,
-    defaultMethods
+    defaultMethods,
+    isLegacyThailandBankMethod,
+    publicBankLaunchersProjection,
+    publicTrustDisplayForMethod,
+    sanitizeBankLaunchers
 };

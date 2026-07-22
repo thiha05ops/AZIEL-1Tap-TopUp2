@@ -1374,6 +1374,32 @@ textarea {
   border-top: 1px solid rgba(255, 255, 255, .08);
 }
 
+.pm-bank-launcher-list {
+  display: grid;
+  gap: 14px;
+}
+
+.pm-bank-launcher-row {
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .035);
+}
+
+.pm-bank-launcher-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 12px;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.pm-bank-launcher-preview strong {
+  color: #f8fafc;
+  font-size: 13px;
+}
+
 .payment-config-section h5,
 .payment-capability-details h5 {
   margin: 0 0 10px;
