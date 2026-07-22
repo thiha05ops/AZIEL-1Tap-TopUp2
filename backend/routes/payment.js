@@ -43,6 +43,12 @@ const {
     normalizePaymentKey,
     projectPaymentInstructions
 } = require("../services/manualPaymentAttemptService");
+const {
+    computeRecoverableExpiresAt,
+    evaluateRecoverability,
+    getAttemptOwnerQuery,
+    projectRecoverableAttempt
+} = require("../services/pendingPaymentRecoveryService");
 const { formatPaymentDisplayName } = require("../services/paymentDisplayNameService");
 const {
     OmisePaymentError,
@@ -244,11 +250,15 @@ async function createManualAttemptRecord(payload) {
 
     for (let i = 0; i < 3; i++) {
         try {
-            return await ManualPaymentAttempt.create({
+            const candidate = {
                 ...payload,
                 attemptId: i === 0 && payload.attemptId ? payload.attemptId : createAttemptId(),
                 reference: i === 0 && payload.reference ? payload.reference : createManualReference()
-            });
+            };
+            if (!candidate.recoverableExpiresAt) {
+                candidate.recoverableExpiresAt = computeRecoverableExpiresAt(candidate);
+            }
+            return await ManualPaymentAttempt.create(candidate);
         } catch (error) {
             lastError = error;
             if (error?.code !== 11000) break;
@@ -561,6 +571,7 @@ async function createOrderFromManualAttempt(attempt, evidence, username) {
 
             activeAttempt.status = "consumed";
             activeAttempt.consumedAt = now;
+            activeAttempt.receiptSubmittedAt = evidence.uploadedAt || now;
             activeAttempt.orderId = order.orderId;
             activeAttempt.evidence = evidence;
             await activeAttempt.save({ session });
@@ -645,6 +656,7 @@ async function createOrderFromManualAttemptWithoutTransaction(attempt, evidence,
                 $set: {
                     status: "consumed",
                     consumedAt: new Date(),
+                    receiptSubmittedAt: evidence.uploadedAt || new Date(),
                     orderId: createdOrder.orderId,
                     evidence
                 }
@@ -913,6 +925,135 @@ router.post("/payment/manual/attempt", authMiddleware, manualAttemptLimiter, asy
             success: false,
             code: "MANUAL_PAYMENT_ATTEMPT_FAILED",
             message: "Manual payment attempt failed"
+        });
+    }
+});
+
+// GET /api/payment/manual/recoverable
+router.get("/payment/manual/recoverable", authMiddleware, async (req, res) => {
+    try {
+        const now = new Date();
+        const attempts = await ManualPaymentAttempt.find(getAttemptOwnerQuery(req.user, {
+            status: "active",
+            expiresAt: { $gt: now }
+        }))
+            .sort({ createdAt: -1 })
+            .limit(25);
+
+        const recoverable = [];
+
+        for (const attempt of attempts) {
+            const linkedOrderExists = Boolean(await Order.exists({
+                manualPaymentAttemptId: attempt.attemptId
+            }));
+            const evaluation = evaluateRecoverability(attempt, { now, linkedOrderExists });
+
+            if (evaluation.resumable) {
+                recoverable.push(projectRecoverableAttempt(attempt, evaluation, { includeQr: false }));
+            }
+        }
+
+        return res.json({
+            success: true,
+            recoverable
+        });
+    } catch (error) {
+        console.log("Recoverable manual payment lookup error:", error?.message || error);
+        return res.status(500).json({
+            success: false,
+            code: "RECOVERABLE_PAYMENT_LOOKUP_FAILED",
+            message: "Recoverable payments could not be loaded."
+        });
+    }
+});
+
+// GET /api/payment/manual/recoverable/:attemptId
+router.get("/payment/manual/recoverable/:attemptId", authMiddleware, async (req, res) => {
+    try {
+        const attempt = await ManualPaymentAttempt.findOne(getAttemptOwnerQuery(req.user, {
+            attemptId: String(req.params.attemptId || "").trim()
+        }));
+
+        if (!attempt) {
+            return res.status(404).json({
+                success: false,
+                code: "RECOVERABLE_PAYMENT_NOT_FOUND",
+                message: "Recoverable payment was not found."
+            });
+        }
+
+        const linkedOrderExists = Boolean(await Order.exists({
+            manualPaymentAttemptId: attempt.attemptId
+        }));
+        const evaluation = evaluateRecoverability(attempt, { linkedOrderExists });
+
+        if (!evaluation.resumable) {
+            return res.status(409).json({
+                success: false,
+                code: "RECOVERABLE_PAYMENT_UNAVAILABLE",
+                message: "This payment can no longer be resumed.",
+                reason: evaluation.reason,
+                remainingSeconds: evaluation.remainingSeconds,
+                recoverableExpiresAt: evaluation.recoverableExpiresAt
+            });
+        }
+
+        return res.json({
+            success: true,
+            recoverable: projectRecoverableAttempt(attempt, evaluation, { includeQr: true })
+        });
+    } catch (error) {
+        console.log("Recoverable manual payment detail error:", error?.message || error);
+        return res.status(500).json({
+            success: false,
+            code: "RECOVERABLE_PAYMENT_DETAIL_FAILED",
+            message: "Recoverable payment could not be loaded."
+        });
+    }
+});
+
+// POST /api/payment/manual/recoverable/:attemptId/resume
+router.post("/payment/manual/recoverable/:attemptId/resume", authMiddleware, async (req, res) => {
+    try {
+        const attempt = await ManualPaymentAttempt.findOne(getAttemptOwnerQuery(req.user, {
+            attemptId: String(req.params.attemptId || "").trim()
+        }));
+
+        if (!attempt) {
+            return res.status(404).json({
+                success: false,
+                code: "RECOVERABLE_PAYMENT_NOT_FOUND",
+                message: "Recoverable payment was not found."
+            });
+        }
+
+        const linkedOrderExists = Boolean(await Order.exists({
+            manualPaymentAttemptId: attempt.attemptId
+        }));
+        const evaluation = evaluateRecoverability(attempt, { linkedOrderExists });
+
+        if (!evaluation.resumable) {
+            return res.status(409).json({
+                success: false,
+                code: "RECOVERABLE_PAYMENT_UNAVAILABLE",
+                message: "This payment can no longer be resumed.",
+                reason: evaluation.reason,
+                remainingSeconds: evaluation.remainingSeconds,
+                recoverableExpiresAt: evaluation.recoverableExpiresAt
+            });
+        }
+
+        return res.json({
+            success: true,
+            code: "RECOVERABLE_PAYMENT_RESUMED",
+            recoverable: projectRecoverableAttempt(attempt, evaluation, { includeQr: true })
+        });
+    } catch (error) {
+        console.log("Recoverable manual payment resume error:", error?.message || error);
+        return res.status(500).json({
+            success: false,
+            code: "RECOVERABLE_PAYMENT_RESUME_FAILED",
+            message: "Recoverable payment could not be resumed."
         });
     }
 });

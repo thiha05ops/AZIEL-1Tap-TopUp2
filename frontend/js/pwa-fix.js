@@ -1,36 +1,41 @@
-initAzielFooterPolish();
-scheduleAzielTrustLogoRender();
-registerAzielServiceWorker();
+if (!window.__AZIEL_PWA_FIX_INITIALIZED__) {
+    window.__AZIEL_PWA_FIX_INITIALIZED__ = true;
 
-document.addEventListener("click", e => {
-    const link = e.target.closest("a");
+    initAzielFooterPolish();
+    scheduleAzielTrustLogoRender();
+    loadPendingPaymentRecoveryOverlay();
+    registerAzielServiceWorker();
 
-    if (!link) return;
+    document.addEventListener("click", e => {
+        const link = e.target.closest("a");
 
-    const href = link.getAttribute("href");
+        if (!link) return;
 
-    if (!href) return;
+        const href = link.getAttribute("href");
 
-    if (
-        href.startsWith("http") ||
-        href.startsWith("https") ||
-        href.startsWith("//")
-    ) {
-        return;
-    }
+        if (!href) return;
 
-    if (
-        href.startsWith("#") ||
-        href.startsWith("mailto:") ||
-        href.startsWith("tel:")
-    ) {
-        return;
-    }
+        if (
+            href.startsWith("http") ||
+            href.startsWith("https") ||
+            href.startsWith("//")
+        ) {
+            return;
+        }
 
-    e.preventDefault();
+        if (
+            href.startsWith("#") ||
+            href.startsWith("mailto:") ||
+            href.startsWith("tel:")
+        ) {
+            return;
+        }
 
-    window.location.href = href;
-});
+        e.preventDefault();
+
+        window.location.href = href;
+    });
+}
 
 function initAzielFooterPolish() {
     const footers = document.querySelectorAll(".site-footer, .game-mini-footer");
@@ -86,6 +91,59 @@ function scheduleAzielTrustLogoRender() {
     window.addEventListener("aziel:shopRegionChanged", event => {
         render({ region: event?.detail?.region, refresh: true });
     });
+}
+
+function loadPendingPaymentRecoveryOverlay() {
+    const loaderState = window.__AZIEL_PENDING_PAYMENT_RECOVERY_LOADER__ || {
+        loading: false,
+        loaded: false
+    };
+    window.__AZIEL_PENDING_PAYMENT_RECOVERY_LOADER__ = loaderState;
+
+    if (loaderState.loaded || loaderState.loading || window.__AZIEL_PENDING_PAYMENT_RECOVERY_INITIALIZED__) return;
+
+    const page = (window.location.pathname.split("/").pop() || "home.html").toLowerCase();
+    const eligiblePages = new Set([
+        "home.html",
+        "mlbb.html",
+        "pubg.html",
+        "freefire.html",
+        "hok.html",
+        "aov-id.html",
+        "pubg-rp.html",
+        "telegram.html",
+        "genshin.html",
+        "roblox.html",
+        "wallet.html",
+        "tracking.html",
+        "account.html"
+    ]);
+
+    if (!eligiblePages.has(page)) return;
+    if (!document.getElementById("azHeaderMount")) return;
+    if (document.querySelector('script[data-aziel-pending-payment-recovery="true"]')) return;
+
+    if (!document.querySelector('link[data-aziel-pending-payment-recovery="true"]')) {
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = "/css/payment/pending-payment-recovery.css?v=20260722-phase22";
+        link.dataset.azielPendingPaymentRecovery = "true";
+        document.head.appendChild(link);
+    }
+
+    const script = document.createElement("script");
+    script.src = "/js/payment/pending-payment-recovery.js?v=20260722-phase22";
+    script.defer = true;
+    script.dataset.azielPendingPaymentRecovery = "true";
+    loaderState.loading = true;
+    script.onload = () => {
+        loaderState.loading = false;
+        loaderState.loaded = true;
+    };
+    script.onerror = () => {
+        loaderState.loading = false;
+    };
+    document.head.appendChild(script);
 }
 
 function registerAzielServiceWorker() {

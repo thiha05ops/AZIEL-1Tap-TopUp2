@@ -5,6 +5,17 @@
     let activeState = null;
     const DYNAMIC_PROMPTPAY_QR_VERSION = "promptpay-emv-merchant-proxy-v2";
     let qrExpiryTimer = null;
+    const recoveryOpenCounters = {
+        open: 0,
+        normalize: 0,
+        minimal: 0,
+        qr: 0,
+        launcher: 0,
+        save: 0,
+        submit: 0,
+        countdown: 0,
+        close: 0
+    };
 
     function escapeHTML(value) {
         const utilEscape = window.PaymentUtils?.escapeHTML;
@@ -173,6 +184,22 @@
         return window.AZIEL_LANG?.[lang]?.[key] || window.AZIEL_LANG?.en?.[key] || fallback || key;
     }
 
+    function recoveryCheckpoint(label) {
+        if (!isDevelopmentHost()) return;
+        console.info(`[AZIEL RECOVERY CHECKOUT] ${label}`, {
+            time: Math.round(performance.now()),
+            counters: { ...recoveryOpenCounters }
+        });
+    }
+
+    function incrementRecoveryCounter(name) {
+        if (!Object.prototype.hasOwnProperty.call(recoveryOpenCounters, name)) return;
+        recoveryOpenCounters[name] += 1;
+        if (isDevelopmentHost() && recoveryOpenCounters[name] > 5) {
+            throw new Error(`Recovery checkout repeated ${name} more than 5 times during one open.`);
+        }
+    }
+
     function clearQrExpiryCountdown() {
         if (qrExpiryTimer) {
             clearInterval(qrExpiryTimer);
@@ -199,7 +226,11 @@
             el.hidden = false;
             if (seconds <= 0) {
                 clearQrExpiryCountdown();
-                setQrLoading(false, t("payment_qr_expired_retry", "QR expired. Please retry."));
+                if (isRecoveryMode(activeState)) {
+                    markRecoveryExpired();
+                } else {
+                    setQrLoading(false, t("payment_qr_expired_retry", "QR expired. Please retry."));
+                }
             }
         };
 
@@ -212,7 +243,21 @@
     }
 
     function shouldGenerateDynamicPromptPay(options = {}) {
-        return isDynamicPromptPayMode(options);
+        return isDynamicPromptPayMode(options) && !isRecoveryMode(options);
+    }
+
+    function isRecoveryMode(options = {}) {
+        return String(options.mode || "").toLowerCase() === "recovery";
+    }
+
+    function recoveryExpiresAt(options = {}) {
+        return options.recoverableExpiresAt || options.dynamicQr?.expiresAt || "";
+    }
+
+    function isRecoveryExpired(options = {}) {
+        const expiry = recoveryExpiresAt(options);
+        const time = expiry ? new Date(expiry).getTime() : 0;
+        return isRecoveryMode(options) && (!Number.isFinite(time) || time <= Date.now());
     }
 
     function renderedQrSourceType(options = {}, qr = "") {
@@ -300,6 +345,35 @@
         activeState.activeDynamicQr = activeDynamicQrMatchesCheckout(activeDynamicQr, activeState || {}) ? activeDynamicQr : null;
     }
 
+    function markRecoveryExpired() {
+        if (!activeState) return;
+        activeState.expired = true;
+        setMessage("error", t("recoveryPaymentExpired", "Payment session expired"));
+        const fallback = document.getElementById("azPaymentSheetQrFallback");
+        const retry = document.getElementById("azPaymentSheetRetryQr");
+        if (fallback) {
+            fallback.hidden = false;
+            fallback.textContent = t("recoveryQrUnavailable", "This QR can no longer be used");
+        }
+        if (retry) retry.hidden = true;
+        [
+            "azPaymentSheetSaveQr",
+            "azPaymentSheetOpenBankApp",
+            "azPaymentSheetContinueReceipt",
+            "azPaymentSheetBackQr",
+            "azPaymentSheetSubmit"
+        ].forEach(id => {
+            const button = document.getElementById(id);
+            if (button) button.disabled = true;
+        });
+        window.dispatchEvent(new CustomEvent("aziel:recovered-payment-expired", {
+            detail: {
+                attemptId: activeState.attemptId || "",
+                reference: activeState.reference || ""
+            }
+        }));
+    }
+
     function clearActiveQr() {
         if (activeState) activeState.activeQr = null;
     }
@@ -331,6 +405,7 @@
     }
 
     function persistCheckoutState(options = {}) {
+        if (isRecoveryMode(options)) return;
         try {
             const snapshot = {
                 schemaVersion: DYNAMIC_PROMPTPAY_QR_VERSION,
@@ -351,6 +426,7 @@
     }
 
     function restoreCheckoutState(options = {}) {
+        if (isRecoveryMode(options)) return {};
         try {
             const raw = sessionStorage.getItem(checkoutStorageKey(options));
             const snapshot = raw ? JSON.parse(raw) : null;
@@ -805,11 +881,13 @@
         if (nav) nav.hidden = !isMobileFlow;
         if (continueBtn) {
             continueBtn.hidden = !isMobileFlow || step !== "qr";
+            continueBtn.disabled = activeState.expired === true || isRecoveryExpired(activeState);
             continueBtn.textContent = t("payment_continue_to_receipt", "Continue to Receipt");
             continueBtn.onclick = () => setMobilePromptPayStep("receipt");
         }
         if (backBtn) {
             backBtn.hidden = !isMobileFlow || step !== "receipt";
+            backBtn.disabled = activeState.expired === true || isRecoveryExpired(activeState);
             backBtn.textContent = t("payment_back_to_qr", "Back to QR");
             backBtn.onclick = () => setMobilePromptPayStep("qr");
         }
@@ -992,12 +1070,14 @@
         const directOpenAppMode = String(options.openAppMode || "direct") !== "bank_chooser";
         const androidPackageCapability = directOpenAppMode && hasAndroidLaunchCapability(options);
         const desktopPromptPay = isDesktopPromptPayFlow(options);
-        const canSaveQr = bool(options.enableSaveQr) && Boolean(qr);
-        const canOpenApp = !desktopPromptPay && bool(options.enableOpenApp) &&
+        const expired = options.expired === true || isRecoveryExpired(options);
+        const canSaveQr = !expired && bool(options.enableSaveQr) && Boolean(qr);
+        const canOpenApp = !expired && !desktopPromptPay && bool(options.enableOpenApp) &&
             (String(options.openAppMode || "direct") === "bank_chooser" || Boolean(appTarget.url) || androidPackageCapability);
         if (actions) actions.hidden = !(canSaveQr || canOpenApp);
         if (saveQr) {
             saveQr.hidden = !canSaveQr;
+            saveQr.disabled = expired;
             saveQr.textContent = t("payment_save_qr", "Save QR");
             saveQr.onclick = canSaveQr ? () => downloadQr(activeState) : null;
         }
@@ -1006,6 +1086,7 @@
                 ? t("payment_choose_banking_app", "Banking App")
                 : options.appDisplayName || options.methodName || "Bank App";
             openBankApp.hidden = !canOpenApp;
+            openBankApp.disabled = expired;
             openBankApp.textContent = isMobilePromptPayFlow(options)
                 ? t("payment_open_banking_app", "Open Banking App")
                 : appTarget.source === "store" ? `${t("payment_open_install_app", "Open / Install")} ${appName}` : `${t("payment_open_app_short", "Open")} ${appName}`;
@@ -1469,6 +1550,7 @@
         const amount = Number(options.amount || 0);
         const currency = options.currency || "";
         const requiresSlip = options.requiresSlip !== false;
+        const recoveryMode = isRecoveryMode(options);
         const methodName = window.AZIEL_PAYMENT_DISPLAY?.from?.(
             options.methodName || options.paymentMethod,
             options.methodName || options.paymentMethod || "Payment"
@@ -1479,16 +1561,19 @@
         const qr = dynamicQr
             ? ""
             : normalizeUrl(options.qrImageUrl || options.qrImage || restored.qrImageUrl || "");
-        const qrSourceType = renderedQrSourceType(options, qr);
+        const recoveryQr = recoveryMode && isDynamicPromptPayMode(options) ? qr : "";
+        const qrSourceType = recoveryQr ? "dynamic_response" : renderedQrSourceType(options, qr);
         const submitLabel = options.submitLabel || (requiresSlip ? "Submit for Verification" : "Continue");
 
         activeState = {
             ...options,
+            mode: recoveryMode ? "recovery" : "new",
             qrImageUrl: qr,
             qrImage: qr,
-            dynamicQr: dynamicQr ? null : restored.dynamicQr || options.dynamicQr || null,
+            dynamicQr: dynamicQr ? null : options.dynamicQr || restored.dynamicQr || null,
             activeQr: null,
             activeDynamicQr: null,
+            expired: recoveryMode ? isRecoveryExpired(options) : false,
             requiresSlip,
             submitLabel,
             checklistSteps: [],
@@ -1497,7 +1582,9 @@
         };
         if (dynamicQr) activeState.submitLabel = t("payment_submit_for_verification", submitLabel);
 
-        modal.querySelector("#azPaymentSheetTitle").textContent = `${methodName} Transfer`;
+        modal.querySelector("#azPaymentSheetTitle").textContent = recoveryMode
+            ? t("recoveryResumePayment", "Resume Payment")
+            : `${methodName} Transfer`;
         modal.querySelector("#azPaymentSheetAmount").textContent = `${amount.toLocaleString()} ${currency}`.trim();
         modal.querySelector("#azPaymentSheetSubtitle").textContent = dynamicQr
             ? t("payment_promptpay_dynamic_subtitle", "Scan the amount-specific PromptPay QR")
@@ -1573,6 +1660,10 @@
             ? activeState.submitLabel
             : submitLabel;
         modal.querySelector("#azPaymentSheetSubmit").onclick = async () => {
+            if (activeState.expired === true || isRecoveryExpired(activeState)) {
+                markRecoveryExpired();
+                return;
+            }
             const file = selectedFile();
             if (requiresSlip && !file) {
                 setMessage("error", "Please choose your payment receipt first.");
@@ -1581,6 +1672,10 @@
             }
             if (shouldGenerateDynamicPromptPay(activeState) && !activeState.dynamicQr?.qrPayload) {
                 setMessage("error", "Please generate the payment QR before submitting your receipt.");
+                return;
+            }
+            if (isRecoveryMode(activeState) && !activeDynamicQrMatchesCheckout(activeState.activeDynamicQr, activeState)) {
+                setMessage("error", t("recoveryQrUnavailable", "This QR can no longer be used"));
                 return;
             }
 
@@ -1611,9 +1706,613 @@
         modal.querySelector("[data-role='close']")?.focus();
         persistCheckoutState(activeState);
 
+        if (activeState.expired) {
+            markRecoveryExpired();
+        }
+
         if (dynamicQr && !qr) {
             generateDynamicQrForActiveState();
         }
+    }
+
+    function normalizeRecovery(recovery = {}) {
+        incrementRecoveryCounter("normalize");
+        recoveryCheckpoint("RECOVERY_OPEN_2 normalizeRecovery:start");
+        const instructions = recovery.instructions || {};
+        const dynamicQr = recovery.dynamicQr || {};
+        const normalized = {
+            mode: "recovery",
+            attemptId: recovery.attemptId || "",
+            attemptReference: recovery.attemptReference || recovery.reference || "",
+            methodCode: recovery.paymentMethod || instructions.key || "promptpay",
+            methodName: recovery.paymentName || instructions.method || "PromptPay QR",
+            paymentMethod: recovery.paymentMethod || instructions.key || "promptpay",
+            paymentType: recovery.paymentType || "manual",
+            provider: recovery.provider || "promptpay",
+            amount: recovery.finalAmount || recovery.amount,
+            currency: recovery.currency || "THB",
+            productName: recovery.productName || recovery.game || "",
+            game: recovery.productName || recovery.game || "",
+            packageName: recovery.packageName || "",
+            accountName: recovery.accountName || "",
+            accountNumber: recovery.accountNumber || "",
+            reference: recovery.attemptReference || recovery.reference || dynamicQr.orderReference || "",
+            qrImageUrl: dynamicQr.qrImage || "",
+            qrMode: recovery.qrMode || instructions.qrMode || "aziel_promptpay_dynamic",
+            confirmationMode: recovery.confirmationMode || "manual_admin",
+            recoverableExpiresAt: recovery.recoverableExpiresAt || dynamicQr.expiresAt || "",
+            remainingSeconds: recovery.remainingSeconds,
+            dynamicQr: {
+                orderReference: dynamicQr.orderReference || recovery.attemptReference || recovery.reference || "",
+                encodedReference: dynamicQr.encodedReference || "",
+                qrImage: dynamicQr.qrImage || "",
+                expiresAt: dynamicQr.expiresAt || recovery.recoverableExpiresAt || ""
+            },
+            requiresSlip: recovery.receiptUploadEnabled !== false && recovery.slipRequired !== false,
+            receiptUploadEnabled: recovery.receiptUploadEnabled !== false,
+            slipRequired: recovery.slipRequired !== false,
+            enableSaveQr: instructions.enableSaveQr !== false,
+            enableOpenApp: instructions.enableOpenApp !== false,
+            enableChecklist: instructions.enableChecklist !== false,
+            appDisplayName: instructions.appDisplayName || "PromptPay",
+            openAppMode: instructions.openAppMode || "bank_chooser",
+            appLaunchMode: instructions.appLaunchMode || "APP_ONLY",
+            iosAppLaunchUrl: instructions.iosAppLaunchUrl || "",
+            androidAppLaunchUrl: instructions.androidAppLaunchUrl || "",
+            androidPackageName: instructions.androidPackageName || "",
+            appStoreFallbackUrl: instructions.appStoreFallbackUrl || "",
+            playStoreFallbackUrl: instructions.playStoreFallbackUrl || "",
+            bankLaunchers: Array.isArray(instructions.bankLaunchers) ? instructions.bankLaunchers : [],
+            checklistSteps: Array.isArray(recovery.checklistSteps) ? recovery.checklistSteps : [],
+            submitLabel: t("payment_submit_for_verification", "Submit for Verification"),
+            loadingText: t("payment_submitting_receipt", "Submitting receipt..."),
+            successMessage: t("payment_slip_submitted", "Payment slip submitted")
+        };
+        recoveryCheckpoint("RECOVERY_OPEN_3 normalizeRecovery:end");
+        return normalized;
+    }
+
+    async function submitRecoveredReceipt(options = {}, file, setMessage) {
+        const fd = new FormData();
+        fd.append("slip", file);
+        const res = await fetch(`/api/payment/manual/attempt/${encodeURIComponent(options.attemptId)}/slip`, {
+            method: "POST",
+            headers: window.AZIEL?.authHeaders?.() || window.PaymentUtils?.authHeaders?.() || {},
+            body: fd
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) {
+            throw new Error(data.message || t("payment_submission_failed", "Submission failed. Please try again."));
+        }
+        setMessage("success", data.message || t("payment_slip_submitted", "Payment slip submitted"));
+        return data;
+    }
+
+    function recoveryCountdownText(options = {}) {
+        const expiry = recoveryExpiresAt(options);
+        const time = expiry ? new Date(expiry).getTime() : 0;
+        if (!Number.isFinite(time) || time <= Date.now()) return t("recoveryPaymentExpired", "Payment session expired");
+        const seconds = Math.max(0, Math.ceil((time - Date.now()) / 1000));
+        const minutes = Math.floor(seconds / 60);
+        const remainder = String(seconds % 60).padStart(2, "0");
+        return `${t("payment_qr_expires_in", "QR expires in")} ${minutes}:${remainder}`;
+    }
+
+    function recoveryBankLaunchers(options = {}) {
+        const source = Array.isArray(options.bankLaunchers) ? options.bankLaunchers : [];
+        const normalized = window.AZIEL_PAYMENT_TRUST?.normalizePromptPayLaunchers?.(source, options) ||
+            source
+                .filter(app => app && app.enabled !== false)
+                .filter(app => String(app.key || "").toLowerCase() !== "kplus")
+                .map(app => ({
+                    key: app.key || "",
+                    label: app.displayName || app.appDisplayName || app.label || "Banking App",
+                    logo: app.logoUrl || app.logo || "",
+                    enabled: app.enabled !== false,
+                    appLaunchMode: app.appLaunchMode || "APP_ONLY",
+                    iosAppLaunchUrl: app.iosAppLaunchUrl || "",
+                    androidAppLaunchUrl: app.androidAppLaunchUrl || "",
+                    androidPackageName: app.androidPackageName || "",
+                    appStoreFallbackUrl: app.appStoreFallbackUrl || "",
+                    playStoreFallbackUrl: app.playStoreFallbackUrl || ""
+                }));
+
+        return normalized
+            .filter(app => app && app.enabled !== false)
+            .filter(app => String(app.key || "").toLowerCase() !== "kplus")
+            .slice(0, 4)
+            .map(app => ({
+                key: String(app.key || app.label || "").trim(),
+                label: app.label || app.displayName || app.appDisplayName || "Banking App",
+                logo: app.logo || app.logoUrl || "",
+                appLaunchMode: app.appLaunchMode || "APP_ONLY",
+                iosAppLaunchUrl: app.iosAppLaunchUrl || "",
+                androidAppLaunchUrl: app.androidAppLaunchUrl || "",
+                androidPackageName: app.androidPackageName || "",
+                appStoreFallbackUrl: app.appStoreFallbackUrl || app.appStoreUrl || "",
+                playStoreFallbackUrl: app.playStoreFallbackUrl || app.playStoreUrl || ""
+            }));
+    }
+
+    function recoveryProductText(state = {}) {
+        return [state.game || "", state.package || ""].filter(Boolean).join(" · ");
+    }
+
+    function updateRecoveryMessage(type = "", message = "") {
+        setMessage(type, message);
+    }
+
+    function renderRecoveryChecklist(state = {}) {
+        const box = document.getElementById("azPaymentSheetChecklist");
+        const list = document.getElementById("azPaymentSheetChecklistSteps");
+        if (!box || !list) return;
+
+        const steps = normalizeChecklistSteps({
+            ...state,
+            qrMode: "aziel_promptpay_dynamic",
+            enableChecklist: true
+        });
+        state.checklistSteps = steps;
+        state.completedChecklistActions = state.completedChecklistActions || new Set();
+
+        list.innerHTML = steps.map((step, index) => `
+            <li data-action="${escapeHTML(step.action)}" class="${index === 0 ? "is-active" : ""}" aria-current="${index === 0 ? "step" : "false"}">
+                <i aria-hidden="true"></i>
+                <span>${escapeHTML(step.label)}</span>
+            </li>
+        `).join("");
+        box.hidden = !steps.length;
+    }
+
+    function renderRecoveryDesktopBanks(state = {}) {
+        incrementRecoveryCounter("launcher");
+        const box = document.getElementById("azPaymentSheetDesktopBanks");
+        if (!box) return;
+        const apps = recoveryBankLaunchers(state);
+        if (!apps.length || isMobilePromptPayFlow(state)) {
+            box.hidden = true;
+            box.innerHTML = "";
+            return;
+        }
+        box.innerHTML = `
+            <span>${escapeHTML(t("payment_supported_banking_apps", "Supported Banking Apps"))}</span>
+            <div class="az-payment-sheet__desktop-bank-logos" aria-label="${escapeHTML(t("payment_supported_banking_apps", "Supported Banking Apps"))}">
+                ${apps.map(app => `
+                    <span title="${escapeHTML(app.label)}">
+                        ${app.logo ? `<img src="${escapeHTML(app.logo)}" alt="" aria-hidden="true">` : ""}
+                    </span>
+                `).join("")}
+            </div>
+        `;
+        box.hidden = false;
+    }
+
+    function updateRecoveryMobileStep(step = "qr") {
+        if (!activeState || !isRecoveryMode(activeState)) return;
+        activeState.mobileStep = step === "receipt" ? "receipt" : "qr";
+        const modal = document.getElementById("azRecoveredPaymentMiniSheet");
+        if (!modal) return;
+        const isMobileFlow = isMobilePromptPayFlow(activeState);
+        const isReceipt = activeState.mobileStep === "receipt";
+
+        modal.classList.toggle("is-mobile-promptpay", isMobileFlow);
+        modal.classList.toggle("is-desktop-promptpay", !isMobileFlow);
+        modal.classList.toggle("is-mobile-step-qr", isMobileFlow && !isReceipt);
+        modal.classList.toggle("is-mobile-step-receipt", isMobileFlow && isReceipt);
+
+        const receipt = modal.querySelector("#azPaymentSheetReceipt");
+        const summary = modal.querySelector("#azPaymentSheetReceiptSummary");
+        const nav = modal.querySelector("#azPaymentSheetMobileNav");
+        const continueBtn = modal.querySelector("#azPaymentSheetContinueReceipt");
+        const backBtn = modal.querySelector("#azPaymentSheetBackQr");
+        const submit = modal.querySelector("#azPaymentSheetSubmit");
+        const actions = modal.querySelector("#azPaymentSheetActions");
+        const checklist = modal.querySelector("#azPaymentSheetChecklist");
+
+        if (nav) nav.hidden = !isMobileFlow;
+        if (continueBtn) continueBtn.hidden = !isMobileFlow || isReceipt;
+        if (backBtn) backBtn.hidden = !isMobileFlow || !isReceipt;
+        if (receipt) receipt.hidden = isMobileFlow ? !isReceipt : false;
+        if (summary) {
+            summary.hidden = !isMobileFlow || !isReceipt;
+            if (isMobileFlow && isReceipt) renderMobileReceiptSummary(modal, {
+                amount: activeState.amount,
+                currency: activeState.currency,
+                productName: activeState.game,
+                game: activeState.game,
+                packageName: activeState.package,
+                dynamicQr: { expiresAt: activeState.recoverableExpiresAt }
+            });
+        }
+        if (submit) submit.hidden = isMobileFlow && !isReceipt;
+        if (actions) actions.hidden = isMobileFlow && isReceipt;
+        if (checklist) checklist.hidden = isMobileFlow && isReceipt;
+    }
+
+    function closeMinimalRecoverySheet(reason = "button") {
+        incrementRecoveryCounter("close");
+        recoveryCheckpoint(`RECOVERY_OPEN_CLOSE ${reason}`);
+        clearQrExpiryCountdown();
+        const modal = document.getElementById("azRecoveredPaymentMiniSheet");
+        modal?.remove();
+        const detail = activeState ? {
+            attemptId: activeState.attemptId || "",
+            reference: activeState.attemptReference || "",
+            reason
+        } : { reason };
+        activeState = null;
+        window.dispatchEvent(new CustomEvent("aziel:recovered-payment-closed", { detail }));
+    }
+
+    function expireRecoverySheet() {
+        if (!activeState || activeState.expiryEventSent) return;
+        activeState.expired = true;
+        activeState.expiryEventSent = true;
+        clearQrExpiryCountdown();
+        [
+            "azPaymentSheetSaveQr",
+            "azPaymentSheetOpenBankApp",
+            "azPaymentSheetContinueReceipt",
+            "azPaymentSheetBackQr",
+            "azPaymentSheetSubmit",
+            "azPaymentSheetSlipInput"
+        ].forEach(id => {
+            const control = document.getElementById(id);
+            if (control) control.disabled = true;
+        });
+        updateRecoveryMessage("error", t("recoveryPaymentExpired", "Payment session expired"));
+        const countdown = document.getElementById("azRecoveredPaymentCountdown");
+        if (countdown) countdown.textContent = t("recoveryPaymentExpired", "Payment session expired");
+        window.dispatchEvent(new CustomEvent("aziel:recovered-payment-expired", {
+            detail: {
+                attemptId: activeState.attemptId,
+                reference: activeState.attemptReference
+            }
+        }));
+    }
+
+    function startRecoveryCountdown(state = {}) {
+        clearQrExpiryCountdown();
+        const countdown = document.getElementById("azRecoveredPaymentCountdown");
+        const expiry = recoveryExpiresAt(state);
+        const time = expiry ? new Date(expiry).getTime() : 0;
+        if (!countdown || !Number.isFinite(time)) return;
+        if (time <= Date.now()) {
+            expireRecoverySheet();
+            return;
+        }
+        incrementRecoveryCounter("countdown");
+        qrExpiryTimer = setInterval(() => {
+            countdown.textContent = recoveryCountdownText(state);
+            if (time <= Date.now()) expireRecoverySheet();
+        }, 1000);
+    }
+
+    function bindRecoverySaveQr(state = {}) {
+        incrementRecoveryCounter("save");
+        const button = document.getElementById("azPaymentSheetSaveQr");
+        if (!button) return;
+        button.onclick = async () => {
+            if (state.expired) return;
+            try {
+                button.disabled = true;
+                await saveDynamicQr(state.activeDynamicQr);
+                updateChecklist("save_qr");
+                updateRecoveryMessage("success", t("payment_qr_ready_to_save", "QR ready to save"));
+            } catch (error) {
+                updateRecoveryMessage("error", t("payment_qr_save_failed", "Could not save QR. Long-press the image to save."));
+            } finally {
+                button.disabled = Boolean(state.expired);
+            }
+        };
+    }
+
+    function launchRecoveryBank(profile = {}, state = {}) {
+        const helper = window.AZIEL_ANDROID_APP_LAUNCH;
+        const platform = helper?.resolvePlatform?.() || "desktop";
+        if (platform === "ios") {
+            const iosUrl = profile.iosAppLaunchUrl || "";
+            if (!iosUrl) {
+                updateRecoveryMessage("error", t("payment_bank_app_unavailable", "Bank app unavailable. Open your banking app and import the saved QR."));
+                return;
+            }
+            window.location.href = iosUrl;
+            setTimeout(() => {
+                updateChecklist("open_app");
+                updateRecoveryMessage("success", `${t("payment_opening_bank_app", "Opening")} ${profile.label || "banking app"}. ${t("payment_return_upload_receipt", "Return here after transfer and upload your receipt.")}`);
+                document.getElementById("azPaymentMobileBankChooser")?.setAttribute("hidden", "");
+            }, 0);
+            return;
+        }
+
+        const target = resolveBankProfileLaunchTarget(profile);
+        if (!target.url && !hasAndroidLaunchCapability(profile)) {
+            updateRecoveryMessage("error", t("payment_bank_app_unavailable", "Bank app unavailable. Open your banking app and import the saved QR."));
+            return;
+        }
+        updateChecklist("open_app");
+        updateRecoveryMessage("success", `${t("payment_opening_bank_app", "Opening")} ${profile.label || "banking app"}. ${t("payment_return_upload_receipt", "Return here after transfer and upload your receipt.")}`);
+        if (target.url) window.location.href = target.url;
+        document.getElementById("azPaymentMobileBankChooser")?.setAttribute("hidden", "");
+    }
+
+    function showRecoveryBankChooser(state = {}) {
+        incrementRecoveryCounter("launcher");
+        const chooser = document.getElementById("azPaymentMobileBankChooser");
+        if (!chooser) return;
+        const apps = recoveryBankLaunchers(state);
+        const launcherByKey = new Map();
+        chooser.innerHTML = `
+            <button type="button" class="az-payment-sheet__mobile-chooser-backdrop" data-recovery-bank-cancel aria-label="${escapeHTML(t("payment_cancel", "Cancel"))}"></button>
+            <section class="az-payment-sheet__mobile-chooser-card" role="dialog" aria-modal="false" aria-label="${escapeHTML(t("payment_choose_banking_app", "Choose Banking App"))}">
+                <header>
+                    <strong>${escapeHTML(t("payment_choose_banking_app", "Choose Banking App"))}</strong>
+                    <button type="button" data-recovery-bank-cancel aria-label="${escapeHTML(t("payment_cancel", "Cancel"))}">×</button>
+                </header>
+                <div class="az-payment-sheet__mobile-bank-list">
+                    ${apps.map((app, index) => {
+                        const key = app.key || `bank-${index}`;
+                        launcherByKey.set(key, app);
+                        const target = resolveBankProfileLaunchTarget(app);
+                        const disabled = !target.url && !hasAndroidLaunchCapability(app);
+                        return `
+                            <button type="button" class="az-payment-sheet__mobile-bank-launcher-row" data-recovery-bank-key="${escapeHTML(key)}" ${disabled ? "disabled" : ""}>
+                                <i aria-hidden="true">${app.logo ? `<img src="${escapeHTML(app.logo)}" alt="">` : ""}</i>
+                                <span>${escapeHTML(app.label)}</span>
+                                <b aria-hidden="true">›</b>
+                            </button>
+                        `;
+                    }).join("")}
+                </div>
+                <button type="button" class="az-payment-sheet__mobile-cancel" data-recovery-bank-cancel>${escapeHTML(t("payment_cancel", "Cancel"))}</button>
+            </section>
+        `;
+        chooser.hidden = false;
+        chooser.querySelectorAll("[data-recovery-bank-key]").forEach(button => {
+            button.onclick = event => {
+                event.preventDefault();
+                event.stopPropagation();
+                const profile = launcherByKey.get(button.getAttribute("data-recovery-bank-key") || "");
+                launchRecoveryBank(profile, state);
+            };
+        });
+        chooser.querySelectorAll("[data-recovery-bank-cancel]").forEach(button => {
+            button.onclick = () => {
+                chooser.hidden = true;
+            };
+        });
+    }
+
+    function bindRecoveryFileInput(state = {}) {
+        const input = document.getElementById("azPaymentSheetSlipInput");
+        const preview = document.getElementById("azPaymentSheetPreview");
+        const image = document.getElementById("azPaymentSheetPreviewImage");
+        const name = document.getElementById("azPaymentSheetFileName");
+        const remove = document.getElementById("azPaymentSheetRemoveFile");
+        const submit = document.getElementById("azPaymentSheetSubmit");
+        if (!input || !preview || !image || !name || !submit) return;
+
+        input.value = "";
+        submit.disabled = true;
+        input.onchange = () => {
+            const file = input.files?.[0] || null;
+            state.receiptFile = file;
+            if (!file) return;
+            name.textContent = file.name || t("payment_receipt_selected", "Selected payment receipt");
+            image.src = URL.createObjectURL(file);
+            preview.hidden = false;
+            submit.disabled = Boolean(state.expired || state.submitting);
+            updateChecklist("upload_receipt");
+            updateRecoveryMessage("", "");
+        };
+        remove.onclick = () => {
+            input.value = "";
+            state.receiptFile = null;
+            preview.hidden = true;
+            image.removeAttribute("src");
+            name.textContent = "";
+            submit.disabled = true;
+        };
+    }
+
+    function bindRecoverySubmit(state = {}) {
+        incrementRecoveryCounter("submit");
+        const submit = document.getElementById("azPaymentSheetSubmit");
+        if (!submit) return;
+        submit.onclick = async () => {
+            if (state.expired || isRecoveryExpired(state)) {
+                expireRecoverySheet();
+                return;
+            }
+            if (state.submitting) return;
+            if (!state.receiptFile) {
+                updateRecoveryMessage("error", t("payment_choose_receipt_first", "Please choose your payment receipt first."));
+                return;
+            }
+            state.submitting = true;
+            submit.disabled = true;
+            submit.textContent = t("payment_submitting_receipt", "Submitting receipt...");
+            try {
+                const data = await submitRecoveredReceipt(state, state.receiptFile, updateRecoveryMessage);
+                if (!state.submittedEventSent) {
+                    state.submittedEventSent = true;
+                    window.dispatchEvent(new CustomEvent("aziel:recovered-payment-submitted", {
+                        detail: {
+                            attemptId: state.attemptId,
+                            reference: state.attemptReference,
+                            order: data.order || null,
+                            duplicate: Boolean(data.duplicate)
+                        }
+                    }));
+                }
+                closeMinimalRecoverySheet("submitted");
+            } catch (error) {
+                state.submitting = false;
+                submit.disabled = false;
+                submit.textContent = t("payment_submit_for_verification", "Submit for Verification");
+                updateRecoveryMessage("error", error.message || t("payment_submission_failed", "Submission failed. Please try again."));
+            }
+        };
+    }
+
+    function showMinimalRecoveredPayment(options = {}) {
+        incrementRecoveryCounter("minimal");
+        recoveryCheckpoint("RECOVERY_OPEN_4 minimal:start");
+        clearQrExpiryCountdown();
+        document.getElementById("azRecoveredPaymentMiniSheet")?.remove();
+
+        const amount = Number(options.amount || 0);
+        const qr = normalizeUrl(options.qrImageUrl || options.dynamicQr?.qrImage || "");
+        const apps = recoveryBankLaunchers(options);
+        const mobile = isMobileViewport();
+
+        activeState = {
+            mode: "recovery",
+            attemptId: String(options.attemptId || ""),
+            attemptReference: String(options.attemptReference || options.reference || ""),
+            game: String(options.game || options.productName || ""),
+            package: String(options.packageName || options.package || ""),
+            amount,
+            currency: String(options.currency || ""),
+            region: String(options.region || "TH").toUpperCase(),
+            qrImage: qr,
+            qrImageUrl: qr,
+            qrMode: "aziel_promptpay_dynamic",
+            paymentMethod: options.paymentMethod || "promptpay",
+            methodCode: options.methodCode || options.paymentMethod || "promptpay",
+            methodName: options.methodName || "PromptPay QR",
+            recoverableExpiresAt: options.recoverableExpiresAt || options.dynamicQr?.expiresAt || "",
+            remainingSeconds: options.remainingSeconds,
+            bankLaunchers: apps,
+            mobileStep: "qr",
+            receiptFile: null,
+            submitting: false,
+            submittedEventSent: false,
+            expiryEventSent: false,
+            expired: isRecoveryExpired(options),
+            requiresSlip: true,
+            enableChecklist: true,
+            enableSaveQr: true,
+            enableOpenApp: true,
+            openAppMode: "bank_chooser",
+            checklistSteps: [],
+            completedChecklistActions: new Set(),
+            activeDynamicQr: createActiveDynamicQr({
+                ...options,
+                reference: options.attemptReference || options.reference || ""
+            }, {
+                qrImage: qr,
+                qrPayload: "",
+                amount: options.amount,
+                orderReference: options.attemptReference || options.reference || ""
+            })
+        };
+
+        const modal = document.createElement("div");
+        modal.id = "azRecoveredPaymentMiniSheet";
+        modal.className = `az-payment-sheet show az-payment-sheet--recovery-minimal ${mobile ? "is-mobile-promptpay is-mobile-step-qr" : "is-desktop-promptpay"}`;
+        modal.innerHTML = `
+            <div class="az-payment-sheet__panel" role="dialog" aria-modal="true" aria-labelledby="azRecoveredPaymentTitle">
+                <button type="button" class="az-payment-sheet__close" data-role="close" aria-label="${escapeHTML(t("close", "Close"))}">×</button>
+                <div class="az-payment-sheet__body">
+                    <header class="az-payment-sheet__header">
+                        <h2 id="azRecoveredPaymentTitle" class="az-payment-sheet__title">${escapeHTML(t("recoveryResumePayment", "Resume Payment"))}</h2>
+                        <strong class="az-payment-sheet__amount">${escapeHTML(`${amount.toLocaleString()} ${options.currency || ""}`.trim())}</strong>
+                        ${recoveryProductText(activeState) ? `<span class="az-payment-sheet__subtitle">${escapeHTML(recoveryProductText(activeState))}</span>` : ""}
+                    </header>
+                    <figure class="az-payment-sheet__qr">
+                        <img id="azRecoveredPaymentQrImage" alt="${escapeHTML(t("payment_promptpay_qr", "PromptPay QR"))}">
+                        <span id="azRecoveredPaymentCountdown" class="az-payment-sheet__qr-expiry">${escapeHTML(recoveryCountdownText(options))}</span>
+                    </figure>
+                    <div id="azPaymentSheetActions" class="az-payment-sheet__actions">
+                        <button type="button" id="azPaymentSheetSaveQr" class="az-payment-sheet__action">${escapeHTML(t("payment_save_qr", "Save QR"))}</button>
+                        <button type="button" id="azPaymentSheetOpenBankApp" class="az-payment-sheet__action" ${mobile ? "" : "hidden"}>${escapeHTML(t("payment_open_banking_app", "Open Banking App"))}</button>
+                    </div>
+                    <section id="azPaymentSheetDesktopBanks" class="az-payment-sheet__desktop-banks" hidden></section>
+                    <section id="azPaymentSheetChecklist" class="az-payment-sheet__checklist">
+                        <span>${escapeHTML(t("payment_progress", "Payment progress"))}</span>
+                        <ol id="azPaymentSheetChecklistSteps"></ol>
+                    </section>
+                    <div id="azPaymentSheetMobileNav" class="az-payment-sheet__mobile-nav" ${mobile ? "" : "hidden"}>
+                        <button type="button" id="azPaymentSheetContinueReceipt" class="az-payment-sheet__action">${escapeHTML(t("payment_continue_to_receipt", "Continue to Receipt"))}</button>
+                        <button type="button" id="azPaymentSheetBackQr" class="az-payment-sheet__secondary" hidden>${escapeHTML(t("payment_back_to_qr", "Back to QR"))}</button>
+                    </div>
+                    <section id="azPaymentSheetReceiptSummary" class="az-payment-sheet__receipt-summary" hidden></section>
+                    <section id="azPaymentSheetReceipt" class="az-payment-sheet__receipt" ${mobile ? "hidden" : ""}>
+                        <div class="az-payment-sheet__receipt-copy">
+                            <strong id="azPaymentSheetReceiptTitle">${escapeHTML(t("payment_upload_receipt_title", "Upload Payment Receipt"))}</strong>
+                            <span id="azPaymentSheetReceiptHelper">${escapeHTML(t("payment_receipt_helper", "Choose the screenshot after you finish the transfer."))}</span>
+                        </div>
+                        <label class="az-payment-sheet__upload">
+                            <span id="azPaymentSheetUploadLabel">${escapeHTML(t("payment_choose_screenshot", "Choose Screenshot"))}</span>
+                            <small>${escapeHTML(t("payment_receipt_file_hint", "Image file, up to the platform upload limit"))}</small>
+                            <input type="file" id="azPaymentSheetSlipInput" accept="image/*">
+                        </label>
+                        <div id="azPaymentSheetPreview" class="az-payment-sheet__preview" hidden>
+                            <span id="azPaymentSheetFileName"></span>
+                            <img id="azPaymentSheetPreviewImage" src="" alt="${escapeHTML(t("payment_receipt_selected", "Selected payment receipt"))}">
+                            <button type="button" id="azPaymentSheetRemoveFile">${escapeHTML(t("remove", "Remove"))}</button>
+                        </div>
+                    </section>
+                    <div id="azPaymentSheetMessage" class="az-payment-sheet__message" role="status" aria-live="polite"></div>
+                </div>
+                <div id="azPaymentMobileBankChooser" class="az-payment-sheet__mobile-chooser" hidden></div>
+                <button type="button" id="azPaymentSheetSubmit" class="az-payment-sheet__submit" ${mobile ? "hidden" : ""}>${escapeHTML(t("payment_submit_for_verification", "Submit for Verification"))}</button>
+            </div>
+        `;
+
+        modal.querySelector("[data-role='close']")?.addEventListener("click", () => closeMinimalRecoverySheet("button"));
+        modal.addEventListener("click", event => {
+            if (event.target === modal) closeMinimalRecoverySheet("backdrop");
+        });
+        document.body.appendChild(modal);
+        const qrImage = modal.querySelector("#azRecoveredPaymentQrImage");
+        if (qrImage) {
+            incrementRecoveryCounter("qr");
+            qrImage.src = qr;
+        }
+
+        renderRecoveryChecklist(activeState);
+        renderRecoveryDesktopBanks(activeState);
+        bindRecoverySaveQr(activeState);
+        modal.querySelector("#azPaymentSheetOpenBankApp")?.addEventListener("click", () => showRecoveryBankChooser(activeState));
+        modal.querySelector("#azPaymentSheetContinueReceipt")?.addEventListener("click", () => updateRecoveryMobileStep("receipt"));
+        modal.querySelector("#azPaymentSheetBackQr")?.addEventListener("click", () => updateRecoveryMobileStep("qr"));
+        bindRecoveryFileInput(activeState);
+        bindRecoverySubmit(activeState);
+        updateRecoveryMobileStep("qr");
+        startRecoveryCountdown(activeState);
+        if (activeState.expired) expireRecoverySheet();
+
+        recoveryCheckpoint("RECOVERY_OPEN_5 minimal:end");
+    }
+
+    function openRecoveredPayment(recovery = {}) {
+        recoveryOpenCounters.open = 0;
+        recoveryOpenCounters.normalize = 0;
+        recoveryOpenCounters.minimal = 0;
+        recoveryOpenCounters.qr = 0;
+        recoveryOpenCounters.launcher = 0;
+        recoveryOpenCounters.save = 0;
+        recoveryOpenCounters.submit = 0;
+        recoveryOpenCounters.countdown = 0;
+        recoveryOpenCounters.close = 0;
+        incrementRecoveryCounter("open");
+        recoveryCheckpoint("RECOVERY_OPEN_1 openRecoveredPayment:start");
+        const options = normalizeRecovery(recovery);
+        recoveryCheckpoint("RECOVERY_OPEN_6 after normalize");
+        if (!options.attemptId || !options.qrImageUrl || options.qrMode !== "aziel_promptpay_dynamic" || recovery.resumable === false) {
+            showMinimalRecoveredPayment({
+                ...options,
+                qrImageUrl: "",
+                dynamicQr: null
+            });
+            return;
+        }
+
+        recoveryCheckpoint("RECOVERY_OPEN_7 before minimal sheet");
+        showMinimalRecoveredPayment(options);
+        recoveryCheckpoint("RECOVERY_OPEN_8 openRecoveredPayment:end");
     }
 
     function close(reason = "programmatic") {
@@ -1627,10 +2326,19 @@
 
     window.PaymentCheckoutSheet = {
         show,
+        openRecoveredPayment,
         close,
         setMessage,
         setLoading
     };
+
+    if (!window.__AZIEL_PAYMENT_CHECKOUT_RECOVERY_LISTENER__) {
+        window.__AZIEL_PAYMENT_CHECKOUT_RECOVERY_LISTENER__ = true;
+        window.addEventListener("aziel:resume-payment", event => {
+            const recovery = event.detail?.recovery || event.detail || {};
+            openRecoveredPayment(recovery);
+        });
+    }
 
     window.PaymentQrSaver = {
         save: saveQrAsset,

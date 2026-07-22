@@ -144,6 +144,7 @@ const manualPaymentAttemptSchema = new mongoose.Schema(
                 orderReference: { type: String, default: "" },
                 encodedReference: { type: String, default: "" },
                 qrPayload: { type: String, default: "" },
+                qrImage: { type: String, default: "" },
                 expiresAt: { type: Date, default: null }
             }
         },
@@ -156,6 +157,14 @@ const manualPaymentAttemptSchema = new mongoose.Schema(
         expiresAt: {
             type: Date,
             required: true
+        },
+        recoverableExpiresAt: {
+            type: Date,
+            default: null
+        },
+        receiptSubmittedAt: {
+            type: Date,
+            default: null
         },
         consumedAt: {
             type: Date,
@@ -181,6 +190,8 @@ const manualPaymentAttemptSchema = new mongoose.Schema(
 );
 
 manualPaymentAttemptSchema.index({ username: 1, status: 1, expiresAt: 1 });
+manualPaymentAttemptSchema.index({ username: 1, status: 1, recoverableExpiresAt: 1 });
+manualPaymentAttemptSchema.index({ customerUserId: 1, status: 1, recoverableExpiresAt: 1 });
 manualPaymentAttemptSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 });
 
 module.exports = mongoose.model("ManualPaymentAttempt", manualPaymentAttemptSchema);

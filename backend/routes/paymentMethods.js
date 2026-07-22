@@ -28,6 +28,7 @@ const {
     createPromptPayQr,
     maskPromptPayRecipient
 } = require("../services/promptPayQrService");
+const { computeRecoverableExpiresAt } = require("../services/pendingPaymentRecoveryService");
 
 const CANONICAL_PROVIDER_BY_KEY = Object.freeze({
     promptpay: "promptpay",
@@ -1167,6 +1168,15 @@ router.post("/payment-methods/:key/promptpay-qr", authMiddleware, async (req, re
             currency: attempt.canonicalCurrency || req.body.currency,
             orderReference: attempt.reference
         });
+        const recoverableExpiresAt = computeRecoverableExpiresAt({
+            createdAt: attempt.createdAt,
+            expiresAt: attempt.expiresAt,
+            instructions: {
+                dynamicQr: {
+                    expiresAt: result.expiresAt
+                }
+            }
+        });
 
         await ManualPaymentAttempt.updateOne(
             {
@@ -1180,7 +1190,9 @@ router.post("/payment-methods/:key/promptpay-qr", authMiddleware, async (req, re
                     "instructions.dynamicQr.orderReference": result.orderReference,
                     "instructions.dynamicQr.encodedReference": result.encodedReference,
                     "instructions.dynamicQr.qrPayload": result.qrPayload,
-                    "instructions.dynamicQr.expiresAt": new Date(result.expiresAt)
+                    "instructions.dynamicQr.qrImage": result.qrImage,
+                    "instructions.dynamicQr.expiresAt": new Date(result.expiresAt),
+                    recoverableExpiresAt
                 }
             }
         ).catch(error => {

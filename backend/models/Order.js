@@ -165,6 +165,7 @@ const orderSchema = new mongoose.Schema({
         orderReference: { type: String, default: "" },
         encodedReference: { type: String, default: "" },
         qrPayload: { type: String, default: "" },
+        qrImage: { type: String, default: "" },
         expiresAt: { type: Date, default: null }
     },
 
