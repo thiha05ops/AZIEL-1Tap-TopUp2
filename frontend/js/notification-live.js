@@ -52,7 +52,7 @@ function updateHeaderDropdown(notifications) {
     }
 
     list.innerHTML = items.map(item => `
-        <div class="notification-item ${item.read ? "" : "unread"}" data-id="${escapeHTML(item.id)}">
+        <div class="notification-item ${item.read ? "" : "unread"}" data-id="${escapeHTML(item.id)}" data-resume-payment="${escapeHTML(getRecoveryAttemptId(item))}">
             <div class="notification-title">${escapeHTML(item.title)}</div>
             <div class="notification-message">${escapeHTML(item.message)}</div>
             <div class="notification-time">${escapeHTML(formatNotificationTime(item.createdAt))}</div>
@@ -62,8 +62,17 @@ function updateHeaderDropdown(notifications) {
     list.querySelectorAll(".notification-item").forEach(item => {
         item.addEventListener("click", () => {
             window.AZIEL_NOTIFICATIONS.markRead(item.dataset.id);
+            if (item.dataset.resumePayment && window.AZIEL_PENDING_PAYMENT_RECOVERY?.resumeAttempt) {
+                window.AZIEL_PENDING_PAYMENT_RECOVERY.resumeAttempt(item.dataset.resumePayment);
+            }
         });
     });
+}
+
+function getRecoveryAttemptId(item = {}) {
+    const metadata = item.metadata || {};
+    const actionType = metadata.notificationActionType || item.action?.type || "";
+    return actionType === "resume_manual_payment" ? String(metadata.manualPaymentAttemptId || "") : "";
 }
 
 function updateLegacyBadge(unreadCount) {

@@ -51,6 +51,7 @@
             "roblox.html",
             "wallet.html",
             "tracking.html",
+            "notifications.html",
             "account.html"
         ]);
 
@@ -452,12 +453,15 @@
     window.AZIEL_PENDING_PAYMENT_RECOVERY = window.AZIEL_PENDING_PAYMENT_RECOVERY || {
         attempts: [],
         selectedRecovery: null,
+        resumeAttempt,
         refresh: () => fetchRecoverable({ force: true }),
         dismiss: () => {
             setDismissed(state.activeAttempt);
             removeOverlay();
         }
     };
+    window.AZIEL_PENDING_PAYMENT_RECOVERY.resumeAttempt = resumeAttempt;
+    window.AZIEL_PENDING_PAYMENT_RECOVERY.refresh = () => fetchRecoverable({ force: true });
 
     if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", init);

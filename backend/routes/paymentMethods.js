@@ -28,7 +28,12 @@ const {
     createPromptPayQr,
     maskPromptPayRecipient
 } = require("../services/promptPayQrService");
-const { computeRecoverableExpiresAt } = require("../services/pendingPaymentRecoveryService");
+const {
+    computeRecoverableExpiresAt,
+    evaluateRecoverability,
+    projectRecoverableAttempt
+} = require("../services/pendingPaymentRecoveryService");
+const notificationService = require("../services/notificationService");
 
 const CANONICAL_PROVIDER_BY_KEY = Object.freeze({
     promptpay: "promptpay",
@@ -1178,6 +1183,7 @@ router.post("/payment-methods/:key/promptpay-qr", authMiddleware, async (req, re
             }
         });
 
+        let promptPaySnapshotUpdated = false;
         await ManualPaymentAttempt.updateOne(
             {
                 reference: result.orderReference,
@@ -1195,11 +1201,45 @@ router.post("/payment-methods/:key/promptpay-qr", authMiddleware, async (req, re
                     recoverableExpiresAt
                 }
             }
-        ).catch(error => {
+        ).then(update => {
+            promptPaySnapshotUpdated = Number(update?.matchedCount || 0) > 0;
+        }).catch(error => {
             if (process.env.NODE_ENV !== "production") {
                 console.log("PromptPay QR attempt snapshot skipped:", error.message);
             }
         });
+
+        const notificationAttempt = {
+            ...(typeof attempt.toObject === "function" ? attempt.toObject() : attempt),
+            recoverableExpiresAt,
+            instructions: {
+                ...(attempt.instructions || {}),
+                dynamicQr: {
+                    ...(attempt.instructions?.dynamicQr || {}),
+                    orderReference: result.orderReference,
+                    encodedReference: result.encodedReference,
+                    qrPayload: result.qrPayload,
+                    qrImage: result.qrImage,
+                    expiresAt: new Date(result.expiresAt)
+                }
+            }
+        };
+        const recoveryEvaluation = evaluateRecoverability(notificationAttempt, {
+            now: new Date(),
+            linkedOrderExists: false
+        });
+
+        if (promptPaySnapshotUpdated && recoveryEvaluation.resumable) {
+            notificationService.ensurePaymentRecoveryNotification({
+                user: req.user,
+                attempt: notificationAttempt,
+                recovery: projectRecoverableAttempt(notificationAttempt, recoveryEvaluation, { includeQr: false })
+            }).catch(error => {
+                if (process.env.NODE_ENV !== "production") {
+                    console.log("PromptPay recovery notification skipped:", error.message);
+                }
+            });
+        }
 
         res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
         res.setHeader("Pragma", "no-cache");

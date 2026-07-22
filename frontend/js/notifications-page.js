@@ -206,6 +206,12 @@ function filterNotifications(notifications) {
 
 function renderNotificationItem(item) {
     const action = getSafeAction(item.action);
+    const recoveryAction = getRecoveryAction(item);
+    const title = formatNotificationText(item, "title");
+    const message = formatNotificationText(item, "message");
+    const actionLabel = recoveryAction
+        ? t(item.metadata?.i18nActionKey || "pendingPaymentNotificationAction", "Continue Payment")
+        : action?.label || "Open";
 
     return `
         <article class="noti-card ${item.read ? "" : "unread"}" data-id="${escapeHTML(item.id)}">
@@ -217,14 +223,18 @@ function renderNotificationItem(item) {
                     <time>${escapeHTML(formatNotificationTime(item.createdAt))}</time>
                 </div>
 
-                <h2>${escapeHTML(formatPaymentText(item.title))}</h2>
-                <p>${escapeHTML(formatPaymentText(item.message))}</p>
+                <h2>${escapeHTML(formatPaymentText(title))}</h2>
+                <p>${escapeHTML(formatPaymentText(message))}</p>
                 ${renderPromotionMeta(item)}
 
                 <div class="noti-card-actions">
-                    ${action ? `
+                    ${recoveryAction ? `
+                        <button class="noti-action-link" type="button" data-resume-payment="${escapeHTML(recoveryAction.attemptId)}" data-action-read="${escapeHTML(item.id)}">
+                            ${escapeHTML(actionLabel)}
+                        </button>
+                    ` : action ? `
                         <a class="noti-action-link" href="${escapeHTML(action.url)}" data-action-read="${escapeHTML(item.id)}"${action.external ? ' target="_blank" rel="noopener noreferrer"' : ""}>
-                            ${escapeHTML(action.label || "Open")}
+                            ${escapeHTML(actionLabel)}
                         </a>
                     ` : ""}
 
@@ -270,9 +280,16 @@ function bindNotificationItems() {
     });
 
     document.querySelectorAll("[data-action-read]").forEach(link => {
-        link.addEventListener("click", () => {
+        link.addEventListener("click", event => {
             window.AZIEL_NOTIFICATIONS?.markRead(link.dataset.actionRead);
             window.AZIEL_MOTION?.emphasize(link.closest(".noti-card"), "updated");
+
+            const attemptId = link.dataset.resumePayment || "";
+            if (!attemptId) return;
+
+            event.preventDefault();
+            event.stopPropagation();
+            resumePaymentFromNotification(attemptId, link);
         });
     });
 
@@ -290,6 +307,22 @@ function bindNotificationItems() {
     });
 }
 
+async function resumePaymentFromNotification(attemptId, source) {
+    const recovery = window.AZIEL_PENDING_PAYMENT_RECOVERY;
+
+    if (!recovery?.resumeAttempt) {
+        window.AZIEL_UI?.toast?.error?.("Payment recovery is still loading. Please try again.");
+        return;
+    }
+
+    try {
+        source.disabled = true;
+        await recovery.resumeAttempt(attemptId);
+    } finally {
+        source.disabled = false;
+    }
+}
+
 function getSafeAction(action) {
     if (!action?.url) return null;
 
@@ -303,6 +336,30 @@ function getSafeAction(action) {
         url,
         external: /^https?:\/\//i.test(url)
     };
+}
+
+function getRecoveryAction(item = {}) {
+    const metadata = item.metadata || {};
+    const action = item.action || {};
+    const attemptId = String(metadata.manualPaymentAttemptId || "").trim();
+    const actionType = metadata.notificationActionType || action.type || "";
+
+    if (!attemptId || actionType !== "resume_manual_payment") return null;
+
+    return { attemptId };
+}
+
+function formatNotificationText(item = {}, field = "title") {
+    const metadata = item.metadata || {};
+    const key = field === "message" ? metadata.i18nMessageKey : metadata.i18nTitleKey;
+    const fallback = item[field] || "";
+    const text = key ? t(key, fallback) : fallback;
+
+    return String(text || fallback || "").replace("{game}", metadata.game || "your order");
+}
+
+function t(key, fallback) {
+    return window.AZIEL_I18N?.t?.(key, fallback) || fallback || key;
 }
 
 function formatPaymentText(value) {

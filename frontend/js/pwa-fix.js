@@ -116,6 +116,7 @@ function loadPendingPaymentRecoveryOverlay() {
         "roblox.html",
         "wallet.html",
         "tracking.html",
+        "notifications.html",
         "account.html"
     ]);
 

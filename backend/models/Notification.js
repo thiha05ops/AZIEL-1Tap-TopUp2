@@ -36,6 +36,7 @@ const notificationSchema =
                     "topup_delayed",
                     "announcement",
                     "promo",
+                    "payment_recovery",
                     "system",
                     "general"
                 ],
@@ -115,6 +116,18 @@ notificationSchema.index({ username: 1, isRead: 1, createdAt: -1 });
 notificationSchema.index({ userId: 1, createdAt: -1, _id: -1 });
 notificationSchema.index({ userId: 1, isRead: 1, createdAt: -1, _id: -1 });
 notificationSchema.index({ username: 1, createdAt: -1, _id: -1 });
+notificationSchema.index(
+    { userId: 1, type: 1, "metadata.manualPaymentAttemptId": 1 },
+    {
+        unique: true,
+        partialFilterExpression: {
+            userId: { $type: "objectId" },
+            type: "payment_recovery",
+            source: "manual_payment_recovery",
+            "metadata.manualPaymentAttemptId": { $type: "string" }
+        }
+    }
+);
 
 module.exports =
     mongoose.model(

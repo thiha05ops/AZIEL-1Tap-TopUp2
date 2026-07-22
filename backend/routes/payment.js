@@ -81,6 +81,12 @@ function devLog(...args) {
     if (!isProduction) console.log(...args);
 }
 
+function settlePaymentRecoveryNotification(input = {}) {
+    notificationService.resolvePaymentRecoveryNotification(input).catch(error => {
+        devLog("Payment recovery notification resolution skipped:", error?.message || error);
+    });
+}
+
 function getCurrencyKey(currency) {
     return currency === "THB" ? "THB" : "MMK";
 }
@@ -933,6 +939,8 @@ router.post("/payment/manual/attempt", authMiddleware, manualAttemptLimiter, asy
 router.get("/payment/manual/recoverable", authMiddleware, async (req, res) => {
     try {
         const now = new Date();
+        await notificationService.expirePaymentRecoveryNotifications(req.user);
+
         const attempts = await ManualPaymentAttempt.find(getAttemptOwnerQuery(req.user, {
             status: "active",
             expiresAt: { $gt: now }
@@ -949,7 +957,19 @@ router.get("/payment/manual/recoverable", authMiddleware, async (req, res) => {
             const evaluation = evaluateRecoverability(attempt, { now, linkedOrderExists });
 
             if (evaluation.resumable) {
-                recoverable.push(projectRecoverableAttempt(attempt, evaluation, { includeQr: false }));
+                const projected = projectRecoverableAttempt(attempt, evaluation, { includeQr: false });
+                recoverable.push(projected);
+                await notificationService.ensurePaymentRecoveryNotification({
+                    user: req.user,
+                    attempt,
+                    recovery: projected
+                });
+            } else if (evaluation.reason) {
+                await notificationService.resolvePaymentRecoveryNotification({
+                    user: req.user,
+                    attemptId: attempt.attemptId,
+                    status: evaluation.reason
+                });
             }
         }
 
@@ -988,6 +1008,12 @@ router.get("/payment/manual/recoverable/:attemptId", authMiddleware, async (req,
         const evaluation = evaluateRecoverability(attempt, { linkedOrderExists });
 
         if (!evaluation.resumable) {
+            settlePaymentRecoveryNotification({
+                user: req.user,
+                attemptId: attempt.attemptId,
+                status: evaluation.reason || "unavailable"
+            });
+
             return res.status(409).json({
                 success: false,
                 code: "RECOVERABLE_PAYMENT_UNAVAILABLE",
@@ -1033,6 +1059,12 @@ router.post("/payment/manual/recoverable/:attemptId/resume", authMiddleware, asy
         const evaluation = evaluateRecoverability(attempt, { linkedOrderExists });
 
         if (!evaluation.resumable) {
+            settlePaymentRecoveryNotification({
+                user: req.user,
+                attemptId: attempt.attemptId,
+                status: evaluation.reason || "unavailable"
+            });
+
             return res.status(409).json({
                 success: false,
                 code: "RECOVERABLE_PAYMENT_UNAVAILABLE",
@@ -1093,6 +1125,12 @@ router.post("/payment/manual/attempt/:attemptId/slip", authMiddleware, upload.si
             });
 
             if (existingOrder) {
+                settlePaymentRecoveryNotification({
+                    user: req.user,
+                    attemptId: attempt.attemptId,
+                    status: "order_created"
+                });
+
                 return res.json({
                     success: true,
                     code: "MANUAL_PAYMENT_ORDER_ALREADY_CREATED",
@@ -1115,6 +1153,12 @@ router.post("/payment/manual/attempt/:attemptId/slip", authMiddleware, upload.si
                 await attempt.save();
                 await releasePromoRedemption(attempt.promoRedemptionId);
             }
+
+            settlePaymentRecoveryNotification({
+                user: req.user,
+                attemptId: attempt.attemptId,
+                status: "expired"
+            });
 
             return res.status(410).json({
                 success: false,
@@ -1139,6 +1183,11 @@ router.post("/payment/manual/attempt/:attemptId/slip", authMiddleware, upload.si
 
         const result = await createOrderFromManualAttempt(attempt, evidence, req.user.username);
         orderCreated = true;
+        settlePaymentRecoveryNotification({
+            user: req.user,
+            attemptId: attempt.attemptId,
+            status: "submitted"
+        });
 
         await emitManualOrderSubmitted(req, result.order, result.duplicate);
 

@@ -19,9 +19,19 @@ const VALID_TYPES = new Set([
     "topup_delayed",
     "announcement",
     "promo",
+    "payment_recovery",
     "system",
     "general"
 ]);
+
+const PAYMENT_RECOVERY_TYPE = "payment_recovery";
+const PAYMENT_RECOVERY_SOURCE = "manual_payment_recovery";
+const PAYMENT_RECOVERY_ACTION_TYPE = "resume_manual_payment";
+const PAYMENT_RECOVERY_I18N = Object.freeze({
+    title: "pendingPaymentNotificationTitle",
+    message: "pendingPaymentNotificationMessage",
+    action: "pendingPaymentNotificationAction"
+});
 
 const VALID_CATEGORIES = new Set([
     "orders",
@@ -54,6 +64,7 @@ function normalizeCategory(category, type = "") {
 
     if (type === "order" || type === "order_completed" || type === "topup_delayed") return "orders";
     if (type === "wallet") return "wallet";
+    if (type === PAYMENT_RECOVERY_TYPE) return "payments";
     if (type === "refund") return "refunds";
     if (type === "support") return "support";
     if (type === "promo") return "promotions";
@@ -100,7 +111,15 @@ function sanitizeMetadata(metadata = {}) {
         "campaignCode",
         "startsAt",
         "endsAt",
-        "imageUrl"
+        "imageUrl",
+        "manualPaymentAttemptId",
+        "attemptReference",
+        "packageName",
+        "recoverableExpiresAt",
+        "notificationActionType",
+        "i18nTitleKey",
+        "i18nMessageKey",
+        "i18nActionKey"
     ].forEach(key => {
         if (metadata[key] !== undefined && metadata[key] !== null) {
             safe[key] = metadata[key];
@@ -108,6 +127,27 @@ function sanitizeMetadata(metadata = {}) {
     });
 
     return safe;
+}
+
+function buildPaymentRecoveryMessage(game) {
+    const name = cleanText(game || "your order", "your order");
+    return `Your ${name} payment is waiting to be completed.`;
+}
+
+function buildPaymentRecoveryMetadata(attempt = {}, recovery = {}) {
+    return sanitizeMetadata({
+        manualPaymentAttemptId: attempt.attemptId || recovery.attemptId,
+        attemptReference: attempt.reference || recovery.attemptReference || recovery.reference,
+        game: attempt.productName || recovery.productName || recovery.game || "your order",
+        packageName: attempt.packageName || recovery.packageName || "",
+        amount: attempt.finalAmount || attempt.canonicalAmount || recovery.finalAmount || recovery.amount,
+        currency: attempt.canonicalCurrency || recovery.currency,
+        recoverableExpiresAt: recovery.recoverableExpiresAt || attempt.recoverableExpiresAt || attempt.expiresAt,
+        notificationActionType: PAYMENT_RECOVERY_ACTION_TYPE,
+        i18nTitleKey: PAYMENT_RECOVERY_I18N.title,
+        i18nMessageKey: PAYMENT_RECOVERY_I18N.message,
+        i18nActionKey: PAYMENT_RECOVERY_I18N.action
+    });
 }
 
 function userContextFromAuth(user) {
@@ -230,6 +270,130 @@ async function getUnreadCount(user) {
         ...activeFilter(user),
         isRead: false
     });
+}
+
+async function ensurePaymentRecoveryNotification(input = {}) {
+    const owner = await resolveUserOwner(input);
+    const attempt = input.attempt || {};
+    const recovery = input.recovery || {};
+    const metadata = buildPaymentRecoveryMetadata(attempt, recovery);
+    const attemptId = cleanText(metadata.manualPaymentAttemptId);
+
+    if (!owner?.username || !owner?.id || !isObjectId(owner.id) || !attemptId) {
+        return { notification: null, normalized: null, unreadCount: 0, created: false };
+    }
+
+    const title = "Payment Not Completed";
+    const message = buildPaymentRecoveryMessage(metadata.game);
+    const expiresAt = metadata.recoverableExpiresAt ? new Date(metadata.recoverableExpiresAt) : null;
+    const action = sanitizeAction({
+        type: PAYMENT_RECOVERY_ACTION_TYPE,
+        label: "Continue Payment",
+        url: "notifications.html"
+    });
+    const filter = {
+        userId: owner.id,
+        type: PAYMENT_RECOVERY_TYPE,
+        source: PAYMENT_RECOVERY_SOURCE,
+        "metadata.manualPaymentAttemptId": attemptId
+    };
+
+    const result = await Notification.updateOne(
+        filter,
+        {
+            $setOnInsert: {
+                userId: owner.id,
+                username: owner.username,
+                title,
+                message,
+                type: PAYMENT_RECOVERY_TYPE,
+                category: "payments",
+                source: PAYMENT_RECOVERY_SOURCE,
+                action,
+                isRead: false,
+                deletedByUser: false,
+                createdAt: new Date()
+            },
+            $set: {
+                status: "active",
+                expiresAt,
+                metadata,
+                updatedAt: new Date()
+            }
+        },
+        { upsert: true }
+    );
+
+    const notification = await Notification.findOne(filter);
+    const normalized = notification ? normalizeNotification(notification) : null;
+    const unreadCount = await getUnreadCount(owner);
+
+    if (result.upsertedCount > 0 && normalized) {
+        await realtime.emitNotification(owner.username, normalized, { unreadCount });
+    } else {
+        await realtime.emitNotificationCount(owner.username, unreadCount);
+    }
+
+    return {
+        notification,
+        normalized,
+        unreadCount,
+        created: result.upsertedCount > 0
+    };
+}
+
+async function expirePaymentRecoveryNotifications(user) {
+    const filter = {
+        ...activeFilter(user),
+        type: PAYMENT_RECOVERY_TYPE,
+        source: PAYMENT_RECOVERY_SOURCE,
+        status: "active",
+        expiresAt: { $lte: new Date() }
+    };
+
+    const result = await Notification.updateMany(filter, {
+        status: "expired",
+        isRead: true
+    });
+
+    if (result.modifiedCount > 0) {
+        const unreadCount = await getUnreadCount(user);
+        await realtime.emitNotificationCount(user.username, unreadCount);
+    }
+
+    return result;
+}
+
+async function resolvePaymentRecoveryNotification(input = {}) {
+    const owner = await resolveUserOwner(input);
+    const attemptId = cleanText(input.attemptId || input.attempt?.attemptId || "");
+
+    if (!owner?.username || !attemptId) {
+        return { notification: null, unreadCount: owner ? await getUnreadCount(owner) : 0 };
+    }
+
+    const notification = await Notification.findOneAndUpdate(
+        {
+            ...ownerFilter(owner),
+            type: PAYMENT_RECOVERY_TYPE,
+            source: PAYMENT_RECOVERY_SOURCE,
+            "metadata.manualPaymentAttemptId": attemptId
+        },
+        {
+            status: cleanText(input.status || "resolved", "resolved"),
+            isRead: true
+        },
+        { new: true }
+    );
+
+    const unreadCount = await getUnreadCount(owner);
+    await realtime.emitNotificationCount(owner.username, unreadCount);
+
+    return {
+        notification,
+        normalized: notification ? normalizeNotification(notification) : null,
+        unreadCount
+    };
 }
 
 async function createUserNotification(input = {}) {
@@ -418,11 +582,14 @@ module.exports = {
     createBroadcastNotifications,
     createUserNotification,
     deleteNotification,
+    ensurePaymentRecoveryNotification,
+    expirePaymentRecoveryNotifications,
     getUnreadCount,
     getUserNotifications,
     markAllNotificationsRead,
     markNotificationRead,
     normalizeNotification,
     ownerFilter,
+    resolvePaymentRecoveryNotification,
     resolveUserOwner
 };
