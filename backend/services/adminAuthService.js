@@ -95,6 +95,44 @@ function readAdminTotpSecret(admin, stage) {
     }
 }
 
+function readAdminPendingTotpSecret(admin, stage) {
+    try {
+        return decryptSecret(admin.twoFactor?.pendingSecretEncrypted || "");
+    } catch (error) {
+        console.error("Admin pending 2FA secret decrypt failed", {
+            stage,
+            adminId: maskAdminId(admin),
+            name: error?.name || "Error",
+            message: error?.message || "",
+            code: error?.code || ""
+        });
+        throw new AdminAuthError(
+            "ADMIN_2FA_SECRET_UNAVAILABLE",
+            "Two-factor authentication could not be verified. Contact the account owner.",
+            401
+        );
+    }
+}
+
+async function buildAdmin2FASetupResponse(account, secret) {
+    const provisioningUri = generateURI({
+        secret,
+        strategy: "totp",
+        algorithm: "sha1",
+        digits: 6,
+        period: 30,
+        issuer: "AZIEL Admin",
+        label: account.username
+    });
+
+    return {
+        manualKey: secret,
+        provisioningUri,
+        qrDataUrl: await QRCode.toDataURL(provisioningUri, { margin: 1, width: 220 }),
+        expiresAt: account.twoFactor.pendingExpiresAt
+    };
+}
+
 async function bootstrapFirstOwnerIfAllowed({ username, password, req }) {
     const count = await AdminAccount.countDocuments();
     if (count > 0) return null;
@@ -509,27 +547,21 @@ async function startAdmin2FASetup(admin) {
     const account = await AdminAccount.findById(admin.id || admin.adminId);
     if (!account) throw new AdminAuthError("ADMIN_ACCOUNT_NOT_FOUND", "Admin account not found.", 404);
 
+    if (
+        account.twoFactor?.pendingSecretEncrypted &&
+        account.twoFactor.pendingExpiresAt &&
+        account.twoFactor.pendingExpiresAt > new Date()
+    ) {
+        const pendingSecret = readAdminPendingTotpSecret(account, "admin_2fa_setup_reuse");
+        return buildAdmin2FASetupResponse(account, pendingSecret);
+    }
+
     const secret = generateSecret();
     account.twoFactor.pendingSecretEncrypted = encryptSecret(secret);
     account.twoFactor.pendingExpiresAt = new Date(Date.now() + ADMIN_2FA_SETUP_TTL_MS);
     await account.save();
 
-    const provisioningUri = generateURI({
-        secret,
-        strategy: "totp",
-        algorithm: "sha1",
-        digits: 6,
-        period: 30,
-        issuer: "AZIEL Admin",
-        label: account.username
-    });
-
-    return {
-        manualKey: secret,
-        provisioningUri,
-        qrDataUrl: await QRCode.toDataURL(provisioningUri, { margin: 1, width: 220 }),
-        expiresAt: account.twoFactor.pendingExpiresAt
-    };
+    return buildAdmin2FASetupResponse(account, secret);
 }
 
 async function verifyAdmin2FASetup(admin, code, req) {
@@ -538,12 +570,7 @@ async function verifyAdmin2FASetup(admin, code, req) {
         throw new AdminAuthError("ADMIN_2FA_INVALID", "Invalid verification code.");
     }
 
-    const secret = readAdminTotpSecret({
-        ...account.toObject(),
-        twoFactor: {
-            pendingSecretEncrypted: account.twoFactor.pendingSecretEncrypted
-        }
-    }, "admin_2fa_setup");
+    const secret = readAdminPendingTotpSecret(account, "admin_2fa_setup");
     if (!(await verifyTotp(secret, code))) {
         throw new AdminAuthError("ADMIN_2FA_INVALID", "Invalid verification code.");
     }

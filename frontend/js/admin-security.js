@@ -9,6 +9,7 @@ const adminAuditPaging = {
     hasMore: false,
     cursorStack: [""]
 };
+let admin2FASetupInFlight = false;
 
 document.addEventListener("DOMContentLoaded", () => {
     initAdminSecurityController();
@@ -433,7 +434,19 @@ function safeAuditResourceId(resourceType = "", resourceId = "") {
 }
 
 async function startAdmin2FASetup() {
-    const data = await adminFetch("/api/admin/security/2fa/setup", { method: "POST" });
+    if (admin2FASetupInFlight) return;
+    admin2FASetupInFlight = true;
+    const startButton = document.getElementById("startAdmin2FABtn");
+    setAdminSecurityButtonLoading(startButton, adminT("loading", "Loading"));
+
+    let data;
+    try {
+        data = await adminFetch("/api/admin/security/2fa/setup", { method: "POST" });
+    } finally {
+        admin2FASetupInFlight = false;
+        resetAdminSecurityButton(startButton);
+    }
+
     if (!data?.success) return;
     const setup = data.setup || {};
     const modal = ensureAdminSecurityModal("admin2FAModal");
