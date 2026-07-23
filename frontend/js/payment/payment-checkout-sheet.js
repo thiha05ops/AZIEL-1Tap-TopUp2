@@ -1216,31 +1216,10 @@
     }
 
     async function ensurePromptPayLauncherRuntime() {
-        if (Array.isArray(window.AZIEL_TH_BANK_APPS) && window.AZIEL_TH_BANK_APPS.length) {
-            return true;
+        if (typeof window.ensurePromptPayBankLauncherRuntime === "function") {
+            const launchers = await window.ensurePromptPayBankLauncherRuntime();
+            return Array.isArray(launchers) && launchers.length > 0;
         }
-
-        if (typeof window.loadPaymentMethods === "function") {
-            await window.loadPaymentMethods();
-            if (Array.isArray(window.AZIEL_TH_BANK_APPS) && window.AZIEL_TH_BANK_APPS.length) {
-                return true;
-            }
-        }
-
-        await new Promise(resolve => {
-            const startedAt = Date.now();
-            const timer = window.setInterval(() => {
-                if (Array.isArray(window.AZIEL_TH_BANK_APPS) && window.AZIEL_TH_BANK_APPS.length) {
-                    window.clearInterval(timer);
-                    resolve();
-                    return;
-                }
-                if (Date.now() - startedAt > 3000) {
-                    window.clearInterval(timer);
-                    resolve();
-                }
-            }, 40);
-        });
 
         return Array.isArray(window.AZIEL_TH_BANK_APPS) && window.AZIEL_TH_BANK_APPS.length > 0;
     }
@@ -2214,6 +2193,9 @@
             });
             return;
         }
+        state.bankLaunchers = window.ensurePromptPayBankLauncherRuntime
+            ? await window.ensurePromptPayBankLauncherRuntime()
+            : state.bankLaunchers;
         const apps = recoveryBankLaunchers(state);
         if (!apps.length) {
             chooser.hidden = true;
@@ -2468,10 +2450,19 @@
         renderRecoveryChecklist(activeState);
         renderRecoveryDesktopBanks(activeState);
         bindRecoverySaveQr(activeState);
-        modal.querySelector("#azPaymentSheetOpenBankApp")?.addEventListener("click", () => {
-            showRecoveryBankChooser(activeState).catch(() => {
+        modal.querySelector("#azPaymentSheetOpenBankApp")?.addEventListener("click", async event => {
+            const button = event.currentTarget;
+            const label = button.textContent;
+            button.disabled = true;
+            button.textContent = rt(activeState, "loading", "Loading...");
+            try {
+                await showRecoveryBankChooser(activeState);
+            } catch (error) {
                 updateRecoveryMessage("error", rt(activeState, "payment_bank_app_unavailable", "Bank app unavailable. Open your banking app and import the saved QR."));
-            });
+            } finally {
+                button.disabled = Boolean(activeState?.expired);
+                button.textContent = label;
+            }
         });
         modal.querySelector("#azPaymentSheetContinueReceipt")?.addEventListener("click", () => updateRecoveryMobileStep("receipt"));
         modal.querySelector("#azPaymentSheetBackQr")?.addEventListener("click", () => updateRecoveryMobileStep("qr"));

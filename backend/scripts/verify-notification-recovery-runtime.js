@@ -17,8 +17,8 @@ const notificationsPage = read("frontend/js/notifications-page.js");
 assertIncludes(pwaFix, "window.ensurePendingPaymentRecoveryRuntime", "Shared recovery runtime initializer");
 assertIncludes(pwaFix, "window.__AZIEL_PENDING_PAYMENT_RECOVERY_RUNTIME_PROMISE__", "Shared in-flight runtime promise");
 assertIncludes(pwaFix, "await ensureAzielI18nReady()", "Runtime waits for i18n");
-assertIncludes(pwaFix, "payment-checkout-sheet.js?v=20260723-recovery-runtime", "Runtime loads checkout sheet once");
-assertIncludes(pwaFix, "pending-payment-recovery.js?v=20260723-recovery-runtime", "Runtime loads recovery overlay once");
+assertIncludes(pwaFix, "payment-checkout-sheet.js?v=20260723-context-bank-runtime", "Runtime loads checkout sheet once");
+assertIncludes(pwaFix, "pending-payment-recovery.js?v=20260723-context-bank-runtime", "Runtime loads recovery overlay once");
 assertIncludes(pwaFix, "window.AZIEL_PENDING_PAYMENT_RECOVERY?.resumeAttempt", "Runtime waits for resumeAttempt API");
 
 assertIncludes(notificationLive, "await window.ensurePendingPaymentRecoveryRuntime?.()", "Bell notification resume waits for shared runtime");

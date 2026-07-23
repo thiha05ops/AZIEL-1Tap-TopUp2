@@ -16,7 +16,6 @@
         attempts: [],
         activeAttempt: null,
         countdownTimer: null,
-        checkoutObserver: null,
         selectedRecovery: null,
         runtimePromise: null,
         lastFetchStartedAt: 0,
@@ -73,28 +72,37 @@
         return (window.location.pathname.split("/").pop() || "home.html").toLowerCase();
     }
 
+    function getRecoveryPageContext() {
+        const page = currentPage();
+        const gameMap = {
+            "mlbb.html": "mlbb",
+            "pubg.html": "pubg",
+            "freefire.html": "freefire",
+            "hok.html": "hok",
+            "aov-id.html": "aov",
+            "pubg-rp.html": "pubg-rp",
+            "telegram.html": "telegram",
+            "genshin.html": "genshin",
+            "roblox.html": "roblox"
+        };
+
+        if (page === "home.html" || page === "" || page === "/") {
+            return { type: "home", gameKey: null };
+        }
+        if (page === "notifications.html") {
+            return { type: "notifications", gameKey: null };
+        }
+        if (gameMap[page]) {
+            return { type: "game", gameKey: gameMap[page] };
+        }
+
+        return { type: "other", gameKey: null };
+    }
+
     function isEligiblePage() {
         if (!document.getElementById("azHeaderMount")) return false;
         if (currentPage().startsWith("admin")) return false;
-
-        const allowed = new Set([
-            "home.html",
-            "mlbb.html",
-            "pubg.html",
-            "freefire.html",
-            "hok.html",
-            "aov-id.html",
-            "pubg-rp.html",
-            "telegram.html",
-            "genshin.html",
-            "roblox.html",
-            "wallet.html",
-            "tracking.html",
-            "notifications.html",
-            "account.html"
-        ]);
-
-        return allowed.has(currentPage());
+        return getRecoveryPageContext().type !== "other";
     }
 
     function getToken() {
@@ -158,6 +166,66 @@
     function getIconSrc(attempt = {}) {
         const code = safeText(attempt.productCode || attempt.gameCode, "").toLowerCase().replace(/[^a-z0-9_-]/g, "");
         return code ? `/assets/games/${code}.webp` : "";
+    }
+
+    function normalizeAttemptGameKey(attempt = {}) {
+        const stable = safeText(
+            attempt.gameKey ||
+            attempt.productKey ||
+            attempt.productCode ||
+            attempt.gameCode ||
+            attempt.methodProductKey,
+            ""
+        ).toLowerCase();
+        const readable = safeText(
+            attempt.productName ||
+            attempt.gameName ||
+            attempt.game ||
+            attempt.title,
+            ""
+        ).toLowerCase();
+        const compact = String(stable || readable)
+            .replace(/&/g, "and")
+            .replace(/[^a-z0-9]+/g, "");
+        const aliases = {
+            mobilelegends: "mlbb",
+            mobilelegendsbangbang: "mlbb",
+            mlbb: "mlbb",
+            pubgmobile: "pubg",
+            pubg: "pubg",
+            pubgm: "pubg",
+            pubgroyalepass: "pubg-rp",
+            pubgrp: "pubg-rp",
+            royalepass: "pubg-rp",
+            freefire: "freefire",
+            ff: "freefire",
+            honorofkings: "hok",
+            hok: "hok",
+            genshinimpact: "genshin",
+            genshin: "genshin",
+            roblox: "roblox",
+            arenaofvalor: "aov",
+            aov: "aov",
+            aovid: "aov",
+            telegram: "telegram"
+        };
+
+        return aliases[compact] || stable.replace(/[^a-z0-9_-]+/g, "") || compact;
+    }
+
+    function filterAttemptsForPage(attempts = []) {
+        const context = getRecoveryPageContext();
+        const activeAttempts = attempts
+            .filter(item => item?.resumable !== false)
+            .map(item => ({ ...item, gameKey: normalizeAttemptGameKey(item) }))
+            .filter(item => computeRemaining(item) > 0);
+
+        if (context.type === "home") return activeAttempts;
+        if (context.type === "game") {
+            return activeAttempts.filter(item => item.gameKey === context.gameKey);
+        }
+
+        return [];
     }
 
     function removeOverlay(options = {}) {
@@ -351,7 +419,7 @@
         state.runtimePromise = (async () => {
             await loadStylesheet("/css/payment/payment-checkout-sheet.css?v=20260722-promptpay-platform", "aziel-recovery-checkout-css");
             await loadScript("/js/payment/android-app-launch.js?v=20260722-open-app", "aziel-recovery-android-launch", () => Boolean(window.AZIEL_ANDROID_APP_LAUNCH));
-            await loadScript("/js/payment/payment-checkout-sheet.js?v=20260723-recovery-runtime", "aziel-recovery-checkout-sheet", () => Boolean(window.PaymentCheckoutSheet?.openRecoveredPayment));
+            await loadScript("/js/payment/payment-checkout-sheet.js?v=20260723-context-bank-runtime", "aziel-recovery-checkout-sheet", () => Boolean(window.PaymentCheckoutSheet?.openRecoveredPayment));
             if (!window.PaymentCheckoutSheet?.openRecoveredPayment) {
                 throw new Error("Recovery checkout is unavailable.");
             }
@@ -366,11 +434,9 @@
 
     function chooseActiveAttempt(attempts = []) {
         const currentRegion = window.AZIEL?.getShopRegion?.() || "";
-        return attempts
-            .filter(item => item?.resumable !== false)
+        return filterAttemptsForPage(attempts)
             .filter(item => !currentRegion || !item?.region || String(item.region).toUpperCase() === String(currentRegion).toUpperCase())
             .filter(item => !isDismissed(item))
-            .filter(item => computeRemaining(item) > 0)
             .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())[0] || null;
     }
 
@@ -408,11 +474,14 @@
 
             const data = await res.json().catch(() => ({}));
             const attempts = Array.isArray(data.recoverable) ? data.recoverable : [];
-            state.attempts = attempts;
+            state.attempts = filterAttemptsForPage(attempts)
+                .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
             state.activeAttempt = chooseActiveAttempt(attempts);
             recoveryDevLog("RECOVERY_REFRESH_RESULT", {
                 forceAttemptId: options.forceAttemptId || "",
                 count: attempts.length,
+                eligibleCount: state.attempts.length,
+                pageContext: getRecoveryPageContext(),
                 matched: Boolean(options.forceAttemptId && attempts.some(item => item.attemptId === options.forceAttemptId)),
                 activeAttemptId: state.activeAttempt?.attemptId || ""
             });
@@ -534,27 +603,10 @@
         }
     }
 
-    function watchCheckoutSheet() {
-        if (state.checkoutObserver || !document.body) return;
-
-        state.checkoutObserver = new MutationObserver(() => {
-            if (isPaymentSheetOpen()) removeOverlay();
-        });
-
-        state.checkoutObserver.observe(document.body, {
-            childList: true,
-            subtree: true,
-            attributes: true,
-            attributeFilter: ["class"]
-        });
-    }
-
     async function init() {
         if (state.initialized || !isEligiblePage()) return;
         state.initialized = true;
         await waitForLanguageRuntime();
-
-        watchCheckoutSheet();
 
         window.addEventListener("aziel:ready", () => fetchRecoverable({ force: true }));
         window.addEventListener("aziel:userChanged", () => {

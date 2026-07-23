@@ -53,7 +53,8 @@ function verifyCheckoutRecoveryMode() {
     includes("frontend/js/payment/payment-checkout-sheet.js", "window.AZIEL_TH_BANK_APPS", "recovery bank chooser must use the public PromptPay launcher runtime collection.");
     includes("frontend/js/payment/payment-checkout-sheet.js", "canonical_promptpay_runtime", "canonical PromptPay launchers must take precedence over recovery snapshots.");
     includes("frontend/js/payment/payment-checkout-sheet.js", "async function ensurePromptPayLauncherRuntime", "recovery chooser must wait for PromptPay launcher runtime readiness.");
-    includes("frontend/js/payment/payment-checkout-sheet.js", "await window.loadPaymentMethods()", "recovery chooser must bootstrap canonical launcher runtime when needed.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "window.ensurePromptPayBankLauncherRuntime", "recovery chooser must use the shared bank launcher runtime when needed.");
+    includes("frontend/js/pwa-fix.js", "await window.loadPaymentMethods()", "shared bank launcher runtime must bootstrap canonical payment methods when needed.");
     includes("frontend/js/payment/payment-checkout-sheet.js", "const ready = await ensurePromptPayLauncherRuntime()", "recovery chooser must not render shell before launchers are ready.");
     includes("frontend/js/payment/payment-checkout-sheet.js", "sourceType: \"empty\"", "recovery chooser must not render rows from stale recovery snapshot launchers.");
     includes("frontend/js/payment/payment-checkout-sheet.js", "cloneRecoveryLauncher", "recovery chooser must clone launchers instead of mutating canonical arrays.");

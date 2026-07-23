@@ -83,10 +83,10 @@ function verifyCheckoutCacheBusters() {
         "frontend/genshin.html",
         "frontend/roblox.html"
     ].forEach(file => {
-        includes(file, "payment-checkout-sheet.js?v=20260723-recovery-runtime", "Game checkout page must load the close-event checkout sheet.");
+        includes(file, "payment-checkout-sheet.js?v=20260723-context-bank-runtime", "Game checkout page must load the close-event checkout sheet.");
         includes(file, "payment-deeplink.js?v=20260723-close-event", "Game checkout page must load the attempt-aware deeplink bridge.");
         includes(file, "payment-manual.js?v=20260723-close-event", "Game checkout page must load the attempt-aware manual bridge.");
-        includes(file, "pwa-fix.js?v=20260723-language-recovery-refresh", "Game checkout page must load the recovery/language/refresh loader.");
+        includes(file, "pwa-fix.js?v=20260723-context-bank-runtime", "Game checkout page must load the recovery/language/refresh loader.");
     });
 }
 

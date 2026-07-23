@@ -51,11 +51,10 @@ function verifyOneTimeOwnership() {
 function verifyNoRecursiveRecoveryFetch() {
     const overlay = read("frontend/js/payment/pending-payment-recovery.js");
     const renderBlock = overlay.match(/function renderOverlay\(\) \{[\s\S]*?\n    function startCountdown/)?.[0] || "";
-    const observerBlock = overlay.match(/function watchCheckoutSheet\(\) \{[\s\S]*?\n    async function init/)?.[0] || "";
     assert(renderBlock, "pending-payment-recovery.js: renderOverlay block must be detectable.");
-    assert(observerBlock, "pending-payment-recovery.js: watchCheckoutSheet block must be detectable.");
     assert(!renderBlock.includes("fetchRecoverable({ force: true });"), "render/countdown expiry must not recursively refetch recoverable attempts.");
-    assert(!observerBlock.includes("renderOverlay();"), "checkout MutationObserver must not rerender overlay in response to its own DOM mutations.");
+    assert(!overlay.includes("new MutationObserver"), "recovery overlay must not use MutationObserver for visibility.");
+    assert(overlay.includes("aziel:payment-checkout-closed"), "recovery overlay must use explicit checkout close events.");
 }
 
 function verifyRecoveryCheckoutDoesNotPersistQrSnapshots() {

@@ -50,6 +50,7 @@
     "verify:global-language-authority": "node backend/scripts/verify-global-language-authority.js",
     "verify:notification-recovery-runtime": "node backend/scripts/verify-notification-recovery-runtime.js",
     "verify:pwa-refresh": "node backend/scripts/verify-pwa-refresh.js",
+    "verify:recovery-context-and-bank-runtime": "node backend/scripts/verify-recovery-context-and-bank-runtime.js",
     "verify:manual-payment": "node backend/scripts/verify-manual-payment-flow.js",
     "verify:omise-webhook": "node backend/scripts/verify-omise-webhook.js",
     "verify:email-delivery": "node backend/scripts/verify-email-delivery.js",

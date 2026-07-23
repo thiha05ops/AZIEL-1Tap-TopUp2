@@ -14,18 +14,19 @@ window.selectedPaymentData = null;
 async function loadPaymentMethods() {
     const paymentGrid = document.getElementById("paymentGrid");
     const paymentInput = document.getElementById("paymentMethod");
-
-    if (!paymentGrid || !paymentInput) return;
+    const hasPaymentGrid = Boolean(paymentGrid && paymentInput);
 
     const region =
         localStorage.getItem("region") ||
         localStorage.getItem("selectedRegion") ||
         "MM";
 
-    paymentGrid.innerHTML = `<p class="pay-loading">Loading payment methods...</p>`;
-    paymentInput.value = "";
-    window.selectedPaymentData = null;
-    document.dispatchEvent(new Event("paymentChanged"));
+    if (hasPaymentGrid) {
+        paymentGrid.innerHTML = `<p class="pay-loading">Loading payment methods...</p>`;
+        paymentInput.value = "";
+        window.selectedPaymentData = null;
+        document.dispatchEvent(new Event("paymentChanged"));
+    }
 
     try {
         const API_BASE = location.port === "5500" ? `${location.protocol}//${location.hostname === "127.0.0.1" ? "127.0.0.1" : "localhost"}:3000` : "";
@@ -44,6 +45,13 @@ async function loadPaymentMethods() {
             .filter(isPublicPaymentMethodUsable)
             .sort(sortPaymentMethods);
         window.AZIEL_TH_BANK_APPS = getConfiguredThaiBankApps(rawMethods);
+
+        if (!hasPaymentGrid) {
+            window.dispatchEvent(new CustomEvent("aziel:promptpayBankLaunchersReady", {
+                detail: { count: window.AZIEL_TH_BANK_APPS.length }
+            }));
+            return window.AZIEL_TH_BANK_APPS;
+        }
 
         if (!methods.some(method => normalizePaymentKey(method.key) === "wallet")) {
             methods.push(getWalletMethod(region));
@@ -66,8 +74,10 @@ async function loadPaymentMethods() {
 
     } catch (error) {
         console.error("Load payment methods error:", error);
-        paymentGrid.innerHTML = `<p class="pay-error">Payment methods failed to load.</p>`;
-        document.dispatchEvent(new Event("paymentChanged"));
+        if (hasPaymentGrid) {
+            paymentGrid.innerHTML = `<p class="pay-error">Payment methods failed to load.</p>`;
+            document.dispatchEvent(new Event("paymentChanged"));
+        }
     }
 }
 

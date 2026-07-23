@@ -115,10 +115,7 @@ function loadPendingPaymentRecoveryOverlay() {
         "telegram.html",
         "genshin.html",
         "roblox.html",
-        "wallet.html",
-        "tracking.html",
-        "notifications.html",
-        "account.html"
+        "notifications.html"
     ]);
 
     if (!eligiblePages.has(page)) return;
@@ -134,7 +131,7 @@ function loadPendingPaymentRecoveryOverlay() {
     }
 
     const script = document.createElement("script");
-    script.src = "/js/payment/pending-payment-recovery.js?v=20260723-recovery-runtime";
+    script.src = "/js/payment/pending-payment-recovery.js?v=20260723-context-bank-runtime";
     script.defer = true;
     script.dataset.azielPendingPaymentRecovery = "true";
     loaderState.loading = true;
@@ -244,12 +241,12 @@ window.ensurePendingPaymentRecoveryRuntime = function ensurePendingPaymentRecove
             () => Boolean(window.AZIEL_ANDROID_APP_LAUNCH)
         );
         await loadAzielScriptOnce(
-            "/js/payment/payment-checkout-sheet.js?v=20260723-recovery-runtime",
+            "/js/payment/payment-checkout-sheet.js?v=20260723-context-bank-runtime",
             "aziel-recovery-checkout-sheet",
             () => Boolean(window.PaymentCheckoutSheet?.openRecoveredPayment)
         );
         await loadAzielScriptOnce(
-            "/js/payment/pending-payment-recovery.js?v=20260723-recovery-runtime",
+            "/js/payment/pending-payment-recovery.js?v=20260723-context-bank-runtime",
             "aziel-pending-payment-recovery",
             () => Boolean(window.AZIEL_PENDING_PAYMENT_RECOVERY?.resumeAttempt)
         );
@@ -307,6 +304,124 @@ function initAzielPwaRefresh() {
         }
     });
 }
+
+function normalizeAzielLauncherKey(value = "") {
+    const compact = String(value || "")
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]/g, "");
+    const aliases = {
+        scbeasy: "scb",
+        scb: "scb",
+        bangkokbank: "bangkok_bank",
+        bangkok: "bangkok_bank",
+        bualuang: "bangkok_bank",
+        krungsri: "krungsri",
+        krungthainext: "krungthai",
+        krungthai: "krungthai",
+        kplus: "kplus",
+        kasikorn: "kplus"
+    };
+    return aliases[compact] || compact;
+}
+
+function compactAzielBankLaunchers(launchers = []) {
+    const normalized = window.AZIEL_PAYMENT_TRUST?.normalizePromptPayLaunchers?.(launchers, { region: "TH" }) ||
+        (Array.isArray(launchers) ? launchers : []);
+    const supported = new Set(["scb", "bangkok_bank", "krungsri", "krungthai"]);
+    const seen = new Set();
+
+    return normalized
+        .map(app => {
+            const key = normalizeAzielLauncherKey(app?.key || app?.provider || app?.displayName || app?.appDisplayName || app?.label);
+            if (!key || !supported.has(key) || key === "kplus" || seen.has(key)) return null;
+            if (app?.enabled === false || app?.enabled === "false") return null;
+            seen.add(key);
+            return {
+                id: key,
+                key,
+                displayName: app.displayName || app.appDisplayName || app.label || "Banking App",
+                label: app.label || app.displayName || app.appDisplayName || "Banking App",
+                logo: app.logo || app.logoUrl || app.trustDisplay?.logo || "",
+                logoUrl: app.logoUrl || app.logo || app.trustDisplay?.logo || "",
+                appLaunchMode: app.appLaunchMode || "APP_ONLY",
+                deepLinkUrl: app.deepLinkUrl || app.deepLink || "",
+                iosAppLaunchUrl: app.iosAppLaunchUrl || "",
+                androidAppLaunchUrl: app.androidAppLaunchUrl || "",
+                androidPackage: app.androidPackage || app.androidPackageName || "",
+                androidPackageName: app.androidPackageName || app.androidPackage || "",
+                appStoreFallbackUrl: app.appStoreFallbackUrl || app.appStoreUrl || "",
+                playStoreFallbackUrl: app.playStoreFallbackUrl || app.playStoreUrl || "",
+                enabled: true
+            };
+        })
+        .filter(Boolean);
+}
+
+function azielApiUrl(path) {
+    if (window.AZIEL?.apiUrl) return window.AZIEL.apiUrl(path);
+    if (location.port === "5500") {
+        const host = location.hostname === "127.0.0.1" ? "127.0.0.1" : "localhost";
+        return `${location.protocol}//${host}:3000${path}`;
+    }
+    return path;
+}
+
+async function fetchPromptPayBankLaunchersDirectly() {
+    const response = await fetch(azielApiUrl("/api/payment-methods?region=TH"), {
+        headers: window.AZIEL?.authHeaders?.() || {}
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.success) {
+        throw new Error(data.message || "Could not load payment methods");
+    }
+    const methods = Array.isArray(data.methods) ? data.methods : [];
+    const promptPay = methods.find(method => {
+        const key = normalizeAzielLauncherKey(method.key || method.method || method.provider || "");
+        return String(method.region || "").toUpperCase() === "TH" && key === "promptpay";
+    });
+    const promptPayLaunchers = compactAzielBankLaunchers(promptPay?.bankLaunchers || []);
+    window.AZIEL_TH_BANK_APPS = promptPayLaunchers.map(app => ({ ...app }));
+    return compactAzielBankLaunchers(window.AZIEL_TH_BANK_APPS);
+}
+
+window.ensurePromptPayBankLauncherRuntime = function ensurePromptPayBankLauncherRuntime() {
+    if (window.__AZIEL_PROMPTPAY_BANK_LAUNCHER_RUNTIME_PROMISE__) {
+        return window.__AZIEL_PROMPTPAY_BANK_LAUNCHER_RUNTIME_PROMISE__;
+    }
+
+    const existing = compactAzielBankLaunchers(window.AZIEL_TH_BANK_APPS || []);
+    if (existing.length) return Promise.resolve(existing.map(app => ({ ...app })));
+
+    window.__AZIEL_PROMPTPAY_BANK_LAUNCHER_RUNTIME_PROMISE__ = (async () => {
+        await ensureAzielI18nReady();
+        await loadAzielScriptOnce(
+            "/js/payment-trust-display.js?v=20260722-region-trust",
+            "aziel-payment-trust-display",
+            () => Boolean(window.AZIEL_PAYMENT_TRUST?.normalizePromptPayLaunchers)
+        );
+        await loadAzielScriptOnce(
+            "/js/payment.js?v=20260723-bank-launcher-runtime",
+            "aziel-payment-method-runtime",
+            () => Boolean(window.loadPaymentMethods)
+        );
+
+        if (typeof window.loadPaymentMethods === "function") {
+            await window.loadPaymentMethods();
+        }
+
+        let launchers = compactAzielBankLaunchers(window.AZIEL_TH_BANK_APPS || []);
+        if (!launchers.length) {
+            launchers = await fetchPromptPayBankLaunchersDirectly();
+        }
+
+        return launchers.map(app => ({ ...app }));
+    })().finally(() => {
+        window.__AZIEL_PROMPTPAY_BANK_LAUNCHER_RUNTIME_PROMISE__ = null;
+    });
+
+    return window.__AZIEL_PROMPTPAY_BANK_LAUNCHER_RUNTIME_PROMISE__;
+};
 
 function registerAzielServiceWorker() {
     if (!("serviceWorker" in navigator)) return;
