@@ -54,6 +54,10 @@ function verifyImmediateOverlayRefresh() {
     includes("frontend/js/payment/pending-payment-recovery.js", "window.addEventListener(\"aziel:payment-checkout-closed\"", "Recovery overlay must listen to checkout close.");
     includes("frontend/js/payment/pending-payment-recovery.js", "consumePendingCheckoutCloseEvent", "Recovery overlay must consume a one-time pending close handoff if loaded after close.");
     includes("frontend/js/payment/pending-payment-recovery.js", "window.__AZIEL_PENDING_PAYMENT_CLOSE_EVENT__", "Recovery overlay must read the late-listener pending close handoff.");
+    includes("frontend/js/payment/pending-payment-recovery.js", "function waitForLanguageRuntime", "Recovery overlay must wait for site i18n before initial render.");
+    includes("frontend/js/payment/pending-payment-recovery.js", "await waitForLanguageRuntime()", "Recovery overlay init must not race the language runtime.");
+    includes("frontend/js/payment/pending-payment-recovery.js", "window.AZIEL_I18N?.getLang?.()", "Recovery overlay must use the site i18n language getter.");
+    includes("frontend/js/payment/pending-payment-recovery.js", "translateForLang", "Recovery overlay must render from one locale snapshot.");
     includes("frontend/js/payment/pending-payment-recovery.js", "detail.mode !== \"new\"", "Recovery overlay must ignore recovery checkout close events.");
     includes("frontend/js/payment/pending-payment-recovery.js", "detail.receiptSubmitted || detail.completed || detail.cancelled", "Recovery overlay must skip submitted/completed/cancelled closes.");
     includes("frontend/js/payment/pending-payment-recovery.js", "forceAttemptId: detail.attemptId", "Close refresh must preserve the just-closed attempt ID.");
@@ -79,10 +83,10 @@ function verifyCheckoutCacheBusters() {
         "frontend/genshin.html",
         "frontend/roblox.html"
     ].forEach(file => {
-        includes(file, "payment-checkout-sheet.js?v=20260723-close-event", "Game checkout page must load the close-event checkout sheet.");
+        includes(file, "payment-checkout-sheet.js?v=20260723-recovery-runtime", "Game checkout page must load the close-event checkout sheet.");
         includes(file, "payment-deeplink.js?v=20260723-close-event", "Game checkout page must load the attempt-aware deeplink bridge.");
         includes(file, "payment-manual.js?v=20260723-close-event", "Game checkout page must load the attempt-aware manual bridge.");
-        includes(file, "pwa-fix.js?v=20260723-recovery-close", "Game checkout page must load the recovery close-event loader.");
+        includes(file, "pwa-fix.js?v=20260723-recovery-runtime", "Game checkout page must load the recovery close-event loader.");
     });
 }
 
@@ -96,8 +100,8 @@ function verifyDismissalRules() {
 function verifyRecoveryLocalization() {
     const overlay = read("frontend/js/payment/pending-payment-recovery.js");
     includes("frontend/js/payment/pending-payment-recovery.js", "function currentLanguage", "Recovery overlay must read the current locale at render time.");
-    includes("frontend/js/payment/pending-payment-recovery.js", "localStorage.getItem(\"azielLanguage\")", "Recovery overlay must fall back to persisted AZIEL language.");
-    includes("frontend/js/payment/pending-payment-recovery.js", "window.AZIEL_LANG?.[lang]?.[key]", "Recovery overlay must read dictionaries directly when the i18n facade returns fallback copy.");
+    includes("frontend/js/payment/pending-payment-recovery.js", "window.localStorage?.getItem(\"azielLanguage\")", "Recovery overlay must fall back to persisted AZIEL language.");
+    includes("frontend/js/payment/pending-payment-recovery.js", "localized[key] || english[key]", "Recovery overlay must read dictionaries directly from one locale snapshot.");
     includes("frontend/js/payment/pending-payment-recovery.js", "window.addEventListener(\"aziel:languageChanged\"", "Recovery overlay must rerender when the global language changes.");
     [
         "resumePaymentTitle",

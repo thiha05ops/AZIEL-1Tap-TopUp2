@@ -49,7 +49,29 @@ function verifyCheckoutRecoveryMode() {
     includes("frontend/js/payment/payment-checkout-sheet.js", "bindRecoverySubmit", "recovery must own duplicate-safe receipt submission.");
     includes("frontend/js/payment/payment-checkout-sheet.js", "saveDynamicQr(state.activeDynamicQr)", "Save QR must use the recovered dynamic QR helper.");
     includes("frontend/js/payment/payment-checkout-sheet.js", "recoveryBankLaunchers", "bank chooser must use canonical recovery launcher collection.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "recoveryCanonicalLaunchers", "recovery bank chooser must have a canonical PromptPay launcher source.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "window.AZIEL_TH_BANK_APPS", "recovery bank chooser must use the public PromptPay launcher runtime collection.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "canonical_promptpay_runtime", "canonical PromptPay launchers must take precedence over recovery snapshots.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "async function ensurePromptPayLauncherRuntime", "recovery chooser must wait for PromptPay launcher runtime readiness.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "await window.loadPaymentMethods()", "recovery chooser must bootstrap canonical launcher runtime when needed.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "const ready = await ensurePromptPayLauncherRuntime()", "recovery chooser must not render shell before launchers are ready.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "sourceType: \"empty\"", "recovery chooser must not render rows from stale recovery snapshot launchers.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "cloneRecoveryLauncher", "recovery chooser must clone launchers instead of mutating canonical arrays.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "promptPayRuntime.map(cloneRecoveryLauncher)", "each recovery chooser open must use a fresh cloned canonical launcher list.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "RECOVERY_LAUNCHERS_SOURCE", "recovery launcher source diagnostics must exist.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "RECOVERY_LAUNCHERS_NORMALIZED", "recovery launcher normalized diagnostics must exist.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "RECOVERY_LAUNCHERS_RENDERED", "recovery launcher rendered diagnostics must exist.");
     includes("frontend/js/payment/payment-checkout-sheet.js", "String(app.key || \"\").toLowerCase() !== \"kplus\"", "K PLUS must remain hidden.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "normalizeRecoveryLauncherKey(app.key || app.provider || app.displayName || app.appDisplayName || app.label) !== \"kplus\"", "recovery launcher filtering must explicitly hide K PLUS.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "id: normalizeRecoveryLauncherKey", "recovery launchers must normalize to compact objects with stable IDs.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "androidPackage: app.androidPackage || app.androidPackageName || \"\"", "recovery launchers must preserve Android package launch fields.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "function getCanonicalSiteLanguage", "recovery checkout must use a single canonical site language source.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "window.AZIEL_I18N?.getLang?.() || \"en\"", "canonical recovery language must come from the site i18n runtime.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "lang = getCanonicalSiteLanguage()", "recovery render must capture one locale snapshot.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "rt(activeState, \"recoveryResumePayment\"", "recovery title must use the captured locale.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "rt(state, \"payment_choose_banking_app\"", "recovery chooser must use the captured locale.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "rerenderActiveRecoveryCheckout", "language changes must rerender active recovery checkout.");
+    includes("frontend/js/payment/payment-checkout-sheet.js", "aziel:languageChanged", "recovery checkout must listen for site language changes.");
     assert(openBlock && !openBlock.includes("show({"), "openRecoveredPayment must not call the full shared show() renderer.");
     assert(openBlock.includes("showMinimalRecoveredPayment(options)"), "openRecoveredPayment must route valid recovery to the dedicated renderer.");
     assert(!openBlock.includes("requestDynamicPromptPayQr"), "recovered checkout must not call dynamic QR generation.");
@@ -73,7 +95,18 @@ function verifyI18n() {
         "recoveryPaymentExpired",
         "recoveryQrUnavailable",
         "recoveryStartNewPayment",
-        "recoveryBack"
+        "recoveryBack",
+        "payment_progress",
+        "payment_receipt_file_hint",
+        "payment_receipt_selected",
+        "payment_choose_receipt_first",
+        "payment_submitting_receipt",
+        "payment_slip_submitted",
+        "payment_submission_failed",
+        "payment_qr_ready_to_save",
+        "payment_qr_save_failed",
+        "close",
+        "remove"
     ];
 
     ["frontend/lang/en.js", "frontend/lang/my.js", "frontend/lang/th.js"].forEach(file => {

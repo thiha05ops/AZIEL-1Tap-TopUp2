@@ -169,19 +169,27 @@
         return value === true || value === "true";
     }
 
+    function getCanonicalSiteLanguage() {
+        const lang = window.AZIEL_I18N?.getLang?.() || "en";
+        return window.AZIEL_LANG?.[lang] ? lang : "en";
+    }
+
+    function translateForLang(key, fallback = "", lang = getCanonicalSiteLanguage()) {
+        const english = window.AZIEL_LANG?.en || {};
+        const localized = window.AZIEL_LANG?.[lang] || {};
+        return localized[key] || english[key] || fallback || key;
+    }
+
     function t(key, fallback = "") {
-        const translated = window.AZIEL_I18N?.t?.(key, fallback);
-        if (translated && translated !== key) return translated;
-        const storage = window.localStorage;
-        const lang =
-            storage?.getItem("azielLanguage") ||
-            storage?.getItem("azielLang") ||
-            storage?.getItem("aziel_lang") ||
-            storage?.getItem("language") ||
-            storage?.getItem("selectedLanguage") ||
-            document.documentElement?.lang ||
-            "en";
-        return window.AZIEL_LANG?.[lang]?.[key] || window.AZIEL_LANG?.en?.[key] || fallback || key;
+        return translateForLang(key, fallback);
+    }
+
+    function tr(options = {}, key, fallback = "") {
+        return translateForLang(key, fallback, options.lang || getCanonicalSiteLanguage());
+    }
+
+    function rt(state = {}, key, fallback = "") {
+        return translateForLang(key, fallback, state.lang || getCanonicalSiteLanguage());
     }
 
     function checkoutDevLog(label, detail = {}) {
@@ -739,24 +747,24 @@
         ].includes(action);
     }
 
-    function dynamicPromptPayChecklistSteps() {
+    function dynamicPromptPayChecklistSteps(options = {}) {
         if (isDesktopPromptPayFlow()) {
             return [
-                { key: "scan_or_save_qr", label: t("payment_desktop_checklist_scan_or_save_qr", "Scan or save the QR"), action: "scan_saved_qr", enabled: true, sortOrder: 10 },
-                { key: "pay_with_bank_app", label: t("payment_desktop_checklist_pay_with_bank_app", "Pay using your banking app"), action: "open_app", enabled: true, sortOrder: 20 },
-                { key: "upload_receipt", label: t("payment_desktop_checklist_upload_receipt", "Upload the payment receipt"), action: "upload_receipt", enabled: true, sortOrder: 30 }
+                { key: "scan_or_save_qr", label: tr(options, "payment_desktop_checklist_scan_or_save_qr", "Scan or save the QR"), action: "scan_saved_qr", enabled: true, sortOrder: 10 },
+                { key: "pay_with_bank_app", label: tr(options, "payment_desktop_checklist_pay_with_bank_app", "Pay using your banking app"), action: "open_app", enabled: true, sortOrder: 20 },
+                { key: "upload_receipt", label: tr(options, "payment_desktop_checklist_upload_receipt", "Upload the payment receipt"), action: "upload_receipt", enabled: true, sortOrder: 30 }
             ];
         }
         return [
-            { key: "save_qr", label: t("payment_checklist_save_qr", "Save QR"), action: "save_qr", enabled: true, sortOrder: 10 },
-            { key: "open_app", label: t("payment_checklist_open_banking_app", "Open banking app"), action: "open_app", enabled: true, sortOrder: 20 },
-            { key: "scan_saved_qr", label: t("payment_checklist_scan_saved_qr", "Scan the saved QR and pay"), action: "scan_saved_qr", enabled: true, sortOrder: 30 },
-            { key: "upload_receipt", label: t("payment_checklist_upload_receipt", "Upload payment receipt"), action: "upload_receipt", enabled: true, sortOrder: 40 }
+            { key: "save_qr", label: tr(options, "payment_checklist_save_qr", "Save QR"), action: "save_qr", enabled: true, sortOrder: 10 },
+            { key: "open_app", label: tr(options, "payment_checklist_open_banking_app", "Open banking app"), action: "open_app", enabled: true, sortOrder: 20 },
+            { key: "scan_saved_qr", label: tr(options, "payment_checklist_scan_saved_qr", "Scan the saved QR and pay"), action: "scan_saved_qr", enabled: true, sortOrder: 30 },
+            { key: "upload_receipt", label: tr(options, "payment_checklist_upload_receipt", "Upload payment receipt"), action: "upload_receipt", enabled: true, sortOrder: 40 }
         ];
     }
 
     function defaultChecklistSteps(options = {}) {
-        if (isDynamicPromptPayMode(options)) return dynamicPromptPayChecklistSteps();
+        if (isDynamicPromptPayMode(options)) return dynamicPromptPayChecklistSteps(options);
         const steps = [];
         if (options.enableSaveQr && (options.qrImageUrl || options.qrImage)) {
             steps.push({ key: "save_qr", label: t("payment_save_qr", "Save QR"), action: "save_qr", enabled: true, sortOrder: 10 });
@@ -772,7 +780,7 @@
             steps.push({
                 key: "open_app",
                 label: options.openAppMode === "bank_chooser"
-                    ? t("payment_open_banking_app", "Open Banking App")
+                    ? tr(options, "payment_open_banking_app", "Open Banking App")
                     : `Open ${options.appDisplayName || options.methodName || "payment app"}`,
                 action: "open_app",
                 enabled: true,
@@ -788,7 +796,7 @@
     }
 
     function normalizeChecklistSteps(options = {}) {
-        if (isDynamicPromptPayMode(options)) return dynamicPromptPayChecklistSteps();
+        if (isDynamicPromptPayMode(options)) return dynamicPromptPayChecklistSteps(options);
         const configured = Array.isArray(options.checklistSteps) ? options.checklistSteps : [];
         const source = configured.length ? configured : defaultChecklistSteps(options);
 
@@ -796,14 +804,14 @@
             .filter(step => step && step.enabled !== false && knownChecklistAction(step.action))
             .map((step, index) => ({
                 key: step.key || step.action || `step_${index}`,
-                label: translateChecklistLabel(step),
+                label: translateChecklistLabel(step, options),
                 action: step.action,
                 sortOrder: Number(step.sortOrder || (index + 1) * 10)
             }))
             .sort((a, b) => a.sortOrder - b.sortOrder);
     }
 
-    function translateChecklistLabel(step = {}) {
+    function translateChecklistLabel(step = {}, options = {}) {
         const action = step.action || "";
         const raw = String(step.label || "").trim();
         const standard = {
@@ -818,7 +826,7 @@
             scan_saved_qr: "payment_checklist_scan_saved_qr",
             upload_receipt: "payment_upload_receipt"
         }[action];
-        if (key && (!raw || standard[action]?.includes(raw))) return t(key, raw || action.replaceAll("_", " "));
+        if (key && (!raw || standard[action]?.includes(raw))) return tr(options, key, raw || action.replaceAll("_", " "));
         return raw || String(action || "").replaceAll("_", " ");
     }
 
@@ -879,12 +887,12 @@
             .filter(Boolean)
             .join(" · ");
         const expiry = options.dynamicQr?.expiresAt
-            ? `${t("payment_qr_expires_in", "QR expires in")} ${new Date(options.dynamicQr.expiresAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+            ? `${tr(options, "payment_qr_expires_in", "QR expires in")} ${new Date(options.dynamicQr.expiresAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
             : "";
         summary.innerHTML = [
-            amountText ? `<div><span>${escapeHTML(t("total", "Total"))}</span><strong>${escapeHTML(amountText)}</strong></div>` : "",
-            product ? `<div><span>${escapeHTML(t("package", "Package"))}</span><strong>${escapeHTML(product)}</strong></div>` : "",
-            expiry ? `<div><span>${escapeHTML(t("payment_promptpay_qr", "PromptPay QR"))}</span><strong>${escapeHTML(expiry)}</strong></div>` : ""
+            amountText ? `<div><span>${escapeHTML(tr(options, "total", "Total"))}</span><strong>${escapeHTML(amountText)}</strong></div>` : "",
+            product ? `<div><span>${escapeHTML(tr(options, "package", "Package"))}</span><strong>${escapeHTML(product)}</strong></div>` : "",
+            expiry ? `<div><span>${escapeHTML(tr(options, "payment_promptpay_qr", "PromptPay QR"))}</span><strong>${escapeHTML(expiry)}</strong></div>` : ""
         ].filter(Boolean).join("");
     }
 
@@ -1154,6 +1162,87 @@
         return Array.isArray(window.AZIEL_TH_BANK_APPS)
             ? window.AZIEL_TH_BANK_APPS.filter(app => app && app.enabled !== false)
             : [];
+    }
+
+    function normalizeRecoveryLauncherKey(value = "") {
+        const compact = String(value || "")
+            .toLowerCase()
+            .trim()
+            .replace(/[^a-z0-9]/g, "");
+        const aliases = {
+            scbeasy: "scb",
+            scb: "scb",
+            bangkokbank: "bangkok_bank",
+            bangkok: "bangkok_bank",
+            bualuang: "bangkok_bank",
+            krungsri: "krungsri",
+            krungthainext: "krungthai",
+            krungthai: "krungthai",
+            kplus: "kplus",
+            kasikorn: "kplus"
+        };
+        return aliases[compact] || compact;
+    }
+
+    function recoveryLauncherSnapshot(options = {}) {
+        if (Array.isArray(options.bankLaunchers)) return options.bankLaunchers;
+        if (Array.isArray(options.instructions?.bankLaunchers)) return options.instructions.bankLaunchers;
+        return [];
+    }
+
+    function cloneRecoveryLauncher(app = {}) {
+        return {
+            ...app,
+            trustDisplay: app.trustDisplay ? { ...app.trustDisplay } : app.trustDisplay
+        };
+    }
+
+    function recoveryCanonicalLaunchers(options = {}) {
+        const promptPayRuntime = Array.isArray(window.AZIEL_TH_BANK_APPS) ? window.AZIEL_TH_BANK_APPS : [];
+        if (promptPayRuntime.length) {
+            return {
+                sourceType: "canonical_promptpay_runtime",
+                source: promptPayRuntime.map(cloneRecoveryLauncher),
+                snapshotCount: recoveryLauncherSnapshot(options).length
+            };
+        }
+
+        const snapshot = recoveryLauncherSnapshot(options);
+        return {
+            sourceType: "empty",
+            source: [],
+            snapshotCount: snapshot.length
+        };
+    }
+
+    async function ensurePromptPayLauncherRuntime() {
+        if (Array.isArray(window.AZIEL_TH_BANK_APPS) && window.AZIEL_TH_BANK_APPS.length) {
+            return true;
+        }
+
+        if (typeof window.loadPaymentMethods === "function") {
+            await window.loadPaymentMethods();
+            if (Array.isArray(window.AZIEL_TH_BANK_APPS) && window.AZIEL_TH_BANK_APPS.length) {
+                return true;
+            }
+        }
+
+        await new Promise(resolve => {
+            const startedAt = Date.now();
+            const timer = window.setInterval(() => {
+                if (Array.isArray(window.AZIEL_TH_BANK_APPS) && window.AZIEL_TH_BANK_APPS.length) {
+                    window.clearInterval(timer);
+                    resolve();
+                    return;
+                }
+                if (Date.now() - startedAt > 3000) {
+                    window.clearInterval(timer);
+                    resolve();
+                }
+            }, 40);
+        });
+
+        return Array.isArray(window.AZIEL_TH_BANK_APPS) && window.AZIEL_TH_BANK_APPS.length > 0;
     }
 
     function renderDesktopSupportedBanks(options = {}) {
@@ -1757,8 +1846,10 @@
         recoveryCheckpoint("RECOVERY_OPEN_2 normalizeRecovery:start");
         const instructions = recovery.instructions || {};
         const dynamicQr = recovery.dynamicQr || {};
+        const lang = getCanonicalSiteLanguage();
         const normalized = {
             mode: "recovery",
+            lang,
             attemptId: recovery.attemptId || "",
             attemptReference: recovery.attemptReference || recovery.reference || "",
             methodCode: recovery.paymentMethod || instructions.key || "promptpay",
@@ -1801,9 +1892,9 @@
             playStoreFallbackUrl: instructions.playStoreFallbackUrl || "",
             bankLaunchers: Array.isArray(instructions.bankLaunchers) ? instructions.bankLaunchers : [],
             checklistSteps: Array.isArray(recovery.checklistSteps) ? recovery.checklistSteps : [],
-            submitLabel: t("payment_submit_for_verification", "Submit for Verification"),
-            loadingText: t("payment_submitting_receipt", "Submitting receipt..."),
-            successMessage: t("payment_slip_submitted", "Payment slip submitted")
+            submitLabel: translateForLang("payment_submit_for_verification", "Submit for Verification", lang),
+            loadingText: translateForLang("payment_submitting_receipt", "Submitting receipt...", lang),
+            successMessage: translateForLang("payment_slip_submitted", "Payment slip submitted", lang)
         };
         recoveryCheckpoint("RECOVERY_OPEN_3 normalizeRecovery:end");
         return normalized;
@@ -1819,56 +1910,78 @@
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.success) {
-            throw new Error(data.message || t("payment_submission_failed", "Submission failed. Please try again."));
+            throw new Error(data.message || rt(options, "payment_submission_failed", "Submission failed. Please try again."));
         }
-        setMessage("success", data.message || t("payment_slip_submitted", "Payment slip submitted"));
+        setMessage("success", data.message || rt(options, "payment_slip_submitted", "Payment slip submitted"));
         return data;
     }
 
     function recoveryCountdownText(options = {}) {
         const expiry = recoveryExpiresAt(options);
         const time = expiry ? new Date(expiry).getTime() : 0;
-        if (!Number.isFinite(time) || time <= Date.now()) return t("recoveryPaymentExpired", "Payment session expired");
+        if (!Number.isFinite(time) || time <= Date.now()) return rt(options, "recoveryPaymentExpired", "Payment session expired");
         const seconds = Math.max(0, Math.ceil((time - Date.now()) / 1000));
         const minutes = Math.floor(seconds / 60);
         const remainder = String(seconds % 60).padStart(2, "0");
-        return `${t("payment_qr_expires_in", "QR expires in")} ${minutes}:${remainder}`;
+        return `${rt(options, "payment_qr_expires_in", "QR expires in")} ${minutes}:${remainder}`;
     }
 
     function recoveryBankLaunchers(options = {}) {
-        const source = Array.isArray(options.bankLaunchers) ? options.bankLaunchers : [];
-        const normalized = window.AZIEL_PAYMENT_TRUST?.normalizePromptPayLaunchers?.(source, options) ||
+        const sourceInfo = recoveryCanonicalLaunchers(options);
+        const source = Array.isArray(sourceInfo.source) ? sourceInfo.source : [];
+        checkoutDevLog("RECOVERY_LAUNCHERS_SOURCE", {
+            sourceType: sourceInfo.sourceType,
+            sourceCount: source.length,
+            snapshotCount: sourceInfo.snapshotCount
+        });
+
+        const normalized = window.AZIEL_PAYMENT_TRUST?.normalizePromptPayLaunchers?.(source, { ...options, region: "TH" }) ||
             source
                 .filter(app => app && app.enabled !== false)
-                .filter(app => String(app.key || "").toLowerCase() !== "kplus")
+                .filter(app => normalizeRecoveryLauncherKey(app.key || app.provider || app.displayName || app.appDisplayName) !== "kplus")
                 .map(app => ({
-                    key: app.key || "",
+                    key: normalizeRecoveryLauncherKey(app.key || app.provider || app.displayName || app.appDisplayName),
                     label: app.displayName || app.appDisplayName || app.label || "Banking App",
                     logo: app.logoUrl || app.logo || "",
                     enabled: app.enabled !== false,
                     appLaunchMode: app.appLaunchMode || "APP_ONLY",
+                    deepLinkUrl: app.deepLinkUrl || app.deepLink || "",
                     iosAppLaunchUrl: app.iosAppLaunchUrl || "",
                     androidAppLaunchUrl: app.androidAppLaunchUrl || "",
+                    androidPackage: app.androidPackage || app.androidPackageName || "",
                     androidPackageName: app.androidPackageName || "",
                     appStoreFallbackUrl: app.appStoreFallbackUrl || "",
                     playStoreFallbackUrl: app.playStoreFallbackUrl || ""
                 }));
 
-        return normalized
+        const compact = normalized
             .filter(app => app && app.enabled !== false)
-            .filter(app => String(app.key || "").toLowerCase() !== "kplus")
+            .filter(app => normalizeRecoveryLauncherKey(app.key || app.provider || app.displayName || app.appDisplayName || app.label) !== "kplus")
             .slice(0, 4)
             .map(app => ({
-                key: String(app.key || app.label || "").trim(),
+                id: normalizeRecoveryLauncherKey(app.key || app.provider || app.displayName || app.appDisplayName || app.label),
+                key: normalizeRecoveryLauncherKey(app.key || app.provider || app.displayName || app.appDisplayName || app.label),
+                displayName: app.displayName || app.appDisplayName || app.label || "Banking App",
                 label: app.label || app.displayName || app.appDisplayName || "Banking App",
                 logo: app.logo || app.logoUrl || "",
                 appLaunchMode: app.appLaunchMode || "APP_ONLY",
+                deepLinkUrl: app.deepLinkUrl || app.deepLink || "",
                 iosAppLaunchUrl: app.iosAppLaunchUrl || "",
                 androidAppLaunchUrl: app.androidAppLaunchUrl || "",
+                androidPackage: app.androidPackage || app.androidPackageName || "",
                 androidPackageName: app.androidPackageName || "",
                 appStoreFallbackUrl: app.appStoreFallbackUrl || app.appStoreUrl || "",
-                playStoreFallbackUrl: app.playStoreFallbackUrl || app.playStoreUrl || ""
+                playStoreFallbackUrl: app.playStoreFallbackUrl || app.playStoreUrl || "",
+                enabled: app.enabled !== false
             }));
+
+        checkoutDevLog("RECOVERY_LAUNCHERS_NORMALIZED", {
+            sourceType: sourceInfo.sourceType,
+            normalizedCount: compact.length,
+            keys: compact.map(app => app.key)
+        });
+
+        return compact;
     }
 
     function recoveryProductText(state = {}) {
@@ -1912,8 +2025,8 @@
             return;
         }
         box.innerHTML = `
-            <span>${escapeHTML(t("payment_supported_banking_apps", "Supported Banking Apps"))}</span>
-            <div class="az-payment-sheet__desktop-bank-logos" aria-label="${escapeHTML(t("payment_supported_banking_apps", "Supported Banking Apps"))}">
+            <span>${escapeHTML(rt(state, "payment_supported_banking_apps", "Supported Banking Apps"))}</span>
+            <div class="az-payment-sheet__desktop-bank-logos" aria-label="${escapeHTML(rt(state, "payment_supported_banking_apps", "Supported Banking Apps"))}">
                 ${apps.map(app => `
                     <span title="${escapeHTML(app.label)}">
                         ${app.logo ? `<img src="${escapeHTML(app.logo)}" alt="" aria-hidden="true">` : ""}
@@ -1953,6 +2066,7 @@
         if (summary) {
             summary.hidden = !isMobileFlow || !isReceipt;
             if (isMobileFlow && isReceipt) renderMobileReceiptSummary(modal, {
+                lang: activeState.lang,
                 amount: activeState.amount,
                 currency: activeState.currency,
                 productName: activeState.game,
@@ -2008,9 +2122,9 @@
             const control = document.getElementById(id);
             if (control) control.disabled = true;
         });
-        updateRecoveryMessage("error", t("recoveryPaymentExpired", "Payment session expired"));
+        updateRecoveryMessage("error", rt(activeState, "recoveryPaymentExpired", "Payment session expired"));
         const countdown = document.getElementById("azRecoveredPaymentCountdown");
-        if (countdown) countdown.textContent = t("recoveryPaymentExpired", "Payment session expired");
+        if (countdown) countdown.textContent = rt(activeState, "recoveryPaymentExpired", "Payment session expired");
         window.dispatchEvent(new CustomEvent("aziel:recovered-payment-expired", {
             detail: {
                 attemptId: activeState.attemptId,
@@ -2046,9 +2160,9 @@
                 button.disabled = true;
                 await saveDynamicQr(state.activeDynamicQr);
                 updateChecklist("save_qr");
-                updateRecoveryMessage("success", t("payment_qr_ready_to_save", "QR ready to save"));
+                updateRecoveryMessage("success", rt(state, "payment_qr_ready_to_save", "QR ready to save"));
             } catch (error) {
-                updateRecoveryMessage("error", t("payment_qr_save_failed", "Could not save QR. Long-press the image to save."));
+                updateRecoveryMessage("error", rt(state, "payment_qr_save_failed", "Could not save QR. Long-press the image to save."));
             } finally {
                 button.disabled = Boolean(state.expired);
             }
@@ -2061,13 +2175,13 @@
         if (platform === "ios") {
             const iosUrl = profile.iosAppLaunchUrl || "";
             if (!iosUrl) {
-                updateRecoveryMessage("error", t("payment_bank_app_unavailable", "Bank app unavailable. Open your banking app and import the saved QR."));
+                updateRecoveryMessage("error", rt(state, "payment_bank_app_unavailable", "Bank app unavailable. Open your banking app and import the saved QR."));
                 return;
             }
             window.location.href = iosUrl;
             setTimeout(() => {
                 updateChecklist("open_app");
-                updateRecoveryMessage("success", `${t("payment_opening_bank_app", "Opening")} ${profile.label || "banking app"}. ${t("payment_return_upload_receipt", "Return here after transfer and upload your receipt.")}`);
+                updateRecoveryMessage("success", `${rt(state, "payment_opening_bank_app", "Opening")} ${profile.label || "banking app"}. ${rt(state, "payment_return_upload_receipt", "Return here after transfer and upload your receipt.")}`);
                 document.getElementById("azPaymentMobileBankChooser")?.setAttribute("hidden", "");
             }, 0);
             return;
@@ -2075,31 +2189,59 @@
 
         const target = resolveBankProfileLaunchTarget(profile);
         if (!target.url && !hasAndroidLaunchCapability(profile)) {
-            updateRecoveryMessage("error", t("payment_bank_app_unavailable", "Bank app unavailable. Open your banking app and import the saved QR."));
+            updateRecoveryMessage("error", rt(state, "payment_bank_app_unavailable", "Bank app unavailable. Open your banking app and import the saved QR."));
             return;
         }
         updateChecklist("open_app");
-        updateRecoveryMessage("success", `${t("payment_opening_bank_app", "Opening")} ${profile.label || "banking app"}. ${t("payment_return_upload_receipt", "Return here after transfer and upload your receipt.")}`);
+        updateRecoveryMessage("success", `${rt(state, "payment_opening_bank_app", "Opening")} ${profile.label || "banking app"}. ${rt(state, "payment_return_upload_receipt", "Return here after transfer and upload your receipt.")}`);
         if (target.url) window.location.href = target.url;
         document.getElementById("azPaymentMobileBankChooser")?.setAttribute("hidden", "");
     }
 
-    function showRecoveryBankChooser(state = {}) {
+    async function showRecoveryBankChooser(state = {}) {
         incrementRecoveryCounter("launcher");
         const chooser = document.getElementById("azPaymentMobileBankChooser");
         if (!chooser) return;
+        const ready = await ensurePromptPayLauncherRuntime();
+        if (!ready) {
+            chooser.hidden = true;
+            chooser.innerHTML = "";
+            updateRecoveryMessage("error", rt(state, "payment_bank_app_unavailable", "Bank app unavailable. Open your banking app and import the saved QR."));
+            checkoutDevLog("RECOVERY_LAUNCHERS_RENDERED", {
+                renderedCount: 0,
+                sourceReady: false,
+                keys: []
+            });
+            return;
+        }
         const apps = recoveryBankLaunchers(state);
+        if (!apps.length) {
+            chooser.hidden = true;
+            chooser.innerHTML = "";
+            updateRecoveryMessage("error", rt(state, "payment_bank_app_unavailable", "Bank app unavailable. Open your banking app and import the saved QR."));
+            checkoutDevLog("RECOVERY_LAUNCHERS_RENDERED", {
+                renderedCount: 0,
+                sourceReady: true,
+                keys: []
+            });
+            return;
+        }
+        checkoutDevLog("RECOVERY_LAUNCHERS_RENDERED", {
+            renderedCount: apps.length,
+            sourceReady: true,
+            keys: apps.map(app => app.key || app.id || "")
+        });
         const launcherByKey = new Map();
         chooser.innerHTML = `
-            <button type="button" class="az-payment-sheet__mobile-chooser-backdrop" data-recovery-bank-cancel aria-label="${escapeHTML(t("payment_cancel", "Cancel"))}"></button>
-            <section class="az-payment-sheet__mobile-chooser-card" role="dialog" aria-modal="false" aria-label="${escapeHTML(t("payment_choose_banking_app", "Choose Banking App"))}">
+            <button type="button" class="az-payment-sheet__mobile-chooser-backdrop" data-recovery-bank-cancel aria-label="${escapeHTML(rt(state, "payment_cancel", "Cancel"))}"></button>
+            <section class="az-payment-sheet__mobile-chooser-card" role="dialog" aria-modal="false" aria-label="${escapeHTML(rt(state, "payment_choose_banking_app", "Choose Banking App"))}">
                 <header>
-                    <strong>${escapeHTML(t("payment_choose_banking_app", "Choose Banking App"))}</strong>
-                    <button type="button" data-recovery-bank-cancel aria-label="${escapeHTML(t("payment_cancel", "Cancel"))}">×</button>
+                    <strong>${escapeHTML(rt(state, "payment_choose_banking_app", "Choose Banking App"))}</strong>
+                    <button type="button" data-recovery-bank-cancel aria-label="${escapeHTML(rt(state, "payment_cancel", "Cancel"))}">×</button>
                 </header>
                 <div class="az-payment-sheet__mobile-bank-list">
                     ${apps.map((app, index) => {
-                        const key = app.key || `bank-${index}`;
+                        const key = app.key || app.id || `bank-${index}`;
                         launcherByKey.set(key, app);
                         const target = resolveBankProfileLaunchTarget(app);
                         const disabled = !target.url && !hasAndroidLaunchCapability(app);
@@ -2112,7 +2254,7 @@
                         `;
                     }).join("")}
                 </div>
-                <button type="button" class="az-payment-sheet__mobile-cancel" data-recovery-bank-cancel>${escapeHTML(t("payment_cancel", "Cancel"))}</button>
+                <button type="button" class="az-payment-sheet__mobile-cancel" data-recovery-bank-cancel>${escapeHTML(rt(state, "payment_cancel", "Cancel"))}</button>
             </section>
         `;
         chooser.hidden = false;
@@ -2146,7 +2288,7 @@
             const file = input.files?.[0] || null;
             state.receiptFile = file;
             if (!file) return;
-            name.textContent = file.name || t("payment_receipt_selected", "Selected payment receipt");
+            name.textContent = file.name || rt(state, "payment_receipt_selected", "Selected payment receipt");
             image.src = URL.createObjectURL(file);
             preview.hidden = false;
             submit.disabled = Boolean(state.expired || state.submitting);
@@ -2174,12 +2316,12 @@
             }
             if (state.submitting) return;
             if (!state.receiptFile) {
-                updateRecoveryMessage("error", t("payment_choose_receipt_first", "Please choose your payment receipt first."));
+                updateRecoveryMessage("error", rt(state, "payment_choose_receipt_first", "Please choose your payment receipt first."));
                 return;
             }
             state.submitting = true;
             submit.disabled = true;
-            submit.textContent = t("payment_submitting_receipt", "Submitting receipt...");
+            submit.textContent = rt(state, "payment_submitting_receipt", "Submitting receipt...");
             try {
                 const data = await submitRecoveredReceipt(state, state.receiptFile, updateRecoveryMessage);
                 if (!state.submittedEventSent) {
@@ -2197,8 +2339,8 @@
             } catch (error) {
                 state.submitting = false;
                 submit.disabled = false;
-                submit.textContent = t("payment_submit_for_verification", "Submit for Verification");
-                updateRecoveryMessage("error", error.message || t("payment_submission_failed", "Submission failed. Please try again."));
+                submit.textContent = rt(state, "payment_submit_for_verification", "Submit for Verification");
+                updateRecoveryMessage("error", error.message || rt(state, "payment_submission_failed", "Submission failed. Please try again."));
             }
         };
     }
@@ -2209,6 +2351,7 @@
         clearQrExpiryCountdown();
         document.getElementById("azRecoveredPaymentMiniSheet")?.remove();
 
+        const lang = getCanonicalSiteLanguage();
         const amount = Number(options.amount || 0);
         const qr = normalizeUrl(options.qrImageUrl || options.dynamicQr?.qrImage || "");
         const apps = recoveryBankLaunchers(options);
@@ -2216,6 +2359,8 @@
 
         activeState = {
             mode: "recovery",
+            lang,
+            recoveryOptions: { ...options, lang },
             attemptId: String(options.attemptId || ""),
             attemptReference: String(options.attemptReference || options.reference || ""),
             game: String(options.game || options.productName || ""),
@@ -2261,51 +2406,51 @@
         modal.className = `az-payment-sheet show az-payment-sheet--recovery-minimal ${mobile ? "is-mobile-promptpay is-mobile-step-qr" : "is-desktop-promptpay"}`;
         modal.innerHTML = `
             <div class="az-payment-sheet__panel" role="dialog" aria-modal="true" aria-labelledby="azRecoveredPaymentTitle">
-                <button type="button" class="az-payment-sheet__close" data-role="close" aria-label="${escapeHTML(t("close", "Close"))}">×</button>
+                <button type="button" class="az-payment-sheet__close" data-role="close" aria-label="${escapeHTML(rt(activeState, "close", "Close"))}">×</button>
                 <div class="az-payment-sheet__body">
                     <header class="az-payment-sheet__header">
-                        <h2 id="azRecoveredPaymentTitle" class="az-payment-sheet__title">${escapeHTML(t("recoveryResumePayment", "Resume Payment"))}</h2>
+                        <h2 id="azRecoveredPaymentTitle" class="az-payment-sheet__title">${escapeHTML(rt(activeState, "recoveryResumePayment", "Resume Payment"))}</h2>
                         <strong class="az-payment-sheet__amount">${escapeHTML(`${amount.toLocaleString()} ${options.currency || ""}`.trim())}</strong>
                         ${recoveryProductText(activeState) ? `<span class="az-payment-sheet__subtitle">${escapeHTML(recoveryProductText(activeState))}</span>` : ""}
                     </header>
                     <figure class="az-payment-sheet__qr">
-                        <img id="azRecoveredPaymentQrImage" alt="${escapeHTML(t("payment_promptpay_qr", "PromptPay QR"))}">
-                        <span id="azRecoveredPaymentCountdown" class="az-payment-sheet__qr-expiry">${escapeHTML(recoveryCountdownText(options))}</span>
+                        <img id="azRecoveredPaymentQrImage" alt="${escapeHTML(rt(activeState, "payment_promptpay_qr", "PromptPay QR"))}">
+                        <span id="azRecoveredPaymentCountdown" class="az-payment-sheet__qr-expiry">${escapeHTML(recoveryCountdownText(activeState))}</span>
                     </figure>
                     <div id="azPaymentSheetActions" class="az-payment-sheet__actions">
-                        <button type="button" id="azPaymentSheetSaveQr" class="az-payment-sheet__action">${escapeHTML(t("payment_save_qr", "Save QR"))}</button>
-                        <button type="button" id="azPaymentSheetOpenBankApp" class="az-payment-sheet__action" ${mobile ? "" : "hidden"}>${escapeHTML(t("payment_open_banking_app", "Open Banking App"))}</button>
+                        <button type="button" id="azPaymentSheetSaveQr" class="az-payment-sheet__action">${escapeHTML(rt(activeState, "payment_save_qr", "Save QR"))}</button>
+                        <button type="button" id="azPaymentSheetOpenBankApp" class="az-payment-sheet__action" ${mobile ? "" : "hidden"}>${escapeHTML(rt(activeState, "payment_open_banking_app", "Open Banking App"))}</button>
                     </div>
                     <section id="azPaymentSheetDesktopBanks" class="az-payment-sheet__desktop-banks" hidden></section>
                     <section id="azPaymentSheetChecklist" class="az-payment-sheet__checklist">
-                        <span>${escapeHTML(t("payment_progress", "Payment progress"))}</span>
+                        <span>${escapeHTML(rt(activeState, "payment_progress", "Payment progress"))}</span>
                         <ol id="azPaymentSheetChecklistSteps"></ol>
                     </section>
                     <div id="azPaymentSheetMobileNav" class="az-payment-sheet__mobile-nav" ${mobile ? "" : "hidden"}>
-                        <button type="button" id="azPaymentSheetContinueReceipt" class="az-payment-sheet__action">${escapeHTML(t("payment_continue_to_receipt", "Continue to Receipt"))}</button>
-                        <button type="button" id="azPaymentSheetBackQr" class="az-payment-sheet__secondary" hidden>${escapeHTML(t("payment_back_to_qr", "Back to QR"))}</button>
+                        <button type="button" id="azPaymentSheetContinueReceipt" class="az-payment-sheet__action">${escapeHTML(rt(activeState, "payment_continue_to_receipt", "Continue to Receipt"))}</button>
+                        <button type="button" id="azPaymentSheetBackQr" class="az-payment-sheet__secondary" hidden>${escapeHTML(rt(activeState, "payment_back_to_qr", "Back to QR"))}</button>
                     </div>
                     <section id="azPaymentSheetReceiptSummary" class="az-payment-sheet__receipt-summary" hidden></section>
                     <section id="azPaymentSheetReceipt" class="az-payment-sheet__receipt" ${mobile ? "hidden" : ""}>
                         <div class="az-payment-sheet__receipt-copy">
-                            <strong id="azPaymentSheetReceiptTitle">${escapeHTML(t("payment_upload_receipt_title", "Upload Payment Receipt"))}</strong>
-                            <span id="azPaymentSheetReceiptHelper">${escapeHTML(t("payment_receipt_helper", "Choose the screenshot after you finish the transfer."))}</span>
+                            <strong id="azPaymentSheetReceiptTitle">${escapeHTML(rt(activeState, "payment_upload_receipt_title", "Upload Payment Receipt"))}</strong>
+                            <span id="azPaymentSheetReceiptHelper">${escapeHTML(rt(activeState, "payment_receipt_helper", "Choose the screenshot after you finish the transfer."))}</span>
                         </div>
                         <label class="az-payment-sheet__upload">
-                            <span id="azPaymentSheetUploadLabel">${escapeHTML(t("payment_choose_screenshot", "Choose Screenshot"))}</span>
-                            <small>${escapeHTML(t("payment_receipt_file_hint", "Image file, up to the platform upload limit"))}</small>
+                            <span id="azPaymentSheetUploadLabel">${escapeHTML(rt(activeState, "payment_choose_screenshot", "Choose Screenshot"))}</span>
+                            <small>${escapeHTML(rt(activeState, "payment_receipt_file_hint", "Image file, up to the platform upload limit"))}</small>
                             <input type="file" id="azPaymentSheetSlipInput" accept="image/*">
                         </label>
                         <div id="azPaymentSheetPreview" class="az-payment-sheet__preview" hidden>
                             <span id="azPaymentSheetFileName"></span>
-                            <img id="azPaymentSheetPreviewImage" src="" alt="${escapeHTML(t("payment_receipt_selected", "Selected payment receipt"))}">
-                            <button type="button" id="azPaymentSheetRemoveFile">${escapeHTML(t("remove", "Remove"))}</button>
+                            <img id="azPaymentSheetPreviewImage" src="" alt="${escapeHTML(rt(activeState, "payment_receipt_selected", "Selected payment receipt"))}">
+                            <button type="button" id="azPaymentSheetRemoveFile">${escapeHTML(rt(activeState, "remove", "Remove"))}</button>
                         </div>
                     </section>
                     <div id="azPaymentSheetMessage" class="az-payment-sheet__message" role="status" aria-live="polite"></div>
                 </div>
                 <div id="azPaymentMobileBankChooser" class="az-payment-sheet__mobile-chooser" hidden></div>
-                <button type="button" id="azPaymentSheetSubmit" class="az-payment-sheet__submit" ${mobile ? "hidden" : ""}>${escapeHTML(t("payment_submit_for_verification", "Submit for Verification"))}</button>
+                <button type="button" id="azPaymentSheetSubmit" class="az-payment-sheet__submit" ${mobile ? "hidden" : ""}>${escapeHTML(rt(activeState, "payment_submit_for_verification", "Submit for Verification"))}</button>
             </div>
         `;
 
@@ -2323,7 +2468,11 @@
         renderRecoveryChecklist(activeState);
         renderRecoveryDesktopBanks(activeState);
         bindRecoverySaveQr(activeState);
-        modal.querySelector("#azPaymentSheetOpenBankApp")?.addEventListener("click", () => showRecoveryBankChooser(activeState));
+        modal.querySelector("#azPaymentSheetOpenBankApp")?.addEventListener("click", () => {
+            showRecoveryBankChooser(activeState).catch(() => {
+                updateRecoveryMessage("error", rt(activeState, "payment_bank_app_unavailable", "Bank app unavailable. Open your banking app and import the saved QR."));
+            });
+        });
         modal.querySelector("#azPaymentSheetContinueReceipt")?.addEventListener("click", () => updateRecoveryMobileStep("receipt"));
         modal.querySelector("#azPaymentSheetBackQr")?.addEventListener("click", () => updateRecoveryMobileStep("qr"));
         bindRecoveryFileInput(activeState);
@@ -2333,6 +2482,21 @@
         if (activeState.expired) expireRecoverySheet();
 
         recoveryCheckpoint("RECOVERY_OPEN_5 minimal:end");
+    }
+
+    function rerenderActiveRecoveryCheckout() {
+        if (!activeState || !isRecoveryMode(activeState)) return;
+        const options = {
+            ...(activeState.recoveryOptions || {}),
+            ...activeState,
+            packageName: activeState.package || activeState.packageName || "",
+            dynamicQr: {
+                ...(activeState.dynamicQr || {}),
+                qrImage: activeState.qrImageUrl || activeState.qrImage || "",
+                expiresAt: activeState.recoverableExpiresAt || activeState.dynamicQr?.expiresAt || ""
+            }
+        };
+        showMinimalRecoveredPayment(options);
     }
 
     function openRecoveredPayment(recovery = {}) {
@@ -2395,6 +2559,13 @@
         window.addEventListener("aziel:resume-payment", event => {
             const recovery = event.detail?.recovery || event.detail || {};
             openRecoveredPayment(recovery);
+        });
+    }
+
+    if (!window.__AZIEL_PAYMENT_CHECKOUT_RECOVERY_LANGUAGE_LISTENER__) {
+        window.__AZIEL_PAYMENT_CHECKOUT_RECOVERY_LANGUAGE_LISTENER__ = true;
+        window.addEventListener("aziel:languageChanged", () => {
+            rerenderActiveRecoveryCheckout();
         });
     }
 

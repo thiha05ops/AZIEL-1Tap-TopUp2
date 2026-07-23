@@ -133,7 +133,7 @@ function loadPendingPaymentRecoveryOverlay() {
     }
 
     const script = document.createElement("script");
-    script.src = "/js/payment/pending-payment-recovery.js?v=20260723-recovery-ux";
+    script.src = "/js/payment/pending-payment-recovery.js?v=20260723-recovery-runtime";
     script.defer = true;
     script.dataset.azielPendingPaymentRecovery = "true";
     loaderState.loading = true;

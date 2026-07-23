@@ -5,7 +5,7 @@
     if (window.__AZIEL_PENDING_PAYMENT_RECOVERY_INITIALIZED__) return;
     window.__AZIEL_PENDING_PAYMENT_RECOVERY_INITIALIZED__ = true;
 
-    const MODULE_VERSION = "20260723-recovery-ux";
+    const MODULE_VERSION = "20260723-recovery-runtime";
     const DISMISS_PREFIX = "azielPendingPaymentDismissed:";
     const RECOVERY_EVENT = "aziel:resume-payment";
     const CHECKOUT_SELECTOR = "#azPaymentCheckoutSheet.show";
@@ -26,24 +26,39 @@
     };
 
     function currentLanguage() {
-        return window.AZIEL_I18N?.getLang?.() ||
-            localStorage.getItem("azielLanguage") ||
-            localStorage.getItem("language") ||
-            localStorage.getItem("azielLang") ||
-            localStorage.getItem("selectedLanguage") ||
-            document.documentElement?.lang ||
+        const lang = window.AZIEL_I18N?.getLang?.() ||
+            window.localStorage?.getItem("azielLanguage") ||
+            window.localStorage?.getItem("language") ||
+            window.localStorage?.getItem("azielLang") ||
             "en";
+        return window.AZIEL_LANG?.[lang] ? lang : "en";
+    }
+
+    function translateForLang(key, fallback = "", lang = currentLanguage()) {
+        const english = window.AZIEL_LANG?.en || {};
+        const localized = window.AZIEL_LANG?.[lang] || {};
+        return localized[key] || english[key] || fallback || key;
     }
 
     function t(key, fallback) {
-        const translated = window.AZIEL_I18N?.t?.(key, fallback);
-        if (translated && translated !== key && translated !== fallback) return translated;
-        const lang = currentLanguage();
-        return window.AZIEL_LANG?.[lang]?.[key] ||
-            window.AZIEL_LANG?.en?.[key] ||
-            translated ||
-            fallback ||
-            key;
+        return translateForLang(key, fallback);
+    }
+
+    function isLanguageRuntimeReady() {
+        return Boolean(window.AZIEL_I18N?.getLang && window.AZIEL_LANG?.en);
+    }
+
+    function waitForLanguageRuntime() {
+        if (isLanguageRuntimeReady()) return Promise.resolve();
+        return new Promise(resolve => {
+            const startedAt = Date.now();
+            const timer = window.setInterval(() => {
+                if (isLanguageRuntimeReady() || Date.now() - startedAt > 3000) {
+                    window.clearInterval(timer);
+                    resolve();
+                }
+            }, 40);
+        });
     }
 
     function isDev() {
@@ -184,7 +199,6 @@
         overlay.id = "azPendingPaymentOverlay";
         overlay.className = "az-pending-payment";
         overlay.dataset.version = MODULE_VERSION;
-        overlay.setAttribute("aria-label", t("resumePaymentTitle", "Payment Not Completed"));
         document.body.appendChild(overlay);
         return overlay;
     }
@@ -214,10 +228,13 @@
         const moreCount = Math.max(0, state.attempts.length - 1);
         const iconSrc = getIconSrc(attempt);
         const overlay = ensureOverlay();
+        const lang = currentLanguage();
+        const tt = (key, fallback = "") => translateForLang(key, fallback, lang);
         overlay.classList.remove("is-preview", "is-leaving");
+        overlay.setAttribute("aria-label", tt("resumePaymentTitle", "Payment Not Completed"));
         overlay.innerHTML = `
             <div class="az-pending-payment__shell" role="region" aria-labelledby="azPendingPaymentTitle">
-                <button type="button" class="az-pending-payment__close" aria-label="${t("resumePaymentClose", "Dismiss resume payment")}">
+                <button type="button" class="az-pending-payment__close" aria-label="${tt("resumePaymentClose", "Dismiss resume payment")}">
                     <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                 </button>
                 <div class="az-pending-payment__content">
@@ -226,29 +243,29 @@
                             <i class="fa-solid fa-bolt"></i>
                         </div>
                         <div class="az-pending-payment__text">
-                            <strong id="azPendingPaymentTitle">${t("resumePaymentTitle", "Payment Not Completed")}</strong>
-                            <span>${t("resumePaymentSubtitle", "You have a payment waiting to be completed.")}</span>
+                            <strong id="azPendingPaymentTitle">${tt("resumePaymentTitle", "Payment Not Completed")}</strong>
+                            <span>${tt("resumePaymentSubtitle", "You have a payment waiting to be completed.")}</span>
                         </div>
                     </div>
                     <div class="az-pending-payment__product">
                         <div class="az-pending-payment__thumb" aria-hidden="true">
-                            ${iconSrc ? `<img src="${iconSrc}" alt="" loading="lazy" decoding="async">` : `<i class="fa-solid fa-gamepad"></i>`}
+                        ${iconSrc ? `<img src="${iconSrc}" alt="" loading="lazy" decoding="async">` : `<i class="fa-solid fa-gamepad"></i>`}
                         </div>
                         <div>
-                            <strong>${safeText(attempt.productName, t("payment", "Payment"))}</strong>
+                            <strong>${safeText(attempt.productName, tt("payment", "Payment"))}</strong>
                             <span>${safeText(attempt.packageName, "-")}</span>
                         </div>
                     </div>
                     <div class="az-pending-payment__meta">
                         <b>${formatAmount(attempt)}</b>
                         <small>
-                            <span>${t("resumePaymentRemaining", "Time remaining")}</span>
+                            <span>${tt("resumePaymentRemaining", "Time remaining")}</span>
                             <span id="azPendingPaymentCountdown">${formatRemaining(remaining)}</span>
                         </small>
-                        ${moreCount > 0 ? `<em>${t("resumePaymentMore", "+{count} more pending payments").replace("{count}", String(moreCount))}</em>` : ""}
+                        ${moreCount > 0 ? `<em>${tt("resumePaymentMore", "+{count} more pending payments").replace("{count}", String(moreCount))}</em>` : ""}
                     </div>
                     <button type="button" class="az-pending-payment__continue">
-                        ${t("resumePaymentAction", "Continue Payment")}
+                        ${tt("resumePaymentAction", "Continue Payment")}
                     </button>
                 </div>
             </div>
@@ -335,7 +352,7 @@
         state.runtimePromise = (async () => {
             await loadStylesheet("/css/payment/payment-checkout-sheet.css?v=20260722-promptpay-platform", "aziel-recovery-checkout-css");
             await loadScript("/js/payment/android-app-launch.js?v=20260722-open-app", "aziel-recovery-android-launch", () => Boolean(window.AZIEL_ANDROID_APP_LAUNCH));
-            await loadScript("/js/payment/payment-checkout-sheet.js?v=20260722-phase23-recovery", "aziel-recovery-checkout-sheet", () => Boolean(window.PaymentCheckoutSheet?.openRecoveredPayment));
+            await loadScript("/js/payment/payment-checkout-sheet.js?v=20260723-recovery-runtime", "aziel-recovery-checkout-sheet", () => Boolean(window.PaymentCheckoutSheet?.openRecoveredPayment));
             if (!window.PaymentCheckoutSheet?.openRecoveredPayment) {
                 throw new Error("Recovery checkout is unavailable.");
             }
@@ -482,7 +499,7 @@
             const button = document.querySelector(".az-pending-payment__continue");
             if (button) {
                 button.disabled = true;
-                button.textContent = t("Loading...", "Loading...");
+                button.textContent = t("loading", "Loading...");
             }
 
             const res = await fetch(getApiUrl(`/api/payment/manual/recoverable/${encodeURIComponent(id)}/resume`), {
@@ -533,9 +550,10 @@
         });
     }
 
-    function init() {
+    async function init() {
         if (state.initialized || !isEligiblePage()) return;
         state.initialized = true;
+        await waitForLanguageRuntime();
 
         watchCheckoutSheet();
 
