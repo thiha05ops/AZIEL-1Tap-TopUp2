@@ -11,6 +11,7 @@ const WalletTopup = require("../models/WalletTopup");
 const WalletTopupIntent = require("../models/WalletTopupIntent");
 const WalletTransaction = require("../models/WalletTransaction");
 const PaymentMethod = require("../models/PaymentMethod");
+const WalletReviewNote = require("../models/WalletReviewNote");
 const upload = require("../middleware/imageMemoryUpload");
 const adminMiddleware = require("../middleware/adminMiddleware");
 const { PERMISSIONS, requireAdminPermission } = require("../services/adminAuthorizationService");
@@ -52,6 +53,12 @@ const {
     sendPaginationError
 } = require("../services/paginationService");
 const { formatPaymentMethod } = require("../services/paymentDisplayNameService");
+const { createPromptPayQr } = require("../services/promptPayQrService");
+
+const ADMIN_WALLET_SALES_STATUSES = Object.freeze(["paid", "processing", "completed"]);
+const ADMIN_WALLET_REWARD_ORDER_THRESHOLD = 5;
+const ADMIN_WALLET_REWARD_MMK_THRESHOLD = 50000;
+const ADMIN_WALLET_REWARD_THB_THRESHOLD = 500;
 
 // ======================
 // HELPERS
@@ -118,6 +125,31 @@ function isAutoPromptPayMethod(method = {}) {
     );
 }
 
+function isManualDynamicPromptPayMethod(method = {}) {
+    return (
+        String(method.paymentType || "manual").toLowerCase() === "manual" &&
+        normalizeMethod(method.key) === "promptpay" &&
+        String(method.region || "").toUpperCase() === "TH" &&
+        String(method.qrMode || "") === "aziel_promptpay_dynamic" &&
+        method.dynamicQrSupported === true &&
+        method.amountPrefillSupported === true &&
+        method.receiptUploadEnabled !== false &&
+        method.confirmationMode === "manual_admin"
+    );
+}
+
+function isWalletFundingMethodEligible(method = {}) {
+    if (!method || method.enabled !== true) return false;
+    if (isMethodInMaintenance(method)) return false;
+    const type = String(method.paymentType || "manual").toLowerCase();
+    const provider = String(method.provider || "").toLowerCase();
+    if (type === "wallet" || provider === "wallet" || normalizeMethod(method.key) === "wallet") return false;
+    if (type === "auto") return isAutoPromptPayMethod(method);
+    if (isManualDynamicPromptPayMethod(method)) return true;
+    if (!isManualLikePaymentMethod(method)) return false;
+    return Boolean(getMethodQrImage(method)) && Boolean(method.accountName && method.accountNumber);
+}
+
 function projectWalletPaymentMethod(method = {}) {
     const slipRequired = typeof method.slipRequired === "boolean"
         ? method.slipRequired
@@ -132,6 +164,8 @@ function projectWalletPaymentMethod(method = {}) {
         accountName: method.accountName || "",
         accountNumber: method.accountNumber || "",
         qrImage: getMethodQrImage(method),
+        qrMode: method.qrMode || "uploaded_static",
+        dynamicQr: method.dynamicQr || null,
         maintenanceMessage: method.maintenanceMessage || "",
         slipRequired,
         logoUrl: `/assets/payment/${method.key}.png`,
@@ -139,6 +173,13 @@ function projectWalletPaymentMethod(method = {}) {
         deepLinkUrl: method.deepLinkUrl || "",
         appStoreUrl: method.appStoreUrl || "",
         playStoreUrl: method.playStoreUrl || "",
+        openAppMode: method.openAppMode || "",
+        appLaunchMode: method.appLaunchMode || "",
+        iosAppLaunchUrl: method.iosAppLaunchUrl || "",
+        androidAppLaunchUrl: method.androidAppLaunchUrl || "",
+        androidPackageName: method.androidPackageName || "",
+        appStoreFallbackUrl: method.appStoreFallbackUrl || method.appStoreUrl || "",
+        playStoreFallbackUrl: method.playStoreFallbackUrl || method.playStoreUrl || "",
         enableSaveQr: method.enableSaveQr === true,
         enableOpenApp: method.enableOpenApp === true,
         enableChecklist: method.enableChecklist === true,
@@ -148,7 +189,8 @@ function projectWalletPaymentMethod(method = {}) {
         galleryScanSupported: method.galleryScanSupported === true,
         autoVerificationSupported: method.autoVerificationSupported === true,
         webhookSupported: method.webhookSupported === true,
-        checklistSteps: Array.isArray(method.checklistSteps) ? method.checklistSteps : []
+        checklistSteps: Array.isArray(method.checklistSteps) ? method.checklistSteps : [],
+        bankLaunchers: Array.isArray(method.bankLaunchers) ? method.bankLaunchers : []
     };
 }
 
@@ -181,7 +223,9 @@ function createPaymentSnapshot(methodPresentation = {}) {
         provider: methodPresentation.provider || "",
         accountName: methodPresentation.accountName || "",
         accountNumber: methodPresentation.accountNumber || "",
-        qrImage: methodPresentation.qrImage || ""
+        qrImage: methodPresentation.qrImage || "",
+        qrMode: methodPresentation.qrMode || "",
+        dynamicQr: methodPresentation.dynamicQr || null
     };
 }
 
@@ -220,6 +264,12 @@ async function resolveWalletPaymentMethod({ paymentMethod, region, currency }) {
 
     if (String(method.paymentType || "").toLowerCase() === "wallet" || String(method.provider || "").toLowerCase() === "wallet") {
         const error = new Error("AZIEL Wallet cannot be used to top up AZIEL Wallet.");
+        error.statusCode = 400;
+        throw error;
+    }
+
+    if (!isWalletFundingMethodEligible(method)) {
+        const error = new Error("Selected payment method is not available for wallet top-up.");
         error.statusCode = 400;
         throw error;
     }
@@ -361,6 +411,103 @@ function projectWalletUser(user = {}) {
             THB: Number(user.wallet?.THB || 0)
         }
     };
+}
+
+function safeAdminName(admin = {}) {
+    return admin.displayName || admin.username || admin.email || "Admin";
+}
+
+function normalizeAdminWalletRegion(region) {
+    const value = String(region || "").trim().toUpperCase();
+    return ["MM", "TH"].includes(value) ? value : "";
+}
+
+function escapeAdminWalletRegex(value = "") {
+    return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function buildAdminWalletTopupQuery(queryParams = {}) {
+    const status = String(queryParams.status || "").trim().toLowerCase();
+    const region = normalizeAdminWalletRegion(queryParams.region);
+    const currency = String(queryParams.currency || "").trim().toUpperCase();
+    const paymentMethod = String(queryParams.paymentMethod || "").trim();
+    const search = String(queryParams.q || "").trim();
+    const query = {};
+
+    if ([
+        "pending",
+        "paid",
+        "completed",
+        "approved",
+        "rejected",
+        "cancelled",
+        "failed"
+    ].includes(status)) {
+        query.status = status;
+    }
+
+    if (region) query.region = region;
+    if (["MMK", "THB"].includes(currency)) query.currency = currency;
+    if (paymentMethod) query.paymentMethod = { $regex: `^${escapeAdminWalletRegex(paymentMethod)}$`, $options: "i" };
+
+    if (search) {
+        const escaped = escapeAdminWalletRegex(search);
+        query.$or = [
+            { username: { $regex: escaped, $options: "i" } },
+            { topupId: { $regex: escaped, $options: "i" } },
+            { transactionId: { $regex: escaped, $options: "i" } },
+            { "paymentEvidence.originalName": { $regex: escaped, $options: "i" } },
+            { "paymentEvidence.key": { $regex: escaped, $options: "i" } },
+            { "paymentEvidence.storageKey": { $regex: escaped, $options: "i" } }
+        ];
+    }
+
+    return query;
+}
+
+function buildAdminWalletTopupSort(sort = "") {
+    const value = String(sort || "newest").toLowerCase();
+    if (value === "oldest") return { createdAt: 1, _id: 1 };
+    if (value === "highest_amount") return { amount: -1, createdAt: -1, _id: -1 };
+    return { createdAt: -1, _id: -1 };
+}
+
+function summarizeWalletCustomerOrders(orders = []) {
+    const summary = {
+        totalOrders: orders.length,
+        totalSpend: { MMK: 0, THB: 0 }
+    };
+
+    orders.forEach(order => {
+        const status = String(order.status || "").toLowerCase();
+        const currency = getCurrencyKey(order.currency);
+        if (ADMIN_WALLET_SALES_STATUSES.includes(status) && !order.refunded) {
+            summary.totalSpend[currency] += Number(order.amount || 0);
+        }
+    });
+
+    return summary;
+}
+
+function walletCustomerTags(user = {}, orderSummary = {}) {
+    const tags = [];
+    const createdAt = user.createdAt ? new Date(user.createdAt) : null;
+    const ageDays = createdAt && !Number.isNaN(createdAt.getTime())
+        ? (Date.now() - createdAt.getTime()) / (24 * 60 * 60 * 1000)
+        : 0;
+    const totalOrders = Number(orderSummary.totalOrders || 0);
+    const totalSpend = orderSummary.totalSpend || {};
+
+    if (Number(totalSpend.MMK || 0) >= 100000 || Number(totalSpend.THB || 0) >= 1000) tags.push("High Value");
+    if (totalOrders >= 10) tags.push("Frequent Buyer");
+    if (ageDays >= 180) tags.push("Early Supporter");
+    if (Number(totalSpend.MMK || 0) >= ADMIN_WALLET_REWARD_MMK_THRESHOLD ||
+        Number(totalSpend.THB || 0) >= ADMIN_WALLET_REWARD_THB_THRESHOLD ||
+        totalOrders >= ADMIN_WALLET_REWARD_ORDER_THRESHOLD) {
+        tags.push("Reward Eligible");
+    }
+
+    return tags;
 }
 
 function parsePagination(query = {}) {
@@ -630,11 +777,30 @@ router.post("/wallet/manual-intent", authMiddleware, async (req, res) => {
             });
         }
 
+        const intentId = createWalletReference("WINT");
+        const reference = createWalletReference("WALLET");
         const methodPresentation = projectWalletPaymentMethod(configuredMethod);
+        let dynamicQr = null;
+        if (isManualDynamicPromptPayMethod(configuredMethod)) {
+            dynamicQr = await createPromptPayQr({
+                method: configuredMethod,
+                amount: Number(amount),
+                currency: currencyKey,
+                orderReference: reference
+            });
+            methodPresentation.qrImage = dynamicQr.qrImage;
+            methodPresentation.dynamicQr = {
+                orderReference: dynamicQr.orderReference,
+                encodedReference: dynamicQr.encodedReference,
+                qrPayload: dynamicQr.qrPayload,
+                qrImage: dynamicQr.qrImage,
+                expiresAt: dynamicQr.expiresAt
+            };
+        }
         const snapshot = createPaymentSnapshot(methodPresentation);
         const intent = await WalletTopupIntent.create({
-            intentId: createWalletReference("WINT"),
-            reference: createWalletReference("WALLET"),
+            intentId,
+            reference,
             username,
             ...buildOrderCustomerSnapshot(req.user),
             amount: Number(amount),
@@ -662,6 +828,22 @@ router.post("/wallet/manual-intent", authMiddleware, async (req, res) => {
             paymentName: snapshot.method,
             qrImage: snapshot.qrImage,
             qrUrl: snapshot.qrImage,
+            qrMode: snapshot.qrMode,
+            dynamicQr: snapshot.dynamicQr,
+            enableSaveQr: methodPresentation.enableSaveQr,
+            enableOpenApp: methodPresentation.enableOpenApp,
+            enableChecklist: methodPresentation.enableChecklist,
+            checklistSteps: methodPresentation.checklistSteps,
+            openAppMode: methodPresentation.openAppMode,
+            appLaunchMode: methodPresentation.appLaunchMode,
+            iosAppLaunchUrl: methodPresentation.iosAppLaunchUrl,
+            androidAppLaunchUrl: methodPresentation.androidAppLaunchUrl,
+            androidPackageName: methodPresentation.androidPackageName,
+            appStoreUrl: methodPresentation.appStoreUrl,
+            playStoreUrl: methodPresentation.playStoreUrl,
+            appStoreFallbackUrl: methodPresentation.appStoreFallbackUrl,
+            playStoreFallbackUrl: methodPresentation.playStoreFallbackUrl,
+            bankLaunchers: methodPresentation.bankLaunchers,
             accountName: snapshot.accountName,
             accountNumber: snapshot.accountNumber,
             slipRequired: true
@@ -849,6 +1031,15 @@ async function submitWalletIntentSlip(req, res) {
         }
 
         const methodPresentation = projectWalletPaymentMethod(configuredMethod);
+        if (intent.methodSnapshot?.qrImage) {
+            methodPresentation.qrImage = intent.methodSnapshot.qrImage;
+        }
+        if (intent.methodSnapshot?.qrMode) {
+            methodPresentation.qrMode = intent.methodSnapshot.qrMode;
+        }
+        if (intent.methodSnapshot?.dynamicQr) {
+            methodPresentation.dynamicQr = intent.methodSnapshot.dynamicQr;
+        }
         const snapshot = createPaymentSnapshot(methodPresentation);
 
         evidence = await uploadFile({
@@ -1065,24 +1256,12 @@ router.post("/wallet/upload-slip/:topupId", authMiddleware, upload.single("slip"
 
 router.get("/admin/wallet/topups", adminMiddleware, requireAdminPermission(PERMISSIONS.WALLET_READ), async (req, res) => {
     try {
-        const status = String(req.query.status || "").trim().toLowerCase();
         const limit = parseLimit(req.query.limit, { defaultLimit: 50, maxLimit: 100 });
-        const query = {};
-
-        if ([
-            "pending",
-            "paid",
-            "completed",
-            "approved",
-            "rejected",
-            "cancelled",
-            "failed"
-        ].includes(status)) {
-            query.status = status;
-        }
+        const query = buildAdminWalletTopupQuery(req.query);
+        const sort = buildAdminWalletTopupSort(req.query.sort);
 
         const topupsRaw = await WalletTopup.find(applyCursorFilter(query, req.query.cursor))
-            .sort({ createdAt: -1, _id: -1 })
+            .sort(sort)
             .limit(limit + 1)
             .lean();
         const { page, pagination } = pageResult(topupsRaw, limit);
@@ -1119,7 +1298,7 @@ router.get("/admin/wallet/topups/:id/context", adminMiddleware, requireAdminPerm
         }
 
         const user = await User.findOne({ username: topup.username })
-            .select("username region wallet")
+            .select("username email displayName region wallet createdAt lastActiveAt lastLoginDevice sessionUpdatedAt")
             .lean();
 
         if (!user) {
@@ -1129,20 +1308,105 @@ router.get("/admin/wallet/topups/:id/context", adminMiddleware, requireAdminPerm
             });
         }
 
-        const timeline = await getWalletTimeline(topup.username, {
-            currency: getCurrencyKey(topup.currency),
-            limit: 10
-        });
+        const [timeline, orders, notes] = await Promise.all([
+            getWalletTimeline(topup.username, {
+                currency: getCurrencyKey(topup.currency),
+                limit: 10
+            }),
+            Order.find({ username: topup.username })
+                .sort({ createdAt: -1, _id: -1 })
+                .limit(100)
+                .select("amount currency status refunded createdAt updatedAt")
+                .lean(),
+            WalletReviewNote.find({ topupId: topup._id })
+                .sort({ createdAt: -1, _id: -1 })
+                .limit(50)
+                .lean()
+        ]);
+        const orderSummary = summarizeWalletCustomerOrders(orders);
 
         return res.json({
             success: true,
             topup: projectAdminWalletTopup(topup),
             wallet: projectWalletUser(user),
-            recentTransactions: timeline.transactions
+            customerSummary: {
+                username: user.username,
+                displayName: user.displayName || user.username,
+                email: user.email || "",
+                region: user.region || "",
+                wallet: user.wallet || { MMK: 0, THB: 0 },
+                memberSince: user.createdAt,
+                lastLogin: user.lastLoginDevice?.loginAt || user.sessionUpdatedAt || null,
+                totalOrders: orderSummary.totalOrders,
+                totalSpend: orderSummary.totalSpend,
+                tags: walletCustomerTags(user, orderSummary)
+            },
+            recentTransactions: timeline.transactions,
+            notes: notes.map(note => ({
+                _id: note._id,
+                body: note.body,
+                adminName: note.createdByAdminName || "Admin",
+                updatedByAdminName: note.updatedByAdminName || "",
+                createdAt: note.createdAt,
+                updatedAt: note.updatedAt
+            }))
         });
     } catch (error) {
         console.log("Admin wallet topup context error:", error);
         return sendWalletError(res, error, "Load wallet context failed");
+    }
+});
+
+router.post("/admin/wallet/topups/:id/notes", adminMiddleware, requireAdminPermission(PERMISSIONS.WALLET_APPROVE), async (req, res) => {
+    try {
+        const body = String(req.body?.body || "").trim();
+        if (!body) return res.status(400).json({ success: false, message: "Note is required" });
+
+        const topup = await WalletTopup.findById(req.params.id).select("_id").lean();
+        if (!topup) return res.status(404).json({ success: false, message: "Topup not found" });
+
+        const note = await WalletReviewNote.create({
+            topupId: topup._id,
+            body,
+            createdByAdminId: req.admin?._id || null,
+            createdByAdminName: safeAdminName(req.admin)
+        });
+
+        return res.status(201).json({ success: true, note });
+    } catch (error) {
+        console.log("Admin wallet note create error:", error);
+        return sendWalletError(res, error, "Create wallet note failed");
+    }
+});
+
+router.put("/admin/wallet/topups/:id/notes/:noteId", adminMiddleware, requireAdminPermission(PERMISSIONS.WALLET_APPROVE), async (req, res) => {
+    try {
+        const body = String(req.body?.body || "").trim();
+        if (!body) return res.status(400).json({ success: false, message: "Note is required" });
+
+        const note = await WalletReviewNote.findOne({ _id: req.params.noteId, topupId: req.params.id });
+        if (!note) return res.status(404).json({ success: false, message: "Note not found" });
+
+        note.body = body;
+        note.updatedByAdminId = req.admin?._id || null;
+        note.updatedByAdminName = safeAdminName(req.admin);
+        await note.save();
+
+        return res.json({ success: true, note });
+    } catch (error) {
+        console.log("Admin wallet note update error:", error);
+        return sendWalletError(res, error, "Update wallet note failed");
+    }
+});
+
+router.delete("/admin/wallet/topups/:id/notes/:noteId", adminMiddleware, requireAdminPermission(PERMISSIONS.WALLET_APPROVE), async (req, res) => {
+    try {
+        const result = await WalletReviewNote.deleteOne({ _id: req.params.noteId, topupId: req.params.id });
+        if (!result.deletedCount) return res.status(404).json({ success: false, message: "Note not found" });
+        return res.json({ success: true });
+    } catch (error) {
+        console.log("Admin wallet note delete error:", error);
+        return sendWalletError(res, error, "Delete wallet note failed");
     }
 });
 

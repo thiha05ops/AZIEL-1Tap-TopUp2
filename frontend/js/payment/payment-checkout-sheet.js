@@ -256,7 +256,10 @@
     }
 
     function shouldGenerateDynamicPromptPay(options = {}) {
-        return isDynamicPromptPayMode(options) && !isRecoveryMode(options);
+        return isDynamicPromptPayMode(options) && !isRecoveryMode(options) &&
+            !options.qrImageUrl &&
+            !options.qrImage &&
+            !options.dynamicQr?.qrImage;
     }
 
     function isRecoveryMode(options = {}) {
@@ -1727,7 +1730,7 @@
             retryQr.onclick = () => generateDynamicQrForActiveState();
         }
 
-        if (qr) setQrImage(qr, qrSourceType);
+        if (qr) setQrImage(qr, qrSourceType, options.dynamicQr?.qrPayload || "");
         else if (dynamicQr) setQrLoading(true);
         else modal.querySelector("#azPaymentSheetQrWrap").hidden = true;
 

@@ -97,9 +97,13 @@ function getWalletUser() {
 }
 
 function getWalletRegion() {
-    return AZIEL.getShopRegion?.() ||
+    const region = AZIEL.getShopRegion?.() ||
         AZIEL.getRegion?.() ||
         "MM";
+    return String(region || "").trim().toUpperCase() === "TH" ||
+        String(region || "").trim().toLowerCase().includes("thai")
+        ? "TH"
+        : "MM";
 }
 
 function getWalletCurrency() {
@@ -162,6 +166,15 @@ function getSelectedPaymentMethod() {
         galleryScanSupported: activeCard?.dataset.galleryScanSupported === "true",
         autoVerificationSupported: activeCard?.dataset.autoVerificationSupported === "true",
         webhookSupported: activeCard?.dataset.webhookSupported === "true",
+        qrMode: activeCard?.dataset.qrMode || "",
+        openAppMode: activeCard?.dataset.openAppMode || "",
+        appLaunchMode: activeCard?.dataset.appLaunchMode || "",
+        iosAppLaunchUrl: activeCard?.dataset.iosAppLaunchUrl || "",
+        androidAppLaunchUrl: activeCard?.dataset.androidAppLaunchUrl || "",
+        androidPackageName: activeCard?.dataset.androidPackageName || "",
+        appStoreFallbackUrl: activeCard?.dataset.appStoreFallbackUrl || "",
+        playStoreFallbackUrl: activeCard?.dataset.playStoreFallbackUrl || "",
+        bankLaunchers: parseWalletBankLaunchers(activeCard?.dataset.bankLaunchers),
         checklistSteps: parseWalletChecklistSteps(activeCard?.dataset.checklistSteps)
     };
 }
@@ -175,18 +188,34 @@ function parseWalletChecklistSteps(value) {
     }
 }
 
+function parseWalletBankLaunchers(value) {
+    try {
+        const launchers = JSON.parse(value || "[]");
+        return Array.isArray(launchers) ? launchers : [];
+    } catch (error) {
+        return [];
+    }
+}
+
 function isPromptPayPayment(payment) {
     const provider = normalizePaymentKey(payment?.provider || "");
-    const raw = normalizePaymentKey(payment?.raw || "");
-    const method = normalizePaymentKey(payment?.method || "");
 
     return (
         payment?.paymentType === "auto" ||
-        provider === "omise" ||
-        provider === "promptpay" ||
-        raw === "promptpay" ||
-        method.includes("promptpay")
+        provider === "omise"
     );
+}
+
+function isManualDynamicPromptPayWalletMethod(method = {}) {
+    const type = normalizePaymentKey(method.paymentType || "");
+    const provider = normalizePaymentKey(method.provider || "");
+    return ["manual", "deeplink"].includes(type) &&
+        provider === "promptpay" &&
+        String(method.qrMode || "") === "aziel_promptpay_dynamic" &&
+        method.dynamicQrSupported === true &&
+        method.amountPrefillSupported === true &&
+        method.receiptUploadEnabled !== false &&
+        method.confirmationMode === "manual_admin";
 }
 
 async function loadWalletPaymentMethods() {
@@ -237,6 +266,7 @@ function isWalletFundingMethodAvailable(method = {}) {
     if (type === "wallet" || provider === "wallet" || normalizePaymentKey(method.key) === "wallet") return false;
     if (String(method.maintenanceMessage || "").trim()) return false;
     if (type !== "auto" && provider !== "omise") {
+        if (isManualDynamicPromptPayWalletMethod(method)) return true;
         const hasQr = Boolean(method.qrImage || method.qrImageUrl || method.uploadedQrImage || method.finalQrImage);
         const hasAccount = Boolean(method.accountName && method.accountNumber);
         if (!hasQr || !hasAccount) return false;
@@ -301,6 +331,15 @@ function buildWalletPaymentCard(method, index) {
     card.dataset.galleryScanSupported = String(method.galleryScanSupported === true);
     card.dataset.autoVerificationSupported = String(method.autoVerificationSupported === true);
     card.dataset.webhookSupported = String(method.webhookSupported === true);
+    card.dataset.qrMode = method.qrMode || "";
+    card.dataset.openAppMode = method.openAppMode || "";
+    card.dataset.appLaunchMode = method.appLaunchMode || "";
+    card.dataset.iosAppLaunchUrl = method.iosAppLaunchUrl || "";
+    card.dataset.androidAppLaunchUrl = method.androidAppLaunchUrl || "";
+    card.dataset.androidPackageName = method.androidPackageName || "";
+    card.dataset.appStoreFallbackUrl = method.appStoreFallbackUrl || method.appStoreUrl || "";
+    card.dataset.playStoreFallbackUrl = method.playStoreFallbackUrl || method.playStoreUrl || "";
+    card.dataset.bankLaunchers = JSON.stringify(Array.isArray(method.bankLaunchers) ? method.bankLaunchers : []);
     card.dataset.checklistSteps = JSON.stringify(Array.isArray(method.checklistSteps) ? method.checklistSteps : []);
 
     card.innerHTML = `
@@ -789,10 +828,20 @@ async function submitTopup() {
                 appDisplayName: data.appDisplayName || data.method?.appDisplayName || payment.appDisplayName,
                 appStoreUrl: data.appStoreUrl || data.method?.appStoreUrl || payment.appStoreUrl,
                 playStoreUrl: data.playStoreUrl || data.method?.playStoreUrl || payment.playStoreUrl,
+                appStoreFallbackUrl: data.appStoreFallbackUrl || data.method?.appStoreFallbackUrl || payment.appStoreFallbackUrl,
+                playStoreFallbackUrl: data.playStoreFallbackUrl || data.method?.playStoreFallbackUrl || payment.playStoreFallbackUrl,
                 enableSaveQr: data.enableSaveQr === true || data.method?.enableSaveQr === true || payment.enableSaveQr === true,
                 enableOpenApp: data.enableOpenApp === true || data.method?.enableOpenApp === true || payment.enableOpenApp === true,
                 enableChecklist: data.enableChecklist === true || data.method?.enableChecklist === true || payment.enableChecklist === true,
                 checklistSteps: data.checklistSteps || data.method?.checklistSteps || payment.checklistSteps || [],
+                qrMode: data.qrMode || data.method?.qrMode || payment.qrMode,
+                dynamicQr: data.dynamicQr || data.method?.dynamicQr || null,
+                openAppMode: data.openAppMode || data.method?.openAppMode || payment.openAppMode,
+                appLaunchMode: data.appLaunchMode || data.method?.appLaunchMode || payment.appLaunchMode,
+                iosAppLaunchUrl: data.iosAppLaunchUrl || data.method?.iosAppLaunchUrl || payment.iosAppLaunchUrl,
+                androidAppLaunchUrl: data.androidAppLaunchUrl || data.method?.androidAppLaunchUrl || payment.androidAppLaunchUrl,
+                androidPackageName: data.androidPackageName || data.method?.androidPackageName || payment.androidPackageName,
+                bankLaunchers: data.bankLaunchers || data.method?.bankLaunchers || payment.bankLaunchers || [],
                 method: data.method || payment
             });
         }
@@ -874,6 +923,8 @@ function openWalletManualModal(data, info) {
         accountNumber,
         reference,
         qrImageUrl: qrImage,
+        qrMode: info.qrMode || "",
+        dynamicQr: info.dynamicQr || null,
         instructions: "Transfer the exact amount, then upload the payment receipt.",
         requiresSlip: slipRequired,
         deepLink,
@@ -883,6 +934,14 @@ function openWalletManualModal(data, info) {
         appDisplayName: info.appDisplayName || appName,
         appStoreUrl: info.appStoreUrl || "",
         playStoreUrl: info.playStoreUrl || "",
+        appStoreFallbackUrl: info.appStoreFallbackUrl || "",
+        playStoreFallbackUrl: info.playStoreFallbackUrl || "",
+        openAppMode: info.openAppMode || "",
+        appLaunchMode: info.appLaunchMode || "",
+        iosAppLaunchUrl: info.iosAppLaunchUrl || "",
+        androidAppLaunchUrl: info.androidAppLaunchUrl || "",
+        androidPackageName: info.androidPackageName || "",
+        bankLaunchers: info.bankLaunchers || [],
         checklistSteps: info.checklistSteps || [],
         submitLabel: "Submit for Verification",
         loadingText: "Submitting receipt...",

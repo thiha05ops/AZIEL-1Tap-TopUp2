@@ -61,7 +61,15 @@ const walletTopupIntentSchema = new mongoose.Schema(
             provider: { type: String, default: "" },
             accountName: { type: String, default: "" },
             accountNumber: { type: String, default: "" },
-            qrImage: { type: String, default: "" }
+            qrImage: { type: String, default: "" },
+            qrMode: { type: String, default: "" },
+            dynamicQr: {
+                orderReference: { type: String, default: "" },
+                encodedReference: { type: String, default: "" },
+                qrPayload: { type: String, default: "" },
+                qrImage: { type: String, default: "" },
+                expiresAt: { type: Date, default: null }
+            }
         },
         status: {
             type: String,

@@ -29,6 +29,10 @@ const {
     maskPromptPayRecipient
 } = require("../services/promptPayQrService");
 const {
+    getPaymentInfrastructureSnapshot,
+    railTypeForMethod
+} = require("../services/paymentInfrastructureService");
+const {
     computeRecoverableExpiresAt,
     evaluateRecoverability,
     projectRecoverableAttempt
@@ -829,7 +833,7 @@ function publicTrustDisplayForMethod(obj = {}, readiness = { ready: false }) {
         logo,
         label: obj.region === "TH" && key === "promptpay" && obj.qrMode === "aziel_promptpay_dynamic"
             ? "PromptPay"
-            : formatPaymentMethod({ ...obj, provider }, getProviderLabel(provider, obj.method || "Payment")),
+            : formatPaymentMethod(Object.assign({}, obj, { provider }), getProviderLabel(provider, obj.method || "Payment")),
         sortOrder: safeSortOrder(obj.sortOrder),
         group: provider === "wallet" || key === "wallet" ? "wallet" : "payment_method"
     };
@@ -984,6 +988,10 @@ function formatAdminMethod(method) {
         checklistSteps: sanitizeChecklistSteps(obj.checklistSteps || []),
         bankLaunchers: sanitizeBankLaunchers(obj.bankLaunchers || []),
         sortOrder: safeSortOrder(obj.sortOrder),
+        railType: obj.railType || railTypeForMethod(obj),
+        availabilityMode: obj.availabilityMode || (obj.enabled === true ? "MANUAL_ONLY" : "DISABLED"),
+        routingPriority: obj.routingPriority || 0,
+        customerVisible: obj.enabled === true && formatMethod(method).publicReady === true,
         providerOptions: validProvidersFor(obj.region, obj.paymentType).map(item => ({
             key: item.key,
             label: item.label
@@ -1279,6 +1287,32 @@ router.get("/admin/payment-methods", adminMiddleware, requireAdminPermission(PER
         });
     } catch (error) {
         console.log("Admin payment methods error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Server error"
+        });
+    }
+});
+
+router.get("/admin/payment-infrastructure", adminMiddleware, requireAdminPermission(PERMISSIONS.PAYMENT_METHODS_MANAGE), async (req, res) => {
+    try {
+        await seedPaymentMethods();
+
+        const methods = await PaymentMethod
+            .find({})
+            .sort({ region: 1, sortOrder: 1, method: 1 })
+            .lean();
+
+        return res.json(await getPaymentInfrastructureSnapshot(methods.map(method => {
+            const readiness = paymentMethodReadiness(method);
+            return {
+                ...method,
+                publicReady: readiness.ready,
+                missingConfiguration: readiness.missing
+            };
+        })));
+    } catch (error) {
+        console.log("Admin payment infrastructure error:", error);
         return res.status(500).json({
             success: false,
             message: "Server error"

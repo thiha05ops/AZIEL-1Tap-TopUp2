@@ -39,6 +39,10 @@ assertIncludes(adminCss, ".admin-body .top-actions", "Mobile topbar must control
 assertIncludes(adminCss, "display: none", "Mobile CSS must hide nonessential permanent shell controls");
 assertIncludes(adminCss, "#section-orders .orders-command-panel > .panel-head", "Orders duplicate heading must be controlled on mobile");
 assertIncludes(adminCss, "#section-wallet .wallet-command-panel > .panel-head", "Wallet duplicate heading must be controlled on mobile");
+assertIncludes(adminCss, "#section-wallet.admin-mobile-detail-open .wallet-command-panel", "Wallet mobile detail state must hide the queue panel");
+assertIncludes(adminCss, "#section-wallet.admin-mobile-list-open .wallet-detail-panel", "Wallet mobile list state must hide the detail panel");
+assertIncludes(adminCss, ".wallet-queue-filters,\n  .wallet-summary-grid", "Wallet filters and summary must collapse to one mobile column");
+assertIncludes(adminCss, ".wallet-review-sticky {\n    position: static;", "Wallet sticky desktop header must release on mobile");
 assertIncludes(adminCss, "#section-users.admin-mobile-detail-open .customer-crm-list-panel", "Customer CRM mobile list/detail state must exist");
 assertIncludes(adminCss, "#section-users.admin-mobile-list-open .customer-crm-detail-panel", "Customer CRM mobile detail panel must hide in list mode");
 assert.ok(

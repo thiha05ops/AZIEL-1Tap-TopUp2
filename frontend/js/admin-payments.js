@@ -2,6 +2,8 @@
 // AZIEL Admin Payment Methods Manager V2.5
 
 let adminPaymentMethods = [];
+let adminPaymentInfrastructure = null;
+let adminPaymentInfrastructureActiveRegion = "TH";
 let adminPaymentsInitialized = false;
 
 const ADMIN_PAYMENT_PROVIDERS = Object.freeze({
@@ -86,10 +88,13 @@ async function loadAdminPaymentMethods() {
     const box = document.getElementById("paymentMethodsContainer");
     if (!box) return;
 
-    box.innerHTML = `<div class="admin-list-empty">Loading payment methods...</div>`;
+    box.innerHTML = `<div class="admin-list-empty">Loading payment infrastructure...</div>`;
 
     try {
-        const data = await adminFetch("/api/admin/payment-methods");
+        const [data, infrastructure] = await Promise.all([
+            adminFetch("/api/admin/payment-methods"),
+            adminFetch("/api/admin/payment-infrastructure")
+        ]);
 
         if (!data || !data.success) {
             box.innerHTML = `<div class="admin-list-empty">${data?.message || "Failed to load payment methods"}</div>`;
@@ -97,17 +102,20 @@ async function loadAdminPaymentMethods() {
         }
 
         adminPaymentMethods = Array.isArray(data.methods) ? data.methods : [];
+        adminPaymentInfrastructure = infrastructure?.success ? infrastructure : null;
         renderAdminPaymentMethods(adminPaymentMethods);
 
     } catch (error) {
         console.log("Load admin payments error:", error);
-        box.innerHTML = `<div class="admin-list-empty">Server error while loading payment methods</div>`;
+        box.innerHTML = `<div class="admin-list-empty">Server error while loading payment infrastructure</div>`;
     }
 }
 
 function renderAdminPaymentMethods(methods) {
     const box = document.getElementById("paymentMethodsContainer");
     if (!box) return;
+    const activeRegion = getPaymentInfrastructureActiveRegion(methods);
+    const regionMethods = getPaymentMethodsForInfrastructureRegion(methods, activeRegion);
 
     const toolbar = `
         <div class="admin-payment-toolbar">
@@ -118,12 +126,13 @@ function renderAdminPaymentMethods(methods) {
     `;
 
     if (!methods.length) {
-        box.innerHTML = `${toolbar}<div class="admin-list-empty">No payment methods found.</div>`;
+        box.innerHTML = renderPaymentInfrastructureWorkspace(methods, `${toolbar}<div class="admin-list-empty">No payment methods found.</div>`, activeRegion);
         bindAdminPaymentActions();
+        bindPaymentInfrastructureActions();
         return;
     }
 
-    box.innerHTML = toolbar + methods.map(method => {
+    const editorMarkup = toolbar + (regionMethods.length ? regionMethods.map(method => {
         const qr = method.uploadedQrImage || method.qrImageUrl || method.qrImage || "";
         const qrUrl = getAdminPaymentUploadUrl(qr);
         const type = method.paymentType || "manual";
@@ -609,9 +618,12 @@ function renderAdminPaymentMethods(methods) {
                 </details>
             </div>
         `;
-    }).join("");
+    }).join("") : `<div class="admin-list-empty">No payment methods configured for ${escapeAdminHTML(activeRegion === "MM" ? "Myanmar" : activeRegion === "TH" ? "Thailand" : "Future Regions")}.</div>`);
+
+    box.innerHTML = renderPaymentInfrastructureWorkspace(methods, editorMarkup, activeRegion);
 
     bindAdminPaymentActions();
+    bindPaymentInfrastructureActions();
 }
 
 function renderPromptPayBankLauncherEditor(method = {}) {
@@ -632,6 +644,343 @@ function renderPromptPayBankLauncherEditor(method = {}) {
             </div>
         </section>
     `;
+}
+
+function getPaymentInfrastructureActiveRegion(methods = []) {
+    const infraRegions = Array.isArray(adminPaymentInfrastructure?.regions)
+        ? adminPaymentInfrastructure.regions.map(region => region.region).filter(Boolean)
+        : [];
+    if (infraRegions.includes(adminPaymentInfrastructureActiveRegion)) {
+        return adminPaymentInfrastructureActiveRegion;
+    }
+    if (infraRegions.includes("TH")) return "TH";
+    if (infraRegions.includes("MM")) return "MM";
+    if (methods.some(method => String(method.region || "").toUpperCase() === "TH")) return "TH";
+    if (methods.some(method => String(method.region || "").toUpperCase() === "MM")) return "MM";
+    return "TH";
+}
+
+function getPaymentMethodsForInfrastructureRegion(methods = [], region = "TH") {
+    if (region === "FUTURE") return [];
+    return methods.filter(method => {
+        const methodRegion = String(method.region || "").toUpperCase();
+        const methodKey = String(method.key || "").toLowerCase();
+        return methodRegion === region || methodKey === "wallet";
+    });
+}
+
+function renderPaymentInfrastructureWorkspace(methods = [], configurationMarkup = "", selectedRegion = "") {
+    const infra = adminPaymentInfrastructure || buildFallbackPaymentInfrastructure(methods);
+    const regions = Array.isArray(infra.regions) ? infra.regions : [];
+    const activeRegion = selectedRegion || getPaymentInfrastructureActiveRegion(methods);
+    const active = regions.find(region => region.region === activeRegion) || regions[0] || {};
+    const panels = {
+        overview: renderPaymentInfrastructureOverview(active, infra),
+        configuration: configurationMarkup,
+        display: renderPaymentInfrastructureCustomerDisplay(active),
+        accounts: renderPaymentInfrastructureAccounts(active),
+        providers: renderPaymentInfrastructureProviders(infra),
+        routing: renderPaymentInfrastructureRouting(infra),
+        cards: renderPaymentInfrastructureCards(active),
+        webhooks: renderPaymentInfrastructureWebhooks(infra),
+        diagnostics: renderPaymentInfrastructureDiagnostics(active, infra)
+    };
+
+    return `
+        <div class="payment-infrastructure-workspace" data-payment-infra-region="${escapeAdminHTML(activeRegion)}">
+            <aside class="payment-infra-nav" aria-label="Payment infrastructure regions">
+                <h4>Regions</h4>
+                ${regions.map(region => `
+                    <button class="payment-infra-region ${region.region === activeRegion ? "active" : ""}" type="button" data-payment-infra-region="${escapeAdminHTML(region.region)}">
+                        <strong>${escapeAdminHTML(region.label || region.region)}</strong>
+                        <small>${escapeAdminHTML((region.manualRails || []).length)} manual · ${escapeAdminHTML((region.automaticRails || []).length)} auto</small>
+                    </button>
+                `).join("")}
+                <div class="payment-infra-nav-group">
+                    <span>Manual Rails</span>
+                    ${(active.manualRails || []).map(rail => `<em>${escapeAdminHTML(rail.label)}</em>`).join("") || "<em>None configured</em>"}
+                </div>
+                <div class="payment-infra-nav-group">
+                    <span>Automatic Rails</span>
+                    ${(active.automaticRails || []).map(rail => `<em>${escapeAdminHTML(rail.label)} · ${escapeAdminHTML(rail.status)}</em>`).join("") || "<em>Disabled placeholders</em>"}
+                </div>
+                <div class="payment-infra-nav-group">
+                    <span>Wallet</span>
+                    ${(active.wallet || []).map(rail => `<em>${escapeAdminHTML(rail.label)}</em>`).join("") || "<em>Global wallet rail</em>"}
+                </div>
+                <div class="payment-infra-nav-group">
+                    <span>Providers</span>
+                    ${(active.providers || []).map(provider => `<em>${escapeAdminHTML(provider.displayName)} · ${escapeAdminHTML(provider.healthState)}</em>`).join("") || "<em>No configured provider</em>"}
+                </div>
+            </aside>
+
+            <section class="payment-infra-main">
+                <div class="payment-infra-tabs" role="tablist" aria-label="Payment infrastructure workspace">
+                    ${Object.keys(panels).map((key, index) => `
+                        <button class="${index === 0 ? "active" : ""}" type="button" data-payment-infra-tab="${key}">
+                            ${escapeAdminHTML(paymentInfrastructureTabLabel(key))}
+                        </button>
+                    `).join("")}
+                </div>
+                ${Object.entries(panels).map(([key, markup], index) => `
+                    <div class="payment-infra-panel ${index === 0 ? "active" : ""}" data-payment-infra-panel="${key}">
+                        ${markup}
+                    </div>
+                `).join("")}
+            </section>
+        </div>
+    `;
+}
+
+function buildFallbackPaymentInfrastructure(methods = []) {
+    const regionGroups = ["MM", "TH", "FUTURE"].map(region => ({
+        region,
+        label: region === "MM" ? "Myanmar" : region === "TH" ? "Thailand" : "Future Regions",
+        manualRails: methods.filter(method => (method.region || "") === region && method.paymentType !== "auto" && method.paymentType !== "wallet").map(method => ({
+            label: method.method || method.key,
+            railType: method.railType || "MANUAL_QR",
+            status: method.enabled ? "READY" : "DISABLED",
+            enabled: method.enabled === true,
+            customerVisible: method.enabled === true,
+            capabilities: {
+                saveQr: method.enableSaveQr === true,
+                openApp: method.enableOpenApp === true,
+                receiptUpload: method.receiptUploadEnabled !== false,
+                adminVerification: method.confirmationMode === "manual_admin",
+                bankLaunchers: Array.isArray(method.bankLaunchers) ? method.bankLaunchers.length : 0
+            },
+            diagnostics: []
+        })),
+        automaticRails: [],
+        wallet: methods.filter(method => method.paymentType === "wallet").map(method => ({ label: method.method || "AZIEL Wallet", status: "READY" })),
+        providers: []
+    }));
+    return {
+        regions: regionGroups,
+        providers: [],
+        adapters: [],
+        routing: {
+            MM: { mode: "MANUAL_ONLY", primaryRail: "MANUAL_QR", fallbackRail: "" },
+            TH: { mode: "MANUAL_ONLY", primaryRail: "MANUAL_QR", fallbackRail: "" }
+        },
+        security: { rawSecretsReturned: false }
+    };
+}
+
+function paymentInfrastructureTabLabel(key) {
+    return {
+        overview: "Overview",
+        configuration: "Configuration",
+        display: "Customer Display",
+        accounts: "Accounts / QR",
+        providers: "Providers",
+        routing: "Routing",
+        cards: "Cards",
+        webhooks: "Webhooks",
+        diagnostics: "Diagnostics"
+    }[key] || key;
+}
+
+function renderPaymentInfrastructureOverview(region = {}, infra = {}) {
+    const manual = region.manualRails || [];
+    const automatic = region.automaticRails || [];
+    return `
+        <div class="payment-infra-grid">
+            ${paymentInfraMetric("Region", region.label || region.region || "-")}
+            ${paymentInfraMetric("Manual Rails", manual.length)}
+            ${paymentInfraMetric("Automatic Rails", automatic.length)}
+            ${paymentInfraMetric("Routing Mode", infra.routing?.[region.region]?.mode || "MANUAL_ONLY")}
+        </div>
+        <div class="payment-rail-columns">
+            ${renderRailGroup("Manual Rails", manual)}
+            ${renderRailGroup("Automatic Rails", automatic)}
+            ${renderRailGroup("Wallet", region.wallet || [])}
+        </div>
+    `;
+}
+
+function renderRailGroup(title, rails = []) {
+    return `
+        <section class="payment-rail-group">
+            <h4>${escapeAdminHTML(title)}</h4>
+            ${rails.length ? rails.map(renderPaymentRailRow).join("") : `<div class="payment-infra-empty">No rails configured.</div>`}
+        </section>
+    `;
+}
+
+function renderPaymentRailRow(rail = {}) {
+    const status = rail.status || (rail.enabled ? "READY" : "DISABLED");
+    return `
+        <article class="payment-rail-row">
+            <div>
+                <strong>${escapeAdminHTML(rail.label || rail.displayName || rail.key || "Rail")}</strong>
+                <small>${escapeAdminHTML(rail.railType || "Rail")} · ${escapeAdminHTML(rail.availabilityMode || "DISABLED")}</small>
+            </div>
+            <span class="payment-infra-status ${escapeAdminHTML(status.toLowerCase())}">${escapeAdminHTML(status)}</span>
+            <p>${escapeAdminHTML(rail.customerVisible ? "Customer visible" : "Not customer visible")}</p>
+        </article>
+    `;
+}
+
+function renderPaymentInfrastructureCustomerDisplay(region = {}) {
+    return `
+        <div class="payment-preview-grid">
+            ${(region.manualRails || []).map(rail => `
+                <article class="payment-preview-card">
+                    <strong>${escapeAdminHTML(rail.label)}</strong>
+                    <span>${escapeAdminHTML(rail.railType)}</span>
+                    <p>${escapeAdminHTML(rail.capabilities?.receiptUpload ? "Receipt upload and manual admin verification remain active." : "Customer display only.")}</p>
+                    <div class="payment-summary-capabilities">
+                        ${capabilityChip("QR", rail.capabilities?.dynamicQr || rail.capabilities?.saveQr)}
+                        ${capabilityChip("Save QR", rail.capabilities?.saveQr)}
+                        ${capabilityChip("Open App", rail.capabilities?.openApp)}
+                        ${capabilityChip("Receipt", rail.capabilities?.receiptUpload)}
+                    </div>
+                </article>
+            `).join("") || `<div class="payment-infra-empty">No manual preview available.</div>`}
+        </div>
+    `;
+}
+
+function renderPaymentInfrastructureAccounts(region = {}) {
+    return `
+        <div class="payment-rail-columns">
+            ${renderRailGroup("Accounts / QR", (region.manualRails || []).filter(rail => ["MANUAL_QR", "MANUAL_BANK_TRANSFER", "MANUAL_BANK_APP"].includes(rail.railType)))}
+        </div>
+        <p class="payment-section-help">Manual receiving account, QR, launcher, checklist, and receipt settings remain editable in Configuration.</p>
+    `;
+}
+
+function renderPaymentInfrastructureProviders(infra = {}) {
+    const providers = infra.providers || [];
+    return `
+        <div class="payment-provider-grid">
+            ${providers.map(provider => `
+                <article class="payment-provider-card">
+                    <strong>${escapeAdminHTML(provider.displayName)}</strong>
+                    <small>${escapeAdminHTML(provider.providerCode)} · adapter: ${escapeAdminHTML(provider.adapterName || "missing")}</small>
+                    <span class="payment-infra-status ${escapeAdminHTML(String(provider.healthState || "not_configured").toLowerCase())}">${escapeAdminHTML(provider.healthState || "NOT_CONFIGURED")}</span>
+                    <dl>
+                        <div><dt>Currencies</dt><dd>${escapeAdminHTML((provider.supportedCurrencies || []).join(", ") || "-")}</dd></div>
+                        <div><dt>Rails</dt><dd>${escapeAdminHTML((provider.supportedRails || []).join(", ") || "-")}</dd></div>
+                        <div><dt>Refunds</dt><dd>${provider.refundCapability ? "Supported" : "Not ready"}</dd></div>
+                    </dl>
+                    ${renderProviderCredentialStates(provider)}
+                </article>
+            `).join("") || `<div class="payment-infra-empty">No provider configuration exists yet.</div>`}
+        </div>
+    `;
+}
+
+function renderProviderCredentialStates(provider = {}) {
+    return `
+        <div class="payment-credential-grid">
+            ${(provider.environments || []).map(env => `
+                <div>
+                    <strong>${escapeAdminHTML(env.environment)}</strong>
+                    <span>Public key: ${escapeAdminHTML(env.publicKeyStatus)}</span>
+                    <span>Secret key: ${escapeAdminHTML(env.secretKeyStatus)}</span>
+                    <span>Webhook secret: ${escapeAdminHTML(env.webhookSecretStatus)}</span>
+                    <span>Merchant: ${escapeAdminHTML(env.merchantIdentifierStatus)}</span>
+                </div>
+            `).join("")}
+        </div>
+    `;
+}
+
+function renderPaymentInfrastructureRouting(infra = {}) {
+    const routing = infra.routing || {};
+    return `
+        <div class="payment-infra-grid">
+            ${Object.entries(routing).map(([region, config]) => paymentInfraMetric(region, `${config.mode} · primary ${config.primaryRail || "-"}`)).join("")}
+        </div>
+        <div class="payment-method-hint">
+            <strong>Controlled migration rule</strong>
+            <span>Automatic rails cannot become primary until provider, credentials, webhook, health, and rail readiness pass. Manual rails are not disabled automatically.</span>
+        </div>
+    `;
+}
+
+function renderPaymentInfrastructureCards(region = {}) {
+    const cardRails = (region.automaticRails || []).filter(rail => rail.railType === "AUTO_CARD");
+    return `
+        ${cardRails.map(rail => `
+            <article class="payment-provider-card">
+                <strong>${escapeAdminHTML(rail.label)}</strong>
+                <span class="payment-infra-status not_configured">${escapeAdminHTML(rail.status || "NOT_CONFIGURED")}</span>
+                <p>Future card rail metadata only. AZIEL does not store card numbers.</p>
+                <dl>
+                    <div><dt>Networks</dt><dd>${escapeAdminHTML((rail.card?.networks || []).join(", ") || "-")}</dd></div>
+                    <div><dt>Checkout Modes</dt><dd>${escapeAdminHTML((rail.card?.checkoutModes || []).join(", ") || "-")}</dd></div>
+                    <div><dt>3DS</dt><dd>${escapeAdminHTML(rail.card?.threeDS || "Provider dependent")}</dd></div>
+                </dl>
+            </article>
+        `).join("") || `<div class="payment-infra-empty">Card rail is disabled until a verified provider is configured.</div>`}
+    `;
+}
+
+function renderPaymentInfrastructureWebhooks(infra = {}) {
+    return `
+        <div class="payment-provider-grid">
+            ${(infra.providers || []).map(provider => (provider.environments || []).map(env => `
+                <article class="payment-provider-card">
+                    <strong>${escapeAdminHTML(provider.displayName)} · ${escapeAdminHTML(env.environment)}</strong>
+                    <span class="payment-infra-status ${env.webhook?.secretConfigured ? "ready" : "not_configured"}">${env.webhook?.secretConfigured ? "SECRET CONFIGURED" : "NOT_CONFIGURED"}</span>
+                    <dl>
+                        <div><dt>Endpoint</dt><dd>Provider-specific, signature verified</dd></div>
+                        <div><dt>Last received</dt><dd>${escapeAdminHTML(formatAdminDate(env.webhook?.lastReceivedAt))}</dd></div>
+                        <div><dt>Last verified</dt><dd>${escapeAdminHTML(formatAdminDate(env.webhook?.lastVerifiedAt))}</dd></div>
+                        <div><dt>Replay protection</dt><dd>${env.webhook?.replayProtectionReady ? "Ready" : "Not configured"}</dd></div>
+                    </dl>
+                </article>
+            `).join("")).join("") || `<div class="payment-infra-empty">No webhook diagnostics yet.</div>`}
+        </div>
+    `;
+}
+
+function renderPaymentInfrastructureDiagnostics(region = {}, infra = {}) {
+    const rails = [...(region.manualRails || []), ...(region.automaticRails || [])];
+    return `
+        <div class="payment-diagnostics-list">
+            ${rails.map(rail => `
+                <article>
+                    <h4>${escapeAdminHTML(rail.label)}</h4>
+                    ${(rail.diagnostics || []).map(item => `
+                        <p><span>${escapeAdminHTML(item.label)}</span><b class="payment-infra-status ${escapeAdminHTML(String(item.status || "not_configured").toLowerCase())}">${escapeAdminHTML(item.status || "NOT_CONFIGURED")}</b></p>
+                    `).join("") || "<p><span>No diagnostics</span><b>LEGACY</b></p>"}
+                </article>
+            `).join("")}
+        </div>
+    `;
+}
+
+function paymentInfraMetric(label, value) {
+    return `<div class="payment-infra-metric"><span>${escapeAdminHTML(label)}</span><strong>${escapeAdminHTML(value)}</strong></div>`;
+}
+
+function bindPaymentInfrastructureActions() {
+    document.querySelectorAll(".payment-infra-tabs [data-payment-infra-tab]").forEach(button => {
+        button.addEventListener("click", () => {
+            const tab = button.dataset.paymentInfraTab;
+            const root = button.closest(".payment-infrastructure-workspace");
+            root?.querySelectorAll("[data-payment-infra-tab]").forEach(item => item.classList.toggle("active", item === button));
+            root?.querySelectorAll("[data-payment-infra-panel]").forEach(panel => panel.classList.toggle("active", panel.dataset.paymentInfraPanel === tab));
+        });
+    });
+    document.querySelectorAll(".payment-infra-region").forEach(button => {
+        button.addEventListener("click", () => {
+            const region = button.dataset.paymentInfraRegion || "TH";
+            adminPaymentInfrastructureActiveRegion = region;
+            renderAdminPaymentMethods(adminPaymentMethods);
+            showAdminToast?.(`${region === "MM" ? "Myanmar" : region === "TH" ? "Thailand" : "Future Regions"} payment rails selected.`, "info");
+        });
+    });
+}
+
+function formatAdminDate(value) {
+    if (!value) return "-";
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? "-" : parsed.toLocaleString();
 }
 
 function defaultPromptPayBankLaunchers() {

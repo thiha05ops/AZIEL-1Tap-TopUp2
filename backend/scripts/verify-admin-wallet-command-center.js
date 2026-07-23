@@ -4,6 +4,7 @@ const path = require("path");
 
 const WalletTopup = require("../models/WalletTopup");
 const WalletTransaction = require("../models/WalletTransaction");
+const WalletReviewNote = require("../models/WalletReviewNote");
 const User = require("../models/User");
 const {
     normalizeCurrency,
@@ -23,6 +24,8 @@ function verifyModelTruth() {
     assert(WalletTransaction.schema.path("balanceBefore"), "WalletTransaction.balanceBefore must exist");
     assert(WalletTransaction.schema.path("balanceAfter"), "WalletTransaction.balanceAfter must exist");
     assert(WalletTransaction.schema.path("direction"), "WalletTransaction.direction must exist");
+    assert(WalletReviewNote.schema.path("topupId"), "WalletReviewNote.topupId must exist");
+    assert(WalletReviewNote.schema.path("body"), "WalletReviewNote.body must exist");
     assert(User.schema.path("wallet.MMK"), "User.wallet.MMK must exist");
     assert(User.schema.path("wallet.THB"), "User.wallet.THB must exist");
 }
@@ -51,6 +54,10 @@ function verifyAdminRouteContracts() {
     assert(routes.includes("projectAdminWalletTopup"), "Topups should use Admin-safe projection");
     assert(routes.includes("projectWalletUser"), "Wallet context should use Admin-safe user projection");
     assert(routes.includes("projectLedger"), "Transactions should use ledger projection");
+    assert(routes.includes("buildAdminWalletTopupQuery"), "Wallet topup queue should support read-only admin filters.");
+    assert(routes.includes('router.post("/admin/wallet/topups/:id/notes"'), "Wallet review notes create route should exist.");
+    assert(routes.includes('router.put("/admin/wallet/topups/:id/notes/:noteId"'), "Wallet review notes update route should exist.");
+    assert(routes.includes('router.delete("/admin/wallet/topups/:id/notes/:noteId"'), "Wallet review notes delete route should exist.");
 }
 
 function verifyProjectionSafety() {
@@ -90,15 +97,31 @@ function verifyLedgerProjection() {
 function verifyFrontendContracts() {
     const html = read("frontend/admin.html");
     const walletJs = read("frontend/js/admin-wallet.js");
+    const css = read("frontend/css/admin/admin-design-system.css");
 
     assert(html.includes("wallet-command-center"), "Wallet section should use command center shell");
     assert(html.includes('data-wallet-view="pending"'), "Pending topups tab should exist");
+    assert(html.includes('data-wallet-view="approved"'), "Approved wallet queue tab should exist");
+    assert(html.includes('data-wallet-view="rejected"'), "Rejected wallet queue tab should exist");
     assert(html.includes('data-wallet-view="transactions"'), "Transactions tab should exist");
     assert(html.includes('data-wallet-view="adjustments"'), "Adjustments tab should exist");
+    assert(html.includes("walletQueueSearch"), "Wallet queue search should exist.");
+    assert(html.includes("walletQueueRegion"), "Wallet region filter should exist.");
+    assert(html.includes("walletQueueCurrency"), "Wallet currency filter should exist.");
+    assert(html.includes("walletQueuePaymentMethod"), "Wallet payment method filter should exist.");
+    assert(html.includes("walletQueueSort"), "Wallet sort control should exist.");
     assert(walletJs.includes("/api/admin/wallet/topups/"), "Wallet detail should load topup context");
     assert(walletJs.includes("/api/admin/wallet/transactions"), "Wallet ledger should use Admin transaction endpoint");
     assert(walletJs.includes("/api/admin/wallet/adjust"), "Wallet adjustments should use existing Admin adjustment route");
+    assert(walletJs.includes("const listScrollTop = box.scrollTop"), "Wallet queue should preserve list scroll position.");
+    assert(walletJs.includes("renderWalletTimeline"), "Wallet review workspace should render timeline.");
+    assert(walletJs.includes("renderWalletReviewNotes"), "Wallet review workspace should render private notes.");
+    assert(walletJs.includes("wallet-slip-viewer"), "Wallet review workspace should render large slip viewer.");
     assert(walletJs.includes("aziel:admin-dashboard-refresh"), "Wallet actions should refresh dashboard counts");
+    assert(css.includes('body.admin-body[data-admin-section="wallet"]'), "Wallet desktop scroll ownership should be section scoped.");
+    assert(css.includes(".wallet-command-center") && css.includes("height: var(--admin-orders-workspace-height);"), "Wallet command center should be viewport bounded.");
+    assert(css.includes(".wallet-queue-list") && css.includes("overflow-y: auto"), "Wallet queue should own independent scrolling.");
+    assert(css.includes(".wallet-review-scroll") && css.includes("overflow-y: auto"), "Wallet review workspace should own independent scrolling.");
     assert(!/(^|[^.\w$])confirm\s*\(/.test(walletJs), "Wallet command center should not use native confirm");
 }
 

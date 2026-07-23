@@ -10,6 +10,7 @@ let selectedTopupContext = null;
 let walletTransactionPage = 1;
 let walletTransactionTotalPages = 1;
 let walletRefreshTimer = null;
+let walletQueueSearchTimer = null;
 const adminWalletPaging = {
     topups: {
         limit: 50,
@@ -37,6 +38,7 @@ function initAdminWalletController() {
 
     initSlipZoom();
     bindWalletTabs();
+    bindWalletQueueFilters();
     bindWalletTransactions();
     bindWalletAdjustment();
     bindWalletRealtime();
@@ -69,6 +71,25 @@ function bindWalletTabs() {
             selectedTopupContext = null;
             resetWalletTransactionPaging();
             updateWalletHash();
+        });
+    });
+}
+
+function bindWalletQueueFilters() {
+    document.getElementById("walletQueueSearch")?.addEventListener("input", () => {
+        clearTimeout(walletQueueSearchTimer);
+        walletQueueSearchTimer = setTimeout(() => {
+            selectedTopupId = "";
+            selectedTopupContext = null;
+            loadWalletTopups(true);
+        }, 250);
+    });
+
+    ["walletQueueRegion", "walletQueueCurrency", "walletQueuePaymentMethod", "walletQueueSort"].forEach(id => {
+        document.getElementById(id)?.addEventListener("change", () => {
+            selectedTopupId = "";
+            selectedTopupContext = null;
+            loadWalletTopups(true);
         });
     });
 }
@@ -146,7 +167,7 @@ function applyWalletContext(context = {}) {
         currentWalletView = "pending";
     }
 
-    if (!["pending", "all", "transactions", "adjustments"].includes(currentWalletView)) {
+    if (!["pending", "approved", "rejected", "transactions", "adjustments"].includes(currentWalletView)) {
         currentWalletView = "pending";
     }
 }
@@ -226,7 +247,19 @@ function buildWalletTopupsEndpoint(cursor = "") {
     const params = new URLSearchParams();
     params.set("limit", String(adminWalletPaging.topups.limit));
     if (currentWalletView === "pending") params.set("status", "pending");
+    if (currentWalletView === "approved") params.set("status", "approved");
+    if (currentWalletView === "rejected") params.set("status", "rejected");
+    const q = document.getElementById("walletQueueSearch")?.value?.trim() || "";
+    const region = document.getElementById("walletQueueRegion")?.value || "";
+    const currency = document.getElementById("walletQueueCurrency")?.value || "";
+    const paymentMethod = document.getElementById("walletQueuePaymentMethod")?.value || "";
+    const sort = document.getElementById("walletQueueSort")?.value || "newest";
     if (cursor) params.set("cursor", cursor);
+    if (q) params.set("q", q);
+    if (region) params.set("region", region);
+    if (currency) params.set("currency", currency);
+    if (paymentMethod) params.set("paymentMethod", paymentMethod);
+    params.set("sort", sort);
     const query = params.toString();
     return query ? `/api/admin/wallet/topups?${query}` : "/api/admin/wallet/topups";
 }
@@ -252,11 +285,12 @@ function reconcileSelectedTopup() {
 function renderWalletTopups(topups) {
     const box = document.getElementById("adminWalletList");
     if (!box) return;
+    const listScrollTop = box.scrollTop;
 
     if (!topups.length) {
         box.innerHTML = `
             <div class="admin-empty-box wallet-empty-state">
-                ${escapeHTML(currentWalletView === "pending" ? adminT("no_pending_wallet_topups") : adminT("no_wallet_topups_found"))}
+                ${escapeHTML(currentWalletView === "pending" ? adminT("no_pending_wallet_topups") : "No wallet records match this queue.")}
             </div>
         `;
         return;
@@ -269,16 +303,20 @@ function renderWalletTopups(topups) {
 
         return `
             <button class="wallet-queue-row ${selected ? "active" : ""}" type="button" data-id="${escapeHTML(item._id)}">
-                <span>
+                <span class="wallet-row-customer">
                     <strong>${escapeHTML(item.username || "-")}</strong>
-                    <small>${escapeHTML(item.topupId || "-")} · ${escapeHTML(formatRelativeTime(item.createdAt))}</small>
+                    <small>${escapeHTML(item.region || "-")} · ${escapeHTML(item.topupId || "-")}</small>
                 </span>
-                <span>
+                <span class="wallet-row-amount">
                     <b>${Number(item.amount || 0).toLocaleString()} ${escapeHTML(item.currency || "")}</b>
-                    <small>${escapeHTML(formatPaymentName(item.paymentMethod || "-"))} · ${escapeHTML(evidence)}</small>
+                    <small>${escapeHTML(formatPaymentName(item.paymentMethod || "-"))}</small>
                 </span>
                 <span class="admin-status ${escapeHTML(normalizeTopupStatus(status))}">
                     ${escapeHTML(formatTopupStatus(status))}
+                </span>
+                <span class="wallet-row-time">
+                    <b>${escapeHTML(formatRelativeTime(item.createdAt))}</b>
+                    <small>${escapeHTML(evidence)}</small>
                 </span>
             </button>
         `;
@@ -292,6 +330,7 @@ function renderWalletTopups(topups) {
     ` : "";
 
     box.innerHTML = rows + loadMore;
+    box.scrollTop = listScrollTop;
 
     box.querySelectorAll(".wallet-queue-row").forEach(row => {
         row.addEventListener("click", async () => {
@@ -351,7 +390,9 @@ function renderSelectedTopup(errorMessage = "") {
 
     const topup = selectedTopupContext?.topup;
     const wallet = selectedTopupContext?.wallet;
+    const customerSummary = selectedTopupContext?.customerSummary || {};
     const transactions = selectedTopupContext?.recentTransactions || [];
+    const notes = selectedTopupContext?.notes || [];
 
     if (!topup) {
         panel.innerHTML = `<div class="order-detail-empty"><strong>${escapeHTML(adminT("select_topup_to_review"))}</strong></div>`;
@@ -363,50 +404,64 @@ function renderSelectedTopup(errorMessage = "") {
     const expectedBalance = currentBalance + Number(topup.amount || 0);
 
     panel.innerHTML = `
-        <div class="order-detail-head">
-            <div>
-                <button class="admin-mobile-back-btn" type="button" data-mobile-back="wallet">
-                    ← ${escapeHTML(adminT("back_to_wallet", "Wallet"))}
-                </button>
-                <span>${escapeHTML(adminT("topup_review"))}</span>
-                <h3>${escapeHTML(topup.topupId || "-")}</h3>
+        <div class="wallet-review-sticky">
+            <div class="order-detail-head wallet-review-head">
+                <div>
+                    <button class="admin-mobile-back-btn" type="button" data-mobile-back="wallet">
+                        ← ${escapeHTML(adminT("back_to_wallet", "Wallet"))}
+                    </button>
+                    <span>${escapeHTML(adminT("topup_review"))}</span>
+                    <h3>${escapeHTML(topup.topupId || "-")}</h3>
+                </div>
+                <div class="wallet-review-head-meta">
+                    <strong>${Number(topup.amount || 0).toLocaleString()} ${escapeHTML(currency)}</strong>
+                    <span class="admin-status ${escapeHTML(normalizeTopupStatus(topup.status))}">
+                        ${escapeHTML(formatTopupStatus(topup.status))}
+                    </span>
+                </div>
             </div>
-            <span class="admin-status ${escapeHTML(normalizeTopupStatus(topup.status))}">
-                ${escapeHTML(formatTopupStatus(topup.status))}
-            </span>
+            ${renderTopupActions(topup, currentBalance, expectedBalance)}
         </div>
 
-        ${renderTopupActions(topup, currentBalance, expectedBalance)}
+        <div class="wallet-review-scroll">
+            <section class="order-detail-section wallet-customer-summary">
+                <h4>Customer Summary</h4>
+                <div class="wallet-summary-grid">
+                    ${renderWalletSummaryItem("Customer Name", customerSummary.displayName || topup.username)}
+                    ${renderWalletSummaryItem("Region", customerSummary.region || topup.region || wallet?.region || "-")}
+                    ${renderWalletSummaryItem("Wallet Balance", `${currentBalance.toLocaleString()} ${currency}`)}
+                    ${renderWalletSummaryItem("Total Spend MMK", formatMoney(customerSummary.totalSpend?.MMK, "MMK"))}
+                    ${renderWalletSummaryItem("Total Spend THB", formatMoney(customerSummary.totalSpend?.THB, "THB"))}
+                    ${renderWalletSummaryItem("Orders", Number(customerSummary.totalOrders || 0).toLocaleString())}
+                    ${renderWalletSummaryItem("Member Since", formatDate(customerSummary.memberSince))}
+                    ${renderWalletSummaryItem("Reward Tags", renderWalletTags(customerSummary.tags || []), true)}
+                </div>
+            </section>
 
-        <div class="order-detail-grid">
-            ${renderWalletDetailSection("topup_identity", [
-        ["topup_id", topup.topupId],
-        ["status", formatTopupStatus(topup.status)],
-        ["created", formatDate(topup.createdAt)],
-        ["updated", formatDate(topup.updatedAt)]
-    ])}
-            ${renderWalletDetailSection("customer", [
-        ["username", topup.username],
-        ["region", topup.region || wallet?.region || "-"],
-        ["current_wallet_balance", `${currentBalance.toLocaleString()} ${currency}`],
-        ["wallet_currency", currency]
-    ])}
-            ${renderWalletDetailSection("topup_request", [
-        ["requested_amount", Number(topup.amount || 0).toLocaleString()],
-        ["currency", currency],
-        ["payment_method", formatPaymentName(topup.paymentMethod)],
-        ["reference", topup.transactionId || topup.topupId || "-"]
-    ])}
-        </div>
+            <section class="order-detail-section">
+                <h4>Payment Evidence</h4>
+                ${renderTopupEvidence(topup)}
+            </section>
 
-        <div class="order-detail-section">
-            <h4>${escapeHTML(adminT("payment_evidence"))}</h4>
-            ${renderTopupEvidence(topup)}
-        </div>
+            <section class="order-detail-section">
+                <h4>Timeline</h4>
+                ${renderWalletTimeline(topup, transactions)}
+            </section>
 
-        <div class="order-detail-section">
-            <h4>${escapeHTML(adminT("wallet_context"))}</h4>
-            ${renderRecentTransactions(transactions)}
+            <section class="order-detail-section">
+                <h4>Private Notes</h4>
+                ${renderWalletReviewNotes(notes)}
+            </section>
+
+            <section class="order-detail-section">
+                <h4>${escapeHTML(adminT("topup_request"))}</h4>
+                <div class="wallet-summary-grid">
+                    ${renderWalletSummaryItem(adminT("payment_method"), formatPaymentName(topup.paymentMethod))}
+                    ${renderWalletSummaryItem(adminT("reference"), topup.transactionId || topup.topupId || "-")}
+                    ${renderWalletSummaryItem(adminT("created"), formatDate(topup.createdAt))}
+                    ${renderWalletSummaryItem(adminT("updated"), formatDate(topup.updatedAt))}
+                </div>
+            </section>
         </div>
     `;
 
@@ -414,6 +469,20 @@ function renderSelectedTopup(errorMessage = "") {
         window.AZIEL_ADMIN_LAYOUT?.showList?.("wallet");
     });
     bindTopupDetailActions(panel, topup, currentBalance, expectedBalance);
+}
+
+function renderWalletSummaryItem(label, value, raw = false) {
+    return `
+        <div>
+            <span>${escapeHTML(label)}</span>
+            <strong>${raw ? value : escapeHTML(value || "-")}</strong>
+        </div>
+    `;
+}
+
+function renderWalletTags(tags = []) {
+    if (!tags.length) return escapeHTML("None");
+    return `<span class="customer-tags">${tags.map(tag => `<em>${escapeHTML(tag)}</em>`).join("")}</span>`;
 }
 
 function renderTopupActions(topup, currentBalance, expectedBalance) {
@@ -456,12 +525,61 @@ function renderTopupEvidence(topup) {
     if (isAdminUploadedImageFailed(url)) return `<div class="order-evidence-empty">${escapeHTML(adminT("payment_evidence_unavailable"))}</div>`;
 
     return `
-        <div class="order-evidence-preview">
+        <div class="order-evidence-preview wallet-slip-viewer">
             <img src="${escapeHTML(url)}" data-src="${escapeHTML(url)}" alt="${escapeHTML(adminT("payment_evidence"))}" onerror="handleAdminWalletImageError(this)">
-            <button type="button" data-wallet-action="view-evidence" data-src="${escapeHTML(url)}">
-                ${escapeHTML(adminT("view_full_image"))}
-            </button>
+            <div class="wallet-slip-actions">
+                <button type="button" data-wallet-action="view-evidence" data-src="${escapeHTML(url)}">Zoom</button>
+                <a href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer">Open Full Size</a>
+                <a href="${escapeHTML(url)}" download>Download</a>
+                <button type="button" data-wallet-action="fit-width">Fit Width</button>
+                <button type="button" data-wallet-action="fit-height">Fit Height</button>
+            </div>
         </div>
+    `;
+}
+
+function renderWalletTimeline(topup, transactions = []) {
+    const rows = [
+        { label: "Created", date: topup.createdAt },
+        { label: "Slip Uploaded", date: topup.paymentEvidence?.uploadedAt || (topup.hasPaymentEvidence ? topup.updatedAt : null) },
+        { label: "Reviewed", date: ["approved", "rejected"].includes(String(topup.status || "")) ? topup.updatedAt : null },
+        { label: "Approved", date: String(topup.status || "") === "approved" ? topup.updatedAt : null },
+        { label: "Rejected", date: String(topup.status || "") === "rejected" ? topup.updatedAt : null },
+        { label: "Credited", date: transactions.find(item => String(item.type || "").includes("topup"))?.createdAt || null }
+    ].filter(item => item.date)
+        .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    if (!rows.length) return `<div class="order-evidence-empty">No wallet timeline yet.</div>`;
+
+    return `
+        <div class="wallet-review-timeline">
+            ${rows.map(item => `
+                <div>
+                    <i></i>
+                    <span>${escapeHTML(item.label)}</span>
+                    <time>${escapeHTML(formatDate(item.date))}</time>
+                </div>
+            `).join("")}
+        </div>
+    `;
+}
+
+function renderWalletReviewNotes(notes = []) {
+    return `
+        <form id="walletReviewNoteForm" class="customer-note-form">
+            <textarea id="walletReviewNoteInput" rows="3" placeholder="Add a private wallet review note"></textarea>
+            <button class="admin-primary-btn" type="submit">Add Note</button>
+        </form>
+        ${notes.length ? `<div class="customer-notes-list">${notes.map(note => `
+            <article class="customer-note-card">
+                <textarea data-wallet-note-body="${escapeHTML(note._id)}">${escapeHTML(note.body)}</textarea>
+                <div>
+                    <span>${escapeHTML(note.adminName || "Admin")} · ${escapeHTML(formatDate(note.createdAt))}</span>
+                    <button class="admin-secondary-btn" type="button" data-save-wallet-note="${escapeHTML(note._id)}">Save</button>
+                    <button class="admin-danger-btn" type="button" data-delete-wallet-note="${escapeHTML(note._id)}">Delete</button>
+                </div>
+            </article>
+        `).join("")}</div>` : `<div class="order-evidence-empty">No private notes yet.</div>`}
     `;
 }
 
@@ -502,6 +620,14 @@ function bindTopupDetailActions(panel, topup, currentBalance, expectedBalance) {
     panel.querySelector('[data-wallet-action="view-evidence"]')?.addEventListener("click", event => {
         openSlipModal(event.currentTarget.dataset.src || "");
     });
+    panel.querySelector('[data-wallet-action="fit-width"]')?.addEventListener("click", () => {
+        panel.querySelector(".wallet-slip-viewer")?.classList.remove("fit-height");
+        panel.querySelector(".wallet-slip-viewer")?.classList.add("fit-width");
+    });
+    panel.querySelector('[data-wallet-action="fit-height"]')?.addEventListener("click", () => {
+        panel.querySelector(".wallet-slip-viewer")?.classList.remove("fit-width");
+        panel.querySelector(".wallet-slip-viewer")?.classList.add("fit-height");
+    });
 
     panel.querySelector('[data-wallet-action="approve"]')?.addEventListener("click", event => {
         approveTopup(topup, currentBalance, expectedBalance, event.currentTarget);
@@ -510,6 +636,52 @@ function bindTopupDetailActions(panel, topup, currentBalance, expectedBalance) {
     panel.querySelector('[data-wallet-action="reject"]')?.addEventListener("click", event => {
         rejectTopup(topup, event.currentTarget);
     });
+    panel.querySelector("#walletReviewNoteForm")?.addEventListener("submit", async event => {
+        event.preventDefault();
+        const input = document.getElementById("walletReviewNoteInput");
+        const body = input?.value?.trim() || "";
+        if (!body) return;
+        const data = await adminFetch(`/api/admin/wallet/topups/${encodeURIComponent(topup._id)}/notes`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ body })
+        });
+        showAdminToast?.(data?.success ? "Note added" : data?.message || "Note could not be saved.", data?.success ? "success" : "error");
+        if (data?.success) loadSelectedTopupContext();
+    });
+    panel.querySelectorAll("[data-save-wallet-note]").forEach(button => {
+        button.addEventListener("click", () => saveWalletReviewNote(topup._id, button.dataset.saveWalletNote));
+    });
+    panel.querySelectorAll("[data-delete-wallet-note]").forEach(button => {
+        button.addEventListener("click", () => deleteWalletReviewNote(topup._id, button.dataset.deleteWalletNote));
+    });
+}
+
+async function saveWalletReviewNote(topupId, noteId) {
+    const input = Array.from(document.querySelectorAll("[data-wallet-note-body]"))
+        .find(item => item.dataset.walletNoteBody === noteId);
+    const body = input?.value?.trim() || "";
+    if (!body) return;
+    const data = await adminFetch(`/api/admin/wallet/topups/${encodeURIComponent(topupId)}/notes/${encodeURIComponent(noteId)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body })
+    });
+    showAdminToast?.(data?.success ? "Note saved" : data?.message || "Note update failed", data?.success ? "success" : "error");
+    if (data?.success) loadSelectedTopupContext();
+}
+
+async function deleteWalletReviewNote(topupId, noteId) {
+    const confirmed = await confirmWalletAction({
+        title: "Delete note",
+        message: "Delete this private wallet note?",
+        confirmText: "Delete",
+        danger: true
+    });
+    if (!confirmed) return;
+    const data = await adminFetch(`/api/admin/wallet/topups/${encodeURIComponent(topupId)}/notes/${encodeURIComponent(noteId)}`, { method: "DELETE" });
+    showAdminToast?.(data?.success ? "Note deleted" : data?.message || "Note delete failed", data?.success ? "success" : "error");
+    if (data?.success) loadSelectedTopupContext();
 }
 
 async function approveTopup(topup, currentBalance, expectedBalance, btn) {
@@ -760,8 +932,8 @@ function syncWalletTabs() {
 }
 
 function updateWalletHash() {
-    const context = currentWalletView === "pending"
-        ? { status: "pending" }
+    const context = ["pending", "approved", "rejected"].includes(currentWalletView)
+        ? { view: currentWalletView, status: currentWalletView }
         : { view: currentWalletView };
     window.openAdminSection?.("wallet", true, context);
 }
@@ -855,6 +1027,10 @@ function formatRecordedBalance(value, currency) {
     return value === null || value === undefined
         ? adminT("not_recorded")
         : `${Number(value || 0).toLocaleString()} ${currency || ""}`;
+}
+
+function formatMoney(value, currency) {
+    return `${Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: currency === "THB" ? 2 : 0 })} ${currency}`;
 }
 
 function formatPaymentName(value) {

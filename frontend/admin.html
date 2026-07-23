@@ -605,8 +605,8 @@
                         <button class="settings-tab active" data-settings-tab="payments">
                             💳
                             <span>
-                                <b>Payment Methods</b>
-                                <small>PromptPay, SCB, KBZPay, WavePay</small>
+                                <b>Payment Infrastructure</b>
+                                <small>Manual rails, providers, routing</small>
                             </span>
                         </button>
                     </div>
@@ -614,11 +614,11 @@
                     <div class="settings-content">
                         <div class="settings-panel active" data-settings-panel="payments">
                             <div class="settings-card">
-                                <h3>Payment Management</h3>
-                                <p>Enable or disable payment methods and update QR/account information.</p>
+                                <h3>Payment Infrastructure</h3>
+                                <p>Separate manual payment rails from future automatic provider-backed payments.</p>
 
                                 <div id="paymentMethodsContainer">
-                                    Loading payment methods...
+                                    Loading payment infrastructure...
                                 </div>
                             </div>
                         </div>
@@ -635,13 +635,41 @@
                         </div>
 
                         <div class="wallet-command-tabs" role="tablist" aria-label="Wallet views">
-                            <button class="wallet-command-tab active" type="button" data-wallet-view="pending" data-admin-i18n="pending_topups">Pending Top-ups</button>
-                            <button class="wallet-command-tab" type="button" data-wallet-view="all" data-admin-i18n="all_topups">All Top-ups</button>
+                            <button class="wallet-command-tab active" type="button" data-wallet-view="pending" data-admin-i18n="pending">Pending</button>
+                            <button class="wallet-command-tab" type="button" data-wallet-view="approved" data-admin-i18n="approved">Approved</button>
+                            <button class="wallet-command-tab" type="button" data-wallet-view="rejected" data-admin-i18n="rejected">Rejected</button>
                             <button class="wallet-command-tab" type="button" data-wallet-view="transactions" data-admin-i18n="transactions">Transactions</button>
                             <button class="wallet-command-tab" type="button" data-wallet-view="adjustments" data-admin-i18n="adjustments">Adjustments</button>
                         </div>
 
                         <div id="walletTopupWorkspace" class="wallet-view-panel active">
+                            <div class="wallet-queue-filters">
+                                <input id="walletQueueSearch" type="search" placeholder="Search customer, wallet ID, or reference">
+                                <select id="walletQueueRegion" aria-label="Wallet region">
+                                    <option value="">All Regions</option>
+                                    <option value="MM">Myanmar</option>
+                                    <option value="TH">Thailand</option>
+                                </select>
+                                <select id="walletQueueCurrency" aria-label="Wallet currency">
+                                    <option value="">MMK / THB</option>
+                                    <option value="MMK">MMK</option>
+                                    <option value="THB">THB</option>
+                                </select>
+                                <select id="walletQueuePaymentMethod" aria-label="Wallet payment method">
+                                    <option value="">All Methods</option>
+                                    <option value="ayapay">AYA Pay</option>
+                                    <option value="kbzpay">KBZPay</option>
+                                    <option value="wavepay">WavePay</option>
+                                    <option value="promptpay">PromptPay</option>
+                                    <option value="scb">SCB</option>
+                                    <option value="bangkok_bank">Bangkok Bank</option>
+                                </select>
+                                <select id="walletQueueSort" aria-label="Wallet sort">
+                                    <option value="newest">Newest</option>
+                                    <option value="oldest">Oldest</option>
+                                    <option value="highest_amount">Highest Amount</option>
+                                </select>
+                            </div>
                             <div id="adminWalletList" class="wallet-queue-list">
                                 <div class="admin-dashboard-skeleton"></div>
                                 <div class="admin-dashboard-skeleton"></div>

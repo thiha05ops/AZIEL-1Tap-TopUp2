@@ -184,6 +184,37 @@ const paymentMethodSchema = new mongoose.Schema(
             enum: ["manual", "auto", "deeplink", "wallet"],
             default: "manual"
         },
+        railType: {
+            type: String,
+            enum: ["MANUAL_QR", "MANUAL_BANK_TRANSFER", "MANUAL_BANK_APP", "WALLET", "AUTO_PROMPTPAY", "AUTO_CARD", ""],
+            default: ""
+        },
+        availabilityMode: {
+            type: String,
+            enum: ["MANUAL_ONLY", "AUTO_ONLY", "AUTO_WITH_MANUAL_FALLBACK", "DISABLED", ""],
+            default: ""
+        },
+        routingPriority: {
+            type: Number,
+            default: 0
+        },
+        providerEnvironment: {
+            type: String,
+            enum: ["TEST", "LIVE", ""],
+            default: ""
+        },
+        feeConfig: {
+            minAmount: { type: Number, default: 0 },
+            maxAmount: { type: Number, default: 0 },
+            percentageFee: { type: Number, default: 0 },
+            fixedFee: { type: Number, default: 0 },
+            feeAbsorbedBy: {
+                type: String,
+                enum: ["CUSTOMER", "MERCHANT"],
+                default: "MERCHANT"
+            },
+            displayText: { type: String, default: "" }
+        },
         provider: {
             type: String,
             default: "manual"
