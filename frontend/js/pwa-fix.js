@@ -127,13 +127,13 @@ function loadPendingPaymentRecoveryOverlay() {
     if (!document.querySelector('link[data-aziel-pending-payment-recovery="true"]')) {
         const link = document.createElement("link");
         link.rel = "stylesheet";
-        link.href = "/css/payment/pending-payment-recovery.css?v=20260722-phase22";
+        link.href = "/css/payment/pending-payment-recovery.css?v=20260723-recovery-ux";
         link.dataset.azielPendingPaymentRecovery = "true";
         document.head.appendChild(link);
     }
 
     const script = document.createElement("script");
-    script.src = "/js/payment/pending-payment-recovery.js?v=20260722-phase22";
+    script.src = "/js/payment/pending-payment-recovery.js?v=20260723-recovery-ux";
     script.defer = true;
     script.dataset.azielPendingPaymentRecovery = "true";
     loaderState.loading = true;

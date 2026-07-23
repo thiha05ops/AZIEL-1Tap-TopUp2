@@ -45,6 +45,7 @@
             accountName: paymentSession?.accountName || payment.accountName || "",
             accountNumber: paymentSession?.accountNumber || payment.accountNumber || "",
             reference: paymentSession?.reference || orderData.orderId || orderData.topupId || "",
+            attemptId: paymentSession?.attemptId || orderData.manualPaymentAttemptId || "",
             qrImageUrl: paymentSession?.qrImage || paymentSession?.qrUrl || payment.qrImage || "",
             qrMode: paymentSession?.qrMode || payment.qrMode || "",
             instructions: "Transfer the exact amount, then upload the payment receipt.",

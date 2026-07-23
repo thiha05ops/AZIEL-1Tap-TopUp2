@@ -46,6 +46,7 @@
     "verify:pending-payment-recovery-checkout": "node backend/scripts/verify-pending-payment-recovery-checkout.js",
     "verify:pending-payment-recovery-runtime-safety": "node backend/scripts/verify-pending-payment-recovery-runtime-safety.js",
     "verify:pending-payment-recovery-notifications": "node backend/scripts/verify-pending-payment-recovery-notifications.js",
+    "verify:pending-payment-recovery-ux": "node backend/scripts/verify-pending-payment-recovery-ux.js",
     "verify:manual-payment": "node backend/scripts/verify-manual-payment-flow.js",
     "verify:omise-webhook": "node backend/scripts/verify-omise-webhook.js",
     "verify:email-delivery": "node backend/scripts/verify-email-delivery.js",

@@ -18,12 +18,15 @@
 .az-pending-payment__shell {
     position: relative;
     overflow: hidden;
-    border: 1px solid color-mix(in srgb, var(--az-border, rgba(139, 92, 246, .22)) 70%, transparent);
-    border-radius: 22px;
+    border: 1px solid color-mix(in srgb, var(--az-primary, #8b5cf6) 34%, var(--az-border, rgba(139, 92, 246, .22)));
+    border-radius: 24px;
     background:
-        linear-gradient(135deg, color-mix(in srgb, var(--az-surface, #14111f) 90%, transparent), color-mix(in srgb, var(--az-surface-2, #201634) 82%, transparent)),
+        radial-gradient(circle at 12% 20%, color-mix(in srgb, var(--az-primary, #8b5cf6) 24%, transparent), transparent 34%),
+        linear-gradient(135deg, color-mix(in srgb, var(--az-surface, #14111f) 90%, transparent), color-mix(in srgb, var(--az-surface-2, #201634) 84%, transparent)),
         color-mix(in srgb, var(--az-surface, #14111f) 88%, transparent);
-    box-shadow: 0 18px 48px rgba(9, 4, 24, .24);
+    box-shadow:
+        0 18px 48px rgba(9, 4, 24, .28),
+        0 0 36px color-mix(in srgb, var(--az-primary, #8b5cf6) 16%, transparent);
     color: var(--az-text, #f8f7ff);
     pointer-events: auto;
     backdrop-filter: blur(18px);
@@ -32,45 +35,79 @@
 
 .az-pending-payment__content {
     display: grid;
-    grid-template-columns: 48px minmax(0, 1fr) auto auto;
-    gap: 14px;
+    grid-template-columns: minmax(220px, 1.2fr) minmax(210px, .95fr) auto auto;
+    gap: 18px;
     align-items: center;
-    min-height: 78px;
-    padding: 14px 52px 14px 16px;
+    min-height: 86px;
+    padding: 16px 56px 16px 18px;
+}
+
+.az-pending-payment__identity,
+.az-pending-payment__product {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: 12px;
 }
 
 .az-pending-payment__icon {
     display: grid;
     place-items: center;
-    width: 48px;
-    height: 48px;
+    flex: 0 0 auto;
+    width: 52px;
+    height: 52px;
     overflow: hidden;
     border-radius: 16px;
-    background: color-mix(in srgb, var(--az-primary, #8b5cf6) 18%, transparent);
-    color: var(--az-primary, #8b5cf6);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--az-primary, #8b5cf6) 24%, transparent);
+    background:
+        linear-gradient(135deg, color-mix(in srgb, var(--az-primary, #8b5cf6) 42%, transparent), color-mix(in srgb, var(--az-primary-2, #a855f7) 20%, transparent));
+    color: #fff;
+    box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, white 20%, transparent),
+        0 12px 28px color-mix(in srgb, var(--az-primary, #8b5cf6) 24%, transparent);
 }
 
-.az-pending-payment__icon img {
+.az-pending-payment__icon i {
+    font-size: 1.15rem;
+}
+
+.az-pending-payment__thumb {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 52px;
+    height: 52px;
+    overflow: hidden;
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--az-primary, #8b5cf6) 14%, transparent);
+    color: var(--az-primary, #8b5cf6);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--az-primary, #8b5cf6) 22%, transparent);
+}
+
+.az-pending-payment__thumb img {
     width: 100%;
     height: 100%;
     object-fit: cover;
 }
 
-.az-pending-payment__text {
+.az-pending-payment__text,
+.az-pending-payment__product > div {
     display: grid;
     min-width: 0;
-    gap: 3px;
+    gap: 4px;
 }
 
-.az-pending-payment__text strong {
-    font-size: .98rem;
+.az-pending-payment__text strong,
+.az-pending-payment__product strong {
+    overflow: hidden;
+    font-size: 1rem;
     font-weight: 800;
     color: var(--az-text, #f8f7ff);
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .az-pending-payment__text span,
-.az-pending-payment__text small,
+.az-pending-payment__product span,
 .az-pending-payment__meta small,
 .az-pending-payment__meta em {
     min-width: 0;
@@ -84,7 +121,7 @@
     font-size: .88rem;
 }
 
-.az-pending-payment__text small,
+.az-pending-payment__product span,
 .az-pending-payment__meta small,
 .az-pending-payment__meta em {
     font-size: .78rem;
@@ -94,12 +131,13 @@
 .az-pending-payment__meta {
     display: grid;
     justify-items: end;
-    min-width: 128px;
-    gap: 3px;
+    min-width: 142px;
+    gap: 5px;
 }
 
 .az-pending-payment__meta b {
-    font-size: 1rem;
+    font-size: 1.06rem;
+    font-weight: 900;
     color: var(--az-text, #f8f7ff);
     white-space: nowrap;
 }
@@ -111,7 +149,13 @@
 }
 
 #azPendingPaymentCountdown {
-    color: var(--az-primary, #8b5cf6);
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    border-radius: 999px;
+    padding: 0 8px;
+    background: color-mix(in srgb, var(--az-primary, #8b5cf6) 16%, transparent);
+    color: color-mix(in srgb, var(--az-primary, #8b5cf6) 72%, white);
     font-weight: 800;
 }
 
@@ -162,28 +206,46 @@
 body.light .az-pending-payment__shell,
 [data-theme="light"] .az-pending-payment__shell {
     background:
-        linear-gradient(135deg, rgba(255, 255, 255, .94), rgba(246, 241, 255, .9)),
+        radial-gradient(circle at 12% 20%, rgba(139, 92, 246, .16), transparent 34%),
+        linear-gradient(135deg, rgba(255, 255, 255, .96), rgba(246, 241, 255, .94)),
         rgba(255, 255, 255, .92);
+    border-color: rgba(139, 92, 246, .28);
     color: var(--az-text, #151322);
-    box-shadow: 0 18px 48px rgba(48, 27, 94, .14);
+    box-shadow:
+        0 18px 48px rgba(48, 27, 94, .17),
+        0 0 0 1px rgba(255, 255, 255, .76) inset;
 }
 
 body.light .az-pending-payment__text strong,
+body.light .az-pending-payment__product strong,
 body.light .az-pending-payment__meta b,
 [data-theme="light"] .az-pending-payment__text strong,
+[data-theme="light"] .az-pending-payment__product strong,
 [data-theme="light"] .az-pending-payment__meta b {
     color: var(--az-text, #151322);
 }
 
 body.light .az-pending-payment__text span,
-body.light .az-pending-payment__text small,
+body.light .az-pending-payment__product span,
 body.light .az-pending-payment__meta small,
 body.light .az-pending-payment__meta em,
 [data-theme="light"] .az-pending-payment__text span,
-[data-theme="light"] .az-pending-payment__text small,
+[data-theme="light"] .az-pending-payment__product span,
 [data-theme="light"] .az-pending-payment__meta small,
 [data-theme="light"] .az-pending-payment__meta em {
-    color: var(--az-muted, #676176);
+    color: #5f5871;
+}
+
+body.light #azPendingPaymentCountdown,
+[data-theme="light"] #azPendingPaymentCountdown {
+    background: rgba(139, 92, 246, .12);
+    color: #6d42d8;
+}
+
+body.light .az-pending-payment__close,
+[data-theme="light"] .az-pending-payment__close {
+    background: rgba(246, 241, 255, .86);
+    color: #4b4261;
 }
 
 @media (max-width: 720px) {
@@ -197,20 +259,34 @@ body.light .az-pending-payment__meta em,
     }
 
     .az-pending-payment__content {
-        grid-template-columns: 44px minmax(0, 1fr);
+        grid-template-columns: minmax(0, 1fr);
         gap: 10px 12px;
         min-height: 0;
-        padding: 13px 46px 14px 14px;
+        padding: 14px;
+    }
+
+    .az-pending-payment__identity {
+        padding-right: 38px;
     }
 
     .az-pending-payment__icon {
-        width: 44px;
-        height: 44px;
+        width: 42px;
+        height: 42px;
+        border-radius: 14px;
+    }
+
+    .az-pending-payment__thumb {
+        width: 48px;
+        height: 48px;
         border-radius: 14px;
     }
 
     .az-pending-payment__meta {
-        grid-column: 2;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        grid-column: auto;
         justify-items: start;
         min-width: 0;
         width: 100%;
@@ -223,6 +299,124 @@ body.light .az-pending-payment__meta em,
     }
 }
 
+@media (max-width: 520px) {
+    .az-pending-payment {
+        width: calc(100vw - 24px);
+    }
+
+    .az-pending-payment__shell {
+        border-radius: 16px;
+    }
+
+    .az-pending-payment__content {
+        gap: 8px;
+        padding: 11px 12px 12px;
+    }
+
+    .az-pending-payment__identity {
+        gap: 9px;
+        padding-right: 34px;
+    }
+
+    .az-pending-payment__icon {
+        width: 34px;
+        height: 34px;
+        border-radius: 11px;
+    }
+
+    .az-pending-payment__icon i {
+        font-size: .88rem;
+    }
+
+    .az-pending-payment__text {
+        gap: 0;
+    }
+
+    .az-pending-payment__text strong {
+        font-size: .92rem;
+        line-height: 1.18;
+    }
+
+    .az-pending-payment__text span {
+        display: none;
+    }
+
+    .az-pending-payment__product {
+        gap: 9px;
+    }
+
+    .az-pending-payment__thumb {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+    }
+
+    .az-pending-payment__product > div {
+        gap: 1px;
+    }
+
+    .az-pending-payment__product strong {
+        font-size: .9rem;
+        line-height: 1.2;
+    }
+
+    .az-pending-payment__product span {
+        font-size: .74rem;
+        line-height: 1.25;
+    }
+
+    .az-pending-payment__meta {
+        min-height: 24px;
+    }
+
+    .az-pending-payment__meta b {
+        min-width: 0;
+        overflow: hidden;
+        font-size: .94rem;
+        line-height: 1.2;
+        text-overflow: ellipsis;
+    }
+
+    .az-pending-payment__meta small {
+        flex: 0 0 auto;
+        gap: 0;
+    }
+
+    .az-pending-payment__meta small > span:first-child {
+        display: none;
+    }
+
+    .az-pending-payment__meta em {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 20px;
+        border-radius: 999px;
+        padding: 0 7px;
+        background: color-mix(in srgb, var(--az-primary, #8b5cf6) 14%, transparent);
+        font-size: .7rem;
+    }
+
+    #azPendingPaymentCountdown {
+        min-height: 22px;
+        padding-inline: 8px;
+        font-size: .76rem;
+    }
+
+    .az-pending-payment__continue {
+        min-height: 44px;
+        padding-inline: 14px;
+        font-size: .9rem;
+    }
+
+    .az-pending-payment__close {
+        top: 8px;
+        right: 8px;
+        width: 30px;
+        height: 30px;
+    }
+}
+
 @media (max-width: 380px) {
     .az-pending-payment {
         width: calc(100vw - 20px);
@@ -232,8 +426,14 @@ body.light .az-pending-payment__meta em,
         padding-inline: 12px 44px;
     }
 
-    .az-pending-payment__text strong {
+    .az-pending-payment__text strong,
+    .az-pending-payment__product strong {
         font-size: .92rem;
+    }
+
+    .az-pending-payment__text span,
+    .az-pending-payment__product span {
+        font-size: .76rem;
     }
 }
 

@@ -184,6 +184,11 @@
         return window.AZIEL_LANG?.[lang]?.[key] || window.AZIEL_LANG?.en?.[key] || fallback || key;
     }
 
+    function checkoutDevLog(label, detail = {}) {
+        if (!isDevelopmentHost()) return;
+        console.info(label, detail);
+    }
+
     function recoveryCheckpoint(label) {
         if (!isDevelopmentHost()) return;
         console.info(`[AZIEL RECOVERY CHECKOUT] ${label}`, {
@@ -380,6 +385,37 @@
 
     function clearActiveDynamicQr() {
         if (activeState) activeState.activeDynamicQr = null;
+    }
+
+    function checkoutCloseDetail(reason = "programmatic", state = activeState) {
+        if (!state) return;
+
+        const submitted = reason === "submitted" || state.receiptSubmitted === true || state.submittedEventSent === true;
+        return {
+            mode: isRecoveryMode(state) ? "recovery" : "new",
+            attemptId: state.attemptId || state.manualPaymentAttemptId || "",
+            reference: state.reference || state.attemptReference || "",
+            receiptSubmitted: submitted,
+            completed: submitted,
+            cancelled: false,
+            reason
+        };
+    }
+
+    function emitCheckoutClosed(detail) {
+        if (!detail) return;
+        window.__AZIEL_PENDING_PAYMENT_CLOSE_EVENT__ = {
+            ...detail,
+            capturedAt: Date.now()
+        };
+        checkoutDevLog("CHECKOUT_CLOSE_EVENT_DISPATCHED", {
+            attemptId: detail.attemptId,
+            mode: detail.mode,
+            receiptSubmitted: detail.receiptSubmitted,
+            completed: detail.completed,
+            cancelled: detail.cancelled
+        });
+        window.dispatchEvent(new CustomEvent("aziel:payment-checkout-closed", { detail }));
     }
 
     function checkoutStorageKey(options = {}) {
@@ -1688,6 +1724,7 @@
                     setLoading,
                     options: activeState
                 });
+                if (result !== false && activeState) activeState.receiptSubmitted = true;
                 if (result !== false) setMessage("success", options.successMessage || "Submitted for verification.");
             } catch (error) {
                 console.log("Payment checkout sheet submit error:", error);
@@ -1932,14 +1969,25 @@
     function closeMinimalRecoverySheet(reason = "button") {
         incrementRecoveryCounter("close");
         recoveryCheckpoint(`RECOVERY_OPEN_CLOSE ${reason}`);
+        const closeDetail = checkoutCloseDetail(reason, activeState);
+        checkoutDevLog("CHECKOUT_CLOSE_1", {
+            attemptId: closeDetail?.attemptId || "",
+            reason
+        });
         clearQrExpiryCountdown();
         const modal = document.getElementById("azRecoveredPaymentMiniSheet");
         modal?.remove();
+        document.body.classList.remove("az-payment-sheet-open");
         const detail = activeState ? {
             attemptId: activeState.attemptId || "",
             reference: activeState.attemptReference || "",
             reason
         } : { reason };
+        checkoutDevLog("CHECKOUT_CLOSE_2", {
+            attemptId: closeDetail?.attemptId || "",
+            sheetOpen: Boolean(document.querySelector("#azRecoveredPaymentMiniSheet.show"))
+        });
+        emitCheckoutClosed(closeDetail);
         activeState = null;
         window.dispatchEvent(new CustomEvent("aziel:recovered-payment-closed", { detail }));
     }
@@ -2316,11 +2364,21 @@
     }
 
     function close(reason = "programmatic") {
+        const closeDetail = checkoutCloseDetail(reason, activeState);
+        checkoutDevLog("CHECKOUT_CLOSE_1", {
+            attemptId: closeDetail?.attemptId || "",
+            reason
+        });
         const modal = document.getElementById("azPaymentCheckoutSheet");
         modal?.classList.remove("show");
         document.body.classList.remove("az-payment-sheet-open");
         clearQrExpiryCountdown();
         activeState?.onClose?.(reason);
+        checkoutDevLog("CHECKOUT_CLOSE_2", {
+            attemptId: closeDetail?.attemptId || "",
+            sheetOpen: Boolean(document.querySelector("#azPaymentCheckoutSheet.show"))
+        });
+        emitCheckoutClosed(closeDetail);
         activeState = null;
     }
 

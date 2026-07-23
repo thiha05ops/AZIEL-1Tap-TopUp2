@@ -5,7 +5,7 @@
     if (window.__AZIEL_PENDING_PAYMENT_RECOVERY_INITIALIZED__) return;
     window.__AZIEL_PENDING_PAYMENT_RECOVERY_INITIALIZED__ = true;
 
-    const MODULE_VERSION = "20260722-phase22";
+    const MODULE_VERSION = "20260723-recovery-ux";
     const DISMISS_PREFIX = "azielPendingPaymentDismissed:";
     const RECOVERY_EVENT = "aziel:resume-payment";
     const CHECKOUT_SELECTOR = "#azPaymentCheckoutSheet.show";
@@ -19,7 +19,10 @@
         checkoutObserver: null,
         selectedRecovery: null,
         runtimePromise: null,
-        lastFetchStartedAt: 0
+        lastFetchStartedAt: 0,
+        forceShowAttemptId: "",
+        closeRefreshInFlight: false,
+        closeRefreshTimer: null
     };
 
     function t(key, fallback) {
@@ -28,6 +31,11 @@
 
     function isDev() {
         return ["localhost", "127.0.0.1"].includes(window.location.hostname);
+    }
+
+    function recoveryDevLog(label, detail = {}) {
+        if (!isDev()) return;
+        console.info(label, detail);
     }
 
     function currentPage() {
@@ -79,6 +87,7 @@
     }
 
     function isDismissed(attempt) {
+        if (state.forceShowAttemptId && attempt?.attemptId === state.forceShowAttemptId) return false;
         return sessionStorage.getItem(dismissKey(attempt?.attemptId)) === "1";
     }
 
@@ -126,6 +135,10 @@
             clearInterval(state.countdownTimer);
             state.countdownTimer = null;
         }
+        if (state.closeRefreshTimer) {
+            window.clearTimeout(state.closeRefreshTimer);
+            state.closeRefreshTimer = null;
+        }
         if (!overlay) return;
 
         if (options.animate === false) {
@@ -141,6 +154,8 @@
         state.attempts = [];
         state.activeAttempt = null;
         state.selectedRecovery = null;
+        state.forceShowAttemptId = "";
+        state.closeRefreshInFlight = false;
         removeOverlay({ animate: false });
     }
 
@@ -189,13 +204,23 @@
                     <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                 </button>
                 <div class="az-pending-payment__content">
-                    <div class="az-pending-payment__icon" aria-hidden="true">
-                        ${iconSrc ? `<img src="${iconSrc}" alt="" loading="lazy" decoding="async">` : `<i class="fa-solid fa-gamepad"></i>`}
+                    <div class="az-pending-payment__identity">
+                        <div class="az-pending-payment__icon" aria-hidden="true">
+                            <i class="fa-solid fa-bolt"></i>
+                        </div>
+                        <div class="az-pending-payment__text">
+                            <strong id="azPendingPaymentTitle">${t("resumePaymentTitle", "Payment Not Completed")}</strong>
+                            <span>${t("resumePaymentSubtitle", "You have a payment waiting to be completed.")}</span>
+                        </div>
                     </div>
-                    <div class="az-pending-payment__text">
-                        <strong id="azPendingPaymentTitle">${t("resumePaymentTitle", "Payment Not Completed")}</strong>
-                        <span>${t("resumePaymentSubtitle", "You have a payment waiting to be completed.")}</span>
-                        <small>${safeText(attempt.productName, t("payment", "Payment"))} · ${safeText(attempt.packageName, "-")}</small>
+                    <div class="az-pending-payment__product">
+                        <div class="az-pending-payment__thumb" aria-hidden="true">
+                            ${iconSrc ? `<img src="${iconSrc}" alt="" loading="lazy" decoding="async">` : `<i class="fa-solid fa-gamepad"></i>`}
+                        </div>
+                        <div>
+                            <strong>${safeText(attempt.productName, t("payment", "Payment"))}</strong>
+                            <span>${safeText(attempt.packageName, "-")}</span>
+                        </div>
                     </div>
                     <div class="az-pending-payment__meta">
                         <b>${formatAmount(attempt)}</b>
@@ -219,6 +244,11 @@
         });
 
         startCountdown();
+        recoveryDevLog("RECOVERY_OVERLAY_RENDERED", {
+            attemptId: attempt.attemptId,
+            remainingSeconds: remaining
+        });
+        if (state.forceShowAttemptId === attempt.attemptId) state.forceShowAttemptId = "";
     }
 
     function startCountdown() {
@@ -312,20 +342,26 @@
     }
 
     async function fetchRecoverable(options = {}) {
-        if (!isEligiblePage()) return;
+        if (!isEligiblePage()) return null;
         if (state.fetching) return;
         if (!getToken()) {
             clearState();
-            return;
+            return null;
         }
-        if (!window.AZIEL?.user) return;
+        if (!window.AZIEL?.user) return null;
         if (isPaymentSheetOpen()) {
             removeOverlay();
-            return;
+            return null;
         }
+
+        if (options.forceAttemptId) state.forceShowAttemptId = safeText(options.forceAttemptId, "");
 
         state.fetching = true;
         state.lastFetchStartedAt = Date.now();
+        recoveryDevLog("RECOVERY_REFRESH_STARTED", {
+            attemptId: options.forceAttemptId || "",
+            forced: Boolean(options.forceAttemptId || options.force)
+        });
 
         try {
             const res = await fetch(getApiUrl("/api/payment/manual/recoverable"), {
@@ -334,25 +370,91 @@
 
             if (res.status === 401) {
                 clearState();
-                return;
+                return null;
             }
 
             const data = await res.json().catch(() => ({}));
             const attempts = Array.isArray(data.recoverable) ? data.recoverable : [];
             state.attempts = attempts;
             state.activeAttempt = chooseActiveAttempt(attempts);
+            recoveryDevLog("RECOVERY_REFRESH_RESULT", {
+                forceAttemptId: options.forceAttemptId || "",
+                count: attempts.length,
+                matched: Boolean(options.forceAttemptId && attempts.some(item => item.attemptId === options.forceAttemptId)),
+                activeAttemptId: state.activeAttempt?.attemptId || ""
+            });
 
             if (!state.activeAttempt) {
                 removeOverlay();
-                return;
+                return null;
             }
 
             renderOverlay();
+            return state.activeAttempt;
         } catch (error) {
             if (isDev()) console.warn("Pending payment recovery lookup failed:", error.message);
+            return null;
         } finally {
             state.fetching = false;
         }
+    }
+
+    function scheduleCheckoutCloseRefresh(detail = {}) {
+        recoveryDevLog("RECOVERY_CLOSE_EVENT_RECEIVED", {
+            attemptId: detail.attemptId || "",
+            mode: detail.mode || "",
+            receiptSubmitted: Boolean(detail.receiptSubmitted),
+            completed: Boolean(detail.completed),
+            cancelled: Boolean(detail.cancelled)
+        });
+        if (state.closeRefreshInFlight) return;
+        if (detail.mode !== "new") return;
+        if (!detail.attemptId) return;
+        if (detail.receiptSubmitted || detail.completed || detail.cancelled) return;
+
+        if (state.closeRefreshTimer) {
+            window.clearTimeout(state.closeRefreshTimer);
+            state.closeRefreshTimer = null;
+        }
+
+        state.closeRefreshInFlight = true;
+        state.forceShowAttemptId = safeText(detail.attemptId, "");
+
+        const run = async (attempt = 1) => {
+            if (isPaymentSheetOpen()) {
+                if (attempt < 2) {
+                    state.closeRefreshTimer = window.setTimeout(() => run(attempt + 1), 350);
+                    return;
+                }
+                state.closeRefreshInFlight = false;
+                return;
+            }
+
+            const active = await fetchRecoverable({
+                force: true,
+                forceAttemptId: detail.attemptId
+            });
+
+            if (!active && attempt < 2) {
+                state.closeRefreshTimer = window.setTimeout(() => run(attempt + 1), 350);
+                return;
+            }
+
+            state.closeRefreshInFlight = false;
+            state.closeRefreshTimer = null;
+        };
+
+        state.closeRefreshTimer = window.setTimeout(() => run(1), 120);
+    }
+
+    function consumePendingCheckoutCloseEvent() {
+        const pending = window.__AZIEL_PENDING_PAYMENT_CLOSE_EVENT__;
+        if (!pending || pending.consumed) return;
+        window.__AZIEL_PENDING_PAYMENT_CLOSE_EVENT__ = {
+            ...pending,
+            consumed: true
+        };
+        scheduleCheckoutCloseRefresh(pending);
     }
 
     async function resumeAttempt(attemptId) {
@@ -432,6 +534,10 @@
             removeOverlay();
             fetchRecoverable({ force: true });
         });
+        window.addEventListener("aziel:payment-checkout-closed", event => {
+            scheduleCheckoutCloseRefresh(event.detail || {});
+        });
+        consumePendingCheckoutCloseEvent();
         window.addEventListener("aziel:recovered-payment-submitted", event => {
             const attemptId = event.detail?.attemptId || state.selectedRecovery?.attemptId || state.activeAttempt?.attemptId || "";
             if (attemptId) sessionStorage.setItem(dismissKey(attemptId), "1");
