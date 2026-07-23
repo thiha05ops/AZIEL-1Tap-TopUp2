@@ -19,6 +19,10 @@ const adminSectionTitles = {
         titleKey: "dashboard",
         subKey: "dashboard_sub"
     },
+    website: {
+        titleKey: "website",
+        subKey: "website_sub"
+    },
     orders: {
         titleKey: "orders",
         subKey: "orders_sub"

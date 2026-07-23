@@ -22,6 +22,7 @@ const packageJson = read("package.json");
 
 const expectedModules = [
     ["dashboard", "DASHBOARD_READ"],
+    ["website", "SITE_CONTENT_READ"],
     ["orders", "ORDERS_READ"],
     ["wallet", "WALLET_READ"],
     ["fulfillment", "SUPPLIERS_READ,FULFILLMENT_READ"],
@@ -51,6 +52,7 @@ assertIncludes(html, `data-admin-permission="DESIGN_STUDIO_READ"`, "Design Studi
 
 [
     "Command",
+    "Experience",
     "Operations",
     "Commerce",
     "Site Content",
@@ -86,7 +88,7 @@ assertIncludes(css, "@media (max-width: 768px)", "Mobile drawer breakpoint must 
 assertIncludes(css, "background: rgba(2, 6, 23, .18)", "Mobile backdrop must stay light utility-drawer style.");
 assertIncludes(css, "@media (prefers-reduced-motion: reduce)", "Reduced motion contract must remain available.");
 
-["design_studio", "nav_search_placeholder", "collapse_navigation", "expand_navigation"].forEach(key => {
+["design_studio", "website", "experience", "nav_search_placeholder", "collapse_navigation", "expand_navigation"].forEach(key => {
     assertIncludes(en, `${key}:`, `English dictionary missing ${key}.`);
     assertIncludes(my, `${key}:`, `Myanmar dictionary missing ${key}.`);
     assertIncludes(th, `${key}:`, `Thai dictionary missing ${key}.`);

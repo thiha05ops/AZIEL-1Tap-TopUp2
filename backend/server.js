@@ -53,6 +53,8 @@ const homeBannerRoutes = require("./routes/homeBanners");
 const campaignRoutes = require("./routes/campaigns");
 const promoRoutes = require("./routes/promos");
 const sitePlacementRoutes = require("./routes/sitePlacements");
+const websiteRuntimeRoutes = require("./routes/websiteRuntime");
+const configurationRegistryRoutes = require("./routes/configurationRegistry");
 const realtime = require("./services/realtime");
 
 // EXPRESS APP
@@ -202,6 +204,8 @@ function configureApplication(mongoConnection) {
     app.use("/api", campaignRoutes);
     app.use("/api", promoRoutes);
     app.use("/api", sitePlacementRoutes);
+    app.use("/api", configurationRegistryRoutes);
+    app.use("/api", websiteRuntimeRoutes);
 
     app.use("/api", (err, req, res, next) => {
         if (!err) return next();

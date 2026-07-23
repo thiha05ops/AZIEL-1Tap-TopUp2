@@ -72,6 +72,15 @@
                 </div>
 
                 <div class="admin-nav-group">
+                    <span class="admin-nav-label" data-admin-i18n="experience">Experience</span>
+
+                    <button class="admin-nav" data-section="website" type="button" data-admin-permission="SITE_CONTENT_READ">
+                        <i class="fa-solid fa-globe"></i>
+                        <span data-admin-i18n="website">Website</span>
+                    </button>
+                </div>
+
+                <div class="admin-nav-group">
                     <span class="admin-nav-label" data-admin-i18n="operations">Operations</span>
 
                     <button class="admin-nav" data-section="orders" type="button" data-admin-permission="ORDERS_READ">
@@ -397,6 +406,42 @@
                     </div>
                 </div>
 
+            </section>
+
+            <section class="admin-section" id="section-website">
+                <div class="website-runtime-workspace">
+                    <header class="website-runtime-header">
+                        <div>
+                            <span class="admin-eyebrow" data-admin-i18n="website_runtime">Website Runtime</span>
+                            <h3 data-admin-i18n="website_observation">Public Website Observation</h3>
+                            <p data-admin-i18n="website_observation_sub">Read-only inventory, ownership, diagnostics, and preview for the current public website.</p>
+                        </div>
+                        <div class="website-runtime-actions">
+                            <button id="websiteRuntimeRefresh" class="admin-secondary-btn" type="button" data-admin-i18n="refresh">Refresh</button>
+                            <button id="websiteRuntimeOpenPublic" class="admin-secondary-btn" type="button" data-admin-i18n="open_public_site">Open Public Site</button>
+                        </div>
+                    </header>
+
+                    <div class="website-runtime-tabs" role="tablist" aria-label="Website runtime sections">
+                        <button class="active" type="button" role="tab" aria-selected="true" data-website-runtime-tab="overview" data-admin-i18n="overview">Overview</button>
+                        <button type="button" role="tab" aria-selected="false" data-website-runtime-tab="home" data-admin-i18n="home">Home</button>
+                        <button type="button" role="tab" aria-selected="false" data-website-runtime-tab="navigation" data-admin-i18n="navigation">Navigation</button>
+                        <button type="button" role="tab" aria-selected="false" data-website-runtime-tab="games" data-admin-i18n="games_explore">Games & Explore</button>
+                        <button type="button" role="tab" aria-selected="false" data-website-runtime-tab="campaigns" data-admin-i18n="campaigns">Campaigns</button>
+                        <button type="button" role="tab" aria-selected="false" data-website-runtime-tab="regions" data-admin-i18n="regions">Regions</button>
+                        <button type="button" role="tab" aria-selected="false" data-website-runtime-tab="configuration">Configuration</button>
+                        <button type="button" role="tab" aria-selected="false" data-website-runtime-tab="preview" data-admin-i18n="preview">Preview</button>
+                        <button type="button" role="tab" aria-selected="false" data-website-runtime-tab="diagnostics" data-admin-i18n="diagnostics">Diagnostics</button>
+                    </div>
+
+                    <div id="websiteRuntimeStatus" class="website-runtime-status" aria-live="polite">
+                        <span data-admin-i18n="loading">Loading</span>
+                    </div>
+
+                    <div id="websiteRuntimeContent" class="website-runtime-content">
+                        <div class="admin-empty-state">Loading website runtime...</div>
+                    </div>
+                </div>
             </section>
 
             <section class="admin-section" id="section-orders">
@@ -1229,8 +1274,23 @@ TH</textarea></label>
     <script src="/js/admin/admin-ui.js?v=20260715-phase15"></script>
     <script src="/js/admin/admin-action-modal.js?v=20260714-phase4"></script>
     <script src="/js/admin-auth.js?v=20260715-phase12"></script>
+    <script src="/js/os/kernel-errors.js?v=20260724-os-kernel"></script>
+    <script src="/js/os/kernel-diagnostics.js?v=20260724-os-kernel"></script>
+    <script src="/js/os/event-bus.js?v=20260724-os-kernel"></script>
+    <script src="/js/os/app-registry.js?v=20260724-os-kernel"></script>
+    <script src="/js/os/workspace-manager.js?v=20260724-os-kernel"></script>
+    <script src="/js/os/navigation-manager.js?v=20260724-os-kernel"></script>
+    <script src="/js/os/service-container.js?v=20260724-os-kernel"></script>
+    <script src="/js/os/runtime-registry.js?v=20260724-os-kernel"></script>
+    <script src="/js/os/apps/core-app-manifest.js?v=20260724-os-kernel"></script>
+    <script src="/js/os/compatibility/admin-navigation-adapter.js?v=20260724-os-kernel"></script>
+    <script src="/js/os/kernel.js?v=20260724-os-kernel"></script>
     <script src="/js/admin-app.js?v=20260724-admin-nav"></script>
+    <script src="/js/os/kernel-bootstrap.js?v=20260724-os-kernel"></script>
+    <script src="/js/os/configuration/configuration-client.js?v=20260724-config-registry"></script>
+    <script src="/js/os/configuration/configuration-runtime-bridge.js?v=20260724-config-registry"></script>
     <script src="/js/admin-stats.js?v=20260723-command-center-payment-renderer"></script>
+    <script src="/js/admin-website-runtime.js?v=20260724-website-runtime"></script>
     <script src="/js/admin-fulfillment.js?v=20260715-phase13-qa4"></script>
     <script src="/js/payment-display.js?v=20260718-labels"></script>
     <script src="/js/admin-orders.js?v=20260715-phase13-qa4"></script>
