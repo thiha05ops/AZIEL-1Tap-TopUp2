@@ -53,8 +53,8 @@ function updateHeaderDropdown(notifications) {
 
     list.innerHTML = items.map(item => `
         <div class="notification-item ${item.read ? "" : "unread"}" data-id="${escapeHTML(item.id)}" data-resume-payment="${escapeHTML(getRecoveryAttemptId(item))}">
-            <div class="notification-title">${escapeHTML(item.title)}</div>
-            <div class="notification-message">${escapeHTML(item.message)}</div>
+            <div class="notification-title">${escapeHTML(formatNotificationText(item, "title"))}</div>
+            <div class="notification-message">${escapeHTML(formatNotificationText(item, "message"))}</div>
             <div class="notification-time">${escapeHTML(formatNotificationTime(item.createdAt))}</div>
         </div>
     `).join("");
@@ -73,6 +73,15 @@ function getRecoveryAttemptId(item = {}) {
     const metadata = item.metadata || {};
     const actionType = metadata.notificationActionType || item.action?.type || "";
     return actionType === "resume_manual_payment" ? String(metadata.manualPaymentAttemptId || "") : "";
+}
+
+function formatNotificationText(item = {}, field = "title") {
+    const metadata = item.metadata || {};
+    const key = field === "message" ? metadata.i18nMessageKey : metadata.i18nTitleKey;
+    const fallback = item[field] || "";
+    const text = key ? t(key, fallback) : fallback;
+
+    return String(text || fallback || "").replace("{game}", metadata.game || "your order");
 }
 
 function updateLegacyBadge(unreadCount) {
@@ -98,9 +107,9 @@ function showNotificationPopup(data) {
     const popup = document.createElement("div");
     popup.id = "liveNotificationPopup";
     popup.innerHTML = `
-        <strong>${escapeHTML(data.title || "Notification")}</strong>
+        <strong>${escapeHTML(formatNotificationText(data, "title") || "Notification")}</strong>
         <br>
-        ${escapeHTML(data.message || "")}
+        ${escapeHTML(formatNotificationText(data, "message") || "")}
     `;
 
     document.body.appendChild(popup);
@@ -157,6 +166,23 @@ function playNotificationSound() {
 function formatNotificationTime(date) {
     if (!date) return "";
     return new Date(date).toLocaleString();
+}
+
+function t(key, fallback) {
+    const translated = window.AZIEL_I18N?.t?.(key, fallback);
+    if (translated && translated !== key && translated !== fallback) return translated;
+    const lang = window.AZIEL_I18N?.getLang?.() ||
+        localStorage.getItem("azielLanguage") ||
+        localStorage.getItem("language") ||
+        localStorage.getItem("azielLang") ||
+        localStorage.getItem("selectedLanguage") ||
+        document.documentElement?.lang ||
+        "en";
+    return window.AZIEL_LANG?.[lang]?.[key] ||
+        window.AZIEL_LANG?.en?.[key] ||
+        translated ||
+        fallback ||
+        key;
 }
 
 function escapeHTML(value) {

@@ -359,7 +359,20 @@ function formatNotificationText(item = {}, field = "title") {
 }
 
 function t(key, fallback) {
-    return window.AZIEL_I18N?.t?.(key, fallback) || fallback || key;
+    const translated = window.AZIEL_I18N?.t?.(key, fallback);
+    if (translated && translated !== key && translated !== fallback) return translated;
+    const lang = window.AZIEL_I18N?.getLang?.() ||
+        localStorage.getItem("azielLanguage") ||
+        localStorage.getItem("language") ||
+        localStorage.getItem("azielLang") ||
+        localStorage.getItem("selectedLanguage") ||
+        document.documentElement?.lang ||
+        "en";
+    return window.AZIEL_LANG?.[lang]?.[key] ||
+        window.AZIEL_LANG?.en?.[key] ||
+        translated ||
+        fallback ||
+        key;
 }
 
 function formatPaymentText(value) {

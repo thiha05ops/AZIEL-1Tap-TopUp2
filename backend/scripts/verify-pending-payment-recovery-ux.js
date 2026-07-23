@@ -93,6 +93,29 @@ function verifyDismissalRules() {
     assert(!read("frontend/js/payment/pending-payment-recovery.js").includes("localStorage.setItem(dismissKey"), "Dismissal must not become permanent.");
 }
 
+function verifyRecoveryLocalization() {
+    const overlay = read("frontend/js/payment/pending-payment-recovery.js");
+    includes("frontend/js/payment/pending-payment-recovery.js", "function currentLanguage", "Recovery overlay must read the current locale at render time.");
+    includes("frontend/js/payment/pending-payment-recovery.js", "localStorage.getItem(\"azielLanguage\")", "Recovery overlay must fall back to persisted AZIEL language.");
+    includes("frontend/js/payment/pending-payment-recovery.js", "window.AZIEL_LANG?.[lang]?.[key]", "Recovery overlay must read dictionaries directly when the i18n facade returns fallback copy.");
+    includes("frontend/js/payment/pending-payment-recovery.js", "window.addEventListener(\"aziel:languageChanged\"", "Recovery overlay must rerender when the global language changes.");
+    [
+        "resumePaymentTitle",
+        "resumePaymentSubtitle",
+        "resumePaymentAction",
+        "resumePaymentRemaining",
+        "resumePaymentMore",
+        "resumePaymentClose"
+    ].forEach(key => {
+        includes("frontend/js/payment/pending-payment-recovery.js", key, `Recovery overlay must use ${key}.`);
+    });
+    assert(!/Payment Not Completed<\/strong>|Continue Payment<\/button>|Time remaining<\/span>/.test(overlay), "Recovery overlay must not render fixed English labels without i18n.");
+
+    includes("frontend/js/notifications-page.js", "window.AZIEL_LANG?.[lang]?.[key]", "Notification recovery action must follow current locale fallback.");
+    includes("frontend/js/notification-live.js", "formatNotificationText", "Legacy notification dropdown/popup must localize recovery notification text.");
+    includes("frontend/js/notification-live.js", "window.AZIEL_LANG?.[lang]?.[key]", "Legacy notification dropdown/popup must follow current locale fallback.");
+}
+
 function verifyVisualHierarchy() {
     const css = read("frontend/css/payment/pending-payment-recovery.css");
     includes("frontend/js/payment/pending-payment-recovery.js", "az-pending-payment__identity", "Overlay markup must include a recovery identity group.");
@@ -116,6 +139,7 @@ function verifyVisualHierarchy() {
 verifyCheckoutCloseContract();
 verifyImmediateOverlayRefresh();
 verifyDismissalRules();
+verifyRecoveryLocalization();
 verifyVisualHierarchy();
 verifyCheckoutCacheBusters();
 
