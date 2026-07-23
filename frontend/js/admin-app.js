@@ -3,8 +3,10 @@
 
 document.addEventListener("DOMContentLoaded", () => {
     initAdminLayoutController();
+    initAdminSidebarState();
     initAdminNavigation();
     initAdminMobileSidebar();
+    initAdminNavSearch();
     initAdminSearch();
     initAdminBroadcast();
     initQuickBroadcastButtons();
@@ -79,13 +81,16 @@ const adminSectionTitles = {
     }
 };
 
+const ADMIN_SIDEBAR_COLLAPSED_KEY = "aziel_admin_sidebar_collapsed";
+
 function initAdminNavigation() {
     const navButtons = document.querySelectorAll(".admin-nav");
-    const sections = document.querySelectorAll(".admin-section");
-    const title = document.getElementById("adminPageTitle");
-    const sub = document.getElementById("adminPageSub");
+
+    hydrateAdminNavMetadata();
 
     navButtons.forEach(btn => {
+        if (!btn.dataset.section) return;
+
         btn.addEventListener("click", () => {
             const target = btn.dataset.section;
             openAdminSection(target);
@@ -107,6 +112,17 @@ function initAdminNavigation() {
     }
 
     setDefaultSection();
+}
+
+function hydrateAdminNavMetadata() {
+    document.querySelectorAll(".admin-nav").forEach(item => {
+        const label = item.querySelector("span")?.textContent?.trim() || item.textContent?.trim() || "";
+        if (label) {
+            item.dataset.navLabel = label;
+            if (!item.getAttribute("aria-label")) item.setAttribute("aria-label", label);
+            if (!item.getAttribute("title")) item.setAttribute("title", label);
+        }
+    });
 }
 
 function parseAdminHash() {
@@ -147,7 +163,13 @@ function openAdminSection(sectionName, updateHash = true, context = {}) {
     const sub = document.getElementById("adminPageSub");
 
     navButtons.forEach(item => {
-        item.classList.toggle("active", item.dataset.section === sectionName);
+        const isActive = item.dataset.section === sectionName;
+        item.classList.toggle("active", isActive);
+        if (isActive) {
+            item.setAttribute("aria-current", "page");
+        } else {
+            item.removeAttribute("aria-current");
+        }
     });
 
     document.body.dataset.adminSection = sectionName;
@@ -178,6 +200,7 @@ function openAdminSection(sectionName, updateHash = true, context = {}) {
             sub.dataset.adminI18n = pageInfo.subKey;
             sub.innerText = adminT(pageInfo.subKey);
         }
+        updateAdminSectionPill(sectionName);
     }
 
     if (updateHash) {
@@ -198,8 +221,27 @@ function openAdminSection(sectionName, updateHash = true, context = {}) {
     }));
 }
 
+function updateAdminSectionPill(sectionName) {
+    const pill = document.getElementById("adminSectionPill");
+    const activeNav = Array.from(document.querySelectorAll(".admin-nav"))
+        .find(item => item.dataset.section === sectionName);
+    const group = activeNav?.closest(".admin-nav-group");
+    const label = group?.querySelector(".admin-nav-label");
+    if (!pill || !label) return;
+
+    const key = label.dataset.adminI18n;
+    if (key) {
+        pill.dataset.adminI18n = key;
+        pill.textContent = adminT(key, label.textContent || "");
+    } else {
+        pill.removeAttribute("data-admin-i18n");
+        pill.textContent = label.textContent || "";
+    }
+}
+
 function initAdminLayoutController() {
     const mediaQuery = window.matchMedia("(max-width: 768px)");
+    let drawerReturnFocus = null;
 
     function isMobile() {
         return mediaQuery.matches;
@@ -225,11 +267,37 @@ function initAdminLayoutController() {
         document.body.classList.remove("admin-sidebar-open");
         document.body.classList.remove("admin-drawer-lock");
         document.getElementById("adminMenuToggle")?.setAttribute("aria-expanded", "false");
+        document.getElementById("adminSidebar")?.setAttribute("aria-hidden", isMobile() ? "true" : "false");
+        if (drawerReturnFocus && typeof drawerReturnFocus.focus === "function") {
+            drawerReturnFocus.focus({ preventScroll: true });
+        }
+        drawerReturnFocus = null;
     }
 
-    function openDrawer() {
+    function openDrawer(opener = document.activeElement) {
+        drawerReturnFocus = opener;
         document.body.classList.add("admin-sidebar-open", "admin-drawer-lock");
         document.getElementById("adminMenuToggle")?.setAttribute("aria-expanded", "true");
+        const sidebar = document.getElementById("adminSidebar");
+        sidebar?.setAttribute("aria-hidden", "false");
+        const first = getAdminDrawerFocusable()[0];
+        setTimeout(() => first?.focus?.({ preventScroll: true }), 0);
+    }
+
+    function trapDrawerFocus(event) {
+        if (!document.body.classList.contains("admin-sidebar-open") || event.key !== "Tab") return;
+        const focusable = getAdminDrawerFocusable();
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
     }
 
     mediaQuery.addEventListener?.("change", event => {
@@ -237,6 +305,9 @@ function initAdminLayoutController() {
         if (!event.matches) {
             closeDrawer();
             ["orders", "wallet", "catalog", "fulfillment"].forEach(showList);
+            document.getElementById("adminSidebar")?.setAttribute("aria-hidden", "false");
+        } else {
+            document.getElementById("adminSidebar")?.setAttribute("aria-hidden", document.body.classList.contains("admin-sidebar-open") ? "false" : "true");
         }
         window.dispatchEvent(new CustomEvent("aziel:admin-layout-change", {
             detail: { mobile: event.matches }
@@ -244,6 +315,8 @@ function initAdminLayoutController() {
     });
 
     document.body.classList.toggle("admin-is-mobile", isMobile());
+    document.getElementById("adminSidebar")?.setAttribute("aria-hidden", isMobile() ? "true" : "false");
+    document.addEventListener("keydown", trapDrawerFocus);
 
     window.AZIEL_ADMIN_LAYOUT = {
         isMobile,
@@ -252,6 +325,35 @@ function initAdminLayoutController() {
         showDetail,
         showList
     };
+}
+
+function getAdminDrawerFocusable() {
+    const sidebar = document.getElementById("adminSidebar");
+    if (!sidebar) return [];
+    return Array.from(sidebar.querySelectorAll("button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])"))
+        .filter(element => !element.hidden && element.offsetParent !== null);
+}
+
+function initAdminSidebarState() {
+    const collapseBtn = document.getElementById("adminSidebarCollapse");
+    const saved = localStorage.getItem(ADMIN_SIDEBAR_COLLAPSED_KEY) === "true";
+    setAdminSidebarCollapsed(saved);
+
+    collapseBtn?.addEventListener("click", () => {
+        setAdminSidebarCollapsed(!document.body.classList.contains("admin-sidebar-collapsed"), true);
+    });
+}
+
+function setAdminSidebarCollapsed(collapsed, persist = false) {
+    document.body.classList.toggle("admin-sidebar-collapsed", Boolean(collapsed));
+    const collapseBtn = document.getElementById("adminSidebarCollapse");
+    if (collapseBtn) {
+        collapseBtn.setAttribute("aria-pressed", collapsed ? "true" : "false");
+        collapseBtn.setAttribute("aria-label", collapsed ? adminT("expand_navigation", "Expand admin navigation") : adminT("collapse_navigation", "Collapse admin navigation"));
+        collapseBtn.querySelector("i")?.classList.toggle("fa-angles-right", Boolean(collapsed));
+        collapseBtn.querySelector("i")?.classList.toggle("fa-angles-left", !collapsed);
+    }
+    if (persist) localStorage.setItem(ADMIN_SIDEBAR_COLLAPSED_KEY, collapsed ? "true" : "false");
 }
 
 function adminT(key, fallback = "") {
@@ -273,6 +375,7 @@ function initAdminLogout() {
 
 function initAdminLocaleRefresh() {
     window.addEventListener("aziel:admin-locale-changed", () => {
+        hydrateAdminNavMetadata();
         const activeSection = document.querySelector(".admin-section.active");
         const sectionName = activeSection?.id?.replace("section-", "") || "dashboard";
         const pageInfo = adminSectionTitles[sectionName] || adminSectionTitles.dashboard;
@@ -281,6 +384,8 @@ function initAdminLocaleRefresh() {
 
         if (title) title.innerText = adminT(pageInfo.titleKey);
         if (sub) sub.innerText = adminT(pageInfo.subKey);
+        setAdminSidebarCollapsed(document.body.classList.contains("admin-sidebar-collapsed"));
+        updateAdminSectionPill(sectionName);
     });
 }
 
@@ -292,7 +397,7 @@ function initAdminMobileSidebar() {
     if (toggleBtn) {
         toggleBtn.setAttribute("aria-expanded", "false");
         toggleBtn.addEventListener("click", () => {
-            window.AZIEL_ADMIN_LAYOUT?.openDrawer?.();
+            window.AZIEL_ADMIN_LAYOUT?.openDrawer?.(toggleBtn);
         });
     }
 
@@ -311,6 +416,54 @@ function initAdminMobileSidebar() {
     document.addEventListener("keydown", event => {
         if (event.key === "Escape") {
             window.AZIEL_ADMIN_LAYOUT?.closeDrawer?.();
+        }
+    });
+}
+
+function initAdminNavSearch() {
+    const input = document.getElementById("adminNavSearch");
+    const menu = document.querySelector(".admin-menu");
+    if (!input || !menu) return;
+
+    function applyFilter() {
+        const value = input.value.trim().toLowerCase();
+        const groups = Array.from(menu.querySelectorAll(".admin-nav-group"));
+
+        groups.forEach(group => {
+            const items = Array.from(group.querySelectorAll(".admin-nav"));
+            let visibleCount = 0;
+
+            items.forEach(item => {
+                const text = [
+                    item.dataset.navLabel,
+                    item.textContent,
+                    item.dataset.section
+                ].join(" ").toLowerCase();
+                const isMatch = !value || text.includes(value);
+                item.hidden = !isMatch;
+                if (isMatch) visibleCount += 1;
+            });
+
+            group.hidden = visibleCount === 0;
+        });
+    }
+
+    input.addEventListener("input", applyFilter);
+    input.addEventListener("keydown", event => {
+        if (event.key === "Escape") {
+            input.value = "";
+            applyFilter();
+            input.blur();
+            return;
+        }
+
+        if (event.key === "Enter") {
+            const firstVisible = Array.from(menu.querySelectorAll(".admin-nav:not([hidden])"))
+                .find(item => item.dataset.section);
+            if (firstVisible) {
+                event.preventDefault();
+                firstVisible.click();
+            }
         }
     });
 }

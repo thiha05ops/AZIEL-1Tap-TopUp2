@@ -26,6 +26,7 @@
     "verify:admin-promos": "node backend/scripts/verify-admin-promos.js",
     "verify:admin-promo-editor-layout": "node backend/scripts/verify-admin-promo-editor-layout.js",
     "verify:campaign-popup-visual": "node backend/scripts/verify-campaign-popup-visual.js",
+    "verify:admin-navigation": "node backend/scripts/verify-admin-navigation.js",
     "verify:admin-mobile": "node backend/scripts/verify-admin-mobile-responsive.js",
     "verify:admin-security": "node backend/scripts/verify-admin-security.js",
     "verify:admin-2fa-setup": "node backend/scripts/verify-admin-2fa-setup.js",

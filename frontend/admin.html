@@ -21,7 +21,7 @@
     <link rel="stylesheet" href="/css/admin/admin-wallet.css?v=20260706-2">
     <link rel="stylesheet" href="/css/admin/admin-support.css?v=20260706-2">
     <link rel="stylesheet" href="/css/admin/admin-live-chat.css?v=20260706-2">
-    <link rel="stylesheet" href="/css/admin/admin-design-system.css?v=20260723-catalog-workspace">
+    <link rel="stylesheet" href="/css/admin/admin-design-system.css?v=20260724-admin-nav">
     <link rel="stylesheet" href="/css/campaign/campaign-popup.css?v=20260715-visual">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -29,21 +29,35 @@
 
 <body class="admin-body">
 
-    <div id="adminSidebarOverlay" class="admin-sidebar-overlay"></div>
+    <div id="adminSidebarOverlay" class="admin-sidebar-overlay" aria-hidden="true"></div>
 
     <div class="admin-app">
 
-        <aside class="admin-sidebar">
+        <aside id="adminSidebar" class="admin-sidebar" aria-label="AZIEL Admin navigation">
 
             <div class="admin-sidebar-head">
                 <div class="admin-logo">
-                    <h1>AZIEL</h1>
-                    <span>CONTROL CENTER</span>
+                    <span class="admin-logo-mark" aria-hidden="true">A</span>
+                    <div class="admin-logo-copy">
+                        <h1>AZIEL</h1>
+                        <span data-admin-i18n="control_center">CONTROL CENTER</span>
+                    </div>
                 </div>
 
-                <button id="adminSidebarClose" class="admin-sidebar-close" type="button">
+                <button id="adminSidebarCollapse" class="admin-sidebar-collapse" type="button" aria-label="Collapse admin navigation" aria-pressed="false">
+                    <i class="fa-solid fa-angles-left" aria-hidden="true"></i>
+                </button>
+
+                <button id="adminSidebarClose" class="admin-sidebar-close" type="button" aria-label="Close admin navigation">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
+            </div>
+
+            <div class="admin-nav-search" role="search">
+                <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                <input id="adminNavSearch" type="search" autocomplete="off" spellcheck="false"
+                    placeholder="Jump to module..." data-admin-i18n-placeholder="nav_search_placeholder"
+                    aria-label="Search admin modules" />
             </div>
 
             <nav class="admin-menu" aria-label="Admin navigation">
@@ -106,7 +120,7 @@
 
                     <a class="admin-nav admin-design-studio-link" href="/admin-design-studio.html" data-admin-permission="DESIGN_STUDIO_READ">
                         <i class="fa-solid fa-palette"></i>
-                        <span>Design Studio</span>
+                        <span data-admin-i18n="design_studio">Design Studio</span>
                     </a>
                 </div>
 
@@ -193,11 +207,12 @@
             <header class="admin-topbar">
 
                 <div class="admin-title-wrap">
-                    <button id="adminMenuToggle" class="admin-menu-toggle" type="button">
-                        <i class="fa-solid fa-bars"></i>
+                    <button id="adminMenuToggle" class="admin-menu-toggle" type="button" aria-label="Open admin navigation" aria-controls="adminSidebar" aria-expanded="false">
+                        <i class="fa-solid fa-bars" aria-hidden="true"></i>
                     </button>
 
                     <div>
+                        <span id="adminSectionPill" class="admin-section-pill" data-admin-i18n="command">Command</span>
                         <h2 id="adminPageTitle" data-admin-i18n="dashboard">Dashboard</h2>
                         <p id="adminPageSub" data-admin-i18n="dashboard_sub">Real operational snapshot for AZIEL today.</p>
                     </div>
@@ -1207,14 +1222,14 @@ TH</textarea></label>
     <script src="/js/ui-feedback.js?v=20260712-m6"></script>
     <script src="/js/admin-api.js?v=20260707"></script>
     <script src="/js/socket-client.js?v=20260712"></script>
-    <script src="/lang/admin/en.js?v=20260715-phase13-qa4"></script>
-    <script src="/lang/admin/my.js?v=20260715-phase13-qa4"></script>
-    <script src="/lang/admin/th.js?v=20260718-i18n"></script>
+    <script src="/lang/admin/en.js?v=20260724-admin-nav"></script>
+    <script src="/lang/admin/my.js?v=20260724-admin-nav"></script>
+    <script src="/lang/admin/th.js?v=20260724-admin-nav"></script>
     <script src="/js/admin/admin-i18n.js?v=20260713-phase1"></script>
     <script src="/js/admin/admin-ui.js?v=20260715-phase15"></script>
     <script src="/js/admin/admin-action-modal.js?v=20260714-phase4"></script>
     <script src="/js/admin-auth.js?v=20260715-phase12"></script>
-    <script src="/js/admin-app.js?v=20260714-phase5"></script>
+    <script src="/js/admin-app.js?v=20260724-admin-nav"></script>
     <script src="/js/admin-stats.js?v=20260723-command-center-payment-renderer"></script>
     <script src="/js/admin-fulfillment.js?v=20260715-phase13-qa4"></script>
     <script src="/js/payment-display.js?v=20260718-labels"></script>
