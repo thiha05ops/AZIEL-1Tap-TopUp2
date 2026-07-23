@@ -188,6 +188,7 @@ function openAdminSection(sectionName, updateHash = true, context = {}) {
     window.AZIEL_ADMIN_LAYOUT?.showList?.("wallet");
     window.AZIEL_ADMIN_LAYOUT?.showList?.("catalog");
     window.AZIEL_ADMIN_LAYOUT?.showList?.("fulfillment");
+    window.AZIEL_ADMIN_LAYOUT?.showList?.("users");
 
     window.dispatchEvent(new CustomEvent("aziel:admin-section-opened", {
         detail: {

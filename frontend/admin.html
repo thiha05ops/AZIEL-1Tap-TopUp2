@@ -711,15 +711,52 @@
             </section>
 
             <section class="admin-section" id="section-users">
-                <div class="panel">
-                    <div class="panel-head">
-                        <h3>Users</h3>
-                        <span>Registered customers</span>
+                <div class="customer-crm-workspace">
+                    <div class="panel customer-crm-list-panel">
+                        <div class="panel-head">
+                            <div>
+                                <h3>Customer CRM</h3>
+                                <span>Relationship workspace for registered customers.</span>
+                            </div>
+                            <button id="refreshCustomersBtn" class="admin-secondary-btn" type="button">Refresh</button>
+                        </div>
+
+                        <div class="customer-crm-filters">
+                            <input id="customerSearchInput" type="search" placeholder="Search username, email, or order ID">
+                            <select id="customerRegionFilter" aria-label="Customer region">
+                                <option value="all">All Regions</option>
+                                <option value="MM">Myanmar</option>
+                                <option value="TH">Thailand</option>
+                            </select>
+                            <select id="customerStatusFilter" aria-label="Customer status">
+                                <option value="all">All</option>
+                                <option value="active">Active</option>
+                                <option value="blocked">Blocked</option>
+                                <option value="vip">VIP</option>
+                                <option value="reward">Reward Eligible</option>
+                            </select>
+                            <select id="customerSortSelect" aria-label="Customer sort">
+                                <option value="newest">Newest</option>
+                                <option value="highest_spend">Highest Spend</option>
+                                <option value="most_orders">Most Orders</option>
+                                <option value="recently_active">Recently Active</option>
+                                <option value="highest_wallet">Highest Wallet</option>
+                            </select>
+                        </div>
+
+                        <div id="adminUsersList" class="customer-crm-list" aria-live="polite">
+                            <div class="admin-dashboard-skeleton"></div>
+                            <div class="admin-dashboard-skeleton"></div>
+                            <div class="admin-dashboard-skeleton"></div>
+                        </div>
                     </div>
 
-                    <div id="adminUsersList">
-                        Loading users...
-                    </div>
+                    <aside id="customerCrmWorkspace" class="panel customer-crm-detail-panel" aria-live="polite">
+                        <div class="customer-crm-empty">
+                            <strong>Select a customer</strong>
+                            <span>Customer summary, orders, wallet history, activity, and notes will appear here.</span>
+                        </div>
+                    </aside>
                 </div>
             </section>
 
@@ -1169,7 +1206,7 @@ TH</textarea></label>
     <script src="/js/admin-payments.js?v=20260722-promptpay-parent"></script>
 
     <script src="/js/admin-wallet.js?v=20260714-phase4"></script>
-    <script src="/js/admin-users.js?v=20260707"></script>
+    <script src="/js/admin-users.js?v=20260723-customer-crm"></script>
     <script src="/js/admin-settings.js?v=20260713-phase1"></script>
 
     <script src="/js/pwa-fix.js"></script>

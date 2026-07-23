@@ -232,6 +232,8 @@ function verifyModuleIntegrationAndRegressions() {
     const fulfillment = read("frontend/js/admin-fulfillment.js");
     const security = read("frontend/js/admin-security.js");
     const liveChat = read("frontend/js/admin-live-chat.js");
+    const adminUsers = read("frontend/js/admin-users.js");
+    const adminCss = read("frontend/css/admin/admin-design-system.css");
 
     assert(orders.includes("adminOrdersRequestGate"), "Orders must integrate shared request gate.");
     assert(orders.includes("createPaginatedState"), "Orders must integrate shared paginated state.");
@@ -259,6 +261,13 @@ function verifyModuleIntegrationAndRegressions() {
 
     assert(liveChat.includes("mergeChatMessages"), "Live Chat paginated/realtime message dedupe must remain.");
     assert(liveChat.includes("adminLiveChatLoadOlderBtn"), "Live Chat older message loading must remain.");
+
+    assert(adminUsers.includes("const listScrollTop = box.scrollTop"), "Customer CRM must preserve list scroll position across selection rerenders.");
+    assert(adminUsers.includes("box.scrollTop = listScrollTop"), "Customer CRM list scroll position must be restored after rendering.");
+    assert(adminCss.includes('body.admin-body[data-admin-section="users"]'), "Customer CRM desktop body scroll ownership must be section scoped.");
+    assert(adminCss.includes(".customer-crm-workspace") && adminCss.includes("height: var(--admin-orders-workspace-height);"), "Customer CRM workspace must be viewport bounded on desktop.");
+    assert(adminCss.includes(".customer-crm-list") && adminCss.includes("overflow-y: auto"), "Customer CRM list must own independent vertical scrolling.");
+    assert(adminCss.includes(".customer-tab-panel") && adminCss.includes("overscroll-behavior: contain"), "Customer CRM detail tab panel must own contained scrolling.");
 
     ["adminOrdersInitialized", "adminWalletInitialized", "fulfillmentInitialized"].forEach(pattern => {
         assert(orders.includes(pattern) || wallet.includes(pattern) || fulfillment.includes(pattern), `${pattern} lifecycle guard must remain.`);

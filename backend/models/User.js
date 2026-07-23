@@ -77,6 +77,12 @@ const userSchema = new mongoose.Schema(
             default: "MM"
         },
 
+        isBlocked: {
+            type: Boolean,
+            default: false,
+            index: true
+        },
+
         mlbbUserId: {
             type: String,
             default: ""

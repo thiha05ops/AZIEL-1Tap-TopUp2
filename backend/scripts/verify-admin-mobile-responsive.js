@@ -39,6 +39,14 @@ assertIncludes(adminCss, ".admin-body .top-actions", "Mobile topbar must control
 assertIncludes(adminCss, "display: none", "Mobile CSS must hide nonessential permanent shell controls");
 assertIncludes(adminCss, "#section-orders .orders-command-panel > .panel-head", "Orders duplicate heading must be controlled on mobile");
 assertIncludes(adminCss, "#section-wallet .wallet-command-panel > .panel-head", "Wallet duplicate heading must be controlled on mobile");
+assertIncludes(adminCss, "#section-users.admin-mobile-detail-open .customer-crm-list-panel", "Customer CRM mobile list/detail state must exist");
+assertIncludes(adminCss, "#section-users.admin-mobile-list-open .customer-crm-detail-panel", "Customer CRM mobile detail panel must hide in list mode");
+assert.ok(
+    /@media \(max-width: 768px\)[\s\S]*\.customer-crm-workspace\s*\{[\s\S]*display:\s*block;/.test(adminCss),
+    "Customer CRM must return to single-column mobile layout"
+);
+assertIncludes(adminCss, ".customer-crm-list,\n  .customer-tab-panel", "Customer CRM mobile scroll containers must release desktop overflow ownership");
+assertIncludes(adminCss, "max-height: none;\n    overflow: visible;", "Customer CRM mobile must use normal page scrolling");
 
 assertIncludes(adminOrders, "showDetail?.(\"orders\")", "Orders must open mobile detail from queue selection");
 assertIncludes(adminOrders, "showList?.(\"orders\")", "Orders detail must support back to list");
@@ -47,6 +55,7 @@ assertIncludes(adminWallet, "showList?.(\"wallet\")", "Wallet detail must suppor
 assertIncludes(adminCatalog, "showDetail?.(\"catalog\")", "Catalog must open mobile detail from product selection");
 assertIncludes(adminCatalog, "showList?.(\"catalog\")", "Catalog detail must support back to list");
 assertIncludes(adminLiveChat, "admin-chat-detail-open", "Live Chat must use inbox-to-conversation mobile state");
+assertIncludes(adminApp, "showList?.(\"users\")", "Customer CRM must integrate central mobile list/detail controller");
 
 assertIncludes(adminCss, ".orders-queue-tabs", "Orders tab strip CSS must exist");
 assertIncludes(adminCss, "overscroll-behavior-x: contain", "Mobile tabs must use local horizontal scroll");
