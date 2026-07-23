@@ -68,7 +68,8 @@ function verifyFrontendEntry() {
     includes("frontend/js/payment/pending-payment-recovery.js", "\"notifications.html\"", "Recovery module must consider Notifications an eligible page.");
     includes("frontend/js/payment/pending-payment-recovery.js", "resumeAttempt,", "Recovery module must export resumeAttempt for notification actions.");
     includes("frontend/js/notifications-page.js", "data-resume-payment", "Notification center must render a recovery command button.");
-    includes("frontend/js/notifications-page.js", "window.AZIEL_PENDING_PAYMENT_RECOVERY", "Notification center must reuse the existing recovery runtime.");
+    includes("frontend/js/notifications-page.js", "window.ensurePendingPaymentRecoveryRuntime", "Notification center must wait for the shared recovery runtime.");
+    includes("frontend/js/notification-live.js", "window.ensurePendingPaymentRecoveryRuntime", "Legacy dropdown adapter must wait for the shared recovery runtime.");
     includes("frontend/js/notification-live.js", "getRecoveryAttemptId", "Legacy dropdown adapter must recognize recovery notifications.");
 
     ["frontend/lang/en.js", "frontend/lang/my.js", "frontend/lang/th.js"].forEach(file => {

@@ -2,6 +2,7 @@ if (!window.__AZIEL_PWA_FIX_INITIALIZED__) {
     window.__AZIEL_PWA_FIX_INITIALIZED__ = true;
 
     initAzielFooterPolish();
+    initAzielPwaRefresh();
     scheduleAzielTrustLogoRender();
     loadPendingPaymentRecoveryOverlay();
     registerAzielServiceWorker();
@@ -145,6 +146,166 @@ function loadPendingPaymentRecoveryOverlay() {
         loaderState.loading = false;
     };
     document.head.appendChild(script);
+}
+
+function loadAzielScriptOnce(src, marker, readyCheck) {
+    if (typeof readyCheck === "function" && readyCheck()) return Promise.resolve();
+
+    const existing = document.querySelector(`script[data-${marker}="true"]`);
+    if (existing) {
+        return new Promise((resolve, reject) => {
+            if (typeof readyCheck === "function" && readyCheck()) {
+                resolve();
+                return;
+            }
+            existing.addEventListener("load", () => resolve(), { once: true });
+            existing.addEventListener("error", () => reject(new Error(`Could not load ${src}`)), { once: true });
+            window.setTimeout(() => {
+                if (typeof readyCheck !== "function" || readyCheck()) {
+                    resolve();
+                    return;
+                }
+                reject(new Error(`${src} is present but not ready`));
+            }, 5000);
+        });
+    }
+
+    return new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = src;
+        script.defer = true;
+        script.dataset[marker.replace(/-([a-z])/g, (_, char) => char.toUpperCase())] = "true";
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error(`Could not load ${src}`));
+        document.head.appendChild(script);
+    });
+}
+
+function loadAzielStylesheetOnce(href, marker) {
+    if (document.querySelector(`link[data-${marker}="true"]`)) return;
+
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = href;
+    link.dataset[marker.replace(/-([a-z])/g, (_, char) => char.toUpperCase())] = "true";
+    document.head.appendChild(link);
+}
+
+function waitForAzielRuntime(check, label, timeoutMs = 5000) {
+    if (check()) return Promise.resolve(check());
+
+    return new Promise((resolve, reject) => {
+        const startedAt = Date.now();
+        const timer = window.setInterval(() => {
+            const value = check();
+            if (value) {
+                window.clearInterval(timer);
+                resolve(value);
+                return;
+            }
+
+            if (Date.now() - startedAt >= timeoutMs) {
+                window.clearInterval(timer);
+                reject(new Error(`${label} did not become ready`));
+            }
+        }, 50);
+    });
+}
+
+async function ensureAzielI18nReady() {
+    if (window.AZIEL_I18N?.ready) {
+        await window.AZIEL_I18N.ready();
+        return;
+    }
+
+    await waitForAzielRuntime(() => window.AZIEL_I18N?.getLang, "AZIEL i18n", 3000).catch(() => {});
+}
+
+window.ensurePendingPaymentRecoveryRuntime = function ensurePendingPaymentRecoveryRuntime() {
+    if (window.__AZIEL_PENDING_PAYMENT_RECOVERY_RUNTIME_PROMISE__) {
+        return window.__AZIEL_PENDING_PAYMENT_RECOVERY_RUNTIME_PROMISE__;
+    }
+
+    window.__AZIEL_PENDING_PAYMENT_RECOVERY_RUNTIME_PROMISE__ = (async () => {
+        await ensureAzielI18nReady();
+
+        loadAzielStylesheetOnce(
+            "/css/payment/payment-checkout-sheet.css?v=20260722-promptpay-platform",
+            "aziel-payment-checkout-css"
+        );
+        loadAzielStylesheetOnce(
+            "/css/payment/pending-payment-recovery.css?v=20260723-recovery-ux",
+            "aziel-pending-payment-recovery"
+        );
+
+        await loadAzielScriptOnce(
+            "/js/payment/android-app-launch.js?v=20260722-open-app",
+            "aziel-android-app-launch",
+            () => Boolean(window.AZIEL_ANDROID_APP_LAUNCH)
+        );
+        await loadAzielScriptOnce(
+            "/js/payment/payment-checkout-sheet.js?v=20260723-recovery-runtime",
+            "aziel-recovery-checkout-sheet",
+            () => Boolean(window.PaymentCheckoutSheet?.openRecoveredPayment)
+        );
+        await loadAzielScriptOnce(
+            "/js/payment/pending-payment-recovery.js?v=20260723-recovery-runtime",
+            "aziel-pending-payment-recovery",
+            () => Boolean(window.AZIEL_PENDING_PAYMENT_RECOVERY?.resumeAttempt)
+        );
+
+        const runtime = await waitForAzielRuntime(
+            () => window.AZIEL_PENDING_PAYMENT_RECOVERY?.resumeAttempt && window.AZIEL_PENDING_PAYMENT_RECOVERY,
+            "Pending payment recovery runtime"
+        );
+
+        return runtime;
+    })().catch(error => {
+        window.__AZIEL_PENDING_PAYMENT_RECOVERY_RUNTIME_PROMISE__ = null;
+        throw error;
+    });
+
+    return window.__AZIEL_PENDING_PAYMENT_RECOVERY_RUNTIME_PROMISE__;
+};
+
+function initAzielPwaRefresh() {
+    if (window.AZIEL_PWA_REFRESH?.requestRefresh) return;
+
+    const t = (key, fallback) => window.AZIEL_I18N?.t?.(key, fallback) || fallback || key;
+
+    const isPaymentFlowOpen = () => Boolean(
+        document.querySelector("#azPaymentCheckoutSheet.show") ||
+        document.querySelector(".az-payment-bank-chooser.show") ||
+        document.body.classList.contains("az-payment-sheet-open") ||
+        document.body.dataset.paymentSheetOpen === "true"
+    );
+
+    const requestRefresh = () => {
+        if (window.__AZIEL_PWA_REFRESHING__) return false;
+
+        if (isPaymentFlowOpen()) {
+            const confirmed = window.confirm(t(
+                "pwa_refresh_payment_open_confirm",
+                "A payment is currently open. Refresh anyway?"
+            ));
+            if (!confirmed) return false;
+        }
+
+        window.__AZIEL_PWA_REFRESHING__ = true;
+        window.location.reload();
+        return true;
+    };
+
+    window.AZIEL_PWA_REFRESH = { requestRefresh, isPaymentFlowOpen };
+
+    window.addEventListener("aziel:pwaUpdateReady", () => {
+        if (window.__AZIEL_PWA_UPDATE_NOTICE_SHOWN__) return;
+        window.__AZIEL_PWA_UPDATE_NOTICE_SHOWN__ = true;
+
+        if (window.AZIEL_UI?.toast?.info) {
+            window.AZIEL_UI.toast.info(t("pwa_update_available", "Update available. Refresh when ready."));
+        }
+    });
 }
 
 function registerAzielServiceWorker() {

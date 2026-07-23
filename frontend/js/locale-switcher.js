@@ -34,8 +34,6 @@ function initLocaleSwitcher() {
     const activeLang =
         window.AZIEL_I18N?.getLang?.() ||
         localStorage.getItem("azielLanguage") ||
-        localStorage.getItem("language") ||
-        localStorage.getItem("azielLang") ||
         "en";
 
     renderLocaleUI(activeRegion, activeCurrency, activeLang);
@@ -69,8 +67,6 @@ function initLocaleSwitcher() {
             window.AZIEL_I18N.setLang(lang);
         } else {
             localStorage.setItem("azielLanguage", lang);
-            localStorage.setItem("language", lang);
-            localStorage.setItem("azielLang", lang);
         }
     });
 
@@ -133,7 +129,7 @@ function initLocaleSwitcher() {
 
     window.addEventListener("aziel:languageChanged", e => {
         const lang =
-            e.detail?.language ||
+            e.detail?.lang ||
             window.AZIEL_I18N?.getLang?.() ||
             "en";
 
@@ -157,8 +153,6 @@ function initLocaleSwitcher() {
 
 function saveLocale(region, currency, lang) {
     localStorage.setItem("azielLanguage", lang);
-    localStorage.setItem("language", lang);
-    localStorage.setItem("azielLang", lang);
 
     localStorage.setItem("shopRegion", region);
     localStorage.setItem("region", region);

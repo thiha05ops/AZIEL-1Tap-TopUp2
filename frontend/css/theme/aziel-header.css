@@ -503,6 +503,10 @@ body.theme-dark .dropdown-btn:hover {
     color: var(--danger, #ef4444);
 }
 
+.az-mobile-refresh-action {
+    display: none;
+}
+
 /* SUPPORT LIVE BADGE */
 
 .support-row {
@@ -684,6 +688,10 @@ body.theme-dark .az-nav-drop-menu a i {
 /* MOBILE */
 
 @media (max-width: 900px) {
+    .az-mobile-refresh-action {
+        display: flex;
+    }
+
     :root {
         --az-header-mobile-height: 96px;
     }

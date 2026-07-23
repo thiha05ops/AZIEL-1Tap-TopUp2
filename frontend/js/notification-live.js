@@ -60,13 +60,28 @@ function updateHeaderDropdown(notifications) {
     `).join("");
 
     list.querySelectorAll(".notification-item").forEach(item => {
-        item.addEventListener("click", () => {
+        item.addEventListener("click", async () => {
             window.AZIEL_NOTIFICATIONS.markRead(item.dataset.id);
-            if (item.dataset.resumePayment && window.AZIEL_PENDING_PAYMENT_RECOVERY?.resumeAttempt) {
-                window.AZIEL_PENDING_PAYMENT_RECOVERY.resumeAttempt(item.dataset.resumePayment);
+            if (item.dataset.resumePayment) {
+                await resumePaymentFromLiveNotification(item.dataset.resumePayment);
             }
         });
     });
+}
+
+async function resumePaymentFromLiveNotification(attemptId) {
+    try {
+        const runtime = await window.ensurePendingPaymentRecoveryRuntime?.();
+        if (!runtime?.resumeAttempt) {
+            throw new Error("Payment recovery runtime unavailable");
+        }
+        await runtime.resumeAttempt(attemptId);
+    } catch (error) {
+        window.AZIEL_UI?.toast?.error?.(t(
+            "payment_recovery_unavailable",
+            "Payment recovery is still loading. Please try again."
+        ));
+    }
 }
 
 function getRecoveryAttemptId(item = {}) {
@@ -173,9 +188,6 @@ function t(key, fallback) {
     if (translated && translated !== key && translated !== fallback) return translated;
     const lang = window.AZIEL_I18N?.getLang?.() ||
         localStorage.getItem("azielLanguage") ||
-        localStorage.getItem("language") ||
-        localStorage.getItem("azielLang") ||
-        localStorage.getItem("selectedLanguage") ||
         document.documentElement?.lang ||
         "en";
     return window.AZIEL_LANG?.[lang]?.[key] ||

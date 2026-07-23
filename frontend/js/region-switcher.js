@@ -4,7 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const currencySelect = document.getElementById("currencySelect");
 
     const savedRegion = localStorage.getItem("region") || "TH";
-    const savedLang = localStorage.getItem("azielLang") || "en";
+    const savedLang = window.AZIEL_I18N?.getLang?.() || localStorage.getItem("azielLanguage") || "en";
     const savedCurrency =
         localStorage.getItem("currency") ||
         (savedRegion === "TH" ? "THB" : "MMK");
@@ -43,7 +43,11 @@ document.addEventListener("DOMContentLoaded", () => {
     languageSelect?.addEventListener("change", () => {
         const lang = languageSelect.value;
 
-        localStorage.setItem("azielLang", lang);
+        if (window.AZIEL_I18N?.setLang) {
+            window.AZIEL_I18N.setLang(lang);
+        } else {
+            localStorage.setItem("azielLanguage", lang);
+        }
         changeGoogleTranslate(lang);
     });
 

@@ -33,6 +33,7 @@ function initHeader() {
     initProfileDropdown();
     initHeaderSearchTrigger();
     initThemeButton();
+    initMobileRefreshButton();
     initHeaderLogout();
     initCanonicalHeaderScroll();
     translateHeader();
@@ -404,6 +405,10 @@ function translateHeader() {
     if (window.AZIEL_I18N?.translatePage) {
         window.AZIEL_I18N.translatePage(document);
     }
+    const refreshBtn = document.getElementById("mobileRefreshBtn");
+    if (refreshBtn) {
+        refreshBtn.setAttribute("aria-label", window.AZIEL_I18N?.t?.("pwa_refresh_label", "Refresh page") || "Refresh page");
+    }
 }
 
 function initProfileDropdown() {
@@ -458,6 +463,24 @@ function initThemeButton() {
 
         document.body.classList.toggle("theme-dark");
         document.body.classList.toggle("theme-light");
+    });
+}
+
+function initMobileRefreshButton() {
+    const btn = document.getElementById("mobileRefreshBtn");
+    if (!btn) return;
+    if (btn.dataset.ready === "true") return;
+
+    btn.dataset.ready = "true";
+    btn.setAttribute("aria-label", window.AZIEL_I18N?.t?.("pwa_refresh_label", "Refresh page") || "Refresh page");
+
+    btn.addEventListener("click", () => {
+        document.getElementById("profileDropdown")?.classList.remove("show");
+        if (window.AZIEL_PWA_REFRESH?.requestRefresh) {
+            window.AZIEL_PWA_REFRESH.requestRefresh();
+            return;
+        }
+        window.location.reload();
     });
 }
 

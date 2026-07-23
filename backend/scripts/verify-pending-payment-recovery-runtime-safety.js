@@ -17,15 +17,19 @@ function notIncludes(file, snippet, message) {
 }
 
 function verifyNoPageReloads() {
-    [
-        "frontend/js/pwa-fix.js",
-        "frontend/js/payment/pending-payment-recovery.js"
-    ].forEach(file => {
-        const source = read(file);
-        assert(!/location\.reload\s*\(/.test(source), `${file}: recovery runtime must not reload the page.`);
-        assert(!/location\.replace\s*\(/.test(source), `${file}: recovery runtime must not replace the page.`);
-        assert(!/location\.assign\s*\(/.test(source), `${file}: recovery runtime must not assign navigation.`);
-    });
+    const pwaFix = read("frontend/js/pwa-fix.js");
+    const recoveryLoaderBlock = pwaFix.slice(
+        pwaFix.indexOf("function loadPendingPaymentRecoveryOverlay"),
+        pwaFix.indexOf("function initAzielPwaRefresh")
+    );
+    assert(!/location\.reload\s*\(/.test(recoveryLoaderBlock), "pwa-fix.js: recovery loader must not reload the page.");
+    assert(!/location\.replace\s*\(/.test(recoveryLoaderBlock), "pwa-fix.js: recovery loader must not replace the page.");
+    assert(!/location\.assign\s*\(/.test(recoveryLoaderBlock), "pwa-fix.js: recovery loader must not assign navigation.");
+
+    const overlay = read("frontend/js/payment/pending-payment-recovery.js");
+    assert(!/location\.reload\s*\(/.test(overlay), "pending-payment-recovery.js: recovery runtime must not reload the page.");
+    assert(!/location\.replace\s*\(/.test(overlay), "pending-payment-recovery.js: recovery runtime must not replace the page.");
+    assert(!/location\.assign\s*\(/.test(overlay), "pending-payment-recovery.js: recovery runtime must not assign navigation.");
 
     notIncludes("frontend/js/pwa-fix.js", "controllerchange", "PWA fix must not auto-reload on service worker controller changes.");
     notIncludes("frontend/js/pwa-fix.js", "pwaUpdateReady\"), () => location.reload", "PWA update readiness must not reload automatically.");
@@ -47,7 +51,7 @@ function verifyOneTimeOwnership() {
 function verifyNoRecursiveRecoveryFetch() {
     const overlay = read("frontend/js/payment/pending-payment-recovery.js");
     const renderBlock = overlay.match(/function renderOverlay\(\) \{[\s\S]*?\n    function startCountdown/)?.[0] || "";
-    const observerBlock = overlay.match(/function watchCheckoutSheet\(\) \{[\s\S]*?\n    function init/)?.[0] || "";
+    const observerBlock = overlay.match(/function watchCheckoutSheet\(\) \{[\s\S]*?\n    async function init/)?.[0] || "";
     assert(renderBlock, "pending-payment-recovery.js: renderOverlay block must be detectable.");
     assert(observerBlock, "pending-payment-recovery.js: watchCheckoutSheet block must be detectable.");
     assert(!renderBlock.includes("fetchRecoverable({ force: true });"), "render/countdown expiry must not recursively refetch recoverable attempts.");

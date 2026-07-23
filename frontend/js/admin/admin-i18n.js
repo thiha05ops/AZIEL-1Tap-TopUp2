@@ -6,7 +6,7 @@
         const saved = localStorage.getItem(STORAGE_KEY);
         if (SUPPORTED.has(saved)) return saved;
 
-        const customer = localStorage.getItem("azielLanguage") || localStorage.getItem("language");
+        const customer = localStorage.getItem("azielLanguage");
         if (SUPPORTED.has(customer)) return customer;
 
         return "en";

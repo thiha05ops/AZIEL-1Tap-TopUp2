@@ -308,17 +308,23 @@ function bindNotificationItems() {
 }
 
 async function resumePaymentFromNotification(attemptId, source) {
-    const recovery = window.AZIEL_PENDING_PAYMENT_RECOVERY;
-
-    if (!recovery?.resumeAttempt) {
-        window.AZIEL_UI?.toast?.error?.("Payment recovery is still loading. Please try again.");
-        return;
-    }
-
     try {
         source.disabled = true;
+        window.AZIEL_UI?.button?.setLoading?.(source, { text: t("loading", "Loading...") });
+
+        const recovery = await window.ensurePendingPaymentRecoveryRuntime?.();
+        if (!recovery?.resumeAttempt) {
+            throw new Error("Payment recovery runtime unavailable");
+        }
+
         await recovery.resumeAttempt(attemptId);
+    } catch (error) {
+        window.AZIEL_UI?.toast?.error?.(t(
+            "payment_recovery_unavailable",
+            "Payment recovery is still loading. Please try again."
+        ));
     } finally {
+        window.AZIEL_UI?.button?.reset?.(source);
         source.disabled = false;
     }
 }
@@ -363,9 +369,6 @@ function t(key, fallback) {
     if (translated && translated !== key && translated !== fallback) return translated;
     const lang = window.AZIEL_I18N?.getLang?.() ||
         localStorage.getItem("azielLanguage") ||
-        localStorage.getItem("language") ||
-        localStorage.getItem("azielLang") ||
-        localStorage.getItem("selectedLanguage") ||
         document.documentElement?.lang ||
         "en";
     return window.AZIEL_LANG?.[lang]?.[key] ||

@@ -217,10 +217,6 @@
         if (translated && translated !== key) return translated;
         const lang =
             localStorage.getItem("azielLanguage") ||
-            localStorage.getItem("azielLang") ||
-            localStorage.getItem("aziel_lang") ||
-            localStorage.getItem("language") ||
-            localStorage.getItem("selectedLanguage") ||
             document.documentElement?.lang ||
             "en";
         return window.AZIEL_LANG?.[lang]?.[key] || window.AZIEL_LANG?.en?.[key] || fallback;

@@ -3,6 +3,11 @@
 
 (function () {
     const LANG_KEY = "azielLanguage";
+    const LEGACY_LANG_KEYS = ["language", "azielLang", "selectedLanguage"];
+    const SUPPORTED_LANGS = new Set(["en", "my", "th"]);
+    const missingKeys = new Set();
+    let activeLang = "";
+    let readyPromise = null;
 
     const SKIP_TAGS = new Set([
         "SCRIPT",
@@ -24,13 +29,39 @@
         ".fa-brands"
     ].join(",");
 
+    function normalizeLang(lang) {
+        const value = String(lang || "").toLowerCase();
+        return SUPPORTED_LANGS.has(value) ? value : "en";
+    }
+
+    function readStoredLang() {
+        try {
+            const canonical = localStorage.getItem(LANG_KEY);
+            if (canonical) return normalizeLang(canonical);
+
+            for (const key of LEGACY_LANG_KEYS) {
+                const legacy = localStorage.getItem(key);
+                if (!legacy) continue;
+                const migrated = normalizeLang(legacy);
+                localStorage.setItem(LANG_KEY, migrated);
+                return migrated;
+            }
+
+            localStorage.setItem(LANG_KEY, "en");
+        } catch (error) {
+            return "en";
+        }
+
+        return "en";
+    }
+
     function getLang() {
-        return (
-            localStorage.getItem(LANG_KEY) ||
-            localStorage.getItem("language") ||
-            localStorage.getItem("azielLang") ||
-            "en"
-        );
+        if (!activeLang) {
+            activeLang = readStoredLang();
+            document.documentElement.lang = activeLang;
+        }
+
+        return activeLang;
     }
 
     function getDict(lang = getLang()) {
@@ -45,33 +76,67 @@
             .trim();
     }
 
-    function t(keyOrText, fallback = "") {
+    function reportMissingKey(key, lang) {
+        if (!key) return;
+        if (!["localhost", "127.0.0.1"].includes(location.hostname)) return;
+
+        const missingKey = `${lang}:${key}`;
+        if (missingKeys.has(missingKey)) return;
+        missingKeys.add(missingKey);
+        console.warn("[AZIEL i18n] Missing translation key", { lang, key });
+    }
+
+    function interpolate(value, params = {}) {
+        return String(value || "").replace(/\{([a-zA-Z0-9_]+)\}/g, (match, name) => (
+            Object.prototype.hasOwnProperty.call(params, name) ? String(params[name]) : match
+        ));
+    }
+
+    function t(keyOrText, fallback = "", maybeParams = {}) {
+        const params = typeof fallback === "object" && fallback !== null ? fallback : maybeParams;
+        const fallbackText = typeof fallback === "object" && fallback !== null ? "" : fallback;
         const dict = getDict();
         const value = normalizeText(keyOrText);
 
         const english = window.AZIEL_LANG?.en || {};
-        return (
+        const translated = (
             dict[value] ||
             dict[keyOrText] ||
-            fallback ||
             english[value] ||
             english[keyOrText] ||
+            fallbackText ||
             value
         );
+
+        if (
+            !dict[value] &&
+            !dict[keyOrText] &&
+            !english[value] &&
+            !english[keyOrText]
+        ) {
+            reportMissingKey(value || keyOrText, getLang());
+        }
+
+        return interpolate(translated, params);
     }
 
     function setLang(lang) {
-        if (!window.AZIEL_LANG?.[lang]) return;
+        const nextLang = normalizeLang(lang);
 
-        localStorage.setItem(LANG_KEY, lang);
-        localStorage.setItem("language", lang);
-        localStorage.setItem("azielLang", lang);
+        try {
+            localStorage.setItem(LANG_KEY, nextLang);
+        } catch (error) {
+            // Language persistence must never block UI translation.
+        }
+
+        activeLang = nextLang;
+        document.documentElement.lang = nextLang;
 
         translatePage(document);
 
         window.dispatchEvent(
             new CustomEvent("aziel:languageChanged", {
-                detail: { language: lang }
+                detail: { lang: nextLang }
             })
         );
     }
@@ -245,7 +310,20 @@
         t,
         getLang,
         setLang,
-        translatePage
+        translatePage,
+        ready() {
+            if (!readyPromise) {
+                readyPromise = Promise.resolve().then(() => {
+                    getLang();
+                    return activeLang;
+                });
+            }
+
+            return readyPromise;
+        },
+        missingKeys() {
+            return Array.from(missingKeys);
+        }
     };
 
     document.addEventListener("DOMContentLoaded", () => {

@@ -338,10 +338,6 @@ function translatePaymentText(key, fallback = "") {
     const storage = window.localStorage;
     const lang =
         storage?.getItem("azielLanguage") ||
-        storage?.getItem("azielLang") ||
-        storage?.getItem("aziel_lang") ||
-        storage?.getItem("language") ||
-        storage?.getItem("selectedLanguage") ||
         document.documentElement?.lang ||
         "en";
     return window.AZIEL_LANG?.[lang]?.[key] || window.AZIEL_LANG?.en?.[key] || fallback;

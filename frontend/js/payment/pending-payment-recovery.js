@@ -28,8 +28,6 @@
     function currentLanguage() {
         const lang = window.AZIEL_I18N?.getLang?.() ||
             window.localStorage?.getItem("azielLanguage") ||
-            window.localStorage?.getItem("language") ||
-            window.localStorage?.getItem("azielLang") ||
             "en";
         return window.AZIEL_LANG?.[lang] ? lang : "en";
     }
@@ -49,6 +47,7 @@
     }
 
     function waitForLanguageRuntime() {
+        if (window.AZIEL_I18N?.ready) return window.AZIEL_I18N.ready();
         if (isLanguageRuntimeReady()) return Promise.resolve();
         return new Promise(resolve => {
             const startedAt = Date.now();
