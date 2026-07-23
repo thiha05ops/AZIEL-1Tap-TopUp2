@@ -73,6 +73,15 @@ const catalogPackageSchema = new mongoose.Schema(
             type: String,
             trim: true,
             default: ""
+        },
+        deletedAt: {
+            type: Date,
+            default: null
+        },
+        deletedBy: {
+            type: String,
+            trim: true,
+            default: ""
         }
     },
     {
@@ -84,5 +93,6 @@ catalogPackageSchema.index({ productCode: 1, packageCode: 1 }, { unique: true })
 catalogPackageSchema.index({ productCode: 1, sortOrder: 1 });
 catalogPackageSchema.index({ enabled: 1 });
 catalogPackageSchema.index({ iconAssetId: 1 });
+catalogPackageSchema.index({ productCode: 1, deletedAt: 1 });
 
 module.exports = mongoose.model("CatalogPackage", catalogPackageSchema);

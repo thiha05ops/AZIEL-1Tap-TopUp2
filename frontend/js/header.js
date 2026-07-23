@@ -212,30 +212,7 @@ function renderHeaderNav() {
             </button>
 
             <div class="az-nav-drop-menu" id="azGamesDropdownMenu" role="menu" aria-label="Game categories">
-                <a href="mobile-games.html" role="menuitem">
-                    <i class="fa-solid fa-mobile-screen-button"></i>
-                    <span>Mobile Games</span>
-                </a>
-
-                <a href="pc-games.html" role="menuitem">
-                    <i class="fa-solid fa-desktop"></i>
-                    <span>PC Games</span>
-                </a>
-
-                <a href="gift-cards.html" role="menuitem">
-                    <i class="fa-solid fa-gift"></i>
-                    <span>Gift Cards</span>
-                </a>
-
-                <a href="social-topup.html" role="menuitem">
-                    <i class="fa-brands fa-telegram"></i>
-                    <span>Social Top Up</span>
-                </a>
-
-                <a href="coming-soon.html" role="menuitem">
-                    <i class="fa-regular fa-clock"></i>
-                    <span>Coming Soon</span>
-                </a>
+                ${renderGamesDropdownItems(getFallbackStorefrontSections())}
             </div>
         </div>
 
@@ -271,19 +248,118 @@ function renderHeaderNav() {
     }
 
     initGamesDropdown();
+    loadStorefrontSectionsForHeader();
     translateHeader();
 }
 
-function initGamesDropdown() {
+function getFallbackStorefrontSections() {
+    return [
+        { key: "mobile-games", displayName: "Mobile Games", icon: "mobile", path: "/mobile-games.html", status: "PUBLISHED", showInGamesMenu: true, sortOrder: 1 },
+        { key: "pc-games", displayName: "PC Games", icon: "desktop", path: "/pc-games.html", status: "COMING_SOON", showInGamesMenu: true, sortOrder: 2 },
+        { key: "gift-cards", displayName: "Gift Cards", icon: "gift", path: "/gift-cards.html", status: "PUBLISHED", showInGamesMenu: true, sortOrder: 3 },
+        { key: "social-topup", displayName: "Social Top Up", icon: "telegram", path: "/social-topup.html", status: "COMING_SOON", showInGamesMenu: true, sortOrder: 4 }
+    ];
+}
+
+function sectionIconClass(icon = "") {
+    const map = {
+        mobile: "fa-solid fa-mobile-screen-button",
+        desktop: "fa-solid fa-desktop",
+        gift: "fa-solid fa-gift",
+        telegram: "fa-brands fa-telegram",
+        clock: "fa-regular fa-clock"
+    };
+    return map[String(icon || "").toLowerCase()] || "fa-solid fa-layer-group";
+}
+
+function renderGamesDropdownItems(sections = []) {
+    return sections
+        .filter(section => section?.showInGamesMenu !== false && section?.status !== "HIDDEN")
+        .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0))
+        .map(section => `
+            <a href="${escapeHeaderHtml(section.path || "/mobile-games.html")}" role="menuitem" data-storefront-section="${escapeHeaderHtml(section.key || "")}">
+                <i class="${escapeHeaderHtml(sectionIconClass(section.icon))}"></i>
+                <span>${escapeHeaderHtml(section.displayName || "Games")}</span>
+            </a>
+        `).join("");
+}
+
+function escapeHeaderHtml(value = "") {
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+async function loadStorefrontSectionsForHeader() {
+    const menu = document.getElementById("azGamesDropdownMenu");
+    if (!menu || menu.dataset.dynamicReady === "true") return;
+
+    try {
+        const sections = window.AZIEL_STOREFRONT_SECTIONS
+            ? await window.AZIEL_STOREFRONT_SECTIONS.load()
+            : await fetch("/api/public/storefront-sections", {
+                cache: "no-store",
+                headers: { Accept: "application/json" }
+            }).then(async response => {
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok || !data.success || !Array.isArray(data.sections)) {
+                    throw new Error("Storefront sections unavailable");
+                }
+                return data.sections;
+            });
+        const items = renderGamesDropdownItems(sections);
+        if (items) {
+            menu.innerHTML = items;
+            menu.dataset.dynamicReady = "true";
+            markActiveHeaderLinks();
+            initGamesDropdown({ refreshItems: true });
+        }
+    } catch (error) {
+        menu.dataset.dynamicReady = "fallback";
+    }
+}
+
+function markActiveHeaderLinks() {
+    const nav = document.getElementById("azHeaderNav");
+    const active = document.getElementById("azHeaderMount")?.dataset?.nav;
+    if (!nav) return;
+
+    nav.querySelectorAll("a").forEach(link => {
+        const href = link.getAttribute("href") || "";
+        link.classList.toggle("active", (
+            (active === "home" && href.includes("home")) ||
+            (active === "games" && (
+                href.includes("mobile-games") ||
+                href.includes("pc-games") ||
+                href.includes("gift-cards") ||
+                href.includes("social-topup") ||
+                href.includes("coming-soon")
+            )) ||
+            (active === "wallet" && href.includes("wallet")) ||
+            (active === "orders" && href.includes("tracking")) ||
+            (active === "support" && href.includes("support"))
+        ));
+    });
+}
+
+function initGamesDropdown(options = {}) {
     const dropdown = document.getElementById("gamesNavDropdown");
     const btn = dropdown?.querySelector(".az-nav-drop-btn");
     const menu = dropdown?.querySelector(".az-nav-drop-menu");
 
     if (!dropdown || !btn || !menu) return;
-    if (dropdown.dataset.ready === "true") return;
+    if (dropdown.dataset.ready === "true" && !options.refreshItems) return;
 
     dropdown.dataset.ready = "true";
-    const menuItems = Array.from(menu.querySelectorAll("a"));
+    let menuItems = Array.from(menu.querySelectorAll("a"));
+
+    if (options.refreshItems) {
+        dropdown.dataset.menuVersion = String(Date.now());
+        return;
+    }
 
     const syncDropdownA11y = () => {
         btn.setAttribute("aria-expanded", dropdown.classList.contains("show") ? "true" : "false");
@@ -319,6 +395,7 @@ function initGamesDropdown() {
     };
 
     const openDropdown = ({ focusFirst = false } = {}) => {
+        menuItems = Array.from(menu.querySelectorAll("a"));
         dropdown.classList.add("show");
         syncDropdownA11y();
         emitDropdownState();

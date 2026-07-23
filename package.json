@@ -14,6 +14,8 @@
     "verify:catalog-frontend": "node backend/scripts/verify-catalog-frontend.js",
     "verify:admin-game-presentation": "node backend/scripts/verify-admin-game-presentation.js",
     "verify:admin-catalog": "node backend/scripts/verify-admin-catalog-control.js",
+    "verify:catalog-workspace-storefront": "node backend/scripts/verify-catalog-workspace-storefront.js",
+    "verify:admin-catalog-crud": "node backend/scripts/verify-admin-catalog-crud-completion.js",
     "verify:admin-catalog-expansion": "node backend/scripts/verify-admin-catalog-expansion.js",
     "verify:admin-catalog-modal": "node backend/scripts/verify-admin-catalog-modal-flow.js",
     "verify:admin-media": "node backend/scripts/verify-admin-media-library.js",

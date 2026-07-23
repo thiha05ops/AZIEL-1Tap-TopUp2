@@ -55,6 +55,19 @@ const gameBannerSchema = new mongoose.Schema(
             type: String,
             trim: true,
             default: "admin"
+        },
+        metadata: {
+            type: mongoose.Schema.Types.Mixed,
+            default: {}
+        },
+        deletedAt: {
+            type: Date,
+            default: null
+        },
+        deletedBy: {
+            type: String,
+            trim: true,
+            default: ""
         }
     },
     {
@@ -64,5 +77,6 @@ const gameBannerSchema = new mongoose.Schema(
 
 gameBannerSchema.index({ productCode: 1, sortOrder: 1, _id: 1 });
 gameBannerSchema.index({ productCode: 1, enabled: 1, startsAt: 1, endsAt: 1 });
+gameBannerSchema.index({ productCode: 1, deletedAt: 1 });
 
 module.exports = mongoose.model("GameBanner", gameBannerSchema);

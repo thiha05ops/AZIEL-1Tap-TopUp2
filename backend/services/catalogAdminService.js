@@ -19,6 +19,10 @@ class CatalogAdminError extends Error {
 
 const MAX_PRICE = 100000000;
 const MAX_SORT_ORDER = 1000000;
+const MAX_PRODUCT_NAME = 120;
+const MAX_PRODUCT_DESCRIPTION = 1200;
+const MAX_SEO_TITLE = 90;
+const MAX_SEO_DESCRIPTION = 180;
 
 function assertNoImmutableFields(patch = {}, fields = []) {
     fields.forEach(field => {
@@ -77,6 +81,37 @@ function parseBoolean(value, field) {
     }
 
     return value;
+}
+
+function cleanEditableText(value = "", max = 120) {
+    return String(value || "").trim().slice(0, max);
+}
+
+function normalizeProductName(value) {
+    const name = cleanEditableText(value, MAX_PRODUCT_NAME);
+
+    if (!name) {
+        throw new CatalogAdminError(
+            "CATALOG_PRODUCT_NAME_INVALID",
+            "Product name is required."
+        );
+    }
+
+    return name;
+}
+
+function normalizeSupportedRegions(value = []) {
+    if (!Array.isArray(value)) {
+        throw new CatalogAdminError("CATALOG_PATCH_INVALID", "supportedRegions must be an array.");
+    }
+
+    const regions = Array.from(new Set(value.map(normalizeRegion).filter(region => REGION_CURRENCIES[region])));
+
+    if (!regions.length) {
+        throw new CatalogAdminError("CATALOG_REGION_PRICE_UNAVAILABLE", "At least one supported region is required.");
+    }
+
+    return regions;
 }
 
 function parsePrice(value) {
@@ -193,17 +228,49 @@ function buildProductPatch(patch = {}) {
     assertNoImmutableFields(patch, ["_id", "id", "productCode", "source", "createdAt", "updatedAt", "__v"]);
 
     const updates = {};
+    const allowed = new Set([
+        "name",
+        "description",
+        "enabled",
+        "featured",
+        "supportedRegions",
+        "seo",
+        "expectedUpdatedAt"
+    ]);
 
-    if (Object.prototype.hasOwnProperty.call(patch, "enabled")) {
-        updates.enabled = parseBoolean(patch.enabled, "enabled");
-    }
-
-    const allowed = new Set(["enabled", "expectedUpdatedAt"]);
     Object.keys(patch).forEach(key => {
         if (!allowed.has(key)) {
             throw new CatalogAdminError("CATALOG_PATCH_INVALID", `${key} is not editable.`);
         }
     });
+
+    if (Object.prototype.hasOwnProperty.call(patch, "name")) {
+        updates.name = normalizeProductName(patch.name);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(patch, "description")) {
+        updates.description = cleanEditableText(patch.description, MAX_PRODUCT_DESCRIPTION);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(patch, "enabled")) {
+        updates.enabled = parseBoolean(patch.enabled, "enabled");
+    }
+
+    if (Object.prototype.hasOwnProperty.call(patch, "featured")) {
+        updates.featured = parseBoolean(patch.featured, "featured");
+    }
+
+    if (Object.prototype.hasOwnProperty.call(patch, "supportedRegions")) {
+        updates.supportedRegions = normalizeSupportedRegions(patch.supportedRegions);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(patch, "seo")) {
+        if (!patch.seo || typeof patch.seo !== "object" || Array.isArray(patch.seo)) {
+            throw new CatalogAdminError("CATALOG_PATCH_INVALID", "seo must be an object.");
+        }
+        updates["seo.title"] = cleanEditableText(patch.seo.title, MAX_SEO_TITLE);
+        updates["seo.description"] = cleanEditableText(patch.seo.description, MAX_SEO_DESCRIPTION);
+    }
 
     return updates;
 }
@@ -212,7 +279,7 @@ function buildPackagePatch(document, patch = {}) {
     assertNoImmutableFields(patch, ["_id", "id", "productCode", "packageCode", "source", "createdAt", "updatedAt", "__v"]);
 
     const updates = {};
-    const allowed = new Set(["enabled", "prices", "expectedUpdatedAt"]);
+    const allowed = new Set(["name", "enabled", "prices", "iconAssetId", "expectedUpdatedAt"]);
 
     Object.keys(patch).forEach(key => {
         if (!allowed.has(key)) {
@@ -222,6 +289,14 @@ function buildPackagePatch(document, patch = {}) {
 
     if (Object.prototype.hasOwnProperty.call(patch, "enabled")) {
         updates.enabled = parseBoolean(patch.enabled, "enabled");
+    }
+
+    if (Object.prototype.hasOwnProperty.call(patch, "name")) {
+        updates.name = normalizePackageName(patch.name);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(patch, "iconAssetId")) {
+        updates.iconAssetId = cleanEditableText(patch.iconAssetId, 96);
     }
 
     if (patch.prices !== undefined) {
@@ -237,28 +312,36 @@ function buildPackagePatch(document, patch = {}) {
                 throw new CatalogAdminError("CATALOG_PATCH_INVALID", "Unsupported price region.");
             }
 
-            if (!document.prices?.[region]) {
-                throw new CatalogAdminError(
-                    "CATALOG_REGION_PRICE_UNAVAILABLE",
-                    "This regional price is not available for the package."
-                );
-            }
-
             if (!pricePatch || typeof pricePatch !== "object" || Array.isArray(pricePatch)) {
                 throw new CatalogAdminError("CATALOG_PATCH_INVALID", "Regional price patch must be an object.");
             }
 
-            const regionalAllowed = new Set(["amount"]);
+            const regionalAllowed = new Set(["amount", "enabled"]);
             Object.keys(pricePatch).forEach(key => {
                 if (!regionalAllowed.has(key)) {
                     throw new CatalogAdminError("CATALOG_PATCH_INVALID", `${key} is not editable.`);
                 }
             });
 
+            if (Object.prototype.hasOwnProperty.call(pricePatch, "enabled")) {
+                const nextEnabled = parseBoolean(pricePatch.enabled, `${region}.enabled`);
+                if (nextEnabled || document.prices?.[region]) {
+                    updates[`prices.${region}.enabled`] = nextEnabled;
+                    updates[`prices.${region}.currency`] = currency;
+                }
+            }
+
             if (Object.prototype.hasOwnProperty.call(pricePatch, "amount")) {
                 updates[`prices.${region}.amount`] = parsePrice(pricePatch.amount);
                 updates[`prices.${region}.currency`] = currency;
-                updates[`prices.${region}.enabled`] = true;
+                if (!Object.prototype.hasOwnProperty.call(pricePatch, "enabled") && !document.prices?.[region]) {
+                    updates[`prices.${region}.enabled`] = true;
+                }
+            } else if (pricePatch.enabled === true && !document.prices?.[region]) {
+                throw new CatalogAdminError(
+                    "CATALOG_PRICE_INVALID",
+                    "Price amount is required."
+                );
             }
         });
     }
@@ -285,10 +368,12 @@ async function updateProduct({ productCode, patch = {}, actor = "admin" }) {
     const updates = buildProductPatch(patch);
 
     if (!Object.keys(updates).length || !hasChanges(product, updates)) {
-        return { changed: false, product: product.toObject() };
+        return { changed: false, product: product.toObject(), changedFields: [] };
     }
 
-    Object.assign(product, updates);
+    Object.entries(updates).forEach(([path, value]) => {
+        product.set(path, value);
+    });
     await product.save();
     console.log("Catalog product updated:", {
         action: "catalog.product.update",
@@ -298,7 +383,54 @@ async function updateProduct({ productCode, patch = {}, actor = "admin" }) {
         timestamp: new Date().toISOString()
     });
 
-    return { changed: true, product: product.toObject() };
+    return { changed: true, product: product.toObject(), changedFields: Object.keys(updates) };
+}
+
+async function softDeleteProduct({ productCode, expectedUpdatedAt, actor = "admin" } = {}) {
+    const normalizedProductCode = normalizeProductCode(productCode);
+    const product = await CatalogProduct.findOne({ productCode: normalizedProductCode });
+
+    if (!product) {
+        throw new CatalogAdminError("CATALOG_PRODUCT_NOT_FOUND", "Product not found.", 404);
+    }
+
+    assertFresh(product, expectedUpdatedAt);
+
+    if (product.deletedAt) {
+        return { changed: false, product: product.toObject(), changedFields: [] };
+    }
+
+    product.set("metadata.preDeleteEnabled", product.enabled !== false);
+    product.enabled = false;
+    product.deletedAt = new Date();
+    product.deletedBy = actor;
+    await product.save();
+
+    return { changed: true, product: product.toObject(), changedFields: ["deletedAt", "enabled"] };
+}
+
+async function restoreProduct({ productCode, expectedUpdatedAt, actor = "admin" } = {}) {
+    const normalizedProductCode = normalizeProductCode(productCode);
+    const product = await CatalogProduct.findOne({ productCode: normalizedProductCode });
+
+    if (!product) {
+        throw new CatalogAdminError("CATALOG_PRODUCT_NOT_FOUND", "Product not found.", 404);
+    }
+
+    assertFresh(product, expectedUpdatedAt);
+
+    if (!product.deletedAt) {
+        return { changed: false, product: product.toObject(), changedFields: [] };
+    }
+
+    product.enabled = product.metadata?.preDeleteEnabled !== false;
+    product.deletedAt = null;
+    product.deletedBy = "";
+    product.set("metadata.restoredBy", actor);
+    product.set("metadata.restoredAt", new Date().toISOString());
+    await product.save();
+
+    return { changed: true, product: product.toObject(), changedFields: ["deletedAt", "enabled"] };
 }
 
 async function updatePackage({ productCode, packageCode, patch = {}, actor = "admin" }) {
@@ -313,11 +445,33 @@ async function updatePackage({ productCode, packageCode, patch = {}, actor = "ad
         throw new CatalogAdminError("CATALOG_PACKAGE_NOT_FOUND", "Package not found.", 404);
     }
 
+    const product = await CatalogProduct.findOne({ productCode: normalizedProductCode }).lean();
+    if (!product) {
+        throw new CatalogAdminError("CATALOG_PRODUCT_NOT_FOUND", "Product not found.", 404);
+    }
+
     assertFresh(item, patch.expectedUpdatedAt);
     const updates = buildPackagePatch(item, patch);
 
+    if (updates.iconAssetId) {
+        await assertAssetCategory(updates.iconAssetId, "package_icon");
+    }
+
+    const supportedRegions = product.supportedRegions || [];
+    Object.entries(patch.prices || {}).forEach(([regionKey, pricePatch]) => {
+        const region = normalizeRegion(regionKey);
+        const willBeAvailable = pricePatch?.enabled === true ||
+            (Object.prototype.hasOwnProperty.call(pricePatch || {}, "amount") && pricePatch?.enabled !== false);
+        if (willBeAvailable && supportedRegions.length && !supportedRegions.includes(region)) {
+            throw new CatalogAdminError(
+                "CATALOG_REGION_PRICE_UNAVAILABLE",
+                "This product does not support the selected region."
+            );
+        }
+    });
+
     if (!Object.keys(updates).length || !hasChanges(item, updates)) {
-        return { changed: false, package: item.toObject() };
+        return { changed: false, package: item.toObject(), changedFields: [] };
     }
 
     Object.entries(updates).forEach(([path, value]) => {
@@ -333,7 +487,62 @@ async function updatePackage({ productCode, packageCode, patch = {}, actor = "ad
         timestamp: new Date().toISOString()
     });
 
-    return { changed: true, package: item.toObject() };
+    return { changed: true, package: item.toObject(), changedFields: Object.keys(updates) };
+}
+
+async function softDeletePackage({ productCode, packageCode, expectedUpdatedAt, actor = "admin" } = {}) {
+    const normalizedProductCode = normalizeProductCode(productCode);
+    const normalizedPackageCode = normalizePackageCode(packageCode);
+    const item = await CatalogPackage.findOne({
+        productCode: normalizedProductCode,
+        packageCode: normalizedPackageCode
+    });
+
+    if (!item) {
+        throw new CatalogAdminError("CATALOG_PACKAGE_NOT_FOUND", "Package not found.", 404);
+    }
+
+    assertFresh(item, expectedUpdatedAt);
+
+    if (item.deletedAt) {
+        return { changed: false, package: item.toObject(), changedFields: [] };
+    }
+
+    item.set("metadata.preDeleteEnabled", item.enabled !== false);
+    item.enabled = false;
+    item.deletedAt = new Date();
+    item.deletedBy = actor;
+    await item.save();
+
+    return { changed: true, package: item.toObject(), changedFields: ["deletedAt", "enabled"] };
+}
+
+async function restorePackage({ productCode, packageCode, expectedUpdatedAt, actor = "admin" } = {}) {
+    const normalizedProductCode = normalizeProductCode(productCode);
+    const normalizedPackageCode = normalizePackageCode(packageCode);
+    const item = await CatalogPackage.findOne({
+        productCode: normalizedProductCode,
+        packageCode: normalizedPackageCode
+    });
+
+    if (!item) {
+        throw new CatalogAdminError("CATALOG_PACKAGE_NOT_FOUND", "Package not found.", 404);
+    }
+
+    assertFresh(item, expectedUpdatedAt);
+
+    if (!item.deletedAt) {
+        return { changed: false, package: item.toObject(), changedFields: [] };
+    }
+
+    item.enabled = item.metadata?.preDeleteEnabled !== false;
+    item.deletedAt = null;
+    item.deletedBy = "";
+    item.set("metadata.restoredBy", actor);
+    item.set("metadata.restoredAt", new Date().toISOString());
+    await item.save();
+
+    return { changed: true, package: item.toObject(), changedFields: ["deletedAt", "enabled"] };
 }
 
 async function createPackage({ productCode, patch = {}, actor = "admin" } = {}) {
@@ -382,9 +591,60 @@ async function createPackage({ productCode, patch = {}, actor = "admin" } = {}) 
     }
 }
 
+async function reorderPackages({ productCode, orderedPackageCodes = [], actor = "admin" } = {}) {
+    const normalizedProductCode = normalizeProductCode(productCode);
+    const product = await CatalogProduct.findOne({ productCode: normalizedProductCode }).lean();
+
+    if (!product) {
+        throw new CatalogAdminError("CATALOG_PRODUCT_NOT_FOUND", "Product not found.", 404);
+    }
+
+    const codes = orderedPackageCodes.map(normalizePackageCode).filter(Boolean);
+    const unique = new Set(codes);
+
+    if (!codes.length || unique.size !== codes.length) {
+        throw new CatalogAdminError("CATALOG_PACKAGE_REORDER_INVALID", "Package order contains duplicates or is empty.");
+    }
+
+    const packages = await CatalogPackage.find({ productCode: normalizedProductCode }).lean();
+    const existingCodes = packages.map(item => item.packageCode);
+
+    if (codes.length !== existingCodes.length) {
+        throw new CatalogAdminError("CATALOG_PACKAGE_REORDER_INVALID", "Package order must include every package for this product.");
+    }
+
+    const existingSet = new Set(existingCodes);
+    if (codes.some(code => !existingSet.has(code))) {
+        throw new CatalogAdminError("CATALOG_PACKAGE_REORDER_INVALID", "Package order includes unknown or foreign packages.");
+    }
+
+    await Promise.all(codes.map((packageCode, index) => CatalogPackage.updateOne(
+        { productCode: normalizedProductCode, packageCode },
+        { $set: { sortOrder: index + 1 } }
+    )));
+
+    console.log("Catalog package order updated:", {
+        action: "catalog.package.reorder",
+        productCode: normalizedProductCode,
+        count: codes.length,
+        actor,
+        timestamp: new Date().toISOString()
+    });
+
+    return {
+        changed: true,
+        orderedPackageCodes: codes
+    };
+}
+
 module.exports = {
     CatalogAdminError,
     createPackage,
+    reorderPackages,
+    restorePackage,
+    restoreProduct,
+    softDeletePackage,
+    softDeleteProduct,
     updatePackage,
     updateProduct
 };

@@ -8,9 +8,21 @@ const { ADMIN_AUDIT_ACTIONS, writeAdminAudit } = require("../services/adminAudit
 const {
     CatalogAdminError,
     createPackage,
+    reorderPackages,
+    restorePackage,
+    restoreProduct,
+    softDeletePackage,
+    softDeleteProduct,
     updatePackage,
     updateProduct
 } = require("../services/catalogAdminService");
+const {
+    StorefrontSectionError,
+    getStorefrontSection,
+    listStorefrontSections,
+    reorderStorefrontSections,
+    updateStorefrontSection
+} = require("../services/storefrontSectionService");
 const {
     GameBannerError,
     createBanner,
@@ -18,6 +30,7 @@ const {
     listAdminBanners,
     listPublicBanners,
     reorderBanners,
+    restoreBanner,
     updateBanner
 } = require("../services/gameBannerService");
 const {
@@ -43,7 +56,7 @@ const {
 const { StorageError } = require("../services/storageService");
 
 function sendAdminCatalogError(res, error) {
-    if (error instanceof CatalogAdminError || error instanceof MediaError || error instanceof StorageError || error instanceof GameBannerError) {
+    if (error instanceof CatalogAdminError || error instanceof MediaError || error instanceof StorageError || error instanceof GameBannerError || error instanceof StorefrontSectionError) {
         return res.status(error.statusCode || 400).json({
             success: false,
             code: error.code,
@@ -112,6 +125,54 @@ router.get("/catalog/:productCode/banners", async (req, res) => {
     }
 });
 
+router.get("/public/storefront-sections", async (req, res) => {
+    try {
+        const sections = await listStorefrontSections({
+            publicOnly: true,
+            includeHidden: false
+        });
+
+        res.set("Cache-Control", "no-store");
+        return res.json({
+            success: true,
+            sections
+        });
+    } catch (error) {
+        console.log("Public storefront sections error:", error?.code || error?.name || "STOREFRONT_SECTIONS_ERROR");
+
+        return res.status(500).json({
+            success: false,
+            message: "Storefront sections unavailable"
+        });
+    }
+});
+
+router.get("/public/storefront-sections/:key", async (req, res) => {
+    try {
+        const section = await getStorefrontSection(req.params.key, { publicOnly: true });
+
+        if (!section) {
+            return res.status(404).json({
+                success: false,
+                message: "Storefront section not found"
+            });
+        }
+
+        res.set("Cache-Control", "no-store");
+        return res.json({
+            success: true,
+            section
+        });
+    } catch (error) {
+        console.log("Public storefront section error:", error?.code || error?.name || "STOREFRONT_SECTION_ERROR");
+
+        return res.status(error.statusCode || 500).json({
+            success: false,
+            message: error.statusCode === 404 ? error.message : "Storefront section unavailable"
+        });
+    }
+});
+
 router.get("/catalog/:productCode", async (req, res) => {
     try {
         const product = await getCatalogProductDetail(req.params.productCode, { includeDisabled: false });
@@ -163,6 +224,11 @@ router.get("/admin/catalog/products", adminMiddleware, requireAdminPermission(PE
                 imageAsset: product.imageAsset || null,
                 bannerAsset: product.bannerAsset || null,
                 mobilePackagePreviewAsset: product.mobilePackagePreviewAsset || null,
+                description: product.description || "",
+                featured: product.featured === true,
+                seo: product.seo || { title: "", description: "" },
+                deleted: product.deleted === true,
+                deletedAt: product.deletedAt || null,
                 updatedAt: product.updatedAt
             }))
         });
@@ -173,6 +239,72 @@ router.get("/admin/catalog/products", adminMiddleware, requireAdminPermission(PE
             success: false,
             message: "Catalog data unavailable"
         });
+    }
+});
+
+router.patch("/admin/catalog/products/:productCode/delete", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_MANAGE), async (req, res) => {
+    try {
+        const result = await softDeleteProduct({
+            productCode: req.params.productCode,
+            expectedUpdatedAt: req.body?.expectedUpdatedAt,
+            actor: req.admin?.username || "admin"
+        });
+        const product = await getCatalogProductDetail(result.product.productCode, {
+            source: "database",
+            includeDisabled: true,
+            includeAssetProjection: true
+        });
+        await writeAdminAudit({
+            actor: req.admin,
+            req,
+            action: ADMIN_AUDIT_ACTIONS.CATALOG_PRODUCT_REMOVED,
+            resourceType: "CatalogProduct",
+            resourceId: result.product.productCode,
+            metadata: { changedFields: result.changedFields || [] }
+        }).catch(error => console.log("Admin audit failed:", error.message));
+
+        return res.json({
+            success: true,
+            changed: result.changed,
+            unchanged: !result.changed,
+            ...projectAdminSource(),
+            product
+        });
+    } catch (error) {
+        return sendAdminCatalogError(res, error);
+    }
+});
+
+router.patch("/admin/catalog/products/:productCode/restore", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_MANAGE), async (req, res) => {
+    try {
+        const result = await restoreProduct({
+            productCode: req.params.productCode,
+            expectedUpdatedAt: req.body?.expectedUpdatedAt,
+            actor: req.admin?.username || "admin"
+        });
+        const product = await getCatalogProductDetail(result.product.productCode, {
+            source: "database",
+            includeDisabled: true,
+            includeAssetProjection: true
+        });
+        await writeAdminAudit({
+            actor: req.admin,
+            req,
+            action: ADMIN_AUDIT_ACTIONS.CATALOG_PRODUCT_RESTORED,
+            resourceType: "CatalogProduct",
+            resourceId: result.product.productCode,
+            metadata: { changedFields: result.changedFields || [] }
+        }).catch(error => console.log("Admin audit failed:", error.message));
+
+        return res.json({
+            success: true,
+            changed: result.changed,
+            unchanged: !result.changed,
+            ...projectAdminSource(),
+            product
+        });
+    } catch (error) {
+        return sendAdminCatalogError(res, error);
     }
 });
 
@@ -265,6 +397,108 @@ router.patch("/admin/catalog/products/:productCode", adminMiddleware, requireAdm
             unchanged: !result.changed,
             ...projectAdminSource(),
             product
+        });
+    } catch (error) {
+        return sendAdminCatalogError(res, error);
+    }
+});
+
+router.patch("/admin/catalog/products/:productCode/packages/reorder", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_MANAGE), async (req, res) => {
+    try {
+        const result = await reorderPackages({
+            productCode: req.params.productCode,
+            orderedPackageCodes: req.body?.orderedPackageCodes || [],
+            actor: req.admin?.username || "admin"
+        });
+        const product = await getCatalogProductDetail(req.params.productCode, {
+            source: "database",
+            includeDisabled: true,
+            includeAssetProjection: true
+        });
+        await writeAdminAudit({
+            actor: req.admin,
+            req,
+            action: ADMIN_AUDIT_ACTIONS.CATALOG_PACKAGE_REORDERED,
+            resourceType: "CatalogPackage",
+            resourceId: normalizeProductCode(req.params.productCode),
+            metadata: { orderedPackageCodes: result.orderedPackageCodes }
+        }).catch(error => console.log("Admin audit failed:", error.message));
+
+        return res.json({
+            success: true,
+            changed: true,
+            ...projectAdminSource(),
+            product
+        });
+    } catch (error) {
+        return sendAdminCatalogError(res, error);
+    }
+});
+
+router.patch("/admin/catalog/products/:productCode/packages/:packageCode/delete", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_MANAGE), async (req, res) => {
+    try {
+        const result = await softDeletePackage({
+            productCode: req.params.productCode,
+            packageCode: req.params.packageCode,
+            expectedUpdatedAt: req.body?.expectedUpdatedAt,
+            actor: req.admin?.username || "admin"
+        });
+        const product = await getCatalogProductDetail(result.package.productCode, {
+            source: "database",
+            includeDisabled: true,
+            includeAssetProjection: true
+        });
+        await writeAdminAudit({
+            actor: req.admin,
+            req,
+            action: ADMIN_AUDIT_ACTIONS.CATALOG_PACKAGE_REMOVED,
+            resourceType: "CatalogPackage",
+            resourceId: `${result.package.productCode}:${result.package.packageCode}`,
+            metadata: { changedFields: result.changedFields || [] }
+        }).catch(error => console.log("Admin audit failed:", error.message));
+
+        return res.json({
+            success: true,
+            changed: result.changed,
+            unchanged: !result.changed,
+            ...projectAdminSource(),
+            product,
+            package: product?.packages?.find(item => item.packageCode === result.package.packageCode) || null
+        });
+    } catch (error) {
+        return sendAdminCatalogError(res, error);
+    }
+});
+
+router.patch("/admin/catalog/products/:productCode/packages/:packageCode/restore", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_MANAGE), async (req, res) => {
+    try {
+        const result = await restorePackage({
+            productCode: req.params.productCode,
+            packageCode: req.params.packageCode,
+            expectedUpdatedAt: req.body?.expectedUpdatedAt,
+            actor: req.admin?.username || "admin"
+        });
+        const product = await getCatalogProductDetail(result.package.productCode, {
+            source: "database",
+            includeDisabled: true,
+            includeAssetProjection: true
+        });
+        await writeAdminAudit({
+            actor: req.admin,
+            req,
+            action: ADMIN_AUDIT_ACTIONS.CATALOG_PACKAGE_RESTORED,
+            resourceType: "CatalogPackage",
+            resourceId: `${result.package.productCode}:${result.package.packageCode}`,
+            metadata: { changedFields: result.changedFields || [] }
+        }).catch(error => console.log("Admin audit failed:", error.message));
+
+        return res.json({
+            success: true,
+            changed: result.changed,
+            unchanged: !result.changed,
+            ...projectAdminSource(),
+            product,
+            package: product?.packages?.find(item => item.packageCode === result.package.packageCode) || null
         });
     } catch (error) {
         return sendAdminCatalogError(res, error);
@@ -401,13 +635,36 @@ router.delete("/admin/catalog/products/:productCode/banners/:bannerId", adminMid
     try {
         const result = await deleteBanner({
             productCode: req.params.productCode,
-            bannerId: req.params.bannerId
+            bannerId: req.params.bannerId,
+            actor: req.admin?.username || "admin"
         });
         const banners = await listAdminBanners(req.params.productCode);
         await writeAdminAudit({
             actor: req.admin,
             req,
             action: ADMIN_AUDIT_ACTIONS.GAME_BANNER_REMOVED,
+            resourceType: "GameBanner",
+            resourceId: req.params.bannerId,
+            metadata: { productCode: req.params.productCode }
+        }).catch(error => console.log("Admin audit failed:", error.message));
+        return res.json({ success: true, ...result, ...projectAdminSource(), ...banners });
+    } catch (error) {
+        return sendAdminCatalogError(res, error);
+    }
+});
+
+router.patch("/admin/catalog/products/:productCode/banners/:bannerId/restore", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_MANAGE), async (req, res) => {
+    try {
+        const result = await restoreBanner({
+            productCode: req.params.productCode,
+            bannerId: req.params.bannerId,
+            actor: req.admin?.username || "admin"
+        });
+        const banners = await listAdminBanners(req.params.productCode);
+        await writeAdminAudit({
+            actor: req.admin,
+            req,
+            action: ADMIN_AUDIT_ACTIONS.GAME_BANNER_RESTORED,
             resourceType: "GameBanner",
             resourceId: req.params.bannerId,
             metadata: { productCode: req.params.productCode }
@@ -425,7 +682,83 @@ router.put("/admin/catalog/products/:productCode/banners/order", adminMiddleware
             orderedIds: req.body?.orderedIds || [],
             actor: req.admin?.username || "admin"
         });
+        await writeAdminAudit({
+            actor: req.admin,
+            req,
+            action: ADMIN_AUDIT_ACTIONS.GAME_BANNER_REORDERED,
+            resourceType: "GameBanner",
+            resourceId: normalizeProductCode(req.params.productCode),
+            metadata: { orderedIds: (req.body?.orderedIds || []).map(String) }
+        }).catch(error => console.log("Admin audit failed:", error.message));
         return res.json({ success: true, changed: true, ...projectAdminSource(), ...result });
+    } catch (error) {
+        return sendAdminCatalogError(res, error);
+    }
+});
+
+router.get("/admin/catalog/storefront-sections", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_READ), async (req, res) => {
+    try {
+        const sections = await listStorefrontSections();
+        return res.json({
+            success: true,
+            ...projectAdminSource(),
+            sections
+        });
+    } catch (error) {
+        return sendAdminCatalogError(res, error);
+    }
+});
+
+router.patch("/admin/catalog/storefront-sections/reorder", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_MANAGE), async (req, res) => {
+    try {
+        const result = await reorderStorefrontSections({
+            orderedKeys: req.body?.orderedKeys || [],
+            actor: req.admin?.username || "admin"
+        });
+        await writeAdminAudit({
+            actor: req.admin,
+            req,
+            action: ADMIN_AUDIT_ACTIONS.STOREFRONT_SECTION_REORDERED,
+            resourceType: "StorefrontSection",
+            resourceId: "games-menu",
+            metadata: { orderedKeys: (req.body?.orderedKeys || []).map(String) }
+        }).catch(error => console.log("Admin audit failed:", error.message));
+
+        return res.json({
+            success: true,
+            changed: true,
+            ...projectAdminSource(),
+            sections: result.sections
+        });
+    } catch (error) {
+        return sendAdminCatalogError(res, error);
+    }
+});
+
+router.patch("/admin/catalog/storefront-sections/:key", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_MANAGE), async (req, res) => {
+    try {
+        const result = await updateStorefrontSection({
+            key: req.params.key,
+            patch: req.body || {},
+            actor: req.admin?.username || "admin"
+        });
+        await writeAdminAudit({
+            actor: req.admin,
+            req,
+            action: ADMIN_AUDIT_ACTIONS.STOREFRONT_SECTION_UPDATED,
+            resourceType: "StorefrontSection",
+            resourceId: result.section?.key || req.params.key,
+            metadata: { changedFields: result.changedFields || [] }
+        }).catch(error => console.log("Admin audit failed:", error.message));
+
+        return res.json({
+            success: true,
+            changed: result.changed,
+            unchanged: !result.changed,
+            ...projectAdminSource(),
+            section: result.section,
+            sections: await listStorefrontSections()
+        });
     } catch (error) {
         return sendAdminCatalogError(res, error);
     }

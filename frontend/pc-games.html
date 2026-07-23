@@ -62,64 +62,8 @@
                 <h2>PC Games</h2>
             </div>
 
-            <div class="home-game-grid">
-
-                <a href="#" class="home-game-card">
-                    <img src="/assets/games/steam.webp" alt="Steam Wallet">
-                    <div>
-                        <h3>Steam Wallet</h3>
-                        <p>Coming Soon</p>
-                    </div>
-                </a>
-
-                <a href="#" class="home-game-card">
-                    <img src="/assets/games/lol.webp" alt="League of Legends">
-                    <div>
-                        <h3>League of Legends</h3>
-                        <p>Coming Soon</p>
-                    </div>
-                </a>
-
-                <a href="#" class="home-game-card">
-                    <img src="/assets/games/minecraft.webp" alt="Minecraft">
-                    <div>
-                        <h3>Minecraft</h3>
-                        <p>Coming Soon</p>
-                    </div>
-                </a>
-
-                <a href="#" class="home-game-card">
-                    <img src="/assets/games/ea-sports-fc.webp" alt="EA Sports FC">
-                    <div>
-                        <h3>EA Sports FC</h3>
-                        <p>Coming Soon</p>
-                    </div>
-                </a>
-
-                <a href="#" class="home-game-card">
-                    <img src="/assets/games/dota2.webp" alt="Dota 2">
-                    <div>
-                        <h3>Dota 2</h3>
-                        <p>Coming Soon</p>
-                    </div>
-                </a>
-
-                <a href="#" class="home-game-card">
-                    <img src="/assets/games/cs2.webp" alt="Counter Strike 2">
-                    <div>
-                        <h3>Counter Strike 2</h3>
-                        <p>Coming Soon</p>
-                    </div>
-                </a>
-
-                <a href="#" class="home-game-card">
-                    <img src="/assets/games/apex.webp" alt="Apex Legends">
-                    <div>
-                        <h3>Apex Legends</h3>
-                        <p>Coming Soon</p>
-                    </div>
-                </a>
-
+            <div class="az-catalog-empty">
+                PC game services are being prepared.
             </div>
         </section>
 
@@ -195,7 +139,8 @@
     <script src="/js/auth-check.js"></script>
 
     <script src="/js/header-loader.js?v=20260717-pass3"></script>
-    <script src="/js/header.js?v=20260708"></script>
+    <script src="/js/storefront-sections.js?v=20260723-catalog-workspace"></script>
+    <script src="/js/header.js?v=20260723-catalog-workspace"></script>
     <script src="/js/header-scroll.js?v=20260708"></script>
 
     <script src="/js/locale-switcher.js"></script>
@@ -203,6 +148,9 @@
     <script src="/js/catalog-runtime.js?v=20260714-phase7"></script>
     <script src="/js/catalog-discovery.js?v=20260714-phase7"></script>
     <script src="/js/pwa-fix.js?v=20260723-context-bank-runtime"></script>
+    <script>
+        window.AZIEL_STOREFRONT_SECTIONS?.applyPageAccess?.("pc-games");
+    </script>
 
 </body>
 

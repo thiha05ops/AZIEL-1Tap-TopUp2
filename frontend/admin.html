@@ -21,7 +21,7 @@
     <link rel="stylesheet" href="/css/admin/admin-wallet.css?v=20260706-2">
     <link rel="stylesheet" href="/css/admin/admin-support.css?v=20260706-2">
     <link rel="stylesheet" href="/css/admin/admin-live-chat.css?v=20260706-2">
-    <link rel="stylesheet" href="/css/admin/admin-design-system.css?v=20260715-phase13-qa3">
+    <link rel="stylesheet" href="/css/admin/admin-design-system.css?v=20260723-catalog-workspace">
     <link rel="stylesheet" href="/css/campaign/campaign-popup.css?v=20260715-visual">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -225,66 +225,160 @@
             </header>
 
             <section class="admin-section active" id="section-dashboard">
+                <div class="dashboard-command-center">
+                    <header class="dashboard-command-header">
+                        <div class="dashboard-command-title">
+                            <span class="admin-eyebrow">AZIEL Operations</span>
+                            <h3>Business Command Center</h3>
+                            <p>Sales, order flow, and operational attention for the selected period.</p>
+                        </div>
+                        <form id="dashboardFilters" class="dashboard-filter-bar" aria-label="Dashboard filters">
+                            <label>
+                                <span>Date range</span>
+                                <select id="dashboardPresetSelect">
+                                    <option value="today">Today</option>
+                                    <option value="yesterday">Yesterday</option>
+                                    <option value="last_7_days">Last 7 Days</option>
+                                    <option value="last_30_days">Last 30 Days</option>
+                                    <option value="this_month">This Month</option>
+                                    <option value="last_month">Last Month</option>
+                                    <option value="custom">Custom Range</option>
+                                </select>
+                            </label>
+                            <label>
+                                <span>Region</span>
+                                <select id="dashboardRegionSelect">
+                                    <option value="ALL">All Regions</option>
+                                    <option value="MM">Myanmar</option>
+                                    <option value="TH">Thailand</option>
+                                </select>
+                            </label>
+                            <div id="dashboardCustomRange" class="dashboard-custom-range" hidden>
+                                <label>
+                                    <span>Start</span>
+                                    <input id="dashboardStartDate" type="date">
+                                </label>
+                                <label>
+                                    <span>End</span>
+                                    <input id="dashboardEndDate" type="date">
+                                </label>
+                                <button id="dashboardApplyCustomBtn" class="admin-primary-btn" type="button">Apply</button>
+                                <button id="dashboardCancelCustomBtn" class="admin-secondary-btn" type="button">Cancel</button>
+                            </div>
+                            <button id="refreshDashboardBtn" class="admin-secondary-btn" type="button">Refresh</button>
+                            <span id="dashboardLastUpdated" class="dashboard-updated" data-admin-i18n="last_updated">Last updated</span>
+                        </form>
+                    </header>
 
-                <div class="panel admin-action-panel">
-                    <div class="panel-head">
-                        <h3 data-admin-i18n="action_required">Action Required</h3>
-                        <button id="refreshDashboardBtn" class="admin-secondary-btn" type="button" data-admin-i18n="refresh">Refresh</button>
-                    </div>
+                    <div id="dashboardRangeMeta" class="dashboard-range-meta" aria-live="polite"></div>
+                    <div id="dashboardErrorRegion" class="dashboard-panel-error" hidden></div>
 
-                    <div id="actionRequiredList" class="admin-action-grid" aria-live="polite">
+                    <div id="dashboardKpis" class="dashboard-kpi-grid" aria-live="polite">
                         <div class="admin-dashboard-skeleton"></div>
                         <div class="admin-dashboard-skeleton"></div>
                         <div class="admin-dashboard-skeleton"></div>
-                    </div>
-                </div>
-
-                <div class="panel admin-today-panel">
-                    <div class="panel-head">
-                        <h3 data-admin-i18n="today">Today</h3>
-                        <span id="dashboardLastUpdated" data-admin-i18n="last_updated">Last updated</span>
+                        <div class="admin-dashboard-skeleton"></div>
                     </div>
 
-                    <div class="stats-grid admin-today-grid">
-                        <div class="stat-card">
-                            <span data-admin-i18n="orders_today">Orders Today</span>
-                            <strong id="ordersToday">0</strong>
-                            <small data-admin-i18n="timezone_bangkok">Asia/Bangkok</small>
-                        </div>
+                    <div class="dashboard-primary-grid">
+                        <article class="panel dashboard-chart-panel">
+                            <div class="dashboard-panel-head">
+                                <div>
+                                    <h3>Sales Trend</h3>
+                                    <span>Separate MMK, THB, and order-count views.</span>
+                                </div>
+                                <div class="dashboard-segmented" role="tablist" aria-label="Sales trend metric">
+                                    <button class="active" type="button" data-dashboard-chart="MMK">MMK</button>
+                                    <button type="button" data-dashboard-chart="THB">THB</button>
+                                    <button type="button" data-dashboard-chart="orders">Orders</button>
+                                </div>
+                            </div>
+                            <div id="dashboardSalesChart" class="dashboard-svg-chart" aria-live="polite"></div>
+                        </article>
 
-                        <div class="stat-card">
-                            <span data-admin-i18n="completed_today">Completed Today</span>
-                            <strong id="completedToday">0</strong>
-                            <small class="up" data-admin-i18n="completed">Completed</small>
-                        </div>
-
-                        <div class="stat-card">
-                            <span data-admin-i18n="failed_today">Failed Today</span>
-                            <strong id="failedToday">0</strong>
-                            <small class="warn" data-admin-i18n="failed">Failed</small>
-                        </div>
-
-                        <div class="stat-card">
-                            <span data-admin-i18n="new_users_today">New Users</span>
-                            <strong id="newUsersToday">0</strong>
-                            <small data-admin-i18n="users">Users</small>
-                        </div>
+                        <article class="panel dashboard-status-panel">
+                            <div class="dashboard-panel-head">
+                                <div>
+                                    <h3>Order Status</h3>
+                                    <span>Production lifecycle grouping.</span>
+                                </div>
+                            </div>
+                            <div id="dashboardStatusChart" class="dashboard-status-chart" aria-live="polite"></div>
+                        </article>
                     </div>
 
-                    <div class="admin-revenue-lines">
-                        <p><span data-admin-i18n="completed_order_value_mmk">Completed Order Value MMK</span><b id="completedValueMMK">0 MMK</b></p>
-                        <p><span data-admin-i18n="completed_order_value_thb">Completed Order Value THB</span><b id="completedValueTHB">0 THB</b></p>
-                    </div>
-                </div>
+                    <div class="dashboard-secondary-grid">
+                        <article class="panel">
+                            <div class="dashboard-panel-head">
+                                <div>
+                                    <h3>Needs Attention</h3>
+                                    <span>Actionable operations queues.</span>
+                                </div>
+                            </div>
+                            <div id="dashboardAttentionQueue" class="dashboard-attention-list" aria-live="polite"></div>
+                        </article>
 
-                <div class="panel admin-recent-panel">
-                    <div class="panel-head">
-                        <h3 data-admin-i18n="recent_operations">Recent Operations</h3>
-                        <span data-admin-i18n="real_order_events">Real order updates</span>
+                        <article class="panel">
+                            <div class="dashboard-panel-head">
+                                <div>
+                                    <h3>Region Performance</h3>
+                                    <span>Myanmar and Thailand separated.</span>
+                                </div>
+                            </div>
+                            <div id="dashboardRegionPerformance" class="dashboard-region-list" aria-live="polite"></div>
+                        </article>
                     </div>
 
-                    <div id="recentOperationsList" class="activity-list admin-recent-list">
-                        <p data-admin-i18n="loading">Loading</p>
+                    <div class="dashboard-secondary-grid dashboard-business-grid">
+                        <article class="panel">
+                            <div class="dashboard-panel-head">
+                                <div>
+                                    <h3>Top Games</h3>
+                                    <span>Eligible paid/completed order sales.</span>
+                                </div>
+                                <button class="admin-secondary-btn" type="button" data-dashboard-section="catalog">View Catalog</button>
+                            </div>
+                            <div id="dashboardTopGames" class="dashboard-table-list" aria-live="polite"></div>
+                        </article>
+
+                        <article class="panel">
+                            <div class="dashboard-panel-head">
+                                <div>
+                                    <h3>Payment Methods</h3>
+                                    <span>Grouped by actual order payment method.</span>
+                                </div>
+                                <button class="admin-secondary-btn" type="button" data-dashboard-section="payment-methods">Open Methods</button>
+                            </div>
+                            <div id="dashboardPaymentMethods" class="dashboard-table-list" aria-live="polite"></div>
+                        </article>
+                    </div>
+
+                    <div class="dashboard-bottom-command-grid">
+                        <article class="panel">
+                            <div class="dashboard-panel-head">
+                                <div>
+                                    <h3>Recent Activity</h3>
+                                    <span>Real records only.</span>
+                                </div>
+                                <div class="dashboard-segmented" role="tablist" aria-label="Recent activity">
+                                    <button class="active" type="button" data-dashboard-activity="orders">Orders</button>
+                                    <button type="button" data-dashboard-activity="wallet">Wallet</button>
+                                    <button type="button" data-dashboard-activity="customers">Customers</button>
+                                    <button type="button" data-dashboard-activity="support">Support</button>
+                                </div>
+                            </div>
+                            <div id="dashboardRecentActivity" class="dashboard-activity-list" aria-live="polite"></div>
+                        </article>
+
+                        <aside class="panel dashboard-quick-actions-panel">
+                            <div class="dashboard-panel-head">
+                                <div>
+                                    <h3>Quick Actions</h3>
+                                    <span>Role-aware entry points.</span>
+                                </div>
+                            </div>
+                            <div id="dashboardQuickActions" class="dashboard-quick-actions" aria-live="polite"></div>
+                        </aside>
                     </div>
                 </div>
 
@@ -331,12 +425,24 @@
             </section>
 
             <section class="admin-section" id="section-catalog">
-                <div class="catalog-command-center">
-                    <div class="panel catalog-products-panel">
+                <div class="catalog-workspace-shell">
+                    <div class="catalog-top-tabs" role="tablist" aria-label="Catalog workspace views">
+                        <button class="catalog-top-tab active" type="button" role="tab" aria-selected="true" data-catalog-view="products">
+                            <i class="fa-solid fa-layer-group"></i>
+                            <span>Products</span>
+                        </button>
+                        <button class="catalog-top-tab" type="button" role="tab" aria-selected="false" data-catalog-view="storefront">
+                            <i class="fa-solid fa-store"></i>
+                            <span>Storefront Sections</span>
+                        </button>
+                    </div>
+
+                    <div class="catalog-command-center" data-catalog-panel="products">
+                        <div class="panel catalog-products-panel">
                         <div class="panel-head">
                             <div>
                                 <h3 data-admin-i18n="catalog">Catalog</h3>
-                                <span data-admin-i18n="catalog_readonly_sub">Read-only canonical catalog foundation.</span>
+                                <span data-admin-i18n="catalog_readonly_sub">Database-authoritative product workspace.</span>
                             </div>
                             <button id="refreshCatalogBtn" class="admin-secondary-btn" type="button" data-admin-i18n="refresh">Refresh</button>
                         </div>
@@ -356,13 +462,28 @@
                             <div class="admin-dashboard-skeleton"></div>
                             <div class="admin-dashboard-skeleton"></div>
                         </div>
+                        </div>
+
+                        <aside id="adminCatalogDetailPanel" class="panel catalog-detail-panel" aria-live="polite">
+                            <div class="catalog-detail-empty">
+                                <strong data-admin-i18n="select_product">Select a product</strong>
+                            </div>
+                        </aside>
                     </div>
 
-                    <aside id="adminCatalogDetailPanel" class="panel catalog-detail-panel" aria-live="polite">
-                        <div class="catalog-detail-empty">
-                            <strong data-admin-i18n="select_product">Select a product</strong>
+                    <div class="panel catalog-storefront-panel" data-catalog-panel="storefront" hidden>
+                        <div class="panel-head">
+                            <div>
+                                <h3>Storefront Sections</h3>
+                                <span>Control Games dropdown visibility, order, and section access.</span>
+                            </div>
+                            <button id="refreshStorefrontSectionsBtn" class="admin-secondary-btn" type="button">Refresh</button>
                         </div>
-                    </aside>
+                        <div id="adminStorefrontSections" class="catalog-storefront-list" aria-live="polite">
+                            <div class="admin-dashboard-skeleton"></div>
+                            <div class="admin-dashboard-skeleton"></div>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -1029,13 +1150,13 @@ TH</textarea></label>
     <script src="/js/admin/admin-action-modal.js?v=20260714-phase4"></script>
     <script src="/js/admin-auth.js?v=20260715-phase12"></script>
     <script src="/js/admin-app.js?v=20260714-phase5"></script>
-    <script src="/js/admin-stats.js?v=20260713-phase3"></script>
+    <script src="/js/admin-stats.js?v=20260723-command-center-payment-renderer"></script>
     <script src="/js/admin-fulfillment.js?v=20260715-phase13-qa4"></script>
     <script src="/js/payment-display.js?v=20260718-labels"></script>
     <script src="/js/admin-orders.js?v=20260715-phase13-qa4"></script>
     <script src="/js/admin/admin-media-selector.js?v=20260714-phase8"></script>
     <script src="/js/admin-media.js?v=20260714-phase8"></script>
-    <script src="/js/admin-catalog.js?v=20260714-phase6"></script>
+    <script src="/js/admin-catalog.js?v=20260723-catalog-workspace"></script>
     <script src="/js/admin-home-banners.js?v=20260715-phase86"></script>
     <script src="/js/admin-site-placements.js?v=20260715-phase11"></script>
     <script src="/js/admin-campaigns.js?v=20260715-phase9"></script>

@@ -67,7 +67,8 @@ includes(gameBannerService, ".sort({ sortOrder: 1, _id: 1 })", "Banner ordering 
 includes(gameBannerService, "async function reorderBanners", "Banner reorder service missing");
 includes(gameBannerService, "unique.size !== ids.length", "Duplicate reorder IDs must be rejected");
 includes(gameBannerService, "banners.length !== ids.length", "Foreign banner reorder IDs must be rejected");
-includes(gameBannerService, "deleteOne", "Remove must delete banner record");
+includes(gameBannerService, "banner.deletedAt = new Date()", "Remove must soft-delete banner record");
+includes(gameBannerService, "async function restoreBanner", "Banner restore service missing");
 assert.ok(!/deleteFile/.test(gameBannerService), "Removing banner must not delete MediaAsset");
 includes(mediaService, "GameBanner.countDocuments", "Media safe-delete must count GameBanner references");
 
@@ -77,9 +78,11 @@ includes(routes, "router.post(\"/admin/catalog/products/:productCode/banners\"",
 includes(routes, "router.patch(\"/admin/catalog/products/:productCode/banners/:bannerId\"", "Admin banner edit API missing");
 includes(routes, "router.put(\"/admin/catalog/products/:productCode/banners/order\"", "Admin banner reorder API missing");
 includes(routes, "router.delete(\"/admin/catalog/products/:productCode/banners/:bannerId\"", "Admin banner remove API missing");
+includes(routes, "router.patch(\"/admin/catalog/products/:productCode/banners/:bannerId/restore\"", "Admin banner restore API missing");
 
 includes(gamePresentation, "window.AZIEL_GAME_PRESENTATION", "Shared customer banner runtime missing");
-includes(gamePresentation, "if (!data.managed) return", "Never-managed products must allow static fallback");
+includes(gamePresentation, "if (!data.managed)", "Never-managed products must branch to static fallback");
+includes(gamePresentation, "releaseStaticFallback(root)", "Never-managed products must explicitly allow static fallback");
 includes(gamePresentation, "game-banner-managed-empty", "Managed product with zero eligible banners must not resurrect static banners");
 includes(gamePresentation, "fetch(`/api/catalog/${encodeURIComponent(productCode)}/banners`", "Shared runtime must use public banner API");
 includes(gamePresentation, "javascript|data|vbscript", "Runtime CTA safety must exist");

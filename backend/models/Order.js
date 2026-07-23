@@ -335,6 +335,7 @@ orderSchema.index(
 );
 orderSchema.index({ createdAt: -1, _id: -1 });
 orderSchema.index({ status: 1, createdAt: -1, _id: -1 });
+orderSchema.index({ status: 1, updatedAt: -1, region: 1, currency: 1 });
 orderSchema.index({ username: 1, createdAt: -1, _id: -1 });
 orderSchema.index({ orderId: 1, createdAt: -1, _id: -1 });
 

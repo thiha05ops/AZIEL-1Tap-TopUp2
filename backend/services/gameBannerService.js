@@ -101,6 +101,7 @@ async function loadMediaMap(banners = []) {
 }
 
 function isEligibleBanner(banner, now = new Date()) {
+    if (banner.deletedAt) return false;
     if (banner.enabled !== true) return false;
     const nowMs = now.getTime();
     const start = banner.startsAt ? new Date(banner.startsAt).getTime() : null;
@@ -137,6 +138,8 @@ function projectAdminBanner(banner = {}, mediaMap = new Map()) {
         mediaAssetId: banner.mediaAssetId,
         mediaAsset: projectMediaAsset(asset),
         enabled: banner.enabled === true,
+        deleted: Boolean(banner.deletedAt),
+        deletedAt: banner.deletedAt || null,
         sortOrder: Number(banner.sortOrder || 0),
         ctaLabel: banner.ctaLabel || "",
         ctaTarget: banner.ctaTarget || "",
@@ -255,15 +258,47 @@ async function updateBanner({ productCode, bannerId, patch = {}, actor = "admin"
     return { changed: true, banner: banner.toObject() };
 }
 
-async function deleteBanner({ productCode, bannerId } = {}) {
+async function deleteBanner({ productCode, bannerId, actor = "admin" } = {}) {
     const product = await assertProduct(productCode);
-    const result = await GameBanner.deleteOne({ _id: bannerId, productCode: product.productCode });
+    const banner = await GameBanner.findOne({ _id: bannerId, productCode: product.productCode });
 
-    if (!result.deletedCount) {
+    if (!banner) {
         throw new GameBannerError("BANNER_NOT_FOUND", "Banner not found.", 404);
     }
 
-    return { deleted: true, bannerId };
+    if (banner.deletedAt) {
+        return { deleted: true, changed: false, bannerId };
+    }
+
+    banner.set("metadata.preDeleteEnabled", banner.enabled === true);
+    banner.enabled = false;
+    banner.deletedAt = new Date();
+    banner.deletedBy = actor;
+    banner.updatedBy = actor;
+    await banner.save();
+
+    return { deleted: true, changed: true, bannerId };
+}
+
+async function restoreBanner({ productCode, bannerId, actor = "admin" } = {}) {
+    const product = await assertProduct(productCode);
+    const banner = await GameBanner.findOne({ _id: bannerId, productCode: product.productCode });
+
+    if (!banner) {
+        throw new GameBannerError("BANNER_NOT_FOUND", "Banner not found.", 404);
+    }
+
+    if (!banner.deletedAt) {
+        return { restored: true, changed: false, bannerId, banner: banner.toObject() };
+    }
+
+    banner.enabled = banner.metadata?.preDeleteEnabled !== false;
+    banner.deletedAt = null;
+    banner.deletedBy = "";
+    banner.updatedBy = actor;
+    await banner.save();
+
+    return { restored: true, changed: true, bannerId, banner: banner.toObject() };
 }
 
 async function reorderBanners({ productCode, orderedIds = [], actor = "admin" } = {}) {
@@ -275,7 +310,7 @@ async function reorderBanners({ productCode, orderedIds = [], actor = "admin" } 
         throw new GameBannerError("BANNER_REORDER_INVALID", "Banner order contains duplicates or is empty.");
     }
 
-    const banners = await GameBanner.find({ productCode: product.productCode, _id: { $in: ids } });
+    const banners = await GameBanner.find({ productCode: product.productCode, _id: { $in: ids }, deletedAt: null });
 
     if (banners.length !== ids.length) {
         throw new GameBannerError("BANNER_REORDER_INVALID", "Banner order includes unknown or foreign banners.");
@@ -300,5 +335,6 @@ module.exports = {
     parseSchedule,
     parseSortOrder,
     reorderBanners,
+    restoreBanner,
     updateBanner
 };

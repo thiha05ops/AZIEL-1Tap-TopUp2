@@ -209,6 +209,13 @@ function getDatabaseProductFromRows(payload = {}, products = []) {
         );
     }
 
+    if (product.deletedAt) {
+        throw new CatalogError(
+            "PRODUCT_DISABLED",
+            "This product is not available for purchase."
+        );
+    }
+
     if (!product.enabled) {
         throw new CatalogError(
             "PRODUCT_DISABLED",
@@ -243,6 +250,13 @@ function getDatabasePackageFromRows(product, payload = {}, packages = []) {
         throw new CatalogError(
             "PACKAGE_NOT_FOUND",
             "Package is not available."
+        );
+    }
+
+    if (item.deletedAt) {
+        throw new CatalogError(
+            "PACKAGE_DISABLED",
+            "This package is not available for purchase."
         );
     }
 
@@ -386,6 +400,7 @@ function mediaUrl(asset) {
 }
 
 function projectCatalogPackage(item = {}, { includeDisabled = true, mediaMap = new Map(), includeAssetProjection = false } = {}) {
+    if (!includeDisabled && item.deletedAt) return null;
     if (!includeDisabled && item.enabled === false) return null;
 
     const prices = {};
@@ -408,6 +423,8 @@ function projectCatalogPackage(item = {}, { includeDisabled = true, mediaMap = n
         packageCode: item.packageCode,
         name: item.name,
         enabled: item.enabled !== false,
+        deleted: Boolean(item.deletedAt),
+        deletedAt: item.deletedAt || null,
         prices,
         sortOrder: Number(item.sortOrder || 0),
         iconUrl: mediaUrl(iconAsset),
@@ -423,6 +440,7 @@ function projectCatalogPackage(item = {}, { includeDisabled = true, mediaMap = n
 }
 
 function projectCatalogProduct(product = {}, packages = [], { includeDisabled = true, mediaMap = new Map(), includeAssetProjection = false } = {}) {
+    if (!includeDisabled && product.deletedAt) return null;
     if (!includeDisabled && product.enabled === false) return null;
 
     const publicPackages = packages
@@ -441,7 +459,11 @@ function projectCatalogProduct(product = {}, packages = [], { includeDisabled = 
     const projection = {
         productCode: product.productCode,
         name: product.name,
+        description: product.description || "",
         enabled: product.enabled !== false,
+        featured: product.featured === true,
+        deleted: Boolean(product.deletedAt),
+        deletedAt: product.deletedAt || null,
         supportedRegions: Array.isArray(product.supportedRegions)
             ? product.supportedRegions
             : Object.keys(REGION_CURRENCIES),
@@ -458,6 +480,10 @@ function projectCatalogProduct(product = {}, packages = [], { includeDisabled = 
             altText: mobilePackagePreviewAsset?.altText || ""
         },
         mobilePackagePreviewUrl: mediaUrl(mobilePackagePreviewAsset),
+        seo: {
+            title: product.seo?.title || "",
+            description: product.seo?.description || ""
+        },
         updatedAt: product.updatedAt || null
     };
 

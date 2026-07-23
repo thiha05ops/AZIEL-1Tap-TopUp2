@@ -514,20 +514,39 @@ textarea {
 .admin-toast {
   position: fixed;
   top: 24px;
-  right: -420px;
+  right: -440px;
   z-index: 999999;
-  padding: 14px 18px;
-  border-radius: 16px;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 16px;
+  border-radius: 14px;
   background: rgba(21, 29, 49, .96);
   border: 1px solid rgba(255, 255, 255, .08);
   color: #fff;
   font-weight: 900;
-  box-shadow: 0 18px 50px rgba(0, 0, 0, .35);
-  transition: .3s ease;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .32);
+  transition: right .24s ease, opacity .18s ease, transform .18s ease;
+  opacity: .96;
+}
+
+.admin-toast::before {
+  content: "✓";
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(34, 197, 94, .16);
+  color: #4ade80;
+  font-size: 13px;
+  flex: 0 0 24px;
 }
 
 .admin-toast.show {
   right: 24px;
+  transform: translateY(0);
 }
 
 .admin-toast.success {
@@ -536,6 +555,18 @@ textarea {
 
 .admin-toast.error {
   border-color: rgba(248, 113, 113, .45);
+}
+
+.admin-toast.error::before {
+  content: "!";
+  background: rgba(248, 113, 113, .16);
+  color: #fca5a5;
+}
+
+.admin-toast.info::before {
+  content: "i";
+  background: rgba(139, 92, 246, .16);
+  color: #c4b5fd;
 }
 
 /* ADMIN LIVE POPUP + BADGE */

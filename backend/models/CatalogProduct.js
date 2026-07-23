@@ -14,9 +14,18 @@ const catalogProductSchema = new mongoose.Schema(
             required: true,
             trim: true
         },
+        description: {
+            type: String,
+            trim: true,
+            default: ""
+        },
         enabled: {
             type: Boolean,
             default: true
+        },
+        featured: {
+            type: Boolean,
+            default: false
         },
         supportedRegions: {
             type: [String],
@@ -40,6 +49,18 @@ const catalogProductSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.Mixed,
             default: {}
         },
+        seo: {
+            title: {
+                type: String,
+                trim: true,
+                default: ""
+            },
+            description: {
+                type: String,
+                trim: true,
+                default: ""
+            }
+        },
         presentation: {
             imageAssetId: {
                 type: String,
@@ -58,6 +79,15 @@ const catalogProductSchema = new mongoose.Schema(
                     default: ""
                 }
             }
+        },
+        deletedAt: {
+            type: Date,
+            default: null
+        },
+        deletedBy: {
+            type: String,
+            trim: true,
+            default: ""
         }
     },
     {
@@ -67,6 +97,7 @@ const catalogProductSchema = new mongoose.Schema(
 
 catalogProductSchema.index({ productCode: 1 }, { unique: true });
 catalogProductSchema.index({ enabled: 1, sortOrder: 1 });
+catalogProductSchema.index({ deletedAt: 1 });
 catalogProductSchema.index({ "presentation.imageAssetId": 1 });
 catalogProductSchema.index({ "presentation.bannerAssetId": 1 });
 catalogProductSchema.index({ "presentation.mobilePackagePreview.assetId": 1 });
