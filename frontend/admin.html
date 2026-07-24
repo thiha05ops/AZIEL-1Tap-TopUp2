@@ -412,9 +412,9 @@
                 <div class="website-runtime-workspace">
                     <header class="website-runtime-header">
                         <div>
-                            <span class="admin-eyebrow" data-admin-i18n="website_runtime">Website Runtime</span>
-                            <h3 data-admin-i18n="website_observation">Public Website Observation</h3>
-                            <p data-admin-i18n="website_observation_sub">Read-only inventory, ownership, diagnostics, and preview for the current public website.</p>
+                            <span class="admin-eyebrow">Website Workspace</span>
+                            <h3>What do you want to do today?</h3>
+                            <p>Manage the public website, preview changes, and check launch readiness without leaving this workspace.</p>
                         </div>
                         <div class="website-runtime-actions">
                             <button id="websiteRuntimeRefresh" class="admin-secondary-btn" type="button" data-admin-i18n="refresh">Refresh</button>
@@ -422,16 +422,16 @@
                         </div>
                     </header>
 
-                    <div class="website-runtime-tabs" role="tablist" aria-label="Website runtime sections">
-                        <button class="active" type="button" role="tab" aria-selected="true" data-website-runtime-tab="overview" data-admin-i18n="overview">Overview</button>
-                        <button type="button" role="tab" aria-selected="false" data-website-runtime-tab="home" data-admin-i18n="home">Home</button>
-                        <button type="button" role="tab" aria-selected="false" data-website-runtime-tab="navigation" data-admin-i18n="navigation">Navigation</button>
-                        <button type="button" role="tab" aria-selected="false" data-website-runtime-tab="games" data-admin-i18n="games_explore">Games & Explore</button>
-                        <button type="button" role="tab" aria-selected="false" data-website-runtime-tab="campaigns" data-admin-i18n="campaigns">Campaigns</button>
-                        <button type="button" role="tab" aria-selected="false" data-website-runtime-tab="regions" data-admin-i18n="regions">Regions</button>
-                        <button type="button" role="tab" aria-selected="false" data-website-runtime-tab="configuration">Configuration</button>
+                    <div class="website-runtime-tabs" role="tablist" aria-label="Website owner workspace sections">
+                        <button class="active" type="button" role="tab" aria-selected="true" data-website-runtime-tab="overview">Start</button>
+                        <button type="button" role="tab" aria-selected="false" data-website-runtime-tab="home">Manage Home</button>
+                        <button type="button" role="tab" aria-selected="false" data-website-runtime-tab="games">Manage Games</button>
+                        <button type="button" role="tab" aria-selected="false" data-website-runtime-tab="campaigns">Promotions</button>
+                        <button type="button" role="tab" aria-selected="false" data-website-runtime-tab="regions">Regions</button>
                         <button type="button" role="tab" aria-selected="false" data-website-runtime-tab="preview" data-admin-i18n="preview">Preview</button>
-                        <button type="button" role="tab" aria-selected="false" data-website-runtime-tab="diagnostics" data-admin-i18n="diagnostics">Diagnostics</button>
+                        <button type="button" role="tab" aria-selected="false" data-website-runtime-tab="configuration">Publish Status</button>
+                        <button class="website-runtime-tab--developer" type="button" role="tab" aria-selected="false" data-website-runtime-tab="navigation" hidden>Navigation</button>
+                        <button class="website-runtime-tab--developer" type="button" role="tab" aria-selected="false" data-website-runtime-tab="diagnostics" hidden>Diagnostics</button>
                     </div>
 
                     <div id="websiteRuntimeStatus" class="website-runtime-status" aria-live="polite">

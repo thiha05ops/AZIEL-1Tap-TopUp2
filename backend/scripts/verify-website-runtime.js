@@ -111,6 +111,11 @@ function verifyAdminWorkspaceAndKernelIntegration() {
     includes("frontend/admin.html", "data-section=\"website\"", "Website app nav item must exist.");
     includes("frontend/admin.html", "data-admin-permission=\"SITE_CONTENT_READ\"", "Website app must use Site Content read permission.");
     includes("frontend/admin.html", "id=\"section-website\"", "Website workspace section must exist.");
+    includes("frontend/admin.html", "Website Workspace", "Website section must present owner-first workspace label.");
+    includes("frontend/admin.html", "What do you want to do today?", "Website landing must answer the owner task question.");
+    includes("frontend/admin.html", "Manage Home", "Owner task navigation must expose Manage Home.");
+    includes("frontend/admin.html", "Publish Status", "Owner task navigation must expose Publish Status.");
+    includes("frontend/admin.html", "website-runtime-tab--developer", "Developer tabs must remain available without dominating owner navigation.");
     includes("frontend/admin.html", "/js/admin-website-runtime.js", "Website runtime frontend controller must load.");
     includes("frontend/js/admin-app.js", "website:", "Website section title must be registered.");
     includes("frontend/js/os/apps/core-app-manifest.js", "website: 15", "Kernel app ordering must include Website.");
@@ -129,6 +134,11 @@ function verifyAdminWorkspaceAndKernelIntegration() {
     includes("frontend/js/admin-website-runtime.js", "configurationReadiness", "Frontend must render configuration readiness.");
     includes("frontend/js/admin-website-runtime.js", "renderRuntimeHealth", "Frontend must render runtime health.");
     includes("frontend/js/admin-website-runtime.js", "renderMigrationQueue", "Frontend must render migration queue.");
+    includes("frontend/js/admin-website-runtime.js", "renderOwnerContextBar", "Owner workspace must show region, draft, preview, and publish context.");
+    includes("frontend/js/admin-website-runtime.js", "ownerActionCard", "Owner workspace must provide task cards.");
+    includes("frontend/js/admin-website-runtime.js", "website-developer-tools", "Developer tools must remain available through progressive disclosure.");
+    includes("frontend/js/admin-website-runtime.js", "ownerReadinessLabel", "Owner workspace must translate technical readiness into owner language.");
+    includes("frontend/js/admin-website-runtime.js", "Start editing to create a new editing session.", "Technical empty session state must have owner-facing copy.");
     includes("frontend/js/admin-website-runtime.js", "data-website-inventory-search", "Frontend must expose inventory search.");
     includes("frontend/js/admin-website-runtime.js", "websitePreviewHealth", "Frontend must render preview health.");
     includes("frontend/js/admin-website-runtime.js", "buildPreviewUrl", "Preview must use one canonical URL builder.");
@@ -173,6 +183,9 @@ function verifyPublicUnchanged() {
 
 function verifyResponsiveAndI18n() {
     includes("frontend/css/admin/admin-design-system.css", ".website-runtime-workspace", "Website workspace styles must exist.");
+    includes("frontend/css/admin/admin-design-system.css", ".website-owner-action-grid", "Owner action card layout must exist.");
+    includes("frontend/css/admin/admin-design-system.css", ".website-owner-context", "Owner context bar layout must exist.");
+    includes("frontend/css/admin/admin-design-system.css", ".website-developer-tools", "Developer tools progressive disclosure styling must exist.");
     includes("frontend/css/admin/admin-design-system.css", ".website-preview-frame-wrap.mobile iframe", "Mobile preview width must be bounded.");
     includes("frontend/css/admin/admin-design-system.css", ".website-runtime-detail-card", "Expandable inventory cards must be styled.");
     includes("frontend/css/admin/admin-design-system.css", ".website-runtime-health-grid", "Runtime health grid must be styled.");

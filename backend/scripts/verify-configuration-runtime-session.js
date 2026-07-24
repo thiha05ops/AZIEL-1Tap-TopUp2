@@ -153,7 +153,9 @@ function verifyRoutesAndUi() {
     includes("frontend/js/admin-website-runtime.js", "Reopen Session", "UI must handle expired session recovery.");
     includes("frontend/js/admin-website-runtime.js", "expiresAt", "UI must display session expiry.");
     notIncludes("frontend/js/admin-website-runtime.js", "Save Session", "Session UI must not expose save.");
-    notIncludes("frontend/js/admin-website-runtime.js", "Publish", "Session UI must not expose publish.");
+    notIncludes("frontend/js/admin-website-runtime.js", "data-configuration-publish", "Session UI must not expose publish action.");
+    notIncludes("frontend/js/admin-website-runtime.js", "Publish Session", "Session UI must not expose publish session action.");
+    includes("frontend/js/admin-website-runtime.js", "Publishing is not implemented in this workspace.", "Owner publish status must remain read-only.");
     includes("backend/services/websiteRuntimeService.js", "sessionDiagnostics", "Website Runtime must include session diagnostics.");
 }
 

@@ -513,6 +513,170 @@ body.theme-light.admin-body .admin-nav-search {
   min-width: 0;
 }
 
+.website-owner-context {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.website-owner-context article {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-md);
+  background: rgba(139, 92, 246, .08);
+}
+
+.website-owner-context span,
+.website-owner-context small {
+  display: block;
+  color: var(--admin-text-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.website-owner-context strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--admin-text);
+  overflow-wrap: anywhere;
+}
+
+.website-owner-hero,
+.website-owner-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+  padding: 18px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-lg);
+  background: linear-gradient(135deg, rgba(139, 92, 246, .16), rgba(14, 165, 233, .08)), var(--admin-surface-raised);
+  color: var(--admin-text);
+}
+
+.website-owner-hero h3,
+.website-owner-section-head h3 {
+  margin: 4px 0;
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.website-owner-hero p,
+.website-owner-section-head p {
+  max-width: 720px;
+  color: var(--admin-text-muted);
+}
+
+.website-owner-action-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.website-owner-action-card {
+  display: grid;
+  align-content: space-between;
+  gap: 16px;
+  min-height: 168px;
+  padding: 16px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-lg);
+  background: var(--admin-surface-raised);
+  color: var(--admin-text);
+}
+
+.website-owner-action-card h4 {
+  margin: 0 0 7px;
+  font-size: 18px;
+}
+
+.website-owner-action-card p {
+  margin: 0;
+  color: var(--admin-text-muted);
+}
+
+.website-owner-action-card .admin-secondary-btn {
+  justify-self: start;
+}
+
+.website-developer-tools {
+  margin-top: 14px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-lg);
+  background: color-mix(in srgb, var(--admin-surface-raised) 92%, transparent);
+  color: var(--admin-text);
+  overflow: clip;
+}
+
+.website-developer-tools > summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.website-developer-tools > summary::-webkit-details-marker {
+  display: none;
+}
+
+.website-developer-tools > summary span {
+  display: block;
+  color: var(--admin-text-muted);
+}
+
+.website-developer-tools > summary b {
+  color: var(--admin-text-muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.website-developer-tools[open] {
+  padding-bottom: 14px;
+}
+
+.website-developer-tools[open] > :not(summary) {
+  margin-inline: 14px;
+}
+
+.website-developer-tool-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.website-developer-tool {
+  display: grid;
+  gap: 4px;
+  min-height: 74px;
+  padding: 12px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-md);
+  background: var(--admin-surface);
+  color: var(--admin-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.website-developer-tool:hover,
+.website-developer-tool:focus-visible {
+  border-color: var(--admin-border-strong);
+  background: rgba(139, 92, 246, .12);
+}
+
+.website-developer-tool span {
+  color: var(--admin-text-muted);
+  font-size: 12px;
+}
+
 .website-runtime-grid,
 .website-runtime-owner-grid {
   display: grid;
@@ -5249,6 +5413,14 @@ button.media-asset-card {
   }
 }
 
+@media (max-width: 1100px) {
+  .website-owner-context,
+  .website-owner-action-grid,
+  .website-developer-tool-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 768px) {
   html,
   body.admin-body {
@@ -5434,12 +5606,17 @@ button.media-asset-card {
   }
 
   .website-runtime-header,
+  .website-owner-hero,
+  .website-owner-section-head,
   .website-runtime-card,
   .website-runtime-row {
     display: grid;
     grid-template-columns: 1fr;
   }
 
+  .website-owner-context,
+  .website-owner-action-grid,
+  .website-developer-tool-grid,
   .website-runtime-grid,
   .website-runtime-owner-grid,
   .website-runtime-health-grid,

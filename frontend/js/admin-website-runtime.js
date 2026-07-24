@@ -164,6 +164,64 @@
         return `readiness-${String(value || "unknown").toLowerCase()}`;
     }
 
+    function ownerReadinessLabel(value = "") {
+        const labels = {
+            READY: "Ready",
+            HEALTHY: "Ready",
+            PARTIAL: "Needs Review",
+            WARNING: "Needs Review",
+            BLOCKED: "Action Required",
+            ATTENTION: "Action Required",
+            DEGRADED: "Action Required",
+            UNKNOWN: "Unknown",
+            OBSERVING: "Watching"
+        };
+        return labels[String(value || "UNKNOWN").toUpperCase()] || humanizeEnum(value);
+    }
+
+    function draftStatusLabel() {
+        const draft = state.configuration.draft;
+        if (draft?.previewProjection) return "Draft Preview Ready";
+        if (draft?.dirtyState?.isDirty) return "Draft Available";
+        if (draft) return "Draft Open";
+        return "No Draft";
+    }
+
+    function publishStatusLabel(data = state.data || {}) {
+        const readiness = data.runtimeHealth?.configurationReadiness?.status || data.runtime?.status || "UNKNOWN";
+        if (state.configuration.draft?.dirtyState?.isDirty) return "Draft Available";
+        if (readiness === "READY" || readiness === "HEALTHY") return "Ready to Publish";
+        if (readiness === "PARTIAL" || readiness === "WARNING") return "Needs Review";
+        if (readiness === "BLOCKED" || readiness === "DEGRADED" || readiness === "ATTENTION") return "Action Required";
+        return "No Draft";
+    }
+
+    function renderOwnerContextBar(data = state.data || {}) {
+        const route = state.previewRoute || "/home.html";
+        const previewState = state.previewHealth.refreshState || "Idle";
+        return `
+            <section class="website-owner-context" aria-label="Website workspace context">
+                <article>
+                    <span>Current Region</span>
+                    <strong>${escapeHtml(state.configuration.contextRegion || state.previewRegion || "MM")}</strong>
+                </article>
+                <article>
+                    <span>Current Draft</span>
+                    <strong>${escapeHtml(draftStatusLabel())}</strong>
+                </article>
+                <article>
+                    <span>Preview Status</span>
+                    <strong>${escapeHtml(ownerReadinessLabel(previewState))}</strong>
+                    <small>${escapeHtml(route)}</small>
+                </article>
+                <article>
+                    <span>Publish Readiness</span>
+                    <strong>${escapeHtml(publishStatusLabel(data))}</strong>
+                </article>
+            </section>
+        `;
+    }
+
     function searchableInventoryText(entry = {}) {
         return [
             entry.sourceOwner,
@@ -176,6 +234,11 @@
             entry.configurationReadiness,
             entry.ownerAppId
         ].filter(Boolean).join(" ").toLowerCase();
+    }
+
+    function openWebsiteTab(tab) {
+        state.activeTab = tab || "overview";
+        renderWebsiteRuntime();
     }
 
     function initWebsiteRuntime() {
@@ -342,7 +405,7 @@
 
         const renderers = {
             overview: renderOverview,
-            home: () => renderDomain("Home"),
+            home: renderOwnerHome,
             navigation: () => renderDomain("Navigation"),
             games: () => renderDomain("Games"),
             campaigns: () => renderDomain("Campaigns"),
@@ -355,19 +418,112 @@
         bindWebsiteRuntimeActions(content, data);
     }
 
+    function renderOwnerHome(data) {
+        const homeItems = (data.inventory || []).filter(entry => entry.domain === "Home");
+        const readyCount = homeItems.filter(entry => ["READY", "HEALTHY"].includes(entry.configurationReadiness || entry.status)).length;
+        const reviewCount = Math.max(0, homeItems.length - readyCount);
+        return `
+            ${renderOwnerContextBar(data)}
+            <section class="website-owner-section-head">
+                <div>
+                    <span class="admin-eyebrow">Manage Home</span>
+                    <h3>Home screen controls</h3>
+                    <p>Hero banner, placements, featured content, trending content, sections, draft status, and preview.</p>
+                </div>
+                <button class="admin-secondary-btn" type="button" data-website-runtime-open="preview">Preview Home</button>
+            </section>
+            <section class="website-owner-action-grid" aria-label="Home management tasks">
+                ${ownerActionCard("Hero Banner", "Open the existing Home Banner owner to manage the top storefront banner.", "home", "Review")}
+                ${ownerActionCard("Placements", "Review assigned home placements and draft state.", "configuration", "Draft Status")}
+                ${ownerActionCard("Featured", "Check featured storefront sections and owner readiness.", "home", "Review")}
+                ${ownerActionCard("Trending", "Review visible content used by high-priority home areas.", "home", "Review")}
+                ${ownerActionCard("Sections", "Review storefront sections without changing public behavior here.", "home", "Review")}
+                ${ownerActionCard("Preview", "Preview the current Home route by region and viewport.", "preview", "Open Preview")}
+            </section>
+            <div class="website-runtime-grid">
+                ${metricCard("Home Items", homeItems.length, "observed surfaces")}
+                ${metricCard("Ready", readyCount, "owner-managed")}
+                ${metricCard("Needs Review", reviewCount, "check before publish")}
+                ${metricCard("Draft", draftStatusLabel(), "editing state")}
+            </div>
+            <details class="website-developer-tools">
+                <summary>
+                    <div>
+                        <strong>Technical Details</strong>
+                        <span>Configuration IDs, adapters, source ownership, diagnostics, and raw readiness.</span>
+                    </div>
+                    <b>Developer</b>
+                </summary>
+                ${renderDomains(["Home"])}
+            </details>
+        `;
+    }
+
     function renderOverview(data) {
         const summary = data.summary || {};
         return `
-            <div class="website-runtime-grid">
-                ${metricCard("Runtime", humanizeEnum(data.runtime?.status || "OBSERVING"), data.runtime?.environment || "")}
-                ${metricCard("Routes", data.publicRoutes?.length || 0, "observed public routes")}
-                ${metricCard("Inventory", summary.total || 0, "normalized items")}
-                ${metricCard("Blocked", summary.blockedReadinessCount || 0, "readiness items")}
-            </div>
-            ${renderRuntimeHealth(data.runtimeHealth || {})}
-            <div class="website-runtime-owner-grid">
-                ${(data.ownershipSummary || []).slice(0, 8).map(ownerCard).join("")}
-            </div>
+            ${renderOwnerContextBar(data)}
+            <section class="website-owner-hero" aria-labelledby="websiteOwnerPrompt">
+                <div>
+                    <span class="admin-eyebrow">Owner Mode</span>
+                    <h3 id="websiteOwnerPrompt">What do you want to do today?</h3>
+                    <p>Choose a daily website task. Technical runtime tools stay available under Developer Tools.</p>
+                </div>
+                <button class="admin-primary-btn" type="button" data-website-runtime-open="preview">Preview Website</button>
+            </section>
+            <section class="website-owner-action-grid" aria-label="Website owner tasks">
+                ${ownerActionCard("Manage Home", "Hero banner, placements, featured, trending, sections, draft status, and preview.", "home", "Open Home")}
+                ${ownerActionCard("Manage Games", "Review games and public catalog surfaces that feed the storefront.", "games", "Open Games")}
+                ${ownerActionCard("Promotions", "Check active campaign and promotional placements.", "campaigns", "Open Promotions")}
+                ${ownerActionCard("Regions", "Review Myanmar and Thailand storefront coverage.", "regions", "Open Regions")}
+                ${ownerActionCard("Preview Website", "See the public website by route, region, and viewport.", "preview", "Open Preview")}
+                ${ownerActionCard("Publish Status", "Check readiness, draft status, validation, and safe next steps.", "configuration", "Check Status")}
+            </section>
+            <details class="website-developer-tools">
+                <summary>
+                    <div>
+                        <strong>Developer Tools</strong>
+                        <span>Runtime, Configuration System, Editing Sessions, Diagnostics, Health, Events, Ownership, and raw details.</span>
+                    </div>
+                    <b>Advanced</b>
+                </summary>
+                <div class="website-developer-tool-grid">
+                    ${developerToolButton("Website Runtime", "overview", `${humanizeEnum(data.runtime?.status || "OBSERVING")} · ${data.runtime?.environment || "browser"}`)}
+                    ${developerToolButton("Configuration System", "configuration", `${state.configuration.data?.definitionCount || 0} definitions`)}
+                    ${developerToolButton("Editing Sessions", "configuration", state.configuration.session?.sessionId ? ownerReadinessLabel(state.configuration.session.status) : "No active session")}
+                    ${developerToolButton("Diagnostics", "diagnostics", `${summary.blockedReadinessCount || 0} action items`)}
+                    ${developerToolButton("Health", "diagnostics", ownerReadinessLabel(data.runtimeHealth?.overallHealth?.status || "UNKNOWN"))}
+                    ${developerToolButton("Ownership", "navigation", `${data.ownershipSummary?.length || 0} owners`)}
+                </div>
+                <div class="website-runtime-grid">
+                    ${metricCard("Website Runtime", humanizeEnum(data.runtime?.status || "OBSERVING"), data.runtime?.environment || "")}
+                    ${metricCard("Routes", data.publicRoutes?.length || 0, "observed public routes")}
+                    ${metricCard("Inventory", summary.total || 0, "normalized items")}
+                    ${metricCard("Action Required", summary.blockedReadinessCount || 0, "readiness items")}
+                </div>
+                ${renderRuntimeHealth(data.runtimeHealth || {})}
+            </details>
+        `;
+    }
+
+    function ownerActionCard(title, description, tab, actionLabel) {
+        return `
+            <article class="website-owner-action-card">
+                <div>
+                    <h4>${escapeHtml(title)}</h4>
+                    <p>${escapeHtml(description)}</p>
+                </div>
+                <button class="admin-secondary-btn" type="button" data-website-runtime-open="${escapeHtml(tab)}">${escapeHtml(actionLabel)}</button>
+            </article>
+        `;
+    }
+
+    function developerToolButton(title, tab, description) {
+        return `
+            <button class="website-developer-tool" type="button" data-website-runtime-open="${escapeHtml(tab)}">
+                <strong>${escapeHtml(title)}</strong>
+                <span>${escapeHtml(description || "Open")}</span>
+            </button>
         `;
     }
 
@@ -557,6 +713,46 @@
         const actionDisabled = actionLoading ? "disabled" : "";
         const actionLabel = actionLoading ? "Working..." : "";
         return `
+            ${renderOwnerContextBar(state.data || {})}
+            <section class="website-owner-section-head">
+                <div>
+                    <span class="admin-eyebrow">Publish Status</span>
+                    <h3>${escapeHtml(publishStatusLabel(state.data || {}))}</h3>
+                    <p>Review draft state, validate changes, and preview safely. Publishing is not implemented in this workspace.</p>
+                </div>
+                <button class="admin-secondary-btn" type="button" data-website-runtime-open="preview">Preview Website</button>
+            </section>
+            <article class="website-runtime-card">
+                <div>
+                    <span class="admin-status-pill ${draft?.dirtyState?.isDirty ? "readiness-warning" : ""}">${escapeHtml(draftStatusLabel())}</span>
+                    <h4>${escapeHtml(draft ? "Draft changes are available." : "No draft changes yet.")}</h4>
+                    <p>${escapeHtml(sessionActive ? "You can create, validate, preview, or discard runtime-only draft changes." : "Start editing to create a new editing session.")}</p>
+                </div>
+            </article>
+            <section class="website-runtime-config-actions">
+                <label class="website-runtime-search">
+                    <span>Current Region</span>
+                    <select data-configuration-region>
+                        <option value="MM" ${configState.contextRegion === "MM" ? "selected" : ""}>Myanmar</option>
+                        <option value="TH" ${configState.contextRegion === "TH" ? "selected" : ""}>Thailand</option>
+                    </select>
+                </label>
+                <button class="admin-secondary-btn" type="button" data-configuration-open-session="${escapeHtml(definition.id || "website.home.placements")}" ${actionDisabled}>${escapeHtml(sessionActive ? "Reopen Session" : "Start Editing")}</button>
+                <button class="admin-secondary-btn" type="button" data-draft-create="${escapeHtml(session?.sessionId || "")}" ${sessionActive && !actionLoading ? "" : "disabled"}>${actionLoading === "createDraft" ? "Working..." : "Create Draft"}</button>
+                <button class="admin-secondary-btn" type="button" data-draft-toggle="${escapeHtml(session?.sessionId || "")}" ${draft && sessionActive && !actionLoading ? "" : "disabled"}>${actionLoading === "updateDraft" ? "Working..." : "Toggle First Placement"}</button>
+                <button class="admin-secondary-btn" type="button" data-draft-validate="${escapeHtml(session?.sessionId || "")}" ${draft && sessionActive && !actionLoading ? "" : "disabled"}>${actionLoading === "validateDraft" ? "Working..." : "Validate Draft"}</button>
+                <button class="admin-secondary-btn" type="button" data-draft-preview="${escapeHtml(session?.sessionId || "")}" ${draft && sessionActive && !actionLoading ? "" : "disabled"}>${actionLoading === "previewDraft" ? "Working..." : "Preview Draft"}</button>
+                <button class="admin-secondary-btn" type="button" data-draft-discard="${escapeHtml(session?.sessionId || "")}" ${draft && sessionActive && !actionLoading ? "" : "disabled"}>${actionLoading === "discardDraft" ? "Working..." : "Discard Draft"}</button>
+            </section>
+            ${draft?.previewProjection ? renderDraftPreview(draft.previewProjection) : ""}
+            <details class="website-developer-tools">
+                <summary>
+                    <div>
+                        <strong>Developer Tools</strong>
+                        <span>Configuration System, Editing Session, adapters, validation detail, readiness diagnostics, and raw projection data.</span>
+                    </div>
+                    <b>Advanced</b>
+                </summary>
             <div class="website-runtime-grid">
                 ${metricCard("Registry", humanizeEnum(registry.lifecycleStatus || diagnostics.lifecycleStatus), "lifecycle")}
                 ${metricCard("Definitions", registry.definitionCount || 0, "registered contracts")}
@@ -610,6 +806,7 @@
             ${renderConfigurationDraft(session, draft)}
             ${resolution ? renderConfigurationResolution(resolution) : ""}
             ${validation ? renderConfigurationValidation(validation) : ""}
+            </details>
         `;
     }
 
@@ -883,6 +1080,10 @@
                     document.querySelector(`.admin-nav[data-section="${appId}"]`)?.click();
                 }
             });
+        });
+
+        root.querySelectorAll("[data-website-runtime-open]").forEach(btn => {
+            btn.addEventListener("click", () => openWebsiteTab(btn.dataset.websiteRuntimeOpen || "overview"));
         });
 
         root.querySelector("[data-website-inventory-search]")?.addEventListener("input", event => {
