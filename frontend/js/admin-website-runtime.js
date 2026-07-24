@@ -17,7 +17,8 @@
             session: null,
             sessionDiagnostics: null,
             draft: null,
-            contextRegion: "MM"
+            contextRegion: "MM",
+            actionLoading: ""
         },
         previewHealth: {
             iframeLoaded: false,
@@ -29,8 +30,13 @@
             refreshState: "Idle",
             sameOriginState: "Same-origin sandbox"
         },
-        previewStartedAt: 0
+        previewStartedAt: 0,
+        previewLoadToken: 0,
+        previewTimeoutId: null
     };
+
+    const PREVIEW_REGIONS = ["MM", "TH"];
+    const PREVIEW_MODES = ["desktop", "tablet", "mobile"];
 
     window.addEventListener("aziel:admin-section-opened", event => {
         if (event.detail?.section === "website") initWebsiteRuntime();
@@ -105,6 +111,53 @@
             hour12: true
         }).format(date);
         return `${datePart}, ${timePart}, Asia/Bangkok`;
+    }
+
+    function getKernelService(name) {
+        try {
+            const services = window.AZIELOS?.services;
+            if (!services?.resolve) return null;
+            if (typeof services.has === "function" && !services.has(name)) return null;
+            return services.resolve(name);
+        } catch (_error) {
+            return null;
+        }
+    }
+
+    function showRuntimeNotice(message, type = "error") {
+        if (window.showAdminToast) {
+            window.showAdminToast(message, type);
+            return;
+        }
+        state.configuration.error = message;
+    }
+
+    function allowedPreviewRoutes() {
+        const routes = state.data?.publicRoutes || [];
+        return routes.map(route => route.path).filter(path => typeof path === "string" && path.startsWith("/") && !path.startsWith("//"));
+    }
+
+    function normalizePreviewRoute(route) {
+        const fallback = allowedPreviewRoutes().includes("/home.html") ? "/home.html" : allowedPreviewRoutes()[0] || "/home.html";
+        const cleanRoute = String(route || "").split("?")[0].trim();
+        return allowedPreviewRoutes().includes(cleanRoute) ? cleanRoute : fallback;
+    }
+
+    function normalizePreviewRegion(region) {
+        return PREVIEW_REGIONS.includes(region) ? region : "MM";
+    }
+
+    function normalizePreviewMode(mode) {
+        return PREVIEW_MODES.includes(mode) ? mode : "desktop";
+    }
+
+    function buildPreviewUrl({ cacheBust = false } = {}) {
+        state.previewRoute = normalizePreviewRoute(state.previewRoute);
+        state.previewRegion = normalizePreviewRegion(state.previewRegion);
+        const params = new URLSearchParams();
+        params.set("azPreviewRegion", state.previewRegion);
+        if (cacheBust) params.set("azPreviewRefresh", String(Date.now()));
+        return `${state.previewRoute}?${params.toString()}`;
     }
 
     function readinessClass(value = "") {
@@ -186,21 +239,24 @@
         if (state.configuration.loading && !force) return;
         state.configuration.loading = true;
         state.configuration.error = "";
+        state.configuration.actionLoading = "";
         if (state.activeTab === "configuration") renderWebsiteRuntime();
 
         try {
-            const service = window.AZIELOS?.services?.resolve?.("configuration");
-            const sessionService = window.AZIELOS?.services?.resolve?.("configurationSession");
+            const service = getKernelService("configuration");
+            const sessionService = getKernelService("configurationSession");
             const data = service ? await service.list() : await adminFetch("/api/admin/configuration-registry");
             if (!data?.success) throw new Error(data?.message || "Configuration registry unavailable");
             state.configuration.data = data.registry || null;
             if (sessionService) {
                 const sessions = await sessionService.list();
                 state.configuration.sessionDiagnostics = sessions.diagnostics || null;
-                state.configuration.session = (sessions.sessions || []).find(session => (
+                const activeSession = (sessions.sessions || []).find(session => (
                     session.configurationId === "website.home.placements" &&
-                    ["OPEN", "ACTIVE", "VALIDATED"].includes(session.status)
-                )) || state.configuration.session;
+                    ["OPEN", "ACTIVE", "VALIDATED"].includes(session.status) &&
+                    session.context?.region === state.configuration.contextRegion
+                ));
+                if (activeSession) state.configuration.session = activeSession;
             }
             window.AZIELOS?.events?.emit?.("configuration.definition.registered", {
                 definitionCount: state.configuration.data?.definitionCount || 0
@@ -492,10 +548,14 @@
         const draftDiagnostics = registry.draftDiagnostics || state.data?.configurationRegistry?.draftDiagnostics || {};
         const definition = (registry.definitions || []).find(item => item.id === "website.home.placements") || registry.definitions?.[0] || {};
         const session = configState.session;
-        const sessionActive = session?.sessionId && !["CLOSED", "EXPIRED", "FAILED"].includes(session.status);
+        const sessionContextMatches = session?.context?.region === configState.contextRegion;
+        const sessionActive = session?.sessionId && sessionContextMatches && !["CLOSED", "EXPIRED", "FAILED"].includes(session.status);
         const resolution = configState.resolution || session;
         const validation = configState.validation || session?.validation;
         const draft = configState.draft;
+        const actionLoading = configState.actionLoading;
+        const actionDisabled = actionLoading ? "disabled" : "";
+        const actionLabel = actionLoading ? "Working..." : "";
         return `
             <div class="website-runtime-grid">
                 ${metricCard("Registry", humanizeEnum(registry.lifecycleStatus || diagnostics.lifecycleStatus), "lifecycle")}
@@ -540,11 +600,11 @@
                         <option value="TH" ${configState.contextRegion === "TH" ? "selected" : ""}>Thailand</option>
                     </select>
                 </label>
-                <button class="admin-secondary-btn" type="button" data-configuration-open-session="${escapeHtml(definition.id || "website.home.placements")}">Open Session</button>
-                <button class="admin-secondary-btn" type="button" data-configuration-resolve-session="${escapeHtml(session?.sessionId || "")}" ${sessionActive ? "" : "disabled"}>Resolve</button>
-                <button class="admin-secondary-btn" type="button" data-configuration-validate-session="${escapeHtml(session?.sessionId || "")}" ${sessionActive ? "" : "disabled"}>Validate</button>
-                <button class="admin-secondary-btn" type="button" data-configuration-close-session="${escapeHtml(session?.sessionId || "")}" ${sessionActive ? "" : "disabled"}>Close Session</button>
-                <button class="admin-secondary-btn" type="button" data-configuration-refresh>Refresh Registry</button>
+                <button class="admin-secondary-btn" type="button" data-configuration-open-session="${escapeHtml(definition.id || "website.home.placements")}" ${actionDisabled}>${escapeHtml(sessionActive ? "Reopen Session" : "Open Session")}</button>
+                <button class="admin-secondary-btn" type="button" data-configuration-resolve-session="${escapeHtml(session?.sessionId || "")}" ${sessionActive && !actionLoading ? "" : "disabled"}>${actionLoading === "resolveSession" ? actionLabel : "Resolve"}</button>
+                <button class="admin-secondary-btn" type="button" data-configuration-validate-session="${escapeHtml(session?.sessionId || "")}" ${sessionActive && !actionLoading ? "" : "disabled"}>${actionLoading === "validateSession" ? actionLabel : "Validate"}</button>
+                <button class="admin-secondary-btn" type="button" data-configuration-close-session="${escapeHtml(session?.sessionId || "")}" ${sessionActive && !actionLoading ? "" : "disabled"}>${actionLoading === "closeSession" ? actionLabel : "Close Session"}</button>
+                <button class="admin-secondary-btn" type="button" data-configuration-refresh ${actionDisabled}>Refresh Registry</button>
             </section>
             ${renderConfigurationSession(session)}
             ${renderConfigurationDraft(session, draft)}
@@ -599,7 +659,10 @@
     }
 
     function renderConfigurationDraft(session, draft) {
-        const sessionActive = session?.sessionId && !["CLOSED", "EXPIRED", "FAILED"].includes(session.status);
+        const sessionActive = session?.sessionId &&
+            session.context?.region === state.configuration.contextRegion &&
+            !["CLOSED", "EXPIRED", "FAILED"].includes(session.status);
+        const actionLoading = state.configuration.actionLoading;
         const changed = draft?.dirtyState?.changedFields || [];
         return `
             <article class="website-runtime-detail-card ${draft?.dirtyState?.isDirty ? "readiness-warning" : ""}" ${draft ? "open" : ""}>
@@ -622,11 +685,11 @@
                     ${detail("Production Mutation", "No")}
                 </div>
                 <section class="website-runtime-config-actions">
-                    <button class="admin-secondary-btn" type="button" data-draft-create="${escapeHtml(session?.sessionId || "")}" ${sessionActive ? "" : "disabled"}>Create Draft</button>
-                    <button class="admin-secondary-btn" type="button" data-draft-toggle="${escapeHtml(session?.sessionId || "")}" ${draft && sessionActive ? "" : "disabled"}>Toggle First Placement</button>
-                    <button class="admin-secondary-btn" type="button" data-draft-validate="${escapeHtml(session?.sessionId || "")}" ${draft && sessionActive ? "" : "disabled"}>Validate Draft</button>
-                    <button class="admin-secondary-btn" type="button" data-draft-preview="${escapeHtml(session?.sessionId || "")}" ${draft && sessionActive ? "" : "disabled"}>Preview Draft</button>
-                    <button class="admin-secondary-btn" type="button" data-draft-discard="${escapeHtml(session?.sessionId || "")}" ${draft && sessionActive ? "" : "disabled"}>Discard Draft</button>
+                    <button class="admin-secondary-btn" type="button" data-draft-create="${escapeHtml(session?.sessionId || "")}" ${sessionActive && !actionLoading ? "" : "disabled"}>${actionLoading === "createDraft" ? "Working..." : "Create Draft"}</button>
+                    <button class="admin-secondary-btn" type="button" data-draft-toggle="${escapeHtml(session?.sessionId || "")}" ${draft && sessionActive && !actionLoading ? "" : "disabled"}>${actionLoading === "updateDraft" ? "Working..." : "Toggle First Placement"}</button>
+                    <button class="admin-secondary-btn" type="button" data-draft-validate="${escapeHtml(session?.sessionId || "")}" ${draft && sessionActive && !actionLoading ? "" : "disabled"}>${actionLoading === "validateDraft" ? "Working..." : "Validate Draft"}</button>
+                    <button class="admin-secondary-btn" type="button" data-draft-preview="${escapeHtml(session?.sessionId || "")}" ${draft && sessionActive && !actionLoading ? "" : "disabled"}>${actionLoading === "previewDraft" ? "Working..." : "Preview Draft"}</button>
+                    <button class="admin-secondary-btn" type="button" data-draft-discard="${escapeHtml(session?.sessionId || "")}" ${draft && sessionActive && !actionLoading ? "" : "disabled"}>${actionLoading === "discardDraft" ? "Working..." : "Discard Draft"}</button>
                 </section>
                 ${draft?.previewProjection ? renderDraftPreview(draft.previewProjection) : ""}
             </article>
@@ -694,8 +757,11 @@
 
     function renderPreview(data) {
         const routes = data.publicRoutes || [];
+        state.previewRoute = normalizePreviewRoute(state.previewRoute);
+        state.previewRegion = normalizePreviewRegion(state.previewRegion);
+        state.previewMode = normalizePreviewMode(state.previewMode);
         const routeOptions = routes.map(route => `<option value="${escapeHtml(route.path)}" ${route.path === state.previewRoute ? "selected" : ""}>${escapeHtml(route.label)}</option>`).join("");
-        const previewSrc = `${state.previewRoute}?azPreviewRegion=${encodeURIComponent(state.previewRegion)}`;
+        const previewSrc = buildPreviewUrl();
         state.previewHealth.regionApplied = state.previewRegion;
         state.previewHealth.viewport = state.previewMode;
         return `
@@ -713,7 +779,7 @@
                     <button class="admin-secondary-btn" type="button" data-open-preview>${escapeHtml(t("open", "Open"))}</button>
                 </form>
                 <div class="website-preview-frame-wrap ${escapeHtml(state.previewMode)}">
-                    <iframe title="AZIEL public website preview" sandbox="allow-same-origin allow-scripts allow-forms" referrerpolicy="same-origin" src="${escapeHtml(previewSrc)}"></iframe>
+                    <iframe data-preview-frame title="AZIEL public website preview" sandbox="allow-same-origin allow-scripts allow-forms" referrerpolicy="same-origin" src="${escapeHtml(previewSrc)}"></iframe>
                 </div>
                 <div id="websitePreviewHealth" class="website-preview-health">
                     ${renderPreviewHealth(data)}
@@ -826,7 +892,12 @@
 
         root.querySelector("[data-configuration-refresh]")?.addEventListener("click", () => loadConfigurationRegistry(true));
         root.querySelector("[data-configuration-region]")?.addEventListener("change", event => {
-            state.configuration.contextRegion = ["MM", "TH"].includes(event.target.value) ? event.target.value : "MM";
+            state.configuration.contextRegion = normalizePreviewRegion(event.target.value);
+            state.configuration.session = null;
+            state.configuration.resolution = null;
+            state.configuration.validation = null;
+            state.configuration.draft = null;
+            renderWebsiteRuntime();
         });
         root.querySelector("[data-configuration-open-session]")?.addEventListener("click", async event => {
             await openConfigurationSession(event.currentTarget.dataset.configurationOpenSession || "website.home.placements");
@@ -857,61 +928,105 @@
         });
 
         root.querySelector("[data-preview-route]")?.addEventListener("change", event => {
-            state.previewRoute = event.target.value;
-            resetPreviewHealth("Route changed");
+            state.previewRoute = normalizePreviewRoute(event.target.value);
             window.AZIELOS?.events?.emit?.("website.preview.route_changed", { route: state.previewRoute }, { source: "website-app" });
-            renderWebsiteRuntime();
+            navigatePreview(root, "Route changed", true);
         });
         root.querySelector("[data-preview-region]")?.addEventListener("change", event => {
-            state.previewRegion = ["MM", "TH"].includes(event.target.value) ? event.target.value : "MM";
-            resetPreviewHealth("Region changed");
+            state.previewRegion = normalizePreviewRegion(event.target.value);
             window.AZIELOS?.events?.emit?.("website.preview.region_changed", { region: state.previewRegion }, { source: "website-app" });
-            renderWebsiteRuntime();
+            navigatePreview(root, "Region changed", true);
         });
         root.querySelectorAll("[data-preview-mode]").forEach(btn => {
             btn.addEventListener("click", () => {
-                state.previewMode = btn.dataset.previewMode;
+                state.previewMode = normalizePreviewMode(btn.dataset.previewMode);
                 state.previewHealth.viewport = state.previewMode;
-                renderWebsiteRuntime();
+                root.querySelectorAll("[data-preview-mode]").forEach(modeButton => {
+                    const active = modeButton.dataset.previewMode === state.previewMode;
+                    modeButton.classList.toggle("active", active);
+                    modeButton.setAttribute("aria-pressed", active ? "true" : "false");
+                });
+                root.querySelector(".website-preview-frame-wrap")?.classList.remove("desktop", "tablet", "mobile");
+                root.querySelector(".website-preview-frame-wrap")?.classList.add(state.previewMode);
+                updatePreviewHealth(root);
             });
         });
         root.querySelector("[data-refresh-preview]")?.addEventListener("click", () => {
-            const frame = root.querySelector("iframe");
-            if (frame) {
-                resetPreviewHealth("Refreshing");
-                frame.src = frame.src;
-                updatePreviewHealth(root);
-            }
+            navigatePreview(root, "Refreshing", true);
         });
-        const frame = root.querySelector("iframe");
-        if (frame && frame.dataset.bound !== "true") {
-            frame.dataset.bound = "true";
-            state.previewStartedAt = performance.now();
-            frame.addEventListener("load", () => {
-                state.previewHealth = {
-                    ...state.previewHealth,
-                    iframeLoaded: true,
-                    previewLatencyMs: Math.max(0, Math.round(performance.now() - state.previewStartedAt)),
-                    routeAvailable: "Observed",
-                    regionApplied: state.previewRegion,
-                    viewport: state.previewMode,
-                    assetStatus: "Observed",
-                    refreshState: "Loaded",
-                    sameOriginState: "Same-origin sandbox"
-                };
-                updatePreviewHealth(root);
-            }, { once: true });
-        }
+        bindPreviewFrame(root);
         root.querySelector("[data-open-preview]")?.addEventListener("click", () => {
             window.AZIELOS?.events?.emit?.("website.preview.opened", {
                 route: state.previewRoute,
                 region: state.previewRegion
             }, { source: "website-app" });
-            window.open(`${state.previewRoute}?azPreviewRegion=${encodeURIComponent(state.previewRegion)}`, "_blank", "noopener,noreferrer");
+            window.open(buildPreviewUrl(), "_blank", "noopener,noreferrer");
         });
     }
 
+    function navigatePreview(root, refreshState = "Loading", cacheBust = false) {
+        state.previewRoute = normalizePreviewRoute(state.previewRoute);
+        state.previewRegion = normalizePreviewRegion(state.previewRegion);
+        state.previewMode = normalizePreviewMode(state.previewMode);
+        resetPreviewHealth(refreshState);
+        const frame = root.querySelector("[data-preview-frame]");
+        if (!frame) {
+            renderWebsiteRuntime();
+            return;
+        }
+        bindPreviewFrame(root);
+        frame.src = buildPreviewUrl({ cacheBust });
+        updatePreviewHealth(root);
+    }
+
+    function clearPreviewTimeout() {
+        if (state.previewTimeoutId) {
+            window.clearTimeout(state.previewTimeoutId);
+            state.previewTimeoutId = null;
+        }
+    }
+
+    function bindPreviewFrame(root) {
+        const frame = root.querySelector("[data-preview-frame]");
+        if (!frame) return;
+        if (!state.previewStartedAt) state.previewStartedAt = performance.now();
+        const token = state.previewLoadToken;
+        if (frame.dataset.previewLoadToken === String(token)) return;
+        frame.dataset.previewLoadToken = String(token);
+        clearPreviewTimeout();
+        state.previewTimeoutId = window.setTimeout(() => {
+            if (token !== state.previewLoadToken) return;
+            state.previewHealth = {
+                ...state.previewHealth,
+                iframeLoaded: false,
+                previewLatencyMs: Math.max(0, Math.round(performance.now() - state.previewStartedAt)),
+                routeAvailable: "Timeout",
+                assetStatus: "Timeout",
+                refreshState: "Timeout"
+            };
+            updatePreviewHealth(root);
+        }, 12000);
+        frame.addEventListener("load", () => {
+            if (token !== state.previewLoadToken) return;
+            clearPreviewTimeout();
+            state.previewHealth = {
+                ...state.previewHealth,
+                iframeLoaded: true,
+                previewLatencyMs: Math.max(0, Math.round(performance.now() - state.previewStartedAt)),
+                routeAvailable: "Observed",
+                regionApplied: state.previewRegion,
+                viewport: state.previewMode,
+                assetStatus: "Observed",
+                refreshState: "Loaded",
+                sameOriginState: "Same-origin sandbox"
+            };
+            updatePreviewHealth(root);
+        }, { once: true });
+    }
+
     function resetPreviewHealth(refreshState = "Loading") {
+        clearPreviewTimeout();
+        state.previewLoadToken += 1;
         state.previewHealth = {
             iframeLoaded: false,
             routeAvailable: "Unknown",
@@ -933,7 +1048,9 @@
 
     async function resolveConfigurationDefinition(id) {
         try {
-            const service = window.AZIELOS?.services?.resolve?.("configuration");
+            state.configuration.actionLoading = "resolveDefinition";
+            renderWebsiteRuntime();
+            const service = getKernelService("configuration");
             const context = {
                 region: state.configuration.contextRegion,
                 language: window.AZIEL_ADMIN_I18N?.getLocale?.() || "en",
@@ -951,15 +1068,20 @@
             state.configuration.validation = data.resolution?.validation || null;
             renderWebsiteRuntime();
         } catch (error) {
-            state.configuration.error = error?.message || "Configuration resolution failed.";
+            showRuntimeNotice(error?.message || "Configuration resolution failed.");
             renderWebsiteRuntime();
+        } finally {
+            state.configuration.actionLoading = "";
+            if (state.activeTab === "configuration") renderWebsiteRuntime();
         }
     }
 
     async function validateConfigurationDefinition(id) {
         try {
+            state.configuration.actionLoading = "validateDefinition";
+            renderWebsiteRuntime();
             if (!state.configuration.resolution) await resolveConfigurationDefinition(id);
-            const service = window.AZIELOS?.services?.resolve?.("configuration");
+            const service = getKernelService("configuration");
             const context = {
                 region: state.configuration.contextRegion,
                 language: window.AZIEL_ADMIN_I18N?.getLocale?.() || "en",
@@ -977,14 +1099,19 @@
             state.configuration.validation = data.validation || null;
             renderWebsiteRuntime();
         } catch (error) {
-            state.configuration.error = error?.message || "Configuration validation failed.";
+            showRuntimeNotice(error?.message || "Configuration validation failed.");
             renderWebsiteRuntime();
+        } finally {
+            state.configuration.actionLoading = "";
+            if (state.activeTab === "configuration") renderWebsiteRuntime();
         }
     }
 
     async function openConfigurationSession(id) {
         try {
-            const service = window.AZIELOS?.services?.resolve?.("configurationSession");
+            state.configuration.actionLoading = "openSession";
+            renderWebsiteRuntime();
+            const service = getKernelService("configurationSession");
             const context = configurationContext();
             const data = service
                 ? await service.openSession(id, context)
@@ -999,15 +1126,20 @@
             state.configuration.draft = null;
             renderWebsiteRuntime();
         } catch (error) {
-            state.configuration.error = error?.message || "Configuration session failed.";
+            showRuntimeNotice(error?.message || "Configuration session failed.");
             renderWebsiteRuntime();
+        } finally {
+            state.configuration.actionLoading = "";
+            if (state.activeTab === "configuration") renderWebsiteRuntime();
         }
     }
 
     async function resolveConfigurationSession(sessionId) {
         if (!sessionId) return;
         try {
-            const service = window.AZIELOS?.services?.resolve?.("configurationSession");
+            state.configuration.actionLoading = "resolveSession";
+            renderWebsiteRuntime();
+            const service = getKernelService("configurationSession");
             const data = service
                 ? await service.resolveSession(sessionId)
                 : await adminFetch(`/api/admin/configuration-sessions/${encodeURIComponent(sessionId)}/resolve`, {
@@ -1020,15 +1152,20 @@
             state.configuration.validation = data.session?.validation || null;
             renderWebsiteRuntime();
         } catch (error) {
-            state.configuration.error = error?.message || "Configuration session resolution failed.";
+            handleConfigurationSessionError(error, "Configuration session resolution failed.");
             renderWebsiteRuntime();
+        } finally {
+            state.configuration.actionLoading = "";
+            if (state.activeTab === "configuration") renderWebsiteRuntime();
         }
     }
 
     async function validateConfigurationSession(sessionId) {
         if (!sessionId) return;
         try {
-            const service = window.AZIELOS?.services?.resolve?.("configurationSession");
+            state.configuration.actionLoading = "validateSession";
+            renderWebsiteRuntime();
+            const service = getKernelService("configurationSession");
             const data = service
                 ? await service.validateSession(sessionId)
                 : await adminFetch(`/api/admin/configuration-sessions/${encodeURIComponent(sessionId)}/validate`, {
@@ -1041,15 +1178,20 @@
             state.configuration.validation = data.session?.validation || null;
             renderWebsiteRuntime();
         } catch (error) {
-            state.configuration.error = error?.message || "Configuration session validation failed.";
+            handleConfigurationSessionError(error, "Configuration session validation failed.");
             renderWebsiteRuntime();
+        } finally {
+            state.configuration.actionLoading = "";
+            if (state.activeTab === "configuration") renderWebsiteRuntime();
         }
     }
 
     async function closeConfigurationSession(sessionId) {
         if (!sessionId) return;
         try {
-            const service = window.AZIELOS?.services?.resolve?.("configurationSession");
+            state.configuration.actionLoading = "closeSession";
+            renderWebsiteRuntime();
+            const service = getKernelService("configurationSession");
             const data = service
                 ? await service.closeSession(sessionId)
                 : await adminFetch(`/api/admin/configuration-sessions/${encodeURIComponent(sessionId)}/close`, {
@@ -1063,9 +1205,25 @@
             state.configuration.draft = null;
             renderWebsiteRuntime();
         } catch (error) {
-            state.configuration.error = error?.message || "Configuration session close failed.";
+            handleConfigurationSessionError(error, "Configuration session close failed.");
             renderWebsiteRuntime();
+        } finally {
+            state.configuration.actionLoading = "";
+            if (state.activeTab === "configuration") renderWebsiteRuntime();
         }
+    }
+
+    function handleConfigurationSessionError(error, fallbackMessage) {
+        const message = error?.message || fallbackMessage;
+        if (/expired|closed|not found|invalid session/i.test(message)) {
+            state.configuration.session = null;
+            state.configuration.resolution = null;
+            state.configuration.validation = null;
+            state.configuration.draft = null;
+            showRuntimeNotice("Session expired. Reopen Session to continue.", "error");
+            return;
+        }
+        showRuntimeNotice(message, "error");
     }
 
     function configurationContext() {
@@ -1111,7 +1269,9 @@
 
     async function draftRequest(sessionId, method, patch = null) {
         try {
-            const service = window.AZIELOS?.services?.resolve?.("configurationSession");
+            state.configuration.actionLoading = method;
+            renderWebsiteRuntime();
+            const service = getKernelService("configurationSession");
             let data;
             if (service?.[method]) {
                 data = patch ? await service[method](sessionId, patch) : await service[method](sessionId);
@@ -1132,8 +1292,11 @@
             state.configuration.draft = data.draft || null;
             renderWebsiteRuntime();
         } catch (error) {
-            state.configuration.error = error?.message || "Home Placement draft operation failed.";
+            handleConfigurationSessionError(error, "Home Placement draft operation failed.");
             renderWebsiteRuntime();
+        } finally {
+            state.configuration.actionLoading = "";
+            if (state.activeTab === "configuration") renderWebsiteRuntime();
         }
     }
 })();

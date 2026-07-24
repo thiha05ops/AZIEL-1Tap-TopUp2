@@ -1,47 +1,49 @@
 (function () {
     const SERVICE_NAME = "configuration";
     const SESSION_SERVICE_NAME = "configurationSession";
-    let registered = false;
 
     function registerConfigurationBridge() {
         const kernel = window.AZIELOS;
         const factory = window.AZIEL_CONFIGURATION_CLIENT?.createConfigurationClient;
-        if (!kernel?.services || !factory || registered) return;
-        if (kernel.services.has(SERVICE_NAME)) {
-            registered = true;
-            return;
-        }
+        if (!kernel?.services || !factory) return;
+        const hasConfiguration = kernel.services.has?.(SERVICE_NAME);
+        const hasSession = kernel.services.has?.(SESSION_SERVICE_NAME);
+        if (hasConfiguration && hasSession) return;
 
         const client = factory();
-        const service = Object.freeze({
-            list: client.list,
-            get: client.get,
-            resolve: async (id, context = {}) => {
-                const result = await client.resolve(id, context);
-                kernel.events?.emit?.("configuration.resolved", {
-                    configurationId: id,
-                    readiness: result.resolution?.readiness?.state || "UNKNOWN"
-                }, { source: "configuration-runtime-bridge" });
-                return result;
-            },
-            validate: async (id, value = {}, context = {}) => {
-                const result = await client.validate(id, value, context);
-                kernel.events?.emit?.("configuration.validation.completed", {
-                    configurationId: id,
-                    valid: Boolean(result.validation?.valid)
-                }, { source: "configuration-runtime-bridge" });
-                return result;
-            }
-        });
 
-        kernel.services.register(SERVICE_NAME, service, {
-            metadata: {
-                source: "configuration-runtime-bridge",
-                safe: true,
-                readOnly: true
-            }
-        });
-        if (!kernel.services.has(SESSION_SERVICE_NAME)) {
+        if (!hasConfiguration) {
+            const service = Object.freeze({
+                list: client.list,
+                get: client.get,
+                resolve: async (id, context = {}) => {
+                    const result = await client.resolve(id, context);
+                    kernel.events?.emit?.("configuration.resolved", {
+                        configurationId: id,
+                        readiness: result.resolution?.readiness?.state || "UNKNOWN"
+                    }, { source: "configuration-runtime-bridge" });
+                    return result;
+                },
+                validate: async (id, value = {}, context = {}) => {
+                    const result = await client.validate(id, value, context);
+                    kernel.events?.emit?.("configuration.validation.completed", {
+                        configurationId: id,
+                        valid: Boolean(result.validation?.valid)
+                    }, { source: "configuration-runtime-bridge" });
+                    return result;
+                }
+            });
+
+            kernel.services.register(SERVICE_NAME, service, {
+                metadata: {
+                    source: "configuration-runtime-bridge",
+                    safe: true,
+                    readOnly: true
+                }
+            });
+        }
+
+        if (!hasSession) {
             kernel.services.register(SESSION_SERVICE_NAME, Object.freeze({
                 list: client.sessions,
                 openSession: async (id, context = {}) => {
@@ -104,7 +106,6 @@
                 }
             });
         }
-        registered = true;
         kernel.events?.emit?.("configuration.registry.ready", {
             service: SERVICE_NAME
         }, { source: "configuration-runtime-bridge" });
