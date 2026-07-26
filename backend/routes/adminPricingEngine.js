@@ -13,6 +13,22 @@ const {
     saveDraftPricing
 } = require("../services/commerce/adminPricingEngineService");
 
+const PRICING_ENGINE_REQUEST_TIMEOUT_MS = 8000;
+
+function withTimeout(promise, label = "Pricing Engine request") {
+    let timeout = null;
+    const timeoutPromise = new Promise((_, reject) => {
+        timeout = setTimeout(() => {
+            reject(new AdminPricingEngineError(
+                "PRICING_ENGINE_TIMEOUT",
+                `${label} timed out. Please retry.`,
+                504
+            ));
+        }, PRICING_ENGINE_REQUEST_TIMEOUT_MS);
+    });
+    return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeout));
+}
+
 function sendPricingError(res, error) {
     if (error instanceof AdminPricingEngineError) {
         return res.status(error.statusCode || 400).json({
@@ -38,6 +54,19 @@ function sendPricingError(res, error) {
         });
     }
 
+    if (
+        error?.name === "MongoServerError" ||
+        error?.name === "MongooseError" ||
+        /mongo|database|timed out|unavailable/i.test(error?.message || "")
+    ) {
+        console.log("Admin pricing engine data error:", error?.code || error?.name || "PRICING_DATA_UNAVAILABLE");
+        return res.status(503).json({
+            success: false,
+            code: "PRICING_DATA_UNAVAILABLE",
+            message: "Pricing data is temporarily unavailable. Please retry."
+        });
+    }
+
     console.log("Admin pricing engine error:", error?.code || error?.name || "PRICING_ENGINE_FAILED");
     return res.status(500).json({
         success: false,
@@ -57,7 +86,7 @@ function requireOwner(req, res, next) {
 
 router.get("/admin/pricing-engine", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_READ), async (req, res) => {
     try {
-        const state = await getPricingConsoleState();
+        const state = await withTimeout(getPricingConsoleState(), "Pricing Engine load");
         return res.json({ success: true, ...state });
     } catch (error) {
         return sendPricingError(res, error);

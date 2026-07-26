@@ -5,6 +5,8 @@ const PricingPolicy = require("../../models/PricingPolicy");
 const PriceVersion = require("../../models/PriceVersion");
 
 const BRANCH_KEY = "storefront";
+const QUERY_MAX_TIME_MS = 5000;
+const PRODUCT_LIMIT = 250;
 const CONFIG_KEYS = Object.freeze([
     { region: "TH", currency: "THB" },
     { region: "MM", currency: "MMK" }
@@ -132,14 +134,19 @@ function policyName(region, currency, status = "Draft") {
     return `AZIEL ${region}/${currency} ${status} Pricing`;
 }
 
+function boundedQuery(query) {
+    return typeof query?.maxTimeMS === "function" ? query.maxTimeMS(QUERY_MAX_TIME_MS) : query;
+}
+
 async function latestVersion() {
-    return PriceVersion.findOne({ branchKey: BRANCH_KEY })
-        .sort({ versionNumber: -1, createdAt: -1 })
-        .lean();
+    const query = PriceVersion.findOne({ branchKey: BRANCH_KEY })
+        .select("versionId versionNumber status publishedAt publishedBy createdAt metadata")
+        .sort({ versionNumber: -1, createdAt: -1 });
+    return boundedQuery(query).lean();
 }
 
 async function activePolicy(region, currency) {
-    return PricingPolicy.findOne({
+    const query = PricingPolicy.findOne({
         status: "ACTIVE",
         region,
         currency,
@@ -147,11 +154,13 @@ async function activePolicy(region, currency) {
             { $or: [{ effectiveFrom: null }, { effectiveFrom: { $exists: false } }, { effectiveFrom: { $lte: new Date() } }] },
             { $or: [{ effectiveUntil: null }, { effectiveUntil: { $exists: false } }, { effectiveUntil: { $gte: new Date() } }] }
         ]
-    }).sort({ effectiveFrom: -1, updatedAt: -1, _id: -1 }).lean();
+    }).sort({ effectiveFrom: -1, updatedAt: -1, _id: -1 });
+    return boundedQuery(query).lean();
 }
 
 async function draftPolicy(region, currency) {
-    return PricingPolicy.findOne({ code: draftCode(region, currency), status: "DRAFT" }).lean();
+    const query = PricingPolicy.findOne({ code: draftCode(region, currency), status: "DRAFT" });
+    return boundedQuery(query).lean();
 }
 
 function publicPolicy(policy, source, fallbackConfig = null) {
@@ -170,10 +179,7 @@ function publicPolicy(policy, source, fallbackConfig = null) {
     };
 }
 
-async function affectedSummary() {
-    const packages = await CatalogPackage.find({ enabled: true, deletedAt: null })
-        .select("_id productCode packageCode prices")
-        .lean();
+function affectedSummaryFromPackages(packages = []) {
     const products = new Set();
     const currencies = new Set();
     let packageCount = 0;
@@ -192,12 +198,7 @@ async function affectedSummary() {
     };
 }
 
-async function listProductSamples() {
-    const packages = await CatalogPackage.find({ enabled: true, deletedAt: null })
-        .sort({ productCode: 1, sortOrder: 1, packageCode: 1 })
-        .limit(250)
-        .lean();
-
+function productsFromPackages(packages = []) {
     const products = new Map();
     packages.forEach(pkg => {
         const productId = text(pkg.productCode).toLowerCase();
@@ -231,20 +232,70 @@ async function listProductSamples() {
     return [...products.values()].filter(product => product.packages.length);
 }
 
-async function getPricingConsoleState() {
-    const version = await latestVersion();
-    const affected = await affectedSummary();
-    const products = await listProductSamples();
-    const policies = [];
+async function readCatalogPackages() {
+    const query = CatalogPackage.find({ enabled: true, deletedAt: null })
+        .select("_id productCode packageCode name prices sortOrder metadata")
+        .sort({ productCode: 1, sortOrder: 1, packageCode: 1 })
+        .limit(PRODUCT_LIMIT);
+    return boundedQuery(query).lean();
+}
 
+async function readConsolePolicies(now = new Date()) {
+    const draftCodes = CONFIG_KEYS.map(item => draftCode(item.region, item.currency));
+    const query = PricingPolicy.find({
+        $or: [
+            {
+                status: "ACTIVE",
+                region: { $in: CONFIG_KEYS.map(item => item.region) },
+                currency: { $in: CONFIG_KEYS.map(item => item.currency) },
+                $and: [
+                    { $or: [{ effectiveFrom: null }, { effectiveFrom: { $exists: false } }, { effectiveFrom: { $lte: now } }] },
+                    { $or: [{ effectiveUntil: null }, { effectiveUntil: { $exists: false } }, { effectiveUntil: { $gte: now } }] }
+                ]
+            },
+            {
+                status: "DRAFT",
+                code: { $in: draftCodes }
+            }
+        ]
+    })
+        .select("name code status region currency defaultSupplierFee defaultBusinessCost defaultPlatformCost defaultGatewayFee defaultTax defaultProfitRule defaultRoundingRule metadata createdAt updatedAt updatedBy effectiveFrom effectiveUntil")
+        .sort({ status: 1, effectiveFrom: -1, updatedAt: -1, _id: -1 });
+    return boundedQuery(query).lean();
+}
+
+function latestPolicyForKey(policies = [], status, region, currency) {
+    return policies.find(policy => policy.status === status && policy.region === region && policy.currency === currency) || null;
+}
+
+async function getPricingConsoleState() {
+    const startedAt = Date.now();
+    const [version, catalogPackages, policyRecords] = await Promise.all([
+        latestVersion(),
+        readCatalogPackages(),
+        readConsolePolicies()
+    ]);
+    const affected = affectedSummaryFromPackages(catalogPackages);
+    const products = productsFromPackages(catalogPackages);
+    const policies = [];
     for (const item of CONFIG_KEYS) {
-        const active = await activePolicy(item.region, item.currency);
-        const draft = await draftPolicy(item.region, item.currency);
+        const active = latestPolicyForKey(policyRecords, "ACTIVE", item.region, item.currency);
+        const draft = policyRecords.find(policy => policy.status === "DRAFT" && policy.code === draftCode(item.region, item.currency)) || null;
         policies.push({
             region: item.region,
             currency: item.currency,
             active: publicPolicy(active, active ? "active" : "neutral", { ...neutralPolicyConfig(), exchangeRate: item.region === "MM" ? 118 : 1 }),
             draft: publicPolicy(draft, draft ? "draft" : "active-copy", active ? configFromPolicy(active) : { ...neutralPolicyConfig(), exchangeRate: item.region === "MM" ? 118 : 1 })
+        });
+    }
+    const elapsedMs = Date.now() - startedAt;
+    if (elapsedMs > 2000 || process.env.AZIEL_PRICING_ENGINE_TIMING === "true") {
+        console.log("[PRICING_ENGINE] console state loaded", {
+            elapsedMs,
+            products: products.length,
+            packages: catalogPackages.length,
+            policies: policyRecords.length,
+            version: version?.versionNumber || null
         });
     }
 
@@ -392,11 +443,8 @@ async function publishPricing(admin = {}) {
         await PriceVersion.updateOne({ _id: previousVersion._id }, { $set: { status: "SUPERSEDED", supersededAt: now, updatedBy: actor } });
     }
 
-    const affected = await affectedSummary();
-    const packages = await CatalogPackage.find({ enabled: true, deletedAt: null })
-        .select("_id packageCode")
-        .limit(250)
-        .lean();
+    const packages = await readCatalogPackages();
+    const affected = affectedSummaryFromPackages(packages);
     const version = await PriceVersion.create({
         versionNumber,
         branchKey: BRANCH_KEY,
@@ -442,6 +490,7 @@ async function publishPricing(admin = {}) {
 module.exports = {
     AdminPricingEngineError,
     BRANCH_KEY,
+    QUERY_MAX_TIME_MS,
     getPricingConsoleState,
     neutralPolicyConfig,
     publishPricing,

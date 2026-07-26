@@ -2,7 +2,9 @@
 
 const assert = require("assert");
 const fs = require("fs");
+const http = require("http");
 const path = require("path");
+const { Duplex } = require("stream");
 
 const root = path.join(__dirname, "..", "..");
 const CatalogPackage = require("../models/CatalogPackage");
@@ -17,6 +19,40 @@ const { buildProductionPricingContext } = require("../services/commerce/producti
 
 function read(file) {
     return fs.readFileSync(path.join(root, file), "utf8");
+}
+
+function invokeExpress(app, requestPath) {
+    return new Promise((resolve, reject) => {
+        const chunks = [];
+        class MockSocket extends Duplex {
+            _read() {}
+            _write(chunk, encoding, callback) {
+                chunks.push(Buffer.from(chunk));
+                callback();
+            }
+        }
+
+        const socket = new MockSocket();
+        const req = new http.IncomingMessage(socket);
+        req.method = "GET";
+        req.url = requestPath;
+        req.originalUrl = requestPath;
+        req.headers = { authorization: "Bearer test" };
+
+        const res = new http.ServerResponse(req);
+        res.assignSocket(socket);
+        res.on("finish", () => {
+            const rawBody = Buffer.concat(chunks).toString("utf8");
+            const bodyStart = rawBody.indexOf("\r\n\r\n");
+            resolve({
+                status: res.statusCode,
+                headers: res.getHeaders(),
+                bodyText: bodyStart >= 0 ? rawBody.slice(bodyStart + 4) : rawBody
+            });
+        });
+        res.on("error", reject);
+        app.handle(req, res, reject);
+    });
 }
 
 function assertContains(file, needle, message) {
@@ -36,6 +72,7 @@ function chain(value) {
         sort() { return api; },
         select() { return api; },
         limit() { return api; },
+        maxTimeMS() { return api; },
         lean: async () => clone(value)
     };
     return api;
@@ -63,6 +100,7 @@ function matches(document, query = {}) {
 function installModelMocks() {
     const originals = {
         catalogFind: CatalogPackage.find,
+        policyFind: PricingPolicy.find,
         policyFindOne: PricingPolicy.findOne,
         policyFindOneAndUpdate: PricingPolicy.findOneAndUpdate,
         policyCreate: PricingPolicy.create,
@@ -91,6 +129,7 @@ function installModelMocks() {
     }];
 
     CatalogPackage.find = () => chain(packages);
+    PricingPolicy.find = query => chain(policies.filter(policy => matches(policy, query)));
     PricingPolicy.findOne = query => chain(policies.filter(policy => matches(policy, query)).at(-1) || null);
     PricingPolicy.findOneAndUpdate = (query, update) => {
         let doc = policies.find(policy => matches(policy, query));
@@ -126,10 +165,12 @@ function installModelMocks() {
     };
 
     return {
+        packages,
         policies,
         versions,
         restore() {
             CatalogPackage.find = originals.catalogFind;
+            PricingPolicy.find = originals.policyFind;
             PricingPolicy.findOne = originals.policyFindOne;
             PricingPolicy.findOneAndUpdate = originals.policyFindOneAndUpdate;
             PricingPolicy.create = originals.policyCreate;
@@ -141,6 +182,77 @@ function installModelMocks() {
             PriceVersion.updateOne = originals.versionUpdateOne;
         }
     };
+}
+
+async function verifyApiGetCompletesQuickly() {
+    const mock = installModelMocks();
+    try {
+        for (let index = 0; index < 180; index += 1) {
+            mock.packages.push({
+                _id: `64f0000000000000001${String(index).padStart(3, "0")}`,
+                productCode: `game${index % 20}`,
+                packageCode: `PKG${index}`,
+                name: `Package ${index}`,
+                enabled: true,
+                deletedAt: null,
+                sortOrder: index,
+                prices: {
+                    TH: { amount: 100 + index, currency: "THB", enabled: true },
+                    MM: { amount: 10000 + index, currency: "MMK", enabled: true }
+                },
+                metadata: { gameName: `Game ${index % 20}` }
+            });
+        }
+
+        const adminMiddlewarePath = require.resolve("../middleware/adminMiddleware");
+        const originalAdminMiddleware = require.cache[adminMiddlewarePath];
+        require.cache[adminMiddlewarePath] = {
+            id: adminMiddlewarePath,
+            filename: adminMiddlewarePath,
+            loaded: true,
+            exports: (req, res, next) => {
+                req.admin = { role: "OWNER", username: "owner" };
+                next();
+            }
+        };
+        delete require.cache[require.resolve("../routes/adminPricingEngine")];
+        const express = require("express");
+        const app = express();
+        app.use(express.json());
+        app.use("/api", require("../routes/adminPricingEngine"));
+        try {
+            const startedAt = Date.now();
+            const response = await invokeExpress(app, "/api/admin/pricing-engine");
+            const body = JSON.parse(response.bodyText);
+            const elapsedMs = Date.now() - startedAt;
+            assert.strictEqual(response.status, 200, "Pricing Engine GET must return 200.");
+            assert.strictEqual(body.success, true, "Pricing Engine GET must return success.");
+            assert(elapsedMs < 2000, `Pricing Engine GET should complete under 2s in realistic-volume verifier, got ${elapsedMs}ms.`);
+            assert(Array.isArray(body.products) && body.products.length >= 20, "Pricing Engine GET must return grouped real products.");
+            assert(body.products[0].packages.length > 0, "Pricing Engine GET products must contain package contexts.");
+
+            CatalogPackage.find = () => {
+                throw new Error("database unavailable");
+            };
+            const failureStartedAt = Date.now();
+            const failureResponse = await invokeExpress(app, "/api/admin/pricing-engine");
+            const failureBody = JSON.parse(failureResponse.bodyText);
+            const failureElapsedMs = Date.now() - failureStartedAt;
+            assert.strictEqual(failureResponse.status, 503, "Database failure must return a fast 503.");
+            assert.strictEqual(failureBody.code, "PRICING_DATA_UNAVAILABLE", "Database failure must return an actionable pricing data error.");
+            assert(failureElapsedMs < 1000, `Database failure should return quickly, got ${failureElapsedMs}ms.`);
+            console.log("Pricing Engine API verifier timing:", {
+                successElapsedMs: elapsedMs,
+                failureElapsedMs
+            });
+        } finally {
+            if (originalAdminMiddleware) require.cache[adminMiddlewarePath] = originalAdminMiddleware;
+            else delete require.cache[adminMiddlewarePath];
+            delete require.cache[require.resolve("../routes/adminPricingEngine")];
+        }
+    } finally {
+        mock.restore();
+    }
 }
 
 async function verifyDraftPublishAndQuotePickup() {
@@ -262,6 +374,11 @@ function verifySource() {
     assertContains("frontend/js/admin-pricing-engine.js", "button.textContent = originalText", "Pricing Engine buttons must restore labels after Save/Publish settles.");
     assertContains("frontend/js/admin-pricing-engine.js", "state.saving = false", "Save Draft must clear saving state in finally.");
     assertContains("frontend/js/admin-pricing-engine.js", "state.publishing = false", "Publish must clear publishing state in finally.");
+    assertContains("backend/services/commerce/adminPricingEngineService.js", "Promise.all", "Pricing Engine GET must run independent reads in parallel.");
+    assertContains("backend/services/commerce/adminPricingEngineService.js", "readCatalogPackages", "Pricing Engine GET must use one bounded catalog/package query.");
+    assertContains("backend/services/commerce/adminPricingEngineService.js", "readConsolePolicies", "Pricing Engine GET must use one bounded policy query.");
+    assertContains("backend/services/commerce/adminPricingEngineService.js", "maxTimeMS", "Pricing Engine GET queries must be bounded.");
+    assertContains("backend/routes/adminPricingEngine.js", "PRICING_ENGINE_REQUEST_TIMEOUT_MS", "Pricing Engine GET route must have a hard timeout safety net.");
     assertContains("backend/routes/adminPricingEngine.js", "requireOwner", "Publishing must be OWNER-only.");
     assertContains("backend/services/commerce/adminPricingEngineService.js", "PriceVersion.create", "Publishing must create a PriceVersion.");
     assertContains("backend/services/commerce/productionPricingContextService.js", "\"metadata.policyIds\"", "Production quote context must resolve branch versions published by the admin console.");
@@ -270,6 +387,7 @@ function verifySource() {
 async function main() {
     verifySource();
     await verifyDraftPublishAndQuotePickup();
+    await verifyApiGetCompletesQuickly();
     console.log("Admin Pricing Engine production activation verification passed.");
 }
 
