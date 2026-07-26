@@ -211,6 +211,13 @@ function verifySource() {
     assertContains("frontend/js/admin-pricing-engine.js", "/api/admin/pricing-engine", "Pricing Engine UI must load production config.");
     assertContains("frontend/js/admin-pricing-engine.js", "/api/admin/pricing-engine/draft", "Pricing Engine UI must save backend drafts.");
     assertContains("frontend/js/admin-pricing-engine.js", "/api/admin/pricing-engine/publish", "Pricing Engine UI must publish backend versions.");
+    assertContains("frontend/js/admin-pricing-engine.js", "handleSectionClick", "Pricing Engine actions must use delegated click handling so controls survive rerenders.");
+    assertContains("frontend/js/admin-pricing-engine.js", "event.target.closest(\"[data-pricing-edit]\")", "Pricing Engine Edit buttons must be handled by delegated events.");
+    assertContains("frontend/js/admin-pricing-engine.js", "adminRequest", "Pricing Engine API actions must use bounded request lifecycle.");
+    assertContains("frontend/js/admin-pricing-engine.js", "controller.abort()", "Pricing Engine Save/Publish must not remain loading forever on a hung request.");
+    assertContains("frontend/js/admin-pricing-engine.js", "button.textContent = originalText", "Pricing Engine buttons must restore labels after Save/Publish settles.");
+    assertContains("frontend/js/admin-pricing-engine.js", "state.saving = false", "Save Draft must clear saving state in finally.");
+    assertContains("frontend/js/admin-pricing-engine.js", "state.publishing = false", "Publish must clear publishing state in finally.");
     assertContains("backend/routes/adminPricingEngine.js", "requireOwner", "Publishing must be OWNER-only.");
     assertContains("backend/services/commerce/adminPricingEngineService.js", "PriceVersion.create", "Publishing must create a PriceVersion.");
     assertContains("backend/services/commerce/productionPricingContextService.js", "\"metadata.policyIds\"", "Production quote context must resolve branch versions published by the admin console.");

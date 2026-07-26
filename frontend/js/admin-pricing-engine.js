@@ -19,7 +19,9 @@
         version: null,
         affected: null,
         dirty: false,
-        loading: false
+        loading: false,
+        saving: false,
+        publishing: false
     };
 
     document.addEventListener("DOMContentLoaded", initPricingEngineUi);
@@ -33,19 +35,37 @@
         if (!section || section.dataset.pricingEngineBound === "true") return;
         section.dataset.pricingEngineBound = "true";
 
-        section.querySelectorAll("[data-pricing-edit]").forEach(button => {
-            button.addEventListener("click", () => editDraftValue(section, button.dataset.pricingEdit));
-        });
+        section.addEventListener("click", handleSectionClick);
 
         section.querySelector("#pricingProductSearch")?.addEventListener("input", event => {
             filterProducts(section, event.target.value || "");
         });
 
-        section.querySelector("#pricingSaveDraftBtn")?.addEventListener("click", () => saveDraft(section));
-        section.querySelector("#pricingPublishBtn")?.addEventListener("click", () => publishDraft(section));
-
         setPublishAvailability(section);
         loadProductionState(section);
+    }
+
+    function handleSectionClick(event) {
+        const section = event.currentTarget;
+        const editButton = event.target.closest("[data-pricing-edit]");
+        if (editButton && section.contains(editButton)) {
+            event.preventDefault();
+            editDraftValue(section, editButton.dataset.pricingEdit);
+            return;
+        }
+
+        const saveButton = event.target.closest("#pricingSaveDraftBtn");
+        if (saveButton && section.contains(saveButton)) {
+            event.preventDefault();
+            saveDraft(section);
+            return;
+        }
+
+        const publishButton = event.target.closest("#pricingPublishBtn");
+        if (publishButton && section.contains(publishButton)) {
+            event.preventDefault();
+            publishDraft(section);
+        }
     }
 
     function escapeHTML(value) {
@@ -96,6 +116,16 @@
         return JSON.parse(JSON.stringify(config || neutralConfig()));
     }
 
+    async function adminRequest(url, options = {}, timeoutMs = 20000) {
+        const controller = new AbortController();
+        const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            return await adminFetch(url, { ...options, signal: controller.signal });
+        } finally {
+            window.clearTimeout(timeout);
+        }
+    }
+
     async function loadProductionState(section) {
         if (state.loading) return;
         state.loading = true;
@@ -128,6 +158,7 @@
             setStatus(section, "Pricing unavailable");
         } finally {
             state.loading = false;
+            setPublishAvailability(section);
         }
     }
 
@@ -372,11 +403,17 @@
     }
 
     async function saveDraft(section) {
+        if (state.saving || state.publishing) return false;
+        state.saving = true;
         const button = section.querySelector("#pricingSaveDraftBtn");
-        if (button) button.disabled = true;
+        const originalText = button?.textContent || "Save Draft";
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Saving draft...";
+        }
         setStatus(section, "Saving draft...");
         try {
-            const data = await adminFetch("/api/admin/pricing-engine/draft", {
+            const data = await adminRequest("/api/admin/pricing-engine/draft", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ policies: payloadPolicies() })
@@ -395,11 +432,16 @@
             setStatus(section, "Draft save failed");
             return false;
         } finally {
-            if (button) button.disabled = false;
+            state.saving = false;
+            if (button) {
+                button.textContent = originalText;
+            }
+            setPublishAvailability(section);
         }
     }
 
     async function publishDraft(section) {
+        if (state.publishing || state.saving) return;
         const role = String(window.AZIEL_ADMIN_AUTH?.state?.admin?.role || localStorage.getItem("adminRole") || "").toUpperCase();
         if (role !== "OWNER") {
             setStatus(section, "Owner only");
@@ -412,11 +454,16 @@
             if (!saved) return;
         }
 
+        state.publishing = true;
         const button = section.querySelector("#pricingPublishBtn");
-        if (button) button.disabled = true;
+        const originalText = button?.textContent || "Publish";
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Publishing...";
+        }
         setStatus(section, "Publishing...");
         try {
-            const data = await adminFetch("/api/admin/pricing-engine/publish", { method: "POST" });
+            const data = await adminRequest("/api/admin/pricing-engine/publish", { method: "POST" });
             if (!data?.success) throw new Error(data?.message || "Publish failed.");
             if (data.state) {
                 state.version = data.state.version || data.version || state.version;
@@ -439,6 +486,10 @@
             renderError(section, error);
             setStatus(section, "Publish failed");
         } finally {
+            state.publishing = false;
+            if (button) {
+                button.textContent = originalText;
+            }
             setPublishAvailability(section);
         }
     }
@@ -453,9 +504,9 @@
         const save = section.querySelector("#pricingSaveDraftBtn");
         const role = String(window.AZIEL_ADMIN_AUTH?.state?.admin?.role || localStorage.getItem("adminRole") || "").toUpperCase();
         const canManage = window.AZIEL_ADMIN_AUTH?.hasPermission?.("CATALOG_MANAGE") !== false;
-        if (save) save.disabled = !canManage;
+        if (save) save.disabled = !canManage || state.saving || state.publishing;
         if (publish) {
-            publish.disabled = role !== "OWNER";
+            publish.disabled = role !== "OWNER" || state.saving || state.publishing;
             publish.title = role === "OWNER" ? "Publish production pricing" : "Only OWNER can publish production pricing";
         }
     }
