@@ -22,6 +22,22 @@ function sendPricingError(res, error) {
         });
     }
 
+    if (error?.name === "ValidationError") {
+        return res.status(400).json({
+            success: false,
+            code: "PRICING_VALIDATION_ERROR",
+            message: error.message || "Pricing validation failed."
+        });
+    }
+
+    if (error?.code === 11000) {
+        return res.status(409).json({
+            success: false,
+            code: "PRICING_VERSION_CONFLICT",
+            message: "Pricing version already exists. Reload and try again."
+        });
+    }
+
     console.log("Admin pricing engine error:", error?.code || error?.name || "PRICING_ENGINE_FAILED");
     return res.status(500).json({
         success: false,

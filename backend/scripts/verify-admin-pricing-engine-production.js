@@ -164,8 +164,44 @@ async function verifyDraftPublishAndQuotePickup() {
         }, { username: "owner" });
 
         let state = await getPricingConsoleState();
+        assert(Array.isArray(state.products), "Pricing Engine load must return products.");
+        assert.strictEqual(state.products.length, 1, "Pricing Engine load must group catalog packages by product.");
+        assert(Array.isArray(state.products[0].packages), "Pricing Engine product must include selectable package contexts.");
+        assert.strictEqual(state.products[0].packages[0].supplierPrice, 1000, "Pricing Engine package context must include real supplier/base price.");
         assert.strictEqual(state.policies.find(item => item.region === "TH").draft.config.profitRule.value, 15, "Saved draft must survive backend reload.");
 
+        await saveDraftPricing({
+            policies: [{
+                region: "TH",
+                currency: "THB",
+                config: {
+                    profitRule: { type: "PERCENT", value: 0 },
+                    gatewayFee: { enabled: false, type: "PERCENT", value: 0 },
+                    platformCost: { enabled: false, type: "FIXED", value: 0 },
+                    roundingRule: { enabled: false, mode: "NONE", increment: 0 }
+                }
+            }]
+        }, { username: "owner" });
+        state = await getPricingConsoleState();
+        assert.strictEqual(state.policies.find(item => item.region === "TH").draft.config.profitRule.value, 0, "Pricing Engine draft must preserve valid zero profit.");
+        assert.strictEqual(state.policies.find(item => item.region === "TH").draft.config.gatewayFee.value, 0, "Pricing Engine draft must preserve valid zero gateway fee.");
+
+        await saveDraftPricing({
+            policies: [{
+                region: "TH",
+                currency: "THB",
+                config: {
+                    exchangeRate: 1,
+                    supplierFee: { enabled: false, type: "PERCENT", value: 0 },
+                    businessCost: { enabled: false, type: "FIXED", value: 0 },
+                    gatewayFee: { enabled: true, type: "PERCENT", value: 2 },
+                    platformCost: { enabled: true, type: "FIXED", value: 20 },
+                    tax: { enabled: false, type: "PERCENT", value: 0 },
+                    profitRule: { type: "PERCENT", value: 15 },
+                    roundingRule: { enabled: true, mode: "NEAREST", increment: 10, psychologicalEnding: 0 }
+                }
+            }]
+        }, { username: "owner" });
         const published = await publishPricing({ username: "owner" });
         assert.strictEqual(published.version.versionNumber, 1, "First publish must create pricing version v1.");
         assert.strictEqual(mock.versions[0].status, "PUBLISHED", "Published version must be PUBLISHED.");
@@ -213,8 +249,16 @@ function verifySource() {
     assertContains("frontend/js/admin-pricing-engine.js", "/api/admin/pricing-engine/publish", "Pricing Engine UI must publish backend versions.");
     assertContains("frontend/js/admin-pricing-engine.js", "handleSectionClick", "Pricing Engine actions must use delegated click handling so controls survive rerenders.");
     assertContains("frontend/js/admin-pricing-engine.js", "event.target.closest(\"[data-pricing-edit]\")", "Pricing Engine Edit buttons must be handled by delegated events.");
-    assertContains("frontend/js/admin-pricing-engine.js", "adminRequest", "Pricing Engine API actions must use bounded request lifecycle.");
+    assertContains("frontend/js/admin-pricing-engine.js", "pricingFetch", "Pricing Engine API actions must use bounded request lifecycle.");
     assertContains("frontend/js/admin-pricing-engine.js", "controller.abort()", "Pricing Engine Save/Publish must not remain loading forever on a hung request.");
+    assertContains("frontend/js/admin-pricing-engine.js", "selectedProductId", "Pricing Engine must keep selected product in explicit state.");
+    assertContains("frontend/js/admin-pricing-engine.js", "selectedPackageId", "Pricing Engine must keep selected package in explicit state.");
+    assertContains("frontend/js/admin-pricing-engine.js", "previewError", "Pricing Engine must keep preview error in explicit state.");
+    assertContains("frontend/js/admin-pricing-engine.js", "loadError", "Pricing Engine must keep load error in explicit state.");
+    assertContains("frontend/js/admin-pricing-engine.js", "saveError", "Pricing Engine must keep save error in explicit state.");
+    assertContains("frontend/js/admin-pricing-engine.js", "publishError", "Pricing Engine must keep publish error in explicit state.");
+    assertContains("frontend/js/admin-pricing-engine.js", "getSelectedPackage", "Pricing Engine preview must resolve a real package context.");
+    assertContains("frontend/js/admin-pricing-engine.js", "positiveAmount(selectedPackage.supplierPrice", "Pricing Engine preview must validate package supplier cost.");
     assertContains("frontend/js/admin-pricing-engine.js", "button.textContent = originalText", "Pricing Engine buttons must restore labels after Save/Publish settles.");
     assertContains("frontend/js/admin-pricing-engine.js", "state.saving = false", "Save Draft must clear saving state in finally.");
     assertContains("frontend/js/admin-pricing-engine.js", "state.publishing = false", "Publish must clear publishing state in finally.");

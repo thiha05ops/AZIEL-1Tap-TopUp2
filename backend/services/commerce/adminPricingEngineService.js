@@ -195,13 +195,24 @@ async function affectedSummary() {
 async function listProductSamples() {
     const packages = await CatalogPackage.find({ enabled: true, deletedAt: null })
         .sort({ productCode: 1, sortOrder: 1, packageCode: 1 })
-        .limit(50)
+        .limit(250)
         .lean();
 
-    return packages.flatMap(pkg => {
-        return Object.entries(pkg.prices || {}).map(([region, price]) => {
+    const products = new Map();
+    packages.forEach(pkg => {
+        const productId = text(pkg.productCode).toLowerCase();
+        if (!productId) return;
+        if (!products.has(productId)) {
+            products.set(productId, {
+                productId,
+                productCode: productId,
+                productName: text(pkg.metadata?.gameName || pkg.metadata?.productName || pkg.productCode),
+                packages: []
+            });
+        }
+        Object.entries(pkg.prices || {}).forEach(([region, price]) => {
             if (!price || price.enabled === false) return null;
-            return {
+            products.get(productId).packages.push({
                 productCode: pkg.productCode,
                 productName: text(pkg.metadata?.gameName || pkg.metadata?.productName || pkg.productCode),
                 packageId: String(pkg._id),
@@ -212,9 +223,12 @@ async function listProductSamples() {
                 supplierCurrency: upper(price.currency),
                 supplierPrice: number(price.amount),
                 exchangeRate: 1
-            };
-        }).filter(Boolean);
+            });
+            return null;
+        });
     });
+
+    return [...products.values()].filter(product => product.packages.length);
 }
 
 async function getPricingConsoleState() {

@@ -284,7 +284,7 @@ function verifyModuleIntegrationAndRegressions() {
     assert(html.includes("pricingSaveDraftBtn") && html.includes("pricingPublishBtn"), "Pricing Engine production controls must expose Save Draft and Publish.");
     assert(!html.includes("Simulation Only"), "Pricing Engine must not remain in Simulation Only mode.");
     assert(pricingEngine.includes("initPricingEngineUi"), "Pricing Engine UI controller must initialize production pricing selection.");
-    assert(pricingEngine.includes("syncPricingPreview"), "Pricing Engine selection must update visual preview labels.");
+    assert(pricingEngine.includes("calculateAndRenderPreview"), "Pricing Engine selection must update visual preview labels.");
     assert(pricingEngine.includes("window.AZIEL_COMMERCE_PRICING_ENGINE"), "Pricing Engine UI must consume the shared browser calculation engine.");
     assert(pricingEngine.includes("result.breakdown"), "Pricing Engine preview must render engine breakdown output.");
     assert(pricingEngine.includes("/api/admin/pricing-engine"), "Pricing Engine must load production pricing configuration.");
