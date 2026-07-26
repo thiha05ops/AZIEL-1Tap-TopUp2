@@ -461,7 +461,11 @@ function verifySource() {
     assertContains("frontend/js/admin-pricing-engine.js", "waitForAdminAuthReady", "Pricing Engine must wait for Admin auth readiness before the initial production fetch.");
     assertContains("frontend/js/admin-pricing-engine.js", "state.loadPromise", "Pricing Engine load lifecycle must coalesce duplicate boot/auth requests.");
     assertContains("frontend/js/admin-pricing-engine.js", "[PRICING_ENGINE_ASYNC]", "Pricing Engine async lifecycle must have opt-in timing checkpoints.");
-    assertContains("frontend/admin.html", "pricing-engine-async-lifecycle", "Admin page must request the async lifecycle Pricing Engine controller build.");
+    assertContains("frontend/admin.html", "pricing-engine-resilient-console", "Admin page must request the resilient Pricing Engine controller build.");
+    assertContains("frontend/admin.html", "data-pricing-product-id=", "Static Pricing Engine product cards must expose the canonical delegated-click contract.");
+    assertContains("frontend/js/admin-pricing-engine.js", "apiReady", "Pricing Engine must separate API readiness from local preview interactivity.");
+    assertContains("frontend/js/admin-pricing-engine.js", "hydrateFallbackProductsFromDom", "Pricing Engine must hydrate selectable products from static DOM before API completion.");
+    assertContains("frontend/js/admin-pricing-engine.js", "canPersistPricing", "Pricing Engine must gate Save/Publish on trusted API state and valid preview.");
     assertContains("frontend/js/admin-pricing-engine.js", "selectedProductId", "Pricing Engine must keep selected product in explicit state.");
     assertContains("frontend/js/admin-pricing-engine.js", "selectedPackageId", "Pricing Engine must keep selected package in explicit state.");
     assertContains("frontend/js/admin-pricing-engine.js", "previewError", "Pricing Engine must keep preview error in explicit state.");

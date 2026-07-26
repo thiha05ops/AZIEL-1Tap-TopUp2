@@ -116,6 +116,7 @@
     "verify:commerce-customer-checkout-integration": "node backend/scripts/verify-commerce-customer-checkout-integration.js",
     "verify:commerce-pricing-production-integration": "node backend/scripts/verify-commerce-pricing-production-integration.js",
     "verify:admin-pricing-engine-production": "node backend/scripts/verify-admin-pricing-engine-production.js",
+    "verify:admin-pricing-engine-controller": "node backend/scripts/verify-admin-pricing-engine-controller.js",
     "verify:commerce-checkout-application-service": "node backend/scripts/verify-commerce-checkout-application-service.js",
     "verify:commerce-order-snapshot-runtime": "node backend/scripts/verify-commerce-order-snapshot-runtime.js",
     "verify:commerce-order-persistence": "node backend/scripts/verify-commerce-order-persistence.js",

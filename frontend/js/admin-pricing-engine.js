@@ -29,6 +29,8 @@
         calculating: false,
         saving: false,
         publishing: false,
+        apiReady: false,
+        productSource: "empty",
         loadError: "",
         previewError: "",
         saveError: "",
@@ -68,6 +70,7 @@
         section.dataset.pricingEngineBound = "true";
         section.addEventListener("click", handleSectionClick);
         section.querySelector("#pricingProductSearch")?.addEventListener("input", event => filterProducts(section, event.target.value || ""));
+        hydrateFallbackProductsFromDom(section);
         requestProductionLoad(section, "dom-ready");
         trace("EXIT initPricingEngineUi");
     }
@@ -112,6 +115,14 @@
     function number(value, fallback = 0) {
         const numeric = Number(value);
         return Number.isFinite(numeric) ? numeric : fallback;
+    }
+
+    function slug(value) {
+        return String(value || "")
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "");
     }
 
     function positiveAmount(value, field) {
@@ -177,6 +188,23 @@
     function getSelectedPackage() {
         const product = getSelectedProduct();
         return product.packages.find(pkg => pkg.packageId === state.selectedPackageId) || product.packages[0] || FALLBACK_PRODUCT.packages[0];
+    }
+
+    function hasValidSelection() {
+        const product = state.products.find(item => item.productId === state.selectedProductId);
+        return Boolean(product?.packages?.some(pkg => pkg.packageId === state.selectedPackageId));
+    }
+
+    function canPersistPricing() {
+        return state.apiReady === true &&
+            state.productSource === "server" &&
+            hasValidSelection() &&
+            Boolean(state.preview) &&
+            !state.previewError &&
+            !state.loading &&
+            !state.calculating &&
+            !state.saving &&
+            !state.publishing;
     }
 
     function getDraftPolicy(region, currency) {
@@ -290,6 +318,60 @@
         };
     }
 
+    function normalizeDomProductRow(row) {
+        if (!row) return null;
+        const productName = String(row.dataset.pricingProduct || row.querySelector("strong")?.textContent || "").trim();
+        const productId = String(row.dataset.pricingProductId || row.dataset.pricingProductCode || slug(productName)).trim();
+        const packageId = String(row.dataset.pricingPackageId || row.dataset.pricingPackage || "").trim();
+        const supplierPrice = number(row.dataset.pricingSupplierPrice, NaN);
+        if (!productId || !packageId || !Number.isFinite(supplierPrice)) return null;
+        return {
+            productId,
+            productCode: String(row.dataset.pricingProductCode || productId).trim().toLowerCase(),
+            productName: productName || productId,
+            packages: [{
+                packageId,
+                packageCode: String(row.dataset.pricingPackageCode || packageId).trim(),
+                packageName: String(row.dataset.pricingPackage || row.querySelector("small")?.textContent || packageId).trim(),
+                productCode: String(row.dataset.pricingProductCode || productId).trim().toLowerCase(),
+                productName: productName || productId,
+                region: String(row.dataset.pricingRegion || "TH").toUpperCase(),
+                currency: String(row.dataset.pricingCurrency || "THB").toUpperCase(),
+                supplierCurrency: String(row.dataset.pricingSupplierCurrency || row.dataset.pricingCurrency || "THB").toUpperCase(),
+                supplierPrice,
+                exchangeRate: Math.max(0, number(row.dataset.pricingExchangeRate, 1))
+            }]
+        };
+    }
+
+    function hydrateFallbackProductsFromDom(section) {
+        if (!section || state.products.length) return;
+        const rows = Array.from(section.querySelectorAll("#pricingProductList [data-pricing-product-id]"));
+        const products = rows.map(normalizeDomProductRow).filter(Boolean);
+        if (!products.length) return;
+        const selectedRow = rows.find(row => row.classList.contains("active"));
+        state.products = products;
+        state.productSource = "fallback";
+        state.selectedProductId = selectedRow?.dataset.pricingProductId || products[0].productId;
+        const selectedProduct = getSelectedProduct();
+        state.selectedPackageId = selectedRow?.dataset.pricingPackageId || selectedProduct.packages[0]?.packageId || "";
+        renderProducts(section);
+        calculateAndRenderPreview(section);
+    }
+
+    function preserveSelectionOrDefault(previousProductId = "", previousPackageId = "") {
+        const product = state.products.find(item => item.productId === previousProductId);
+        if (product) {
+            state.selectedProductId = product.productId;
+            const pkg = product.packages.find(item => item.packageId === previousPackageId);
+            state.selectedPackageId = pkg?.packageId || product.packages[0]?.packageId || "";
+            return;
+        }
+        const firstProduct = state.products[0] || FALLBACK_PRODUCT;
+        state.selectedProductId = firstProduct.productId;
+        state.selectedPackageId = firstProduct.packages[0]?.packageId || "";
+    }
+
     function requestProductionLoad(section, reason = "manual") {
         if (!section) return Promise.resolve();
         if (state.loadPromise) {
@@ -305,6 +387,7 @@
     async function loadProductionState(section, reason = "manual") {
         if (state.loading) return state.loadPromise || Promise.resolve();
         trace("ENTER loadProductionState", { reason });
+        hydrateFallbackProductsFromDom(section);
         state.loading = true;
         state.loadError = "";
         setStatus(section, "Loading production pricing...");
@@ -314,6 +397,8 @@
             const data = await pricingFetch("/api/admin/pricing-engine");
             trace("STATE populate started");
             state.products = normalizeProducts(data);
+            state.productSource = "server";
+            state.apiReady = true;
             state.activeVersion = data.version || null;
             state.affected = data.affected || null;
             state.activePolicy.clear();
@@ -335,11 +420,9 @@
                     source: item.draft?.source || "active-copy"
                 });
             });
-            const firstProduct = state.products[0] || FALLBACK_PRODUCT;
-            state.selectedProductId = state.selectedProductId || firstProduct.productId;
-            const selectedProduct = getSelectedProduct();
-            state.selectedPackageId = state.selectedPackageId || selectedProduct.packages[0]?.packageId || "";
+            preserveSelectionOrDefault(state.selectedProductId, state.selectedPackageId);
             state.dirty = false;
+            state.loadError = "";
             trace("STATE populated", { productCount: state.products.length, packageCount: state.products.reduce((sum, item) => sum + item.packages.length, 0) });
             trace("RENDER products started");
             renderProducts(section);
@@ -348,8 +431,14 @@
             calculateAndRenderPreview(section);
             trace("PREVIEW finished");
         } catch (error) {
+            state.apiReady = false;
             state.loadError = `Failed to load pricing: ${error.message}`;
-            renderError(section, state.loadError);
+            if (state.products.length) {
+                calculateAndRenderPreview(section);
+                renderLoadError(section, `${state.loadError} Product selection and local preview remain available. Save and Publish are disabled until production pricing loads.`);
+            } else {
+                renderError(section, state.loadError);
+            }
             setStatus(section, "Pricing unavailable");
             trace("LOAD failed", { message: error.message });
         } finally {
@@ -392,9 +481,16 @@
 
     function selectProduct(section, productId, packageId = "") {
         const product = state.products.find(item => item.productId === productId);
-        if (!product) return;
+        if (!product) {
+            state.preview = null;
+            state.previewError = `Product context unavailable: ${productId || "unknown"}.`;
+            renderError(section, state.previewError);
+            renderButtons(section);
+            return;
+        }
         state.selectedProductId = product.productId;
         state.selectedPackageId = packageId || product.packages[0]?.packageId || "";
+        state.previewError = "";
         renderProducts(section);
         calculateAndRenderPreview(section);
     }
@@ -639,6 +735,14 @@
         setText(section, "#pricingStorefrontPrice", "Unavailable");
     }
 
+    function renderLoadError(section, message) {
+        const errorBox = section.querySelector("#pricingSimulationError");
+        if (errorBox) {
+            errorBox.hidden = false;
+            errorBox.textContent = message || state.loadError || "Production pricing data is unavailable.";
+        }
+    }
+
     function payloadPolicies() {
         return [...state.draftPolicy.values()].map(policy => ({
             region: policy.region,
@@ -677,6 +781,15 @@
 
     async function saveDraft(section) {
         if (state.saving || state.publishing) return false;
+        if (!canPersistPricing()) {
+            state.saveError = state.loadError
+                ? "Save Draft is disabled until production pricing data loads."
+                : "Save Draft is disabled until a valid product preview is ready.";
+            renderLoadError(section, state.saveError);
+            setStatus(section, "Save disabled");
+            renderButtons(section);
+            return false;
+        }
         state.saving = true;
         state.saveError = "";
         const button = section.querySelector("#pricingSaveDraftBtn");
@@ -716,6 +829,15 @@
             state.publishError = "Failed to publish: OWNER permission required.";
             renderError(section, state.publishError);
             setStatus(section, "Owner only");
+            return;
+        }
+        if (!canPersistPricing()) {
+            state.publishError = state.loadError
+                ? "Publish is disabled until production pricing data loads."
+                : "Publish is disabled until a valid product preview is ready.";
+            renderLoadError(section, state.publishError);
+            setStatus(section, "Publish disabled");
+            renderButtons(section);
             return;
         }
         const confirmed = window.confirm("Publish Pricing Version?\n\nFuture customer quotes will immediately use these rules.\nExisting orders will remain unchanged.");
@@ -763,15 +885,30 @@
         const publish = section.querySelector("#pricingPublishBtn");
         const role = String(window.AZIEL_ADMIN_AUTH?.state?.admin?.role || localStorage.getItem("adminRole") || "").toUpperCase();
         const canManage = window.AZIEL_ADMIN_AUTH?.hasPermission?.("CATALOG_MANAGE") !== false;
-        if (save) save.disabled = !canManage || state.loading || state.saving || state.publishing;
+        const canPersist = canPersistPricing();
+        if (save) {
+            save.disabled = !canManage || !canPersist;
+            save.title = canManage
+                ? (canPersist ? "Save pricing draft" : "Production pricing must load before saving")
+                : "Catalog manage permission required";
+        }
         if (publish) {
-            publish.disabled = role !== "OWNER" || state.loading || state.saving || state.publishing;
-            publish.title = role === "OWNER" ? "Publish production pricing" : "Only OWNER can publish production pricing";
+            publish.disabled = role !== "OWNER" || !canPersist;
+            publish.title = role === "OWNER"
+                ? (canPersist ? "Publish production pricing" : "Production pricing must load before publishing")
+                : "Only OWNER can publish production pricing";
         }
     }
 
     function renderStatus(section) {
         if (state.loading || state.saving || state.publishing) return;
+        if (state.loadError && !state.apiReady) {
+            setStatus(section, "Pricing unavailable");
+            setText(section, "#pricingSummaryExchangeMeta", "Local preview only");
+            setText(section, "#pricingSummaryProfitMeta", "Save disabled");
+            setText(section, "#pricingSummaryGatewayMeta", "Publish disabled");
+            return;
+        }
         const version = state.activeVersion;
         setStatus(section, version ? `Production Active · v${version.versionNumber}` : "Production Ready");
         setText(section, "#pricingSummaryExchangeMeta", version?.publishedAt ? `Published ${new Date(version.publishedAt).toLocaleString()}` : "Production configuration");
@@ -784,6 +921,8 @@
         loadProductionState: () => requestProductionLoad(document.getElementById("section-pricing-engine"), "public-api"),
         selectProduct: productId => selectProduct(document.getElementById("section-pricing-engine"), productId),
         saveDraft: () => saveDraft(document.getElementById("section-pricing-engine")),
-        publishDraft: () => publishDraft(document.getElementById("section-pricing-engine"))
+        publishDraft: () => publishDraft(document.getElementById("section-pricing-engine")),
+        hydrateFallbackProductsFromDom: () => hydrateFallbackProductsFromDom(document.getElementById("section-pricing-engine")),
+        canPersistPricing
     };
 })();
