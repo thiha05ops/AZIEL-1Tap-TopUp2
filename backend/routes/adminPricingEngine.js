@@ -10,47 +10,158 @@ const {
     AdminPricingEngineError,
     getPricingConsoleState,
     publishPricing,
+    runPricingEngineDiagnostics,
     saveDraftPricing
 } = require("../services/commerce/adminPricingEngineService");
 
 const PRICING_ENGINE_REQUEST_TIMEOUT_MS = 8000;
 
-function withTimeout(promise, label = "Pricing Engine request") {
-    let timeout = null;
-    const timeoutPromise = new Promise((_, reject) => {
-        timeout = setTimeout(() => {
-            reject(new AdminPricingEngineError(
-                "PRICING_ENGINE_TIMEOUT",
-                `${label} timed out. Please retry.`,
-                504
-            ));
-        }, PRICING_ENGINE_REQUEST_TIMEOUT_MS);
-    });
-    return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeout));
+function createRequestId() {
+    return `pricing-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function sendPricingError(res, error) {
+function createPricingTrace(req, res) {
+    const startedAt = Date.now();
+    const requestId = req.headers["x-request-id"] || req.headers["x-render-request-id"] || createRequestId();
+    let completed = false;
+    const trace = {
+        requestId,
+        get completed() {
+            return completed || res.headersSent || req.aborted;
+        },
+        markCompleted() {
+            completed = true;
+        },
+        log(checkpoint, metadata = {}) {
+            console.log("[PRICING_ENGINE_TRACE]", {
+                requestId,
+                checkpoint,
+                elapsedMs: Date.now() - startedAt,
+                adminId: req.admin?._id ? String(req.admin._id).slice(0, 8) : req.admin?.id ? String(req.admin.id).slice(0, 8) : "",
+                adminRole: req.admin?.role || "",
+                reqAborted: Boolean(req.aborted),
+                headersSent: Boolean(res.headersSent),
+                ...metadata
+            });
+        }
+    };
+    req.pricingTrace = trace;
+    req.pricingRequestId = requestId;
+    trace.log("PRICING_REQUEST_RECEIVED", { method: req.method, path: req.originalUrl || req.url });
+    req.on("aborted", () => {
+        trace.log("REQUEST_ABORTED");
+        completed = true;
+    });
+    res.on("close", () => {
+        if (!res.writableEnded && !completed) trace.log("REQUEST_ABORTED", { close: true });
+        completed = true;
+    });
+    return trace;
+}
+
+function startPricingDeadline(req, res) {
+    const trace = req.pricingTrace || createPricingTrace(req, res);
+    const timer = setTimeout(() => {
+        if (res.headersSent || req.aborted) return;
+        trace.log("REQUEST_ERROR", {
+            code: "PRICING_DATA_TIMEOUT",
+            message: "Pricing data could not be loaded within the server deadline."
+        });
+        trace.markCompleted();
+        return res.status(503).json({
+            success: false,
+            code: "PRICING_DATA_TIMEOUT",
+            message: "Pricing data could not be loaded within the server deadline.",
+            requestId: trace.requestId
+        });
+    }, PRICING_ENGINE_REQUEST_TIMEOUT_MS);
+    res.on("finish", () => clearTimeout(timer));
+    res.on("close", () => clearTimeout(timer));
+    return timer;
+}
+
+function pricingLifecycle(req, res, next) {
+    createPricingTrace(req, res);
+    startPricingDeadline(req, res);
+    next();
+}
+
+function tracedAdminMiddleware(req, res, next) {
+    const trace = req.pricingTrace;
+    trace?.log("AUTH_STARTED");
+    return adminMiddleware(req, res, error => {
+        if (trace?.completed) return;
+        if (error) {
+            trace?.log("REQUEST_ERROR", {
+                stage: "auth",
+                errorName: error?.name || "Error",
+                errorCode: error?.code || "",
+                errorMessage: error?.message || ""
+            });
+            return next(error);
+        }
+        trace?.log("AUTH_COMPLETED");
+        return next();
+    });
+}
+
+function tracedPermission(permission) {
+    const middleware = requireAdminPermission(permission);
+    return (req, res, next) => {
+        const trace = req.pricingTrace;
+        trace?.log("RBAC_STARTED", { permission });
+        return middleware(req, res, error => {
+            if (trace?.completed) return;
+            if (error) {
+                trace?.log("REQUEST_ERROR", {
+                    stage: "rbac",
+                    errorName: error?.name || "Error",
+                    errorCode: error?.code || "",
+                    errorMessage: error?.message || ""
+                });
+                return next(error);
+            }
+            trace?.log("RBAC_COMPLETED", { permission });
+            return next();
+        });
+    };
+}
+
+function sendPricingError(req, res, error) {
+    const trace = req?.pricingTrace;
+    trace?.log("REQUEST_ERROR", {
+        errorName: error?.name || "Error",
+        errorCode: error?.code || "",
+        errorMessage: error?.message || ""
+    });
+    if (res.headersSent || req?.aborted) return;
     if (error instanceof AdminPricingEngineError) {
+        trace?.markCompleted();
         return res.status(error.statusCode || 400).json({
             success: false,
             code: error.code,
-            message: error.message
+            message: error.message,
+            requestId: trace?.requestId
         });
     }
 
     if (error?.name === "ValidationError") {
+        trace?.markCompleted();
         return res.status(400).json({
             success: false,
             code: "PRICING_VALIDATION_ERROR",
-            message: error.message || "Pricing validation failed."
+            message: error.message || "Pricing validation failed.",
+            requestId: trace?.requestId
         });
     }
 
     if (error?.code === 11000) {
+        trace?.markCompleted();
         return res.status(409).json({
             success: false,
             code: "PRICING_VERSION_CONFLICT",
-            message: "Pricing version already exists. Reload and try again."
+            message: "Pricing version already exists. Reload and try again.",
+            requestId: trace?.requestId
         });
     }
 
@@ -60,18 +171,22 @@ function sendPricingError(res, error) {
         /mongo|database|timed out|unavailable/i.test(error?.message || "")
     ) {
         console.log("Admin pricing engine data error:", error?.code || error?.name || "PRICING_DATA_UNAVAILABLE");
+        trace?.markCompleted();
         return res.status(503).json({
             success: false,
             code: "PRICING_DATA_UNAVAILABLE",
-            message: "Pricing data is temporarily unavailable. Please retry."
+            message: "Pricing data is temporarily unavailable. Please retry.",
+            requestId: trace?.requestId
         });
     }
 
     console.log("Admin pricing engine error:", error?.code || error?.name || "PRICING_ENGINE_FAILED");
+    trace?.markCompleted();
     return res.status(500).json({
         success: false,
         code: "PRICING_ENGINE_FAILED",
-        message: "Pricing Engine request failed"
+        message: "Pricing Engine request failed",
+        requestId: trace?.requestId
     });
 }
 
@@ -84,12 +199,38 @@ function requireOwner(req, res, next) {
     });
 }
 
-router.get("/admin/pricing-engine", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_READ), async (req, res) => {
+router.get("/admin/pricing-engine", pricingLifecycle, tracedAdminMiddleware, tracedPermission(PERMISSIONS.CATALOG_READ), async (req, res) => {
     try {
-        const state = await withTimeout(getPricingConsoleState(), "Pricing Engine load");
-        return res.json({ success: true, ...state });
+        req.pricingTrace?.log("ROUTE_HANDLER_ENTERED");
+        const state = await getPricingConsoleState({ trace: req.pricingTrace });
+        if (res.headersSent || req.aborted || req.pricingTrace?.completed) return;
+        req.pricingTrace?.log("RESPONSE_SENT", {
+            products: Array.isArray(state.products) ? state.products.length : 0,
+            policies: Array.isArray(state.policies) ? state.policies.length : 0
+        });
+        req.pricingTrace?.markCompleted();
+        return res.json({ success: true, requestId: req.pricingTrace?.requestId, ...state });
     } catch (error) {
-        return sendPricingError(res, error);
+        return sendPricingError(req, res, error);
+    }
+});
+
+router.get("/admin/pricing-engine/diagnostics", pricingLifecycle, tracedAdminMiddleware, tracedPermission(PERMISSIONS.CATALOG_MANAGE), requireOwner, async (req, res) => {
+    try {
+        req.pricingTrace?.log("ROUTE_HANDLER_ENTERED", { diagnostic: true });
+        const diagnostics = await runPricingEngineDiagnostics(req.pricingTrace);
+        if (res.headersSent || req.aborted || req.pricingTrace?.completed) return;
+        req.pricingTrace?.log("RESPONSE_SENT", { diagnostic: true, checks: diagnostics.checks.length });
+        req.pricingTrace?.markCompleted();
+        return res.json({
+            success: true,
+            requestId: req.pricingTrace?.requestId,
+            authReached: true,
+            adminRole: req.admin?.role || "",
+            ...diagnostics
+        });
+    } catch (error) {
+        return sendPricingError(req, res, error);
     }
 });
 
@@ -112,7 +253,7 @@ router.put("/admin/pricing-engine/draft", adminMiddleware, requireAdminPermissio
         });
         return res.json({ success: true, ...result });
     } catch (error) {
-        return sendPricingError(res, error);
+        return sendPricingError(req, res, error);
     }
 });
 
@@ -145,7 +286,7 @@ router.post("/admin/pricing-engine/publish", adminMiddleware, requireAdminPermis
             state: result.state
         });
     } catch (error) {
-        return sendPricingError(res, error);
+        return sendPricingError(req, res, error);
     }
 });
 

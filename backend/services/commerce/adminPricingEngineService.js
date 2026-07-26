@@ -1,5 +1,6 @@
 "use strict";
 
+const mongoose = require("mongoose");
 const CatalogPackage = require("../../models/CatalogPackage");
 const PricingPolicy = require("../../models/PricingPolicy");
 const PriceVersion = require("../../models/PriceVersion");
@@ -138,11 +139,22 @@ function boundedQuery(query) {
     return typeof query?.maxTimeMS === "function" ? query.maxTimeMS(QUERY_MAX_TIME_MS) : query;
 }
 
-async function latestVersion() {
+function serviceTrace(trace, checkpoint, metadata = {}) {
+    if (trace && typeof trace.log === "function") trace.log(checkpoint, metadata);
+}
+
+async function latestVersion(trace = null) {
+    serviceTrace(trace, "VERSION_QUERY_STARTED", {
+        modelConnection: PriceVersion.db?.name || ""
+    });
     const query = PriceVersion.findOne({ branchKey: BRANCH_KEY })
         .select("versionId versionNumber status publishedAt publishedBy createdAt metadata")
         .sort({ versionNumber: -1, createdAt: -1 });
-    return boundedQuery(query).lean();
+    const version = await boundedQuery(query).lean();
+    serviceTrace(trace, "VERSION_QUERY_COMPLETED", {
+        count: version ? 1 : 0
+    });
+    return version;
 }
 
 async function activePolicy(region, currency) {
@@ -232,16 +244,30 @@ function productsFromPackages(packages = []) {
     return [...products.values()].filter(product => product.packages.length);
 }
 
-async function readCatalogPackages() {
+async function readCatalogPackages(trace = null) {
+    serviceTrace(trace, "CATALOG_QUERY_STARTED", {
+        modelConnection: CatalogPackage.db?.name || "",
+        limit: PRODUCT_LIMIT
+    });
     const query = CatalogPackage.find({ enabled: true, deletedAt: null })
         .select("_id productCode packageCode name prices sortOrder metadata")
         .sort({ productCode: 1, sortOrder: 1, packageCode: 1 })
         .limit(PRODUCT_LIMIT);
-    return boundedQuery(query).lean();
+    const packages = await boundedQuery(query).lean();
+    serviceTrace(trace, "CATALOG_QUERY_COMPLETED", {
+        count: packages.length
+    });
+    return packages;
 }
 
-async function readConsolePolicies(now = new Date()) {
+async function readConsolePolicies(now = new Date(), trace = null) {
     const draftCodes = CONFIG_KEYS.map(item => draftCode(item.region, item.currency));
+    serviceTrace(trace, "ACTIVE_POLICY_QUERY_STARTED", {
+        modelConnection: PricingPolicy.db?.name || ""
+    });
+    serviceTrace(trace, "DRAFT_POLICY_QUERY_STARTED", {
+        modelConnection: PricingPolicy.db?.name || ""
+    });
     const query = PricingPolicy.find({
         $or: [
             {
@@ -261,22 +287,37 @@ async function readConsolePolicies(now = new Date()) {
     })
         .select("name code status region currency defaultSupplierFee defaultBusinessCost defaultPlatformCost defaultGatewayFee defaultTax defaultProfitRule defaultRoundingRule metadata createdAt updatedAt updatedBy effectiveFrom effectiveUntil")
         .sort({ status: 1, effectiveFrom: -1, updatedAt: -1, _id: -1 });
-    return boundedQuery(query).lean();
+    const policies = await boundedQuery(query).lean();
+    serviceTrace(trace, "ACTIVE_POLICY_QUERY_COMPLETED", {
+        count: policies.filter(policy => policy.status === "ACTIVE").length
+    });
+    serviceTrace(trace, "DRAFT_POLICY_QUERY_COMPLETED", {
+        count: policies.filter(policy => policy.status === "DRAFT").length
+    });
+    return policies;
 }
 
 function latestPolicyForKey(policies = [], status, region, currency) {
     return policies.find(policy => policy.status === status && policy.region === region && policy.currency === currency) || null;
 }
 
-async function getPricingConsoleState() {
+async function getPricingConsoleState(options = {}) {
+    const trace = options.trace || null;
     const startedAt = Date.now();
+    serviceTrace(trace, "STATE_SERVICE_STARTED");
     const [version, catalogPackages, policyRecords] = await Promise.all([
-        latestVersion(),
-        readCatalogPackages(),
-        readConsolePolicies()
+        latestVersion(trace),
+        readCatalogPackages(trace),
+        readConsolePolicies(new Date(), trace)
     ]);
+    serviceTrace(trace, "PRODUCT_GROUPING_STARTED");
     const affected = affectedSummaryFromPackages(catalogPackages);
     const products = productsFromPackages(catalogPackages);
+    serviceTrace(trace, "PRODUCT_GROUPING_COMPLETED", {
+        products: products.length,
+        packages: catalogPackages.length
+    });
+    serviceTrace(trace, "RESPONSE_MAPPING_STARTED");
     const policies = [];
     for (const item of CONFIG_KEYS) {
         const active = latestPolicyForKey(policyRecords, "ACTIVE", item.region, item.currency);
@@ -288,6 +329,9 @@ async function getPricingConsoleState() {
             draft: publicPolicy(draft, draft ? "draft" : "active-copy", active ? configFromPolicy(active) : { ...neutralPolicyConfig(), exchangeRate: item.region === "MM" ? 118 : 1 })
         });
     }
+    serviceTrace(trace, "RESPONSE_MAPPING_COMPLETED", {
+        policies: policies.length
+    });
     const elapsedMs = Date.now() - startedAt;
     if (elapsedMs > 2000 || process.env.AZIEL_PRICING_ENGINE_TIMING === "true") {
         console.log("[PRICING_ENGINE] console state loaded", {
@@ -314,6 +358,71 @@ async function getPricingConsoleState() {
         affected,
         products,
         policies
+    };
+}
+
+async function runPricingEngineDiagnostics(trace = null) {
+    const startedAt = Date.now();
+    const step = async (name, fn) => {
+        const stepStartedAt = Date.now();
+        try {
+            const result = await fn();
+            return {
+                name,
+                ok: true,
+                elapsedMs: Date.now() - stepStartedAt,
+                ...result
+            };
+        } catch (error) {
+            serviceTrace(trace, "REQUEST_ERROR", {
+                diagnostic: name,
+                errorName: error?.name || "Error",
+                errorCode: error?.code || "",
+                errorMessage: error?.message || ""
+            });
+            return {
+                name,
+                ok: false,
+                elapsedMs: Date.now() - stepStartedAt,
+                errorName: error?.name || "Error",
+                errorCode: error?.code || "",
+                errorMessage: error?.message || ""
+            };
+        }
+    };
+
+    const checks = [];
+    checks.push(await step("mongoReadyState", async () => ({
+        readyState: mongoose.connection.readyState,
+        connectionName: mongoose.connection.name || "",
+        modelConnections: {
+            PricingPolicy: PricingPolicy.db?.name || "",
+            PriceVersion: PriceVersion.db?.name || "",
+            CatalogPackage: CatalogPackage.db?.name || ""
+        }
+    })));
+    checks.push(await step("pricingPolicyQuery", async () => {
+        const query = PricingPolicy.find({})
+            .select("_id code status region currency")
+            .limit(1);
+        const rows = await boundedQuery(query).lean();
+        return { count: rows.length };
+    }));
+    checks.push(await step("priceVersionQuery", async () => {
+        const row = await latestVersion(trace);
+        return { count: row ? 1 : 0 };
+    }));
+    checks.push(await step("catalogPackageQuery", async () => {
+        const query = CatalogPackage.find({ enabled: true, deletedAt: null })
+            .select("_id productCode packageCode prices")
+            .limit(1);
+        const rows = await boundedQuery(query).lean();
+        return { count: rows.length };
+    }));
+
+    return {
+        totalElapsedMs: Date.now() - startedAt,
+        checks
     };
 }
 
@@ -494,5 +603,6 @@ module.exports = {
     getPricingConsoleState,
     neutralPolicyConfig,
     publishPricing,
+    runPricingEngineDiagnostics,
     saveDraftPricing
 };

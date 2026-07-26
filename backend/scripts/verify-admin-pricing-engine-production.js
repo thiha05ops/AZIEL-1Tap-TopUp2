@@ -21,9 +21,10 @@ function read(file) {
     return fs.readFileSync(path.join(root, file), "utf8");
 }
 
-function invokeExpress(app, requestPath) {
+function invokeExpress(app, requestPath, options = {}) {
     return new Promise((resolve, reject) => {
         const chunks = [];
+        const timeout = setTimeout(() => reject(new Error(`Verifier request hung: ${requestPath}`)), options.timeoutMs || 3000);
         class MockSocket extends Duplex {
             _read() {}
             _write(chunk, encoding, callback) {
@@ -34,14 +35,15 @@ function invokeExpress(app, requestPath) {
 
         const socket = new MockSocket();
         const req = new http.IncomingMessage(socket);
-        req.method = "GET";
+        req.method = options.method || "GET";
         req.url = requestPath;
         req.originalUrl = requestPath;
-        req.headers = { authorization: "Bearer test" };
+        req.headers = options.headers || { authorization: "Bearer test" };
 
         const res = new http.ServerResponse(req);
         res.assignSocket(socket);
         res.on("finish", () => {
+            clearTimeout(timeout);
             const rawBody = Buffer.concat(chunks).toString("utf8");
             const bodyStart = rawBody.indexOf("\r\n\r\n");
             resolve({
@@ -50,7 +52,10 @@ function invokeExpress(app, requestPath) {
                 bodyText: bodyStart >= 0 ? rawBody.slice(bodyStart + 4) : rawBody
             });
         });
-        res.on("error", reject);
+        res.on("error", error => {
+            clearTimeout(timeout);
+            reject(error);
+        });
         app.handle(req, res, reject);
     });
 }
@@ -184,6 +189,51 @@ function installModelMocks() {
     };
 }
 
+function mountPricingEngineRoute({ adminMiddlewareExport, serviceOverride } = {}) {
+    const adminMiddlewarePath = require.resolve("../middleware/adminMiddleware");
+    const servicePath = require.resolve("../services/commerce/adminPricingEngineService");
+    const routePath = require.resolve("../routes/adminPricingEngine");
+    const originalAdminMiddleware = require.cache[adminMiddlewarePath];
+    const originalService = require.cache[servicePath];
+    const originalRoute = require.cache[routePath];
+    if (adminMiddlewareExport) {
+        require.cache[adminMiddlewarePath] = {
+            id: adminMiddlewarePath,
+            filename: adminMiddlewarePath,
+            loaded: true,
+            exports: adminMiddlewareExport
+        };
+    }
+    if (serviceOverride) {
+        require.cache[servicePath] = {
+            id: servicePath,
+            filename: servicePath,
+            loaded: true,
+            exports: {
+                ...require("../services/commerce/adminPricingEngineService"),
+                ...serviceOverride
+            }
+        };
+    }
+    delete require.cache[routePath];
+    const express = require("express");
+    const app = express();
+    app.use(express.json());
+    app.use("/api", require("../routes/adminPricingEngine"));
+
+    return {
+        app,
+        restore() {
+            if (originalAdminMiddleware) require.cache[adminMiddlewarePath] = originalAdminMiddleware;
+            else delete require.cache[adminMiddlewarePath];
+            if (originalService) require.cache[servicePath] = originalService;
+            else delete require.cache[servicePath];
+            if (originalRoute) require.cache[routePath] = originalRoute;
+            else delete require.cache[routePath];
+        }
+    };
+}
+
 async function verifyApiGetCompletesQuickly() {
     const mock = installModelMocks();
     try {
@@ -204,25 +254,15 @@ async function verifyApiGetCompletesQuickly() {
             });
         }
 
-        const adminMiddlewarePath = require.resolve("../middleware/adminMiddleware");
-        const originalAdminMiddleware = require.cache[adminMiddlewarePath];
-        require.cache[adminMiddlewarePath] = {
-            id: adminMiddlewarePath,
-            filename: adminMiddlewarePath,
-            loaded: true,
-            exports: (req, res, next) => {
+        const mounted = mountPricingEngineRoute({
+            adminMiddlewareExport: (req, res, next) => {
                 req.admin = { role: "OWNER", username: "owner" };
                 next();
             }
-        };
-        delete require.cache[require.resolve("../routes/adminPricingEngine")];
-        const express = require("express");
-        const app = express();
-        app.use(express.json());
-        app.use("/api", require("../routes/adminPricingEngine"));
+        });
         try {
             const startedAt = Date.now();
-            const response = await invokeExpress(app, "/api/admin/pricing-engine");
+            const response = await invokeExpress(mounted.app, "/api/admin/pricing-engine");
             const body = JSON.parse(response.bodyText);
             const elapsedMs = Date.now() - startedAt;
             assert.strictEqual(response.status, 200, "Pricing Engine GET must return 200.");
@@ -235,7 +275,7 @@ async function verifyApiGetCompletesQuickly() {
                 throw new Error("database unavailable");
             };
             const failureStartedAt = Date.now();
-            const failureResponse = await invokeExpress(app, "/api/admin/pricing-engine");
+            const failureResponse = await invokeExpress(mounted.app, "/api/admin/pricing-engine");
             const failureBody = JSON.parse(failureResponse.bodyText);
             const failureElapsedMs = Date.now() - failureStartedAt;
             assert.strictEqual(failureResponse.status, 503, "Database failure must return a fast 503.");
@@ -246,12 +286,65 @@ async function verifyApiGetCompletesQuickly() {
                 failureElapsedMs
             });
         } finally {
-            if (originalAdminMiddleware) require.cache[adminMiddlewarePath] = originalAdminMiddleware;
-            else delete require.cache[adminMiddlewarePath];
-            delete require.cache[require.resolve("../routes/adminPricingEngine")];
+            mounted.restore();
         }
     } finally {
         mock.restore();
+    }
+}
+
+async function verifyMiddlewareAndDeadlineLifecycle() {
+    let mounted = mountPricingEngineRoute({
+        adminMiddlewareExport: (req, res) => res.status(401).json({ success: false, error: "ADMIN_SESSION_INVALID" })
+    });
+    try {
+        const startedAt = Date.now();
+        const response = await invokeExpress(mounted.app, "/api/admin/pricing-engine", { headers: {} });
+        const body = JSON.parse(response.bodyText);
+        assert.strictEqual(response.status, 401, "Unauthenticated Pricing Engine GET must return promptly.");
+        assert.strictEqual(body.success, false, "Unauthenticated response must be structured.");
+        assert(Date.now() - startedAt < 1000, "Unauthenticated Pricing Engine GET must not hang.");
+    } finally {
+        mounted.restore();
+    }
+
+    mounted = mountPricingEngineRoute({
+        adminMiddlewareExport: (req, res, next) => {
+            req.admin = { role: "SUPPORT", username: "support" };
+            next();
+        }
+    });
+    try {
+        const startedAt = Date.now();
+        const response = await invokeExpress(mounted.app, "/api/admin/pricing-engine");
+        const body = JSON.parse(response.bodyText);
+        assert.strictEqual(response.status, 403, "Forbidden Pricing Engine GET must return promptly.");
+        assert.strictEqual(body.success, false, "Forbidden response must be structured.");
+        assert(Date.now() - startedAt < 1000, "Forbidden Pricing Engine GET must not hang.");
+    } finally {
+        mounted.restore();
+    }
+
+    mounted = mountPricingEngineRoute({
+        adminMiddlewareExport: (req, res, next) => {
+            req.admin = { role: "OWNER", username: "owner" };
+            next();
+        },
+        serviceOverride: {
+            getPricingConsoleState: () => new Promise(() => {})
+        }
+    });
+    try {
+        const startedAt = Date.now();
+        const response = await invokeExpress(mounted.app, "/api/admin/pricing-engine", { timeoutMs: 9000 });
+        const body = JSON.parse(response.bodyText);
+        const elapsedMs = Date.now() - startedAt;
+        assert.strictEqual(response.status, 503, "Stalled Pricing Engine GET must return server-side 503.");
+        assert.strictEqual(body.code, "PRICING_DATA_TIMEOUT", "Stalled Pricing Engine GET must return timeout code.");
+        assert(body.requestId, "Stalled Pricing Engine GET must return requestId.");
+        assert(elapsedMs >= 7500 && elapsedMs < 9000, `Stalled service must be bounded by server deadline, got ${elapsedMs}ms.`);
+    } finally {
+        mounted.restore();
     }
 }
 
@@ -385,6 +478,12 @@ function verifySource() {
     assertContains("backend/services/commerce/adminPricingEngineService.js", "readConsolePolicies", "Pricing Engine GET must use one bounded policy query.");
     assertContains("backend/services/commerce/adminPricingEngineService.js", "maxTimeMS", "Pricing Engine GET queries must be bounded.");
     assertContains("backend/routes/adminPricingEngine.js", "PRICING_ENGINE_REQUEST_TIMEOUT_MS", "Pricing Engine GET route must have a hard timeout safety net.");
+    assertContains("backend/routes/adminPricingEngine.js", "pricingLifecycle", "Pricing Engine GET must start tracing and deadline before auth/RBAC.");
+    assertContains("backend/routes/adminPricingEngine.js", "tracedAdminMiddleware", "Pricing Engine auth middleware must be traced and bounded.");
+    assertContains("backend/routes/adminPricingEngine.js", "tracedPermission", "Pricing Engine RBAC middleware must be traced and bounded.");
+    assertContains("backend/routes/adminPricingEngine.js", "PRICING_DATA_TIMEOUT", "Pricing Engine deadline must send a structured timeout response.");
+    assertContains("backend/routes/adminPricingEngine.js", "/admin/pricing-engine/diagnostics", "Pricing Engine must expose temporary OWNER-only diagnostics.");
+    assertContains("backend/services/commerce/adminPricingEngineService.js", "runPricingEngineDiagnostics", "Pricing Engine diagnostics must run bounded model checks.");
     assertContains("backend/routes/adminPricingEngine.js", "requireOwner", "Publishing must be OWNER-only.");
     assertContains("backend/services/commerce/adminPricingEngineService.js", "PriceVersion.create", "Publishing must create a PriceVersion.");
     assertContains("backend/services/commerce/productionPricingContextService.js", "\"metadata.policyIds\"", "Production quote context must resolve branch versions published by the admin console.");
@@ -394,6 +493,7 @@ async function main() {
     verifySource();
     await verifyDraftPublishAndQuotePickup();
     await verifyApiGetCompletesQuickly();
+    await verifyMiddlewareAndDeadlineLifecycle();
     console.log("Admin Pricing Engine production activation verification passed.");
 }
 
