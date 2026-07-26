@@ -1,0 +1,99 @@
+const PRICING_POLICY_STATUS = Object.freeze(["DRAFT", "ACTIVE", "INACTIVE", "ARCHIVED"]);
+
+const PRICING_RULE_SCOPE = Object.freeze(["GLOBAL", "REGION", "GAME", "CATEGORY", "TIER", "PACKAGE"]);
+
+const PRICING_RULE_TYPE = Object.freeze([
+    "MARKUP_PERCENT",
+    "MARKUP_FIXED",
+    "PROFIT_MARGIN_PERCENT",
+    "PROFIT_FIXED",
+    "FEE_PERCENT",
+    "FEE_FIXED",
+    "PRICE_OVERRIDE",
+    "ROUNDING"
+]);
+
+const PROMOTION_RULE_STATUS = Object.freeze(["DRAFT", "SCHEDULED", "ACTIVE", "PAUSED", "ENDED", "ARCHIVED"]);
+
+const PROMOTION_TYPE = Object.freeze([
+    "PERCENTAGE_DISCOUNT",
+    "FIXED_DISCOUNT",
+    "OVERRIDE_PRICE",
+    "FREE_ITEM",
+    "NON_PRICE_REWARD"
+]);
+
+const PROMOTION_SCOPE = Object.freeze([
+    "GLOBAL",
+    "REGION",
+    "GAME",
+    "CATEGORY",
+    "TIER",
+    "PACKAGE",
+    "PAYMENT_METHOD",
+    "USER_SEGMENT"
+]);
+
+const CAMPAIGN_STATUS = Object.freeze(["DRAFT", "SCHEDULED", "ACTIVE", "PAUSED", "ENDED", "CANCELLED", "ARCHIVED"]);
+
+const AVAILABILITY_STATE = Object.freeze([
+    "AVAILABLE",
+    "OUT_OF_STOCK",
+    "TEMPORARILY_UNAVAILABLE",
+    "COMING_SOON",
+    "HIDDEN",
+    "DISCONTINUED"
+]);
+
+const INVENTORY_SOURCE = Object.freeze(["MANUAL", "SUPPLIER", "SYSTEM"]);
+
+const PRICE_VERSION_STATUS = Object.freeze([
+    "DRAFT",
+    "VALIDATED",
+    "APPROVED",
+    "PUBLISHED",
+    "SUPERSEDED",
+    "ROLLED_BACK",
+    "ARCHIVED"
+]);
+
+const ROUNDING_MODE = Object.freeze(["NONE", "NEAREST", "UP", "DOWN", "PSYCHOLOGICAL"]);
+
+const CURRENCY = Object.freeze(["MMK", "THB"]);
+
+const REGION = Object.freeze(["MM", "TH"]);
+
+const ELIGIBILITY_OPERATOR = Object.freeze(["ALL", "ANY", "NOT"]);
+
+const ELIGIBILITY_COMPARATOR = Object.freeze([
+    "EQUALS",
+    "NOT_EQUALS",
+    "IN",
+    "NOT_IN",
+    "GREATER_THAN",
+    "GREATER_THAN_OR_EQUAL",
+    "LESS_THAN",
+    "LESS_THAN_OR_EQUAL",
+    "EXISTS",
+    "NOT_EXISTS",
+    "BETWEEN",
+    "CONTAINS"
+]);
+
+module.exports = Object.freeze({
+    PRICING_POLICY_STATUS,
+    PRICING_RULE_SCOPE,
+    PRICING_RULE_TYPE,
+    PROMOTION_RULE_STATUS,
+    PROMOTION_TYPE,
+    PROMOTION_SCOPE,
+    CAMPAIGN_STATUS,
+    AVAILABILITY_STATE,
+    INVENTORY_SOURCE,
+    PRICE_VERSION_STATUS,
+    ROUNDING_MODE,
+    CURRENCY,
+    REGION,
+    ELIGIBILITY_OPERATOR,
+    ELIGIBILITY_COMPARATOR
+});

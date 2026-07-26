@@ -117,6 +117,11 @@
                         <span data-admin-i18n="catalog">Catalog</span>
                     </button>
 
+                    <button class="admin-nav" data-section="pricing-engine" type="button" data-admin-permission="CATALOG_READ">
+                        <i class="fa-solid fa-scale-balanced"></i>
+                        <span data-admin-i18n="pricing_engine">Pricing Engine</span>
+                    </button>
+
                     <button class="admin-nav" data-section="promos" type="button" data-admin-permission="PROMOS_READ">
                         <i class="fa-solid fa-ticket"></i>
                         <span data-admin-i18n="promo_codes">Promo Codes</span>
@@ -543,6 +548,197 @@
                             <div class="admin-dashboard-skeleton"></div>
                             <div class="admin-dashboard-skeleton"></div>
                         </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="admin-section" id="section-pricing-engine">
+                <div class="catalog-workspace-shell pricing-engine-shell">
+                    <header class="catalog-workspace-head pricing-engine-head">
+                        <div class="catalog-workspace-title">
+                            <span class="admin-status-pill is-purple">Commerce</span>
+                            <h3 data-admin-i18n="pricing_engine">Pricing Engine</h3>
+                            <p data-admin-i18n="pricing_engine_sub">Rule-based pricing and business policy management.</p>
+                        </div>
+                        <div class="catalog-workspace-actions">
+                            <button id="pricingSaveDraftBtn" class="admin-secondary-btn" type="button">Save Draft</button>
+                            <button id="pricingPublishBtn" class="admin-primary-btn" type="button">Publish</button>
+                            <button id="pricingProductionStatus" class="admin-secondary-btn" type="button" disabled>Production Active</button>
+                        </div>
+                    </header>
+
+                    <div class="pricing-summary-grid" aria-label="Pricing Engine summary">
+                        <article class="website-runtime-metric">
+                            <span>Exchange Rate</span>
+                            <strong id="pricingSummaryExchange">THB 1 = MMK 118</strong>
+                            <small id="pricingSummaryExchangeMeta">Production configuration</small>
+                        </article>
+                        <article class="website-runtime-metric">
+                            <span>Default Profit</span>
+                            <strong id="pricingSummaryProfit">12%</strong>
+                            <small id="pricingSummaryProfitMeta">Draft preview</small>
+                        </article>
+                        <article class="website-runtime-metric">
+                            <span>Gateway Fee</span>
+                            <strong id="pricingSummaryGateway">2.5%</strong>
+                            <small id="pricingSummaryGatewayMeta">Draft editable</small>
+                        </article>
+                        <article class="website-runtime-metric">
+                            <span>Affected Packages</span>
+                            <strong id="pricingSummaryPackages">1</strong>
+                            <small id="pricingSummaryPackagesMeta">Future quotes affected</small>
+                        </article>
+                    </div>
+
+                    <div class="pricing-engine-workspace">
+                        <aside class="panel pricing-products-panel" aria-label="Pricing Engine products">
+                            <div class="panel-head">
+                                <div>
+                                    <h3>Products</h3>
+                                    <span>Select a product to preview production pricing rules.</span>
+                                </div>
+                            </div>
+                            <label class="website-runtime-search pricing-product-search">
+                                <span>Search</span>
+                                <input id="pricingProductSearch" type="search" placeholder="Search products..." autocomplete="off">
+                            </label>
+                            <div id="pricingProductList" class="catalog-product-list pricing-product-list" aria-live="polite">
+                                <button class="catalog-product-row pricing-product-row active" type="button" data-pricing-product="Mobile Legends" data-pricing-package="7740 + 1548 Diamonds" data-pricing-package-id="MLBB_7740" data-pricing-region="TH" data-pricing-currency="THB" data-pricing-supplier-currency="THB" data-pricing-supplier-price="1120" data-pricing-exchange-rate="1">
+                                    <span>
+                                        <strong>Mobile Legends</strong>
+                                        <small>Popular mobile top-up catalog</small>
+                                    </span>
+                                    <span class="catalog-row-meta">
+                                        <b>MLBB</b>
+                                        <small>TH / MM</small>
+                                    </span>
+                                </button>
+                                <button class="catalog-product-row pricing-product-row" type="button" data-pricing-product="PUBG Mobile" data-pricing-package="8100 UC" data-pricing-package-id="PUBG_8100_UC" data-pricing-region="MM" data-pricing-currency="MMK" data-pricing-supplier-currency="THB" data-pricing-supplier-price="870" data-pricing-exchange-rate="118">
+                                    <span>
+                                        <strong>PUBG Mobile</strong>
+                                        <small>Battle royale packages</small>
+                                    </span>
+                                    <span class="catalog-row-meta">
+                                        <b>PUBG</b>
+                                        <small>TH / MM</small>
+                                    </span>
+                                </button>
+                                <button class="catalog-product-row pricing-product-row" type="button" data-pricing-product="Free Fire" data-pricing-package="Weekly Membership" data-pricing-package-id="FF_WEEKLY" data-pricing-region="MM" data-pricing-currency="MMK" data-pricing-supplier-currency="MMK" data-pricing-supplier-price="18500" data-pricing-exchange-rate="1">
+                                    <span>
+                                        <strong>Free Fire</strong>
+                                        <small>Diamonds and memberships</small>
+                                    </span>
+                                    <span class="catalog-row-meta">
+                                        <b>FF</b>
+                                        <small>TH / MM</small>
+                                    </span>
+                                </button>
+                                <button class="catalog-product-row pricing-product-row" type="button" data-pricing-product="Honor of Kings" data-pricing-package="8000 Tokens" data-pricing-package-id="HOK_8000" data-pricing-region="TH" data-pricing-currency="THB" data-pricing-supplier-currency="THB" data-pricing-supplier-price="680" data-pricing-exchange-rate="1">
+                                    <span>
+                                        <strong>Honor of Kings</strong>
+                                        <small>Token package policy</small>
+                                    </span>
+                                    <span class="catalog-row-meta">
+                                        <b>HOK</b>
+                                        <small>TH</small>
+                                    </span>
+                                </button>
+                                <button class="catalog-product-row pricing-product-row" type="button" data-pricing-product="Genshin Impact" data-pricing-package="Genesis Crystals" data-pricing-package-id="GI_CRYSTALS" data-pricing-region="TH" data-pricing-currency="THB" data-pricing-supplier-currency="THB" data-pricing-supplier-price="1490" data-pricing-exchange-rate="1">
+                                    <span>
+                                        <strong>Genshin Impact</strong>
+                                        <small>Gift and crystal catalog</small>
+                                    </span>
+                                    <span class="catalog-row-meta">
+                                        <b>GI</b>
+                                        <small>Global</small>
+                                    </span>
+                                </button>
+                            </div>
+                        </aside>
+
+                        <main class="panel pricing-rules-panel" aria-label="Pricing rules">
+                            <div class="panel-head">
+                                <div>
+                                    <h3>Pricing Rules</h3>
+                                    <span id="pricingRulesSubtitle">Mobile Legends policy preview.</span>
+                                </div>
+                            </div>
+                            <div class="pricing-rule-list">
+                                <article class="pricing-rule-row">
+                                    <i class="fa-solid fa-money-bill-transfer" aria-hidden="true"></i>
+                                    <div>
+                                        <strong>Exchange Rate</strong>
+                                        <span>Convert supplier currency into storefront currency.</span>
+                                    </div>
+                                    <b id="pricingRuleExchangeValue">1.00</b>
+                                    <button class="admin-secondary-btn" type="button" data-pricing-edit="exchangeRate">Edit</button>
+                                </article>
+                                <article class="pricing-rule-row">
+                                    <i class="fa-solid fa-percent" aria-hidden="true"></i>
+                                    <div>
+                                        <strong>Exchange Fee</strong>
+                                        <span>Operational fee for currency conversion.</span>
+                                    </div>
+                                    <b id="pricingRuleSupplierFeeValue">0%</b>
+                                    <button class="admin-secondary-btn" type="button" data-pricing-edit="supplierFee">Edit</button>
+                                </article>
+                                <article class="pricing-rule-row">
+                                    <i class="fa-solid fa-credit-card" aria-hidden="true"></i>
+                                    <div>
+                                        <strong>Gateway Fee</strong>
+                                        <span>Payment provider processing policy.</span>
+                                    </div>
+                                    <b id="pricingRuleGatewayValue">2.5%</b>
+                                    <button class="admin-secondary-btn" type="button" data-pricing-edit="gatewayFee">Edit</button>
+                                </article>
+                                <article class="pricing-rule-row">
+                                    <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                                    <div>
+                                        <strong>Platform Fee</strong>
+                                        <span>AZIEL operational platform cost policy.</span>
+                                    </div>
+                                    <b id="pricingRulePlatformValue">35</b>
+                                    <button class="admin-secondary-btn" type="button" data-pricing-edit="platformFee">Edit</button>
+                                </article>
+                                <article class="pricing-rule-row">
+                                    <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+                                    <div>
+                                        <strong>Profit</strong>
+                                        <span>Default commercial profit policy.</span>
+                                    </div>
+                                    <b id="pricingRuleProfitValue">12%</b>
+                                    <button class="admin-secondary-btn" type="button" data-pricing-edit="profit">Edit</button>
+                                </article>
+                                <article class="pricing-rule-row">
+                                    <i class="fa-solid fa-equals" aria-hidden="true"></i>
+                                    <div>
+                                        <strong>Round Rule</strong>
+                                        <span>Customer-facing price rounding policy.</span>
+                                    </div>
+                                    <b id="pricingRuleRoundValue">Nearest 10</b>
+                                    <button class="admin-secondary-btn" type="button" data-pricing-edit="rounding">Edit</button>
+                                </article>
+                            </div>
+                        </main>
+
+                        <aside class="panel pricing-preview-panel" aria-label="Pricing preview">
+                            <div class="panel-head">
+                                <div>
+                                    <h3>Pricing Preview</h3>
+                                    <span id="pricingPreviewProduct">Mobile Legends</span>
+                                </div>
+                            </div>
+                            <div id="pricingSimulationError" class="pricing-simulation-error" role="alert" hidden></div>
+                            <div id="pricingFlow" class="pricing-flow" aria-live="polite"></div>
+                            <div id="pricingBreakdown" class="pricing-breakdown" aria-label="Pricing calculation breakdown"></div>
+                            <article class="pricing-storefront-preview" aria-label="Storefront package preview">
+                                <span class="admin-status-pill is-purple">Live Preview</span>
+                                <h4 id="pricingStorefrontProduct">Mobile Legends</h4>
+                                <p id="pricingStorefrontPackage">7740 + 1548 Diamonds</p>
+                                <strong id="pricingStorefrontPrice">Calculating...</strong>
+                                <button class="admin-secondary-btn" type="button" disabled>Customer View</button>
+                            </article>
+                        </aside>
                     </div>
                 </div>
             </section>
@@ -1297,6 +1493,8 @@ TH</textarea></label>
     <script src="/js/admin/admin-media-selector.js?v=20260714-phase8"></script>
     <script src="/js/admin-media.js?v=20260714-phase8"></script>
     <script src="/js/admin-catalog.js?v=20260723-catalog-workspace"></script>
+    <script src="/js/commerce/pricingCalculationEngine.js?v=20260726-commerce-sim"></script>
+    <script src="/js/admin-pricing-engine.js?v=20260726-pricing-engine-prod"></script>
     <script src="/js/admin-home-banners.js?v=20260715-phase86"></script>
     <script src="/js/admin-site-placements.js?v=20260715-phase11"></script>
     <script src="/js/admin-campaigns.js?v=20260715-phase9"></script>

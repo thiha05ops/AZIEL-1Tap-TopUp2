@@ -80,6 +80,44 @@
         return data;
     }
 
+    async function createCommerceManualPromptPayCheckout(orderData) {
+        const res = await fetch(PaymentUtils.apiUrl("/api/commerce/checkout/manual-promptpay"), {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                ...PaymentUtils.authHeaders()
+            },
+            body: JSON.stringify(orderData)
+        });
+
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+            throw createPaymentError(data);
+        }
+
+        if (data.session?.commerceOrderId && data.session?.attemptId) {
+            try {
+                localStorage.setItem("aziel:commerce-pending-payment", JSON.stringify({
+                    commerce: true,
+                    orderId: data.session.commerceOrderId,
+                    attemptId: data.session.attemptId,
+                    productName: data.session.productName || orderData.game || "",
+                    packageName: data.session.packageName || orderData.packageName || "",
+                    productCode: orderData.productCode || orderData.gameKey || "",
+                    gameKey: orderData.gameKey || orderData.productCode || "",
+                    region: orderData.region || data.session.region || "",
+                    paymentMethod: data.session.paymentMethod || orderData.paymentMethod || "promptpay",
+                    createdAt: new Date().toISOString()
+                }));
+            } catch (error) {
+                // Recovery marker is best-effort; Commerce remains server-owned.
+            }
+        }
+
+        return data.session;
+    }
+
     async function start(orderData) {
         const selectedPayment = window.selectedPaymentData || {};
         const type =
@@ -96,11 +134,14 @@
             }
 
             if (type === "manual" || type === "deeplink") {
-                const attemptSession = await createManualAttempt(orderData);
+                const attemptSession = await createCommerceManualPromptPayCheckout(orderData);
                 attemptSession.selectedPaymentMethod = selectedPayment;
                 const attemptOrder = attemptSession.order || {
                     ...orderData,
-                    orderId: attemptSession.reference,
+                    orderId: attemptSession.orderId || attemptSession.commerceOrderId,
+                    commerceOrderId: attemptSession.commerceOrderId || attemptSession.orderId,
+                    commercePaymentAttemptId: attemptSession.attemptId,
+                    quoteId: attemptSession.quoteId,
                     manualPaymentAttemptId: attemptSession.attemptId,
                     amount: attemptSession.amount,
                     currency: attemptSession.currency,
@@ -147,7 +188,8 @@
     window.AZIEL_PAYMENT = {
         start,
         createPaymentSession,
-        createManualAttempt
+        createManualAttempt,
+        createCommerceManualPromptPayCheckout
     };
 
 })();

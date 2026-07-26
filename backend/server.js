@@ -55,6 +55,8 @@ const promoRoutes = require("./routes/promos");
 const sitePlacementRoutes = require("./routes/sitePlacements");
 const websiteRuntimeRoutes = require("./routes/websiteRuntime");
 const configurationRegistryRoutes = require("./routes/configurationRegistry");
+const commerceManualPaymentRoutes = require("./routes/commerceManualPaymentRoutes");
+const adminPricingEngineRoutes = require("./routes/adminPricingEngine");
 const realtime = require("./services/realtime");
 
 // EXPRESS APP
@@ -206,6 +208,8 @@ function configureApplication(mongoConnection) {
     app.use("/api", sitePlacementRoutes);
     app.use("/api", configurationRegistryRoutes);
     app.use("/api", websiteRuntimeRoutes);
+    app.use("/api", commerceManualPaymentRoutes);
+    app.use("/api", adminPricingEngineRoutes);
 
     app.use("/api", (err, req, res, next) => {
         if (!err) return next();

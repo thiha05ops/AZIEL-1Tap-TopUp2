@@ -8,6 +8,7 @@
         support: 50,
         chat: 60,
         catalog: 70,
+        "pricing-engine": 75,
         promos: 80,
         media: 90,
         "design-studio": 100,

@@ -54,6 +54,10 @@ const {
 } = require("../services/paginationService");
 const { formatPaymentMethod } = require("../services/paymentDisplayNameService");
 const { createPromptPayQr } = require("../services/promptPayQrService");
+const {
+    startCustomerWalletCheckout,
+    CustomerWalletCheckoutError
+} = require("../services/commerce/customerWalletCheckoutService");
 
 const ADMIN_WALLET_SALES_STATUSES = Object.freeze(["paid", "processing", "completed"]);
 const ADMIN_WALLET_REWARD_ORDER_THRESHOLD = 5;
@@ -1739,163 +1743,51 @@ async function markWalletTopupPaid(req, topupId) {
 // ======================
 
 router.post("/wallet/pay", authMiddleware, async (req, res) => {
-    let reservedRedemption = null;
     try {
-        const {
-            orderId,
-            userId,
-            zoneId,
-            game,
-            gameKey,
-            productCode,
-            packageName,
-            packageCode,
-            amount,
-            currency,
-            region,
-            promoCode
-        } = req.body;
-        const username = req.user.username;
-
-        if (!userId) {
+        if (!req.body?.userId) {
             return res.status(400).json({
                 success: false,
                 message: "Missing wallet payment data"
             });
         }
 
-        const pricing = await resolvePurchasePricing({
-            payload: {
-                productCode: productCode || gameKey,
-                gameKey,
-                game,
-                packageCode,
-                packageName,
-                amount,
-                currency,
-                region,
-                promoCode
-            },
+        const result = await startCustomerWalletCheckout(req.body || {}, {
             user: req.user,
-            verifyUserLimit: true
-        });
-        const catalogItem = pricing.catalogItem;
-
-        const currencyKey = pricing.currency;
-
-        const requestedOrderId = orderId || "AZL-" + Date.now();
-        const existingOrder = await Order.findOne({
-            orderId: requestedOrderId,
-            username
+            sessionId: req.sessionID || req.headers["x-session-id"] || ""
         });
 
-        if (existingOrder) {
-            if (existingOrder.status === ORDER_STATES.PAID || existingOrder.paymentStatus === PAYMENT_STATES.PAID) {
-                const balance = await getWalletBalance(username, existingOrder.currency || currencyKey);
-
-                return res.json({
-                    success: true,
-                    message: "Wallet payment already completed",
-                    order: existingOrder,
-                    balance
-                });
-            }
-
-            return res.status(409).json({
-                success: false,
-                code: "DUPLICATE_ORDER_ID",
-                message: "Order already exists and is not payable by wallet"
-            });
-        }
-
-        reservedRedemption = await reservePromoUse({
-            pricing,
-            user: req.user,
-            orderId: requestedOrderId
-        });
-
-        const order = await Order.create({
-            orderId: requestedOrderId,
-            username,
-            ...buildOrderCustomerSnapshot(req.user),
-            userId,
-            zoneId: zoneId || "-",
-            game: catalogItem.productName,
-            productCode: catalogItem.productCode,
-            productName: catalogItem.productName,
-            packageName: catalogItem.packageName,
-            packageCode: catalogItem.packageCode,
-            selectedPackage: catalogItem.packageName,
-            amount: pricing.finalAmount,
-            originalAmount: pricing.originalAmount,
-            discountAmount: pricing.discountAmount,
-            finalAmount: pricing.finalAmount,
-            promoCode: pricing.promoCode,
-            promoSnapshot: pricing.promoSnapshot,
-            promoRedemptionId: reservedRedemption?._id || null,
-            currency: currencyKey,
-            region: catalogItem.region,
-            paymentMethod: "wallet",
-            status: ORDER_STATES.PENDING_PAYMENT,
-            paymentStatus: PAYMENT_STATES.PENDING,
-            paymentSlip: "",
-            note: "Paid with wallet",
-            timeline: [{
-                status: ORDER_STATES.PENDING_PAYMENT,
-                previousStatus: "",
-                paymentStatus: PAYMENT_STATES.PENDING,
-                source: "user",
-                actorType: "user",
-                actor: username,
-                reason: "Wallet order created",
-                idempotencyKey: `order:create:${requestedOrderId}`,
-                at: new Date()
-            }]
-        });
-
-        const walletResult = await payOrderWithWallet(order);
-        await consumePromoRedemption(reservedRedemption?._id, order.orderId);
-        reservedRedemption = null;
-
-        const paidTransition = await transitionOrder(order, ORDER_STATES.PAID, {
-            source: "wallet",
-            actorType: "user",
-            actor: username,
-            reason: "Paid with AZIEL Wallet",
-            paymentStatus: PAYMENT_STATES.PAID,
-            idempotencyKey: `wallet:payment:${requestedOrderId}`
-        });
-
-        await emitCommittedWalletUpdate(username, walletResult, {
-            currency: currencyKey,
+        await emitCommittedWalletUpdate(req.user.username, {
+            balance: result.balance,
+            transaction: result.transaction,
+            duplicate: result.duplicate
+        }, {
+            currency: result.order?.currency,
             status: "payment"
         });
 
         realtime.emitAdminWalletUpdate({
             type: "wallet_payment",
-            orderId: paidTransition.order.orderId,
-            username,
+            orderId: result.order?.orderId,
+            username: req.user.username,
             status: "paid",
-            game: catalogItem.productName,
-            packageName: catalogItem.packageName
+            game: result.order?.productName || result.order?.game || "",
+            packageName: result.order?.packageName || ""
         });
 
-        res.json({
+        return res.json({
             success: true,
             message: "Paid with wallet",
-            order: paidTransition.order,
-            balance: walletResult.balance,
-            transaction: walletResult.transaction,
-            duplicate: Boolean(walletResult.duplicate)
+            order: result.order,
+            balance: result.balance,
+            transaction: result.transaction,
+            duplicate: Boolean(result.duplicate)
         });
 
     } catch (error) {
         console.log("Wallet pay error:", error);
 
-        await releasePromoRedemption(reservedRedemption?._id);
-
-        if (error instanceof CatalogError || error instanceof PromoError) {
-            return res.status(error.statusCode).json({
+        if (error instanceof CustomerWalletCheckoutError) {
+            return res.status(error.statusCode || 400).json({
                 success: false,
                 code: error.code,
                 message: error.message

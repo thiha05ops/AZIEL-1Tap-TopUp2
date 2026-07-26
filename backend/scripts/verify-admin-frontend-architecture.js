@@ -227,12 +227,14 @@ function verifyScriptAndScopeOwnership() {
 }
 
 function verifyModuleIntegrationAndRegressions() {
+    const html = read("frontend/admin.html");
     const orders = read("frontend/js/admin-orders.js");
     const wallet = read("frontend/js/admin-wallet.js");
     const fulfillment = read("frontend/js/admin-fulfillment.js");
     const security = read("frontend/js/admin-security.js");
     const liveChat = read("frontend/js/admin-live-chat.js");
     const adminUsers = read("frontend/js/admin-users.js");
+    const pricingEngine = read("frontend/js/admin-pricing-engine.js");
     const adminCss = read("frontend/css/admin/admin-design-system.css");
 
     assert(orders.includes("adminOrdersRequestGate"), "Orders must integrate shared request gate.");
@@ -268,6 +270,26 @@ function verifyModuleIntegrationAndRegressions() {
     assert(adminCss.includes(".customer-crm-workspace") && adminCss.includes("height: var(--admin-orders-workspace-height);"), "Customer CRM workspace must be viewport bounded on desktop.");
     assert(adminCss.includes(".customer-crm-list") && adminCss.includes("overflow-y: auto"), "Customer CRM list must own independent vertical scrolling.");
     assert(adminCss.includes(".customer-tab-panel") && adminCss.includes("overscroll-behavior: contain"), "Customer CRM detail tab panel must own contained scrolling.");
+
+    assert(html.includes('data-section="pricing-engine"'), "Pricing Engine nav item must exist.");
+    assert(html.includes('id="section-pricing-engine"'), "Pricing Engine section must exist.");
+    assert(html.indexOf('data-section="catalog"') < html.indexOf('data-section="pricing-engine"'), "Pricing Engine should sit after Catalog in Commerce navigation.");
+    assert(html.indexOf('data-section="pricing-engine"') < html.indexOf('data-section="promos"'), "Pricing Engine should sit before Promo Codes in Commerce navigation.");
+    assert(html.includes("Rule-based pricing and business policy management."), "Pricing Engine approved subtitle must render.");
+    assert(html.includes("Exchange Rate") && html.includes("Default Profit") && html.includes("Gateway Fee") && html.includes("Affected Packages"), "Pricing Engine summary cards must render.");
+    assert(html.includes("Mobile Legends") && html.includes("PUBG Mobile") && html.includes("Free Fire") && html.includes("Honor of Kings") && html.includes("Genshin Impact"), "Pricing Engine product selector must preserve existing rows before live data loads.");
+    assert(html.includes("id=\"pricingFlow\"") && html.includes("id=\"pricingStorefrontPrice\""), "Pricing Engine production preview render targets must exist.");
+    assert(html.includes("/js/commerce/pricingCalculationEngine.js") && html.indexOf("/js/commerce/pricingCalculationEngine.js") < html.indexOf("/js/admin-pricing-engine.js"), "Pricing Engine must load the browser calculation engine before the UI controller.");
+    assert(adminCss.includes(".pricing-engine-workspace") && adminCss.includes("grid-template-columns: minmax(250px, 320px) minmax(360px, 1fr) minmax(280px, 360px);"), "Pricing Engine must use the approved three-column desktop layout.");
+    assert(html.includes("pricingSaveDraftBtn") && html.includes("pricingPublishBtn"), "Pricing Engine production controls must expose Save Draft and Publish.");
+    assert(!html.includes("Simulation Only"), "Pricing Engine must not remain in Simulation Only mode.");
+    assert(pricingEngine.includes("initPricingEngineUi"), "Pricing Engine UI controller must initialize production pricing selection.");
+    assert(pricingEngine.includes("syncPricingPreview"), "Pricing Engine selection must update visual preview labels.");
+    assert(pricingEngine.includes("window.AZIEL_COMMERCE_PRICING_ENGINE"), "Pricing Engine UI must consume the shared browser calculation engine.");
+    assert(pricingEngine.includes("result.breakdown"), "Pricing Engine preview must render engine breakdown output.");
+    assert(pricingEngine.includes("/api/admin/pricing-engine"), "Pricing Engine must load production pricing configuration.");
+    assert(pricingEngine.includes("/api/admin/pricing-engine/draft"), "Pricing Engine must save production drafts.");
+    assert(pricingEngine.includes("/api/admin/pricing-engine/publish"), "Pricing Engine must publish production versions.");
 
     ["adminOrdersInitialized", "adminWalletInitialized", "fulfillmentInitialized"].forEach(pattern => {
         assert(orders.includes(pattern) || wallet.includes(pattern) || fulfillment.includes(pattern), `${pattern} lifecycle guard must remain.`);

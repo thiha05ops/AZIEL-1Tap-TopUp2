@@ -1,0 +1,228 @@
+"use strict";
+
+const assert = require("assert");
+const fs = require("fs");
+const path = require("path");
+
+const root = path.join(__dirname, "..", "..");
+const CatalogPackage = require("../models/CatalogPackage");
+const PricingPolicy = require("../models/PricingPolicy");
+const PriceVersion = require("../models/PriceVersion");
+const {
+    getPricingConsoleState,
+    publishPricing,
+    saveDraftPricing
+} = require("../services/commerce/adminPricingEngineService");
+const { buildProductionPricingContext } = require("../services/commerce/productionPricingContextService");
+
+function read(file) {
+    return fs.readFileSync(path.join(root, file), "utf8");
+}
+
+function assertContains(file, needle, message) {
+    assert(read(file).includes(needle), message);
+}
+
+function assertNotContains(file, needle, message) {
+    assert(!read(file).includes(needle), message);
+}
+
+function clone(value) {
+    return JSON.parse(JSON.stringify(value));
+}
+
+function chain(value) {
+    const api = {
+        sort() { return api; },
+        select() { return api; },
+        limit() { return api; },
+        lean: async () => clone(value)
+    };
+    return api;
+}
+
+function matchValue(actual, expected) {
+    if (expected && typeof expected === "object" && !Array.isArray(expected)) {
+        if (expected.$in) return expected.$in.includes(actual);
+        if (expected.$exists !== undefined) return expected.$exists ? actual !== undefined : actual === undefined;
+        if (expected.$lte !== undefined) return actual == null || new Date(actual) <= new Date(expected.$lte);
+        if (expected.$gte !== undefined) return actual == null || new Date(actual) >= new Date(expected.$gte);
+    }
+    return String(actual ?? "") === String(expected ?? "");
+}
+
+function matches(document, query = {}) {
+    return Object.entries(query).every(([key, expected]) => {
+        if (key === "$and") return expected.every(item => matches(document, item));
+        if (key === "$or") return expected.some(item => matches(document, item));
+        const actual = key.split(".").reduce((current, part) => current?.[part], document);
+        return matchValue(actual, expected);
+    });
+}
+
+function installModelMocks() {
+    const originals = {
+        catalogFind: CatalogPackage.find,
+        policyFindOne: PricingPolicy.findOne,
+        policyFindOneAndUpdate: PricingPolicy.findOneAndUpdate,
+        policyCreate: PricingPolicy.create,
+        policyUpdateOne: PricingPolicy.updateOne,
+        ruleFind: require("../models/PricingRule").find,
+        versionFindOne: PriceVersion.findOne,
+        versionFind: PriceVersion.find,
+        versionCreate: PriceVersion.create,
+        versionUpdateOne: PriceVersion.updateOne
+    };
+
+    let policyId = 1;
+    let versionId = 1;
+    const policies = [];
+    const versions = [];
+    const packages = [{
+        _id: "64f000000000000000000123",
+        productCode: "mlbb",
+        packageCode: "WEEKLY",
+        name: "Weekly Pass",
+        enabled: true,
+        deletedAt: null,
+        sortOrder: 1,
+        prices: { TH: { amount: 1000, currency: "THB", enabled: true } },
+        metadata: { gameName: "Mobile Legends" }
+    }];
+
+    CatalogPackage.find = () => chain(packages);
+    PricingPolicy.findOne = query => chain(policies.filter(policy => matches(policy, query)).at(-1) || null);
+    PricingPolicy.findOneAndUpdate = (query, update) => {
+        let doc = policies.find(policy => matches(policy, query));
+        if (!doc) {
+            doc = { _id: `policy-${policyId++}`, code: update.$setOnInsert?.code, createdBy: update.$setOnInsert?.createdBy, createdAt: new Date().toISOString() };
+            policies.push(doc);
+        }
+        Object.assign(doc, update.$set || {}, { updatedAt: new Date().toISOString() });
+        return chain(doc);
+    };
+    PricingPolicy.create = async input => {
+        const doc = { ...clone(input), _id: `policy-${policyId++}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+        policies.push(doc);
+        return clone(doc);
+    };
+    PricingPolicy.updateOne = async (query, update) => {
+        const doc = policies.find(policy => matches(policy, query));
+        if (doc) Object.assign(doc, update.$set || {}, { updatedAt: new Date().toISOString() });
+        return { modifiedCount: doc ? 1 : 0 };
+    };
+    require("../models/PricingRule").find = () => chain([]);
+    PriceVersion.findOne = query => chain(versions.filter(version => matches(version, query)).at(-1) || null);
+    PriceVersion.find = query => chain(versions.filter(version => matches(version, query)));
+    PriceVersion.create = async input => {
+        const doc = { ...clone(input), _id: `version-${versionId}`, versionId: `pv-${versionId++}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+        versions.push(doc);
+        return clone(doc);
+    };
+    PriceVersion.updateOne = async (query, update) => {
+        const doc = versions.find(version => matches(version, query));
+        if (doc) Object.assign(doc, update.$set || {}, { updatedAt: new Date().toISOString() });
+        return { modifiedCount: doc ? 1 : 0 };
+    };
+
+    return {
+        policies,
+        versions,
+        restore() {
+            CatalogPackage.find = originals.catalogFind;
+            PricingPolicy.findOne = originals.policyFindOne;
+            PricingPolicy.findOneAndUpdate = originals.policyFindOneAndUpdate;
+            PricingPolicy.create = originals.policyCreate;
+            PricingPolicy.updateOne = originals.policyUpdateOne;
+            require("../models/PricingRule").find = originals.ruleFind;
+            PriceVersion.findOne = originals.versionFindOne;
+            PriceVersion.find = originals.versionFind;
+            PriceVersion.create = originals.versionCreate;
+            PriceVersion.updateOne = originals.versionUpdateOne;
+        }
+    };
+}
+
+async function verifyDraftPublishAndQuotePickup() {
+    const mock = installModelMocks();
+    try {
+        await saveDraftPricing({
+            policies: [{
+                region: "TH",
+                currency: "THB",
+                config: {
+                    exchangeRate: 1,
+                    supplierFee: { enabled: false, type: "PERCENT", value: 0 },
+                    businessCost: { enabled: false, type: "FIXED", value: 0 },
+                    gatewayFee: { enabled: true, type: "PERCENT", value: 2 },
+                    platformCost: { enabled: true, type: "FIXED", value: 20 },
+                    tax: { enabled: false, type: "PERCENT", value: 0 },
+                    profitRule: { type: "PERCENT", value: 15 },
+                    roundingRule: { enabled: true, mode: "NEAREST", increment: 10, psychologicalEnding: 0 }
+                }
+            }]
+        }, { username: "owner" });
+
+        let state = await getPricingConsoleState();
+        assert.strictEqual(state.policies.find(item => item.region === "TH").draft.config.profitRule.value, 15, "Saved draft must survive backend reload.");
+
+        const published = await publishPricing({ username: "owner" });
+        assert.strictEqual(published.version.versionNumber, 1, "First publish must create pricing version v1.");
+        assert.strictEqual(mock.versions[0].status, "PUBLISHED", "Published version must be PUBLISHED.");
+        assert.strictEqual(mock.policies.some(policy => policy.status === "ACTIVE" && policy.region === "TH"), true, "Publish must activate a production policy.");
+
+        const context = await buildProductionPricingContext({
+            pkg: {
+                _id: "64f000000000000000000123",
+                productCode: "mlbb",
+                packageCode: "WEEKLY",
+                name: "Weekly Pass",
+                metadata: { gameName: "Mobile Legends" }
+            },
+            price: { amount: 1000, currency: "THB" },
+            catalog: { productCode: "mlbb", packageCode: "WEEKLY", productName: "Mobile Legends" },
+            region: "TH",
+            currency: "THB",
+            now: new Date()
+        });
+        assert.strictEqual(context.pricing.pricingInput.policy.profitRule.value, 15, "Future quote context must use the newly published active policy.");
+        assert.strictEqual(context.pricing.versionContext.priceVersionNumber, 1, "Future quote context must snapshot the published pricing version.");
+
+        const oldOrder = Object.freeze({ commercial: Object.freeze({ totalAmount: 1000 }), quoteMetadata: Object.freeze({ pricingVersion: "pv-old" }) });
+        await saveDraftPricing({
+            policies: [{
+                region: "TH",
+                currency: "THB",
+                config: { profitRule: { type: "PERCENT", value: 30 } }
+            }]
+        }, { username: "owner" });
+        const second = await publishPricing({ username: "owner" });
+        assert.strictEqual(second.version.versionNumber, 2, "Second publish must increment pricing version.");
+        assert.strictEqual(oldOrder.commercial.totalAmount, 1000, "Historical CommerceOrder snapshots must remain unchanged after publish.");
+    } finally {
+        mock.restore();
+    }
+}
+
+function verifySource() {
+    assertContains("frontend/admin.html", "pricingSaveDraftBtn", "Pricing Engine UI must expose Save Draft.");
+    assertContains("frontend/admin.html", "pricingPublishBtn", "Pricing Engine UI must expose Publish.");
+    assertNotContains("frontend/admin.html", "Simulation Only", "Pricing Engine page must not remain in Simulation Only mode.");
+    assertContains("frontend/js/admin-pricing-engine.js", "/api/admin/pricing-engine", "Pricing Engine UI must load production config.");
+    assertContains("frontend/js/admin-pricing-engine.js", "/api/admin/pricing-engine/draft", "Pricing Engine UI must save backend drafts.");
+    assertContains("frontend/js/admin-pricing-engine.js", "/api/admin/pricing-engine/publish", "Pricing Engine UI must publish backend versions.");
+    assertContains("backend/routes/adminPricingEngine.js", "requireOwner", "Publishing must be OWNER-only.");
+    assertContains("backend/services/commerce/adminPricingEngineService.js", "PriceVersion.create", "Publishing must create a PriceVersion.");
+    assertContains("backend/services/commerce/productionPricingContextService.js", "\"metadata.policyIds\"", "Production quote context must resolve branch versions published by the admin console.");
+}
+
+async function main() {
+    verifySource();
+    await verifyDraftPublishAndQuotePickup();
+    console.log("Admin Pricing Engine production activation verification passed.");
+}
+
+main().catch(error => {
+    console.error(error);
+    process.exit(1);
+});

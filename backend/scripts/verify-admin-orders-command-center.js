@@ -27,10 +27,12 @@ function verifyOrderRouteContracts() {
 
     assert(source.includes('router.get("/admin/orders", adminMiddleware'), "Admin orders list must require adminMiddleware");
     assert(source.includes('filter === "manual_review"'), "Admin orders API should support manual_review");
-    assert(source.includes('query.status = "pending_payment"'), "Manual review filter should require pending_payment");
-    assert(source.includes('"paymentEvidence.url"'), "Manual review should include paymentEvidence.url evidence");
-    assert(source.includes('"paymentEvidence.key"'), "Manual review should include paymentEvidence.key evidence");
+    assert(source.includes("listCommerceManualReviewOrders"), "Manual review filter should read Commerce PaymentAttempt records");
+    assert(source.includes('provider: COMMERCE_MANUAL_PROVIDER'), "Manual review filter should require the Commerce Manual PromptPay provider");
+    assert(source.includes('status: "PENDING"'), "Manual review filter should require pending PaymentAttempts");
+    assert(source.includes('"safeMetadata.receiptAttached": true'), "Manual review filter should require Commerce receipt evidence");
     assert(source.includes("projectAdminOrder"), "Admin orders should use an explicit projection");
+    assert(source.includes("projectCommerceManualAttempt"), "Admin manual review should use an explicit Commerce projection");
     assert(source.includes("allowedNextStatuses"), "Admin order projection should include allowed transitions");
     assert(source.includes("transitionOrder(order, status"), "Status updates should use canonical transitionOrder");
     assert(!source.includes("ManualPaymentAttempt.find"), "Admin order queues must not query ManualPaymentAttempt");

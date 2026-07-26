@@ -461,6 +461,10 @@ function getOrderActions(order) {
         actions.push({ action: "confirm-paid", labelKey: "confirm_paid", className: "order-primary-action" });
     }
 
+    if (status === "pending_payment" && order.isCommerceManualPayment && order.hasPaymentEvidence && allowed.has("failed")) {
+        actions.push({ action: "reject-manual-payment", labelKey: "reject", className: "order-danger-action" });
+    }
+
     if (status === "paid" && allowed.has("processing")) {
         actions.push({ action: "start-processing", labelKey: "start_processing", className: "order-primary-action" });
     }
@@ -489,6 +493,7 @@ function bindDetailActions(panel, order) {
     });
 
     panel.querySelector('[data-action="confirm-paid"]')?.addEventListener("click", () => confirmOrderPaid(order));
+    panel.querySelector('[data-action="reject-manual-payment"]')?.addEventListener("click", () => rejectCommerceManualPayment(order));
     panel.querySelector('[data-action="start-processing"]')?.addEventListener("click", () => transitionSelectedOrder(order, "processing"));
     panel.querySelector('[data-action="complete-order"]')?.addEventListener("click", () => transitionSelectedOrder(order, "completed"));
     panel.querySelector('[data-action="fail-order"]')?.addEventListener("click", () => transitionSelectedOrder(order, "failed"));
@@ -504,7 +509,88 @@ async function confirmOrderPaid(order) {
 
     if (!confirmed) return;
 
+    if (order.isCommerceManualPayment) {
+        await approveCommerceManualPayment(order);
+        return;
+    }
+
     await transitionSelectedOrder(order, "paid", { skipConfirm: true });
+}
+
+async function approveCommerceManualPayment(order) {
+    const attemptId = order.commercePaymentAttemptId || order.manualPaymentAttemptId;
+    if (!attemptId) {
+        showAdminToast?.(adminT("something_went_wrong"), "error");
+        return;
+    }
+
+    const btn = document.querySelector(`#adminOrderDetailPanel [data-action="confirm-paid"]`);
+
+    try {
+        window.AZIEL_UI?.button?.setLoading(btn, { text: adminT("loading") });
+        const data = await adminFetch(`/api/admin/commerce/payments/${encodeURIComponent(attemptId)}/approve`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ note: "Approved from Admin Orders manual review." })
+        });
+
+        if (!data?.success) {
+            showAdminToast?.(data?.message || adminT("something_went_wrong"), "error");
+            return;
+        }
+
+        showAdminToast?.(adminT("order_updated"), "success");
+        dispatchDashboardRefresh();
+        await loadOrders(false);
+    } catch (error) {
+        console.log("Approve commerce manual payment error:", error);
+        showAdminToast?.(adminT("something_went_wrong"), "error");
+    } finally {
+        window.AZIEL_UI?.button?.reset(btn);
+    }
+}
+
+async function rejectCommerceManualPayment(order) {
+    const attemptId = order.commercePaymentAttemptId || order.manualPaymentAttemptId;
+    if (!attemptId) {
+        showAdminToast?.(adminT("something_went_wrong"), "error");
+        return;
+    }
+
+    const reason = prompt(`${adminT("reject")}?\n\n${order.orderId}\n\nReason:`);
+    if (!reason) return;
+
+    const confirmed = await confirmOrderAction({
+        title: adminT("reject"),
+        message: `${adminT("reject")}?\n\n${order.orderId}`
+    });
+
+    if (!confirmed) return;
+
+    const btn = document.querySelector(`#adminOrderDetailPanel [data-action="reject-manual-payment"]`);
+
+    try {
+        window.AZIEL_UI?.button?.setLoading(btn, { text: adminT("loading") });
+        const data = await adminFetch(`/api/admin/commerce/payments/${encodeURIComponent(attemptId)}/reject`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ reason })
+        });
+
+        if (!data?.success) {
+            showAdminToast?.(data?.message || adminT("something_went_wrong"), "error");
+            return;
+        }
+
+        showAdminToast?.(adminT("order_updated"), "success");
+        dispatchDashboardRefresh();
+        await loadOrders(false);
+    } catch (error) {
+        console.log("Reject commerce manual payment error:", error);
+        showAdminToast?.(adminT("something_went_wrong"), "error");
+    } finally {
+        window.AZIEL_UI?.button?.reset(btn);
+    }
 }
 
 async function transitionSelectedOrder(order, status, options = {}) {

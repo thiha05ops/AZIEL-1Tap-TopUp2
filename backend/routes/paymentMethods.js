@@ -889,8 +889,13 @@ function isLegacyThailandBankMethod(method = {}) {
         THAI_STANDALONE_BANK_KEYS.has(String(method.key || "").toLowerCase());
 }
 
+function toPaymentMethodObject(method = {}) {
+    if (!method) return {};
+    return typeof method.toObject === "function" ? method.toObject() : method;
+}
+
 function formatMethod(method) {
-    const obj = method.toObject();
+    const obj = toPaymentMethodObject(method);
     const provider = normalizeProviderKey(obj.provider || obj.key || "");
     const isDynamicPromptPayQr = obj.qrMode === "aziel_promptpay_dynamic";
     const configuredQrImage = safePublicAssetUrl(
@@ -939,15 +944,16 @@ function formatMethod(method) {
 }
 
 function formatAdminMethod(method) {
-    const obj = typeof method.toObject === "function" ? method.toObject() : method;
+    const obj = toPaymentMethodObject(method);
     const configuredQrImage = safePublicAssetUrl(
         obj.uploadedQrImage ||
         obj.qrImageUrl ||
         obj.qrImage ||
         ""
     );
+    const publicMethod = formatMethod(obj);
     return {
-        ...formatMethod(method),
+        ...publicMethod,
         qrImage: configuredQrImage,
         qrImageUrl: configuredQrImage,
         uploadedQrImage: configuredQrImage,
@@ -991,7 +997,7 @@ function formatAdminMethod(method) {
         railType: obj.railType || railTypeForMethod(obj),
         availabilityMode: obj.availabilityMode || (obj.enabled === true ? "MANUAL_ONLY" : "DISABLED"),
         routingPriority: obj.routingPriority || 0,
-        customerVisible: obj.enabled === true && formatMethod(method).publicReady === true,
+        customerVisible: obj.enabled === true && publicMethod.publicReady === true,
         providerOptions: validProvidersFor(obj.region, obj.paymentType).map(item => ({
             key: item.key,
             label: item.label
@@ -1754,9 +1760,12 @@ module.exports._test = {
     applyPaymentMethodPatch,
     applySeedDefaultsWithoutOverwriting,
     defaultMethods,
+    formatAdminMethod,
+    formatMethod,
     isLegacyThailandBankMethod,
     mergePromptPayLaunchers,
     publicBankLaunchersProjection,
     publicTrustDisplayForMethod,
-    sanitizeBankLaunchers
+    sanitizeBankLaunchers,
+    toPaymentMethodObject
 };

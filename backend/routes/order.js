@@ -7,6 +7,8 @@ const mongoose = require("mongoose");
 
 const Order = require("../models/Order");
 const PaymentMethod = require("../models/PaymentMethod");
+const CommerceOrder = require("../models/CommerceOrder");
+const PaymentAttempt = require("../models/PaymentAttempt");
 
 const upload = require("../middleware/orderUpload");
 const authMiddleware = require("../middleware/authMiddleware");
@@ -64,6 +66,8 @@ const {
     logStorageError,
     uploadFile
 } = require("../services/storageService");
+
+const COMMERCE_MANUAL_PROVIDER = "MANUAL_PROMPTPAY";
 
 function getCurrencyKey(currency) {
     return String(currency || "").toUpperCase() === "THB" ? "THB" : "MMK";
@@ -127,6 +131,241 @@ function hasManualPaymentEvidence(order = {}) {
         order.paymentEvidence?.key ||
         order.paymentEvidence?.storageKey
     );
+}
+
+function hasCommercePaymentEvidence(attempt = {}) {
+    return Boolean(attempt.safeMetadata?.receiptAttached && attempt.safeMetadata?.receiptEvidence?.fileReference);
+}
+
+function commerceAdminId(attempt = {}) {
+    return `commerce:${attempt.attemptId || attempt._id || ""}`;
+}
+
+function commerceAttemptIdFromAdminId(value = "") {
+    const id = String(value || "");
+    return id.startsWith("commerce:") ? id.slice("commerce:".length) : "";
+}
+
+function commerceOrderIdFromAdminId(value = "") {
+    const id = String(value || "");
+    return id.startsWith("commerce-order:") ? id.slice("commerce-order:".length) : "";
+}
+
+function commerceOrderStatusForAttempt(attempt = {}, order = {}) {
+    const status = String(attempt.status || "").toUpperCase();
+    if (status === "PAID") return "paid";
+    if (status === "FAILED") return "failed";
+    if (status === "EXPIRED") return "expired";
+    if (status === "CANCELLED") return "cancelled";
+    return order.status || "pending_payment";
+}
+
+function commercePaymentStatusForAttempt(attempt = {}, order = {}) {
+    const status = String(attempt.status || "").toUpperCase();
+    if (status === "PAID") return "paid";
+    if (status === "FAILED") return "failed";
+    if (status === "EXPIRED") return "expired";
+    if (status === "CANCELLED") return "cancelled";
+    return order.paymentStatus || "pending";
+}
+
+function commercePaymentEvidence(attempt = {}) {
+    const evidence = attempt.safeMetadata?.receiptEvidence || {};
+    if (!evidence.fileReference && !evidence.storageKey) return {};
+    return {
+        url: evidence.fileReference || "",
+        key: evidence.storageKey || evidence.fileReference || "",
+        storageKey: evidence.storageKey || "",
+        provider: evidence.storageProvider || "",
+        mimeType: evidence.mimeType || "",
+        size: Number(evidence.fileSize || 0),
+        uploadedAt: evidence.uploadedAt || null,
+        receiptId: evidence.receiptId || ""
+    };
+}
+
+function projectCommerceManualAttempt(attempt = {}, order = {}, options = {}) {
+    const product = order.product || {};
+    const commercial = order.commercial || {};
+    const status = commerceOrderStatusForAttempt(attempt, order);
+    const paymentStatus = commercePaymentStatusForAttempt(attempt, order);
+    const evidence = commercePaymentEvidence(attempt);
+
+    return {
+        _id: commerceAdminId(attempt),
+        orderId: order.orderId || attempt.orderId || "",
+        commerceOrderId: order.orderId || attempt.orderId || "",
+        commercePaymentAttemptId: attempt.attemptId || "",
+        isCommerceManualPayment: true,
+        username: order.owner?.userId || order.customer?.contact?.email || attempt.ownerId || "customer",
+        game: product.gameName || product.gameCode || "",
+        productCode: product.gameCode || product.gameId || "",
+        productName: product.gameName || product.gameCode || "",
+        userId: order.owner?.userId || attempt.ownerId || "",
+        zoneId: order.fulfilment?.input?.zoneId || order.fulfilment?.input?.serverId || "",
+        packageName: product.packageName || product.packageCode || "",
+        packageCode: product.packageCode || product.packageId || "",
+        amount: Number(attempt.amount ?? commercial.totalAmount ?? 0),
+        currency: attempt.currency || commercial.currency || "",
+        region: attempt.region || product.region || commercial.region || "",
+        paymentMethod: attempt.paymentMethod || order.payment?.paymentMethodId || "promptpay",
+        paymentSlip: evidence.url || "",
+        paymentEvidence: evidence,
+        paymentStatus,
+        paymentProvider: attempt.provider || order.payment?.provider || COMMERCE_MANUAL_PROVIDER,
+        transactionId: attempt.providerReference || "",
+        manualPaymentAttemptId: attempt.attemptId || "",
+        note: order.customer?.notes || "",
+        status,
+        refundRequested: false,
+        refunded: false,
+        timeline: (attempt.eventHistory || []).map(event => ({
+            status: String(event.status || "").toLowerCase(),
+            paymentStatus: String(event.status || "").toLowerCase(),
+            source: event.eventType || "commerce_manual_payment",
+            actorType: "system",
+            at: event.receivedAt || event.occurredAt || attempt.updatedAt
+        })),
+        allowedNextStatuses: status === "pending_payment" && hasCommercePaymentEvidence(attempt) ? ["paid", "failed"] : [],
+        fulfillment: {
+            status: String(order.fulfilment?.status || "not_started").toUpperCase(),
+            source: "commerce"
+        },
+        fulfillmentAttempts: [],
+        actions: {
+            canApproveManualPayment: status === "pending_payment",
+            canRejectManualPayment: status === "pending_payment"
+        },
+        hasPaymentEvidence: hasCommercePaymentEvidence(attempt),
+        isSummary: options.summary === true,
+        createdAt: attempt.createdAt || order.createdAt,
+        updatedAt: attempt.updatedAt || order.updatedAt
+    };
+}
+
+function projectCommerceOrder(order = {}, options = {}) {
+    const product = order.product || {};
+    const commercial = order.commercial || {};
+    const payment = order.payment || {};
+    const fulfilmentInput = order.fulfilment?.input || {};
+    return {
+        _id: options.admin ? `commerce-order:${order.orderId}` : order._id,
+        orderId: order.orderId || "",
+        commerceOrderId: order.orderId || "",
+        isCommerceOrder: true,
+        username: options.username || order.owner?.userId || order.customer?.contact?.email || "customer",
+        game: product.gameName || product.gameCode || "",
+        productCode: product.gameCode || product.gameId || "",
+        productName: product.gameName || product.gameCode || "",
+        userId: fulfilmentInput.gameAccount?.userId || fulfilmentInput.userId || order.owner?.userId || "",
+        zoneId: fulfilmentInput.gameAccount?.zoneId || fulfilmentInput.zoneId || fulfilmentInput.serverId || "",
+        packageName: product.packageName || product.packageCode || "",
+        packageCode: product.packageCode || product.packageId || "",
+        amount: Number(commercial.totalAmount || 0),
+        originalAmount: Number(commercial.originalUnitPrice || 0),
+        discountAmount: Number(commercial.discountAmount || 0),
+        finalAmount: Number(commercial.totalAmount || 0),
+        currency: commercial.currency || "",
+        region: commercial.region || product.region || "",
+        paymentMethod: payment.paymentMethodId || "",
+        paymentStatus: order.paymentStatus || payment.status || "",
+        paymentProvider: payment.provider || "",
+        transactionId: "",
+        note: order.customer?.notes || "",
+        status: order.status || "",
+        refundRequested: false,
+        refunded: false,
+        allowedNextStatuses: getAllowedNextStatuses(order.status),
+        fulfillment: {
+            status: String(order.fulfilment?.status || "not_started").toUpperCase(),
+            source: "commerce"
+        },
+        fulfillmentAttempts: [],
+        actions: {},
+        hasPaymentEvidence: false,
+        isSummary: options.summary === true,
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt
+    };
+}
+
+async function listCommerceManualReviewOrders({ search = "", cursor = "", limit = 50 } = {}) {
+    const query = {
+        provider: COMMERCE_MANUAL_PROVIDER,
+        status: "PENDING",
+        "safeMetadata.receiptAttached": true,
+        "safeMetadata.receiptEvidence.fileReference": { $type: "string", $ne: "" }
+    };
+
+    if (search) {
+        const escaped = escapeRegex(search);
+        query.$or = [
+            { orderId: { $regex: `^${escaped}`, $options: "i" } },
+            { ownerId: { $regex: `^${escaped}`, $options: "i" } },
+            { attemptId: { $regex: `^${escaped}`, $options: "i" } }
+        ];
+    }
+
+    const attempts = await PaymentAttempt.find(applyCursorFilter(query, cursor))
+        .sort({ createdAt: -1, _id: -1 })
+        .limit(limit + 1)
+        .lean();
+    const { page, pagination } = pageResult(attempts, limit);
+    const orderIds = [...new Set(page.map(attempt => attempt.orderId).filter(Boolean))];
+    const orders = await CommerceOrder.find({ orderId: { $in: orderIds } }).lean();
+    const orderById = new Map(orders.map(order => [order.orderId, order]));
+
+    const items = page.map(attempt => projectCommerceManualAttempt(attempt, orderById.get(attempt.orderId) || {}, { summary: true }));
+
+    return { items, pagination };
+}
+
+async function listCommerceOrdersForAdmin({ status = "", search = "", limit = 50 } = {}) {
+    const query = {};
+    if (status && [
+        "pending_payment",
+        "paid",
+        "processing",
+        "completed",
+        "cancelled",
+        "failed",
+        "expired",
+        "refund_pending",
+        "refunded"
+    ].includes(status)) {
+        query.status = status;
+    }
+    if (search) {
+        const escaped = escapeRegex(search);
+        query.$or = [
+            { orderId: { $regex: `^${escaped}`, $options: "i" } },
+            { "owner.userId": { $regex: `^${escaped}`, $options: "i" } }
+        ];
+    }
+    const orders = await CommerceOrder.find(query)
+        .sort({ createdAt: -1, _id: -1 })
+        .limit(limit)
+        .lean();
+    return orders.map(order => projectCommerceOrder(order, { admin: true, summary: true }));
+}
+
+async function getCommerceManualOrderForAdmin(id = "", options = {}) {
+    const attemptId = commerceAttemptIdFromAdminId(id) || id;
+    if (!attemptId) return null;
+    const attempt = await PaymentAttempt.findOne({
+        attemptId,
+        provider: COMMERCE_MANUAL_PROVIDER
+    }).lean();
+    if (!attempt) return null;
+    const order = await CommerceOrder.findOne({ orderId: attempt.orderId }).lean();
+    return projectCommerceManualAttempt(attempt, order || {}, options);
+}
+
+async function getCommerceOrderForAdmin(id = "", options = {}) {
+    const orderId = commerceOrderIdFromAdminId(id);
+    if (!orderId) return null;
+    const order = await CommerceOrder.findOne({ orderId }).lean();
+    return order ? projectCommerceOrder(order, { admin: true, ...options }) : null;
 }
 
 function projectAdminOrder(order, fulfillmentAttempts = []) {
@@ -213,9 +452,20 @@ function projectAdminOrderSummary(order, fulfillmentAttempts = []) {
 // CUSTOMER ORDER HISTORY
 router.get("/history/:username", authMiddleware, async (req, res) => {
     try {
-        const orders = await Order.find({
-            username: getAuthenticatedUsername(req)
-        }).sort({ createdAt: -1 });
+        const username = getAuthenticatedUsername(req);
+        const [legacyOrders, commerceOrders] = await Promise.all([
+            Order.find({
+                username
+            }).sort({ createdAt: -1 }).lean(),
+            CommerceOrder.find({
+                "owner.type": "USER",
+                "owner.userId": String(req.user?._id || req.user?.id || req.user?.userId || "")
+            }).sort({ createdAt: -1 }).lean()
+        ]);
+        const orders = [
+            ...legacyOrders,
+            ...commerceOrders.map(order => projectCommerceOrder(order, { username }))
+        ].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
         res.json({ success: true, orders });
 
@@ -228,9 +478,20 @@ router.get("/history/:username", authMiddleware, async (req, res) => {
 // CUSTOMER RECENT ORDERS
 router.get("/order/user/:username", authMiddleware, async (req, res) => {
     try {
-        const orders = await Order.find({
-            username: getAuthenticatedUsername(req)
-        }).sort({ createdAt: -1 });
+        const username = getAuthenticatedUsername(req);
+        const [legacyOrders, commerceOrders] = await Promise.all([
+            Order.find({
+                username
+            }).sort({ createdAt: -1 }).lean(),
+            CommerceOrder.find({
+                "owner.type": "USER",
+                "owner.userId": String(req.user?._id || req.user?.id || req.user?.userId || "")
+            }).sort({ createdAt: -1 }).lean()
+        ]);
+        const orders = [
+            ...legacyOrders,
+            ...commerceOrders.map(order => projectCommerceOrder(order, { username }))
+        ].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
         res.json({ success: true, orders });
 
@@ -248,6 +509,13 @@ router.get("/order/track/:orderId", async (req, res) => {
         });
 
         if (!order) {
+            const commerceOrder = await CommerceOrder.findOne({ orderId: req.params.orderId }).lean();
+            if (commerceOrder) {
+                return res.json({
+                    success: true,
+                    order: projectCommerceOrder(commerceOrder)
+                });
+            }
             return res.json({
                 success: false,
                 message: "Order not found"
@@ -276,6 +544,18 @@ router.get("/order/status/:orderId", authMiddleware, async (req, res) => {
         });
 
         if (!order) {
+            const commerceOrder = await CommerceOrder.findOne({
+                orderId: req.params.orderId,
+                "owner.type": "USER",
+                "owner.userId": String(req.user?._id || req.user?.id || req.user?.userId || "")
+            }).lean();
+            if (commerceOrder) {
+                return res.json({
+                    success: true,
+                    order: projectCommerceOrder(commerceOrder),
+                    allowedNextStatuses: getAllowedNextStatuses(commerceOrder.status)
+                });
+            }
             return res.status(404).json({
                 success: false,
                 code: "ORDER_NOT_FOUND",
@@ -411,13 +691,18 @@ router.get("/admin/orders", adminMiddleware, requireAdminPermission(PERMISSIONS.
         const limit = parseLimit(req.query.limit, { defaultLimit: 50, maxLimit: 100 });
 
         if (filter === "manual_review") {
-            query.status = "pending_payment";
-            query.$or = [
-                { paymentSlip: { $type: "string", $ne: "" } },
-                { "paymentEvidence.url": { $type: "string", $ne: "" } },
-                { "paymentEvidence.key": { $type: "string", $ne: "" } },
-                { "paymentEvidence.storageKey": { $type: "string", $ne: "" } }
-            ];
+            const { items, pagination } = await listCommerceManualReviewOrders({
+                search,
+                cursor: req.query.cursor,
+                limit
+            });
+
+            return res.json({
+                success: true,
+                items,
+                orders: items,
+                pagination
+            });
         } else if ([
             "pending_payment",
             "paid",
@@ -457,7 +742,11 @@ router.get("/admin/orders", adminMiddleware, requireAdminPermission(PERMISSIONS.
             .lean();
         const { page, pagination } = pageResult(orders, limit);
         const fulfillmentByOrder = await getOrderFulfillmentSummary(page.map(order => order._id));
-        const items = page.map(order => projectAdminOrderSummary(order, fulfillmentByOrder.get(String(order._id)) || []));
+        const legacyItems = page.map(order => projectAdminOrderSummary(order, fulfillmentByOrder.get(String(order._id)) || []));
+        const commerceItems = await listCommerceOrdersForAdmin({ status, search, limit });
+        const items = [...legacyItems, ...commerceItems]
+            .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+            .slice(0, limit);
 
         res.json({
             success: true,
@@ -476,6 +765,22 @@ router.get("/admin/orders", adminMiddleware, requireAdminPermission(PERMISSIONS.
 
 router.get("/admin/orders/:id", adminMiddleware, requireAdminPermission(PERMISSIONS.ORDERS_READ), async (req, res) => {
     try {
+        const commerceOrderDetail = await getCommerceOrderForAdmin(req.params.id);
+        if (commerceOrderDetail) {
+            return res.json({
+                success: true,
+                order: commerceOrderDetail
+            });
+        }
+
+        const commerceOrder = await getCommerceManualOrderForAdmin(req.params.id);
+        if (commerceOrder) {
+            return res.json({
+                success: true,
+                order: commerceOrder
+            });
+        }
+
         const order = await Order.findById(req.params.id);
         if (!order) {
             return res.status(404).json({
@@ -1084,3 +1389,14 @@ function formatStatusText(status) {
 }
 
 module.exports = router;
+module.exports._test = {
+    commerceAdminId,
+    commerceAttemptIdFromAdminId,
+    commerceOrderIdFromAdminId,
+    commercePaymentEvidence,
+    commerceOrderStatusForAttempt,
+    commercePaymentStatusForAttempt,
+    hasCommercePaymentEvidence,
+    projectCommerceOrder,
+    projectCommerceManualAttempt
+};

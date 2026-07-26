@@ -317,6 +317,8 @@ window.AZIEL_ADMIN_LANG.th = {
     catalog: "แคตตาล็อก",
     catalog_sub: "Inspect canonical product and package catalog truth.",
     catalog_readonly_sub: "Read-only canonical catalog foundation.",
+    pricing_engine: "Pricing Engine",
+    pricing_engine_sub: "จัดการ pricing rule และ business policy",
     products: "สินค้าs",
     packages: "แพ็กเกจs",
     product_code: "สินค้า รหัส",

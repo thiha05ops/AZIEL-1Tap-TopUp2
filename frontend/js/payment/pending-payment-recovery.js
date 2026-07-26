@@ -7,6 +7,7 @@
 
     const MODULE_VERSION = "20260723-recovery-runtime";
     const DISMISS_PREFIX = "azielPendingPaymentDismissed:";
+    const COMMERCE_MARKER_KEY = "aziel:commerce-pending-payment";
     const RECOVERY_EVENT = "aziel:resume-payment";
     const CHECKOUT_SELECTOR = "#azPaymentCheckoutSheet.show";
 
@@ -113,6 +114,24 @@
         return window.AZIEL?.apiUrl?.(path) || path;
     }
 
+    function readCommerceMarker() {
+        try {
+            const marker = JSON.parse(localStorage.getItem(COMMERCE_MARKER_KEY) || "null");
+            if (!marker?.orderId || !marker?.attemptId) return null;
+            return marker;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function clearCommerceMarker() {
+        try {
+            localStorage.removeItem(COMMERCE_MARKER_KEY);
+        } catch (error) {
+            // Marker cleanup is best-effort.
+        }
+    }
+
     function isAuthenticated() {
         return Boolean(getToken() && window.AZIEL?.user);
     }
@@ -161,6 +180,77 @@
             }
         }
         return Math.max(0, Number(attempt.remainingSeconds || 0));
+    }
+
+    function projectCommercePayment(marker = {}, payment = {}) {
+        const expiresAt = payment.expiresAt || "";
+        const expiresTime = expiresAt ? new Date(expiresAt).getTime() : 0;
+        const qr = payment.qr || {};
+        return {
+            commerce: true,
+            orderId: payment.orderId || marker.orderId,
+            attemptId: payment.attemptId || marker.attemptId,
+            attemptReference: qr.encodedReference || payment.attemptId || marker.attemptId,
+            reference: qr.encodedReference || payment.attemptId || marker.attemptId,
+            productName: marker.productName || "",
+            packageName: marker.packageName || "",
+            productCode: marker.productCode || marker.gameKey || "",
+            gameKey: marker.gameKey || marker.productCode || "",
+            region: marker.region || "TH",
+            paymentMethod: marker.paymentMethod || "promptpay",
+            paymentName: "PromptPay QR",
+            paymentType: "manual",
+            provider: "promptpay",
+            amount: payment.amount,
+            finalAmount: payment.amount,
+            currency: payment.currency || "THB",
+            createdAt: marker.createdAt || "",
+            recoverableExpiresAt: expiresAt,
+            remainingSeconds: Number.isFinite(expiresTime) ? Math.max(0, Math.floor((expiresTime - Date.now()) / 1000)) : 0,
+            receiptUploadEnabled: payment.receiptEvidence?.attached !== true,
+            slipRequired: true,
+            resumable: payment.receiptEvidence?.attached !== true && String(payment.paymentStatus || "").toLowerCase() === "pending",
+            qrMode: qr.mode || "aziel_promptpay_dynamic",
+            dynamicQr: {
+                qrImage: qr.image || "",
+                qrPayload: qr.payload || "",
+                expiresAt,
+                orderReference: qr.encodedReference || payment.attemptId || marker.attemptId,
+                encodedReference: qr.encodedReference || ""
+            },
+            instructions: {
+                key: "promptpay",
+                method: "PromptPay QR",
+                qrMode: qr.mode || "aziel_promptpay_dynamic",
+                enableSaveQr: true,
+                enableOpenApp: true,
+                enableChecklist: true,
+                openAppMode: "bank_chooser",
+                appLaunchMode: "APP_ONLY",
+                appDisplayName: "PromptPay",
+                bankLaunchers: []
+            }
+        };
+    }
+
+    async function fetchCommerceRecoverable() {
+        const marker = readCommerceMarker();
+        if (!marker) return [];
+        const res = await fetch(getApiUrl(`/api/commerce/orders/${encodeURIComponent(marker.orderId)}/payments/manual-promptpay?attemptId=${encodeURIComponent(marker.attemptId)}`), {
+            headers: window.AZIEL?.authHeaders?.() || { Authorization: `Bearer ${getToken()}` }
+        });
+        if (res.status === 404 || res.status === 410) {
+            clearCommerceMarker();
+            return [];
+        }
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success || !data.payment?.attemptId) return [];
+        const projected = projectCommercePayment(marker, data.payment);
+        if (projected.receiptUploadEnabled === false || projected.resumable === false || computeRemaining(projected) <= 0) {
+            clearCommerceMarker();
+            return [];
+        }
+        return [projected];
     }
 
     function getIconSrc(attempt = {}) {
@@ -473,7 +563,9 @@
             }
 
             const data = await res.json().catch(() => ({}));
-            const attempts = Array.isArray(data.recoverable) ? data.recoverable : [];
+            const legacyAttempts = Array.isArray(data.recoverable) ? data.recoverable : [];
+            const commerceAttempts = await fetchCommerceRecoverable();
+            const attempts = [...commerceAttempts, ...legacyAttempts];
             state.attempts = filterAttemptsForPage(attempts)
                 .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
             state.activeAttempt = chooseActiveAttempt(attempts);
@@ -570,22 +662,37 @@
                 button.textContent = t("loading", "Loading...");
             }
 
-            const res = await fetch(getApiUrl(`/api/payment/manual/recoverable/${encodeURIComponent(id)}/resume`), {
+            const selected = state.attempts.find(item => item.attemptId === id);
+            let recoverable = null;
+
+            if (selected?.commerce === true) {
+                const commerceAttempts = await fetchCommerceRecoverable();
+                recoverable = commerceAttempts.find(item => item.attemptId === id) || null;
+            } else {
+                const res = await fetch(getApiUrl(`/api/payment/manual/recoverable/${encodeURIComponent(id)}/resume`), {
                 method: "POST",
                 headers: window.AZIEL?.authHeaders?.({ "Content-Type": "application/json" }) || {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${getToken()}`
                 }
-            });
-            const data = await res.json().catch(() => ({}));
+                });
+                const data = await res.json().catch(() => ({}));
 
-            if (!res.ok || !data.success || !data.recoverable?.attemptId) {
+                if (!res.ok || !data.success || !data.recoverable?.attemptId) {
+                    removeOverlay();
+                    await fetchRecoverable({ force: true });
+                    return;
+                }
+                recoverable = data.recoverable;
+            }
+
+            if (!recoverable?.attemptId) {
                 removeOverlay();
                 await fetchRecoverable({ force: true });
                 return;
             }
 
-            state.selectedRecovery = data.recoverable;
+            state.selectedRecovery = recoverable;
             window.AZIEL_PENDING_PAYMENT_RECOVERY.attempts = state.attempts.slice();
             window.AZIEL_PENDING_PAYMENT_RECOVERY.selectedRecovery = state.selectedRecovery;
 
@@ -593,7 +700,7 @@
             removeOverlay();
             window.dispatchEvent(new CustomEvent(RECOVERY_EVENT, {
                 detail: {
-                    recovery: data.recoverable,
+                    recovery: recoverable,
                     attempts: state.attempts.slice()
                 }
             }));

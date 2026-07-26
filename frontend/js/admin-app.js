@@ -43,6 +43,10 @@ const adminSectionTitles = {
         titleKey: "catalog",
         subKey: "catalog_sub"
     },
+    "pricing-engine": {
+        titleKey: "pricing_engine",
+        subKey: "pricing_engine_sub"
+    },
     promos: {
         titleKey: "promo_codes",
         subKey: "promo_codes_sub"
@@ -510,6 +514,8 @@ function initAdminSearch() {
 
         if (
             keyword.includes("catalog") ||
+            keyword.includes("pricing") ||
+            keyword.includes("price") ||
             keyword.includes("media") ||
             keyword.includes("asset") ||
             keyword.includes("image") ||
@@ -522,6 +528,11 @@ function initAdminSearch() {
             keyword.includes("package") ||
             keyword.includes("game")
         ) {
+            if (keyword.includes("pricing") || keyword.includes("price")) {
+                openAdminSection("pricing-engine");
+                return;
+            }
+
             if (keyword.includes("campaign") || keyword.includes("popup") || keyword.includes("promotion")) {
                 openAdminSection("campaigns");
                 return;

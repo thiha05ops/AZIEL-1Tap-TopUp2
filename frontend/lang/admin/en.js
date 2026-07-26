@@ -318,6 +318,8 @@ window.AZIEL_ADMIN_LANG.en = {
     catalog: "Catalog",
     catalog_sub: "Inspect canonical product and package catalog truth.",
     catalog_readonly_sub: "Read-only canonical catalog foundation.",
+    pricing_engine: "Pricing Engine",
+    pricing_engine_sub: "Rule-based pricing and business policy management.",
     products: "Products",
     packages: "Packages",
     product: "Product",

@@ -35,6 +35,36 @@
                 ? false
                 : paymentSession?.slipRequired !== false && payment.slipRequired !== false;
 
+        async function submitCommerceReceipt(file, setMessage, close) {
+            const orderId = paymentSession?.commerceOrderId || orderData.commerceOrderId || paymentSession?.orderId || orderData.orderId;
+            const attemptId = paymentSession?.attemptId || orderData.commercePaymentAttemptId || orderData.manualPaymentAttemptId;
+            if (!orderId || !attemptId) throw new Error("Payment attempt is unavailable.");
+            const fd = new FormData();
+            fd.append("slip", file);
+            const res = await fetch(`/api/commerce/orders/${encodeURIComponent(orderId)}/payments/${encodeURIComponent(attemptId)}/receipt`, {
+                method: "POST",
+                headers: window.PaymentUtils?.authHeaders?.() || {},
+                body: fd
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) {
+                throw new Error(data.message || "Submission failed. Please try again.");
+            }
+            setMessage("success", data.message || "Payment slip submitted");
+            try {
+                localStorage.removeItem("aziel:commerce-pending-payment");
+            } catch (error) {
+                // Recovery marker cleanup is best-effort.
+            }
+            window.PaymentUtils?.showSuccess?.(
+                orderId,
+                "Slip Submitted",
+                "Waiting for Verification. Your payment slip has been submitted. We'll notify you after verification."
+            );
+            close("submitted");
+            return true;
+        }
+
         window.PaymentCheckoutSheet.show({
             ...payment,
             methodCode: paymentSession?.paymentMethod || payment.key || orderData.paymentMethod,
@@ -73,6 +103,9 @@
             submitLabel: "Submit for Verification",
             loadingText: "Submitting receipt...",
             onSubmit: async ({ file, setMessage, close }) => {
+                if (paymentSession?.commerce === true || paymentSession?.commerceOrderId || orderData.commerceOrderId) {
+                    return submitCommerceReceipt(file, setMessage, close);
+                }
                 const msgAdapter = {
                     set innerHTML(value) {
                         const text = String(value || "").replace(/<[^>]*>/g, "").trim();

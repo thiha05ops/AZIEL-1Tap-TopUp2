@@ -1832,6 +1832,8 @@
         const normalized = {
             mode: "recovery",
             lang,
+            commerce: recovery.commerce === true,
+            commerceOrderId: recovery.orderId || recovery.commerceOrderId || "",
             attemptId: recovery.attemptId || "",
             attemptReference: recovery.attemptReference || recovery.reference || "",
             methodCode: recovery.paymentMethod || instructions.key || "promptpay",
@@ -1885,7 +1887,10 @@
     async function submitRecoveredReceipt(options = {}, file, setMessage) {
         const fd = new FormData();
         fd.append("slip", file);
-        const res = await fetch(`/api/payment/manual/attempt/${encodeURIComponent(options.attemptId)}/slip`, {
+        const endpoint = options.commerce === true && options.commerceOrderId
+            ? `/api/commerce/orders/${encodeURIComponent(options.commerceOrderId)}/payments/${encodeURIComponent(options.attemptId)}/receipt`
+            : `/api/payment/manual/attempt/${encodeURIComponent(options.attemptId)}/slip`;
+        const res = await fetch(endpoint, {
             method: "POST",
             headers: window.AZIEL?.authHeaders?.() || window.PaymentUtils?.authHeaders?.() || {},
             body: fd
@@ -1895,6 +1900,13 @@
             throw new Error(data.message || rt(options, "payment_submission_failed", "Submission failed. Please try again."));
         }
         setMessage("success", data.message || rt(options, "payment_slip_submitted", "Payment slip submitted"));
+        if (options.commerce === true) {
+            try {
+                localStorage.removeItem("aziel:commerce-pending-payment");
+            } catch (error) {
+                // Recovery marker cleanup is best-effort.
+            }
+        }
         return data;
     }
 
@@ -2345,6 +2357,8 @@
         activeState = {
             mode: "recovery",
             lang,
+            commerce: options.commerce === true,
+            commerceOrderId: options.commerceOrderId || options.orderId || "",
             recoveryOptions: { ...options, lang },
             attemptId: String(options.attemptId || ""),
             attemptReference: String(options.attemptReference || options.reference || ""),

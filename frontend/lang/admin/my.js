@@ -318,6 +318,8 @@ window.AZIEL_ADMIN_LANG.my = {
     catalog: "Catalog",
     catalog_sub: "Canonical product နှင့် package catalog truth ကို ကြည့်ရန်။",
     catalog_readonly_sub: "ဖတ်ရန်သာ catalog foundation။",
+    pricing_engine: "Pricing Engine",
+    pricing_engine_sub: "Rule-based pricing နှင့် business policy များကို စီမံရန်။",
     products: "Product များ",
     packages: "Package များ",
     product: "Product",
