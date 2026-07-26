@@ -363,6 +363,12 @@ function verifySource() {
     assertContains("frontend/js/admin-pricing-engine.js", "event.target.closest(\"[data-pricing-edit]\")", "Pricing Engine Edit buttons must be handled by delegated events.");
     assertContains("frontend/js/admin-pricing-engine.js", "pricingFetch", "Pricing Engine API actions must use bounded request lifecycle.");
     assertContains("frontend/js/admin-pricing-engine.js", "controller.abort()", "Pricing Engine Save/Publish must not remain loading forever on a hung request.");
+    assertContains("frontend/js/admin-pricing-engine.js", "requestProductionLoad(section, \"dom-ready\")", "Pricing Engine DOM boot must use the coalesced load lifecycle.");
+    assertContains("frontend/js/admin-pricing-engine.js", "requestProductionLoad(section, \"admin-auth-ready\")", "Pricing Engine auth-ready boot must join the same load lifecycle.");
+    assertContains("frontend/js/admin-pricing-engine.js", "waitForAdminAuthReady", "Pricing Engine must wait for Admin auth readiness before the initial production fetch.");
+    assertContains("frontend/js/admin-pricing-engine.js", "state.loadPromise", "Pricing Engine load lifecycle must coalesce duplicate boot/auth requests.");
+    assertContains("frontend/js/admin-pricing-engine.js", "[PRICING_ENGINE_ASYNC]", "Pricing Engine async lifecycle must have opt-in timing checkpoints.");
+    assertContains("frontend/admin.html", "pricing-engine-async-lifecycle", "Admin page must request the async lifecycle Pricing Engine controller build.");
     assertContains("frontend/js/admin-pricing-engine.js", "selectedProductId", "Pricing Engine must keep selected product in explicit state.");
     assertContains("frontend/js/admin-pricing-engine.js", "selectedPackageId", "Pricing Engine must keep selected package in explicit state.");
     assertContains("frontend/js/admin-pricing-engine.js", "previewError", "Pricing Engine must keep preview error in explicit state.");

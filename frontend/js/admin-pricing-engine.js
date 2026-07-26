@@ -33,22 +33,43 @@
         previewError: "",
         saveError: "",
         publishError: "",
-        renderSeq: 0
+        renderSeq: 0,
+        loadPromise: null
     };
+    const bootStartedAt = Date.now();
+
+    function trace(label, details = {}) {
+        try {
+            const enabled = window.location.search.includes("pricingTrace=1") || localStorage.getItem("AZIEL_PRICING_ENGINE_TRACE") === "true";
+            if (!enabled) return;
+            console.info("[PRICING_ENGINE_ASYNC]", label, {
+                elapsedMs: Date.now() - bootStartedAt,
+                loading: state.loading,
+                products: state.products.length,
+                selectedProductId: state.selectedProductId,
+                ...details
+            });
+        } catch (_) {
+            // Tracing must never affect Pricing Engine runtime.
+        }
+    }
 
     document.addEventListener("DOMContentLoaded", initPricingEngineUi);
     window.addEventListener("aziel:admin-auth-ready", () => {
+        trace("AUTH_READY_EVENT");
         const section = document.getElementById("section-pricing-engine");
-        if (section?.dataset.pricingEngineBound === "true") loadProductionState(section);
+        if (section?.dataset.pricingEngineBound === "true") requestProductionLoad(section, "admin-auth-ready");
     });
 
     function initPricingEngineUi() {
+        trace("ENTER initPricingEngineUi");
         const section = document.getElementById("section-pricing-engine");
         if (!section || section.dataset.pricingEngineBound === "true") return;
         section.dataset.pricingEngineBound = "true";
         section.addEventListener("click", handleSectionClick);
         section.querySelector("#pricingProductSearch")?.addEventListener("input", event => filterProducts(section, event.target.value || ""));
-        loadProductionState(section);
+        requestProductionLoad(section, "dom-ready");
+        trace("EXIT initPricingEngineUi");
     }
 
     function handleSectionClick(event) {
@@ -175,6 +196,7 @@
         if (!token) throw new Error("Admin session missing.");
         const controller = new AbortController();
         const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+        trace("FETCH started", { url, timeoutMs });
         try {
             const response = await fetch(url, {
                 ...options,
@@ -184,10 +206,12 @@
                     Authorization: `Bearer ${token}`
                 }
             });
+            trace("FETCH resolved", { url, status: response.status });
             const contentType = response.headers.get("content-type") || "";
             const body = contentType.includes("application/json")
                 ? await response.json().catch(() => ({}))
                 : { message: await response.text().catch(() => "") };
+            trace("JSON parsed", { url, success: body?.success !== false });
             if (!response.ok || body?.success === false) {
                 const code = body?.code || body?.error || `HTTP_${response.status}`;
                 const message = body?.message || response.statusText || "Pricing request failed.";
@@ -200,6 +224,26 @@
         } finally {
             window.clearTimeout(timeout);
         }
+    }
+
+    function waitForAdminAuthReady(timeoutMs = 5000) {
+        if (!localStorage.getItem("adminToken")) return Promise.resolve();
+        if (!window.AZIEL_ADMIN_AUTH || window.AZIEL_ADMIN_AUTH.state?.loaded) return Promise.resolve();
+        trace("AUTH wait started", { timeoutMs });
+        return new Promise(resolve => {
+            let settled = false;
+            const finish = reason => {
+                if (settled) return;
+                settled = true;
+                window.removeEventListener("aziel:admin-auth-ready", onReady);
+                window.clearTimeout(timer);
+                trace("AUTH wait finished", { reason });
+                resolve();
+            };
+            const onReady = () => finish("event");
+            const timer = window.setTimeout(() => finish("timeout"), timeoutMs);
+            window.addEventListener("aziel:admin-auth-ready", onReady, { once: true });
+        });
     }
 
     function normalizeProducts(data) {
@@ -246,14 +290,29 @@
         };
     }
 
-    async function loadProductionState(section) {
-        if (state.loading) return;
+    function requestProductionLoad(section, reason = "manual") {
+        if (!section) return Promise.resolve();
+        if (state.loadPromise) {
+            trace("LOAD joined existing promise", { reason });
+            return state.loadPromise;
+        }
+        state.loadPromise = loadProductionState(section, reason).finally(() => {
+            state.loadPromise = null;
+        });
+        return state.loadPromise;
+    }
+
+    async function loadProductionState(section, reason = "manual") {
+        if (state.loading) return state.loadPromise || Promise.resolve();
+        trace("ENTER loadProductionState", { reason });
         state.loading = true;
         state.loadError = "";
         setStatus(section, "Loading production pricing...");
         renderButtons(section);
         try {
+            await waitForAdminAuthReady();
             const data = await pricingFetch("/api/admin/pricing-engine");
+            trace("STATE populate started");
             state.products = normalizeProducts(data);
             state.activeVersion = data.version || null;
             state.affected = data.affected || null;
@@ -281,16 +340,23 @@
             const selectedProduct = getSelectedProduct();
             state.selectedPackageId = state.selectedPackageId || selectedProduct.packages[0]?.packageId || "";
             state.dirty = false;
+            trace("STATE populated", { productCount: state.products.length, packageCount: state.products.reduce((sum, item) => sum + item.packages.length, 0) });
+            trace("RENDER products started");
             renderProducts(section);
+            trace("RENDER products finished");
+            trace("PREVIEW started");
             calculateAndRenderPreview(section);
+            trace("PREVIEW finished");
         } catch (error) {
             state.loadError = `Failed to load pricing: ${error.message}`;
             renderError(section, state.loadError);
             setStatus(section, "Pricing unavailable");
+            trace("LOAD failed", { message: error.message });
         } finally {
             state.loading = false;
             renderButtons(section);
             renderStatus(section);
+            trace("RENDER finished");
         }
     }
 
@@ -444,11 +510,13 @@
         const seq = ++state.renderSeq;
         state.calculating = true;
         state.previewError = "";
+        trace("PREVIEW render labels started", { seq });
         renderStaticLabels(section);
         try {
             const result = calculatePreview();
             if (seq !== state.renderSeq) return;
             state.preview = result;
+            trace("PREVIEW calculation finished", { seq });
             renderFlow(section, result);
             renderBreakdown(section, result);
             setText(section, "#pricingStorefrontPrice", formatMoney(result.regularPrice, result.currency));
@@ -463,11 +531,13 @@
             state.preview = null;
             state.previewError = error.message || "Failed to calculate preview.";
             renderError(section, state.previewError);
+            trace("PREVIEW failed", { seq, message: state.previewError });
         } finally {
             if (seq === state.renderSeq) {
                 state.calculating = false;
                 renderButtons(section);
                 renderStatus(section);
+                trace("PREVIEW render finished", { seq });
             }
         }
     }
@@ -711,7 +781,7 @@
 
     window.AZIEL_ADMIN_PRICING_ENGINE = {
         _state: state,
-        loadProductionState: () => loadProductionState(document.getElementById("section-pricing-engine")),
+        loadProductionState: () => requestProductionLoad(document.getElementById("section-pricing-engine"), "public-api"),
         selectProduct: productId => selectProduct(document.getElementById("section-pricing-engine"), productId),
         saveDraft: () => saveDraft(document.getElementById("section-pricing-engine")),
         publishDraft: () => publishDraft(document.getElementById("section-pricing-engine"))
