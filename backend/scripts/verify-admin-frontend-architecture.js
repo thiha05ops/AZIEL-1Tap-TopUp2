@@ -274,9 +274,10 @@ function verifyModuleIntegrationAndRegressions() {
     assert(html.includes('data-section="pricing-engine"'), "Pricing Engine nav item must exist.");
     assert(html.includes('id="section-pricing-engine"'), "Pricing Engine section must exist.");
     assert(html.indexOf('data-section="catalog"') < html.indexOf('data-section="pricing-engine"'), "Pricing Engine should sit after Catalog in Commerce navigation.");
-    assert(html.indexOf('data-section="pricing-engine"') < html.indexOf('data-section="promos"'), "Pricing Engine should sit before Promo Codes in Commerce navigation.");
-    assert(html.includes("Daily supplier-cost operations, margin review, and controlled publishing."), "Pricing Workspace operations subtitle must render.");
-    assert(html.includes("Pricing Workspace") && html.includes("Business Rules"), "Pricing Engine module must separate daily operations from low-frequency business rules.");
+    assert(html.indexOf('<span class="admin-nav-label">Growth</span>') < html.indexOf('data-section="promos"'), "Promo Codes should live in the Growth navigation group.");
+    assert(html.indexOf('<span class="admin-nav-label" data-admin-i18n="commerce">Commerce</span>') < html.indexOf('data-section="catalog"'), "Catalog should live in the Commerce navigation group.");
+    assert(html.includes("Daily Supplier Workspace"), "Pricing Workspace operations subtitle must render.");
+    assert(html.includes("<h3>Pricing</h3>") && html.includes("Business Rules"), "Pricing Engine module must separate daily operations from low-frequency business rules.");
     assert(html.includes("Exchange Rate") && html.includes("Default Profit") && html.includes("Gateway Fee") && html.includes("Affected Packages"), "Pricing Engine summary cards must render.");
     assert(html.includes("Mobile Legends") && html.includes("PUBG Mobile") && html.includes("Free Fire") && html.includes("Honor of Kings") && html.includes("Genshin Impact"), "Pricing Engine product selector must preserve existing rows before live data loads.");
     assert(html.includes("id=\"pricingFlow\"") && html.includes("id=\"pricingStorefrontPrice\""), "Pricing Engine production preview render targets must exist.");

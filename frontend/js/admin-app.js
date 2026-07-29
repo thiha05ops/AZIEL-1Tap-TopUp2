@@ -1,5 +1,5 @@
 // frontend/js/admin-app.js
-// AZIEL Admin V2.5 Main Controller
+// AZIEL OS V2.5 Main Controller
 
 document.addEventListener("DOMContentLoaded", () => {
     initAdminLayoutController();
@@ -8,6 +8,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initAdminMobileSidebar();
     initAdminNavSearch();
     initAdminSearch();
+    initAdminTopbarActions();
     initAdminBroadcast();
     initQuickBroadcastButtons();
     initAdminLogout();
@@ -44,7 +45,7 @@ const adminSectionTitles = {
         subKey: "catalog_sub"
     },
     "pricing-engine": {
-        titleKey: "pricing_engine",
+        titleKey: "pricing",
         subKey: "pricing_engine_sub"
     },
     promos: {
@@ -120,6 +121,15 @@ function initAdminNavigation() {
     }
 
     setDefaultSection();
+}
+
+function initAdminTopbarActions() {
+    document.getElementById("adminNotificationsBtn")?.addEventListener("click", () => {
+        window.open("/notifications.html", "_blank", "noopener,noreferrer");
+    });
+    document.getElementById("adminProfileBtn")?.addEventListener("click", () => {
+        openAdminSection("admin-security");
+    });
 }
 
 function hydrateAdminNavMetadata() {
@@ -202,13 +212,17 @@ function openAdminSection(sectionName, updateHash = true, context = {}) {
     if (pageInfo) {
         if (title) {
             title.dataset.adminI18n = pageInfo.titleKey;
-            title.innerText = adminT(pageInfo.titleKey);
+            title.innerText = pageInfo.titleKey === "pricing"
+                ? adminT(pageInfo.titleKey, "Pricing")
+                : adminT(pageInfo.titleKey);
         }
         if (sub) {
             sub.dataset.adminI18n = pageInfo.subKey;
             sub.innerText = adminT(pageInfo.subKey);
         }
         updateAdminSectionPill(sectionName);
+        const titleText = title?.innerText?.trim() || "Dashboard";
+        document.title = `${titleText} · AZIEL OS`;
     }
 
     if (updateHash) {

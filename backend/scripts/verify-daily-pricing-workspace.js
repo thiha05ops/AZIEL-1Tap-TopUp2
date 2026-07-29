@@ -57,7 +57,8 @@ function verifyBackend() {
 }
 
 function verifyFrontend() {
-    includes("frontend/admin.html", "Pricing Workspace", "Admin navigation surface must be renamed for daily operations.");
+    includes("frontend/admin.html", "<h3>Pricing</h3>", "Admin navigation surface must use the AZIEL OS Pricing module name.");
+    includes("frontend/admin.html", "Daily Supplier Workspace", "Daily supplier workspace subtitle must remain visible.");
     includes("frontend/admin.html", "pricingWorkspaceGrid", "Workspace grid must exist.");
     includes("frontend/admin.html", "pricingPastePanel", "Paste workflow must exist.");
     includes("frontend/admin.html", "pricingReviewPanel", "Review workflow must exist.");

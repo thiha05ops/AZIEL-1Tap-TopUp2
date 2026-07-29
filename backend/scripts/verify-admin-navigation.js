@@ -51,14 +51,13 @@ assertIncludes(html, `href="/admin-design-studio.html"`, "Design Studio must rem
 assertIncludes(html, `data-admin-permission="DESIGN_STUDIO_READ"`, "Design Studio RBAC marker must remain.");
 
 [
-    "Command",
-    "Experience",
-    "Operations",
+    "Home",
+    "Growth",
     "Commerce",
-    "Site Content",
+    "Operations",
     "Customers",
-    "Security",
-    "Platform"
+    "Administration",
+    "System"
 ].forEach(group => assertIncludes(html, group, `Navigation group ${group} must exist.`));
 
 assertIncludes(html, `id="adminSidebarCollapse"`, "Desktop collapsed sidebar control must exist.");
@@ -88,7 +87,7 @@ assertIncludes(css, "@media (max-width: 768px)", "Mobile drawer breakpoint must 
 assertIncludes(css, "background: rgba(2, 6, 23, .18)", "Mobile backdrop must stay light utility-drawer style.");
 assertIncludes(css, "@media (prefers-reduced-motion: reduce)", "Reduced motion contract must remain available.");
 
-["design_studio", "website", "experience", "nav_search_placeholder", "collapse_navigation", "expand_navigation"].forEach(key => {
+["design_studio", "website", "commerce", "operations", "customers", "nav_search_placeholder", "collapse_navigation", "expand_navigation"].forEach(key => {
     assertIncludes(en, `${key}:`, `English dictionary missing ${key}.`);
     assertIncludes(my, `${key}:`, `Myanmar dictionary missing ${key}.`);
     assertIncludes(th, `${key}:`, `Thai dictionary missing ${key}.`);

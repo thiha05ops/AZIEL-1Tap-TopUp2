@@ -27,6 +27,7 @@
     "verify:admin-promo-editor-layout": "node backend/scripts/verify-admin-promo-editor-layout.js",
     "verify:campaign-popup-visual": "node backend/scripts/verify-campaign-popup-visual.js",
     "verify:admin-navigation": "node backend/scripts/verify-admin-navigation.js",
+    "verify:aziel-os-admin-foundation": "node backend/scripts/verify-aziel-os-admin-foundation.js",
     "verify:aziel-os-kernel": "node backend/scripts/verify-aziel-os-kernel.js",
     "verify:website-runtime": "node backend/scripts/verify-website-runtime.js",
     "verify:configuration-registry": "node backend/scripts/verify-configuration-registry.js",

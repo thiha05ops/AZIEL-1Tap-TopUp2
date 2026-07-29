@@ -134,8 +134,9 @@ function verifyAdminLoginEntry() {
     });
 
     [
-        "AZIEL",
-        "Control Center",
+        "AZIEL OS",
+        "Commerce Operating System",
+        "Version 2.5",
         "Secure operations access",
         "Continue to Console",
         "Protected administrative area",

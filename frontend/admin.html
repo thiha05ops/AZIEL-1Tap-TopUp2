@@ -3,13 +3,14 @@
 
 <head>
     <meta charset="UTF-8" />
-    <title>AZIEL Admin V2.5</title>
+    <title>AZIEL OS · Commerce Operating System</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 
     <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/webp" href="/assets/logo/aziel-icon.webp">
     <meta name="theme-color" content="#070716">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="AZIEL">
+    <meta name="apple-mobile-web-app-title" content="AZIEL OS">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
     <link rel="stylesheet" href="/css/theme/aziel-design-system.css?v=20260701">
@@ -33,14 +34,15 @@
 
     <div class="admin-app">
 
-        <aside id="adminSidebar" class="admin-sidebar" aria-label="AZIEL Admin navigation">
+        <aside id="adminSidebar" class="admin-sidebar" aria-label="AZIEL OS navigation">
 
             <div class="admin-sidebar-head">
                 <div class="admin-logo">
-                    <span class="admin-logo-mark" aria-hidden="true">A</span>
+                    <img class="admin-logo-img" src="/assets/logo/aziel-icon.webp" alt="AZIEL OS" width="38" height="38" decoding="async">
                     <div class="admin-logo-copy">
-                        <h1>AZIEL</h1>
-                        <span data-admin-i18n="control_center">CONTROL CENTER</span>
+                        <h1>AZIEL OS</h1>
+                        <span>Commerce Operating System</span>
+                        <small>Version 2.5</small>
                     </div>
                 </div>
 
@@ -63,7 +65,7 @@
             <nav class="admin-menu" aria-label="Admin navigation">
 
                 <div class="admin-nav-group">
-                    <span class="admin-nav-label" data-admin-i18n="command">Command</span>
+                    <span class="admin-nav-label">Home</span>
 
                     <button class="admin-nav active" data-section="dashboard" type="button" data-admin-permission="DASHBOARD_READ">
                     <i class="fa-solid fa-chart-line"></i>
@@ -72,45 +74,41 @@
                 </div>
 
                 <div class="admin-nav-group">
-                    <span class="admin-nav-label" data-admin-i18n="experience">Experience</span>
+                    <span class="admin-nav-label">Growth</span>
 
+                    <button class="admin-nav" data-section="campaigns" type="button" data-admin-permission="CAMPAIGNS_READ">
+                        <i class="fa-solid fa-bullseye"></i>
+                        <span data-admin-i18n="campaigns">Campaigns</span>
+                    </button>
+                    <button class="admin-nav" data-section="promos" type="button" data-admin-permission="PROMOS_READ">
+                        <i class="fa-solid fa-ticket"></i>
+                        <span data-admin-i18n="promo_codes">Promo Codes</span>
+                    </button>
+                    <button class="admin-nav" data-section="site-content" type="button" data-admin-permission="SITE_CONTENT_READ">
+                        <i class="fa-solid fa-images"></i>
+                        <span data-admin-i18n="home_banners">Home Banners</span>
+                    </button>
                     <button class="admin-nav" data-section="website" type="button" data-admin-permission="SITE_CONTENT_READ">
                         <i class="fa-solid fa-globe"></i>
-                        <span data-admin-i18n="website">Website</span>
+                        <span>Game Banners</span>
                     </button>
+                    <button class="admin-nav" data-section="media" type="button" data-admin-permission="MEDIA_READ">
+                        <i class="fa-solid fa-photo-film"></i>
+                        <span data-admin-i18n="media_library">Media Library</span>
+                    </button>
+                    <a class="admin-nav admin-design-studio-link" href="/admin-design-studio.html" data-admin-permission="DESIGN_STUDIO_READ">
+                        <i class="fa-solid fa-palette"></i>
+                        <span data-admin-i18n="design_studio">Design Studio</span>
+                    </a>
                 </div>
 
                 <div class="admin-nav-group">
-                    <span class="admin-nav-label" data-admin-i18n="operations">Operations</span>
+                    <span class="admin-nav-label" data-admin-i18n="commerce">Commerce</span>
 
                     <button class="admin-nav" data-section="orders" type="button" data-admin-permission="ORDERS_READ">
                     <i class="fa-solid fa-box"></i>
                         <span data-admin-i18n="orders">Orders</span>
                 </button>
-
-                    <button class="admin-nav" data-section="wallet" type="button" data-admin-permission="WALLET_READ">
-                    <i class="fa-solid fa-wallet"></i>
-                        <span data-admin-i18n="wallet">Wallet</span>
-                </button>
-
-                    <button class="admin-nav" data-section="fulfillment" type="button" data-admin-permission="SUPPLIERS_READ,FULFILLMENT_READ">
-                        <i class="fa-solid fa-truck-ramp-box"></i>
-                        <span data-admin-i18n="fulfillment">Fulfillment</span>
-                    </button>
-
-                    <button class="admin-nav" data-section="support" type="button" data-admin-permission="SUPPORT_READ">
-                    <i class="fa-solid fa-headset"></i>
-                        <span data-admin-i18n="support">Support</span>
-                </button>
-
-                    <button class="admin-nav" data-section="chat" type="button" data-admin-permission="LIVE_CHAT_READ">
-                    <i class="fa-solid fa-comments"></i>
-                        <span data-admin-i18n="live_chat">Live Chat</span>
-                </button>
-                </div>
-
-                <div class="admin-nav-group">
-                    <span class="admin-nav-label" data-admin-i18n="commerce">Commerce</span>
 
                     <button class="admin-nav" data-section="catalog" type="button" data-admin-permission="CATALOG_READ">
                         <i class="fa-solid fa-layer-group"></i>
@@ -119,37 +117,24 @@
 
                     <button class="admin-nav" data-section="pricing-engine" type="button" data-admin-permission="CATALOG_READ">
                         <i class="fa-solid fa-scale-balanced"></i>
-                        <span data-admin-i18n="pricing_engine">Pricing Engine</span>
+                        <span>Pricing</span>
                     </button>
-
-                    <button class="admin-nav" data-section="promos" type="button" data-admin-permission="PROMOS_READ">
-                        <i class="fa-solid fa-ticket"></i>
-                        <span data-admin-i18n="promo_codes">Promo Codes</span>
-                    </button>
-
-                    <button class="admin-nav" data-section="media" type="button" data-admin-permission="MEDIA_READ">
-                        <i class="fa-solid fa-photo-film"></i>
-                        <span data-admin-i18n="media_library">Media Library</span>
-                    </button>
-
-                    <a class="admin-nav admin-design-studio-link" href="/admin-design-studio.html" data-admin-permission="DESIGN_STUDIO_READ">
-                        <i class="fa-solid fa-palette"></i>
-                        <span data-admin-i18n="design_studio">Design Studio</span>
-                    </a>
+                    <button class="admin-nav" data-section="wallet" type="button" data-admin-permission="WALLET_READ">
+                    <i class="fa-solid fa-wallet"></i>
+                        <span data-admin-i18n="wallet">Wallet</span>
+                </button>
                 </div>
 
                 <div class="admin-nav-group">
-                    <span class="admin-nav-label" data-admin-i18n="site_content">Site Content</span>
-
-                    <button class="admin-nav" data-section="site-content" type="button" data-admin-permission="SITE_CONTENT_READ">
-                        <i class="fa-solid fa-images"></i>
-                        <span data-admin-i18n="home_banners">Home Banners</span>
+                    <span class="admin-nav-label" data-admin-i18n="operations">Operations</span>
+                    <button class="admin-nav" data-section="fulfillment" type="button" data-admin-permission="SUPPLIERS_READ,FULFILLMENT_READ">
+                        <i class="fa-solid fa-truck-ramp-box"></i>
+                        <span data-admin-i18n="fulfillment">Fulfillment</span>
                     </button>
-
-                    <button class="admin-nav" data-section="campaigns" type="button" data-admin-permission="CAMPAIGNS_READ">
-                        <i class="fa-solid fa-bullseye"></i>
-                        <span data-admin-i18n="campaigns">Campaigns</span>
-                    </button>
+                    <button class="admin-nav" data-section="payments" type="button" data-admin-permission="PAYMENT_METHODS_READ,PAYMENT_METHODS_MANAGE">
+                    <i class="fa-solid fa-credit-card"></i>
+                        <span data-admin-i18n="payment_methods">Payment Methods</span>
+                </button>
                 </div>
 
                 <div class="admin-nav-group">
@@ -164,10 +149,18 @@
                         <i class="fa-solid fa-bullhorn"></i>
                         <span data-admin-i18n="broadcast">Broadcast</span>
                 </button>
+                    <button class="admin-nav" data-section="support" type="button" data-admin-permission="SUPPORT_READ">
+                    <i class="fa-solid fa-headset"></i>
+                        <span data-admin-i18n="support">Support</span>
+                </button>
+                    <button class="admin-nav" data-section="chat" type="button" data-admin-permission="LIVE_CHAT_READ">
+                    <i class="fa-solid fa-comments"></i>
+                        <span data-admin-i18n="live_chat">Live Chat</span>
+                </button>
                 </div>
 
                 <div class="admin-nav-group" data-admin-permission="ADMIN_ACCOUNTS_READ,ADMIN_SESSIONS_READ,AUDIT_LOG_READ">
-                    <span class="admin-nav-label" data-admin-i18n="security">Security</span>
+                    <span class="admin-nav-label">Administration</span>
 
                     <button class="admin-nav" data-section="admin-security" type="button">
                         <i class="fa-solid fa-user-shield"></i>
@@ -176,12 +169,7 @@
                 </div>
 
                 <div class="admin-nav-group">
-                    <span class="admin-nav-label" data-admin-i18n="platform">Platform</span>
-
-                    <button class="admin-nav" data-section="payments" type="button" data-admin-permission="PAYMENT_METHODS_READ,PAYMENT_METHODS_MANAGE">
-                    <i class="fa-solid fa-credit-card"></i>
-                        <span data-admin-i18n="payment_methods">Payment Methods</span>
-                </button>
+                    <span class="admin-nav-label">System</span>
 
                     <button class="admin-nav" data-section="settings" type="button" data-admin-permission="SETTINGS_MANAGE">
                         <i class="fa-solid fa-gear"></i>
@@ -209,10 +197,11 @@
             <div class="admin-user-box">
                 <div class="admin-avatar">A</div>
                     <div>
-                        <strong>Admin AZIEL</strong>
-                        <small data-admin-i18n="admin">Admin</small>
+                        <strong>AZIEL OS</strong>
+                        <small>Commerce Operating System · 2.5</small>
                 </div>
             </div>
+            <div class="admin-os-version" aria-label="AZIEL OS version">AZIEL OS · Version 2.5</div>
 
         </aside>
 
@@ -226,7 +215,7 @@
                     </button>
 
                     <div>
-                        <span id="adminSectionPill" class="admin-section-pill" data-admin-i18n="command">Command</span>
+                        <span id="adminSectionPill" class="admin-section-pill">Home</span>
                         <h2 id="adminPageTitle" data-admin-i18n="dashboard">Dashboard</h2>
                         <p id="adminPageSub" data-admin-i18n="dashboard_sub">Real operational snapshot for AZIEL today.</p>
                     </div>
@@ -237,15 +226,21 @@
                         data-admin-i18n-placeholder="search_placeholder" />
 
                     <div class="admin-topbar-controls">
+                        <button id="adminNotificationsBtn" class="admin-icon-btn" type="button" aria-label="Notifications">
+                            <i class="fa-solid fa-bell" aria-hidden="true"></i>
+                            <span class="admin-topbar-badge" aria-label="Unread notifications">0</span>
+                        </button>
                         <select id="adminLocaleSelect" class="admin-locale-select" aria-label="Admin language">
                             <option value="en">English</option>
                             <option value="my">မြန်မာ</option>
                             <option value="th">ไทย</option>
                         </select>
 
-                        <button id="adminLogoutBtn" class="admin-logout-btn" type="button" data-admin-i18n="logout">
-                            Logout
+                        <button id="adminProfileBtn" class="admin-profile-btn" type="button" aria-label="Admin profile" data-admin-permission="ADMIN_ACCOUNTS_READ,ADMIN_SESSIONS_READ,AUDIT_LOG_READ">
+                            <span class="admin-avatar">A</span>
+                            <span>Owner</span>
                         </button>
+                        <button id="adminLogoutBtn" class="admin-logout-btn" type="button" data-admin-i18n="logout">Logout</button>
 
                         <a href="home.html" data-admin-i18n="back_home">Back Home</a>
                     </div>
@@ -257,9 +252,9 @@
                 <div class="dashboard-command-center">
                     <header class="dashboard-command-header">
                         <div class="dashboard-command-title">
-                            <span class="admin-eyebrow">AZIEL Operations</span>
-                            <h3>Business Command Center</h3>
-                            <p>Sales, order flow, and operational attention for the selected period.</p>
+                            <span class="admin-eyebrow">AZIEL OS · Version 2.5</span>
+                            <h3>Dashboard</h3>
+                            <p>Commerce operations overview using live AZIEL data for the selected period.</p>
                         </div>
                         <form id="dashboardFilters" class="dashboard-filter-bar" aria-label="Dashboard filters">
                             <label>
@@ -557,8 +552,8 @@
                     <header class="catalog-workspace-head pricing-engine-head">
                         <div class="catalog-workspace-title">
                             <span class="admin-status-pill is-purple">Commerce</span>
-                            <h3 data-admin-i18n="pricing_engine">Pricing Workspace</h3>
-                            <p data-admin-i18n="pricing_engine_sub">Daily supplier-cost operations, margin review, and controlled publishing.</p>
+                            <h3>Pricing</h3>
+                            <p>Daily Supplier Workspace</p>
                         </div>
                         <div class="catalog-workspace-actions">
                             <button id="pricingPasteBtn" class="admin-secondary-btn" type="button">Import / Paste</button>
