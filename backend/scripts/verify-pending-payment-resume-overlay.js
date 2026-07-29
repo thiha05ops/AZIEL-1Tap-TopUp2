@@ -12,13 +12,18 @@ function includes(file, snippet, message) {
     assert(read(file).includes(snippet), `${file}: ${message}`);
 }
 
+function notIncludes(file, snippet, message) {
+    assert(!read(file).includes(snippet), `${file}: ${message}`);
+}
+
 function verifyLoader() {
     includes("frontend/js/pwa-fix.js", "loadPendingPaymentRecoveryOverlay();", "PWA runtime must load the recovery overlay once.");
     includes("frontend/js/pwa-fix.js", "eligiblePages", "loader must use an explicit customer page allow-list.");
     includes("frontend/js/pwa-fix.js", "\"home.html\"", "home must be eligible.");
     includes("frontend/js/pwa-fix.js", "\"mlbb.html\"", "game pages must be eligible.");
-    includes("frontend/js/pwa-fix.js", "\"wallet.html\"", "wallet must be eligible.");
-    includes("frontend/js/pwa-fix.js", "\"tracking.html\"", "tracking/orders page must be eligible.");
+    includes("frontend/js/pwa-fix.js", "\"notifications.html\"", "notifications must be eligible.");
+    notIncludes("frontend/js/pwa-fix.js", "\"wallet.html\"", "wallet must not load the page-level recovery overlay.");
+    notIncludes("frontend/js/pwa-fix.js", "\"tracking.html\"", "tracking/orders page must not load the page-level recovery overlay.");
     includes("frontend/js/pwa-fix.js", "azHeaderMount", "loader must require shared header mount.");
     includes("frontend/js/pwa-fix.js", "/css/payment/pending-payment-recovery.css", "loader must include shared overlay CSS.");
     includes("frontend/js/pwa-fix.js", "/js/payment/pending-payment-recovery.js", "loader must include shared overlay JS.");
@@ -52,7 +57,7 @@ function verifyOverlayModule() {
 
     assert(!/localStorage\.(getItem|setItem)\([^)]*PendingPaymentDismissed/.test(js), "dismissal must not use permanent localStorage.");
     assert(!/createPromptPayQr|payment-methods\/.*promptpay-qr|payment\/manual\/attempt["'`)]/.test(js), "overlay must not create attempts or regenerate QR.");
-    assert(!/Order|notificationService|createUserNotification/.test(js), "overlay must not create Orders or notifications.");
+    assert(!/new\s+Order|Order\.create|notificationService|createUserNotification/.test(js), "overlay must not create Orders or notifications.");
     assert(!/qrPayload/.test(js), "overlay must not place raw QR payload handling in the frontend entry layer.");
     assert(!/document\.body\.classList\.add\(["'].*lock|overflow\s*=\s*["']hidden/.test(js), "overlay must not lock page scrolling.");
 }

@@ -408,6 +408,35 @@ async function findActiveAttemptForOrder(input = {}, options = {}) {
     }
 }
 
+async function findAttemptsForOwner(input = {}, options = {}) {
+    const opts = normalizeOptions(options);
+    const query = {
+        ...ownerQuery(input.owner || {})
+    };
+    if (Array.isArray(input.statuses) && input.statuses.length) {
+        query.status = { $in: input.statuses.map(normalizeStatus) };
+    }
+    if (input.provider) query.provider = normalizeOptionalId(input.provider, "provider", 160);
+    if (input.expiresAfter) {
+        const expiresAfter = new Date(input.expiresAfter);
+        if (Number.isFinite(expiresAfter.getTime())) query.expiresAt = { $gt: expiresAfter };
+    }
+    try {
+        let request = opts.model.find(query);
+        request = withSession(request, opts.mongoSession);
+        if (typeof request.sort === "function") request = request.sort({ createdAt: -1 });
+        if (Number.isInteger(Number(input.limit)) && Number(input.limit) > 0) {
+            request = request.limit(Math.min(Number(input.limit), 50));
+        }
+        if (opts.lean && typeof request.lean === "function") request = request.lean();
+        const result = request.exec ? await request.exec() : await request;
+        return Array.isArray(result) ? result.map(plainRecord) : [];
+    } catch (error) {
+        if (error instanceof PaymentAttemptRepositoryError) throw error;
+        throw wrapError(error, ERROR_CODES.PAYMENT_PERSISTENCE_ERROR, "read");
+    }
+}
+
 async function findAttemptByProviderReference(input = {}, options = {}) {
     const providerReference = assertId(
         input.providerReference || input.providerTransactionId,
@@ -741,6 +770,7 @@ module.exports = Object.freeze({
     findAttemptByIdForOwner,
     findAttemptsForOrder,
     findActiveAttemptForOrder,
+    findAttemptsForOwner,
     findAttemptByProviderReference,
     findAttemptByIdempotency,
     updateStatus,

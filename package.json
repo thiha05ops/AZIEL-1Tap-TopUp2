@@ -57,6 +57,7 @@
     "verify:pending-payment-recovery-runtime-safety": "node backend/scripts/verify-pending-payment-recovery-runtime-safety.js",
     "verify:pending-payment-recovery-notifications": "node backend/scripts/verify-pending-payment-recovery-notifications.js",
     "verify:pending-payment-recovery-ux": "node backend/scripts/verify-pending-payment-recovery-ux.js",
+    "verify:commerce-pending-payment-recovery": "node backend/scripts/verify-commerce-pending-payment-recovery.js",
     "verify:global-language-authority": "node backend/scripts/verify-global-language-authority.js",
     "verify:notification-recovery-runtime": "node backend/scripts/verify-notification-recovery-runtime.js",
     "verify:pwa-refresh": "node backend/scripts/verify-pwa-refresh.js",

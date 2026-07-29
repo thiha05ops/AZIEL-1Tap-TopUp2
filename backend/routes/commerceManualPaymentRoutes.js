@@ -11,6 +11,12 @@ function createCommerceManualPaymentRoutes(options = {}) {
     const router = express.Router();
     const controller = options.controller || createCommerceManualPaymentController(options.controllerOptions || {});
 
+    router.get(
+        "/commerce/payments/recoverable",
+        authMiddleware,
+        controller.listRecoverable
+    );
+
     router.post(
         "/commerce/checkout/manual-promptpay",
         authMiddleware,

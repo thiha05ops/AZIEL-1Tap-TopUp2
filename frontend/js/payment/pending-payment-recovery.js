@@ -213,7 +213,6 @@
             qrMode: qr.mode || "aziel_promptpay_dynamic",
             dynamicQr: {
                 qrImage: qr.image || "",
-                qrPayload: qr.payload || "",
                 expiresAt,
                 orderReference: qr.encodedReference || payment.attemptId || marker.attemptId,
                 encodedReference: qr.encodedReference || ""
@@ -233,12 +232,49 @@
         };
     }
 
-    async function fetchCommerceRecoverable() {
+    function normalizeCommerceRecoverable(item = {}) {
+        if (!item?.attemptId) return null;
+        return {
+            ...item,
+            architecture: "commerce",
+            commerce: true,
+            commerceOrderId: item.commerceOrderId || item.orderId || "",
+            orderId: item.orderId || item.commerceOrderId || "",
+            paymentType: item.paymentType || "manual",
+            paymentMethod: item.paymentMethod || "promptpay",
+            provider: item.provider || "promptpay",
+            paymentName: item.paymentName || "PromptPay QR",
+            qrMode: item.qrMode || item.dynamicQr?.mode || "aziel_promptpay_dynamic",
+            receiptUploadEnabled: item.receiptUploadEnabled !== false,
+            slipRequired: item.slipRequired !== false,
+            resumable: item.resumable !== false
+        };
+    }
+
+    async function fetchCommerceServerRecoverable() {
+        const marker = readCommerceMarker();
+        const res = await fetch(getApiUrl("/api/commerce/payments/recoverable"), {
+            headers: window.AZIEL?.authHeaders?.() || { Authorization: `Bearer ${getToken()}` }
+        });
+        if (res.status === 401 || res.status === 403) return null;
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) return [];
+        const attempts = (Array.isArray(data.recoverable) ? data.recoverable : [])
+            .map(normalizeCommerceRecoverable)
+            .filter(Boolean);
+        if (marker?.attemptId && !attempts.some(item => item.attemptId === marker.attemptId && item.orderId === marker.orderId)) {
+            clearCommerceMarker();
+        }
+        return attempts;
+    }
+
+    async function fetchCommerceMarkerRecoverable() {
         const marker = readCommerceMarker();
         if (!marker) return [];
         const res = await fetch(getApiUrl(`/api/commerce/orders/${encodeURIComponent(marker.orderId)}/payments/manual-promptpay?attemptId=${encodeURIComponent(marker.attemptId)}`), {
             headers: window.AZIEL?.authHeaders?.() || { Authorization: `Bearer ${getToken()}` }
         });
+        if (res.status === 401 || res.status === 403) return [];
         if (res.status === 404 || res.status === 410) {
             clearCommerceMarker();
             return [];
@@ -251,6 +287,46 @@
             return [];
         }
         return [projected];
+    }
+
+    async function fetchCommerceRecoverable() {
+        const serverAttempts = await fetchCommerceServerRecoverable();
+        if (serverAttempts === null) return null;
+        const markerAttempts = await fetchCommerceMarkerRecoverable().catch(() => []);
+        return mergeRecoverableAttempts([...markerAttempts, ...serverAttempts], []);
+    }
+
+    function mergeRecoverableAttempts(commerceAttempts = [], legacyAttempts = [], additionalAttempts = []) {
+        const marker = readCommerceMarker();
+        const commerceIds = new Set();
+        const byKey = new Map();
+        const merged = [];
+        [...commerceAttempts, ...additionalAttempts.filter(item => item?.commerce === true)].forEach(item => {
+            if (!item?.attemptId) return;
+            const normalized = normalizeCommerceRecoverable(item);
+            if (!normalized) return;
+            commerceIds.add(normalized.attemptId);
+            const key = `commerce:${normalized.attemptId}`;
+            if (!byKey.has(key)) {
+                byKey.set(key, normalized);
+                merged.push(normalized);
+            }
+        });
+        legacyAttempts.forEach(item => {
+            if (!item?.attemptId || commerceIds.has(item.attemptId)) return;
+            const key = `legacy:${item.attemptId}`;
+            if (!byKey.has(key)) {
+                byKey.set(key, { ...item, architecture: "legacy", commerce: false });
+                merged.push(byKey.get(key));
+            }
+        });
+        return merged.sort((a, b) => {
+            const aMarker = marker?.attemptId && a.attemptId === marker.attemptId ? 1 : 0;
+            const bMarker = marker?.attemptId && b.attemptId === marker.attemptId ? 1 : 0;
+            if (aMarker !== bMarker) return bMarker - aMarker;
+            if (a.commerce !== b.commerce) return a.commerce ? -1 : 1;
+            return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+        });
     }
 
     function getIconSrc(attempt = {}) {
@@ -553,19 +629,31 @@
         });
 
         try {
-            const res = await fetch(getApiUrl("/api/payment/manual/recoverable"), {
-                headers: window.AZIEL?.authHeaders?.() || { Authorization: `Bearer ${getToken()}` }
-            });
+            const [commerceAttemptsResult, legacyResponseResult] = await Promise.allSettled([
+                fetchCommerceRecoverable(),
+                fetch(getApiUrl("/api/payment/manual/recoverable"), {
+                    headers: window.AZIEL?.authHeaders?.() || { Authorization: `Bearer ${getToken()}` }
+                })
+            ]);
 
-            if (res.status === 401) {
+            const commerceAttempts = commerceAttemptsResult.status === "fulfilled" && Array.isArray(commerceAttemptsResult.value)
+                ? commerceAttemptsResult.value
+                : [];
+            const res = legacyResponseResult.status === "fulfilled" ? legacyResponseResult.value : null;
+
+            if (commerceAttemptsResult.status === "fulfilled" && commerceAttemptsResult.value === null) {
                 clearState();
                 return null;
             }
 
-            const data = await res.json().catch(() => ({}));
+            if (res?.status === 401) {
+                clearState();
+                return null;
+            }
+
+            const data = res ? await res.json().catch(() => ({})) : {};
             const legacyAttempts = Array.isArray(data.recoverable) ? data.recoverable : [];
-            const commerceAttempts = await fetchCommerceRecoverable();
-            const attempts = [...commerceAttempts, ...legacyAttempts];
+            const attempts = mergeRecoverableAttempts(commerceAttempts, legacyAttempts);
             state.attempts = filterAttemptsForPage(attempts)
                 .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
             state.activeAttempt = chooseActiveAttempt(attempts);
@@ -667,7 +755,7 @@
 
             if (selected?.commerce === true) {
                 const commerceAttempts = await fetchCommerceRecoverable();
-                recoverable = commerceAttempts.find(item => item.attemptId === id) || null;
+                recoverable = (Array.isArray(commerceAttempts) ? commerceAttempts : []).find(item => item.attemptId === id) || selected || null;
             } else {
                 const res = await fetch(getApiUrl(`/api/payment/manual/recoverable/${encodeURIComponent(id)}/resume`), {
                 method: "POST",

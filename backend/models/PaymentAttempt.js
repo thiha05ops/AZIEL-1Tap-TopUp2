@@ -144,6 +144,7 @@ paymentAttemptSchema.index({ provider: 1, ownerId: 1, idempotencyKey: 1, operati
     partialFilterExpression: { idempotencyKey: { $exists: true, $gt: "" } }
 });
 paymentAttemptSchema.index({ ownerId: 1, orderId: 1 });
+paymentAttemptSchema.index({ ownerId: 1, "owner.type": 1, provider: 1, status: 1, expiresAt: 1, createdAt: -1 });
 paymentAttemptSchema.index({ orderId: 1, createdAt: -1 });
 paymentAttemptSchema.index({ status: 1 });
 paymentAttemptSchema.index({ expiresAt: 1 }, { partialFilterExpression: { expiresAt: { $type: "date" } } });

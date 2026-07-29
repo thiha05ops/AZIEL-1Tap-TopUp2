@@ -10,6 +10,10 @@ const {
     CustomerManualPromptPayCheckoutError
 } = require("../services/commerce/customerManualPromptPayCheckoutService");
 const {
+    createCommercePaymentRecoveryService,
+    CommercePaymentRecoveryError
+} = require("../services/commerce/commercePaymentRecoveryService");
+const {
     StorageError,
     cleanupAfterFailedPersistence,
     logStorageError,
@@ -44,6 +48,14 @@ function respondError(res, error) {
             retryable: error.retryable === true
         });
     }
+    if (error instanceof CommercePaymentRecoveryError) {
+        return res.status(error.httpStatus || 400).json({
+            success: false,
+            error: error.code,
+            code: error.code,
+            message: error.message
+        });
+    }
     return res.status(500).json({
         success: false,
         error: "COMMERCE_MANUAL_PAYMENT_FAILED",
@@ -57,8 +69,21 @@ function receiptId() {
 
 function createCommerceManualPaymentController(options = {}) {
     const service = options.service || createManualPaymentApplicationService(options.serviceOptions || {});
+    const recoveryService = options.recoveryService || createCommercePaymentRecoveryService(options.recoveryOptions || {});
 
     return Object.freeze({
+        async listRecoverable(req, res) {
+            try {
+                const recoverable = await recoveryService.listRecoverablePayments({
+                    user: req.user,
+                    sessionId: req.sessionID || req.headers["x-session-id"] || ""
+                });
+                return respondSuccess(res, { recoverable });
+            } catch (error) {
+                return respondError(res, error);
+            }
+        },
+
         async customerPromptPayCheckout(req, res) {
             try {
                 const result = await startCustomerManualPromptPayCheckout(req.body || {}, {

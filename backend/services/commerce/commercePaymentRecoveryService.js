@@ -1,0 +1,201 @@
+"use strict";
+
+const orderRepository = require("./orderRepository");
+const paymentAttemptRepository = require("./paymentAttemptRepository");
+
+const SERVICE_VERSION = "commerce.payment-recovery.v1";
+const MANUAL_PROMPTPAY_PROVIDER = "MANUAL_PROMPTPAY";
+const RECOVERABLE_STATUSES = Object.freeze(["PENDING"]);
+const RECOVERABLE_ORDER_STATUSES = Object.freeze(new Set(["pending_payment"]));
+const RECOVERABLE_ORDER_PAYMENT_STATUSES = Object.freeze(new Set(["pending", "unpaid"]));
+
+class CommercePaymentRecoveryError extends Error {
+    constructor(code, message, options = {}) {
+        super(message);
+        this.name = "CommercePaymentRecoveryError";
+        this.code = code;
+        this.httpStatus = options.httpStatus || 400;
+        this.stage = String(options.stage || "");
+    }
+}
+
+function text(value) {
+    return String(value || "").trim();
+}
+
+function normalizeOwner(user = {}, sessionId = "") {
+    const userId = text(user.id || user._id || user.userId);
+    if (userId) return { type: "USER", userId, sessionId: "" };
+    const session = text(sessionId);
+    if (session) return { type: "SESSION", userId: "", sessionId: session };
+    throw new CommercePaymentRecoveryError("UNAUTHENTICATED", "Authenticated customer is required.", {
+        httpStatus: 401,
+        stage: "auth"
+    });
+}
+
+function sameOwner(left = {}, right = {}) {
+    if (!left?.type || left.type !== right?.type) return false;
+    if (left.type === "USER") return text(left.userId) && text(left.userId) === text(right.userId);
+    if (left.type === "SESSION") return text(left.sessionId) && text(left.sessionId) === text(right.sessionId);
+    return false;
+}
+
+function hasReceiptEvidence(attempt = {}) {
+    return Boolean(
+        attempt.safeMetadata?.receiptAttached === true ||
+        attempt.safeMetadata?.receiptEvidence?.receiptId ||
+        attempt.safeMetadata?.receiptEvidence?.fileReference
+    );
+}
+
+function notExpired(attempt = {}, now = new Date()) {
+    const expiresAt = attempt.expiresAt ? new Date(attempt.expiresAt) : null;
+    return Boolean(expiresAt && Number.isFinite(expiresAt.getTime()) && expiresAt > now);
+}
+
+function orderRecoverable(order = {}) {
+    const status = text(order.status).toLowerCase();
+    const paymentStatus = text(order.paymentStatus || order.payment?.status).toLowerCase();
+    return RECOVERABLE_ORDER_STATUSES.has(status) && RECOVERABLE_ORDER_PAYMENT_STATUSES.has(paymentStatus);
+}
+
+function attemptRecoverable(attempt = {}, order = {}, owner = {}, now = new Date()) {
+    if (!attempt?.attemptId || !order?.orderId) return false;
+    if (!sameOwner(owner, attempt.owner) || !sameOwner(owner, order.owner)) return false;
+    if (text(attempt.provider).toUpperCase() !== MANUAL_PROMPTPAY_PROVIDER) return false;
+    if (!RECOVERABLE_STATUSES.includes(text(attempt.status).toUpperCase())) return false;
+    if (!notExpired(attempt, now)) return false;
+    if (hasReceiptEvidence(attempt)) return false;
+    if (!orderRecoverable(order)) return false;
+    const qr = attempt.qr || {};
+    return Boolean(qr.image && (qr.mode || "aziel_promptpay_dynamic") === "aziel_promptpay_dynamic");
+}
+
+function remainingSeconds(attempt = {}, now = new Date()) {
+    const expiresAt = attempt.expiresAt ? new Date(attempt.expiresAt) : null;
+    if (!expiresAt || !Number.isFinite(expiresAt.getTime())) return 0;
+    return Math.max(0, Math.floor((expiresAt.getTime() - now.getTime()) / 1000));
+}
+
+function projectRecoverableCommerceAttempt({ attempt = {}, order = {}, now = new Date() } = {}) {
+    const product = order.product || {};
+    const commercial = order.commercial || {};
+    const qr = attempt.qr || {};
+    const instructions = attempt.paymentInstructions || {};
+    const orderReference = qr.encodedReference || attempt.providerReference || attempt.attemptId;
+    return {
+        architecture: "commerce",
+        commerce: true,
+        commerceRecoveryVersion: SERVICE_VERSION,
+        orderId: order.orderId || attempt.orderId || "",
+        commerceOrderId: order.orderId || attempt.orderId || "",
+        quoteId: order.quoteId || attempt.quoteId || "",
+        attemptId: attempt.attemptId || "",
+        attemptReference: orderReference,
+        reference: orderReference,
+        orderReference,
+        productCode: product.gameCode || product.gameId || "",
+        gameCode: product.gameCode || product.gameId || "",
+        productName: product.gameName || "",
+        packageCode: product.packageCode || product.packageId || product.packageRef || "",
+        packageName: product.packageName || "",
+        gameUserData: {
+            userId: order.fulfilment?.input?.userId || order.fulfilment?.input?.playerId || "",
+            zoneId: order.fulfilment?.input?.zoneId || order.fulfilment?.input?.serverId || ""
+        },
+        amount: Number(attempt.amount ?? commercial.totalAmount ?? 0),
+        originalAmount: Number(commercial.originalUnitPrice ?? commercial.totalAmount ?? attempt.amount ?? 0),
+        discountAmount: Number(commercial.discountAmount || 0),
+        finalAmount: Number(attempt.amount ?? commercial.totalAmount ?? 0),
+        promoCode: order.promotion?.code || order.promotionSnapshot?.code || "",
+        promoSnapshot: order.promotion || order.promotionSnapshot || null,
+        currency: attempt.currency || commercial.currency || "",
+        region: attempt.region || commercial.region || product.region || "",
+        paymentMethod: attempt.paymentMethod || order.payment?.paymentMethodId || "promptpay",
+        paymentType: "manual",
+        provider: "promptpay",
+        paymentName: instructions.title || "PromptPay QR",
+        qrMode: qr.mode || "aziel_promptpay_dynamic",
+        confirmationMode: attempt.confirmationMode || instructions.confirmationMode || "manual_admin",
+        receiptUploadEnabled: true,
+        slipRequired: true,
+        checklistSteps: Array.isArray(instructions.steps) ? instructions.steps : [],
+        instructions: {
+            method: instructions.title || "PromptPay QR",
+            key: attempt.paymentMethod || "promptpay",
+            qrMode: qr.mode || "aziel_promptpay_dynamic",
+            confirmationMode: attempt.confirmationMode || instructions.confirmationMode || "manual_admin",
+            enableSaveQr: true,
+            enableOpenApp: true,
+            enableChecklist: true,
+            dynamicQrSupported: true,
+            amountPrefillSupported: true,
+            referenceSupported: true,
+            galleryScanSupported: true,
+            receiptUploadEnabled: true,
+            slipRequired: true,
+            openAppMode: "bank_chooser",
+            appLaunchMode: "APP_ONLY",
+            appDisplayName: "PromptPay",
+            bankLaunchers: []
+        },
+        createdAt: attempt.createdAt || order.createdAt || "",
+        expiresAt: attempt.expiresAt || "",
+        recoverableExpiresAt: attempt.expiresAt || "",
+        remainingSeconds: remainingSeconds(attempt, now),
+        receiptSubmitted: false,
+        resumable: true,
+        dynamicQr: {
+            orderReference,
+            encodedReference: qr.encodedReference || "",
+            qrImage: qr.image || "",
+            expiresAt: attempt.expiresAt || ""
+        }
+    };
+}
+
+function createCommercePaymentRecoveryService(dependencies = {}) {
+    const deps = {
+        paymentAttemptRepository: dependencies.paymentAttemptRepository || paymentAttemptRepository,
+        commerceOrderRepository: dependencies.commerceOrderRepository || orderRepository,
+        clock: dependencies.clock || (() => new Date())
+    };
+
+    async function listRecoverablePayments(input = {}) {
+        const owner = normalizeOwner(input.user || {}, input.sessionId || "");
+        const now = deps.clock();
+        const attempts = await deps.paymentAttemptRepository.findAttemptsForOwner({
+            owner,
+            provider: MANUAL_PROMPTPAY_PROVIDER,
+            statuses: RECOVERABLE_STATUSES,
+            expiresAfter: now,
+            limit: input.limit || 25
+        });
+        const orderIds = Array.from(new Set(attempts.map(attempt => attempt.orderId).filter(Boolean)));
+        const orders = typeof deps.commerceOrderRepository.findOwnedOrdersByIds === "function"
+            ? await deps.commerceOrderRepository.findOwnedOrdersByIds({ orderIds, owner })
+            : [];
+        const orderById = new Map(orders.map(order => [order.orderId, order]));
+        const recoverable = [];
+        for (const attempt of attempts) {
+            const order = orderById.get(attempt.orderId) || null;
+            if (!attemptRecoverable(attempt, order, owner, now)) continue;
+            recoverable.push(projectRecoverableCommerceAttempt({ attempt, order, now }));
+        }
+        return recoverable;
+    }
+
+    return Object.freeze({
+        listRecoverablePayments
+    });
+}
+
+module.exports = Object.freeze({
+    SERVICE_VERSION,
+    RECOVERABLE_STATUSES,
+    createCommercePaymentRecoveryService,
+    projectRecoverableCommerceAttempt,
+    attemptRecoverable,
+    CommercePaymentRecoveryError
+});

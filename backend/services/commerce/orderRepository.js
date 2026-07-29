@@ -214,6 +214,26 @@ async function findOwnedOrderById(input, options = {}) {
     }
 }
 
+async function findOwnedOrdersByIds(input, options = {}) {
+    const source = input || {};
+    const orderIds = Array.from(new Set((Array.isArray(source.orderIds) ? source.orderIds : [])
+        .map(orderId => assertId(orderId, "orderId", ERROR_CODES.INVALID_ORDER_ID))));
+    if (!orderIds.length) return [];
+    const opts = normalizeOptions(options);
+    try {
+        let query = opts.model.find({
+            orderId: { $in: orderIds },
+            ...ownerQuery(source.owner || {})
+        });
+        query = withSession(query, opts.session);
+        if (opts.lean && typeof query.lean === "function") query = query.lean();
+        const result = query.exec ? await query.exec() : await query;
+        return Array.isArray(result) ? result.map(plainRecord) : [];
+    } catch (error) {
+        throw wrapError(error, ERROR_CODES.ORDER_READ_FAILED, "read");
+    }
+}
+
 async function findOwnedOrderByQuoteId(input, options = {}) {
     const source = input || {};
     const quoteId = assertId(source.quoteId, "quoteId", ERROR_CODES.INVALID_QUOTE_ID);
@@ -455,6 +475,7 @@ module.exports = Object.freeze({
     createOrderRecord,
     findOrderById,
     findOwnedOrderById,
+    findOwnedOrdersByIds,
     findOrderByQuoteId,
     findOwnedOrderByQuoteId,
     findOrderByCheckoutId,
