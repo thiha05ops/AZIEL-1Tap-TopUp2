@@ -78,6 +78,37 @@ function ruleSnapshot(rule) {
     };
 }
 
+function manualPublishedPriceRule({ price = {}, packageContext = {}, region, currency } = {}) {
+    const mode = upper(price.publishedPriceMode || "LEGACY_COMPATIBILITY_PRICE");
+    if (mode === "POLICY_DERIVED") return null;
+    const publishedAmount = Number(price.amount);
+    if (!Number.isFinite(publishedAmount) || publishedAmount < 0) return null;
+    const reason = text(price.manualOverrideReason) || (
+        mode === "MANUAL_OVERRIDE"
+            ? "Manual published-price override."
+            : "Legacy catalog selling price preserved during pricing-policy migration."
+    );
+
+    return {
+        id: `catalog-published-price:${packageContext.packageCode}:${upper(region)}`,
+        code: `${mode}:${packageContext.packageCode}:${upper(region)}`,
+        ruleType: "PRICE_OVERRIDE",
+        value: publishedAmount,
+        priority: 1000,
+        scopeType: "PACKAGE",
+        scopeReference: packageContext.packageCode,
+        stopFurtherProcessing: true,
+        effectiveFrom: null,
+        effectiveUntil: null,
+        configuration: {
+            source: "catalog_package.price",
+            publishedPriceMode: mode,
+            manualOverrideReason: reason,
+            currency: upper(currency)
+        }
+    };
+}
+
 function packageContextFromCatalog(pkg = {}, catalog = {}) {
     const packageId = text(pkg._id || catalog.packageId);
     const productCode = text(catalog.productCode || pkg.productCode).toLowerCase();
@@ -190,6 +221,13 @@ async function buildProductionPricingContext({ pkg, price, catalog = {}, region,
         loadPublishedVersion({ policy, pkg, region: normalizedRegion, now }),
         loadActiveRules({ policy, packageContext, region: normalizedRegion, currency: normalizedCurrency, now })
     ]);
+    const priceOverrideRule = manualPublishedPriceRule({
+        price,
+        packageContext,
+        region: normalizedRegion,
+        currency: normalizedCurrency
+    });
+    const appliedPricingRules = priceOverrideRule ? [priceOverrideRule, ...rules] : rules;
 
     return {
         packageContext,
@@ -200,7 +238,7 @@ async function buildProductionPricingContext({ pkg, price, catalog = {}, region,
                 targetCurrency: normalizedCurrency,
                 exchangeRate: supplierCost.currency === normalizedCurrency ? null : exchangeRate,
                 policy: policyFromRecord(policy),
-                appliedPricingRules: rules,
+                appliedPricingRules,
                 context: {
                     evaluationTime: now.toISOString(),
                     region: normalizedRegion,
@@ -217,6 +255,8 @@ async function buildProductionPricingContext({ pkg, price, catalog = {}, region,
                     businessRuntime: {
                         supplierCostConfigured: supplierCost.configured === true,
                         supplierCostSource: supplierCost.source,
+                        publishedPriceMode: price.publishedPriceMode || "LEGACY_COMPATIBILITY_PRICE",
+                        manualOverrideReason: price.manualOverrideReason || "",
                         healthyMarginRequired: true
                     }
                 }

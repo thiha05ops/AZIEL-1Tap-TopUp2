@@ -407,18 +407,33 @@ function calculateBasePrice(input) {
         currency: supplierCurrency
     });
 
+    const preExchangeSubtotal = subtotal;
+    const exchange = validateExchange({ ...input, supplierCurrency, targetCurrency });
+    subtotal = exchange.rate ? normalizeAmount(subtotal * exchange.rate) : subtotal;
+    const postExchangeSubtotal = subtotal;
+    breakdownStage(breakdown, {
+        stage: "EXCHANGE",
+        label: "Currency exchange",
+        inputAmount: preExchangeSubtotal,
+        ruleType: exchange.rate ? "RATE" : "NONE",
+        ruleValue: exchange.rate,
+        amountAdded: normalizeAmount(postExchangeSubtotal - preExchangeSubtotal),
+        outputAmount: postExchangeSubtotal,
+        currency: targetCurrency
+    });
+
     const supplierFee = applyMonetaryRule(subtotal, policy.supplierFee, "policy.supplierFee");
     const beforeSupplierFee = subtotal;
     subtotal = normalizeAmount(subtotal + supplierFee.amount);
     breakdownStage(breakdown, {
         stage: "SUPPLIER_FEE",
-        label: "Supplier fee",
+        label: "Exchange fee",
         inputAmount: beforeSupplierFee,
         ruleType: supplierFee.rule.type,
         ruleValue: supplierFee.rule.value,
         amountAdded: supplierFee.amount,
         outputAmount: subtotal,
-        currency: supplierCurrency
+        currency: targetCurrency
     });
 
     const businessCost = applyMonetaryRule(subtotal, policy.businessCost, "policy.businessCost");
@@ -432,44 +447,6 @@ function calculateBasePrice(input) {
         ruleValue: businessCost.rule.value,
         amountAdded: businessCost.amount,
         outputAmount: subtotal,
-        currency: supplierCurrency
-    });
-
-    const costBeforeProfit = subtotal;
-    const profitRuleOverride = [...rules].filter(rule => ["PROFIT_MARGIN_PERCENT", "PROFIT_FIXED"].includes(rule.ruleType))[0];
-    const profitRule = profitRuleOverride
-        ? { enabled: true, type: profitRuleOverride.ruleType.endsWith("_PERCENT") ? "PERCENT" : "FIXED", value: profitRuleOverride.value }
-        : policy.profitRule;
-    const profit = applyMonetaryRule(subtotal, profitRule, "policy.profitRule");
-    let profitAmount = profit.amount;
-    rules.filter(rule => ["MARKUP_PERCENT", "MARKUP_FIXED"].includes(rule.ruleType)).forEach(rule => {
-        profitAmount = normalizeAmount(profitAmount + ruleAmount(subtotal, rule));
-    });
-    const beforeProfit = subtotal;
-    subtotal = normalizeAmount(subtotal + profitAmount);
-    breakdownStage(breakdown, {
-        stage: "PROFIT",
-        label: "Profit and markup",
-        inputAmount: beforeProfit,
-        ruleType: profit.rule.type,
-        ruleValue: profit.rule.value,
-        amountAdded: profitAmount,
-        outputAmount: subtotal,
-        currency: supplierCurrency
-    });
-
-    const preExchangeSubtotal = subtotal;
-    const exchange = validateExchange({ ...input, supplierCurrency, targetCurrency });
-    subtotal = exchange.rate ? normalizeAmount(subtotal * exchange.rate) : subtotal;
-    const postExchangeSubtotal = subtotal;
-    breakdownStage(breakdown, {
-        stage: "EXCHANGE",
-        label: "Currency exchange",
-        inputAmount: preExchangeSubtotal,
-        ruleType: exchange.rate ? "RATE" : "NONE",
-        ruleValue: exchange.rate,
-        amountAdded: normalizeAmount(postExchangeSubtotal - preExchangeSubtotal),
-        outputAmount: postExchangeSubtotal,
         currency: targetCurrency
     });
 
@@ -532,6 +509,29 @@ function calculateBasePrice(input) {
         currency: targetCurrency
     });
 
+    const costBeforeProfit = subtotal;
+    const profitRuleOverride = [...rules].filter(rule => ["PROFIT_MARGIN_PERCENT", "PROFIT_FIXED"].includes(rule.ruleType))[0];
+    const profitRule = profitRuleOverride
+        ? { enabled: true, type: profitRuleOverride.ruleType.endsWith("_PERCENT") ? "PERCENT" : "FIXED", value: profitRuleOverride.value }
+        : policy.profitRule;
+    const profit = applyMonetaryRule(subtotal, profitRule, "policy.profitRule");
+    let profitAmount = profit.amount;
+    rules.filter(rule => ["MARKUP_PERCENT", "MARKUP_FIXED"].includes(rule.ruleType)).forEach(rule => {
+        profitAmount = normalizeAmount(profitAmount + ruleAmount(subtotal, rule));
+    });
+    const beforeProfit = subtotal;
+    subtotal = normalizeAmount(subtotal + profitAmount);
+    breakdownStage(breakdown, {
+        stage: "PROFIT",
+        label: "Profit and markup",
+        inputAmount: beforeProfit,
+        ruleType: profit.rule.type,
+        ruleValue: profit.rule.value,
+        amountAdded: profitAmount,
+        outputAmount: subtotal,
+        currency: targetCurrency
+    });
+
     const preRoundingPrice = subtotal;
     const roundingOverride = [...rules].filter(rule => rule.ruleType === "ROUNDING")[0];
     const roundingRule = roundingOverride
@@ -571,7 +571,7 @@ function calculateBasePrice(input) {
         });
     }
 
-    const totalCost = postExchangeSubtotal;
+    const totalCost = costBeforeProfit;
     const calculatedProfitAmount = normalizeAmount(regularPrice - totalCost);
     const calculatedMarginPercent = calculateMargin(regularPrice, totalCost);
     if (calculatedProfitAmount < 0) {

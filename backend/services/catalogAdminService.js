@@ -26,7 +26,9 @@ const MAX_SEO_DESCRIPTION = 180;
 const MAX_SUPPLIER_NAME = 120;
 const MAX_SUPPLIER_VERSION = 80;
 const MAX_PRICING_NOTE = 240;
+const MAX_OVERRIDE_REASON = 240;
 const MAX_SUPPLIER_COST_HISTORY = 200;
+const PUBLISHED_PRICE_MODES = Object.freeze(["POLICY_DERIVED", "MANUAL_OVERRIDE", "LEGACY_COMPATIBILITY_PRICE"]);
 
 function assertNoImmutableFields(patch = {}, fields = []) {
     fields.forEach(field => {
@@ -169,6 +171,14 @@ function parseNullableDate(value, field = "supplierCostTimestamp") {
         throw new CatalogAdminError("CATALOG_PATCH_INVALID", `${field} must be a valid date.`);
     }
     return date;
+}
+
+function parsePublishedPriceMode(value) {
+    const mode = String(value || "LEGACY_COMPATIBILITY_PRICE").trim().toUpperCase();
+    if (!PUBLISHED_PRICE_MODES.includes(mode)) {
+        throw new CatalogAdminError("CATALOG_PATCH_INVALID", "Published price mode is not supported.");
+    }
+    return mode;
 }
 
 function parseSortOrder(value) {
@@ -356,6 +366,8 @@ function buildPackagePatch(document, patch = {}) {
             const regionalAllowed = new Set([
                 "amount",
                 "enabled",
+                "publishedPriceMode",
+                "manualOverrideReason",
                 "supplierCost",
                 "supplierCurrency",
                 "supplierName",
@@ -388,6 +400,18 @@ function buildPackagePatch(document, patch = {}) {
                     "CATALOG_PRICE_INVALID",
                     "Price amount is required."
                 );
+            }
+
+            if (Object.prototype.hasOwnProperty.call(pricePatch, "publishedPriceMode")) {
+                updates[`prices.${region}.publishedPriceMode`] = parsePublishedPriceMode(pricePatch.publishedPriceMode);
+            }
+            if (Object.prototype.hasOwnProperty.call(pricePatch, "manualOverrideReason")) {
+                updates[`prices.${region}.manualOverrideReason`] = cleanEditableText(pricePatch.manualOverrideReason, MAX_OVERRIDE_REASON);
+            }
+            const nextMode = updates[`prices.${region}.publishedPriceMode`] || document.prices?.[region]?.publishedPriceMode || "LEGACY_COMPATIBILITY_PRICE";
+            const nextReason = updates[`prices.${region}.manualOverrideReason`] ?? document.prices?.[region]?.manualOverrideReason ?? "";
+            if (nextMode === "MANUAL_OVERRIDE" && !nextReason) {
+                throw new CatalogAdminError("CATALOG_PATCH_INVALID", "Manual published-price override requires a reason.");
             }
 
             if (Object.prototype.hasOwnProperty.call(pricePatch, "supplierCost")) {

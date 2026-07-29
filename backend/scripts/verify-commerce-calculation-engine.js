@@ -60,7 +60,7 @@ function verifyExchange() {
         targetCurrency: "THB",
         exchangeRate: { rate: 0.0125, sourceCurrency: "MMK", targetCurrency: "THB", source: "test" }
     }));
-    almostEqual(mmToTh.postExchangeSubtotal, 1.375, "MMK to THB should use supplied rate.");
+    almostEqual(mmToTh.postExchangeSubtotal, 1.25, "MMK to THB should convert supplier cost before customer-side fees and profit.");
     assert.strictEqual(mmToTh.exchangeRateMetadata.source, "test", "exchange metadata must be preserved.");
 
     const thToMm = calculateBasePrice(baseInput({
@@ -68,7 +68,7 @@ function verifyExchange() {
         targetCurrency: "MMK",
         exchangeRate: { rate: 80, sourceCurrency: "THB", targetCurrency: "MMK" }
     }));
-    almostEqual(thToMm.postExchangeSubtotal, 8800, "THB to MMK should use supplied rate.");
+    almostEqual(thToMm.postExchangeSubtotal, 8000, "THB to MMK should convert supplier cost before customer-side fees and profit.");
 
     assertError(() => calculateBasePrice(baseInput({ supplierCurrency: "MMK", targetCurrency: "THB" })), ERROR_CODES.INVALID_EXCHANGE_RATE, "missing exchange rate must fail.");
     assertError(() => calculateBasePrice(baseInput({ supplierCurrency: "MMK", targetCurrency: "THB", exchangeRate: { rate: 0, sourceCurrency: "MMK", targetCurrency: "THB" } })), ERROR_CODES.INVALID_EXCHANGE_RATE, "invalid exchange rate must fail.");
@@ -132,7 +132,7 @@ function verifyPricingRules() {
         ]
     }));
     assert.deepStrictEqual(result.appliedRules.map(rule => rule.code), ["PACKAGE-MARKUP", "REGION-FEE"], "rule precedence and stopFurtherProcessing must be deterministic.");
-    almostEqual(result.profitAmount, 15, "markup rule should add to profit stage.");
+    almostEqual(result.profitAmount, 15.2, "markup rule should add to profit stage after customer-side fee cost.");
     almostEqual(result.pricingRuleFeeAmount, 2, "fee rule should add after platform fee stage.");
 
     const override = calculateBasePrice(baseInput({
@@ -281,7 +281,7 @@ function verifyWorkedExamples() {
             roundingRule: { enabled: true, mode: "NEAREST", increment: 100 }
         }
     });
-    almostEqual(mmk.regularPrice, 10700, "documented MMK original price example.");
+    almostEqual(mmk.regularPrice, 10800, "documented MMK original price example.");
 
     const thb = calculateBasePrice({
         supplierCost: 950,

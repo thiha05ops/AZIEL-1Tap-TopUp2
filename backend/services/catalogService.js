@@ -417,6 +417,8 @@ function projectCatalogPackage(item = {}, { includeDisabled = true, mediaMap = n
         };
 
         if (includeAdminPricing) {
+            prices[region].publishedPriceMode = price.publishedPriceMode || "LEGACY_COMPATIBILITY_PRICE";
+            prices[region].manualOverrideReason = price.manualOverrideReason || "";
             prices[region].supplierCost = price.supplierCost == null ? null : Number(price.supplierCost);
             prices[region].supplierCurrency = price.supplierCurrency || "";
             prices[region].supplierName = price.supplierName || "";

@@ -36,8 +36,23 @@
         saveError: "",
         publishError: "",
         renderSeq: 0,
-        loadPromise: null
+        loadPromise: null,
+        workspace: {
+            rows: [],
+            previewRows: [],
+            selectedRowId: "",
+            previewing: false,
+            publishing: false,
+            filter: "ALL",
+            regionView: "ALL",
+            productFilter: "ALL",
+            pasteMatches: [],
+            debounce: null,
+            previewSeq: 0,
+            lastPreviewAt: ""
+        }
     };
+    const simulationState = state;
     const bootStartedAt = Date.now();
 
     function trace(label, details = {}) {
@@ -69,7 +84,10 @@
         if (!section || section.dataset.pricingEngineBound === "true") return;
         section.dataset.pricingEngineBound = "true";
         section.addEventListener("click", handleSectionClick);
+        section.addEventListener("input", handleWorkspaceInput);
+        section.addEventListener("change", handleWorkspaceChange);
         section.querySelector("#pricingProductSearch")?.addEventListener("input", event => filterProducts(section, event.target.value || ""));
+        section.querySelector("#pricingScopeSelector")?.addEventListener("change", () => calculateAndRenderPreview(section));
         hydrateFallbackProductsFromDom(section);
         requestProductionLoad(section, "dom-ready");
         trace("EXIT initPricingEngineUi");
@@ -99,6 +117,58 @@
         if (publishButton && section.contains(publishButton)) {
             event.preventDefault();
             publishDraft(section);
+            return;
+        }
+        const pasteButton = event.target.closest("#pricingPasteBtn");
+        if (pasteButton && section.contains(pasteButton)) {
+            event.preventDefault();
+            togglePanel(section, "#pricingPastePanel", true);
+            return;
+        }
+        const pasteClose = event.target.closest("#pricingPasteCloseBtn");
+        if (pasteClose && section.contains(pasteClose)) {
+            event.preventDefault();
+            togglePanel(section, "#pricingPastePanel", false);
+            return;
+        }
+        const parsePaste = event.target.closest("#pricingParsePasteBtn");
+        if (parsePaste && section.contains(parsePaste)) {
+            event.preventDefault();
+            parseWorkspacePaste(section);
+            return;
+        }
+        const reviewButton = event.target.closest("#pricingReviewBtn");
+        if (reviewButton && section.contains(reviewButton)) {
+            event.preventDefault();
+            renderWorkspaceReview(section, true);
+            return;
+        }
+        const reviewClose = event.target.closest("#pricingReviewCloseBtn");
+        if (reviewClose && section.contains(reviewClose)) {
+            event.preventDefault();
+            togglePanel(section, "#pricingReviewPanel", false);
+            return;
+        }
+        const publishSelected = event.target.closest("#pricingWorkspacePublishSelectedBtn");
+        if (publishSelected && section.contains(publishSelected)) {
+            event.preventDefault();
+            publishWorkspace(section, false);
+            return;
+        }
+        const publishAll = event.target.closest("#pricingWorkspacePublishAllBtn");
+        if (publishAll && section.contains(publishAll)) {
+            event.preventDefault();
+            publishWorkspace(section, true);
+            return;
+        }
+        const detailButton = event.target.closest("[data-pricing-workspace-row]");
+        if (detailButton && section.contains(detailButton)) {
+            const interactive = event.target.closest("input, button, select, textarea, a");
+            if (!interactive || interactive === detailButton) {
+                state.workspace.selectedRowId = detailButton.dataset.pricingWorkspaceRow;
+                renderWorkspaceGrid(section);
+                renderWorkspaceDetail(section);
+            }
         }
     }
 
@@ -314,6 +384,10 @@
             currency: String(pkg.currency || "THB").toUpperCase(),
             supplierCurrency: String(pkg.supplierCurrency || pkg.currency || "THB").toUpperCase(),
             supplierPrice,
+            publishedPrice: number(pkg.publishedPrice ?? pkg.amount, supplierPrice),
+            publishedPriceMode: String(pkg.publishedPriceMode || "LEGACY_COMPATIBILITY_PRICE").toUpperCase(),
+            manualOverrideReason: String(pkg.manualOverrideReason || "").trim(),
+            updatedAt: pkg.updatedAt || "",
             exchangeRate: Math.max(0, number(pkg.exchangeRate, 1))
         };
     }
@@ -339,6 +413,10 @@
                 currency: String(row.dataset.pricingCurrency || "THB").toUpperCase(),
                 supplierCurrency: String(row.dataset.pricingSupplierCurrency || row.dataset.pricingCurrency || "THB").toUpperCase(),
                 supplierPrice,
+                publishedPrice: number(row.dataset.pricingPublishedPrice, supplierPrice),
+                publishedPriceMode: String(row.dataset.pricingPublishedPriceMode || "LEGACY_COMPATIBILITY_PRICE").toUpperCase(),
+                manualOverrideReason: String(row.dataset.pricingManualOverrideReason || "").trim(),
+                updatedAt: row.dataset.pricingUpdatedAt || "",
                 exchangeRate: Math.max(0, number(row.dataset.pricingExchangeRate, 1))
             }]
         };
@@ -426,6 +504,10 @@
             trace("STATE populated", { productCount: state.products.length, packageCount: state.products.reduce((sum, item) => sum + item.packages.length, 0) });
             trace("RENDER products started");
             renderProducts(section);
+            buildWorkspaceRows(section);
+            renderWorkspaceControls(section);
+            renderWorkspaceGrid(section);
+            requestWorkspacePreview(section);
             trace("RENDER products finished");
             trace("PREVIEW started");
             calculateAndRenderPreview(section);
@@ -503,6 +585,422 @@
         });
     }
 
+    function flattenWorkspacePackages() {
+        const byPackage = new Map();
+        state.products.forEach(product => {
+            product.packages.forEach(pkg => {
+                const key = `${product.productCode}:${pkg.packageCode}`;
+                const existing = byPackage.get(key);
+                if (!existing) {
+                    byPackage.set(key, {
+                        rowId: key,
+                        productCode: product.productCode,
+                        productName: product.productName,
+                        packageCode: pkg.packageCode,
+                        packageName: pkg.packageName,
+                        supplierPackageCode: pkg.supplierPackageCode || pkg.packageCode,
+                        oldSupplierCost: pkg.supplierPrice,
+                        newSupplierCost: pkg.supplierPrice,
+                        supplierCurrency: pkg.supplierCurrency || "THB",
+                        supplierName: pkg.supplierName || "",
+                        supplierVersion: pkg.supplierVersion || "",
+                        supplierCostTimestamp: pkg.supplierCostTimestamp || "",
+                        expectedUpdatedAt: pkg.updatedAt || "",
+                        publishedPriceMode: pkg.publishedPriceMode,
+                        manualOverrideReason: pkg.manualOverrideReason,
+                        selected: true,
+                        changed: false,
+                        status: "Unchanged"
+                    });
+                    return;
+                }
+                if (!existing.expectedUpdatedAt && pkg.updatedAt) existing.expectedUpdatedAt = pkg.updatedAt;
+                if (existing.oldSupplierCost == null && pkg.supplierPrice != null) {
+                    existing.oldSupplierCost = pkg.supplierPrice;
+                    existing.newSupplierCost = pkg.supplierPrice;
+                }
+            });
+        });
+        return [...byPackage.values()];
+    }
+
+    function buildWorkspaceRows(section) {
+        const previous = new Map(state.workspace.rows.map(row => [row.rowId, row]));
+        state.workspace.rows = flattenWorkspacePackages().map(row => {
+            const staged = previous.get(row.rowId);
+            return staged ? { ...row, ...staged, productName: row.productName, packageName: row.packageName, expectedUpdatedAt: row.expectedUpdatedAt || staged.expectedUpdatedAt } : row;
+        });
+        if (!state.workspace.selectedRowId && state.workspace.rows[0]) state.workspace.selectedRowId = state.workspace.rows[0].rowId;
+        renderWorkspaceControls(section);
+    }
+
+    function handleWorkspaceInput(event) {
+        const section = event.currentTarget;
+        const costInput = event.target.closest("[data-pricing-cost-input]");
+        if (costInput && section.contains(costInput)) {
+            const row = state.workspace.rows.find(item => item.rowId === costInput.dataset.pricingCostInput);
+            if (!row) return;
+            row.newSupplierCost = number(costInput.value, row.newSupplierCost);
+            row.changed = row.newSupplierCost !== row.oldSupplierCost;
+            row.status = "Edited";
+            state.workspace.selectedRowId = row.rowId;
+            renderWorkspaceDetail(section);
+            scheduleWorkspacePreview(section);
+            return;
+        }
+        const supplierInput = event.target.closest("#pricingWorkspaceSupplier, #pricingWorkspaceVersion");
+        if (supplierInput && section.contains(supplierInput)) {
+            scheduleWorkspacePreview(section);
+        }
+    }
+
+    function handleWorkspaceChange(event) {
+        const section = event.currentTarget;
+        const checkbox = event.target.closest("[data-pricing-select-row]");
+        if (checkbox && section.contains(checkbox)) {
+            const row = state.workspace.rows.find(item => item.rowId === checkbox.dataset.pricingSelectRow);
+            if (row) row.selected = checkbox.checked;
+            renderWorkspaceGrid(section);
+            renderWorkspaceReview(section, false);
+            return;
+        }
+        const currency = event.target.closest("#pricingWorkspaceCurrency");
+        if (currency && section.contains(currency)) {
+            state.workspace.rows.forEach(row => {
+                if (row.selected) {
+                    row.supplierCurrency = currency.value;
+                    row.changed = true;
+                    row.status = "Edited";
+                }
+            });
+            scheduleWorkspacePreview(section);
+            return;
+        }
+        const productFilter = event.target.closest("#pricingWorkspaceProduct");
+        if (productFilter && section.contains(productFilter)) {
+            state.workspace.productFilter = productFilter.value;
+            renderWorkspaceGrid(section);
+            return;
+        }
+        const regionView = event.target.closest("#pricingWorkspaceRegion");
+        if (regionView && section.contains(regionView)) {
+            state.workspace.regionView = regionView.value;
+            renderWorkspaceGrid(section);
+            return;
+        }
+        const filter = event.target.closest("#pricingWorkspaceFilter");
+        if (filter && section.contains(filter)) {
+            state.workspace.filter = filter.value;
+            renderWorkspaceGrid(section);
+        }
+    }
+
+    function renderWorkspaceControls(section) {
+        const productSelect = section.querySelector("#pricingWorkspaceProduct");
+        if (productSelect) {
+            const current = productSelect.value || state.workspace.productFilter || "ALL";
+            productSelect.innerHTML = '<option value="ALL">All products</option>' + state.products.map(product => (
+                `<option value="${escapeHTML(product.productCode)}">${escapeHTML(product.productName)}</option>`
+            )).join("");
+            productSelect.value = [...productSelect.options].some(option => option.value === current) ? current : "ALL";
+            state.workspace.productFilter = productSelect.value;
+        }
+    }
+
+    function workspaceRowsForRender() {
+        return state.workspace.rows.filter(row => {
+            if (state.workspace.productFilter !== "ALL" && row.productCode !== state.workspace.productFilter) return false;
+            const preview = state.workspace.previewRows.find(item => item.rowId === row.rowId);
+            const status = preview?.status || row.status || "Unchanged";
+            if (state.workspace.filter === "ALL") return true;
+            if (state.workspace.filter === "CHANGED") return row.changed || preview?.changed;
+            if (state.workspace.filter === "READY") return status === "Ready";
+            if (state.workspace.filter === "BLOCKED") return status === "Blocked";
+            if (state.workspace.filter === "LOW_MARGIN") return preview?.regions?.some(item => item.profitabilityStatus === "LOW_MARGIN");
+            if (state.workspace.filter === "NEGATIVE_MARGIN") return preview?.regions?.some(item => /NEGATIVE|BELOW_COST/.test(item.profitabilityStatus || ""));
+            if (state.workspace.filter === "SUPPLIER_COST_MISSING") return preview?.regions?.some(item => item.profitabilityStatus === "UNKNOWN_SUPPLIER_COST");
+            if (state.workspace.filter === "EXCHANGE_RATE_MISSING") return preview?.regions?.some(item => item.profitabilityStatus === "EXCHANGE_RATE_MISSING");
+            if (state.workspace.filter === "MANUAL_OVERRIDE") return preview?.regions?.some(item => item.publishedPriceMode === "MANUAL_OVERRIDE");
+            if (state.workspace.filter === "LEGACY_COMPATIBILITY_PRICE") return preview?.regions?.some(item => item.publishedPriceMode === "LEGACY_COMPATIBILITY_PRICE");
+            if (state.workspace.filter === "PROMO_RISK") return preview?.warnings?.some(item => /COUPON|PROMO/i.test(item.code || ""));
+            return true;
+        });
+    }
+
+    function regionPreview(row, region) {
+        const preview = state.workspace.previewRows.find(item => item.rowId === row.rowId);
+        return preview?.regions?.find(item => item.region === region) || null;
+    }
+
+    function statusClass(status = "") {
+        if (status === "Ready") return "is-ready";
+        if (status === "Blocked") return "is-blocked";
+        if (status === "Warning") return "is-warning";
+        return "";
+    }
+
+    function renderWorkspaceGrid(section) {
+        const grid = section.querySelector("#pricingWorkspaceGrid");
+        if (!grid) return;
+        const rows = workspaceRowsForRender();
+        if (!rows.length) {
+            grid.innerHTML = '<p class="empty">No packages match the current pricing workspace filter.</p>';
+            renderWorkspaceSummary(section);
+            renderWorkspaceDetail(section);
+            return;
+        }
+        const header = `
+            <div class="pricing-grid-head" role="row">
+                <span></span><span>Package</span><span>Old Cost</span><span>New Cost</span><span>Currency</span>
+                <span>TH Price</span><span>TH Profit</span><span>MM Price</span><span>MM Profit</span><span>Discount</span><span>Status</span>
+            </div>`;
+        const body = rows.map(row => {
+            const preview = state.workspace.previewRows.find(item => item.rowId === row.rowId);
+            const th = regionPreview(row, "TH");
+            const mm = regionPreview(row, "MM");
+            const status = preview?.status || row.status || "Unchanged";
+            const selected = row.rowId === state.workspace.selectedRowId;
+            return `
+                <div class="pricing-grid-row ${selected ? "is-selected" : ""}" role="row" data-status="${escapeHTML(status)}" data-pricing-workspace-row="${escapeHTML(row.rowId)}" tabindex="0">
+                    <label class="pricing-grid-cell">
+                        <input type="checkbox" data-pricing-select-row="${escapeHTML(row.rowId)}" ${row.selected !== false ? "checked" : ""} aria-label="Select ${escapeHTML(row.packageName)}">
+                    </label>
+                    <div class="pricing-grid-cell">
+                        <strong>${escapeHTML(row.packageName)}</strong>
+                        <small>${escapeHTML(row.productName)} · ${escapeHTML(row.packageCode)}</small>
+                    </div>
+                    <div class="pricing-grid-cell"><span>${formatMoney(row.oldSupplierCost, row.supplierCurrency)}</span><small>Supplier</small></div>
+                    <div class="pricing-grid-cell"><input data-pricing-cost-input="${escapeHTML(row.rowId)}" type="number" min="0" step="0.01" value="${escapeHTML(row.newSupplierCost)}" aria-label="New supplier cost"></div>
+                    <div class="pricing-grid-cell"><span>${escapeHTML(row.supplierCurrency)}</span><small>${escapeHTML(row.supplierName || "Supplier")}</small></div>
+                    <div class="pricing-grid-cell"><span>${th ? formatMoney(th.publishedPrice, "THB") : "—"}</span><small>${th ? formatMoney(th.recommendedSellingPrice, "THB") : "No TH"}</small></div>
+                    <div class="pricing-grid-cell"><span>${th?.netProfit == null ? "—" : formatMoney(th.netProfit, "THB")}</span><small>${th?.marginPercent == null ? "Margin unknown" : `${th.marginPercent}%`}</small></div>
+                    <div class="pricing-grid-cell"><span>${mm ? formatMoney(mm.publishedPrice, "MMK") : "—"}</span><small>${mm ? formatMoney(mm.recommendedSellingPrice, "MMK") : "No MM"}</small></div>
+                    <div class="pricing-grid-cell"><span>${mm?.netProfit == null ? "—" : formatMoney(mm.netProfit, "MMK")}</span><small>${mm?.marginPercent == null ? "Margin unknown" : `${mm.marginPercent}%`}</small></div>
+                    <div class="pricing-grid-cell"><span>${Math.max(th?.displayDiscountPercent || 0, mm?.displayDiscountPercent || 0)}%</span><small>Reference vs published</small></div>
+                    <div class="pricing-grid-cell"><span class="pricing-status-chip ${statusClass(status)}">${escapeHTML(status)}</span><small>${(preview?.warnings || preview?.blockingErrors || [])[0]?.message || "Server preview"}</small></div>
+                </div>
+            `;
+        }).join("");
+        grid.innerHTML = header + body;
+        renderWorkspaceSummary(section);
+        renderWorkspaceDetail(section);
+    }
+
+    function renderWorkspaceSummary(section, summary = null) {
+        const computed = summary || {
+            packagesLoaded: state.workspace.rows.length,
+            changed: state.workspace.rows.filter(row => row.changed).length,
+            ready: state.workspace.previewRows.filter(row => row.status === "Ready").length,
+            lowMargin: state.workspace.previewRows.filter(row => row.regions?.some(item => item.profitabilityStatus === "LOW_MARGIN")).length,
+            negativeMargin: state.workspace.previewRows.filter(row => row.regions?.some(item => /NEGATIVE|BELOW_COST/.test(item.profitabilityStatus || ""))).length,
+            missingSupplierCost: state.workspace.previewRows.filter(row => row.regions?.some(item => item.profitabilityStatus === "UNKNOWN_SUPPLIER_COST")).length,
+            manualOverrides: state.workspace.previewRows.filter(row => row.regions?.some(item => item.publishedPriceMode === "MANUAL_OVERRIDE")).length,
+            promoRisk: state.workspace.previewRows.filter(row => row.warnings?.some(item => /COUPON|PROMO/i.test(item.code || ""))).length
+        };
+        setText(section, "#pricingWorkspacePackagesLoaded", computed.packagesLoaded || 0);
+        setText(section, "#pricingWorkspaceChanged", computed.changed || 0);
+        setText(section, "#pricingWorkspaceReady", computed.ready || 0);
+        setText(section, "#pricingWorkspaceLowMargin", computed.lowMargin || 0);
+        setText(section, "#pricingWorkspaceNegativeMargin", computed.negativeMargin || 0);
+        setText(section, "#pricingWorkspaceMissingCost", computed.missingSupplierCost || 0);
+        setText(section, "#pricingWorkspaceManualOverrides", computed.manualOverrides || 0);
+        setText(section, "#pricingWorkspacePromoRisk", computed.promoRisk || 0);
+        setText(section, "#pricingWorkspaceUpdated", `Last updated: ${state.workspace.lastPreviewAt || "Not previewed"}`);
+    }
+
+    function renderWorkspaceDetail(section) {
+        const box = section.querySelector("#pricingWorkspaceDetail");
+        if (!box) return;
+        const row = state.workspace.previewRows.find(item => item.rowId === state.workspace.selectedRowId) ||
+            state.workspace.rows.find(item => item.rowId === state.workspace.selectedRowId);
+        if (!row) {
+            box.innerHTML = '<p class="empty">No staged package selected.</p>';
+            return;
+        }
+        setText(section, "#pricingWorkspaceDetailTitle", `${row.productName} · ${row.packageName}`);
+        const regionCards = (row.regions || []).map(region => `
+            <article class="pricing-detail-card">
+                <strong>${region.region === "TH" ? "Thailand" : "Myanmar"} · ${escapeHTML(region.currency || "")}</strong>
+                <div class="pricing-detail-line"><span>Recommended</span><b>${formatMoney(region.recommendedSellingPrice, region.currency)}</b></div>
+                <div class="pricing-detail-line"><span>Published</span><b>${formatMoney(region.publishedPrice, region.currency)}</b></div>
+                <div class="pricing-detail-line"><span>Final after promo</span><b>${formatMoney(region.finalPayableAmount, region.currency)}</b></div>
+                <div class="pricing-detail-line"><span>Net profit / margin</span><b>${region.netProfit == null ? "Unknown" : `${formatMoney(region.netProfit, region.currency)} · ${region.marginPercent}%`}</b></div>
+                <div class="pricing-detail-line"><span>Payment fee impact</span><b>${escapeHTML((region.paymentFeeSimulation || []).map(item => `${item.method}: ${item.marginPercent ?? "?"}%`).join(" · "))}</b></div>
+                <div class="pricing-detail-line"><span>Policy source</span><b>${escapeHTML(region.effectivePolicySource || "production")}</b></div>
+            </article>
+        `).join("");
+        const warnings = [...(row.warnings || []), ...(row.blockingErrors || [])].map(item => `<li>${escapeHTML(item.message || item.code)}</li>`).join("");
+        box.innerHTML = `
+            <article class="pricing-detail-card">
+                <strong>${escapeHTML(row.packageName || "")}</strong>
+                <div class="pricing-detail-line"><span>Supplier cost</span><b>${formatMoney(row.oldSupplierCost, row.supplierCurrency)} → ${formatMoney(row.newSupplierCost, row.supplierCurrency)}</b></div>
+                <div class="pricing-detail-line"><span>Supplier code</span><b>${escapeHTML(row.supplierPackageCode || row.packageCode || "")}</b></div>
+                <div class="pricing-detail-line"><span>Status</span><b>${escapeHTML(row.status || "Edited")}</b></div>
+            </article>
+            ${regionCards || '<p class="empty">Preview this row to inspect regional calculations.</p>'}
+            ${warnings ? `<article class="pricing-detail-card"><strong>Warnings</strong><ul>${warnings}</ul></article>` : ""}
+        `;
+    }
+
+    function workspacePayloadRows({ onlySelected = false } = {}) {
+        const supplierName = sectionValue("#pricingWorkspaceSupplier", "Primary supplier");
+        const supplierVersion = sectionValue("#pricingWorkspaceVersion", "");
+        return state.workspace.rows
+            .filter(row => !onlySelected || row.selected !== false)
+            .map(row => ({
+                rowId: row.rowId,
+                productCode: row.productCode,
+                packageCode: row.packageCode,
+                newSupplierCost: row.newSupplierCost,
+                supplierCurrency: row.supplierCurrency,
+                supplierName,
+                supplierVersion,
+                supplierCostTimestamp: new Date().toISOString(),
+                expectedUpdatedAt: row.expectedUpdatedAt,
+                selected: row.selected !== false
+            }));
+    }
+
+    function sectionValue(selector, fallback = "") {
+        return document.querySelector(`#section-pricing-engine ${selector}`)?.value || fallback;
+    }
+
+    function scheduleWorkspacePreview(section) {
+        window.clearTimeout(state.workspace.debounce);
+        state.workspace.debounce = window.setTimeout(() => requestWorkspacePreview(section), 350);
+    }
+
+    async function requestWorkspacePreview(section) {
+        if (!section || !state.apiReady || !state.workspace.rows.length) return;
+        const seq = ++state.workspace.previewSeq;
+        state.workspace.previewing = true;
+        renderWorkspaceSummary(section);
+        try {
+            const result = await pricingFetch("/api/admin/pricing-engine/workspace/preview", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ rows: workspacePayloadRows() })
+            });
+            if (seq !== state.workspace.previewSeq) return;
+            state.workspace.previewRows = Array.isArray(result.rows) ? result.rows : [];
+            state.workspace.lastPreviewAt = new Date(result.generatedAt || Date.now()).toLocaleTimeString();
+            renderWorkspaceSummary(section, result.summary);
+            const mm = state.workspace.previewRows.flatMap(row => row.regions || []).find(item => item.region === "MM" && item.exchangeRate);
+            if (mm) {
+                setText(section, "#pricingWorkspaceMmkRate", `${mm.supplierCurrency || "THB"} → MMK · ${mm.exchangeRate}`);
+                setText(section, "#pricingWorkspaceMmkRateMeta", `${mm.exchangeRateSource || "Production policy"} · rounding applies server-side`);
+            }
+        } catch (error) {
+            if (seq !== state.workspace.previewSeq) return;
+            setStatus(section, `Workspace preview failed: ${error.message}`);
+        } finally {
+            if (seq === state.workspace.previewSeq) {
+                state.workspace.previewing = false;
+                renderWorkspaceGrid(section);
+                renderButtons(section);
+            }
+        }
+    }
+
+    function parseWorkspacePaste(section) {
+        const input = section.querySelector("#pricingPasteInput");
+        const result = section.querySelector("#pricingPasteResult");
+        const lines = String(input?.value || "").split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+        const parsed = [];
+        const unmatched = [];
+        const duplicates = new Set();
+        const seen = new Set();
+        lines.forEach((line, index) => {
+            const match = line.match(/^(.+?)[,\t ]+([0-9]+(?:\.[0-9]+)?)$/);
+            if (!match) {
+                unmatched.push(line);
+                return;
+            }
+            const key = match[1].trim().toLowerCase();
+            const price = number(match[2], NaN);
+            const row = state.workspace.rows.find(item =>
+                item.packageCode.toLowerCase() === key ||
+                item.supplierPackageCode?.toLowerCase() === key ||
+                item.packageName.toLowerCase() === key
+            ) || (lines.length === state.workspace.rows.length ? state.workspace.rows[index] : null);
+            if (!row || !Number.isFinite(price)) {
+                unmatched.push(line);
+                return;
+            }
+            if (seen.has(row.rowId)) duplicates.add(row.rowId);
+            seen.add(row.rowId);
+            row.newSupplierCost = price;
+            row.changed = row.newSupplierCost !== row.oldSupplierCost;
+            row.status = "Edited";
+            row.selected = true;
+            parsed.push(row);
+        });
+        state.workspace.pasteMatches = parsed;
+        if (result) result.textContent = `${parsed.length} matched · ${unmatched.length} unmatched · ${duplicates.size} duplicate`;
+        renderWorkspaceGrid(section);
+        scheduleWorkspacePreview(section);
+    }
+
+    function renderWorkspaceReview(section, open = false) {
+        const panel = section.querySelector("#pricingReviewPanel");
+        const list = section.querySelector("#pricingReviewList");
+        const summary = section.querySelector("#pricingReviewSummary");
+        if (!panel || !list) return;
+        const changed = state.workspace.previewRows.filter(row => row.changed || state.workspace.rows.find(item => item.rowId === row.rowId)?.changed);
+        if (summary) summary.textContent = `${changed.length} packages staged. Blocked rows will be skipped by publish.`;
+        list.innerHTML = changed.length ? changed.map(row => `
+            <article class="pricing-review-row">
+                <strong>${escapeHTML(row.packageName)}</strong>
+                <small>${escapeHTML(row.productName)} · ${escapeHTML(row.packageCode)} · ${escapeHTML(row.status)}</small>
+                <div class="pricing-detail-line"><span>Supplier cost</span><b>${formatMoney(row.oldSupplierCost, row.supplierCurrency)} → ${formatMoney(row.newSupplierCost, row.supplierCurrency)}</b></div>
+                <div class="pricing-detail-line"><span>TH / MM</span><b>${escapeHTML((row.regions || []).map(item => `${item.region}: ${formatMoney(item.publishedPrice, item.currency)}`).join(" · "))}</b></div>
+            </article>
+        `).join("") : '<p class="empty">No staged pricing changes.</p>';
+        if (open) togglePanel(section, "#pricingReviewPanel", true);
+    }
+
+    async function publishWorkspace(section, publishAll = false) {
+        if (!state.apiReady || state.workspace.publishing) return;
+        const rows = workspacePayloadRows({ onlySelected: !publishAll });
+        if (!rows.length) {
+            window.alert("Select at least one staged row to publish.");
+            return;
+        }
+        const confirmed = window.confirm(`${publishAll ? "Publish all" : "Publish selected"} staged pricing changes?\n\nThe server will recalculate each row before saving. Blocked rows will remain staged for retry.`);
+        if (!confirmed) return;
+        state.workspace.publishing = true;
+        setStatus(section, publishAll ? "Publishing all staged pricing..." : "Publishing selected pricing...");
+        renderButtons(section);
+        try {
+            const result = await pricingFetch("/api/admin/pricing-engine/workspace/publish", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ rows, publishAll })
+            }, 30000);
+            setStatus(section, `Pricing publish complete: ${result.summary?.published || 0} published, ${result.summary?.failed || 0} failed.`);
+            const publishedKeys = new Set((result.results || [])
+                .filter(item => item.published)
+                .map(item => `${item.productCode}:${item.packageCode}`));
+            state.workspace.rows = state.workspace.rows.map(row => publishedKeys.has(row.rowId)
+                ? { ...row, oldSupplierCost: row.newSupplierCost, changed: false, selected: false, status: "Published" }
+                : row);
+            state.workspace.previewRows = state.workspace.previewRows.filter(row => !publishedKeys.has(row.rowId));
+            await requestProductionLoad(section, "workspace-publish");
+            renderWorkspaceReview(section, true);
+        } catch (error) {
+            setStatus(section, `Pricing publish failed: ${error.message}`);
+        } finally {
+            state.workspace.publishing = false;
+            renderButtons(section);
+        }
+    }
+
+    function togglePanel(section, selector, force) {
+        const panel = section.querySelector(selector);
+        if (!panel) return;
+        panel.hidden = typeof force === "boolean" ? !force : !panel.hidden;
+    }
+
     function promptNumber(label, currentValue, options = {}) {
         const next = window.prompt(label, String(currentValue ?? 0));
         if (next === null) return null;
@@ -570,6 +1068,24 @@
                 targetCurrency: selectedPackage.currency,
                 source: "admin-production-draft"
             };
+        const appliedPricingRules = [];
+        if (selectedPackage.publishedPriceMode !== "POLICY_DERIVED" && Number.isFinite(Number(selectedPackage.publishedPrice))) {
+            appliedPricingRules.push({
+                code: `${selectedPackage.publishedPriceMode || "LEGACY_COMPATIBILITY_PRICE"}:${selectedPackage.packageCode}:${selectedPackage.region}`,
+                ruleType: "PRICE_OVERRIDE",
+                value: Number(selectedPackage.publishedPrice),
+                priority: 1000,
+                scopeType: "PACKAGE",
+                scopeReference: selectedPackage.packageCode,
+                stopFurtherProcessing: true,
+                configuration: {
+                    source: "catalog_package.price",
+                    publishedPriceMode: selectedPackage.publishedPriceMode,
+                    manualOverrideReason: selectedPackage.manualOverrideReason || "Legacy catalog selling price preserved during pricing-policy migration.",
+                    currency: selectedPackage.currency
+                }
+            });
+        }
 
         return {
             supplierCost,
@@ -592,7 +1108,8 @@
                 packageCode: selectedPackage.packageCode,
                 gameId: selectedProduct.productCode,
                 gameCode: selectedProduct.productCode
-            }
+            },
+            appliedPricingRules
         };
     }
 
@@ -656,10 +1173,18 @@
         const product = getSelectedProduct();
         const pkg = getSelectedPackage();
         const config = getDraftPolicy(pkg.region, pkg.currency).config;
+        const scope = section.querySelector("#pricingScopeSelector")?.value || "REGION";
+        const modeLabel = pkg.publishedPriceMode === "POLICY_DERIVED"
+            ? "Policy derived"
+            : pkg.publishedPriceMode === "MANUAL_OVERRIDE"
+                ? "Manual override"
+                : "Legacy compatibility price";
         setText(section, "#pricingRulesSubtitle", `${product.productName} · ${pkg.packageName}. ${state.dirty ? "Unsaved draft." : "Draft loaded."}`);
         setText(section, "#pricingPreviewProduct", `${product.productName} · ${pkg.region} · ${pkg.currency}`);
         setText(section, "#pricingStorefrontProduct", product.productName);
         setText(section, "#pricingStorefrontPackage", pkg.packageName);
+        setText(section, "#pricingEffectiveSource", scope === "REGION" ? `${pkg.region} policy` : `${scope.charAt(0)}${scope.slice(1).toLowerCase()} view`);
+        setText(section, "#pricingPublishedMode", modeLabel);
         setText(section, "#pricingRuleExchangeValue", pkg.supplierCurrency === pkg.currency ? "1.00" : String(config.exchangeRate || pkg.exchangeRate || 1));
         setText(section, "#pricingRuleSupplierFeeValue", formatPercent(config.supplierFee?.value));
         setText(section, "#pricingRuleGatewayValue", formatPercent(config.gatewayFee?.value));
@@ -687,16 +1212,19 @@
     function renderFlow(section, result) {
         const flow = section.querySelector("#pricingFlow");
         if (!flow) return;
+        const pkg = getSelectedPackage();
+        const overrideApplied = result.preOverridePrice != null;
         const rows = [
-            pricingStep("Supplier Price", formatMoney(result.supplierCost, result.supplierCurrency), formatMoney(result.supplierCost, result.supplierCurrency)),
+            pricingStep("Supplier Cost", formatMoney(result.supplierCost, result.supplierCurrency), formatMoney(result.supplierCost, result.supplierCurrency)),
             pricingStep("Exchange", result.exchangeRateApplied ? `× ${result.exchangeRateApplied}` : "Same currency", formatMoney(result.postExchangeSubtotal, result.currency)),
-            pricingStep("Supplier Fee", formatMoney(result.supplierFeeAmount, result.supplierCurrency), formatMoney(result.breakdown.find(item => item.stageId === "SUPPLIER_FEE")?.outputAmount, result.supplierCurrency)),
-            pricingStep("Business Cost", formatMoney(result.businessCostAmount, result.supplierCurrency), formatMoney(result.costBeforeProfit, result.supplierCurrency)),
+            pricingStep("Exchange Fee", formatMoney(result.supplierFeeAmount, result.currency), formatMoney(result.breakdown.find(item => item.stageId === "SUPPLIER_FEE")?.outputAmount, result.currency)),
+            pricingStep("Business Cost", formatMoney(result.businessCostAmount, result.currency), formatMoney(result.breakdown.find(item => item.stageId === "BUSINESS_COST")?.outputAmount, result.currency)),
             pricingStep("Gateway Fee", formatMoney(result.gatewayFeeAmount, result.currency), formatMoney(result.breakdown.find(item => item.stageId === "GATEWAY_FEE")?.outputAmount, result.currency)),
             pricingStep("Platform Fee", formatMoney(result.platformFeeAmount, result.currency), formatMoney(result.breakdown.find(item => item.stageId === "PLATFORM_FEE")?.outputAmount, result.currency)),
-            pricingStep("Profit", formatMoney(result.profitAmount, result.supplierCurrency), formatMoney(result.preExchangeSubtotal, result.supplierCurrency)),
+            pricingStep("Profit", formatMoney(result.profitAmount, result.currency), formatMoney(result.breakdown.find(item => item.stageId === "PROFIT")?.outputAmount, result.currency)),
             pricingStep("Tax", formatMoney(result.taxAmount, result.currency), formatMoney(result.breakdown.find(item => item.stageId === "TAX")?.outputAmount, result.currency)),
-            pricingStep("Round", formatMoney(result.regularPrice - result.preRoundingPrice, result.currency), formatMoney(result.regularPrice, result.currency)),
+            pricingStep("Recommended Price", formatMoney(result.preOverridePrice ?? result.regularPrice, result.currency), "Policy output"),
+            pricingStep(overrideApplied ? "Published Override" : "Published Price", formatMoney(result.regularPrice, result.currency), overrideApplied ? (pkg.manualOverrideReason || pkg.publishedPriceMode) : "Policy derived"),
             pricingStep("Customer Price", formatMoney(result.regularPrice, result.currency), "Live Preview", "pricing-flow-total")
         ];
         flow.innerHTML = rows.join('<i class="fa-solid fa-arrow-down" aria-hidden="true"></i>');
@@ -883,9 +1411,13 @@
     function renderButtons(section) {
         const save = section.querySelector("#pricingSaveDraftBtn");
         const publish = section.querySelector("#pricingPublishBtn");
+        const workspacePublishSelected = section.querySelector("#pricingWorkspacePublishSelectedBtn");
+        const workspacePublishAll = section.querySelector("#pricingWorkspacePublishAllBtn");
         const role = String(window.AZIEL_ADMIN_AUTH?.state?.admin?.role || localStorage.getItem("adminRole") || "").toUpperCase();
         const canManage = window.AZIEL_ADMIN_AUTH?.hasPermission?.("CATALOG_MANAGE") !== false;
         const canPersist = canPersistPricing();
+        const workspaceBusy = state.workspace.previewing || state.workspace.publishing;
+        const workspaceReady = state.apiReady && state.workspace.rows.length > 0;
         if (save) {
             save.disabled = !canManage || !canPersist;
             save.title = canManage
@@ -898,6 +1430,13 @@
                 ? (canPersist ? "Publish production pricing" : "Production pricing must load before publishing")
                 : "Only OWNER can publish production pricing";
         }
+        [workspacePublishSelected, workspacePublishAll].forEach(button => {
+            if (!button) return;
+            button.disabled = role !== "OWNER" || !canManage || !workspaceReady || workspaceBusy;
+            button.title = role === "OWNER"
+                ? (workspaceReady ? "Publish staged daily pricing changes" : "Load production pricing before publishing")
+                : "Only OWNER can publish pricing workspace changes";
+        });
     }
 
     function renderStatus(section) {
@@ -922,6 +1461,9 @@
         selectProduct: productId => selectProduct(document.getElementById("section-pricing-engine"), productId),
         saveDraft: () => saveDraft(document.getElementById("section-pricing-engine")),
         publishDraft: () => publishDraft(document.getElementById("section-pricing-engine")),
+        previewWorkspace: () => requestWorkspacePreview(document.getElementById("section-pricing-engine")),
+        publishWorkspace: publishAll => publishWorkspace(document.getElementById("section-pricing-engine"), publishAll === true),
+        parseWorkspacePaste: () => parseWorkspacePaste(document.getElementById("section-pricing-engine")),
         hydrateFallbackProductsFromDom: () => hydrateFallbackProductsFromDom(document.getElementById("section-pricing-engine")),
         canPersistPricing
     };

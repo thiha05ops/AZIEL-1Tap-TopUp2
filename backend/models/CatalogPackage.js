@@ -11,6 +11,16 @@ const regionalPriceSchema = new mongoose.Schema(
             enum: ["MMK", "THB"],
             required: true
         },
+        publishedPriceMode: {
+            type: String,
+            enum: ["POLICY_DERIVED", "MANUAL_OVERRIDE", "LEGACY_COMPATIBILITY_PRICE"],
+            default: "LEGACY_COMPATIBILITY_PRICE"
+        },
+        manualOverrideReason: {
+            type: String,
+            trim: true,
+            default: ""
+        },
         enabled: {
             type: Boolean,
             default: true

@@ -48,14 +48,18 @@ function verifyMarkup() {
 }
 
 function verifyController() {
+    const source = read("frontend/js/admin-pricing-engine.js");
     includes("frontend/js/admin-pricing-engine.js", "window.AZIEL_COMMERCE_PRICING_ENGINE", "Pricing UI must call the shared browser engine namespace.");
     includes("frontend/js/admin-pricing-engine.js", "calculateBasePrice", "Pricing UI must call calculateBasePrice.");
     includes("frontend/js/admin-pricing-engine.js", "result.breakdown", "Pricing UI must render engine breakdown output.");
     includes("frontend/js/admin-pricing-engine.js", "stageId", "Pricing breakdown must render stable stageId values.");
     includes("frontend/js/admin-pricing-engine.js", "simulationState", "Pricing UI must maintain local simulation state.");
     includes("frontend/js/admin-pricing-engine.js", "data-pricing-edit", "Edit buttons must update local simulation state.");
-    notIncludes("frontend/js/admin-pricing-engine.js", "adminFetch(", "Pricing simulation must not call Admin APIs.");
-    notIncludes("frontend/js/admin-pricing-engine.js", "fetch(", "Pricing simulation must not call browser fetch.");
+
+    const calculatePreviewBody = source.match(/function calculatePreview\(\) \{([\s\S]*?)\n    \}/)?.[1] || "";
+    assert(calculatePreviewBody.includes("engine.calculateBasePrice"), "Pricing preview must calculate through the shared engine.");
+    assert(!calculatePreviewBody.includes("adminFetch("), "Pricing preview calculation must not call Admin APIs.");
+    assert(!calculatePreviewBody.includes("fetch("), "Pricing preview calculation must not call browser fetch.");
 }
 
 function verifyEngineParity() {

@@ -896,6 +896,8 @@ function populateRegionalPricingControls(modal, region, draft, price = {}, defau
     setValue("SupplierVersion", supplier.supplierVersion ?? price?.supplierVersion ?? "");
     setValue("SupplierCostTimestamp", supplier.supplierCostTimestamp ?? formatDateInputValue(price?.supplierCostTimestamp));
     setValue("PricingNote", supplier.pricingNote ?? price?.pricingNote ?? "");
+    setValue("PublishedPriceMode", supplier.publishedPriceMode ?? price?.publishedPriceMode ?? "LEGACY_COMPATIBILITY_PRICE");
+    setValue("ManualOverrideReason", supplier.manualOverrideReason ?? price?.manualOverrideReason ?? "");
 }
 
 function readRegionalPricingDraft(modal, region) {
@@ -906,7 +908,9 @@ function readRegionalPricingDraft(modal, region) {
         supplierName: read("SupplierName"),
         supplierVersion: read("SupplierVersion"),
         supplierCostTimestamp: read("SupplierCostTimestamp"),
-        pricingNote: read("PricingNote")
+        pricingNote: read("PricingNote"),
+        publishedPriceMode: read("PublishedPriceMode"),
+        manualOverrideReason: read("ManualOverrideReason")
     };
 }
 
@@ -919,7 +923,9 @@ function buildPreviewPricePayload(draft, region) {
         supplierName: draft.supplier?.[region]?.supplierName,
         supplierVersion: draft.supplier?.[region]?.supplierVersion,
         supplierCostTimestamp: draft.supplier?.[region]?.supplierCostTimestamp,
-        pricingNote: draft.supplier?.[region]?.pricingNote
+        pricingNote: draft.supplier?.[region]?.pricingNote,
+        publishedPriceMode: draft.supplier?.[region]?.publishedPriceMode,
+        manualOverrideReason: draft.supplier?.[region]?.manualOverrideReason
     };
 }
 
@@ -934,6 +940,8 @@ function applySupplierPatchChanges(pkg, draft, prices, changes, region) {
     const supplierVersionChanged = comparable(supplier.supplierVersion) !== comparable(existing.supplierVersion || "");
     const timestampChanged = comparable(supplier.supplierCostTimestamp) !== comparable(formatDateInputValue(existing.supplierCostTimestamp));
     const noteChanged = comparable(supplier.pricingNote) !== comparable(existing.pricingNote || "");
+    const modeChanged = comparable(supplier.publishedPriceMode) !== comparable(existing.publishedPriceMode || "LEGACY_COMPATIBILITY_PRICE");
+    const reasonChanged = comparable(supplier.manualOverrideReason) !== comparable(existing.manualOverrideReason || "");
 
     if (supplierCostChanged) patch.supplierCost = supplier.supplierCost;
     if (supplierCurrencyChanged) patch.supplierCurrency = supplier.supplierCurrency;
@@ -941,10 +949,12 @@ function applySupplierPatchChanges(pkg, draft, prices, changes, region) {
     if (supplierVersionChanged) patch.supplierVersion = supplier.supplierVersion;
     if (timestampChanged) patch.supplierCostTimestamp = supplier.supplierCostTimestamp;
     if (noteChanged) patch.pricingNote = supplier.pricingNote;
+    if (modeChanged) patch.publishedPriceMode = supplier.publishedPriceMode;
+    if (reasonChanged) patch.manualOverrideReason = supplier.manualOverrideReason;
 
     if (Object.keys(patch).length) {
         prices[region] = { ...(prices[region] || {}), ...patch };
-        changes.push(`${region}: ${adminT("supplier_cost", "Supplier Cost")} / ${adminT("pricing_note", "Pricing Note")}`);
+        changes.push(`${region}: ${adminT("supplier_cost", "Supplier Cost")} / ${adminT("published_price_mode", "Published Price Mode")}`);
     }
 }
 
@@ -967,7 +977,10 @@ function renderPricingPreviewResult(region, preview) {
             <dl class="catalog-pricing-metrics">
                 <div><dt>${adminT("supplier_cost", "Supplier Cost")}</dt><dd>${preview.supplierCostConfigured ? escapeHtml(formatOptionalMoney(preview.supplierCost, preview.supplierCurrency)) : adminT("supplier_cost_not_configured", "Supplier cost not configured")}</dd></div>
                 <div><dt>${adminT("exchange_rate", "Exchange Rate")}</dt><dd>${preview.conversionRequired ? `${escapeHtml(preview.exchangeRatePair)} @ ${escapeHtml(preview.exchangeRate)}` : adminT("no_conversion_required", "No conversion required")}</dd></div>
+                <div><dt>${adminT("recommended_price", "Recommended Price")}</dt><dd>${escapeHtml(formatOptionalMoney(preview.recommendedSellingPrice, preview.currency))}</dd></div>
+                <div><dt>${adminT("published_price", "Published Price")}</dt><dd>${escapeHtml(formatOptionalMoney(preview.baseSellingPrice, preview.currency))}</dd></div>
                 <div><dt>${adminT("customer_payable", "Customer Payable")}</dt><dd>${escapeHtml(formatOptionalMoney(preview.finalPayableAmount, preview.currency))}</dd></div>
+                <div><dt>${adminT("price_difference", "Price Difference")}</dt><dd>${escapeHtml(formatOptionalMoney(preview.publishedPriceDifference || 0, preview.currency))}</dd></div>
                 <div><dt>${adminT("discount", "Discount")}</dt><dd>${escapeHtml(formatOptionalMoney(preview.discountAmount || 0, preview.currency))}</dd></div>
                 <div><dt>${adminT("net_profit", "Net Profit")}</dt><dd>${preview.netProfit == null ? "-" : escapeHtml(formatOptionalMoney(preview.netProfit, preview.currency))}</dd></div>
                 <div><dt>${adminT("margin", "Margin")}</dt><dd>${preview.marginPercent == null ? "-" : `${escapeHtml(preview.marginPercent)}%`}</dd></div>
@@ -2003,6 +2016,11 @@ function validatePackageEditDraft(pkg, draft) {
                 return false;
             }
         }
+
+        if (draft.supplier?.[region]?.publishedPriceMode === "MANUAL_OVERRIDE" && !draft.supplier?.[region]?.manualOverrideReason) {
+            showAdminToast?.(adminT("manual_override_reason_required", "Manual override reason is required."), "error");
+            return false;
+        }
     }
 
     return true;
@@ -2112,6 +2130,14 @@ function renderRegionalPricingEditor(region, label, currency) {
             <div class="catalog-regional-pricing-grid">
                 <label>${priceLabel}<input id="catalogEdit${region}" data-pricing-preview-input type="number" step="0.01" min="0"></label>
                 <label>${adminT("selling_currency", "Selling Currency")}<input type="text" value="${escapeHtml(currency)}" readonly></label>
+                <label>${adminT("published_price_mode", "Published Price Mode")}
+                    <select id="catalogEdit${region}PublishedPriceMode" data-pricing-preview-input>
+                        <option value="LEGACY_COMPATIBILITY_PRICE">${adminT("legacy_compatibility_price", "Legacy compatibility price")}</option>
+                        <option value="MANUAL_OVERRIDE">${adminT("manual_override", "Manual override")}</option>
+                        <option value="POLICY_DERIVED">${adminT("policy_derived", "Policy derived")}</option>
+                    </select>
+                </label>
+                <label>${adminT("manual_override_reason", "Override Reason")}<input id="catalogEdit${region}ManualOverrideReason" data-pricing-preview-input type="text" maxlength="240" placeholder="${adminT("required_for_manual_override", "Required for manual override")}"></label>
                 <label>${adminT("supplier_cost", "Supplier Cost")}<input id="catalogEdit${region}SupplierCost" data-pricing-preview-input type="number" step="0.01" min="0" placeholder="${adminT("supplier_cost_not_configured", "Supplier cost not configured")}"></label>
                 <label>${adminT("supplier_currency", "Supplier Currency")}
                     <select id="catalogEdit${region}SupplierCurrency" data-pricing-preview-input>
@@ -2484,10 +2510,16 @@ function renderPackageBusinessPrice(price, region) {
         ? adminT("supplier_cost_not_configured", "Supplier cost not configured")
         : formatOptionalMoney(price.supplierCost, price.supplierCurrency || price.currency);
     const updated = price.supplierCostTimestamp ? new Date(price.supplierCostTimestamp).toLocaleDateString() : "";
+    const mode = String(price.publishedPriceMode || "LEGACY_COMPATIBILITY_PRICE").toUpperCase();
+    const modeLabel = mode === "POLICY_DERIVED"
+        ? adminT("policy_derived", "Policy derived")
+        : mode === "MANUAL_OVERRIDE"
+            ? adminT("manual_override", "Manual override")
+            : adminT("legacy_compatibility_price", "Legacy compatibility price");
     return `
         <span class="catalog-business-price" data-region="${escapeHtml(region)}">
             <strong>${escapeHtml(formatRegionalPrice(price))}</strong>
-            <small>${escapeHtml(supplier)}</small>
+            <small>${escapeHtml(modeLabel)} · ${escapeHtml(supplier)}</small>
             ${renderPricingStatusChip(packageStaticPricingStatus(price))}
             ${updated ? `<em>${escapeHtml(updated)}</em>` : ""}
         </span>

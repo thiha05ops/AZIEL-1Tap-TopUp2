@@ -557,12 +557,17 @@
                     <header class="catalog-workspace-head pricing-engine-head">
                         <div class="catalog-workspace-title">
                             <span class="admin-status-pill is-purple">Commerce</span>
-                            <h3 data-admin-i18n="pricing_engine">Pricing Engine</h3>
-                            <p data-admin-i18n="pricing_engine_sub">Rule-based pricing and business policy management.</p>
+                            <h3 data-admin-i18n="pricing_engine">Pricing Workspace</h3>
+                            <p data-admin-i18n="pricing_engine_sub">Daily supplier-cost operations, margin review, and controlled publishing.</p>
                         </div>
                         <div class="catalog-workspace-actions">
+                            <button id="pricingPasteBtn" class="admin-secondary-btn" type="button">Import / Paste</button>
+                            <button id="pricingReviewBtn" class="admin-secondary-btn" type="button">Review Changes</button>
+                            <button id="pricingWorkspacePublishSelectedBtn" class="admin-primary-btn" type="button">Publish Selected</button>
+                            <button id="pricingWorkspacePublishAllBtn" class="admin-secondary-btn" type="button">Publish All</button>
                             <button id="pricingSaveDraftBtn" class="admin-secondary-btn" type="button">Save Draft</button>
                             <button id="pricingPublishBtn" class="admin-primary-btn" type="button">Publish</button>
+                            <span class="admin-status-pill is-warning">Not Saved</span>
                             <button id="pricingProductionStatus" class="admin-secondary-btn" type="button" disabled>Production Active</button>
                         </div>
                     </header>
@@ -590,12 +595,150 @@
                         </article>
                     </div>
 
+                    <div class="pricing-policy-scope-strip" aria-label="Pricing policy scope">
+                        <label>
+                            <span>Policy Scope</span>
+                            <select id="pricingScopeSelector">
+                                <option value="GLOBAL">Global</option>
+                                <option value="REGION" selected>Region</option>
+                                <option value="PRODUCT">Product</option>
+                                <option value="PACKAGE">Package</option>
+                            </select>
+                        </label>
+                        <div>
+                            <span>Effective source</span>
+                            <strong id="pricingEffectiveSource">Region policy</strong>
+                        </div>
+                        <div>
+                            <span>Published price mode</span>
+                            <strong id="pricingPublishedMode">Legacy compatibility price</strong>
+                        </div>
+                    </div>
+
+                    <div class="pricing-workspace-toolbar" aria-label="Daily pricing workspace controls">
+                        <label>
+                            <span>Supplier</span>
+                            <input id="pricingWorkspaceSupplier" type="text" value="Primary supplier" placeholder="Supplier name">
+                        </label>
+                        <label>
+                            <span>Product</span>
+                            <select id="pricingWorkspaceProduct">
+                                <option value="ALL">All products</option>
+                            </select>
+                        </label>
+                        <label>
+                            <span>Region View</span>
+                            <select id="pricingWorkspaceRegion">
+                                <option value="ALL">All</option>
+                                <option value="TH">Thailand</option>
+                                <option value="MM">Myanmar</option>
+                            </select>
+                        </label>
+                        <label>
+                            <span>Supplier Currency</span>
+                            <select id="pricingWorkspaceCurrency">
+                                <option value="THB">THB</option>
+                                <option value="MMK">MMK</option>
+                            </select>
+                        </label>
+                        <label>
+                            <span>Supplier Version</span>
+                            <input id="pricingWorkspaceVersion" type="text" placeholder="2026-07-29">
+                        </label>
+                        <label>
+                            <span>Filter</span>
+                            <select id="pricingWorkspaceFilter">
+                                <option value="ALL">All</option>
+                                <option value="CHANGED">Changed</option>
+                                <option value="READY">Ready</option>
+                                <option value="LOW_MARGIN">Low margin</option>
+                                <option value="NEGATIVE_MARGIN">Negative margin</option>
+                                <option value="SUPPLIER_COST_MISSING">Supplier cost missing</option>
+                                <option value="EXCHANGE_RATE_MISSING">Exchange rate missing</option>
+                                <option value="MANUAL_OVERRIDE">Manual override</option>
+                                <option value="LEGACY_COMPATIBILITY_PRICE">Legacy compatibility price</option>
+                                <option value="PROMO_RISK">Promo risk</option>
+                                <option value="BLOCKED">Blocked</option>
+                            </select>
+                        </label>
+                        <span id="pricingWorkspaceUpdated" class="admin-status-pill">Last updated: Not previewed</span>
+                    </div>
+
+                    <div class="pricing-exchange-strip" aria-label="Exchange operations">
+                        <div>
+                            <span>Thailand</span>
+                            <strong>Supplier THB → Selling THB</strong>
+                            <small>No conversion required</small>
+                        </div>
+                        <div>
+                            <span>Myanmar</span>
+                            <strong id="pricingWorkspaceMmkRate">Supplier THB → Selling MMK</strong>
+                            <small id="pricingWorkspaceMmkRateMeta">Current production rate and rounding apply server-side</small>
+                        </div>
+                    </div>
+
+                    <div class="pricing-workspace-summary" aria-label="Daily pricing workspace summary">
+                        <article><span>Packages loaded</span><strong id="pricingWorkspacePackagesLoaded">0</strong></article>
+                        <article><span>Changed</span><strong id="pricingWorkspaceChanged">0</strong></article>
+                        <article><span>Ready</span><strong id="pricingWorkspaceReady">0</strong></article>
+                        <article><span>Low margin</span><strong id="pricingWorkspaceLowMargin">0</strong></article>
+                        <article><span>Negative margin</span><strong id="pricingWorkspaceNegativeMargin">0</strong></article>
+                        <article><span>Missing cost</span><strong id="pricingWorkspaceMissingCost">0</strong></article>
+                        <article><span>Manual overrides</span><strong id="pricingWorkspaceManualOverrides">0</strong></article>
+                        <article><span>Promo risk</span><strong id="pricingWorkspacePromoRisk">0</strong></article>
+                    </div>
+
+                    <section class="pricing-daily-workspace" aria-label="Daily pricing operations">
+                        <div class="pricing-grid-wrap">
+                            <div id="pricingWorkspaceGrid" class="pricing-workspace-grid" aria-live="polite">
+                                <p class="empty">Load production pricing to begin daily supplier-cost review.</p>
+                            </div>
+                        </div>
+                        <aside class="pricing-workspace-detail" aria-label="Pricing calculation detail">
+                            <div class="panel-head">
+                                <div>
+                                    <h3>Calculation Detail</h3>
+                                    <span id="pricingWorkspaceDetailTitle">Select a row to inspect before/after pricing.</span>
+                                </div>
+                            </div>
+                            <div id="pricingWorkspaceDetail" class="pricing-workspace-detail-body">
+                                <p class="empty">No staged package selected.</p>
+                            </div>
+                        </aside>
+                    </section>
+
+                    <section id="pricingPastePanel" class="pricing-paste-panel" hidden aria-label="Paste supplier price data">
+                        <div class="panel-head">
+                            <div>
+                                <h3>Paste Supplier Prices</h3>
+                                <span>Use package code + price, package name + price, or one price per line after confirming the loaded order.</span>
+                            </div>
+                            <button id="pricingPasteCloseBtn" class="admin-secondary-btn" type="button">Close</button>
+                        </div>
+                        <textarea id="pricingPasteInput" rows="8" placeholder="MLBB_7740 1120&#10;PUBG_8100_UC 870"></textarea>
+                        <div class="catalog-workspace-actions">
+                            <button id="pricingParsePasteBtn" class="admin-primary-btn" type="button">Parse Paste</button>
+                            <span id="pricingPasteResult" class="admin-status-pill">No pasted rows yet</span>
+                        </div>
+                    </section>
+
+                    <section id="pricingReviewPanel" class="pricing-review-panel" hidden aria-label="Review staged pricing changes">
+                        <div class="panel-head">
+                            <div>
+                                <h3>Review Changes</h3>
+                                <span id="pricingReviewSummary">No staged changes.</span>
+                            </div>
+                            <button id="pricingReviewCloseBtn" class="admin-secondary-btn" type="button">Close</button>
+                        </div>
+                        <div id="pricingReviewList" class="pricing-review-list"></div>
+                    </section>
+
                     <div class="pricing-engine-workspace">
                         <aside class="panel pricing-products-panel" aria-label="Pricing Engine products">
                             <div class="panel-head">
                                 <div>
-                                    <h3>Products</h3>
-                                    <span>Select a product to preview production pricing rules.</span>
+                                    <h3>Business Rules</h3>
+                                    <span>Low-frequency policy controls and focused package preview.</span>
                                 </div>
                             </div>
                             <label class="website-runtime-search pricing-product-search">

@@ -13,6 +13,10 @@ const {
     runPricingEngineDiagnostics,
     saveDraftPricing
 } = require("../services/commerce/adminPricingEngineService");
+const {
+    batchPreviewDailyPricing,
+    publishDailyPricing
+} = require("../services/commerce/adminPricingControlCenterService");
 
 const PRICING_ENGINE_REQUEST_TIMEOUT_MS = 8000;
 
@@ -285,6 +289,46 @@ router.post("/admin/pricing-engine/publish", adminMiddleware, requireAdminPermis
             },
             state: result.state
         });
+    } catch (error) {
+        return sendPricingError(req, res, error);
+    }
+});
+
+router.post("/admin/pricing-engine/workspace/preview", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_READ), async (req, res) => {
+    try {
+        const result = await batchPreviewDailyPricing({
+            rows: req.body?.rows || [],
+            couponCode: req.body?.couponCode || "",
+            actor: req.admin || null
+        });
+        return res.json(result);
+    } catch (error) {
+        return sendPricingError(req, res, error);
+    }
+});
+
+router.post("/admin/pricing-engine/workspace/publish", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_MANAGE), requireOwner, async (req, res) => {
+    try {
+        const result = await publishDailyPricing({
+            rows: req.body?.rows || [],
+            publishAll: req.body?.publishAll === true,
+            actor: req.admin?.username || "admin",
+            admin: req.admin || null
+        });
+        await writeAdminAudit({
+            actor: req.admin,
+            req,
+            action: ADMIN_AUDIT_ACTIONS.CATALOG_PACKAGE_UPDATED,
+            resourceType: "CatalogPackage",
+            resourceId: "daily-pricing-workspace",
+            metadata: {
+                requested: result.summary.requested,
+                published: result.summary.published,
+                failed: result.summary.failed,
+                skipped: result.summary.skipped
+            }
+        }).catch(error => console.log("Admin audit failed:", error.message));
+        return res.json(result);
     } catch (error) {
         return sendPricingError(req, res, error);
     }

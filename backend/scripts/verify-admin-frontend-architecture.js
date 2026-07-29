@@ -275,13 +275,15 @@ function verifyModuleIntegrationAndRegressions() {
     assert(html.includes('id="section-pricing-engine"'), "Pricing Engine section must exist.");
     assert(html.indexOf('data-section="catalog"') < html.indexOf('data-section="pricing-engine"'), "Pricing Engine should sit after Catalog in Commerce navigation.");
     assert(html.indexOf('data-section="pricing-engine"') < html.indexOf('data-section="promos"'), "Pricing Engine should sit before Promo Codes in Commerce navigation.");
-    assert(html.includes("Rule-based pricing and business policy management."), "Pricing Engine approved subtitle must render.");
+    assert(html.includes("Daily supplier-cost operations, margin review, and controlled publishing."), "Pricing Workspace operations subtitle must render.");
+    assert(html.includes("Pricing Workspace") && html.includes("Business Rules"), "Pricing Engine module must separate daily operations from low-frequency business rules.");
     assert(html.includes("Exchange Rate") && html.includes("Default Profit") && html.includes("Gateway Fee") && html.includes("Affected Packages"), "Pricing Engine summary cards must render.");
     assert(html.includes("Mobile Legends") && html.includes("PUBG Mobile") && html.includes("Free Fire") && html.includes("Honor of Kings") && html.includes("Genshin Impact"), "Pricing Engine product selector must preserve existing rows before live data loads.");
     assert(html.includes("id=\"pricingFlow\"") && html.includes("id=\"pricingStorefrontPrice\""), "Pricing Engine production preview render targets must exist.");
     assert(html.includes("/js/commerce/pricingCalculationEngine.js") && html.indexOf("/js/commerce/pricingCalculationEngine.js") < html.indexOf("/js/admin-pricing-engine.js"), "Pricing Engine must load the browser calculation engine before the UI controller.");
     assert(adminCss.includes(".pricing-engine-workspace") && adminCss.includes("grid-template-columns: minmax(250px, 320px) minmax(360px, 1fr) minmax(280px, 360px);"), "Pricing Engine must use the approved three-column desktop layout.");
     assert(html.includes("pricingSaveDraftBtn") && html.includes("pricingPublishBtn"), "Pricing Engine production controls must expose Save Draft and Publish.");
+    assert(html.includes("pricingWorkspaceGrid") && html.includes("pricingWorkspacePublishSelectedBtn"), "Pricing Workspace daily grid and publish controls must render.");
     assert(!html.includes("Simulation Only"), "Pricing Engine must not remain in Simulation Only mode.");
     assert(pricingEngine.includes("initPricingEngineUi"), "Pricing Engine UI controller must initialize production pricing selection.");
     assert(pricingEngine.includes("calculateAndRenderPreview"), "Pricing Engine selection must update visual preview labels.");

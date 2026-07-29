@@ -29,6 +29,8 @@ function verifyModel() {
     includes("backend/models/CatalogPackage.js", "supplierVersion", "CatalogPackage keeps supplierVersion.");
     includes("backend/models/CatalogPackage.js", "supplierCostTimestamp", "CatalogPackage keeps supplierCostTimestamp.");
     includes("backend/models/CatalogPackage.js", "pricingNote", "CatalogPackage keeps pricingNote.");
+    includes("backend/models/CatalogPackage.js", "publishedPriceMode", "CatalogPackage keeps published price mode.");
+    includes("backend/models/CatalogPackage.js", "manualOverrideReason", "CatalogPackage keeps manual override reason.");
     includes("backend/models/CatalogPackage.js", "supplierCostHistory", "CatalogPackage keeps immutable supplier cost history.");
 }
 
@@ -48,6 +50,7 @@ function verifyAdminPatchAndHistory() {
     includes("backend/services/catalogAdminService.js", "MAX_SUPPLIER_COST_HISTORY", "Supplier cost history must have bounded retention.");
     includes("backend/services/catalogAdminService.js", ".concat(supplierCostHistoryEntries)", "Supplier cost history must be appended.");
     includes("backend/services/catalogAdminService.js", ".slice(-MAX_SUPPLIER_COST_HISTORY)", "Supplier cost history must retain the newest bounded entries.");
+    includes("backend/services/catalogAdminService.js", "Manual published-price override requires a reason.", "Manual override must require reason.");
 }
 
 function verifyServerAuthoritativePreview() {
@@ -56,6 +59,8 @@ function verifyServerAuthoritativePreview() {
     includes("backend/services/commerce/adminPricingControlCenterService.js", "loadCommercePromotionContext", "Coupon preview must use existing promotion bridge.");
     includes("backend/services/commerce/adminPricingControlCenterService.js", "UNKNOWN_SUPPLIER_COST", "Missing supplier cost status must exist.");
     includes("backend/services/commerce/adminPricingControlCenterService.js", "EXCHANGE_RATE_MISSING", "Missing exchange status must exist.");
+    includes("backend/services/commerce/productionPricingContextService.js", "manualPublishedPriceRule", "Existing catalog prices must become explicit published-price overrides.");
+    includes("backend/services/commerce/productionPricingContextService.js", "POLICY_DERIVED", "Policy-derived packages must be able to remove overrides.");
     includes("backend/services/commerce/adminPricingControlCenterService.js", "bulkBackfillSupplierCosts", "Bulk backfill service must exist.");
 }
 
@@ -70,6 +75,7 @@ function verifyFrontend() {
     const source = read("frontend/js/admin-catalog.js");
     assert(source.includes("catalogEdit${region}SupplierCost") && source.includes("renderRegionalPricingEditor(\"MM\"") && source.includes("renderRegionalPricingEditor(\"TH\""), "Package editor must expose supplier-cost inputs for both regions.");
     assert(source.includes("catalogEditCouponPreview"), "Package editor must expose coupon impact preview input.");
+    assert(source.includes("catalogEdit${region}PublishedPriceMode") && source.includes("catalogEdit${region}ManualOverrideReason"), "Package editor must expose published-price mode and manual override reason.");
     assert(source.includes("scheduleCatalogPricingPreview"), "Frontend must debounce server-authoritative pricing preview.");
     assert(source.includes("/pricing-preview"), "Frontend must call pricing preview endpoint.");
     assert(!source.includes("calculateBasePrice("), "Frontend must not invoke pricing formulas directly.");

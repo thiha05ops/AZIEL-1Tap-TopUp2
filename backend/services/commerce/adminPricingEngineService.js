@@ -178,6 +178,7 @@ async function draftPolicy(region, currency) {
 
 function publicPolicy(policy, source, fallbackConfig = null) {
     const config = policy ? configFromPolicy(policy) : (fallbackConfig || neutralPolicyConfig());
+    const inheritedSource = policy ? "Region" : "Global";
     return {
         id: policy?._id ? String(policy._id) : "",
         source,
@@ -188,6 +189,9 @@ function publicPolicy(policy, source, fallbackConfig = null) {
         updatedAt: policy?.updatedAt || null,
         createdAt: policy?.createdAt || null,
         updatedBy: policy?.updatedBy || "",
+        scope: policy ? "REGION" : "GLOBAL",
+        hierarchy: ["Global", "Region", "Product", "Package"],
+        valueSources: Object.fromEntries(Object.keys(config).map(key => [key, inheritedSource])),
         config
     };
 }
@@ -248,6 +252,10 @@ function productsFromPackages(packages = []) {
                 supplierCostTimestamp: supplierCost.costTimestamp,
                 supplierCostConfigured: supplierCost.configured === true,
                 supplierCostSource: supplierCost.source,
+                publishedPrice: number(price.amount),
+                publishedPriceMode: upper(price.publishedPriceMode || "LEGACY_COMPATIBILITY_PRICE"),
+                manualOverrideReason: text(price.manualOverrideReason),
+                updatedAt: pkg.updatedAt || null,
                 exchangeRate: 1
             });
             return null;
