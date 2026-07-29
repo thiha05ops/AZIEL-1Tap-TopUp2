@@ -65,6 +65,9 @@ assertIncludes(html, `id="adminNavSearch"`, "Admin nav search control must exist
 assertIncludes(html, `id="adminSidebarOverlay"`, "Mobile drawer backdrop must exist.");
 assertIncludes(html, `aria-controls="adminSidebar"`, "Topbar menu must target the sidebar.");
 assertIncludes(html, `id="adminSectionPill"`, "Topbar active group context pill must exist.");
+assertIncludes(html, `admin-sidebar-header`, "Sidebar must expose an explicit header region.");
+assertIncludes(html, `admin-sidebar-navigation`, "Sidebar must expose an explicit navigation region.");
+assertIncludes(html, `admin-sidebar-footer`, "Sidebar must expose an explicit footer region.");
 
 assertIncludes(app, "ADMIN_SIDEBAR_COLLAPSED_KEY", "Collapsed state storage key must exist.");
 assertIncludes(app, "localStorage.setItem(ADMIN_SIDEBAR_COLLAPSED_KEY", "Collapsed state must persist.");
@@ -79,6 +82,13 @@ assertIncludes(app, "window.AZIEL_ADMIN_LAYOUT?.closeDrawer", "Route selection m
 
 assertIncludes(css, "--admin-sidebar-width", "Sidebar width token must exist.");
 assertIncludes(css, "--admin-sidebar-collapsed-width", "Collapsed sidebar width token must exist.");
+assertIncludes(css, "grid-template-rows: minmax(76px, auto) minmax(0, 1fr) auto", "Expanded sidebar must reserve header, navigation, and footer rows.");
+assertIncludes(css, ".admin-sidebar-navigation", "Sidebar navigation region styles must exist.");
+assertIncludes(css, "grid-template-rows: auto minmax(0, 1fr)", "Navigation region must keep search separate from the scrollable menu.");
+assertIncludes(css, ".admin-body .admin-menu", "Navigation menu must own its scroll lane.");
+assertIncludes(css, "overflow-y: auto", "Navigation menu must scroll independently instead of entering the header area.");
+assertIncludes(css, "grid-template-rows: minmax(88px, auto) minmax(0, 1fr) auto", "Collapsed sidebar must reserve enough header height for logo and collapse button.");
+assertIncludes(css, "flex-wrap: nowrap", "Collapsed sidebar header must not wrap over the navigation hit area.");
 assertIncludes(css, ".admin-body.admin-sidebar-collapsed .admin-app", "Collapsed grid rule must exist.");
 assertIncludes(css, ".admin-body.admin-sidebar-collapsed .admin-nav::after", "Collapsed tooltip rule must exist.");
 assertIncludes(css, ".admin-nav-search", "Navigation search styling must exist.");

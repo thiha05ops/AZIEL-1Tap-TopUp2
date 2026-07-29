@@ -106,6 +106,9 @@ body.theme-light {
   border-right-color: var(--admin-border);
   padding: 18px 12px;
   gap: 14px;
+  display: grid;
+  grid-template-rows: minmax(76px, auto) minmax(0, 1fr) auto;
+  overflow: hidden;
   overflow-x: visible;
   scrollbar-width: thin;
   scrollbar-color: rgba(148, 163, 184, .22) transparent;
@@ -118,8 +121,11 @@ body.theme-light.admin-body .admin-sidebar {
 
 .admin-body .admin-sidebar-head {
   align-items: center;
-  min-height: 50px;
+  min-height: 76px;
   gap: 8px;
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 2;
 }
 
 .admin-body .admin-logo {
@@ -184,6 +190,8 @@ body.theme-light.admin-body .admin-sidebar {
 }
 
 .admin-sidebar-collapse {
+  position: relative;
+  z-index: 3;
   display: grid;
   place-items: center;
   width: 34px;
@@ -200,6 +208,42 @@ body.theme-light.admin-body .admin-sidebar {
   color: var(--admin-text);
   border-color: var(--admin-border-strong);
   background: rgba(139, 92, 246, .12);
+}
+
+.admin-sidebar-navigation {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  overflow: hidden;
+}
+
+.admin-body .admin-menu {
+  min-height: 0;
+  overflow-x: visible;
+  overflow-y: auto;
+  padding-right: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, .22) transparent;
+}
+
+.admin-body .admin-menu::-webkit-scrollbar {
+  width: 6px;
+}
+
+.admin-body .admin-menu::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(148, 163, 184, .22);
+}
+
+.admin-sidebar-footer {
+  min-height: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.admin-sidebar-footer .admin-user-box {
+  margin-top: 0;
 }
 
 .admin-nav-search {
@@ -333,7 +377,9 @@ body.theme-light.admin-body .admin-nav-search {
 
 .admin-body.admin-sidebar-collapsed .admin-sidebar {
   padding-inline: 10px;
-  overflow-y: auto;
+  grid-template-rows: minmax(88px, auto) minmax(0, 1fr) auto;
+  overflow-x: visible;
+  overflow-y: hidden;
 }
 
 .admin-body.admin-sidebar-collapsed .admin-logo {
@@ -351,7 +397,10 @@ body.theme-light.admin-body .admin-nav-search {
 
 .admin-body.admin-sidebar-collapsed .admin-sidebar-head {
   justify-content: center;
-  flex-wrap: wrap;
+  align-content: start;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  min-height: 88px;
 }
 
 .admin-body.admin-sidebar-collapsed .admin-sidebar-collapse {
@@ -6162,6 +6211,7 @@ button.media-asset-card {
   .admin-body.admin-sidebar-collapsed .admin-sidebar {
     width: min(86vw, 320px);
     padding: calc(18px + env(safe-area-inset-top)) 14px calc(18px + env(safe-area-inset-bottom));
+    grid-template-rows: minmax(76px, auto) minmax(0, 1fr) auto;
   }
 
   .admin-body.admin-sidebar-collapsed .admin-logo-copy,
@@ -6187,6 +6237,8 @@ button.media-asset-card {
   .admin-body.admin-sidebar-collapsed .admin-sidebar-head {
     justify-content: space-between;
     flex-wrap: nowrap;
+    flex-direction: row;
+    min-height: 76px;
   }
 
   .admin-body.admin-sidebar-collapsed .admin-nav {

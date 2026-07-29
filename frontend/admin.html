@@ -37,7 +37,7 @@
 
         <aside id="adminSidebar" class="admin-sidebar" aria-label="AZIEL OS navigation">
 
-            <div class="admin-sidebar-head">
+            <div class="admin-sidebar-head admin-sidebar-header">
                 <div class="admin-logo" data-aziel-os-brand="sidebar">
                     <img class="admin-logo-fallback" src="/assets/logo/aziel-icon.webp" alt="AZIEL OS" width="38" height="38" decoding="async">
                     <div class="admin-logo-copy">
@@ -55,23 +55,24 @@
                 </button>
             </div>
 
-            <div class="admin-nav-search" role="search">
-                <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-                <input id="adminNavSearch" type="search" autocomplete="off" spellcheck="false"
-                    placeholder="Jump to module..." data-admin-i18n-placeholder="nav_search_placeholder"
-                    aria-label="Search admin modules" />
-            </div>
-
-            <nav class="admin-menu" aria-label="Admin navigation">
-
-                <div class="admin-nav-group">
-                    <span class="admin-nav-label">Home</span>
-
-                    <button class="admin-nav active" data-section="dashboard" type="button" data-admin-permission="DASHBOARD_READ">
-                    <i class="fa-solid fa-chart-line"></i>
-                        <span data-admin-i18n="dashboard">Dashboard</span>
-                    </button>
+            <div class="admin-sidebar-navigation">
+                <div class="admin-nav-search" role="search">
+                    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                    <input id="adminNavSearch" type="search" autocomplete="off" spellcheck="false"
+                        placeholder="Jump to module..." data-admin-i18n-placeholder="nav_search_placeholder"
+                        aria-label="Search admin modules" />
                 </div>
+
+                <nav class="admin-menu" aria-label="Admin navigation">
+
+                    <div class="admin-nav-group">
+                        <span class="admin-nav-label">Home</span>
+
+                        <button class="admin-nav active" data-section="dashboard" type="button" data-admin-permission="DASHBOARD_READ">
+                        <i class="fa-solid fa-chart-line"></i>
+                            <span data-admin-i18n="dashboard">Dashboard</span>
+                        </button>
+                    </div>
 
                 <div class="admin-nav-group">
                     <span class="admin-nav-label">Growth</span>
@@ -177,31 +178,34 @@
                 </button>
                 </div>
 
-            </nav>
-
-            <div class="admin-mobile-drawer-actions" aria-label="Mobile admin actions">
-                <label for="adminMobileLocaleSelect" data-admin-i18n="language">Language</label>
-                <select id="adminMobileLocaleSelect" class="admin-locale-select" aria-label="Admin language">
-                    <option value="en">English</option>
-                    <option value="my">မြန်မာ</option>
-                    <option value="th">ไทย</option>
-                </select>
-
-                <a href="home.html" data-admin-i18n="back_home">Back Home</a>
-
-                <button id="adminMobileLogoutBtn" class="admin-logout-btn" type="button" data-admin-i18n="logout">
-                    Logout
-                </button>
+                </nav>
             </div>
 
-            <div class="admin-user-box">
-                <div class="admin-avatar">A</div>
+            <div class="admin-sidebar-footer">
+                <div class="admin-mobile-drawer-actions" aria-label="Mobile admin actions">
+                    <label for="adminMobileLocaleSelect" data-admin-i18n="language">Language</label>
+                    <select id="adminMobileLocaleSelect" class="admin-locale-select" aria-label="Admin language">
+                        <option value="en">English</option>
+                        <option value="my">မြန်မာ</option>
+                        <option value="th">ไทย</option>
+                    </select>
+
+                    <a href="home.html" data-admin-i18n="back_home">Back Home</a>
+
+                    <button id="adminMobileLogoutBtn" class="admin-logout-btn" type="button" data-admin-i18n="logout">
+                        Logout
+                    </button>
+                </div>
+
+                <div class="admin-user-box">
+                    <div class="admin-avatar">A</div>
                     <div>
                         <strong>AZIEL OS</strong>
                         <small>Commerce Operating System · 2.5</small>
+                    </div>
                 </div>
+                <div class="admin-os-version" aria-label="AZIEL OS version">AZIEL OS · Version 2.5</div>
             </div>
-            <div class="admin-os-version" aria-label="AZIEL OS version">AZIEL OS · Version 2.5</div>
 
         </aside>
 
