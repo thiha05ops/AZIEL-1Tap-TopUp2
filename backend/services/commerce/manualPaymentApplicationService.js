@@ -8,6 +8,10 @@ const { createPaymentOrchestrator, PaymentOrchestratorError } = require("./payme
 const { createProviderRegistry } = require("./providerRegistry");
 const { createManualPromptPayProvider } = require("./manualPromptPayProviderFactory");
 const PaymentMethod = require("../../models/PaymentMethod");
+const {
+    consumeCommercePromotion,
+    releaseCommercePromotion
+} = require("./commercePromotionBridgeService");
 
 const SERVICE_VERSION = "commerce.manual-payment-application.v1";
 const MANUAL_PROVIDER_ID = "MANUAL_PROMPTPAY";
@@ -325,6 +329,17 @@ function createManualPaymentApplicationService(dependencies = {}) {
         }
     }
 
+    async function updatePromotionRedemptionSnapshot(order, snapshot) {
+        if (!order?.orderId || !snapshot || typeof deps.commerceOrderRepository.setPromotionRedemptionSnapshot !== "function") {
+            return order;
+        }
+        return deps.commerceOrderRepository.setPromotionRedemptionSnapshot({
+            orderId: order.orderId,
+            promotionRedemptionSnapshot: snapshot,
+            changedAt: deps.clock()
+        });
+    }
+
     async function initiateManualPayment(input = {}) {
         try {
             const owner = normalizeOwner(input.owner || {});
@@ -430,7 +445,9 @@ function createManualPaymentApplicationService(dependencies = {}) {
                 }
             });
             const updatedAttempt = await deps.paymentAttemptRepository.findAttemptById({ attemptId });
-            const updatedOrder = await deps.commerceOrderRepository.findOrderById(order.orderId);
+            let updatedOrder = await deps.commerceOrderRepository.findOrderById(order.orderId);
+            const consumedRedemption = await consumeCommercePromotion(updatedOrder);
+            updatedOrder = await updatePromotionRedemptionSnapshot(updatedOrder, consumedRedemption);
             await audit("COMMERCE_MANUAL_PAYMENT_APPROVED", { actor: admin, resourceId: attemptId, metadata: { orderId: order.orderId } });
             await notify("commerce.manualPayment.approved", { orderId: order.orderId, attemptId });
             return toSafePaymentView({ order: updatedOrder, attempt: updatedAttempt, paymentResult: result, admin: true });
@@ -465,7 +482,9 @@ function createManualPaymentApplicationService(dependencies = {}) {
                 }
             });
             const updatedAttempt = await deps.paymentAttemptRepository.findAttemptById({ attemptId });
-            const updatedOrder = await deps.commerceOrderRepository.findOrderById(order.orderId);
+            let updatedOrder = await deps.commerceOrderRepository.findOrderById(order.orderId);
+            const releasedRedemption = await releaseCommercePromotion(updatedOrder);
+            updatedOrder = await updatePromotionRedemptionSnapshot(updatedOrder, releasedRedemption);
             await audit("COMMERCE_MANUAL_PAYMENT_REJECTED", { actor: admin, resourceId: attemptId, metadata: { orderId: order.orderId, reason } });
             await notify("commerce.manualPayment.rejected", { orderId: order.orderId, attemptId });
             return toSafePaymentView({ order: updatedOrder, attempt: updatedAttempt, paymentResult: result, admin: true });
@@ -481,6 +500,12 @@ function createManualPaymentApplicationService(dependencies = {}) {
             const result = owner
                 ? await orchestrator.expirePayment({ attemptId, owner })
                 : await orchestrator.expirePayment({ attemptId, owner: normalizeOwner(input.owner || {}) });
+            const updatedAttempt = await deps.paymentAttemptRepository.findAttemptById({ attemptId });
+            if (updatedAttempt?.orderId) {
+                const updatedOrder = await deps.commerceOrderRepository.findOrderById(updatedAttempt.orderId);
+                const releasedRedemption = await releaseCommercePromotion(updatedOrder);
+                await updatePromotionRedemptionSnapshot(updatedOrder, releasedRedemption);
+            }
             return toSafePaymentView({ paymentResult: result });
         } catch (error) {
             throw mapPaymentError(error, "expiry");
@@ -492,6 +517,12 @@ function createManualPaymentApplicationService(dependencies = {}) {
             const owner = normalizeOwner(input.owner || {});
             const attemptId = assertId(input.attemptId, "attemptId");
             const result = await orchestrator.cancelPayment({ attemptId, owner });
+            const updatedAttempt = await deps.paymentAttemptRepository.findAttemptById({ attemptId });
+            if (updatedAttempt?.orderId) {
+                const updatedOrder = await deps.commerceOrderRepository.findOrderById(updatedAttempt.orderId);
+                const releasedRedemption = await releaseCommercePromotion(updatedOrder);
+                await updatePromotionRedemptionSnapshot(updatedOrder, releasedRedemption);
+            }
             return toSafePaymentView({ paymentResult: result });
         } catch (error) {
             throw mapPaymentError(error, "cancel");

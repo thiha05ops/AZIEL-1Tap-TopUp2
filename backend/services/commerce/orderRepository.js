@@ -440,6 +440,35 @@ async function appendOperationalReference(input = {}, options = {}) {
     }
 }
 
+async function setPromotionRedemptionSnapshot(input = {}, options = {}) {
+    const orderId = assertId(input.orderId, "orderId", ERROR_CODES.INVALID_ORDER_ID);
+    const snapshot = input.promotionRedemptionSnapshot || null;
+    const changedAt = input.changedAt ? new Date(input.changedAt) : null;
+    if (!changedAt || !Number.isFinite(changedAt.getTime())) {
+        throw new OrderRepositoryError(ERROR_CODES.INVALID_ORDER_RECORD, "changedAt must be supplied for promotion redemption updates.", { stage: "update" });
+    }
+    const opts = normalizeOptions(options);
+    const query = { orderId };
+    if (input.owner) Object.assign(query, ownerQuery(input.owner));
+    try {
+        const updated = await execQuery(opts.model.findOneAndUpdate(
+            query,
+            {
+                $set: {
+                    promotionRedemptionSnapshot: snapshot ? structuredClone(snapshot) : null,
+                    updatedAt: changedAt
+                }
+            },
+            { new: true, runValidators: true }
+        ), opts);
+        if (!updated) throw new OrderRepositoryError(ERROR_CODES.ORDER_NOT_FOUND, "Order not found.", { stage: "update" });
+        return plainRecord(updated);
+    } catch (error) {
+        if (error instanceof OrderRepositoryError) throw error;
+        throw wrapError(error, ERROR_CODES.ORDER_UPDATE_FAILED, "update");
+    }
+}
+
 function classifyPersistenceError(error, payload = {}) {
     if (error?.code === 11000) {
         const keyPattern = error.keyPattern || {};
@@ -484,6 +513,7 @@ module.exports = Object.freeze({
     updatePaymentStatus,
     updateFulfilmentStatus,
     appendOperationalReference,
+    setPromotionRedemptionSnapshot,
     OrderRepositoryError,
     ERROR_CODES,
     ORDER_TRANSITIONS,

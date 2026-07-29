@@ -555,6 +555,7 @@ async function validatePromotion(quote, context, deps) {
     const result = validationResultAllowed(await deps.validatePromotionRedemption({
         quote,
         owner: context.normalized.owner,
+        orderId: context.orderId,
         checkoutTime: context.checkoutTime,
         transactionContext: context.transactionContext
     }), ERROR_CODES.PROMOTION_REDEMPTION_UNAVAILABLE, "promotion");

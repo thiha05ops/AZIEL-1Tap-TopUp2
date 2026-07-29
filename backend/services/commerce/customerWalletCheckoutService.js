@@ -7,6 +7,12 @@ const { createAndPersistPricingQuote } = require("./pricingQuoteApplicationServi
 const { checkoutFromQuote } = require("./checkoutApplicationService");
 const orderRepository = require("./orderRepository");
 const { buildProductionPricingContext } = require("./productionPricingContextService");
+const {
+    consumeCommercePromotion,
+    loadCommercePromotionContext,
+    releaseCommercePromotion,
+    reserveCommercePromotion
+} = require("./commercePromotionBridgeService");
 const { debitWallet } = require("../walletService");
 
 const ERROR_CODES = Object.freeze({
@@ -174,6 +180,17 @@ async function startCustomerWalletCheckout(input = {}, context = {}, dependencie
         now: issuedAt
     });
     const idempotencySeed = text(input.orderId) || publicId("checkout");
+    const suppliedCouponCode = text(input.promoCode);
+    const quoteDependencies = defaultQuoteDependencies({
+        ...(suppliedCouponCode ? {
+            loadPromotionContext: args => loadCommercePromotionContext({
+                ...args,
+                catalog,
+                user: context.user
+            })
+        } : {}),
+        ...(dependencies.quoteDependencies || {})
+    });
     const quoteResult = await createAndPersistPricingQuote({
         owner,
         request: {
@@ -184,7 +201,7 @@ async function startCustomerWalletCheckout(input = {}, context = {}, dependencie
                 packageCode: catalog.packageCode
             },
             paymentMethodId: method.key || "wallet",
-            couponCode: input.promoCode || "",
+            couponCode: suppliedCouponCode,
             quantity: 1
         },
         idempotencyKey: `quote:${idempotencySeed}`,
@@ -205,84 +222,137 @@ async function startCustomerWalletCheckout(input = {}, context = {}, dependencie
             },
             pricing: pricingContext.pricing
         }
-    }, defaultQuoteDependencies(dependencies.quoteDependencies || {}));
+    }, quoteDependencies);
 
-    const checkoutResult = await checkoutFromQuote({
-        quoteId: quoteResult.publicQuote.quoteId,
-        owner,
-        idempotencyKey: `checkout:${idempotencySeed}`,
-        paymentSelection: {
-            paymentMethodId: method.key || "wallet",
-            paymentChannel: "AZIEL_WALLET"
-        },
-        customerInput: {
-            gameAccount: {
-                userId: input.userId || "",
-                zoneId: input.zoneId || ""
-            },
-            customFields: {
-                username: input.username || username,
-                gameKey: input.gameKey || input.productCode || ""
-            }
-        },
-        requestMetadata: {
-            source: "customer-wallet"
-        }
-    }, {
-        validateOperationalPackageState: async () => ({ allowed: true }),
-        validateFulfilmentInput: async ({ customerInput }) => ({ allowed: true, normalisedFulfilmentInput: customerInput }),
-        validatePaymentMethod: async () => ({
-            allowed: true,
-            paymentSnapshot: {
+    const repo = dependencies.orderRepository || orderRepository;
+    let redemption = null;
+    let checkoutResult = null;
+    let releaseReservationOnFailure = true;
+    try {
+        checkoutResult = await checkoutFromQuote({
+            quoteId: quoteResult.publicQuote.quoteId,
+            owner,
+            idempotencyKey: `checkout:${idempotencySeed}`,
+            paymentSelection: {
                 paymentMethodId: method.key || "wallet",
-                paymentChannel: "AZIEL_WALLET",
-                provider: "AZIEL_WALLET",
-                flowType: "wallet",
-                nextAction: "DEBIT_WALLET",
-                paymentMethodBound: true
+                paymentChannel: "AZIEL_WALLET"
             },
-            nextAction: "DEBIT_WALLET"
-        }),
-        getCheckoutTime: () => new Date(),
-        generateOrderId: () => publicId("AZL"),
-        generateCheckoutId: () => publicId("CHK"),
-        ...dependencies.checkoutDependencies
-    });
+            customerInput: {
+                gameAccount: {
+                    userId: input.userId || "",
+                    zoneId: input.zoneId || ""
+                },
+                customFields: {
+                    username: input.username || username,
+                    gameKey: input.gameKey || input.productCode || ""
+                }
+            },
+            requestMetadata: {
+                source: "customer-wallet"
+            }
+        }, {
+            validateOperationalPackageState: async () => ({ allowed: true }),
+            validateFulfilmentInput: async ({ customerInput }) => ({ allowed: true, normalisedFulfilmentInput: customerInput }),
+            validatePaymentMethod: async () => ({
+                allowed: true,
+                paymentSnapshot: {
+                    paymentMethodId: method.key || "wallet",
+                    paymentChannel: "AZIEL_WALLET",
+                    provider: "AZIEL_WALLET",
+                    flowType: "wallet",
+                    nextAction: "DEBIT_WALLET",
+                    paymentMethodBound: true
+                },
+                nextAction: "DEBIT_WALLET"
+            }),
+            validatePromotionRedemption: async ({ quote, orderId }) => {
+                redemption = await reserveCommercePromotion({
+                    order: {
+                        orderId,
+                        commercial: {
+                            region: quote.commercialSnapshot?.region,
+                            currency: quote.commercialSnapshot?.currency,
+                            originalUnitPrice: quote.commercialSnapshot?.originalPrice,
+                            quantity: quote.commercialSnapshot?.quantity,
+                            discountAmount: quote.commercialSnapshot?.discountAmount,
+                            totalAmount: quote.commercialSnapshot?.quotedTotalAmount
+                        },
+                        promotionSnapshot: quote.promotionSnapshot
+                    },
+                    user: context.user,
+                    expiresAt: quote.lifecycle?.expiresAt || quoteResult.publicQuote.expiresAt || null
+                });
+                return { allowed: true, promotionRedemptionSnapshot: redemption };
+            },
+            getCheckoutTime: () => new Date(),
+            generateOrderId: () => publicId("AZL"),
+            generateCheckoutId: () => publicId("CHK"),
+            ...dependencies.checkoutDependencies
+        });
+        const commerceOrder = await repo.findOrderById(checkoutResult.checkout.orderId);
 
-    const orderAmount = Number(checkoutResult.checkout?.pricing?.totalAmount || 0);
-    const orderCurrency = text(checkoutResult.checkout?.pricing?.currency || catalog.currency).toUpperCase();
-    const walletResult = await (dependencies.debitWallet || debitWallet)({
-        username,
-        amount: orderAmount,
-        currency: orderCurrency,
-        type: "wallet.payment",
-        source: "commerce_wallet_payment",
-        referenceType: "commerce_order",
-        referenceId: checkoutResult.checkout.orderId,
-        orderId: checkoutResult.checkout.orderId,
-        idempotencyKey: `wallet:commerce-order:${checkoutResult.checkout.orderId}:payment`,
-        description: `Paid for ${checkoutResult.checkout.product?.gameName || catalog.productCode} - ${checkoutResult.checkout.product?.packageName || catalog.pkg.name}`,
-        metadata: {
-            commerce: true,
-            orderId: checkoutResult.checkout.orderId,
-            quoteId: checkoutResult.checkout.quoteId
-        }
-    });
-    const paidOrder = await markCommerceOrderPaid(checkoutResult.checkout.orderId, owner, dependencies);
-
-    return {
-        checkout: checkoutResult.checkout,
-        order: publicOrder(paidOrder, {
-            ...checkoutResult.checkout,
+        const orderAmount = Number(checkoutResult.checkout?.pricing?.totalAmount || 0);
+        const orderCurrency = text(checkoutResult.checkout?.pricing?.currency || catalog.currency).toUpperCase();
+        const walletResult = await (dependencies.debitWallet || debitWallet)({
+            username,
             amount: orderAmount,
             currency: orderCurrency,
-            region: catalog.region,
-            packageCode: catalog.packageCode
-        }),
-        balance: walletResult.balance,
-        transaction: walletResult.transaction,
-        duplicate: Boolean(walletResult.duplicate)
-    };
+            type: "wallet.payment",
+            source: "commerce_wallet_payment",
+            referenceType: "commerce_order",
+            referenceId: checkoutResult.checkout.orderId,
+            orderId: checkoutResult.checkout.orderId,
+            idempotencyKey: `wallet:commerce-order:${checkoutResult.checkout.orderId}:payment`,
+            description: `Paid for ${checkoutResult.checkout.product?.gameName || catalog.productCode} - ${checkoutResult.checkout.product?.packageName || catalog.pkg.name}`,
+            metadata: {
+                commerce: true,
+                orderId: checkoutResult.checkout.orderId,
+                quoteId: checkoutResult.checkout.quoteId
+            }
+        });
+        releaseReservationOnFailure = false;
+        let paidOrder = await markCommerceOrderPaid(checkoutResult.checkout.orderId, owner, dependencies);
+        const promotionOrder = paidOrder || commerceOrder;
+        if (redemption || promotionOrder?.promotionRedemptionSnapshot?.redemptionId) {
+            const consumed = await consumeCommercePromotion({
+                ...promotionOrder,
+                promotionRedemptionSnapshot: promotionOrder?.promotionRedemptionSnapshot || redemption
+            });
+            if (consumed && typeof repo.setPromotionRedemptionSnapshot === "function") {
+                paidOrder = await repo.setPromotionRedemptionSnapshot({
+                    orderId: checkoutResult.checkout.orderId,
+                    promotionRedemptionSnapshot: consumed,
+                    changedAt: new Date()
+                });
+            }
+        }
+
+        return {
+            checkout: checkoutResult.checkout,
+            order: publicOrder(paidOrder, {
+                ...checkoutResult.checkout,
+                amount: orderAmount,
+                currency: orderCurrency,
+                region: catalog.region,
+                packageCode: catalog.packageCode
+            }),
+            balance: walletResult.balance,
+            transaction: walletResult.transaction,
+            duplicate: Boolean(walletResult.duplicate)
+        };
+    } catch (error) {
+        if (redemption && releaseReservationOnFailure) {
+            const released = await releaseCommercePromotion({ orderId: checkoutResult?.checkout?.orderId || redemption.orderId, promotionRedemptionSnapshot: redemption });
+            if (released && checkoutResult?.checkout?.orderId && typeof repo.setPromotionRedemptionSnapshot === "function") {
+                await repo.setPromotionRedemptionSnapshot({
+                    orderId: checkoutResult.checkout.orderId,
+                    promotionRedemptionSnapshot: released,
+                    changedAt: new Date()
+                });
+            }
+        }
+        throw error;
+    }
 }
 
 module.exports = Object.freeze({
