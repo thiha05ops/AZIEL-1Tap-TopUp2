@@ -24,6 +24,7 @@ function verifyBackend() {
     includes("backend/routes/adminPricingEngine.js", "requireOwner", "Publish must remain owner-only.");
     includes("backend/routes/adminPricingEngine.js", "batchPreviewDailyPricing", "Route must call server-side batch preview.");
     includes("backend/routes/adminPricingEngine.js", "publishDailyPricing", "Route must call server-side publish.");
+    includes("backend/routes/adminPricingEngine.js", "region: req.body?.region || \"\"", "Preview/publish routes must pass selected region.");
 
     includes("backend/services/commerce/adminPricingControlCenterService.js", "MAX_WORKSPACE_ROWS = 250", "Workspace must have a bounded batch size.");
     includes("backend/services/commerce/adminPricingControlCenterService.js", "batchPreviewDailyPricing", "Batch preview service must exist.");
@@ -49,6 +50,10 @@ function verifyBackend() {
     includes("backend/services/commerce/adminPricingControlCenterService.js", "Supplier cost missing — enter or paste supplier cost.", "Missing cost preview must explain the next operator action.");
     includes("backend/services/commerce/adminPricingControlCenterService.js", "configuredProfitabilityRows", "Low and negative margin metrics must require configured supplier cost.");
     includes("backend/services/commerce/adminPricingControlCenterService.js", "regionalPriceRows", "Summary must distinguish package rows from regional price rows.");
+    includes("backend/services/commerce/adminPricingControlCenterService.js", "workspaceRegions(region)", "Workspace preview must isolate selected region.");
+    includes("backend/services/commerce/adminPricingControlCenterService.js", "WORKSPACE_REGION_REQUIRED", "Publish must reject All-region bulk publish.");
+    includes("backend/services/commerce/adminPricingControlCenterService.js", "WORKSPACE_PUBLISH_ALL_DISABLED", "Backend must reject publish-all requests.");
+    includes("backend/services/commerce/adminPricingControlCenterService.js", "[publishRegion]: pricePatch", "Publish must update only the selected region.");
 }
 
 function verifyFrontend() {
@@ -58,12 +63,22 @@ function verifyFrontend() {
     includes("frontend/admin.html", "pricingReviewPanel", "Review workflow must exist.");
     includes("frontend/admin.html", "pricingWorkspacePublishSelectedBtn", "Publish selected action must exist.");
     includes("frontend/admin.html", "pricingWorkspacePublishAllBtn", "Publish all action must exist.");
+    includes("frontend/admin.html", "Publish All Disabled", "Unsafe publish-all flow must be visibly disabled.");
     includes("frontend/admin.html", "pricing-business-rules-drawer", "Low-frequency policy controls must be collapsed or separated.");
     includes("frontend/admin.html", "<option value=\"TH\" selected>Thailand</option>", "Daily Pricing Workspace must default to Thailand view.");
     includes("frontend/admin.html", "Supplier THB → Selling THB", "Thailand exchange copy must name source and target.");
     includes("frontend/admin.html", "Supplier THB → Selling MMK", "Myanmar exchange copy must name source and target.");
 
     includes("frontend/js/admin-pricing-engine.js", "workspace: {", "Controller must maintain staged workspace state.");
+    includes("frontend/js/admin-pricing-engine.js", "selectedProductId", "Workspace must have explicit selected product state.");
+    includes("frontend/js/admin-pricing-engine.js", "selectedRegion", "Workspace must have explicit selected region state.");
+    includes("frontend/js/admin-pricing-engine.js", "selectedSupplier", "Workspace must have explicit selected supplier state.");
+    includes("frontend/js/admin-pricing-engine.js", "supplierCurrency", "Workspace must have explicit supplier currency state.");
+    includes("frontend/js/admin-pricing-engine.js", "selectedPackageId", "Workspace must have explicit selected package state.");
+    includes("frontend/js/admin-pricing-engine.js", "stagedChangesByPackageId: new Map()", "Workspace must separate staged rows from loaded rows.");
+    includes("frontend/js/admin-pricing-engine.js", "previewResultsByPackageId: new Map()", "Workspace must key preview results by package id.");
+    includes("frontend/js/admin-pricing-engine.js", "selectedPackageDetail", "Workspace must track selected package detail explicitly.");
+    includes("frontend/js/admin-pricing-engine.js", "activeRequestSequence", "Workspace must guard request lifecycle.");
     includes("frontend/js/admin-pricing-engine.js", "buildWorkspaceRows", "Workspace must load many packages into a staged grid.");
     includes("frontend/js/admin-pricing-engine.js", "data-pricing-cost-input", "Inline supplier-cost editing must exist.");
     includes("frontend/js/admin-pricing-engine.js", "parseWorkspacePaste", "Paste parser must exist.");
@@ -82,6 +97,14 @@ function verifyFrontend() {
     includes("frontend/js/admin-pricing-engine.js", "supplierPrice: Number.isFinite(supplierPrice) ? supplierPrice : null", "Missing supplier cost must not hide package rows.");
     includes("frontend/js/admin-pricing-engine.js", "regionView: \"TH\"", "Daily Pricing Workspace state must default to Thailand.");
     includes("frontend/js/admin-pricing-engine.js", "state.workspace.productFilter === \"ALL\"", "Workspace must switch from All to first product with rows for daily editing.");
+    includes("frontend/js/admin-pricing-engine.js", "stageWorkspaceRow", "Only explicit input/paste changes may stage rows.");
+    includes("frontend/js/admin-pricing-engine.js", "stagedRows()", "Review and publish must operate on staged rows only.");
+    includes("frontend/js/admin-pricing-engine.js", "clearIncompatibleWorkspaceState", "Product changes must clear incompatible detail/preview state.");
+    includes("frontend/js/admin-pricing-engine.js", "row.productCode !== state.workspace.productFilter", "Detail panel must refuse stale product rows.");
+    includes("frontend/js/admin-pricing-engine.js", "body: JSON.stringify({ rows, region: workspaceRegion() })", "Preview must send only staged rows for selected region.");
+    includes("frontend/js/admin-pricing-engine.js", "Publish All and All-region publishing are temporarily disabled", "Unsafe publish-all and All-region publish must be blocked.");
+    includes("frontend/js/admin-pricing-engine.js", "body: JSON.stringify({ rows: publishable, publishAll: false, region: workspaceRegion() })", "Publish payload must contain only publishable staged rows.");
+    includes("frontend/js/admin-pricing-engine.js", "workspacePublishAll.disabled = true", "Publish All button must stay disabled.");
     includes("frontend/js/admin-pricing-engine.js", "state.workspace.regionView !== \"ALL\"", "Region view must filter by normalized regional support.");
     includes("frontend/js/admin-pricing-engine.js", "Legacy THB Price", "Thailand/All grids must label legacy customer prices explicitly.");
     includes("frontend/js/admin-pricing-engine.js", "Legacy MMK Price", "Myanmar/All grids must label legacy customer prices explicitly.");
@@ -97,6 +120,7 @@ function verifyFrontend() {
     includes("frontend/css/admin/admin-design-system.css", "min-width: 980px", "Desktop grid must use intentional contained scrolling without the old extra-wide mixed region table.");
     includes("frontend/css/admin/admin-design-system.css", ".pricing-grid-head.is-all-view", "All view must have a compact grid configuration.");
     includes("frontend/css/admin/admin-design-system.css", ".pricing-business-rules-drawer", "Business Rules drawer styles must exist.");
+    includes("frontend/css/admin/admin-design-system.css", "repeat(5, minmax(0, 1fr))", "Daily summary must use simplified five-card metrics.");
     includes("frontend/css/admin/admin-design-system.css", "grid-template-columns: 1fr", "Mobile layout must collapse to one column.");
 }
 

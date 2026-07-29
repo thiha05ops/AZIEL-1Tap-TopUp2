@@ -40,6 +40,15 @@
         workspace: {
             rows: [],
             previewRows: [],
+            selectedProductId: "",
+            selectedRegion: "TH",
+            selectedSupplier: "Primary supplier",
+            supplierCurrency: "THB",
+            selectedPackageId: "",
+            stagedChangesByPackageId: new Map(),
+            previewResultsByPackageId: new Map(),
+            selectedPackageDetail: null,
+            activeRequestSequence: 0,
             selectedRowId: "",
             previewing: false,
             publishing: false,
@@ -172,6 +181,8 @@
             const interactive = event.target.closest("input, button, select, textarea, a");
             if (!interactive || interactive === detailButton) {
                 state.workspace.selectedRowId = detailButton.dataset.pricingWorkspaceRow;
+                const row = state.workspace.rows.find(item => item.rowId === state.workspace.selectedRowId);
+                state.workspace.selectedPackageId = row ? workspacePackageId(row) : "";
                 renderWorkspaceGrid(section);
                 renderWorkspaceDetail(section);
             }
@@ -201,6 +212,26 @@
 
     function inputValue(value) {
         return value == null || value === "" || !Number.isFinite(Number(value)) ? "" : String(value);
+    }
+
+    function workspacePackageId(row = {}) {
+        return `${slug(row.productCode)}:${String(row.packageCode || row.packageId || "").trim()}`;
+    }
+
+    function workspaceRegion() {
+        return state.workspace.selectedRegion || state.workspace.regionView || "TH";
+    }
+
+    function stagedRows() {
+        return [...state.workspace.stagedChangesByPackageId.values()];
+    }
+
+    function previewForPackageId(packageId) {
+        return state.workspace.previewResultsByPackageId.get(packageId) || null;
+    }
+
+    function isRowStaged(row) {
+        return state.workspace.stagedChangesByPackageId.has(workspacePackageId(row));
     }
 
     function slug(value) {
@@ -630,6 +661,7 @@
                         productCode: product.productCode,
                         productName: product.productName,
                         packageCode: pkg.packageCode,
+                        packageId: pkg.packageId,
                         packageName: pkg.packageName,
                         supplierPackageCode: pkg.supplierPackageCode || pkg.packageCode,
                         oldSupplierCost: hasConfiguredCost ? pkg.supplierPrice : null,
@@ -647,7 +679,7 @@
                         packageEnabled: pkg.packageEnabled !== false,
                         priceEnabledByRegion: { [pkg.region]: pkg.priceEnabled !== false },
                         supplierCostConfigured: hasConfiguredCost,
-                        selected: true,
+                        selected: false,
                         changed: false,
                         status: "Unchanged"
                     });
@@ -658,6 +690,7 @@
                 existing.publishedPricesByRegion[pkg.region] = pkg.publishedPrice;
                 existing.currenciesByRegion[pkg.region] = pkg.currency;
                 existing.priceEnabledByRegion[pkg.region] = pkg.priceEnabled !== false;
+                if (!existing.packageId && pkg.packageId) existing.packageId = pkg.packageId;
                 existing.packageEnabled = existing.packageEnabled && pkg.packageEnabled !== false;
                 if (existing.oldSupplierCost == null && pkg.supplierCostConfigured === true && pkg.supplierPrice != null) {
                     existing.oldSupplierCost = pkg.supplierPrice;
@@ -670,18 +703,79 @@
     }
 
     function buildWorkspaceRows(section) {
-        const previous = new Map(state.workspace.rows.map(row => [row.rowId, row]));
         state.workspace.rows = flattenWorkspacePackages().map(row => {
-            const staged = previous.get(row.rowId);
-            return staged ? { ...row, ...staged, productName: row.productName, packageName: row.packageName, expectedUpdatedAt: row.expectedUpdatedAt || staged.expectedUpdatedAt } : row;
+            const packageId = workspacePackageId(row);
+            const staged = state.workspace.stagedChangesByPackageId.get(packageId);
+            return staged ? { ...row, ...staged, selected: true, changed: true, status: "Edited" } : row;
         });
-        if (!state.workspace.selectedRowId && state.workspace.rows[0]) state.workspace.selectedRowId = state.workspace.rows[0].rowId;
-        if (state.workspace.productFilter === "ALL") {
+        if (!state.workspace.selectedRowId && state.workspace.rows[0]) {
+            state.workspace.selectedRowId = state.workspace.rows[0].rowId;
+            state.workspace.selectedPackageId = workspacePackageId(state.workspace.rows[0]);
+        }
+        if (!state.workspace.selectedProductId || state.workspace.productFilter === "ALL") {
             const selectedProduct = state.products.find(product => product.productId === state.selectedProductId);
             const firstWithRows = state.products.find(product => state.workspace.rows.some(row => row.productCode === product.productCode));
-            state.workspace.productFilter = selectedProduct?.productCode || firstWithRows?.productCode || "ALL";
+            state.workspace.selectedProductId = selectedProduct?.productCode || firstWithRows?.productCode || "ALL";
+            state.workspace.productFilter = state.workspace.selectedProductId;
         }
+        state.workspace.selectedRegion = state.workspace.regionView;
         renderWorkspaceControls(section);
+    }
+
+    function stageWorkspaceRow(row, nextCost) {
+        const packageId = workspacePackageId(row);
+        if (nextCost == null || nextCost === row.oldSupplierCost) {
+            state.workspace.stagedChangesByPackageId.delete(packageId);
+            state.workspace.previewResultsByPackageId.delete(packageId);
+            row.newSupplierCost = row.oldSupplierCost;
+            row.selected = false;
+            row.changed = false;
+            row.status = "Unchanged";
+            return;
+        }
+        const staged = {
+            ...row,
+            rowId: row.rowId,
+            packageId,
+            newSupplierCost: nextCost,
+            supplierCurrency: state.workspace.supplierCurrency,
+            selected: true,
+            changed: true,
+            status: "Edited"
+        };
+        state.workspace.stagedChangesByPackageId.set(packageId, staged);
+        row.newSupplierCost = nextCost;
+        row.supplierCurrency = state.workspace.supplierCurrency;
+        row.selected = true;
+        row.changed = true;
+        row.status = "Edited";
+    }
+
+    function clearPreviewForUnstagedRows() {
+        const stagedIds = new Set(state.workspace.stagedChangesByPackageId.keys());
+        [...state.workspace.previewResultsByPackageId.keys()].forEach(packageId => {
+            if (!stagedIds.has(packageId)) state.workspace.previewResultsByPackageId.delete(packageId);
+        });
+        state.workspace.previewRows = [...state.workspace.previewResultsByPackageId.values()];
+    }
+
+    function clearIncompatibleWorkspaceState() {
+        const selectedProduct = state.workspace.selectedProductId;
+        [...state.workspace.stagedChangesByPackageId.entries()].forEach(([packageId, row]) => {
+            if (selectedProduct !== "ALL" && row.productCode !== selectedProduct) {
+                state.workspace.stagedChangesByPackageId.delete(packageId);
+                state.workspace.previewResultsByPackageId.delete(packageId);
+            }
+        });
+        if (state.workspace.selectedRowId) {
+            const selectedRow = state.workspace.rows.find(row => row.rowId === state.workspace.selectedRowId);
+            if (!selectedRow || (selectedProduct !== "ALL" && selectedRow.productCode !== selectedProduct)) {
+                state.workspace.selectedRowId = "";
+                state.workspace.selectedPackageId = "";
+                state.workspace.selectedPackageDetail = null;
+            }
+        }
+        clearPreviewForUnstagedRows();
     }
 
     function handleWorkspaceInput(event) {
@@ -690,16 +784,16 @@
         if (costInput && section.contains(costInput)) {
             const row = state.workspace.rows.find(item => item.rowId === costInput.dataset.pricingCostInput);
             if (!row) return;
-            row.newSupplierCost = parseOptionalPositiveAmount(costInput.value);
-            row.changed = row.newSupplierCost !== row.oldSupplierCost;
-            row.status = "Edited";
+            stageWorkspaceRow(row, parseOptionalPositiveAmount(costInput.value));
             state.workspace.selectedRowId = row.rowId;
+            state.workspace.selectedPackageId = workspacePackageId(row);
             renderWorkspaceDetail(section);
             scheduleWorkspacePreview(section);
             return;
         }
         const supplierInput = event.target.closest("#pricingWorkspaceSupplier, #pricingWorkspaceVersion");
         if (supplierInput && section.contains(supplierInput)) {
+            if (supplierInput.id === "pricingWorkspaceSupplier") state.workspace.selectedSupplier = supplierInput.value || "";
             scheduleWorkspacePreview(section);
         }
     }
@@ -709,33 +803,46 @@
         const checkbox = event.target.closest("[data-pricing-select-row]");
         if (checkbox && section.contains(checkbox)) {
             const row = state.workspace.rows.find(item => item.rowId === checkbox.dataset.pricingSelectRow);
-            if (row) row.selected = checkbox.checked;
+            if (row && isRowStaged(row)) {
+                const staged = state.workspace.stagedChangesByPackageId.get(workspacePackageId(row));
+                staged.selected = checkbox.checked;
+                row.selected = checkbox.checked;
+            } else if (row) {
+                row.selected = false;
+                checkbox.checked = false;
+            }
             renderWorkspaceGrid(section);
             renderWorkspaceReview(section, false);
             return;
         }
         const currency = event.target.closest("#pricingWorkspaceCurrency");
         if (currency && section.contains(currency)) {
+            state.workspace.supplierCurrency = currency.value;
+            state.workspace.stagedChangesByPackageId.forEach(row => {
+                row.supplierCurrency = currency.value;
+            });
             state.workspace.rows.forEach(row => {
-                if (row.selected) {
-                    row.supplierCurrency = currency.value;
-                    row.changed = true;
-                    row.status = "Edited";
-                }
+                if (isRowStaged(row)) row.supplierCurrency = currency.value;
             });
             scheduleWorkspacePreview(section);
             return;
         }
         const productFilter = event.target.closest("#pricingWorkspaceProduct");
         if (productFilter && section.contains(productFilter)) {
+            state.workspace.selectedProductId = productFilter.value;
             state.workspace.productFilter = productFilter.value;
+            clearIncompatibleWorkspaceState();
             renderWorkspaceGrid(section);
             return;
         }
         const regionView = event.target.closest("#pricingWorkspaceRegion");
         if (regionView && section.contains(regionView)) {
             state.workspace.regionView = regionView.value;
+            state.workspace.selectedRegion = regionView.value;
+            state.workspace.previewResultsByPackageId.clear();
+            state.workspace.previewRows = [];
             renderWorkspaceGrid(section);
+            scheduleWorkspacePreview(section);
             return;
         }
         const filter = event.target.closest("#pricingWorkspaceFilter");
@@ -759,20 +866,24 @@
         if (regionSelect && [...regionSelect.options].some(option => option.value === state.workspace.regionView)) {
             regionSelect.value = state.workspace.regionView;
         }
+        const currencySelect = section.querySelector("#pricingWorkspaceCurrency");
+        if (currencySelect && [...currencySelect.options].some(option => option.value === state.workspace.supplierCurrency)) {
+            currencySelect.value = state.workspace.supplierCurrency;
+        }
     }
 
     function workspaceRowsForRender() {
         return state.workspace.rows.filter(row => {
             if (state.workspace.productFilter !== "ALL" && row.productCode !== state.workspace.productFilter) return false;
             if (state.workspace.regionView !== "ALL" && !row.supportedRegions?.includes(state.workspace.regionView)) return false;
-            const preview = state.workspace.previewRows.find(item => item.rowId === row.rowId);
+            const preview = previewForPackageId(workspacePackageId(row));
             const status = preview?.status || row.status || "Unchanged";
             if (state.workspace.filter === "ALL") return true;
-            if (state.workspace.filter === "CHANGED") return row.changed || preview?.changed;
+            if (state.workspace.filter === "CHANGED") return isRowStaged(row);
             if (state.workspace.filter === "READY") return status === "Ready";
             if (state.workspace.filter === "BLOCKED") return status === "Blocked";
-            if (state.workspace.filter === "LOW_MARGIN") return preview?.regions?.some(item => item.profitabilityStatus === "LOW_MARGIN");
-            if (state.workspace.filter === "NEGATIVE_MARGIN") return preview?.regions?.some(item => /NEGATIVE|BELOW_COST/.test(item.profitabilityStatus || ""));
+            if (state.workspace.filter === "LOW_MARGIN") return preview?.regions?.some(item => item.supplierCostConfigured === true && item.profitabilityStatus === "LOW_MARGIN");
+            if (state.workspace.filter === "NEGATIVE_MARGIN") return preview?.regions?.some(item => item.supplierCostConfigured === true && /NEGATIVE|BELOW_COST/.test(item.profitabilityStatus || ""));
             if (state.workspace.filter === "SUPPLIER_COST_MISSING") return preview?.regions?.some(item => item.profitabilityStatus === "UNKNOWN_SUPPLIER_COST");
             if (state.workspace.filter === "EXCHANGE_RATE_MISSING") return preview?.regions?.some(item => item.profitabilityStatus === "EXCHANGE_RATE_MISSING");
             if (state.workspace.filter === "MANUAL_OVERRIDE") return preview?.regions?.some(item => item.publishedPriceMode === "MANUAL_OVERRIDE");
@@ -783,7 +894,7 @@
     }
 
     function regionPreview(row, region) {
-        const preview = state.workspace.previewRows.find(item => item.rowId === row.rowId);
+        const preview = previewForPackageId(workspacePackageId(row));
         return preview?.regions?.find(item => item.region === region) || null;
     }
 
@@ -862,13 +973,14 @@
                     <span>Legacy THB price</span><span>Legacy MMK price</span><span>Regions</span><span>Status</span>
                 </div>`;
         const body = rows.map(row => {
-            const preview = state.workspace.previewRows.find(item => item.rowId === row.rowId);
+            const packageId = workspacePackageId(row);
+            const preview = previewForPackageId(packageId);
             const region = view === "ALL" ? null : regionPreview(row, view);
             const status = preview?.status || row.status || "Unchanged";
             const selected = row.rowId === state.workspace.selectedRowId;
             const selector = `
                 <label class="pricing-grid-cell">
-                    <input type="checkbox" data-pricing-select-row="${escapeHTML(row.rowId)}" ${row.selected !== false ? "checked" : ""} aria-label="Select ${escapeHTML(row.packageName)}">
+                    <input type="checkbox" data-pricing-select-row="${escapeHTML(row.rowId)}" ${isRowStaged(row) && row.selected !== false ? "checked" : ""} ${isRowStaged(row) ? "" : "disabled"} aria-label="Select ${escapeHTML(row.packageName)}">
                 </label>`;
             const packageCell = `
                 <div class="pricing-grid-cell">
@@ -922,13 +1034,14 @@
             packagesLoaded: state.workspace.rows.length,
             packageRows: state.workspace.rows.length,
             regionalPriceRows: state.workspace.rows.reduce((sum, row) => sum + (row.supportedRegions?.length || 0), 0),
-            changed: state.workspace.rows.filter(row => row.changed).length,
+            changed: stagedRows().length,
             ready: state.workspace.previewRows.filter(row => row.status === "Ready").length,
             lowMargin: state.workspace.previewRows.filter(row => row.regions?.some(item => item.supplierCostConfigured === true && item.profitabilityStatus === "LOW_MARGIN")).length,
             negativeMargin: state.workspace.previewRows.filter(row => row.regions?.some(item => item.supplierCostConfigured === true && /NEGATIVE|BELOW_COST/.test(item.profitabilityStatus || ""))).length,
             missingSupplierCost: state.workspace.previewRows.filter(row => row.regions?.some(item => item.profitabilityStatus === "UNKNOWN_SUPPLIER_COST")).length,
             manualOverrides: state.workspace.previewRows.filter(row => row.regions?.some(item => item.publishedPriceMode === "MANUAL_OVERRIDE")).length,
-            promoRisk: state.workspace.previewRows.filter(row => row.warnings?.some(item => /COUPON|PROMO/i.test(item.code || ""))).length
+            promoRisk: state.workspace.previewRows.filter(row => row.warnings?.some(item => /COUPON|PROMO/i.test(item.code || ""))).length,
+            blocked: state.workspace.previewRows.filter(row => row.status === "Blocked").length
         };
         setText(section, "#pricingWorkspacePackagesLoaded", `${computed.packageRows ?? computed.packagesLoaded ?? 0} packages / ${computed.regionalPriceRows ?? 0} regional price rows`);
         setText(section, "#pricingWorkspaceChanged", computed.changed || 0);
@@ -936,6 +1049,7 @@
         setText(section, "#pricingWorkspaceLowMargin", computed.lowMargin || 0);
         setText(section, "#pricingWorkspaceNegativeMargin", computed.negativeMargin || 0);
         setText(section, "#pricingWorkspaceMissingCost", computed.missingSupplierCost || 0);
+        setText(section, "#pricingWorkspaceBlocked", computed.blocked || 0);
         setText(section, "#pricingWorkspaceManualOverrides", computed.manualOverrides || 0);
         setText(section, "#pricingWorkspacePromoRisk", computed.promoRisk || 0);
         setText(section, "#pricingWorkspaceUpdated", `Last updated: ${state.workspace.lastPreviewAt || "Not previewed"}`);
@@ -944,12 +1058,17 @@
     function renderWorkspaceDetail(section) {
         const box = section.querySelector("#pricingWorkspaceDetail");
         if (!box) return;
-        const row = state.workspace.previewRows.find(item => item.rowId === state.workspace.selectedRowId) ||
-            state.workspace.rows.find(item => item.rowId === state.workspace.selectedRowId);
-        if (!row) {
+        const loadedRow = state.workspace.rows.find(item => item.rowId === state.workspace.selectedRowId);
+        if (!loadedRow || (state.workspace.productFilter !== "ALL" && loadedRow.productCode !== state.workspace.productFilter)) {
+            state.workspace.selectedRowId = "";
+            state.workspace.selectedPackageId = "";
+            state.workspace.selectedPackageDetail = null;
             box.innerHTML = '<p class="empty">No staged package selected.</p>';
             return;
         }
+        const row = previewForPackageId(workspacePackageId(loadedRow)) || loadedRow;
+        state.workspace.selectedPackageId = workspacePackageId(loadedRow);
+        state.workspace.selectedPackageDetail = row;
         setText(section, "#pricingWorkspaceDetailTitle", `${row.productName} · ${row.packageName}`);
         const regionCards = (row.regions || []).map(region => `
             <article class="pricing-detail-card">
@@ -981,14 +1100,14 @@
     function workspacePayloadRows({ onlySelected = false } = {}) {
         const supplierName = sectionValue("#pricingWorkspaceSupplier", "Primary supplier");
         const supplierVersion = sectionValue("#pricingWorkspaceVersion", "");
-        return state.workspace.rows
+        return stagedRows()
             .filter(row => !onlySelected || row.selected !== false)
             .map(row => ({
                 rowId: row.rowId,
                 productCode: row.productCode,
                 packageCode: row.packageCode,
                 newSupplierCost: row.newSupplierCost,
-                supplierCurrency: row.supplierCurrency,
+                supplierCurrency: state.workspace.supplierCurrency,
                 supplierName,
                 supplierVersion,
                 supplierCostTimestamp: new Date().toISOString(),
@@ -1008,17 +1127,31 @@
 
     async function requestWorkspacePreview(section) {
         if (!section || !state.apiReady || !state.workspace.rows.length) return;
+        const rows = workspacePayloadRows();
+        if (!rows.length || workspaceRegion() === "ALL") {
+            state.workspace.previewResultsByPackageId.clear();
+            state.workspace.previewRows = [];
+            renderWorkspaceSummary(section);
+            renderWorkspaceGrid(section);
+            renderButtons(section);
+            return;
+        }
         const seq = ++state.workspace.previewSeq;
+        state.workspace.activeRequestSequence = seq;
         state.workspace.previewing = true;
         renderWorkspaceSummary(section);
         try {
             const result = await pricingFetch("/api/admin/pricing-engine/workspace/preview", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ rows: workspacePayloadRows() })
+                body: JSON.stringify({ rows, region: workspaceRegion() })
             });
             if (seq !== state.workspace.previewSeq) return;
-            state.workspace.previewRows = Array.isArray(result.rows) ? result.rows : [];
+            state.workspace.previewResultsByPackageId.clear();
+            (Array.isArray(result.rows) ? result.rows : []).forEach(row => {
+                state.workspace.previewResultsByPackageId.set(workspacePackageId(row), row);
+            });
+            clearPreviewForUnstagedRows();
             state.workspace.lastPreviewAt = new Date(result.generatedAt || Date.now()).toLocaleTimeString();
             renderWorkspaceSummary(section, result.summary);
             const mm = state.workspace.previewRows.flatMap(row => row.regions || []).find(item => item.region === "MM" && item.exchangeRate);
@@ -1054,21 +1187,21 @@
             }
             const key = match[1].trim().toLowerCase();
             const price = number(match[2], NaN);
-            const row = state.workspace.rows.find(item =>
+            const candidates = state.workspace.rows.filter(item =>
+                state.workspace.productFilter === "ALL" || item.productCode === state.workspace.productFilter
+            );
+            const row = candidates.find(item =>
                 item.packageCode.toLowerCase() === key ||
                 item.supplierPackageCode?.toLowerCase() === key ||
                 item.packageName.toLowerCase() === key
-            ) || (lines.length === state.workspace.rows.length ? state.workspace.rows[index] : null);
+            );
             if (!row || !Number.isFinite(price)) {
                 unmatched.push(line);
                 return;
             }
             if (seen.has(row.rowId)) duplicates.add(row.rowId);
             seen.add(row.rowId);
-            row.newSupplierCost = price;
-            row.changed = row.newSupplierCost !== row.oldSupplierCost;
-            row.status = "Edited";
-            row.selected = true;
+            stageWorkspaceRow(row, price);
             parsed.push(row);
         });
         state.workspace.pasteMatches = parsed;
@@ -1082,14 +1215,19 @@
         const list = section.querySelector("#pricingReviewList");
         const summary = section.querySelector("#pricingReviewSummary");
         if (!panel || !list) return;
-        const changed = state.workspace.previewRows.filter(row => row.changed || state.workspace.rows.find(item => item.rowId === row.rowId)?.changed);
+        const changed = stagedRows().map(row => ({
+            ...row,
+            ...(previewForPackageId(workspacePackageId(row)) || {})
+        }));
         if (summary) summary.textContent = `${changed.length} packages staged. Blocked rows will be skipped by publish.`;
         list.innerHTML = changed.length ? changed.map(row => `
             <article class="pricing-review-row">
                 <strong>${escapeHTML(row.packageName)}</strong>
                 <small>${escapeHTML(row.productName)} · ${escapeHTML(row.packageCode)} · ${escapeHTML(row.status)}</small>
                 <div class="pricing-detail-line"><span>Supplier cost</span><b>${formatMoney(row.oldSupplierCost, row.supplierCurrency)} → ${formatMoney(row.newSupplierCost, row.supplierCurrency)}</b></div>
-                <div class="pricing-detail-line"><span>TH / MM</span><b>${escapeHTML((row.regions || []).map(item => `${item.region}: ${formatMoney(item.publishedPrice, item.currency)}`).join(" · "))}</b></div>
+                <div class="pricing-detail-line"><span>Selling price</span><b>${escapeHTML((row.regions || []).map(item => `${item.region}: ${formatMoney(item.publishedPrice, item.currency)} → ${item.recommendedSellingPrice == null ? "Unavailable" : formatMoney(item.recommendedSellingPrice, item.currency)}`).join(" · ") || "Preview pending")}</b></div>
+                <div class="pricing-detail-line"><span>Profit / margin</span><b>${escapeHTML((row.regions || []).map(item => `${item.region}: ${item.netProfit == null ? "Unknown" : formatMoney(item.netProfit, item.currency)} / ${item.marginPercent == null ? "Unknown" : `${item.marginPercent}%`}`).join(" · ") || "Unknown")}</b></div>
+                <div class="pricing-detail-line"><span>Publish eligibility</span><b>${row.publishEligible === true ? "Publishable" : "Blocked or preview pending"}</b></div>
             </article>
         `).join("") : '<p class="empty">No staged pricing changes.</p>';
         if (open) togglePanel(section, "#pricingReviewPanel", true);
@@ -1097,30 +1235,49 @@
 
     async function publishWorkspace(section, publishAll = false) {
         if (!state.apiReady || state.workspace.publishing) return;
-        const rows = workspacePayloadRows({ onlySelected: !publishAll });
+        if (publishAll || workspaceRegion() === "ALL") {
+            window.alert("Publish All and All-region publishing are temporarily disabled. Choose Thailand or Myanmar and publish explicit staged rows only.");
+            return;
+        }
+        const rows = workspacePayloadRows({ onlySelected: true });
         if (!rows.length) {
             window.alert("Select at least one staged row to publish.");
             return;
         }
-        const confirmed = window.confirm(`${publishAll ? "Publish all" : "Publish selected"} staged pricing changes?\n\nThe server will recalculate each row before saving. Blocked rows will remain staged for retry.`);
+        const publishable = rows.filter(row => {
+            const preview = previewForPackageId(workspacePackageId(row));
+            return preview?.publishEligible === true &&
+                preview.regions?.length === 1 &&
+                preview.regions[0]?.region === workspaceRegion() &&
+                Number(row.newSupplierCost) === Number(state.workspace.stagedChangesByPackageId.get(workspacePackageId(row))?.newSupplierCost);
+        });
+        if (!publishable.length) {
+            window.alert("Preview the staged rows and resolve blocked items before publishing.");
+            return;
+        }
+        const confirmed = window.confirm(`Publish ${publishable.length} staged ${workspaceRegion()} pricing change${publishable.length === 1 ? "" : "s"}?\n\nThe server will recalculate each row before saving. Failed rows will remain staged for retry.`);
         if (!confirmed) return;
         state.workspace.publishing = true;
-        setStatus(section, publishAll ? "Publishing all staged pricing..." : "Publishing selected pricing...");
+        setStatus(section, "Publishing staged pricing changes...");
         renderButtons(section);
         try {
             const result = await pricingFetch("/api/admin/pricing-engine/workspace/publish", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ rows, publishAll })
+                body: JSON.stringify({ rows: publishable, publishAll: false, region: workspaceRegion() })
             }, 30000);
             setStatus(section, `Pricing publish complete: ${result.summary?.published || 0} published, ${result.summary?.failed || 0} failed.`);
             const publishedKeys = new Set((result.results || [])
                 .filter(item => item.published)
                 .map(item => `${item.productCode}:${item.packageCode}`));
-            state.workspace.rows = state.workspace.rows.map(row => publishedKeys.has(row.rowId)
-                ? { ...row, oldSupplierCost: row.newSupplierCost, changed: false, selected: false, status: "Published" }
-                : row);
-            state.workspace.previewRows = state.workspace.previewRows.filter(row => !publishedKeys.has(row.rowId));
+            state.workspace.rows = state.workspace.rows.map(row => {
+                if (!publishedKeys.has(row.rowId)) return row;
+                const packageId = workspacePackageId(row);
+                state.workspace.stagedChangesByPackageId.delete(packageId);
+                state.workspace.previewResultsByPackageId.delete(packageId);
+                return { ...row, oldSupplierCost: row.newSupplierCost, changed: false, selected: false, status: "Published" };
+            });
+            clearPreviewForUnstagedRows();
             await requestProductionLoad(section, "workspace-publish");
             renderWorkspaceReview(section, true);
         } catch (error) {
@@ -1558,6 +1715,10 @@
         const canPersist = canPersistPricing();
         const workspaceBusy = state.workspace.previewing || state.workspace.publishing;
         const workspaceReady = state.apiReady && state.workspace.rows.length > 0;
+        const hasPublishableWorkspaceRows = stagedRows().some(row => {
+            const preview = previewForPackageId(workspacePackageId(row));
+            return row.selected !== false && preview?.publishEligible === true && preview.regions?.[0]?.region === workspaceRegion();
+        });
         if (save) {
             save.disabled = !canManage || !canPersist;
             save.title = canManage
@@ -1570,13 +1731,16 @@
                 ? (canPersist ? "Publish production pricing" : "Production pricing must load before publishing")
                 : "Only OWNER can publish production pricing";
         }
-        [workspacePublishSelected, workspacePublishAll].forEach(button => {
-            if (!button) return;
-            button.disabled = role !== "OWNER" || !canManage || !workspaceReady || workspaceBusy;
-            button.title = role === "OWNER"
-                ? (workspaceReady ? "Publish staged daily pricing changes" : "Load production pricing before publishing")
+        if (workspacePublishSelected) {
+            workspacePublishSelected.disabled = role !== "OWNER" || !canManage || !workspaceReady || workspaceBusy || !hasPublishableWorkspaceRows || workspaceRegion() === "ALL";
+            workspacePublishSelected.title = role === "OWNER"
+                ? (hasPublishableWorkspaceRows ? "Publish explicit staged pricing changes" : "Stage and preview at least one publishable row")
                 : "Only OWNER can publish pricing workspace changes";
-        });
+        }
+        if (workspacePublishAll) {
+            workspacePublishAll.disabled = true;
+            workspacePublishAll.title = "Publish All is temporarily disabled until region-specific daily workflows are stable.";
+        }
     }
 
     function renderStatus(section) {

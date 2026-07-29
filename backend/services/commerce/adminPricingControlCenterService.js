@@ -109,6 +109,12 @@ function rowKey(row = {}) {
     return `${normalizeProductCode(row.productCode)}:${normalizePackageCode(row.packageCode)}`;
 }
 
+function workspaceRegions(region) {
+    const normalized = upper(region || "");
+    if (!normalized || normalized === "ALL") return [...WORKSPACE_REGIONS];
+    return [normalizeRegion(normalized)];
+}
+
 function normalizeWorkspaceRow(row = {}, index = 0) {
     const productCode = normalizeProductCode(row.productCode);
     const packageCode = normalizePackageCode(row.packageCode);
@@ -424,7 +430,7 @@ function summarizeWorkspaceRows(rows = []) {
     };
 }
 
-async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = null } = {}) {
+async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = null, region = "" } = {}) {
     if (!Array.isArray(rows) || !rows.length) {
         throw new AdminPricingControlCenterError("WORKSPACE_PREVIEW_EMPTY", "At least one staged price row is required.");
     }
@@ -490,7 +496,7 @@ async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = nu
                 regions: []
             };
         }
-        const regional = await Promise.all(WORKSPACE_REGIONS.map(region => previewLoadedPackageRegion({
+        const regional = await Promise.all(workspaceRegions(region).map(region => previewLoadedPackageRegion({
             product,
             pkg,
             region,
@@ -545,8 +551,16 @@ async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = nu
     };
 }
 
-async function publishDailyPricing({ rows = [], publishAll = false, actor = "admin", admin = null } = {}) {
-    const preview = await batchPreviewDailyPricing({ rows, actor: admin || { username: actor } });
+async function publishDailyPricing({ rows = [], publishAll = false, actor = "admin", admin = null, region = "" } = {}) {
+    if (publishAll === true) {
+        throw new AdminPricingControlCenterError("WORKSPACE_PUBLISH_ALL_DISABLED", "Publish All is temporarily disabled for Daily Pricing Workspace.", 400);
+    }
+    const selectedRegions = workspaceRegions(region);
+    if (selectedRegions.length !== 1) {
+        throw new AdminPricingControlCenterError("WORKSPACE_REGION_REQUIRED", "Publish requires a single selected region.", 400);
+    }
+    const publishRegion = selectedRegions[0];
+    const preview = await batchPreviewDailyPricing({ rows, actor: admin || { username: actor }, region: publishRegion });
     const selectedKeys = new Set();
     rows.forEach((row, index) => {
         if (!publishAll && row.selected === false) return;
@@ -592,8 +606,7 @@ async function publishDailyPricing({ rows = [], publishAll = false, actor = "adm
         };
         const patch = {
             prices: {
-                TH: pricePatch,
-                MM: pricePatch
+                [publishRegion]: pricePatch
             },
             expectedUpdatedAt: normalized.expectedUpdatedAt || row.expectedUpdatedAt
         };

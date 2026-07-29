@@ -6896,7 +6896,7 @@ body.theme-light.admin-body .pm-qr-preview {
 
 .pricing-workspace-toolbar {
   display: grid;
-  grid-template-columns: minmax(160px, 1.2fr) repeat(4, minmax(128px, 1fr)) auto;
+  grid-template-columns: minmax(160px, 1.2fr) repeat(3, minmax(128px, 1fr)) auto;
   gap: 10px;
   align-items: end;
   padding: 12px;
@@ -6946,7 +6946,7 @@ body.theme-light.admin-body .pm-qr-preview {
 
 .pricing-workspace-summary {
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 1px;
   overflow: hidden;
   margin-bottom: 12px;

@@ -563,8 +563,8 @@
                         <div class="catalog-workspace-actions">
                             <button id="pricingPasteBtn" class="admin-secondary-btn" type="button">Import / Paste</button>
                             <button id="pricingReviewBtn" class="admin-secondary-btn" type="button">Review Changes</button>
-                            <button id="pricingWorkspacePublishSelectedBtn" class="admin-primary-btn" type="button">Publish Selected</button>
-                            <button id="pricingWorkspacePublishAllBtn" class="admin-secondary-btn" type="button">Publish All</button>
+                            <button id="pricingWorkspacePublishSelectedBtn" class="admin-primary-btn" type="button">Publish Changes</button>
+                            <button id="pricingWorkspacePublishAllBtn" class="admin-secondary-btn" type="button" disabled>Publish All Disabled</button>
                             <button id="pricingSaveDraftBtn" class="admin-secondary-btn" type="button">Save Draft</button>
                             <button id="pricingPublishBtn" class="admin-primary-btn" type="button">Publish</button>
                             <span class="admin-status-pill is-warning">Not Saved</span>
@@ -641,26 +641,6 @@
                                 <option value="MMK">MMK</option>
                             </select>
                         </label>
-                        <label>
-                            <span>Supplier Version</span>
-                            <input id="pricingWorkspaceVersion" type="text" placeholder="2026-07-29">
-                        </label>
-                        <label>
-                            <span>Filter</span>
-                            <select id="pricingWorkspaceFilter">
-                                <option value="ALL">All</option>
-                                <option value="CHANGED">Changed</option>
-                                <option value="READY">Ready</option>
-                                <option value="LOW_MARGIN">Low margin</option>
-                                <option value="NEGATIVE_MARGIN">Negative margin</option>
-                                <option value="SUPPLIER_COST_MISSING">Supplier cost missing</option>
-                                <option value="EXCHANGE_RATE_MISSING">Exchange rate missing</option>
-                                <option value="MANUAL_OVERRIDE">Manual override</option>
-                                <option value="LEGACY_COMPATIBILITY_PRICE">Legacy compatibility price</option>
-                                <option value="PROMO_RISK">Promo risk</option>
-                                <option value="BLOCKED">Blocked</option>
-                            </select>
-                        </label>
                         <span id="pricingWorkspaceUpdated" class="admin-status-pill">Last updated: Not previewed</span>
                     </div>
 
@@ -681,11 +661,8 @@
                         <article><span>Package rows</span><strong id="pricingWorkspacePackagesLoaded">0 packages / 0 regional price rows</strong></article>
                         <article><span>Changed</span><strong id="pricingWorkspaceChanged">0</strong></article>
                         <article><span>Ready</span><strong id="pricingWorkspaceReady">0</strong></article>
-                        <article><span>Low margin</span><strong id="pricingWorkspaceLowMargin">0</strong></article>
-                        <article><span>Negative margin</span><strong id="pricingWorkspaceNegativeMargin">0</strong></article>
                         <article><span>Missing cost</span><strong id="pricingWorkspaceMissingCost">0</strong></article>
-                        <article><span>Manual overrides</span><strong id="pricingWorkspaceManualOverrides">0</strong></article>
-                        <article><span>Promo risk</span><strong id="pricingWorkspacePromoRisk">0</strong></article>
+                        <article><span>Blocked</span><strong id="pricingWorkspaceBlocked">0</strong></article>
                     </div>
 
                     <section class="pricing-daily-workspace" aria-label="Daily pricing operations">

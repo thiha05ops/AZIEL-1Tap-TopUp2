@@ -290,6 +290,7 @@ router.post("/admin/pricing-engine/workspace/preview", adminMiddleware, requireA
         const result = await batchPreviewDailyPricing({
             rows: req.body?.rows || [],
             couponCode: req.body?.couponCode || "",
+            region: req.body?.region || "",
             actor: req.admin || null
         });
         return res.json(result);
@@ -303,6 +304,7 @@ router.post("/admin/pricing-engine/workspace/publish", adminMiddleware, requireA
         const result = await publishDailyPricing({
             rows: req.body?.rows || [],
             publishAll: req.body?.publishAll === true,
+            region: req.body?.region || "",
             actor: req.admin?.username || "admin",
             admin: req.admin || null
         });
