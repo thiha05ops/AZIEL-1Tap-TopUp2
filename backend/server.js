@@ -185,6 +185,7 @@ function configureApplication(mongoConnection) {
     });
 
     app.use("/api", authRoutes);
+    app.use("/api", adminPricingEngineRoutes);
     app.use("/api", adminAuthRoutes);
     app.use("/api", adminUsersRoutes);
     app.use("/api", adminStatsRoutes);
@@ -209,7 +210,6 @@ function configureApplication(mongoConnection) {
     app.use("/api", configurationRegistryRoutes);
     app.use("/api", websiteRuntimeRoutes);
     app.use("/api", commerceManualPaymentRoutes);
-    app.use("/api", adminPricingEngineRoutes);
 
     app.use("/api", (err, req, res, next) => {
         if (!err) return next();
