@@ -257,6 +257,10 @@ function projectCommerceOrder(order = {}, options = {}) {
     const product = order.product || {};
     const commercial = order.commercial || {};
     const payment = order.payment || {};
+    const pricing = order.pricing || order.quoteSnapshot?.pricingSnapshot || {};
+    const businessRuntime = pricing.businessRuntime || {};
+    const supplierSnapshot = businessRuntime.supplierCostSnapshot || pricing.supplierCostSnapshot || pricing.context?.supplierCostSnapshot || {};
+    const exchangeSnapshot = businessRuntime.exchangeRateSnapshot || pricing.exchangeSnapshot || pricing.exchangeRate || pricing.context?.exchangeRateSnapshot || null;
     const fulfilmentInput = order.fulfilment?.input || {};
     return {
         _id: options.admin ? `commerce-order:${order.orderId}` : order._id,
@@ -294,6 +298,26 @@ function projectCommerceOrder(order = {}, options = {}) {
         actions: {},
         hasPaymentEvidence: false,
         isSummary: options.summary === true,
+        businessSnapshot: options.summary === true ? null : {
+            available: Boolean(order.quoteSnapshot?.pricingSnapshot || order.pricing || order.commercialSnapshot),
+            sellingPrice: Number(commercial.originalUnitPrice || order.commercialSnapshot?.originalUnitPrice || order.quoteSnapshot?.commercialSnapshot?.originalPrice || 0),
+            supplierCost: businessRuntime.supplierCostConfigured === false ? null : (businessRuntime.supplierCost ?? supplierSnapshot.amount ?? null),
+            convertedSupplierCost: businessRuntime.convertedSupplierCost ?? null,
+            discount: Number(commercial.discountAmount || order.commercialSnapshot?.discountAmount || 0),
+            finalPayableAmount: Number(commercial.totalAmount || order.commercialSnapshot?.totalAmount || order.quoteSnapshot?.commercialSnapshot?.quotedTotalAmount || 0),
+            gatewayFee: businessRuntime.gatewayFee ?? null,
+            walletFee: businessRuntime.walletFee ?? null,
+            grossProfit: businessRuntime.grossProfit ?? null,
+            netProfit: businessRuntime.netProfit ?? null,
+            marginPercent: businessRuntime.marginPercent ?? null,
+            supplierName: businessRuntime.supplierName || supplierSnapshot.supplierName || "",
+            supplierVersion: businessRuntime.supplierVersion || supplierSnapshot.supplierVersion || "",
+            supplierCurrency: businessRuntime.supplierCurrency || supplierSnapshot.currency || "",
+            exchangeRate: exchangeSnapshot?.rate ?? null,
+            exchangeRatePair: exchangeSnapshot ? `${exchangeSnapshot.sourceCurrency || ""}_${exchangeSnapshot.targetCurrency || ""}` : "",
+            exchangeRateSource: exchangeSnapshot?.source || "",
+            profitabilityStatus: businessRuntime.profitabilityStatus || ""
+        },
         createdAt: order.createdAt,
         updatedAt: order.updatedAt
     };

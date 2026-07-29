@@ -38,6 +38,70 @@ const regionalPriceSchema = new mongoose.Schema(
         supplierCostTimestamp: {
             type: Date,
             default: null
+        },
+        pricingNote: {
+            type: String,
+            trim: true,
+            default: ""
+        }
+    },
+    {
+        _id: false
+    }
+);
+
+const supplierCostHistorySchema = new mongoose.Schema(
+    {
+        region: {
+            type: String,
+            enum: ["MM", "TH"],
+            required: true
+        },
+        previousSupplierCost: {
+            type: Number,
+            default: null
+        },
+        newSupplierCost: {
+            type: Number,
+            default: null
+        },
+        previousSupplierCurrency: {
+            type: String,
+            enum: ["MMK", "THB", ""],
+            default: ""
+        },
+        newSupplierCurrency: {
+            type: String,
+            enum: ["MMK", "THB", ""],
+            default: ""
+        },
+        supplierName: {
+            type: String,
+            trim: true,
+            default: ""
+        },
+        supplierVersion: {
+            type: String,
+            trim: true,
+            default: ""
+        },
+        supplierCostTimestamp: {
+            type: Date,
+            default: null
+        },
+        pricingNote: {
+            type: String,
+            trim: true,
+            default: ""
+        },
+        changedBy: {
+            type: String,
+            trim: true,
+            default: "admin"
+        },
+        changedAt: {
+            type: Date,
+            default: Date.now
         }
     },
     {
@@ -92,6 +156,10 @@ const catalogPackageSchema = new mongoose.Schema(
         metadata: {
             type: mongoose.Schema.Types.Mixed,
             default: {}
+        },
+        supplierCostHistory: {
+            type: [supplierCostHistorySchema],
+            default: []
         },
         iconAssetId: {
             type: String,

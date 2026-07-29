@@ -23,6 +23,9 @@ const {
     updatePackage,
     updateProduct
 } = require("../services/catalogAdminService");
+const {
+    assertSafeMutatingVerifierDatabase
+} = require("./verifierDatabaseSafety");
 
 const ROOT = path.join(__dirname, "../..");
 const TEST_PRODUCT = "phase6test";
@@ -170,6 +173,7 @@ function assertFrontendOverlay() {
 }
 
 async function main() {
+    const safety = assertSafeMutatingVerifierDatabase("verify-admin-catalog-control");
     await mongoose.connect(process.env.MONGO_URI, {
         serverSelectionTimeoutMS: Number(process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS || 10000)
     });
@@ -310,7 +314,9 @@ async function main() {
         await mongoose.connection.close(false);
     }
 
-    console.log("Admin catalog control verification checks passed.");
+    console.log("Admin catalog control verification checks passed.", {
+        database: safety.databaseName
+    });
 }
 
 main().catch(error => {

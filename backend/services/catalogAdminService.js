@@ -23,6 +23,10 @@ const MAX_PRODUCT_NAME = 120;
 const MAX_PRODUCT_DESCRIPTION = 1200;
 const MAX_SEO_TITLE = 90;
 const MAX_SEO_DESCRIPTION = 180;
+const MAX_SUPPLIER_NAME = 120;
+const MAX_SUPPLIER_VERSION = 80;
+const MAX_PRICING_NOTE = 240;
+const MAX_SUPPLIER_COST_HISTORY = 200;
 
 function assertNoImmutableFields(patch = {}, fields = []) {
     fields.forEach(field => {
@@ -132,6 +136,39 @@ function parsePrice(value) {
     }
 
     return amount;
+}
+
+function parseNullablePrice(value, field = "supplierCost") {
+    if (value === "" || value === null || value === undefined) return null;
+
+    const amount = Number(value);
+
+    if (!Number.isFinite(amount) || amount < 0 || amount > MAX_PRICE) {
+        throw new CatalogAdminError(
+            "CATALOG_PRICE_INVALID",
+            `${field} must be a finite non-negative number.`
+        );
+    }
+
+    return amount;
+}
+
+function parseSupplierCurrency(value, fallback = "") {
+    const currency = String(value || fallback || "").trim().toUpperCase();
+    if (!currency) return "";
+    if (!["MMK", "THB"].includes(currency)) {
+        throw new CatalogAdminError("CATALOG_PATCH_INVALID", "Supplier currency is not supported.");
+    }
+    return currency;
+}
+
+function parseNullableDate(value, field = "supplierCostTimestamp") {
+    if (value === "" || value === null || value === undefined) return null;
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) {
+        throw new CatalogAdminError("CATALOG_PATCH_INVALID", `${field} must be a valid date.`);
+    }
+    return date;
 }
 
 function parseSortOrder(value) {
@@ -316,7 +353,16 @@ function buildPackagePatch(document, patch = {}) {
                 throw new CatalogAdminError("CATALOG_PATCH_INVALID", "Regional price patch must be an object.");
             }
 
-            const regionalAllowed = new Set(["amount", "enabled"]);
+            const regionalAllowed = new Set([
+                "amount",
+                "enabled",
+                "supplierCost",
+                "supplierCurrency",
+                "supplierName",
+                "supplierVersion",
+                "supplierCostTimestamp",
+                "pricingNote"
+            ]);
             Object.keys(pricePatch).forEach(key => {
                 if (!regionalAllowed.has(key)) {
                     throw new CatalogAdminError("CATALOG_PATCH_INVALID", `${key} is not editable.`);
@@ -343,6 +389,32 @@ function buildPackagePatch(document, patch = {}) {
                     "Price amount is required."
                 );
             }
+
+            if (Object.prototype.hasOwnProperty.call(pricePatch, "supplierCost")) {
+                updates[`prices.${region}.supplierCost`] = parseNullablePrice(pricePatch.supplierCost, `${region}.supplierCost`);
+                updates[`prices.${region}.supplierCurrency`] = parseSupplierCurrency(pricePatch.supplierCurrency, document.prices?.[region]?.supplierCurrency || currency);
+                if (!updates[`prices.${region}.supplierCurrency`]) {
+                    updates[`prices.${region}.supplierCurrency`] = currency;
+                }
+                if (!document.prices?.[region] && !Object.prototype.hasOwnProperty.call(updates, `prices.${region}.amount`)) {
+                    throw new CatalogAdminError("CATALOG_PRICE_INVALID", "Selling price is required before supplier cost can be configured.");
+                }
+            } else if (Object.prototype.hasOwnProperty.call(pricePatch, "supplierCurrency")) {
+                updates[`prices.${region}.supplierCurrency`] = parseSupplierCurrency(pricePatch.supplierCurrency, document.prices?.[region]?.supplierCurrency || currency);
+            }
+
+            if (Object.prototype.hasOwnProperty.call(pricePatch, "supplierName")) {
+                updates[`prices.${region}.supplierName`] = cleanEditableText(pricePatch.supplierName, MAX_SUPPLIER_NAME);
+            }
+            if (Object.prototype.hasOwnProperty.call(pricePatch, "supplierVersion")) {
+                updates[`prices.${region}.supplierVersion`] = cleanEditableText(pricePatch.supplierVersion, MAX_SUPPLIER_VERSION);
+            }
+            if (Object.prototype.hasOwnProperty.call(pricePatch, "supplierCostTimestamp")) {
+                updates[`prices.${region}.supplierCostTimestamp`] = parseNullableDate(pricePatch.supplierCostTimestamp, `${region}.supplierCostTimestamp`);
+            }
+            if (Object.prototype.hasOwnProperty.call(pricePatch, "pricingNote")) {
+                updates[`prices.${region}.pricingNote`] = cleanEditableText(pricePatch.pricingNote, MAX_PRICING_NOTE);
+            }
         });
     }
 
@@ -354,6 +426,50 @@ function hasChanges(document, updates = {}) {
         const current = path.split(".").reduce((row, key) => row?.[key], document);
         return current !== value;
     });
+}
+
+function normalizeComparable(value) {
+    if (value instanceof Date) return value.toISOString();
+    if (value === undefined) return null;
+    return value;
+}
+
+function buildSupplierCostHistoryEntries(document, updates = {}, actor = "admin") {
+    const entries = [];
+    ["MM", "TH"].forEach(region => {
+        const changed = [
+            "supplierCost",
+            "supplierCurrency",
+            "supplierName",
+            "supplierVersion",
+            "supplierCostTimestamp",
+            "pricingNote"
+        ].some(key => {
+            const path = `prices.${region}.${key}`;
+            return Object.prototype.hasOwnProperty.call(updates, path) &&
+                normalizeComparable(updates[path]) !== normalizeComparable(document.prices?.[region]?.[key]);
+        });
+
+        if (!changed) return;
+
+        const previous = document.prices?.[region] || {};
+        entries.push({
+            region,
+            previousSupplierCost: previous.supplierCost == null ? null : Number(previous.supplierCost),
+            newSupplierCost: Object.prototype.hasOwnProperty.call(updates, `prices.${region}.supplierCost`)
+                ? updates[`prices.${region}.supplierCost`]
+                : (previous.supplierCost == null ? null : Number(previous.supplierCost)),
+            previousSupplierCurrency: previous.supplierCurrency || "",
+            newSupplierCurrency: updates[`prices.${region}.supplierCurrency`] || previous.supplierCurrency || "",
+            supplierName: updates[`prices.${region}.supplierName`] ?? previous.supplierName ?? "",
+            supplierVersion: updates[`prices.${region}.supplierVersion`] ?? previous.supplierVersion ?? "",
+            supplierCostTimestamp: updates[`prices.${region}.supplierCostTimestamp`] ?? previous.supplierCostTimestamp ?? null,
+            pricingNote: updates[`prices.${region}.pricingNote`] ?? previous.pricingNote ?? "",
+            changedBy: actor || "admin",
+            changedAt: new Date()
+        });
+    });
+    return entries;
 }
 
 async function updateProduct({ productCode, patch = {}, actor = "admin" }) {
@@ -474,9 +590,19 @@ async function updatePackage({ productCode, packageCode, patch = {}, actor = "ad
         return { changed: false, package: item.toObject(), changedFields: [] };
     }
 
+    const supplierCostHistoryEntries = buildSupplierCostHistoryEntries(item, updates, actor);
+
     Object.entries(updates).forEach(([path, value]) => {
         item.set(path, value);
     });
+    if (!Array.isArray(item.supplierCostHistory)) {
+        item.supplierCostHistory = [];
+    }
+    if (supplierCostHistoryEntries.length) {
+        item.supplierCostHistory = item.supplierCostHistory
+            .concat(supplierCostHistoryEntries)
+            .slice(-MAX_SUPPLIER_COST_HISTORY);
+    }
     await item.save();
     console.log("Catalog package updated:", {
         action: "catalog.package.update",

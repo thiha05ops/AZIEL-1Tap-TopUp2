@@ -331,13 +331,12 @@ async function verifyDatabaseReadFailure() {
 }
 
 function verifyRouteOwnership() {
-    const routeFiles = [
+    const catalogBackedRouteFiles = [
         "backend/routes/payment.js",
-        "backend/routes/order.js",
-        "backend/routes/wallet.js"
+        "backend/routes/order.js"
     ];
 
-    routeFiles.forEach(file => {
+    catalogBackedRouteFiles.forEach(file => {
         const source = fs.readFileSync(path.join(ROOT, file), "utf8");
         assert(source.includes("require(\"../services/catalogService\")"), `${file} should use catalogService`);
         assert(!source.includes("require(\"../catalog/catalog\")"), `${file} must not import static catalog directly`);
@@ -347,6 +346,14 @@ function verifyRouteOwnership() {
     const payment = fs.readFileSync(path.join(ROOT, "backend/routes/payment.js"), "utf8");
     const order = fs.readFileSync(path.join(ROOT, "backend/routes/order.js"), "utf8");
     const wallet = fs.readFileSync(path.join(ROOT, "backend/routes/wallet.js"), "utf8");
+    const walletCheckout = fs.readFileSync(path.join(ROOT, "backend/services/commerce/customerWalletCheckoutService.js"), "utf8");
+
+    assert(!wallet.includes("require(\"../catalog/catalog\")"), "wallet route must not import static catalog directly");
+    assert(!wallet.includes("require('../catalog/catalog')"), "wallet route must not import static catalog directly");
+    assert(
+        wallet.includes("customerWalletCheckoutService") && wallet.includes("startCustomerWalletCheckout"),
+        "wallet route should delegate Commerce wallet checkout ownership"
+    );
 
     const paymentCatalogCalls =
         (payment.match(/await resolveOrderCatalog/g) || []).length +
@@ -354,13 +361,12 @@ function verifyRouteOwnership() {
     const orderCatalogCalls =
         (order.match(/await resolveOrderCatalog/g) || []).length +
         (order.match(/await resolvePurchasePricing/g) || []).length;
-    const walletCatalogCalls =
-        (wallet.match(/await resolveOrderCatalog/g) || []).length +
-        (wallet.match(/await resolvePurchasePricing/g) || []).length;
 
     assert(paymentCatalogCalls >= 2, "payment route catalog-backed calls must be awaited");
     assert(orderCatalogCalls >= 1, "order route catalog-backed call must be awaited");
-    assert(walletCatalogCalls >= 1, "wallet route catalog-backed call must be awaited");
+    assert(walletCheckout.includes("async function loadCatalogPackage"), "Commerce wallet checkout must own catalog package loading");
+    assert(walletCheckout.includes("const catalog = await loadCatalogPackage(input);"), "Commerce wallet checkout catalog load must be awaited");
+    assert(walletCheckout.includes("buildProductionPricingContext"), "Commerce wallet checkout must resolve production pricing context from catalog data");
 }
 
 function verifySourceConfiguration() {

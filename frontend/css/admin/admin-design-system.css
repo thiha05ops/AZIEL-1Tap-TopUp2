@@ -5261,7 +5261,7 @@ button.media-asset-card {
 }
 
 #catalogPackageEditModal .admin-action-modal-box {
-  width: min(620px, calc(100vw - 28px));
+  width: min(920px, calc(100vw - 28px));
   border-radius: 18px;
 }
 
@@ -5271,6 +5271,195 @@ button.media-asset-card {
   padding-top: 12px;
   border-top: 1px solid var(--admin-border);
   background: var(--admin-surface);
+}
+
+.catalog-business-price {
+  display: grid;
+  gap: 5px;
+  align-content: center;
+}
+
+.catalog-business-price strong {
+  color: var(--admin-text);
+  font-size: 13px;
+}
+
+.catalog-business-price small,
+.catalog-business-price em {
+  color: var(--admin-text-muted);
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.25;
+}
+
+.catalog-business-price .catalog-pricing-status {
+  width: fit-content;
+  gap: 5px;
+  font-size: 10px;
+}
+
+.catalog-pricing-control-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.catalog-regional-pricing {
+  align-content: start;
+}
+
+.catalog-regional-pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+
+.catalog-regional-pricing-grid label {
+  margin-top: 0;
+}
+
+.catalog-regional-pricing-grid select {
+  min-height: var(--admin-control-height);
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+  background: var(--admin-surface);
+  color: var(--admin-text);
+  padding: 0 12px;
+}
+
+.catalog-regional-note {
+  grid-column: 1 / -1;
+}
+
+.catalog-pricing-preview {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--admin-border) 76%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--admin-surface-raised) 64%, var(--admin-surface) 36%);
+}
+
+.catalog-pricing-preview header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.catalog-pricing-preview header strong {
+  color: var(--admin-text);
+}
+
+.catalog-pricing-preview header span,
+.catalog-pricing-preview-state {
+  color: var(--admin-text-muted);
+  font-size: 12px;
+}
+
+#catalogPricingPreview {
+  display: grid;
+  gap: 12px;
+}
+
+.catalog-pricing-preview-card {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  background: var(--admin-surface);
+}
+
+.catalog-pricing-preview-card-head,
+.catalog-pricing-preview-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.catalog-pricing-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.catalog-pricing-metrics div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.catalog-pricing-metrics dt,
+.catalog-pricing-preview-meta {
+  color: var(--admin-text-muted);
+  font-size: 11px;
+}
+
+.catalog-pricing-metrics dd {
+  margin: 0;
+  color: var(--admin-text);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.catalog-pricing-warnings {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--admin-warning);
+  font-size: 12px;
+}
+
+.catalog-pricing-warnings li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.catalog-bulk-cost-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+
+.catalog-bulk-cost-rows {
+  display: grid;
+  gap: 10px;
+  max-height: 42vh;
+  overflow-y: auto;
+  margin-top: 14px;
+  padding-right: 4px;
+}
+
+.catalog-bulk-cost-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(100px, .6fr) repeat(2, minmax(110px, .5fr));
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  background: var(--admin-surface);
+}
+
+.catalog-bulk-cost-row strong,
+.catalog-bulk-cost-row small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.catalog-bulk-cost-row small,
+.catalog-bulk-cost-unavailable {
+  color: var(--admin-text-muted);
+  font-size: 11px;
 }
 
 .catalog-product-drawer {
@@ -6201,6 +6390,21 @@ button.media-asset-card {
   .catalog-detail-grid,
   .catalog-media-control {
     grid-template-columns: 1fr;
+  }
+
+  .catalog-pricing-control-grid,
+  .catalog-regional-pricing-grid,
+  .catalog-pricing-metrics,
+  .catalog-bulk-cost-controls,
+  .catalog-bulk-cost-row {
+    grid-template-columns: 1fr;
+  }
+
+  .catalog-pricing-preview header,
+  .catalog-pricing-preview-card-head,
+  .catalog-pricing-preview-meta {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .catalog-media-preview {

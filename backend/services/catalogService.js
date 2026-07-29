@@ -399,7 +399,7 @@ function mediaUrl(asset) {
     return asset?.secureUrl || asset?.url || "";
 }
 
-function projectCatalogPackage(item = {}, { includeDisabled = true, mediaMap = new Map(), includeAssetProjection = false } = {}) {
+function projectCatalogPackage(item = {}, { includeDisabled = true, mediaMap = new Map(), includeAssetProjection = false, includeAdminPricing = false } = {}) {
     if (!includeDisabled && item.deletedAt) return null;
     if (!includeDisabled && item.enabled === false) return null;
 
@@ -415,6 +415,15 @@ function projectCatalogPackage(item = {}, { includeDisabled = true, mediaMap = n
             currency: price.currency || currency,
             enabled: price.enabled !== false
         };
+
+        if (includeAdminPricing) {
+            prices[region].supplierCost = price.supplierCost == null ? null : Number(price.supplierCost);
+            prices[region].supplierCurrency = price.supplierCurrency || "";
+            prices[region].supplierName = price.supplierName || "";
+            prices[region].supplierVersion = price.supplierVersion || "";
+            prices[region].supplierCostTimestamp = price.supplierCostTimestamp || null;
+            prices[region].pricingNote = price.pricingNote || "";
+        }
     });
 
     const iconAsset = item.iconAssetId ? mediaMap.get(item.iconAssetId) : null;
@@ -436,15 +445,33 @@ function projectCatalogPackage(item = {}, { includeDisabled = true, mediaMap = n
         projection.iconAsset = projectMediaAsset(iconAsset);
     }
 
+    if (includeAdminPricing) {
+        projection.supplierCostHistory = Array.isArray(item.supplierCostHistory)
+            ? item.supplierCostHistory.slice(-20).map(entry => ({
+                region: entry.region || "",
+                previousSupplierCost: entry.previousSupplierCost == null ? null : Number(entry.previousSupplierCost),
+                newSupplierCost: entry.newSupplierCost == null ? null : Number(entry.newSupplierCost),
+                previousSupplierCurrency: entry.previousSupplierCurrency || "",
+                newSupplierCurrency: entry.newSupplierCurrency || "",
+                supplierName: entry.supplierName || "",
+                supplierVersion: entry.supplierVersion || "",
+                supplierCostTimestamp: entry.supplierCostTimestamp || null,
+                pricingNote: entry.pricingNote || "",
+                changedBy: entry.changedBy || "",
+                changedAt: entry.changedAt || null
+            }))
+            : [];
+    }
+
     return projection;
 }
 
-function projectCatalogProduct(product = {}, packages = [], { includeDisabled = true, mediaMap = new Map(), includeAssetProjection = false } = {}) {
+function projectCatalogProduct(product = {}, packages = [], { includeDisabled = true, mediaMap = new Map(), includeAssetProjection = false, includeAdminPricing = false } = {}) {
     if (!includeDisabled && product.deletedAt) return null;
     if (!includeDisabled && product.enabled === false) return null;
 
     const publicPackages = packages
-        .map(item => projectCatalogPackage(item, { includeDisabled, mediaMap, includeAssetProjection }))
+        .map(item => projectCatalogPackage(item, { includeDisabled, mediaMap, includeAssetProjection, includeAdminPricing }))
         .filter(Boolean);
     const imageAsset = product.presentation?.imageAssetId
         ? mediaMap.get(product.presentation.imageAssetId)
@@ -516,7 +543,7 @@ function toStaticPublicCatalog({ includeDisabled = true } = {}) {
         .filter(Boolean);
 }
 
-async function toDatabasePublicCatalog({ includeDisabled = true, includeAssetProjection = false } = {}) {
+async function toDatabasePublicCatalog({ includeDisabled = true, includeAssetProjection = false, includeAdminPricing = false } = {}) {
     const [products, packages] = await Promise.all([
         CatalogProduct.find().sort({ sortOrder: 1, productCode: 1 }).lean(),
         CatalogPackage.find().sort({ productCode: 1, sortOrder: 1, packageCode: 1 }).lean()
@@ -529,7 +556,8 @@ async function toDatabasePublicCatalog({ includeDisabled = true, includeAssetPro
             return projectCatalogProduct(product, productPackages, {
                 includeDisabled,
                 mediaMap,
-                includeAssetProjection
+                includeAssetProjection,
+                includeAdminPricing
             });
         })
         .filter(Boolean);
@@ -541,7 +569,8 @@ async function toPublicCatalog(options = {}) {
     if (source === "database") {
         return toDatabasePublicCatalog({
             includeDisabled: options.includeDisabled !== false,
-            includeAssetProjection: Boolean(options.includeAssetProjection)
+            includeAssetProjection: Boolean(options.includeAssetProjection),
+            includeAdminPricing: Boolean(options.includeAdminPricing)
         });
     }
 
@@ -562,7 +591,8 @@ async function getCatalogProductDetail(productCode, options = {}) {
         return projectCatalogProduct(product, packages, {
             includeDisabled: options.includeDisabled !== false,
             mediaMap,
-            includeAssetProjection: Boolean(options.includeAssetProjection)
+            includeAssetProjection: Boolean(options.includeAssetProjection),
+            includeAdminPricing: Boolean(options.includeAdminPricing)
         });
     }
 

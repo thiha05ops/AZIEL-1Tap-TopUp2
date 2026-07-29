@@ -349,6 +349,8 @@ function renderSelectedOrder() {
     ])}
         </div>
 
+        ${renderOrderBusinessSnapshot(order)}
+
         ${window.AZIEL_ADMIN_FULFILLMENT?.renderOrderFulfillment?.(order) || ""}
 
         <div class="order-detail-section">
@@ -381,6 +383,48 @@ function renderDetailSection(titleKey, rows) {
             `).join("")}
         </section>
     `;
+}
+
+function formatBusinessMoney(value, currency = "") {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return "-";
+    return `${numeric.toLocaleString()} ${currency || ""}`.trim();
+}
+
+function renderOrderBusinessSnapshot(order) {
+    const snapshot = order.businessSnapshot || null;
+    if (!order.isCommerceOrder) {
+        return `
+            <section class="order-detail-section">
+                <h4>${escapeHTML(adminT("business_snapshot", "Business Snapshot"))}</h4>
+                <div class="order-evidence-empty">${escapeHTML(adminT("historical_data_unavailable", "Historical data unavailable"))}</div>
+            </section>
+        `;
+    }
+    if (!snapshot?.available) {
+        return `
+            <section class="order-detail-section">
+                <h4>${escapeHTML(adminT("business_snapshot", "Business Snapshot"))}</h4>
+                <div class="order-evidence-empty">${escapeHTML(adminT("historical_data_unavailable", "Historical data unavailable"))}</div>
+            </section>
+        `;
+    }
+    const currency = order.currency || "";
+    return renderDetailSection("business_snapshot", [
+        ["selling_price", formatBusinessMoney(snapshot.sellingPrice, currency)],
+        ["supplier_cost", snapshot.supplierCost == null ? adminT("supplier_cost_not_configured", "Supplier cost not configured") : formatBusinessMoney(snapshot.supplierCost, snapshot.supplierCurrency || currency)],
+        ["converted_supplier_cost", formatBusinessMoney(snapshot.convertedSupplierCost, currency)],
+        ["discount", formatBusinessMoney(snapshot.discount, currency)],
+        ["final_payable", formatBusinessMoney(snapshot.finalPayableAmount, currency)],
+        ["gateway_fee", formatBusinessMoney(snapshot.gatewayFee, currency)],
+        ["wallet_fee", formatBusinessMoney(snapshot.walletFee, currency)],
+        ["gross_profit", formatBusinessMoney(snapshot.grossProfit, currency)],
+        ["net_profit", formatBusinessMoney(snapshot.netProfit, currency)],
+        ["margin", snapshot.marginPercent == null ? "-" : `${Number(snapshot.marginPercent).toLocaleString()}%`],
+        ["supplier", [snapshot.supplierName, snapshot.supplierVersion].filter(Boolean).join(" / ") || "-"],
+        ["exchange_rate", snapshot.exchangeRate ? `${snapshot.exchangeRatePair || ""} ${snapshot.exchangeRate} ${snapshot.exchangeRateSource || ""}`.trim() : adminT("no_conversion_required", "No conversion required")],
+        ["profitability_status", snapshot.profitabilityStatus || "-"]
+    ]);
 }
 
 function renderEvidence(order) {

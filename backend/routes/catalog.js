@@ -46,6 +46,11 @@ const {
     toPublicCatalog
 } = require("../services/catalogService");
 const {
+    AdminPricingControlCenterError,
+    bulkBackfillSupplierCosts,
+    previewPackagePricing
+} = require("../services/commerce/adminPricingControlCenterService");
+const {
     MediaError,
     createAsset,
     deleteAsset,
@@ -56,7 +61,7 @@ const {
 const { StorageError } = require("../services/storageService");
 
 function sendAdminCatalogError(res, error) {
-    if (error instanceof CatalogAdminError || error instanceof MediaError || error instanceof StorageError || error instanceof GameBannerError || error instanceof StorefrontSectionError) {
+    if (error instanceof CatalogAdminError || error instanceof MediaError || error instanceof StorageError || error instanceof GameBannerError || error instanceof StorefrontSectionError || error instanceof AdminPricingControlCenterError) {
         return res.status(error.statusCode || 400).json({
             success: false,
             code: error.code,
@@ -252,7 +257,8 @@ router.patch("/admin/catalog/products/:productCode/delete", adminMiddleware, req
         const product = await getCatalogProductDetail(result.product.productCode, {
             source: "database",
             includeDisabled: true,
-            includeAssetProjection: true
+            includeAssetProjection: true,
+            includeAdminPricing: true
         });
         await writeAdminAudit({
             actor: req.admin,
@@ -285,7 +291,8 @@ router.patch("/admin/catalog/products/:productCode/restore", adminMiddleware, re
         const product = await getCatalogProductDetail(result.product.productCode, {
             source: "database",
             includeDisabled: true,
-            includeAssetProjection: true
+            includeAssetProjection: true,
+            includeAdminPricing: true
         });
         await writeAdminAudit({
             actor: req.admin,
@@ -314,7 +321,8 @@ router.get("/admin/catalog/products/:productCode", adminMiddleware, requireAdmin
         const product = await getCatalogProductDetail(productCode, {
             source: "database",
             includeDisabled: true,
-            includeAssetProjection: true
+            includeAssetProjection: true,
+            includeAdminPricing: true
         });
 
         if (!product) {
@@ -345,7 +353,8 @@ router.get("/admin/catalog/products/:productCode/packages", adminMiddleware, req
         const product = await getCatalogProductDetail(productCode, {
             source: "database",
             includeDisabled: true,
-            includeAssetProjection: true
+            includeAssetProjection: true,
+            includeAdminPricing: true
         });
 
         if (!product) {
@@ -413,7 +422,8 @@ router.patch("/admin/catalog/products/:productCode/packages/reorder", adminMiddl
         const product = await getCatalogProductDetail(req.params.productCode, {
             source: "database",
             includeDisabled: true,
-            includeAssetProjection: true
+            includeAssetProjection: true,
+            includeAdminPricing: true
         });
         await writeAdminAudit({
             actor: req.admin,
@@ -446,7 +456,8 @@ router.patch("/admin/catalog/products/:productCode/packages/:packageCode/delete"
         const product = await getCatalogProductDetail(result.package.productCode, {
             source: "database",
             includeDisabled: true,
-            includeAssetProjection: true
+            includeAssetProjection: true,
+            includeAdminPricing: true
         });
         await writeAdminAudit({
             actor: req.admin,
@@ -481,7 +492,8 @@ router.patch("/admin/catalog/products/:productCode/packages/:packageCode/restore
         const product = await getCatalogProductDetail(result.package.productCode, {
             source: "database",
             includeDisabled: true,
-            includeAssetProjection: true
+            includeAssetProjection: true,
+            includeAdminPricing: true
         });
         await writeAdminAudit({
             actor: req.admin,
@@ -539,6 +551,52 @@ router.patch("/admin/catalog/products/:productCode/packages/:packageCode", admin
     }
 });
 
+router.post("/admin/catalog/products/:productCode/packages/:packageCode/pricing-preview", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_READ), async (req, res) => {
+    try {
+        const preview = await previewPackagePricing({
+            productCode: req.params.productCode,
+            packageCode: req.params.packageCode,
+            region: req.body?.region,
+            priceDraft: req.body?.price || {},
+            couponCode: req.body?.couponCode || "",
+            actor: req.admin || null
+        });
+
+        return res.json({
+            success: true,
+            preview
+        });
+    } catch (error) {
+        return sendAdminCatalogError(res, error);
+    }
+});
+
+router.patch("/admin/catalog/pricing/supplier-costs/bulk", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_MANAGE), async (req, res) => {
+    try {
+        const result = await bulkBackfillSupplierCosts({
+            rows: req.body?.rows || [],
+            overwrite: req.body?.overwrite === true,
+            actor: req.admin?.username || "admin"
+        });
+        await writeAdminAudit({
+            actor: req.admin,
+            req,
+            action: ADMIN_AUDIT_ACTIONS.CATALOG_PACKAGE_UPDATED,
+            resourceType: "CatalogPackage",
+            resourceId: "bulk-supplier-cost",
+            metadata: {
+                updatedCount: result.updatedCount,
+                skippedCount: result.skippedCount,
+                overwrite: req.body?.overwrite === true
+            }
+        }).catch(error => console.log("Admin audit failed:", error.message));
+
+        return res.json(result);
+    } catch (error) {
+        return sendAdminCatalogError(res, error);
+    }
+});
+
 router.post("/admin/catalog/products/:productCode/packages", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_MANAGE), async (req, res) => {
     try {
         const result = await createPackage({
@@ -549,7 +607,8 @@ router.post("/admin/catalog/products/:productCode/packages", adminMiddleware, re
         const product = await getCatalogProductDetail(result.package.productCode, {
             source: "database",
             includeDisabled: true,
-            includeAssetProjection: true
+            includeAssetProjection: true,
+            includeAdminPricing: true
         });
         await writeAdminAudit({
             actor: req.admin,
@@ -856,7 +915,8 @@ router.patch("/admin/catalog/products/:productCode/presentation/image", adminMid
         const product = await getCatalogProductDetail(result.product.productCode, {
             source: "database",
             includeDisabled: true,
-            includeAssetProjection: true
+            includeAssetProjection: true,
+            includeAdminPricing: true
         });
 
         return res.json({
@@ -882,7 +942,8 @@ router.delete("/admin/catalog/products/:productCode/presentation/image", adminMi
         const product = await getCatalogProductDetail(result.product.productCode, {
             source: "database",
             includeDisabled: true,
-            includeAssetProjection: true
+            includeAssetProjection: true,
+            includeAdminPricing: true
         });
 
         return res.json({
@@ -909,7 +970,8 @@ router.patch("/admin/catalog/products/:productCode/presentation/banner", adminMi
         const product = await getCatalogProductDetail(result.product.productCode, {
             source: "database",
             includeDisabled: true,
-            includeAssetProjection: true
+            includeAssetProjection: true,
+            includeAdminPricing: true
         });
 
         return res.json({
@@ -935,7 +997,8 @@ router.delete("/admin/catalog/products/:productCode/presentation/banner", adminM
         const product = await getCatalogProductDetail(result.product.productCode, {
             source: "database",
             includeDisabled: true,
-            includeAssetProjection: true
+            includeAssetProjection: true,
+            includeAdminPricing: true
         });
 
         return res.json({
@@ -962,7 +1025,8 @@ router.patch("/admin/catalog/products/:productCode/presentation/mobile-package-p
         const product = await getCatalogProductDetail(result.product.productCode, {
             source: "database",
             includeDisabled: true,
-            includeAssetProjection: true
+            includeAssetProjection: true,
+            includeAdminPricing: true
         });
 
         return res.json({
@@ -988,7 +1052,8 @@ router.delete("/admin/catalog/products/:productCode/presentation/mobile-package-
         const product = await getCatalogProductDetail(result.product.productCode, {
             source: "database",
             includeDisabled: true,
-            includeAssetProjection: true
+            includeAssetProjection: true,
+            includeAdminPricing: true
         });
 
         return res.json({
@@ -1015,7 +1080,8 @@ router.patch("/admin/catalog/products/:productCode/packages/:packageCode/present
         const product = await getCatalogProductDetail(result.package.productCode, {
             source: "database",
             includeDisabled: true,
-            includeAssetProjection: true
+            includeAssetProjection: true,
+            includeAdminPricing: true
         });
 
         return res.json({
@@ -1042,7 +1108,8 @@ router.delete("/admin/catalog/products/:productCode/packages/:packageCode/presen
         const product = await getCatalogProductDetail(result.package.productCode, {
             source: "database",
             includeDisabled: true,
-            includeAssetProjection: true
+            includeAssetProjection: true,
+            includeAdminPricing: true
         });
 
         return res.json({

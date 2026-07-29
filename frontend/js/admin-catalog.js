@@ -16,6 +16,8 @@ let storefrontSections = [];
 let catalogPackageSearch = "";
 let catalogPackageStatusFilter = "all";
 let catalogHighlightedPackageCode = "";
+let catalogPricingPreviewTimer = null;
+let catalogPricingPreviewRequestId = 0;
 
 document.addEventListener("DOMContentLoaded", () => {
     initAdminCatalogController();
@@ -308,6 +310,7 @@ function renderCatalogTabPanel(product, packages) {
                         <option value="disabled" ${catalogPackageStatusFilter === "disabled" ? "selected" : ""}>Disabled</option>
                         <option value="deleted" ${catalogPackageStatusFilter === "deleted" ? "selected" : ""}>Deleted</option>
                     </select>
+                    <button class="admin-secondary-btn" type="button" data-bulk-supplier-cost>${adminT("bulk_supplier_cost", "Bulk Supplier Cost")}</button>
                 </div>
                 ${renderPackageTable(filterPackages(packages))}
             </div>
@@ -583,6 +586,9 @@ function bindActiveCatalogTab(detail, product, packages) {
             catalogPackageStatusFilter = event.target.value || "all";
             renderCatalogDetail(product);
         });
+        detail.querySelector("[data-bulk-supplier-cost]")?.addEventListener("click", () => {
+            openBulkSupplierCostPanel(product, packages);
+        });
         bindPackageDrag(detail, product, packages);
     }
 
@@ -838,8 +844,8 @@ function renderPackageTable(packages) {
                     <span><b>${escapeHtml(item.packageCode)}</b></span>
                     <span>${escapeHtml(item.name)}</span>
                     <span class="catalog-icon-cell">${renderPackageIconControl(item)}</span>
-                    <span>${formatRegionalPrice(item.prices?.MM)}</span>
-                    <span>${formatRegionalPrice(item.prices?.TH)}</span>
+                    <span>${renderPackageBusinessPrice(item.prices?.MM, "MM")}</span>
+                    <span>${renderPackageBusinessPrice(item.prices?.TH, "TH")}</span>
                     <span><b class="admin-status-pill ${deleted ? "is-danger" : (item.enabled ? "is-ok" : "is-muted")}">${adminT(deleted ? "deleted" : (item.enabled ? "enabled" : "disabled"), deleted ? "Deleted" : (item.enabled ? "Enabled" : "Disabled"))}</b></span>
                     <span class="catalog-package-actions">
                         <button class="admin-icon-btn catalog-row-primary-action" type="button" data-edit-package="${escapeHtml(item.packageCode)}">
@@ -872,6 +878,160 @@ function renderPackageTable(packages) {
             `;}).join("")}
         </div>
     `;
+}
+
+function regionalControlId(region, suffix) {
+    return `catalogEdit${region}${suffix}`;
+}
+
+function populateRegionalPricingControls(modal, region, draft, price = {}, defaultCurrency = "") {
+    const supplier = draft?.supplier?.[region] || {};
+    const setValue = (suffix, value) => {
+        const field = modal.querySelector(`#${regionalControlId(region, suffix)}`);
+        if (field) field.value = value ?? "";
+    };
+    setValue("SupplierCost", supplier.supplierCost ?? price?.supplierCost ?? "");
+    setValue("SupplierCurrency", supplier.supplierCurrency ?? price?.supplierCurrency ?? defaultCurrency);
+    setValue("SupplierName", supplier.supplierName ?? price?.supplierName ?? "");
+    setValue("SupplierVersion", supplier.supplierVersion ?? price?.supplierVersion ?? "");
+    setValue("SupplierCostTimestamp", supplier.supplierCostTimestamp ?? formatDateInputValue(price?.supplierCostTimestamp));
+    setValue("PricingNote", supplier.pricingNote ?? price?.pricingNote ?? "");
+}
+
+function readRegionalPricingDraft(modal, region) {
+    const read = suffix => String(modal?.querySelector(`#${regionalControlId(region, suffix)}`)?.value || "").trim();
+    return {
+        supplierCost: read("SupplierCost"),
+        supplierCurrency: read("SupplierCurrency"),
+        supplierName: read("SupplierName"),
+        supplierVersion: read("SupplierVersion"),
+        supplierCostTimestamp: read("SupplierCostTimestamp"),
+        pricingNote: read("PricingNote")
+    };
+}
+
+function buildPreviewPricePayload(draft, region) {
+    return {
+        amount: draft.values?.[region],
+        enabled: draft.regionEnabled?.[region] === true,
+        supplierCost: draft.supplier?.[region]?.supplierCost,
+        supplierCurrency: draft.supplier?.[region]?.supplierCurrency,
+        supplierName: draft.supplier?.[region]?.supplierName,
+        supplierVersion: draft.supplier?.[region]?.supplierVersion,
+        supplierCostTimestamp: draft.supplier?.[region]?.supplierCostTimestamp,
+        pricingNote: draft.supplier?.[region]?.pricingNote
+    };
+}
+
+function applySupplierPatchChanges(pkg, draft, prices, changes, region) {
+    const existing = pkg.prices?.[region] || {};
+    const supplier = draft.supplier?.[region] || {};
+    const patch = {};
+    const comparable = value => String(value ?? "").trim();
+    const supplierCostChanged = comparable(supplier.supplierCost) !== comparable(existing.supplierCost ?? "");
+    const supplierCurrencyChanged = comparable(supplier.supplierCurrency) !== comparable(existing.supplierCurrency || existing.currency || "");
+    const supplierNameChanged = comparable(supplier.supplierName) !== comparable(existing.supplierName || "");
+    const supplierVersionChanged = comparable(supplier.supplierVersion) !== comparable(existing.supplierVersion || "");
+    const timestampChanged = comparable(supplier.supplierCostTimestamp) !== comparable(formatDateInputValue(existing.supplierCostTimestamp));
+    const noteChanged = comparable(supplier.pricingNote) !== comparable(existing.pricingNote || "");
+
+    if (supplierCostChanged) patch.supplierCost = supplier.supplierCost;
+    if (supplierCurrencyChanged) patch.supplierCurrency = supplier.supplierCurrency;
+    if (supplierNameChanged) patch.supplierName = supplier.supplierName;
+    if (supplierVersionChanged) patch.supplierVersion = supplier.supplierVersion;
+    if (timestampChanged) patch.supplierCostTimestamp = supplier.supplierCostTimestamp;
+    if (noteChanged) patch.pricingNote = supplier.pricingNote;
+
+    if (Object.keys(patch).length) {
+        prices[region] = { ...(prices[region] || {}), ...patch };
+        changes.push(`${region}: ${adminT("supplier_cost", "Supplier Cost")} / ${adminT("pricing_note", "Pricing Note")}`);
+    }
+}
+
+function renderPricingPreviewState(message, type = "muted") {
+    const root = document.getElementById("catalogPricingPreview");
+    if (!root) return;
+    root.innerHTML = `<div class="catalog-pricing-preview-state is-${escapeHtml(type)}">${escapeHtml(message)}</div>`;
+}
+
+function renderPricingPreviewResult(region, preview) {
+    const root = document.querySelector(`[data-pricing-preview-region="${region}"]`);
+    if (!root) return;
+    const warnings = [...(preview.warnings || []), ...(preview.blockingErrors || [])];
+    root.innerHTML = `
+        <div class="catalog-pricing-preview-card">
+            <div class="catalog-pricing-preview-card-head">
+                <strong>${escapeHtml(region)} ${adminT("pricing_preview", "Pricing Preview")}</strong>
+                ${renderPricingStatusChip(preview.profitabilityStatus)}
+            </div>
+            <dl class="catalog-pricing-metrics">
+                <div><dt>${adminT("supplier_cost", "Supplier Cost")}</dt><dd>${preview.supplierCostConfigured ? escapeHtml(formatOptionalMoney(preview.supplierCost, preview.supplierCurrency)) : adminT("supplier_cost_not_configured", "Supplier cost not configured")}</dd></div>
+                <div><dt>${adminT("exchange_rate", "Exchange Rate")}</dt><dd>${preview.conversionRequired ? `${escapeHtml(preview.exchangeRatePair)} @ ${escapeHtml(preview.exchangeRate)}` : adminT("no_conversion_required", "No conversion required")}</dd></div>
+                <div><dt>${adminT("customer_payable", "Customer Payable")}</dt><dd>${escapeHtml(formatOptionalMoney(preview.finalPayableAmount, preview.currency))}</dd></div>
+                <div><dt>${adminT("discount", "Discount")}</dt><dd>${escapeHtml(formatOptionalMoney(preview.discountAmount || 0, preview.currency))}</dd></div>
+                <div><dt>${adminT("net_profit", "Net Profit")}</dt><dd>${preview.netProfit == null ? "-" : escapeHtml(formatOptionalMoney(preview.netProfit, preview.currency))}</dd></div>
+                <div><dt>${adminT("margin", "Margin")}</dt><dd>${preview.marginPercent == null ? "-" : `${escapeHtml(preview.marginPercent)}%`}</dd></div>
+            </dl>
+            <div class="catalog-pricing-preview-meta">
+                <span>${escapeHtml(preview.exchangeRateSource || preview.exchangeRateProvider || "AZIEL Commerce")}</span>
+                <span>${preview.supplierName ? escapeHtml(preview.supplierName) : adminT("supplier_not_named", "Supplier not named")}</span>
+            </div>
+            ${warnings.length ? `<ul class="catalog-pricing-warnings">${warnings.map(item => `<li><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>${escapeHtml(item.message || item.code)}</li>`).join("")}</ul>` : ""}
+        </div>
+    `;
+}
+
+function scheduleCatalogPricingPreview(product, pkg) {
+    clearTimeout(catalogPricingPreviewTimer);
+    catalogPricingPreviewTimer = setTimeout(() => loadCatalogPricingPreview(product, pkg), 350);
+}
+
+async function loadCatalogPricingPreview(product, pkg) {
+    const modal = document.getElementById("catalogPackageEditModal");
+    if (!modal?.classList.contains("show")) return;
+    const draft = readPackageEditDraft(product, pkg);
+    const requestId = ++catalogPricingPreviewRequestId;
+    renderPricingPreviewState(adminT("pricing_preview_loading", "Calculating authoritative preview..."), "loading");
+    const regions = ["MM", "TH"].filter(region => draft.regionEnabled?.[region]);
+    if (!regions.length) {
+        renderPricingPreviewState(adminT("pricing_preview_no_region", "Enable a region to preview pricing."), "muted");
+        return;
+    }
+    const root = document.getElementById("catalogPricingPreview");
+    if (root) {
+        root.innerHTML = regions.map(region => `<div data-pricing-preview-region="${region}"></div>`).join("");
+    }
+
+    await Promise.all(regions.map(async region => {
+        try {
+            const data = await adminFetch(`/api/admin/catalog/products/${encodeURIComponent(product.productCode)}/packages/${encodeURIComponent(pkg.packageCode)}/pricing-preview`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    region,
+                    price: buildPreviewPricePayload(draft, region),
+                    couponCode: draft.couponCode || ""
+                })
+            });
+            if (requestId !== catalogPricingPreviewRequestId) return;
+            if (!data?.success) {
+                renderPricingPreviewResult(region, {
+                    profitabilityStatus: "INVALID_CONFIGURATION",
+                    warnings: [],
+                    blockingErrors: [{ message: data?.message || adminT("pricing_preview_failed", "Pricing preview unavailable.") }]
+                });
+                return;
+            }
+            renderPricingPreviewResult(region, data.preview || {});
+        } catch (error) {
+            if (requestId !== catalogPricingPreviewRequestId) return;
+            renderPricingPreviewResult(region, {
+                profitabilityStatus: "INVALID_CONFIGURATION",
+                warnings: [],
+                blockingErrors: [{ message: error?.message || adminT("pricing_preview_failed", "Pricing preview unavailable.") }]
+            });
+        }
+    }));
 }
 
 function renderBannerList(banners = []) {
@@ -1709,17 +1869,27 @@ function openPackageEditPanel(product, pkg) {
     thEnabled.checked = draft?.regionEnabled?.TH ?? Boolean(pkg.prices?.TH);
     mmInput.value = draft?.values?.MM ?? pkg.prices?.MM?.amount ?? "";
     thInput.value = draft?.values?.TH ?? pkg.prices?.TH?.amount ?? "";
+    populateRegionalPricingControls(modal, "MM", draft, pkg.prices?.MM, "MMK");
+    populateRegionalPricingControls(modal, "TH", draft, pkg.prices?.TH, "THB");
+    modal.querySelector("#catalogEditCouponPreview").value = draft?.couponCode || "";
     mmInput.disabled = !mmEnabled.checked;
     thInput.disabled = !thEnabled.checked;
 
     modal.classList.add("show");
+    scheduleCatalogPricingPreview(product, pkg);
 
     mmEnabled.onchange = () => {
         mmInput.disabled = !mmEnabled.checked;
+        scheduleCatalogPricingPreview(product, pkg);
     };
     thEnabled.onchange = () => {
         thInput.disabled = !thEnabled.checked;
+        scheduleCatalogPricingPreview(product, pkg);
     };
+    modal.querySelectorAll("[data-pricing-preview-input]").forEach(input => {
+        input.oninput = () => scheduleCatalogPricingPreview(product, pkg);
+        input.onchange = () => scheduleCatalogPricingPreview(product, pkg);
+    });
     modal.querySelector("#catalogEditIcon").onclick = async () => {
         const asset = await window.AZIEL_ADMIN_MEDIA_SELECTOR?.open?.({ category: "package_icon" });
         if (!asset) return;
@@ -1824,6 +1994,15 @@ function validatePackageEditDraft(pkg, draft) {
             showAdminToast?.(adminT("catalog_update_failed", "Catalog update failed"), "error");
             return false;
         }
+
+        const supplierCost = draft.supplier?.[region]?.supplierCost;
+        if (supplierCost !== "") {
+            const supplierAmount = Number(supplierCost);
+            if (!Number.isFinite(supplierAmount) || supplierAmount < 0) {
+                showAdminToast?.(adminT("catalog_update_failed", "Catalog update failed"), "error");
+                return false;
+            }
+        }
     }
 
     return true;
@@ -1851,7 +2030,12 @@ function readPackageEditDraft(product, pkg) {
         values: {
             MM: mmEnabled ? String(mmInput?.value || "").trim() : "",
             TH: thEnabled ? String(thInput?.value || "").trim() : ""
-        }
+        },
+        supplier: {
+            MM: readRegionalPricingDraft(modal, "MM"),
+            TH: readRegionalPricingDraft(modal, "TH")
+        },
+        couponCode: String(modal?.querySelector("#catalogEditCouponPreview")?.value || "").trim()
     };
 }
 
@@ -1906,12 +2090,155 @@ function buildPackageEditChanges(pkg, draft) {
         changes.push(`TH: ${Number(draft.values.TH).toLocaleString()} THB`);
     }
 
+    ["MM", "TH"].forEach(region => {
+        if (draft.regionEnabled[region]) {
+            applySupplierPatchChanges(pkg, draft, prices, changes, region);
+        }
+    });
+
     return { name: nextName, enabled, iconAssetId, prices, changes };
 }
 
 function reopenPackageEditPanel(product, pkg, draft) {
     catalogPackageEditDraft = draft;
     openPackageEditPanel(product, pkg);
+}
+
+function renderRegionalPricingEditor(region, label, currency) {
+    const priceLabel = region === "MM" ? adminT("mmk_price", "MMK Price") : adminT("thb_price", "THB Price");
+    return `
+        <fieldset class="catalog-edit-fieldset catalog-regional-pricing" data-region="${escapeHtml(region)}">
+            <legend>${escapeHtml(label)} ${adminT("pricing", "Pricing")}</legend>
+            <div class="catalog-regional-pricing-grid">
+                <label>${priceLabel}<input id="catalogEdit${region}" data-pricing-preview-input type="number" step="0.01" min="0"></label>
+                <label>${adminT("selling_currency", "Selling Currency")}<input type="text" value="${escapeHtml(currency)}" readonly></label>
+                <label>${adminT("supplier_cost", "Supplier Cost")}<input id="catalogEdit${region}SupplierCost" data-pricing-preview-input type="number" step="0.01" min="0" placeholder="${adminT("supplier_cost_not_configured", "Supplier cost not configured")}"></label>
+                <label>${adminT("supplier_currency", "Supplier Currency")}
+                    <select id="catalogEdit${region}SupplierCurrency" data-pricing-preview-input>
+                        <option value="${escapeHtml(currency)}">${escapeHtml(currency)}</option>
+                        <option value="${currency === "MMK" ? "THB" : "MMK"}">${currency === "MMK" ? "THB" : "MMK"}</option>
+                    </select>
+                </label>
+                <label>${adminT("supplier_name", "Supplier Name")}<input id="catalogEdit${region}SupplierName" data-pricing-preview-input type="text" maxlength="120"></label>
+                <label>${adminT("supplier_version", "Supplier Version")}<input id="catalogEdit${region}SupplierVersion" data-pricing-preview-input type="text" maxlength="80"></label>
+                <label>${adminT("supplier_cost_timestamp", "Cost Timestamp")}<input id="catalogEdit${region}SupplierCostTimestamp" data-pricing-preview-input type="date"></label>
+                <label class="catalog-regional-note">${adminT("pricing_note", "Pricing Note")}<textarea id="catalogEdit${region}PricingNote" data-pricing-preview-input maxlength="240" rows="2"></textarea></label>
+            </div>
+        </fieldset>
+    `;
+}
+
+function openBulkSupplierCostPanel(product, packages = []) {
+    ensureBulkSupplierCostModal();
+    const modal = document.getElementById("catalogBulkSupplierCostModal");
+    const rows = packages.filter(item => !item.deleted && item.enabled !== false);
+    modal.querySelector("#catalogBulkSupplierCostRows").innerHTML = rows.map(pkg => `
+        <div class="catalog-bulk-cost-row" data-bulk-package="${escapeHtml(pkg.packageCode)}">
+            <strong>${escapeHtml(pkg.name)}</strong>
+            <small>${escapeHtml(pkg.packageCode)}</small>
+            ${["MM", "TH"].map(region => pkg.prices?.[region] ? `
+                <label>${escapeHtml(region)}
+                    <input data-bulk-cost="${escapeHtml(region)}" type="number" step="0.01" min="0" placeholder="${pkg.prices[region].supplierCost == null ? adminT("supplier_cost_not_configured", "Supplier cost not configured") : escapeHtml(pkg.prices[region].supplierCost)}">
+                </label>
+            ` : `<span class="catalog-bulk-cost-unavailable">${escapeHtml(region)} ${adminT("not_available", "Not available")}</span>`).join("")}
+        </div>
+    `).join("") || renderCatalogEmptyState({
+        icon: "fa-solid fa-coins",
+        title: adminT("no_packages_found", "No packages found"),
+        description: adminT("catalog_empty_packages_helper", "Packages for this product will appear here.")
+    });
+    modal.querySelector("#catalogBulkSupplierName").value = "";
+    modal.querySelector("#catalogBulkSupplierCurrency").value = "THB";
+    modal.querySelector("#catalogBulkSupplierVersion").value = "";
+    modal.querySelector("#catalogBulkSupplierTimestamp").value = formatDateInputValue(new Date());
+    modal.querySelector("#catalogBulkPricingNote").value = "";
+    modal.querySelector("#catalogBulkOverwrite").checked = false;
+    modal.classList.add("show");
+    modal.querySelector("#catalogBulkCancel").onclick = () => modal.classList.remove("show");
+    modal.querySelector("#catalogBulkSave").onclick = () => saveBulkSupplierCosts(product);
+}
+
+async function saveBulkSupplierCosts(product) {
+    const modal = document.getElementById("catalogBulkSupplierCostModal");
+    const supplierName = String(modal.querySelector("#catalogBulkSupplierName")?.value || "").trim();
+    const supplierCurrency = String(modal.querySelector("#catalogBulkSupplierCurrency")?.value || "THB").trim();
+    const supplierVersion = String(modal.querySelector("#catalogBulkSupplierVersion")?.value || "").trim();
+    const supplierCostTimestamp = String(modal.querySelector("#catalogBulkSupplierTimestamp")?.value || "").trim();
+    const pricingNote = String(modal.querySelector("#catalogBulkPricingNote")?.value || "").trim();
+    const overwrite = Boolean(modal.querySelector("#catalogBulkOverwrite")?.checked);
+    const rows = [];
+
+    modal.querySelectorAll("[data-bulk-package]").forEach(row => {
+        row.querySelectorAll("[data-bulk-cost]").forEach(input => {
+            const value = String(input.value || "").trim();
+            if (!value) return;
+            rows.push({
+                productCode: product.productCode,
+                packageCode: row.dataset.bulkPackage,
+                region: input.dataset.bulkCost,
+                supplierCost: value,
+                supplierCurrency,
+                supplierName,
+                supplierVersion,
+                supplierCostTimestamp,
+                pricingNote
+            });
+        });
+    });
+
+    if (!rows.length) {
+        showAdminToast?.(adminT("no_changes_to_save", "No changes to save."), "info");
+        return;
+    }
+
+    const confirmed = await confirmCatalogAction({
+        title: adminT("bulk_supplier_cost", "Bulk Supplier Cost"),
+        message: `${rows.length} ${adminT("packages", "Packages")}\n${overwrite ? adminT("overwrite_existing_costs", "Existing supplier costs may be overwritten.") : adminT("configured_costs_skipped", "Configured supplier costs will be skipped.")}`,
+        confirmText: adminT("save_changes", "Save Changes")
+    });
+    if (!confirmed) return;
+
+    const result = await adminFetch("/api/admin/catalog/pricing/supplier-costs/bulk", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows, overwrite })
+    });
+    if (!result?.success) {
+        showAdminToast?.(result?.message || adminT("catalog_update_failed", "Catalog update failed"), "error");
+        return;
+    }
+    modal.classList.remove("show");
+    showAdminToast?.(`${result.updatedCount || 0} updated, ${result.skippedCount || 0} skipped`, "success");
+    await selectCatalogProduct(product.productCode, true);
+}
+
+function ensureBulkSupplierCostModal() {
+    if (document.getElementById("catalogBulkSupplierCostModal")) return;
+    const modal = document.createElement("div");
+    modal.id = "catalogBulkSupplierCostModal";
+    modal.className = "admin-action-modal catalog-edit-modal";
+    modal.innerHTML = `
+        <div class="admin-action-modal-box">
+            <h3>${adminT("bulk_supplier_cost", "Bulk Supplier Cost")}</h3>
+            <div class="catalog-bulk-cost-controls">
+                <label>${adminT("supplier_name", "Supplier Name")}<input id="catalogBulkSupplierName" type="text" maxlength="120"></label>
+                <label>${adminT("supplier_currency", "Supplier Currency")}<select id="catalogBulkSupplierCurrency"><option value="THB">THB</option><option value="MMK">MMK</option></select></label>
+                <label>${adminT("supplier_version", "Supplier Version")}<input id="catalogBulkSupplierVersion" type="text" maxlength="80"></label>
+                <label>${adminT("supplier_cost_timestamp", "Cost Timestamp")}<input id="catalogBulkSupplierTimestamp" type="date"></label>
+                <label class="catalog-regional-note">${adminT("pricing_note", "Pricing Note")}<textarea id="catalogBulkPricingNote" rows="2" maxlength="240"></textarea></label>
+                <label class="catalog-toggle-row"><span>${adminT("overwrite_existing_costs", "Overwrite existing supplier costs")}</span><input id="catalogBulkOverwrite" type="checkbox"></label>
+            </div>
+            <div id="catalogBulkSupplierCostRows" class="catalog-bulk-cost-rows"></div>
+            <div class="admin-action-modal-actions">
+                <button id="catalogBulkCancel" type="button">${adminT("cancel", "Cancel")}</button>
+                <button id="catalogBulkSave" class="admin-primary-btn" type="button">${adminT("save_changes", "Save Changes")}</button>
+            </div>
+        </div>
+    `;
+    modal.addEventListener("click", event => {
+        if (event.target === modal) modal.classList.remove("show");
+    });
+    document.body.appendChild(modal);
 }
 
 function ensurePackageEditModal() {
@@ -1931,8 +2258,18 @@ function ensurePackageEditModal() {
                 <label class="catalog-choice-chip"><input id="catalogEditMMEnabled" type="checkbox"> Myanmar</label>
                 <label class="catalog-choice-chip"><input id="catalogEditTHEnabled" type="checkbox"> Thailand</label>
             </fieldset>
-            <label>${adminT("mmk_price", "MMK Price")} <input id="catalogEditMM" type="number" step="0.01" min="0"></label>
-            <label>${adminT("thb_price", "THB Price")} <input id="catalogEditTH" type="number" step="0.01" min="0"></label>
+            <div class="catalog-pricing-control-grid">
+                ${renderRegionalPricingEditor("MM", "Myanmar", "MMK")}
+                ${renderRegionalPricingEditor("TH", "Thailand", "THB")}
+            </div>
+            <label>${adminT("coupon_preview", "Coupon Impact Preview")} <input id="catalogEditCouponPreview" data-pricing-preview-input type="text" maxlength="40" placeholder="${adminT("optional_coupon_code", "Optional coupon code")}"></label>
+            <section class="catalog-pricing-preview" aria-live="polite">
+                <header>
+                    <strong>${adminT("live_business_preview", "Live Business Preview")}</strong>
+                    <span>${adminT("server_authoritative", "Server authoritative")}</span>
+                </header>
+                <div id="catalogPricingPreview"></div>
+            </section>
             <button id="catalogEditIcon" class="admin-secondary-btn" type="button">${adminT("select_package_icon", "Select Package Icon")}</button>
             <button id="catalogEditIconClear" class="admin-icon-btn danger" type="button">${adminT("remove_icon", "Remove Icon")}</button>
             <p id="catalogEditIconLabel"></p>
@@ -2092,6 +2429,69 @@ function formatRegionalPrice(price) {
     const amount = Number(price.amount);
     const formatted = Number.isFinite(amount) ? amount.toLocaleString("en-US") : String(price.amount || "");
     return `${formatted} ${price.currency || ""}`.trim();
+}
+
+function formatOptionalMoney(amount, currency = "") {
+    const numeric = Number(amount);
+    if (!Number.isFinite(numeric)) return "";
+    return `${numeric.toLocaleString("en-US")} ${currency || ""}`.trim();
+}
+
+function formatDateInputValue(value) {
+    if (!value) return "";
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return "";
+    return date.toISOString().slice(0, 10);
+}
+
+function renderPricingStatusChip(status = "UNKNOWN_SUPPLIER_COST") {
+    const labels = {
+        HEALTHY: adminT("pricing_healthy", "Healthy pricing"),
+        LOW_MARGIN: adminT("pricing_low_margin", "Low margin"),
+        NEGATIVE_MARGIN: adminT("pricing_negative_margin", "Loss-making"),
+        PRICE_BELOW_COST: adminT("pricing_price_below_cost", "Price below supplier cost"),
+        UNKNOWN_SUPPLIER_COST: adminT("pricing_supplier_cost_missing", "Supplier cost missing"),
+        EXCHANGE_RATE_MISSING: adminT("pricing_exchange_missing", "Exchange rate missing"),
+        INVALID_CONFIGURATION: adminT("pricing_invalid_setup", "Invalid pricing setup")
+    };
+    const classes = {
+        HEALTHY: "is-ok",
+        LOW_MARGIN: "is-warning",
+        NEGATIVE_MARGIN: "is-danger",
+        PRICE_BELOW_COST: "is-danger",
+        UNKNOWN_SUPPLIER_COST: "is-muted",
+        EXCHANGE_RATE_MISSING: "is-warning",
+        INVALID_CONFIGURATION: "is-danger"
+    };
+    return `<b class="admin-status-pill catalog-pricing-status ${classes[status] || "is-muted"}"><i class="fa-solid fa-chart-line" aria-hidden="true"></i>${escapeHtml(labels[status] || status)}</b>`;
+}
+
+function packageStaticPricingStatus(price) {
+    if (!price || price.enabled === false) return "INVALID_CONFIGURATION";
+    if (price.supplierCost == null || price.supplierCost === "") return "UNKNOWN_SUPPLIER_COST";
+    const supplier = Number(price.supplierCost);
+    const selling = Number(price.amount);
+    if (!Number.isFinite(supplier) || !Number.isFinite(selling)) return "INVALID_CONFIGURATION";
+    if ((price.supplierCurrency || price.currency) === price.currency && selling < supplier) return "PRICE_BELOW_COST";
+    return "HEALTHY";
+}
+
+function renderPackageBusinessPrice(price, region) {
+    if (!price || price.enabled === false) {
+        return `<span class="catalog-business-price is-muted">${adminT("not_available", "Not available")}</span>`;
+    }
+    const supplier = price.supplierCost == null || price.supplierCost === ""
+        ? adminT("supplier_cost_not_configured", "Supplier cost not configured")
+        : formatOptionalMoney(price.supplierCost, price.supplierCurrency || price.currency);
+    const updated = price.supplierCostTimestamp ? new Date(price.supplierCostTimestamp).toLocaleDateString() : "";
+    return `
+        <span class="catalog-business-price" data-region="${escapeHtml(region)}">
+            <strong>${escapeHtml(formatRegionalPrice(price))}</strong>
+            <small>${escapeHtml(supplier)}</small>
+            ${renderPricingStatusChip(packageStaticPricingStatus(price))}
+            ${updated ? `<em>${escapeHtml(updated)}</em>` : ""}
+        </span>
+    `;
 }
 
 function escapeHtml(value) {

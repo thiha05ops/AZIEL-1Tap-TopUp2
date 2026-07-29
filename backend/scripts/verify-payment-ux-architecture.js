@@ -146,9 +146,13 @@ function main() {
     [
         ".az-payment-sheet__actions",
         ".az-payment-sheet__checklist",
-        ".az-payment-sheet__fallback",
-        "@media (max-width: 520px)"
+        ".az-payment-sheet__fallback"
     ].forEach(token => assertIncludes(css, token, "payment sheet responsive capability styling"));
+    if (!/@media\s*\(max-width:\s*(?:520|600)px\)/.test(css) ||
+        !css.includes(".az-payment-sheet.is-mobile-promptpay .az-payment-sheet__actions") ||
+        !css.includes(".az-payment-sheet.is-mobile-promptpay .az-payment-sheet__checklist")) {
+        throw new Error("payment sheet responsive capability styling");
+    }
 
     const gameCss = read("frontend/css/game/payment-grid.css");
     [
