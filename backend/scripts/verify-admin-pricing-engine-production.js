@@ -352,7 +352,8 @@ async function verifyMiddlewareAndDeadlineLifecycle() {
         const body = JSON.parse(response.bodyText);
         const elapsedMs = Date.now() - startedAt;
         assert.strictEqual(response.status, 503, "Stalled Pricing Engine GET must return server-side 503.");
-        assert.strictEqual(body.code, "PRICING_DATA_TIMEOUT", "Stalled Pricing Engine GET must return timeout code.");
+        assert.strictEqual(body.code, "PRICING_WORKSPACE_BOOTSTRAP_TIMEOUT", "Stalled Pricing Engine GET must return timeout code.");
+        assert(body.stage, "Stalled Pricing Engine GET must return the last safe stage.");
         assert(body.requestId, "Stalled Pricing Engine GET must return requestId.");
         assert(elapsedMs >= 7500 && elapsedMs < 9000, `Stalled service must be bounded by server deadline, got ${elapsedMs}ms.`);
     } finally {
@@ -475,7 +476,9 @@ function verifySource() {
     assertContains("frontend/js/admin-pricing-engine.js", "waitForAdminAuthReady", "Pricing Engine must wait for Admin auth readiness before the initial production fetch.");
     assertContains("frontend/js/admin-pricing-engine.js", "state.loadPromise", "Pricing Engine load lifecycle must coalesce duplicate boot/auth requests.");
     assertContains("frontend/js/admin-pricing-engine.js", "[PRICING_ENGINE_ASYNC]", "Pricing Engine async lifecycle must have opt-in timing checkpoints.");
-    assertContains("frontend/admin.html", "pricing-workspace-bootstrap", "Admin page must cache-bust the Pricing Workspace bootstrap cancellation fix.");
+    assertContains("frontend/admin.html", "pricing-workspace-complete-response", "Admin page must cache-bust the Pricing Workspace complete-response fix.");
+    assertContains("frontend/js/admin-pricing-engine.js", "pricingRetryLoadBtn", "Pricing Engine frontend must expose a retry action after bootstrap failure.");
+    assertContains("frontend/js/admin-pricing-engine.js", "Pricing workspace failed to load", "Pricing Engine frontend must leave loading state with an actionable error.");
     assertContains("frontend/admin.html", "data-pricing-product-id=", "Static Pricing Engine product cards must expose the canonical delegated-click contract.");
     assertContains("frontend/js/admin-pricing-engine.js", "apiReady", "Pricing Engine must separate API readiness from local preview interactivity.");
     assertContains("frontend/js/admin-pricing-engine.js", "hydrateFallbackProductsFromDom", "Pricing Engine must hydrate selectable products from static DOM before API completion.");
@@ -492,6 +495,10 @@ function verifySource() {
     assertContains("frontend/js/admin-pricing-engine.js", "state.saving = false", "Save Draft must clear saving state in finally.");
     assertContains("frontend/js/admin-pricing-engine.js", "state.publishing = false", "Publish must clear publishing state in finally.");
     assertContains("backend/services/commerce/adminPricingEngineService.js", "Promise.all", "Pricing Engine GET must run independent reads in parallel.");
+    assertContains("backend/services/commerce/adminPricingEngineService.js", "CATALOG_PRODUCT_QUERY_STARTED", "Pricing Engine GET must trace CatalogProduct query start.");
+    assertContains("backend/services/commerce/adminPricingEngineService.js", "CATALOG_PRODUCT_QUERY_COMPLETED", "Pricing Engine GET must trace CatalogProduct query completion.");
+    assertContains("backend/services/commerce/adminPricingEngineService.js", "withBootstrapDeadline", "Pricing Engine GET must wrap bootstrap dependencies in an awaited server-side deadline.");
+    assertContains("backend/services/commerce/adminPricingEngineService.js", "plainJson", "Pricing Engine GET state must be converted to JSON-safe data.");
     assertContains("backend/services/commerce/adminPricingEngineService.js", "readCatalogPackages", "Pricing Engine GET must use one bounded catalog/package query.");
     assertContains("backend/services/commerce/adminPricingEngineService.js", "readConsolePolicies", "Pricing Engine GET must use one bounded policy query.");
     assertContains("backend/services/commerce/adminPricingEngineService.js", "maxTimeMS", "Pricing Engine GET queries must be bounded.");
@@ -499,7 +506,9 @@ function verifySource() {
     assertContains("backend/routes/adminPricingEngine.js", "pricingLifecycle", "Pricing Engine GET must start tracing and deadline before auth/RBAC.");
     assertContains("backend/routes/adminPricingEngine.js", "tracedAdminMiddleware", "Pricing Engine auth middleware must be traced and bounded.");
     assertContains("backend/routes/adminPricingEngine.js", "tracedPermission", "Pricing Engine RBAC middleware must be traced and bounded.");
-    assertContains("backend/routes/adminPricingEngine.js", "PRICING_DATA_TIMEOUT", "Pricing Engine deadline must send a structured timeout response.");
+    assertContains("backend/routes/adminPricingEngine.js", "PRICING_WORKSPACE_BOOTSTRAP_TIMEOUT", "Pricing Engine deadline must send a structured timeout response.");
+    assertContains("backend/routes/adminPricingEngine.js", "RESPONSE_SERIALIZATION_STARTED", "Pricing Engine GET must trace response serialization.");
+    assertContains("backend/routes/adminPricingEngine.js", "RESPONSE_SERIALIZATION_COMPLETED", "Pricing Engine GET must prove response serialization completed before send.");
     assertContains("backend/routes/adminPricingEngine.js", "/admin/pricing-engine/diagnostics", "Pricing Engine must expose temporary OWNER-only diagnostics.");
     assertContains("backend/services/commerce/adminPricingEngineService.js", "runPricingEngineDiagnostics", "Pricing Engine diagnostics must run bounded model checks.");
     assertContains("backend/routes/adminPricingEngine.js", "requireOwner", "Publishing must be OWNER-only.");

@@ -10,17 +10,19 @@ const { resolveSupplierCostSnapshot } = require("./supplierCostService");
 const BRANCH_KEY = "storefront";
 const QUERY_MAX_TIME_MS = 5000;
 const PRODUCT_LIMIT = 250;
+const PRICING_BOOTSTRAP_DEADLINE_MS = 7500;
 const CONFIG_KEYS = Object.freeze([
     { region: "TH", currency: "THB" },
     { region: "MM", currency: "MMK" }
 ]);
 
 class AdminPricingEngineError extends Error {
-    constructor(code, message, statusCode = 400) {
+    constructor(code, message, statusCode = 400, details = {}) {
         super(message);
         this.name = "AdminPricingEngineError";
         this.code = code;
         this.statusCode = statusCode;
+        this.stage = details.stage || "";
     }
 }
 
@@ -143,6 +145,35 @@ function boundedQuery(query) {
 
 function serviceTrace(trace, checkpoint, metadata = {}) {
     if (trace && typeof trace.log === "function") trace.log(checkpoint, metadata);
+}
+
+function plainJson(value) {
+    return JSON.parse(JSON.stringify(value));
+}
+
+function withBootstrapDeadline(promise, trace = null, timeoutMs = PRICING_BOOTSTRAP_DEADLINE_MS) {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+            const stage = trace?.lastCheckpoint || "unknown";
+            const error = new AdminPricingEngineError(
+                "PRICING_WORKSPACE_BOOTSTRAP_TIMEOUT",
+                "Pricing workspace data could not be loaded in time.",
+                503,
+                { stage }
+            );
+            reject(error);
+        }, timeoutMs);
+
+        Promise.resolve(promise)
+            .then(value => {
+                clearTimeout(timer);
+                resolve(value);
+            })
+            .catch(error => {
+                clearTimeout(timer);
+                reject(error);
+            });
+    });
 }
 
 async function latestVersion(trace = null) {
@@ -300,12 +331,21 @@ async function readCatalogPackages(trace = null) {
     return packages;
 }
 
-async function readCatalogProducts() {
-    return await boundedQuery(
+async function readCatalogProducts(trace = null) {
+    serviceTrace(trace, "CATALOG_PRODUCT_QUERY_STARTED", {
+        modelConnection: CatalogProduct.db?.name || "",
+        limit: PRODUCT_LIMIT
+    });
+    const products = await boundedQuery(
         CatalogProduct.find({ deletedAt: null })
             .select("productCode name displayName supportedRegions enabled")
             .sort({ productCode: 1 })
+            .limit(PRODUCT_LIMIT)
     ).lean();
+    serviceTrace(trace, "CATALOG_PRODUCT_QUERY_COMPLETED", {
+        count: products.length
+    });
+    return products;
 }
 
 async function readConsolePolicies(now = new Date(), trace = null) {
@@ -356,7 +396,7 @@ async function getPricingConsoleState(options = {}) {
     const [version, catalogPackages, catalogProducts, policyRecords] = await Promise.all([
         latestVersion(trace),
         readCatalogPackages(trace),
-        readCatalogProducts(),
+        readCatalogProducts(trace),
         readConsolePolicies(new Date(), trace)
     ]);
     serviceTrace(trace, "PRODUCT_GROUPING_STARTED");
@@ -393,7 +433,7 @@ async function getPricingConsoleState(options = {}) {
         });
     }
 
-    return {
+    return plainJson({
         branchKey: BRANCH_KEY,
         status: version ? "Production Active" : "Production Ready",
         version: version ? {
@@ -408,7 +448,7 @@ async function getPricingConsoleState(options = {}) {
         affected,
         products,
         policies
-    };
+    });
 }
 
 async function runPricingEngineDiagnostics(trace = null) {
@@ -649,10 +689,12 @@ async function publishPricing(admin = {}) {
 module.exports = {
     AdminPricingEngineError,
     BRANCH_KEY,
+    PRICING_BOOTSTRAP_DEADLINE_MS,
     QUERY_MAX_TIME_MS,
     getPricingConsoleState,
     neutralPolicyConfig,
     publishPricing,
     runPricingEngineDiagnostics,
-    saveDraftPricing
+    saveDraftPricing,
+    withBootstrapDeadline
 };

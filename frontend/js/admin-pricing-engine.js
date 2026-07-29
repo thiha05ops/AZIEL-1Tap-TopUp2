@@ -119,6 +119,12 @@
             publishDraft(section);
             return;
         }
+        const retryButton = event.target.closest("#pricingRetryLoadBtn");
+        if (retryButton && section.contains(retryButton)) {
+            event.preventDefault();
+            requestProductionLoad(section, "retry");
+            return;
+        }
         const pasteButton = event.target.closest("#pricingPasteBtn");
         if (pasteButton && section.contains(pasteButton)) {
             event.preventDefault();
@@ -529,9 +535,9 @@
                 calculateAndRenderPreview(section);
                 renderLoadError(section, `${state.loadError} Product selection and local preview remain available. Save and Publish are disabled until production pricing loads.`);
             } else {
-                renderError(section, state.loadError);
+                renderLoadError(section, state.loadError);
             }
-            setStatus(section, "Pricing unavailable");
+            setStatus(section, "Pricing workspace failed to load");
             trace("LOAD failed", { message: error.message });
         } finally {
             state.loading = false;
@@ -1301,7 +1307,10 @@
         const errorBox = section.querySelector("#pricingSimulationError");
         if (errorBox) {
             errorBox.hidden = false;
-            errorBox.textContent = message || state.loadError || "Production pricing data is unavailable.";
+            errorBox.innerHTML = `
+                <span>${escapeHTML(message || state.loadError || "Production pricing data is unavailable.")}</span>
+                <button id="pricingRetryLoadBtn" class="admin-secondary-btn" type="button">Retry</button>
+            `;
         }
     }
 
@@ -1476,7 +1485,7 @@
     function renderStatus(section) {
         if (state.loading || state.saving || state.publishing) return;
         if (state.loadError && !state.apiReady) {
-            setStatus(section, "Pricing unavailable");
+            setStatus(section, "Pricing workspace failed to load");
             setText(section, "#pricingSummaryExchangeMeta", "Local preview only");
             setText(section, "#pricingSummaryProfitMeta", "Save disabled");
             setText(section, "#pricingSummaryGatewayMeta", "Publish disabled");

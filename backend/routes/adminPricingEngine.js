@@ -11,7 +11,8 @@ const {
     getPricingConsoleState,
     publishPricing,
     runPricingEngineDiagnostics,
-    saveDraftPricing
+    saveDraftPricing,
+    withBootstrapDeadline
 } = require("../services/commerce/adminPricingEngineService");
 const {
     batchPreviewDailyPricing,
@@ -36,7 +37,9 @@ function createPricingTrace(req, res) {
         markCompleted() {
             completed = true;
         },
+        lastCheckpoint: "created",
         log(checkpoint, metadata = {}) {
+            this.lastCheckpoint = checkpoint;
             console.log("[PRICING_ENGINE_TRACE]", {
                 requestId,
                 checkpoint,
@@ -68,14 +71,16 @@ function startPricingDeadline(req, res) {
     const timer = setTimeout(() => {
         if (res.headersSent || req.aborted) return;
         trace.log("REQUEST_ERROR", {
-            code: "PRICING_DATA_TIMEOUT",
-            message: "Pricing data could not be loaded within the server deadline."
+            code: "PRICING_WORKSPACE_BOOTSTRAP_TIMEOUT",
+            message: "Pricing workspace data could not be loaded in time.",
+            stage: trace.lastCheckpoint || "unknown"
         });
         trace.markCompleted();
         return res.status(503).json({
             success: false,
-            code: "PRICING_DATA_TIMEOUT",
-            message: "Pricing data could not be loaded within the server deadline.",
+            code: "PRICING_WORKSPACE_BOOTSTRAP_TIMEOUT",
+            message: "Pricing workspace data could not be loaded in time.",
+            stage: trace.lastCheckpoint || "unknown",
             requestId: trace.requestId
         });
     }, PRICING_ENGINE_REQUEST_TIMEOUT_MS);
@@ -136,7 +141,8 @@ function sendPricingError(req, res, error) {
     trace?.log("REQUEST_ERROR", {
         errorName: error?.name || "Error",
         errorCode: error?.code || "",
-        errorMessage: error?.message || ""
+        errorMessage: error?.message || "",
+        ...(error?.stage ? { stage: error.stage } : {})
     });
     if (res.headersSent || req?.aborted) return;
     if (error instanceof AdminPricingEngineError) {
@@ -145,6 +151,7 @@ function sendPricingError(req, res, error) {
             success: false,
             code: error.code,
             message: error.message,
+            ...(error.stage ? { stage: error.stage } : {}),
             requestId: trace?.requestId
         });
     }
@@ -206,14 +213,21 @@ function requireOwner(req, res, next) {
 router.get("/admin/pricing-engine", pricingLifecycle, tracedAdminMiddleware, tracedPermission(PERMISSIONS.CATALOG_READ), async (req, res) => {
     try {
         req.pricingTrace?.log("ROUTE_HANDLER_ENTERED");
-        const state = await getPricingConsoleState({ trace: req.pricingTrace });
+        const state = await withBootstrapDeadline(getPricingConsoleState({ trace: req.pricingTrace }), req.pricingTrace);
         if (res.headersSent || req.aborted || req.pricingTrace?.completed) return;
+        req.pricingTrace?.log("RESPONSE_SERIALIZATION_STARTED");
+        const responseBody = { success: true, requestId: req.pricingTrace?.requestId, ...state };
+        const serialized = JSON.stringify(responseBody);
+        req.pricingTrace?.log("RESPONSE_SERIALIZATION_COMPLETED", {
+            bytes: Buffer.byteLength(serialized)
+        });
         req.pricingTrace?.log("RESPONSE_SENT", {
             products: Array.isArray(state.products) ? state.products.length : 0,
             policies: Array.isArray(state.policies) ? state.policies.length : 0
         });
         req.pricingTrace?.markCompleted();
-        return res.json({ success: true, requestId: req.pricingTrace?.requestId, ...state });
+        res.setHeader("Content-Type", "application/json; charset=utf-8");
+        return res.send(serialized);
     } catch (error) {
         return sendPricingError(req, res, error);
     }
