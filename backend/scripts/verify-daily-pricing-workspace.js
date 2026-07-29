@@ -40,6 +40,10 @@ function verifyBackend() {
     includes("backend/services/commerce/adminPricingControlCenterService.js", "failed: true", "Partial publish failures must be explicit.");
     includes("backend/services/commerce/adminPricingControlCenterService.js", "invalidWorkspaceRow", "Invalid pasted rows must become row-scoped blocked rows.");
     includes("backend/services/commerce/adminPricingControlCenterService.js", "invalidRows.concat(previewRows)", "Valid rows must still preview when invalid rows exist.");
+    includes("backend/services/commerce/adminPricingEngineService.js", "CatalogProduct", "Pricing Workspace bootstrap must use Admin catalog product data for product names.");
+    includes("backend/services/commerce/adminPricingEngineService.js", "CatalogPackage.find({ deletedAt: null })", "Pricing Workspace bootstrap must include disabled packages instead of enabled-only rows.");
+    includes("backend/services/commerce/adminPricingEngineService.js", "priceEnabled: price.enabled !== false", "Admin pricing payload must preserve disabled regional price status.");
+    includes("backend/services/commerce/adminPricingEngineService.js", "supplierCostConfigured", "Admin pricing payload must expose missing supplier-cost state.");
 }
 
 function verifyFrontend() {
@@ -69,6 +73,11 @@ function verifyFrontend() {
     includes("frontend/js/admin-pricing-engine.js", "previewSeq", "Debounced previews must protect against stale response overwrite.");
     includes("frontend/js/admin-pricing-engine.js", "window.confirm", "Publish must require explicit confirmation.");
     includes("frontend/js/admin-pricing-engine.js", "publishedKeys", "Successful published rows must be cleared from staged retry state.");
+    includes("frontend/js/admin-pricing-engine.js", "supplierPrice: Number.isFinite(supplierPrice) ? supplierPrice : null", "Missing supplier cost must not hide package rows.");
+    includes("frontend/js/admin-pricing-engine.js", "state.workspace.productFilter !== \"ALL\"", "All products must remain a non-filtering state.");
+    includes("frontend/js/admin-pricing-engine.js", "state.workspace.regionView !== \"ALL\"", "Region view must filter by normalized regional support.");
+    includes("frontend/js/admin-pricing-engine.js", "item.packageCode.toLowerCase() === key", "Paste matching must support exact package-code lookup.");
+    includes("frontend/js/admin-pricing-engine.js", "No catalog products loaded", "Empty state must distinguish missing product payloads.");
     notIncludes("frontend/js/admin-pricing-engine.js", "fetch('/api/admin/pricing-engine/workspace", "Workspace must use centralized pricingFetch helper, not ad hoc fetch.");
 
     includes("frontend/css/admin/admin-design-system.css", ".pricing-daily-workspace", "Daily workspace styles must exist.");

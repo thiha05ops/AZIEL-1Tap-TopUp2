@@ -348,15 +348,17 @@
         const raw = Array.isArray(data?.products) && data.products.length ? data.products : [FALLBACK_PRODUCT];
         if (raw.some(product => Array.isArray(product.packages))) {
             return raw.map(product => ({
-                productId: String(product.productId || product.productCode || product.productName || "").toLowerCase(),
-                productCode: String(product.productCode || product.productId || "").toLowerCase(),
+                productId: slug(product.productId || product.productCode || product.productName || ""),
+                productCode: slug(product.productCode || product.productId || product.productName || ""),
                 productName: product.productName || product.productCode || "Product",
+                enabled: product.enabled !== false,
+                supportedRegions: Array.isArray(product.supportedRegions) ? product.supportedRegions.map(region => String(region).toUpperCase()) : [],
                 packages: (product.packages || []).map(normalizePackage).filter(Boolean)
-            })).filter(product => product.productId && product.packages.length);
+            })).filter(product => product.productId);
         }
         const grouped = new Map();
         raw.map(normalizePackage).filter(Boolean).forEach(pkg => {
-            const productId = String(pkg.productCode || pkg.productName || "product").toLowerCase();
+            const productId = slug(pkg.productCode || pkg.productName || "product");
             if (!grouped.has(productId)) {
                 grouped.set(productId, {
                     productId,
@@ -372,18 +374,24 @@
 
     function normalizePackage(pkg) {
         if (!pkg) return null;
-        const supplierPrice = number(pkg.supplierPrice ?? pkg.amount, NaN);
-        if (!Number.isFinite(supplierPrice)) return null;
+        const supplierPrice = number(pkg.supplierPrice ?? pkg.supplierCost, NaN);
         return {
             packageId: String(pkg.packageId || pkg.packageRef || pkg.packageCode || "").trim(),
             packageCode: String(pkg.packageCode || pkg.packageId || "").trim(),
             packageName: String(pkg.packageName || pkg.name || pkg.packageCode || "Package").trim(),
-            productCode: String(pkg.productCode || "").toLowerCase(),
+            productCode: slug(pkg.productCode || pkg.productId || pkg.productName || ""),
             productName: String(pkg.productName || pkg.gameName || pkg.productCode || "Product").trim(),
+            packageEnabled: pkg.packageEnabled !== false,
+            priceEnabled: pkg.priceEnabled !== false,
             region: String(pkg.region || "TH").toUpperCase(),
             currency: String(pkg.currency || "THB").toUpperCase(),
             supplierCurrency: String(pkg.supplierCurrency || pkg.currency || "THB").toUpperCase(),
-            supplierPrice,
+            supplierPrice: Number.isFinite(supplierPrice) ? supplierPrice : null,
+            supplierCostConfigured: pkg.supplierCostConfigured === true,
+            supplierPackageCode: String(pkg.supplierPackageCode || pkg.supplierCode || pkg.packageCode || "").trim(),
+            supplierName: String(pkg.supplierName || "").trim(),
+            supplierVersion: String(pkg.supplierVersion || "").trim(),
+            supplierCostTimestamp: pkg.supplierCostTimestamp || "",
             publishedPrice: number(pkg.publishedPrice ?? pkg.amount, supplierPrice),
             publishedPriceMode: String(pkg.publishedPriceMode || "LEGACY_COMPATIBILITY_PRICE").toUpperCase(),
             manualOverrideReason: String(pkg.manualOverrideReason || "").trim(),
@@ -401,13 +409,13 @@
         if (!productId || !packageId || !Number.isFinite(supplierPrice)) return null;
         return {
             productId,
-            productCode: String(row.dataset.pricingProductCode || productId).trim().toLowerCase(),
+            productCode: slug(row.dataset.pricingProductCode || productId),
             productName: productName || productId,
             packages: [{
                 packageId,
                 packageCode: String(row.dataset.pricingPackageCode || packageId).trim(),
                 packageName: String(row.dataset.pricingPackage || row.querySelector("small")?.textContent || packageId).trim(),
-                productCode: String(row.dataset.pricingProductCode || productId).trim().toLowerCase(),
+                productCode: slug(row.dataset.pricingProductCode || productId),
                 productName: productName || productId,
                 region: String(row.dataset.pricingRegion || "TH").toUpperCase(),
                 currency: String(row.dataset.pricingCurrency || "THB").toUpperCase(),
@@ -445,7 +453,7 @@
             state.selectedPackageId = pkg?.packageId || product.packages[0]?.packageId || "";
             return;
         }
-        const firstProduct = state.products[0] || FALLBACK_PRODUCT;
+        const firstProduct = state.products.find(item => item.packages?.length) || state.products[0] || FALLBACK_PRODUCT;
         state.selectedProductId = firstProduct.productId;
         state.selectedPackageId = firstProduct.packages[0]?.packageId || "";
     }
@@ -541,20 +549,21 @@
         list.innerHTML = state.products.map(product => {
             const defaultPackage = product.packages[0];
             const selected = product.productId === state.selectedProductId;
+            const hasPackages = Boolean(defaultPackage);
             return `
                 <button class="catalog-product-row pricing-product-row ${selected ? "active" : ""}" type="button"
                     aria-pressed="${selected ? "true" : "false"}"
                     data-pricing-product-id="${escapeHTML(product.productId)}"
-                    data-pricing-package-id="${escapeHTML(defaultPackage.packageId)}"
+                    data-pricing-package-id="${escapeHTML(defaultPackage?.packageId || "")}"
                     data-pricing-product="${escapeHTML(product.productName)}"
-                    data-pricing-package="${escapeHTML(defaultPackage.packageName)}">
+                    data-pricing-package="${escapeHTML(defaultPackage?.packageName || "")}">
                     <span>
                         <strong>${escapeHTML(product.productName)}</strong>
-                        <small>${escapeHTML(defaultPackage.packageName)}</small>
+                        <small>${escapeHTML(defaultPackage?.packageName || "No pricing packages configured")}</small>
                     </span>
                     <span class="catalog-row-meta">
-                        <b>${escapeHTML(defaultPackage.packageCode || product.productCode)}</b>
-                        <small>${escapeHTML(defaultPackage.region)} / ${escapeHTML(defaultPackage.currency)}</small>
+                        <b>${escapeHTML(defaultPackage?.packageCode || product.productCode)}</b>
+                        <small>${hasPackages ? `${escapeHTML(defaultPackage.region)} / ${escapeHTML(defaultPackage.currency)}` : "Catalog product"}</small>
                     </span>
                 </button>
             `;
@@ -574,7 +583,12 @@
         state.selectedPackageId = packageId || product.packages[0]?.packageId || "";
         state.previewError = "";
         renderProducts(section);
-        calculateAndRenderPreview(section);
+        if (product.packages.length) {
+            calculateAndRenderPreview(section);
+        } else {
+            state.preview = null;
+            renderLoadError(section, "This catalog product has no pricing packages configured yet.");
+        }
     }
 
     function filterProducts(section, query) {
@@ -608,6 +622,9 @@
                         expectedUpdatedAt: pkg.updatedAt || "",
                         publishedPriceMode: pkg.publishedPriceMode,
                         manualOverrideReason: pkg.manualOverrideReason,
+                        supportedRegions: [pkg.region],
+                        packageEnabled: pkg.packageEnabled !== false,
+                        priceEnabledByRegion: { [pkg.region]: pkg.priceEnabled !== false },
                         selected: true,
                         changed: false,
                         status: "Unchanged"
@@ -615,6 +632,9 @@
                     return;
                 }
                 if (!existing.expectedUpdatedAt && pkg.updatedAt) existing.expectedUpdatedAt = pkg.updatedAt;
+                if (!existing.supportedRegions.includes(pkg.region)) existing.supportedRegions.push(pkg.region);
+                existing.priceEnabledByRegion[pkg.region] = pkg.priceEnabled !== false;
+                existing.packageEnabled = existing.packageEnabled && pkg.packageEnabled !== false;
                 if (existing.oldSupplierCost == null && pkg.supplierPrice != null) {
                     existing.oldSupplierCost = pkg.supplierPrice;
                     existing.newSupplierCost = pkg.supplierPrice;
@@ -710,6 +730,7 @@
     function workspaceRowsForRender() {
         return state.workspace.rows.filter(row => {
             if (state.workspace.productFilter !== "ALL" && row.productCode !== state.workspace.productFilter) return false;
+            if (state.workspace.regionView !== "ALL" && !row.supportedRegions?.includes(state.workspace.regionView)) return false;
             const preview = state.workspace.previewRows.find(item => item.rowId === row.rowId);
             const status = preview?.status || row.status || "Unchanged";
             if (state.workspace.filter === "ALL") return true;
@@ -744,7 +765,17 @@
         if (!grid) return;
         const rows = workspaceRowsForRender();
         if (!rows.length) {
-            grid.innerHTML = '<p class="empty">No packages match the current pricing workspace filter.</p>';
+            let message = "No packages match the current pricing workspace filter.";
+            if (state.loadError && !state.apiReady) {
+                message = `${state.loadError} Retry after confirming your Admin session and pricing API availability.`;
+            } else if (!state.products.length) {
+                message = "No catalog products loaded for Pricing Workspace.";
+            } else if (!state.workspace.rows.length) {
+                message = "Catalog products loaded, but no package rows were available for pricing operations.";
+            } else if (state.workspace.productFilter !== "ALL") {
+                message = "No packages for the selected product under the current filters.";
+            }
+            grid.innerHTML = `<p class="empty">${escapeHTML(message)}</p>`;
             renderWorkspaceSummary(section);
             renderWorkspaceDetail(section);
             return;
@@ -1156,6 +1187,7 @@
     }
 
     function formatMoney(value, currency) {
+        if (value == null || value === "" || !Number.isFinite(Number(value))) return `— ${currency || getSelectedPackage().currency}`;
         const numeric = Number(value || 0);
         return `${numeric.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${currency || getSelectedPackage().currency}`;
     }

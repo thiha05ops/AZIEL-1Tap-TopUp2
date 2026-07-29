@@ -7,6 +7,7 @@ const path = require("path");
 const { Duplex } = require("stream");
 
 const root = path.join(__dirname, "..", "..");
+const CatalogProduct = require("../models/CatalogProduct");
 const CatalogPackage = require("../models/CatalogPackage");
 const PricingPolicy = require("../models/PricingPolicy");
 const PriceVersion = require("../models/PriceVersion");
@@ -104,6 +105,7 @@ function matches(document, query = {}) {
 
 function installModelMocks() {
     const originals = {
+        productFind: CatalogProduct.find,
         catalogFind: CatalogPackage.find,
         policyFind: PricingPolicy.find,
         policyFindOne: PricingPolicy.findOne,
@@ -132,7 +134,15 @@ function installModelMocks() {
         prices: { TH: { amount: 1000, currency: "THB", enabled: true } },
         metadata: { gameName: "Mobile Legends" }
     }];
+    const products = [{
+        productCode: "mlbb",
+        name: "Mobile Legends",
+        enabled: true,
+        supportedRegions: ["TH", "MM"],
+        deletedAt: null
+    }];
 
+    CatalogProduct.find = () => chain(products);
     CatalogPackage.find = () => chain(packages);
     PricingPolicy.find = query => chain(policies.filter(policy => matches(policy, query)));
     PricingPolicy.findOne = query => chain(policies.filter(policy => matches(policy, query)).at(-1) || null);
@@ -171,9 +181,11 @@ function installModelMocks() {
 
     return {
         packages,
+        products,
         policies,
         versions,
         restore() {
+            CatalogProduct.find = originals.productFind;
             CatalogPackage.find = originals.catalogFind;
             PricingPolicy.find = originals.policyFind;
             PricingPolicy.findOne = originals.policyFindOne;

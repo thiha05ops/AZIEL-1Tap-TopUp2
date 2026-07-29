@@ -1,6 +1,7 @@
 "use strict";
 
 const mongoose = require("mongoose");
+const CatalogProduct = require("../../models/CatalogProduct");
 const CatalogPackage = require("../../models/CatalogPackage");
 const PricingPolicy = require("../../models/PricingPolicy");
 const PriceVersion = require("../../models/PriceVersion");
@@ -215,21 +216,37 @@ function affectedSummaryFromPackages(packages = []) {
     };
 }
 
-function productsFromPackages(packages = []) {
+function productsFromPackages(packages = [], productMap = new Map()) {
     const products = new Map();
+    productMap.forEach((product, key) => {
+        const productId = text(product.productCode || key).toLowerCase();
+        if (!productId) return;
+        products.set(productId, {
+            productId,
+            productCode: productId,
+            productName: text(product.name || product.displayName || product.productCode),
+            enabled: product.enabled !== false,
+            supportedRegions: Array.isArray(product.supportedRegions) ? product.supportedRegions.map(upper) : [],
+            packages: []
+        });
+    });
     packages.forEach(pkg => {
         const productId = text(pkg.productCode).toLowerCase();
         if (!productId) return;
+        const product = productMap.get(productId) || productMap.get(text(pkg.productCode));
+        const productName = text(product?.name || product?.displayName || pkg.metadata?.gameName || pkg.metadata?.productName || pkg.productCode);
         if (!products.has(productId)) {
             products.set(productId, {
                 productId,
                 productCode: productId,
-                productName: text(pkg.metadata?.gameName || pkg.metadata?.productName || pkg.productCode),
+                productName,
+                enabled: product?.enabled !== false,
+                supportedRegions: Array.isArray(product?.supportedRegions) ? product.supportedRegions.map(upper) : [],
                 packages: []
             });
         }
         Object.entries(pkg.prices || {}).forEach(([region, price]) => {
-            if (!price || price.enabled === false) return null;
+            if (!price) return null;
             const supplierCost = resolveSupplierCostSnapshot({
                 pkg,
                 price,
@@ -239,10 +256,12 @@ function productsFromPackages(packages = []) {
             });
             products.get(productId).packages.push({
                 productCode: pkg.productCode,
-                productName: text(pkg.metadata?.gameName || pkg.metadata?.productName || pkg.productCode),
+                productName,
                 packageId: String(pkg._id),
                 packageCode: pkg.packageCode,
                 packageName: pkg.name,
+                packageEnabled: pkg.enabled !== false,
+                priceEnabled: price.enabled !== false,
                 region: upper(region),
                 currency: upper(price.currency),
                 supplierCurrency: upper(supplierCost.currency),
@@ -262,7 +281,7 @@ function productsFromPackages(packages = []) {
         });
     });
 
-    return [...products.values()].filter(product => product.packages.length);
+    return [...products.values()];
 }
 
 async function readCatalogPackages(trace = null) {
@@ -270,7 +289,7 @@ async function readCatalogPackages(trace = null) {
         modelConnection: CatalogPackage.db?.name || "",
         limit: PRODUCT_LIMIT
     });
-    const query = CatalogPackage.find({ enabled: true, deletedAt: null })
+    const query = CatalogPackage.find({ deletedAt: null })
         .select("_id productCode packageCode name prices sortOrder metadata updatedAt")
         .sort({ productCode: 1, sortOrder: 1, packageCode: 1 })
         .limit(PRODUCT_LIMIT);
@@ -279,6 +298,14 @@ async function readCatalogPackages(trace = null) {
         count: packages.length
     });
     return packages;
+}
+
+async function readCatalogProducts() {
+    return await boundedQuery(
+        CatalogProduct.find({ deletedAt: null })
+            .select("productCode name displayName supportedRegions enabled")
+            .sort({ productCode: 1 })
+    ).lean();
 }
 
 async function readConsolePolicies(now = new Date(), trace = null) {
@@ -326,14 +353,16 @@ async function getPricingConsoleState(options = {}) {
     const trace = options.trace || null;
     const startedAt = Date.now();
     serviceTrace(trace, "STATE_SERVICE_STARTED");
-    const [version, catalogPackages, policyRecords] = await Promise.all([
+    const [version, catalogPackages, catalogProducts, policyRecords] = await Promise.all([
         latestVersion(trace),
         readCatalogPackages(trace),
+        readCatalogProducts(),
         readConsolePolicies(new Date(), trace)
     ]);
     serviceTrace(trace, "PRODUCT_GROUPING_STARTED");
     const affected = affectedSummaryFromPackages(catalogPackages);
-    const products = productsFromPackages(catalogPackages);
+    const productMap = new Map(catalogProducts.map(product => [text(product.productCode).toLowerCase(), product]));
+    const products = productsFromPackages(catalogPackages, productMap);
     serviceTrace(trace, "PRODUCT_GROUPING_COMPLETED", {
         products: products.length,
         packages: catalogPackages.length
