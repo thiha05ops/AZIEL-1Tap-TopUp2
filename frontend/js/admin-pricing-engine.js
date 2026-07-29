@@ -292,13 +292,15 @@
     async function pricingFetch(url, options = {}, timeoutMs = 20000) {
         const token = localStorage.getItem("adminToken") || "";
         if (!token) throw new Error("Admin session missing.");
-        const controller = new AbortController();
-        const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+        const useTimeout = Number.isFinite(Number(timeoutMs)) && Number(timeoutMs) > 0;
+        const controller = useTimeout ? new AbortController() : null;
+        const timeout = useTimeout ? window.setTimeout(() => controller.abort(), timeoutMs) : null;
         trace("FETCH started", { url, timeoutMs });
         try {
             const response = await fetch(url, {
                 ...options,
-                signal: controller.signal,
+                cache: options.cache || "no-store",
+                signal: controller?.signal,
                 headers: {
                     ...(options.headers || {}),
                     Authorization: `Bearer ${token}`
@@ -320,7 +322,7 @@
             if (error?.name === "AbortError") throw new Error("Request timed out. Please retry.");
             throw error;
         } finally {
-            window.clearTimeout(timeout);
+            if (timeout) window.clearTimeout(timeout);
         }
     }
 
@@ -480,7 +482,7 @@
         renderButtons(section);
         try {
             await waitForAdminAuthReady();
-            const data = await pricingFetch("/api/admin/pricing-engine");
+            const data = await pricingFetch("/api/admin/pricing-engine", {}, 0);
             trace("STATE populate started");
             state.products = normalizeProducts(data);
             state.productSource = "server";

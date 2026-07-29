@@ -468,12 +468,14 @@ function verifySource() {
     assertContains("frontend/js/admin-pricing-engine.js", "event.target.closest(\"[data-pricing-edit]\")", "Pricing Engine Edit buttons must be handled by delegated events.");
     assertContains("frontend/js/admin-pricing-engine.js", "pricingFetch", "Pricing Engine API actions must use bounded request lifecycle.");
     assertContains("frontend/js/admin-pricing-engine.js", "controller.abort()", "Pricing Engine Save/Publish must not remain loading forever on a hung request.");
+    assertContains("frontend/js/admin-pricing-engine.js", "cache: options.cache || \"no-store\"", "Pricing Engine bootstrap must bypass stale browser/service-worker cache.");
+    assertContains("frontend/js/admin-pricing-engine.js", "pricingFetch(\"/api/admin/pricing-engine\", {}, 0)", "Pricing Engine bootstrap GET must not be client-aborted before the backend sends a structured response.");
     assertContains("frontend/js/admin-pricing-engine.js", "requestProductionLoad(section, \"dom-ready\")", "Pricing Engine DOM boot must use the coalesced load lifecycle.");
     assertContains("frontend/js/admin-pricing-engine.js", "requestProductionLoad(section, \"admin-auth-ready\")", "Pricing Engine auth-ready boot must join the same load lifecycle.");
     assertContains("frontend/js/admin-pricing-engine.js", "waitForAdminAuthReady", "Pricing Engine must wait for Admin auth readiness before the initial production fetch.");
     assertContains("frontend/js/admin-pricing-engine.js", "state.loadPromise", "Pricing Engine load lifecycle must coalesce duplicate boot/auth requests.");
     assertContains("frontend/js/admin-pricing-engine.js", "[PRICING_ENGINE_ASYNC]", "Pricing Engine async lifecycle must have opt-in timing checkpoints.");
-    assertContains("frontend/admin.html", "pricing-engine-resilient-console", "Admin page must request the resilient Pricing Engine controller build.");
+    assertContains("frontend/admin.html", "pricing-workspace-bootstrap", "Admin page must cache-bust the Pricing Workspace bootstrap cancellation fix.");
     assertContains("frontend/admin.html", "data-pricing-product-id=", "Static Pricing Engine product cards must expose the canonical delegated-click contract.");
     assertContains("frontend/js/admin-pricing-engine.js", "apiReady", "Pricing Engine must separate API readiness from local preview interactivity.");
     assertContains("frontend/js/admin-pricing-engine.js", "hydrateFallbackProductsFromDom", "Pricing Engine must hydrate selectable products from static DOM before API completion.");
