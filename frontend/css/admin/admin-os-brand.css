@@ -1,0 +1,135 @@
+.aziel-os-brand {
+  color: #f8fafc;
+}
+
+.aziel-os-brand-inner {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.aziel-os-svg-mark {
+  width: clamp(72px, 44%, 86px);
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+
+.aziel-os-svg-mark.is-compact {
+  width: 36px;
+}
+
+.aziel-os-wordmark {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: .18em;
+  color: #f8fafc;
+  font-size: 22px;
+  font-weight: 950;
+  line-height: 1;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.aziel-os-wordmark b {
+  background: linear-gradient(135deg, #d8b4fe 0%, #a855f7 42%, #7c3aed 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.aziel-os-subtitle {
+  color: rgba(203, 213, 225, .82);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .24em;
+  line-height: 1.35;
+  text-align: center;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.admin-logo-fallback {
+  display: none;
+}
+
+.admin-logo[data-aziel-os-brand] {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  min-height: 128px;
+  padding: 8px 4px 12px;
+}
+
+.admin-logo[data-aziel-os-brand] .admin-logo-fallback,
+.admin-entry-brand-lockup[data-aziel-os-brand] .admin-logo-fallback {
+  display: block;
+}
+
+.admin-logo[data-aziel-os-brand] .aziel-os-brand-inner + .admin-logo-fallback,
+.admin-entry-brand-lockup[data-aziel-os-brand] .aziel-os-brand-inner + .admin-logo-fallback {
+  display: none;
+}
+
+.admin-entry-brand-lockup {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+}
+
+.admin-entry-brand-lockup .aziel-os-brand-inner {
+  justify-items: start;
+}
+
+.admin-entry-brand-lockup .aziel-os-svg-mark {
+  width: clamp(116px, 22vw, 168px);
+}
+
+.admin-entry-brand-lockup .aziel-os-wordmark {
+  justify-content: start;
+  font-size: clamp(42px, 8vw, 72px);
+  letter-spacing: .16em;
+}
+
+.admin-entry-brand-lockup .aziel-os-subtitle {
+  font-size: 12px;
+  letter-spacing: .30em;
+}
+
+.admin-body.admin-sidebar-collapsed .admin-logo[data-aziel-os-brand] {
+  min-height: 58px;
+  padding: 6px 0;
+}
+
+.admin-body.admin-sidebar-collapsed .admin-logo[data-aziel-os-brand] .aziel-os-wordmark,
+.admin-body.admin-sidebar-collapsed .admin-logo[data-aziel-os-brand] .aziel-os-subtitle {
+  display: none;
+}
+
+.admin-body.admin-sidebar-collapsed .admin-logo[data-aziel-os-brand] .aziel-os-svg-mark {
+  width: 36px;
+}
+
+@media (max-width: 760px) {
+  .admin-entry-brand-lockup .aziel-os-svg-mark {
+    width: 96px;
+  }
+
+  .admin-entry-brand-lockup .aziel-os-wordmark {
+    font-size: clamp(34px, 12vw, 54px);
+  }
+
+  .admin-entry-brand-lockup .aziel-os-subtitle {
+    white-space: normal;
+    text-align: left;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aziel-os-svg-mark * {
+    transition: none !important;
+  }
+}

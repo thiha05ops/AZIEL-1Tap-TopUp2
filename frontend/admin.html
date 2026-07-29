@@ -23,6 +23,7 @@
     <link rel="stylesheet" href="/css/admin/admin-support.css?v=20260706-2">
     <link rel="stylesheet" href="/css/admin/admin-live-chat.css?v=20260706-2">
     <link rel="stylesheet" href="/css/admin/admin-design-system.css?v=20260724-admin-nav">
+    <link rel="stylesheet" href="/css/admin/admin-os-brand.css?v=20260729-os-mark">
     <link rel="stylesheet" href="/css/campaign/campaign-popup.css?v=20260715-visual">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -37,12 +38,11 @@
         <aside id="adminSidebar" class="admin-sidebar" aria-label="AZIEL OS navigation">
 
             <div class="admin-sidebar-head">
-                <div class="admin-logo">
-                    <img class="admin-logo-img" src="/assets/logo/aziel-icon.webp" alt="AZIEL OS" width="38" height="38" decoding="async">
+                <div class="admin-logo" data-aziel-os-brand="sidebar">
+                    <img class="admin-logo-fallback" src="/assets/logo/aziel-icon.webp" alt="AZIEL OS" width="38" height="38" decoding="async">
                     <div class="admin-logo-copy">
                         <h1>AZIEL OS</h1>
                         <span>Commerce Operating System</span>
-                        <small>Version 2.5</small>
                     </div>
                 </div>
 
@@ -672,6 +672,9 @@
                                     <h3>Calculation Detail</h3>
                                     <span id="pricingWorkspaceDetailTitle">Select a row to inspect before/after pricing.</span>
                                 </div>
+                                <button id="pricingWorkspaceDetailClose" class="admin-icon-btn" type="button" aria-label="Close calculation detail">
+                                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                                </button>
                             </div>
                             <div id="pricingWorkspaceDetail" class="pricing-workspace-detail-body">
                                 <p class="empty">No staged package selected.</p>
@@ -1593,6 +1596,7 @@ TH</textarea></label>
     <script src="/js/admin/admin-i18n.js?v=20260713-phase1"></script>
     <script src="/js/admin/admin-ui.js?v=20260715-phase15"></script>
     <script src="/js/admin/admin-action-modal.js?v=20260714-phase4"></script>
+    <script src="/js/admin-os-brand.js?v=20260729-os-mark"></script>
     <script src="/js/admin-auth.js?v=20260715-phase12"></script>
     <script src="/js/os/kernel-errors.js?v=20260724-os-kernel"></script>
     <script src="/js/os/kernel-diagnostics.js?v=20260724-os-kernel"></script>

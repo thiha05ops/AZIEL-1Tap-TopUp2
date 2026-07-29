@@ -37,8 +37,13 @@ function main() {
     includes("frontend/admin.html", "adminProfileBtn", "Shared topbar profile action must exist.");
     includes("frontend/admin.html", "adminGlobalSearch", "Existing global search entry must remain.");
     includes("frontend/admin-login.html", "AZIEL OS", "Admin login must use AZIEL OS branding.");
-    includes("frontend/admin-login.html", "Commerce Operating System · Version 2.5", "Admin login must show OS subtitle/version.");
+    includes("frontend/admin-login.html", "Commerce Operating System", "Admin login must show OS subtitle.");
     notIncludes("frontend/home.html", "AZIEL OS", "Public storefront Home must not inherit Admin OS branding.");
+    includes("frontend/admin.html", "data-aziel-os-brand=\"sidebar\"", "Expanded sidebar must use the reusable AZIEL OS SVG brand component.");
+    includes("frontend/admin-login.html", "data-aziel-os-brand=\"login\"", "Login must use the reusable AZIEL OS SVG brand component.");
+    includes("frontend/js/admin-os-brand.js", "linearGradient", "AZIEL OS mark must use SVG gradient surfaces.");
+    includes("frontend/js/admin-os-brand.js", "feGaussianBlur", "AZIEL OS mark must use restrained SVG glow.");
+    includes("frontend/js/admin-os-brand.js", "admin-logo-fallback", "AZIEL OS SVG must retain image fallback.");
 
     assertOrder("frontend/admin.html", [
         "<span class=\"admin-nav-label\">Home</span>",
@@ -64,7 +69,8 @@ function main() {
     includes("frontend/css/admin/admin-design-system.css", "--aziel-os-purple", "AZIEL OS accent token must exist.");
     includes("frontend/css/admin/admin-design-system.css", "--aziel-os-focus-ring", "AZIEL OS focus ring token must exist.");
     includes("frontend/css/admin/admin-design-system.css", "@media (prefers-reduced-motion", "Admin design system must respect reduced motion.");
-    includes("frontend/css/admin/admin-design-system.css", ".admin-logo-img", "Admin logo image styling must prevent layout shift.");
+    includes("frontend/css/admin/admin-os-brand.css", ".aziel-os-svg-mark", "Admin SVG mark styling must exist.");
+    includes("frontend/css/admin/admin-os-brand.css", ".admin-body.admin-sidebar-collapsed", "Collapsed sidebar must show compact AZIEL OS mark.");
     includes("frontend/css/admin/admin-design-system.css", ".admin-icon-btn", "Reusable topbar icon button style must exist.");
 
     includes("frontend/js/admin-app.js", "document.title = `${titleText} · AZIEL OS`", "Page-specific titles must end with AZIEL OS.");

@@ -16,6 +16,10 @@ function notIncludes(file, fragment, message) {
     assert(!read(file).includes(fragment), `${file}: ${message}`);
 }
 
+function notIncludes(file, fragment, message) {
+    assert(!read(file).includes(fragment), `${file}: ${message}`);
+}
+
 function verifyBackend() {
     includes("backend/routes/adminPricingEngine.js", "/admin/pricing-engine/workspace/preview", "Daily Pricing Workspace preview endpoint must exist.");
     includes("backend/routes/adminPricingEngine.js", "/admin/pricing-engine/workspace/publish", "Daily Pricing Workspace publish endpoint must exist.");
@@ -103,13 +107,24 @@ function verifyFrontend() {
     includes("frontend/js/admin-pricing-engine.js", "clearIncompatibleWorkspaceState", "Product changes must clear incompatible detail/preview state.");
     includes("frontend/js/admin-pricing-engine.js", "row.productCode !== state.workspace.productFilter", "Detail panel must refuse stale product rows.");
     includes("frontend/js/admin-pricing-engine.js", "body: JSON.stringify({ rows, region: workspaceRegion() })", "Preview must send only staged rows for selected region.");
+    includes("frontend/js/admin-pricing-engine.js", "renderSupplierCostCell", "Supplier cost column must own a dedicated lightweight cell renderer.");
+    includes("frontend/js/admin-pricing-engine.js", "data-pricing-cost-action", "Supplier cost should activate editing from a display cell.");
+    includes("frontend/js/admin-pricing-engine.js", "moveCostEditor(section, event.shiftKey ? -1 : 1)", "Enter and Shift+Enter must move between supplier cost rows.");
+    includes("frontend/js/admin-pricing-engine.js", "cancelCostEditor(section)", "Escape must cancel supplier cost editing.");
+    includes("frontend/js/admin-pricing-engine.js", "Preview required", "Recommended price should clearly show preview-required state.");
+    notIncludes("frontend/js/admin-pricing-engine.js", "placeholder=\"Enter cost\"", "Supplier cost rows must not render heavy empty input boxes by default.");
+    includes("frontend/js/admin-pricing-engine.js", "displayWorkspaceStatus", "Pricing rows must use concise daily status labels.");
+    includes("frontend/js/admin-pricing-engine.js", "Select a package to view calculation", "Calculation detail must collapse to a clear empty state.");
+    includes("frontend/css/admin/admin-design-system.css", ".pricing-cost-cell", "Supplier cost cells must have subtle editable-column styling.");
+    includes("frontend/css/admin/admin-design-system.css", ".pricing-cost-input-shell", "Active supplier cost input must have owned focus styling.");
+    includes("frontend/css/admin/admin-design-system.css", ".pricing-workspace-detail.is-empty", "Calculation detail must support a collapsed empty state.");
     includes("frontend/js/admin-pricing-engine.js", "Publish All and All-region publishing are temporarily disabled", "Unsafe publish-all and All-region publish must be blocked.");
     includes("frontend/js/admin-pricing-engine.js", "body: JSON.stringify({ rows: publishable, publishAll: false, region: workspaceRegion() })", "Publish payload must contain only publishable staged rows.");
     includes("frontend/js/admin-pricing-engine.js", "workspacePublishAll.disabled = true", "Publish All button must stay disabled.");
     includes("frontend/js/admin-pricing-engine.js", "state.workspace.regionView !== \"ALL\"", "Region view must filter by normalized regional support.");
     includes("frontend/js/admin-pricing-engine.js", "Legacy THB Price", "Thailand/All grids must label legacy customer prices explicitly.");
     includes("frontend/js/admin-pricing-engine.js", "Legacy MMK Price", "Myanmar/All grids must label legacy customer prices explicitly.");
-    includes("frontend/js/admin-pricing-engine.js", "recommendedSellingPrice == null ? \"Unavailable\"", "Missing cost must not show fake recommended prices.");
+    includes("frontend/js/admin-pricing-engine.js", "recommendedSellingPrice == null ? \"Preview required\"", "Missing cost must not show fake recommended prices.");
     includes("frontend/js/admin-pricing-engine.js", "row.oldSupplierCost == null ? \"Not configured\"", "Detail panel must describe missing supplier cost.");
     includes("frontend/js/admin-pricing-engine.js", "parseOptionalPositiveAmount", "Inline editing must keep empty supplier cost empty until staged.");
     includes("frontend/js/admin-pricing-engine.js", "item.packageCode.toLowerCase() === key", "Paste matching must support exact package-code lookup.");
@@ -118,7 +133,7 @@ function verifyFrontend() {
 
     includes("frontend/css/admin/admin-design-system.css", ".pricing-daily-workspace", "Daily workspace styles must exist.");
     includes("frontend/css/admin/admin-design-system.css", "max-width: 720px", "Mobile card workflow breakpoint must exist.");
-    includes("frontend/css/admin/admin-design-system.css", "min-width: 980px", "Desktop grid must use intentional contained scrolling without the old extra-wide mixed region table.");
+    includes("frontend/css/admin/admin-design-system.css", "min-width: 860px", "Desktop grid must use intentional contained scrolling without the old extra-wide mixed region table.");
     includes("frontend/css/admin/admin-design-system.css", ".pricing-grid-head.is-all-view", "All view must have a compact grid configuration.");
     includes("frontend/css/admin/admin-design-system.css", ".pricing-business-rules-drawer", "Business Rules drawer styles must exist.");
     includes("frontend/css/admin/admin-design-system.css", "repeat(5, minmax(0, 1fr))", "Daily summary must use simplified five-card metrics.");
