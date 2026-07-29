@@ -81,6 +81,16 @@ function devLog(...args) {
     if (!isProduction) console.log(...args);
 }
 
+function commerceCoreDisabledLegacyPayableResponse(res, legacyFlow) {
+    return res.status(410).json({
+        success: false,
+        code: "LEGACY_PAYABLE_CREATION_DISABLED",
+        message: "New payable checkout creation is handled by AZIEL Commerce Core.",
+        legacyFlow,
+        commerceAuthority: "CommerceOrder + PaymentAttempt"
+    });
+}
+
 function settlePaymentRecoveryNotification(input = {}) {
     notificationService.resolvePaymentRecoveryNotification(input).catch(error => {
         devLog("Payment recovery notification resolution skipped:", error?.message || error);
@@ -757,6 +767,10 @@ async function emitManualOrderSubmitted(req, order, duplicate = false) {
 // MANUAL / DEEPLINK PAYMENT ATTEMPT
 // POST /api/payment/manual/attempt
 router.post("/payment/manual/attempt", authMiddleware, manualAttemptLimiter, async (req, res) => {
+    if (process.env.AZIEL_ALLOW_LEGACY_PAYABLE_CREATION !== "true") {
+        return commerceCoreDisabledLegacyPayableResponse(res, "manual_payment_attempt");
+    }
+
     let reservedRedemption = null;
     try {
         const {
@@ -1233,6 +1247,10 @@ router.post("/payment/manual/attempt/:attemptId/slip", authMiddleware, upload.si
 
 // GAME PAYMENT CREATE
 router.post("/payment/create", authMiddleware, activeOrderCreateLimiter, async (req, res) => {
+    if (process.env.AZIEL_ALLOW_LEGACY_PAYABLE_CREATION !== "true") {
+        return commerceCoreDisabledLegacyPayableResponse(res, "legacy_order_payment_create");
+    }
+
     let reservedRedemption = null;
     try {
         devLog("PAYMENT CREATE BODY =", req.body);

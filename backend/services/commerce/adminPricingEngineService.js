@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const CatalogPackage = require("../../models/CatalogPackage");
 const PricingPolicy = require("../../models/PricingPolicy");
 const PriceVersion = require("../../models/PriceVersion");
+const { resolveSupplierCostSnapshot } = require("./supplierCostService");
 
 const BRANCH_KEY = "storefront";
 const QUERY_MAX_TIME_MS = 5000;
@@ -225,6 +226,13 @@ function productsFromPackages(packages = []) {
         }
         Object.entries(pkg.prices || {}).forEach(([region, price]) => {
             if (!price || price.enabled === false) return null;
+            const supplierCost = resolveSupplierCostSnapshot({
+                pkg,
+                price,
+                region,
+                currency: price.currency,
+                now: new Date()
+            });
             products.get(productId).packages.push({
                 productCode: pkg.productCode,
                 productName: text(pkg.metadata?.gameName || pkg.metadata?.productName || pkg.productCode),
@@ -233,8 +241,13 @@ function productsFromPackages(packages = []) {
                 packageName: pkg.name,
                 region: upper(region),
                 currency: upper(price.currency),
-                supplierCurrency: upper(price.currency),
-                supplierPrice: number(price.amount),
+                supplierCurrency: upper(supplierCost.currency),
+                supplierPrice: number(supplierCost.amount),
+                supplierName: supplierCost.supplierName,
+                supplierVersion: supplierCost.supplierVersion,
+                supplierCostTimestamp: supplierCost.costTimestamp,
+                supplierCostConfigured: supplierCost.configured === true,
+                supplierCostSource: supplierCost.source,
                 exchangeRate: 1
             });
             return null;
@@ -250,7 +263,7 @@ async function readCatalogPackages(trace = null) {
         limit: PRODUCT_LIMIT
     });
     const query = CatalogPackage.find({ enabled: true, deletedAt: null })
-        .select("_id productCode packageCode name prices sortOrder metadata")
+        .select("_id productCode packageCode name prices sortOrder metadata updatedAt")
         .sort({ productCode: 1, sortOrder: 1, packageCode: 1 })
         .limit(PRODUCT_LIMIT);
     const packages = await boundedQuery(query).lean();

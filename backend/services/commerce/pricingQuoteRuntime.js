@@ -273,6 +273,7 @@ function summarizePricingInput(pricingInput = {}) {
         targetCurrency: normalizeUpper(pricingInput.targetCurrency),
         exchangeRate: pricingInput.exchangeRate ? clonePlain(pricingInput.exchangeRate, "pricingInput.exchangeRate") : null,
         policy: pricingInput.policy ? clonePlain(pricingInput.policy, "pricingInput.policy") : null,
+        context: pricingInput.context ? clonePlain(pricingInput.context, "pricingInput.context") : null,
         appliedPricingRules: Array.isArray(pricingInput.appliedPricingRules)
             ? pricingInput.appliedPricingRules.map(sanitizeRule)
             : []
@@ -322,7 +323,11 @@ function runPricingCalculation(pricingInput) {
     }
 }
 
-function validatePricingResult(result, requestCurrency) {
+function supplierCostConfigured(pricingInput = {}) {
+    return pricingInput.context?.supplierCostSnapshot?.configured === true;
+}
+
+function validatePricingResult(result, requestCurrency, pricingInput = {}) {
     if (!result || result.success !== true) {
         throw new PricingQuoteRuntimeError(ERROR_CODES.INVALID_PRICING_RESULT, "Pricing result did not succeed.");
     }
@@ -335,6 +340,12 @@ function validatePricingResult(result, requestCurrency) {
     const originalPrice = normalizeAmount(result.originalPrice, "pricingResult.originalPrice");
     if (originalPrice < 0) {
         throw new PricingQuoteRuntimeError(ERROR_CODES.INVALID_PRICING_RESULT, "Pricing original price cannot be negative.");
+    }
+    const warningCodes = new Set((result.warnings || []).map(warning => warning?.code).filter(Boolean));
+    if (supplierCostConfigured(pricingInput) && (warningCodes.has("NEGATIVE_EFFECTIVE_PROFIT") || warningCodes.has("PRICE_BELOW_COST"))) {
+        throw new PricingQuoteRuntimeError(ERROR_CODES.INVALID_PRICING_RESULT, "Pricing result failed margin safety checks.", {
+            warningCodes: [...warningCodes]
+        });
     }
     return originalPrice;
 }
@@ -399,9 +410,40 @@ function validatePromotionResult(result, currency) {
 }
 
 function buildPricingSnapshot(pricingInput, pricingResult, priceVersion) {
+    const inputSummary = summarizePricingInput(pricingInput);
+    const configuredSupplierCost = inputSummary.context?.supplierCostSnapshot?.configured === true;
+    const pricingWarningCodes = new Set((pricingResult.warnings || []).map(warning => warning?.code).filter(Boolean));
+    const profitabilityStatus = configuredSupplierCost
+        ? (pricingWarningCodes.has("NEGATIVE_EFFECTIVE_PROFIT") || pricingWarningCodes.has("PRICE_BELOW_COST")
+            ? "NEGATIVE"
+            : pricingWarningCodes.has("ZERO_MARGIN")
+                ? "LOW"
+                : "HEALTHY")
+        : "UNKNOWN_SUPPLIER_COST";
     return {
-        inputSummary: summarizePricingInput(pricingInput),
+        inputSummary,
         result: clonePlain(pricingResult, "pricingResult"),
+        supplierCostSnapshot: inputSummary.context?.supplierCostSnapshot || null,
+        exchangeSnapshot: inputSummary.context?.exchangeRateSnapshot || inputSummary.exchangeRate || null,
+        businessRuntime: {
+            supplierCost: inputSummary.supplierCost,
+            supplierCurrency: inputSummary.supplierCurrency,
+            supplierCostConfigured: configuredSupplierCost,
+            supplierCostSource: inputSummary.context?.supplierCostSnapshot?.source || "",
+            sellingPrice: normalizeAmount(pricingResult.originalPrice || 0, "pricingResult.originalPrice"),
+            sellingCurrency: normalizeUpper(pricingResult.currency),
+            discount: 0,
+            gatewayFee: normalizeAmount(pricingResult.gatewayFeeAmount || 0, "pricingResult.gatewayFeeAmount"),
+            walletFee: 0,
+            netRevenue: normalizeAmount(pricingResult.originalPrice || 0, "pricingResult.originalPrice"),
+            grossProfit: configuredSupplierCost ? normalizeAmount(pricingResult.calculatedProfitAmount || 0, "pricingResult.calculatedProfitAmount") : null,
+            netProfit: configuredSupplierCost ? normalizeAmount(pricingResult.calculatedProfitAmount || 0, "pricingResult.calculatedProfitAmount") : null,
+            marginPercent: configuredSupplierCost ? normalizeAmount(pricingResult.calculatedMarginPercent || 0, "pricingResult.calculatedMarginPercent") : null,
+            profitabilityStatus,
+            marginEnforcementApplied: configuredSupplierCost,
+            healthyMargin: profitabilityStatus === "HEALTHY",
+            warnings: configuredSupplierCost ? [] : ["SUPPLIER_COST_NOT_CONFIGURED"]
+        },
         engineVersion: pricingResult.engineVersion || PRICING_ENGINE_VERSION,
         specificationVersion: pricingResult.specificationVersion || PRICING_SPECIFICATION_VERSION,
         priceVersion: clonePlain(priceVersion, "versionContext")
@@ -495,7 +537,7 @@ function createPricingQuote(input) {
     const pricingInput = requirePlainObject(input.pricingInput, "pricingInput");
 
     const pricingResult = runPricingCalculation(pricingInput);
-    const originalPrice = validatePricingResult(pricingResult, currency);
+    const originalPrice = validatePricingResult(pricingResult, currency, pricingInput);
     const promotionInput = buildPromotionInput(input, originalPrice, currency, {
         issuedAt: times.issuedAt,
         region,

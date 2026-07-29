@@ -14,6 +14,30 @@ const regionalPriceSchema = new mongoose.Schema(
         enabled: {
             type: Boolean,
             default: true
+        },
+        supplierCost: {
+            type: Number,
+            min: 0,
+            default: null
+        },
+        supplierCurrency: {
+            type: String,
+            enum: ["MMK", "THB"],
+            default: null
+        },
+        supplierName: {
+            type: String,
+            trim: true,
+            default: ""
+        },
+        supplierVersion: {
+            type: String,
+            trim: true,
+            default: ""
+        },
+        supplierCostTimestamp: {
+            type: Date,
+            default: null
         }
     },
     {

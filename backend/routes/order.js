@@ -69,6 +69,16 @@ const {
 
 const COMMERCE_MANUAL_PROVIDER = "MANUAL_PROMPTPAY";
 
+function commerceCoreDisabledLegacyPayableResponse(res, legacyFlow) {
+    return res.status(410).json({
+        success: false,
+        code: "LEGACY_PAYABLE_CREATION_DISABLED",
+        message: "New payable checkout creation is handled by AZIEL Commerce Core.",
+        legacyFlow,
+        commerceAuthority: "CommerceOrder + PaymentAttempt"
+    });
+}
+
 function getCurrencyKey(currency) {
     return String(currency || "").toUpperCase() === "THB" ? "THB" : "MMK";
 }
@@ -1219,6 +1229,10 @@ router.post("/admin/orders/:id/refund", adminMiddleware, requireAdminPermission(
 
 // LEGACY / MANUAL ORDER CREATE
 router.post("/orders", authMiddleware, orderCreateLimiter, upload.single("paymentSlip"), async (req, res) => {
+    if (process.env.AZIEL_ALLOW_LEGACY_PAYABLE_CREATION !== "true") {
+        return commerceCoreDisabledLegacyPayableResponse(res, "legacy_orders_create");
+    }
+
     let evidence = null;
     let evidencePersisted = false;
     let reservedRedemption = null;

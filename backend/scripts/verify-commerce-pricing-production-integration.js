@@ -140,6 +140,7 @@ function commerceDeps({ records, createdOrders, orderIds = ["AZL-000001"], quote
                 createdOrders.push(order);
                 return order;
             },
+            findOrderById: async orderId => createdOrders.find(order => order.orderId === orderId) || null,
             markQuoteUsed: async ({ quoteId }) => {
                 const quote = records.get(quoteId);
                 return quote ? { ...structuredClone(quote), status: "USED" } : null;
@@ -148,6 +149,19 @@ function commerceDeps({ records, createdOrders, orderIds = ["AZL-000001"], quote
             getCheckoutTime: () => new Date("2026-07-26T12:01:00.000Z"),
             generateCheckoutId: () => "CHK-1",
             generateOrderId: () => orderIds.shift() || `AZL-${Date.now()}`
+        },
+        orderRepository: {
+            findOrderById: async orderId => createdOrders.find(order => order.orderId === orderId) || null,
+            updateOrderPaymentStatus: async ({ orderId, paymentStatus, paymentCompletedAt }) => {
+                const order = createdOrders.find(item => item.orderId === orderId);
+                if (!order) return null;
+                order.payment = {
+                    ...(order.payment || {}),
+                    status: paymentStatus,
+                    paidAt: paymentCompletedAt?.toISOString?.() || paymentCompletedAt || null
+                };
+                return order;
+            }
         }
     };
 }
@@ -231,6 +245,9 @@ async function verifyWalletAuthoritativeAmount() {
                 };
             },
             orderRepository: {
+                async findOrderById(orderId) {
+                    return paidOrders.get(orderId) || createdOrders.find(item => item.orderId === orderId) || null;
+                },
                 async findOwnedOrderById({ orderId }) {
                     return paidOrders.get(orderId) || createdOrders.find(item => item.orderId === orderId) || null;
                 },

@@ -247,7 +247,10 @@ function main() {
     includes("frontend/js/payment/payment-checkout-sheet.js", "payment_continue_to_receipt", "mobile QR step must continue to receipt upload");
     includes("frontend/js/payment/payment-checkout-sheet.js", "isDesktopPromptPayFlow", "desktop PromptPay must have explicit platform ownership");
     includes("frontend/js/payment/payment-checkout-sheet.js", "renderDesktopSupportedBanks", "desktop PromptPay must render informational supported-bank logos");
-    includes("frontend/js/payment/payment-checkout-sheet.js", "const canOpenApp = !desktopPromptPay", "desktop PromptPay must hide bank-launch action");
+    assert(
+        /const canOpenApp =[\s\S]*?!desktopPromptPay[\s\S]*?bool\(options\.enableOpenApp\)/.test(read("frontend/js/payment/payment-checkout-sheet.js")),
+        "desktop PromptPay must hide bank-launch action"
+    );
     includes("frontend/js/payment/payment-checkout-sheet.js", "payment_desktop_checklist_scan_or_save_qr", "desktop PromptPay checklist must avoid Open Banking App requirement");
     includes("frontend/js/payment/payment-checkout-sheet.js", "el.hidden = true;\n        el.textContent = \"\";", "customer-visible QR diagnostics must stay hidden");
     includes("frontend/css/payment/payment-checkout-sheet.css", ".az-payment-sheet.is-mobile-step-qr", "mobile QR step must have dedicated layout rules");

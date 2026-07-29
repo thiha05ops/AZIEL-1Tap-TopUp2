@@ -3,6 +3,8 @@
 const PricingPolicy = require("../../models/PricingPolicy");
 const PricingRule = require("../../models/PricingRule");
 const PriceVersion = require("../../models/PriceVersion");
+const { resolveExchangeRate } = require("./exchangeRateService");
+const { resolveSupplierCostSnapshot } = require("./supplierCostService");
 
 const DEFAULT_BRANCH = "storefront";
 
@@ -171,6 +173,18 @@ async function buildProductionPricingContext({ pkg, price, catalog = {}, region,
     const normalizedRegion = upper(region);
     const normalizedCurrency = upper(currency);
     const packageContext = packageContextFromCatalog(pkg, catalog);
+    const supplierCost = resolveSupplierCostSnapshot({
+        pkg,
+        price,
+        region: normalizedRegion,
+        currency: normalizedCurrency,
+        now
+    });
+    const exchangeRate = resolveExchangeRate({
+        sourceCurrency: supplierCost.currency,
+        targetCurrency: normalizedCurrency,
+        now
+    });
     const policy = await loadActivePolicy({ region: normalizedRegion, currency: normalizedCurrency, now });
     const [version, rules] = await Promise.all([
         loadPublishedVersion({ policy, pkg, region: normalizedRegion, now }),
@@ -181,9 +195,10 @@ async function buildProductionPricingContext({ pkg, price, catalog = {}, region,
         packageContext,
         pricing: {
             pricingInput: {
-                supplierCost: amount(price?.amount),
-                supplierCurrency: normalizedCurrency,
+                supplierCost: amount(supplierCost.amount),
+                supplierCurrency: supplierCost.currency,
                 targetCurrency: normalizedCurrency,
+                exchangeRate: supplierCost.currency === normalizedCurrency ? null : exchangeRate,
                 policy: policyFromRecord(policy),
                 appliedPricingRules: rules,
                 context: {
@@ -196,7 +211,14 @@ async function buildProductionPricingContext({ pkg, price, catalog = {}, region,
                     categoryCode: packageContext.categoryCode,
                     packageId: packageContext.packageId,
                     packageRef: packageContext.packageRef,
-                    packageCode: packageContext.packageCode
+                    packageCode: packageContext.packageCode,
+                    supplierCostSnapshot: supplierCost,
+                    exchangeRateSnapshot: exchangeRate,
+                    businessRuntime: {
+                        supplierCostConfigured: supplierCost.configured === true,
+                        supplierCostSource: supplierCost.source,
+                        healthyMarginRequired: true
+                    }
                 }
             },
             versionContext: {

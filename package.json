@@ -120,6 +120,7 @@
     "verify:commerce-manual-promptpay-adapter": "node backend/scripts/verify-commerce-manual-promptpay-adapter.js",
     "verify:commerce-manual-payment-application": "node backend/scripts/verify-commerce-manual-payment-application.js",
     "verify:commerce-customer-checkout-integration": "node backend/scripts/verify-commerce-customer-checkout-integration.js",
+    "verify:commerce-core-mega-sprint-phase1": "node backend/scripts/verify-commerce-core-mega-sprint-phase1.js",
     "verify:commerce-pricing-production-integration": "node backend/scripts/verify-commerce-pricing-production-integration.js",
     "verify:admin-pricing-engine-production": "node backend/scripts/verify-admin-pricing-engine-production.js",
     "verify:admin-pricing-engine-controller": "node backend/scripts/verify-admin-pricing-engine-controller.js",
