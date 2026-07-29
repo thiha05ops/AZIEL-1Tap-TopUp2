@@ -37,8 +37,14 @@ assertIncludes(adminHtml, "admin-mobile-drawer-actions", "Mobile drawer actions 
 
 assertIncludes(adminCss, ".admin-body .top-actions", "Mobile topbar must control desktop top actions");
 assertIncludes(adminCss, "display: none", "Mobile CSS must hide nonessential permanent shell controls");
-assertIncludes(adminCss, "#section-orders .orders-command-panel > .panel-head", "Orders duplicate heading must be controlled on mobile");
-assertIncludes(adminCss, "#section-wallet .wallet-command-panel > .panel-head", "Wallet duplicate heading must be controlled on mobile");
+assert.ok(
+    /#section-orders\s+\.orders-command-panel\s*>\s*\.panel-head/.test(adminCss),
+    "Orders duplicate heading must be controlled on mobile"
+);
+assert.ok(
+    /#section-wallet\s+\.wallet-command-panel\s*>\s*\.panel-head/.test(adminCss),
+    "Wallet duplicate heading must be controlled on mobile"
+);
 assertIncludes(adminCss, "#section-wallet.admin-mobile-detail-open .wallet-command-panel", "Wallet mobile detail state must hide the queue panel");
 assertIncludes(adminCss, "#section-wallet.admin-mobile-list-open .wallet-detail-panel", "Wallet mobile list state must hide the detail panel");
 assertIncludes(adminCss, ".wallet-queue-filters,\n  .wallet-summary-grid", "Wallet filters and summary must collapse to one mobile column");

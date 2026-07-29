@@ -16,10 +16,6 @@ function notIncludes(file, fragment, message) {
     assert(!read(file).includes(fragment), `${file}: ${message}`);
 }
 
-function notIncludes(file, fragment, message) {
-    assert(!read(file).includes(fragment), `${file}: ${message}`);
-}
-
 function verifyBackend() {
     includes("backend/routes/adminPricingEngine.js", "/admin/pricing-engine/workspace/preview", "Daily Pricing Workspace preview endpoint must exist.");
     includes("backend/routes/adminPricingEngine.js", "/admin/pricing-engine/workspace/publish", "Daily Pricing Workspace publish endpoint must exist.");
@@ -113,17 +109,33 @@ function verifyFrontend() {
     includes("frontend/js/admin-pricing-engine.js", "cancelCostEditor(section)", "Escape must cancel supplier cost editing.");
     includes("frontend/js/admin-pricing-engine.js", "Preview required", "Recommended price should clearly show preview-required state.");
     notIncludes("frontend/js/admin-pricing-engine.js", "placeholder=\"Enter cost\"", "Supplier cost rows must not render heavy empty input boxes by default.");
+    notIncludes("frontend/js/admin-pricing-engine.js", "Server preview", "Pricing rows must not show duplicate recommended-price helper labels.");
     includes("frontend/js/admin-pricing-engine.js", "displayWorkspaceStatus", "Pricing rows must use concise daily status labels.");
     includes("frontend/js/admin-pricing-engine.js", "Select a package to view calculation", "Calculation detail must collapse to a clear empty state.");
+    includes("frontend/js/admin-pricing-engine.js", "Thailand supplier costs are entered in THB", "Thailand supplier currency control must explain THB lock.");
+    includes("frontend/admin.html", "class=\"pricing-workspace-detail\" aria-label=\"Pricing calculation detail\" hidden aria-hidden=\"true\"", "Calculation detail panel must start collapsed by default.");
+    includes("frontend/js/admin-pricing-engine.js", "workspace?.classList.remove(\"has-detail\")", "Workspace must restore full-width grid when no row is selected.");
+    includes("frontend/js/admin-pricing-engine.js", "panel?.setAttribute(\"hidden\", \"\")", "Detail panel must be hidden when no row is selected.");
+    includes("frontend/js/admin-pricing-engine.js", "workspace?.classList.add(\"has-detail\")", "Workspace must open the detail column only after row selection.");
+    includes("frontend/js/admin-pricing-engine.js", "panel?.removeAttribute(\"hidden\")", "Detail panel must remove hidden only for selected rows.");
+    includes("frontend/js/admin-pricing-engine.js", "#pricingWorkspaceDetailClose", "Detail panel must keep an explicit close action.");
+    includes("frontend/js/admin-pricing-engine.js", ": (state.workspace.supplierCurrency || \"THB\")", "Myanmar supplier cost display must follow the supplier currency selector.");
+    notIncludes("frontend/js/admin-pricing-engine.js", "state.workspace.regionView === \"MM\" ? \"MMK\"", "Myanmar region must not hard-force supplier costs to MMK.");
     includes("frontend/css/admin/admin-design-system.css", ".pricing-cost-cell", "Supplier cost cells must have subtle editable-column styling.");
     includes("frontend/css/admin/admin-design-system.css", ".pricing-cost-input-shell", "Active supplier cost input must have owned focus styling.");
-    includes("frontend/css/admin/admin-design-system.css", ".pricing-workspace-detail.is-empty", "Calculation detail must support a collapsed empty state.");
+    includes("frontend/css/admin/admin-design-system.css", ".pricing-cost-display", "Inactive supplier cost display must have a click affordance.");
+    includes("frontend/css/admin/admin-design-system.css", "cursor: pointer", "Inactive supplier cost display must use a pointer cursor.");
+    includes("frontend/css/admin/admin-design-system.css", ".pricing-cost-input-shell input", "Active supplier cost input must be height-constrained inside the 36px shell.");
+    includes("frontend/css/admin/admin-design-system.css", ".pricing-workspace-detail[hidden]", "Calculation detail must be truly removed from layout while collapsed.");
+    includes("frontend/css/admin/admin-design-system.css", "width: 16px", "Desktop checkboxes must be 16px.");
+    includes("frontend/css/admin/admin-design-system.css", "width: 18px", "Tablet checkboxes must be 18px.");
+    includes("frontend/css/admin/admin-design-system.css", "width: 20px", "Mobile checkboxes must be 20px.");
     includes("frontend/js/admin-pricing-engine.js", "Publish All and All-region publishing are temporarily disabled", "Unsafe publish-all and All-region publish must be blocked.");
     includes("frontend/js/admin-pricing-engine.js", "body: JSON.stringify({ rows: publishable, publishAll: false, region: workspaceRegion() })", "Publish payload must contain only publishable staged rows.");
     includes("frontend/js/admin-pricing-engine.js", "workspacePublishAll.disabled = true", "Publish All button must stay disabled.");
     includes("frontend/js/admin-pricing-engine.js", "state.workspace.regionView !== \"ALL\"", "Region view must filter by normalized regional support.");
-    includes("frontend/js/admin-pricing-engine.js", "Legacy THB Price", "Thailand/All grids must label legacy customer prices explicitly.");
-    includes("frontend/js/admin-pricing-engine.js", "Legacy MMK Price", "Myanmar/All grids must label legacy customer prices explicitly.");
+    includes("frontend/js/admin-pricing-engine.js", "<span>Current Price</span><span>Recommended Price</span><span>Profit</span><span>Status</span>", "Thailand grid must use concise daily pricing columns.");
+    includes("frontend/js/admin-pricing-engine.js", "state.workspace.regionView === \"TH\"", "Thailand view must force supplier currency ownership.");
     includes("frontend/js/admin-pricing-engine.js", "recommendedSellingPrice == null ? \"Preview required\"", "Missing cost must not show fake recommended prices.");
     includes("frontend/js/admin-pricing-engine.js", "row.oldSupplierCost == null ? \"Not configured\"", "Detail panel must describe missing supplier cost.");
     includes("frontend/js/admin-pricing-engine.js", "parseOptionalPositiveAmount", "Inline editing must keep empty supplier cost empty until staged.");
@@ -134,7 +146,8 @@ function verifyFrontend() {
     includes("frontend/css/admin/admin-design-system.css", ".pricing-daily-workspace", "Daily workspace styles must exist.");
     includes("frontend/css/admin/admin-design-system.css", "max-width: 720px", "Mobile card workflow breakpoint must exist.");
     includes("frontend/css/admin/admin-design-system.css", "min-width: 860px", "Desktop grid must use intentional contained scrolling without the old extra-wide mixed region table.");
-    includes("frontend/css/admin/admin-design-system.css", ".pricing-grid-head.is-all-view", "All view must have a compact grid configuration.");
+    includes("frontend/css/admin/admin-design-system.css", ".pricing-grid-head.is-th-view", "Thailand view must have a compact grid configuration.");
+    includes("frontend/css/admin/admin-design-system.css", ".pricing-grid-head.is-mm-view", "Myanmar view must have a compact grid configuration.");
     includes("frontend/css/admin/admin-design-system.css", ".pricing-business-rules-drawer", "Business Rules drawer styles must exist.");
     includes("frontend/css/admin/admin-design-system.css", "repeat(5, minmax(0, 1fr))", "Daily summary must use simplified five-card metrics.");
     includes("frontend/css/admin/admin-design-system.css", "grid-template-columns: 1fr", "Mobile layout must collapse to one column.");

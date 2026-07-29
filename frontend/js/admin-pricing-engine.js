@@ -913,6 +913,13 @@
         }
         const currency = event.target.closest("#pricingWorkspaceCurrency");
         if (currency && section.contains(currency)) {
+            if (state.workspace.regionView === "TH") {
+                currency.value = "THB";
+                state.workspace.supplierCurrency = "THB";
+                renderWorkspaceControls(section);
+                renderWorkspaceGrid(section);
+                return;
+            }
             state.workspace.supplierCurrency = currency.value;
             state.workspace.stagedChangesByPackageId.forEach(row => {
                 row.supplierCurrency = currency.value;
@@ -920,6 +927,8 @@
             state.workspace.rows.forEach(row => {
                 if (isRowStaged(row)) row.supplierCurrency = currency.value;
             });
+            renderWorkspaceControls(section);
+            renderWorkspaceGrid(section);
             scheduleWorkspacePreview(section);
             return;
         }
@@ -935,8 +944,18 @@
         if (regionView && section.contains(regionView)) {
             state.workspace.regionView = regionView.value;
             state.workspace.selectedRegion = regionView.value;
+            if (regionView.value === "TH") {
+                state.workspace.supplierCurrency = "THB";
+                state.workspace.stagedChangesByPackageId.forEach(row => {
+                    row.supplierCurrency = "THB";
+                });
+                state.workspace.rows.forEach(row => {
+                    if (isRowStaged(row)) row.supplierCurrency = "THB";
+                });
+            }
             state.workspace.previewResultsByPackageId.clear();
             state.workspace.previewRows = [];
+            renderWorkspaceControls(section);
             renderWorkspaceGrid(section);
             scheduleWorkspacePreview(section);
             return;
@@ -962,9 +981,37 @@
         if (regionSelect && [...regionSelect.options].some(option => option.value === state.workspace.regionView)) {
             regionSelect.value = state.workspace.regionView;
         }
+        if (state.workspace.regionView === "TH") {
+            state.workspace.supplierCurrency = "THB";
+        }
         const currencySelect = section.querySelector("#pricingWorkspaceCurrency");
         if (currencySelect && [...currencySelect.options].some(option => option.value === state.workspace.supplierCurrency)) {
             currencySelect.value = state.workspace.supplierCurrency;
+            currencySelect.disabled = state.workspace.regionView === "TH";
+            currencySelect.title = state.workspace.regionView === "TH"
+                ? "Thailand supplier costs are entered in THB"
+                : "";
+        }
+        const mmRate = section.querySelector("#pricingWorkspaceMmkRate");
+        if (mmRate) {
+            mmRate.textContent = `Supplier ${state.workspace.supplierCurrency || "THB"} → Selling MMK`;
+        }
+    }
+
+    function syncWorkspaceControlState(section) {
+        const regionSelect = section?.querySelector("#pricingWorkspaceRegion");
+        if (regionSelect?.value) {
+            state.workspace.regionView = regionSelect.value;
+            state.workspace.selectedRegion = regionSelect.value;
+        }
+        const currencySelect = section?.querySelector("#pricingWorkspaceCurrency");
+        if (state.workspace.regionView === "TH") {
+            state.workspace.supplierCurrency = "THB";
+            if (currencySelect) currencySelect.value = "THB";
+            return;
+        }
+        if (currencySelect?.value) {
+            state.workspace.supplierCurrency = currencySelect.value;
         }
     }
 
@@ -1045,7 +1092,10 @@
         const active = state.workspace.editingCostRowId === row.rowId;
         const changed = isRowStaged(row);
         const missing = row.newSupplierCost == null;
-        const currency = escapeHTML(row.supplierCurrency || state.workspace.supplierCurrency || "THB");
+        const displayCurrency = state.workspace.regionView === "TH"
+            ? "THB"
+            : (state.workspace.supplierCurrency || "THB");
+        const currency = escapeHTML(displayCurrency);
         if (active) {
             return `
                 <div class="pricing-grid-cell pricing-cost-cell is-editing ${changed ? "is-changed" : ""}" data-pricing-cost-cell="${rowId}">
@@ -1053,7 +1103,6 @@
                         <input data-pricing-cost-input="${rowId}" type="number" min="0" step="0.01" value="${escapeHTML(inputValue(row.newSupplierCost))}" aria-label="New supplier cost">
                         <span>${currency}</span>
                     </label>
-                    <small>Enter to continue · Esc cancels</small>
                 </div>`;
         }
         return `
@@ -1061,18 +1110,16 @@
                 <button class="pricing-cost-display" type="button" data-pricing-cost-action="${rowId}" aria-label="Edit supplier cost for ${escapeHTML(row.packageName)}">
                     <strong>${missing ? "Add cost" : displayCostValue(row.newSupplierCost)}</strong>
                     <span>${currency}</span>
+                    <i class="fa-solid fa-pen" aria-hidden="true"></i>
                 </button>
-                <small>${changed ? "Changed" : missing ? "Missing cost" : `Current: ${formatMoney(row.oldSupplierCost, row.supplierCurrency)}`}</small>
             </div>`;
-    }
-
-    function rowStatusHint(preview) {
-        return (preview?.blockingErrors || preview?.warnings || [])[0]?.message || "Server preview";
     }
 
     function renderWorkspaceGrid(section) {
         const grid = section.querySelector("#pricingWorkspaceGrid");
         if (!grid) return;
+        syncWorkspaceControlState(section);
+        renderWorkspaceControls(section);
         const rows = workspaceRowsForRender();
         if (!rows.length) {
             let message = "No packages match the current pricing workspace filter.";
@@ -1092,15 +1139,15 @@
         }
         const view = state.workspace.regionView;
         const header = view === "TH"
-            ? `<div class="pricing-grid-head is-region-view" role="row">
+            ? `<div class="pricing-grid-head is-th-view" role="row">
                 <span>Select</span><span>Package</span><span>Supplier Cost</span>
-                <span>Current Price</span><span>Recommended Price</span><span>Profit</span><span>Margin</span><span>Status</span>
+                <span>Current Price</span><span>Recommended Price</span><span>Profit</span><span>Status</span>
             </div>`
             : view === "MM"
-                ? `<div class="pricing-grid-head is-region-view" role="row">
+                ? `<div class="pricing-grid-head is-mm-view" role="row">
                     <span>Select</span><span>Package</span><span>Supplier Cost</span>
                     <span>Exchange Rate</span><span>Current Price</span><span>Recommended Price</span>
-                    <span>Profit</span><span>Margin</span><span>Status</span>
+                    <span>Profit</span><span>Status</span>
                 </div>`
                 : `<div class="pricing-grid-head is-all-view" role="row">
                     <span>Select</span><span>Package</span><span>Supplier Cost</span>
@@ -1122,33 +1169,32 @@
                     <small>${escapeHTML(row.productName)} · ${escapeHTML(row.packageCode)}</small>
                 </div>`;
             const costCell = renderSupplierCostCell(row);
-            const statusCell = `<div class="pricing-grid-cell"><span class="pricing-status-chip ${statusClass(status)}">${escapeHTML(status)}</span><small>${escapeHTML(rowStatusHint(preview))}</small></div>`;
+            const statusCell = `<div class="pricing-grid-cell"><span class="pricing-status-chip ${statusClass(status)}">${escapeHTML(status)}</span></div>`;
             let cells;
             if (view === "TH") {
                 cells = `${selector}${packageCell}${costCell}
-                    <div class="pricing-grid-cell"><span>${publishedPriceForRow(row, "TH")}</span><small>Legacy THB Price</small></div>
-                    <div class="pricing-grid-cell"><span>${recommendedPriceForRegion(region)}</span><small>Server preview</small></div>
-                    <div class="pricing-grid-cell"><span>${profitForRegion(region)}</span><small>Net profit</small></div>
-                    <div class="pricing-grid-cell"><span>${marginForRegion(region)}</span><small>Margin</small></div>
+                    <div class="pricing-grid-cell"><span>${publishedPriceForRow(row, "TH")}</span></div>
+                    <div class="pricing-grid-cell"><span>${recommendedPriceForRegion(region)}</span></div>
+                    <div class="pricing-grid-cell"><span>${profitForRegion(region)}</span></div>
                     ${statusCell}`;
             } else if (view === "MM") {
                 cells = `${selector}${packageCell}${costCell}
-                    <div class="pricing-grid-cell"><span>${region?.exchangeRate || "—"}</span><small>${escapeHTML(region?.exchangeRatePair || "THB→MMK")}</small></div>
-                    <div class="pricing-grid-cell"><span>${publishedPriceForRow(row, "MM")}</span><small>Legacy MMK Price</small></div>
-                    <div class="pricing-grid-cell"><span>${recommendedPriceForRegion(region)}</span><small>Server preview</small></div>
-                    <div class="pricing-grid-cell"><span>${profitForRegion(region)}</span><small>Net profit</small></div>
-                    <div class="pricing-grid-cell"><span>${marginForRegion(region)}</span><small>Margin</small></div>
+                    <div class="pricing-grid-cell"><span>${region?.exchangeRate || "—"}</span></div>
+                    <div class="pricing-grid-cell"><span>${publishedPriceForRow(row, "MM")}</span></div>
+                    <div class="pricing-grid-cell"><span>${recommendedPriceForRegion(region)}</span></div>
+                    <div class="pricing-grid-cell"><span>${profitForRegion(region)}</span></div>
                     ${statusCell}`;
             } else {
                 const regions = workspaceRegionsForRow(row);
                 cells = `${selector}${packageCell}${costCell}
-                    <div class="pricing-grid-cell"><span>${publishedPriceForRow(row, "TH")}</span><small>Legacy THB Price</small></div>
-                    <div class="pricing-grid-cell"><span>${publishedPriceForRow(row, "MM")}</span><small>Legacy MMK Price</small></div>
-                    <div class="pricing-grid-cell"><span>${escapeHTML(regions.join(" / ") || "—")}</span><small>${regions.length} regional price rows</small></div>
+                    <div class="pricing-grid-cell"><span>${publishedPriceForRow(row, "TH")}</span></div>
+                    <div class="pricing-grid-cell"><span>${publishedPriceForRow(row, "MM")}</span></div>
+                    <div class="pricing-grid-cell"><span>${escapeHTML(regions.join(" / ") || "—")}</span></div>
                     ${statusCell}`;
             }
+            const viewClass = view === "ALL" ? "is-all-view" : view === "MM" ? "is-mm-view" : "is-th-view";
             return `
-                <div class="pricing-grid-row ${selected ? "is-selected" : ""} ${view === "ALL" ? "is-all-view" : "is-region-view"}" role="row" data-status="${escapeHTML(status)}" data-pricing-workspace-row="${escapeHTML(row.rowId)}" tabindex="0">
+                <div class="pricing-grid-row ${selected ? "is-selected" : ""} ${viewClass}" role="row" data-status="${escapeHTML(status)}" data-pricing-workspace-row="${escapeHTML(row.rowId)}" tabindex="0">
                     ${cells}
                 </div>
             `;
@@ -1187,21 +1233,29 @@
     function renderWorkspaceDetail(section) {
         const box = section.querySelector("#pricingWorkspaceDetail");
         const panel = section.querySelector(".pricing-workspace-detail");
+        const workspace = section.querySelector(".pricing-daily-workspace");
         if (!box) return;
         const loadedRow = state.workspace.rows.find(item => item.rowId === state.workspace.selectedRowId);
         if (!loadedRow || (state.workspace.productFilter !== "ALL" && loadedRow.productCode !== state.workspace.productFilter)) {
             state.workspace.selectedRowId = "";
             state.workspace.selectedPackageId = "";
             state.workspace.selectedPackageDetail = null;
-            panel?.classList.add("is-empty");
+            workspace?.classList.remove("has-detail");
             panel?.classList.remove("is-open");
+            panel?.setAttribute("hidden", "");
+            panel?.setAttribute("aria-hidden", "true");
             setText(section, "#pricingWorkspaceDetailTitle", "Select a package to view calculation");
-            box.innerHTML = '<button class="pricing-detail-empty-action" type="button" disabled>Select a package to view calculation</button>';
+            box.innerHTML = "";
             return;
         }
-        panel?.classList.remove("is-empty");
+        workspace?.classList.add("has-detail");
+        panel?.removeAttribute("hidden");
+        panel?.setAttribute("aria-hidden", "false");
         panel?.classList.add("is-open");
         const row = previewForPackageId(workspacePackageId(loadedRow)) || loadedRow;
+        const supplierCurrency = state.workspace.regionView === "TH"
+            ? "THB"
+            : (state.workspace.supplierCurrency || "THB");
         state.workspace.selectedPackageId = workspacePackageId(loadedRow);
         state.workspace.selectedPackageDetail = row;
         setText(section, "#pricingWorkspaceDetailTitle", `${row.productName} · ${row.packageName}`);
@@ -1221,8 +1275,8 @@
         box.innerHTML = `
             <article class="pricing-detail-card">
                 <strong>${escapeHTML(row.packageName || "")}</strong>
-                <div class="pricing-detail-line"><span>Supplier Cost</span><b>${row.oldSupplierCost == null ? "Not configured" : formatMoney(row.oldSupplierCost, row.supplierCurrency)}</b></div>
-                <div class="pricing-detail-line"><span>New Supplier Cost</span><b>${row.newSupplierCost == null ? "Empty" : formatMoney(row.newSupplierCost, row.supplierCurrency)}</b></div>
+                <div class="pricing-detail-line"><span>Supplier Cost</span><b>${row.oldSupplierCost == null ? "Not configured" : formatMoney(row.oldSupplierCost, supplierCurrency)}</b></div>
+                <div class="pricing-detail-line"><span>New Supplier Cost</span><b>${row.newSupplierCost == null ? "Empty" : formatMoney(row.newSupplierCost, supplierCurrency)}</b></div>
                 <div class="pricing-detail-line"><span>Supplier code</span><b>${escapeHTML(row.supplierPackageCode || row.packageCode || "")}</b></div>
                 <div class="pricing-detail-line"><span>Status</span><b>${escapeHTML(row.status || "Edited")}</b></div>
                 ${row.newSupplierCost == null ? '<div class="pricing-detail-line"><span>Next action</span><b>Enter supplier cost</b></div>' : ""}

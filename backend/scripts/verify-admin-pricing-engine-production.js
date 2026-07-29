@@ -476,7 +476,7 @@ function verifySource() {
     assertContains("frontend/js/admin-pricing-engine.js", "waitForAdminAuthReady", "Pricing Engine must wait for Admin auth readiness before the initial production fetch.");
     assertContains("frontend/js/admin-pricing-engine.js", "state.loadPromise", "Pricing Engine load lifecycle must coalesce duplicate boot/auth requests.");
     assertContains("frontend/js/admin-pricing-engine.js", "[PRICING_ENGINE_ASYNC]", "Pricing Engine async lifecycle must have opt-in timing checkpoints.");
-    assertContains("frontend/admin.html", "pricing-workspace-complete-response", "Admin page must cache-bust the Pricing Workspace complete-response fix.");
+    assertContains("frontend/admin.html", "20260729-pricing-final", "Admin page must cache-bust the final Pricing Workspace QA repair.");
     assertContains("frontend/js/admin-pricing-engine.js", "pricingRetryLoadBtn", "Pricing Engine frontend must expose a retry action after bootstrap failure.");
     assertContains("frontend/js/admin-pricing-engine.js", "Pricing workspace failed to load", "Pricing Engine frontend must leave loading state with an actionable error.");
     assertContains("frontend/admin.html", "data-pricing-product-id=", "Static Pricing Engine product cards must expose the canonical delegated-click contract.");
