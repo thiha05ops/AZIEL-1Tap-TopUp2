@@ -243,7 +243,9 @@ router.put("/admin/pricing-engine/draft", adminMiddleware, requireAdminPermissio
                     region: policy.region,
                     currency: policy.currency,
                     policyId: policy.id
-                }))
+                })),
+                supplierCostDraftRows: result.workspaceDraft?.summary?.saved || 0,
+                supplierCostDraftGroups: result.workspaceDraft?.summary?.groups || 0
             }
         });
         return res.json({ success: true, ...result });

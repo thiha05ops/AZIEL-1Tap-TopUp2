@@ -25,6 +25,19 @@ function verifyBackend() {
     includes("backend/routes/adminPricingEngine.js", "batchPreviewDailyPricing", "Route must call server-side batch preview.");
     includes("backend/routes/adminPricingEngine.js", "publishDailyPricing", "Route must call server-side publish.");
     includes("backend/routes/adminPricingEngine.js", "region: req.body?.region || \"\"", "Preview/publish routes must pass selected region.");
+    includes("backend/routes/adminPricingEngine.js", "supplierCostDraftRows", "Save Draft audit must record supplier-cost draft rows.");
+
+    includes("backend/models/PricingWorkspaceDraft.js", "packageRows", "Supplier-cost drafts must persist package rows separately from CatalogPackage.");
+    includes("backend/models/PricingWorkspaceDraft.js", "stagedSupplierCost", "Supplier-cost draft rows must store the staged supplier cost.");
+    includes("backend/models/PricingWorkspaceDraft.js", "productId: 1, region: 1, supplierCurrency: 1, status: 1", "Supplier-cost draft scope must include product, region, currency, and status.");
+    includes("backend/models/PricingWorkspaceDraft.js", "partialFilterExpression: { status: \"DRAFT\" }", "Only active draft scopes should be unique.");
+    includes("backend/services/commerce/pricingWorkspaceDraftService.js", "saveSupplierCostDraftRows", "Supplier-cost draft service must save staged rows.");
+    includes("backend/services/commerce/pricingWorkspaceDraftService.js", "listSupplierCostDraftRows", "Supplier-cost draft service must load saved rows for bootstrap.");
+    includes("backend/services/commerce/pricingWorkspaceDraftService.js", "clearPublishedSupplierCostDraftRows", "Published rows must be cleaned from saved draft state.");
+    includes("backend/services/commerce/pricingWorkspaceDraftService.js", "validateCatalogRows", "Save Draft must validate staged rows against CatalogPackage.");
+    includes("backend/services/commerce/pricingWorkspaceDraftService.js", "pkg.prices?.[row.region]", "Draft validation must require the selected regional price to exist.");
+    includes("backend/services/commerce/pricingWorkspaceDraftService.js", "if (region === \"TH\") return \"THB\"", "Thailand supplier-cost drafts must remain THB.");
+    includes("backend/services/commerce/pricingWorkspaceDraftService.js", "const currency = upper(value || (region === \"MM\" ? \"THB\" : \"THB\"))", "Myanmar region must not force supplier costs to MMK.");
 
     includes("backend/services/commerce/adminPricingControlCenterService.js", "MAX_WORKSPACE_ROWS = 250", "Workspace must have a bounded batch size.");
     includes("backend/services/commerce/adminPricingControlCenterService.js", "batchPreviewDailyPricing", "Batch preview service must exist.");
@@ -45,7 +58,8 @@ function verifyBackend() {
     includes("backend/services/commerce/adminPricingEngineService.js", "CatalogPackage.find({ deletedAt: null })", "Pricing Workspace bootstrap must include disabled packages instead of enabled-only rows.");
     includes("backend/services/commerce/adminPricingEngineService.js", "priceEnabled: price.enabled !== false", "Admin pricing payload must preserve disabled regional price status.");
     includes("backend/services/commerce/adminPricingEngineService.js", "supplierCostConfigured", "Admin pricing payload must expose missing supplier-cost state.");
-    includes("backend/services/commerce/adminPricingEngineService.js", "supplierPrice: supplierCostConfigured ? number(supplierCost.amount) : null", "Legacy storefront price must never be projected as supplier cost.");
+    includes("backend/services/commerce/adminPricingEngineService.js", "supplierCostConfigured ? number(supplierCost.amount) : null", "Legacy storefront price must never be projected as published supplier cost.");
+    includes("backend/services/commerce/adminPricingEngineService.js", "supplierCostSource: savedDraftConfigured ? \"saved_draft\" : supplierCostConfigured ? \"published\" : \"legacy_compatibility\"", "Legacy compatibility must remain a final fallback when neither draft nor published supplier cost exists.");
     includes("backend/services/commerce/adminPricingControlCenterService.js", "rawSupplierCost == null || rawSupplierCost === \"\" ? null", "Missing supplier cost must remain a valid workspace state.");
     includes("backend/services/commerce/adminPricingControlCenterService.js", "Supplier cost missing — enter or paste supplier cost.", "Missing cost preview must explain the next operator action.");
     includes("backend/services/commerce/adminPricingControlCenterService.js", "configuredProfitabilityRows", "Low and negative margin metrics must require configured supplier cost.");
@@ -54,6 +68,15 @@ function verifyBackend() {
     includes("backend/services/commerce/adminPricingControlCenterService.js", "WORKSPACE_REGION_REQUIRED", "Publish must reject All-region bulk publish.");
     includes("backend/services/commerce/adminPricingControlCenterService.js", "WORKSPACE_PUBLISH_ALL_DISABLED", "Backend must reject publish-all requests.");
     includes("backend/services/commerce/adminPricingControlCenterService.js", "[publishRegion]: pricePatch", "Publish must update only the selected region.");
+    includes("backend/services/commerce/adminPricingControlCenterService.js", "clearPublishedSupplierCostDraftRows", "Publish must clear successful supplier-cost draft rows.");
+    includes("backend/services/commerce/adminPricingControlCenterService.js", "draftCleanup", "Publish response must report draft cleanup separately from publish result.");
+    includes("backend/services/commerce/adminPricingEngineService.js", "listSupplierCostDraftRows", "Bootstrap must load saved supplier-cost drafts.");
+    includes("backend/services/commerce/adminPricingEngineService.js", "supplierCostDraftRows", "Bootstrap must map saved supplier-cost draft rows into package payloads.");
+    includes("backend/services/commerce/adminPricingEngineService.js", "savedDraftSupplierCost", "Bootstrap must expose saved supplier cost separately from published cost.");
+    includes("backend/services/commerce/adminPricingEngineService.js", "publishedSupplierPrice", "Bootstrap must expose canonical published supplier cost separately.");
+    includes("backend/services/commerce/adminPricingEngineService.js", "supplierCostSource: savedDraftConfigured ? \"saved_draft\" : supplierCostConfigured ? \"published\" : \"legacy_compatibility\"", "Bootstrap source precedence must be saved draft, published, then legacy compatibility.");
+    includes("backend/services/commerce/adminPricingEngineService.js", "rows: payload.workspaceRows", "Save Draft must persist supplier-cost rows in addition to policies.");
+    includes("backend/services/commerce/adminPricingEngineService.js", "saveSupplierCostDraftRows", "Save Draft must call the supplier-cost draft service.");
 }
 
 function verifyFrontend() {
@@ -89,12 +112,18 @@ function verifyFrontend() {
     includes("frontend/js/admin-pricing-engine.js", "/api/admin/pricing-engine/workspace/publish", "Publish must use server endpoint.");
     includes("frontend/js/admin-pricing-engine.js", "workspacePayloadRows", "Frontend must send raw intended supplier-cost changes.");
     includes("frontend/js/admin-pricing-engine.js", "newSupplierCost", "Frontend must stage intended supplier costs.");
+    includes("frontend/js/admin-pricing-engine.js", "savedDraftSupplierCost", "Frontend must understand saved supplier-cost drafts.");
+    includes("frontend/js/admin-pricing-engine.js", "publishedSupplierPrice", "Frontend must keep published supplier cost separate from saved drafts.");
+    includes("frontend/js/admin-pricing-engine.js", "applyRegionalSupplierCost", "Frontend must restore saved draft state by selected region.");
+    includes("frontend/js/admin-pricing-engine.js", "supplierCostSource: \"unsaved_stage\"", "New local edits must be marked as unsaved stage.");
+    includes("frontend/js/admin-pricing-engine.js", "status: \"Saved Draft\"", "Saved supplier-cost drafts must restore as Saved Draft rows.");
     includes("frontend/js/admin-pricing-engine.js", "paymentFeeSimulation", "Frontend must render payment-fee simulation output.");
     includes("frontend/js/admin-pricing-engine.js", "displayDiscountPercent", "Frontend must keep display discount separate.");
     includes("frontend/js/admin-pricing-engine.js", "state.workspace.previewRows", "Frontend must render server preview rows.");
     includes("frontend/js/admin-pricing-engine.js", "previewSeq", "Debounced previews must protect against stale response overwrite.");
     includes("frontend/js/admin-pricing-engine.js", "window.confirm", "Publish must require explicit confirmation.");
     includes("frontend/js/admin-pricing-engine.js", "publishedKeys", "Successful published rows must be cleared from staged retry state.");
+    includes("frontend/js/admin-pricing-engine.js", "state.workspace.stagedChangesByPackageId.clear()", "Save Draft must reload saved drafts from server rather than keeping unsaved-stage labels.");
     includes("frontend/js/admin-pricing-engine.js", "supplierPrice: Number.isFinite(supplierPrice) ? supplierPrice : null", "Missing supplier cost must not hide package rows.");
     includes("frontend/js/admin-pricing-engine.js", "regionView: \"TH\"", "Daily Pricing Workspace state must default to Thailand.");
     includes("frontend/js/admin-pricing-engine.js", "state.workspace.productFilter === \"ALL\"", "Workspace must switch from All to first product with rows for daily editing.");
@@ -103,6 +132,8 @@ function verifyFrontend() {
     includes("frontend/js/admin-pricing-engine.js", "clearIncompatibleWorkspaceState", "Product changes must clear incompatible detail/preview state.");
     includes("frontend/js/admin-pricing-engine.js", "row.productCode !== state.workspace.productFilter", "Detail panel must refuse stale product rows.");
     includes("frontend/js/admin-pricing-engine.js", "body: JSON.stringify({ rows, region: workspaceRegion() })", "Preview must send only staged rows for selected region.");
+    includes("frontend/js/admin-pricing-engine.js", "workspaceRows: workspacePayloadRows()", "Save Draft must send staged supplier-cost rows.");
+    includes("frontend/js/admin-pricing-engine.js", "workspaceRegion: workspaceRegion()", "Save Draft must scope supplier-cost rows to the selected region.");
     includes("frontend/js/admin-pricing-engine.js", "renderSupplierCostCell", "Supplier cost column must own a dedicated lightweight cell renderer.");
     includes("frontend/js/admin-pricing-engine.js", "data-pricing-cost-action", "Supplier cost should activate editing from a display cell.");
     includes("frontend/js/admin-pricing-engine.js", "moveCostEditor(section, event.shiftKey ? -1 : 1)", "Enter and Shift+Enter must move between supplier cost rows.");
@@ -113,6 +144,8 @@ function verifyFrontend() {
     includes("frontend/js/admin-pricing-engine.js", "displayWorkspaceStatus", "Pricing rows must use concise daily status labels.");
     includes("frontend/js/admin-pricing-engine.js", "Select a package to view calculation", "Calculation detail must collapse to a clear empty state.");
     includes("frontend/js/admin-pricing-engine.js", "Thailand supplier costs are entered in THB", "Thailand supplier currency control must explain THB lock.");
+    includes("frontend/js/admin-pricing-engine.js", "Unsaved Changes", "Workspace must use approved Unsaved Changes label.");
+    includes("frontend/js/admin-pricing-engine.js", "Draft Saved", "Save Draft success must use approved Draft Saved label.");
     includes("frontend/admin.html", "class=\"pricing-workspace-detail\" aria-label=\"Pricing calculation detail\" hidden aria-hidden=\"true\"", "Calculation detail panel must start collapsed by default.");
     includes("frontend/js/admin-pricing-engine.js", "workspace?.classList.remove(\"has-detail\")", "Workspace must restore full-width grid when no row is selected.");
     includes("frontend/js/admin-pricing-engine.js", "panel?.setAttribute(\"hidden\", \"\")", "Detail panel must be hidden when no row is selected.");

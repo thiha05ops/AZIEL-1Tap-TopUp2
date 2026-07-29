@@ -7,6 +7,7 @@ const { buildProductionPricingContext } = require("./productionPricingContextSer
 const { createPricingQuote } = require("./pricingQuoteRuntime");
 const { loadCommercePromotionContext } = require("./commercePromotionBridgeService");
 const { updatePackage } = require("../catalogAdminService");
+const { clearPublishedSupplierCostDraftRows } = require("./pricingWorkspaceDraftService");
 
 const PROFITABILITY_STATUS = Object.freeze({
     HEALTHY: "HEALTHY",
@@ -636,6 +637,7 @@ async function publishDailyPricing({ rows = [], publishAll = false, actor = "adm
             });
         }
     }
+    const draftCleanup = await clearPublishedSupplierCostDraftRows({ rows: results, region: publishRegion });
 
     return {
         success: true,
@@ -647,7 +649,8 @@ async function publishDailyPricing({ rows = [], publishAll = false, actor = "adm
             skipped: results.filter(item => item.skipped).length
         },
         previewSummary: preview.summary,
-        results
+        results,
+        draftCleanup
     };
 }
 

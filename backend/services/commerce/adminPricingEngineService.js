@@ -6,6 +6,11 @@ const CatalogPackage = require("../../models/CatalogPackage");
 const PricingPolicy = require("../../models/PricingPolicy");
 const PriceVersion = require("../../models/PriceVersion");
 const { resolveSupplierCostSnapshot } = require("./supplierCostService");
+const {
+    draftRowMap,
+    listSupplierCostDraftRows,
+    saveSupplierCostDraftRows
+} = require("./pricingWorkspaceDraftService");
 
 const BRANCH_KEY = "storefront";
 const QUERY_MAX_TIME_MS = 5000;
@@ -247,8 +252,9 @@ function affectedSummaryFromPackages(packages = []) {
     };
 }
 
-function productsFromPackages(packages = [], productMap = new Map()) {
+function productsFromPackages(packages = [], productMap = new Map(), supplierCostDraftRows = []) {
     const products = new Map();
+    const savedDraftMap = draftRowMap(supplierCostDraftRows);
     productMap.forEach((product, key) => {
         const productId = text(product.productCode || key).toLowerCase();
         if (!productId) return;
@@ -278,6 +284,7 @@ function productsFromPackages(packages = [], productMap = new Map()) {
         }
         Object.entries(pkg.prices || {}).forEach(([region, price]) => {
             if (!price) return null;
+            const normalizedRegion = upper(region);
             const supplierCost = resolveSupplierCostSnapshot({
                 pkg,
                 price,
@@ -286,6 +293,21 @@ function productsFromPackages(packages = [], productMap = new Map()) {
                 now: new Date()
             });
             const supplierCostConfigured = supplierCost.configured === true;
+            const savedDraft = savedDraftMap.get(`${productId}:${normalizedRegion}:${upper(pkg.packageCode)}`) || null;
+            const savedDraftConfigured = savedDraft?.stagedSupplierCost != null;
+            const effectiveSupplierCostConfigured = savedDraftConfigured || supplierCostConfigured;
+            const effectiveSupplierPrice = savedDraftConfigured
+                ? number(savedDraft.stagedSupplierCost)
+                : supplierCostConfigured ? number(supplierCost.amount) : null;
+            const effectiveSupplierCurrency = savedDraftConfigured
+                ? upper(savedDraft.supplierCurrency)
+                : supplierCostConfigured ? upper(supplierCost.currency) : upper(price.supplierCurrency || price.currency);
+            const effectiveSupplierName = savedDraftConfigured
+                ? text(savedDraft.supplierName || supplierCost.supplierName)
+                : supplierCost.supplierName;
+            const effectiveSupplierVersion = savedDraftConfigured
+                ? text(savedDraft.supplierVersion || supplierCost.supplierVersion)
+                : supplierCost.supplierVersion;
             products.get(productId).packages.push({
                 productCode: pkg.productCode,
                 productName,
@@ -294,15 +316,36 @@ function productsFromPackages(packages = [], productMap = new Map()) {
                 packageName: pkg.name,
                 packageEnabled: pkg.enabled !== false,
                 priceEnabled: price.enabled !== false,
-                region: upper(region),
+                region: normalizedRegion,
                 currency: upper(price.currency),
-                supplierCurrency: supplierCostConfigured ? upper(supplierCost.currency) : upper(price.supplierCurrency || price.currency),
-                supplierPrice: supplierCostConfigured ? number(supplierCost.amount) : null,
-                supplierName: supplierCost.supplierName,
-                supplierVersion: supplierCost.supplierVersion,
-                supplierCostTimestamp: supplierCost.costTimestamp,
-                supplierCostConfigured,
-                supplierCostSource: supplierCost.source,
+                supplierCurrency: effectiveSupplierCurrency,
+                supplierPrice: effectiveSupplierPrice,
+                supplierName: effectiveSupplierName,
+                supplierVersion: effectiveSupplierVersion,
+                supplierCostTimestamp: savedDraftConfigured ? savedDraft.updatedAt : supplierCost.costTimestamp,
+                supplierCostConfigured: effectiveSupplierCostConfigured,
+                supplierCostSource: savedDraftConfigured ? "saved_draft" : supplierCostConfigured ? "published" : "legacy_compatibility",
+                supplierCostSources: {
+                    effective: savedDraftConfigured ? "saved_draft" : supplierCostConfigured ? "published" : "legacy_compatibility",
+                    published: supplierCostConfigured ? "published" : "legacy_compatibility",
+                    savedDraft: savedDraftConfigured ? "saved_draft" : "",
+                    unsavedStage: "unsaved_stage"
+                },
+                publishedSupplierPrice: supplierCostConfigured ? number(supplierCost.amount) : null,
+                publishedSupplierCurrency: supplierCostConfigured ? upper(supplierCost.currency) : upper(price.supplierCurrency || price.currency),
+                publishedSupplierName: supplierCost.supplierName,
+                publishedSupplierVersion: supplierCost.supplierVersion,
+                publishedSupplierCostTimestamp: supplierCost.costTimestamp,
+                publishedSupplierCostConfigured: supplierCostConfigured,
+                publishedSupplierCostSource: supplierCostConfigured ? "published" : "legacy_compatibility",
+                savedDraftSupplierCost: savedDraftConfigured ? number(savedDraft.stagedSupplierCost) : null,
+                savedDraftSupplierCurrency: savedDraftConfigured ? upper(savedDraft.supplierCurrency) : "",
+                savedDraftSupplierName: savedDraftConfigured ? text(savedDraft.supplierName) : "",
+                savedDraftSupplierVersion: savedDraftConfigured ? text(savedDraft.supplierVersion) : "",
+                savedDraftSupplierCostConfigured: savedDraftConfigured,
+                savedDraftSupplierCostTimestamp: savedDraft?.updatedAt || null,
+                savedDraftId: savedDraft?.draftId || "",
+                savedDraftVersion: savedDraft?.version || null,
                 publishedPrice: number(price.amount),
                 publishedPriceMode: upper(price.publishedPriceMode || "LEGACY_COMPATIBILITY_PRICE"),
                 manualOverrideReason: text(price.manualOverrideReason),
@@ -394,19 +437,21 @@ async function getPricingConsoleState(options = {}) {
     const trace = options.trace || null;
     const startedAt = Date.now();
     serviceTrace(trace, "STATE_SERVICE_STARTED");
-    const [version, catalogPackages, catalogProducts, policyRecords] = await Promise.all([
+    const [version, catalogPackages, catalogProducts, policyRecords, supplierCostDraftRows] = await Promise.all([
         latestVersion(trace),
         readCatalogPackages(trace),
         readCatalogProducts(trace),
-        readConsolePolicies(new Date(), trace)
+        readConsolePolicies(new Date(), trace),
+        listSupplierCostDraftRows()
     ]);
     serviceTrace(trace, "PRODUCT_GROUPING_STARTED");
     const affected = affectedSummaryFromPackages(catalogPackages);
     const productMap = new Map(catalogProducts.map(product => [text(product.productCode).toLowerCase(), product]));
-    const products = productsFromPackages(catalogPackages, productMap);
+    const products = productsFromPackages(catalogPackages, productMap, supplierCostDraftRows);
     serviceTrace(trace, "PRODUCT_GROUPING_COMPLETED", {
-        products: products.length,
-        packages: catalogPackages.length
+            products: products.length,
+            packages: catalogPackages.length,
+            supplierCostDraftRows: supplierCostDraftRows.length
     });
     serviceTrace(trace, "RESPONSE_MAPPING_STARTED");
     const policies = [];
@@ -567,8 +612,15 @@ async function saveDraftPricing(payload = {}, admin = {}) {
         saved.push(publicPolicy(draft, "draft"));
     }
 
+    const workspaceDraft = await saveSupplierCostDraftRows({
+        rows: payload.workspaceRows || payload.supplierCostRows || [],
+        region: payload.workspaceRegion || payload.region || "",
+        admin
+    });
+
     return {
         saved,
+        workspaceDraft,
         state: await getPricingConsoleState()
     };
 }

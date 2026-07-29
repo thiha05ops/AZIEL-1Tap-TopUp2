@@ -271,7 +271,12 @@
     }
 
     function workspacePackageId(row = {}) {
-        return `${slug(row.productCode)}:${String(row.packageCode || row.packageId || "").trim()}`;
+        const rowRegion = row.region ||
+            row.draftRegion ||
+            (Array.isArray(row.regions) && row.regions[0]?.region) ||
+            (state.workspace.regionView !== "ALL" ? state.workspace.regionView : row.supportedRegions?.[0]) ||
+            "TH";
+        return `${slug(row.productCode)}:${String(rowRegion).toUpperCase()}:${String(row.packageCode || row.packageId || "").trim()}`;
     }
 
     function workspaceRegion() {
@@ -424,6 +429,15 @@
             !state.publishing;
     }
 
+    function canSaveDraftPricing() {
+        return state.apiReady === true &&
+            state.productSource === "server" &&
+            hasValidSelection() &&
+            !state.loading &&
+            !state.saving &&
+            !state.publishing;
+    }
+
     function getDraftPolicy(region, currency) {
         const key = policyKey(region, currency);
         if (!state.draftPolicy.has(key)) {
@@ -537,6 +551,23 @@
             supplierCurrency: String(pkg.supplierCurrency || pkg.currency || "THB").toUpperCase(),
             supplierPrice: Number.isFinite(supplierPrice) ? supplierPrice : null,
             supplierCostConfigured: pkg.supplierCostConfigured === true,
+            supplierCostSource: String(pkg.supplierCostSource || "").trim(),
+            supplierCostSources: pkg.supplierCostSources || {},
+            publishedSupplierPrice: number(pkg.publishedSupplierPrice, NaN),
+            publishedSupplierCurrency: String(pkg.publishedSupplierCurrency || pkg.supplierCurrency || pkg.currency || "THB").toUpperCase(),
+            publishedSupplierName: String(pkg.publishedSupplierName || "").trim(),
+            publishedSupplierVersion: String(pkg.publishedSupplierVersion || "").trim(),
+            publishedSupplierCostTimestamp: pkg.publishedSupplierCostTimestamp || "",
+            publishedSupplierCostConfigured: pkg.publishedSupplierCostConfigured === true,
+            publishedSupplierCostSource: String(pkg.publishedSupplierCostSource || "").trim(),
+            savedDraftSupplierCost: number(pkg.savedDraftSupplierCost, NaN),
+            savedDraftSupplierCurrency: String(pkg.savedDraftSupplierCurrency || "").toUpperCase(),
+            savedDraftSupplierName: String(pkg.savedDraftSupplierName || "").trim(),
+            savedDraftSupplierVersion: String(pkg.savedDraftSupplierVersion || "").trim(),
+            savedDraftSupplierCostTimestamp: pkg.savedDraftSupplierCostTimestamp || "",
+            savedDraftSupplierCostConfigured: pkg.savedDraftSupplierCostConfigured === true,
+            savedDraftId: String(pkg.savedDraftId || "").trim(),
+            savedDraftVersion: pkg.savedDraftVersion || null,
             supplierPackageCode: String(pkg.supplierPackageCode || pkg.supplierCode || pkg.packageCode || "").trim(),
             supplierName: String(pkg.supplierName || "").trim(),
             supplierVersion: String(pkg.supplierVersion || "").trim(),
@@ -748,6 +779,48 @@
         });
     }
 
+    function finiteOrNull(value) {
+        return Number.isFinite(Number(value)) ? Number(value) : null;
+    }
+
+    function supplierCostRegion(row) {
+        if (state.workspace.regionView !== "ALL" && row.supportedRegions?.includes(state.workspace.regionView)) {
+            return state.workspace.regionView;
+        }
+        return row.supportedRegions?.[0] || "TH";
+    }
+
+    function applyRegionalSupplierCost(row) {
+        const region = supplierCostRegion(row);
+        const publishedCost = finiteOrNull(row.publishedSupplierCostsByRegion?.[region]);
+        const savedDraftCost = finiteOrNull(row.savedDraftSupplierCostsByRegion?.[region]);
+        const hasSavedDraft = savedDraftCost != null;
+        const hasPublished = publishedCost != null;
+        const supplierCurrency = hasSavedDraft
+            ? row.savedDraftSupplierCurrenciesByRegion?.[region]
+            : row.publishedSupplierCurrenciesByRegion?.[region];
+        row.oldSupplierCost = hasPublished ? publishedCost : null;
+        row.newSupplierCost = hasSavedDraft ? savedDraftCost : hasPublished ? publishedCost : null;
+        row.supplierCurrency = supplierCurrency || (region === "TH" ? "THB" : state.workspace.supplierCurrency || "THB");
+        row.supplierName = hasSavedDraft
+            ? row.savedDraftSupplierNamesByRegion?.[region] || row.supplierName || "Primary supplier"
+            : row.publishedSupplierNamesByRegion?.[region] || row.supplierName || "";
+        row.supplierVersion = hasSavedDraft
+            ? row.savedDraftSupplierVersionsByRegion?.[region] || row.supplierVersion || ""
+            : row.publishedSupplierVersionsByRegion?.[region] || row.supplierVersion || "";
+        row.supplierCostTimestamp = hasSavedDraft
+            ? row.savedDraftSupplierTimestampsByRegion?.[region] || row.supplierCostTimestamp || ""
+            : row.publishedSupplierTimestampsByRegion?.[region] || row.supplierCostTimestamp || "";
+        row.savedDraftSupplierCostConfigured = hasSavedDraft;
+        row.draftRegion = region;
+        row.supplierCostConfigured = hasSavedDraft || hasPublished;
+        row.supplierCostSource = hasSavedDraft ? "saved_draft" : hasPublished ? "published" : "legacy_compatibility";
+        row.selected = hasSavedDraft;
+        row.changed = hasSavedDraft;
+        row.status = hasSavedDraft ? "Saved Draft" : "Unchanged";
+        return row;
+    }
+
     function flattenWorkspacePackages() {
         const byPackage = new Map();
         state.products.forEach(product => {
@@ -755,7 +828,12 @@
                 const key = `${product.productCode}:${pkg.packageCode}`;
                 const existing = byPackage.get(key);
                 if (!existing) {
-                    const hasConfiguredCost = pkg.supplierCostConfigured === true && pkg.supplierPrice != null;
+                    const publishedCost = pkg.publishedSupplierCostConfigured === true && Number.isFinite(pkg.publishedSupplierPrice)
+                        ? pkg.publishedSupplierPrice
+                        : null;
+                    const savedDraftCost = pkg.savedDraftSupplierCostConfigured === true && Number.isFinite(pkg.savedDraftSupplierCost)
+                        ? pkg.savedDraftSupplierCost
+                        : null;
                     byPackage.set(key, {
                         rowId: key,
                         productCode: product.productCode,
@@ -764,8 +842,8 @@
                         packageId: pkg.packageId,
                         packageName: pkg.packageName,
                         supplierPackageCode: pkg.supplierPackageCode || pkg.packageCode,
-                        oldSupplierCost: hasConfiguredCost ? pkg.supplierPrice : null,
-                        newSupplierCost: hasConfiguredCost ? pkg.supplierPrice : null,
+                        oldSupplierCost: null,
+                        newSupplierCost: null,
                         supplierCurrency: pkg.supplierCurrency || "THB",
                         supplierName: pkg.supplierName || "",
                         supplierVersion: pkg.supplierVersion || "",
@@ -775,10 +853,21 @@
                         manualOverrideReason: pkg.manualOverrideReason,
                         publishedPricesByRegion: { [pkg.region]: pkg.publishedPrice },
                         currenciesByRegion: { [pkg.region]: pkg.currency },
+                        publishedSupplierCostsByRegion: { [pkg.region]: publishedCost },
+                        publishedSupplierCurrenciesByRegion: { [pkg.region]: pkg.publishedSupplierCurrency || pkg.supplierCurrency || pkg.currency },
+                        publishedSupplierNamesByRegion: { [pkg.region]: pkg.publishedSupplierName || "" },
+                        publishedSupplierVersionsByRegion: { [pkg.region]: pkg.publishedSupplierVersion || "" },
+                        publishedSupplierTimestampsByRegion: { [pkg.region]: pkg.publishedSupplierCostTimestamp || "" },
+                        savedDraftSupplierCostsByRegion: { [pkg.region]: savedDraftCost },
+                        savedDraftSupplierCurrenciesByRegion: { [pkg.region]: pkg.savedDraftSupplierCurrency || "" },
+                        savedDraftSupplierNamesByRegion: { [pkg.region]: pkg.savedDraftSupplierName || "" },
+                        savedDraftSupplierVersionsByRegion: { [pkg.region]: pkg.savedDraftSupplierVersion || "" },
+                        savedDraftSupplierTimestampsByRegion: { [pkg.region]: pkg.savedDraftSupplierCostTimestamp || "" },
                         supportedRegions: [pkg.region],
                         packageEnabled: pkg.packageEnabled !== false,
                         priceEnabledByRegion: { [pkg.region]: pkg.priceEnabled !== false },
-                        supplierCostConfigured: hasConfiguredCost,
+                        supplierCostConfigured: false,
+                        supplierCostSource: pkg.supplierCostSource || "",
                         selected: false,
                         changed: false,
                         status: "Unchanged"
@@ -790,23 +879,36 @@
                 existing.publishedPricesByRegion[pkg.region] = pkg.publishedPrice;
                 existing.currenciesByRegion[pkg.region] = pkg.currency;
                 existing.priceEnabledByRegion[pkg.region] = pkg.priceEnabled !== false;
+                existing.publishedSupplierCostsByRegion[pkg.region] = pkg.publishedSupplierCostConfigured === true && Number.isFinite(pkg.publishedSupplierPrice)
+                    ? pkg.publishedSupplierPrice
+                    : null;
+                existing.publishedSupplierCurrenciesByRegion[pkg.region] = pkg.publishedSupplierCurrency || pkg.supplierCurrency || pkg.currency;
+                existing.publishedSupplierNamesByRegion[pkg.region] = pkg.publishedSupplierName || "";
+                existing.publishedSupplierVersionsByRegion[pkg.region] = pkg.publishedSupplierVersion || "";
+                existing.publishedSupplierTimestampsByRegion[pkg.region] = pkg.publishedSupplierCostTimestamp || "";
+                existing.savedDraftSupplierCostsByRegion[pkg.region] = pkg.savedDraftSupplierCostConfigured === true && Number.isFinite(pkg.savedDraftSupplierCost)
+                    ? pkg.savedDraftSupplierCost
+                    : null;
+                existing.savedDraftSupplierCurrenciesByRegion[pkg.region] = pkg.savedDraftSupplierCurrency || "";
+                existing.savedDraftSupplierNamesByRegion[pkg.region] = pkg.savedDraftSupplierName || "";
+                existing.savedDraftSupplierVersionsByRegion[pkg.region] = pkg.savedDraftSupplierVersion || "";
+                existing.savedDraftSupplierTimestampsByRegion[pkg.region] = pkg.savedDraftSupplierCostTimestamp || "";
                 if (!existing.packageId && pkg.packageId) existing.packageId = pkg.packageId;
                 existing.packageEnabled = existing.packageEnabled && pkg.packageEnabled !== false;
-                if (existing.oldSupplierCost == null && pkg.supplierCostConfigured === true && pkg.supplierPrice != null) {
-                    existing.oldSupplierCost = pkg.supplierPrice;
-                    existing.newSupplierCost = pkg.supplierPrice;
-                    existing.supplierCostConfigured = true;
-                }
             });
         });
-        return [...byPackage.values()];
+        return [...byPackage.values()].map(applyRegionalSupplierCost);
     }
 
     function buildWorkspaceRows(section) {
         state.workspace.rows = flattenWorkspacePackages().map(row => {
             const packageId = workspacePackageId(row);
             const staged = state.workspace.stagedChangesByPackageId.get(packageId);
-            return staged ? { ...row, ...staged, selected: true, changed: true, status: "Edited" } : row;
+            if (staged) return { ...row, ...staged, selected: true, changed: true, status: staged.status || "Edited" };
+            if (row.savedDraftSupplierCostConfigured) {
+                state.workspace.stagedChangesByPackageId.set(packageId, { ...row, selected: true, changed: true, status: "Saved Draft" });
+            }
+            return row;
         });
         if (!state.workspace.selectedProductId || state.workspace.productFilter === "ALL") {
             const selectedProduct = state.products.find(product => product.productId === state.selectedProductId);
@@ -835,16 +937,19 @@
             packageId,
             newSupplierCost: nextCost,
             supplierCurrency: state.workspace.supplierCurrency,
+            supplierCostSource: "unsaved_stage",
+            draftRegion: supplierCostRegion(row),
             selected: true,
             changed: true,
-            status: "Edited"
+            status: "Unsaved Changes"
         };
         state.workspace.stagedChangesByPackageId.set(packageId, staged);
         row.newSupplierCost = nextCost;
         row.supplierCurrency = state.workspace.supplierCurrency;
         row.selected = true;
         row.changed = true;
-        row.status = "Edited";
+        row.supplierCostSource = "unsaved_stage";
+        row.status = "Unsaved Changes";
     }
 
     function clearPreviewForUnstagedRows() {
@@ -955,6 +1060,7 @@
             }
             state.workspace.previewResultsByPackageId.clear();
             state.workspace.previewRows = [];
+            buildWorkspaceRows(section);
             renderWorkspaceControls(section);
             renderWorkspaceGrid(section);
             scheduleWorkspacePreview(section);
@@ -1043,7 +1149,8 @@
 
     function statusClass(status = "") {
         if (status === "Ready") return "is-ready";
-        if (status === "Changed") return "is-changed";
+        if (status === "Changed" || status === "Unsaved Changes") return "is-changed";
+        if (status === "Saved Draft") return "is-warning";
         if (status === "Missing Cost") return "is-missing";
         if (status === "Published") return "is-published";
         if (status === "Blocked") return "is-blocked";
@@ -1079,9 +1186,13 @@
 
     function displayWorkspaceStatus(row, preview) {
         if (preview?.status === "Blocked") return "Blocked";
-        if (preview?.status === "Ready") return isRowStaged(row) ? "Ready" : "Published";
+        if (preview?.status === "Ready") {
+            if (row.supplierCostSource === "saved_draft") return "Saved Draft";
+            return isRowStaged(row) ? "Ready" : "Published";
+        }
         if (preview?.status === "Warning") return "Ready";
-        if (isRowStaged(row)) return "Changed";
+        if (row.supplierCostSource === "saved_draft") return "Saved Draft";
+        if (isRowStaged(row)) return "Unsaved Changes";
         if (row.newSupplierCost == null) return "Missing Cost";
         if (row.status === "Published") return "Published";
         return "Published";
@@ -1291,16 +1402,19 @@
         const supplierVersion = sectionValue("#pricingWorkspaceVersion", "");
         return stagedRows()
             .filter(row => !onlySelected || row.selected !== false)
+            .filter(row => (row.draftRegion || supplierCostRegion(row)) === workspaceRegion())
             .map(row => ({
                 rowId: row.rowId,
                 productCode: row.productCode,
+                packageId: row.packageId,
                 packageCode: row.packageCode,
                 newSupplierCost: row.newSupplierCost,
-                supplierCurrency: state.workspace.supplierCurrency,
+                supplierCurrency: state.workspace.regionView === "TH" ? "THB" : (row.supplierCurrency || state.workspace.supplierCurrency),
                 supplierName,
                 supplierVersion,
                 supplierCostTimestamp: new Date().toISOString(),
                 expectedUpdatedAt: row.expectedUpdatedAt,
+                supplierCostSource: row.supplierCostSource || (row.savedDraftSupplierCostConfigured ? "saved_draft" : "unsaved_stage"),
                 selected: row.selected !== false
             }));
     }
@@ -1458,9 +1572,9 @@
             setStatus(section, `Pricing publish complete: ${result.summary?.published || 0} published, ${result.summary?.failed || 0} failed.`);
             const publishedKeys = new Set((result.results || [])
                 .filter(item => item.published)
-                .map(item => `${item.productCode}:${item.packageCode}`));
+                .map(item => `${item.productCode}:${workspaceRegion()}:${item.packageCode}`));
             state.workspace.rows = state.workspace.rows.map(row => {
-                if (!publishedKeys.has(row.rowId)) return row;
+                if (!publishedKeys.has(workspacePackageId(row))) return row;
                 const packageId = workspacePackageId(row);
                 state.workspace.stagedChangesByPackageId.delete(packageId);
                 state.workspace.previewResultsByPackageId.delete(packageId);
@@ -1795,10 +1909,10 @@
 
     async function saveDraft(section) {
         if (state.saving || state.publishing) return false;
-        if (!canPersistPricing()) {
+        if (!canSaveDraftPricing()) {
             state.saveError = state.loadError
                 ? "Save Draft is disabled until production pricing data loads."
-                : "Save Draft is disabled until a valid product preview is ready.";
+                : "Save Draft is disabled until production pricing data is ready.";
             renderLoadError(section, state.saveError);
             setStatus(section, "Save disabled");
             renderButtons(section);
@@ -1817,11 +1931,21 @@
             const data = await pricingFetch("/api/admin/pricing-engine/draft", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ policies: payloadPolicies() })
+                body: JSON.stringify({
+                    policies: payloadPolicies(),
+                    workspaceRows: workspacePayloadRows(),
+                    workspaceRegion: workspaceRegion()
+                })
             });
+            state.workspace.stagedChangesByPackageId.clear();
+            state.workspace.previewResultsByPackageId.clear();
             applyServerState(data.state || data);
             state.dirty = false;
-            setStatus(section, "Draft saved");
+            setStatus(section, "Draft Saved");
+            buildWorkspaceRows(section);
+            renderWorkspaceControls(section);
+            renderWorkspaceGrid(section);
+            requestWorkspacePreview(section);
             calculateAndRenderPreview(section);
             return true;
         } catch (error) {
@@ -1902,6 +2026,7 @@
         const role = String(window.AZIEL_ADMIN_AUTH?.state?.admin?.role || localStorage.getItem("adminRole") || "").toUpperCase();
         const canManage = window.AZIEL_ADMIN_AUTH?.hasPermission?.("CATALOG_MANAGE") !== false;
         const canPersist = canPersistPricing();
+        const canSaveDraft = canSaveDraftPricing();
         const workspaceBusy = state.workspace.previewing || state.workspace.publishing;
         const workspaceReady = state.apiReady && state.workspace.rows.length > 0;
         const hasPublishableWorkspaceRows = stagedRows().some(row => {
@@ -1909,9 +2034,9 @@
             return row.selected !== false && preview?.publishEligible === true && preview.regions?.[0]?.region === workspaceRegion();
         });
         if (save) {
-            save.disabled = !canManage || !canPersist;
+            save.disabled = !canManage || !canSaveDraft;
             save.title = canManage
-                ? (canPersist ? "Save pricing draft" : "Production pricing must load before saving")
+                ? (canSaveDraft ? "Save pricing policy and supplier-cost drafts" : "Production pricing must load before saving")
                 : "Catalog manage permission required";
         }
         if (publish) {
@@ -1945,7 +2070,7 @@
         setStatus(section, version ? `Production Active · v${version.versionNumber}` : "Production Ready");
         setText(section, "#pricingSummaryExchangeMeta", version?.publishedAt ? `Published ${new Date(version.publishedAt).toLocaleString()}` : "Production configuration");
         setText(section, "#pricingSummaryProfitMeta", version?.publishedBy ? `Published by ${version.publishedBy}` : "Draft preview");
-        setText(section, "#pricingSummaryGatewayMeta", state.dirty ? "Unsaved draft" : "Draft editable");
+        setText(section, "#pricingSummaryGatewayMeta", state.dirty || stagedRows().some(row => row.supplierCostSource === "unsaved_stage") ? "Unsaved Changes" : "Draft editable");
     }
 
     window.AZIEL_ADMIN_PRICING_ENGINE = {

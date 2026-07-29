@@ -10,6 +10,7 @@ const root = path.join(__dirname, "..", "..");
 const CatalogProduct = require("../models/CatalogProduct");
 const CatalogPackage = require("../models/CatalogPackage");
 const PricingPolicy = require("../models/PricingPolicy");
+const PricingWorkspaceDraft = require("../models/PricingWorkspaceDraft");
 const PriceVersion = require("../models/PriceVersion");
 const {
     getPricingConsoleState,
@@ -112,6 +113,9 @@ function installModelMocks() {
         policyFindOneAndUpdate: PricingPolicy.findOneAndUpdate,
         policyCreate: PricingPolicy.create,
         policyUpdateOne: PricingPolicy.updateOne,
+        workspaceDraftFind: PricingWorkspaceDraft.find,
+        workspaceDraftFindOne: PricingWorkspaceDraft.findOne,
+        workspaceDraftFindOneAndUpdate: PricingWorkspaceDraft.findOneAndUpdate,
         ruleFind: require("../models/PricingRule").find,
         versionFindOne: PriceVersion.findOne,
         versionFind: PriceVersion.find,
@@ -122,6 +126,7 @@ function installModelMocks() {
     let policyId = 1;
     let versionId = 1;
     const policies = [];
+    const workspaceDrafts = [];
     const versions = [];
     const packages = [{
         _id: "64f000000000000000000123",
@@ -165,6 +170,27 @@ function installModelMocks() {
         if (doc) Object.assign(doc, update.$set || {}, { updatedAt: new Date().toISOString() });
         return { modifiedCount: doc ? 1 : 0 };
     };
+    PricingWorkspaceDraft.find = query => chain(workspaceDrafts.filter(draft => matches(draft, query)));
+    PricingWorkspaceDraft.findOne = query => chain(workspaceDrafts.filter(draft => matches(draft, query)).at(-1) || null);
+    PricingWorkspaceDraft.findOneAndUpdate = (query, update) => {
+        let doc = workspaceDrafts.find(draft => matches(draft, query));
+        if (!doc) {
+            doc = {
+                _id: `workspace-draft-${workspaceDrafts.length + 1}`,
+                productId: update.$setOnInsert?.productId,
+                region: update.$setOnInsert?.region,
+                supplierCurrency: update.$setOnInsert?.supplierCurrency,
+                status: update.$setOnInsert?.status || "DRAFT",
+                version: update.$setOnInsert?.version || 1,
+                createdBy: update.$setOnInsert?.createdBy,
+                createdAt: new Date().toISOString()
+            };
+            workspaceDrafts.push(doc);
+        }
+        Object.assign(doc, update.$set || {}, { updatedAt: new Date().toISOString() });
+        if (update.$inc?.version) doc.version = Number(doc.version || 0) + Number(update.$inc.version);
+        return chain(doc);
+    };
     require("../models/PricingRule").find = () => chain([]);
     PriceVersion.findOne = query => chain(versions.filter(version => matches(version, query)).at(-1) || null);
     PriceVersion.find = query => chain(versions.filter(version => matches(version, query)));
@@ -183,6 +209,7 @@ function installModelMocks() {
         packages,
         products,
         policies,
+        workspaceDrafts,
         versions,
         restore() {
             CatalogProduct.find = originals.productFind;
@@ -192,6 +219,9 @@ function installModelMocks() {
             PricingPolicy.findOneAndUpdate = originals.policyFindOneAndUpdate;
             PricingPolicy.create = originals.policyCreate;
             PricingPolicy.updateOne = originals.policyUpdateOne;
+            PricingWorkspaceDraft.find = originals.workspaceDraftFind;
+            PricingWorkspaceDraft.findOne = originals.workspaceDraftFindOne;
+            PricingWorkspaceDraft.findOneAndUpdate = originals.workspaceDraftFindOneAndUpdate;
             require("../models/PricingRule").find = originals.ruleFind;
             PriceVersion.findOne = originals.versionFindOne;
             PriceVersion.find = originals.versionFind;
