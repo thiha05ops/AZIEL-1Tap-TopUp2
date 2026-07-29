@@ -44,7 +44,7 @@
             previewing: false,
             publishing: false,
             filter: "ALL",
-            regionView: "ALL",
+            regionView: "TH",
             productFilter: "ALL",
             pasteMatches: [],
             debounce: null,
@@ -191,6 +191,16 @@
     function number(value, fallback = 0) {
         const numeric = Number(value);
         return Number.isFinite(numeric) ? numeric : fallback;
+    }
+
+    function parseOptionalPositiveAmount(value) {
+        if (value == null || String(value).trim() === "") return null;
+        const numeric = Number(value);
+        return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+    }
+
+    function inputValue(value) {
+        return value == null || value === "" || !Number.isFinite(Number(value)) ? "" : String(value);
     }
 
     function slug(value) {
@@ -614,6 +624,7 @@
                 const key = `${product.productCode}:${pkg.packageCode}`;
                 const existing = byPackage.get(key);
                 if (!existing) {
+                    const hasConfiguredCost = pkg.supplierCostConfigured === true && pkg.supplierPrice != null;
                     byPackage.set(key, {
                         rowId: key,
                         productCode: product.productCode,
@@ -621,8 +632,8 @@
                         packageCode: pkg.packageCode,
                         packageName: pkg.packageName,
                         supplierPackageCode: pkg.supplierPackageCode || pkg.packageCode,
-                        oldSupplierCost: pkg.supplierPrice,
-                        newSupplierCost: pkg.supplierPrice,
+                        oldSupplierCost: hasConfiguredCost ? pkg.supplierPrice : null,
+                        newSupplierCost: hasConfiguredCost ? pkg.supplierPrice : null,
                         supplierCurrency: pkg.supplierCurrency || "THB",
                         supplierName: pkg.supplierName || "",
                         supplierVersion: pkg.supplierVersion || "",
@@ -630,9 +641,12 @@
                         expectedUpdatedAt: pkg.updatedAt || "",
                         publishedPriceMode: pkg.publishedPriceMode,
                         manualOverrideReason: pkg.manualOverrideReason,
+                        publishedPricesByRegion: { [pkg.region]: pkg.publishedPrice },
+                        currenciesByRegion: { [pkg.region]: pkg.currency },
                         supportedRegions: [pkg.region],
                         packageEnabled: pkg.packageEnabled !== false,
                         priceEnabledByRegion: { [pkg.region]: pkg.priceEnabled !== false },
+                        supplierCostConfigured: hasConfiguredCost,
                         selected: true,
                         changed: false,
                         status: "Unchanged"
@@ -641,11 +655,14 @@
                 }
                 if (!existing.expectedUpdatedAt && pkg.updatedAt) existing.expectedUpdatedAt = pkg.updatedAt;
                 if (!existing.supportedRegions.includes(pkg.region)) existing.supportedRegions.push(pkg.region);
+                existing.publishedPricesByRegion[pkg.region] = pkg.publishedPrice;
+                existing.currenciesByRegion[pkg.region] = pkg.currency;
                 existing.priceEnabledByRegion[pkg.region] = pkg.priceEnabled !== false;
                 existing.packageEnabled = existing.packageEnabled && pkg.packageEnabled !== false;
-                if (existing.oldSupplierCost == null && pkg.supplierPrice != null) {
+                if (existing.oldSupplierCost == null && pkg.supplierCostConfigured === true && pkg.supplierPrice != null) {
                     existing.oldSupplierCost = pkg.supplierPrice;
                     existing.newSupplierCost = pkg.supplierPrice;
+                    existing.supplierCostConfigured = true;
                 }
             });
         });
@@ -659,6 +676,11 @@
             return staged ? { ...row, ...staged, productName: row.productName, packageName: row.packageName, expectedUpdatedAt: row.expectedUpdatedAt || staged.expectedUpdatedAt } : row;
         });
         if (!state.workspace.selectedRowId && state.workspace.rows[0]) state.workspace.selectedRowId = state.workspace.rows[0].rowId;
+        if (state.workspace.productFilter === "ALL") {
+            const selectedProduct = state.products.find(product => product.productId === state.selectedProductId);
+            const firstWithRows = state.products.find(product => state.workspace.rows.some(row => row.productCode === product.productCode));
+            state.workspace.productFilter = selectedProduct?.productCode || firstWithRows?.productCode || "ALL";
+        }
         renderWorkspaceControls(section);
     }
 
@@ -668,7 +690,7 @@
         if (costInput && section.contains(costInput)) {
             const row = state.workspace.rows.find(item => item.rowId === costInput.dataset.pricingCostInput);
             if (!row) return;
-            row.newSupplierCost = number(costInput.value, row.newSupplierCost);
+            row.newSupplierCost = parseOptionalPositiveAmount(costInput.value);
             row.changed = row.newSupplierCost !== row.oldSupplierCost;
             row.status = "Edited";
             state.workspace.selectedRowId = row.rowId;
@@ -726,12 +748,16 @@
     function renderWorkspaceControls(section) {
         const productSelect = section.querySelector("#pricingWorkspaceProduct");
         if (productSelect) {
-            const current = productSelect.value || state.workspace.productFilter || "ALL";
+            const current = state.workspace.productFilter || productSelect.value || "ALL";
             productSelect.innerHTML = '<option value="ALL">All products</option>' + state.products.map(product => (
                 `<option value="${escapeHTML(product.productCode)}">${escapeHTML(product.productName)}</option>`
             )).join("");
             productSelect.value = [...productSelect.options].some(option => option.value === current) ? current : "ALL";
             state.workspace.productFilter = productSelect.value;
+        }
+        const regionSelect = section.querySelector("#pricingWorkspaceRegion");
+        if (regionSelect && [...regionSelect.options].some(option => option.value === state.workspace.regionView)) {
+            regionSelect.value = state.workspace.regionView;
         }
     }
 
@@ -768,6 +794,36 @@
         return "";
     }
 
+    function workspaceRegionsForRow(row) {
+        if (state.workspace.regionView === "ALL") return row.supportedRegions || [];
+        return row.supportedRegions?.includes(state.workspace.regionView) ? [state.workspace.regionView] : [];
+    }
+
+    function publishedPriceForRow(row, region) {
+        const preview = regionPreview(row, region);
+        const currency = preview?.currency || row.currenciesByRegion?.[region] || (region === "MM" ? "MMK" : "THB");
+        const amount = preview?.publishedPrice ?? row.publishedPricesByRegion?.[region];
+        return formatMoney(amount, currency);
+    }
+
+    function recommendedPriceForRegion(region) {
+        return region?.recommendedSellingPrice == null ? "Unavailable" : formatMoney(region.recommendedSellingPrice, region.currency);
+    }
+
+    function marginForRegion(region) {
+        if (!region || region.marginPercent == null) return "Unknown";
+        return `${region.marginPercent}%`;
+    }
+
+    function profitForRegion(region) {
+        if (!region || region.netProfit == null) return "Unknown";
+        return formatMoney(region.netProfit, region.currency);
+    }
+
+    function rowStatusHint(preview) {
+        return (preview?.blockingErrors || preview?.warnings || [])[0]?.message || "Server preview";
+    }
+
     function renderWorkspaceGrid(section) {
         const grid = section.querySelector("#pricingWorkspaceGrid");
         if (!grid) return;
@@ -788,35 +844,71 @@
             renderWorkspaceDetail(section);
             return;
         }
-        const header = `
-            <div class="pricing-grid-head" role="row">
-                <span></span><span>Package</span><span>Old Cost</span><span>New Cost</span><span>Currency</span>
-                <span>TH Price</span><span>TH Profit</span><span>MM Price</span><span>MM Profit</span><span>Discount</span><span>Status</span>
-            </div>`;
+        const view = state.workspace.regionView;
+        const header = view === "TH"
+            ? `<div class="pricing-grid-head is-region-view" role="row">
+                <span>Select</span><span>Package</span><span>Package code</span><span>Supplier cost THB</span>
+                <span>Current THB price</span><span>Recommended THB price</span><span>Published THB price</span>
+                <span>Net profit</span><span>Margin</span><span>Status</span>
+            </div>`
+            : view === "MM"
+                ? `<div class="pricing-grid-head is-region-view" role="row">
+                    <span>Select</span><span>Package</span><span>Package code</span><span>Supplier cost</span>
+                    <span>Exchange rate</span><span>Current MMK price</span><span>Recommended MMK price</span>
+                    <span>Published MMK price</span><span>Net profit</span><span>Margin</span><span>Status</span>
+                </div>`
+                : `<div class="pricing-grid-head is-all-view" role="row">
+                    <span>Select</span><span>Package</span><span>Package code</span><span>Supplier cost</span>
+                    <span>Legacy THB price</span><span>Legacy MMK price</span><span>Regions</span><span>Status</span>
+                </div>`;
         const body = rows.map(row => {
             const preview = state.workspace.previewRows.find(item => item.rowId === row.rowId);
-            const th = regionPreview(row, "TH");
-            const mm = regionPreview(row, "MM");
+            const region = view === "ALL" ? null : regionPreview(row, view);
             const status = preview?.status || row.status || "Unchanged";
             const selected = row.rowId === state.workspace.selectedRowId;
+            const selector = `
+                <label class="pricing-grid-cell">
+                    <input type="checkbox" data-pricing-select-row="${escapeHTML(row.rowId)}" ${row.selected !== false ? "checked" : ""} aria-label="Select ${escapeHTML(row.packageName)}">
+                </label>`;
+            const packageCell = `
+                <div class="pricing-grid-cell">
+                    <strong>${escapeHTML(row.packageName)}</strong>
+                    <small>${escapeHTML(row.productName)}</small>
+                </div>`;
+            const codeCell = `<div class="pricing-grid-cell"><span>${escapeHTML(row.packageCode)}</span><small>${escapeHTML(row.supplierPackageCode || "Supplier code")}</small></div>`;
+            const costInput = `<input data-pricing-cost-input="${escapeHTML(row.rowId)}" type="number" min="0" step="0.01" value="${escapeHTML(inputValue(row.newSupplierCost))}" placeholder="Enter cost" aria-label="New supplier cost">`;
+            const costCell = `<div class="pricing-grid-cell"><span>${formatMoney(row.oldSupplierCost, row.supplierCurrency)}</span>${costInput}<small>${row.oldSupplierCost == null ? "Supplier cost missing" : "Current supplier cost"}</small></div>`;
+            const statusCell = `<div class="pricing-grid-cell"><span class="pricing-status-chip ${statusClass(status)}">${escapeHTML(status)}</span><small>${escapeHTML(rowStatusHint(preview))}</small></div>`;
+            let cells;
+            if (view === "TH") {
+                cells = `${selector}${packageCell}${codeCell}
+                    <div class="pricing-grid-cell">${costInput}<small>${row.newSupplierCost == null ? "Supplier cost missing" : `Old: ${formatMoney(row.oldSupplierCost, row.supplierCurrency)}`}</small></div>
+                    <div class="pricing-grid-cell"><span>${publishedPriceForRow(row, "TH")}</span><small>Legacy THB Price</small></div>
+                    <div class="pricing-grid-cell"><span>${recommendedPriceForRegion(region)}</span><small>Server preview</small></div>
+                    <div class="pricing-grid-cell"><span>${publishedPriceForRow(row, "TH")}</span><small>Unchanged before publish</small></div>
+                    <div class="pricing-grid-cell"><span>${profitForRegion(region)}</span><small>Net profit</small></div>
+                    <div class="pricing-grid-cell"><span>${marginForRegion(region)}</span><small>Margin</small></div>
+                    ${statusCell}`;
+            } else if (view === "MM") {
+                cells = `${selector}${packageCell}${codeCell}${costCell}
+                    <div class="pricing-grid-cell"><span>${region?.exchangeRate || "—"}</span><small>${escapeHTML(region?.exchangeRatePair || "THB→MMK")}</small></div>
+                    <div class="pricing-grid-cell"><span>${publishedPriceForRow(row, "MM")}</span><small>Legacy MMK Price</small></div>
+                    <div class="pricing-grid-cell"><span>${recommendedPriceForRegion(region)}</span><small>Server preview</small></div>
+                    <div class="pricing-grid-cell"><span>${publishedPriceForRow(row, "MM")}</span><small>Unchanged before publish</small></div>
+                    <div class="pricing-grid-cell"><span>${profitForRegion(region)}</span><small>Net profit</small></div>
+                    <div class="pricing-grid-cell"><span>${marginForRegion(region)}</span><small>Margin</small></div>
+                    ${statusCell}`;
+            } else {
+                const regions = workspaceRegionsForRow(row);
+                cells = `${selector}${packageCell}${codeCell}${costCell}
+                    <div class="pricing-grid-cell"><span>${publishedPriceForRow(row, "TH")}</span><small>Legacy THB Price</small></div>
+                    <div class="pricing-grid-cell"><span>${publishedPriceForRow(row, "MM")}</span><small>Legacy MMK Price</small></div>
+                    <div class="pricing-grid-cell"><span>${escapeHTML(regions.join(" / ") || "—")}</span><small>${regions.length} regional price rows</small></div>
+                    ${statusCell}`;
+            }
             return `
-                <div class="pricing-grid-row ${selected ? "is-selected" : ""}" role="row" data-status="${escapeHTML(status)}" data-pricing-workspace-row="${escapeHTML(row.rowId)}" tabindex="0">
-                    <label class="pricing-grid-cell">
-                        <input type="checkbox" data-pricing-select-row="${escapeHTML(row.rowId)}" ${row.selected !== false ? "checked" : ""} aria-label="Select ${escapeHTML(row.packageName)}">
-                    </label>
-                    <div class="pricing-grid-cell">
-                        <strong>${escapeHTML(row.packageName)}</strong>
-                        <small>${escapeHTML(row.productName)} · ${escapeHTML(row.packageCode)}</small>
-                    </div>
-                    <div class="pricing-grid-cell"><span>${formatMoney(row.oldSupplierCost, row.supplierCurrency)}</span><small>Supplier</small></div>
-                    <div class="pricing-grid-cell"><input data-pricing-cost-input="${escapeHTML(row.rowId)}" type="number" min="0" step="0.01" value="${escapeHTML(row.newSupplierCost)}" aria-label="New supplier cost"></div>
-                    <div class="pricing-grid-cell"><span>${escapeHTML(row.supplierCurrency)}</span><small>${escapeHTML(row.supplierName || "Supplier")}</small></div>
-                    <div class="pricing-grid-cell"><span>${th ? formatMoney(th.publishedPrice, "THB") : "—"}</span><small>${th ? formatMoney(th.recommendedSellingPrice, "THB") : "No TH"}</small></div>
-                    <div class="pricing-grid-cell"><span>${th?.netProfit == null ? "—" : formatMoney(th.netProfit, "THB")}</span><small>${th?.marginPercent == null ? "Margin unknown" : `${th.marginPercent}%`}</small></div>
-                    <div class="pricing-grid-cell"><span>${mm ? formatMoney(mm.publishedPrice, "MMK") : "—"}</span><small>${mm ? formatMoney(mm.recommendedSellingPrice, "MMK") : "No MM"}</small></div>
-                    <div class="pricing-grid-cell"><span>${mm?.netProfit == null ? "—" : formatMoney(mm.netProfit, "MMK")}</span><small>${mm?.marginPercent == null ? "Margin unknown" : `${mm.marginPercent}%`}</small></div>
-                    <div class="pricing-grid-cell"><span>${Math.max(th?.displayDiscountPercent || 0, mm?.displayDiscountPercent || 0)}%</span><small>Reference vs published</small></div>
-                    <div class="pricing-grid-cell"><span class="pricing-status-chip ${statusClass(status)}">${escapeHTML(status)}</span><small>${(preview?.warnings || preview?.blockingErrors || [])[0]?.message || "Server preview"}</small></div>
+                <div class="pricing-grid-row ${selected ? "is-selected" : ""} ${view === "ALL" ? "is-all-view" : "is-region-view"}" role="row" data-status="${escapeHTML(status)}" data-pricing-workspace-row="${escapeHTML(row.rowId)}" tabindex="0">
+                    ${cells}
                 </div>
             `;
         }).join("");
@@ -828,15 +920,17 @@
     function renderWorkspaceSummary(section, summary = null) {
         const computed = summary || {
             packagesLoaded: state.workspace.rows.length,
+            packageRows: state.workspace.rows.length,
+            regionalPriceRows: state.workspace.rows.reduce((sum, row) => sum + (row.supportedRegions?.length || 0), 0),
             changed: state.workspace.rows.filter(row => row.changed).length,
             ready: state.workspace.previewRows.filter(row => row.status === "Ready").length,
-            lowMargin: state.workspace.previewRows.filter(row => row.regions?.some(item => item.profitabilityStatus === "LOW_MARGIN")).length,
-            negativeMargin: state.workspace.previewRows.filter(row => row.regions?.some(item => /NEGATIVE|BELOW_COST/.test(item.profitabilityStatus || ""))).length,
+            lowMargin: state.workspace.previewRows.filter(row => row.regions?.some(item => item.supplierCostConfigured === true && item.profitabilityStatus === "LOW_MARGIN")).length,
+            negativeMargin: state.workspace.previewRows.filter(row => row.regions?.some(item => item.supplierCostConfigured === true && /NEGATIVE|BELOW_COST/.test(item.profitabilityStatus || ""))).length,
             missingSupplierCost: state.workspace.previewRows.filter(row => row.regions?.some(item => item.profitabilityStatus === "UNKNOWN_SUPPLIER_COST")).length,
             manualOverrides: state.workspace.previewRows.filter(row => row.regions?.some(item => item.publishedPriceMode === "MANUAL_OVERRIDE")).length,
             promoRisk: state.workspace.previewRows.filter(row => row.warnings?.some(item => /COUPON|PROMO/i.test(item.code || ""))).length
         };
-        setText(section, "#pricingWorkspacePackagesLoaded", computed.packagesLoaded || 0);
+        setText(section, "#pricingWorkspacePackagesLoaded", `${computed.packageRows ?? computed.packagesLoaded ?? 0} packages / ${computed.regionalPriceRows ?? 0} regional price rows`);
         setText(section, "#pricingWorkspaceChanged", computed.changed || 0);
         setText(section, "#pricingWorkspaceReady", computed.ready || 0);
         setText(section, "#pricingWorkspaceLowMargin", computed.lowMargin || 0);
@@ -860,9 +954,10 @@
         const regionCards = (row.regions || []).map(region => `
             <article class="pricing-detail-card">
                 <strong>${region.region === "TH" ? "Thailand" : "Myanmar"} · ${escapeHTML(region.currency || "")}</strong>
-                <div class="pricing-detail-line"><span>Recommended</span><b>${formatMoney(region.recommendedSellingPrice, region.currency)}</b></div>
-                <div class="pricing-detail-line"><span>Published</span><b>${formatMoney(region.publishedPrice, region.currency)}</b></div>
+                <div class="pricing-detail-line"><span>Current published price</span><b>${formatMoney(region.publishedPrice, region.currency)}</b></div>
+                <div class="pricing-detail-line"><span>Recommended price</span><b>${region.recommendedSellingPrice == null ? "Unavailable" : formatMoney(region.recommendedSellingPrice, region.currency)}</b></div>
                 <div class="pricing-detail-line"><span>Final after promo</span><b>${formatMoney(region.finalPayableAmount, region.currency)}</b></div>
+                <div class="pricing-detail-line"><span>Reference discount</span><b>${region.displayDiscountPercent || 0}%</b></div>
                 <div class="pricing-detail-line"><span>Net profit / margin</span><b>${region.netProfit == null ? "Unknown" : `${formatMoney(region.netProfit, region.currency)} · ${region.marginPercent}%`}</b></div>
                 <div class="pricing-detail-line"><span>Payment fee impact</span><b>${escapeHTML((region.paymentFeeSimulation || []).map(item => `${item.method}: ${item.marginPercent ?? "?"}%`).join(" · "))}</b></div>
                 <div class="pricing-detail-line"><span>Policy source</span><b>${escapeHTML(region.effectivePolicySource || "production")}</b></div>
@@ -872,9 +967,11 @@
         box.innerHTML = `
             <article class="pricing-detail-card">
                 <strong>${escapeHTML(row.packageName || "")}</strong>
-                <div class="pricing-detail-line"><span>Supplier cost</span><b>${formatMoney(row.oldSupplierCost, row.supplierCurrency)} → ${formatMoney(row.newSupplierCost, row.supplierCurrency)}</b></div>
+                <div class="pricing-detail-line"><span>Supplier Cost</span><b>${row.oldSupplierCost == null ? "Not configured" : formatMoney(row.oldSupplierCost, row.supplierCurrency)}</b></div>
+                <div class="pricing-detail-line"><span>New Supplier Cost</span><b>${row.newSupplierCost == null ? "Empty" : formatMoney(row.newSupplierCost, row.supplierCurrency)}</b></div>
                 <div class="pricing-detail-line"><span>Supplier code</span><b>${escapeHTML(row.supplierPackageCode || row.packageCode || "")}</b></div>
                 <div class="pricing-detail-line"><span>Status</span><b>${escapeHTML(row.status || "Edited")}</b></div>
+                ${row.newSupplierCost == null ? '<div class="pricing-detail-line"><span>Next action</span><b>Enter supplier cost</b></div>' : ""}
             </article>
             ${regionCards || '<p class="empty">Preview this row to inspect regional calculations.</p>'}
             ${warnings ? `<article class="pricing-detail-card"><strong>Warnings</strong><ul>${warnings}</ul></article>` : ""}

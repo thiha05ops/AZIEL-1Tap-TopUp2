@@ -285,6 +285,7 @@ function productsFromPackages(packages = [], productMap = new Map()) {
                 currency: price.currency,
                 now: new Date()
             });
+            const supplierCostConfigured = supplierCost.configured === true;
             products.get(productId).packages.push({
                 productCode: pkg.productCode,
                 productName,
@@ -295,12 +296,12 @@ function productsFromPackages(packages = [], productMap = new Map()) {
                 priceEnabled: price.enabled !== false,
                 region: upper(region),
                 currency: upper(price.currency),
-                supplierCurrency: upper(supplierCost.currency),
-                supplierPrice: number(supplierCost.amount),
+                supplierCurrency: supplierCostConfigured ? upper(supplierCost.currency) : upper(price.supplierCurrency || price.currency),
+                supplierPrice: supplierCostConfigured ? number(supplierCost.amount) : null,
                 supplierName: supplierCost.supplierName,
                 supplierVersion: supplierCost.supplierVersion,
                 supplierCostTimestamp: supplierCost.costTimestamp,
-                supplierCostConfigured: supplierCost.configured === true,
+                supplierCostConfigured,
                 supplierCostSource: supplierCost.source,
                 publishedPrice: number(price.amount),
                 publishedPriceMode: upper(price.publishedPriceMode || "LEGACY_COMPATIBILITY_PRICE"),

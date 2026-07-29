@@ -630,7 +630,7 @@
                             <span>Region View</span>
                             <select id="pricingWorkspaceRegion">
                                 <option value="ALL">All</option>
-                                <option value="TH">Thailand</option>
+                                <option value="TH" selected>Thailand</option>
                                 <option value="MM">Myanmar</option>
                             </select>
                         </label>
@@ -678,7 +678,7 @@
                     </div>
 
                     <div class="pricing-workspace-summary" aria-label="Daily pricing workspace summary">
-                        <article><span>Packages loaded</span><strong id="pricingWorkspacePackagesLoaded">0</strong></article>
+                        <article><span>Package rows</span><strong id="pricingWorkspacePackagesLoaded">0 packages / 0 regional price rows</strong></article>
                         <article><span>Changed</span><strong id="pricingWorkspaceChanged">0</strong></article>
                         <article><span>Ready</span><strong id="pricingWorkspaceReady">0</strong></article>
                         <article><span>Low margin</span><strong id="pricingWorkspaceLowMargin">0</strong></article>
@@ -733,6 +733,14 @@
                         <div id="pricingReviewList" class="pricing-review-list"></div>
                     </section>
 
+                    <details class="pricing-business-rules-drawer">
+                        <summary>
+                            <span>
+                                <strong>Business Rules</strong>
+                                <small>Low-frequency policy controls and focused package preview.</small>
+                            </span>
+                            <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                        </summary>
                     <div class="pricing-engine-workspace">
                         <aside class="panel pricing-products-panel" aria-label="Pricing Engine products">
                             <div class="panel-head">
@@ -883,6 +891,7 @@
                             </article>
                         </aside>
                     </div>
+                    </details>
                 </div>
             </section>
 

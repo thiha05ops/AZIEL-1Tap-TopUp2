@@ -45,6 +45,7 @@ function upper(value) {
 }
 
 function amount(value) {
+    if (value == null || value === "") return null;
     const numeric = Number(value);
     return Number.isFinite(numeric) && numeric >= 0 ? numeric : null;
 }
@@ -111,12 +112,13 @@ function rowKey(row = {}) {
 function normalizeWorkspaceRow(row = {}, index = 0) {
     const productCode = normalizeProductCode(row.productCode);
     const packageCode = normalizePackageCode(row.packageCode);
-    const newSupplierCost = positiveAmount(row.newSupplierCost ?? row.supplierCost);
+    const rawSupplierCost = row.newSupplierCost ?? row.supplierCost;
+    const newSupplierCost = rawSupplierCost == null || rawSupplierCost === "" ? null : positiveAmount(rawSupplierCost);
     const supplierCurrency = upper(row.supplierCurrency || "THB");
     if (!productCode || !packageCode) {
         throw new AdminPricingControlCenterError("WORKSPACE_ROW_INVALID", `Row ${index + 1} requires productCode and packageCode.`);
     }
-    if (newSupplierCost == null) {
+    if (rawSupplierCost != null && rawSupplierCost !== "" && newSupplierCost == null) {
         throw new AdminPricingControlCenterError("WORKSPACE_SUPPLIER_COST_INVALID", `Row ${index + 1} requires a positive supplier cost.`);
     }
     if (!["MMK", "THB"].includes(supplierCurrency)) {
@@ -302,6 +304,32 @@ async function previewLoadedPackageRegion({ product, pkg, region, row, couponCod
             blockingErrors: [warning("REGIONAL_PRICE_UNAVAILABLE", `${region} price is not configured for this package.`)]
         };
     }
+    if (row.newSupplierCost == null) {
+        return {
+            success: true,
+            region,
+            currency: REGION_CURRENCIES[region],
+            sellingPrice: round(existing.amount),
+            publishedPrice: round(existing.amount),
+            recommendedSellingPrice: null,
+            finalPayableAmount: round(existing.amount),
+            referencePrice: round(Math.max(Number(existing.referencePrice || 0), Number(existing.amount || 0))),
+            supplierCost: null,
+            supplierCurrency: row.supplierCurrency || existing.supplierCurrency || existing.currency,
+            supplierCostConfigured: false,
+            productCode: product.productCode,
+            packageCode: pkg.packageCode,
+            publishedPriceMode: existing.publishedPriceMode || "LEGACY_COMPATIBILITY_PRICE",
+            manualOverrideReason: existing.manualOverrideReason || "",
+            paymentFeeSimulation: [],
+            grossProfit: null,
+            netProfit: null,
+            marginPercent: null,
+            profitabilityStatus: PROFITABILITY_STATUS.UNKNOWN_SUPPLIER_COST,
+            warnings: [warning("LEGACY_PRICE_ACTIVE", "Existing storefront price remains unchanged until a true supplier cost is staged.")],
+            blockingErrors: [warning("UNKNOWN_SUPPLIER_COST", "Supplier cost missing — enter or paste supplier cost.")]
+        };
+    }
 
     const priceDraft = {
         supplierCost: row.newSupplierCost,
@@ -378,12 +406,15 @@ function rowStatusFromRegional(regional = []) {
 }
 
 function summarizeWorkspaceRows(rows = []) {
+    const configuredProfitabilityRows = rows.filter(row => row.regions?.some(item => item.supplierCostConfigured === true));
     return {
         packagesLoaded: rows.length,
+        packageRows: rows.length,
+        regionalPriceRows: rows.reduce((sum, row) => sum + (Array.isArray(row.regions) ? row.regions.length : 0), 0),
         changed: rows.filter(row => row.changed).length,
         ready: rows.filter(row => row.status === "Ready").length,
-        lowMargin: rows.filter(row => row.regions?.some(item => item.profitabilityStatus === PROFITABILITY_STATUS.LOW_MARGIN)).length,
-        negativeMargin: rows.filter(row => row.regions?.some(item => item.profitabilityStatus === PROFITABILITY_STATUS.NEGATIVE_MARGIN || item.profitabilityStatus === PROFITABILITY_STATUS.PRICE_BELOW_COST)).length,
+        lowMargin: configuredProfitabilityRows.filter(row => row.regions?.some(item => item.profitabilityStatus === PROFITABILITY_STATUS.LOW_MARGIN)).length,
+        negativeMargin: configuredProfitabilityRows.filter(row => row.regions?.some(item => item.profitabilityStatus === PROFITABILITY_STATUS.NEGATIVE_MARGIN || item.profitabilityStatus === PROFITABILITY_STATUS.PRICE_BELOW_COST)).length,
         missingSupplierCost: rows.filter(row => row.regions?.some(item => item.profitabilityStatus === PROFITABILITY_STATUS.UNKNOWN_SUPPLIER_COST)).length,
         missingExchangeRate: rows.filter(row => row.regions?.some(item => item.profitabilityStatus === PROFITABILITY_STATUS.EXCHANGE_RATE_MISSING)).length,
         manualOverrides: rows.filter(row => row.regions?.some(item => item.publishedPriceMode === "MANUAL_OVERRIDE")).length,

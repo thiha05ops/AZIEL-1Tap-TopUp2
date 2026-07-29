@@ -6964,6 +6964,43 @@ body.theme-light.admin-body .pm-qr-preview {
   font-size: 20px;
 }
 
+.pricing-business-rules-drawer {
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+  background: var(--admin-surface);
+  color: var(--admin-text);
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.pricing-business-rules-drawer > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 54px;
+  padding: 12px 14px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.pricing-business-rules-drawer > summary::-webkit-details-marker {
+  display: none;
+}
+
+.pricing-business-rules-drawer > summary span {
+  display: grid;
+  gap: 3px;
+}
+
+.pricing-business-rules-drawer > summary small {
+  color: var(--admin-text-muted);
+}
+
+.pricing-business-rules-drawer[open] > summary i {
+  transform: rotate(180deg);
+}
+
 .pricing-daily-workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
@@ -6984,18 +7021,27 @@ body.theme-light.admin-body .pm-qr-preview {
 }
 
 .pricing-workspace-grid {
-  min-width: 1180px;
+  min-width: 980px;
 }
 
 .pricing-grid-head,
 .pricing-grid-row {
   display: grid;
-  grid-template-columns: 42px minmax(190px, 1.4fr) 120px 120px 118px 118px 130px 130px 124px 118px 150px;
   align-items: center;
   gap: 8px;
   min-height: 54px;
   padding: 8px 12px;
   border-bottom: 1px solid var(--admin-border);
+}
+
+.pricing-grid-head.is-region-view,
+.pricing-grid-row.is-region-view {
+  grid-template-columns: 64px minmax(190px, 1.3fr) 130px 150px 140px 160px 150px 128px 100px 160px;
+}
+
+.pricing-grid-head.is-all-view,
+.pricing-grid-row.is-all-view {
+  grid-template-columns: 64px minmax(190px, 1.4fr) 130px 170px 150px 150px 120px 170px;
 }
 
 .pricing-grid-head {
@@ -7178,6 +7224,16 @@ body.theme-light.admin-body .pm-qr-preview {
     border: 1px solid var(--admin-border);
     border-radius: 10px;
     padding: 10px;
+  }
+
+  .pricing-grid-head.is-region-view,
+  .pricing-grid-head.is-all-view {
+    display: none;
+  }
+
+  .pricing-grid-row.is-region-view,
+  .pricing-grid-row.is-all-view {
+    grid-template-columns: 34px minmax(0, 1fr);
   }
 
   .pricing-grid-row .pricing-grid-cell {

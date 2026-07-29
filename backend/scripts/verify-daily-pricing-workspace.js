@@ -44,6 +44,11 @@ function verifyBackend() {
     includes("backend/services/commerce/adminPricingEngineService.js", "CatalogPackage.find({ deletedAt: null })", "Pricing Workspace bootstrap must include disabled packages instead of enabled-only rows.");
     includes("backend/services/commerce/adminPricingEngineService.js", "priceEnabled: price.enabled !== false", "Admin pricing payload must preserve disabled regional price status.");
     includes("backend/services/commerce/adminPricingEngineService.js", "supplierCostConfigured", "Admin pricing payload must expose missing supplier-cost state.");
+    includes("backend/services/commerce/adminPricingEngineService.js", "supplierPrice: supplierCostConfigured ? number(supplierCost.amount) : null", "Legacy storefront price must never be projected as supplier cost.");
+    includes("backend/services/commerce/adminPricingControlCenterService.js", "rawSupplierCost == null || rawSupplierCost === \"\" ? null", "Missing supplier cost must remain a valid workspace state.");
+    includes("backend/services/commerce/adminPricingControlCenterService.js", "Supplier cost missing — enter or paste supplier cost.", "Missing cost preview must explain the next operator action.");
+    includes("backend/services/commerce/adminPricingControlCenterService.js", "configuredProfitabilityRows", "Low and negative margin metrics must require configured supplier cost.");
+    includes("backend/services/commerce/adminPricingControlCenterService.js", "regionalPriceRows", "Summary must distinguish package rows from regional price rows.");
 }
 
 function verifyFrontend() {
@@ -53,7 +58,8 @@ function verifyFrontend() {
     includes("frontend/admin.html", "pricingReviewPanel", "Review workflow must exist.");
     includes("frontend/admin.html", "pricingWorkspacePublishSelectedBtn", "Publish selected action must exist.");
     includes("frontend/admin.html", "pricingWorkspacePublishAllBtn", "Publish all action must exist.");
-    includes("frontend/admin.html", "Business Rules", "Low-frequency policy controls must be visually separated.");
+    includes("frontend/admin.html", "pricing-business-rules-drawer", "Low-frequency policy controls must be collapsed or separated.");
+    includes("frontend/admin.html", "<option value=\"TH\" selected>Thailand</option>", "Daily Pricing Workspace must default to Thailand view.");
     includes("frontend/admin.html", "Supplier THB → Selling THB", "Thailand exchange copy must name source and target.");
     includes("frontend/admin.html", "Supplier THB → Selling MMK", "Myanmar exchange copy must name source and target.");
 
@@ -74,15 +80,23 @@ function verifyFrontend() {
     includes("frontend/js/admin-pricing-engine.js", "window.confirm", "Publish must require explicit confirmation.");
     includes("frontend/js/admin-pricing-engine.js", "publishedKeys", "Successful published rows must be cleared from staged retry state.");
     includes("frontend/js/admin-pricing-engine.js", "supplierPrice: Number.isFinite(supplierPrice) ? supplierPrice : null", "Missing supplier cost must not hide package rows.");
-    includes("frontend/js/admin-pricing-engine.js", "state.workspace.productFilter !== \"ALL\"", "All products must remain a non-filtering state.");
+    includes("frontend/js/admin-pricing-engine.js", "regionView: \"TH\"", "Daily Pricing Workspace state must default to Thailand.");
+    includes("frontend/js/admin-pricing-engine.js", "state.workspace.productFilter === \"ALL\"", "Workspace must switch from All to first product with rows for daily editing.");
     includes("frontend/js/admin-pricing-engine.js", "state.workspace.regionView !== \"ALL\"", "Region view must filter by normalized regional support.");
+    includes("frontend/js/admin-pricing-engine.js", "Legacy THB Price", "Thailand/All grids must label legacy customer prices explicitly.");
+    includes("frontend/js/admin-pricing-engine.js", "Legacy MMK Price", "Myanmar/All grids must label legacy customer prices explicitly.");
+    includes("frontend/js/admin-pricing-engine.js", "recommendedSellingPrice == null ? \"Unavailable\"", "Missing cost must not show fake recommended prices.");
+    includes("frontend/js/admin-pricing-engine.js", "row.oldSupplierCost == null ? \"Not configured\"", "Detail panel must describe missing supplier cost.");
+    includes("frontend/js/admin-pricing-engine.js", "parseOptionalPositiveAmount", "Inline editing must keep empty supplier cost empty until staged.");
     includes("frontend/js/admin-pricing-engine.js", "item.packageCode.toLowerCase() === key", "Paste matching must support exact package-code lookup.");
     includes("frontend/js/admin-pricing-engine.js", "No catalog products loaded", "Empty state must distinguish missing product payloads.");
     notIncludes("frontend/js/admin-pricing-engine.js", "fetch('/api/admin/pricing-engine/workspace", "Workspace must use centralized pricingFetch helper, not ad hoc fetch.");
 
     includes("frontend/css/admin/admin-design-system.css", ".pricing-daily-workspace", "Daily workspace styles must exist.");
     includes("frontend/css/admin/admin-design-system.css", "max-width: 720px", "Mobile card workflow breakpoint must exist.");
-    includes("frontend/css/admin/admin-design-system.css", "min-width: 1180px", "Desktop grid must use intentional contained horizontal scrolling.");
+    includes("frontend/css/admin/admin-design-system.css", "min-width: 980px", "Desktop grid must use intentional contained scrolling without the old extra-wide mixed region table.");
+    includes("frontend/css/admin/admin-design-system.css", ".pricing-grid-head.is-all-view", "All view must have a compact grid configuration.");
+    includes("frontend/css/admin/admin-design-system.css", ".pricing-business-rules-drawer", "Business Rules drawer styles must exist.");
     includes("frontend/css/admin/admin-design-system.css", "grid-template-columns: 1fr", "Mobile layout must collapse to one column.");
 }
 

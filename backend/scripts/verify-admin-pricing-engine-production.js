@@ -131,7 +131,7 @@ function installModelMocks() {
         enabled: true,
         deletedAt: null,
         sortOrder: 1,
-        prices: { TH: { amount: 1000, currency: "THB", enabled: true } },
+        prices: { TH: { amount: 1000, currency: "THB", enabled: true, supplierCost: 1000, supplierCurrency: "THB" } },
         metadata: { gameName: "Mobile Legends" }
     }];
     const products = [{
@@ -433,7 +433,7 @@ async function verifyDraftPublishAndQuotePickup() {
                 name: "Weekly Pass",
                 metadata: { gameName: "Mobile Legends" }
             },
-            price: { amount: 1000, currency: "THB" },
+            price: { amount: 1000, currency: "THB", supplierCost: 1000, supplierCurrency: "THB" },
             catalog: { productCode: "mlbb", packageCode: "WEEKLY", productName: "Mobile Legends" },
             region: "TH",
             currency: "THB",
