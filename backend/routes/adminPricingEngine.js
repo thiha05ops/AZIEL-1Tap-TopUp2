@@ -95,45 +95,22 @@ function pricingLifecycle(req, res, next) {
     next();
 }
 
-function tracedAdminMiddleware(req, res, next) {
-    const trace = req.pricingTrace;
-    trace?.log("AUTH_STARTED");
-    return adminMiddleware(req, res, error => {
-        if (trace?.completed) return;
-        if (error) {
-            trace?.log("REQUEST_ERROR", {
-                stage: "auth",
-                errorName: error?.name || "Error",
-                errorCode: error?.code || "",
-                errorMessage: error?.message || ""
-            });
-            return next(error);
-        }
-        trace?.log("AUTH_COMPLETED");
+function traceCheckpoint(checkpoint, metadata = {}) {
+    return (req, _res, next) => {
+        req.pricingTrace?.log(checkpoint, metadata);
         return next();
-    });
+    };
 }
 
-function tracedPermission(permission) {
-    const middleware = requireAdminPermission(permission);
-    return (req, res, next) => {
-        const trace = req.pricingTrace;
-        trace?.log("RBAC_STARTED", { permission });
-        return middleware(req, res, error => {
-            if (trace?.completed) return;
-            if (error) {
-                trace?.log("REQUEST_ERROR", {
-                    stage: "rbac",
-                    errorName: error?.name || "Error",
-                    errorCode: error?.code || "",
-                    errorMessage: error?.message || ""
-                });
-                return next(error);
-            }
-            trace?.log("RBAC_COMPLETED", { permission });
-            return next();
-        });
-    };
+function pricingAuth(permission) {
+    return [
+        traceCheckpoint("AUTH_STARTED"),
+        adminMiddleware,
+        traceCheckpoint("AUTH_COMPLETED"),
+        traceCheckpoint("RBAC_STARTED", { permission }),
+        requireAdminPermission(permission),
+        traceCheckpoint("RBAC_COMPLETED", { permission })
+    ];
 }
 
 function sendPricingError(req, res, error) {
@@ -210,7 +187,7 @@ function requireOwner(req, res, next) {
     });
 }
 
-router.get("/admin/pricing-engine", pricingLifecycle, tracedAdminMiddleware, tracedPermission(PERMISSIONS.CATALOG_READ), async (req, res) => {
+router.get("/admin/pricing-engine", pricingLifecycle, ...pricingAuth(PERMISSIONS.CATALOG_READ), async (req, res) => {
     try {
         req.pricingTrace?.log("ROUTE_HANDLER_ENTERED");
         const state = await withBootstrapDeadline(getPricingConsoleState({ trace: req.pricingTrace }), req.pricingTrace);
@@ -233,7 +210,7 @@ router.get("/admin/pricing-engine", pricingLifecycle, tracedAdminMiddleware, tra
     }
 });
 
-router.get("/admin/pricing-engine/diagnostics", pricingLifecycle, tracedAdminMiddleware, tracedPermission(PERMISSIONS.CATALOG_MANAGE), requireOwner, async (req, res) => {
+router.get("/admin/pricing-engine/diagnostics", pricingLifecycle, ...pricingAuth(PERMISSIONS.CATALOG_MANAGE), requireOwner, async (req, res) => {
     try {
         req.pricingTrace?.log("ROUTE_HANDLER_ENTERED", { diagnostic: true });
         const diagnostics = await runPricingEngineDiagnostics(req.pricingTrace);

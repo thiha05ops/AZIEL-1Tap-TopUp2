@@ -504,8 +504,9 @@ function verifySource() {
     assertContains("backend/services/commerce/adminPricingEngineService.js", "maxTimeMS", "Pricing Engine GET queries must be bounded.");
     assertContains("backend/routes/adminPricingEngine.js", "PRICING_ENGINE_REQUEST_TIMEOUT_MS", "Pricing Engine GET route must have a hard timeout safety net.");
     assertContains("backend/routes/adminPricingEngine.js", "pricingLifecycle", "Pricing Engine GET must start tracing and deadline before auth/RBAC.");
-    assertContains("backend/routes/adminPricingEngine.js", "tracedAdminMiddleware", "Pricing Engine auth middleware must be traced and bounded.");
-    assertContains("backend/routes/adminPricingEngine.js", "tracedPermission", "Pricing Engine RBAC middleware must be traced and bounded.");
+    assertContains("backend/routes/adminPricingEngine.js", "pricingAuth", "Pricing Engine auth/RBAC lifecycle must use the shared admin middleware with trace checkpoints.");
+    assertContains("backend/routes/adminPricingEngine.js", "adminMiddleware", "Pricing Engine must use the same Admin auth middleware as the rest of Admin.");
+    assertContains("backend/routes/adminPricingEngine.js", "requireAdminPermission(permission)", "Pricing Engine must use the canonical RBAC middleware without custom wrapper hangs.");
     assertContains("backend/routes/adminPricingEngine.js", "PRICING_WORKSPACE_BOOTSTRAP_TIMEOUT", "Pricing Engine deadline must send a structured timeout response.");
     assertContains("backend/routes/adminPricingEngine.js", "RESPONSE_SERIALIZATION_STARTED", "Pricing Engine GET must trace response serialization.");
     assertContains("backend/routes/adminPricingEngine.js", "RESPONSE_SERIALIZATION_COMPLETED", "Pricing Engine GET must prove response serialization completed before send.");
