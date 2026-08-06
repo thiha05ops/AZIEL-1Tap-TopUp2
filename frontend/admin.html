@@ -39,18 +39,21 @@
 
             <div class="admin-sidebar-head admin-sidebar-header">
                 <div class="admin-logo" data-aziel-os-brand="sidebar">
-                    <img class="admin-logo-fallback" src="/assets/logo/aziel-icon.webp" alt="AZIEL OS" width="38" height="38" decoding="async">
+                    <img class="admin-logo-fallback" src="/assets/logo/aziel-icon.webp" alt="AZIEL OS" width="38"
+                        height="38" decoding="async">
                     <div class="admin-logo-copy">
                         <h1>AZIEL OS</h1>
                         <span>Commerce Operating System</span>
                     </div>
                 </div>
 
-                <button id="adminSidebarCollapse" class="admin-sidebar-collapse" type="button" aria-label="Collapse admin navigation" aria-pressed="false">
+                <button id="adminSidebarCollapse" class="admin-sidebar-collapse" type="button"
+                    aria-label="Collapse admin navigation" aria-pressed="false">
                     <i class="fa-solid fa-angles-left" aria-hidden="true"></i>
                 </button>
 
-                <button id="adminSidebarClose" class="admin-sidebar-close" type="button" aria-label="Close admin navigation">
+                <button id="adminSidebarClose" class="admin-sidebar-close" type="button"
+                    aria-label="Close admin navigation">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
@@ -68,115 +71,137 @@
                     <div class="admin-nav-group">
                         <span class="admin-nav-label">Home</span>
 
-                        <button class="admin-nav active" data-section="dashboard" type="button" data-admin-permission="DASHBOARD_READ">
-                        <i class="fa-solid fa-chart-line"></i>
+                        <button class="admin-nav active" data-section="dashboard" type="button"
+                            data-admin-permission="DASHBOARD_READ">
+                            <i class="fa-solid fa-chart-line"></i>
                             <span data-admin-i18n="dashboard">Dashboard</span>
                         </button>
                     </div>
 
-                <div class="admin-nav-group">
-                    <span class="admin-nav-label">Growth</span>
+                    <div class="admin-nav-group">
+                        <span class="admin-nav-label">Growth</span>
 
-                    <button class="admin-nav" data-section="campaigns" type="button" data-admin-permission="CAMPAIGNS_READ">
-                        <i class="fa-solid fa-bullseye"></i>
-                        <span data-admin-i18n="campaigns">Campaigns</span>
-                    </button>
-                    <button class="admin-nav" data-section="promos" type="button" data-admin-permission="PROMOS_READ">
-                        <i class="fa-solid fa-ticket"></i>
-                        <span data-admin-i18n="promo_codes">Promo Codes</span>
-                    </button>
-                    <button class="admin-nav" data-section="site-content" type="button" data-admin-permission="SITE_CONTENT_READ">
-                        <i class="fa-solid fa-images"></i>
-                        <span data-admin-i18n="home_banners">Home Banners</span>
-                    </button>
-                    <button class="admin-nav" data-section="website" type="button" data-admin-permission="SITE_CONTENT_READ">
-                        <i class="fa-solid fa-globe"></i>
-                        <span>Game Banners</span>
-                    </button>
-                    <button class="admin-nav" data-section="media" type="button" data-admin-permission="MEDIA_READ">
-                        <i class="fa-solid fa-photo-film"></i>
-                        <span data-admin-i18n="media_library">Media Library</span>
-                    </button>
-                    <a class="admin-nav admin-design-studio-link" href="/admin-design-studio.html" data-admin-permission="DESIGN_STUDIO_READ">
-                        <i class="fa-solid fa-palette"></i>
-                        <span data-admin-i18n="design_studio">Design Studio</span>
-                    </a>
-                </div>
+                        <button class="admin-nav" data-section="campaigns" type="button"
+                            data-admin-permission="CAMPAIGNS_READ">
+                            <i class="fa-solid fa-bullseye"></i>
+                            <span data-admin-i18n="campaigns">Campaigns</span>
+                        </button>
+                        <button class="admin-nav" data-section="promos" type="button"
+                            data-admin-permission="PROMOS_READ">
+                            <i class="fa-solid fa-ticket"></i>
+                            <span data-admin-i18n="promo_codes">Promo Codes</span>
+                        </button>
+                        <button class="admin-nav" data-section="site-content" type="button"
+                            data-admin-permission="SITE_CONTENT_READ">
+                            <i class="fa-solid fa-images"></i>
+                            <span data-admin-i18n="home_banners">Home Banners</span>
+                        </button>
+                        <button class="admin-nav" data-section="website" type="button"
+                            data-admin-permission="SITE_CONTENT_READ">
+                            <i class="fa-solid fa-globe"></i>
+                            <span>Game Banners</span>
+                        </button>
+                        <button class="admin-nav" data-section="media" type="button" data-admin-permission="MEDIA_READ">
+                            <i class="fa-solid fa-photo-film"></i>
+                            <span data-admin-i18n="media_library">Media Library</span>
+                        </button>
+                        <a class="admin-nav admin-design-studio-link" href="/admin-design-studio.html"
+                            data-admin-permission="DESIGN_STUDIO_READ">
+                            <i class="fa-solid fa-palette"></i>
+                            <span data-admin-i18n="design_studio">Design Studio</span>
+                        </a>
+                    </div>
 
-                <div class="admin-nav-group">
-                    <span class="admin-nav-label" data-admin-i18n="commerce">Commerce</span>
+                    <div class="admin-nav-group">
+                        <span class="admin-nav-label" data-admin-i18n="commerce">Commerce</span>
 
-                    <button class="admin-nav" data-section="orders" type="button" data-admin-permission="ORDERS_READ">
-                    <i class="fa-solid fa-box"></i>
-                        <span data-admin-i18n="orders">Orders</span>
-                </button>
+                        <button class="admin-nav" data-section="orders" type="button"
+                            data-admin-permission="ORDERS_READ">
+                            <i class="fa-solid fa-box"></i>
+                            <span data-admin-i18n="orders">Orders</span>
+                        </button>
 
-                    <button class="admin-nav" data-section="catalog" type="button" data-admin-permission="CATALOG_READ">
-                        <i class="fa-solid fa-layer-group"></i>
-                        <span data-admin-i18n="catalog">Catalog</span>
-                    </button>
+                        <button class="admin-nav" data-section="catalog" type="button"
+                            data-admin-permission="CATALOG_READ">
+                            <i class="fa-solid fa-layer-group"></i>
+                            <span data-admin-i18n="catalog">Catalog</span>
+                        </button>
 
-                    <button class="admin-nav" data-section="pricing-engine" type="button" data-admin-permission="CATALOG_READ">
-                        <i class="fa-solid fa-scale-balanced"></i>
-                        <span>Pricing</span>
-                    </button>
-                    <button class="admin-nav" data-section="wallet" type="button" data-admin-permission="WALLET_READ">
-                    <i class="fa-solid fa-wallet"></i>
-                        <span data-admin-i18n="wallet">Wallet</span>
-                </button>
-                </div>
+                        <button class="admin-nav" data-section="pricing-engine" type="button"
+                            data-admin-permission="CATALOG_READ">
+                            <i class="fa-solid fa-scale-balanced"></i>
+                            <span>Daily Pricing</span>
+                        </button>
+                        <button class="admin-nav" data-section="pricing-settings" type="button"
+                            data-admin-permission="CATALOG_MANAGE">
+                            <i class="fa-solid fa-sliders"></i>
+                            <span>Pricing Settings</span>
+                        </button>
+                        <button class="admin-nav" data-section="wallet" type="button"
+                            data-admin-permission="WALLET_READ">
+                            <i class="fa-solid fa-wallet"></i>
+                            <span data-admin-i18n="wallet">Wallet</span>
+                        </button>
+                    </div>
 
-                <div class="admin-nav-group">
-                    <span class="admin-nav-label" data-admin-i18n="operations">Operations</span>
-                    <button class="admin-nav" data-section="fulfillment" type="button" data-admin-permission="SUPPLIERS_READ,FULFILLMENT_READ">
-                        <i class="fa-solid fa-truck-ramp-box"></i>
-                        <span data-admin-i18n="fulfillment">Fulfillment</span>
-                    </button>
-                    <button class="admin-nav" data-section="payments" type="button" data-admin-permission="PAYMENT_METHODS_READ,PAYMENT_METHODS_MANAGE">
-                    <i class="fa-solid fa-credit-card"></i>
-                        <span data-admin-i18n="payment_methods">Payment Methods</span>
-                </button>
-                </div>
+                    <div class="admin-nav-group">
+                        <span class="admin-nav-label" data-admin-i18n="operations">Operations</span>
+                        <button class="admin-nav" data-section="fulfillment" type="button"
+                            data-admin-permission="SUPPLIERS_READ,FULFILLMENT_READ">
+                            <i class="fa-solid fa-truck-ramp-box"></i>
+                            <span data-admin-i18n="fulfillment">Fulfillment</span>
+                        </button>
+                        <button class="admin-nav" data-section="payments" type="button"
+                            data-admin-permission="PAYMENT_METHODS_READ,PAYMENT_METHODS_MANAGE">
+                            <i class="fa-solid fa-credit-card"></i>
+                            <span data-admin-i18n="payment_methods">Payment Methods</span>
+                        </button>
+                    </div>
 
-                <div class="admin-nav-group">
-                    <span class="admin-nav-label" data-admin-i18n="customers">Customers</span>
+                    <div class="admin-nav-group">
+                        <span class="admin-nav-label" data-admin-i18n="customers">Customers</span>
 
-                    <button class="admin-nav" data-section="users" type="button" data-admin-permission="USERS_READ">
-                        <i class="fa-solid fa-users"></i>
-                        <span data-admin-i18n="users">Users</span>
-                </button>
+                        <button class="admin-nav" data-section="users" type="button" data-admin-permission="USERS_READ">
+                            <i class="fa-solid fa-users"></i>
+                            <span data-admin-i18n="users">Users</span>
+                        </button>
 
-                    <button class="admin-nav" data-section="broadcast" type="button" data-admin-permission="SETTINGS_MANAGE">
-                        <i class="fa-solid fa-bullhorn"></i>
-                        <span data-admin-i18n="broadcast">Broadcast</span>
-                </button>
-                    <button class="admin-nav" data-section="support" type="button" data-admin-permission="SUPPORT_READ">
-                    <i class="fa-solid fa-headset"></i>
-                        <span data-admin-i18n="support">Support</span>
-                </button>
-                    <button class="admin-nav" data-section="chat" type="button" data-admin-permission="LIVE_CHAT_READ">
-                    <i class="fa-solid fa-comments"></i>
-                        <span data-admin-i18n="live_chat">Live Chat</span>
-                </button>
-                </div>
+                        <button class="admin-nav" data-section="broadcast" type="button"
+                            data-admin-permission="SETTINGS_MANAGE">
+                            <i class="fa-solid fa-bullhorn"></i>
+                            <span data-admin-i18n="broadcast">Broadcast</span>
+                        </button>
+                        <button class="admin-nav" data-section="support" type="button"
+                            data-admin-permission="SUPPORT_READ">
+                            <i class="fa-solid fa-headset"></i>
+                            <span data-admin-i18n="support">Support</span>
+                        </button>
+                        <button class="admin-nav" data-section="chat" type="button"
+                            data-admin-permission="LIVE_CHAT_READ">
+                            <i class="fa-solid fa-comments"></i>
+                            <span data-admin-i18n="live_chat">Live Chat</span>
+                        </button>
+                    </div>
 
-                <div class="admin-nav-group" data-admin-permission="ADMIN_ACCOUNTS_READ,ADMIN_SESSIONS_READ,AUDIT_LOG_READ">
-                    <span class="admin-nav-label">Administration</span>
+                    <div class="admin-nav-group"
+                        data-admin-permission="ADMIN_ACCOUNTS_READ,ADMIN_SESSIONS_READ,AUDIT_LOG_READ">
+                        <span class="admin-nav-label">Administration</span>
 
-                    <button class="admin-nav" data-section="admin-security" type="button">
-                        <i class="fa-solid fa-user-shield"></i>
-                        <span data-admin-i18n="admin_team">Admin Team</span>
-                    </button>
-                </div>
+                        <button class="admin-nav" data-section="admin-security" type="button">
+                            <i class="fa-solid fa-user-shield"></i>
+                            <span data-admin-i18n="admin_team">Admin Team</span>
+                        </button>
+                    </div>
 
-                <div class="admin-nav-group">
-                    <span class="admin-nav-label">System</span>
+                    <div class="admin-nav-group">
+                        <span class="admin-nav-label">System</span>
 
-                    <button class="admin-nav" data-section="settings" type="button" data-admin-permission="SETTINGS_MANAGE">
-                        <i class="fa-solid fa-gear"></i>
-                        <span data-admin-i18n="site_settings">Site Settings</span>
-                </button>
-                </div>
+                        <button class="admin-nav" data-section="settings" type="button"
+                            data-admin-permission="SETTINGS_MANAGE">
+                            <i class="fa-solid fa-gear"></i>
+                            <span data-admin-i18n="site_settings">Site Settings</span>
+                        </button>
+                    </div>
 
                 </nav>
             </div>
@@ -214,14 +239,16 @@
             <header class="admin-topbar">
 
                 <div class="admin-title-wrap">
-                    <button id="adminMenuToggle" class="admin-menu-toggle" type="button" aria-label="Open admin navigation" aria-controls="adminSidebar" aria-expanded="false">
+                    <button id="adminMenuToggle" class="admin-menu-toggle" type="button"
+                        aria-label="Open admin navigation" aria-controls="adminSidebar" aria-expanded="false">
                         <i class="fa-solid fa-bars" aria-hidden="true"></i>
                     </button>
 
                     <div>
                         <span id="adminSectionPill" class="admin-section-pill">Home</span>
                         <h2 id="adminPageTitle" data-admin-i18n="dashboard">Dashboard</h2>
-                        <p id="adminPageSub" data-admin-i18n="dashboard_sub">Real operational snapshot for AZIEL today.</p>
+                        <p id="adminPageSub" data-admin-i18n="dashboard_sub">Real operational snapshot for AZIEL today.
+                        </p>
                     </div>
                 </div>
 
@@ -230,7 +257,8 @@
                         data-admin-i18n-placeholder="search_placeholder" />
 
                     <div class="admin-topbar-controls">
-                        <button id="adminNotificationsBtn" class="admin-icon-btn" type="button" aria-label="Notifications">
+                        <button id="adminNotificationsBtn" class="admin-icon-btn" type="button"
+                            aria-label="Notifications">
                             <i class="fa-solid fa-bell" aria-hidden="true"></i>
                             <span class="admin-topbar-badge" aria-label="Unread notifications">0</span>
                         </button>
@@ -240,11 +268,13 @@
                             <option value="th">ไทย</option>
                         </select>
 
-                        <button id="adminProfileBtn" class="admin-profile-btn" type="button" aria-label="Admin profile" data-admin-permission="ADMIN_ACCOUNTS_READ,ADMIN_SESSIONS_READ,AUDIT_LOG_READ">
+                        <button id="adminProfileBtn" class="admin-profile-btn" type="button" aria-label="Admin profile"
+                            data-admin-permission="ADMIN_ACCOUNTS_READ,ADMIN_SESSIONS_READ,AUDIT_LOG_READ">
                             <span class="admin-avatar">A</span>
                             <span>Owner</span>
                         </button>
-                        <button id="adminLogoutBtn" class="admin-logout-btn" type="button" data-admin-i18n="logout">Logout</button>
+                        <button id="adminLogoutBtn" class="admin-logout-btn" type="button"
+                            data-admin-i18n="logout">Logout</button>
 
                         <a href="home.html" data-admin-i18n="back_home">Back Home</a>
                     </div>
@@ -290,11 +320,14 @@
                                     <span>End</span>
                                     <input id="dashboardEndDate" type="date">
                                 </label>
-                                <button id="dashboardApplyCustomBtn" class="admin-primary-btn" type="button">Apply</button>
-                                <button id="dashboardCancelCustomBtn" class="admin-secondary-btn" type="button">Cancel</button>
+                                <button id="dashboardApplyCustomBtn" class="admin-primary-btn"
+                                    type="button">Apply</button>
+                                <button id="dashboardCancelCustomBtn" class="admin-secondary-btn"
+                                    type="button">Cancel</button>
                             </div>
                             <button id="refreshDashboardBtn" class="admin-secondary-btn" type="button">Refresh</button>
-                            <span id="dashboardLastUpdated" class="dashboard-updated" data-admin-i18n="last_updated">Last updated</span>
+                            <span id="dashboardLastUpdated" class="dashboard-updated"
+                                data-admin-i18n="last_updated">Last updated</span>
                         </form>
                     </header>
 
@@ -364,7 +397,8 @@
                                     <h3>Top Games</h3>
                                     <span>Eligible paid/completed order sales.</span>
                                 </div>
-                                <button class="admin-secondary-btn" type="button" data-dashboard-section="catalog">View Catalog</button>
+                                <button class="admin-secondary-btn" type="button" data-dashboard-section="catalog">View
+                                    Catalog</button>
                             </div>
                             <div id="dashboardTopGames" class="dashboard-table-list" aria-live="polite"></div>
                         </article>
@@ -375,7 +409,8 @@
                                     <h3>Payment Methods</h3>
                                     <span>Grouped by actual order payment method.</span>
                                 </div>
-                                <button class="admin-secondary-btn" type="button" data-dashboard-section="payment-methods">Open Methods</button>
+                                <button class="admin-secondary-btn" type="button"
+                                    data-dashboard-section="payment-methods">Open Methods</button>
                             </div>
                             <div id="dashboardPaymentMethods" class="dashboard-table-list" aria-live="polite"></div>
                         </article>
@@ -389,7 +424,8 @@
                                     <span>Real records only.</span>
                                 </div>
                                 <div class="dashboard-segmented" role="tablist" aria-label="Recent activity">
-                                    <button class="active" type="button" data-dashboard-activity="orders">Orders</button>
+                                    <button class="active" type="button"
+                                        data-dashboard-activity="orders">Orders</button>
                                     <button type="button" data-dashboard-activity="wallet">Wallet</button>
                                     <button type="button" data-dashboard-activity="customers">Customers</button>
                                     <button type="button" data-dashboard-activity="support">Support</button>
@@ -418,24 +454,36 @@
                         <div>
                             <span class="admin-eyebrow">Website Workspace</span>
                             <h3>What do you want to do today?</h3>
-                            <p>Manage the public website, preview changes, and check launch readiness without leaving this workspace.</p>
+                            <p>Manage the public website, preview changes, and check launch readiness without leaving
+                                this workspace.</p>
                         </div>
                         <div class="website-runtime-actions">
-                            <button id="websiteRuntimeRefresh" class="admin-secondary-btn" type="button" data-admin-i18n="refresh">Refresh</button>
-                            <button id="websiteRuntimeOpenPublic" class="admin-secondary-btn" type="button" data-admin-i18n="open_public_site">Open Public Site</button>
+                            <button id="websiteRuntimeRefresh" class="admin-secondary-btn" type="button"
+                                data-admin-i18n="refresh">Refresh</button>
+                            <button id="websiteRuntimeOpenPublic" class="admin-secondary-btn" type="button"
+                                data-admin-i18n="open_public_site">Open Public Site</button>
                         </div>
                     </header>
 
                     <div class="website-runtime-tabs" role="tablist" aria-label="Website owner workspace sections">
-                        <button class="active" type="button" role="tab" aria-selected="true" data-website-runtime-tab="overview">Start</button>
-                        <button type="button" role="tab" aria-selected="false" data-website-runtime-tab="home">Manage Home</button>
-                        <button type="button" role="tab" aria-selected="false" data-website-runtime-tab="games">Manage Games</button>
-                        <button type="button" role="tab" aria-selected="false" data-website-runtime-tab="campaigns">Promotions</button>
-                        <button type="button" role="tab" aria-selected="false" data-website-runtime-tab="regions">Regions</button>
-                        <button type="button" role="tab" aria-selected="false" data-website-runtime-tab="preview" data-admin-i18n="preview">Preview</button>
-                        <button type="button" role="tab" aria-selected="false" data-website-runtime-tab="configuration">Publish Status</button>
-                        <button class="website-runtime-tab--developer" type="button" role="tab" aria-selected="false" data-website-runtime-tab="navigation" hidden>Navigation</button>
-                        <button class="website-runtime-tab--developer" type="button" role="tab" aria-selected="false" data-website-runtime-tab="diagnostics" hidden>Diagnostics</button>
+                        <button class="active" type="button" role="tab" aria-selected="true"
+                            data-website-runtime-tab="overview">Start</button>
+                        <button type="button" role="tab" aria-selected="false" data-website-runtime-tab="home">Manage
+                            Home</button>
+                        <button type="button" role="tab" aria-selected="false" data-website-runtime-tab="games">Manage
+                            Games</button>
+                        <button type="button" role="tab" aria-selected="false"
+                            data-website-runtime-tab="campaigns">Promotions</button>
+                        <button type="button" role="tab" aria-selected="false"
+                            data-website-runtime-tab="regions">Regions</button>
+                        <button type="button" role="tab" aria-selected="false" data-website-runtime-tab="preview"
+                            data-admin-i18n="preview">Preview</button>
+                        <button type="button" role="tab" aria-selected="false"
+                            data-website-runtime-tab="configuration">Publish Status</button>
+                        <button class="website-runtime-tab--developer" type="button" role="tab" aria-selected="false"
+                            data-website-runtime-tab="navigation" hidden>Navigation</button>
+                        <button class="website-runtime-tab--developer" type="button" role="tab" aria-selected="false"
+                            data-website-runtime-tab="diagnostics" hidden>Diagnostics</button>
                     </div>
 
                     <div id="websiteRuntimeStatus" class="website-runtime-status" aria-live="polite">
@@ -457,20 +505,29 @@
                         </div>
 
                         <div class="orders-queue-tabs" role="tablist" aria-label="Order queues">
-                            <button class="orders-queue-tab active" type="button" data-order-filter="all" data-admin-i18n="all">All</button>
-                            <button class="orders-queue-tab" type="button" data-order-filter="manual_review" data-admin-i18n="manual_review">Manual Review</button>
-                            <button class="orders-queue-tab" type="button" data-order-filter="paid" data-admin-i18n="paid">Paid</button>
-                            <button class="orders-queue-tab" type="button" data-order-filter="processing" data-admin-i18n="processing">Processing</button>
-                            <button class="orders-queue-tab" type="button" data-order-filter="refund_requested" data-admin-i18n="refund_requests">Refund Requests</button>
-                            <button class="orders-queue-tab" type="button" data-order-filter="completed" data-admin-i18n="completed">Completed</button>
-                            <button class="orders-queue-tab" type="button" data-order-filter="failed" data-admin-i18n="failed">Failed</button>
+                            <button class="orders-queue-tab active" type="button" data-order-filter="all"
+                                data-admin-i18n="all">All</button>
+                            <button class="orders-queue-tab" type="button" data-order-filter="manual_review"
+                                data-admin-i18n="manual_review">Manual Review</button>
+                            <button class="orders-queue-tab" type="button" data-order-filter="paid"
+                                data-admin-i18n="paid">Paid</button>
+                            <button class="orders-queue-tab" type="button" data-order-filter="processing"
+                                data-admin-i18n="processing">Processing</button>
+                            <button class="orders-queue-tab" type="button" data-order-filter="refund_requested"
+                                data-admin-i18n="refund_requests">Refund Requests</button>
+                            <button class="orders-queue-tab" type="button" data-order-filter="completed"
+                                data-admin-i18n="completed">Completed</button>
+                            <button class="orders-queue-tab" type="button" data-order-filter="failed"
+                                data-admin-i18n="failed">Failed</button>
                         </div>
 
                         <div class="admin-filter-bar">
                             <input id="orderSearchInput" type="text" placeholder="Search order or username..."
                                 data-admin-i18n-placeholder="search_order_placeholder">
-                            <button id="orderSearchBtn" class="admin-secondary-btn" type="button" data-admin-i18n="search">Search</button>
-                            <button id="orderClearSearchBtn" class="admin-secondary-btn" type="button" data-admin-i18n="clear">Clear</button>
+                            <button id="orderSearchBtn" class="admin-secondary-btn" type="button"
+                                data-admin-i18n="search">Search</button>
+                            <button id="orderClearSearchBtn" class="admin-secondary-btn" type="button"
+                                data-admin-i18n="clear">Clear</button>
                         </div>
 
                         <div id="adminOrdersQueue" class="orders-queue-list" aria-live="polite">
@@ -491,11 +548,13 @@
             <section class="admin-section" id="section-catalog">
                 <div class="catalog-workspace-shell">
                     <div class="catalog-top-tabs" role="tablist" aria-label="Catalog workspace views">
-                        <button class="catalog-top-tab active" type="button" role="tab" aria-selected="true" data-catalog-view="products">
+                        <button class="catalog-top-tab active" type="button" role="tab" aria-selected="true"
+                            data-catalog-view="products">
                             <i class="fa-solid fa-layer-group"></i>
                             <span>Products</span>
                         </button>
-                        <button class="catalog-top-tab" type="button" role="tab" aria-selected="false" data-catalog-view="storefront">
+                        <button class="catalog-top-tab" type="button" role="tab" aria-selected="false"
+                            data-catalog-view="storefront">
                             <i class="fa-solid fa-store"></i>
                             <span>Storefront Sections</span>
                         </button>
@@ -503,29 +562,31 @@
 
                     <div class="catalog-command-center" data-catalog-panel="products">
                         <div class="panel catalog-products-panel">
-                        <div class="panel-head">
-                            <div>
-                                <h3 data-admin-i18n="catalog">Catalog</h3>
-                                <span data-admin-i18n="catalog_readonly_sub">Database-authoritative product workspace.</span>
+                            <div class="panel-head">
+                                <div>
+                                    <h3 data-admin-i18n="catalog">Catalog</h3>
+                                    <span data-admin-i18n="catalog_readonly_sub">Database-authoritative product
+                                        workspace.</span>
+                                </div>
+                                <button id="refreshCatalogBtn" class="admin-secondary-btn" type="button"
+                                    data-admin-i18n="refresh">Refresh</button>
                             </div>
-                            <button id="refreshCatalogBtn" class="admin-secondary-btn" type="button" data-admin-i18n="refresh">Refresh</button>
-                        </div>
 
-                        <div class="catalog-source-row">
-                            <span data-admin-i18n="database_catalog_data">Database Catalog Data</span>
-                            <b id="catalogSourceLabel">-</b>
-                        </div>
+                            <div class="catalog-source-row">
+                                <span data-admin-i18n="database_catalog_data">Database Catalog Data</span>
+                                <b id="catalogSourceLabel">-</b>
+                            </div>
 
-                        <div class="catalog-source-row">
-                            <span data-admin-i18n="active_runtime_source">Active Runtime Source</span>
-                            <b id="catalogActiveSourceLabel">-</b>
-                        </div>
+                            <div class="catalog-source-row">
+                                <span data-admin-i18n="active_runtime_source">Active Runtime Source</span>
+                                <b id="catalogActiveSourceLabel">-</b>
+                            </div>
 
-                        <div id="adminCatalogProducts" class="catalog-product-list" aria-live="polite">
-                            <div class="admin-dashboard-skeleton"></div>
-                            <div class="admin-dashboard-skeleton"></div>
-                            <div class="admin-dashboard-skeleton"></div>
-                        </div>
+                            <div id="adminCatalogProducts" class="catalog-product-list" aria-live="polite">
+                                <div class="admin-dashboard-skeleton"></div>
+                                <div class="admin-dashboard-skeleton"></div>
+                                <div class="admin-dashboard-skeleton"></div>
+                            </div>
                         </div>
 
                         <aside id="adminCatalogDetailPanel" class="panel catalog-detail-panel" aria-live="polite">
@@ -541,7 +602,8 @@
                                 <h3>Storefront Sections</h3>
                                 <span>Control Games dropdown visibility, order, and section access.</span>
                             </div>
-                            <button id="refreshStorefrontSectionsBtn" class="admin-secondary-btn" type="button">Refresh</button>
+                            <button id="refreshStorefrontSectionsBtn" class="admin-secondary-btn"
+                                type="button">Refresh</button>
                         </div>
                         <div id="adminStorefrontSections" class="catalog-storefront-list" aria-live="polite">
                             <div class="admin-dashboard-skeleton"></div>
@@ -552,325 +614,117 @@
             </section>
 
             <section class="admin-section" id="section-pricing-engine">
-                <div class="catalog-workspace-shell pricing-engine-shell">
-                    <header class="catalog-workspace-head pricing-engine-head">
-                        <div class="catalog-workspace-title">
-                            <span class="admin-status-pill is-purple">Commerce</span>
-                            <h3>Pricing</h3>
-                            <p>Daily Supplier Workspace</p>
+                <div class="pricing-v3-shell" data-pricing-view="daily">
+                    <header class="pricing-v3-header">
+                        <div><span class="admin-status-pill is-purple">Commerce</span>
+                            <h2>Daily Pricing</h2>
+                            <p>Update supplier costs and publish server-calculated prices.</p>
                         </div>
-                        <div class="catalog-workspace-actions">
-                            <button id="pricingPasteBtn" class="admin-secondary-btn" type="button">Import / Paste</button>
-                            <button id="pricingReviewBtn" class="admin-secondary-btn" type="button">Review Changes</button>
-                            <button id="pricingWorkspacePublishSelectedBtn" class="admin-primary-btn" type="button">Publish Changes</button>
-                            <button id="pricingWorkspacePublishAllBtn" class="admin-secondary-btn" type="button" disabled>Publish All Disabled</button>
-                            <button id="pricingSaveDraftBtn" class="admin-secondary-btn" type="button">Save Draft</button>
-                            <button id="pricingPublishBtn" class="admin-primary-btn" type="button">Publish</button>
-                            <span class="admin-status-pill is-warning">Not Saved</span>
-                            <button id="pricingProductionStatus" class="admin-secondary-btn" type="button" disabled>Production Active</button>
-                        </div>
+                        <div class="pricing-v3-header-actions"><span id="pricingDailyState"
+                                class="admin-status-pill">Loading</span><button id="pricingPublishBtn"
+                                class="admin-primary-btn" type="button" disabled><i class="fa-solid fa-cloud-arrow-up"
+                                    aria-hidden="true"></i> Publish Changes</button></div>
                     </header>
-
-                    <div class="pricing-summary-grid" aria-label="Pricing Engine summary">
-                        <article class="website-runtime-metric">
-                            <span>Exchange Rate</span>
-                            <strong id="pricingSummaryExchange">THB 1 = MMK 118</strong>
-                            <small id="pricingSummaryExchangeMeta">Production configuration</small>
-                        </article>
-                        <article class="website-runtime-metric">
-                            <span>Default Profit</span>
-                            <strong id="pricingSummaryProfit">12%</strong>
-                            <small id="pricingSummaryProfitMeta">Draft preview</small>
-                        </article>
-                        <article class="website-runtime-metric">
-                            <span>Gateway Fee</span>
-                            <strong id="pricingSummaryGateway">2.5%</strong>
-                            <small id="pricingSummaryGatewayMeta">Draft editable</small>
-                        </article>
-                        <article class="website-runtime-metric">
-                            <span>Affected Packages</span>
-                            <strong id="pricingSummaryPackages">1</strong>
-                            <small id="pricingSummaryPackagesMeta">Future quotes affected</small>
-                        </article>
-                    </div>
-
-                    <div class="pricing-policy-scope-strip" aria-label="Pricing policy scope">
-                        <label>
-                            <span>Policy Scope</span>
-                            <select id="pricingScopeSelector">
-                                <option value="GLOBAL">Global</option>
-                                <option value="REGION" selected>Region</option>
-                                <option value="PRODUCT">Product</option>
-                                <option value="PACKAGE">Package</option>
-                            </select>
-                        </label>
-                        <div>
-                            <span>Effective source</span>
-                            <strong id="pricingEffectiveSource">Region policy</strong>
-                        </div>
-                        <div>
-                            <span>Published price mode</span>
-                            <strong id="pricingPublishedMode">Legacy compatibility price</strong>
-                        </div>
-                    </div>
-
-                    <div class="pricing-workspace-toolbar" aria-label="Daily pricing workspace controls">
-                        <label>
-                            <span>Supplier</span>
-                            <input id="pricingWorkspaceSupplier" type="text" value="Primary supplier" placeholder="Supplier name">
-                        </label>
-                        <label>
-                            <span>Product</span>
-                            <select id="pricingWorkspaceProduct">
-                                <option value="ALL">All products</option>
-                            </select>
-                        </label>
-                        <label>
-                            <span>Region View</span>
-                            <select id="pricingWorkspaceRegion">
-                                <option value="ALL">All</option>
-                                <option value="TH" selected>Thailand</option>
+                    <div id="pricingDailyBlocking" class="pricing-v3-blocking" role="alert" hidden></div>
+                    <div class="pricing-v3-toolbar">
+                        <label><span>Supplier</span><select id="pricingSupplierSelect">
+                                <option value="">Loading suppliers...</option>
+                            </select></label>
+                        <label><span>Region</span><select id="pricingRegionSelect">
+                                <option value="ALL">All Regions</option>
+                                <option value="TH">Thailand</option>
                                 <option value="MM">Myanmar</option>
-                            </select>
-                        </label>
-                        <label>
-                            <span>Supplier Currency</span>
-                            <select id="pricingWorkspaceCurrency">
+                            </select></label>
+                        <label><span>Product</span><select id="pricingProductSelect">
+                                <option value="">Loading products...</option>
+                            </select></label>
+                        <div class="pricing-v3-readonly"><span>Supplier Currency</span><strong
+                                id="pricingSupplierCurrency">-</strong></div>
+                        <label class="pricing-v3-search"><span>Packages</span><input id="pricingPackageSearch"
+                                type="search" placeholder="Search product or package" autocomplete="off"></label>
+                    </div>
+                    <div class="pricing-v3-table-wrap">
+                        <table class="pricing-v3-table">
+                            <thead>
+                                <tr>
+                                    <th>Package</th>
+                                    <th>Supplier Cost</th>
+                                    <th>Thailand</th>
+                                    <th>Myanmar</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pricingPackageRows">
+                                <tr>
+                                    <td colspan="5" class="empty">Loading production pricing...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <footer class="pricing-v3-footer"><span id="pricingDailySummary">No packages loaded</span><span
+                            id="pricingDraftState">No unsaved changes</span></footer>
+                </div>
+            </section>
+
+            <section class="admin-section" id="section-pricing-settings">
+                <div class="pricing-v3-shell pricing-settings-shell" data-pricing-view="settings">
+                    <header class="pricing-v3-header">
+                        <div><span class="admin-status-pill is-purple">Owner Policy</span>
+                            <h2>Pricing Settings</h2>
+                            <p>Configure the server-owned business policy used by Daily Pricing.</p>
+                        </div>
+                        <div class="pricing-v3-header-actions"><span id="pricingSettingsState"
+                                class="admin-status-pill">Loading</span><button id="pricingSettingsSave"
+                                class="admin-primary-btn" type="button" disabled><i class="fa-solid fa-floppy-disk"
+                                    aria-hidden="true"></i> Save Settings</button></div>
+                    </header>
+                    <div id="pricingSettingsError" class="pricing-v3-blocking" role="alert" hidden></div>
+                    <form id="pricingSettingsForm" class="pricing-settings-form">
+                        <label><span>Policy Region</span><select id="pricingSettingsRegion">
+                                <option value="TH">Thailand</option>
+                                <option value="MM">Myanmar</option>
+                            </select></label>
+                        <label><span>Supplier Currency</span><select name="supplierCurrency">
                                 <option value="THB">THB</option>
                                 <option value="MMK">MMK</option>
-                            </select>
-                        </label>
-                        <span id="pricingWorkspaceUpdated" class="admin-status-pill">Last updated: Not previewed</span>
-                    </div>
-
-                    <div class="pricing-exchange-strip" aria-label="Exchange operations">
-                        <div>
-                            <span>Thailand</span>
-                            <strong>Supplier THB → Selling THB</strong>
-                            <small>No conversion required</small>
-                        </div>
-                        <div>
-                            <span>Myanmar</span>
-                            <strong id="pricingWorkspaceMmkRate">Supplier THB → Selling MMK</strong>
-                            <small id="pricingWorkspaceMmkRateMeta">Current production rate and rounding apply server-side</small>
-                        </div>
-                    </div>
-
-                    <div class="pricing-workspace-summary" aria-label="Daily pricing workspace summary">
-                        <article><span>Package rows</span><strong id="pricingWorkspacePackagesLoaded">0 packages / 0 regional price rows</strong></article>
-                        <article><span>Changed</span><strong id="pricingWorkspaceChanged">0</strong></article>
-                        <article><span>Ready</span><strong id="pricingWorkspaceReady">0</strong></article>
-                        <article><span>Missing cost</span><strong id="pricingWorkspaceMissingCost">0</strong></article>
-                        <article><span>Blocked</span><strong id="pricingWorkspaceBlocked">0</strong></article>
-                    </div>
-
-                    <section class="pricing-daily-workspace" aria-label="Daily pricing operations">
-                        <div class="pricing-grid-wrap">
-                            <div id="pricingWorkspaceGrid" class="pricing-workspace-grid" aria-live="polite">
-                                <p class="empty">Load production pricing to begin daily supplier-cost review.</p>
-                            </div>
-                        </div>
-                        <aside class="pricing-workspace-detail" aria-label="Pricing calculation detail" hidden aria-hidden="true">
-                            <div class="panel-head">
-                                <div>
-                                    <h3>Calculation Detail</h3>
-                                    <span id="pricingWorkspaceDetailTitle">Select a row to inspect before/after pricing.</span>
-                                </div>
-                                <button id="pricingWorkspaceDetailClose" class="admin-icon-btn" type="button" aria-label="Close calculation detail">
-                                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-                                </button>
-                            </div>
-                            <div id="pricingWorkspaceDetail" class="pricing-workspace-detail-body">
-                                <p class="empty">No staged package selected.</p>
-                            </div>
-                        </aside>
-                    </section>
-
-                    <section id="pricingPastePanel" class="pricing-paste-panel" hidden aria-label="Paste supplier price data">
-                        <div class="panel-head">
-                            <div>
-                                <h3>Paste Supplier Prices</h3>
-                                <span>Use package code + price, package name + price, or one price per line after confirming the loaded order.</span>
-                            </div>
-                            <button id="pricingPasteCloseBtn" class="admin-secondary-btn" type="button">Close</button>
-                        </div>
-                        <textarea id="pricingPasteInput" rows="8" placeholder="MLBB_7740 1120&#10;PUBG_8100_UC 870"></textarea>
-                        <div class="catalog-workspace-actions">
-                            <button id="pricingParsePasteBtn" class="admin-primary-btn" type="button">Parse Paste</button>
-                            <span id="pricingPasteResult" class="admin-status-pill">No pasted rows yet</span>
-                        </div>
-                    </section>
-
-                    <section id="pricingReviewPanel" class="pricing-review-panel" hidden aria-label="Review staged pricing changes">
-                        <div class="panel-head">
-                            <div>
-                                <h3>Review Changes</h3>
-                                <span id="pricingReviewSummary">No staged changes.</span>
-                            </div>
-                            <button id="pricingReviewCloseBtn" class="admin-secondary-btn" type="button">Close</button>
-                        </div>
-                        <div id="pricingReviewList" class="pricing-review-list"></div>
-                    </section>
-
-                    <details class="pricing-business-rules-drawer">
-                        <summary>
-                            <span>
-                                <strong>Business Rules</strong>
-                                <small>Low-frequency policy controls and focused package preview.</small>
-                            </span>
-                            <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-                        </summary>
-                    <div class="pricing-engine-workspace">
-                        <aside class="panel pricing-products-panel" aria-label="Pricing Engine products">
-                            <div class="panel-head">
-                                <div>
-                                    <h3>Business Rules</h3>
-                                    <span>Low-frequency policy controls and focused package preview.</span>
-                                </div>
-                            </div>
-                            <label class="website-runtime-search pricing-product-search">
-                                <span>Search</span>
-                                <input id="pricingProductSearch" type="search" placeholder="Search products..." autocomplete="off">
-                            </label>
-                            <div id="pricingProductList" class="catalog-product-list pricing-product-list" aria-live="polite">
-                                <button class="catalog-product-row pricing-product-row active" type="button" data-pricing-product-id="mlbb" data-pricing-product-code="mlbb" data-pricing-product="Mobile Legends" data-pricing-package="7740 + 1548 Diamonds" data-pricing-package-id="MLBB_7740" data-pricing-region="TH" data-pricing-currency="THB" data-pricing-supplier-currency="THB" data-pricing-supplier-price="1120" data-pricing-exchange-rate="1">
-                                    <span>
-                                        <strong>Mobile Legends</strong>
-                                        <small>Popular mobile top-up catalog</small>
-                                    </span>
-                                    <span class="catalog-row-meta">
-                                        <b>MLBB</b>
-                                        <small>TH / MM</small>
-                                    </span>
-                                </button>
-                                <button class="catalog-product-row pricing-product-row" type="button" data-pricing-product-id="pubg" data-pricing-product-code="pubg" data-pricing-product="PUBG Mobile" data-pricing-package="8100 UC" data-pricing-package-id="PUBG_8100_UC" data-pricing-region="MM" data-pricing-currency="MMK" data-pricing-supplier-currency="THB" data-pricing-supplier-price="870" data-pricing-exchange-rate="118">
-                                    <span>
-                                        <strong>PUBG Mobile</strong>
-                                        <small>Battle royale packages</small>
-                                    </span>
-                                    <span class="catalog-row-meta">
-                                        <b>PUBG</b>
-                                        <small>TH / MM</small>
-                                    </span>
-                                </button>
-                                <button class="catalog-product-row pricing-product-row" type="button" data-pricing-product-id="free-fire" data-pricing-product-code="free-fire" data-pricing-product="Free Fire" data-pricing-package="Weekly Membership" data-pricing-package-id="FF_WEEKLY" data-pricing-region="MM" data-pricing-currency="MMK" data-pricing-supplier-currency="MMK" data-pricing-supplier-price="18500" data-pricing-exchange-rate="1">
-                                    <span>
-                                        <strong>Free Fire</strong>
-                                        <small>Diamonds and memberships</small>
-                                    </span>
-                                    <span class="catalog-row-meta">
-                                        <b>FF</b>
-                                        <small>TH / MM</small>
-                                    </span>
-                                </button>
-                                <button class="catalog-product-row pricing-product-row" type="button" data-pricing-product-id="honor-of-kings" data-pricing-product-code="honor-of-kings" data-pricing-product="Honor of Kings" data-pricing-package="8000 Tokens" data-pricing-package-id="HOK_8000" data-pricing-region="TH" data-pricing-currency="THB" data-pricing-supplier-currency="THB" data-pricing-supplier-price="680" data-pricing-exchange-rate="1">
-                                    <span>
-                                        <strong>Honor of Kings</strong>
-                                        <small>Token package policy</small>
-                                    </span>
-                                    <span class="catalog-row-meta">
-                                        <b>HOK</b>
-                                        <small>TH</small>
-                                    </span>
-                                </button>
-                                <button class="catalog-product-row pricing-product-row" type="button" data-pricing-product-id="genshin-impact" data-pricing-product-code="genshin-impact" data-pricing-product="Genshin Impact" data-pricing-package="Genesis Crystals" data-pricing-package-id="GI_CRYSTALS" data-pricing-region="TH" data-pricing-currency="THB" data-pricing-supplier-currency="THB" data-pricing-supplier-price="1490" data-pricing-exchange-rate="1">
-                                    <span>
-                                        <strong>Genshin Impact</strong>
-                                        <small>Gift and crystal catalog</small>
-                                    </span>
-                                    <span class="catalog-row-meta">
-                                        <b>GI</b>
-                                        <small>Global</small>
-                                    </span>
-                                </button>
-                            </div>
-                        </aside>
-
-                        <main class="panel pricing-rules-panel" aria-label="Pricing rules">
-                            <div class="panel-head">
-                                <div>
-                                    <h3>Pricing Rules</h3>
-                                    <span id="pricingRulesSubtitle">Mobile Legends policy preview.</span>
-                                </div>
-                            </div>
-                            <div class="pricing-rule-list">
-                                <article class="pricing-rule-row">
-                                    <i class="fa-solid fa-money-bill-transfer" aria-hidden="true"></i>
-                                    <div>
-                                        <strong>Exchange Rate</strong>
-                                        <span>Convert supplier currency into storefront currency.</span>
-                                    </div>
-                                    <b id="pricingRuleExchangeValue">1.00</b>
-                                    <button class="admin-secondary-btn" type="button" data-pricing-edit="exchangeRate">Edit</button>
-                                </article>
-                                <article class="pricing-rule-row">
-                                    <i class="fa-solid fa-percent" aria-hidden="true"></i>
-                                    <div>
-                                        <strong>Exchange Fee</strong>
-                                        <span>Operational fee for currency conversion.</span>
-                                    </div>
-                                    <b id="pricingRuleSupplierFeeValue">0%</b>
-                                    <button class="admin-secondary-btn" type="button" data-pricing-edit="supplierFee">Edit</button>
-                                </article>
-                                <article class="pricing-rule-row">
-                                    <i class="fa-solid fa-credit-card" aria-hidden="true"></i>
-                                    <div>
-                                        <strong>Gateway Fee</strong>
-                                        <span>Payment provider processing policy.</span>
-                                    </div>
-                                    <b id="pricingRuleGatewayValue">2.5%</b>
-                                    <button class="admin-secondary-btn" type="button" data-pricing-edit="gatewayFee">Edit</button>
-                                </article>
-                                <article class="pricing-rule-row">
-                                    <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
-                                    <div>
-                                        <strong>Platform Fee</strong>
-                                        <span>AZIEL operational platform cost policy.</span>
-                                    </div>
-                                    <b id="pricingRulePlatformValue">35</b>
-                                    <button class="admin-secondary-btn" type="button" data-pricing-edit="platformFee">Edit</button>
-                                </article>
-                                <article class="pricing-rule-row">
-                                    <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
-                                    <div>
-                                        <strong>Profit</strong>
-                                        <span>Default commercial profit policy.</span>
-                                    </div>
-                                    <b id="pricingRuleProfitValue">12%</b>
-                                    <button class="admin-secondary-btn" type="button" data-pricing-edit="profit">Edit</button>
-                                </article>
-                                <article class="pricing-rule-row">
-                                    <i class="fa-solid fa-equals" aria-hidden="true"></i>
-                                    <div>
-                                        <strong>Round Rule</strong>
-                                        <span>Customer-facing price rounding policy.</span>
-                                    </div>
-                                    <b id="pricingRuleRoundValue">Nearest 10</b>
-                                    <button class="admin-secondary-btn" type="button" data-pricing-edit="rounding">Edit</button>
-                                </article>
-                            </div>
-                        </main>
-
-                        <aside class="panel pricing-preview-panel" aria-label="Pricing preview">
-                            <div class="panel-head">
-                                <div>
-                                    <h3>Pricing Preview</h3>
-                                    <span id="pricingPreviewProduct">Mobile Legends</span>
-                                </div>
-                            </div>
-                            <div id="pricingSimulationError" class="pricing-simulation-error" role="alert" hidden></div>
-                            <div id="pricingFlow" class="pricing-flow" aria-live="polite"></div>
-                            <div id="pricingBreakdown" class="pricing-breakdown" aria-label="Pricing calculation breakdown"></div>
-                            <article class="pricing-storefront-preview" aria-label="Storefront package preview">
-                                <span class="admin-status-pill is-purple">Live Preview</span>
-                                <h4 id="pricingStorefrontProduct">Mobile Legends</h4>
-                                <p id="pricingStorefrontPackage">7740 + 1548 Diamonds</p>
-                                <strong id="pricingStorefrontPrice">Calculating...</strong>
-                                <button class="admin-secondary-btn" type="button" disabled>Customer View</button>
-                            </article>
-                        </aside>
-                    </div>
-                    </details>
+                            </select></label>
+                        <div class="pricing-v3-readonly"><span>Store Currency</span><strong
+                                id="pricingSettingsStoreCurrency">THB</strong></div>
+                        <label><span>Exchange Rate</span><input name="exchangeRate" type="number" min="0.0001"
+                                step="0.0001" required><small id="pricingExchangeDirection">1 THB = 1
+                                THB</small></label>
+                        <fieldset>
+                            <legend>Profit Policy</legend><select name="profitType">
+                                <option value="PERCENT">Percentage</option>
+                                <option value="FIXED">Fixed Amount</option>
+                            </select><input name="profitValue" type="number" min="0" step="0.01" required><span
+                                data-unit-for="profit">%</span>
+                        </fieldset>
+                        <fieldset>
+                            <legend>Gateway Fee</legend><select name="gatewayType">
+                                <option value="PERCENT">Percentage</option>
+                                <option value="FIXED">Fixed Amount</option>
+                            </select><input name="gatewayValue" type="number" min="0" step="0.01" required><span
+                                data-unit-for="gateway">%</span>
+                        </fieldset>
+                        <fieldset>
+                            <legend>Platform Fee</legend><select name="platformType">
+                                <option value="PERCENT">Percentage</option>
+                                <option value="FIXED">Fixed Amount</option>
+                            </select><input name="platformValue" type="number" min="0" step="0.01" required><span
+                                data-unit-for="platform">%</span>
+                        </fieldset>
+                        <label><span>Rounding Rule</span><select name="roundingMode">
+                                <option value="NONE">No rounding</option>
+                                <option value="NEAREST">Nearest increment</option>
+                                <option value="UP">Round up</option>
+                                <option value="DOWN">Round down</option>
+                            </select></label>
+                        <label><span>Rounding Increment</span><input name="roundingIncrement" type="number" min="0"
+                                step="1" required><small id="pricingRoundingUnit">THB</small></label>
+                        <label><span>Minimum Profit</span><input name="minimumProfitAmount" type="number" min="0"
+                                step="0.01" required><small id="pricingMinimumProfitUnit">THB</small></label>
+                    </form>
                 </div>
             </section>
 
@@ -880,9 +734,11 @@
                         <div class="panel-head">
                             <div>
                                 <h3 data-admin-i18n="media_library">Media Library</h3>
-                                <span data-admin-i18n="media_library_sub">Durable presentation assets for catalog content.</span>
+                                <span data-admin-i18n="media_library_sub">Durable presentation assets for catalog
+                                    content.</span>
                             </div>
-                            <button id="uploadMediaBtn" class="admin-secondary-btn" type="button" data-admin-i18n="upload_asset">Upload Asset</button>
+                            <button id="uploadMediaBtn" class="admin-secondary-btn" type="button"
+                                data-admin-i18n="upload_asset">Upload Asset</button>
                         </div>
 
                         <div class="admin-filter-bar media-filter-bar">
@@ -899,8 +755,10 @@
                             </select>
                             <input id="mediaSearchInput" type="text" placeholder="Search media..."
                                 data-admin-i18n-placeholder="search_media_placeholder">
-                            <button id="mediaSearchBtn" class="admin-secondary-btn" type="button" data-admin-i18n="search">Search</button>
-                            <button id="mediaRefreshBtn" class="admin-secondary-btn" type="button" data-admin-i18n="refresh">Refresh</button>
+                            <button id="mediaSearchBtn" class="admin-secondary-btn" type="button"
+                                data-admin-i18n="search">Search</button>
+                            <button id="mediaRefreshBtn" class="admin-secondary-btn" type="button"
+                                data-admin-i18n="refresh">Refresh</button>
                         </div>
 
                         <div id="adminMediaGrid" class="media-asset-grid" aria-live="polite">
@@ -918,9 +776,11 @@
                         <div class="panel-head">
                             <div>
                                 <h3 data-admin-i18n="promo_codes">Promo Codes</h3>
-                                <span data-admin-i18n="promo_codes_sub">Create server-authoritative one-code purchase discounts.</span>
+                                <span data-admin-i18n="promo_codes_sub">Create server-authoritative one-code purchase
+                                    discounts.</span>
                             </div>
-                            <button id="addPromoBtn" class="admin-secondary-btn" type="button" data-admin-i18n="add_promo_code">Add Promo Code</button>
+                            <button id="addPromoBtn" class="admin-secondary-btn" type="button"
+                                data-admin-i18n="add_promo_code">Add Promo Code</button>
                         </div>
 
                         <div id="adminPromoList" class="promo-list" aria-live="polite">
@@ -937,9 +797,11 @@
                         <div class="panel-head">
                             <div>
                                 <h3 data-admin-i18n="home_banners">Home Banners</h3>
-                                <span data-admin-i18n="home_banners_sub">Manage the public Home page hero carousel.</span>
+                                <span data-admin-i18n="home_banners_sub">Manage the public Home page hero
+                                    carousel.</span>
                             </div>
-                            <button id="addHomeBannerBtn" class="admin-secondary-btn" type="button" data-admin-i18n="add_home_banner">Add Banner</button>
+                            <button id="addHomeBannerBtn" class="admin-secondary-btn" type="button"
+                                data-admin-i18n="add_home_banner">Add Banner</button>
                         </div>
 
                         <div id="adminHomeBannersList" class="home-banner-list" aria-live="polite">
@@ -952,9 +814,11 @@
                         <div class="panel-head">
                             <div>
                                 <h3 data-admin-i18n="home_placements">Home Placements</h3>
-                                <span data-admin-i18n="home_placements_sub">Manage real Home page product and promo placement order.</span>
+                                <span data-admin-i18n="home_placements_sub">Manage real Home page product and promo
+                                    placement order.</span>
                             </div>
-                            <button id="refreshSitePlacementsBtn" class="admin-secondary-btn" type="button" data-admin-i18n="refresh">Refresh</button>
+                            <button id="refreshSitePlacementsBtn" class="admin-secondary-btn" type="button"
+                                data-admin-i18n="refresh">Refresh</button>
                         </div>
 
                         <div id="adminSitePlacementsList" class="site-placement-list" aria-live="polite">
@@ -973,7 +837,8 @@
                                 <h3 data-admin-i18n="campaigns">Campaigns</h3>
                                 <span data-admin-i18n="campaigns_sub">Manage ENTRY_POPUP engagement campaigns.</span>
                             </div>
-                            <button id="addCampaignBtn" class="admin-secondary-btn" type="button" data-admin-i18n="add_campaign">Add Campaign</button>
+                            <button id="addCampaignBtn" class="admin-secondary-btn" type="button"
+                                data-admin-i18n="add_campaign">Add Campaign</button>
                         </div>
 
                         <div id="adminCampaignList" class="campaign-list" aria-live="polite">
@@ -1022,16 +887,22 @@
                         </div>
 
                         <div class="wallet-command-tabs" role="tablist" aria-label="Wallet views">
-                            <button class="wallet-command-tab active" type="button" data-wallet-view="pending" data-admin-i18n="pending">Pending</button>
-                            <button class="wallet-command-tab" type="button" data-wallet-view="approved" data-admin-i18n="approved">Approved</button>
-                            <button class="wallet-command-tab" type="button" data-wallet-view="rejected" data-admin-i18n="rejected">Rejected</button>
-                            <button class="wallet-command-tab" type="button" data-wallet-view="transactions" data-admin-i18n="transactions">Transactions</button>
-                            <button class="wallet-command-tab" type="button" data-wallet-view="adjustments" data-admin-i18n="adjustments">Adjustments</button>
+                            <button class="wallet-command-tab active" type="button" data-wallet-view="pending"
+                                data-admin-i18n="pending">Pending</button>
+                            <button class="wallet-command-tab" type="button" data-wallet-view="approved"
+                                data-admin-i18n="approved">Approved</button>
+                            <button class="wallet-command-tab" type="button" data-wallet-view="rejected"
+                                data-admin-i18n="rejected">Rejected</button>
+                            <button class="wallet-command-tab" type="button" data-wallet-view="transactions"
+                                data-admin-i18n="transactions">Transactions</button>
+                            <button class="wallet-command-tab" type="button" data-wallet-view="adjustments"
+                                data-admin-i18n="adjustments">Adjustments</button>
                         </div>
 
                         <div id="walletTopupWorkspace" class="wallet-view-panel active">
                             <div class="wallet-queue-filters">
-                                <input id="walletQueueSearch" type="search" placeholder="Search customer, wallet ID, or reference">
+                                <input id="walletQueueSearch" type="search"
+                                    placeholder="Search customer, wallet ID, or reference">
                                 <select id="walletQueueRegion" aria-label="Wallet region">
                                     <option value="">All Regions</option>
                                     <option value="MM">Myanmar</option>
@@ -1065,7 +936,8 @@
 
                         <div id="walletTransactionsWorkspace" class="wallet-view-panel">
                             <div class="admin-filter-bar">
-                                <input id="walletTransactionSearch" type="text" placeholder="Search transaction or user..."
+                                <input id="walletTransactionSearch" type="text"
+                                    placeholder="Search transaction or user..."
                                     data-admin-i18n-placeholder="wallet_transaction_search">
                                 <select id="walletTransactionType">
                                     <option value="" data-admin-i18n="all">All</option>
@@ -1079,13 +951,16 @@
                                     <option value="MMK">MMK</option>
                                     <option value="THB">THB</option>
                                 </select>
-                                <button id="walletTransactionSearchBtn" class="admin-secondary-btn" type="button" data-admin-i18n="search">Search</button>
+                                <button id="walletTransactionSearchBtn" class="admin-secondary-btn" type="button"
+                                    data-admin-i18n="search">Search</button>
                             </div>
                             <div id="adminWalletTransactions" class="wallet-ledger-list"></div>
                             <div class="wallet-pagination">
-                                <button id="walletPrevPage" class="admin-secondary-btn" type="button" data-admin-i18n="previous">Previous</button>
+                                <button id="walletPrevPage" class="admin-secondary-btn" type="button"
+                                    data-admin-i18n="previous">Previous</button>
                                 <span id="walletPageInfo">1 / 1</span>
-                                <button id="walletNextPage" class="admin-secondary-btn" type="button" data-admin-i18n="next">Next</button>
+                                <button id="walletNextPage" class="admin-secondary-btn" type="button"
+                                    data-admin-i18n="next">Next</button>
                             </div>
                         </div>
 
@@ -1112,7 +987,8 @@
                                 <label data-admin-i18n="reason">Reason</label>
                                 <textarea id="walletAdjustReason" placeholder="Required reason"></textarea>
 
-                                <button id="walletAdjustSubmitBtn" class="order-primary-action" type="button" data-admin-i18n="submit_adjustment">Submit Adjustment</button>
+                                <button id="walletAdjustSubmitBtn" class="order-primary-action" type="button"
+                                    data-admin-i18n="submit_adjustment">Submit Adjustment</button>
                             </div>
                         </div>
                     </div>
@@ -1137,7 +1013,8 @@
                         </div>
 
                         <div class="customer-crm-filters">
-                            <input id="customerSearchInput" type="search" placeholder="Search username, email, or order ID">
+                            <input id="customerSearchInput" type="search"
+                                placeholder="Search username, email, or order ID">
                             <select id="customerRegionFilter" aria-label="Customer region">
                                 <option value="all">All Regions</option>
                                 <option value="MM">Myanmar</option>
@@ -1255,7 +1132,8 @@
                             </label>
                             <label>
                                 <span>CTA URL</span>
-                                <input id="promotionCtaUrl" type="text" placeholder="/notifications.html?filter=promotions">
+                                <input id="promotionCtaUrl" type="text"
+                                    placeholder="/notifications.html?filter=promotions">
                             </label>
                         </div>
 
@@ -1316,7 +1194,8 @@
                         </div>
 
                         <div class="admin-inline-actions">
-                            <button id="savePromotionDraftBtn" class="admin-secondary-btn" type="button">Save Draft</button>
+                            <button id="savePromotionDraftBtn" class="admin-secondary-btn" type="button">Save
+                                Draft</button>
                             <button id="publishPromotionBtn" type="button">Publish Promotion</button>
                             <button id="clearPromotionFormBtn" class="admin-secondary-btn" type="button">Clear</button>
                         </div>
@@ -1334,59 +1213,101 @@
                         <div class="panel-head">
                             <div>
                                 <h3 data-admin-i18n="fulfillment">Fulfillment</h3>
-                                <span data-admin-i18n="fulfillment_sub">Supplier mappings and manual fulfillment operations.</span>
+                                <span data-admin-i18n="fulfillment_sub">Supplier mappings and manual fulfillment
+                                    operations.</span>
                             </div>
-                            <button id="refreshFulfillmentBtn" class="admin-secondary-btn" type="button" data-admin-i18n="refresh">Refresh</button>
+                            <button id="refreshFulfillmentBtn" class="admin-secondary-btn" type="button"
+                                data-admin-i18n="refresh">Refresh</button>
                         </div>
 
                         <div class="admin-security-tabs fulfillment-tabs" role="tablist">
-                            <button class="admin-security-tab active" type="button" data-fulfillment-view="suppliers" data-admin-permission="SUPPLIERS_READ" data-admin-i18n="suppliers">Suppliers</button>
-                            <button class="admin-security-tab" type="button" data-fulfillment-view="mappings" data-admin-permission="SUPPLIERS_READ" data-admin-i18n="mappings">Mappings</button>
-                            <button class="admin-security-tab" type="button" data-fulfillment-view="attempts" data-admin-permission="FULFILLMENT_READ" data-admin-i18n="fulfillment_attempts">Fulfillment Attempts</button>
+                            <button class="admin-security-tab active" type="button" data-fulfillment-view="suppliers"
+                                data-admin-permission="SUPPLIERS_READ" data-admin-i18n="suppliers">Suppliers</button>
+                            <button class="admin-security-tab" type="button" data-fulfillment-view="mappings"
+                                data-admin-permission="SUPPLIERS_READ" data-admin-i18n="mappings">Mappings</button>
+                            <button class="admin-security-tab" type="button" data-fulfillment-view="attempts"
+                                data-admin-permission="FULFILLMENT_READ"
+                                data-admin-i18n="fulfillment_attempts">Fulfillment Attempts</button>
                         </div>
 
-                        <div id="fulfillmentSuppliersView" class="fulfillment-view-panel active" data-fulfillment-panel="suppliers">
+                        <div id="fulfillmentSuppliersView" class="fulfillment-view-panel active"
+                            data-fulfillment-panel="suppliers">
                             <div class="fulfillment-form-grid">
-                                <label><span data-admin-i18n="supplier_name">Supplier Name</span><input id="supplierNameInput" type="text"></label>
-                                <label><span data-admin-i18n="supplier_code">Supplier Code</span><input id="supplierCodeInput" type="text"></label>
-                                <label><span data-admin-i18n="supplier_mode">Supplier Mode</span><select id="supplierModeInput"><option value="MANUAL">MANUAL</option><option value="API">API</option></select></label>
-                                <label><span data-admin-i18n="supported_regions">Supported Regions</span><textarea id="supplierRegionsInput" rows="2">MM
+                                <label><span data-admin-i18n="supplier_name">Supplier Name</span><input
+                                        id="supplierNameInput" type="text"></label>
+                                <label><span data-admin-i18n="supplier_code">Supplier Code</span><input
+                                        id="supplierCodeInput" type="text"></label>
+                                <label><span data-admin-i18n="supplier_mode">Supplier Mode</span><select
+                                        id="supplierModeInput">
+                                        <option value="MANUAL">MANUAL</option>
+                                        <option value="API">API</option>
+                                    </select></label>
+                                <label><span data-admin-i18n="supported_regions">Supported Regions</span><textarea
+                                        id="supplierRegionsInput" rows="2">MM
 TH</textarea></label>
-                                <label><span data-admin-i18n="balance_source">Balance Source</span><select id="supplierBalanceSourceInput"><option value="UNKNOWN">UNKNOWN</option><option value="MANUAL">MANUAL</option></select></label>
-                                <label><span data-admin-i18n="manual_balance">Manual Balance</span><input id="supplierBalanceAmountInput" type="number" min="0" step="0.01"></label>
-                                <label><span data-admin-i18n="currency">Currency</span><select id="supplierBalanceCurrencyInput"><option value="">-</option><option value="MMK">MMK</option><option value="THB">THB</option></select></label>
-                                <label class="fulfillment-checkbox"><input id="supplierEnabledInput" type="checkbox" checked> <span data-admin-i18n="enabled">Enabled</span></label>
+                                <label><span data-admin-i18n="balance_source">Balance Source</span><select
+                                        id="supplierBalanceSourceInput">
+                                        <option value="UNKNOWN">UNKNOWN</option>
+                                        <option value="MANUAL">MANUAL</option>
+                                    </select></label>
+                                <label><span data-admin-i18n="manual_balance">Manual Balance</span><input
+                                        id="supplierBalanceAmountInput" type="number" min="0" step="0.01"></label>
+                                <label><span data-admin-i18n="currency">Currency</span><select
+                                        id="supplierBalanceCurrencyInput">
+                                        <option value="">-</option>
+                                        <option value="MMK">MMK</option>
+                                        <option value="THB">THB</option>
+                                    </select></label>
+                                <label class="fulfillment-checkbox"><input id="supplierEnabledInput" type="checkbox"
+                                        checked> <span data-admin-i18n="enabled">Enabled</span></label>
                             </div>
                             <div class="admin-security-actions">
-                                <button id="saveSupplierBtn" class="admin-secondary-btn" type="button" data-admin-permission="SUPPLIERS_MANAGE" data-admin-i18n="add_supplier">Add Supplier</button>
+                                <button id="saveSupplierBtn" class="admin-secondary-btn" type="button"
+                                    data-admin-permission="SUPPLIERS_MANAGE" data-admin-i18n="add_supplier">Add
+                                    Supplier</button>
                             </div>
                             <div id="suppliersList" class="fulfillment-list"></div>
                         </div>
 
-                        <div id="fulfillmentMappingsView" class="fulfillment-view-panel" data-fulfillment-panel="mappings">
+                        <div id="fulfillmentMappingsView" class="fulfillment-view-panel"
+                            data-fulfillment-panel="mappings">
                             <div class="fulfillment-view-head">
                                 <h4 data-admin-i18n="mappings">Mappings</h4>
-                                <small data-admin-i18n="mapping_empty_hint">Map an AZIEL Catalog package to a supplier package before starting fulfillment.</small>
+                                <small data-admin-i18n="mapping_empty_hint">Map an AZIEL Catalog package to a supplier
+                                    package before starting fulfillment.</small>
                             </div>
                             <div class="fulfillment-form-grid">
-                                <label><span data-admin-i18n="supplier">Supplier</span><select id="mappingSupplierInput"></select></label>
-                                <label><span data-admin-i18n="product">Product</span><select id="mappingProductInput"></select></label>
-                                <label><span data-admin-i18n="package">Package</span><select id="mappingPackageInput"></select></label>
-                                <label><span data-admin-i18n="region">Region</span><select id="mappingRegionInput"><option value="MM">MM</option><option value="TH">TH</option></select></label>
-                                <label><span data-admin-i18n="supplier_product_code">Supplier Product Code</span><input id="mappingSupplierProductInput" type="text"></label>
-                                <label><span data-admin-i18n="supplier_package_code">Supplier Package Code</span><input id="mappingSupplierPackageInput" type="text"></label>
-                                <label class="fulfillment-checkbox"><input id="mappingEnabledInput" type="checkbox" checked> <span data-admin-i18n="enabled">Enabled</span></label>
+                                <label><span data-admin-i18n="supplier">Supplier</span><select
+                                        id="mappingSupplierInput"></select></label>
+                                <label><span data-admin-i18n="product">Product</span><select
+                                        id="mappingProductInput"></select></label>
+                                <label><span data-admin-i18n="package">Package</span><select
+                                        id="mappingPackageInput"></select></label>
+                                <label><span data-admin-i18n="region">Region</span><select id="mappingRegionInput">
+                                        <option value="MM">MM</option>
+                                        <option value="TH">TH</option>
+                                    </select></label>
+                                <label><span data-admin-i18n="supplier_product_code">Supplier Product Code</span><input
+                                        id="mappingSupplierProductInput" type="text"></label>
+                                <label><span data-admin-i18n="supplier_package_code">Supplier Package Code</span><input
+                                        id="mappingSupplierPackageInput" type="text"></label>
+                                <label class="fulfillment-checkbox"><input id="mappingEnabledInput" type="checkbox"
+                                        checked> <span data-admin-i18n="enabled">Enabled</span></label>
                             </div>
                             <div class="admin-security-actions">
-                                <button id="saveMappingBtn" class="admin-secondary-btn" type="button" data-admin-permission="SUPPLIER_MAPPINGS_MANAGE" data-admin-i18n="add_mapping">Add Mapping</button>
+                                <button id="saveMappingBtn" class="admin-secondary-btn" type="button"
+                                    data-admin-permission="SUPPLIER_MAPPINGS_MANAGE" data-admin-i18n="add_mapping">Add
+                                    Mapping</button>
                             </div>
                             <div id="mappingsList" class="fulfillment-list"></div>
                         </div>
 
-                        <div id="fulfillmentAttemptsView" class="fulfillment-view-panel" data-fulfillment-panel="attempts">
+                        <div id="fulfillmentAttemptsView" class="fulfillment-view-panel"
+                            data-fulfillment-panel="attempts">
                             <div class="fulfillment-view-head">
                                 <h4 data-admin-i18n="fulfillment_attempts">Fulfillment Attempts</h4>
-                                <small data-admin-i18n="attempts_empty_hint">Fulfillment attempts appear after fulfillment is started from an eligible paid Order.</small>
+                                <small data-admin-i18n="attempts_empty_hint">Fulfillment attempts appear after
+                                    fulfillment is started from an eligible paid Order.</small>
                             </div>
                             <div class="admin-filter-bar">
                                 <select id="fulfillmentAttemptFilter">
@@ -1408,47 +1329,64 @@ TH</textarea></label>
                         <div class="panel-head">
                             <div>
                                 <h3 data-admin-i18n="admin_team">Admin Team</h3>
-                                <span data-admin-i18n="admin_team_sub">Admin identity, 2FA, sessions, and audit accountability.</span>
+                                <span data-admin-i18n="admin_team_sub">Admin identity, 2FA, sessions, and audit
+                                    accountability.</span>
                             </div>
-                            <button id="refreshAdminSecurityBtn" class="admin-secondary-btn" type="button" data-admin-i18n="refresh">Refresh</button>
+                            <button id="refreshAdminSecurityBtn" class="admin-secondary-btn" type="button"
+                                data-admin-i18n="refresh">Refresh</button>
                         </div>
 
                         <div class="admin-security-tabs" role="tablist">
-                            <button class="admin-security-tab active" type="button" data-admin-security-view="accounts" data-admin-permission="ADMIN_ACCOUNTS_READ" data-admin-i18n="admin_accounts">Admin Accounts</button>
-                            <button class="admin-security-tab" type="button" data-admin-security-view="sessions" data-admin-permission="ADMIN_SESSIONS_READ" data-admin-i18n="sessions">Sessions</button>
-                            <button class="admin-security-tab" type="button" data-admin-security-view="audit" data-admin-permission="AUDIT_LOG_READ" data-admin-i18n="audit_log">Audit Log</button>
+                            <button class="admin-security-tab active" type="button" data-admin-security-view="accounts"
+                                data-admin-permission="ADMIN_ACCOUNTS_READ" data-admin-i18n="admin_accounts">Admin
+                                Accounts</button>
+                            <button class="admin-security-tab" type="button" data-admin-security-view="sessions"
+                                data-admin-permission="ADMIN_SESSIONS_READ" data-admin-i18n="sessions">Sessions</button>
+                            <button class="admin-security-tab" type="button" data-admin-security-view="audit"
+                                data-admin-permission="AUDIT_LOG_READ" data-admin-i18n="audit_log">Audit Log</button>
                         </div>
 
                         <div id="adminSecurityAccountsView" class="admin-security-view active">
                             <div class="admin-security-actions">
-                                <button id="addAdminAccountBtn" class="admin-secondary-btn" type="button" data-admin-permission="ADMIN_ACCOUNTS_MANAGE" data-admin-i18n="add_admin">Add Admin</button>
+                                <button id="addAdminAccountBtn" class="admin-secondary-btn" type="button"
+                                    data-admin-permission="ADMIN_ACCOUNTS_MANAGE" data-admin-i18n="add_admin">Add
+                                    Admin</button>
                             </div>
                             <div id="adminAccountsList" class="admin-security-list"></div>
                         </div>
 
                         <div id="adminSecuritySessionsView" class="admin-security-view">
                             <div class="admin-security-actions">
-                                <button id="revokeOtherAdminSessionsBtn" class="admin-secondary-btn danger" type="button" data-admin-permission="ADMIN_SESSIONS_REVOKE" data-admin-i18n="revoke_all_other_sessions">Revoke All Other Sessions</button>
+                                <button id="revokeOtherAdminSessionsBtn" class="admin-secondary-btn danger"
+                                    type="button" data-admin-permission="ADMIN_SESSIONS_REVOKE"
+                                    data-admin-i18n="revoke_all_other_sessions">Revoke All Other Sessions</button>
                             </div>
                             <div id="adminSessionsList" class="admin-security-list"></div>
                             <div class="admin-security-2fa">
                                 <h4 data-admin-i18n="two_factor_authentication">Two-Factor Authentication</h4>
-                                <button id="startAdmin2FABtn" class="admin-secondary-btn" type="button" data-admin-i18n="enable_2fa">Enable 2FA</button>
-                                <button id="disableAdmin2FABtn" class="admin-secondary-btn danger" type="button" data-admin-i18n="disable_2fa">Disable 2FA</button>
+                                <button id="startAdmin2FABtn" class="admin-secondary-btn" type="button"
+                                    data-admin-i18n="enable_2fa">Enable 2FA</button>
+                                <button id="disableAdmin2FABtn" class="admin-secondary-btn danger" type="button"
+                                    data-admin-i18n="disable_2fa">Disable 2FA</button>
                             </div>
                         </div>
 
                         <div id="adminSecurityAuditView" class="admin-security-view">
                             <div class="admin-filter-bar admin-audit-filters">
-                                <input id="adminAuditActionFilter" type="text" placeholder="Audit Action" data-admin-i18n-placeholder="audit_action">
-                                <input id="adminAuditActorFilter" type="text" placeholder="Actor" data-admin-i18n-placeholder="actor">
-                                <button id="adminAuditSearchBtn" class="admin-secondary-btn" type="button" data-admin-i18n="search">Search</button>
+                                <input id="adminAuditActionFilter" type="text" placeholder="Audit Action"
+                                    data-admin-i18n-placeholder="audit_action">
+                                <input id="adminAuditActorFilter" type="text" placeholder="Actor"
+                                    data-admin-i18n-placeholder="actor">
+                                <button id="adminAuditSearchBtn" class="admin-secondary-btn" type="button"
+                                    data-admin-i18n="search">Search</button>
                             </div>
                             <div id="adminAuditLogList" class="admin-security-list"></div>
                             <div class="wallet-pagination">
-                                <button id="adminAuditPrevBtn" class="admin-secondary-btn" type="button" data-admin-i18n="previous">Previous</button>
+                                <button id="adminAuditPrevBtn" class="admin-secondary-btn" type="button"
+                                    data-admin-i18n="previous">Previous</button>
                                 <span id="adminAuditPageInfo">1 / 1</span>
-                                <button id="adminAuditNextBtn" class="admin-secondary-btn" type="button" data-admin-i18n="next">Next</button>
+                                <button id="adminAuditNextBtn" class="admin-secondary-btn" type="button"
+                                    data-admin-i18n="next">Next</button>
                             </div>
                         </div>
                     </div>
@@ -1597,11 +1535,14 @@ TH</textarea></label>
     <script src="/lang/admin/en.js?v=20260724-admin-nav"></script>
     <script src="/lang/admin/my.js?v=20260724-admin-nav"></script>
     <script src="/lang/admin/th.js?v=20260724-admin-nav"></script>
+
     <script src="/js/admin/admin-i18n.js?v=20260713-phase1"></script>
     <script src="/js/admin/admin-ui.js?v=20260715-phase15"></script>
     <script src="/js/admin/admin-action-modal.js?v=20260714-phase4"></script>
+
     <script src="/js/admin-os-brand.js?v=20260729-os-mark"></script>
     <script src="/js/admin-auth.js?v=20260715-phase12"></script>
+
     <script src="/js/os/kernel-errors.js?v=20260724-os-kernel"></script>
     <script src="/js/os/kernel-diagnostics.js?v=20260724-os-kernel"></script>
     <script src="/js/os/event-bus.js?v=20260724-os-kernel"></script>
@@ -1613,20 +1554,27 @@ TH</textarea></label>
     <script src="/js/os/apps/core-app-manifest.js?v=20260724-os-kernel"></script>
     <script src="/js/os/compatibility/admin-navigation-adapter.js?v=20260724-os-kernel"></script>
     <script src="/js/os/kernel.js?v=20260724-os-kernel"></script>
+
     <script src="/js/admin-app.js?v=20260724-admin-nav"></script>
     <script src="/js/os/kernel-bootstrap.js?v=20260724-os-kernel"></script>
+
     <script src="/js/os/configuration/configuration-client.js?v=20260724-config-registry"></script>
     <script src="/js/os/configuration/configuration-runtime-bridge.js?v=20260724-config-registry"></script>
+
     <script src="/js/admin-stats.js?v=20260723-command-center-payment-renderer"></script>
     <script src="/js/admin-website-runtime.js?v=20260724-website-runtime"></script>
     <script src="/js/admin-fulfillment.js?v=20260715-phase13-qa4"></script>
+
     <script src="/js/payment-display.js?v=20260718-labels"></script>
     <script src="/js/admin-orders.js?v=20260715-phase13-qa4"></script>
+
     <script src="/js/admin/admin-media-selector.js?v=20260714-phase8"></script>
     <script src="/js/admin-media.js?v=20260714-phase8"></script>
-    <script src="/js/admin-catalog.js?v=20260723-catalog-workspace"></script>
-    <script src="/js/commerce/pricingCalculationEngine.js?v=20260726-commerce-sim"></script>
-    <script src="/js/admin-pricing-engine.js?v=20260729-pricing-final"></script>
+
+    <!-- UPDATED -->
+    <script src="/js/admin-catalog.js?v=20260731-discount-v1"></script>
+
+    <script src="/js/admin-pricing-engine.js?v=20260730-pricing-v3"></script>
     <script src="/js/admin-home-banners.js?v=20260715-phase86"></script>
     <script src="/js/admin-site-placements.js?v=20260715-phase11"></script>
     <script src="/js/admin-campaigns.js?v=20260715-phase9"></script>
@@ -1642,7 +1590,7 @@ TH</textarea></label>
     <script src="/js/admin-users.js?v=20260723-customer-crm"></script>
     <script src="/js/admin-settings.js?v=20260713-phase1"></script>
 
-    <script src="/js/pwa-fix.js"></script>
+    <script src="/js/pwa-fix.js?v=20260731-cache-runtime-v1"></script>
 
 </body>
 

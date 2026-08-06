@@ -5,6 +5,8 @@ let currentOrderId = "";
 let currentTrackingOrder = null;
 let lastStatus = "";
 let liveTrackingTimer = null;
+let recentOrdersRequestSequence = 0;
+let recentOrdersUserReadyPromise = null;
 
 function t(key, fallback = "") {
     if (window.AZIEL_I18N?.t) {
@@ -57,6 +59,8 @@ document.addEventListener("DOMContentLoaded", () => {
     liveTrackingTimer = setInterval(checkLiveTracking, 5000);
 });
 
+window.addEventListener("aziel:userChanged", loadRecentOrders);
+
 window.addEventListener("beforeunload", () => {
     if (liveTrackingTimer) {
         clearInterval(liveTrackingTimer);
@@ -92,10 +96,10 @@ async function trackOrder(orderId) {
         }
 
         const order = data.order;
-        const status = normalizeStatus(order.status);
+        const status = trackingDisplayStatus(order);
 
         currentTrackingOrder = order;
-        lastStatus = order.status;
+        lastStatus = trackingStateKey(order);
 
         result.innerHTML = `
             <div class="phone-track-card">
@@ -153,7 +157,7 @@ async function trackOrder(orderId) {
                 : t("progress", "Progress")}
                         </h3>
 
-                        <span>${formatStatus(status)}</span>
+                        <span>${formatProgressStatus(order, status)}</span>
                     </div>
 
                     <div class="track-timeline">
@@ -170,7 +174,7 @@ async function trackOrder(orderId) {
                 </div>
 
                 <p class="order-note">
-                    ${escapeHTML(order.note || getDefaultNote(status))}
+                    ${escapeHTML(order.paymentMessage || order.note || getDefaultNote(status))}
                 </p>
             </div>
         `;
@@ -186,6 +190,15 @@ async function trackOrder(orderId) {
 }
 
 function renderTimeline(status, order = null) {
+    if (isAwaitingManualReview(order)) {
+        return timelineStep(
+            "pending_verification",
+            t("trackingAwaitingManualVerification", "Awaiting Manual Verification"),
+            order.paymentMessage || t("trackingPaymentSubmittedText", "Payment submitted. Awaiting verification."),
+            "pending_verification"
+        );
+    }
+
     if (Array.isArray(order?.timeline) && order.timeline.length) {
         return renderServerTimeline(order.timeline);
     }
@@ -195,6 +208,28 @@ function renderTimeline(status, order = null) {
     }
 
     return renderOrderTimeline(status);
+}
+
+function isAwaitingManualReview(order = {}) {
+    return order.awaitingManualReview === true || order.receiptSubmitted === true;
+}
+
+function trackingDisplayStatus(order = {}) {
+    if (isAwaitingManualReview(order) && normalizeStatus(order.status) === "pending") {
+        return "pending_verification";
+    }
+    return normalizeStatus(order.status);
+}
+
+function trackingStateKey(order = {}) {
+    return `${order.status || ""}:${isAwaitingManualReview(order) ? "receipt-submitted" : "awaiting-payment"}`;
+}
+
+function formatProgressStatus(order = {}, status = "") {
+    if (isAwaitingManualReview(order)) {
+        return t("trackingPaymentSubmitted", "Payment Submitted");
+    }
+    return formatStatus(status);
 }
 
 function renderServerTimeline(timeline) {
@@ -593,6 +628,7 @@ function timelineStep(step, title, text, currentStatus) {
 function isStepActive(step, status) {
     const orderFlows = {
         pending: ["pending"],
+        pending_verification: ["pending_verification"],
         paid: ["pending", "paid"],
         processing: ["pending", "paid", "processing"],
         completed: ["pending", "paid", "processing", "completed"],
@@ -618,6 +654,7 @@ function normalizeStatus(status) {
 
     if (s === "pending_payment") return "pending";
     if (s === "pending") return "pending";
+    if (s === "pending_verification") return "pending_verification";
     if (s === "paid") return "paid";
     if (s === "processing") return "processing";
     if (s === "completed") return "completed";
@@ -634,6 +671,7 @@ function normalizeStatus(status) {
 function formatStatus(status) {
     const map = {
         pending: t("statusPending", "Pending"),
+        pending_verification: t("statusPendingVerification", "Pending Verification"),
         paid: t("statusPaid", "Paid"),
         processing: t("statusProcessing", "Processing"),
         completed: t("statusCompleted", "Completed"),
@@ -650,6 +688,7 @@ function formatStatus(status) {
 function getStatusIcon(status) {
     const map = {
         pending: "⏳",
+        pending_verification: "🔎",
         paid: "💳",
         processing: "⚡",
         completed: "✅",
@@ -691,9 +730,10 @@ async function checkLiveTracking() {
 
         if (!data.success || !data.order) return;
 
-        if (data.order.status !== lastStatus) {
-            lastStatus = data.order.status;
-            showTrackingPopup(data.order.status);
+        const nextState = trackingStateKey(data.order);
+        if (nextState !== lastStatus) {
+            lastStatus = nextState;
+            showTrackingPopup(trackingDisplayStatus(data.order));
             trackOrder(currentOrderId);
         }
     } catch (error) {
@@ -740,16 +780,18 @@ async function loadRecentOrders() {
     const box = document.getElementById("recentTrackOrders");
     if (!box) return;
 
-    const username =
-        window.AZIEL?.user?.username ||
-        localStorage.getItem("username");
+    const requestSequence = ++recentOrdersRequestSequence;
+    await waitForRecentOrdersUserReady();
+    if (requestSequence !== recentOrdersRequestSequence) return;
+
+    const username = window.AZIEL?.user?.username || localStorage.getItem("username");
 
     if (!username) {
-        box.innerHTML = `
+        renderRecentOrdersTerminal(box, requestSequence, `
             <p class="empty-orders">
                 ${t("loginRequired", "Login required.")}
             </p>
-        `;
+        `);
         return;
     }
 
@@ -761,20 +803,22 @@ async function loadRecentOrders() {
             }
         );
 
+        if (!res.ok) throw new Error(`Recent orders request failed with ${res.status}.`);
         const data = await res.json();
+        if (requestSequence !== recentOrdersRequestSequence) return;
 
         if (!data.success || !data.orders?.length) {
-            box.innerHTML = `
+            renderRecentOrdersTerminal(box, requestSequence, `
                 <p class="empty-orders">
                     ${t("noRecentOrders", "No recent orders.")}
                 </p>
-            `;
+            `);
             return;
         }
 
         const recentOrders = data.orders.slice(0, 5);
 
-        box.innerHTML = recentOrders.map(order => `
+        renderRecentOrdersTerminal(box, requestSequence, recentOrders.map(order => `
             <div class="recent-order-item"
                  onclick="trackRecentOrder('${escapeHTML(order.orderId)}')">
 
@@ -783,20 +827,46 @@ async function loadRecentOrders() {
                     <p>${escapeHTML(order.packageName || "-")}</p>
                 </div>
 
-                <div class="recent-order-status ${normalizeStatus(order.status)}">
-                    ${formatStatus(normalizeStatus(order.status))}
+                <div class="recent-order-status ${trackingDisplayStatus(order)}">
+                    ${formatStatus(trackingDisplayStatus(order))}
                 </div>
             </div>
-        `).join("");
+        `).join(""));
 
     } catch (error) {
+        if (requestSequence !== recentOrdersRequestSequence) return;
         console.log("Recent orders error:", error);
-        box.innerHTML = `
+        renderRecentOrdersTerminal(box, requestSequence, `
             <p class="empty-orders">
                 ${t("serverError", "Server error.")}
             </p>
-        `;
+        `);
     }
+}
+
+function waitForRecentOrdersUserReady() {
+    if (recentOrdersUserReadyPromise) return recentOrdersUserReadyPromise;
+
+    const hasUser = Boolean(window.AZIEL?.user?.username || localStorage.getItem("username"));
+    const canLoadUser = Boolean(window.AZIEL?.getToken?.() && typeof window.AZIEL?.loadUser === "function");
+    if (hasUser || !canLoadUser) {
+        recentOrdersUserReadyPromise = Promise.resolve();
+        return recentOrdersUserReadyPromise;
+    }
+
+    recentOrdersUserReadyPromise = Promise.race([
+        Promise.resolve(window.AZIEL.loadUser()).catch(() => null),
+        new Promise(resolve => setTimeout(resolve, 2500))
+    ]).then(() => undefined);
+
+    return recentOrdersUserReadyPromise;
+}
+
+function renderRecentOrdersTerminal(box, requestSequence, html) {
+    if (requestSequence !== recentOrdersRequestSequence) return false;
+    box.removeAttribute("data-i18n");
+    box.innerHTML = html;
+    return true;
 }
 
 function trackRecentOrder(orderId) {

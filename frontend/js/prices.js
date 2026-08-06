@@ -139,7 +139,7 @@ function emitPricesRendered(detail = {}) {
 }
 
 function showCatalogMessage(packageContainer, message, retry = false) {
-    packageContainer.innerHTML = `
+  packageContainer.innerHTML = `
     <div class="catalog-unavailable">
       <p>${escapeHtml(message)}</p>
       ${retry ? `<button type="button" class="catalog-retry-btn" data-catalog-retry>${escapeHtml(t("catalogRetry", "Retry"))}</button>` : ""}
@@ -219,6 +219,11 @@ async function renderGamePrices(options = {}) {
          data-product-code="${escapeAttr(item.productCode)}"
          data-icon="${escapeAttr(item.icon)}"
          data-fallback-icon="${escapeAttr(item.fallbackIcon || "")}"
+         data-reference-price="${escapeAttr(item.referencePrice || 0)}"
+         data-save-amount="${escapeAttr(item.saveAmount || 0)}"
+         data-discount-percent="${escapeAttr(item.discountPercent || 0)}"
+         data-show-discount="${item.showDiscount === true}"
+         data-show-original-price="${item.showOriginalPrice === true}"
          data-catalog-synced="true">
       <div class="pack-icon">
         <img src="${escapeAttr(item.icon)}" alt="${escapeAttr(item.name)}" data-fallback-src="${escapeAttr(item.fallbackIcon || "")}">
@@ -226,6 +231,23 @@ async function renderGamePrices(options = {}) {
 
       <div class="pack-info">
         <strong class="pack-name">${escapeHtml(item.name)}</strong>
+
+        ${item.showDiscount
+      ? `<span class="pack-discount-text">
+                Discount: ${Number(item.discountPercent || 0).toLocaleString()}%
+              </span>`
+      : ""
+    }
+      </div>
+
+      <div class="pack-price-block">
+        ${item.showOriginalPrice
+      ? `<span class="pack-original-price">
+                ${formatPackagePrice(item.referencePrice, item.currency)}
+              </span>`
+      : ""
+    }
+
         <span class="pack-price">
           ${formatPackagePrice(item.amount, item.currency)}
         </span>
@@ -289,6 +311,11 @@ function selectPackage(packEl) {
     code: packEl.dataset.code,
     icon: packEl.dataset.icon,
     fallbackIcon: packEl.dataset.fallbackIcon || "",
+    referencePrice: Number(packEl.dataset.referencePrice || 0),
+    saveAmount: Number(packEl.dataset.saveAmount || 0),
+    discountPercent: Number(packEl.dataset.discountPercent || 0),
+    showDiscount: packEl.dataset.showDiscount === "true",
+    showOriginalPrice: packEl.dataset.showOriginalPrice === "true",
     formattedPrice: formatPackagePrice(packEl.dataset.price, packEl.dataset.currency),
     catalogSynced: packEl.dataset.catalogSynced === "true"
   };

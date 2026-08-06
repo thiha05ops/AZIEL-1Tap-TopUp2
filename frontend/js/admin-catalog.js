@@ -244,8 +244,8 @@ function renderCatalogDetail(product) {
                     </summary>
                     <div class="catalog-action-menu-popover">
                         ${productDeleted
-                            ? `<button type="button" data-product-restore><i class="fa-solid fa-rotate-left" aria-hidden="true"></i>${adminT("restore_product", "Restore Product")}</button>`
-                            : `<button class="${product.enabled ? "danger" : ""}" type="button" data-product-toggle="${product.enabled ? "disable" : "enable"}">
+            ? `<button type="button" data-product-restore><i class="fa-solid fa-rotate-left" aria-hidden="true"></i>${adminT("restore_product", "Restore Product")}</button>`
+            : `<button class="${product.enabled ? "danger" : ""}" type="button" data-product-toggle="${product.enabled ? "disable" : "enable"}">
                                 <i class="fa-solid ${product.enabled ? "fa-eye-slash" : "fa-eye"}" aria-hidden="true"></i>
                                 ${adminT(product.enabled ? "disable_product" : "enable_product", product.enabled ? "Disable Product" : "Enable Product")}
                             </button>`}
@@ -365,10 +365,10 @@ function renderCatalogTabPanel(product, packages) {
                     <b>${selectedCatalogBanners.length}</b>
                     <small>${adminT("banners", "Banners")}</small>
                     <b>${[
-                        product.imageAsset || product.imageUrl,
-                        product.mobilePackagePreviewAsset || product.mobilePackagePreviewUrl,
-                        product.bannerAsset || product.bannerUrl
-                    ].filter(Boolean).length}</b>
+            product.imageAsset || product.imageUrl,
+            product.mobilePackagePreviewAsset || product.mobilePackagePreviewUrl,
+            product.bannerAsset || product.bannerUrl
+        ].filter(Boolean).length}</b>
                     <small>${adminT("media", "Media")}</small>
                 </div>
             </article>
@@ -398,10 +398,27 @@ function openProductEditor(product) {
     modal.querySelector("#catalogProductRegionTH").checked = (product.supportedRegions || []).includes("TH");
     modal.querySelector("#catalogProductEnabled").checked = product.enabled !== false;
     modal.querySelector("#catalogProductFeatured").checked = product.featured === true;
+    modal.querySelector("#catalogProductCategory").value = product.catalogCategory || "";
+    modal.querySelector("#catalogProductCommerceState").value = product.commerceState || "HIDDEN";
+    modal.querySelector("#catalogProductDiscoveryEnabled").checked = product.publicDiscoveryEnabled === true;
+    modal.querySelector("#catalogProductHomeEnabled").checked = product.homepageEnabled === true;
+    modal.querySelector("#catalogProductHomeCategory").value = product.homepageCategory || product.catalogCategory || "";
+    modal.querySelector("#catalogProductHomeOrder").value = Number(product.homepageOrder || 0);
+    modal.querySelector("#catalogProductRoute").value = product.productRoute || "";
+    modal.querySelector("#catalogProductMarketScope").value = product.marketScope || "MULTI_REGION";
+    modal.querySelector("#catalogProductDisplayMarketLabel").value = product.displayMarketLabel || "";
+    modal.querySelector("#catalogProductAuthoritativeRegions").textContent = formatRegions(product.supportedRegions);
+    modal.querySelector("#catalogProductPreviewAmount").value = product.previewPrice?.amount ?? "";
+    modal.querySelector("#catalogProductPreviewCurrency").value = product.previewPrice?.currency || "THB";
+    modal.querySelector("#catalogProductPreviewLabel").value = product.previewPrice?.label || "PREVIEW_PRICE";
+    modal.querySelectorAll("[data-home-flag]").forEach(input => input.checked = (product.homepageFlags || []).includes(input.value));
+    modal.querySelectorAll("[data-home-section]").forEach(input => input.checked = (product.homepageSections || []).includes(input.value));
+    const readiness = product.commerceReadiness || { ready: false, missing: ["readiness unavailable"] };
+    modal.querySelector("#catalogProductReadiness").innerHTML = `<strong>${readiness.ready ? "Ready to publish" : "Missing commerce configuration"}</strong><small>${escapeHtml((readiness.missing || []).join(", ") || "All checks passed")}</small>`;
     modal.querySelector("#catalogProductSeoTitle").value = product.seo?.title || "";
     modal.querySelector("#catalogProductSeoDescription").value = product.seo?.description || "";
     modal.querySelector("#catalogProductImageLabel").textContent = product.imageAsset?.name || product.imageUrl || adminT("fallback_static_asset", "Static fallback asset");
-    modal.querySelector("#catalogProductPreviewLabel").textContent = product.mobilePackagePreviewAsset?.name || product.mobilePackagePreviewUrl || adminT("fallback_static_asset", "Static fallback asset");
+    modal.querySelector("#catalogProductMobilePreviewLabel").textContent = product.mobilePackagePreviewAsset?.name || product.mobilePackagePreviewUrl || adminT("fallback_static_asset", "Static fallback asset");
     const deleteBtn = modal.querySelector("#catalogProductDelete");
     const restoreBtn = modal.querySelector("#catalogProductRestore");
     if (deleteBtn) deleteBtn.hidden = Boolean(product.deleted || product.deletedAt);
@@ -459,6 +476,29 @@ function ensureProductEditorModal() {
                 <section data-product-drawer-panel="visibility" hidden>
                     <label class="catalog-toggle-row"><span>${adminT("enabled", "Enabled")}</span><input id="catalogProductEnabled" type="checkbox"></label>
                     <label class="catalog-toggle-row"><span>${adminT("featured", "Featured")}</span><input id="catalogProductFeatured" type="checkbox"></label>
+                    <label>Catalog category <select id="catalogProductCategory">${catalogCategoryOptions()}</select></label>
+                    <label>Commerce state <select id="catalogProductCommerceState"><option value="PURCHASABLE">Purchasable</option><option value="COMING_SOON">Coming Soon</option><option value="TEMPORARILY_UNAVAILABLE">Temporarily Unavailable</option><option value="HIDDEN">Hidden</option></select></label>
+                    <label class="catalog-toggle-row"><span>Public discovery enabled</span><input id="catalogProductDiscoveryEnabled" type="checkbox"></label>
+                    <label>Product route <input id="catalogProductRoute" type="text" maxlength="240" placeholder="mobile-games/product.html"></label>
+                    <label>Market presentation <select id="catalogProductMarketScope"><option value="GLOBAL">Global</option><option value="REGION">Specific region</option><option value="MULTI_REGION">Multiple regions</option></select></label>
+                    <p><b>Authoritative availability</b><br><span id="catalogProductAuthoritativeRegions"></span><br><small>Read-only commerce authority</small></p>
+                    <label>Display market label <input id="catalogProductDisplayMarketLabel" type="text" maxlength="60" placeholder="Use fallback when empty"><small>Presentation only. Does not change selling availability.</small></label>
+                    <fieldset class="catalog-edit-fieldset"><legend>Optional preview pricing</legend>
+                        <label>Amount <input id="catalogProductPreviewAmount" type="number" min="0" step="0.01" placeholder="Leave empty for no preview price"></label>
+                        <label>Currency <select id="catalogProductPreviewCurrency"><option value="THB">THB</option><option value="MMK">MMK</option></select></label>
+                        <label>Label <select id="catalogProductPreviewLabel"><option value="PREVIEW_PRICE">Preview</option><option value="ESTIMATED">Estimated</option><option value="FROM">From</option><option value="NONE">None</option></select></label>
+                        <small>Presentation only. This value never becomes checkout or quote authority.</small>
+                    </fieldset>
+                    <label class="catalog-toggle-row"><span>Show on Home</span><input id="catalogProductHomeEnabled" type="checkbox"></label>
+                    <label>Home category <select id="catalogProductHomeCategory">${catalogCategoryOptions()}</select></label>
+                    <label>Home order <input id="catalogProductHomeOrder" type="number" step="1" value="0"></label>
+                    <fieldset class="catalog-edit-fieldset catalog-chip-fieldset"><legend>Home sections</legend>
+                        ${["POPULAR_GAME_CARDS", "POPULAR_GAME_TOPUP", "POPULAR_PC_GAMES", "POPULAR_GIFT_CARDS", "NEW_GAME_CARDS", "NEW_GAME_TOPUP", "DIGITAL_SERVICES"].map(section => `<label class="catalog-choice-chip"><input type="checkbox" data-home-section value="${section}"> ${section.replaceAll("_", " ")}</label>`).join("")}
+                    </fieldset>
+                    <fieldset class="catalog-edit-fieldset catalog-chip-fieldset"><legend>Discovery flags</legend>
+                        ${["POPULAR", "NEW", "TRENDING", "FEATURED"].map(flag => `<label class="catalog-choice-chip"><input type="checkbox" data-home-flag value="${flag}"> ${flag}</label>`).join("")}
+                    </fieldset>
+                    <div id="catalogProductReadiness" class="catalog-pricing-preview-state" aria-live="polite"></div>
                 </section>
                 <section data-product-drawer-panel="seo" hidden>
                     <label>${adminT("seo_title", "SEO Title")} <input id="catalogProductSeoTitle" type="text" maxlength="90"></label>
@@ -469,7 +509,7 @@ function ensureProductEditorModal() {
                         <p><b>${adminT("product_image", "Product Image")}</b><br><small id="catalogProductImageLabel"></small></p>
                         <button id="catalogProductImageChange" class="admin-secondary-btn" type="button">${adminT("change_image", "Replace")}</button>
                         <button id="catalogProductImageRemove" class="admin-icon-btn danger" type="button">${adminT("remove_image", "Remove")}</button>
-                        <p><b>${adminT("mobile_package_preview", "Mobile Package Preview")}</b><br><small id="catalogProductPreviewLabel"></small></p>
+                        <p><b>${adminT("mobile_package_preview", "Mobile Package Preview")}</b><br><small id="catalogProductMobilePreviewLabel"></small></p>
                         <button id="catalogProductPreviewChange" class="admin-secondary-btn" type="button">${adminT("select_image", "Replace")}</button>
                         <button id="catalogProductPreviewRemove" class="admin-icon-btn danger" type="button">${adminT("remove_image", "Remove")}</button>
                     </div>
@@ -497,6 +537,11 @@ function ensureProductEditorModal() {
     document.body.appendChild(modal);
 }
 
+function catalogCategoryOptions() {
+    return ["", "MOBILE_GAME_TOPUP", "PC_GAME", "GIFT_CARD", "DIGITAL_SERVICE", "MOBILE_RECHARGE", "ENTERTAINMENT"]
+        .map(value => `<option value="${value}">${value || "Needs classification"}</option>`).join("");
+}
+
 function setProductDrawerTab(tab = "general") {
     const modal = document.getElementById("catalogProductEditModal");
     if (!modal) return;
@@ -516,12 +561,29 @@ function readProductEditorPayload(product) {
     if (modal.querySelector("#catalogProductRegionMM")?.checked) supportedRegions.push("MM");
     if (modal.querySelector("#catalogProductRegionTH")?.checked) supportedRegions.push("TH");
 
+    const previewAmount = modal.querySelector("#catalogProductPreviewAmount")?.value?.trim() || "";
     return {
         name: modal.querySelector("#catalogProductName")?.value || "",
         description: modal.querySelector("#catalogProductDescription")?.value || "",
         supportedRegions,
         enabled: Boolean(modal.querySelector("#catalogProductEnabled")?.checked),
         featured: Boolean(modal.querySelector("#catalogProductFeatured")?.checked),
+        catalogCategory: modal.querySelector("#catalogProductCategory")?.value || "",
+        commerceState: modal.querySelector("#catalogProductCommerceState")?.value || "HIDDEN",
+        publicDiscoveryEnabled: Boolean(modal.querySelector("#catalogProductDiscoveryEnabled")?.checked),
+        homepageEnabled: Boolean(modal.querySelector("#catalogProductHomeEnabled")?.checked),
+        homepageCategory: modal.querySelector("#catalogProductHomeCategory")?.value || "",
+        homepageOrder: Number(modal.querySelector("#catalogProductHomeOrder")?.value || 0),
+        homepageFlags: [...modal.querySelectorAll("[data-home-flag]:checked")].map(input => input.value),
+        homepageSections: [...modal.querySelectorAll("[data-home-section]:checked")].map(input => input.value),
+        productRoute: modal.querySelector("#catalogProductRoute")?.value || "",
+        marketScope: modal.querySelector("#catalogProductMarketScope")?.value || "MULTI_REGION",
+        displayMarketLabel: modal.querySelector("#catalogProductDisplayMarketLabel")?.value || "",
+        previewPrice: previewAmount ? {
+            amount: Number(previewAmount),
+            currency: modal.querySelector("#catalogProductPreviewCurrency")?.value || "THB",
+            label: modal.querySelector("#catalogProductPreviewLabel")?.value || "PREVIEW_PRICE"
+        } : null,
         seo: {
             title: modal.querySelector("#catalogProductSeoTitle")?.value || "",
             description: modal.querySelector("#catalogProductSeoDescription")?.value || ""
@@ -770,8 +832,8 @@ function renderProductImageControl(product) {
         <div class="catalog-media-control">
             <div class="catalog-media-preview">
                 ${imageUrl
-                    ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(asset?.altText || product.name)}">`
-                    : `<span>${adminT("fallback_static_asset", "Static fallback asset")}</span>`}
+            ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(asset?.altText || product.name)}">`
+            : `<span>${adminT("fallback_static_asset", "Static fallback asset")}</span>`}
             </div>
             <div>
                 <strong>${adminT("product_image", "Product Image")}</strong>
@@ -793,8 +855,8 @@ function renderMobilePackagePreviewControl(product) {
         <div class="catalog-media-control catalog-mobile-preview-control">
             <div class="catalog-media-preview catalog-media-preview-square">
                 ${imageUrl
-                    ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(asset?.altText || product.name)}">`
-                    : `<span>${adminT("fallback_static_asset", "Static fallback asset")}</span>`}
+            ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(asset?.altText || product.name)}">`
+            : `<span>${adminT("fallback_static_asset", "Static fallback asset")}</span>`}
             </div>
             <div>
                 <strong>${adminT("mobile_package_preview", "Mobile Package Preview")}</strong>
@@ -833,9 +895,9 @@ function renderPackageTable(packages) {
                 <span data-admin-i18n="action">${adminT("action", "Action")}</span>
             </div>
             ${packages.map((item, index) => {
-                const deleted = item.deleted || item.deletedAt;
-                const highlighted = catalogHighlightedPackageCode === item.packageCode ? "is-highlighted" : "";
-                return `
+        const deleted = item.deleted || item.deletedAt;
+        const highlighted = catalogHighlightedPackageCode === item.packageCode ? "is-highlighted" : "";
+        return `
                 <div class="catalog-package-row ${deleted ? "is-deleted" : ""} ${highlighted}" data-package-row="${escapeHtml(item.packageCode)}" draggable="false">
                     <span class="catalog-reorder-cell">
                         <button class="catalog-drag-handle" type="button" draggable="true" data-package-drag="${escapeHtml(item.packageCode)}" aria-label="Drag package ${escapeHtml(item.name)}" ${deleted ? "disabled" : ""}><i class="fa-solid fa-grip-vertical" aria-hidden="true"></i></button>
@@ -853,8 +915,8 @@ function renderPackageTable(packages) {
                             ${adminT("edit", "Edit")}
                         </button>
                         ${deleted
-                            ? `<button class="admin-icon-btn" type="button" data-restore-package="${escapeHtml(item.packageCode)}"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i>${adminT("restore_package", "Restore")}</button>`
-                            : `
+                ? `<button class="admin-icon-btn" type="button" data-restore-package="${escapeHtml(item.packageCode)}"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i>${adminT("restore_package", "Restore")}</button>`
+                : `
                         <details class="catalog-action-menu">
                             <summary class="admin-icon-btn catalog-overflow-trigger" aria-label="${adminT("more_actions", "More Actions")}"><i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i></summary>
                             <div class="catalog-action-menu-popover">
@@ -875,7 +937,8 @@ function renderPackageTable(packages) {
                         </details>`}
                     </span>
                 </div>
-            `;}).join("")}
+            `;
+    }).join("")}
         </div>
     `;
 }
@@ -890,6 +953,15 @@ function populateRegionalPricingControls(modal, region, draft, price = {}, defau
         const field = modal.querySelector(`#${regionalControlId(region, suffix)}`);
         if (field) field.value = value ?? "";
     };
+    const setChecked = (suffix, value) => {
+        const field = modal.querySelector(`#${regionalControlId(region, suffix)}`);
+        if (field) field.checked = Boolean(value);
+    };
+    setValue("ReferencePrice", supplier.referencePrice ?? price?.referencePrice ?? "");
+    setChecked("ShowDiscount", supplier.showDiscount ?? price?.showDiscount ?? false);
+    setChecked("ShowSaveAmount", supplier.showSaveAmount ?? price?.showSaveAmount ?? true);
+    setChecked("ShowOriginalPrice", supplier.showOriginalPrice ?? price?.showOriginalPrice ?? true);
+    setValue("DiscountLabel", supplier.discountLabel ?? price?.discountLabel ?? "");
     setValue("SupplierCost", supplier.supplierCost ?? price?.supplierCost ?? "");
     setValue("SupplierCurrency", supplier.supplierCurrency ?? price?.supplierCurrency ?? defaultCurrency);
     setValue("SupplierName", supplier.supplierName ?? price?.supplierName ?? "");
@@ -902,7 +974,13 @@ function populateRegionalPricingControls(modal, region, draft, price = {}, defau
 
 function readRegionalPricingDraft(modal, region) {
     const read = suffix => String(modal?.querySelector(`#${regionalControlId(region, suffix)}`)?.value || "").trim();
+    const checked = suffix => Boolean(modal?.querySelector(`#${regionalControlId(region, suffix)}`)?.checked);
     return {
+        referencePrice: read("ReferencePrice"),
+        showDiscount: checked("ShowDiscount"),
+        showSaveAmount: checked("ShowSaveAmount"),
+        showOriginalPrice: checked("ShowOriginalPrice"),
+        discountLabel: read("DiscountLabel"),
         supplierCost: read("SupplierCost"),
         supplierCurrency: read("SupplierCurrency"),
         supplierName: read("SupplierName"),
@@ -918,6 +996,11 @@ function buildPreviewPricePayload(draft, region) {
     return {
         amount: draft.values?.[region],
         enabled: draft.regionEnabled?.[region] === true,
+        referencePrice: draft.supplier?.[region]?.referencePrice,
+        showDiscount: draft.supplier?.[region]?.showDiscount,
+        showSaveAmount: draft.supplier?.[region]?.showSaveAmount,
+        showOriginalPrice: draft.supplier?.[region]?.showOriginalPrice,
+        discountLabel: draft.supplier?.[region]?.discountLabel,
         supplierCost: draft.supplier?.[region]?.supplierCost,
         supplierCurrency: draft.supplier?.[region]?.supplierCurrency,
         supplierName: draft.supplier?.[region]?.supplierName,
@@ -934,6 +1017,11 @@ function applySupplierPatchChanges(pkg, draft, prices, changes, region) {
     const supplier = draft.supplier?.[region] || {};
     const patch = {};
     const comparable = value => String(value ?? "").trim();
+    const referencePriceChanged = comparable(supplier.referencePrice) !== comparable(existing.referencePrice ?? "");
+    const showDiscountChanged = Boolean(supplier.showDiscount) !== Boolean(existing.showDiscount);
+    const showSaveAmountChanged = Boolean(supplier.showSaveAmount) !== (existing.showSaveAmount !== false);
+    const showOriginalPriceChanged = Boolean(supplier.showOriginalPrice) !== (existing.showOriginalPrice !== false);
+    const discountLabelChanged = comparable(supplier.discountLabel) !== comparable(existing.discountLabel || "");
     const supplierCostChanged = comparable(supplier.supplierCost) !== comparable(existing.supplierCost ?? "");
     const supplierCurrencyChanged = comparable(supplier.supplierCurrency) !== comparable(existing.supplierCurrency || existing.currency || "");
     const supplierNameChanged = comparable(supplier.supplierName) !== comparable(existing.supplierName || "");
@@ -943,6 +1031,11 @@ function applySupplierPatchChanges(pkg, draft, prices, changes, region) {
     const modeChanged = comparable(supplier.publishedPriceMode) !== comparable(existing.publishedPriceMode || "LEGACY_COMPATIBILITY_PRICE");
     const reasonChanged = comparable(supplier.manualOverrideReason) !== comparable(existing.manualOverrideReason || "");
 
+    if (referencePriceChanged) patch.referencePrice = supplier.referencePrice;
+    if (showDiscountChanged) patch.showDiscount = supplier.showDiscount;
+    if (showSaveAmountChanged) patch.showSaveAmount = supplier.showSaveAmount;
+    if (showOriginalPriceChanged) patch.showOriginalPrice = supplier.showOriginalPrice;
+    if (discountLabelChanged) patch.discountLabel = supplier.discountLabel;
     if (supplierCostChanged) patch.supplierCost = supplier.supplierCost;
     if (supplierCurrencyChanged) patch.supplierCurrency = supplier.supplierCurrency;
     if (supplierNameChanged) patch.supplierName = supplier.supplierName;
@@ -954,7 +1047,10 @@ function applySupplierPatchChanges(pkg, draft, prices, changes, region) {
 
     if (Object.keys(patch).length) {
         prices[region] = { ...(prices[region] || {}), ...patch };
-        changes.push(`${region}: ${adminT("supplier_cost", "Supplier Cost")} / ${adminT("published_price_mode", "Published Price Mode")}`);
+        const displayChanged = referencePriceChanged || showDiscountChanged || showSaveAmountChanged || showOriginalPriceChanged || discountLabelChanged;
+        const supplierChanged = supplierCostChanged || supplierCurrencyChanged || supplierNameChanged || supplierVersionChanged || timestampChanged || noteChanged || modeChanged || reasonChanged;
+        if (displayChanged) changes.push(`${region}: ${adminT("discount_display", "Discount Display")}`);
+        if (supplierChanged) changes.push(`${region}: ${adminT("supplier_cost", "Supplier Cost")} / ${adminT("published_price_mode", "Published Price Mode")}`);
     }
 }
 
@@ -1064,8 +1160,8 @@ function renderBannerList(banners = []) {
                     <button class="catalog-drag-handle" type="button" draggable="true" data-banner-drag="${escapeHtml(banner.id)}" aria-label="Drag banner ${escapeHtml(banner.name)}" ${banner.deleted ? "disabled" : ""}><i class="fa-solid fa-grip-vertical" aria-hidden="true"></i></button>
                     <div class="catalog-banner-preview">
                         ${banner.mediaAsset?.secureUrl || banner.mediaAsset?.url
-                            ? `<img src="${escapeHtml(banner.mediaAsset.secureUrl || banner.mediaAsset.url)}" alt="${escapeHtml(banner.mediaAsset.altText || banner.name)}">`
-                            : `<span>${adminT("banner_image", "Banner Image")}</span>`}
+            ? `<img src="${escapeHtml(banner.mediaAsset.secureUrl || banner.mediaAsset.url)}" alt="${escapeHtml(banner.mediaAsset.altText || banner.name)}">`
+            : `<span>${adminT("banner_image", "Banner Image")}</span>`}
                     </div>
                     <div>
                         <strong>${escapeHtml(banner.name)}</strong>
@@ -1075,8 +1171,8 @@ function renderBannerList(banners = []) {
                     <div class="catalog-package-actions">
                         <button class="admin-icon-btn catalog-row-primary-action" type="button" data-edit-banner="${escapeHtml(banner.id)}"><i class="fa-solid fa-pen" aria-hidden="true"></i>${adminT("edit", "Edit")}</button>
                         ${banner.deleted
-                            ? `<button class="admin-icon-btn" type="button" data-restore-banner="${escapeHtml(banner.id)}"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i>${adminT("restore", "Restore")}</button>`
-                            : `
+            ? `<button class="admin-icon-btn" type="button" data-restore-banner="${escapeHtml(banner.id)}"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i>${adminT("restore", "Restore")}</button>`
+            : `
                         <details class="catalog-action-menu">
                             <summary class="admin-icon-btn catalog-overflow-trigger" aria-label="${adminT("more_actions", "More Actions")}"><i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i></summary>
                             <div class="catalog-action-menu-popover">
@@ -1877,7 +1973,7 @@ function openPackageEditPanel(product, pkg) {
     modal.dataset.iconAssetId = draft?.iconAssetId ?? (pkg.iconAsset?.assetId || "");
     modal.dataset.iconCleared = draft?.iconCleared ? "true" : "";
     modal.querySelector("#catalogEditIconLabel").textContent = draft?.iconLabel || pkg.iconAsset?.name || pkg.iconUrl || adminT("fallback_static_asset", "Static fallback asset");
-    modal.querySelector("#catalogEditSupplierMapping").textContent = formatSupplierMapping(pkg);
+    modal.querySelector("#catalogEditSupplierMapping").value = formatSupplierMapping(pkg);
     mmEnabled.checked = draft?.regionEnabled?.MM ?? Boolean(pkg.prices?.MM);
     thEnabled.checked = draft?.regionEnabled?.TH ?? Boolean(pkg.prices?.TH);
     mmInput.value = draft?.values?.MM ?? pkg.prices?.MM?.amount ?? "";
@@ -2008,6 +2104,22 @@ function validatePackageEditDraft(pkg, draft) {
             return false;
         }
 
+        const display = draft.supplier?.[region] || {};
+        if (display.referencePrice !== "") {
+            const referencePrice = Number(display.referencePrice);
+            if (!Number.isFinite(referencePrice) || referencePrice <= 0) {
+                showAdminToast?.(adminT("reference_price_invalid", "Reference price must be a positive number."), "error");
+                return false;
+            }
+            if (display.showDiscount && referencePrice <= amount) {
+                showAdminToast?.(adminT("reference_price_must_exceed_selling", "Reference price must be greater than the selling price when discount display is enabled."), "error");
+                return false;
+            }
+        } else if (display.showDiscount) {
+            showAdminToast?.(adminT("reference_price_required", "Reference price is required when discount display is enabled."), "error");
+            return false;
+        }
+
         const supplierCost = draft.supplier?.[region]?.supplierCost;
         if (supplierCost !== "") {
             const supplierAmount = Number(supplierCost);
@@ -2130,6 +2242,11 @@ function renderRegionalPricingEditor(region, label, currency) {
             <div class="catalog-regional-pricing-grid">
                 <label>${priceLabel}<input id="catalogEdit${region}" data-pricing-preview-input type="number" step="0.01" min="0"></label>
                 <label>${adminT("selling_currency", "Selling Currency")}<input type="text" value="${escapeHtml(currency)}" readonly></label>
+                <label>${adminT("reference_price", "Original / Reference Price")}<input id="catalogEdit${region}ReferencePrice" data-pricing-preview-input type="number" step="0.01" min="0" placeholder="${adminT("optional_reference_price", "Optional original price")}"></label>
+                <label>${adminT("discount_label", "Discount Label")}<input id="catalogEdit${region}DiscountLabel" data-pricing-preview-input type="text" maxlength="40" placeholder="${adminT("discount_label_example", "HOT DEAL")}"></label>
+                <label class="catalog-toggle-row"><span>${adminT("show_discount_badge", "Show Discount Badge")}</span><input id="catalogEdit${region}ShowDiscount" data-pricing-preview-input type="checkbox"></label>
+                <label class="catalog-toggle-row"><span>${adminT("show_original_price", "Show Original Price")}</span><input id="catalogEdit${region}ShowOriginalPrice" data-pricing-preview-input type="checkbox" checked></label>
+                <label class="catalog-toggle-row"><span>${adminT("show_save_amount", "Show Save Amount")}</span><input id="catalogEdit${region}ShowSaveAmount" data-pricing-preview-input type="checkbox" checked></label>
                 <label>${adminT("published_price_mode", "Published Price Mode")}
                     <select id="catalogEdit${region}PublishedPriceMode" data-pricing-preview-input>
                         <option value="LEGACY_COMPATIBILITY_PRICE">${adminT("legacy_compatibility_price", "Legacy compatibility price")}</option>
@@ -2272,43 +2389,265 @@ function ensurePackageEditModal() {
 
     const modal = document.createElement("div");
     modal.id = "catalogPackageEditModal";
-    modal.className = "admin-action-modal catalog-edit-modal";
+    modal.className = "admin-action-modal catalog-edit-modal catalog-package-editor-modal";
+
     modal.innerHTML = `
-        <div class="admin-action-modal-box">
-            <h3 id="catalogEditTitle"></h3>
-            <label>${adminT("package_code", "Package Code")} <input id="catalogEditPackageCode" type="text" readonly></label>
-            <label>${adminT("package_name", "Package Name")} <input id="catalogEditPackageName" type="text" maxlength="120"></label>
-            <label class="catalog-toggle-row"><span>${adminT("enabled", "Enabled")}</span><input id="catalogEditEnabled" type="checkbox"></label>
-            <fieldset class="catalog-edit-fieldset catalog-chip-fieldset">
-                <legend>${adminT("supported_regions", "Supported Regions")}</legend>
-                <label class="catalog-choice-chip"><input id="catalogEditMMEnabled" type="checkbox"> Myanmar</label>
-                <label class="catalog-choice-chip"><input id="catalogEditTHEnabled" type="checkbox"> Thailand</label>
-            </fieldset>
-            <div class="catalog-pricing-control-grid">
-                ${renderRegionalPricingEditor("MM", "Myanmar", "MMK")}
-                ${renderRegionalPricingEditor("TH", "Thailand", "THB")}
+        <div
+            class="admin-action-modal-box catalog-package-editor-box"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="catalogEditTitle"
+        >
+            <header class="catalog-package-editor-header">
+                <div>
+                    <span class="catalog-editor-eyebrow">
+                        ${adminT("package_settings", "Package Settings")}
+                    </span>
+                    <h3 id="catalogEditTitle"></h3>
+                    <p>
+                        ${adminT(
+        "package_editor_helper",
+        "Manage availability, regional pricing, supplier cost and storefront discount display."
+    )}
+                    </p>
+                </div>
+
+                <button
+                    id="catalogEditClose"
+                    class="admin-icon-btn"
+                    type="button"
+                    aria-label="${adminT("close", "Close")}"
+                >
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                </button>
+            </header>
+
+            <div class="catalog-package-editor-scroll">
+                <section class="catalog-editor-section">
+                    <div class="catalog-editor-section-head">
+                        <div>
+                            <span>${adminT("general", "General")}</span>
+                            <h4>${adminT("package_information", "Package Information")}</h4>
+                        </div>
+                    </div>
+
+                    <div class="catalog-editor-general-grid">
+                        <label>
+                            ${adminT("package_code", "Package Code")}
+                            <input
+                                id="catalogEditPackageCode"
+                                type="text"
+                                readonly
+                            >
+                        </label>
+
+                        <label>
+                            ${adminT("package_name", "Package Name")}
+                            <input
+                                id="catalogEditPackageName"
+                                type="text"
+                                maxlength="120"
+                            >
+                        </label>
+                    </div>
+
+                    <label class="catalog-toggle-row">
+                        <span>
+                            <b>${adminT("enabled", "Enabled")}</b>
+                            <small>
+                                ${adminT(
+        "package_enabled_helper",
+        "Allow this package to be purchased when at least one region is available."
+    )}
+                            </small>
+                        </span>
+                        <input
+                            id="catalogEditEnabled"
+                            type="checkbox"
+                            role="switch"
+                        >
+                    </label>
+
+                    <fieldset class="catalog-edit-fieldset catalog-chip-fieldset">
+                        <legend>${adminT("supported_regions", "Supported Regions")}</legend>
+
+                        <div class="catalog-region-choice-grid">
+                            <label class="catalog-choice-chip">
+                                <input
+                                    id="catalogEditMMEnabled"
+                                    type="checkbox"
+                                >
+                                <span>
+                                    <b>Myanmar</b>
+                                    <small>MMK</small>
+                                </span>
+                            </label>
+
+                            <label class="catalog-choice-chip">
+                                <input
+                                    id="catalogEditTHEnabled"
+                                    type="checkbox"
+                                >
+                                <span>
+                                    <b>Thailand</b>
+                                    <small>THB</small>
+                                </span>
+                            </label>
+                        </div>
+                    </fieldset>
+                </section>
+
+                <section class="catalog-editor-section">
+                    <div class="catalog-editor-section-head">
+                        <div>
+                            <span>${adminT("pricing", "Pricing")}</span>
+                            <h4>${adminT("regional_pricing", "Regional Pricing")}</h4>
+                            <p>
+                                ${adminT(
+        "regional_pricing_helper",
+        "Selling price, reference price, supplier cost and publishing controls are separated by region."
+    )}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="catalog-pricing-control-grid">
+                        ${renderRegionalPricingEditor("MM", "Myanmar", "MMK")}
+                        ${renderRegionalPricingEditor("TH", "Thailand", "THB")}
+                    </div>
+                </section>
+
+                <section class="catalog-editor-section">
+                    <div class="catalog-editor-section-head">
+                        <div>
+                            <span>${adminT("preview", "Preview")}</span>
+                            <h4>${adminT("business_preview", "Business Preview")}</h4>
+                        </div>
+                    </div>
+
+                    <label>
+                        ${adminT("coupon_preview", "Coupon Impact Preview")}
+                        <input
+                            id="catalogEditCouponPreview"
+                            data-pricing-preview-input
+                            type="text"
+                            maxlength="40"
+                            placeholder="${adminT(
+        "optional_coupon_code",
+        "Optional coupon code"
+    )}"
+                        >
+                    </label>
+
+                    <section
+                        class="catalog-pricing-preview"
+                        aria-live="polite"
+                    >
+                        <header>
+                            <strong>
+                                ${adminT(
+        "live_business_preview",
+        "Live Business Preview"
+    )}
+                            </strong>
+                            <span>
+                                ${adminT(
+        "server_authoritative",
+        "Server authoritative"
+    )}
+                            </span>
+                        </header>
+
+                        <div id="catalogPricingPreview"></div>
+                    </section>
+                </section>
+
+                <section class="catalog-editor-section">
+                    <div class="catalog-editor-section-head">
+                        <div>
+                            <span>${adminT("presentation", "Presentation")}</span>
+                            <h4>${adminT("package_icon", "Package Icon")}</h4>
+                        </div>
+                    </div>
+
+                    <div class="catalog-package-icon-editor">
+                        <div>
+                            <strong>${adminT("selected_icon", "Selected Icon")}</strong>
+                            <p id="catalogEditIconLabel"></p>
+                        </div>
+
+                        <div class="catalog-package-icon-actions">
+                            <button
+                                id="catalogEditIcon"
+                                class="admin-secondary-btn"
+                                type="button"
+                            >
+                                <i class="fa-regular fa-image" aria-hidden="true"></i>
+                                ${adminT("select_package_icon", "Select Package Icon")}
+                            </button>
+
+                            <button
+                                id="catalogEditIconClear"
+                                class="admin-icon-btn danger"
+                                type="button"
+                            >
+                                <i class="fa-solid fa-image-slash" aria-hidden="true"></i>
+                                ${adminT("remove_icon", "Remove Icon")}
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="catalog-editor-section">
+                    <div class="catalog-editor-section-head">
+                        <div>
+                            <span>${adminT("fulfillment", "Fulfillment")}</span>
+                            <h4>${adminT("supplier_mapping", "Supplier Mapping")}</h4>
+                        </div>
+                    </div>
+
+                    <label>
+                        ${adminT("supplier_mapping", "Supplier Mapping")}
+                        <input
+                            id="catalogEditSupplierMapping"
+                            type="text"
+                            readonly
+                        >
+                    </label>
+                </section>
             </div>
-            <label>${adminT("coupon_preview", "Coupon Impact Preview")} <input id="catalogEditCouponPreview" data-pricing-preview-input type="text" maxlength="40" placeholder="${adminT("optional_coupon_code", "Optional coupon code")}"></label>
-            <section class="catalog-pricing-preview" aria-live="polite">
-                <header>
-                    <strong>${adminT("live_business_preview", "Live Business Preview")}</strong>
-                    <span>${adminT("server_authoritative", "Server authoritative")}</span>
-                </header>
-                <div id="catalogPricingPreview"></div>
-            </section>
-            <button id="catalogEditIcon" class="admin-secondary-btn" type="button">${adminT("select_package_icon", "Select Package Icon")}</button>
-            <button id="catalogEditIconClear" class="admin-icon-btn danger" type="button">${adminT("remove_icon", "Remove Icon")}</button>
-            <p id="catalogEditIconLabel"></p>
-            <label>${adminT("supplier_mapping", "Supplier Mapping")} <input id="catalogEditSupplierMapping" type="text" readonly></label>
-            <div class="admin-action-modal-actions">
-                <button id="catalogEditCancel" type="button">${adminT("cancel", "Cancel")}</button>
-                <button id="catalogEditSave" class="admin-primary-btn" type="button">${adminT("save_changes", "Save Changes")}</button>
-            </div>
+
+            <footer class="admin-action-modal-actions catalog-package-editor-footer">
+                <button
+                    id="catalogEditCancel"
+                    class="admin-secondary-btn"
+                    type="button"
+                >
+                    ${adminT("cancel", "Cancel")}
+                </button>
+
+                <button
+                    id="catalogEditSave"
+                    class="admin-primary-btn"
+                    type="button"
+                >
+                    <i class="fa-solid fa-check" aria-hidden="true"></i>
+                    ${adminT("save_changes", "Save Changes")}
+                </button>
+            </footer>
         </div>
     `;
+
     modal.addEventListener("click", event => {
-        if (event.target === modal) abandonPackageEditDraft();
+        if (event.target === modal) {
+            abandonPackageEditDraft();
+        }
     });
+
+    modal.querySelector("#catalogEditClose")?.addEventListener("click", () => {
+        abandonPackageEditDraft();
+    });
+
     document.body.appendChild(modal);
 }
 
@@ -2516,9 +2855,19 @@ function renderPackageBusinessPrice(price, region) {
         : mode === "MANUAL_OVERRIDE"
             ? adminT("manual_override", "Manual override")
             : adminT("legacy_compatibility_price", "Legacy compatibility price");
+    const sellingPrice = Number(price.amount);
+    const referencePrice = Number(price.referencePrice);
+    const hasDiscount = price.showDiscount === true &&
+        Number.isFinite(referencePrice) && Number.isFinite(sellingPrice) &&
+        referencePrice > sellingPrice;
+    const saveAmount = hasDiscount ? referencePrice - sellingPrice : 0;
+    const discountPercent = hasDiscount ? Math.round((saveAmount / referencePrice) * 100) : 0;
+    const discountLabel = String(price.discountLabel || "").trim();
     return `
         <span class="catalog-business-price" data-region="${escapeHtml(region)}">
+            ${hasDiscount && price.showOriginalPrice !== false ? `<del>${escapeHtml(formatOptionalMoney(referencePrice, price.currency))}</del>` : ""}
             <strong>${escapeHtml(formatRegionalPrice(price))}</strong>
+            ${hasDiscount ? `<small>${escapeHtml(discountLabel || `${discountPercent}% OFF`)}${price.showSaveAmount !== false ? ` · ${adminT("save", "Save")} ${escapeHtml(formatOptionalMoney(saveAmount, price.currency))}` : ""}</small>` : ""}
             <small>${escapeHtml(modeLabel)} · ${escapeHtml(supplier)}</small>
             ${renderPricingStatusChip(packageStaticPricingStatus(price))}
             ${updated ? `<em>${escapeHtml(updated)}</em>` : ""}

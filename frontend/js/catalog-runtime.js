@@ -176,19 +176,73 @@
         const amount = Number(price.amount);
         if (!Number.isFinite(amount) || amount <= 0) return null;
 
+        const referencePrice = Number(price.referencePrice || 0);
+        const saveAmount = Number(price.saveAmount || 0);
+        const discountPercent = Number(price.discountPercent || 0);
+
+        const hasReferencePrice =
+            Number.isFinite(referencePrice) &&
+            referencePrice > amount;
+
         return {
             productCode: product.productCode,
             productName: product.name,
             packageCode: normalizePackageCode(item.packageCode),
             name: item.name,
+
             amount,
             price: amount,
             currency: price.currency || REGION_CURRENCIES[region],
             region,
+
+            referencePrice: hasReferencePrice ? referencePrice : 0,
+            originalPrice: hasReferencePrice ? referencePrice : 0,
+
+            saveAmount:
+                hasReferencePrice && Number.isFinite(saveAmount)
+                    ? Math.max(0, saveAmount)
+                    : 0,
+
+            discountPercent:
+                hasReferencePrice && Number.isFinite(discountPercent)
+                    ? Math.max(0, discountPercent)
+                    : 0,
+
+            showDiscount:
+                hasReferencePrice && price.showDiscount === true,
+
+            showOriginalPrice:
+                hasReferencePrice && price.showOriginalPrice === true,
+
+            showSaveAmount:
+                hasReferencePrice && price.showSaveAmount === true,
+
+            discountLabel:
+                hasReferencePrice
+                    ? String(price.discountLabel || "").trim()
+                    : "",
+
+            publishedPriceMode: price.publishedPriceMode || "",
+            manualOverrideReason: price.manualOverrideReason || "",
+
             sortOrder: Number(item.sortOrder || 0),
             updatedAt: item.updatedAt || product.updatedAt || "",
-            icon: presentation?.resolvePackageIcon?.(item) || presentation?.getPackageIcon?.(product.productCode, item.packageCode) || "",
-            fallbackIcon: presentation?.getPackageIcon?.(product.productCode, item.packageCode) || "",
+
+            icon:
+                presentation?.resolvePackageIcon?.(item) ||
+                presentation?.getPackageIcon?.(
+                    product.productCode,
+                    item.packageCode
+                ) ||
+                "",
+
+            fallbackIcon:
+                presentation?.getPackageIcon?.(
+                    product.productCode,
+                    item.packageCode
+                ) || "",
+
+            rawPrice: price,
             rawPackage: item,
             rawProduct: product
         };

@@ -138,6 +138,11 @@
             amount: Number(selected.amount || selected.price || 0),
             code: selected.code || selected.packageCode || "",
             icon: selected.icon || "",
+            referencePrice: Number(selected.referencePrice || 0),
+            saveAmount: Number(selected.saveAmount || 0),
+            discountPercent: Number(selected.discountPercent || 0),
+            showDiscount: selected.showDiscount === true,
+            showOriginalPrice: selected.showOriginalPrice === true,
             formattedPrice: selected.formattedPrice || ""
         };
     }
@@ -925,6 +930,11 @@
             region: packEl.dataset.region || "",
             code: packEl.dataset.code || "",
             icon: packEl.dataset.icon || "",
+            referencePrice: Number(packEl.dataset.referencePrice || 0),
+            saveAmount: Number(packEl.dataset.saveAmount || 0),
+            discountPercent: Number(packEl.dataset.discountPercent || 0),
+            showDiscount: packEl.dataset.showDiscount === "true",
+            showOriginalPrice: packEl.dataset.showOriginalPrice === "true",
             formattedPrice: packEl.querySelector(".pack-price")?.textContent?.trim() || ""
         };
     }

@@ -48,6 +48,10 @@ const adminSectionTitles = {
         titleKey: "pricing",
         subKey: "pricing_engine_sub"
     },
+    "pricing-settings": {
+        title: "Pricing Settings",
+        subtitle: "Owner-controlled pricing policy and operating thresholds."
+    },
     promos: {
         titleKey: "promo_codes",
         subKey: "promo_codes_sub"
@@ -211,14 +215,16 @@ function openAdminSection(sectionName, updateHash = true, context = {}) {
 
     if (pageInfo) {
         if (title) {
-            title.dataset.adminI18n = pageInfo.titleKey;
-            title.innerText = pageInfo.titleKey === "pricing"
+            if (pageInfo.titleKey) title.dataset.adminI18n = pageInfo.titleKey;
+            else title.removeAttribute("data-admin-i18n");
+            title.innerText = pageInfo.title || (pageInfo.titleKey === "pricing"
                 ? adminT(pageInfo.titleKey, "Pricing")
-                : adminT(pageInfo.titleKey);
+                : adminT(pageInfo.titleKey));
         }
         if (sub) {
-            sub.dataset.adminI18n = pageInfo.subKey;
-            sub.innerText = adminT(pageInfo.subKey);
+            if (pageInfo.subKey) sub.dataset.adminI18n = pageInfo.subKey;
+            else sub.removeAttribute("data-admin-i18n");
+            sub.innerText = pageInfo.subtitle || adminT(pageInfo.subKey);
         }
         updateAdminSectionPill(sectionName);
         const titleText = title?.innerText?.trim() || "Dashboard";

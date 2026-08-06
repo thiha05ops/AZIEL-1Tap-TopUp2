@@ -49,6 +49,71 @@
             searchDescription: "MOBA Top Up",
             theme: "pink"
         },
+        "marvel-rivals": {
+            route: "coming-soon.html?product=marvel-rivals",
+            image: "assets/fallbacks/game-topup.svg",
+            category: "mobile",
+            featured: true,
+            description: "Top Up",
+            searchDescription: "Top Up"
+        },
+        "blood-strike": {
+            route: "coming-soon.html?product=blood-strike",
+            image: "assets/fallbacks/game-topup.svg",
+            category: "mobile",
+            featured: true,
+            description: "Golds, Pass",
+            searchDescription: "Golds, Pass"
+        },
+        "age-of-empires-mobile": {
+            route: "coming-soon.html?product=age-of-empires-mobile",
+            image: "assets/fallbacks/game-topup.svg",
+            category: "mobile",
+            description: "Top Up",
+            searchDescription: "Top Up"
+        },
+        "lineage-2m": {
+            route: "coming-soon.html?product=lineage-2m",
+            image: "assets/fallbacks/game-topup.svg",
+            category: "mobile",
+            description: "Top Up",
+            searchDescription: "Top Up"
+        },
+        overmortal: {
+            route: "coming-soon.html?product=overmortal",
+            image: "assets/fallbacks/game-topup.svg",
+            category: "mobile",
+            description: "Voucher",
+            searchDescription: "Voucher"
+        },
+        "magic-chess-go-go": {
+            route: "coming-soon.html?product=magic-chess-go-go",
+            image: "assets/fallbacks/game-topup.svg",
+            category: "mobile",
+            description: "Top Up",
+            searchDescription: "Top Up"
+        },
+        lifeafter: {
+            route: "coming-soon.html?product=lifeafter",
+            image: "assets/fallbacks/game-topup.svg",
+            category: "mobile",
+            description: "Credits & Package",
+            searchDescription: "Credits & Package"
+        },
+        "mlbb-twilight-weekly-pass": {
+            route: "coming-soon.html?product=mlbb-twilight-weekly-pass",
+            image: "assets/games/mlbb.webp",
+            category: "mobile",
+            description: "Twilight Pass & Weekly Pass",
+            searchDescription: "Twilight Pass & Weekly Pass"
+        },
+        "blood-strike-pass": {
+            route: "coming-soon.html?product=blood-strike-pass",
+            image: "assets/fallbacks/game-topup.svg",
+            category: "mobile",
+            description: "Pass",
+            searchDescription: "Pass"
+        },
         aovid: {
             route: "aov-id.html",
             image: "assets/games/aov-id.webp",
@@ -62,7 +127,7 @@
             image: "assets/games/pubg-rp.webp",
             category: "mobile",
             featured: false,
-            description: "RP Pack",
+            description: "Royale Pass Pack",
             searchDescription: "Royale Pass Pack"
         },
         telegram: {
@@ -99,7 +164,24 @@
         }
     };
 
-    const DEFAULT_PRODUCT_ICON = "assets/games/mlbb.webp";
+    const HOME_PRESENTATION_RECORDS = Object.freeze({
+        mlbb: { name: "Mobile Legends", description: "Diamonds" },
+        pubg: { name: "PUBG Mobile", description: "UC" },
+        freefire: { name: "Free Fire", description: "Diamonds" },
+        hok: { name: "Honor of Kings", description: "Tokens & Packages" },
+        "marvel-rivals": { name: "Marvel Rivals", description: "Top Up" },
+        "blood-strike": { name: "Blood Strike", description: "Golds, Pass" },
+        "age-of-empires-mobile": { name: "Age of Empires Mobile", description: "Top Up" },
+        "lineage-2m": { name: "Lineage 2M", description: "Top Up" },
+        overmortal: { name: "OverMortal", description: "Voucher" },
+        "magic-chess-go-go": { name: "Magic Chess: Go Go", description: "Top Up" },
+        lifeafter: { name: "LifeAfter", description: "Credits & Package" },
+        pubgrp: { name: "PUBG Mobile Royale Pass Pack", description: "Royale Pass Pack" },
+        "mlbb-twilight-weekly-pass": { name: "Mobile Legends Twilight Pass & Weekly Pass", description: "Twilight Pass & Weekly Pass" },
+        "blood-strike-pass": { name: "Blood Strike Pass", description: "Pass" }
+    });
+
+    const DEFAULT_PRODUCT_ICON = "assets/fallbacks/game-topup.svg";
     const DEFAULT_PACKAGE_ICONS = {
         mlbb: "assets/mlbb/icons/small.webp",
         pubg: "assets/games/pubg.webp",
@@ -153,6 +235,27 @@
         return getProductPresentation(productCode)?.image || DEFAULT_PRODUCT_ICON;
     }
 
+    function getHomePresentationRecord(productCode) {
+        const code = String(productCode || "").trim().toLowerCase();
+        const presentation = getProductPresentation(code);
+        const record = HOME_PRESENTATION_RECORDS[code];
+        if (!presentation || !record) return null;
+        return {
+            productCode: code,
+            name: record.name,
+            description: record.description || presentation.description || "Top Up",
+            image: presentation.image,
+            route: presentation.route || `coming-soon.html?product=${encodeURIComponent(code)}`,
+            category: presentation.category || "mobile",
+            enabled: true,
+            homepageEnabled: true,
+            discoverable: true,
+            purchasable: false,
+            commerceState: "COMING_SOON",
+            homepageSections: ["POPULAR_GAME_TOPUP"]
+        };
+    }
+
     function mediaFirst(value, fallback = "") {
         const mediaUrl = String(value || "").trim();
         if (mediaUrl) return mediaUrl;
@@ -161,7 +264,7 @@
 
     function resolveProductImage(product = {}) {
         const fallback = getProductImage(product.productCode);
-        return mediaFirst(product.imageUrl || product.image, fallback);
+        return mediaFirst(product.imageUrl || product.image || product.artworkPath, fallback);
     }
 
     function resolveProductBanner(product = {}) {
@@ -234,26 +337,32 @@
 
     function buildDisplayProduct(product) {
         const presentation = getProductPresentation(product?.productCode);
-        if (!product || !presentation?.route) return null;
+        const route = String(product?.productRoute || presentation?.route || "").trim();
+        if (!product || !route) return null;
+        const authoritativeCategory = String(product.homepageCategory || product.catalogCategory || "").toLowerCase().replaceAll("_", "-");
 
         return {
             ...product,
-            route: presentation.route,
+            route,
             image: resolveProductImage(product),
-            fallbackImage: presentation.image,
+            fallbackImage: presentation?.image || DEFAULT_PRODUCT_ICON,
             banner: resolveProductBanner(product),
-            category: presentation.category,
-            featured: Boolean(presentation.featured),
-            description: presentation.description || "",
-            searchDescription: presentation.searchDescription || presentation.description || "",
-            theme: presentation.theme || ""
+            category: authoritativeCategory || presentation?.category || "",
+            featured: (product.homepageFlags || []).includes("FEATURED") || Boolean(presentation?.featured),
+            isNew: (product.homepageFlags || []).includes("NEW"),
+            trending: (product.homepageFlags || []).includes("TRENDING"),
+            description: product.description || presentation?.description || "",
+            searchDescription: product.description || presentation?.searchDescription || presentation?.description || "",
+            theme: presentation?.theme || ""
         };
     }
 
     window.AZIEL_CATALOG_PRESENTATION = {
         PRODUCT_PRESENTATION,
+        HOME_PRESENTATION_RECORDS,
         DEFAULT_PACKAGE_ICONS,
         getProductPresentation,
+        getHomePresentationRecord,
         getProductRoute,
         getProductImage,
         resolveProductImage,

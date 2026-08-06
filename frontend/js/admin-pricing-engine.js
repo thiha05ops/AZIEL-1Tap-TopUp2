@@ -1,2088 +1,419 @@
 (function () {
-    const FALLBACK_PRODUCT = Object.freeze({
-        productId: "mlbb",
-        productCode: "mlbb",
-        productName: "Mobile Legends",
-        packages: [{
-            packageId: "MLBB_7740",
-            packageCode: "MLBB_7740",
-            packageName: "7740 + 1548 Diamonds",
-            region: "TH",
-            currency: "THB",
-            supplierCurrency: "THB",
-            supplierPrice: 1120,
-            exchangeRate: 1
-        }]
-    });
+    "use strict";
 
-    const state = {
-        products: [],
-        selectedProductId: "",
-        selectedPackageId: "",
-        activePolicy: new Map(),
-        draftPolicy: new Map(),
-        activeVersion: null,
-        preview: null,
-        affected: null,
-        dirty: false,
-        loading: false,
-        calculating: false,
-        saving: false,
-        publishing: false,
-        apiReady: false,
-        productSource: "empty",
-        loadError: "",
-        previewError: "",
-        saveError: "",
-        publishError: "",
-        renderSeq: 0,
-        loadPromise: null,
-        workspace: {
-            rows: [],
-            previewRows: [],
-            selectedProductId: "",
-            selectedRegion: "TH",
-            selectedSupplier: "Primary supplier",
-            supplierCurrency: "THB",
-            selectedPackageId: "",
-            stagedChangesByPackageId: new Map(),
-            previewResultsByPackageId: new Map(),
-            selectedPackageDetail: null,
-            editingCostRowId: "",
-            editingOriginalCost: null,
-            activeRequestSequence: 0,
-            selectedRowId: "",
-            previewing: false,
-            publishing: false,
-            filter: "ALL",
-            regionView: "TH",
-            productFilter: "ALL",
-            pasteMatches: [],
-            debounce: null,
-            previewSeq: 0,
-            lastPreviewAt: ""
-        }
+    const daily = {
+        loaded: false, loading: false, products: [], policies: [], suppliers: [], region: "ALL",
+        supplierId: "", selectedProductId: "", edits: new Map(), previews: new Map(), search: "", previewSeq: 0,
+        previewController: null, previewTimer: null, saveTimer: null, publishing: false
     };
-    const simulationState = state;
-    const bootStartedAt = Date.now();
+    const settings = { loaded: false, loading: false, policies: [], region: "TH", saving: false };
 
-    function trace(label, details = {}) {
-        try {
-            const enabled = window.location.search.includes("pricingTrace=1") || localStorage.getItem("AZIEL_PRICING_ENGINE_TRACE") === "true";
-            if (!enabled) return;
-            console.info("[PRICING_ENGINE_ASYNC]", label, {
-                elapsedMs: Date.now() - bootStartedAt,
-                loading: state.loading,
-                products: state.products.length,
-                selectedProductId: state.selectedProductId,
-                ...details
-            });
-        } catch (_) {
-            // Tracing must never affect Pricing Engine runtime.
-        }
-    }
+    const $ = (id) => document.getElementById(id);
+    const text = (value) => String(value || "").trim();
+    const upper = (value) => text(value).toUpperCase();
+    const number = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+    const rowKey = (row) => `${upper(row.productCode)}:${upper(row.packageCode)}`;
+    const money = (value, currency) => value == null ? "-" : `${Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })} ${currency}`;
 
-    document.addEventListener("DOMContentLoaded", initPricingEngineUi);
-    window.addEventListener("aziel:admin-auth-ready", () => {
-        trace("AUTH_READY_EVENT");
-        const section = document.getElementById("section-pricing-engine");
-        if (section?.dataset.pricingEngineBound === "true") requestProductionLoad(section, "admin-auth-ready");
-    });
-
-    function initPricingEngineUi() {
-        trace("ENTER initPricingEngineUi");
-        const section = document.getElementById("section-pricing-engine");
-        if (!section || section.dataset.pricingEngineBound === "true") return;
-        section.dataset.pricingEngineBound = "true";
-        section.addEventListener("click", handleSectionClick);
-        section.addEventListener("input", handleWorkspaceInput);
-        section.addEventListener("change", handleWorkspaceChange);
-        section.addEventListener("keydown", handleWorkspaceKeydown);
-        section.addEventListener("dblclick", handleWorkspaceDoubleClick);
-        section.querySelector("#pricingProductSearch")?.addEventListener("input", event => filterProducts(section, event.target.value || ""));
-        section.querySelector("#pricingScopeSelector")?.addEventListener("change", () => calculateAndRenderPreview(section));
-        hydrateFallbackProductsFromDom(section);
-        requestProductionLoad(section, "dom-ready");
-        trace("EXIT initPricingEngineUi");
-    }
-
-    function handleSectionClick(event) {
-        const section = event.currentTarget;
-        const productButton = event.target.closest("[data-pricing-product-id]");
-        if (productButton && section.contains(productButton)) {
-            event.preventDefault();
-            selectProduct(section, productButton.dataset.pricingProductId, productButton.dataset.pricingPackageId);
-            return;
-        }
-        const editButton = event.target.closest("[data-pricing-edit]");
-        if (editButton && section.contains(editButton)) {
-            event.preventDefault();
-            editDraftValue(section, editButton.dataset.pricingEdit);
-            return;
-        }
-        const saveButton = event.target.closest("#pricingSaveDraftBtn");
-        if (saveButton && section.contains(saveButton)) {
-            event.preventDefault();
-            saveDraft(section);
-            return;
-        }
-        const publishButton = event.target.closest("#pricingPublishBtn");
-        if (publishButton && section.contains(publishButton)) {
-            event.preventDefault();
-            publishDraft(section);
-            return;
-        }
-        const retryButton = event.target.closest("#pricingRetryLoadBtn");
-        if (retryButton && section.contains(retryButton)) {
-            event.preventDefault();
-            requestProductionLoad(section, "retry");
-            return;
-        }
-        const pasteButton = event.target.closest("#pricingPasteBtn");
-        if (pasteButton && section.contains(pasteButton)) {
-            event.preventDefault();
-            togglePanel(section, "#pricingPastePanel", true);
-            return;
-        }
-        const pasteClose = event.target.closest("#pricingPasteCloseBtn");
-        if (pasteClose && section.contains(pasteClose)) {
-            event.preventDefault();
-            togglePanel(section, "#pricingPastePanel", false);
-            return;
-        }
-        const parsePaste = event.target.closest("#pricingParsePasteBtn");
-        if (parsePaste && section.contains(parsePaste)) {
-            event.preventDefault();
-            parseWorkspacePaste(section);
-            return;
-        }
-        const reviewButton = event.target.closest("#pricingReviewBtn");
-        if (reviewButton && section.contains(reviewButton)) {
-            event.preventDefault();
-            renderWorkspaceReview(section, true);
-            return;
-        }
-        const reviewClose = event.target.closest("#pricingReviewCloseBtn");
-        if (reviewClose && section.contains(reviewClose)) {
-            event.preventDefault();
-            togglePanel(section, "#pricingReviewPanel", false);
-            return;
-        }
-        const publishSelected = event.target.closest("#pricingWorkspacePublishSelectedBtn");
-        if (publishSelected && section.contains(publishSelected)) {
-            event.preventDefault();
-            publishWorkspace(section, false);
-            return;
-        }
-        const publishAll = event.target.closest("#pricingWorkspacePublishAllBtn");
-        if (publishAll && section.contains(publishAll)) {
-            event.preventDefault();
-            publishWorkspace(section, true);
-            return;
-        }
-        const detailClose = event.target.closest("#pricingWorkspaceDetailClose");
-        if (detailClose && section.contains(detailClose)) {
-            event.preventDefault();
-            clearWorkspaceDetail(section);
-            return;
-        }
-        const costAction = event.target.closest("[data-pricing-cost-action]");
-        if (costAction && section.contains(costAction)) {
-            event.preventDefault();
-            activateCostEditor(section, costAction.dataset.pricingCostAction);
-            return;
-        }
-        const detailButton = event.target.closest("[data-pricing-workspace-row]");
-        if (detailButton && section.contains(detailButton)) {
-            const interactive = event.target.closest("input, button, select, textarea, a");
-            if (!interactive || interactive === detailButton) {
-                state.workspace.selectedRowId = detailButton.dataset.pricingWorkspaceRow;
-                const row = state.workspace.rows.find(item => item.rowId === state.workspace.selectedRowId);
-                state.workspace.selectedPackageId = row ? workspacePackageId(row) : "";
-                renderWorkspaceGrid(section);
-                renderWorkspaceDetail(section);
-            }
-        }
-    }
-
-    function handleWorkspaceDoubleClick(event) {
-        const section = event.currentTarget;
-        const costCell = event.target.closest("[data-pricing-cost-cell]");
-        if (!costCell || !section.contains(costCell)) return;
-        event.preventDefault();
-        activateCostEditor(section, costCell.dataset.pricingCostCell);
-    }
-
-    function handleWorkspaceKeydown(event) {
-        const section = event.currentTarget;
-        const costInput = event.target.closest("[data-pricing-cost-input]");
-        if (costInput && section.contains(costInput)) {
-            if (event.key === "Enter") {
-                event.preventDefault();
-                moveCostEditor(section, event.shiftKey ? -1 : 1);
-                return;
-            }
-            if (event.key === "Escape") {
-                event.preventDefault();
-                cancelCostEditor(section);
-                return;
-            }
-        }
-        if (event.key !== "Enter") return;
-        const row = event.target.closest("[data-pricing-workspace-row]");
-        if (!row || !section.contains(row)) return;
-        const interactive = event.target.closest("input, button, select, textarea, a");
-        if (interactive) return;
-        event.preventDefault();
-        activateCostEditor(section, row.dataset.pricingWorkspaceRow);
-    }
-
-    function escapeHTML(value) {
-        return String(value ?? "").replace(/[&<>"']/g, char => ({
-            "&": "&amp;",
-            "<": "&lt;",
-            ">": "&gt;",
-            '"': "&quot;",
-            "'": "&#39;"
-        }[char]));
-    }
-
-    function number(value, fallback = 0) {
-        const numeric = Number(value);
-        return Number.isFinite(numeric) ? numeric : fallback;
-    }
-
-    function parseOptionalPositiveAmount(value) {
-        if (value == null || String(value).trim() === "") return null;
-        const numeric = Number(value);
-        return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
-    }
-
-    function inputValue(value) {
-        return value == null || value === "" || !Number.isFinite(Number(value)) ? "" : String(value);
-    }
-
-    function displayCostValue(value) {
-        if (value == null || value === "" || !Number.isFinite(Number(value))) return "";
-        return new Intl.NumberFormat("en-US", {
-            minimumFractionDigits: String(value).includes(".") ? Math.min(String(value).split(".")[1].length, 6) : 0,
-            maximumFractionDigits: 6
-        }).format(Number(value));
-    }
-
-    function workspacePackageId(row = {}) {
-        const rowRegion = row.region ||
-            row.draftRegion ||
-            (Array.isArray(row.regions) && row.regions[0]?.region) ||
-            (state.workspace.regionView !== "ALL" ? state.workspace.regionView : row.supportedRegions?.[0]) ||
-            "TH";
-        return `${slug(row.productCode)}:${String(rowRegion).toUpperCase()}:${String(row.packageCode || row.packageId || "").trim()}`;
-    }
-
-    function workspaceRegion() {
-        return state.workspace.selectedRegion || state.workspace.regionView || "TH";
-    }
-
-    function stagedRows() {
-        return [...state.workspace.stagedChangesByPackageId.values()];
-    }
-
-    function previewForPackageId(packageId) {
-        return state.workspace.previewResultsByPackageId.get(packageId) || null;
-    }
-
-    function isRowStaged(row) {
-        return state.workspace.stagedChangesByPackageId.has(workspacePackageId(row));
-    }
-
-    function clearWorkspaceDetail(section) {
-        state.workspace.selectedRowId = "";
-        state.workspace.selectedPackageId = "";
-        state.workspace.selectedPackageDetail = null;
-        renderWorkspaceGrid(section);
-    }
-
-    function activateCostEditor(section, rowId) {
-        const row = state.workspace.rows.find(item => item.rowId === rowId);
-        if (!row) return;
-        state.workspace.editingCostRowId = rowId;
-        state.workspace.editingOriginalCost = row.newSupplierCost;
-        state.workspace.selectedRowId = rowId;
-        state.workspace.selectedPackageId = workspacePackageId(row);
-        renderWorkspaceGrid(section);
-        window.requestAnimationFrame(() => {
-            const input = [...section.querySelectorAll("[data-pricing-cost-input]")]
-                .find(item => item.dataset.pricingCostInput === rowId);
-            input?.focus();
-            input?.select();
-        });
-    }
-
-    function cancelCostEditor(section) {
-        const row = state.workspace.rows.find(item => item.rowId === state.workspace.editingCostRowId);
-        if (row) {
-            stageWorkspaceRow(row, state.workspace.editingOriginalCost);
-        }
-        state.workspace.editingCostRowId = "";
-        state.workspace.editingOriginalCost = null;
-        renderWorkspaceGrid(section);
-        scheduleWorkspacePreview(section);
-    }
-
-    function moveCostEditor(section, direction) {
-        const rows = workspaceRowsForRender();
-        const currentIndex = rows.findIndex(row => row.rowId === state.workspace.editingCostRowId);
-        const nextRow = rows[currentIndex + direction];
-        state.workspace.editingCostRowId = "";
-        state.workspace.editingOriginalCost = null;
-        renderWorkspaceGrid(section);
-        if (nextRow) activateCostEditor(section, nextRow.rowId);
-    }
-
-    function slug(value) {
-        return String(value || "")
-            .trim()
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/^-+|-+$/g, "");
-    }
-
-    function positiveAmount(value, field) {
-        const numeric = number(value, NaN);
-        if (!Number.isFinite(numeric) || numeric <= 0) throw new Error(`Failed to calculate preview: ${field} missing or invalid.`);
-        return numeric;
-    }
-
-    function policyKey(region, currency) {
-        return `${String(region || "").toUpperCase()}:${String(currency || "").toUpperCase()}`;
-    }
-
-    function neutralConfig(region = "TH") {
-        return {
-            exchangeRate: String(region).toUpperCase() === "MM" ? 118 : 1,
-            supplierFee: { enabled: false, type: "PERCENT", value: 0 },
-            businessCost: { enabled: false, type: "FIXED", value: 0 },
-            gatewayFee: { enabled: false, type: "PERCENT", value: 0 },
-            platformCost: { enabled: false, type: "FIXED", value: 0 },
-            tax: { enabled: false, type: "PERCENT", value: 0 },
-            profitRule: { type: "PERCENT", value: 0 },
-            roundingRule: { enabled: false, mode: "NONE", increment: 0, psychologicalEnding: 0 }
-        };
-    }
-
-    function clone(value) {
-        return JSON.parse(JSON.stringify(value || {}));
-    }
-
-    function normalizeConfig(config, region) {
-        const fallback = neutralConfig(region);
-        const money = (rule, base, defaultType = "FIXED") => ({
-            enabled: rule?.enabled === true,
-            type: String(rule?.type || base?.type || defaultType).toUpperCase() === "PERCENT" ? "PERCENT" : "FIXED",
-            value: Math.max(0, number(rule?.value, number(base?.value, 0)))
-        });
-        const profit = config?.profitRule || fallback.profitRule;
-        const rounding = config?.roundingRule || fallback.roundingRule;
-        return {
-            exchangeRate: Math.max(0, number(config?.exchangeRate, fallback.exchangeRate)),
-            supplierFee: money(config?.supplierFee, fallback.supplierFee, "PERCENT"),
-            businessCost: money(config?.businessCost, fallback.businessCost, "FIXED"),
-            gatewayFee: money(config?.gatewayFee, fallback.gatewayFee, "PERCENT"),
-            platformCost: money(config?.platformCost, fallback.platformCost, "FIXED"),
-            tax: money(config?.tax, fallback.tax, "PERCENT"),
-            profitRule: {
-                type: String(profit?.type || "PERCENT").toUpperCase() === "FIXED" ? "FIXED" : "PERCENT",
-                value: Math.max(0, number(profit?.value, 0))
-            },
-            roundingRule: {
-                enabled: rounding?.enabled === true,
-                mode: ["NONE", "NEAREST", "UP", "DOWN", "PSYCHOLOGICAL"].includes(String(rounding?.mode || "NONE").toUpperCase()) ? String(rounding?.mode || "NONE").toUpperCase() : "NONE",
-                increment: Math.max(0, number(rounding?.increment, 0)),
-                psychologicalEnding: Math.max(0, number(rounding?.psychologicalEnding, 0))
-            }
-        };
-    }
-
-    function getSelectedProduct() {
-        return state.products.find(product => product.productId === state.selectedProductId) || state.products[0] || FALLBACK_PRODUCT;
-    }
-
-    function getSelectedPackage() {
-        const product = getSelectedProduct();
-        return product.packages.find(pkg => pkg.packageId === state.selectedPackageId) || product.packages[0] || FALLBACK_PRODUCT.packages[0];
-    }
-
-    function hasValidSelection() {
-        const product = state.products.find(item => item.productId === state.selectedProductId);
-        return Boolean(product?.packages?.some(pkg => pkg.packageId === state.selectedPackageId));
-    }
-
-    function canPersistPricing() {
-        return state.apiReady === true &&
-            state.productSource === "server" &&
-            hasValidSelection() &&
-            Boolean(state.preview) &&
-            !state.previewError &&
-            !state.loading &&
-            !state.calculating &&
-            !state.saving &&
-            !state.publishing;
-    }
-
-    function canSaveDraftPricing() {
-        return state.apiReady === true &&
-            state.productSource === "server" &&
-            hasValidSelection() &&
-            !state.loading &&
-            !state.saving &&
-            !state.publishing;
-    }
-
-    function getDraftPolicy(region, currency) {
-        const key = policyKey(region, currency);
-        if (!state.draftPolicy.has(key)) {
-            state.draftPolicy.set(key, {
-                region,
-                currency,
-                config: neutralConfig(region)
-            });
-        }
-        return state.draftPolicy.get(key);
-    }
-
-    async function pricingFetch(url, options = {}, timeoutMs = 20000) {
+    async function pricingFetch(url, options = {}) {
         const token = localStorage.getItem("adminToken") || "";
         if (!token) throw new Error("Admin session missing.");
-        const useTimeout = Number.isFinite(Number(timeoutMs)) && Number(timeoutMs) > 0;
-        const controller = useTimeout ? new AbortController() : null;
-        const timeout = useTimeout ? window.setTimeout(() => controller.abort(), timeoutMs) : null;
-        trace("FETCH started", { url, timeoutMs });
-        try {
-            const response = await fetch(url, {
-                ...options,
-                cache: options.cache || "no-store",
-                signal: controller?.signal,
-                headers: {
-                    ...(options.headers || {}),
-                    Authorization: `Bearer ${token}`
+        const response = await fetch(url, {
+            ...options,
+            cache: "no-store",
+            headers: { "Content-Type": "application/json", ...(options.headers || {}), Authorization: `Bearer ${token}` }
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok || body.success === false) throw new Error(body.message || body.code || "Pricing request failed.");
+        return body;
+    }
+
+    function policyConfig(region, source = "draft") {
+        const item = (source === "settings" ? settings.policies : daily.policies).find(policy => policy.region === region);
+        return structuredClone(item?.draft?.config || item?.active?.config || {});
+    }
+
+    function policyPayload(policies) {
+        return policies.map(item => ({
+            region: item.region,
+            currency: item.currency,
+            config: structuredClone(item.draft?.config || item.active?.config || {})
+        }));
+    }
+
+    function eligibleSuppliers() {
+        return daily.suppliers.filter(supplier => supplier.enabled !== false &&
+            (!supplier.supportedRegions?.length || daily.region === "ALL" || supplier.supportedRegions.includes(daily.region)) &&
+            ["MMK", "THB"].includes(upper(supplier.supplierCurrency)));
+    }
+
+    function activeSupplier() {
+        return daily.suppliers.find(supplier => String(supplier.id || supplier.supplierId || supplier._id) === daily.supplierId) || null;
+    }
+
+    function regionRows() {
+        const rows = new Map();
+        daily.products.filter(product => !daily.selectedProductId || product.productId === daily.selectedProductId).forEach(product => {
+            (product.packages || []).forEach(pkg => {
+                const key = `${upper(product.productCode)}:${upper(pkg.packageCode)}`;
+                if (!rows.has(key)) rows.set(key, { ...pkg, productName: product.productName, productCode: product.productCode, regionalRows: {} });
+                const row = rows.get(key);
+                row.regionalRows[upper(pkg.region)] = pkg;
+                if (pkg.savedDraftSupplierCost != null) {
+                    row.savedDraftSupplierCost = pkg.savedDraftSupplierCost;
+                    row.savedDraftSupplierId = pkg.savedDraftSupplierId;
+                    row.savedDraftSupplierCurrency = pkg.savedDraftSupplierCurrency;
+                }
+                if (row.publishedSupplierPrice == null && pkg.publishedSupplierPrice != null) {
+                    row.publishedSupplierPrice = pkg.publishedSupplierPrice;
+                    row.publishedSupplierCurrency = pkg.publishedSupplierCurrency;
                 }
             });
-            trace("FETCH resolved", { url, status: response.status });
-            const contentType = response.headers.get("content-type") || "";
-            const body = contentType.includes("application/json")
-                ? await response.json().catch(() => ({}))
-                : { message: await response.text().catch(() => "") };
-            trace("JSON parsed", { url, success: body?.success !== false });
-            if (!response.ok || body?.success === false) {
-                const code = body?.code || body?.error || `HTTP_${response.status}`;
-                const message = body?.message || response.statusText || "Pricing request failed.";
-                throw new Error(`${code}: ${message}`);
-            }
-            return body;
-        } catch (error) {
-            if (error?.name === "AbortError") throw new Error("Request timed out. Please retry.");
-            throw error;
-        } finally {
-            if (timeout) window.clearTimeout(timeout);
-        }
-    }
-
-    function waitForAdminAuthReady(timeoutMs = 5000) {
-        if (!localStorage.getItem("adminToken")) return Promise.resolve();
-        if (!window.AZIEL_ADMIN_AUTH || window.AZIEL_ADMIN_AUTH.state?.loaded) return Promise.resolve();
-        trace("AUTH wait started", { timeoutMs });
-        return new Promise(resolve => {
-            let settled = false;
-            const finish = reason => {
-                if (settled) return;
-                settled = true;
-                window.removeEventListener("aziel:admin-auth-ready", onReady);
-                window.clearTimeout(timer);
-                trace("AUTH wait finished", { reason });
-                resolve();
-            };
-            const onReady = () => finish("event");
-            const timer = window.setTimeout(() => finish("timeout"), timeoutMs);
-            window.addEventListener("aziel:admin-auth-ready", onReady, { once: true });
         });
+        return [...rows.values()];
     }
 
-    function normalizeProducts(data) {
-        const raw = Array.isArray(data?.products) && data.products.length ? data.products : [FALLBACK_PRODUCT];
-        if (raw.some(product => Array.isArray(product.packages))) {
-            return raw.map(product => ({
-                productId: slug(product.productId || product.productCode || product.productName || ""),
-                productCode: slug(product.productCode || product.productId || product.productName || ""),
-                productName: product.productName || product.productCode || "Product",
-                enabled: product.enabled !== false,
-                supportedRegions: Array.isArray(product.supportedRegions) ? product.supportedRegions.map(region => String(region).toUpperCase()) : [],
-                packages: (product.packages || []).map(normalizePackage).filter(Boolean)
-            })).filter(product => product.productId);
-        }
-        const grouped = new Map();
-        raw.map(normalizePackage).filter(Boolean).forEach(pkg => {
-            const productId = slug(pkg.productCode || pkg.productName || "product");
-            if (!grouped.has(productId)) {
-                grouped.set(productId, {
-                    productId,
-                    productCode: pkg.productCode,
-                    productName: pkg.productName,
-                    packages: []
-                });
-            }
-            grouped.get(productId).packages.push(pkg);
-        });
-        return [...grouped.values()];
+    function regionProducts() {
+        return daily.products.filter(product => (product.packages || []).some(pkg => pkg.packageEnabled !== false && pkg.priceEnabled !== false));
     }
 
-    function normalizePackage(pkg) {
-        if (!pkg) return null;
-        const supplierPrice = number(pkg.supplierPrice ?? pkg.supplierCost, NaN);
-        return {
-            packageId: String(pkg.packageId || pkg.packageRef || pkg.packageCode || "").trim(),
-            packageCode: String(pkg.packageCode || pkg.packageId || "").trim(),
-            packageName: String(pkg.packageName || pkg.name || pkg.packageCode || "Package").trim(),
-            productCode: slug(pkg.productCode || pkg.productId || pkg.productName || ""),
-            productName: String(pkg.productName || pkg.gameName || pkg.productCode || "Product").trim(),
-            packageEnabled: pkg.packageEnabled !== false,
-            priceEnabled: pkg.priceEnabled !== false,
-            region: String(pkg.region || "TH").toUpperCase(),
-            currency: String(pkg.currency || "THB").toUpperCase(),
-            supplierCurrency: String(pkg.supplierCurrency || pkg.currency || "THB").toUpperCase(),
-            supplierPrice: Number.isFinite(supplierPrice) ? supplierPrice : null,
-            supplierCostConfigured: pkg.supplierCostConfigured === true,
-            supplierCostSource: String(pkg.supplierCostSource || "").trim(),
-            supplierCostSources: pkg.supplierCostSources || {},
-            publishedSupplierPrice: number(pkg.publishedSupplierPrice, NaN),
-            publishedSupplierCurrency: String(pkg.publishedSupplierCurrency || pkg.supplierCurrency || pkg.currency || "THB").toUpperCase(),
-            publishedSupplierName: String(pkg.publishedSupplierName || "").trim(),
-            publishedSupplierVersion: String(pkg.publishedSupplierVersion || "").trim(),
-            publishedSupplierCostTimestamp: pkg.publishedSupplierCostTimestamp || "",
-            publishedSupplierCostConfigured: pkg.publishedSupplierCostConfigured === true,
-            publishedSupplierCostSource: String(pkg.publishedSupplierCostSource || "").trim(),
-            savedDraftSupplierCost: number(pkg.savedDraftSupplierCost, NaN),
-            savedDraftSupplierCurrency: String(pkg.savedDraftSupplierCurrency || "").toUpperCase(),
-            savedDraftSupplierName: String(pkg.savedDraftSupplierName || "").trim(),
-            savedDraftSupplierVersion: String(pkg.savedDraftSupplierVersion || "").trim(),
-            savedDraftSupplierCostTimestamp: pkg.savedDraftSupplierCostTimestamp || "",
-            savedDraftSupplierCostConfigured: pkg.savedDraftSupplierCostConfigured === true,
-            savedDraftId: String(pkg.savedDraftId || "").trim(),
-            savedDraftVersion: pkg.savedDraftVersion || null,
-            supplierPackageCode: String(pkg.supplierPackageCode || pkg.supplierCode || pkg.packageCode || "").trim(),
-            supplierName: String(pkg.supplierName || "").trim(),
-            supplierVersion: String(pkg.supplierVersion || "").trim(),
-            supplierCostTimestamp: pkg.supplierCostTimestamp || "",
-            publishedPrice: number(pkg.publishedPrice ?? pkg.amount, supplierPrice),
-            publishedPriceMode: String(pkg.publishedPriceMode || "LEGACY_COMPATIBILITY_PRICE").toUpperCase(),
-            manualOverrideReason: String(pkg.manualOverrideReason || "").trim(),
-            updatedAt: pkg.updatedAt || "",
-            exchangeRate: Math.max(0, number(pkg.exchangeRate, 1))
-        };
+    function renderProductSelect() {
+        const select = $("pricingProductSelect");
+        if (!select) return;
+        const products = regionProducts();
+        if (!products.some(product => product.productId === daily.selectedProductId)) daily.selectedProductId = products[0]?.productId || "";
+        select.innerHTML = products.length
+            ? products.map(product => `<option value="${product.productId}">${text(product.productName)}</option>`).join("")
+            : '<option value="">No products available</option>';
+        select.value = daily.selectedProductId;
     }
 
-    function normalizeDomProductRow(row) {
-        if (!row) return null;
-        const productName = String(row.dataset.pricingProduct || row.querySelector("strong")?.textContent || "").trim();
-        const productId = String(row.dataset.pricingProductId || row.dataset.pricingProductCode || slug(productName)).trim();
-        const packageId = String(row.dataset.pricingPackageId || row.dataset.pricingPackage || "").trim();
-        const supplierPrice = number(row.dataset.pricingSupplierPrice, NaN);
-        if (!productId || !packageId || !Number.isFinite(supplierPrice)) return null;
-        return {
-            productId,
-            productCode: slug(row.dataset.pricingProductCode || productId),
-            productName: productName || productId,
-            packages: [{
-                packageId,
-                packageCode: String(row.dataset.pricingPackageCode || packageId).trim(),
-                packageName: String(row.dataset.pricingPackage || row.querySelector("small")?.textContent || packageId).trim(),
-                productCode: slug(row.dataset.pricingProductCode || productId),
-                productName: productName || productId,
-                region: String(row.dataset.pricingRegion || "TH").toUpperCase(),
-                currency: String(row.dataset.pricingCurrency || "THB").toUpperCase(),
-                supplierCurrency: String(row.dataset.pricingSupplierCurrency || row.dataset.pricingCurrency || "THB").toUpperCase(),
-                supplierPrice,
-                publishedPrice: number(row.dataset.pricingPublishedPrice, supplierPrice),
-                publishedPriceMode: String(row.dataset.pricingPublishedPriceMode || "LEGACY_COMPATIBILITY_PRICE").toUpperCase(),
-                manualOverrideReason: String(row.dataset.pricingManualOverrideReason || "").trim(),
-                updatedAt: row.dataset.pricingUpdatedAt || "",
-                exchangeRate: Math.max(0, number(row.dataset.pricingExchangeRate, 1))
-            }]
-        };
-    }
-
-    function hydrateFallbackProductsFromDom(section) {
-        if (!section || state.products.length) return;
-        const rows = Array.from(section.querySelectorAll("#pricingProductList [data-pricing-product-id]"));
-        const products = rows.map(normalizeDomProductRow).filter(Boolean);
-        if (!products.length) return;
-        const selectedRow = rows.find(row => row.classList.contains("active"));
-        state.products = products;
-        state.productSource = "fallback";
-        state.selectedProductId = selectedRow?.dataset.pricingProductId || products[0].productId;
-        const selectedProduct = getSelectedProduct();
-        state.selectedPackageId = selectedRow?.dataset.pricingPackageId || selectedProduct.packages[0]?.packageId || "";
-        renderProducts(section);
-        calculateAndRenderPreview(section);
-    }
-
-    function preserveSelectionOrDefault(previousProductId = "", previousPackageId = "") {
-        const product = state.products.find(item => item.productId === previousProductId);
-        if (product) {
-            state.selectedProductId = product.productId;
-            const pkg = product.packages.find(item => item.packageId === previousPackageId);
-            state.selectedPackageId = pkg?.packageId || product.packages[0]?.packageId || "";
-            return;
-        }
-        const firstProduct = state.products.find(item => item.packages?.length) || state.products[0] || FALLBACK_PRODUCT;
-        state.selectedProductId = firstProduct.productId;
-        state.selectedPackageId = firstProduct.packages[0]?.packageId || "";
-    }
-
-    function requestProductionLoad(section, reason = "manual") {
-        if (!section) return Promise.resolve();
-        if (state.loadPromise) {
-            trace("LOAD joined existing promise", { reason });
-            return state.loadPromise;
-        }
-        state.loadPromise = loadProductionState(section, reason).finally(() => {
-            state.loadPromise = null;
-        });
-        return state.loadPromise;
-    }
-
-    async function loadProductionState(section, reason = "manual") {
-        if (state.loading) return state.loadPromise || Promise.resolve();
-        trace("ENTER loadProductionState", { reason });
-        hydrateFallbackProductsFromDom(section);
-        state.loading = true;
-        state.loadError = "";
-        setStatus(section, "Loading production pricing...");
-        renderButtons(section);
-        try {
-            await waitForAdminAuthReady();
-            const data = await pricingFetch("/api/admin/pricing-engine", {}, 0);
-            trace("STATE populate started");
-            state.products = normalizeProducts(data);
-            state.productSource = "server";
-            state.apiReady = true;
-            state.activeVersion = data.version || null;
-            state.affected = data.affected || null;
-            state.activePolicy.clear();
-            state.draftPolicy.clear();
-            (data.policies || []).forEach(item => {
-                const region = item.region || item.active?.region || item.draft?.region;
-                const currency = item.currency || item.active?.currency || item.draft?.currency;
-                if (!region || !currency) return;
-                state.activePolicy.set(policyKey(region, currency), {
-                    region,
-                    currency,
-                    config: normalizeConfig(item.active?.config, region),
-                    source: item.active?.source || "active"
-                });
-                state.draftPolicy.set(policyKey(region, currency), {
-                    region,
-                    currency,
-                    config: normalizeConfig((item.draft?.config || item.active?.config), region),
-                    source: item.draft?.source || "active-copy"
-                });
-            });
-            preserveSelectionOrDefault(state.selectedProductId, state.selectedPackageId);
-            state.dirty = false;
-            state.loadError = "";
-            trace("STATE populated", { productCount: state.products.length, packageCount: state.products.reduce((sum, item) => sum + item.packages.length, 0) });
-            trace("RENDER products started");
-            renderProducts(section);
-            buildWorkspaceRows(section);
-            renderWorkspaceControls(section);
-            renderWorkspaceGrid(section);
-            requestWorkspacePreview(section);
-            trace("RENDER products finished");
-            trace("PREVIEW started");
-            calculateAndRenderPreview(section);
-            trace("PREVIEW finished");
-        } catch (error) {
-            state.apiReady = false;
-            state.loadError = `Failed to load pricing: ${error.message}`;
-            if (state.products.length) {
-                calculateAndRenderPreview(section);
-                renderLoadError(section, `${state.loadError} Product selection and local preview remain available. Save and Publish are disabled until production pricing loads.`);
-            } else {
-                renderLoadError(section, state.loadError);
-            }
-            setStatus(section, "Pricing workspace failed to load");
-            trace("LOAD failed", { message: error.message });
-        } finally {
-            state.loading = false;
-            renderButtons(section);
-            renderStatus(section);
-            trace("RENDER finished");
-        }
-    }
-
-    function renderProducts(section) {
-        const list = section.querySelector("#pricingProductList");
-        if (!list) return;
-        if (!state.products.length) {
-            list.innerHTML = '<p class="empty">No catalog packages available for pricing.</p>';
-            return;
-        }
-        list.innerHTML = state.products.map(product => {
-            const defaultPackage = product.packages[0];
-            const selected = product.productId === state.selectedProductId;
-            const hasPackages = Boolean(defaultPackage);
-            return `
-                <button class="catalog-product-row pricing-product-row ${selected ? "active" : ""}" type="button"
-                    aria-pressed="${selected ? "true" : "false"}"
-                    data-pricing-product-id="${escapeHTML(product.productId)}"
-                    data-pricing-package-id="${escapeHTML(defaultPackage?.packageId || "")}"
-                    data-pricing-product="${escapeHTML(product.productName)}"
-                    data-pricing-package="${escapeHTML(defaultPackage?.packageName || "")}">
-                    <span>
-                        <strong>${escapeHTML(product.productName)}</strong>
-                        <small>${escapeHTML(defaultPackage?.packageName || "No pricing packages configured")}</small>
-                    </span>
-                    <span class="catalog-row-meta">
-                        <b>${escapeHTML(defaultPackage?.packageCode || product.productCode)}</b>
-                        <small>${hasPackages ? `${escapeHTML(defaultPackage.region)} / ${escapeHTML(defaultPackage.currency)}` : "Catalog product"}</small>
-                    </span>
-                </button>
-            `;
-        }).join("");
-    }
-
-    function selectProduct(section, productId, packageId = "") {
-        const product = state.products.find(item => item.productId === productId);
-        if (!product) {
-            state.preview = null;
-            state.previewError = `Product context unavailable: ${productId || "unknown"}.`;
-            renderError(section, state.previewError);
-            renderButtons(section);
-            return;
-        }
-        state.selectedProductId = product.productId;
-        state.selectedPackageId = packageId || product.packages[0]?.packageId || "";
-        state.previewError = "";
-        renderProducts(section);
-        if (product.packages.length) {
-            calculateAndRenderPreview(section);
-        } else {
-            state.preview = null;
-            renderLoadError(section, "This catalog product has no pricing packages configured yet.");
-        }
-    }
-
-    function filterProducts(section, query) {
-        const normalized = query.trim().toLowerCase();
-        section.querySelectorAll("[data-pricing-product-id]").forEach(row => {
-            const haystack = `${row.dataset.pricingProduct || ""} ${row.dataset.pricingPackage || ""} ${row.textContent || ""}`.toLowerCase();
-            row.hidden = Boolean(normalized) && !haystack.includes(normalized);
-        });
-    }
-
-    function finiteOrNull(value) {
-        return Number.isFinite(Number(value)) ? Number(value) : null;
-    }
-
-    function supplierCostRegion(row) {
-        if (state.workspace.regionView !== "ALL" && row.supportedRegions?.includes(state.workspace.regionView)) {
-            return state.workspace.regionView;
-        }
-        return row.supportedRegions?.[0] || "TH";
-    }
-
-    function applyRegionalSupplierCost(row) {
-        const region = supplierCostRegion(row);
-        const publishedCost = finiteOrNull(row.publishedSupplierCostsByRegion?.[region]);
-        const savedDraftCost = finiteOrNull(row.savedDraftSupplierCostsByRegion?.[region]);
-        const hasSavedDraft = savedDraftCost != null;
-        const hasPublished = publishedCost != null;
-        const supplierCurrency = hasSavedDraft
-            ? row.savedDraftSupplierCurrenciesByRegion?.[region]
-            : row.publishedSupplierCurrenciesByRegion?.[region];
-        row.oldSupplierCost = hasPublished ? publishedCost : null;
-        row.newSupplierCost = hasSavedDraft ? savedDraftCost : hasPublished ? publishedCost : null;
-        row.supplierCurrency = supplierCurrency || (region === "TH" ? "THB" : state.workspace.supplierCurrency || "THB");
-        row.supplierName = hasSavedDraft
-            ? row.savedDraftSupplierNamesByRegion?.[region] || row.supplierName || "Primary supplier"
-            : row.publishedSupplierNamesByRegion?.[region] || row.supplierName || "";
-        row.supplierVersion = hasSavedDraft
-            ? row.savedDraftSupplierVersionsByRegion?.[region] || row.supplierVersion || ""
-            : row.publishedSupplierVersionsByRegion?.[region] || row.supplierVersion || "";
-        row.supplierCostTimestamp = hasSavedDraft
-            ? row.savedDraftSupplierTimestampsByRegion?.[region] || row.supplierCostTimestamp || ""
-            : row.publishedSupplierTimestampsByRegion?.[region] || row.supplierCostTimestamp || "";
-        row.savedDraftSupplierCostConfigured = hasSavedDraft;
-        row.draftRegion = region;
-        row.supplierCostConfigured = hasSavedDraft || hasPublished;
-        row.supplierCostSource = hasSavedDraft ? "saved_draft" : hasPublished ? "published" : "legacy_compatibility";
-        row.selected = hasSavedDraft;
-        row.changed = hasSavedDraft;
-        row.status = hasSavedDraft ? "Saved Draft" : "Unchanged";
-        return row;
-    }
-
-    function flattenWorkspacePackages() {
-        const byPackage = new Map();
-        state.products.forEach(product => {
-            product.packages.forEach(pkg => {
-                const key = `${product.productCode}:${pkg.packageCode}`;
-                const existing = byPackage.get(key);
-                if (!existing) {
-                    const publishedCost = pkg.publishedSupplierCostConfigured === true && Number.isFinite(pkg.publishedSupplierPrice)
-                        ? pkg.publishedSupplierPrice
-                        : null;
-                    const savedDraftCost = pkg.savedDraftSupplierCostConfigured === true && Number.isFinite(pkg.savedDraftSupplierCost)
-                        ? pkg.savedDraftSupplierCost
-                        : null;
-                    byPackage.set(key, {
-                        rowId: key,
-                        productCode: product.productCode,
-                        productName: product.productName,
-                        packageCode: pkg.packageCode,
-                        packageId: pkg.packageId,
-                        packageName: pkg.packageName,
-                        supplierPackageCode: pkg.supplierPackageCode || pkg.packageCode,
-                        oldSupplierCost: null,
-                        newSupplierCost: null,
-                        supplierCurrency: pkg.supplierCurrency || "THB",
-                        supplierName: pkg.supplierName || "",
-                        supplierVersion: pkg.supplierVersion || "",
-                        supplierCostTimestamp: pkg.supplierCostTimestamp || "",
-                        expectedUpdatedAt: pkg.updatedAt || "",
-                        publishedPriceMode: pkg.publishedPriceMode,
-                        manualOverrideReason: pkg.manualOverrideReason,
-                        publishedPricesByRegion: { [pkg.region]: pkg.publishedPrice },
-                        currenciesByRegion: { [pkg.region]: pkg.currency },
-                        publishedSupplierCostsByRegion: { [pkg.region]: publishedCost },
-                        publishedSupplierCurrenciesByRegion: { [pkg.region]: pkg.publishedSupplierCurrency || pkg.supplierCurrency || pkg.currency },
-                        publishedSupplierNamesByRegion: { [pkg.region]: pkg.publishedSupplierName || "" },
-                        publishedSupplierVersionsByRegion: { [pkg.region]: pkg.publishedSupplierVersion || "" },
-                        publishedSupplierTimestampsByRegion: { [pkg.region]: pkg.publishedSupplierCostTimestamp || "" },
-                        savedDraftSupplierCostsByRegion: { [pkg.region]: savedDraftCost },
-                        savedDraftSupplierCurrenciesByRegion: { [pkg.region]: pkg.savedDraftSupplierCurrency || "" },
-                        savedDraftSupplierNamesByRegion: { [pkg.region]: pkg.savedDraftSupplierName || "" },
-                        savedDraftSupplierVersionsByRegion: { [pkg.region]: pkg.savedDraftSupplierVersion || "" },
-                        savedDraftSupplierTimestampsByRegion: { [pkg.region]: pkg.savedDraftSupplierCostTimestamp || "" },
-                        supportedRegions: [pkg.region],
-                        packageEnabled: pkg.packageEnabled !== false,
-                        priceEnabledByRegion: { [pkg.region]: pkg.priceEnabled !== false },
-                        supplierCostConfigured: false,
-                        supplierCostSource: pkg.supplierCostSource || "",
-                        selected: false,
-                        changed: false,
-                        status: "Unchanged"
-                    });
-                    return;
-                }
-                if (!existing.expectedUpdatedAt && pkg.updatedAt) existing.expectedUpdatedAt = pkg.updatedAt;
-                if (!existing.supportedRegions.includes(pkg.region)) existing.supportedRegions.push(pkg.region);
-                existing.publishedPricesByRegion[pkg.region] = pkg.publishedPrice;
-                existing.currenciesByRegion[pkg.region] = pkg.currency;
-                existing.priceEnabledByRegion[pkg.region] = pkg.priceEnabled !== false;
-                existing.publishedSupplierCostsByRegion[pkg.region] = pkg.publishedSupplierCostConfigured === true && Number.isFinite(pkg.publishedSupplierPrice)
-                    ? pkg.publishedSupplierPrice
-                    : null;
-                existing.publishedSupplierCurrenciesByRegion[pkg.region] = pkg.publishedSupplierCurrency || pkg.supplierCurrency || pkg.currency;
-                existing.publishedSupplierNamesByRegion[pkg.region] = pkg.publishedSupplierName || "";
-                existing.publishedSupplierVersionsByRegion[pkg.region] = pkg.publishedSupplierVersion || "";
-                existing.publishedSupplierTimestampsByRegion[pkg.region] = pkg.publishedSupplierCostTimestamp || "";
-                existing.savedDraftSupplierCostsByRegion[pkg.region] = pkg.savedDraftSupplierCostConfigured === true && Number.isFinite(pkg.savedDraftSupplierCost)
-                    ? pkg.savedDraftSupplierCost
-                    : null;
-                existing.savedDraftSupplierCurrenciesByRegion[pkg.region] = pkg.savedDraftSupplierCurrency || "";
-                existing.savedDraftSupplierNamesByRegion[pkg.region] = pkg.savedDraftSupplierName || "";
-                existing.savedDraftSupplierVersionsByRegion[pkg.region] = pkg.savedDraftSupplierVersion || "";
-                existing.savedDraftSupplierTimestampsByRegion[pkg.region] = pkg.savedDraftSupplierCostTimestamp || "";
-                if (!existing.packageId && pkg.packageId) existing.packageId = pkg.packageId;
-                existing.packageEnabled = existing.packageEnabled && pkg.packageEnabled !== false;
-            });
-        });
-        return [...byPackage.values()].map(applyRegionalSupplierCost);
-    }
-
-    function buildWorkspaceRows(section) {
-        state.workspace.rows = flattenWorkspacePackages().map(row => {
-            const packageId = workspacePackageId(row);
-            const staged = state.workspace.stagedChangesByPackageId.get(packageId);
-            if (staged) return { ...row, ...staged, selected: true, changed: true, status: staged.status || "Edited" };
-            if (row.savedDraftSupplierCostConfigured) {
-                state.workspace.stagedChangesByPackageId.set(packageId, { ...row, selected: true, changed: true, status: "Saved Draft" });
-            }
-            return row;
-        });
-        if (!state.workspace.selectedProductId || state.workspace.productFilter === "ALL") {
-            const selectedProduct = state.products.find(product => product.productId === state.selectedProductId);
-            const firstWithRows = state.products.find(product => state.workspace.rows.some(row => row.productCode === product.productCode));
-            state.workspace.selectedProductId = selectedProduct?.productCode || firstWithRows?.productCode || "ALL";
-            state.workspace.productFilter = state.workspace.selectedProductId;
-        }
-        state.workspace.selectedRegion = state.workspace.regionView;
-        renderWorkspaceControls(section);
-    }
-
-    function stageWorkspaceRow(row, nextCost) {
-        const packageId = workspacePackageId(row);
-        if (nextCost == null || nextCost === row.oldSupplierCost) {
-            state.workspace.stagedChangesByPackageId.delete(packageId);
-            state.workspace.previewResultsByPackageId.delete(packageId);
-            row.newSupplierCost = row.oldSupplierCost;
-            row.selected = false;
-            row.changed = false;
-            row.status = "Unchanged";
-            return;
-        }
-        const staged = {
-            ...row,
-            rowId: row.rowId,
-            packageId,
-            newSupplierCost: nextCost,
-            supplierCurrency: state.workspace.supplierCurrency,
-            supplierCostSource: "unsaved_stage",
-            draftRegion: supplierCostRegion(row),
-            selected: true,
-            changed: true,
-            status: "Unsaved Changes"
-        };
-        state.workspace.stagedChangesByPackageId.set(packageId, staged);
-        row.newSupplierCost = nextCost;
-        row.supplierCurrency = state.workspace.supplierCurrency;
-        row.selected = true;
-        row.changed = true;
-        row.supplierCostSource = "unsaved_stage";
-        row.status = "Unsaved Changes";
-    }
-
-    function clearPreviewForUnstagedRows() {
-        const stagedIds = new Set(state.workspace.stagedChangesByPackageId.keys());
-        [...state.workspace.previewResultsByPackageId.keys()].forEach(packageId => {
-            if (!stagedIds.has(packageId)) state.workspace.previewResultsByPackageId.delete(packageId);
-        });
-        state.workspace.previewRows = [...state.workspace.previewResultsByPackageId.values()];
-    }
-
-    function clearIncompatibleWorkspaceState() {
-        const selectedProduct = state.workspace.selectedProductId;
-        [...state.workspace.stagedChangesByPackageId.entries()].forEach(([packageId, row]) => {
-            if (selectedProduct !== "ALL" && row.productCode !== selectedProduct) {
-                state.workspace.stagedChangesByPackageId.delete(packageId);
-                state.workspace.previewResultsByPackageId.delete(packageId);
-            }
-        });
-        if (state.workspace.selectedRowId) {
-            const selectedRow = state.workspace.rows.find(row => row.rowId === state.workspace.selectedRowId);
-            if (!selectedRow || (selectedProduct !== "ALL" && selectedRow.productCode !== selectedProduct)) {
-                state.workspace.selectedRowId = "";
-                state.workspace.selectedPackageId = "";
-                state.workspace.selectedPackageDetail = null;
-            }
-        }
-        clearPreviewForUnstagedRows();
-    }
-
-    function handleWorkspaceInput(event) {
-        const section = event.currentTarget;
-        const costInput = event.target.closest("[data-pricing-cost-input]");
-        if (costInput && section.contains(costInput)) {
-            const row = state.workspace.rows.find(item => item.rowId === costInput.dataset.pricingCostInput);
-            if (!row) return;
-            stageWorkspaceRow(row, parseOptionalPositiveAmount(costInput.value));
-            state.workspace.selectedRowId = row.rowId;
-            state.workspace.selectedPackageId = workspacePackageId(row);
-            renderWorkspaceDetail(section);
-            scheduleWorkspacePreview(section);
-            return;
-        }
-        const supplierInput = event.target.closest("#pricingWorkspaceSupplier, #pricingWorkspaceVersion");
-        if (supplierInput && section.contains(supplierInput)) {
-            if (supplierInput.id === "pricingWorkspaceSupplier") state.workspace.selectedSupplier = supplierInput.value || "";
-            scheduleWorkspacePreview(section);
-        }
-    }
-
-    function handleWorkspaceChange(event) {
-        const section = event.currentTarget;
-        const checkbox = event.target.closest("[data-pricing-select-row]");
-        if (checkbox && section.contains(checkbox)) {
-            const row = state.workspace.rows.find(item => item.rowId === checkbox.dataset.pricingSelectRow);
-            if (row && isRowStaged(row)) {
-                const staged = state.workspace.stagedChangesByPackageId.get(workspacePackageId(row));
-                staged.selected = checkbox.checked;
-                row.selected = checkbox.checked;
-            } else if (row) {
-                row.selected = false;
-                checkbox.checked = false;
-            }
-            renderWorkspaceGrid(section);
-            renderWorkspaceReview(section, false);
-            return;
-        }
-        const currency = event.target.closest("#pricingWorkspaceCurrency");
-        if (currency && section.contains(currency)) {
-            if (state.workspace.regionView === "TH") {
-                currency.value = "THB";
-                state.workspace.supplierCurrency = "THB";
-                renderWorkspaceControls(section);
-                renderWorkspaceGrid(section);
-                return;
-            }
-            state.workspace.supplierCurrency = currency.value;
-            state.workspace.stagedChangesByPackageId.forEach(row => {
-                row.supplierCurrency = currency.value;
-            });
-            state.workspace.rows.forEach(row => {
-                if (isRowStaged(row)) row.supplierCurrency = currency.value;
-            });
-            renderWorkspaceControls(section);
-            renderWorkspaceGrid(section);
-            scheduleWorkspacePreview(section);
-            return;
-        }
-        const productFilter = event.target.closest("#pricingWorkspaceProduct");
-        if (productFilter && section.contains(productFilter)) {
-            state.workspace.selectedProductId = productFilter.value;
-            state.workspace.productFilter = productFilter.value;
-            clearIncompatibleWorkspaceState();
-            renderWorkspaceGrid(section);
-            return;
-        }
-        const regionView = event.target.closest("#pricingWorkspaceRegion");
-        if (regionView && section.contains(regionView)) {
-            state.workspace.regionView = regionView.value;
-            state.workspace.selectedRegion = regionView.value;
-            if (regionView.value === "TH") {
-                state.workspace.supplierCurrency = "THB";
-                state.workspace.stagedChangesByPackageId.forEach(row => {
-                    row.supplierCurrency = "THB";
-                });
-                state.workspace.rows.forEach(row => {
-                    if (isRowStaged(row)) row.supplierCurrency = "THB";
-                });
-            }
-            state.workspace.previewResultsByPackageId.clear();
-            state.workspace.previewRows = [];
-            buildWorkspaceRows(section);
-            renderWorkspaceControls(section);
-            renderWorkspaceGrid(section);
-            scheduleWorkspacePreview(section);
-            return;
-        }
-        const filter = event.target.closest("#pricingWorkspaceFilter");
-        if (filter && section.contains(filter)) {
-            state.workspace.filter = filter.value;
-            renderWorkspaceGrid(section);
-        }
-    }
-
-    function renderWorkspaceControls(section) {
-        const productSelect = section.querySelector("#pricingWorkspaceProduct");
-        if (productSelect) {
-            const current = state.workspace.productFilter || productSelect.value || "ALL";
-            productSelect.innerHTML = '<option value="ALL">All products</option>' + state.products.map(product => (
-                `<option value="${escapeHTML(product.productCode)}">${escapeHTML(product.productName)}</option>`
-            )).join("");
-            productSelect.value = [...productSelect.options].some(option => option.value === current) ? current : "ALL";
-            state.workspace.productFilter = productSelect.value;
-        }
-        const regionSelect = section.querySelector("#pricingWorkspaceRegion");
-        if (regionSelect && [...regionSelect.options].some(option => option.value === state.workspace.regionView)) {
-            regionSelect.value = state.workspace.regionView;
-        }
-        if (state.workspace.regionView === "TH") {
-            state.workspace.supplierCurrency = "THB";
-        }
-        const currencySelect = section.querySelector("#pricingWorkspaceCurrency");
-        if (currencySelect && [...currencySelect.options].some(option => option.value === state.workspace.supplierCurrency)) {
-            currencySelect.value = state.workspace.supplierCurrency;
-            currencySelect.disabled = state.workspace.regionView === "TH";
-            currencySelect.title = state.workspace.regionView === "TH"
-                ? "Thailand supplier costs are entered in THB"
-                : "";
-        }
-        const mmRate = section.querySelector("#pricingWorkspaceMmkRate");
-        if (mmRate) {
-            mmRate.textContent = `Supplier ${state.workspace.supplierCurrency || "THB"} → Selling MMK`;
-        }
-    }
-
-    function syncWorkspaceControlState(section) {
-        const regionSelect = section?.querySelector("#pricingWorkspaceRegion");
-        if (regionSelect?.value) {
-            state.workspace.regionView = regionSelect.value;
-            state.workspace.selectedRegion = regionSelect.value;
-        }
-        const currencySelect = section?.querySelector("#pricingWorkspaceCurrency");
-        if (state.workspace.regionView === "TH") {
-            state.workspace.supplierCurrency = "THB";
-            if (currencySelect) currencySelect.value = "THB";
-            return;
-        }
-        if (currencySelect?.value) {
-            state.workspace.supplierCurrency = currencySelect.value;
-        }
-    }
-
-    function workspaceRowsForRender() {
-        return state.workspace.rows.filter(row => {
-            if (state.workspace.productFilter !== "ALL" && row.productCode !== state.workspace.productFilter) return false;
-            if (state.workspace.regionView !== "ALL" && !row.supportedRegions?.includes(state.workspace.regionView)) return false;
-            const preview = previewForPackageId(workspacePackageId(row));
-            const status = preview?.status || row.status || "Unchanged";
-            if (state.workspace.filter === "ALL") return true;
-            if (state.workspace.filter === "CHANGED") return isRowStaged(row);
-            if (state.workspace.filter === "READY") return status === "Ready";
-            if (state.workspace.filter === "BLOCKED") return status === "Blocked";
-            if (state.workspace.filter === "LOW_MARGIN") return preview?.regions?.some(item => item.supplierCostConfigured === true && item.profitabilityStatus === "LOW_MARGIN");
-            if (state.workspace.filter === "NEGATIVE_MARGIN") return preview?.regions?.some(item => item.supplierCostConfigured === true && /NEGATIVE|BELOW_COST/.test(item.profitabilityStatus || ""));
-            if (state.workspace.filter === "SUPPLIER_COST_MISSING") return preview?.regions?.some(item => item.profitabilityStatus === "UNKNOWN_SUPPLIER_COST");
-            if (state.workspace.filter === "EXCHANGE_RATE_MISSING") return preview?.regions?.some(item => item.profitabilityStatus === "EXCHANGE_RATE_MISSING");
-            if (state.workspace.filter === "MANUAL_OVERRIDE") return preview?.regions?.some(item => item.publishedPriceMode === "MANUAL_OVERRIDE");
-            if (state.workspace.filter === "LEGACY_COMPATIBILITY_PRICE") return preview?.regions?.some(item => item.publishedPriceMode === "LEGACY_COMPATIBILITY_PRICE");
-            if (state.workspace.filter === "PROMO_RISK") return preview?.warnings?.some(item => /COUPON|PROMO/i.test(item.code || ""));
-            return true;
-        });
-    }
-
-    function regionPreview(row, region) {
-        const preview = previewForPackageId(workspacePackageId(row));
-        return preview?.regions?.find(item => item.region === region) || null;
-    }
-
-    function statusClass(status = "") {
-        if (status === "Ready") return "is-ready";
-        if (status === "Changed" || status === "Unsaved Changes") return "is-changed";
-        if (status === "Saved Draft") return "is-warning";
-        if (status === "Missing Cost") return "is-missing";
-        if (status === "Published") return "is-published";
-        if (status === "Blocked") return "is-blocked";
-        if (status === "Warning") return "is-warning";
+    function dailyBlockingReason() {
+        if (!daily.products.length) return "Failed to load products.";
+        if (!["TH", "MM"].every(region => daily.policies.some(policy => policy.region === region && (policy.active || policy.draft)))) return "Failed to load active Thailand and Myanmar pricing policies.";
+        if (!daily.selectedProductId) return "Select a product with configured regional packages.";
+        const supplier = activeSupplier();
+        if (!supplier) return "Select an enabled canonical supplier for this region.";
+        if (!["MMK", "THB"].includes(upper(supplier.supplierCurrency))) return "Selected supplier has no canonical pricing currency.";
         return "";
     }
 
-    function workspaceRegionsForRow(row) {
-        if (state.workspace.regionView === "ALL") return row.supportedRegions || [];
-        return row.supportedRegions?.includes(state.workspace.regionView) ? [state.workspace.regionView] : [];
+    function restoredSupplierId(rows) {
+        return text(rows.find(row => row.savedDraftSupplierId)?.savedDraftSupplierId);
     }
 
-    function publishedPriceForRow(row, region) {
-        const preview = regionPreview(row, region);
-        const currency = preview?.currency || row.currenciesByRegion?.[region] || (region === "MM" ? "MMK" : "THB");
-        const amount = preview?.publishedPrice ?? row.publishedPricesByRegion?.[region];
-        return formatMoney(amount, currency);
-    }
-
-    function recommendedPriceForRegion(region) {
-        return region?.recommendedSellingPrice == null ? "Preview required" : formatMoney(region.recommendedSellingPrice, region.currency);
-    }
-
-    function marginForRegion(region) {
-        if (!region || region.marginPercent == null) return "—";
-        return `${region.marginPercent}%`;
-    }
-
-    function profitForRegion(region) {
-        if (!region || region.netProfit == null) return "—";
-        return formatMoney(region.netProfit, region.currency);
-    }
-
-    function displayWorkspaceStatus(row, preview) {
-        if (preview?.status === "Blocked") return "Blocked";
-        if (preview?.status === "Ready") {
-            if (row.supplierCostSource === "saved_draft") return "Saved Draft";
-            return isRowStaged(row) ? "Ready" : "Published";
-        }
-        if (preview?.status === "Warning") return "Ready";
-        if (row.supplierCostSource === "saved_draft") return "Saved Draft";
-        if (isRowStaged(row)) return "Unsaved Changes";
-        if (row.newSupplierCost == null) return "Missing Cost";
-        if (row.status === "Published") return "Published";
-        return "Published";
-    }
-
-    function renderSupplierCostCell(row) {
-        const rowId = escapeHTML(row.rowId);
-        const active = state.workspace.editingCostRowId === row.rowId;
-        const changed = isRowStaged(row);
-        const missing = row.newSupplierCost == null;
-        const displayCurrency = state.workspace.regionView === "TH"
-            ? "THB"
-            : (state.workspace.supplierCurrency || "THB");
-        const currency = escapeHTML(displayCurrency);
-        if (active) {
-            return `
-                <div class="pricing-grid-cell pricing-cost-cell is-editing ${changed ? "is-changed" : ""}" data-pricing-cost-cell="${rowId}">
-                    <label class="pricing-cost-input-shell">
-                        <input data-pricing-cost-input="${rowId}" type="number" min="0" step="0.01" value="${escapeHTML(inputValue(row.newSupplierCost))}" aria-label="New supplier cost">
-                        <span>${currency}</span>
-                    </label>
-                </div>`;
-        }
-        return `
-            <div class="pricing-grid-cell pricing-cost-cell ${missing ? "is-missing" : ""} ${changed ? "is-changed" : ""}" data-pricing-cost-cell="${rowId}">
-                <button class="pricing-cost-display" type="button" data-pricing-cost-action="${rowId}" aria-label="Edit supplier cost for ${escapeHTML(row.packageName)}">
-                    <strong>${missing ? "Add cost" : displayCostValue(row.newSupplierCost)}</strong>
-                    <span>${currency}</span>
-                    <i class="fa-solid fa-pen" aria-hidden="true"></i>
-                </button>
-            </div>`;
-    }
-
-    function renderWorkspaceGrid(section) {
-        const grid = section.querySelector("#pricingWorkspaceGrid");
-        if (!grid) return;
-        syncWorkspaceControlState(section);
-        renderWorkspaceControls(section);
-        const rows = workspaceRowsForRender();
-        if (!rows.length) {
-            let message = "No packages match the current pricing workspace filter.";
-            if (state.loadError && !state.apiReady) {
-                message = `${state.loadError} Retry after confirming your Admin session and pricing API availability.`;
-            } else if (!state.products.length) {
-                message = "No catalog products loaded for Pricing Workspace.";
-            } else if (!state.workspace.rows.length) {
-                message = "Catalog products loaded, but no package rows were available for pricing operations.";
-            } else if (state.workspace.productFilter !== "ALL") {
-                message = "No packages for the selected product under the current filters.";
-            }
-            grid.innerHTML = `<p class="empty">${escapeHTML(message)}</p>`;
-            renderWorkspaceSummary(section);
-            renderWorkspaceDetail(section);
-            return;
-        }
-        const view = state.workspace.regionView;
-        const header = view === "TH"
-            ? `<div class="pricing-grid-head is-th-view" role="row">
-                <span>Select</span><span>Package</span><span>Supplier Cost</span>
-                <span>Current Price</span><span>Recommended Price</span><span>Profit</span><span>Status</span>
-            </div>`
-            : view === "MM"
-                ? `<div class="pricing-grid-head is-mm-view" role="row">
-                    <span>Select</span><span>Package</span><span>Supplier Cost</span>
-                    <span>Exchange Rate</span><span>Current Price</span><span>Recommended Price</span>
-                    <span>Profit</span><span>Status</span>
-                </div>`
-                : `<div class="pricing-grid-head is-all-view" role="row">
-                    <span>Select</span><span>Package</span><span>Supplier Cost</span>
-                    <span>Legacy THB price</span><span>Legacy MMK price</span><span>Regions</span><span>Status</span>
-                </div>`;
-        const body = rows.map(row => {
-            const packageId = workspacePackageId(row);
-            const preview = previewForPackageId(packageId);
-            const region = view === "ALL" ? null : regionPreview(row, view);
-            const status = displayWorkspaceStatus(row, preview);
-            const selected = row.rowId === state.workspace.selectedRowId;
-            const selector = `
-                <label class="pricing-grid-cell">
-                    <input type="checkbox" data-pricing-select-row="${escapeHTML(row.rowId)}" ${isRowStaged(row) && row.selected !== false ? "checked" : ""} ${isRowStaged(row) ? "" : "disabled"} aria-label="Select ${escapeHTML(row.packageName)}">
-                </label>`;
-            const packageCell = `
-                <div class="pricing-grid-cell">
-                    <strong>${escapeHTML(row.packageName)}</strong>
-                    <small>${escapeHTML(row.productName)} · ${escapeHTML(row.packageCode)}</small>
-                </div>`;
-            const costCell = renderSupplierCostCell(row);
-            const statusCell = `<div class="pricing-grid-cell"><span class="pricing-status-chip ${statusClass(status)}">${escapeHTML(status)}</span></div>`;
-            let cells;
-            if (view === "TH") {
-                cells = `${selector}${packageCell}${costCell}
-                    <div class="pricing-grid-cell"><span>${publishedPriceForRow(row, "TH")}</span></div>
-                    <div class="pricing-grid-cell"><span>${recommendedPriceForRegion(region)}</span></div>
-                    <div class="pricing-grid-cell"><span>${profitForRegion(region)}</span></div>
-                    ${statusCell}`;
-            } else if (view === "MM") {
-                cells = `${selector}${packageCell}${costCell}
-                    <div class="pricing-grid-cell"><span>${region?.exchangeRate || "—"}</span></div>
-                    <div class="pricing-grid-cell"><span>${publishedPriceForRow(row, "MM")}</span></div>
-                    <div class="pricing-grid-cell"><span>${recommendedPriceForRegion(region)}</span></div>
-                    <div class="pricing-grid-cell"><span>${profitForRegion(region)}</span></div>
-                    ${statusCell}`;
-            } else {
-                const regions = workspaceRegionsForRow(row);
-                cells = `${selector}${packageCell}${costCell}
-                    <div class="pricing-grid-cell"><span>${publishedPriceForRow(row, "TH")}</span></div>
-                    <div class="pricing-grid-cell"><span>${publishedPriceForRow(row, "MM")}</span></div>
-                    <div class="pricing-grid-cell"><span>${escapeHTML(regions.join(" / ") || "—")}</span></div>
-                    ${statusCell}`;
-            }
-            const viewClass = view === "ALL" ? "is-all-view" : view === "MM" ? "is-mm-view" : "is-th-view";
-            return `
-                <div class="pricing-grid-row ${selected ? "is-selected" : ""} ${viewClass}" role="row" data-status="${escapeHTML(status)}" data-pricing-workspace-row="${escapeHTML(row.rowId)}" tabindex="0">
-                    ${cells}
-                </div>
-            `;
-        }).join("");
-        grid.innerHTML = header + body;
-        renderWorkspaceSummary(section);
-        renderWorkspaceDetail(section);
-    }
-
-    function renderWorkspaceSummary(section, summary = null) {
-        const computed = summary || {
-            packagesLoaded: state.workspace.rows.length,
-            packageRows: state.workspace.rows.length,
-            regionalPriceRows: state.workspace.rows.reduce((sum, row) => sum + (row.supportedRegions?.length || 0), 0),
-            changed: stagedRows().length,
-            ready: state.workspace.previewRows.filter(row => row.status === "Ready").length,
-            lowMargin: state.workspace.previewRows.filter(row => row.regions?.some(item => item.supplierCostConfigured === true && item.profitabilityStatus === "LOW_MARGIN")).length,
-            negativeMargin: state.workspace.previewRows.filter(row => row.regions?.some(item => item.supplierCostConfigured === true && /NEGATIVE|BELOW_COST/.test(item.profitabilityStatus || ""))).length,
-            missingSupplierCost: state.workspace.previewRows.filter(row => row.regions?.some(item => item.profitabilityStatus === "UNKNOWN_SUPPLIER_COST")).length,
-            manualOverrides: state.workspace.previewRows.filter(row => row.regions?.some(item => item.publishedPriceMode === "MANUAL_OVERRIDE")).length,
-            promoRisk: state.workspace.previewRows.filter(row => row.warnings?.some(item => /COUPON|PROMO/i.test(item.code || ""))).length,
-            blocked: state.workspace.previewRows.filter(row => row.status === "Blocked").length
-        };
-        setText(section, "#pricingWorkspacePackagesLoaded", `${computed.packageRows ?? computed.packagesLoaded ?? 0} packages / ${computed.regionalPriceRows ?? 0} regional price rows`);
-        setText(section, "#pricingWorkspaceChanged", computed.changed || 0);
-        setText(section, "#pricingWorkspaceReady", computed.ready || 0);
-        setText(section, "#pricingWorkspaceLowMargin", computed.lowMargin || 0);
-        setText(section, "#pricingWorkspaceNegativeMargin", computed.negativeMargin || 0);
-        setText(section, "#pricingWorkspaceMissingCost", computed.missingSupplierCost || 0);
-        setText(section, "#pricingWorkspaceBlocked", computed.blocked || 0);
-        setText(section, "#pricingWorkspaceManualOverrides", computed.manualOverrides || 0);
-        setText(section, "#pricingWorkspacePromoRisk", computed.promoRisk || 0);
-        setText(section, "#pricingWorkspaceUpdated", `Last updated: ${state.workspace.lastPreviewAt || "Not previewed"}`);
-    }
-
-    function renderWorkspaceDetail(section) {
-        const box = section.querySelector("#pricingWorkspaceDetail");
-        const panel = section.querySelector(".pricing-workspace-detail");
-        const workspace = section.querySelector(".pricing-daily-workspace");
+    function setDailyError(message) {
+        const box = $("pricingDailyBlocking");
         if (!box) return;
-        const loadedRow = state.workspace.rows.find(item => item.rowId === state.workspace.selectedRowId);
-        if (!loadedRow || (state.workspace.productFilter !== "ALL" && loadedRow.productCode !== state.workspace.productFilter)) {
-            state.workspace.selectedRowId = "";
-            state.workspace.selectedPackageId = "";
-            state.workspace.selectedPackageDetail = null;
-            workspace?.classList.remove("has-detail");
-            panel?.classList.remove("is-open");
-            panel?.setAttribute("hidden", "");
-            panel?.setAttribute("aria-hidden", "true");
-            setText(section, "#pricingWorkspaceDetailTitle", "Select a package to view calculation");
-            box.innerHTML = "";
+        box.hidden = !message;
+        box.textContent = message || "";
+    }
+
+    function renderSupplierSelect() {
+        const select = $("pricingSupplierSelect");
+        if (!select) return;
+        const suppliers = eligibleSuppliers();
+        if (!suppliers.some(item => String(item.id || item.supplierId || item._id) === daily.supplierId)) {
+            daily.supplierId = suppliers.length ? String(suppliers[0].id || suppliers[0].supplierId || suppliers[0]._id) : "";
+        }
+        select.innerHTML = suppliers.length
+            ? suppliers.map(supplier => `<option value="${String(supplier.id || supplier.supplierId || supplier._id)}">${text(supplier.name || supplier.supplierName)}</option>`).join("")
+            : '<option value="">No configured suppliers</option>';
+        select.value = daily.supplierId;
+        const supplier = activeSupplier();
+        $("pricingSupplierCurrency").textContent = supplier?.supplierCurrency || "-";
+        setDailyError(dailyBlockingReason());
+    }
+
+    function previewFor(row) {
+        return daily.previews.get(rowKey(row)) || null;
+    }
+
+    function statusView(row, preview, regionFilter = ["TH", "MM"]) {
+        if (!daily.edits.has(rowKey(row)) && row.savedDraftSupplierCost == null && row.publishedSupplierPrice == null) return { status: "MISSING", reason: "Supplier cost required", regions: [] };
+        const regions = (preview?.regions || []).filter(item => row.regionalRows?.[item.region] && regionFilter.includes(item.region));
+        if (!regions.length) return { status: "WARNING", reason: "Preview pending", regions: [] };
+        const blocked = regions.find(item => item.blockingErrors?.length || ["NEGATIVE_MARGIN", "PRICE_BELOW_COST", "INVALID_CONFIGURATION", "EXCHANGE_RATE_MISSING"].includes(item.profitabilityStatus));
+        if (blocked) return { status: "BLOCKED", reason: `${blocked.region}: ${blocked.blockingErrors?.[0]?.message || "Pricing blocked"}`, regions };
+        const warned = regions.find(item => item.warnings?.length || item.profitabilityStatus === "LOW_MARGIN");
+        if (warned) return { status: "WARNING", reason: `${warned.region}: ${warned.warnings?.[0]?.message || "Commercial warning"}`, regions };
+        return { status: "READY", reason: "All active regions ready", regions };
+    }
+
+    function regionalResult(row, preview, region) {
+        if (!row.regionalRows?.[region]) return '<span class="pricing-region-empty">Not offered</span>';
+        const result = preview?.regions?.find(item => item.region === region);
+        const published = row.regionalRows[region];
+        const canonicalPublished = published.publishedPriceMode === "POLICY_DERIVED" && published.publishedSupplierCostConfigured === true && published.publishedSupplierId;
+        const sellingPrice = result?.recommendedSellingPrice ?? (canonicalPublished ? published.publishedPrice : null);
+        const currency = result?.currency || published.currency;
+        const profit = result?.netProfit;
+        const margin = result?.marginPercent;
+        const reason = result?.blockingErrors?.[0]?.message || result?.warnings?.[0]?.message || "";
+        return `<div class="pricing-region-result"><strong>${money(sellingPrice, currency)}</strong><span>Profit ${money(profit, currency)}</span><span>Margin ${margin == null ? "-" : `${Number(margin).toFixed(2)}%`}</span>${reason ? `<small>${reason}</small>` : ""}</div>`;
+    }
+
+    function renderRows() {
+        const body = $("pricingPackageRows");
+        if (!body) return;
+        const query = daily.search.toLowerCase();
+        const rows = regionRows().filter(row => !query || `${row.productName} ${row.packageName} ${row.packageCode}`.toLowerCase().includes(query));
+        if (!rows.length) {
+            body.innerHTML = '<tr><td colspan="5" class="empty">No packages available for this product.</td></tr>';
+            $("pricingDailySummary").textContent = "0 packages";
             return;
         }
-        workspace?.classList.add("has-detail");
-        panel?.removeAttribute("hidden");
-        panel?.setAttribute("aria-hidden", "false");
-        panel?.classList.add("is-open");
-        const row = previewForPackageId(workspacePackageId(loadedRow)) || loadedRow;
-        const supplierCurrency = state.workspace.regionView === "TH"
-            ? "THB"
-            : (state.workspace.supplierCurrency || "THB");
-        state.workspace.selectedPackageId = workspacePackageId(loadedRow);
-        state.workspace.selectedPackageDetail = row;
-        setText(section, "#pricingWorkspaceDetailTitle", `${row.productName} · ${row.packageName}`);
-        const regionCards = (row.regions || []).map(region => `
-            <article class="pricing-detail-card">
-                <strong>${region.region === "TH" ? "Thailand" : "Myanmar"} · ${escapeHTML(region.currency || "")}</strong>
-                <div class="pricing-detail-line"><span>Current published price</span><b>${formatMoney(region.publishedPrice, region.currency)}</b></div>
-                <div class="pricing-detail-line"><span>Recommended price</span><b>${region.recommendedSellingPrice == null ? "Unavailable" : formatMoney(region.recommendedSellingPrice, region.currency)}</b></div>
-                <div class="pricing-detail-line"><span>Final after promo</span><b>${formatMoney(region.finalPayableAmount, region.currency)}</b></div>
-                <div class="pricing-detail-line"><span>Reference discount</span><b>${region.displayDiscountPercent || 0}%</b></div>
-                <div class="pricing-detail-line"><span>Net profit / margin</span><b>${region.netProfit == null ? "Unknown" : `${formatMoney(region.netProfit, region.currency)} · ${region.marginPercent}%`}</b></div>
-                <div class="pricing-detail-line"><span>Payment fee impact</span><b>${escapeHTML((region.paymentFeeSimulation || []).map(item => `${item.method}: ${item.marginPercent ?? "?"}%`).join(" · "))}</b></div>
-                <div class="pricing-detail-line"><span>Policy source</span><b>${escapeHTML(region.effectivePolicySource || "production")}</b></div>
-            </article>
-        `).join("");
-        const warnings = [...(row.warnings || []), ...(row.blockingErrors || [])].map(item => `<li>${escapeHTML(item.message || item.code)}</li>`).join("");
-        box.innerHTML = `
-            <article class="pricing-detail-card">
-                <strong>${escapeHTML(row.packageName || "")}</strong>
-                <div class="pricing-detail-line"><span>Supplier Cost</span><b>${row.oldSupplierCost == null ? "Not configured" : formatMoney(row.oldSupplierCost, supplierCurrency)}</b></div>
-                <div class="pricing-detail-line"><span>New Supplier Cost</span><b>${row.newSupplierCost == null ? "Empty" : formatMoney(row.newSupplierCost, supplierCurrency)}</b></div>
-                <div class="pricing-detail-line"><span>Supplier code</span><b>${escapeHTML(row.supplierPackageCode || row.packageCode || "")}</b></div>
-                <div class="pricing-detail-line"><span>Status</span><b>${escapeHTML(row.status || "Edited")}</b></div>
-                ${row.newSupplierCost == null ? '<div class="pricing-detail-line"><span>Next action</span><b>Enter supplier cost</b></div>' : ""}
-            </article>
-            ${regionCards || '<p class="empty">Preview this row to inspect regional calculations.</p>'}
-            ${warnings ? `<article class="pricing-detail-card"><strong>Warnings</strong><ul>${warnings}</ul></article>` : ""}
-        `;
+        const supplier = activeSupplier();
+        body.innerHTML = rows.map(row => {
+            const key = rowKey(row);
+            const value = daily.edits.has(key) ? daily.edits.get(key).value : (row.savedDraftSupplierCost ?? row.publishedSupplierPrice ?? "");
+            const preview = previewFor(row);
+            const view = statusView(row, preview);
+            const blocked = dailyBlockingReason();
+            return `<tr data-pricing-row="${key}">
+                <td><strong>${text(row.packageName)}</strong><small>${text(row.productName)} · ${upper(row.packageCode)}</small><details class="pricing-mobile-regions"><summary>Regional prices</summary><div><b>Thailand</b>${regionalResult(row, preview, "TH")}</div><div><b>Myanmar</b>${regionalResult(row, preview, "MM")}</div></details></td>
+                <td><label class="pricing-cost-input"><input type="number" min="0.01" step="0.01" value="${value}" data-supplier-cost="${key}" ${blocked ? `disabled title="${blocked}"` : ""}><span>${supplier?.supplierCurrency || "-"}</span></label></td>
+                <td class="pricing-desktop-region">${regionalResult(row, preview, "TH")}</td><td class="pricing-desktop-region">${regionalResult(row, preview, "MM")}</td>
+                <td><span class="pricing-status is-${view.status.toLowerCase()}">${view.status}</span><small>${view.reason}</small></td>
+            </tr>`;
+        }).join("");
+        $("pricingDailySummary").textContent = `${rows.length} packages · ${daily.edits.size} changed`;
+        updatePublishState();
     }
 
-    function workspacePayloadRows({ onlySelected = false } = {}) {
-        const supplierName = sectionValue("#pricingWorkspaceSupplier", "Primary supplier");
-        const supplierVersion = sectionValue("#pricingWorkspaceVersion", "");
-        return stagedRows()
-            .filter(row => !onlySelected || row.selected !== false)
-            .filter(row => (row.draftRegion || supplierCostRegion(row)) === workspaceRegion())
-            .map(row => ({
-                rowId: row.rowId,
-                productCode: row.productCode,
-                packageId: row.packageId,
-                packageCode: row.packageCode,
-                newSupplierCost: row.newSupplierCost,
-                supplierCurrency: state.workspace.regionView === "TH" ? "THB" : (row.supplierCurrency || state.workspace.supplierCurrency),
-                supplierName,
-                supplierVersion,
-                supplierCostTimestamp: new Date().toISOString(),
-                expectedUpdatedAt: row.expectedUpdatedAt,
-                supplierCostSource: row.supplierCostSource || (row.savedDraftSupplierCostConfigured ? "saved_draft" : "unsaved_stage"),
-                selected: row.selected !== false
-            }));
+    function updatePublishState() {
+        const regions = daily.region === "ALL" ? ["TH", "MM"] : [daily.region];
+        const publishable = regionRows().filter(row => daily.edits.has(rowKey(row)) && ["READY", "WARNING"].includes(statusView(row, previewFor(row), regions).status));
+        $("pricingPublishBtn").disabled = daily.publishing || !activeSupplier() || !publishable.length;
     }
 
-    function sectionValue(selector, fallback = "") {
-        return document.querySelector(`#section-pricing-engine ${selector}`)?.value || fallback;
+    function buildWorkspaceRows() {
+        const supplier = activeSupplier();
+        return regionRows().filter(row => daily.edits.has(rowKey(row))).map(row => ({
+            rowId: rowKey(row), productCode: row.productCode, packageCode: row.packageCode,
+            newSupplierCost: daily.edits.get(rowKey(row)).value,
+            supplierCurrency: supplier.supplierCurrency, supplierName: supplier.name,
+            expectedUpdatedAt: row.updatedAt, selected: true
+        }));
     }
 
-    function scheduleWorkspacePreview(section) {
-        window.clearTimeout(state.workspace.debounce);
-        state.workspace.debounce = window.setTimeout(() => requestWorkspacePreview(section), 350);
+    function buildPreviewRows() {
+        const supplier = activeSupplier();
+        return regionRows().filter(row => daily.edits.has(rowKey(row)) || row.savedDraftSupplierCost != null || row.publishedSupplierPrice != null).map(row => ({
+            rowId: rowKey(row), productCode: row.productCode, packageCode: row.packageCode,
+            newSupplierCost: daily.edits.has(rowKey(row)) ? daily.edits.get(rowKey(row)).value : (row.savedDraftSupplierCost ?? row.publishedSupplierPrice),
+            supplierCurrency: supplier.supplierCurrency, supplierName: supplier.name,
+            expectedUpdatedAt: row.updatedAt, selected: daily.edits.has(rowKey(row))
+        }));
     }
 
-    async function requestWorkspacePreview(section) {
-        if (!section || !state.apiReady || !state.workspace.rows.length) return;
-        const rows = workspacePayloadRows();
-        if (!rows.length || workspaceRegion() === "ALL") {
-            state.workspace.previewResultsByPackageId.clear();
-            state.workspace.previewRows = [];
-            renderWorkspaceSummary(section);
-            renderWorkspaceGrid(section);
-            renderButtons(section);
-            return;
-        }
-        const seq = ++state.workspace.previewSeq;
-        state.workspace.activeRequestSequence = seq;
-        state.workspace.previewing = true;
-        renderWorkspaceSummary(section);
+    function schedulePreview() {
+        clearTimeout(daily.previewTimer);
+        daily.previewTimer = setTimeout(runPreview, 350);
+    }
+
+    async function runPreview() {
+        if (!daily.supplierId || !activeSupplier()) return;
+        const rows = buildPreviewRows();
+        if (!rows.length) return renderRows();
+        const seq = ++daily.previewSeq;
+        daily.previewController?.abort();
+        daily.previewController = new AbortController();
+        $("pricingDailyState").textContent = "Calculating";
         try {
             const result = await pricingFetch("/api/admin/pricing-engine/workspace/preview", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ rows, region: workspaceRegion() })
+                method: "POST", signal: daily.previewController.signal,
+                body: JSON.stringify({ supplierId: daily.supplierId, region: "ALL", rows })
             });
-            if (seq !== state.workspace.previewSeq) return;
-            state.workspace.previewResultsByPackageId.clear();
-            (Array.isArray(result.rows) ? result.rows : []).forEach(row => {
-                state.workspace.previewResultsByPackageId.set(workspacePackageId(row), row);
-            });
-            clearPreviewForUnstagedRows();
-            state.workspace.lastPreviewAt = new Date(result.generatedAt || Date.now()).toLocaleTimeString();
-            renderWorkspaceSummary(section, result.summary);
-            const mm = state.workspace.previewRows.flatMap(row => row.regions || []).find(item => item.region === "MM" && item.exchangeRate);
-            if (mm) {
-                setText(section, "#pricingWorkspaceMmkRate", `${mm.supplierCurrency || "THB"} → MMK · ${mm.exchangeRate}`);
-                setText(section, "#pricingWorkspaceMmkRateMeta", `${mm.exchangeRateSource || "Production policy"} · rounding applies server-side`);
-            }
+            if (seq !== daily.previewSeq) return;
+            (result.rows || []).forEach(row => daily.previews.set(rowKey(row), row));
+            $("pricingDailyState").textContent = "Preview ready";
+            renderRows();
+            if (daily.edits.size) scheduleDraftSave();
         } catch (error) {
-            if (seq !== state.workspace.previewSeq) return;
-            setStatus(section, `Workspace preview failed: ${error.message}`);
-        } finally {
-            if (seq === state.workspace.previewSeq) {
-                state.workspace.previewing = false;
-                renderWorkspaceGrid(section);
-                renderButtons(section);
-            }
+            if (error.name === "AbortError" || seq !== daily.previewSeq) return;
+            $("pricingDailyState").textContent = "Preview failed";
+            setDailyError(error.message);
         }
     }
 
-    function parseWorkspacePaste(section) {
-        const input = section.querySelector("#pricingPasteInput");
-        const result = section.querySelector("#pricingPasteResult");
-        const lines = String(input?.value || "").split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-        const parsed = [];
-        const unmatched = [];
-        const duplicates = new Set();
-        const seen = new Set();
-        lines.forEach((line, index) => {
-            const match = line.match(/^(.+?)[,\t ]+([0-9]+(?:\.[0-9]+)?)$/);
-            if (!match) {
-                unmatched.push(line);
-                return;
-            }
-            const key = match[1].trim().toLowerCase();
-            const price = number(match[2], NaN);
-            const candidates = state.workspace.rows.filter(item =>
-                state.workspace.productFilter === "ALL" || item.productCode === state.workspace.productFilter
-            );
-            const row = candidates.find(item =>
-                item.packageCode.toLowerCase() === key ||
-                item.supplierPackageCode?.toLowerCase() === key ||
-                item.packageName.toLowerCase() === key
-            );
-            if (!row || !Number.isFinite(price)) {
-                unmatched.push(line);
-                return;
-            }
-            if (seen.has(row.rowId)) duplicates.add(row.rowId);
-            seen.add(row.rowId);
-            stageWorkspaceRow(row, price);
-            parsed.push(row);
-        });
-        state.workspace.pasteMatches = parsed;
-        if (result) result.textContent = `${parsed.length} matched · ${unmatched.length} unmatched · ${duplicates.size} duplicate`;
-        renderWorkspaceGrid(section);
-        scheduleWorkspacePreview(section);
+    function scheduleDraftSave() {
+        clearTimeout(daily.saveTimer);
+        daily.saveTimer = setTimeout(saveDraft, 500);
     }
 
-    function renderWorkspaceReview(section, open = false) {
-        const panel = section.querySelector("#pricingReviewPanel");
-        const list = section.querySelector("#pricingReviewList");
-        const summary = section.querySelector("#pricingReviewSummary");
-        if (!panel || !list) return;
-        const changed = stagedRows().map(row => ({
-            ...row,
-            ...(previewForPackageId(workspacePackageId(row)) || {})
-        }));
-        if (summary) summary.textContent = `${changed.length} packages staged. Blocked rows will be skipped by publish.`;
-        list.innerHTML = changed.length ? changed.map(row => `
-            <article class="pricing-review-row">
-                <strong>${escapeHTML(row.packageName)}</strong>
-                <small>${escapeHTML(row.productName)} · ${escapeHTML(row.packageCode)} · ${escapeHTML(row.status)}</small>
-                <div class="pricing-detail-line"><span>Supplier cost</span><b>${formatMoney(row.oldSupplierCost, row.supplierCurrency)} → ${formatMoney(row.newSupplierCost, row.supplierCurrency)}</b></div>
-                <div class="pricing-detail-line"><span>Selling price</span><b>${escapeHTML((row.regions || []).map(item => `${item.region}: ${formatMoney(item.publishedPrice, item.currency)} → ${item.recommendedSellingPrice == null ? "Unavailable" : formatMoney(item.recommendedSellingPrice, item.currency)}`).join(" · ") || "Preview pending")}</b></div>
-                <div class="pricing-detail-line"><span>Profit / margin</span><b>${escapeHTML((row.regions || []).map(item => `${item.region}: ${item.netProfit == null ? "Unknown" : formatMoney(item.netProfit, item.currency)} / ${item.marginPercent == null ? "Unknown" : `${item.marginPercent}%`}`).join(" · ") || "Unknown")}</b></div>
-                <div class="pricing-detail-line"><span>Publish eligibility</span><b>${row.publishEligible === true ? "Publishable" : "Blocked or preview pending"}</b></div>
-            </article>
-        `).join("") : '<p class="empty">No staged pricing changes.</p>';
-        if (open) togglePanel(section, "#pricingReviewPanel", true);
-    }
-
-    async function publishWorkspace(section, publishAll = false) {
-        if (!state.apiReady || state.workspace.publishing) return;
-        if (publishAll || workspaceRegion() === "ALL") {
-            window.alert("Publish All and All-region publishing are temporarily disabled. Choose Thailand or Myanmar and publish explicit staged rows only.");
-            return;
-        }
-        const rows = workspacePayloadRows({ onlySelected: true });
-        if (!rows.length) {
-            window.alert("Select at least one staged row to publish.");
-            return;
-        }
-        const publishable = rows.filter(row => {
-            const preview = previewForPackageId(workspacePackageId(row));
-            return preview?.publishEligible === true &&
-                preview.regions?.length === 1 &&
-                preview.regions[0]?.region === workspaceRegion() &&
-                Number(row.newSupplierCost) === Number(state.workspace.stagedChangesByPackageId.get(workspacePackageId(row))?.newSupplierCost);
-        });
-        if (!publishable.length) {
-            window.alert("Preview the staged rows and resolve blocked items before publishing.");
-            return;
-        }
-        const confirmed = window.confirm(`Publish ${publishable.length} staged ${workspaceRegion()} pricing change${publishable.length === 1 ? "" : "s"}?\n\nThe server will recalculate each row before saving. Failed rows will remain staged for retry.`);
-        if (!confirmed) return;
-        state.workspace.publishing = true;
-        setStatus(section, "Publishing staged pricing changes...");
-        renderButtons(section);
+    async function saveDraft() {
+        const rows = buildWorkspaceRows();
+        if (!rows.length || !daily.supplierId) return;
+        $("pricingDraftState").textContent = "Saving draft...";
         try {
-            const result = await pricingFetch("/api/admin/pricing-engine/workspace/publish", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ rows: publishable, publishAll: false, region: workspaceRegion() })
-            }, 30000);
-            setStatus(section, `Pricing publish complete: ${result.summary?.published || 0} published, ${result.summary?.failed || 0} failed.`);
-            const publishedKeys = new Set((result.results || [])
-                .filter(item => item.published)
-                .map(item => `${item.productCode}:${workspaceRegion()}:${item.packageCode}`));
-            state.workspace.rows = state.workspace.rows.map(row => {
-                if (!publishedKeys.has(workspacePackageId(row))) return row;
-                const packageId = workspacePackageId(row);
-                state.workspace.stagedChangesByPackageId.delete(packageId);
-                state.workspace.previewResultsByPackageId.delete(packageId);
-                return { ...row, oldSupplierCost: row.newSupplierCost, changed: false, selected: false, status: "Published" };
-            });
-            clearPreviewForUnstagedRows();
-            await requestProductionLoad(section, "workspace-publish");
-            renderWorkspaceReview(section, true);
-        } catch (error) {
-            setStatus(section, `Pricing publish failed: ${error.message}`);
-        } finally {
-            state.workspace.publishing = false;
-            renderButtons(section);
-        }
-    }
-
-    function togglePanel(section, selector, force) {
-        const panel = section.querySelector(selector);
-        if (!panel) return;
-        panel.hidden = typeof force === "boolean" ? !force : !panel.hidden;
-    }
-
-    function promptNumber(label, currentValue, options = {}) {
-        const next = window.prompt(label, String(currentValue ?? 0));
-        if (next === null) return null;
-        const parsed = Number(next);
-        if (!Number.isFinite(parsed) || parsed < 0) {
-            window.alert(options.message || "Enter a valid non-negative number.");
-            return null;
-        }
-        if (options.positive && parsed <= 0) {
-            window.alert(options.message || "Enter a number greater than zero.");
-            return null;
-        }
-        if (options.percent && parsed > 100) {
-            window.alert("Percent values must be between 0 and 100.");
-            return null;
-        }
-        return parsed;
-    }
-
-    function editDraftValue(section, field) {
-        const selectedPackage = getSelectedPackage();
-        const policy = getDraftPolicy(selectedPackage.region, selectedPackage.currency);
-        const config = policy.config;
-        const edits = {
-            exchangeRate: ["Exchange rate", () => config.exchangeRate, value => { config.exchangeRate = value; }, { positive: true }],
-            supplierFee: ["Exchange fee percent", () => config.supplierFee.value, value => {
-                config.supplierFee = { enabled: value > 0, type: "PERCENT", value };
-            }, { percent: true }],
-            gatewayFee: ["Gateway fee percent", () => config.gatewayFee.value, value => {
-                config.gatewayFee = { enabled: value > 0, type: "PERCENT", value };
-            }, { percent: true }],
-            platformFee: ["Platform fee", () => config.platformCost.value, value => {
-                config.platformCost = { enabled: value > 0, type: "FIXED", value };
-            }],
-            profit: ["Profit percent", () => config.profitRule.value, value => {
-                config.profitRule = { type: "PERCENT", value };
-            }, { percent: true }],
-            rounding: ["Rounding increment", () => config.roundingRule.increment, value => {
-                config.roundingRule = { enabled: value > 0, mode: value > 0 ? "NEAREST" : "NONE", increment: value, psychologicalEnding: 0 };
-            }]
-        };
-        const edit = edits[field];
-        if (!edit) return;
-        const value = promptNumber(edit[0], edit[1](), edit[3] || {});
-        if (value === null) return;
-        edit[2](value);
-        state.dirty = true;
-        state.saveError = "";
-        state.publishError = "";
-        calculateAndRenderPreview(section);
-    }
-
-    function buildEngineInput() {
-        const selectedProduct = getSelectedProduct();
-        const selectedPackage = getSelectedPackage();
-        if (!selectedPackage.packageId) throw new Error("Failed to calculate preview: package id missing.");
-        if (!selectedPackage.packageCode) throw new Error("Failed to calculate preview: package code missing.");
-        const supplierCost = positiveAmount(selectedPackage.supplierPrice, "package supplier cost");
-        const config = getDraftPolicy(selectedPackage.region, selectedPackage.currency).config;
-        const exchangeRate = selectedPackage.supplierCurrency === selectedPackage.currency
-            ? undefined
-            : {
-                rate: positiveAmount(config.exchangeRate || selectedPackage.exchangeRate, "exchange rate"),
-                sourceCurrency: selectedPackage.supplierCurrency,
-                targetCurrency: selectedPackage.currency,
-                source: "admin-production-draft"
-            };
-        const appliedPricingRules = [];
-        if (selectedPackage.publishedPriceMode !== "POLICY_DERIVED" && Number.isFinite(Number(selectedPackage.publishedPrice))) {
-            appliedPricingRules.push({
-                code: `${selectedPackage.publishedPriceMode || "LEGACY_COMPATIBILITY_PRICE"}:${selectedPackage.packageCode}:${selectedPackage.region}`,
-                ruleType: "PRICE_OVERRIDE",
-                value: Number(selectedPackage.publishedPrice),
-                priority: 1000,
-                scopeType: "PACKAGE",
-                scopeReference: selectedPackage.packageCode,
-                stopFurtherProcessing: true,
-                configuration: {
-                    source: "catalog_package.price",
-                    publishedPriceMode: selectedPackage.publishedPriceMode,
-                    manualOverrideReason: selectedPackage.manualOverrideReason || "Legacy catalog selling price preserved during pricing-policy migration.",
-                    currency: selectedPackage.currency
-                }
-            });
-        }
-
-        return {
-            supplierCost,
-            supplierCurrency: selectedPackage.supplierCurrency,
-            targetCurrency: selectedPackage.currency,
-            exchangeRate,
-            policy: {
-                supplierFee: config.supplierFee,
-                businessCost: config.businessCost,
-                profitRule: config.profitRule,
-                gatewayFee: config.gatewayFee,
-                platformCost: config.platformCost,
-                tax: config.tax,
-                roundingRule: config.roundingRule
-            },
-            context: {
-                region: selectedPackage.region,
-                currency: selectedPackage.currency,
-                packageId: selectedPackage.packageId,
-                packageCode: selectedPackage.packageCode,
-                gameId: selectedProduct.productCode,
-                gameCode: selectedProduct.productCode
-            },
-            appliedPricingRules
-        };
-    }
-
-    function calculatePreview() {
-        const engine = window.AZIEL_COMMERCE_PRICING_ENGINE;
-        if (!engine?.calculateBasePrice) throw new Error("Failed to calculate preview: Commerce calculation engine is not loaded.");
-        return engine.calculateBasePrice(buildEngineInput());
-    }
-
-    function calculateAndRenderPreview(section) {
-        const seq = ++state.renderSeq;
-        state.calculating = true;
-        state.previewError = "";
-        trace("PREVIEW render labels started", { seq });
-        renderStaticLabels(section);
-        try {
-            const result = calculatePreview();
-            if (seq !== state.renderSeq) return;
-            state.preview = result;
-            trace("PREVIEW calculation finished", { seq });
-            renderFlow(section, result);
-            renderBreakdown(section, result);
-            setText(section, "#pricingStorefrontPrice", formatMoney(result.regularPrice, result.currency));
-            window.AZIEL_PRICING_ENGINE_PRODUCTION_PREVIEW = Object.freeze({
-                selectedProductId: state.selectedProductId,
-                selectedPackageId: state.selectedPackageId,
-                policy: clone(getDraftPolicy(getSelectedPackage().region, getSelectedPackage().currency).config),
-                lastResult: result
-            });
-        } catch (error) {
-            if (seq !== state.renderSeq) return;
-            state.preview = null;
-            state.previewError = error.message || "Failed to calculate preview.";
-            renderError(section, state.previewError);
-            trace("PREVIEW failed", { seq, message: state.previewError });
-        } finally {
-            if (seq === state.renderSeq) {
-                state.calculating = false;
-                renderButtons(section);
-                renderStatus(section);
-                trace("PREVIEW render finished", { seq });
-            }
-        }
-    }
-
-    function formatMoney(value, currency) {
-        if (value == null || value === "" || !Number.isFinite(Number(value))) return `— ${currency || getSelectedPackage().currency}`;
-        const numeric = Number(value || 0);
-        return `${numeric.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${currency || getSelectedPackage().currency}`;
-    }
-
-    function formatPercent(value) {
-        return `${Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}%`;
-    }
-
-    function setText(section, selector, value) {
-        const node = section.querySelector(selector);
-        if (node) node.textContent = value;
-    }
-
-    function renderStaticLabels(section) {
-        const product = getSelectedProduct();
-        const pkg = getSelectedPackage();
-        const config = getDraftPolicy(pkg.region, pkg.currency).config;
-        const scope = section.querySelector("#pricingScopeSelector")?.value || "REGION";
-        const modeLabel = pkg.publishedPriceMode === "POLICY_DERIVED"
-            ? "Policy derived"
-            : pkg.publishedPriceMode === "MANUAL_OVERRIDE"
-                ? "Manual override"
-                : "Legacy compatibility price";
-        setText(section, "#pricingRulesSubtitle", `${product.productName} · ${pkg.packageName}. ${state.dirty ? "Unsaved draft." : "Draft loaded."}`);
-        setText(section, "#pricingPreviewProduct", `${product.productName} · ${pkg.region} · ${pkg.currency}`);
-        setText(section, "#pricingStorefrontProduct", product.productName);
-        setText(section, "#pricingStorefrontPackage", pkg.packageName);
-        setText(section, "#pricingEffectiveSource", scope === "REGION" ? `${pkg.region} policy` : `${scope.charAt(0)}${scope.slice(1).toLowerCase()} view`);
-        setText(section, "#pricingPublishedMode", modeLabel);
-        setText(section, "#pricingRuleExchangeValue", pkg.supplierCurrency === pkg.currency ? "1.00" : String(config.exchangeRate || pkg.exchangeRate || 1));
-        setText(section, "#pricingRuleSupplierFeeValue", formatPercent(config.supplierFee?.value));
-        setText(section, "#pricingRuleGatewayValue", formatPercent(config.gatewayFee?.value));
-        setText(section, "#pricingRulePlatformValue", formatMoney(config.platformCost?.value, pkg.currency));
-        setText(section, "#pricingRuleProfitValue", formatPercent(config.profitRule?.value));
-        setText(section, "#pricingRuleRoundValue", config.roundingRule?.enabled ? `Nearest ${config.roundingRule.increment}` : "None");
-        setText(section, "#pricingSummaryExchange", pkg.supplierCurrency === pkg.currency ? "Same currency" : `${pkg.supplierCurrency} × ${config.exchangeRate || pkg.exchangeRate || 1}`);
-        setText(section, "#pricingSummaryProfit", formatPercent(config.profitRule?.value));
-        setText(section, "#pricingSummaryGateway", formatPercent(config.gatewayFee?.value));
-        setText(section, "#pricingSummaryPackages", String(state.affected?.packagesAffected || state.products.reduce((sum, item) => sum + item.packages.length, 0)));
-        setText(section, "#pricingSummaryPackagesMeta", `${state.affected?.productsAffected || state.products.length} products · ${(state.affected?.currenciesAffected || []).join(", ") || pkg.currency}`);
-        renderStatus(section);
-    }
-
-    function pricingStep(label, value, total, totalClass = "") {
-        return `
-            <div class="${totalClass}">
-                <span>${escapeHTML(label)}</span>
-                <b>${escapeHTML(value)}</b>
-                <small>${escapeHTML(total)}</small>
-            </div>
-        `;
-    }
-
-    function renderFlow(section, result) {
-        const flow = section.querySelector("#pricingFlow");
-        if (!flow) return;
-        const pkg = getSelectedPackage();
-        const overrideApplied = result.preOverridePrice != null;
-        const rows = [
-            pricingStep("Supplier Cost", formatMoney(result.supplierCost, result.supplierCurrency), formatMoney(result.supplierCost, result.supplierCurrency)),
-            pricingStep("Exchange", result.exchangeRateApplied ? `× ${result.exchangeRateApplied}` : "Same currency", formatMoney(result.postExchangeSubtotal, result.currency)),
-            pricingStep("Exchange Fee", formatMoney(result.supplierFeeAmount, result.currency), formatMoney(result.breakdown.find(item => item.stageId === "SUPPLIER_FEE")?.outputAmount, result.currency)),
-            pricingStep("Business Cost", formatMoney(result.businessCostAmount, result.currency), formatMoney(result.breakdown.find(item => item.stageId === "BUSINESS_COST")?.outputAmount, result.currency)),
-            pricingStep("Gateway Fee", formatMoney(result.gatewayFeeAmount, result.currency), formatMoney(result.breakdown.find(item => item.stageId === "GATEWAY_FEE")?.outputAmount, result.currency)),
-            pricingStep("Platform Fee", formatMoney(result.platformFeeAmount, result.currency), formatMoney(result.breakdown.find(item => item.stageId === "PLATFORM_FEE")?.outputAmount, result.currency)),
-            pricingStep("Profit", formatMoney(result.profitAmount, result.currency), formatMoney(result.breakdown.find(item => item.stageId === "PROFIT")?.outputAmount, result.currency)),
-            pricingStep("Tax", formatMoney(result.taxAmount, result.currency), formatMoney(result.breakdown.find(item => item.stageId === "TAX")?.outputAmount, result.currency)),
-            pricingStep("Recommended Price", formatMoney(result.preOverridePrice ?? result.regularPrice, result.currency), "Policy output"),
-            pricingStep(overrideApplied ? "Published Override" : "Published Price", formatMoney(result.regularPrice, result.currency), overrideApplied ? (pkg.manualOverrideReason || pkg.publishedPriceMode) : "Policy derived"),
-            pricingStep("Customer Price", formatMoney(result.regularPrice, result.currency), "Live Preview", "pricing-flow-total")
-        ];
-        flow.innerHTML = rows.join('<i class="fa-solid fa-arrow-down" aria-hidden="true"></i>');
-        const errorBox = section.querySelector("#pricingSimulationError");
-        if (errorBox) {
-            errorBox.hidden = true;
-            errorBox.textContent = "";
-        }
-    }
-
-    function renderBreakdown(section, result) {
-        const box = section.querySelector("#pricingBreakdown");
-        if (!box) return;
-        box.innerHTML = `
-            <h4>Engine Breakdown</h4>
-            ${result.breakdown.map(item => `
-                <div class="pricing-breakdown-row" data-stage-id="${escapeHTML(item.stageId)}">
-                    <span>${escapeHTML(item.stageId)}</span>
-                    <b>${escapeHTML(formatMoney(item.amountAdded || 0, item.currency))}</b>
-                    <small>${escapeHTML(formatMoney(item.outputAmount, item.currency))}</small>
-                </div>
-            `).join("")}
-        `;
-    }
-
-    function renderError(section, message) {
-        const errorBox = section.querySelector("#pricingSimulationError");
-        const flow = section.querySelector("#pricingFlow");
-        const breakdown = section.querySelector("#pricingBreakdown");
-        if (errorBox) {
-            errorBox.hidden = false;
-            errorBox.textContent = message || "Pricing Engine error.";
-        }
-        if (flow) flow.innerHTML = "";
-        if (breakdown) breakdown.innerHTML = "";
-        setText(section, "#pricingStorefrontPrice", "Unavailable");
-    }
-
-    function renderLoadError(section, message) {
-        const errorBox = section.querySelector("#pricingSimulationError");
-        if (errorBox) {
-            errorBox.hidden = false;
-            errorBox.innerHTML = `
-                <span>${escapeHTML(message || state.loadError || "Production pricing data is unavailable.")}</span>
-                <button id="pricingRetryLoadBtn" class="admin-secondary-btn" type="button">Retry</button>
-            `;
-        }
-    }
-
-    function payloadPolicies() {
-        return [...state.draftPolicy.values()].map(policy => ({
-            region: policy.region,
-            currency: policy.currency,
-            config: clone(policy.config)
-        }));
-    }
-
-    function applyServerState(data) {
-        if (data.version || data.activeVersion) state.activeVersion = data.version || data.activeVersion;
-        if (data.affected) state.affected = data.affected;
-        if (Array.isArray(data.products) && data.products.length) state.products = normalizeProducts(data);
-        (data.policies || []).forEach(item => {
-            const region = item.region || item.active?.region || item.draft?.region;
-            const currency = item.currency || item.active?.currency || item.draft?.currency;
-            if (!region || !currency) return;
-            if (item.active) {
-                state.activePolicy.set(policyKey(region, currency), {
-                    region,
-                    currency,
-                    config: normalizeConfig(item.active.config, region),
-                    source: item.active.source || "active"
-                });
-            }
-            if (item.draft || item.active) {
-                const source = item.draft?.config ? item.draft : item.active;
-                state.draftPolicy.set(policyKey(region, currency), {
-                    region,
-                    currency,
-                    config: normalizeConfig(source?.config, region),
-                    source: source?.source || "active-copy"
-                });
-            }
-        });
-    }
-
-    async function saveDraft(section) {
-        if (state.saving || state.publishing) return false;
-        if (!canSaveDraftPricing()) {
-            state.saveError = state.loadError
-                ? "Save Draft is disabled until production pricing data loads."
-                : "Save Draft is disabled until production pricing data is ready.";
-            renderLoadError(section, state.saveError);
-            setStatus(section, "Save disabled");
-            renderButtons(section);
-            return false;
-        }
-        state.saving = true;
-        state.saveError = "";
-        const button = section.querySelector("#pricingSaveDraftBtn");
-        const originalText = button?.textContent || "Save Draft";
-        if (button) {
-            button.disabled = true;
-            button.textContent = "Saving draft...";
-        }
-        setStatus(section, "Saving draft...");
-        try {
-            const data = await pricingFetch("/api/admin/pricing-engine/draft", {
+            await pricingFetch("/api/admin/pricing-engine/draft", {
                 method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    policies: payloadPolicies(),
-                    workspaceRows: workspacePayloadRows(),
-                    workspaceRegion: workspaceRegion()
-                })
+                body: JSON.stringify({ policies: policyPayload(daily.policies), workspaceRows: rows, workspaceRegion: daily.region, supplierId: daily.supplierId })
             });
-            state.workspace.stagedChangesByPackageId.clear();
-            state.workspace.previewResultsByPackageId.clear();
-            applyServerState(data.state || data);
-            state.dirty = false;
-            setStatus(section, "Draft Saved");
-            buildWorkspaceRows(section);
-            renderWorkspaceControls(section);
-            renderWorkspaceGrid(section);
-            requestWorkspacePreview(section);
-            calculateAndRenderPreview(section);
-            return true;
+            $("pricingDraftState").textContent = "Draft Saved";
         } catch (error) {
-            state.saveError = `Failed to save draft: ${error.message}`;
-            renderError(section, state.saveError);
-            setStatus(section, "Draft save failed");
-            return false;
-        } finally {
-            state.saving = false;
-            if (button) button.textContent = originalText;
-            renderButtons(section);
+            $("pricingDraftState").textContent = `Draft failed: ${error.message}`;
         }
     }
 
-    async function publishDraft(section) {
-        if (state.publishing || state.saving) return;
-        const role = String(window.AZIEL_ADMIN_AUTH?.state?.admin?.role || localStorage.getItem("adminRole") || "").toUpperCase();
-        if (role !== "OWNER") {
-            state.publishError = "Failed to publish: OWNER permission required.";
-            renderError(section, state.publishError);
-            setStatus(section, "Owner only");
-            return;
-        }
-        if (!canPersistPricing()) {
-            state.publishError = state.loadError
-                ? "Publish is disabled until production pricing data loads."
-                : "Publish is disabled until a valid product preview is ready.";
-            renderLoadError(section, state.publishError);
-            setStatus(section, "Publish disabled");
-            renderButtons(section);
-            return;
-        }
-        const confirmed = window.confirm("Publish Pricing Version?\n\nFuture customer quotes will immediately use these rules.\nExisting orders will remain unchanged.");
-        if (!confirmed) return;
-        if (state.dirty) {
-            const saved = await saveDraft(section);
-            if (!saved) return;
-        }
-
-        state.publishing = true;
-        state.publishError = "";
-        const button = section.querySelector("#pricingPublishBtn");
-        const originalText = button?.textContent || "Publish";
-        if (button) {
-            button.disabled = true;
-            button.textContent = "Publishing...";
-        }
-        setStatus(section, "Publishing...");
+    async function publishRows() {
+        const regions = daily.region === "ALL" ? ["TH", "MM"] : [daily.region];
+        const rows = buildWorkspaceRows().filter(row => ["READY", "WARNING"].includes(statusView(row, daily.previews.get(rowKey(row)), regions).status));
+        if (!rows.length) return;
+        const hasWarning = rows.some(row => statusView(row, daily.previews.get(rowKey(row)), regions).status === "WARNING");
+        if (hasWarning && !window.confirm("Some rows have commercial warnings. Publish these server-calculated prices?")) return;
+        daily.publishing = true;
+        updatePublishState();
+        $("pricingDailyState").textContent = "Publishing";
         try {
-            const data = await pricingFetch("/api/admin/pricing-engine/publish", { method: "POST" });
-            applyServerState(data.state || {});
-            state.activeVersion = data.version || state.activeVersion;
-            state.dirty = false;
-            setStatus(section, `Production Active · v${state.activeVersion?.versionNumber || ""}`);
-            calculateAndRenderPreview(section);
+            const result = await pricingFetch("/api/admin/pricing-engine/workspace/publish", { method: "POST", body: JSON.stringify({ supplierId: daily.supplierId, region: daily.region, rows }) });
+            const successKeys = new Set((result.draftCleanup?.clearedKeys || []).map(upper));
+            successKeys.forEach(key => { daily.edits.delete(key); daily.previews.delete(key); });
+            $("pricingDailyState").textContent = `${result.summary?.published || 0} published`;
+            await loadDaily(true);
         } catch (error) {
-            state.publishError = `Failed to publish: ${error.message}`;
-            renderError(section, state.publishError);
-            setStatus(section, "Publish failed");
+            setDailyError(error.message);
+            $("pricingDailyState").textContent = "Publish failed";
         } finally {
-            state.publishing = false;
-            if (button) button.textContent = originalText;
-            renderButtons(section);
-            renderStatus(section);
+            daily.publishing = false;
+            updatePublishState();
         }
     }
 
-    function setStatus(section, message) {
-        const status = section.querySelector("#pricingProductionStatus");
-        if (status) status.textContent = message;
+    async function loadDaily(force = false) {
+        if (daily.loading || (daily.loaded && !force)) return;
+        daily.loading = true;
+        setDailyError("");
+        $("pricingDailyState").textContent = "Loading";
+        try {
+            const [pricing, supplierResponse] = await Promise.all([pricingFetch("/api/admin/pricing-engine"), pricingFetch("/api/admin/suppliers")]);
+            daily.products = Array.isArray(pricing.products) ? pricing.products : [];
+            daily.policies = Array.isArray(pricing.policies) ? pricing.policies : [];
+            daily.suppliers = Array.isArray(supplierResponse.suppliers) ? supplierResponse.suppliers : [];
+            if (!daily.products.length) throw new Error("Failed to load products: production catalog returned no products.");
+            if (!daily.policies.length) throw new Error("Failed to load pricing policy.");
+            const rows = regionRows();
+            daily.supplierId = restoredSupplierId(rows) || daily.supplierId;
+            daily.edits.clear();
+            rows.forEach(row => { if (row.savedDraftSupplierCost != null) daily.edits.set(rowKey(row), { value: row.savedDraftSupplierCost, restored: true }); });
+            daily.loaded = true;
+            $("pricingDailyState").textContent = "Ready";
+            renderProductSelect();
+            renderSupplierSelect();
+            renderRows();
+            schedulePreview();
+        } catch (error) {
+            daily.loaded = false;
+            setDailyError(error.message);
+            $("pricingDailyState").textContent = "Unavailable";
+            $("pricingPackageRows").innerHTML = '<tr><td colspan="6" class="empty">Failed to load production pricing.</td></tr>';
+        } finally { daily.loading = false; }
     }
 
-    function renderButtons(section) {
-        const save = section.querySelector("#pricingSaveDraftBtn");
-        const publish = section.querySelector("#pricingPublishBtn");
-        const workspacePublishSelected = section.querySelector("#pricingWorkspacePublishSelectedBtn");
-        const workspacePublishAll = section.querySelector("#pricingWorkspacePublishAllBtn");
-        const role = String(window.AZIEL_ADMIN_AUTH?.state?.admin?.role || localStorage.getItem("adminRole") || "").toUpperCase();
-        const canManage = window.AZIEL_ADMIN_AUTH?.hasPermission?.("CATALOG_MANAGE") !== false;
-        const canPersist = canPersistPricing();
-        const canSaveDraft = canSaveDraftPricing();
-        const workspaceBusy = state.workspace.previewing || state.workspace.publishing;
-        const workspaceReady = state.apiReady && state.workspace.rows.length > 0;
-        const hasPublishableWorkspaceRows = stagedRows().some(row => {
-            const preview = previewForPackageId(workspacePackageId(row));
-            return row.selected !== false && preview?.publishEligible === true && preview.regions?.[0]?.region === workspaceRegion();
+    function fillSettings() {
+        const form = $("pricingSettingsForm");
+        const config = policyConfig(settings.region, "settings");
+        const currency = settings.region === "TH" ? "THB" : "MMK";
+        form.elements.supplierCurrency.value = config.supplierCurrency || "THB";
+        form.elements.exchangeRate.value = number(config.exchangeRate, 1);
+        form.elements.profitType.value = config.profitRule?.type || "PERCENT";
+        form.elements.profitValue.value = number(config.profitRule?.value);
+        form.elements.gatewayType.value = config.gatewayFee?.type || "PERCENT";
+        form.elements.gatewayValue.value = number(config.gatewayFee?.value);
+        form.elements.platformType.value = config.platformCost?.type || "FIXED";
+        form.elements.platformValue.value = number(config.platformCost?.value);
+        form.elements.roundingMode.value = config.roundingRule?.mode || "NONE";
+        form.elements.roundingIncrement.value = number(config.roundingRule?.increment);
+        form.elements.minimumProfitAmount.value = number(config.minimumProfitAmount);
+        $("pricingSettingsStoreCurrency").textContent = currency;
+        $("pricingExchangeDirection").textContent = `1 ${form.elements.supplierCurrency.value} = ${form.elements.exchangeRate.value} ${currency}`;
+        $("pricingRoundingUnit").textContent = currency;
+        $("pricingMinimumProfitUnit").textContent = currency;
+        updateSettingUnits();
+    }
+
+    function updateSettingUnits() {
+        const form = $("pricingSettingsForm");
+        const currency = settings.region === "TH" ? "THB" : "MMK";
+        [["profit", "profitType"], ["gateway", "gatewayType"], ["platform", "platformType"]].forEach(([unit, field]) => {
+            form.querySelector(`[data-unit-for="${unit}"]`).textContent = form.elements[field].value === "PERCENT" ? "%" : currency;
         });
-        if (save) {
-            save.disabled = !canManage || !canSaveDraft;
-            save.title = canManage
-                ? (canSaveDraft ? "Save pricing policy and supplier-cost drafts" : "Production pricing must load before saving")
-                : "Catalog manage permission required";
-        }
-        if (publish) {
-            publish.disabled = role !== "OWNER" || !canPersist;
-            publish.title = role === "OWNER"
-                ? (canPersist ? "Publish production pricing" : "Production pricing must load before publishing")
-                : "Only OWNER can publish production pricing";
-        }
-        if (workspacePublishSelected) {
-            workspacePublishSelected.disabled = role !== "OWNER" || !canManage || !workspaceReady || workspaceBusy || !hasPublishableWorkspaceRows || workspaceRegion() === "ALL";
-            workspacePublishSelected.title = role === "OWNER"
-                ? (hasPublishableWorkspaceRows ? "Publish explicit staged pricing changes" : "Stage and preview at least one publishable row")
-                : "Only OWNER can publish pricing workspace changes";
-        }
-        if (workspacePublishAll) {
-            workspacePublishAll.disabled = true;
-            workspacePublishAll.title = "Publish All is temporarily disabled until region-specific daily workflows are stable.";
-        }
+        $("pricingExchangeDirection").textContent = `1 ${form.elements.supplierCurrency.value} = ${form.elements.exchangeRate.value || 0} ${currency}`;
     }
 
-    function renderStatus(section) {
-        if (state.loading || state.saving || state.publishing) return;
-        if (state.loadError && !state.apiReady) {
-            setStatus(section, "Pricing workspace failed to load");
-            setText(section, "#pricingSummaryExchangeMeta", "Local preview only");
-            setText(section, "#pricingSummaryProfitMeta", "Save disabled");
-            setText(section, "#pricingSummaryGatewayMeta", "Publish disabled");
-            return;
-        }
-        const version = state.activeVersion;
-        setStatus(section, version ? `Production Active · v${version.versionNumber}` : "Production Ready");
-        setText(section, "#pricingSummaryExchangeMeta", version?.publishedAt ? `Published ${new Date(version.publishedAt).toLocaleString()}` : "Production configuration");
-        setText(section, "#pricingSummaryProfitMeta", version?.publishedBy ? `Published by ${version.publishedBy}` : "Draft preview");
-        setText(section, "#pricingSummaryGatewayMeta", state.dirty || stagedRows().some(row => row.supplierCostSource === "unsaved_stage") ? "Unsaved Changes" : "Draft editable");
+    async function loadSettings(force = false) {
+        if (settings.loading || (settings.loaded && !force)) return;
+        settings.loading = true;
+        try {
+            const pricing = await pricingFetch("/api/admin/pricing-engine");
+            settings.policies = Array.isArray(pricing.policies) ? pricing.policies : [];
+            if (!settings.policies.length) throw new Error("Failed to load pricing policy.");
+            settings.loaded = true;
+            fillSettings();
+            $("pricingSettingsSave").disabled = false;
+            $("pricingSettingsState").textContent = "Ready";
+        } catch (error) {
+            $("pricingSettingsError").hidden = false;
+            $("pricingSettingsError").textContent = error.message;
+            $("pricingSettingsState").textContent = "Unavailable";
+        } finally { settings.loading = false; }
     }
 
-    window.AZIEL_ADMIN_PRICING_ENGINE = {
-        _state: state,
-        loadProductionState: () => requestProductionLoad(document.getElementById("section-pricing-engine"), "public-api"),
-        selectProduct: productId => selectProduct(document.getElementById("section-pricing-engine"), productId),
-        saveDraft: () => saveDraft(document.getElementById("section-pricing-engine")),
-        publishDraft: () => publishDraft(document.getElementById("section-pricing-engine")),
-        previewWorkspace: () => requestWorkspacePreview(document.getElementById("section-pricing-engine")),
-        publishWorkspace: publishAll => publishWorkspace(document.getElementById("section-pricing-engine"), publishAll === true),
-        parseWorkspacePaste: () => parseWorkspacePaste(document.getElementById("section-pricing-engine")),
-        hydrateFallbackProductsFromDom: () => hydrateFallbackProductsFromDom(document.getElementById("section-pricing-engine")),
-        canPersistPricing
-    };
+    function readSettingsConfig() {
+        const form = $("pricingSettingsForm");
+        const base = policyConfig(settings.region, "settings");
+        return {
+            ...base,
+            supplierCurrency: form.elements.supplierCurrency.value,
+            exchangeRate: number(form.elements.exchangeRate.value),
+            minimumProfitAmount: number(form.elements.minimumProfitAmount.value),
+            profitRule: { type: form.elements.profitType.value, value: number(form.elements.profitValue.value) },
+            gatewayFee: { enabled: number(form.elements.gatewayValue.value) > 0, type: form.elements.gatewayType.value, value: number(form.elements.gatewayValue.value) },
+            platformCost: { enabled: number(form.elements.platformValue.value) > 0, type: form.elements.platformType.value, value: number(form.elements.platformValue.value) },
+            roundingRule: { enabled: form.elements.roundingMode.value !== "NONE", mode: form.elements.roundingMode.value, increment: number(form.elements.roundingIncrement.value), psychologicalEnding: 0 }
+        };
+    }
+
+    async function saveSettings() {
+        const form = $("pricingSettingsForm");
+        if (!form.reportValidity() || settings.saving) return;
+        settings.saving = true;
+        $("pricingSettingsSave").disabled = true;
+        $("pricingSettingsState").textContent = "Saving";
+        try {
+            const policies = settings.policies.map(item => ({ region: item.region, currency: item.currency, config: item.region === settings.region ? readSettingsConfig() : structuredClone(item.draft?.config || item.active?.config || {}) }));
+            await pricingFetch("/api/admin/pricing-engine/draft", { method: "PUT", body: JSON.stringify({ policies }) });
+            await pricingFetch("/api/admin/pricing-engine/publish", { method: "POST", body: JSON.stringify({ regions: [settings.region] }) });
+            $("pricingSettingsState").textContent = "Settings saved";
+            settings.loaded = false;
+            daily.loaded = false;
+            await loadSettings(true);
+        } catch (error) {
+            $("pricingSettingsError").hidden = false;
+            $("pricingSettingsError").textContent = error.message;
+            $("pricingSettingsState").textContent = "Save failed";
+        } finally { settings.saving = false; $("pricingSettingsSave").disabled = false; }
+    }
+
+    function bind() {
+        if (document.documentElement.dataset.pricingV3Bound === "true") return;
+        document.documentElement.dataset.pricingV3Bound = "true";
+        $("pricingRegionSelect")?.addEventListener("change", event => { daily.region = event.target.value; renderSupplierSelect(); renderRows(); updatePublishState(); });
+        $("pricingProductSelect")?.addEventListener("change", event => { daily.selectedProductId = event.target.value; daily.search = ""; $("pricingPackageSearch").value = ""; daily.previews.clear(); renderRows(); schedulePreview(); });
+        $("pricingSupplierSelect")?.addEventListener("change", event => { daily.supplierId = event.target.value; daily.previews.clear(); $("pricingSupplierCurrency").textContent = activeSupplier()?.supplierCurrency || "-"; if (daily.edits.size) schedulePreview(); renderRows(); });
+        $("pricingPackageSearch")?.addEventListener("input", event => { daily.search = event.target.value; renderRows(); });
+        $("pricingPackageRows")?.addEventListener("input", event => { const key = event.target.dataset.supplierCost; if (!key) return; const value = Number(event.target.value); if (Number.isFinite(value) && value > 0) daily.edits.set(key, { value }); else daily.edits.delete(key); daily.previews.delete(key); $("pricingDraftState").textContent = "Unsaved Changes"; schedulePreview(); updatePublishState(); });
+        $("pricingPublishBtn")?.addEventListener("click", publishRows);
+        $("pricingSettingsRegion")?.addEventListener("change", event => { settings.region = event.target.value; fillSettings(); });
+        $("pricingSettingsForm")?.addEventListener("input", updateSettingUnits);
+        $("pricingSettingsSave")?.addEventListener("click", saveSettings);
+        window.addEventListener("aziel:admin-section-opened", event => { if (event.detail?.section === "pricing-engine") loadDaily(); if (event.detail?.section === "pricing-settings") loadSettings(); });
+        window.addEventListener("aziel:admin-auth-ready", () => { if (document.body.dataset.adminSection === "pricing-engine") loadDaily(); if (document.body.dataset.adminSection === "pricing-settings") loadSettings(); });
+        if (document.body.dataset.adminSection === "pricing-engine") loadDaily();
+        if (document.body.dataset.adminSection === "pricing-settings") loadSettings();
+    }
+
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bind, { once: true });
+    else bind();
 })();
