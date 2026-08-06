@@ -25,7 +25,7 @@ function plain(value) {
     if (!value) return null;
     return typeof value.toObject === "function"
         ? value.toObject({ depopulate: true, flattenMaps: true, versionKey: false })
-        : structuredClone(value);
+        : value;
 }
 
 function activeWindowQuery(now = new Date()) {
@@ -58,7 +58,9 @@ function policyFromRecord(policy) {
         gatewayFee: policy.defaultGatewayFee || { enabled: false, type: "FIXED", value: 0 },
         platformCost: policy.defaultPlatformCost || { enabled: false, type: "FIXED", value: 0 },
         tax: policy.defaultTax || { enabled: false, type: "FIXED", value: 0 },
-        roundingRule: policy.defaultRoundingRule || { enabled: false, mode: "NONE", increment: 0, psychologicalEnding: 0 }
+        roundingRule: policy.defaultRoundingRule || { enabled: false, mode: "NONE", increment: 0, psychologicalEnding: 0 },
+        minimumProfitAmount: amount(policy.minimumProfitAmount),
+        minimumProfitMarginPercent: amount(policy.minimumProfitMarginPercent)
     };
 }
 
@@ -80,7 +82,10 @@ function ruleSnapshot(rule) {
 
 function manualPublishedPriceRule({ price = {}, packageContext = {}, region, currency } = {}) {
     const mode = upper(price.publishedPriceMode || "LEGACY_COMPATIBILITY_PRICE");
-    if (mode === "POLICY_DERIVED") return null;
+
+    // Legacy catalog prices are historical outputs, not calculation authority.
+    // Only an explicit MANUAL_OVERRIDE may replace the policy-derived result.
+    if (mode !== "MANUAL_OVERRIDE") return null;
     const publishedAmount = Number(price.amount);
     if (!Number.isFinite(publishedAmount) || publishedAmount < 0) return null;
     const reason = text(price.manualOverrideReason) || (
@@ -199,8 +204,63 @@ async function loadActiveRules({ policy, packageContext, region, currency, now =
 
     return rules.map(ruleSnapshot);
 }
+function isoDate(value, fallback = new Date()) {
+    const date = value instanceof Date ? value : new Date(value || fallback);
+    return Number.isNaN(date.getTime())
+        ? fallback.toISOString()
+        : date.toISOString();
+}
 
-async function buildProductionPricingContext({ pkg, price, catalog = {}, region, currency, now = new Date() } = {}) {
+function resolveProductionExchangeRate({
+    policy,
+    supplierCurrency,
+    targetCurrency,
+    now = new Date()
+} = {}) {
+    const source = upper(supplierCurrency);
+    const target = upper(targetCurrency);
+
+    if (source === target) {
+        return resolveExchangeRate({
+            sourceCurrency: source,
+            targetCurrency: target,
+            now
+        });
+    }
+
+    const metadata = policy?.metadata || {};
+    const policyRate = Number(metadata.exchangeRate);
+
+    if (
+        upper(metadata.supplierCurrency) === source &&
+        Number.isFinite(policyRate) &&
+        policyRate > 0
+    ) {
+        return {
+            rate: policyRate,
+            source: "pricing_policy",
+            provider: "AZIEL_COMMERCE",
+            sourceCurrency: source,
+            targetCurrency: target,
+            capturedAt: isoDate(policy.updatedAt, now)
+        };
+    }
+
+    return resolveExchangeRate({
+        sourceCurrency: source,
+        targetCurrency: target,
+        now
+    });
+}
+async function buildProductionPricingContext({
+    pkg,
+    price,
+    catalog = {},
+    region,
+    currency,
+    now = new Date(),
+    includePublishedPriceOverride = true
+} = {}) {
     const normalizedRegion = upper(region);
     const normalizedCurrency = upper(currency);
     const packageContext = packageContextFromCatalog(pkg, catalog);
@@ -211,22 +271,30 @@ async function buildProductionPricingContext({ pkg, price, catalog = {}, region,
         currency: normalizedCurrency,
         now
     });
-    const exchangeRate = resolveExchangeRate({
-        sourceCurrency: supplierCost.currency,
+    const policy = await loadActivePolicy({
+        region: normalizedRegion,
+        currency: normalizedCurrency,
+        now
+    });
+
+    const exchangeRate = resolveProductionExchangeRate({
+        policy,
+        supplierCurrency: supplierCost.currency,
         targetCurrency: normalizedCurrency,
         now
     });
-    const policy = await loadActivePolicy({ region: normalizedRegion, currency: normalizedCurrency, now });
     const [version, rules] = await Promise.all([
         loadPublishedVersion({ policy, pkg, region: normalizedRegion, now }),
         loadActiveRules({ policy, packageContext, region: normalizedRegion, currency: normalizedCurrency, now })
     ]);
-    const priceOverrideRule = manualPublishedPriceRule({
-        price,
-        packageContext,
-        region: normalizedRegion,
-        currency: normalizedCurrency
-    });
+    const priceOverrideRule = includePublishedPriceOverride
+        ? manualPublishedPriceRule({
+            price,
+            packageContext,
+            region: normalizedRegion,
+            currency: normalizedCurrency
+        })
+        : null;
     const appliedPricingRules = priceOverrideRule ? [priceOverrideRule, ...rules] : rules;
 
     return {

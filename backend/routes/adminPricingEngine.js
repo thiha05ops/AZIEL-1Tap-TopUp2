@@ -256,7 +256,7 @@ router.put("/admin/pricing-engine/draft", adminMiddleware, requireAdminPermissio
 
 router.post("/admin/pricing-engine/publish", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_MANAGE), requireOwner, async (req, res) => {
     try {
-        const result = await publishPricing(req.admin || {});
+        const result = await publishPricing(req.admin || {}, { regions: req.body?.regions || [] });
         await writeAdminAudit({
             actor: req.admin,
             req,
@@ -293,6 +293,7 @@ router.post("/admin/pricing-engine/workspace/preview", adminMiddleware, requireA
             rows: req.body?.rows || [],
             couponCode: req.body?.couponCode || "",
             region: req.body?.region || "",
+            supplierId: req.body?.supplierId || "",
             actor: req.admin || null
         });
         return res.json(result);
@@ -307,6 +308,7 @@ router.post("/admin/pricing-engine/workspace/publish", adminMiddleware, requireA
             rows: req.body?.rows || [],
             publishAll: req.body?.publishAll === true,
             region: req.body?.region || "",
+            supplierId: req.body?.supplierId || "",
             actor: req.admin?.username || "admin",
             admin: req.admin || null
         });

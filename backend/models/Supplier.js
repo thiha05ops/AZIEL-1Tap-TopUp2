@@ -48,6 +48,11 @@ const supplierSchema = new mongoose.Schema(
             enum: ["MM", "TH"],
             default: []
         },
+        supplierCurrency: {
+            type: String,
+            enum: ["MMK", "THB", ""],
+            default: ""
+        },
         capabilities: {
             type: [String],
             default: []

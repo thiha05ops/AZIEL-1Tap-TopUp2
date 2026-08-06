@@ -231,6 +231,23 @@ router.get("/admin/catalog/products", adminMiddleware, requireAdminPermission(PE
                 mobilePackagePreviewAsset: product.mobilePackagePreviewAsset || null,
                 description: product.description || "",
                 featured: product.featured === true,
+                catalogCategory: product.catalogCategory || "",
+                lifecycleStatus: product.lifecycleStatus || "ACTIVE",
+                commerceState: product.commerceState || "HIDDEN",
+                publicDiscoveryEnabled: product.publicDiscoveryEnabled === true,
+                discoverable: product.discoverable === true,
+                purchasable: product.purchasable === true,
+                commerceReadiness: product.commerceReadiness || null,
+                comingSoon: product.comingSoon === true,
+                homepageEnabled: product.homepageEnabled === true,
+                homepageCategory: product.homepageCategory || "",
+                homepageOrder: product.homepageOrder || 0,
+                homepageFlags: product.homepageFlags || [],
+                homepageSections: product.homepageSections || [],
+                productRoute: product.productRoute || "",
+                previewPrice: product.previewPrice || null,
+                marketScope: product.marketScope || "MULTI_REGION",
+                displayMarketLabel: product.displayMarketLabel || "",
                 seo: product.seo || { title: "", description: "" },
                 deleted: product.deleted === true,
                 deletedAt: product.deletedAt || null,
@@ -527,7 +544,9 @@ router.patch("/admin/catalog/products/:productCode/packages/:packageCode", admin
         });
         const product = await getCatalogProductDetail(result.package.productCode, {
             source: "database",
-            includeDisabled: true
+            includeDisabled: true,
+            includeAssetProjection: true,
+            includeAdminPricing: true
         });
         await writeAdminAudit({
             actor: req.admin,

@@ -51,11 +51,39 @@ function isPlainObject(value) {
     return Object.prototype.toString.call(value) === "[object Object]";
 }
 
-function deepFreeze(value) {
-    if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
-    Object.freeze(value);
-    Object.keys(value).forEach(key => deepFreeze(value[key]));
-    return value;
+function deepFreeze(value, seen = new WeakSet()) {
+    if (
+        value === null ||
+        value === undefined ||
+        typeof value !== "object" ||
+        Object.isFrozen(value)
+    ) {
+        return value;
+    }
+
+    // MongoDB ObjectId, Node Buffer and typed arrays may contain
+    // ArrayBuffer views that cannot be frozen when they have elements.
+    if (
+        Buffer.isBuffer(value) ||
+        ArrayBuffer.isView(value) ||
+        value instanceof ArrayBuffer ||
+        value instanceof Date
+    ) {
+        return value;
+    }
+
+    // Avoid recursive cycles from Mongoose/runtime objects.
+    if (seen.has(value)) {
+        return value;
+    }
+
+    seen.add(value);
+
+    for (const key of Object.keys(value)) {
+        deepFreeze(value[key], seen);
+    }
+
+    return Object.freeze(value);
 }
 
 function clonePlain(value) {
@@ -444,7 +472,11 @@ async function createAndPersistPricingQuote(input, dependencies = {}) {
                 throw new PricingQuoteApplicationError(ERROR_CODES.APPLICATION_ORCHESTRATION_FAILED, "Application service mutated caller input.");
             }
         }
-        return deepFreeze(result);
+        return Object.freeze({
+            publicQuote: deepFreeze(result.publicQuote),
+            persistedQuote: result.persistedQuote,
+            metadata: deepFreeze(result.metadata)
+        });
     } catch (error) {
         if (error instanceof PricingQuoteApplicationError) throw error;
         const persistenceCode = mapPersistenceError(error);

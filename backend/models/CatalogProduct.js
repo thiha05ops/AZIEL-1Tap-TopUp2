@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { CATALOG_CATEGORIES, HOMEPAGE_FLAGS, HOMEPAGE_SECTIONS, CATALOG_LIFECYCLE, COMMERCE_STATES } = require("../catalog/catalogTaxonomy");
 
 const catalogProductSchema = new mongoose.Schema(
     {
@@ -26,6 +27,58 @@ const catalogProductSchema = new mongoose.Schema(
         featured: {
             type: Boolean,
             default: false
+        },
+        catalogCategory: {
+            type: String,
+            enum: CATALOG_CATEGORIES,
+            default: undefined
+        },
+        lifecycleStatus: {
+            type: String,
+            enum: CATALOG_LIFECYCLE,
+            default: "ACTIVE"
+        },
+        commerceState: {
+            type: String,
+            enum: COMMERCE_STATES,
+            default: "HIDDEN"
+        },
+        publicDiscoveryEnabled: {
+            type: Boolean,
+            default: false
+        },
+        homepageEnabled: {
+            type: Boolean,
+            default: false
+        },
+        homepageCategory: {
+            type: String,
+            enum: CATALOG_CATEGORIES,
+            default: undefined
+        },
+        homepageOrder: {
+            type: Number,
+            default: 0
+        },
+        homepageFlags: {
+            type: [String],
+            enum: HOMEPAGE_FLAGS,
+            default: []
+        },
+        homepageSections: {
+            type: [String],
+            enum: HOMEPAGE_SECTIONS,
+            default: []
+        },
+        productRoute: {
+            type: String,
+            trim: true,
+            default: ""
+        },
+        artworkPath: {
+            type: String,
+            trim: true,
+            default: ""
         },
         supportedRegions: {
             type: [String],
@@ -62,6 +115,22 @@ const catalogProductSchema = new mongoose.Schema(
             }
         },
         presentation: {
+            previewPrice: {
+                amount: { type: Number, min: 0, default: null },
+                currency: { type: String, enum: ["MMK", "THB"], default: undefined },
+                label: { type: String, enum: ["PREVIEW_PRICE", "ESTIMATED", "FROM", "NONE"], default: "PREVIEW_PRICE" }
+            },
+            displayMarketLabel: {
+                type: String,
+                trim: true,
+                maxlength: 60,
+                default: ""
+            },
+            marketScope: {
+                type: String,
+                enum: ["GLOBAL", "REGION", "MULTI_REGION"],
+                default: "MULTI_REGION"
+            },
             imageAssetId: {
                 type: String,
                 trim: true,
@@ -97,6 +166,8 @@ const catalogProductSchema = new mongoose.Schema(
 
 catalogProductSchema.index({ productCode: 1 }, { unique: true });
 catalogProductSchema.index({ enabled: 1, sortOrder: 1 });
+catalogProductSchema.index({ homepageEnabled: 1, homepageCategory: 1, homepageOrder: 1 });
+catalogProductSchema.index({ homepageEnabled: 1, homepageSections: 1, homepageOrder: 1 });
 catalogProductSchema.index({ deletedAt: 1 });
 catalogProductSchema.index({ "presentation.imageAssetId": 1 });
 catalogProductSchema.index({ "presentation.bannerAssetId": 1 });

@@ -186,9 +186,9 @@ function verifyPublicRedactionAndUiOwnership() {
     assert(/if\s*\(\s*includeAdminPricing\s*\)\s*{[\s\S]*supplierCost/.test(catalogService), "supplier cost must stay out of public projection by default.");
 
     const adminHtml = read("frontend/admin.html");
-    assert(adminHtml.includes("pricingScopeSelector"), "Pricing Engine must expose scope selector.");
-    assert(adminHtml.includes("pricingEffectiveSource"), "Pricing Engine must expose effective source.");
-    assert(adminHtml.includes("pricingPublishedMode"), "Pricing Engine must expose published price mode.");
+    assert(adminHtml.includes("pricingSupplierSelect"), "Daily Pricing must expose canonical supplier selection.");
+    assert(adminHtml.includes("pricingSettingsForm"), "Business policy ownership must live in Pricing Settings.");
+    assert(!adminHtml.includes("pricingScopeSelector"), "Legacy mixed-workspace scope selector must be removed.");
 
     const adminCatalog = read("frontend/js/admin-catalog.js");
     assert(adminCatalog.includes("Published Price Mode"), "Catalog editor must show published price mode.");

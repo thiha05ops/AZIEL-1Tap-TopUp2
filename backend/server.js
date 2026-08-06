@@ -209,7 +209,7 @@ function configureApplication(mongoConnection) {
     app.use("/api", sitePlacementRoutes);
     app.use("/api", configurationRegistryRoutes);
     app.use("/api", websiteRuntimeRoutes);
-    app.use("/api", commerceManualPaymentRoutes);
+    app.use("/api", commerceManualPaymentRoutes());
 
     app.use("/api", (err, req, res, next) => {
         if (!err) return next();

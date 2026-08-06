@@ -533,6 +533,10 @@ function createPaymentOrchestrator(dependencies = {}) {
                         providerReference: providerResult.providerReference,
                         providerTransactionId: providerResult.providerTransactionId,
                         rawProviderStatus: providerResult.rawProviderStatus,
+                        qr: providerResult.qr,
+                        expiresAt: providerResult.expiresAt,
+                        paymentInstructions: providerResult.paymentInstructions,
+                        safeMetadata: providerResult.safeMetadata,
                         transactionContext
                     }) || currentAttempt;
                 }

@@ -161,12 +161,62 @@ function toCheckoutSession({ checkout, payment, method, catalog }) {
     };
 }
 
-async function startCustomerManualPromptPayCheckout(input = {}, context = {}, dependencies = {}) {
+async function startCustomerManualPromptPayCheckout(
+    input = {},
+    context = {},
+    dependencies = {}
+) {
+    console.log("[CHECKOUT STEP 0] Request entered", {
+        productCode: input.productCode || input.gameKey || "",
+        packageCode: input.packageCode || "",
+        region: input.region || "",
+        currency: input.currency || "",
+        paymentMethod: input.paymentMethod || input.methodCode || "",
+        userId: input.userId || "",
+        zoneId: input.zoneId || ""
+    });
+
     const owner = ownerFromUser(context.user, context.sessionId);
+
+    console.log("[CHECKOUT STEP 1] Owner resolved", {
+        hasUserId: Boolean(owner.userId),
+        hasSessionId: Boolean(owner.sessionId)
+    });
+
+    console.log("[CHECKOUT STEP 2] Loading catalog package");
+
     const catalog = await loadCatalogPackage(input);
+
+    console.log("[CHECKOUT STEP 3] Catalog package loaded", {
+        productCode: catalog.productCode,
+        packageCode: catalog.packageCode,
+        region: catalog.region,
+        currency: catalog.currency,
+        catalogPackageId: String(catalog.pkg?._id || ""),
+        catalogAmount: Number(catalog.price?.amount || 0)
+    });
+
+    console.log("[CHECKOUT STEP 4] Loading PromptPay method");
+
     const method = await loadPromptPayMethod(input, catalog.region);
+
+    console.log("[CHECKOUT STEP 5] PromptPay method loaded", {
+        key: method.key,
+        region: method.region,
+        paymentType: method.paymentType,
+        provider: method.provider,
+        qrMode: method.qrMode,
+        enabled: method.enabled === true
+    });
+
     const issuedAt = new Date();
-    const pricingContext = await (dependencies.buildPricingContext || buildProductionPricingContext)({
+
+    console.log("[CHECKOUT STEP 6] Building pricing context");
+
+    const pricingContext = await (
+        dependencies.buildPricingContext ||
+        buildProductionPricingContext
+    )({
         pkg: catalog.pkg,
         price: catalog.price,
         catalog,
@@ -174,142 +224,423 @@ async function startCustomerManualPromptPayCheckout(input = {}, context = {}, de
         currency: catalog.currency,
         now: issuedAt
     });
-    const idempotencySeed = text(input.orderId) || publicId("checkout");
+
+    console.log("[CHECKOUT STEP 7] Pricing context ready", {
+        supplierCost:
+            pricingContext?.pricing?.pricingInput?.supplierCost ?? null,
+        supplierCurrency:
+            pricingContext?.pricing?.pricingInput?.supplierCurrency || "",
+        targetCurrency:
+            pricingContext?.pricing?.pricingInput?.targetCurrency || "",
+        priceVersionId:
+            pricingContext?.pricing?.versionContext?.priceVersionId || "",
+        priceVersionNumber:
+            pricingContext?.pricing?.versionContext?.priceVersionNumber || 0,
+        appliedRuleCount: Array.isArray(
+            pricingContext?.pricing?.pricingInput?.appliedPricingRules
+        )
+            ? pricingContext.pricing.pricingInput.appliedPricingRules.length
+            : 0
+    });
+
+    const idempotencySeed =
+        text(input.orderId) ||
+        publicId("checkout");
+
     const suppliedCouponCode = text(input.promoCode);
+
     const quoteDependencies = defaultQuoteDependencies({
-        ...(suppliedCouponCode ? {
-            loadPromotionContext: args => loadCommercePromotionContext({
-                ...args,
-                catalog,
-                user: context.user
-            })
-        } : {}),
+        ...(suppliedCouponCode
+            ? {
+                loadPromotionContext: args =>
+                    loadCommercePromotionContext({
+                        ...args,
+                        catalog,
+                        user: context.user
+                    })
+            }
+            : {}),
         ...(dependencies.quoteDependencies || {})
     });
-    const quoteResult = await createAndPersistPricingQuote({
-        owner,
-        request: {
-            region: catalog.region,
-            currency: catalog.currency,
-            packageIdentity: {
-                packageRef: String(catalog.pkg._id || ""),
-                packageCode: catalog.packageCode
+
+    console.log("[CHECKOUT STEP 8] Creating pricing quote", {
+        idempotencySeed,
+        couponCode: suppliedCouponCode,
+        validitySeconds:
+            Number(method.dynamicQrExpiryMinutes || 15) * 60
+    });
+
+    const quoteResult = await createAndPersistPricingQuote(
+        {
+            owner,
+            request: {
+                region: catalog.region,
+                currency: catalog.currency,
+                packageIdentity: {
+                    packageRef: String(catalog.pkg._id || ""),
+                    packageCode: catalog.packageCode
+                },
+                paymentMethodId: method.key,
+                couponCode: suppliedCouponCode,
+                quantity: 1
             },
-            paymentMethodId: method.key,
-            couponCode: suppliedCouponCode,
-            quantity: 1
+            idempotencyKey: `quote:${idempotencySeed}`,
+            validitySeconds:
+                Number(method.dynamicQrExpiryMinutes || 15) * 60,
+            trace: {
+                issueSource: "customer-checkout"
+            },
+            trustedContext: {
+                package: {
+                    ...(pricingContext.packageContext || {}),
+                    packageId:
+                        pricingContext.packageContext?.packageId ||
+                        String(catalog.pkg._id || ""),
+                    packageRef:
+                        pricingContext.packageContext?.packageRef ||
+                        String(catalog.pkg._id || ""),
+                    packageCode: catalog.packageCode,
+                    packageName:
+                        pricingContext.packageContext?.packageName ||
+                        catalog.pkg.name,
+                    gameId:
+                        pricingContext.packageContext?.gameId ||
+                        catalog.productCode,
+                    gameCode:
+                        pricingContext.packageContext?.gameCode ||
+                        catalog.productCode,
+                    gameName:
+                        pricingContext.packageContext?.gameName ||
+                        text(input.game) ||
+                        catalog.productCode,
+                    categoryId:
+                        pricingContext.packageContext?.categoryId ||
+                        "game",
+                    categoryCode:
+                        pricingContext.packageContext?.categoryCode ||
+                        "game"
+                },
+                pricing: pricingContext.pricing
+            }
         },
-        idempotencyKey: `quote:${idempotencySeed}`,
-        validitySeconds: Number(method.dynamicQrExpiryMinutes || 15) * 60,
-        trace: { issueSource: "customer-checkout" },
-        trustedContext: {
-            package: {
-                ...(pricingContext.packageContext || {}),
-                packageId: pricingContext.packageContext?.packageId || String(catalog.pkg._id || ""),
-                packageRef: pricingContext.packageContext?.packageRef || String(catalog.pkg._id || ""),
-                packageCode: catalog.packageCode,
-                packageName: pricingContext.packageContext?.packageName || catalog.pkg.name,
-                gameId: pricingContext.packageContext?.gameId || catalog.productCode,
-                gameCode: pricingContext.packageContext?.gameCode || catalog.productCode,
-                gameName: pricingContext.packageContext?.gameName || text(input.game) || catalog.productCode,
-                categoryId: pricingContext.packageContext?.categoryId || "game",
-                categoryCode: pricingContext.packageContext?.categoryCode || "game"
-            },
-            pricing: pricingContext.pricing
-        }
-    }, quoteDependencies);
+        quoteDependencies
+    );
+
+    console.log("[CHECKOUT STEP 9] Pricing quote created", {
+        quoteId: quoteResult?.publicQuote?.quoteId || "",
+        status: quoteResult?.publicQuote?.status || "",
+        amount:
+            quoteResult?.publicQuote?.pricing?.quotedTotalAmount ?? null,
+        currency:
+            quoteResult?.publicQuote?.pricing?.currency || "",
+        persistenceOutcome:
+            quoteResult?.metadata?.persistenceOutcome || ""
+    });
 
     let redemption = null;
     let checkoutResult = null;
+
     try {
-        checkoutResult = await checkoutFromQuote({
-            quoteId: quoteResult.publicQuote.quoteId,
-            owner,
-            idempotencyKey: `checkout:${idempotencySeed}`,
-            paymentSelection: {
-                paymentMethodId: method.key,
-                paymentChannel: "MANUAL_PROMPTPAY"
-            },
-            customerInput: {
-                gameAccount: {
-                    userId: input.userId || "",
-                    zoneId: input.zoneId || ""
-                },
-                customFields: {
-                    username: input.username || "",
-                    gameKey: input.gameKey || input.productCode || ""
-                }
-            },
-            requestMetadata: {
-                source: "customer-storefront"
-            }
-        }, {
-            validateOperationalPackageState: async () => ({ allowed: true }),
-            validateFulfilmentInput: async ({ customerInput }) => ({ allowed: true, normalisedFulfilmentInput: customerInput }),
-            validatePaymentMethod: async () => ({
-                allowed: true,
-                paymentSnapshot: {
+        console.log("[CHECKOUT STEP 10] Starting CommerceOrder checkout");
+
+        checkoutResult = await checkoutFromQuote(
+            {
+                quoteId: quoteResult.publicQuote.quoteId,
+                owner,
+                idempotencyKey: `checkout:${idempotencySeed}`,
+                paymentSelection: {
                     paymentMethodId: method.key,
-                    paymentChannel: "MANUAL_PROMPTPAY",
-                    provider: "MANUAL_PROMPTPAY",
-                    flowType: "manual_promptpay",
-                    nextAction: "OPEN_MANUAL_PAYMENT",
-                    paymentMethodBound: true,
-                    metadata: {
-                        qrMode: method.qrMode,
-                        confirmationMode: method.confirmationMode || "manual_admin"
+                    paymentChannel: "MANUAL_PROMPTPAY"
+                },
+                customerInput: {
+                    gameAccount: {
+                        userId: input.userId || "",
+                        zoneId: input.zoneId || ""
+                    },
+                    customFields: {
+                        username: input.username || "",
+                        gameKey:
+                            input.gameKey ||
+                            input.productCode ||
+                            ""
                     }
                 },
-                nextAction: "OPEN_MANUAL_PAYMENT"
-            }),
-            validatePromotionRedemption: async ({ quote, orderId }) => {
-                redemption = await reserveCommercePromotion({
-                    order: {
-                        orderId,
-                        commercial: {
-                            region: quote.commercialSnapshot?.region,
-                            currency: quote.commercialSnapshot?.currency,
-                            originalUnitPrice: quote.commercialSnapshot?.originalPrice,
-                            quantity: quote.commercialSnapshot?.quantity,
-                            discountAmount: quote.commercialSnapshot?.discountAmount,
-                            totalAmount: quote.commercialSnapshot?.quotedTotalAmount
-                        },
-                        promotionSnapshot: quote.promotionSnapshot
-                    },
-                    user: context.user,
-                    expiresAt: quote.lifecycle?.expiresAt || quoteResult.publicQuote.expiresAt || null
-                });
-                return { allowed: true, promotionRedemptionSnapshot: redemption };
+                requestMetadata: {
+                    source: "customer-storefront"
+                }
             },
-            getCheckoutTime: () => new Date(),
-            generateOrderId: () => publicId("AZL"),
-            generateCheckoutId: () => publicId("CHK"),
-            ...dependencies.checkoutDependencies
+            {
+                validateOperationalPackageState: async () => ({
+                    allowed: true
+                }),
+
+                validateFulfilmentInput: async ({
+                    customerInput
+                }) => ({
+                    allowed: true,
+                    normalisedFulfilmentInput: customerInput
+                }),
+
+                validatePaymentMethod: async () => ({
+                    allowed: true,
+                    paymentSnapshot: {
+                        paymentMethodId: method.key,
+                        paymentChannel: "MANUAL_PROMPTPAY",
+                        provider: "MANUAL_PROMPTPAY",
+                        flowType: "manual_promptpay",
+                        nextAction: "OPEN_MANUAL_PAYMENT",
+                        paymentMethodBound: true,
+                        metadata: {
+                            qrMode: method.qrMode,
+                            confirmationMode:
+                                method.confirmationMode ||
+                                "manual_admin"
+                        }
+                    },
+                    nextAction: "OPEN_MANUAL_PAYMENT"
+                }),
+
+                validatePromotionRedemption: async ({
+                    quote,
+                    orderId
+                }) => {
+                    console.log(
+                        "[CHECKOUT STEP 10A] Reserving promotion",
+                        {
+                            orderId,
+                            hasPromotion:
+                                Boolean(
+                                    quote?.promotionSnapshot
+                                        ?.selectedPromotion
+                                )
+                        }
+                    );
+
+                    redemption =
+                        await reserveCommercePromotion({
+                            order: {
+                                orderId,
+                                commercial: {
+                                    region:
+                                        quote.commercialSnapshot
+                                            ?.region,
+                                    currency:
+                                        quote.commercialSnapshot
+                                            ?.currency,
+                                    originalUnitPrice:
+                                        quote.commercialSnapshot
+                                            ?.originalPrice,
+                                    quantity:
+                                        quote.commercialSnapshot
+                                            ?.quantity,
+                                    discountAmount:
+                                        quote.commercialSnapshot
+                                            ?.discountAmount,
+                                    totalAmount:
+                                        quote.commercialSnapshot
+                                            ?.quotedTotalAmount
+                                },
+                                promotionSnapshot:
+                                    quote.promotionSnapshot
+                            },
+                            user: context.user,
+                            expiresAt:
+                                quote.lifecycle?.expiresAt ||
+                                quoteResult.publicQuote
+                                    .expiresAt ||
+                                null
+                        });
+
+                    console.log(
+                        "[CHECKOUT STEP 10B] Promotion reservation complete",
+                        {
+                            reserved: Boolean(redemption),
+                            orderId:
+                                redemption?.orderId ||
+                                orderId
+                        }
+                    );
+
+                    return {
+                        allowed: true,
+                        promotionRedemptionSnapshot:
+                            redemption
+                    };
+                },
+
+                getCheckoutTime: () => new Date(),
+                generateOrderId: () => publicId("AZL"),
+                generateCheckoutId: () => publicId("CHK"),
+
+                ...dependencies.checkoutDependencies
+            }
+        );
+
+        console.log("[CHECKOUT STEP 11] CommerceOrder created", {
+            orderId:
+                checkoutResult?.checkout?.orderId || "",
+            quoteId:
+                checkoutResult?.checkout?.quoteId || "",
+            status:
+                checkoutResult?.checkout?.status || "",
+            paymentStatus:
+                checkoutResult?.checkout?.paymentStatus ||
+                "",
+            totalAmount:
+                checkoutResult?.checkout?.pricing
+                    ?.totalAmount ?? null,
+            currency:
+                checkoutResult?.checkout?.pricing
+                    ?.currency || "",
+            idempotentReuse:
+                checkoutResult?.metadata
+                    ?.idempotentReuse === true
         });
 
-        const manualService = dependencies.manualPaymentService || createManualPaymentApplicationService(dependencies.manualPaymentOptions || {});
-        const payment = await manualService.initiateManualPayment({
-            orderId: checkoutResult.checkout.orderId,
-            owner,
-            idempotencyKey: `manual:${idempotencySeed}`
+        const manualService =
+            dependencies.manualPaymentService ||
+            createManualPaymentApplicationService(
+                dependencies.manualPaymentOptions || {}
+            );
+
+        console.log(
+            "[CHECKOUT STEP 12] Starting manual payment",
+            {
+                orderId:
+                    checkoutResult.checkout.orderId,
+                idempotencyKey:
+                    `manual:${idempotencySeed}`
+            }
+        );
+
+        const payment =
+            await manualService.initiateManualPayment({
+                orderId:
+                    checkoutResult.checkout.orderId,
+                owner,
+                idempotencyKey:
+                    `manual:${idempotencySeed}`
+            });
+
+        console.log(
+            "[CHECKOUT STEP 13] Manual payment created",
+            {
+                attemptId: payment?.attemptId || "",
+                status:
+                    payment?.paymentStatus || "",
+                amount: payment?.amount ?? null,
+                currency: payment?.currency || "",
+                hasQr: Boolean(payment?.qr?.image),
+                hasQrPayload: Boolean(
+                    payment?.qr?.payload
+                ),
+                expiresAt:
+                    payment?.expiresAt || ""
+            }
+        );
+
+        const session = toCheckoutSession({
+            checkout: checkoutResult.checkout,
+            payment,
+            method,
+            catalog
         });
+
+        console.log(
+            "[CHECKOUT STEP 14] Checkout session ready",
+            {
+                commerceOrderId:
+                    session.commerceOrderId,
+                attemptId: session.attemptId,
+                amount: session.amount,
+                currency: session.currency,
+                hasQrImage: Boolean(
+                    session.qrImage
+                ),
+                hasDynamicQrImage: Boolean(
+                    session.dynamicQr?.qrImage
+                )
+            }
+        );
 
         return {
             checkout: checkoutResult.checkout,
             payment,
-            session: toCheckoutSession({ checkout: checkoutResult.checkout, payment, method, catalog })
+            session
         };
     } catch (error) {
+        console.error(
+            "[CHECKOUT ERROR] Checkout failed",
+            {
+                name: error?.name || "",
+                code: error?.code || "",
+                message: error?.message || "",
+                stage: error?.stage || "",
+                causeCode: error?.causeCode || "",
+                statusCode:
+                    error?.statusCode ||
+                    error?.httpStatus ||
+                    0,
+                retryable:
+                    error?.retryable === true
+            }
+        );
+
         if (redemption) {
-            const released = await releaseCommercePromotion({ orderId: checkoutResult?.checkout?.orderId || redemption.orderId, promotionRedemptionSnapshot: redemption });
-            if (released && checkoutResult?.checkout?.orderId && typeof (dependencies.orderRepository || orderRepository).setPromotionRedemptionSnapshot === "function") {
-                await (dependencies.orderRepository || orderRepository).setPromotionRedemptionSnapshot({
-                    orderId: checkoutResult?.checkout?.orderId || redemption.orderId,
-                    promotionRedemptionSnapshot: released,
+            console.log(
+                "[CHECKOUT CLEANUP] Releasing promotion",
+                {
+                    orderId:
+                        checkoutResult?.checkout
+                            ?.orderId ||
+                        redemption.orderId ||
+                        ""
+                }
+            );
+
+            const released =
+                await releaseCommercePromotion({
+                    orderId:
+                        checkoutResult?.checkout
+                            ?.orderId ||
+                        redemption.orderId,
+                    promotionRedemptionSnapshot:
+                        redemption
+                });
+
+            console.log(
+                "[CHECKOUT CLEANUP] Promotion released",
+                {
+                    released: Boolean(released)
+                }
+            );
+
+            if (
+                released &&
+                checkoutResult?.checkout?.orderId &&
+                typeof (
+                    dependencies.orderRepository ||
+                    orderRepository
+                ).setPromotionRedemptionSnapshot ===
+                "function"
+            ) {
+                await (
+                    dependencies.orderRepository ||
+                    orderRepository
+                ).setPromotionRedemptionSnapshot({
+                    orderId:
+                        checkoutResult.checkout.orderId,
+                    promotionRedemptionSnapshot:
+                        released,
                     changedAt: new Date()
                 });
+
+                console.log(
+                    "[CHECKOUT CLEANUP] Order promotion snapshot updated"
+                );
             }
         }
+
         throw error;
     }
 }

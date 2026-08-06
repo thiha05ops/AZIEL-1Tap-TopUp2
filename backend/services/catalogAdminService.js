@@ -7,6 +7,7 @@ const {
     normalizeRegion
 } = require("../catalog/catalogProjection");
 const { assertAssetCategory } = require("./mediaService");
+const { CATALOG_CATEGORIES, HOMEPAGE_FLAGS, HOMEPAGE_SECTIONS, CATALOG_LIFECYCLE, COMMERCE_STATES } = require("../catalog/catalogTaxonomy");
 
 class CatalogAdminError extends Error {
     constructor(code, message, statusCode = 400) {
@@ -27,6 +28,7 @@ const MAX_SUPPLIER_NAME = 120;
 const MAX_SUPPLIER_VERSION = 80;
 const MAX_PRICING_NOTE = 240;
 const MAX_OVERRIDE_REASON = 240;
+const MAX_DISCOUNT_LABEL = 40;
 const MAX_SUPPLIER_COST_HISTORY = 200;
 const PUBLISHED_PRICE_MODES = Object.freeze(["POLICY_DERIVED", "MANUAL_OVERRIDE", "LEGACY_COMPATIBILITY_PRICE"]);
 
@@ -194,6 +196,35 @@ function parseSortOrder(value) {
     return order;
 }
 
+function parseEnum(value, allowed, field, { optional = false } = {}) {
+    const normalized = String(value || "").trim().toUpperCase();
+    if (optional && !normalized) return undefined;
+    if (!allowed.includes(normalized)) {
+        throw new CatalogAdminError("CATALOG_PATCH_INVALID", `${field} is not supported.`);
+    }
+    return normalized;
+}
+
+function normalizeHomepageFlags(value) {
+    if (!Array.isArray(value)) throw new CatalogAdminError("CATALOG_PATCH_INVALID", "homepageFlags must be an array.");
+    return [...new Set(value.map(flag => parseEnum(flag, HOMEPAGE_FLAGS, "homepageFlags")))];
+}
+
+function normalizeHomepageSections(value) {
+    if (!Array.isArray(value)) throw new CatalogAdminError("CATALOG_PATCH_INVALID", "homepageSections must be an array.");
+    return [...new Set(value.map(section => parseEnum(section, HOMEPAGE_SECTIONS, "homepageSections")))];
+}
+
+function normalizePreviewPrice(value) {
+    if (value === null) return { amount: null, currency: undefined, label: "PREVIEW_PRICE" };
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new CatalogAdminError("CATALOG_PATCH_INVALID", "previewPrice must be an object or null.");
+    const amount = parseNullablePrice(value.amount, "previewPrice.amount");
+    if (amount === null) return { amount: null, currency: undefined, label: "PREVIEW_PRICE" };
+    const currency = parseEnum(value.currency, ["MMK", "THB"], "previewPrice.currency");
+    const label = parseEnum(value.label || "PREVIEW_PRICE", ["PREVIEW_PRICE", "ESTIMATED", "FROM", "NONE"], "previewPrice.label");
+    return { amount, currency, label };
+}
+
 function normalizePackageName(value) {
     const name = String(value || "").trim();
 
@@ -213,9 +244,38 @@ function buildCreateRegionalPrice(region, patch = {}) {
 
     if (!enabled) return undefined;
 
+    const amount = parsePrice(patch.amount);
+    const referencePrice = parseNullablePrice(patch.referencePrice, `${region}.referencePrice`);
+    const showDiscount = Object.prototype.hasOwnProperty.call(patch, "showDiscount")
+        ? parseBoolean(patch.showDiscount, `${region}.showDiscount`)
+        : false;
+
+    if (referencePrice !== null && referencePrice <= amount) {
+        throw new CatalogAdminError(
+            "CATALOG_REFERENCE_PRICE_INVALID",
+            "Reference price must be greater than the selling price."
+        );
+    }
+
+    if (showDiscount && referencePrice === null) {
+        throw new CatalogAdminError(
+            "CATALOG_REFERENCE_PRICE_INVALID",
+            "A valid reference price is required when discount display is enabled."
+        );
+    }
+
     return {
-        amount: parsePrice(patch.amount),
+        amount,
         currency,
+        referencePrice,
+        showDiscount,
+        showSaveAmount: Object.prototype.hasOwnProperty.call(patch, "showSaveAmount")
+            ? parseBoolean(patch.showSaveAmount, `${region}.showSaveAmount`)
+            : true,
+        showOriginalPrice: Object.prototype.hasOwnProperty.call(patch, "showOriginalPrice")
+            ? parseBoolean(patch.showOriginalPrice, `${region}.showOriginalPrice`)
+            : true,
+        discountLabel: cleanEditableText(patch.discountLabel, MAX_DISCOUNT_LABEL),
         enabled: true
     };
 }
@@ -280,6 +340,19 @@ function buildProductPatch(patch = {}) {
         "description",
         "enabled",
         "featured",
+        "catalogCategory",
+        "lifecycleStatus",
+        "commerceState",
+        "publicDiscoveryEnabled",
+        "homepageEnabled",
+        "homepageCategory",
+        "homepageOrder",
+        "homepageFlags",
+        "homepageSections",
+        "productRoute",
+        "previewPrice",
+        "marketScope",
+        "displayMarketLabel",
         "supportedRegions",
         "seo",
         "expectedUpdatedAt"
@@ -307,6 +380,20 @@ function buildProductPatch(patch = {}) {
         updates.featured = parseBoolean(patch.featured, "featured");
     }
 
+    if (Object.prototype.hasOwnProperty.call(patch, "catalogCategory")) updates.catalogCategory = parseEnum(patch.catalogCategory, CATALOG_CATEGORIES, "catalogCategory", { optional: true });
+    if (Object.prototype.hasOwnProperty.call(patch, "lifecycleStatus")) updates.lifecycleStatus = parseEnum(patch.lifecycleStatus, CATALOG_LIFECYCLE, "lifecycleStatus");
+    if (Object.prototype.hasOwnProperty.call(patch, "commerceState")) updates.commerceState = parseEnum(patch.commerceState, COMMERCE_STATES, "commerceState");
+    if (Object.prototype.hasOwnProperty.call(patch, "publicDiscoveryEnabled")) updates.publicDiscoveryEnabled = parseBoolean(patch.publicDiscoveryEnabled, "publicDiscoveryEnabled");
+    if (Object.prototype.hasOwnProperty.call(patch, "homepageEnabled")) updates.homepageEnabled = parseBoolean(patch.homepageEnabled, "homepageEnabled");
+    if (Object.prototype.hasOwnProperty.call(patch, "homepageCategory")) updates.homepageCategory = parseEnum(patch.homepageCategory, CATALOG_CATEGORIES, "homepageCategory", { optional: true });
+    if (Object.prototype.hasOwnProperty.call(patch, "homepageOrder")) updates.homepageOrder = parseSortOrder(patch.homepageOrder);
+    if (Object.prototype.hasOwnProperty.call(patch, "homepageFlags")) updates.homepageFlags = normalizeHomepageFlags(patch.homepageFlags);
+    if (Object.prototype.hasOwnProperty.call(patch, "homepageSections")) updates.homepageSections = normalizeHomepageSections(patch.homepageSections);
+    if (Object.prototype.hasOwnProperty.call(patch, "productRoute")) updates.productRoute = cleanEditableText(patch.productRoute, 240);
+    if (Object.prototype.hasOwnProperty.call(patch, "previewPrice")) updates["presentation.previewPrice"] = normalizePreviewPrice(patch.previewPrice);
+    if (Object.prototype.hasOwnProperty.call(patch, "marketScope")) updates["presentation.marketScope"] = parseEnum(patch.marketScope, ["GLOBAL", "REGION", "MULTI_REGION"], "marketScope");
+    if (Object.prototype.hasOwnProperty.call(patch, "displayMarketLabel")) updates["presentation.displayMarketLabel"] = cleanEditableText(patch.displayMarketLabel, 60);
+
     if (Object.prototype.hasOwnProperty.call(patch, "supportedRegions")) {
         updates.supportedRegions = normalizeSupportedRegions(patch.supportedRegions);
     }
@@ -326,7 +413,7 @@ function buildPackagePatch(document, patch = {}) {
     assertNoImmutableFields(patch, ["_id", "id", "productCode", "packageCode", "source", "createdAt", "updatedAt", "__v"]);
 
     const updates = {};
-    const allowed = new Set(["name", "enabled", "prices", "iconAssetId", "expectedUpdatedAt"]);
+    const allowed = new Set(["name", "enabled", "prices", "canonicalSupplierCost", "iconAssetId", "expectedUpdatedAt"]);
 
     Object.keys(patch).forEach(key => {
         if (!allowed.has(key)) {
@@ -344,6 +431,17 @@ function buildPackagePatch(document, patch = {}) {
 
     if (Object.prototype.hasOwnProperty.call(patch, "iconAssetId")) {
         updates.iconAssetId = cleanEditableText(patch.iconAssetId, 96);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(patch, "canonicalSupplierCost")) {
+        const snapshot = patch.canonicalSupplierCost;
+        if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) throw new CatalogAdminError("CATALOG_PATCH_INVALID", "canonicalSupplierCost must be an object.");
+        updates["canonicalSupplierCost.supplierId"] = snapshot.supplierId || null;
+        updates["canonicalSupplierCost.supplierCode"] = cleanEditableText(snapshot.supplierCode, MAX_SUPPLIER_NAME).toUpperCase();
+        updates["canonicalSupplierCost.supplierName"] = cleanEditableText(snapshot.supplierName, MAX_SUPPLIER_NAME);
+        updates["canonicalSupplierCost.amount"] = parseNullablePrice(snapshot.amount, "canonicalSupplierCost.amount");
+        updates["canonicalSupplierCost.currency"] = parseSupplierCurrency(snapshot.currency, "");
+        updates["canonicalSupplierCost.capturedAt"] = parseNullableDate(snapshot.capturedAt, "canonicalSupplierCost.capturedAt");
     }
 
     if (patch.prices !== undefined) {
@@ -365,11 +463,18 @@ function buildPackagePatch(document, patch = {}) {
 
             const regionalAllowed = new Set([
                 "amount",
+                "referencePrice",
+                "showDiscount",
+                "showSaveAmount",
+                "showOriginalPrice",
+                "discountLabel",
                 "enabled",
                 "publishedPriceMode",
                 "manualOverrideReason",
                 "supplierCost",
                 "supplierCurrency",
+                "supplierId",
+                "supplierCode",
                 "supplierName",
                 "supplierVersion",
                 "supplierCostTimestamp",
@@ -402,6 +507,63 @@ function buildPackagePatch(document, patch = {}) {
                 );
             }
 
+            if (Object.prototype.hasOwnProperty.call(pricePatch, "referencePrice")) {
+                updates[`prices.${region}.referencePrice`] = parseNullablePrice(
+                    pricePatch.referencePrice,
+                    `${region}.referencePrice`
+                );
+            }
+            if (Object.prototype.hasOwnProperty.call(pricePatch, "showDiscount")) {
+                updates[`prices.${region}.showDiscount`] = parseBoolean(
+                    pricePatch.showDiscount,
+                    `${region}.showDiscount`
+                );
+            }
+            if (Object.prototype.hasOwnProperty.call(pricePatch, "showSaveAmount")) {
+                updates[`prices.${region}.showSaveAmount`] = parseBoolean(
+                    pricePatch.showSaveAmount,
+                    `${region}.showSaveAmount`
+                );
+            }
+            if (Object.prototype.hasOwnProperty.call(pricePatch, "showOriginalPrice")) {
+                updates[`prices.${region}.showOriginalPrice`] = parseBoolean(
+                    pricePatch.showOriginalPrice,
+                    `${region}.showOriginalPrice`
+                );
+            }
+            if (Object.prototype.hasOwnProperty.call(pricePatch, "discountLabel")) {
+                updates[`prices.${region}.discountLabel`] = cleanEditableText(
+                    pricePatch.discountLabel,
+                    MAX_DISCOUNT_LABEL
+                );
+            }
+
+            const nextAmount = Object.prototype.hasOwnProperty.call(updates, `prices.${region}.amount`)
+                ? updates[`prices.${region}.amount`]
+                : document.prices?.[region]?.amount;
+            const nextReferencePrice = Object.prototype.hasOwnProperty.call(updates, `prices.${region}.referencePrice`)
+                ? updates[`prices.${region}.referencePrice`]
+                : (document.prices?.[region]?.referencePrice ?? null);
+            const nextShowDiscount = Object.prototype.hasOwnProperty.call(updates, `prices.${region}.showDiscount`)
+                ? updates[`prices.${region}.showDiscount`]
+                : Boolean(document.prices?.[region]?.showDiscount);
+
+            if (nextReferencePrice !== null && nextReferencePrice !== undefined) {
+                if (!Number.isFinite(Number(nextAmount)) || nextReferencePrice <= Number(nextAmount)) {
+                    throw new CatalogAdminError(
+                        "CATALOG_REFERENCE_PRICE_INVALID",
+                        "Reference price must be greater than the selling price."
+                    );
+                }
+            }
+
+            if (nextShowDiscount && (nextReferencePrice === null || nextReferencePrice === undefined)) {
+                throw new CatalogAdminError(
+                    "CATALOG_REFERENCE_PRICE_INVALID",
+                    "A valid reference price is required when discount display is enabled."
+                );
+            }
+
             if (Object.prototype.hasOwnProperty.call(pricePatch, "publishedPriceMode")) {
                 updates[`prices.${region}.publishedPriceMode`] = parsePublishedPriceMode(pricePatch.publishedPriceMode);
             }
@@ -429,6 +591,12 @@ function buildPackagePatch(document, patch = {}) {
 
             if (Object.prototype.hasOwnProperty.call(pricePatch, "supplierName")) {
                 updates[`prices.${region}.supplierName`] = cleanEditableText(pricePatch.supplierName, MAX_SUPPLIER_NAME);
+            }
+            if (Object.prototype.hasOwnProperty.call(pricePatch, "supplierId")) {
+                updates[`prices.${region}.supplierId`] = pricePatch.supplierId || null;
+            }
+            if (Object.prototype.hasOwnProperty.call(pricePatch, "supplierCode")) {
+                updates[`prices.${region}.supplierCode`] = cleanEditableText(pricePatch.supplierCode, MAX_SUPPLIER_NAME).toUpperCase();
             }
             if (Object.prototype.hasOwnProperty.call(pricePatch, "supplierVersion")) {
                 updates[`prices.${region}.supplierVersion`] = cleanEditableText(pricePatch.supplierVersion, MAX_SUPPLIER_VERSION);
@@ -514,6 +682,36 @@ async function updateProduct({ productCode, patch = {}, actor = "admin" }) {
     Object.entries(updates).forEach(([path, value]) => {
         product.set(path, value);
     });
+    if (product.commerceState === "PURCHASABLE") {
+        const SupplierProductMapping = require("../models/SupplierProductMapping");
+        const PackageInventoryState = require("../models/PackageInventoryState");
+        const { projectCommerceReadiness } = require("./catalogService");
+        const [packages, mappings, inventoryStates] = await Promise.all([
+            CatalogPackage.find({ productCode: normalizedProductCode }).lean(),
+            SupplierProductMapping.find({ productCode: normalizedProductCode, enabled: true }).lean(),
+            PackageInventoryState.find().lean()
+        ]);
+        const packageIds = new Set(packages.map(item => String(item._id)));
+        const relevantInventory = inventoryStates.filter(item => packageIds.has(String(item.packageRef)) || packages.some(pkg => pkg.packageCode === item.packageCode));
+        const readiness = projectCommerceReadiness(product.toObject(), packages, mappings, relevantInventory);
+        if (!readiness.ready) {
+            throw new CatalogAdminError(
+                "CATALOG_COMMERCE_CONFIGURATION_INCOMPLETE",
+                `Product cannot be published on Home. Missing: ${readiness.missing.join(", ")}.`
+            );
+        }
+    }
+    if (product.publicDiscoveryEnabled && product.commerceState !== "HIDDEN") {
+        const identityMissing = [
+            !product.name && "name",
+            !product.catalogCategory && "category",
+            !product.productRoute && "route",
+            !(product.artworkPath || product.presentation?.imageAssetId) && "artwork"
+        ].filter(Boolean);
+        if (identityMissing.length) {
+            throw new CatalogAdminError("CATALOG_DISCOVERY_CONFIGURATION_INCOMPLETE", `Product cannot be discoverable. Missing: ${identityMissing.join(", ")}.`);
+        }
+    }
     await product.save();
     console.log("Catalog product updated:", {
         action: "catalog.product.update",

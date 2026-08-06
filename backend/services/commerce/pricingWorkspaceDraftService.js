@@ -4,6 +4,7 @@ const PricingWorkspaceDraft = require("../../models/PricingWorkspaceDraft");
 const CatalogPackage = require("../../models/CatalogPackage");
 const { CURRENCY, REGION } = require("../../constants/commerce");
 const { normalizePackageCode, normalizeProductCode, normalizeRegion } = require("../../catalog/catalogProjection");
+const { resolvePricingSupplier } = require("./pricingSupplierService");
 
 function text(value) {
     return String(value || "").trim();
@@ -38,24 +39,26 @@ function normalizeSupplierCurrency(value, region) {
     return currency;
 }
 
-function normalizeDraftRows(rows = [], region = "TH") {
+function normalizeDraftRows(rows = [], region = "ALL", supplier = {}) {
     if (!Array.isArray(rows) || !rows.length) return [];
-    const normalizedRegion = normalizeRegion(region || "TH");
-    if (!REGION.includes(normalizedRegion)) {
+    const normalizedRegion = upper(region || "ALL") === "ALL" ? "ALL" : normalizeRegion(region);
+    if (![...REGION, "ALL"].includes(normalizedRegion)) {
         throw new Error("Unsupported Pricing Workspace draft region.");
     }
     return (Array.isArray(rows) ? rows : []).map((row, index) => {
         const productId = normalizeProductCode(row.productCode || row.productId);
         const packageCode = normalizePackageCode(row.packageCode);
         const stagedSupplierCost = amount(row.newSupplierCost ?? row.supplierCost ?? row.stagedSupplierCost);
-        const supplierCurrency = normalizeSupplierCurrency(row.supplierCurrency, normalizedRegion);
+        const supplierCurrency = normalizeSupplierCurrency(supplier.supplierCurrency, normalizedRegion);
         if (!productId || !packageCode || stagedSupplierCost == null) return null;
         return {
             rowId: text(row.rowId) || `${productId}:${packageCode}`,
             productId,
             region: normalizedRegion,
             supplierCurrency,
-            supplierName: text(row.supplierName) || "Primary supplier",
+            supplierId: supplier.supplierId,
+            supplierCode: supplier.supplierCode,
+            supplierName: supplier.supplierName,
             supplierVersion: text(row.supplierVersion),
             packageId: text(row.packageId),
             packageCode,
@@ -71,12 +74,14 @@ function normalizeDraftRows(rows = [], region = "TH") {
 function groupRows(rows = []) {
     const groups = new Map();
     rows.forEach(row => {
-        const key = `${row.productId}:${row.region}:${row.supplierCurrency}`;
+        const key = `${row.productId}:${row.region}:${row.supplierId}`;
         if (!groups.has(key)) {
             groups.set(key, {
                 productId: row.productId,
                 region: row.region,
                 supplierCurrency: row.supplierCurrency,
+                supplierId: row.supplierId,
+                supplierCode: row.supplierCode,
                 supplierName: row.supplierName,
                 supplierVersion: row.supplierVersion,
                 rows: []
@@ -111,8 +116,11 @@ async function validateCatalogRows(rows = []) {
         if (!pkg) {
             throw validationError(`Supplier-cost draft row references an unknown catalog package: ${row.productId}/${row.packageCode}.`);
         }
-        if (!pkg.prices?.[row.region]) {
+        if (row.region !== "ALL" && !pkg.prices?.[row.region]) {
             throw validationError(`Supplier-cost draft row references a package without ${row.region} pricing: ${row.productId}/${row.packageCode}.`);
+        }
+        if (row.region === "ALL" && !REGION.some(region => pkg.prices?.[region])) {
+            throw validationError(`Supplier-cost draft row references a package without active regional pricing: ${row.productId}/${row.packageCode}.`);
         }
     });
     return rows;
@@ -125,6 +133,8 @@ function publicDraftRow(doc, row) {
         productCode: doc.productId,
         region: doc.region,
         supplierCurrency: doc.supplierCurrency,
+        supplierId: doc.supplierId ? String(doc.supplierId) : "",
+        supplierCode: doc.supplierCode || "",
         supplierName: doc.supplierName || "Primary supplier",
         supplierVersion: doc.supplierVersion || "",
         packageId: row.packageId || "",
@@ -146,8 +156,8 @@ function draftRowsFromDocs(docs = []) {
 }
 
 async function listSupplierCostDraftRows() {
-    const docs = await PricingWorkspaceDraft.find({ status: "DRAFT" })
-        .select("productId region supplierCurrency supplierName supplierVersion packageRows status version updatedAt updatedBy")
+    const docs = await PricingWorkspaceDraft.find({ region: "ALL", status: "DRAFT" })
+        .select("productId region supplierId supplierCode supplierCurrency supplierName supplierVersion packageRows status version updatedAt updatedBy")
         .sort({ updatedAt: -1 })
         .lean();
     return draftRowsFromDocs(docs);
@@ -156,13 +166,16 @@ async function listSupplierCostDraftRows() {
 function draftRowMap(rows = []) {
     const map = new Map();
     rows.forEach(row => {
-        map.set(`${row.productId}:${row.region}:${row.packageCode}`, row);
+        const key = `${row.productId}:${row.packageCode}`;
+        if (!map.has(key)) map.set(key, row);
     });
     return map;
 }
 
-async function saveSupplierCostDraftRows({ rows = [], region = "TH", admin = {} } = {}) {
-    const normalizedRows = await validateCatalogRows(normalizeDraftRows(rows, region));
+async function saveSupplierCostDraftRows({ rows = [], region = "ALL", supplierId = "", admin = {} } = {}) {
+    if (!Array.isArray(rows) || !rows.length) return { saved: [], summary: { requested: 0, saved: 0, groups: 0 } };
+    const supplier = await resolvePricingSupplier({ supplierId, region: "ALL" });
+    const normalizedRows = await validateCatalogRows(normalizeDraftRows(rows, "ALL", supplier));
     const groups = groupRows(normalizedRows);
     const actor = actorName(admin);
     const now = new Date();
@@ -171,7 +184,7 @@ async function saveSupplierCostDraftRows({ rows = [], region = "TH", admin = {} 
     for (const group of groups) {
         const current = await PricingWorkspaceDraft.findOne({
             productId: group.productId,
-            region: group.region,
+            region: "ALL",
             supplierCurrency: group.supplierCurrency,
             status: "DRAFT"
         }).lean();
@@ -196,13 +209,15 @@ async function saveSupplierCostDraftRows({ rows = [], region = "TH", admin = {} 
         const draft = await PricingWorkspaceDraft.findOneAndUpdate(
             {
                 productId: group.productId,
-                region: group.region,
+                region: "ALL",
                 supplierCurrency: group.supplierCurrency,
                 status: "DRAFT"
             },
             {
                 $set: {
                     supplierName: group.supplierName || current?.supplierName || "Primary supplier",
+                    supplierId: group.supplierId,
+                    supplierCode: group.supplierCode,
                     supplierVersion: group.supplierVersion || current?.supplierVersion || "",
                     packageRows,
                     owner: actorOwner(admin),
@@ -213,10 +228,10 @@ async function saveSupplierCostDraftRows({ rows = [], region = "TH", admin = {} 
                     region: group.region,
                     supplierCurrency: group.supplierCurrency,
                     status: "DRAFT",
-                    version: 1,
+                    ...(!current ? { version: 1 } : {}),
                     createdBy: actor
                 },
-                $inc: { version: current ? 1 : 0 }
+                ...(current ? { $inc: { version: 1 } } : {})
             },
             { new: true, upsert: true, runValidators: true }
         ).lean();
@@ -234,13 +249,25 @@ async function saveSupplierCostDraftRows({ rows = [], region = "TH", admin = {} 
 }
 
 async function clearPublishedSupplierCostDraftRows({ rows = [], region = "" } = {}) {
-    const normalizedRegion = normalizeRegion(region || "TH");
-    const keys = new Set((Array.isArray(rows) ? rows : [])
-        .filter(row => row?.published === true)
-        .map(row => `${normalizeProductCode(row.productCode)}:${normalizePackageCode(row.packageCode)}`));
-    if (!keys.size) return { cleared: 0 };
+    const publishedRows = (Array.isArray(rows) ? rows : []).filter(row => row?.published === true);
+    const candidateKeys = new Set(publishedRows.map(row => `${normalizeProductCode(row.productCode)}:${normalizePackageCode(row.packageCode)}`));
+    if (!candidateKeys.size) return { cleared: 0, clearedKeys: [] };
+    const packages = await CatalogPackage.find({
+        $or: publishedRows.map(row => ({ productCode: normalizeProductCode(row.productCode), packageCode: normalizePackageCode(row.packageCode) })),
+        deletedAt: null
+    }).select("productCode packageCode prices").lean();
+    const keys = new Set(packages.filter(pkg => {
+        const result = publishedRows.find(row => normalizeProductCode(row.productCode) === normalizeProductCode(pkg.productCode) && normalizePackageCode(row.packageCode) === normalizePackageCode(pkg.packageCode));
+        const activePrices = REGION.map(region => pkg.prices?.[region]).filter(price => price?.enabled !== false && price?.currency);
+        return activePrices.length > 0 && activePrices.every(price => (
+            price.publishedPriceMode === "POLICY_DERIVED" &&
+            price.supplierCost != null &&
+            Number(price.supplierCost) === Number(result?.supplierCost)
+        ));
+    }).map(pkg => `${normalizeProductCode(pkg.productCode)}:${normalizePackageCode(pkg.packageCode)}`));
+    if (!keys.size) return { cleared: 0, clearedKeys: [] };
 
-    const docs = await PricingWorkspaceDraft.find({ region: normalizedRegion, status: "DRAFT" });
+    const docs = await PricingWorkspaceDraft.find({ region: "ALL", status: "DRAFT" });
     let cleared = 0;
     for (const doc of docs) {
         const before = doc.packageRows.length;
@@ -251,7 +278,7 @@ async function clearPublishedSupplierCostDraftRows({ rows = [], region = "" } = 
         }
         await doc.save();
     }
-    return { cleared };
+    return { cleared, clearedKeys: [...keys] };
 }
 
 module.exports = {

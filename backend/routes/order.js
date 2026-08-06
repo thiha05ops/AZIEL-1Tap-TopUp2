@@ -262,6 +262,11 @@ function projectCommerceOrder(order = {}, options = {}) {
     const supplierSnapshot = businessRuntime.supplierCostSnapshot || pricing.supplierCostSnapshot || pricing.context?.supplierCostSnapshot || {};
     const exchangeSnapshot = businessRuntime.exchangeRateSnapshot || pricing.exchangeSnapshot || pricing.exchangeRate || pricing.context?.exchangeRateSnapshot || null;
     const fulfilmentInput = order.fulfilment?.input || {};
+    const receiptSubmitted = Array.isArray(order.operationalReferences) && order.operationalReferences.some(reference => (
+        reference?.type === "manual_payment_receipt"
+    ));
+    const awaitingManualReview = receiptSubmitted && order.status === "pending_payment" && (order.paymentStatus || payment.status) === "pending";
+    const awaitingPayment = !receiptSubmitted && order.status === "pending_payment" && ["pending", "unpaid"].includes(order.paymentStatus || payment.status);
     return {
         _id: options.admin ? `commerce-order:${order.orderId}` : order._id,
         orderId: order.orderId || "",
@@ -283,6 +288,14 @@ function projectCommerceOrder(order = {}, options = {}) {
         region: commercial.region || product.region || "",
         paymentMethod: payment.paymentMethodId || "",
         paymentStatus: order.paymentStatus || payment.status || "",
+        receiptSubmitted,
+        awaitingManualReview,
+        awaitingPayment,
+        paymentMessage: awaitingManualReview
+            ? "Payment submitted. Awaiting verification."
+            : awaitingPayment
+                ? "Payment pending. Awaiting payment."
+                : "",
         paymentProvider: payment.provider || "",
         transactionId: "",
         note: order.customer?.notes || "",

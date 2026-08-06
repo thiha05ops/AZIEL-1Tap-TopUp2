@@ -1017,29 +1017,29 @@ function safePublicAssetUrl(value = "") {
 // GET /api/payment-methods
 router.get("/payment-methods", async (req, res) => {
     try {
-        await seedPaymentMethods();
+        // Do not seed or mutate payment methods during a public GET request.
+        // await seedPaymentMethods();
 
         const filter = {};
 
         if (req.query.region) {
-            filter.region = req.query.region;
+            filter.region = String(req.query.region).toUpperCase();
         }
 
         const methods = await PaymentMethod
             .find(filter)
             .sort({ region: 1, sortOrder: 1, method: 1 });
 
-        res.json({
+        return res.json({
             success: true,
             methods: methods
                 .filter(method => !isLegacyThailandBankMethod(method))
                 .map(formatMethod)
         });
-
     } catch (error) {
         console.log("Payment methods error:", error);
 
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: "Server error"
         });

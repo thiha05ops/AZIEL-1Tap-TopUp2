@@ -78,6 +78,8 @@ function roundingRule(input = {}, fallback = {}) {
 function neutralPolicyConfig() {
     return {
         exchangeRate: 1,
+        supplierCurrency: "THB",
+        minimumProfitAmount: 0,
         supplierFee: { enabled: false, type: "PERCENT", value: 0 },
         businessCost: { enabled: false, type: "FIXED", value: 0 },
         gatewayFee: { enabled: false, type: "PERCENT", value: 0 },
@@ -92,6 +94,8 @@ function configFromPolicy(policy = null) {
     const metadata = policy?.metadata || {};
     return {
         exchangeRate: number(metadata.exchangeRate, 1),
+        supplierCurrency: upper(metadata.supplierCurrency || "THB"),
+        minimumProfitAmount: number(policy?.minimumProfitAmount, 0),
         supplierFee: moneyRule(policy?.defaultSupplierFee),
         businessCost: moneyRule(policy?.defaultBusinessCost),
         gatewayFee: moneyRule(policy?.defaultGatewayFee),
@@ -105,6 +109,10 @@ function configFromPolicy(policy = null) {
 function policyFieldsFromConfig(config = {}, fallback = neutralPolicyConfig()) {
     const normalized = {
         exchangeRate: number(config.exchangeRate, number(fallback.exchangeRate, 1)),
+        supplierCurrency: ["MMK", "THB"].includes(upper(config.supplierCurrency))
+            ? upper(config.supplierCurrency)
+            : upper(fallback.supplierCurrency || "THB"),
+        minimumProfitAmount: number(config.minimumProfitAmount, number(fallback.minimumProfitAmount, 0)),
         supplierFee: moneyRule(config.supplierFee, fallback.supplierFee),
         businessCost: moneyRule(config.businessCost, fallback.businessCost),
         gatewayFee: moneyRule(config.gatewayFee, fallback.gatewayFee),
@@ -124,9 +132,11 @@ function policyFieldsFromConfig(config = {}, fallback = neutralPolicyConfig()) {
             defaultTax: normalized.tax,
             defaultProfitRule: normalized.profitRule,
             defaultRoundingRule: normalized.roundingRule,
+            minimumProfitAmount: normalized.minimumProfitAmount,
             metadata: {
                 pricingConsole: true,
-                exchangeRate: normalized.exchangeRate
+                exchangeRate: normalized.exchangeRate,
+                supplierCurrency: normalized.supplierCurrency
             }
         }
     };
@@ -293,18 +303,20 @@ function productsFromPackages(packages = [], productMap = new Map(), supplierCos
                 now: new Date()
             });
             const supplierCostConfigured = supplierCost.configured === true;
-            const savedDraft = savedDraftMap.get(`${productId}:${normalizedRegion}:${upper(pkg.packageCode)}`) || null;
+            const canonicalSupplierCost = pkg.canonicalSupplierCost || {};
+            const canonicalSupplierCostConfigured = canonicalSupplierCost.amount != null && ["MMK", "THB"].includes(upper(canonicalSupplierCost.currency));
+            const savedDraft = savedDraftMap.get(`${productId}:${upper(pkg.packageCode)}`) || null;
             const savedDraftConfigured = savedDraft?.stagedSupplierCost != null;
-            const effectiveSupplierCostConfigured = savedDraftConfigured || supplierCostConfigured;
+            const effectiveSupplierCostConfigured = savedDraftConfigured || canonicalSupplierCostConfigured || supplierCostConfigured;
             const effectiveSupplierPrice = savedDraftConfigured
                 ? number(savedDraft.stagedSupplierCost)
-                : supplierCostConfigured ? number(supplierCost.amount) : null;
+                : canonicalSupplierCostConfigured ? number(canonicalSupplierCost.amount) : supplierCostConfigured ? number(supplierCost.amount) : null;
             const effectiveSupplierCurrency = savedDraftConfigured
                 ? upper(savedDraft.supplierCurrency)
-                : supplierCostConfigured ? upper(supplierCost.currency) : upper(price.supplierCurrency || price.currency);
+                : canonicalSupplierCostConfigured ? upper(canonicalSupplierCost.currency) : supplierCostConfigured ? upper(supplierCost.currency) : upper(price.supplierCurrency || price.currency);
             const effectiveSupplierName = savedDraftConfigured
                 ? text(savedDraft.supplierName || supplierCost.supplierName)
-                : supplierCost.supplierName;
+                : canonicalSupplierCostConfigured ? text(canonicalSupplierCost.supplierName) : supplierCost.supplierName;
             const effectiveSupplierVersion = savedDraftConfigured
                 ? text(savedDraft.supplierVersion || supplierCost.supplierVersion)
                 : supplierCost.supplierVersion;
@@ -321,24 +333,30 @@ function productsFromPackages(packages = [], productMap = new Map(), supplierCos
                 supplierCurrency: effectiveSupplierCurrency,
                 supplierPrice: effectiveSupplierPrice,
                 supplierName: effectiveSupplierName,
+                supplierId: savedDraftConfigured ? text(savedDraft.supplierId) : text(price.supplierId),
+                supplierCode: savedDraftConfigured ? text(savedDraft.supplierCode) : text(price.supplierCode),
                 supplierVersion: effectiveSupplierVersion,
                 supplierCostTimestamp: savedDraftConfigured ? savedDraft.updatedAt : supplierCost.costTimestamp,
                 supplierCostConfigured: effectiveSupplierCostConfigured,
-                supplierCostSource: savedDraftConfigured ? "saved_draft" : supplierCostConfigured ? "published" : "legacy_compatibility",
+                supplierCostSource: savedDraftConfigured ? "saved_draft" : (canonicalSupplierCostConfigured || supplierCostConfigured) ? "published" : "legacy_compatibility",
                 supplierCostSources: {
-                    effective: savedDraftConfigured ? "saved_draft" : supplierCostConfigured ? "published" : "legacy_compatibility",
-                    published: supplierCostConfigured ? "published" : "legacy_compatibility",
+                    effective: savedDraftConfigured ? "saved_draft" : (canonicalSupplierCostConfigured || supplierCostConfigured) ? "published" : "legacy_compatibility",
+                    published: (canonicalSupplierCostConfigured || supplierCostConfigured) ? "published" : "legacy_compatibility",
                     savedDraft: savedDraftConfigured ? "saved_draft" : "",
                     unsavedStage: "unsaved_stage"
                 },
-                publishedSupplierPrice: supplierCostConfigured ? number(supplierCost.amount) : null,
-                publishedSupplierCurrency: supplierCostConfigured ? upper(supplierCost.currency) : upper(price.supplierCurrency || price.currency),
-                publishedSupplierName: supplierCost.supplierName,
+                publishedSupplierPrice: canonicalSupplierCostConfigured ? number(canonicalSupplierCost.amount) : supplierCostConfigured ? number(supplierCost.amount) : null,
+                publishedSupplierCurrency: canonicalSupplierCostConfigured ? upper(canonicalSupplierCost.currency) : supplierCostConfigured ? upper(supplierCost.currency) : upper(price.supplierCurrency || price.currency),
+                publishedSupplierName: canonicalSupplierCostConfigured ? text(canonicalSupplierCost.supplierName) : supplierCost.supplierName,
+                publishedSupplierId: canonicalSupplierCostConfigured ? text(canonicalSupplierCost.supplierId) : text(price.supplierId),
+                publishedSupplierCode: canonicalSupplierCostConfigured ? text(canonicalSupplierCost.supplierCode) : text(price.supplierCode),
                 publishedSupplierVersion: supplierCost.supplierVersion,
-                publishedSupplierCostTimestamp: supplierCost.costTimestamp,
-                publishedSupplierCostConfigured: supplierCostConfigured,
-                publishedSupplierCostSource: supplierCostConfigured ? "published" : "legacy_compatibility",
+                publishedSupplierCostTimestamp: canonicalSupplierCostConfigured ? canonicalSupplierCost.capturedAt : supplierCost.costTimestamp,
+                publishedSupplierCostConfigured: canonicalSupplierCostConfigured || supplierCostConfigured,
+                publishedSupplierCostSource: (canonicalSupplierCostConfigured || supplierCostConfigured) ? "published" : "legacy_compatibility",
                 savedDraftSupplierCost: savedDraftConfigured ? number(savedDraft.stagedSupplierCost) : null,
+                savedDraftSupplierId: savedDraftConfigured ? text(savedDraft.supplierId) : "",
+                savedDraftSupplierCode: savedDraftConfigured ? text(savedDraft.supplierCode) : "",
                 savedDraftSupplierCurrency: savedDraftConfigured ? upper(savedDraft.supplierCurrency) : "",
                 savedDraftSupplierName: savedDraftConfigured ? text(savedDraft.supplierName) : "",
                 savedDraftSupplierVersion: savedDraftConfigured ? text(savedDraft.supplierVersion) : "",
@@ -365,7 +383,7 @@ async function readCatalogPackages(trace = null) {
         limit: PRODUCT_LIMIT
     });
     const query = CatalogPackage.find({ deletedAt: null })
-        .select("_id productCode packageCode name prices sortOrder metadata updatedAt")
+        .select("_id productCode packageCode name prices canonicalSupplierCost sortOrder metadata updatedAt")
         .sort({ productCode: 1, sortOrder: 1, packageCode: 1 })
         .limit(PRODUCT_LIMIT);
     const packages = await boundedQuery(query).lean();
@@ -587,6 +605,10 @@ async function saveDraftPricing(payload = {}, admin = {}) {
         const currentActive = await activePolicy(entry.region, entry.currency);
         const fallback = currentActive ? configFromPolicy(currentActive) : neutralPolicyConfig();
         const { fields } = policyFieldsFromConfig(entry.config, fallback);
+        fields.metadata = {
+            ...(fields.metadata || {}),
+            draftSavedAt: new Date().toISOString()
+        };
         const draft = await PricingPolicy.findOneAndUpdate(
             { code: draftCode(entry.region, entry.currency) },
             {
@@ -599,7 +621,6 @@ async function saveDraftPricing(payload = {}, admin = {}) {
                     effectiveFrom: null,
                     effectiveUntil: null,
                     ...fields,
-                    "metadata.draftSavedAt": new Date().toISOString(),
                     updatedBy: actor
                 },
                 $setOnInsert: {
@@ -614,7 +635,8 @@ async function saveDraftPricing(payload = {}, admin = {}) {
 
     const workspaceDraft = await saveSupplierCostDraftRows({
         rows: payload.workspaceRows || payload.supplierCostRows || [],
-        region: payload.workspaceRegion || payload.region || "",
+        region: "ALL",
+        supplierId: payload.supplierId || "",
         admin
     });
 
@@ -629,11 +651,13 @@ function compactValues(policy) {
     return configFromPolicy(policy);
 }
 
-async function publishPricing(admin = {}) {
+async function publishPricing(admin = {}, options = {}) {
     const actor = text(admin.username || admin.email || admin.id || "admin");
     const drafts = [];
 
+    const requestedRegions = new Set((Array.isArray(options.regions) ? options.regions : []).map(upper).filter(Boolean));
     for (const item of CONFIG_KEYS) {
+        if (requestedRegions.size && !requestedRegions.has(item.region)) continue;
         const draft = await draftPolicy(item.region, item.currency);
         if (draft) drafts.push(draft);
     }
@@ -678,6 +702,8 @@ async function publishPricing(admin = {}) {
             defaultTax: draft.defaultTax,
             defaultProfitRule: draft.defaultProfitRule,
             defaultRoundingRule: draft.defaultRoundingRule,
+            minimumProfitAmount: draft.minimumProfitAmount,
+            minimumProfitMarginPercent: draft.minimumProfitMarginPercent,
             metadata: {
                 ...(draft.metadata || {}),
                 pricingConsole: true,
@@ -689,6 +715,14 @@ async function publishPricing(admin = {}) {
         });
         policyIds.push(active._id);
         newValues.push({ region: draft.region, currency: draft.currency, config: compactValues(active) });
+    }
+
+    if (requestedRegions.size) {
+        for (const item of CONFIG_KEYS) {
+            if (requestedRegions.has(item.region)) continue;
+            const unchangedActive = await activePolicy(item.region, item.currency);
+            if (unchangedActive?._id && !policyIds.some(id => String(id) === String(unchangedActive._id))) policyIds.push(unchangedActive._id);
+        }
     }
 
     if (previousVersion?._id && previousVersion.status === "PUBLISHED") {

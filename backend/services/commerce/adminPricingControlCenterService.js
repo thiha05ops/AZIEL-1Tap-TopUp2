@@ -1,5 +1,6 @@
 "use strict";
 
+const mongoose = require("mongoose");
 const CatalogProduct = require("../../models/CatalogProduct");
 const CatalogPackage = require("../../models/CatalogPackage");
 const { REGION_CURRENCIES, normalizePackageCode, normalizeProductCode, normalizeRegion } = require("../../catalog/catalogProjection");
@@ -8,6 +9,7 @@ const { createPricingQuote } = require("./pricingQuoteRuntime");
 const { loadCommercePromotionContext } = require("./commercePromotionBridgeService");
 const { updatePackage } = require("../catalogAdminService");
 const { clearPublishedSupplierCostDraftRows } = require("./pricingWorkspaceDraftService");
+const { resolvePricingSupplier } = require("./pricingSupplierService");
 
 const PROFITABILITY_STATUS = Object.freeze({
     HEALTHY: "HEALTHY",
@@ -191,7 +193,7 @@ function previewFromQuote({ quote, context, price, couponCode }) {
     const commercial = quote.commercialSnapshot || {};
     const promotion = quote.promotionSnapshot || null;
     const supplierConfigured = supplierSnapshot.configured === true;
-    const status = statusFromQuote({ quote, supplierConfigured });
+    let status = statusFromQuote({ quote, supplierConfigured });
     const warnings = [];
 
     if (!supplierConfigured) {
@@ -205,6 +207,18 @@ function previewFromQuote({ quote, context, price, couponCode }) {
     }
 
     const finalPayable = round(commercial.quotedTotalAmount);
+    const convertedSupplierCost = supplierConfigured ? round(pricing.result?.postExchangeSubtotal) : null;
+    const gatewayFee = round(pricing.result?.gatewayFeeAmount ?? business.gatewayFee ?? 0);
+    const platformFee = round(pricing.result?.platformFeeAmount ?? 0);
+    const grossProfit = supplierConfigured ? round(pricing.result?.calculatedProfitAmount) : null;
+    const netProfit = supplierConfigured ? round(pricing.result?.calculatedProfitAmount ?? business.netProfit) : null;
+    const marginPercent = supplierConfigured ? round(pricing.result?.calculatedMarginPercent ?? business.marginPercent) : null;
+    const minimumProfitAmount = Number(context.pricing.pricingInput.policy?.minimumProfitAmount || 0);
+    const minimumMarginPercent = Number(context.pricing.pricingInput.policy?.minimumProfitMarginPercent || 0);
+    if (netProfit != null && netProfit < 0) status = PROFITABILITY_STATUS.NEGATIVE_MARGIN;
+    if (netProfit != null && netProfit >= 0 && (netProfit < minimumProfitAmount || (marginPercent != null && marginPercent < minimumMarginPercent))) {
+        status = PROFITABILITY_STATUS.LOW_MARGIN;
+    }
     const paymentFeeSimulation = PAYMENT_FEE_METHODS.map(method => {
         const providerCost = round((finalPayable || 0) * method.providerCostRate);
         const netProfit = business.netProfit == null ? null : round((business.netProfit || 0) - (providerCost || 0));
@@ -244,7 +258,7 @@ function previewFromQuote({ quote, context, price, couponCode }) {
         exchangeRateProvider: exchangeSnapshot?.provider || "",
         exchangeRateCapturedAt: exchangeSnapshot?.capturedAt || null,
         conversionRequired: Boolean(exchangeSnapshot && exchangeSnapshot.sourceCurrency !== exchangeSnapshot.targetCurrency),
-        convertedSupplierCost: round(pricing.supplierCostInTargetCurrency ?? business.convertedSupplierCost),
+        convertedSupplierCost,
         recommendedSellingPrice: round(pricing.result?.preOverridePrice ?? pricing.result?.regularPrice ?? commercial.originalPrice),
         manualPublishedPrice: pricing.result?.preOverridePrice != null ? round(commercial.originalPrice) : null,
         publishedPriceDifference: pricing.result?.preOverridePrice != null
@@ -258,13 +272,16 @@ function previewFromQuote({ quote, context, price, couponCode }) {
         saveAmount,
         displayDiscountPercent,
         paymentFeeSimulation,
-        gatewayFee: round(business.gatewayFee),
+        gatewayFee,
+        platformFee,
         walletFee: round(business.walletFee || 0),
         netRevenue: round(business.netRevenue),
-        grossProfit: supplierConfigured ? round(business.grossProfit) : null,
-        netProfit: supplierConfigured ? round(business.netProfit) : null,
-        marginPercent: supplierConfigured ? round(business.marginPercent) : null,
+        grossProfit,
+        netProfit,
+        marginPercent,
         profitabilityStatus: status,
+        minimumProfitAmount,
+        minimumMarginPercent,
         marginEnforcementApplied: business.marginEnforcementApplied === true,
         coupon: couponCode ? {
             code: couponCode,
@@ -369,7 +386,8 @@ async function previewLoadedPackageRegion({ product, pkg, region, row, couponCod
                 packageName: pkg.name
             },
             region,
-            currency: price.currency
+            currency: price.currency,
+            includePublishedPriceOverride: false
         });
         const quote = createPricingQuote({
             quoteId: `daily-pricing-preview:${product.productCode}:${pkg.packageCode}:${region}:${Date.now()}`,
@@ -396,6 +414,9 @@ async function previewLoadedPackageRegion({ product, pkg, region, row, couponCod
             packageCode: pkg.packageCode,
             effectivePolicySource: context.pricing.versionContext?.policySource || "production",
             policyScope: context.pricing.versionContext?.scope || "REGION",
+            policyVersionId: context.pricing.versionContext?.priceVersionId || "",
+            policyVersionNumber: context.pricing.versionContext?.priceVersionNumber || null,
+            calculatedAt: new Date().toISOString(),
             exchangeSnapshot: context.pricing.pricingInput.context.exchangeRateSnapshot || null
         };
     } catch (error) {
@@ -410,6 +431,36 @@ function rowStatusFromRegional(regional = []) {
     if (regional.some(item => item.profitabilityStatus === PROFITABILITY_STATUS.NEGATIVE_MARGIN || item.profitabilityStatus === PROFITABILITY_STATUS.PRICE_BELOW_COST)) return "Blocked";
     if (regional.some(item => item.profitabilityStatus === PROFITABILITY_STATUS.LOW_MARGIN) || warnings.length) return "Warning";
     return "Ready";
+}
+
+function operatorRegionStatus(item = {}) {
+    if (item.blockingErrors?.length || [PROFITABILITY_STATUS.NEGATIVE_MARGIN, PROFITABILITY_STATUS.PRICE_BELOW_COST, PROFITABILITY_STATUS.INVALID_CONFIGURATION, PROFITABILITY_STATUS.EXCHANGE_RATE_MISSING].includes(item.profitabilityStatus)) return "BLOCKED";
+    if (item.warnings?.length || item.profitabilityStatus === PROFITABILITY_STATUS.LOW_MARGIN) return "WARNING";
+    return item.supplierCostConfigured === false ? "MISSING" : "READY";
+}
+
+function withRegionalContract(row = {}) {
+    const regionalResults = {};
+    (row.regions || []).forEach(item => {
+        regionalResults[item.region] = {
+            storeCurrency: item.currency,
+            exchangeRate: item.exchangeRate,
+            convertedSupplierCost: item.convertedSupplierCost,
+            sellingPrice: item.recommendedSellingPrice,
+            gatewayFee: item.gatewayFee,
+            platformFee: item.platformFee,
+            netProfit: item.netProfit,
+            marginPercent: item.marginPercent,
+            status: operatorRegionStatus(item),
+            reason: item.blockingErrors?.[0]?.message || item.warnings?.[0]?.message || "",
+            policyVersionId: item.policyVersionId || "",
+            policyVersionNumber: item.policyVersionNumber || null,
+            calculatedAt: item.calculatedAt || null
+        };
+    });
+    const statuses = Object.values(regionalResults).map(item => item.status);
+    const aggregateStatus = statuses.includes("BLOCKED") ? "BLOCKED" : statuses.includes("WARNING") ? "WARNING" : statuses.includes("MISSING") ? "MISSING" : "READY";
+    return { ...row, aggregateStatus, regionalResults };
 }
 
 function summarizeWorkspaceRows(rows = []) {
@@ -431,7 +482,7 @@ function summarizeWorkspaceRows(rows = []) {
     };
 }
 
-async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = null, region = "" } = {}) {
+async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = null, region = "", supplierId = "" } = {}) {
     if (!Array.isArray(rows) || !rows.length) {
         throw new AdminPricingControlCenterError("WORKSPACE_PREVIEW_EMPTY", "At least one staged price row is required.");
     }
@@ -439,11 +490,26 @@ async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = nu
         throw new AdminPricingControlCenterError("WORKSPACE_PREVIEW_TOO_LARGE", `Daily pricing preview is limited to ${MAX_WORKSPACE_ROWS} rows.`);
     }
 
+    const supplier = await resolvePricingSupplier({ supplierId, region });
+    const packageIds = rows.filter(row => !row.packageCode && mongoose.Types.ObjectId.isValid(text(row.packageId))).map(row => row.packageId);
+    const packagesById = packageIds.length
+        ? new Map((await CatalogPackage.find({ _id: { $in: packageIds }, deletedAt: null }).select("_id productCode packageCode").lean()).map(pkg => [String(pkg._id), pkg]))
+        : new Map();
+    const resolvedInputRows = rows.map(row => {
+        const pkg = packagesById.get(text(row.packageId));
+        return pkg ? { ...row, productCode: row.productCode || row.productId || pkg.productCode, packageCode: pkg.packageCode } : { ...row, productCode: row.productCode || row.productId };
+    });
     const invalidRows = [];
     const normalizedRows = [];
-    rows.forEach((row, index) => {
+    resolvedInputRows.forEach((row, index) => {
         try {
-            normalizedRows.push(normalizeWorkspaceRow(row, index));
+            normalizedRows.push(normalizeWorkspaceRow({
+                ...row,
+                supplierCurrency: supplier.supplierCurrency,
+                supplierName: supplier.supplierName,
+                supplierId: supplier.supplierId,
+                supplierCode: supplier.supplierCode
+            }, index));
         } catch (error) {
             invalidRows.push(invalidWorkspaceRow(row, index, error));
         }
@@ -505,10 +571,18 @@ async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = nu
             couponCode,
             actor
         })));
-        const existingPrices = WORKSPACE_REGIONS.map(region => pkg.prices?.[region]).filter(Boolean);
-        const oldSupplierCost = existingPrices.find(price => price?.supplierCost != null)?.supplierCost ?? null;
-        const oldSupplierCurrency = existingPrices.find(price => price?.supplierCurrency)?.supplierCurrency || "";
-        const changed = oldSupplierCost !== row.newSupplierCost || upper(oldSupplierCurrency) !== row.supplierCurrency;
+        const requestedRegions = workspaceRegions(region);
+        const existingPrices = WORKSPACE_REGIONS.map(regionCode => pkg.prices?.[regionCode]).filter(Boolean);
+        const selectedExistingPrices = requestedRegions
+            .map(regionCode => pkg.prices?.[regionCode])
+            .filter(Boolean);
+        const selectedExistingPrice = selectedExistingPrices[0] || null;
+        const oldSupplierCost = selectedExistingPrice?.supplierCost ?? null;
+        const oldSupplierCurrency = selectedExistingPrice?.supplierCurrency || "";
+        const changed = selectedExistingPrices.some(existingPrice => (
+            Number(existingPrice?.supplierCost) !== Number(row.newSupplierCost) ||
+            upper(existingPrice?.supplierCurrency) !== row.supplierCurrency
+        ));
         const blockingErrors = regional.flatMap(item => item.blockingErrors || []);
         const warnings = regional.flatMap(item => item.warnings || []);
         if (duplicateKeys.includes(rowKey(row))) {
@@ -517,6 +591,7 @@ async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = nu
         return {
             rowId: row.rowId,
             productCode: product.productCode,
+            packageId: String(pkg._id),
             packageCode: pkg.packageCode,
             productName: product.name,
             packageName: pkg.name,
@@ -526,6 +601,8 @@ async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = nu
             costDelta: oldSupplierCost == null ? null : round(row.newSupplierCost - Number(oldSupplierCost)),
             supplierCurrency: row.supplierCurrency,
             supplierName: row.supplierName || existingPrices.find(price => price?.supplierName)?.supplierName || "",
+            supplierId: supplier.supplierId,
+            supplierCode: supplier.supplierCode,
             supplierVersion: row.supplierVersion || existingPrices.find(price => price?.supplierVersion)?.supplierVersion || "",
             supplierCostTimestamp: row.supplierCostTimestamp,
             expectedUpdatedAt: row.expectedUpdatedAt || pkg.updatedAt,
@@ -540,7 +617,7 @@ async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = nu
         };
     }));
 
-    const allRows = invalidRows.concat(previewRows);
+    const allRows = invalidRows.concat(previewRows).map(withRegionalContract);
     return {
         success: true,
         generatedAt: new Date().toISOString(),
@@ -552,65 +629,178 @@ async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = nu
     };
 }
 
-async function publishDailyPricing({ rows = [], publishAll = false, actor = "admin", admin = null, region = "" } = {}) {
+async function publishDailyPricing({
+    rows = [],
+    publishAll = false,
+    actor = "admin",
+    admin = null,
+    region = "",
+    supplierId = "",
+    skipDraftCleanup = false
+} = {}) {
     if (publishAll === true) {
-        throw new AdminPricingControlCenterError("WORKSPACE_PUBLISH_ALL_DISABLED", "Publish All is temporarily disabled for Daily Pricing Workspace.", 400);
+        throw new AdminPricingControlCenterError(
+            "WORKSPACE_PUBLISH_ALL_DISABLED",
+            "Publish All is temporarily disabled for Daily Pricing Workspace.",
+            400
+        );
     }
+
     const selectedRegions = workspaceRegions(region);
-    if (selectedRegions.length !== 1) {
-        throw new AdminPricingControlCenterError("WORKSPACE_REGION_REQUIRED", "Publish requires a single selected region.", 400);
+    if (!selectedRegions.length) {
+        throw new AdminPricingControlCenterError(
+            "WORKSPACE_REGION_REQUIRED",
+            "Publish requires at least one selected region.",
+            400
+        );
     }
-    const publishRegion = selectedRegions[0];
-    const preview = await batchPreviewDailyPricing({ rows, actor: admin || { username: actor }, region: publishRegion });
+
+    /*
+     * Resolve every selected region before previewing. The same supplier may be
+     * returned for both regions, but keeping a per-region map preserves future
+     * support for regional supplier assignments.
+     */
+    const supplierEntries = await Promise.all(selectedRegions.map(async selectedRegion => ([
+        selectedRegion,
+        await resolvePricingSupplier({ supplierId, region: selectedRegion })
+    ])));
+    const suppliersByRegion = new Map(supplierEntries);
+
+    /*
+     * Preview all requested regions in one pass. This produces one authoritative
+     * calculated result per package and region from the active pricing policies.
+     */
+    const preview = await batchPreviewDailyPricing({
+        rows,
+        actor: admin || { username: actor },
+        region: selectedRegions.length === WORKSPACE_REGIONS.length ? "ALL" : selectedRegions[0],
+        supplierId
+    });
+
     const selectedKeys = new Set();
     rows.forEach((row, index) => {
         if (!publishAll && row.selected === false) return;
         try {
             selectedKeys.add(rowKey(normalizeWorkspaceRow(row, index)));
         } catch (_) {
-            // Invalid selected rows are returned as blocked preview rows.
+            // Invalid selected rows are represented by blocked preview rows.
         }
     });
+
+    const normalizedInputByKey = new Map();
+    rows.forEach((input, index) => {
+        try {
+            const normalized = normalizeWorkspaceRow(input, index);
+            normalizedInputByKey.set(rowKey(normalized), normalized);
+        } catch (_) {
+            // Invalid rows are already represented by the preview.
+        }
+    });
+
     const results = [];
 
     for (const row of preview.rows) {
-        if (!selectedKeys.has(`${row.productCode}:${row.packageCode}`)) {
-            results.push({ productCode: row.productCode, packageCode: row.packageCode, published: false, skipped: true, reason: "Not selected" });
-            continue;
-        }
-        if (!row.publishEligible || row.status === "Blocked") {
-            results.push({
-                productCode: row.productCode,
-                packageCode: row.packageCode,
-                published: false,
-                skipped: true,
-                reason: "Blocked by pricing preview",
-                blockingErrors: row.blockingErrors
+        const key = `${row.productCode}:${row.packageCode}`;
+
+        if (!selectedKeys.has(key)) {
+            selectedRegions.forEach(selectedRegion => {
+                results.push({
+                    region: selectedRegion,
+                    productCode: row.productCode,
+                    packageCode: row.packageCode,
+                    published: false,
+                    skipped: true,
+                    reason: "Not selected"
+                });
             });
             continue;
         }
-        const input = rows.find((candidate, index) => {
-            try {
-                return rowKey(normalizeWorkspaceRow(candidate, index)) === `${row.productCode}:${row.packageCode}`;
-            } catch (_) {
-                return false;
+
+        const normalized = normalizedInputByKey.get(key);
+        if (!normalized) {
+            selectedRegions.forEach(selectedRegion => {
+                results.push({
+                    region: selectedRegion,
+                    productCode: row.productCode,
+                    packageCode: row.packageCode,
+                    published: false,
+                    skipped: true,
+                    reason: "Invalid staged row",
+                    blockingErrors: row.blockingErrors || []
+                });
+            });
+            continue;
+        }
+
+        const pricePatches = {};
+        const publishableRegions = [];
+
+        for (const selectedRegion of selectedRegions) {
+            const regionalPreview = (row.regions || []).find(item => item.region === selectedRegion);
+            const calculatedPrice = Number(regionalPreview?.recommendedSellingPrice);
+            const regionalBlockingErrors = regionalPreview?.blockingErrors || [];
+
+            if (
+                !regionalPreview ||
+                regionalBlockingErrors.length > 0 ||
+                !Number.isFinite(calculatedPrice) ||
+                calculatedPrice < 0
+            ) {
+                results.push({
+                    region: selectedRegion,
+                    productCode: row.productCode,
+                    packageCode: row.packageCode,
+                    published: false,
+                    skipped: true,
+                    reason: Number.isFinite(calculatedPrice)
+                        ? "Blocked by pricing preview"
+                        : "Calculated selling price unavailable",
+                    blockingErrors: regionalBlockingErrors.length
+                        ? regionalBlockingErrors
+                        : row.blockingErrors || []
+                });
+                continue;
             }
-        });
-        const normalized = normalizeWorkspaceRow(input);
-        const pricePatch = {
-            supplierCost: normalized.newSupplierCost,
-            supplierCurrency: normalized.supplierCurrency,
-            supplierName: normalized.supplierName || row.supplierName || "",
-            supplierVersion: normalized.supplierVersion || row.supplierVersion || "",
-            supplierCostTimestamp: normalized.supplierCostTimestamp,
-            pricingNote: normalized.pricingNote
-        };
+
+            const supplier = suppliersByRegion.get(selectedRegion);
+            pricePatches[selectedRegion] = {
+                amount: calculatedPrice,
+                publishedPriceMode: "POLICY_DERIVED",
+                manualOverrideReason: "",
+                supplierCost: normalized.newSupplierCost,
+                supplierCurrency: supplier.supplierCurrency,
+                supplierId: supplier.supplierId,
+                supplierCode: supplier.supplierCode,
+                supplierName: supplier.supplierName,
+                supplierVersion: normalized.supplierVersion || row.supplierVersion || "",
+                supplierCostTimestamp: normalized.supplierCostTimestamp,
+                pricingNote: normalized.pricingNote
+            };
+            publishableRegions.push(selectedRegion);
+        }
+
+        if (!publishableRegions.length) continue;
+
+        /*
+         * Important: write TH and MM in one updatePackage() call. Previously the
+         * service recursively published TH first and MM second using the same
+         * expectedUpdatedAt value. The first write changed updatedAt, causing the
+         * second regional write to become stale and leaving MM unchanged.
+         */
+        const canonicalSupplier = suppliersByRegion.get(publishableRegions[0]);
         const patch = {
-            prices: {
-                [publishRegion]: pricePatch
+            canonicalSupplierCost: {
+                supplierId: canonicalSupplier.supplierId,
+                supplierCode: canonicalSupplier.supplierCode,
+                supplierName: canonicalSupplier.supplierName,
+                amount: normalized.newSupplierCost,
+                currency: canonicalSupplier.supplierCurrency,
+                capturedAt: normalized.supplierCostTimestamp
             },
+            prices: pricePatches,
             expectedUpdatedAt: normalized.expectedUpdatedAt || row.expectedUpdatedAt
         };
+
         try {
             const update = await updatePackage({
                 productCode: row.productCode,
@@ -618,26 +808,42 @@ async function publishDailyPricing({ rows = [], publishAll = false, actor = "adm
                 patch,
                 actor
             });
-            results.push({
-                productCode: row.productCode,
-                packageCode: row.packageCode,
-                published: update.changed === true,
-                skipped: update.changed !== true,
-                reason: update.changed ? "" : "No changes",
-                changedFields: update.changedFields || []
+
+            publishableRegions.forEach(selectedRegion => {
+                results.push({
+                    region: selectedRegion,
+                    productCode: row.productCode,
+                    packageCode: row.packageCode,
+                    published: update.changed === true,
+                    supplierCost: normalized.newSupplierCost,
+                    sellingPrice: pricePatches[selectedRegion].amount,
+                    skipped: update.changed !== true,
+                    reason: update.changed ? "" : "No changes",
+                    changedFields: update.changedFields || []
+                });
             });
         } catch (error) {
-            results.push({
-                productCode: row.productCode,
-                packageCode: row.packageCode,
-                published: false,
-                failed: true,
-                reason: error.message || "Publish failed",
-                code: error.code || "PUBLISH_FAILED"
+            publishableRegions.forEach(selectedRegion => {
+                results.push({
+                    region: selectedRegion,
+                    productCode: row.productCode,
+                    packageCode: row.packageCode,
+                    published: false,
+                    failed: true,
+                    reason: error.message || "Publish failed",
+                    code: error.code || "PUBLISH_FAILED"
+                });
             });
         }
     }
-    const draftCleanup = await clearPublishedSupplierCostDraftRows({ rows: results, region: publishRegion });
+
+    const cleanupRegion = selectedRegions.length === 1 ? selectedRegions[0] : undefined;
+    const draftCleanup = skipDraftCleanup
+        ? { cleared: 0 }
+        : await clearPublishedSupplierCostDraftRows({
+            rows: results,
+            ...(cleanupRegion ? { region: cleanupRegion } : {})
+        });
 
     return {
         success: true,

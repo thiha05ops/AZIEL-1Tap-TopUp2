@@ -61,13 +61,24 @@ const pricingWorkspaceDraftSchema = new mongoose.Schema(
         },
         region: {
             type: String,
-            enum: REGION,
+            enum: [...REGION, "ALL"],
             required: true
         },
         supplierCurrency: {
             type: String,
             enum: CURRENCY,
             required: true
+        },
+        supplierId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Supplier",
+            default: null
+        },
+        supplierCode: {
+            type: String,
+            trim: true,
+            uppercase: true,
+            default: ""
         },
         supplierName: {
             type: String,

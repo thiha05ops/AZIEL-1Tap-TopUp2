@@ -5,6 +5,7 @@ const paymentAttemptRepository = require("./paymentAttemptRepository");
 
 const SERVICE_VERSION = "commerce.payment-recovery.v1";
 const MANUAL_PROMPTPAY_PROVIDER = "MANUAL_PROMPTPAY";
+const MANUAL_PROMPTPAY_PROVIDER_ALIASES = Object.freeze(["promptpay", MANUAL_PROMPTPAY_PROVIDER]);
 const RECOVERABLE_STATUSES = Object.freeze(["PENDING"]);
 const RECOVERABLE_ORDER_STATUSES = Object.freeze(new Set(["pending_payment"]));
 const RECOVERABLE_ORDER_PAYMENT_STATUSES = Object.freeze(new Set(["pending", "unpaid"]));
@@ -21,6 +22,13 @@ class CommercePaymentRecoveryError extends Error {
 
 function text(value) {
     return String(value || "").trim();
+}
+
+function normalizeManualPromptPayProvider(value) {
+    const provider = text(value).toUpperCase();
+    return provider === "PROMPTPAY" || provider === MANUAL_PROMPTPAY_PROVIDER
+        ? MANUAL_PROMPTPAY_PROVIDER
+        : "";
 }
 
 function normalizeOwner(user = {}, sessionId = "") {
@@ -63,7 +71,7 @@ function orderRecoverable(order = {}) {
 function attemptRecoverable(attempt = {}, order = {}, owner = {}, now = new Date()) {
     if (!attempt?.attemptId || !order?.orderId) return false;
     if (!sameOwner(owner, attempt.owner) || !sameOwner(owner, order.owner)) return false;
-    if (text(attempt.provider).toUpperCase() !== MANUAL_PROMPTPAY_PROVIDER) return false;
+    if (!normalizeManualPromptPayProvider(attempt.provider)) return false;
     if (!RECOVERABLE_STATUSES.includes(text(attempt.status).toUpperCase())) return false;
     if (!notExpired(attempt, now)) return false;
     if (hasReceiptEvidence(attempt)) return false;
@@ -157,35 +165,113 @@ function projectRecoverableCommerceAttempt({ attempt = {}, order = {}, now = new
 
 function createCommercePaymentRecoveryService(dependencies = {}) {
     const deps = {
-        paymentAttemptRepository: dependencies.paymentAttemptRepository || paymentAttemptRepository,
-        commerceOrderRepository: dependencies.commerceOrderRepository || orderRepository,
-        clock: dependencies.clock || (() => new Date())
+        paymentAttemptRepository:
+            dependencies.paymentAttemptRepository ||
+            paymentAttemptRepository,
+
+        commerceOrderRepository:
+            dependencies.commerceOrderRepository ||
+            orderRepository,
+
+        clock:
+            dependencies.clock ||
+            (() => new Date())
     };
 
     async function listRecoverablePayments(input = {}) {
-        const owner = normalizeOwner(input.user || {}, input.sessionId || "");
+        const owner = normalizeOwner(
+            input.user || {},
+            input.sessionId || ""
+        );
+
         const now = deps.clock();
-        const attempts = await deps.paymentAttemptRepository.findAttemptsForOwner({
-            owner,
-            provider: MANUAL_PROMPTPAY_PROVIDER,
-            statuses: RECOVERABLE_STATUSES,
-            expiresAfter: now,
-            limit: input.limit || 25
-        });
-        const orderIds = Array.from(new Set(attempts.map(attempt => attempt.orderId).filter(Boolean)));
-        const orders = typeof deps.commerceOrderRepository.findOwnedOrdersByIds === "function"
-            ? await deps.commerceOrderRepository.findOwnedOrdersByIds({ orderIds, owner })
+
+        const attemptGroups = await Promise.all(
+            MANUAL_PROMPTPAY_PROVIDER_ALIASES.map(provider =>
+                deps.paymentAttemptRepository.findAttemptsForOwner({
+                    owner,
+                    provider,
+                    statuses: RECOVERABLE_STATUSES,
+                    expiresAfter: now,
+                    limit: input.limit || 25
+                })
+            )
+        );
+
+        const attempts = attemptGroups.flat();
+
+        const safeAttempts = Array.isArray(attempts)
+            ? attempts
             : [];
-        const orderById = new Map(orders.map(order => [order.orderId, order]));
-        const recoverable = [];
-        for (const attempt of attempts) {
-            const order = orderById.get(attempt.orderId) || null;
-            if (!attemptRecoverable(attempt, order, owner, now)) continue;
-            recoverable.push(projectRecoverableCommerceAttempt({ attempt, order, now }));
+
+        const orderIds = Array.from(
+            new Set(
+                safeAttempts
+                    .map(attempt => attempt?.orderId)
+                    .filter(Boolean)
+            )
+        );
+
+        let orders = [];
+
+        if (
+            orderIds.length > 0 &&
+            typeof deps.commerceOrderRepository
+                ?.findOwnedOrdersByIds === "function"
+        ) {
+            orders =
+                await deps.commerceOrderRepository
+                    .findOwnedOrdersByIds({
+                        orderIds,
+                        owner
+                    });
         }
+
+        const safeOrders = Array.isArray(orders)
+            ? orders
+            : [];
+
+        const orderById = new Map(
+            safeOrders.map(order => [
+                order.orderId,
+                order
+            ])
+        );
+
+        const recoverable = [];
+
+        for (const attempt of safeAttempts) {
+            const order =
+                orderById.get(attempt.orderId) ||
+                null;
+
+            if (
+                !attemptRecoverable(
+                    attempt,
+                    order,
+                    owner,
+                    now
+                )
+            ) {
+                continue;
+            }
+
+            recoverable.push(
+                projectRecoverableCommerceAttempt({
+                    attempt,
+                    order,
+                    now
+                })
+            );
+        }
+
         return recoverable;
     }
 
+    /*
+     * ဒီ return က createCommercePaymentRecoveryService()
+     * အတွင်းမှာရှိရမယ်။
+     */
     return Object.freeze({
         listRecoverablePayments
     });

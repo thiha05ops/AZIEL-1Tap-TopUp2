@@ -2,6 +2,8 @@ const catalog = require("../catalog/catalog");
 const MediaAsset = require("../models/MediaAsset");
 const CatalogProduct = require("../models/CatalogProduct");
 const CatalogPackage = require("../models/CatalogPackage");
+const SupplierProductMapping = require("../models/SupplierProductMapping");
+const PackageInventoryState = require("../models/PackageInventoryState");
 const {
     REGION_CURRENCIES,
     getStaticCatalogSnapshot,
@@ -399,7 +401,15 @@ function mediaUrl(asset) {
     return asset?.secureUrl || asset?.url || "";
 }
 
-function projectCatalogPackage(item = {}, { includeDisabled = true, mediaMap = new Map(), includeAssetProjection = false, includeAdminPricing = false } = {}) {
+function projectCatalogPackage(
+    item = {},
+    {
+        includeDisabled = true,
+        mediaMap = new Map(),
+        includeAssetProjection = false,
+        includeAdminPricing = false
+    } = {}
+) {
     if (!includeDisabled && item.deletedAt) return null;
     if (!includeDisabled && item.enabled === false) return null;
 
@@ -413,22 +423,62 @@ function projectCatalogPackage(item = {}, { includeDisabled = true, mediaMap = n
         prices[region] = {
             amount: Number(price.amount),
             currency: price.currency || currency,
-            enabled: price.enabled !== false
+            enabled: price.enabled !== false,
+
+            referencePrice:
+                price.referencePrice == null
+                    ? null
+                    : Number(price.referencePrice),
+
+            saveAmount:
+                Number.isFinite(Number(price.saveAmount))
+                    ? Number(price.saveAmount)
+                    : 0,
+
+            discountPercent:
+                Number.isFinite(Number(price.discountPercent))
+                    ? Number(price.discountPercent)
+                    : 0,
+
+            showDiscount: price.showDiscount === true,
+            showOriginalPrice: price.showOriginalPrice === true,
+            showSaveAmount: price.showSaveAmount === true,
+            discountLabel: price.discountLabel || ""
         };
 
         if (includeAdminPricing) {
-            prices[region].publishedPriceMode = price.publishedPriceMode || "LEGACY_COMPATIBILITY_PRICE";
-            prices[region].manualOverrideReason = price.manualOverrideReason || "";
-            prices[region].supplierCost = price.supplierCost == null ? null : Number(price.supplierCost);
-            prices[region].supplierCurrency = price.supplierCurrency || "";
-            prices[region].supplierName = price.supplierName || "";
-            prices[region].supplierVersion = price.supplierVersion || "";
-            prices[region].supplierCostTimestamp = price.supplierCostTimestamp || null;
-            prices[region].pricingNote = price.pricingNote || "";
+            prices[region].publishedPriceMode =
+                price.publishedPriceMode || "LEGACY_COMPATIBILITY_PRICE";
+
+            prices[region].manualOverrideReason =
+                price.manualOverrideReason || "";
+
+            prices[region].supplierCost =
+                price.supplierCost == null
+                    ? null
+                    : Number(price.supplierCost);
+
+            prices[region].supplierCurrency =
+                price.supplierCurrency || "";
+
+            prices[region].supplierName =
+                price.supplierName || "";
+
+            prices[region].supplierVersion =
+                price.supplierVersion || "";
+
+            prices[region].supplierCostTimestamp =
+                price.supplierCostTimestamp || null;
+
+            prices[region].pricingNote =
+                price.pricingNote || "";
         }
     });
 
-    const iconAsset = item.iconAssetId ? mediaMap.get(item.iconAssetId) : null;
+    const iconAsset = item.iconAssetId
+        ? mediaMap.get(item.iconAssetId)
+        : null;
+
     const projection = {
         productCode: item.productCode,
         packageCode: item.packageCode,
@@ -448,20 +498,38 @@ function projectCatalogPackage(item = {}, { includeDisabled = true, mediaMap = n
     }
 
     if (includeAdminPricing) {
-        projection.supplierCostHistory = Array.isArray(item.supplierCostHistory)
-            ? item.supplierCostHistory.slice(-20).map(entry => ({
-                region: entry.region || "",
-                previousSupplierCost: entry.previousSupplierCost == null ? null : Number(entry.previousSupplierCost),
-                newSupplierCost: entry.newSupplierCost == null ? null : Number(entry.newSupplierCost),
-                previousSupplierCurrency: entry.previousSupplierCurrency || "",
-                newSupplierCurrency: entry.newSupplierCurrency || "",
-                supplierName: entry.supplierName || "",
-                supplierVersion: entry.supplierVersion || "",
-                supplierCostTimestamp: entry.supplierCostTimestamp || null,
-                pricingNote: entry.pricingNote || "",
-                changedBy: entry.changedBy || "",
-                changedAt: entry.changedAt || null
-            }))
+        projection.supplierCostHistory = Array.isArray(
+            item.supplierCostHistory
+        )
+            ? item.supplierCostHistory
+                .slice(-20)
+                .map(entry => ({
+                    region: entry.region || "",
+                    previousSupplierCost:
+                        entry.previousSupplierCost == null
+                            ? null
+                            : Number(entry.previousSupplierCost),
+                    newSupplierCost:
+                        entry.newSupplierCost == null
+                            ? null
+                            : Number(entry.newSupplierCost),
+                    previousSupplierCurrency:
+                        entry.previousSupplierCurrency || "",
+                    newSupplierCurrency:
+                        entry.newSupplierCurrency || "",
+                    supplierName:
+                        entry.supplierName || "",
+                    supplierVersion:
+                        entry.supplierVersion || "",
+                    supplierCostTimestamp:
+                        entry.supplierCostTimestamp || null,
+                    pricingNote:
+                        entry.pricingNote || "",
+                    changedBy:
+                        entry.changedBy || "",
+                    changedAt:
+                        entry.changedAt || null
+                }))
             : [];
     }
 
@@ -491,6 +559,27 @@ function projectCatalogProduct(product = {}, packages = [], { includeDisabled = 
         description: product.description || "",
         enabled: product.enabled !== false,
         featured: product.featured === true,
+        catalogCategory: product.catalogCategory || "",
+        lifecycleStatus: product.lifecycleStatus || "ACTIVE",
+        comingSoon: product.lifecycleStatus === "COMING_SOON",
+        requestedCommerceState: product.commerceState || "HIDDEN",
+        commerceState: product.commerceState || "HIDDEN",
+        publicDiscoveryEnabled: product.publicDiscoveryEnabled === true,
+        homepageEnabled: product.homepageEnabled === true,
+        homepageCategory: product.homepageCategory || product.catalogCategory || "",
+        homepageOrder: Number(product.homepageOrder || 0),
+        homepageFlags: Array.isArray(product.homepageFlags) ? product.homepageFlags : [],
+        homepageSections: Array.isArray(product.homepageSections) ? product.homepageSections : [],
+        productRoute: product.productRoute || "",
+        artworkPath: product.artworkPath || "",
+        marketScope: product.presentation?.marketScope || "MULTI_REGION",
+        displayMarketLabel: product.presentation?.displayMarketLabel || "",
+        previewPrice: product.presentation?.previewPrice?.amount == null ? null : {
+            amount: Number(product.presentation.previewPrice.amount),
+            currency: product.presentation.previewPrice.currency || "",
+            label: product.presentation.previewPrice.label || "PREVIEW_PRICE",
+            isPreviewPrice: true
+        },
         deleted: Boolean(product.deletedAt),
         deletedAt: product.deletedAt || null,
         supportedRegions: Array.isArray(product.supportedRegions)
@@ -534,6 +623,32 @@ function projectCatalogProduct(product = {}, packages = [], { includeDisabled = 
     return projection;
 }
 
+function projectCommerceReadiness(product = {}, packages = [], mappings = [], inventoryStates = []) {
+    const enabledPackages = packages.filter(item => item.enabled !== false && !item.deletedAt);
+    const regions = Array.isArray(product.supportedRegions) ? product.supportedRegions : [];
+    const pricing = enabledPackages.some(item => regions.some(region => {
+        const price = item.prices?.[region];
+        return price?.enabled !== false && Number.isFinite(Number(price?.amount)) && Number(price.amount) > 0;
+    }));
+    const fulfillment = mappings.some(item => item.enabled !== false && regions.includes(item.region));
+    const unavailablePackageIds = new Set(inventoryStates
+        .filter(item => item.availabilityState && item.availabilityState !== "AVAILABLE")
+        .map(item => String(item.packageRef || item.packageId || "")));
+    const availability = enabledPackages.some(item => !unavailablePackageIds.has(String(item._id || item.packageCode || "")));
+    const checks = {
+        catalog: product.enabled !== false && !product.deletedAt,
+        packages: enabledPackages.length > 0,
+        region: regions.length > 0,
+        pricing,
+        fulfillment,
+        availability,
+        route: Boolean(String(product.productRoute || "").trim()),
+        artwork: Boolean(String(product.artworkPath || "").trim() || product.presentation?.imageAssetId)
+    };
+    const missing = Object.entries(checks).filter(([, valid]) => !valid).map(([key]) => key);
+    return { ready: missing.length === 0, checks, missing };
+}
+
 function toStaticPublicCatalog({ includeDisabled = true } = {}) {
     const snapshot = getStaticCatalogSnapshot();
 
@@ -546,21 +661,37 @@ function toStaticPublicCatalog({ includeDisabled = true } = {}) {
 }
 
 async function toDatabasePublicCatalog({ includeDisabled = true, includeAssetProjection = false, includeAdminPricing = false } = {}) {
-    const [products, packages] = await Promise.all([
+    const [products, packages, mappings, inventoryStates] = await Promise.all([
         CatalogProduct.find().sort({ sortOrder: 1, productCode: 1 }).lean(),
-        CatalogPackage.find().sort({ productCode: 1, sortOrder: 1, packageCode: 1 }).lean()
+        CatalogPackage.find().sort({ productCode: 1, sortOrder: 1, packageCode: 1 }).lean(),
+        SupplierProductMapping.find({ enabled: true }).lean(),
+        PackageInventoryState.find().lean()
     ]);
     const mediaMap = await loadMediaAssetMap(products, packages);
 
     return products
         .map(product => {
             const productPackages = packages.filter(item => item.productCode === product.productCode);
-            return projectCatalogProduct(product, productPackages, {
+            const projection = projectCatalogProduct(product, productPackages, {
                 includeDisabled,
                 mediaMap,
                 includeAssetProjection,
                 includeAdminPricing
             });
+            if (!projection) return null;
+            projection.commerceReadiness = projectCommerceReadiness(
+                product,
+                productPackages,
+                mappings.filter(item => item.productCode === product.productCode),
+                inventoryStates.filter(item => productPackages.some(pkg => String(pkg._id) === String(item.packageRef) || pkg.packageCode === item.packageCode))
+            );
+            projection.purchasable = projection.requestedCommerceState === "PURCHASABLE" && projection.commerceReadiness.ready;
+            projection.commerceState = projection.purchasable ? "PURCHASABLE" : projection.requestedCommerceState;
+            projection.comingSoon = projection.commerceState === "COMING_SOON";
+            projection.temporarilyUnavailable = projection.commerceState === "TEMPORARILY_UNAVAILABLE";
+            projection.discoverable = projection.publicDiscoveryEnabled && projection.commerceState !== "HIDDEN";
+            if (!includeDisabled && !projection.discoverable) return null;
+            return projection;
         })
         .filter(Boolean);
 }
@@ -586,16 +717,33 @@ async function getCatalogProductDetail(productCode, options = {}) {
     if (source === "database") {
         const product = await CatalogProduct.findOne({ productCode: normalizedCode }).lean();
         if (!product) return null;
-        const packages = await CatalogPackage.find({ productCode: normalizedCode })
-            .sort({ sortOrder: 1, packageCode: 1 })
-            .lean();
+        const [packages, mappings, inventoryStates] = await Promise.all([
+            CatalogPackage.find({ productCode: normalizedCode }).sort({ sortOrder: 1, packageCode: 1 }).lean(),
+            SupplierProductMapping.find({ productCode: normalizedCode, enabled: true }).lean(),
+            PackageInventoryState.find().lean()
+        ]);
         const mediaMap = await loadMediaAssetMap([product], packages);
-        return projectCatalogProduct(product, packages, {
+        const projection = projectCatalogProduct(product, packages, {
             includeDisabled: options.includeDisabled !== false,
             mediaMap,
             includeAssetProjection: Boolean(options.includeAssetProjection),
             includeAdminPricing: Boolean(options.includeAdminPricing)
         });
+        if (!projection) return null;
+        const packageIds = new Set(packages.map(item => String(item._id)));
+        projection.commerceReadiness = projectCommerceReadiness(
+            product,
+            packages,
+            mappings,
+            inventoryStates.filter(item => packageIds.has(String(item.packageRef)) || packages.some(pkg => pkg.packageCode === item.packageCode))
+        );
+        projection.purchasable = projection.requestedCommerceState === "PURCHASABLE" && projection.commerceReadiness.ready;
+        projection.commerceState = projection.purchasable ? "PURCHASABLE" : projection.requestedCommerceState;
+        projection.comingSoon = projection.commerceState === "COMING_SOON";
+        projection.temporarilyUnavailable = projection.commerceState === "TEMPORARILY_UNAVAILABLE";
+        projection.discoverable = projection.publicDiscoveryEnabled && projection.commerceState !== "HIDDEN";
+        if (options.includeDisabled === false && !projection.discoverable) return null;
+        return projection;
     }
 
     const product = toStaticPublicCatalog({ includeDisabled: options.includeDisabled !== false })
@@ -615,5 +763,6 @@ module.exports = {
     resolveDatabasePackagePriceFromRows,
     resolveOrderCatalog,
     resolvePackagePrice,
+    projectCommerceReadiness,
     toPublicCatalog
 };

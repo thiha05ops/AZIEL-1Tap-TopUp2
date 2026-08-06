@@ -121,6 +121,7 @@ function safeSupplierProjection(supplier = {}) {
         mode: supplier.mode,
         enabled: Boolean(supplier.enabled),
         supportedRegions: supplier.supportedRegions || [],
+        supplierCurrency: supplier.supplierCurrency || supplier.balanceCurrency || supplier.metadata?.supplierCurrency || "",
         capabilities: supplier.capabilities || [],
         balanceAmount: balanceSource === SUPPLIER_BALANCE_SOURCES.UNKNOWN ? null : supplier.balanceAmount,
         balanceCurrency: balanceSource === SUPPLIER_BALANCE_SOURCES.UNKNOWN ? "" : supplier.balanceCurrency,
@@ -199,6 +200,7 @@ async function createSupplier(payload = {}, context = {}) {
         mode,
         enabled: payload.enabled !== false,
         supportedRegions: normalizeRegions(payload.supportedRegions || []),
+        supplierCurrency: normalizeBalanceCurrency(payload.supplierCurrency || payload.balanceCurrency || ""),
         capabilities: Array.isArray(payload.capabilities) ? payload.capabilities.map(item => cleanText(item, 60)).filter(Boolean).slice(0, 20) : [],
         balanceSource,
         balanceAmount: balanceSource === SUPPLIER_BALANCE_SOURCES.MANUAL ? normalizeBalanceAmount(payload.balanceAmount) : null,
@@ -249,6 +251,7 @@ async function updateSupplier(supplierId, payload = {}, context = {}) {
     if (payload.mode !== undefined) supplier.mode = normalizeSupplierMode(payload.mode);
     if (payload.enabled !== undefined) supplier.enabled = Boolean(payload.enabled);
     if (payload.supportedRegions !== undefined) supplier.supportedRegions = normalizeRegions(payload.supportedRegions);
+    if (payload.supplierCurrency !== undefined) supplier.supplierCurrency = normalizeBalanceCurrency(payload.supplierCurrency);
 
     if (payload.balanceSource !== undefined) {
         const nextSource = normalizeBalanceSource(payload.balanceSource);

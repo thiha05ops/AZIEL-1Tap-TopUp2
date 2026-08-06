@@ -676,6 +676,13 @@ async function setProviderReference(input = {}, options = {}) {
         ERROR_CODES.INVALID_PROVIDER_REFERENCE
     );
     const opts = normalizeOptions({ ...options, transactionContext: input.transactionContext || options.transactionContext });
+    const expiresAt = input.expiresAt ? new Date(input.expiresAt) : null;
+    if (expiresAt && !Number.isFinite(expiresAt.getTime())) {
+        throw new PaymentAttemptRepositoryError(ERROR_CODES.INVALID_PAYMENT_ATTEMPT_RECORD, "expiresAt must be valid.", {
+            stage: "reference",
+            metadata: { field: "expiresAt" }
+        });
+    }
     try {
         const existingReference = await findAttemptByProviderReference({ providerReference }, { ...opts, lean: true })
             .catch(error => {
@@ -697,6 +704,9 @@ async function setProviderReference(input = {}, options = {}) {
                     rawProviderStatus: normalizeString(input.rawProviderStatus),
                     providerMetadata: safeMetadata(input.providerMetadata),
                     safeMetadata: safeMetadata(input.safeMetadata),
+                    paymentInstructions: clonePlain(input.paymentInstructions || null),
+                    qr: clonePlain(input.qr || null),
+                    expiresAt,
                     updatedAt: input.changedAt ? new Date(input.changedAt) : new Date()
                 }
             },

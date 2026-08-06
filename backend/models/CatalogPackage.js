@@ -11,6 +11,29 @@ const regionalPriceSchema = new mongoose.Schema(
             enum: ["MMK", "THB"],
             required: true
         },
+        referencePrice: {
+            type: Number,
+            min: 0,
+            default: null
+        },
+        showDiscount: {
+            type: Boolean,
+            default: false
+        },
+        showSaveAmount: {
+            type: Boolean,
+            default: true
+        },
+        showOriginalPrice: {
+            type: Boolean,
+            default: true
+        },
+        discountLabel: {
+            type: String,
+            trim: true,
+            maxlength: 40,
+            default: ""
+        },
         publishedPriceMode: {
             type: String,
             enum: ["POLICY_DERIVED", "MANUAL_OVERRIDE", "LEGACY_COMPATIBILITY_PRICE"],
@@ -38,6 +61,17 @@ const regionalPriceSchema = new mongoose.Schema(
         supplierName: {
             type: String,
             trim: true,
+            default: ""
+        },
+        supplierId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Supplier",
+            default: null
+        },
+        supplierCode: {
+            type: String,
+            trim: true,
+            uppercase: true,
             default: ""
         },
         supplierVersion: {
@@ -154,6 +188,38 @@ const catalogPackageSchema = new mongoose.Schema(
                 default: undefined
             }
         },
+        canonicalSupplierCost: {
+            supplierId: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "Supplier",
+                default: null
+            },
+            supplierCode: {
+                type: String,
+                trim: true,
+                uppercase: true,
+                default: ""
+            },
+            supplierName: {
+                type: String,
+                trim: true,
+                default: ""
+            },
+            amount: {
+                type: Number,
+                min: 0,
+                default: null
+            },
+            currency: {
+                type: String,
+                enum: ["MMK", "THB"],
+                default: null
+            },
+            capturedAt: {
+                type: Date,
+                default: null
+            }
+        },
         sortOrder: {
             type: Number,
             default: 0
@@ -191,7 +257,10 @@ const catalogPackageSchema = new mongoose.Schema(
     }
 );
 
-catalogPackageSchema.index({ productCode: 1, packageCode: 1 }, { unique: true });
+catalogPackageSchema.index(
+    { productCode: 1, packageCode: 1 },
+    { unique: true }
+);
 catalogPackageSchema.index({ productCode: 1, sortOrder: 1 });
 catalogPackageSchema.index({ enabled: 1 });
 catalogPackageSchema.index({ iconAssetId: 1 });

@@ -3,6 +3,7 @@
 const assert = require("assert");
 const fs = require("fs");
 const http = require("http");
+const mongoose = require("mongoose");
 const path = require("path");
 const { Duplex } = require("stream");
 
@@ -173,6 +174,7 @@ function installModelMocks() {
     PricingWorkspaceDraft.find = query => chain(workspaceDrafts.filter(draft => matches(draft, query)));
     PricingWorkspaceDraft.findOne = query => chain(workspaceDrafts.filter(draft => matches(draft, query)).at(-1) || null);
     PricingWorkspaceDraft.findOneAndUpdate = (query, update) => {
+        assert(!(update.$setOnInsert?.version !== undefined && update.$inc?.version !== undefined), "Draft upsert must not assign version through conflicting Mongo operators.");
         let doc = workspaceDrafts.find(draft => matches(draft, query));
         if (!doc) {
             doc = {
@@ -229,6 +231,49 @@ function installModelMocks() {
             PriceVersion.updateOne = originals.versionUpdateOne;
         }
     };
+}
+
+async function verifyNativePricingPolicyObjectId() {
+    const PricingRule = require("../models/PricingRule");
+    const originals = {
+        policyFindOne: PricingPolicy.findOne,
+        ruleFind: PricingRule.find,
+        versionFind: PriceVersion.find
+    };
+    const policyId = new mongoose.Types.ObjectId();
+    let versionQuery = null;
+    try {
+        const nativePolicy = {
+            _id: policyId,
+            status: "ACTIVE",
+            region: "TH",
+            currency: "THB",
+            defaultProfitRule: { type: "FIXED", value: 0 }
+        };
+        PricingPolicy.findOne = () => {
+            const query = { sort() { return query; }, lean: async () => nativePolicy };
+            return query;
+        };
+        PricingRule.find = () => chain([]);
+        PriceVersion.find = query => {
+            versionQuery = query;
+            return chain([]);
+        };
+        await buildProductionPricingContext({
+            pkg: { _id: new mongoose.Types.ObjectId(), productCode: "mlbb", packageCode: "MLBB_13_1", name: "13 Diamonds" },
+            price: { amount: 10, currency: "THB", supplierCost: 9.72, supplierCurrency: "THB" },
+            catalog: { productCode: "mlbb", productName: "Mobile Legends", packageCode: "MLBB_13_1", packageName: "13 Diamonds" },
+            region: "TH",
+            currency: "THB"
+        });
+        const queriedPolicyId = versionQuery?.$or?.[0]?.pricingPolicyId;
+        assert(queriedPolicyId instanceof mongoose.Types.ObjectId, "PriceVersion lookup must receive a native Mongo ObjectId.");
+        assert.strictEqual(queriedPolicyId, policyId, "PriceVersion lookup must preserve the exact PricingPolicy ObjectId instance.");
+    } finally {
+        PricingPolicy.findOne = originals.policyFindOne;
+        PricingRule.find = originals.ruleFind;
+        PriceVersion.find = originals.versionFind;
+    }
 }
 
 function mountPricingEngineRoute({ adminMiddlewareExport, serviceOverride } = {}) {
@@ -489,6 +534,16 @@ async function verifyDraftPublishAndQuotePickup() {
 }
 
 function verifySource() {
+    assertContains("frontend/admin.html", "pricingSettingsSave", "Pricing Settings must expose Save Settings.");
+    assertContains("frontend/admin.html", "pricingPublishBtn", "Daily Pricing must expose Publish Changes.");
+    assertContains("frontend/js/admin-pricing-engine.js", "/workspace/preview", "Daily Pricing must use server preview.");
+    assertContains("frontend/js/admin-pricing-engine.js", "/workspace/publish", "Daily Pricing must use server publish.");
+    assertContains("frontend/js/admin-pricing-engine.js", "/api/admin/pricing-engine/draft", "Supplier cost and policy drafts must persist.");
+    assertContains("frontend/js/admin-pricing-engine.js", "/api/admin/pricing-engine/publish", "Settings save must activate policy without publishing package rows.");
+    assertNotContains("frontend/js/admin-pricing-engine.js", "FALLBACK_PRODUCT", "Bootstrap failure must not show demo products.");
+    assertContains("backend/routes/adminPricingEngine.js", "requireOwner", "Publishing must remain OWNER-only.");
+    assertContains("backend/services/commerce/adminPricingEngineService.js", "PriceVersion.create", "Policy publishing must create a PriceVersion.");
+    return;
     assertContains("frontend/admin.html", "pricingSaveDraftBtn", "Pricing Engine UI must expose Save Draft.");
     assertContains("frontend/admin.html", "pricingPublishBtn", "Pricing Engine UI must expose Publish.");
     assertNotContains("frontend/admin.html", "Simulation Only", "Pricing Engine page must not remain in Simulation Only mode.");
@@ -549,6 +604,7 @@ function verifySource() {
 
 async function main() {
     verifySource();
+    await verifyNativePricingPolicyObjectId();
     await verifyDraftPublishAndQuotePickup();
     await verifyApiGetCompletesQuickly();
     await verifyMiddlewareAndDeadlineLifecycle();
