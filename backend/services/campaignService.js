@@ -4,9 +4,11 @@ const CampaignImpression = require("../models/CampaignImpression");
 const MediaAsset = require("../models/MediaAsset");
 const { assertAssetCategory, projectMediaAsset } = require("./mediaService");
 const { parseCtaTarget, parseSchedule, parseSortOrder } = require("./gameBannerService");
+const { CANONICAL_OPERATIONAL_PRODUCTS, getCanonicalProduct, isCanonicalProductCode } = require("../catalog/canonicalOperationalCatalog");
+const { CAMPAIGN_PLACEMENT_DEFINITIONS, CAMPAIGN_PLACEMENTS, getCampaignPlacementDefinition } = require("../catalog/campaignPlacements");
+const { normalizeCampaignLocales } = require("../catalog/localizedContent");
 
 const CAMPAIGN_TYPES = Object.freeze(["PROMOTION", "NEW_GAME", "ANNOUNCEMENT", "IMPORTANT_UPDATE"]);
-const CAMPAIGN_PLACEMENTS = Object.freeze(["ENTRY_POPUP"]);
 const CAMPAIGN_MEDIA_CATEGORIES = Object.freeze(["campaign", "promotion", "announcement"]);
 const CAMPAIGN_REGIONS = Object.freeze(["MM", "TH"]);
 const CAMPAIGN_AUDIENCES = Object.freeze(["ALL_VISITORS", "LOGGED_IN", "GUESTS"]);
@@ -30,6 +32,14 @@ class CampaignError extends Error {
 
 function cleanText(value = "", max = 120) {
     return String(value || "").trim().slice(0, max);
+}
+
+function parseLocalizedCampaignContent(locales, english) {
+    try {
+        return normalizeCampaignLocales(locales, english);
+    } catch (error) {
+        throw new CampaignError(error.code || "CAMPAIGN_CONTENT_INVALID", error.message);
+    }
 }
 
 function normalizeCampaignCode(value = "") {
@@ -102,6 +112,9 @@ function parseCtaPair(labelValue = "", targetValue = "") {
     if ((ctaLabel && !ctaTarget) || (!ctaLabel && ctaTarget)) {
         throw new CampaignError("CAMPAIGN_CTA_INVALID", "CTA label and target must be configured together.");
     }
+    if (ctaTarget && (/^\/\//.test(ctaTarget) || (!ctaTarget.startsWith("/") && !/^https:\/\//i.test(ctaTarget)))) {
+        throw new CampaignError("CAMPAIGN_CTA_INVALID", "CTA target must be an internal AZIEL path or an HTTPS URL.");
+    }
 
     return { ctaLabel, ctaTarget };
 }
@@ -138,6 +151,22 @@ function buildCampaignPayload(patch = {}, existing = null) {
         Object.prototype.hasOwnProperty.call(patch, "ctaLabel") ? patch.ctaLabel : source.ctaLabel,
         Object.prototype.hasOwnProperty.call(patch, "ctaTarget") ? patch.ctaTarget : source.ctaTarget
     );
+    const locales = parseLocalizedCampaignContent(
+        Object.prototype.hasOwnProperty.call(patch, "locales") ? patch.locales : source.locales,
+        {
+            title: Object.prototype.hasOwnProperty.call(patch, "title") ? patch.title : source.title,
+            body: Object.prototype.hasOwnProperty.call(patch, "body") ? patch.body : source.body,
+            ctaLabel: cta.ctaLabel
+        }
+    );
+
+    const placement = Object.prototype.hasOwnProperty.call(patch, "placement")
+        ? parseEnum(patch.placement, CAMPAIGN_PLACEMENTS, "CAMPAIGN_PLACEMENT_INVALID", "Campaign placement")
+        : source.placement || "ENTRY_POPUP";
+    const requestedProductCode = cleanText(Object.prototype.hasOwnProperty.call(patch, "targetProductCode") ? patch.targetProductCode : source.targetProductCode, 80).toLowerCase();
+    if (getCampaignPlacementDefinition(placement).requiresProductTarget && !isCanonicalProductCode(requestedProductCode)) {
+        throw new CampaignError("CAMPAIGN_PRODUCT_TARGET_INVALID", "Product Notice requires a canonical AZIEL product target.");
+    }
 
     return {
         campaignCode: existing
@@ -149,9 +178,8 @@ function buildCampaignPayload(patch = {}, existing = null) {
         type: Object.prototype.hasOwnProperty.call(patch, "type")
             ? parseEnum(patch.type, CAMPAIGN_TYPES, "CAMPAIGN_TYPE_INVALID", "Campaign type")
             : source.type,
-        placement: Object.prototype.hasOwnProperty.call(patch, "placement")
-            ? parseEnum(patch.placement, CAMPAIGN_PLACEMENTS, "CAMPAIGN_PLACEMENT_INVALID", "Campaign placement")
-            : source.placement || "ENTRY_POPUP",
+        placement,
+        targetProductCode: placement === "PRODUCT_NOTICE" ? requestedProductCode : "",
         title: Object.prototype.hasOwnProperty.call(patch, "title")
             ? parseRequiredText(patch.title, "Title", 120)
             : source.title,
@@ -162,6 +190,7 @@ function buildCampaignPayload(patch = {}, existing = null) {
             ? cleanText(patch.mediaAssetId, 96)
             : source.mediaAssetId || "",
         ...cta,
+        locales,
         regions: Object.prototype.hasOwnProperty.call(patch, "regions")
             ? parseRegions(patch.regions)
             : source.regions || ["MM", "TH"],
@@ -190,13 +219,13 @@ async function loadMediaMap(campaigns = []) {
 }
 
 function getProjectedState(campaign = {}, now = new Date()) {
-    if (campaign.enabled !== true) return "DISABLED";
+    if (campaign.enabled !== true) return campaign.hasBeenEnabled === true ? "DISABLED" : "DRAFT";
     const nowMs = now.getTime();
     const start = campaign.startsAt ? new Date(campaign.startsAt).getTime() : null;
     const end = campaign.endsAt ? new Date(campaign.endsAt).getTime() : null;
 
     if (start && nowMs < start) return "SCHEDULED";
-    if (end && nowMs >= end) return "ENDED";
+    if (end && nowMs >= end) return "EXPIRED";
     return "ACTIVE";
 }
 
@@ -209,11 +238,15 @@ function projectAdminCampaign(campaign = {}, mediaMap = new Map()) {
         name: campaign.name,
         type: campaign.type,
         placement: campaign.placement,
+        placementDefinition: CAMPAIGN_PLACEMENT_DEFINITIONS[campaign.placement],
+        targetProductCode: campaign.targetProductCode || "",
+        targetProductName: getCanonicalProduct(campaign.targetProductCode)?.name || "",
         title: campaign.title,
         body: campaign.body,
         mediaAssetId: campaign.mediaAssetId || "",
         mediaAsset: projectMediaAsset(asset),
         ctaLabel: campaign.ctaLabel || "",
+        locales: normalizeCampaignLocales(campaign.locales, campaign),
         ctaTarget: campaign.ctaTarget || "",
         regions: Array.isArray(campaign.regions) ? campaign.regions : ["MM", "TH"],
         audience: campaign.audience || "ALL_VISITORS",
@@ -222,6 +255,7 @@ function projectAdminCampaign(campaign = {}, mediaMap = new Map()) {
         frequencyPolicy: campaign.frequencyPolicy || "ONCE_PER_SESSION",
         priority: Number(campaign.priority || 0),
         enabled: campaign.enabled === true,
+        hasBeenEnabled: campaign.hasBeenEnabled === true || campaign.enabled === true,
         state: getProjectedState(campaign),
         createdAt: campaign.createdAt || null,
         updatedAt: campaign.updatedAt || null
@@ -233,15 +267,19 @@ function projectPublicCampaign(campaign = {}, mediaMap = new Map()) {
 
     return {
         campaignCode: campaign.campaignCode,
+        campaignVersion: campaign.updatedAt ? new Date(campaign.updatedAt).getTime().toString(36) : "v1",
         type: campaign.type,
         placement: campaign.placement,
+        targetProductCode: campaign.targetProductCode || "",
         title: campaign.title,
         body: campaign.body,
         imageUrl: asset ? asset.secureUrl || asset.url || "" : "",
         imageAltText: asset ? asset.altText || campaign.title || "" : "",
         ctaLabel: campaign.ctaLabel || "",
+        locales: normalizeCampaignLocales(campaign.locales, campaign),
         ctaTarget: campaign.ctaTarget || "",
-        frequencyPolicy: campaign.frequencyPolicy || "ONCE_PER_SESSION"
+        frequencyPolicy: campaign.frequencyPolicy || "ONCE_PER_SESSION",
+        priority: Number(campaign.priority || 0)
     };
 }
 
@@ -252,7 +290,9 @@ async function listAdminCampaigns() {
     const mediaMap = await loadMediaMap(campaigns);
 
     return {
-        campaigns: campaigns.map(item => projectAdminCampaign(item, mediaMap))
+        campaigns: campaigns.map(item => projectAdminCampaign(item, mediaMap)),
+        placements: Object.values(CAMPAIGN_PLACEMENT_DEFINITIONS),
+        canonicalProducts: CANONICAL_OPERATIONAL_PRODUCTS.map(product => ({ productCode: product.productCode, name: product.name, family: product.family, category: product.adminCategory }))
     };
 }
 
@@ -268,6 +308,7 @@ async function createCampaign({ patch = {}, actor = "admin" } = {}) {
     try {
         const campaign = await Campaign.create({
             ...payload,
+            hasBeenEnabled: payload.enabled === true,
             createdBy: actor,
             updatedBy: actor
         });
@@ -290,14 +331,21 @@ async function updateCampaign({ campaignId, patch = {}, actor = "admin" } = {}) 
         throw new CampaignError("CAMPAIGN_NOT_FOUND", "Campaign not found.", 404);
     }
 
-    const payload = buildCampaignPayload(patch, campaign.toObject());
+    const existing = campaign.toObject();
+    const payload = buildCampaignPayload(patch, existing);
     payload.mediaAssetId = await assertCampaignMedia(payload.mediaAssetId);
+    const deliveryFields = ["type", "placement", "targetProductCode", "title", "body", "locales", "mediaAssetId", "ctaLabel", "ctaTarget", "regions", "audience", "startsAt", "endsAt", "frequencyPolicy"];
+    const deliveryChanged = deliveryFields.some(key => JSON.stringify(existing[key] ?? null) !== JSON.stringify(payload[key] ?? null));
 
     Object.entries(payload).forEach(([key, value]) => {
         if (key !== "campaignCode") campaign.set(key, value);
     });
+    if (payload.enabled === true) campaign.hasBeenEnabled = true;
     campaign.updatedBy = actor;
     await campaign.save();
+    if (deliveryChanged) {
+        await CampaignClaimState.deleteMany({ campaignCode: campaign.campaignCode });
+    }
 
     return { changed: true, campaign: campaign.toObject() };
 }
@@ -340,21 +388,45 @@ function isAudienceEligible(campaign, isAuthenticated) {
     return true;
 }
 
-async function resolveEntryPopupCandidates({ region = "MM", isAuthenticated = false, now = new Date() } = {}) {
+function isProductEligible(campaign, productCode = "") {
+    if (campaign.placement !== "PRODUCT_NOTICE") return true;
+    return cleanText(campaign.targetProductCode, 80).toLowerCase() === cleanText(productCode, 80).toLowerCase();
+}
+
+function rankCampaignCandidates(campaigns = []) {
+    return [...campaigns].sort((left, right) =>
+        Number(right.priority || 0) - Number(left.priority || 0) ||
+        Number(new Date(left.startsAt || 0)) - Number(new Date(right.startsAt || 0)) ||
+        Number(new Date(left.createdAt || 0)) - Number(new Date(right.createdAt || 0)) ||
+        String(left.campaignCode || "").localeCompare(String(right.campaignCode || ""))
+    );
+}
+
+async function resolveCampaignCandidates({ placement = "ENTRY_POPUP", productCode = "", region = "MM", isAuthenticated = false, now = new Date() } = {}) {
+    const definition = getCampaignPlacementDefinition(placement);
+    if (!definition) throw new CampaignError("CAMPAIGN_PLACEMENT_INVALID", "Campaign placement is invalid.");
+    const normalizedProductCode = cleanText(productCode, 80).toLowerCase();
+    if (definition.requiresProductTarget && !isCanonicalProductCode(normalizedProductCode)) {
+        throw new CampaignError("CAMPAIGN_PRODUCT_TARGET_INVALID", "A canonical product is required for this placement.");
+    }
     const campaigns = await Campaign.find({
-        placement: "ENTRY_POPUP",
+        placement: definition.code,
+        ...(definition.requiresProductTarget ? { targetProductCode: normalizedProductCode } : {}),
         archivedAt: null,
         enabled: true
     })
         .sort({ priority: -1, startsAt: 1, createdAt: 1, campaignCode: 1 })
         .lean();
 
-    return campaigns.filter(campaign => (
+    return rankCampaignCandidates(campaigns.filter(campaign => (
         isScheduleEligible(campaign, now) &&
         isRegionEligible(campaign, region) &&
-        isAudienceEligible(campaign, isAuthenticated)
-    ));
+        isAudienceEligible(campaign, isAuthenticated) &&
+        isProductEligible(campaign, normalizedProductCode)
+    )));
 }
+
+const resolveEntryPopupCandidates = options => resolveCampaignCandidates({ ...options, placement: "ENTRY_POPUP" });
 
 function bangkokDayKey(date = new Date()) {
     const parts = new Intl.DateTimeFormat("en-CA", {
@@ -377,7 +449,7 @@ function claimFilterForPolicy({ campaign, userId, now, sessionKey }) {
     const base = {
         campaignCode: campaign.campaignCode,
         userId,
-        placement: "ENTRY_POPUP"
+        placement: campaign.placement
     };
 
     if (campaign.frequencyPolicy === "ONCE_PER_CAMPAIGN") {
@@ -425,7 +497,7 @@ async function tryClaimForAuthenticatedUser({ campaign, userId, sessionKey = "",
         $set: {
             campaignCode: campaign.campaignCode,
             userId,
-            placement: "ENTRY_POPUP",
+            placement: campaign.placement,
             lastShownAt: now,
             lastDayKey: dayKey
         },
@@ -447,7 +519,7 @@ async function tryClaimForAuthenticatedUser({ campaign, userId, sessionKey = "",
             campaignId: campaign._id,
             campaignCode: campaign.campaignCode,
             userId,
-            placement: "ENTRY_POPUP",
+            placement: campaign.placement,
             frequencyPolicy: campaign.frequencyPolicy,
             dayKey,
             sessionKey: campaign.frequencyPolicy === "ONCE_PER_SESSION" ? cleanKey : "",
@@ -461,9 +533,9 @@ async function tryClaimForAuthenticatedUser({ campaign, userId, sessionKey = "",
     }
 }
 
-async function claimEntryPopup({ region = "MM", user = null, sessionKey = "", now = new Date() } = {}) {
+async function claimCampaignPlacement({ placement = "ENTRY_POPUP", productCode = "", region = "MM", user = null, sessionKey = "", now = new Date() } = {}) {
     const isAuthenticated = Boolean(user?.id);
-    const candidates = await resolveEntryPopupCandidates({ region, isAuthenticated, now });
+    const candidates = await resolveCampaignCandidates({ placement, productCode, region, isAuthenticated, now });
     const mediaMap = await loadMediaMap(candidates);
 
     if (!isAuthenticated) {
@@ -498,6 +570,8 @@ async function claimEntryPopup({ region = "MM", user = null, sessionKey = "", no
     };
 }
 
+const claimEntryPopup = options => claimCampaignPlacement({ ...options, placement: "ENTRY_POPUP" });
+
 module.exports = {
     BANGKOK_TIMEZONE,
     CAMPAIGN_AUDIENCES,
@@ -508,11 +582,21 @@ module.exports = {
     CAMPAIGN_TYPES,
     CampaignError,
     bangkokDayKey,
+    buildCampaignPayload,
     claimEntryPopup,
+    claimCampaignPlacement,
     createCampaign,
     listAdminCampaigns,
     normalizeCampaignCode,
     removeCampaign,
     resolveEntryPopupCandidates,
+    resolveCampaignCandidates,
+    getProjectedState,
+    isAudienceEligible,
+    isRegionEligible,
+    isScheduleEligible,
+    isProductEligible,
+    projectPublicCampaign,
+    rankCampaignCandidates,
     updateCampaign
 };

@@ -4,6 +4,12 @@
 let adminCampaignsInitialized = false;
 let adminCampaigns = [];
 let campaignSavePending = false;
+const campaignActionPending = new Set();
+let adminCampaignPlacements = [];
+let adminCampaignProducts = [];
+let campaignLoadSequence = 0;
+let campaignLoadController = null;
+let campaignLoadPending = false;
 
 const CAMPAIGN_MEDIA_CATEGORIES = ["campaign", "promotion", "announcement"];
 
@@ -15,7 +21,9 @@ function initAdminCampaignsController() {
     if (adminCampaignsInitialized) return;
     adminCampaignsInitialized = true;
 
-    document.getElementById("addCampaignBtn")?.addEventListener("click", () => openCampaignEditor());
+    const addButton = document.getElementById("addCampaignBtn");
+    if (addButton) addButton.disabled = true;
+    addButton?.addEventListener("click", () => openCampaignEditor());
 
     window.addEventListener("aziel:admin-section-opened", event => {
         if (event.detail?.section === "campaigns") {
@@ -26,31 +34,69 @@ function initAdminCampaignsController() {
     window.addEventListener("aziel:admin-locale-changed", () => {
         renderAdminCampaigns();
     });
+    window.addEventListener("aziel:admin-auth-ready", () => {
+        if (document.body.dataset.adminSection === "campaigns") loadAdminCampaigns();
+    });
+
+    if (document.body.dataset.adminSection === "campaigns" || document.getElementById("section-campaigns")?.classList.contains("active")) {
+        loadAdminCampaigns();
+    }
 }
 
 async function loadAdminCampaigns(force = false) {
     const list = document.getElementById("adminCampaignList");
     if (!list) return;
 
+    if (campaignLoadPending && !force) return;
     if (adminCampaigns.length && !force) {
         renderAdminCampaigns();
         return;
     }
 
-    list.innerHTML = `
-        <div class="admin-dashboard-skeleton"></div>
-        <div class="admin-dashboard-skeleton"></div>
-    `;
+    const requestId = ++campaignLoadSequence;
+    campaignLoadController?.abort();
+    campaignLoadController = new AbortController();
+    campaignLoadPending = true;
+    renderCampaignLoading();
 
-    const data = await adminFetch("/api/admin/campaigns");
-
-    if (!data?.success) {
-        list.innerHTML = `<p class="admin-empty-state">${escapeCampaignHtml(data?.message || adminT("campaign_load_failed", "Campaigns could not be loaded"))}</p>`;
-        return;
+    try {
+        const data = await adminFetch("/api/admin/campaigns", { signal: campaignLoadController.signal });
+        if (requestId !== campaignLoadSequence) return;
+        if (!data?.success || !Array.isArray(data.campaigns) || !Array.isArray(data.placements) || !Array.isArray(data.canonicalProducts)) {
+            throw new Error(data?.message || adminT("campaign_load_failed", "Campaigns could not be loaded"));
+        }
+        adminCampaigns = data.campaigns;
+        adminCampaignPlacements = data.placements;
+        adminCampaignProducts = data.canonicalProducts;
+        document.getElementById("addCampaignBtn")?.removeAttribute("disabled");
+        renderAdminCampaigns();
+    } catch (error) {
+        if (error?.name === "AbortError" && requestId !== campaignLoadSequence) return;
+        if (requestId === campaignLoadSequence) renderCampaignError(error?.message);
+    } finally {
+        if (requestId === campaignLoadSequence) {
+            campaignLoadPending = false;
+            if (list.dataset.campaignState === "loading") renderCampaignError();
+        }
     }
+}
 
-    adminCampaigns = Array.isArray(data.campaigns) ? data.campaigns : [];
-    renderAdminCampaigns();
+function renderCampaignLoading() {
+    const list = document.getElementById("adminCampaignList");
+    if (!list) return;
+    list.dataset.campaignState = "loading";
+    list.innerHTML = '<div class="admin-dashboard-skeleton"></div><div class="admin-dashboard-skeleton"></div>';
+}
+
+function renderCampaignError(message = "") {
+    const list = document.getElementById("adminCampaignList");
+    if (!list) return;
+    list.dataset.campaignState = "error";
+    list.innerHTML = `<div class="campaign-load-state"><strong>${escapeCampaignHtml(message || adminT("campaign_load_failed", "Campaigns could not be loaded."))}</strong><button class="admin-secondary-btn" type="button" data-campaign-retry>${adminT("retry", "Retry")}</button></div>`;
+    list.querySelector("[data-campaign-retry]")?.addEventListener("click", event => {
+        event.currentTarget.disabled = true;
+        loadAdminCampaigns(true);
+    }, { once: true });
 }
 
 function renderAdminCampaigns() {
@@ -58,20 +104,28 @@ function renderAdminCampaigns() {
     if (!list) return;
 
     if (!adminCampaigns.length) {
-        list.innerHTML = `<p class="admin-empty-state">${adminT("no_campaigns_found", "No campaigns found")}</p>`;
+        list.dataset.campaignState = "empty";
+        list.innerHTML = `<div class="campaign-load-state"><strong>${adminT("no_campaigns_yet", "No campaigns yet.")}</strong><p>Create customer engagement campaigns for Entry Popup, Top Notice, or Product Notice.</p><button class="admin-secondary-btn" type="button" data-campaign-add-empty>${adminT("add_campaign", "Add Campaign")}</button></div>`;
+        list.querySelector("[data-campaign-add-empty]")?.addEventListener("click", () => openCampaignEditor());
         return;
     }
 
-    list.innerHTML = adminCampaigns.map(campaign => `
+    list.dataset.campaignState = "content";
+    list.innerHTML = adminCampaigns.map(campaign => {
+        const type = safeCampaignValue(campaign.type, "UNKNOWN");
+        const audience = safeCampaignValue(campaign.audience, "ALL_VISITORS");
+        const frequency = safeCampaignValue(campaign.frequencyPolicy, "ONCE_PER_SESSION");
+        const state = safeCampaignValue(campaign.state, campaign.enabled ? "ACTIVE" : "DISABLED");
+        return `
         <article class="campaign-row" data-campaign-id="${escapeCampaignHtml(campaign.id)}">
             <div class="campaign-row-main">
                 <strong>${escapeCampaignHtml(campaign.name)}</strong>
-                <small>${escapeCampaignHtml(campaign.campaignCode)} · ${adminT(campaign.type.toLowerCase(), campaign.type)} · ${adminT("entry_popup", "Entry Popup")}</small>
-                <small>${formatCampaignRegions(campaign.regions)} · ${adminT(campaign.audience.toLowerCase(), campaign.audience)} · ${adminT(campaign.frequencyPolicy.toLowerCase(), campaign.frequencyPolicy)}</small>
-                <small>${formatCampaignSchedule(campaign)}</small>
+                <small>${escapeCampaignHtml(campaign.campaignCode)} · ${adminT(type.toLowerCase(), type)} · ${escapeCampaignHtml(formatPlacement(campaign.placement))}</small>
+                <small>${escapeCampaignHtml(campaign.targetProductName || "All storefront")} · ${formatCampaignRegions(campaign.regions)} · ${adminT(audience.toLowerCase(), audience)}</small>
+                <small>${adminT(frequency.toLowerCase(), frequency)} · ${formatCampaignSchedule(campaign)}</small>
             </div>
             <div class="campaign-row-status">
-                <b class="admin-status-pill ${campaignStateClass(campaign.state)}">${adminT(campaign.state.toLowerCase(), campaign.state)}</b>
+                <b class="admin-status-pill ${campaignStateClass(state)}">${adminT(state.toLowerCase(), state)}</b>
                 <small>${adminT("priority", "Priority")}: ${Number(campaign.priority || 0)}</small>
             </div>
             <div class="catalog-package-actions">
@@ -83,7 +137,7 @@ function renderAdminCampaigns() {
                 <button class="admin-icon-btn danger" type="button" data-remove-campaign="${escapeCampaignHtml(campaign.id)}">${adminT("remove", "Remove")}</button>
             </div>
         </article>
-    `).join("");
+    `; }).join("");
 
     list.querySelectorAll("[data-preview-campaign]").forEach(btn => {
         btn.addEventListener("click", () => previewCampaign(findCampaign(btn.dataset.previewCampaign)));
@@ -99,6 +153,11 @@ function renderAdminCampaigns() {
     });
 }
 
+function safeCampaignValue(value, fallback) {
+    const normalized = String(value || "").trim();
+    return normalized || fallback;
+}
+
 function openCampaignEditor(campaign = null) {
     ensureCampaignEditorModal();
     const modal = document.getElementById("campaignEditorModal");
@@ -110,10 +169,17 @@ function openCampaignEditor(campaign = null) {
     modal.querySelector("#campaignCode").value = campaign?.campaignCode || "";
     modal.querySelector("#campaignCode").disabled = Boolean(campaign);
     modal.querySelector("#campaignType").value = campaign?.type || "PROMOTION";
-    modal.querySelector("#campaignPlacement").value = "ENTRY_POPUP";
+    modal.querySelector("#campaignPlacement").value = campaign?.placement || "ENTRY_POPUP";
+    modal.querySelector("#campaignTargetProduct").value = campaign?.targetProductCode || adminCampaignProducts[0]?.productCode || "";
+    syncCampaignPlacementFields(modal);
     modal.querySelector("#campaignTitle").value = campaign?.title || "";
     modal.querySelector("#campaignBody").value = campaign?.body || "";
     modal.querySelector("#campaignCtaLabel").value = campaign?.ctaLabel || "";
+    ["my", "th"].forEach(locale => {
+        modal.querySelector(`#campaignTitle_${locale}`).value = campaign?.locales?.[locale]?.title || "";
+        modal.querySelector(`#campaignBody_${locale}`).value = campaign?.locales?.[locale]?.body || "";
+        modal.querySelector(`#campaignCtaLabel_${locale}`).value = campaign?.locales?.[locale]?.ctaLabel || "";
+    });
     modal.querySelector("#campaignCtaTarget").value = campaign?.ctaTarget || "";
     modal.querySelector("#campaignRegion").value = campaignRegionsValue(campaign?.regions);
     modal.querySelector("#campaignAudience").value = campaign?.audience || "ALL_VISITORS";
@@ -136,6 +202,7 @@ function openCampaignEditor(campaign = null) {
     };
     modal.querySelector("#campaignCancel").onclick = () => modal.classList.remove("show");
     modal.querySelector("#campaignSave").onclick = () => saveCampaign(campaign);
+    modal.querySelector("#campaignPlacement").onchange = () => syncCampaignPlacementFields(modal);
 
     modal.classList.add("show");
 }
@@ -167,16 +234,37 @@ function ensureCampaignEditorModal() {
                             </select>
                         </label>
                         <label>${adminT("placement", "Placement")}
-                            <select id="campaignPlacement" disabled>
-                                <option value="ENTRY_POPUP">${adminT("entry_popup", "Entry Popup")}</option>
-                            </select>
+                            <select id="campaignPlacement"></select>
                         </label>
                     </div>
                 </section>
                 <section class="campaign-editor-section">
+                    <h4>${adminT("targeting", "Targeting")}</h4>
+                    <div class="campaign-editor-grid">
+                        <label>${adminT("region", "Region")}
+                            <select id="campaignRegion">
+                                <option value="ALL">${adminT("all_regions", "All Regions")}</option><option value="MM">${adminT("myanmar", "Myanmar")}</option><option value="TH">${adminT("thailand", "Thailand")}</option>
+                            </select>
+                        </label>
+                        <label>${adminT("audience", "Audience")}
+                            <select id="campaignAudience"><option value="ALL_VISITORS">${adminT("all_visitors", "All Visitors")}</option><option value="LOGGED_IN">${adminT("logged_in_users", "Logged-in Users")}</option><option value="GUESTS">${adminT("guests", "Guests")}</option></select>
+                        </label>
+                        <label id="campaignProductTargetField" hidden>${adminT("target_product", "Target Product")}<select id="campaignTargetProduct"></select></label>
+                    </div>
+                </section>
+                <section class="campaign-editor-section">
                     <h4>${adminT("content", "Content")}</h4>
-                    <label>${adminT("title", "Title")} <input id="campaignTitle" type="text"></label>
-                    <label>${adminT("body", "Body")} <textarea id="campaignBody" rows="4"></textarea></label>
+                    <h5>English — fallback</h5>
+                    <label>${adminT("title", "Title")} <input id="campaignTitle" type="text" maxlength="120"></label>
+                    <label>${adminT("body", "Body")} <textarea id="campaignBody" maxlength="700" rows="4"></textarea></label>
+                    <h5>မြန်မာ — optional</h5>
+                    <label>Title <input id="campaignTitle_my" type="text" maxlength="120"></label>
+                    <label>Body <textarea id="campaignBody_my" maxlength="700" rows="4"></textarea></label>
+                    <label>CTA Label <input id="campaignCtaLabel_my" type="text" maxlength="40"></label>
+                    <h5>ไทย — optional</h5>
+                    <label>Title <input id="campaignTitle_th" type="text" maxlength="120"></label>
+                    <label>Body <textarea id="campaignBody_th" maxlength="700" rows="4"></textarea></label>
+                    <label>CTA Label <input id="campaignCtaLabel_th" type="text" maxlength="40"></label>
                 </section>
                 <section class="campaign-editor-section">
                     <h4>${adminT("media", "Media")}</h4>
@@ -199,22 +287,8 @@ function ensureCampaignEditorModal() {
                     </div>
                 </section>
                 <section class="campaign-editor-section">
-                    <h4>${adminT("audience", "Audience")}</h4>
+                    <h4>${adminT("delivery", "Delivery")}</h4>
                     <div class="campaign-editor-grid">
-                        <label>${adminT("region", "Region")}
-                            <select id="campaignRegion">
-                                <option value="ALL">${adminT("all_regions", "All Regions")}</option>
-                                <option value="MM">${adminT("myanmar", "Myanmar")}</option>
-                                <option value="TH">${adminT("thailand", "Thailand")}</option>
-                            </select>
-                        </label>
-                        <label>${adminT("audience", "Audience")}
-                            <select id="campaignAudience">
-                                <option value="ALL_VISITORS">${adminT("all_visitors", "All Visitors")}</option>
-                                <option value="LOGGED_IN">${adminT("logged_in_users", "Logged-in Users")}</option>
-                                <option value="GUESTS">${adminT("guests", "Guests")}</option>
-                            </select>
-                        </label>
                         <label>${adminT("frequency", "Frequency")}
                             <select id="campaignFrequency">
                                 <option value="ONCE_PER_SESSION">${adminT("once_per_session", "Once Per Session")}</option>
@@ -232,6 +306,7 @@ function ensureCampaignEditorModal() {
                         <label>${adminT("start_date", "Start Date")} <input id="campaignStarts" type="datetime-local"></label>
                         <label>${adminT("end_date", "End Date")} <input id="campaignEnds" type="datetime-local"></label>
                     </div>
+                    <small>Times are entered in Thailand time (Asia/Bangkok) and stored as UTC.</small>
                     <label class="campaign-enabled-row"><input id="campaignEnabled" type="checkbox"> ${adminT("enabled", "Enabled")}</label>
                 </section>
             </div>
@@ -245,6 +320,17 @@ function ensureCampaignEditorModal() {
         if (event.target === modal) modal.classList.remove("show");
     });
     document.body.appendChild(modal);
+    const placementSelect = modal.querySelector("#campaignPlacement");
+    placementSelect.innerHTML = adminCampaignPlacements.map(item => `<option value="${escapeCampaignHtml(item.code)}">${escapeCampaignHtml(item.label)}</option>`).join("");
+    const productSelect = modal.querySelector("#campaignTargetProduct");
+    productSelect.innerHTML = adminCampaignProducts.map(item => `<option value="${escapeCampaignHtml(item.productCode)}">${escapeCampaignHtml(item.name)}</option>`).join("");
+}
+
+function syncCampaignPlacementFields(modal) {
+    const placement = modal.querySelector("#campaignPlacement")?.value || "ENTRY_POPUP";
+    const field = modal.querySelector("#campaignProductTargetField");
+    if (field) field.hidden = placement !== "PRODUCT_NOTICE";
+    modal.querySelector("#campaignTargetProduct")?.toggleAttribute("required", placement === "PRODUCT_NOTICE");
 }
 
 async function saveCampaign(existing = null) {
@@ -255,7 +341,7 @@ async function saveCampaign(existing = null) {
     const payload = readCampaignPayload(modal, existing);
     const result = await window.AZIEL_ADMIN_ACTION_MODAL?.open?.({
         title: existing ? adminT("update_campaign", "Update Campaign") : adminT("create_campaign", "Create Campaign"),
-        message: existing ? adminT("update_campaign_message", "Update this ENTRY_POPUP Campaign?") : adminT("create_campaign_message", "Create this ENTRY_POPUP Campaign?"),
+        message: campaignConfirmationSummary(payload),
         input: false,
         confirmText: adminT("save_campaign", "Save Campaign")
     });
@@ -281,11 +367,23 @@ async function saveCampaign(existing = null) {
         adminCampaigns = Array.isArray(data.campaigns) ? data.campaigns : [];
         renderAdminCampaigns();
         modal.classList.remove("show");
+        const saved = adminCampaigns.find(item => item.id === existing?.id || item.campaignCode === String(payload.campaignCode || existing?.campaignCode || "").trim().toUpperCase());
+        if (saved) document.querySelector(`[data-campaign-id="${CSS.escape(saved.id)}"]`)?.classList.add("is-highlighted");
         showAdminToast?.(adminT("campaign_saved", "Campaign saved"), "success");
+    } catch (error) {
+        showAdminToast?.(error?.message || adminT("campaign_save_failed", "Campaign could not be saved"), "error");
     } finally {
         campaignSavePending = false;
         window.AZIEL_UI?.button?.reset(saveBtn);
     }
+}
+
+function campaignConfirmationSummary(payload = {}) {
+    const regions = Array.isArray(payload.regions) && payload.regions.length === 2 ? "All regions" : (payload.regions || []).join(", ");
+    const schedule = `${payload.startsAt ? formatCampaignDate(payload.startsAt) : "Immediate"} → ${payload.endsAt ? formatCampaignDate(payload.endsAt) : "No end"}`;
+    const cta = payload.ctaLabel && payload.ctaTarget ? `${payload.ctaLabel} → ${payload.ctaTarget}` : "None";
+    const product = adminCampaignProducts.find(item => item.productCode === payload.targetProductCode)?.name || "All storefront";
+    return `${payload.name || "Campaign"}\n${payload.type} · ${payload.placement}\nTarget: ${product}\n${regions} · ${payload.audience}\n${schedule}\n${payload.frequencyPolicy}\n${payload.enabled ? "Enabled" : "Disabled/Draft"}\nCTA: ${cta}`;
 }
 
 function readCampaignPayload(modal, existing = null) {
@@ -293,7 +391,8 @@ function readCampaignPayload(modal, existing = null) {
     const payload = {
         name: modal.querySelector("#campaignName")?.value || "",
         type: modal.querySelector("#campaignType")?.value || "PROMOTION",
-        placement: "ENTRY_POPUP",
+        placement: modal.querySelector("#campaignPlacement")?.value || "ENTRY_POPUP",
+        targetProductCode: modal.querySelector("#campaignTargetProduct")?.value || "",
         title: modal.querySelector("#campaignTitle")?.value || "",
         body: modal.querySelector("#campaignBody")?.value || "",
         mediaAssetId: modal.dataset.mediaAssetId || "",
@@ -307,6 +406,19 @@ function readCampaignPayload(modal, existing = null) {
         endsAt: fromCampaignDatetimeValue(modal.querySelector("#campaignEnds")?.value),
         enabled: Boolean(modal.querySelector("#campaignEnabled")?.checked)
     };
+    payload.locales = {
+        en: { title: payload.title, body: payload.body, ctaLabel: payload.ctaLabel },
+        my: {
+            title: modal.querySelector("#campaignTitle_my")?.value || "",
+            body: modal.querySelector("#campaignBody_my")?.value || "",
+            ctaLabel: modal.querySelector("#campaignCtaLabel_my")?.value || ""
+        },
+        th: {
+            title: modal.querySelector("#campaignTitle_th")?.value || "",
+            body: modal.querySelector("#campaignBody_th")?.value || "",
+            ctaLabel: modal.querySelector("#campaignCtaLabel_th")?.value || ""
+        }
+    };
 
     if (!existing) {
         payload.campaignCode = modal.querySelector("#campaignCode")?.value || "";
@@ -316,8 +428,10 @@ function readCampaignPayload(modal, existing = null) {
 }
 
 async function toggleCampaign(campaign) {
-    if (!campaign) return;
+    if (!campaign || campaignActionPending.has(campaign.id)) return;
+    campaignActionPending.add(campaign.id);
 
+    try {
     const data = await adminFetch(`/api/admin/campaigns/${encodeURIComponent(campaign.id)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -332,9 +446,13 @@ async function toggleCampaign(campaign) {
     adminCampaigns = Array.isArray(data.campaigns) ? data.campaigns : [];
     renderAdminCampaigns();
     showAdminToast?.(adminT("campaign_saved", "Campaign saved"), "success");
+    } catch (error) {
+        showAdminToast?.(error?.message || adminT("campaign_save_failed", "Campaign could not be saved"), "error");
+    } finally { campaignActionPending.delete(campaign.id); }
 }
 
 async function removeCampaign(campaignId) {
+    if (!campaignId || campaignActionPending.has(campaignId)) return;
     const result = await window.AZIEL_ADMIN_ACTION_MODAL?.open?.({
         title: adminT("remove_campaign", "Remove Campaign"),
         message: adminT("remove_campaign_message", "Remove this Campaign? Media assets and historical impression records remain."),
@@ -345,6 +463,8 @@ async function removeCampaign(campaignId) {
 
     if (result && result.confirmed === false) return;
 
+    campaignActionPending.add(campaignId);
+    try {
     const data = await adminFetch(`/api/admin/campaigns/${encodeURIComponent(campaignId)}`, {
         method: "DELETE"
     });
@@ -357,13 +477,33 @@ async function removeCampaign(campaignId) {
     adminCampaigns = Array.isArray(data.campaigns) ? data.campaigns : [];
     renderAdminCampaigns();
     showAdminToast?.(adminT("campaign_removed", "Campaign removed"), "success");
+    } catch (error) {
+        showAdminToast?.(error?.message || adminT("campaign_save_failed", "Campaign could not be saved"), "error");
+    } finally { campaignActionPending.delete(campaignId); }
 }
 
 function previewCampaign(campaign) {
     if (!campaign) return;
+    if (campaign.placement !== "ENTRY_POPUP") return previewInlineCampaign(campaign);
     ensureCampaignPreviewModal();
     renderCampaignPreview(campaign);
     document.getElementById("campaignPreviewModal")?.classList.add("show");
+}
+
+function previewInlineCampaign(campaign) {
+    let modal = document.getElementById("campaignInlinePreviewModal");
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "campaignInlinePreviewModal";
+        modal.className = "admin-action-modal";
+        modal.innerHTML = '<div class="admin-action-modal-box campaign-inline-preview-box"><button class="admin-icon-btn" type="button" data-inline-preview-close aria-label="Close">×</button><div data-inline-preview-stage></div></div>';
+        modal.addEventListener("click", event => { if (event.target === modal) modal.classList.remove("show"); });
+        modal.querySelector("[data-inline-preview-close]").onclick = () => modal.classList.remove("show");
+        document.body.appendChild(modal);
+    }
+    const stage = modal.querySelector("[data-inline-preview-stage]");
+    stage.innerHTML = `<small>Preview · ${escapeCampaignHtml(formatPlacement(campaign.placement))} · ${escapeCampaignHtml(campaign.targetProductName || "All storefront")} · ${escapeCampaignHtml(formatCampaignRegions(campaign.regions))} · ${escapeCampaignHtml(campaign.state)}</small><section class="campaign-notice ${campaign.placement === "TOP_NOTICE" ? "campaign-top-notice" : "campaign-product-notice"}"><div><b>${escapeCampaignHtml(campaign.type.replaceAll("_", " "))}</b><h3>${escapeCampaignHtml(campaign.title)}</h3><p>${escapeCampaignHtml(campaign.body)}</p></div>${campaign.ctaLabel && campaign.ctaTarget ? `<a href="${escapeCampaignHtml(campaign.ctaTarget)}">${escapeCampaignHtml(campaign.ctaLabel)}</a>` : ""}</section>`;
+    modal.classList.add("show");
 }
 
 function ensureCampaignPreviewModal() {
@@ -437,6 +577,11 @@ function renderCampaignPreview(campaign) {
     body.textContent = campaign.body;
     content.append(type, title, body);
 
+    const meta = document.createElement("small");
+    meta.className = "campaign-preview-meta";
+    meta.textContent = `${campaign.placement} · ${campaign.state} · ${formatCampaignRegions(campaign.regions)} · ${formatCampaignSchedule(campaign)}`;
+    content.appendChild(meta);
+
     if (campaign.ctaLabel && campaign.ctaTarget) {
         const cta = document.createElement("a");
         cta.className = "campaign-popup-cta";
@@ -466,7 +611,12 @@ function formatCampaignRegions(regions = []) {
 
 function formatCampaignSchedule(campaign = {}) {
     if (!campaign.startsAt && !campaign.endsAt) return adminT("not_scheduled", "Not scheduled");
-    return `${campaign.startsAt ? new Date(campaign.startsAt).toLocaleString() : "…"} → ${campaign.endsAt ? new Date(campaign.endsAt).toLocaleString() : "…"}`;
+    const safeDate = value => {
+        if (!value) return "…";
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? adminT("invalid_date", "Invalid date") : date.toLocaleString();
+    };
+    return `${safeDate(campaign.startsAt)} → ${safeDate(campaign.endsAt)}`;
 }
 
 function campaignStateClass(state = "") {
@@ -475,19 +625,28 @@ function campaignStateClass(state = "") {
     return "is-warning";
 }
 
+function formatPlacement(placement = "") {
+    return adminCampaignPlacements.find(item => item.code === placement)?.label || String(placement).replaceAll("_", " ");
+}
+
 function toCampaignDatetimeValue(value) {
     if (!value) return "";
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return "";
-    const offset = date.getTimezoneOffset() * 60000;
-    return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+    const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(date);
+    const fields = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    return `${fields.year}-${fields.month}-${fields.day}T${fields.hour}:${fields.minute}`;
 }
 
 function fromCampaignDatetimeValue(value) {
     if (!value) return null;
-    const date = new Date(value);
+    const date = new Date(`${value}:00+07:00`);
     if (Number.isNaN(date.getTime())) return null;
     return date.toISOString();
+}
+
+function formatCampaignDate(value) {
+    return new Intl.DateTimeFormat(undefined, { timeZone: "Asia/Bangkok", dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
 function escapeCampaignHtml(value = "") {

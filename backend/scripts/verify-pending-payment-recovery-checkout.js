@@ -15,9 +15,10 @@ function includes(file, snippet, message) {
 function verifyOverlayHandoff() {
     const overlay = read("frontend/js/payment/pending-payment-recovery.js");
     includes("frontend/js/payment/pending-payment-recovery.js", "/api/payment/manual/recoverable/${encodeURIComponent(id)}/resume", "Continue Payment must call resume endpoint with exact attempt ID.");
-    includes("frontend/js/payment/pending-payment-recovery.js", "ensureRecoveryCheckoutRuntime", "overlay must load checkout runtime before event handoff.");
-    includes("frontend/js/payment/pending-payment-recovery.js", "window.dispatchEvent(new CustomEvent(RECOVERY_EVENT", "overlay must dispatch the recovery event.");
-    includes("frontend/js/payment/pending-payment-recovery.js", "removeOverlay();", "overlay must move out of the way before checkout opens.");
+    includes("frontend/js/payment/pending-payment-recovery.js", "payment.html?attemptId=", "overlay must hand recovery to the dedicated Payment page.");
+    includes("frontend/js/payment-page-runtime.js", "async function recover()", "Payment page must recover the authoritative active attempt.");
+    includes("frontend/js/payment-page-runtime.js", "PaymentCheckoutSheet.openRecoveredPayment(recovery)", "Payment page must render the recovered server session.");
+    includes("frontend/js/payment/pending-payment-recovery.js", "removeOverlay();", "overlay must move out of the way before Payment opens.");
     assert(!overlay.includes("renderPreview"), "temporary Phase 2.2 preview renderer must be removed.");
     assert(!overlay.includes("Recovery details ready"), "customer-facing placeholder preview must not remain.");
     assert(!/payment\/manual\/attempt["'`)]/.test(overlay), "overlay must not create a new manual attempt.");

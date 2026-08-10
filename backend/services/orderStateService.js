@@ -1,6 +1,7 @@
 const Order = require("../models/Order");
 const realtime = require("./realtime");
 const orderEmailService = require("./orderEmailService");
+const { ensurePaidOrderFulfillmentWork } = require("./paidFulfillmentRoutingService");
 
 const ORDER_STATES = Object.freeze({
     PENDING_PAYMENT: "pending_payment",
@@ -236,6 +237,9 @@ async function transitionOrder(orderOrId, nextStatusInput, options = {}) {
     }
 
     await order.save({ session: options.session || null });
+    if (nextStatus === ORDER_STATES.PAID) {
+        await ensurePaidOrderFulfillmentWork(order, { session: options.session || null });
+    }
     if (options.emit !== false) {
         await emitCommittedTransition(order, entry);
     }

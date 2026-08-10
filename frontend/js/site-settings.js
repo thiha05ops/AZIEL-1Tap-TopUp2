@@ -51,28 +51,32 @@ async function loadSiteSettings() {
 }
 
 (function autoSystemTheme() {
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const media = window.matchMedia?.("(prefers-color-scheme: dark)");
+    const LEGACY_CLASSES = ["light", "dark", "theme-light", "theme-dark"];
 
     function applyTheme() {
-        const theme = media.matches ? "dark" : "light";
+        const theme = media?.matches ? "dark" : "light";
 
         document.documentElement.classList.remove(
-            "light", "dark", "theme-light", "theme-dark"
+            ...LEGACY_CLASSES
         );
-        document.body.classList.remove(
-            "light", "dark", "theme-light", "theme-dark"
-        );
-
-        document.documentElement.classList.add(theme);
-        document.body.classList.add(theme);
-
+        document.documentElement.classList.add(theme === "dark" ? "theme-dark" : "theme-light");
         document.documentElement.dataset.theme = theme;
-        document.body.dataset.theme = theme;
 
-        localStorage.setItem("theme", theme);
+        if (document.body) {
+            document.body.classList.remove(...LEGACY_CLASSES);
+            document.body.classList.add(theme === "dark" ? "theme-dark" : "theme-light");
+            document.body.dataset.theme = theme;
+        }
+
+        window.AZIEL = window.AZIEL || {};
+        window.AZIEL.theme = {
+            mode: "system",
+            resolved: theme
+        };
     }
 
     applyTheme();
 
-    media.addEventListener("change", applyTheme);
+    media?.addEventListener?.("change", applyTheme);
 })();

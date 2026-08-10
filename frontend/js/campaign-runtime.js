@@ -1,8 +1,9 @@
 // frontend/js/campaign-runtime.js
-// Shared AZIEL customer ENTRY_POPUP Campaign runtime.
+// Shared AZIEL customer Campaign placement runtime.
 
 (function () {
-    const CLAIM_URL = "/api/campaigns/entry-popup/claim";
+    const CLAIM_URL = "/api/campaigns/claim";
+    const LEGACY_ENTRY_POPUP_CLAIM_URL = "/api/campaigns/entry-popup/claim";
     const SESSION_KEY = "aziel_campaign_session_key_v1";
     const SESSION_SEEN_KEY = "aziel_campaign_session_seen_v1";
     const LOCAL_STATE_KEY = "aziel_campaign_frequency_v1";
@@ -11,6 +12,26 @@
 
     let initialized = false;
     let lastFocused = null;
+    const t = (key, fallback) => window.AZIEL_LOCALE?.t?.(key, fallback) || fallback;
+    const claimControllers = new Map();
+    const claimSequences = new Map();
+    const renderedCampaigns = new Map();
+
+    function currentLocale() {
+        return window.AZIEL_LOCALE?.getLocale?.() || "en";
+    }
+
+    function localizeCampaign(campaign = {}) {
+        const locales = campaign.locales && typeof campaign.locales === "object" ? campaign.locales : {};
+        const english = locales.en && typeof locales.en === "object" ? locales.en : campaign;
+        const requested = locales[currentLocale()] && typeof locales[currentLocale()] === "object" ? locales[currentLocale()] : {};
+        return {
+            ...campaign,
+            title: String(requested.title || english.title || campaign.title || ""),
+            body: String(requested.body || english.body || campaign.body || ""),
+            ctaLabel: String(requested.ctaLabel || english.ctaLabel || campaign.ctaLabel || "")
+        };
+    }
 
     function isAdminPage() {
         return /(^|\/)admin(?:-|\.html|$)/i.test(window.location.pathname);
@@ -45,8 +66,13 @@
         return key;
     }
 
-    async function claimEntryPopup() {
+    async function claimPlacement(placement, productCode = "") {
         if (isAdminPage()) return;
+        const sequence = Number(claimSequences.get(placement) || 0) + 1;
+        claimSequences.set(placement, sequence);
+        claimControllers.get(placement)?.abort();
+        const controller = new AbortController();
+        claimControllers.set(placement, controller);
         const token = getToken();
         const headers = {
             "Content-Type": "application/json",
@@ -56,30 +82,34 @@
         try {
             const response = await fetch(apiUrl(CLAIM_URL), {
                 method: "POST",
+                signal: controller.signal,
                 headers,
                 body: JSON.stringify({
                     region: getRegion() === "TH" ? "TH" : "MM",
+                    placement,
+                    ...(placement === "PRODUCT_NOTICE" ? { productCode } : {}),
                     sessionKey: getSessionKey()
                 })
             });
             const data = await response.json();
+            if (sequence !== claimSequences.get(placement)) return;
             if (!response.ok || !data?.success) return;
 
             const campaign = data.authenticated
                 ? data.campaign
                 : selectGuestCampaign(Array.isArray(data.campaigns) ? data.campaigns : []);
 
-            if (!campaign) return;
+            if (!campaign) return closePlacement(placement);
+            if (placement === "PRODUCT_NOTICE" && productCode !== currentProductCode()) return;
 
-            if (!data.authenticated) {
-                markGuestShown(campaign);
-            }
-
-            renderPopup(campaign);
+            if (renderPlacement(campaign) && !data.authenticated) markGuestShown(campaign);
         } catch (error) {
+            if (error?.name === "AbortError") return;
             // Campaign delivery is non-critical. Never block catalog, payments, wallet, or orders.
         }
     }
+
+    const claimEntryPopup = () => claimPlacement("ENTRY_POPUP");
 
     function selectGuestCampaign(campaigns = []) {
         for (const campaign of campaigns) {
@@ -129,7 +159,7 @@
     }
 
     function isGuestFrequencyAllowed(campaign = {}) {
-        const code = campaign.campaignCode;
+        const code = campaignDismissalKey(campaign);
         if (!code) return false;
 
         if (campaign.frequencyPolicy === "ONCE_PER_SESSION") {
@@ -155,7 +185,7 @@
     }
 
     function markGuestShown(campaign = {}) {
-        const code = campaign.campaignCode;
+        const code = campaignDismissalKey(campaign);
         if (!code) return;
 
         if (campaign.frequencyPolicy === "ONCE_PER_SESSION") {
@@ -174,6 +204,13 @@
         writeLocalState(state);
     }
 
+    function campaignDismissalKey(campaign = {}) {
+        const code = String(campaign.campaignCode || "").trim();
+        const version = String(campaign.campaignVersion || "v1").trim();
+        const placement = String(campaign.placement || "ENTRY_POPUP").trim();
+        return code ? `${placement}:${code}:${version}` : "";
+    }
+
     function ensureStyles() {
         if (document.getElementById("azielCampaignPopupStyles")) return;
 
@@ -185,7 +222,7 @@
     }
 
     function renderPopup(campaign = {}) {
-        if (!campaign.title || !campaign.body) return;
+        if (!campaign.title || !campaign.body) return false;
         ensureStyles();
         closePopup();
 
@@ -214,7 +251,7 @@
         const close = document.createElement("button");
         close.className = "campaign-popup-close";
         close.type = "button";
-        close.setAttribute("aria-label", "Close campaign popup");
+        close.setAttribute("aria-label", t("campaign.closePopup", "Close campaign popup"));
         close.textContent = "×";
 
         const visual = document.createElement("div");
@@ -286,6 +323,88 @@
             overlay.classList.add("show");
             close.focus();
         });
+        return true;
+    }
+
+    function renderPlacement(campaign = {}) {
+        const localized = localizeCampaign(campaign);
+        let rendered = false;
+        if (localized.placement === "ENTRY_POPUP") rendered = renderPopup(localized);
+        if (localized.placement === "TOP_NOTICE") rendered = renderNotice(localized, "top");
+        if (localized.placement === "PRODUCT_NOTICE") rendered = renderNotice(localized, "product");
+        if (rendered && campaign.placement) renderedCampaigns.set(campaign.placement, campaign);
+        return rendered;
+    }
+
+    function renderNotice(campaign = {}, kind) {
+        if (!campaign.title || !campaign.body) return false;
+        ensureStyles();
+        const placement = kind === "product" ? "PRODUCT_NOTICE" : "TOP_NOTICE";
+        closePlacement(placement);
+        const notice = document.createElement("section");
+        notice.id = kind === "product" ? "azielProductCampaignNotice" : "azielTopCampaignNotice";
+        notice.className = `campaign-notice campaign-${kind}-notice`;
+        notice.setAttribute("aria-label", t("campaign.noticeLabel", "Campaign notice"));
+
+        const imageUrl = normalizeImageUrl(campaign.imageUrl);
+        if (imageUrl) {
+            const image = document.createElement("img");
+            image.src = imageUrl;
+            image.alt = campaign.imageAltText || "";
+            image.addEventListener("error", () => image.remove(), { once: true });
+            notice.appendChild(image);
+        }
+        const content = document.createElement("div");
+        const label = document.createElement("small");
+        label.textContent = String(campaign.type || "ANNOUNCEMENT").replaceAll("_", " ");
+        const title = document.createElement("h2");
+        title.textContent = campaign.title;
+        const body = document.createElement("p");
+        body.textContent = campaign.body;
+        content.append(label, title, body);
+        notice.appendChild(content);
+        if (campaign.ctaLabel && campaign.ctaTarget && !isUnsafeTarget(campaign.ctaTarget)) {
+            const cta = document.createElement("a");
+            cta.href = campaign.ctaTarget;
+            cta.textContent = campaign.ctaLabel;
+            cta.className = "campaign-notice-cta";
+            notice.appendChild(cta);
+        }
+        const close = document.createElement("button");
+        close.type = "button";
+        close.className = "campaign-notice-close";
+        close.setAttribute("aria-label", kind === "product" ? t("campaign.dismissProduct", "Dismiss product campaign notice") : t("campaign.dismissTop", "Dismiss top campaign notice"));
+        close.textContent = "×";
+        close.addEventListener("click", () => notice.remove());
+        notice.appendChild(close);
+
+        const anchor = kind === "product" ? productNoticeAnchor() : document.querySelector("main");
+        if (!anchor) return false;
+        if (kind === "product") anchor.insertAdjacentElement("afterend", notice);
+        else anchor.insertAdjacentElement("beforebegin", notice);
+        return true;
+    }
+
+    function currentProductCode() {
+        return String(document.getElementById("packages")?.dataset.game || new URLSearchParams(location.search).get("product") || "").trim().toLowerCase();
+    }
+
+    function productNoticeAnchor() {
+        return document.querySelector(".product-identity") || document.querySelector(".game-banner") || null;
+    }
+
+    function closePlacement(placement) {
+        renderedCampaigns.delete(placement);
+        if (placement === "ENTRY_POPUP") return closePopup();
+        document.getElementById(placement === "PRODUCT_NOTICE" ? "azielProductCampaignNotice" : "azielTopCampaignNotice")?.remove();
+    }
+
+    function refreshPlacements() {
+        claimPlacement("ENTRY_POPUP");
+        claimPlacement("TOP_NOTICE");
+        const productCode = currentProductCode();
+        if (productCode) claimPlacement("PRODUCT_NOTICE", productCode);
+        else closePlacement("PRODUCT_NOTICE");
     }
 
     function trapFocus(event, dialog) {
@@ -342,12 +461,18 @@
     function init() {
         if (initialized || isAdminPage()) return;
         initialized = true;
-        claimEntryPopup();
+        refreshPlacements();
+        window.addEventListener("aziel:shopRegionChanged", refreshPlacements);
+        window.addEventListener("aziel:productChanged", refreshPlacements);
+        window.addEventListener("aziel:locale-changed", () => {
+            [...renderedCampaigns.values()].forEach(campaign => renderPlacement(campaign));
+        });
     }
 
     window.AZIEL_CAMPAIGNS = {
-        refresh: claimEntryPopup,
-        close: closePopup
+        refresh: refreshPlacements,
+        close: closePopup,
+        closePlacement
     };
 
     ready(init);

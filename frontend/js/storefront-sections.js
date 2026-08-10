@@ -99,17 +99,31 @@
     function renderUnavailableState(target, section, kind) {
         if (!target || !section) return;
         const isComingSoon = kind === "COMING_SOON";
-        target.innerHTML = `
-            <section class="az-section-state" data-storefront-state="${isComingSoon ? "coming-soon" : "hidden"}">
-                <span class="az-section-state-icon">
-                    <i class="fa-${isComingSoon ? "regular" : "solid"} fa-${isComingSoon ? "clock" : "lock"}"></i>
-                </span>
-                <p>AZIEL / Games</p>
-                <h1>${escapeHtml(section.displayName)}</h1>
-                <span>${isComingSoon ? "Products are being prepared for this section." : "This section is currently unavailable."}</span>
-                <a href="/mobile-games.html">Explore available games</a>
-            </section>
-        `;
+        const t = (key, fallback) => window.AZIEL_LOCALE?.t?.(key, fallback) || fallback;
+        const state = document.createElement("section");
+        state.className = "az-section-state";
+        state.dataset.storefrontState = isComingSoon ? "coming-soon" : "hidden";
+        const iconWrap = document.createElement("span");
+        iconWrap.className = "az-section-state-icon";
+        const icon = document.createElement("i");
+        icon.className = `fa-${isComingSoon ? "regular" : "solid"} fa-${isComingSoon ? "clock" : "lock"}`;
+        icon.setAttribute("aria-hidden", "true");
+        iconWrap.appendChild(icon);
+        const eyebrow = document.createElement("p");
+        eyebrow.textContent = t("storefront.gamesBreadcrumb", "AZIEL / Games");
+        const heading = document.createElement("h1");
+        heading.textContent = !section.displayName || section.displayName === "Unavailable"
+            ? t("storefront.unavailable", "Unavailable")
+            : section.displayName;
+        const message = document.createElement("span");
+        message.textContent = isComingSoon
+            ? t("storefront.sectionPreparing", "Products are being prepared for this section.")
+            : t("storefront.sectionUnavailable", "This section is currently unavailable.");
+        const link = document.createElement("a");
+        link.href = "/mobile-games.html";
+        link.textContent = t("storefront.exploreGames", "Explore available games");
+        state.append(iconWrap, eyebrow, heading, message, link);
+        target.replaceChildren(state);
     }
 
     async function applyPageAccess(sectionKey, options = {}) {

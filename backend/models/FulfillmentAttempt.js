@@ -13,6 +13,12 @@ const ACTIVE_FULFILLMENT_STATUSES = Object.freeze([
     FULFILLMENT_STATUSES.IN_PROGRESS
 ]);
 
+const FULFILLMENT_ROUTE_TYPES = Object.freeze({
+    MANUAL_ADMIN: "MANUAL_ADMIN",
+    SUPPLIER_MANUAL: "SUPPLIER_MANUAL",
+    SUPPLIER_API: "SUPPLIER_API"
+});
+
 const fulfillmentAttemptSchema = new mongoose.Schema(
     {
         fulfillmentId: {
@@ -25,7 +31,13 @@ const fulfillmentAttemptSchema = new mongoose.Schema(
         },
         orderId: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: "Order",
+            refPath: "orderModel",
+            required: true
+        },
+        orderModel: {
+            type: String,
+            enum: ["Order", "CommerceOrder"],
+            default: "Order",
             required: true
         },
         orderCode: {
@@ -36,7 +48,7 @@ const fulfillmentAttemptSchema = new mongoose.Schema(
         supplierId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "Supplier",
-            required: true
+            default: null
         },
         supplierCodeSnapshot: {
             type: String,
@@ -47,7 +59,7 @@ const fulfillmentAttemptSchema = new mongoose.Schema(
         supplierMappingId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "SupplierProductMapping",
-            required: true
+            default: null
         },
         productCode: {
             type: String,
@@ -70,6 +82,12 @@ const fulfillmentAttemptSchema = new mongoose.Schema(
             type: String,
             enum: ["MANUAL", "API"],
             required: true
+        },
+        routeType: {
+            type: String,
+            enum: Object.values(FULFILLMENT_ROUTE_TYPES),
+            required: true,
+            default: FULFILLMENT_ROUTE_TYPES.SUPPLIER_MANUAL
         },
         status: {
             type: String,
@@ -145,6 +163,12 @@ const fulfillmentAttemptSchema = new mongoose.Schema(
     }
 );
 
+fulfillmentAttemptSchema.pre("validate", function validateFulfillmentRoute() {
+    if (this.routeType === FULFILLMENT_ROUTE_TYPES.MANUAL_ADMIN) return;
+    if (!this.supplierId) this.invalidate("supplierId", "Supplier-backed fulfillment requires supplierId.");
+    if (!this.supplierMappingId) this.invalidate("supplierMappingId", "Supplier-backed fulfillment requires supplierMappingId.");
+});
+
 fulfillmentAttemptSchema.index({ orderId: 1, createdAt: -1, _id: -1 });
 fulfillmentAttemptSchema.index(
     { orderId: 1, status: 1 },
@@ -168,3 +192,4 @@ fulfillmentAttemptSchema.index({ createdAt: -1, _id: -1 });
 module.exports = mongoose.model("FulfillmentAttempt", fulfillmentAttemptSchema);
 module.exports.FULFILLMENT_STATUSES = FULFILLMENT_STATUSES;
 module.exports.ACTIVE_FULFILLMENT_STATUSES = ACTIVE_FULFILLMENT_STATUSES;
+module.exports.FULFILLMENT_ROUTE_TYPES = FULFILLMENT_ROUTE_TYPES;

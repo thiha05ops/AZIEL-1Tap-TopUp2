@@ -169,6 +169,7 @@
 
     function projectPackage(product, item, region, presentation) {
         if (!item || item.enabled === false) return null;
+        if (item.fulfillmentRegions && item.fulfillmentRegions[region] !== true) return null;
 
         const price = item.prices?.[region] || null;
         if (!price || price.enabled === false) return null;
@@ -227,6 +228,7 @@
 
             sortOrder: Number(item.sortOrder || 0),
             updatedAt: item.updatedAt || product.updatedAt || "",
+            customerNote: resolveLocalizedCustomerNote(item),
 
             icon:
                 presentation?.resolvePackageIcon?.(item) ||
@@ -235,6 +237,12 @@
                     item.packageCode
                 ) ||
                 "",
+
+            // Catalog-managed package media is optional. Keep it separate from
+            // legacy presentation icons so desktop cards never imply artwork
+            // where the package itself has none.
+            artwork: String(item.iconUrl || "").trim(),
+            artworkAlt: String(item.iconAltText || item.name || "").trim(),
 
             fallbackIcon:
                 presentation?.getPackageIcon?.(
@@ -246,6 +254,12 @@
             rawPackage: item,
             rawProduct: product
         };
+    }
+
+    function resolveLocalizedCustomerNote(item = {}) {
+        const locale = window.AZIEL_LOCALE?.getLocale?.() || window.AZIEL_I18N?.getLang?.() || "en";
+        const locales = item.customerNoteLocales || {};
+        return String(locales[locale] || locales.en || item.customerNote || "").trim();
     }
 
     function getPackage(productCode, packageCode, region = "MM") {

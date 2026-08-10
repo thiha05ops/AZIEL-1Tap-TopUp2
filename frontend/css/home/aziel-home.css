@@ -3,6 +3,8 @@
    Shared Theme Compatible
 ========================= */
 
+.home-product-state { display: inline-flex; width: max-content; margin-top: 4px; padding: 3px 7px; border-radius: 999px; background: rgba(242, 184, 75, 0.14); color: #f2b84b; font-size: 0.7rem; font-weight: 700; }
+
 :root {
     --home-max: 1280px;
     --banner-rgb: 139, 92, 246;
@@ -1635,9 +1637,9 @@ body.dark .az-home::before {
     filter: none !important;
 }
 
-.az-banner-card:not(.active) {
-    opacity: .46 !important;
-    filter: saturate(.82) brightness(.82) !important;
+.az-home-hero .az-banner-card:not(.active) {
+    opacity: 0 !important;
+    filter: none !important;
 }
 
 .az-banner-card img {
@@ -2019,8 +2021,8 @@ body.dark .az-home::before {
         border-radius: 18px !important;
     }
 
-    .az-banner-card:not(.active) {
-        opacity: .18 !important;
+    .az-home-hero .az-banner-card:not(.active) {
+        opacity: 0 !important;
     }
 
     .az-trust-row {

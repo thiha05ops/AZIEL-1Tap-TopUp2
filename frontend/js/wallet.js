@@ -224,7 +224,7 @@ async function loadWalletPaymentMethods() {
     if (!paymentGrid || !paymentInput) return;
 
     const region = getWalletRegion();
-    paymentGrid.innerHTML = `<p class="pay-loading">Loading payment methods...</p>`;
+    paymentGrid.innerHTML = `<p class="pay-loading">${escapeWalletHTML(wt("wallet.loadingPaymentMethods", "Loading payment methods..."))}</p>`;
     paymentInput.value = "";
     walletPaymentMethods = [];
 
@@ -244,7 +244,7 @@ async function loadWalletPaymentMethods() {
         renderWalletPaymentMethods(walletPaymentMethods);
     } catch (error) {
         console.log("Wallet payment methods error:", error);
-        paymentGrid.innerHTML = `<p class="pay-error">Payment methods failed to load.</p>`;
+        paymentGrid.innerHTML = `<p class="pay-error">${escapeWalletHTML(wt("wallet.paymentMethodsFailed", "Payment methods failed to load."))}</p>`;
         updateTopupButtonByMethod();
     }
 }
@@ -279,7 +279,7 @@ function renderWalletPaymentMethods(methods = []) {
     if (!paymentGrid) return;
 
     if (!methods.length) {
-        paymentGrid.innerHTML = `<p class="pay-empty">No wallet top-up payment methods available.</p>`;
+        paymentGrid.innerHTML = `<p class="pay-empty">${escapeWalletHTML(wt("wallet.noPaymentMethods", "No wallet top-up payment methods available."))}</p>`;
         updateTopupButtonByMethod();
         return;
     }
@@ -355,9 +355,9 @@ function buildWalletPaymentCard(method, index) {
 }
 
 function getWalletPaymentBadge(paymentType, provider) {
-    if (paymentType === "auto" || provider === "omise") return `<small class="auto-pay-badge">Auto</small>`;
-    if (paymentType === "deeplink") return `<small class="manual-pay-badge">Bank App</small>`;
-    return `<small class="manual-pay-badge">Receipt</small>`;
+    if (paymentType === "auto" || provider === "omise") return `<small class="auto-pay-badge">${escapeWalletHTML(wt("wallet.paymentBadge.auto", "Auto"))}</small>`;
+    if (paymentType === "deeplink") return `<small class="manual-pay-badge">${escapeWalletHTML(wt("wallet.paymentBadge.bankApp", "Bank App"))}</small>`;
+    return `<small class="manual-pay-badge">${escapeWalletHTML(wt("wallet.paymentBadge.receipt", "Receipt"))}</small>`;
 }
 
 function getWalletPaymentLogo(key) {
@@ -749,9 +749,6 @@ async function submitTopup() {
     const currency = getWalletCurrency();
     const region = getWalletRegion();
 
-    console.log("Wallet selected payment:", payment);
-    console.log("Wallet provider:", provider);
-
     if (!amount || amount <= 0) {
         showWalletToast(wt("enterAmountAlert", "Please enter amount."), "error");
         return;
@@ -925,7 +922,7 @@ function openWalletManualModal(data, info) {
         qrImageUrl: qrImage,
         qrMode: info.qrMode || "",
         dynamicQr: info.dynamicQr || null,
-        instructions: "Transfer the exact amount, then upload the payment receipt.",
+        instructions: wt("wallet.transferInstructions", "Transfer the exact amount, then upload the payment receipt."),
         requiresSlip: slipRequired,
         deepLink,
         enableSaveQr: info.enableSaveQr === true,
@@ -943,8 +940,8 @@ function openWalletManualModal(data, info) {
         androidPackageName: info.androidPackageName || "",
         bankLaunchers: info.bankLaunchers || [],
         checklistSteps: info.checklistSteps || [],
-        submitLabel: "Submit for Verification",
-        loadingText: "Submitting receipt...",
+        submitLabel: wt("wallet.submitVerification", "Submit for Verification"),
+        loadingText: wt("wallet.submittingReceipt", "Submitting receipt..."),
         onSubmit: async ({ file, setMessage, close }) => {
             const formData = new FormData();
             formData.append("slip", file);
@@ -958,11 +955,11 @@ function openWalletManualModal(data, info) {
             const result = await res.json().catch(() => ({}));
 
             if (!res.ok || result.success === false) {
-                setMessage("error", result?.message || "Receipt submission failed. Please try again.");
+                setMessage("error", result?.message || wt("wallet.receiptFailed", "Receipt submission failed. Please try again."));
                 return false;
             }
 
-            showWalletToast("Payment receipt submitted for verification.", "success");
+            showWalletToast(wt("wallet.receiptSubmitted", "Payment receipt submitted for verification."), "success");
             await loadWallet();
             close("submitted");
             resetTopupForm();
@@ -986,7 +983,7 @@ function openWalletPaymentApp(deepLink) {
     if (!link) {
         setWalletMsg(
             msgBox,
-            "This payment app cannot be opened automatically. Please open it manually.",
+            wt("wallet.appOpenFailed", "This payment app cannot be opened automatically. Please open it manually."),
             "error"
         );
         return;
@@ -994,7 +991,7 @@ function openWalletPaymentApp(deepLink) {
 
     setWalletMsg(
         msgBox,
-        "Opening payment app... After transfer, return here and upload your payment slip.",
+        wt("wallet.openingApp", "Opening payment app... After transfer, return here and upload your payment slip."),
         "success"
     );
 
@@ -1009,23 +1006,22 @@ function copyWalletText(text) {
     navigator.clipboard?.writeText(text)
         .then(() => {
             const msg = document.getElementById("walletManualMsg");
-            setWalletMsg(msg, "Copied.", "success");
-            showWalletToast("Copied.", "success");
+            setWalletMsg(msg, wt("common.copied", "Copied."), "success");
+            showWalletToast(wt("common.copied", "Copied."), "success");
         })
         .catch(() => {
-            showWalletToast("Copy failed. Please copy manually.", "error");
-            console.log("Copy text:", text);
+            showWalletToast(wt("common.copyFailed", "Copy failed. Please copy manually."), "error");
         });
 }
 
 async function submitWalletSlip(intentId, file, btn, msgBox) {
     if (!intentId) {
-        setWalletMsg(msgBox, "This payment session has expired. Please start the top-up again.", "error");
+        setWalletMsg(msgBox, wt("wallet.sessionExpired", "This payment session has expired. Please start the top-up again."), "error");
         return;
     }
 
     if (!file) {
-        setWalletMsg(msgBox, "Please choose your payment receipt first.", "error");
+        setWalletMsg(msgBox, wt("wallet.chooseReceipt", "Please choose your payment receipt first."), "error");
         return;
     }
 
@@ -1035,10 +1031,10 @@ async function submitWalletSlip(intentId, file, btn, msgBox) {
 
     try {
         if (window.AZIEL_UI?.button) {
-            window.AZIEL_UI.button.setLoading(btn, { text: "Submitting..." });
+            window.AZIEL_UI.button.setLoading(btn, { text: wt("common.submitting", "Submitting...") });
         } else {
             btn.disabled = true;
-            btn.innerText = "Submitting...";
+            btn.innerText = wt("common.submitting", "Submitting...");
         }
 
         const res = await fetch(walletApiUrl(`/api/wallet/manual-intent/${encodeURIComponent(intentId)}/slip`), {
@@ -1051,7 +1047,7 @@ async function submitWalletSlip(intentId, file, btn, msgBox) {
         if (!res.ok || data.success === false) {
             setWalletMsg(
                 msgBox,
-                data?.message || "Receipt submission failed. Please try again.",
+                data?.message || wt("wallet.receiptFailed", "Receipt submission failed. Please try again."),
                 "error"
             );
             return;
@@ -1059,10 +1055,10 @@ async function submitWalletSlip(intentId, file, btn, msgBox) {
 
         setWalletMsg(
             msgBox,
-            "Payment receipt submitted. Please wait for admin verification.",
+            wt("wallet.receiptAwaitingAdmin", "Payment receipt submitted. Please wait for admin verification."),
             "success"
         );
-        showWalletToast("Payment receipt submitted for verification.", "success");
+        showWalletToast(wt("wallet.receiptSubmitted", "Payment receipt submitted for verification."), "success");
 
         await loadWallet();
 
@@ -1073,14 +1069,14 @@ async function submitWalletSlip(intentId, file, btn, msgBox) {
 
     } catch (error) {
         console.log("Wallet slip upload error:", error);
-        setWalletMsg(msgBox, "Server error", "error");
-        showWalletToast("Server error", "error");
+        setWalletMsg(msgBox, wt("serverError", "Server error"), "error");
+        showWalletToast(wt("serverError", "Server error"), "error");
     } finally {
         if (window.AZIEL_UI?.button) {
             window.AZIEL_UI.button.reset(btn);
         } else {
             btn.disabled = false;
-            btn.innerText = "Submit for Verification";
+            btn.innerText = wt("wallet.submitVerification", "Submit for Verification");
         }
     }
 }

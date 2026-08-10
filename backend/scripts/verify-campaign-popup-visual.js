@@ -91,7 +91,8 @@ function verifyScopeBoundaries() {
     ["colorthief", "color-thief", "vibrant", "node-vibrant"].forEach(dep => {
         assert(!pkg.toLowerCase().includes(dep), `No heavy color extraction dependency allowed: ${dep}`);
     });
-    includes("backend/models/Campaign.js", "enum: [\"ENTRY_POPUP\"]", "ENTRY_POPUP must remain the only Campaign placement.");
+    includes("backend/models/Campaign.js", "enum: CAMPAIGN_PLACEMENTS", "Campaign model must use the central placement contract.");
+    includes("backend/catalog/campaignPlacements.js", "ENTRY_POPUP", "ENTRY_POPUP must remain supported.");
     includes("backend/services/campaignService.js", "ONCE_EVERY_3_DAYS", "Campaign frequency semantics must remain.");
     includes("backend/services/campaignService.js", "Asia/Bangkok", "Asia/Bangkok day semantics must remain.");
     assert(!read("frontend/js/home.js").includes("campaign-popup"), "No page-specific Campaign popup logic in home.js.");

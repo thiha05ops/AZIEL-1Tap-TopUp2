@@ -200,9 +200,13 @@ function createCommercePaymentRecoveryService(dependencies = {}) {
 
         const attempts = attemptGroups.flat();
 
-        const safeAttempts = Array.isArray(attempts)
-            ? attempts
-            : [];
+        const safeAttempts = Array.from(
+            new Map(
+                (Array.isArray(attempts) ? attempts : [])
+                    .filter(attempt => attempt?.attemptId)
+                    .map(attempt => [attempt.attemptId, attempt])
+            ).values()
+        );
 
         const orderIds = Array.from(
             new Set(

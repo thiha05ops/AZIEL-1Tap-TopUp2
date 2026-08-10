@@ -22,7 +22,7 @@ includes("backend/models/PromoRedemption.js", "RESERVED", "PromoRedemption must 
 includes("backend/models/PromoUsageState.js", "reservedCount", "Promo usage state must track reservations.");
 
 includes("backend/services/promoCodeService.js", "resolveOrderCatalog", "Promo service must resolve catalog truth before discounting.");
-includes("backend/services/promoCodeService.js", "Math.floor", "Percentage discounts must use deterministic integer rounding.");
+includes("backend/services/commerce/promotionResolver.js", "INTERNAL_PRECISION = 6", "Promo discounts must use Commerce precision.");
 includes("backend/services/promoCodeService.js", "reservePromoUse", "Promo service must own reservation logic.");
 includes("backend/services/promoCodeService.js", "consumePromoRedemption", "Promo service must own consumption logic.");
 includes("backend/services/promoCodeService.js", "releasePromoRedemption", "Promo service must own release logic.");
@@ -40,7 +40,7 @@ includes("backend/routes/payment.js", "resolvePurchasePricing", "Payment create/
 includes("backend/routes/payment.js", "reservePromoUse", "Payment routes must reserve promo capacity.");
 includes("backend/routes/payment.js", "consumePromoRedemption", "Payment routes must consume promo redemptions.");
 includes("backend/routes/wallet.js", "resolvePurchasePricing", "Wallet pay must use promo pricing.");
-includes("backend/routes/wallet.js", "payOrderWithWallet(order)", "Wallet debit must remain centralized through walletService.");
+includes("backend/services/commerce/customerWalletCheckoutService.js", "walletService", "Wallet debit must remain centralized through walletService.");
 
 includes("frontend/js/game-flow.js", "/api/promos/quote", "Shared game flow must quote promos server-side.");
 includes("frontend/js/game-flow.js", "promoCode:", "Shared game flow must send promo code intent only.");

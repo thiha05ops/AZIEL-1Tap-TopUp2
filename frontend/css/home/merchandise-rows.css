@@ -1,0 +1,944 @@
+/* AZIEL Home — compact storefront strips */
+
+.home-merch-section {
+    width: min(var(--home-max, 1280px), calc(100% - 48px));
+    margin-inline: auto;
+}
+
+.az-home {
+    padding-bottom: 28px !important;
+}
+
+.home-merch-section[hidden] {
+    display: none !important;
+}
+
+.home-merch-section .promotion-count-badge {
+    display: none !important;
+}
+
+.home-merch-row {
+    --tile-start: #6551bd;
+    --tile-end: #8b6ed0;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: calc((100% - 56px) / 5);
+    grid-template-columns: none;
+    gap: 12px;
+    padding: 3px 3px 8px;
+    overflow-x: auto;
+    scroll-snap-type: inline proximity;
+    scrollbar-width: none;
+}
+
+.home-merch-row::-webkit-scrollbar {
+    display: none;
+}
+
+/* Product-owned palettes with restrained fallbacks for runtime products. */
+.home-merch-row > :nth-child(6n + 1) { --tile-start: #5a45b5; --tile-end: #8771ca; }
+.home-merch-row > :nth-child(6n + 2) { --tile-start: #557fab; --tile-end: #8db0d7; }
+.home-merch-row > :nth-child(6n + 3) { --tile-start: #397f7c; --tile-end: #77aaa8; }
+.home-merch-row > :nth-child(6n + 4) { --tile-start: #a37c4c; --tile-end: #dfb36b; }
+.home-merch-row > :nth-child(6n + 5) { --tile-start: #4a5059; --tile-end: #777e89; }
+.home-merch-row > :nth-child(6n) { --tile-start: #6682ac; --tile-end: #9db7df; }
+
+.popular-game-card[data-name*="Mobile Legends" i] { --tile-start: #5540ad; --tile-end: #8a72d1; }
+.popular-game-card[data-name*="PUBG" i] { --tile-start: #567da9; --tile-end: #8fb2d9; }
+.popular-game-card[data-name*="Free Fire" i] { --tile-start: #347a76; --tile-end: #78aaa9; }
+.popular-game-card[data-name*="Honor" i] { --tile-start: #a57b49; --tile-end: #e1b46b; }
+.popular-game-card[data-name*="Roblox" i] { --tile-start: #494f58; --tile-end: #777e89; }
+.popular-game-card[data-name*="Genshin" i] { --tile-start: #6681aa; --tile-end: #9db7df; }
+
+.home-gift-card-tile[data-name*="PlayStation" i] { --tile-start: #0347a8; --tile-end: #1264ce; }
+.home-gift-card-tile[data-name*="Steam" i] { --tile-start: #172635; --tile-end: #354655; }
+.home-gift-card-tile[data-name*="Netflix" i] { --tile-start: #5f1722; --tile-end: #a42139; }
+.home-gift-card-tile[data-name*="Razer" i] { --tile-start: #397340; --tile-end: #6e9d73; }
+.home-gift-card-tile[data-name*="Apple" i] { --tile-start: #735ca6; --tile-end: #6bb0c2; }
+.home-gift-card-tile[data-name*="Google Play" i] { --tile-start: #34798e; --tile-end: #5f9eb0; }
+
+.home-merch-row .popular-game-card,
+.home-gift-card-tile {
+    position: relative;
+    display: grid !important;
+    grid-template-columns: 72px minmax(0, 1fr);
+    grid-template-rows: repeat(4, auto);
+    align-content: center;
+    align-items: center;
+    column-gap: 7px;
+    min-width: 0 !important;
+    min-height: 96px !important;
+    height: 96px !important;
+    padding: 10px 14px 10px 10px !important;
+    overflow: visible;
+    border: 0 !important;
+    border-radius: 9px !important;
+    color: #fff !important;
+    background: linear-gradient(105deg, var(--tile-start), var(--tile-end)) !important;
+    box-shadow: 0 2px 7px rgba(16, 20, 38, .12) !important;
+    text-decoration: none;
+    scroll-snap-align: start;
+    isolation: isolate;
+}
+
+.home-merch-row .popular-game-card::before,
+.home-gift-card-tile::before,
+.home-offers-row .promotion-preview-main::before {
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+    border-radius: inherit;
+    background:
+        linear-gradient(116deg, transparent 0 36%, rgba(255, 255, 255, .09) 36% 55%, transparent 55% 100%),
+        linear-gradient(116deg, transparent 0 66%, rgba(255, 255, 255, .055) 66% 82%, transparent 82% 100%);
+    content: "";
+    pointer-events: none;
+}
+
+.home-merch-row .popular-game-card img,
+.home-gift-card-tile img {
+    grid-column: 1;
+    grid-row: 1 / span 4;
+    z-index: 1;
+    width: 60px !important;
+    height: 60px !important;
+    max-width: none !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 11px !important;
+    object-fit: contain;
+    filter: none !important;
+    transform: translate(-11px, -9px);
+}
+
+/* Game artwork stays fully inside its compact retail strip. */
+.home-merch-row .popular-game-card {
+    grid-template-columns: 72px minmax(0, 1fr);
+    padding: 10px 14px 10px 10px !important;
+    overflow: visible;
+}
+
+.home-merch-row .popular-game-card img {
+    width: 68px !important;
+    height: 68px !important;
+    padding: 4px;
+    object-fit: contain !important;
+    object-position: center;
+    border-radius: 10px !important;
+    background: rgba(255, 255, 255, .1);
+    box-sizing: border-box;
+    transform: none;
+}
+
+.home-gift-card-tile img {
+    width: 68px !important;
+    height: 68px !important;
+    padding: 4px;
+    object-fit: contain !important;
+    object-position: center;
+    border-radius: 12px !important;
+    background: rgba(255, 255, 255, .1);
+    box-sizing: border-box;
+    transform: none;
+}
+
+.home-merch-row .popular-game-card h3,
+.home-gift-card-tile strong {
+    align-self: center;
+    min-width: 0;
+    margin: 0 0 2px !important;
+    overflow: hidden;
+    color: #fff !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    line-height: 1.16;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.home-merch-row .popular-game-card p,
+.home-gift-card-tile small {
+    align-self: center;
+    min-width: 0;
+    margin: 0 !important;
+    overflow: hidden;
+    color: rgba(255, 255, 255, .78) !important;
+    font-size: 12px !important;
+    font-weight: 400 !important;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.home-gift-card-tile > span,
+.home-gift-card-tile strong,
+.home-gift-card-tile small {
+    display: block;
+    min-width: 0;
+}
+
+.home-gift-card-tile > span {
+    grid-column: 2;
+    grid-row: 1 / span 4;
+    align-self: center;
+}
+
+.home-product-market,
+.home-product-price {
+    grid-column: 2;
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    color: rgba(255, 255, 255, .7);
+    font-size: 10px;
+    font-weight: 400;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.home-product-price {
+    color: #fff;
+    font-weight: 600;
+}
+
+.home-product-price.is-preview {
+    color: rgba(255, 255, 255, .82);
+}
+
+.home-product-promo {
+    display: inline-flex;
+    width: fit-content;
+    max-width: 100%;
+    padding: 2px 6px;
+    overflow: hidden;
+    border-radius: 999px;
+    color: #fff;
+    background: var(--primary);
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.home-product-state {
+    position: absolute;
+    right: 8px;
+    bottom: 6px;
+    z-index: 2;
+    padding: 2px 6px;
+    border-radius: 999px;
+    color: #fff;
+    background: rgba(16, 18, 32, .46);
+    font-size: 9px;
+    font-style: normal;
+    font-weight: 650;
+    line-height: 1.35;
+}
+
+.home-merch-row .is-temporarily-unavailable {
+    filter: saturate(.55);
+    opacity: .78;
+}
+
+/* Offers use a distinct branded main strip and light commerce footer. */
+.home-offers-row {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: clamp(260px, 21.8vw, 280px);
+    grid-template-columns: none;
+    padding: 3px 3px 8px;
+    overflow-x: auto;
+    scroll-snap-type: inline proximity;
+    scrollbar-width: none;
+}
+
+.home-offers-row::-webkit-scrollbar {
+    display: none;
+}
+
+.home-offers-row .promotion-preview-item {
+    position: relative;
+    display: grid !important;
+    grid-template-rows: 62px 26px;
+    min-width: 0 !important;
+    min-height: 88px !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    border: 0 !important;
+    border-radius: 9px !important;
+    background: #f4f1f8 !important;
+    box-shadow: 0 2px 7px rgba(16, 20, 38, .12) !important;
+    scroll-snap-align: start;
+    isolation: isolate;
+}
+
+.home-offers-row .promotion-preview-main {
+    --tile-start: #5a45b5;
+    --tile-end: #8a61c7;
+    position: relative;
+    display: grid;
+    grid-template-columns: 60px minmax(0, 1fr);
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+    padding: 5px 10px 5px 5px;
+    overflow: visible;
+    border-radius: 9px 9px 0 0;
+    color: #fff;
+    background: linear-gradient(105deg, var(--tile-start), var(--tile-end));
+    isolation: isolate;
+}
+
+.home-offers-row .promotion-preview-item:nth-child(6n + 2) .promotion-preview-main { --tile-start: #557da8; --tile-end: #83a9d1; }
+.home-offers-row .promotion-preview-item:nth-child(6n + 3) .promotion-preview-main { --tile-start: #59349b; --tile-end: #8d54b4; }
+.home-offers-row .promotion-preview-item:nth-child(6n + 4) .promotion-preview-main { --tile-start: #172635; --tile-end: #3a4b57; }
+.home-offers-row .promotion-preview-item:nth-child(6n + 5) .promotion-preview-main { --tile-start: #3b7444; --tile-end: #74a27a; }
+.home-offers-row .promotion-preview-item:nth-child(6n) .promotion-preview-main { --tile-start: #671927; --tile-end: #a9233b; }
+
+.home-offers-row .promotion-preview-image,
+.home-offers-row .promotion-preview-main > i {
+    grid-column: 1;
+    width: 60px !important;
+    height: 60px !important;
+    max-width: none !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 11px !important;
+    object-fit: contain;
+    filter: none !important;
+    transform: translate(-11px, -9px);
+}
+
+.home-offers-row .promotion-preview-main > i {
+    display: grid;
+    place-items: center;
+    color: #fff;
+    background: rgba(255, 255, 255, .1);
+    font-size: 22px;
+}
+
+.home-offers-row .promotion-preview-copy {
+    min-width: 0;
+}
+
+.home-offers-row .promotion-preview-copy strong {
+    display: block;
+    overflow: hidden;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.16;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.home-offers-row .promotion-preview-meta {
+    display: block;
+    margin-top: 3px;
+    overflow: hidden;
+    color: rgba(255, 255, 255, .78);
+    font-size: 10px;
+    font-weight: 400 !important;
+    line-height: 1.18;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.home-offers-row .promotion-preview-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+    padding: 4px 8px;
+    border-radius: 0 0 9px 9px;
+    color: #292438;
+    background: #f4f1f8;
+}
+
+.home-offers-row .promotion-preview-badge {
+    display: block;
+    max-width: 62%;
+    padding: 2px 6px;
+    overflow: hidden;
+    border-radius: 4px;
+    color: #fff;
+    background: #54a83f;
+    font-size: 8px;
+    font-weight: 800;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    text-transform: none;
+    white-space: nowrap;
+}
+
+.home-offers-row .promotion-preview-value {
+    overflow: hidden;
+    color: #292438;
+    font-size: 10px;
+    font-weight: 750;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.home-offers-row .promotion-preview-cta {
+    position: absolute;
+    z-index: 3;
+    inset: 0;
+    border-radius: inherit;
+    font-size: 0;
+}
+
+.home-merch-row .popular-game-card:focus-visible,
+.home-gift-card-tile:focus-visible,
+.home-offers-row .promotion-preview-cta:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--primary) 72%, white);
+    outline-offset: 3px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .home-merch-row .popular-game-card:hover,
+    .home-gift-card-tile:hover,
+    .home-offers-row .promotion-preview-item:hover {
+        transform: translateY(-1px) !important;
+        box-shadow: 0 3px 9px rgba(16, 20, 38, .16) !important;
+    }
+}
+
+@media (max-width: 768px) {
+    body .az-home .home-merch-section {
+        width: 100dvw !important;
+        max-width: 100dvw !important;
+        margin-inline: 50% 0 !important;
+        transform: translateX(-50%);
+        overflow: visible;
+    }
+
+    .home-merch-section > .az-section-head {
+        padding-inline: max(16px, env(safe-area-inset-left)) max(16px, env(safe-area-inset-right)) !important;
+    }
+
+    .home-merch-section .az-section-head h2 {
+        font-size: 21px !important;
+        line-height: 1.2 !important;
+    }
+
+    .home-merch-section .az-section-head a {
+        min-height: 44px;
+        font-size: 13px;
+    }
+
+    .home-merch-row {
+        display: flex !important;
+        width: 100%;
+        max-width: 100%;
+        gap: 10px !important;
+        padding: 4px max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left)) !important;
+        overflow-x: auto !important;
+        overflow-y: hidden;
+        overscroll-behavior-inline: contain;
+        scroll-padding-inline: max(16px, env(safe-area-inset-left));
+        scroll-snap-type: inline proximity;
+        scrollbar-width: none;
+        box-sizing: border-box;
+    }
+
+    .home-merch-row::-webkit-scrollbar {
+        display: none;
+    }
+
+    .home-merch-row .popular-game-card,
+    .home-gift-card-tile,
+    .home-gift-card-row .promo-item.skeleton {
+        flex: 0 0 clamp(184px, 50.7vw, 196px) !important;
+        width: clamp(184px, 50.7vw, 196px) !important;
+        min-width: clamp(184px, 50.7vw, 196px) !important;
+        min-height: 64px !important;
+        scroll-snap-align: start;
+    }
+
+    .home-merch-row .popular-game-card {
+        grid-template-rows: auto auto;
+        align-content: center;
+    }
+
+    .home-merch-row .popular-game-card h3,
+    .home-gift-card-tile strong {
+        display: -webkit-box;
+        margin-bottom: 3px !important;
+        overflow: hidden;
+        white-space: normal;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+    }
+
+    .home-merch-row .popular-game-card p[data-mobile-meta],
+    .home-gift-card-tile small[data-mobile-meta] {
+        font-size: 0 !important;
+    }
+
+    .home-merch-row .popular-game-card p[data-mobile-meta]::after,
+    .home-gift-card-tile small[data-mobile-meta]::after {
+        content: attr(data-mobile-meta);
+        font-size: 10px;
+        font-weight: 400;
+        line-height: 1.2;
+        white-space: nowrap;
+    }
+
+    .home-offers-row .promotion-preview-item,
+    .home-offers-row .promo-item.skeleton {
+        flex: 0 0 clamp(218px, 59vw, 228px) !important;
+        width: clamp(218px, 59vw, 228px) !important;
+        min-width: clamp(218px, 59vw, 228px) !important;
+        min-height: 88px !important;
+        scroll-snap-align: start;
+    }
+}
+
+@media (min-width: 769px) and (max-width: 1100px) {
+    .home-merch-row {
+        grid-auto-columns: 240px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .home-merch-row,
+    .home-merch-row > * {
+        scroll-behavior: auto !important;
+        transition: none !important;
+    }
+}
+
+/* Desktop marketplace composition. Mobile remains owned by the full-page category carousel. */
+@media (min-width: 769px) {
+    .az-home {
+        --home-max: 1280px;
+    }
+
+    .home-merch-section {
+        margin-top: 38px;
+    }
+
+    .home-merch-section > .az-section-head {
+        align-items: end;
+        min-height: 44px;
+        margin-bottom: 14px;
+    }
+
+    .home-merch-section .az-section-head h2 {
+        margin: 0;
+        color: var(--text);
+        font-size: clamp(20px, 1.55vw, 25px);
+        font-weight: 720;
+        line-height: 1.2;
+        letter-spacing: -.025em;
+    }
+
+    .home-merch-section .az-section-head a {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        min-height: 40px;
+        color: var(--primary);
+        font-size: 13px;
+        font-weight: 650;
+        text-decoration: none;
+    }
+
+    .home-merch-row {
+        display: grid;
+        grid-auto-flow: row;
+        grid-auto-columns: initial;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 16px;
+        padding: 0;
+        overflow: visible;
+    }
+
+    .home-merch-row .popular-game-card,
+    .home-gift-card-tile {
+        display: flex !important;
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: flex-start;
+        min-height: 238px !important;
+        height: 100% !important;
+        padding: 10px 10px 13px !important;
+        overflow: hidden;
+        border: 1px solid color-mix(in srgb, var(--border) 66%, transparent) !important;
+        border-radius: 14px !important;
+        color: var(--text) !important;
+        background: var(--surface-strong) !important;
+        box-shadow: none !important;
+    }
+
+    .home-merch-row .popular-game-card::before,
+    .home-gift-card-tile::before {
+        z-index: 0;
+        inset: 10px 10px auto;
+        height: 142px;
+        border-radius: 10px;
+        background:
+            linear-gradient(120deg, color-mix(in srgb, var(--tile-start) 82%, #181528), color-mix(in srgb, var(--tile-end) 78%, #f2efff));
+        opacity: .22;
+    }
+
+    .home-merch-row .popular-game-card img,
+    .home-gift-card-tile img {
+        position: relative;
+        z-index: 1;
+        width: 100% !important;
+        height: 142px !important;
+        padding: 0;
+        object-fit: contain !important;
+        border-radius: 10px !important;
+        background: color-mix(in srgb, var(--tile-start) 12%, var(--surface));
+        transform: none;
+    }
+
+    .home-merch-row .popular-game-card h3,
+    .home-gift-card-tile strong {
+        position: relative;
+        z-index: 1;
+        display: -webkit-box;
+        margin: 12px 2px 0 !important;
+        overflow: hidden;
+        color: var(--text) !important;
+        font-size: 14px !important;
+        font-weight: 650 !important;
+        line-height: 1.25;
+        white-space: normal;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+    }
+
+    .home-merch-row .popular-game-card p,
+    .home-gift-card-tile small {
+        position: relative;
+        z-index: 1;
+        margin: 5px 2px 0 !important;
+        color: var(--text-muted) !important;
+        font-size: 12px !important;
+        line-height: 1.3;
+    }
+
+    .home-gift-card-tile > span {
+        display: contents;
+    }
+
+    .home-product-price {
+        position: relative;
+        z-index: 1;
+        margin: auto 2px 0;
+        padding-top: 10px;
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 700;
+    }
+
+    .home-product-price.is-preview {
+        color: var(--text-secondary);
+    }
+
+    .home-product-promo {
+        position: absolute;
+        z-index: 2;
+        top: 18px;
+        right: 18px;
+        max-width: calc(100% - 36px);
+        padding: 4px 8px;
+        font-size: 10px;
+    }
+
+    .home-merch-row .is-coming-soon,
+    .home-merch-row .is-temporarily-unavailable {
+        opacity: 1;
+        filter: none;
+        cursor: default;
+    }
+
+    .home-offers-row {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 18px;
+        overflow: visible;
+    }
+
+    .home-offers-row .promotion-preview-item {
+        grid-template-rows: 184px 34px;
+        min-height: 218px !important;
+        overflow: hidden !important;
+        border: 1px solid color-mix(in srgb, var(--border) 60%, transparent) !important;
+        border-radius: 15px !important;
+        background: var(--surface-strong) !important;
+        box-shadow: none !important;
+    }
+
+    .home-offers-row .promotion-preview-main {
+        grid-template-columns: 132px minmax(0, 1fr);
+        gap: 16px;
+        padding: 16px;
+        border-radius: 14px 14px 0 0;
+    }
+
+    .home-offers-row .promotion-preview-image,
+    .home-offers-row .promotion-preview-main > i {
+        width: 132px !important;
+        height: 152px !important;
+        border-radius: 12px !important;
+        object-fit: contain;
+        transform: none;
+    }
+
+    .home-offers-row .promotion-preview-copy strong {
+        font-size: 17px;
+        line-height: 1.25;
+        white-space: normal;
+    }
+
+    .home-offers-row .promotion-preview-meta {
+        margin-top: 7px;
+        font-size: 12px;
+    }
+
+    .home-offers-row .promotion-preview-footer {
+        border-radius: 0 0 14px 14px;
+    }
+
+    .home-news-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 18px;
+    }
+
+    .home-news-card {
+        position: relative;
+        display: grid;
+        min-height: 190px;
+        overflow: hidden;
+        border: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+        border-radius: 15px;
+        color: #fff;
+        background: #171329;
+        text-decoration: none;
+    }
+
+    .home-news-card > img,
+    .home-news-placeholder {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .home-news-placeholder {
+        display: grid;
+        place-items: center;
+        color: rgba(255,255,255,.48);
+        background: linear-gradient(135deg, #33245f, #131629);
+        font-size: 42px;
+    }
+
+    .home-news-copy {
+        position: relative;
+        z-index: 1;
+        align-self: end;
+        display: grid;
+        gap: 4px;
+        padding: 48px 18px 16px;
+        background: linear-gradient(transparent, rgba(8, 8, 18, .9));
+    }
+
+    .home-news-copy strong { font-size: 16px; line-height: 1.25; }
+    .home-news-copy small { color: rgba(255,255,255,.74); font-size: 12px; }
+}
+
+@media (min-width: 1100px) {
+    .az-header {
+        gap: 12px;
+        padding-inline: max(24px, calc((100vw - var(--home-max, 1280px)) / 2));
+    }
+
+    .az-header .az-logo {
+        flex-basis: 126px;
+        width: 126px;
+    }
+
+    .az-header .az-logo-img {
+        width: 126px;
+        max-width: 126px;
+    }
+
+    .az-header .az-nav {
+        gap: 0;
+    }
+
+    .az-header .az-nav > a,
+    .az-header .az-nav-drop-btn {
+        padding-inline: 7px;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .az-header .az-header-right {
+        gap: 8px;
+    }
+}
+
+@media (min-width: 769px) {
+    .home-merch-section {
+        margin-top: 40px;
+    }
+
+    .home-merch-section > .az-section-head {
+        margin-bottom: 12px;
+    }
+
+    .home-merch-section .az-section-head p {
+        margin: 5px 0 0;
+        color: var(--text-muted);
+        font-size: 13px;
+        font-weight: 400;
+        line-height: 1.45;
+    }
+
+    .home-merch-row:not(.home-offers-row) {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        column-gap: 28px;
+        row-gap: 0;
+    }
+
+    .home-merch-row .popular-game-card,
+    .home-gift-card-tile {
+        position: relative;
+        display: grid !important;
+        grid-template-columns: 48px minmax(0, 1fr);
+        grid-template-rows: auto auto auto;
+        align-content: center;
+        align-items: center;
+        column-gap: 12px;
+        min-height: 64px !important;
+        height: 64px !important;
+        padding: 6px 8px !important;
+        overflow: visible;
+        border: 0 !important;
+        border-bottom: 1px solid color-mix(in srgb, var(--border) 68%, transparent) !important;
+        border-radius: 0 !important;
+        color: var(--text) !important;
+        background: linear-gradient(
+            90deg,
+            rgb(var(--product-accent-rgb, 124 58 237) / .11),
+            transparent 48%
+        ) !important;
+        box-shadow: none !important;
+    }
+
+    .home-merch-row .popular-game-card::before,
+    .home-gift-card-tile::before {
+        display: none;
+    }
+
+    .home-merch-row .popular-game-card img,
+    .home-gift-card-tile img {
+        grid-column: 1;
+        grid-row: 1 / span 3;
+        width: 48px !important;
+        height: 48px !important;
+        padding: 2px;
+        object-fit: contain !important;
+        border: 0 !important;
+        border-radius: 11px !important;
+        background: rgb(var(--product-accent-rgb, 124 58 237) / .13);
+        transform: none;
+    }
+
+    .home-merch-row .popular-game-card h3,
+    .home-gift-card-tile strong {
+        grid-column: 2;
+        margin: 0 !important;
+        color: var(--text) !important;
+        font-size: 14px !important;
+        font-weight: 650 !important;
+        line-height: 1.25;
+    }
+
+    .home-merch-row .popular-game-card p,
+    .home-gift-card-tile small {
+        grid-column: 2;
+        margin: 3px 0 0 !important;
+        color: var(--text-muted) !important;
+        font-size: 12px !important;
+        font-weight: 400 !important;
+        line-height: 1.3;
+    }
+
+    .home-gift-card-tile > span {
+        display: contents;
+    }
+
+    .home-product-price {
+        grid-column: 2;
+        margin: 4px 0 0;
+        padding: 0;
+        color: var(--text);
+        font-size: 12px;
+        font-weight: 650;
+    }
+
+    .home-product-promo {
+        position: absolute;
+        top: 9px;
+        right: 8px;
+        padding: 2px 6px;
+        font-size: 9px;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+        .home-merch-row .popular-game-card:hover,
+        .home-gift-card-tile:hover {
+            background: linear-gradient(
+                90deg,
+                rgb(var(--product-accent-rgb, 124 58 237) / .17),
+                transparent 58%
+            ) !important;
+            box-shadow: none !important;
+            transform: none !important;
+        }
+    }
+
+    body.dark .home-merch-row .popular-game-card,
+    body.dark .home-gift-card-tile,
+    body.theme-dark .home-merch-row .popular-game-card,
+    body.theme-dark .home-gift-card-tile {
+        background: linear-gradient(
+            90deg,
+            rgb(var(--product-accent-rgb, 124 58 237) / .15),
+            transparent 52%
+        ) !important;
+    }
+
+    body.dark .home-merch-row .popular-game-card img,
+    body.dark .home-gift-card-tile img,
+    body.theme-dark .home-merch-row .popular-game-card img,
+    body.theme-dark .home-gift-card-tile img {
+        background: rgb(var(--product-accent-rgb, 124 58 237) / .18);
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+        body.dark .home-merch-row .popular-game-card:hover,
+        body.dark .home-gift-card-tile:hover,
+        body.theme-dark .home-merch-row .popular-game-card:hover,
+        body.theme-dark .home-gift-card-tile:hover {
+            background: linear-gradient(
+                90deg,
+                rgb(var(--product-accent-rgb, 124 58 237) / .21),
+                transparent 62%
+            ) !important;
+        }
+    }
+}

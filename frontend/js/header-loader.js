@@ -78,8 +78,6 @@ async function loadAZIELHeader() {
 
         window.dispatchEvent(new Event("aziel:headerLoaded"));
 
-        console.log("AZIEL header loaded ✅");
-
     } catch (err) {
         console.error("Header load error:", err);
     } finally {

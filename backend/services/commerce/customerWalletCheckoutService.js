@@ -3,6 +3,7 @@
 const crypto = require("crypto");
 const CatalogPackage = require("../../models/CatalogPackage");
 const PaymentMethod = require("../../models/PaymentMethod");
+const { loadFulfillmentCapability } = require("../fulfillmentCapabilityService");
 const { createAndPersistPricingQuote } = require("./pricingQuoteApplicationService");
 const { checkoutFromQuote } = require("./checkoutApplicationService");
 const orderRepository = require("./orderRepository");
@@ -18,6 +19,7 @@ const { debitWallet } = require("../walletService");
 const ERROR_CODES = Object.freeze({
     INVALID_CHECKOUT_INPUT: "INVALID_CHECKOUT_INPUT",
     PACKAGE_UNAVAILABLE: "PACKAGE_UNAVAILABLE",
+    FULFILLMENT_UNAVAILABLE: "FULFILLMENT_UNAVAILABLE",
     WALLET_UNAVAILABLE: "WALLET_UNAVAILABLE",
     COMMERCE_WALLET_CHECKOUT_FAILED: "COMMERCE_WALLET_CHECKOUT_FAILED"
 });
@@ -79,6 +81,18 @@ async function loadCatalogPackage(input = {}) {
         throw new CustomerWalletCheckoutError(ERROR_CODES.PACKAGE_UNAVAILABLE, "Selected package is no longer available.", 409);
     }
     return { pkg, price, region, currency, productCode, packageCode };
+}
+
+async function assertAuthoritativeFulfillmentReady(catalog = {}, options = {}) {
+    const capability = await (options.loadCapability || loadFulfillmentCapability)(catalog);
+    if (!capability.fulfillmentAvailable) {
+        throw new CustomerWalletCheckoutError(
+            ERROR_CODES.FULFILLMENT_UNAVAILABLE,
+            "This product is not currently available in the selected region.",
+            409
+        );
+    }
+    return capability;
 }
 
 async function loadWalletMethod(region) {
@@ -169,6 +183,7 @@ async function startCustomerWalletCheckout(input = {}, context = {}, dependencie
     }
 
     const catalog = await loadCatalogPackage(input);
+    await (dependencies.assertFulfillmentReady || assertAuthoritativeFulfillmentReady)(catalog);
     const method = await loadWalletMethod(catalog.region);
     const issuedAt = new Date();
     const pricingContext = await (dependencies.buildPricingContext || buildProductionPricingContext)({
@@ -357,6 +372,7 @@ async function startCustomerWalletCheckout(input = {}, context = {}, dependencie
 
 module.exports = Object.freeze({
     startCustomerWalletCheckout,
+    assertAuthoritativeFulfillmentReady,
     CustomerWalletCheckoutError,
     ERROR_CODES
 });

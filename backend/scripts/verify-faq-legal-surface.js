@@ -127,6 +127,7 @@ function verifyFaq() {
     const file = "frontend/faq.html";
     const js = read("frontend/js/faq.js");
     const css = read("frontend/css/faq.css");
+    const designSystem = read("frontend/css/theme/aziel-design-system.css");
 
     assert(exists(file), "FAQ page must exist.");
     includes(file, 'id="azHeaderMount"', "FAQ must use shared header mount.");
@@ -145,13 +146,14 @@ function verifyFaq() {
     assert(js.includes('event.key !== "Enter" && event.key !== " "'), "frontend/js/faq.js: FAQ keyboard Enter/Space support missing.");
     assert(js.includes("faqNoResults"), "frontend/js/faq.js: FAQ search no-result support missing.");
     assert(js.includes("item.hidden"), "frontend/js/faq.js: FAQ search should hide items without layout hacks.");
-    assert(css.includes("padding: calc(var(--az-header-h"), "frontend/css/faq.css: FAQ top spacing must derive from shared header height.");
+    assert(designSystem.includes("--public-header-height: var(--az-header-height)"), "Shared design system must own public header spacing authority.");
     assert(css.includes("@media (prefers-reduced-motion: reduce)"), "frontend/css/faq.css: FAQ must respect reduced motion.");
     assert(css.includes("overflow-wrap: anywhere"), "frontend/css/faq.css: FAQ must protect long answer wrapping.");
     assert(css.includes(":focus-visible"), "frontend/css/faq.css: FAQ must expose focus styles.");
 }
 
 function verifyPolicies() {
+    const designSystem = read("frontend/css/theme/aziel-design-system.css");
     POLICY_FILES.forEach(file => {
         assert(exists(file), `${file} must exist.`);
         includes(file, 'id="azHeaderMount"', "policy page must use shared header mount.");
@@ -160,7 +162,7 @@ function verifyPolicies() {
         includes(file, "Last Updated: July 2026", "policy Last Updated missing.");
         includes(file, "/css/core/footer.css", "policy footer CSS missing.");
         includes(file, "/css/policy/policy.css", "policy CSS missing.");
-        includes(file, "<footer class=\"site-footer trust-footer\">", "policy footer missing.");
+        includes(file, "<footer class=\"site-footer trust-footer\"", "policy shared footer missing.");
     });
 
     [
@@ -190,7 +192,7 @@ function verifyPolicies() {
     includes("frontend/policies/payment.html", "Available Payment Options", "payment policy must use safer payment options heading.");
     includes("frontend/policies/payment.html", "checkout is the source of current availability", "payment policy must point to checkout as source of truth.");
     includes("frontend/policies/payment.html", "not the same as confirmed payment", "payment policy must distinguish submitted vs confirmed.");
-    includes("frontend/policies/payment.html", "PromptPay or Omise-related payment flows must not be treated as production-live", "payment policy must avoid live provider claim.");
+    includes("frontend/policies/payment.html", "PromptPay provider flows must not be treated as production-live unless the active environment and provider configuration support live processing", "payment policy must avoid unsupported live-provider claims.");
     includes("frontend/policies/payment.html", "AZIEL will never ask for your password, OTP, recovery code, banking password, payment PIN", "payment policy security warning missing.");
 
     includes("frontend/policies/refund.html", "Approved and completed refunds are credited to AZIEL Wallet", "refund destination must match wallet refund truth.");
@@ -203,7 +205,7 @@ function verifyPolicies() {
     includes("frontend/policies/support.html", "Response and resolution timing are not fixed", "support policy must avoid fixed response guarantee.");
 
     const css = read("frontend/css/policy/policy.css");
-    includes("frontend/css/policy/policy.css", "padding: calc(var(--az-header-h", "policy top spacing must derive from shared header height.");
+    assert(designSystem.includes("--public-header-height: var(--az-header-height)"), "Shared design system must retain policy/header spacing authority.");
     includes("frontend/css/policy/policy.css", "@media (max-width: 768px)", "policy responsive CSS missing.");
     includes("frontend/css/policy/policy.css", "overflow-wrap: anywhere", "policy text wrapping protection missing.");
     includes("frontend/css/policy/policy.css", ":focus-visible", "policy focus styles missing.");
@@ -243,7 +245,10 @@ function verifyFooter() {
 
 function verifyClaimSafety() {
     PUBLIC_SURFACE_FILES.forEach(file => {
-        notMatches(file, UNSUPPORTED_CLAIMS, "unsupported public claim found.");
+        const publicText = file.includes("/lang/")
+            ? read(file).replace(/^\s*"[^"]+"\s*:/gm, "")
+            : read(file);
+        assert(!UNSUPPORTED_CLAIMS.test(publicText), `${file}: unsupported public claim found.`);
         notMatches(file, SECRET_OR_INTERNAL, "public trust surface must not expose local URLs, secrets, or internal evidence/supplier terms.");
         assert(!read(file).includes("javascript:void(0)"), `${file}: no javascript placeholder hrefs allowed.`);
     });

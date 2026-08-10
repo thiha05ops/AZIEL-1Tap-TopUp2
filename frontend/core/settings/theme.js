@@ -1,52 +1,44 @@
-// frontend/js/theme.js
-// AZIEL V2.5 Shared Theme Controller
+// frontend/core/settings/theme.js
+// AZIEL public storefront system theme controller
 
 (function () {
-    const STORAGE_KEY = "azielTheme";
     const DARK_CLASS = "theme-dark";
     const LIGHT_CLASS = "theme-light";
+    const LEGACY_CLASSES = [DARK_CLASS, LIGHT_CLASS, "dark", "light"];
+    const LEGACY_STORAGE_KEYS = ["azielTheme", "theme"];
 
     function getSystemTheme() {
         return window.matchMedia &&
-            window.matchMedia("(prefers-color-scheme: light)").matches
-            ? "light"
-            : "dark";
+            window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light";
     }
 
-    function getSavedTheme() {
-        const saved = localStorage.getItem(STORAGE_KEY);
-
-        if (saved === "light" || saved === "dark" || saved === "system") {
-            return saved;
+    function clearLegacyManualPreference() {
+        try {
+            LEGACY_STORAGE_KEYS.forEach(key => {
+                const saved = window.localStorage?.getItem(key);
+                if (saved === "light" || saved === "dark") {
+                    window.localStorage.removeItem(key);
+                }
+            });
+        } catch (error) {
+            // Storage may be unavailable in private browsing or embedded contexts.
         }
-
-        return "system";
     }
 
-    function resolveTheme(mode) {
-        if (mode === "system") {
-            return getSystemTheme();
-        }
+    function applyTheme() {
+        const resolved = getSystemTheme();
 
-        return mode === "light" ? "light" : "dark";
-    }
-
-    function applyTheme(mode) {
-        const resolved = resolveTheme(mode);
-
-        document.body.classList.remove(DARK_CLASS, LIGHT_CLASS);
-        document.documentElement.classList.remove(DARK_CLASS, LIGHT_CLASS);
-
-        document.body.classList.add(
-            resolved === "light" ? LIGHT_CLASS : DARK_CLASS
-        );
-
-        document.documentElement.classList.add(
-            resolved === "light" ? LIGHT_CLASS : DARK_CLASS
-        );
-
+        document.documentElement.classList.remove(...LEGACY_CLASSES);
+        document.documentElement.classList.add(resolved === "dark" ? DARK_CLASS : LIGHT_CLASS);
         document.documentElement.setAttribute("data-theme", resolved);
-        document.body.setAttribute("data-theme", resolved);
+
+        if (document.body) {
+            document.body.classList.remove(...LEGACY_CLASSES);
+            document.body.classList.add(resolved === "dark" ? DARK_CLASS : LIGHT_CLASS);
+            document.body.setAttribute("data-theme", resolved);
+        }
 
         const metaTheme = document.querySelector('meta[name="theme-color"]');
         if (metaTheme) {
@@ -58,52 +50,56 @@
 
         window.AZIEL = window.AZIEL || {};
         window.AZIEL.theme = {
-            mode,
+            mode: "system",
             resolved
         };
+
+        updateThemeStatus();
     }
 
-    function setTheme(mode) {
-        if (!["light", "dark", "system"].includes(mode)) return;
+    function updateThemeStatus() {
+        const themeBtn = document.getElementById("themeToggleBtn");
+        if (!themeBtn) return;
 
-        localStorage.setItem(STORAGE_KEY, mode);
-        applyTheme(mode);
+        const resolved = window.AZIEL?.theme?.resolved || getSystemTheme();
+
+        themeBtn.type = "button";
+        themeBtn.disabled = true;
+        themeBtn.classList.add("theme-status-btn");
+        themeBtn.innerHTML = resolved === "light"
+            ? '<i class="fa-solid fa-sun"></i><span>Auto Light</span>'
+            : '<i class="fa-solid fa-moon"></i><span>Auto Dark</span>';
     }
 
-    function toggleTheme() {
-        const current = window.AZIEL?.theme?.resolved || resolveTheme(getSavedTheme());
-        setTheme(current === "dark" ? "light" : "dark");
+    function initTheme() {
+        clearLegacyManualPreference();
+        applyTheme();
+        window.addEventListener("aziel:headerLoaded", updateThemeStatus);
     }
-
-    const savedMode = getSavedTheme();
 
     if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", () => {
-            applyTheme(savedMode);
-        });
+        applyTheme();
+        document.addEventListener("DOMContentLoaded", initTheme);
     } else {
-        applyTheme(savedMode);
+        initTheme();
     }
 
     if (window.matchMedia) {
-        const media = window.matchMedia("(prefers-color-scheme: light)");
+        const media = window.matchMedia("(prefers-color-scheme: dark)");
 
         media.addEventListener?.("change", () => {
-            const saved = getSavedTheme();
-
-            if (saved === "system") {
-                applyTheme("system");
-            }
+            applyTheme();
         });
     }
 
     window.AZIEL = window.AZIEL || {};
-    window.AZIEL.setTheme = setTheme;
-    window.AZIEL.toggleTheme = toggleTheme;
+    window.AZIEL.applyTheme = applyTheme;
+    window.AZIEL.setTheme = applyTheme;
+    window.AZIEL.toggleTheme = applyTheme;
     window.AZIEL.getTheme = function () {
         return {
-            mode: getSavedTheme(),
-            resolved: resolveTheme(getSavedTheme())
+            mode: "system",
+            resolved: getSystemTheme()
         };
     };
 })();

@@ -126,7 +126,11 @@ function input(overrides = {}) {
             userId: "123456",
             zoneId: "1001",
             playerName: "Tester",
-            customFields: { server: "TH" }
+            customFields: { server: "TH" },
+            accountFields: [
+                { key: "userId", label: "User ID", value: "123456" },
+                { key: "zoneId", label: "Server ID", value: "1001" }
+            ]
         },
         contact: { email: "USER@EXAMPLE.COM", phone: "+6612345678" },
         notes: "Customer note",
@@ -295,10 +299,23 @@ async function verifyCheckoutIntegration() {
         owner: { userId: "user-1", sessionId: "session-1" },
         idempotencyKey: "idem-1",
         paymentSelection: { paymentMethodId: "promptpay", paymentChannel: "manual" },
-        customerInput: { gameAccount: { userId: "123", zoneId: "456" } },
+        customerInput: {
+            gameAccount: {
+                userId: "123",
+                zoneId: "456",
+                accountFields: [
+                    { key: "userId", label: "User ID", value: "123" },
+                    { key: "zoneId", label: "Server ID", value: "456" }
+                ]
+            }
+        },
         requestMetadata: { traceId: "trace" }
     }, deps);
     assert.strictEqual(store.orders[0].schemaVersion, ORDER_SNAPSHOT_SCHEMA_VERSION, "checkout defaults to order snapshot runtime.");
+    assert.deepStrictEqual(store.orders[0].fulfilment.input.accountFields, [
+        { key: "userId", label: "User ID", value: "123" },
+        { key: "zoneId", label: "Server ID", value: "456" }
+    ], "checkout persists the exact configured account-field labels and submitted values.");
     assert.strictEqual(result.checkout.orderId, "AZL-ORDER-0001", "checkout public result still works.");
     assert(!JSON.stringify(result.checkout).includes("requestFingerprint"), "public redaction still excludes fingerprint.");
 

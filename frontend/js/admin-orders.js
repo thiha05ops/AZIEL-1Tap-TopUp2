@@ -8,6 +8,7 @@ let ordersAutoRefreshTimer = null;
 let ordersRefreshDebounce = null;
 let adminOrdersInitialized = false;
 let currentOrderContext = {};
+const commerceManualPaymentActionsInFlight = new Set();
 const adminOrdersRequestGate = window.AZIEL_ADMIN_UI?.request?.createRequestGate?.();
 const adminOrdersPaging = window.AZIEL_ADMIN_UI?.pagination?.createPaginatedState?.({
     getId: order => order?._id,
@@ -331,15 +332,15 @@ function renderSelectedOrder() {
         ["updated", formatDate(order.updatedAt)]
     ])}
             ${renderDetailSection("customer", [
-        ["username", order.username],
-        ["user_id", order.userId],
-        ["region", order.region]
+        ["username", order.customerAccount?.username || order.username || "-"],
+        ["customer_account_id", order.customerAccount?.id || "-"],
+        ["region", order.customerAccount?.region || order.region]
     ])}
+            ${renderGameAccountSection(order)}
             ${renderDetailSection("product", [
         ["product", order.productName || order.game],
         ["package", order.packageName],
-        ["package_code", order.packageCode || "-"],
-        ["server_id", order.zoneId || "-"]
+        ["package_code", order.packageCode || "-"]
     ])}
             ${renderDetailSection("financial", [
         ["amount", Number(order.amount || 0).toLocaleString()],
@@ -383,6 +384,53 @@ function renderDetailSection(titleKey, rows) {
             `).join("")}
         </section>
     `;
+}
+
+function renderGameAccountSection(order = {}) {
+    const fields = Array.isArray(order.accountFields)
+        ? order.accountFields.filter(field => String(field?.value || "").trim())
+        : [];
+    if (!fields.length) {
+        return `
+            <section class="order-detail-section order-game-account">
+                <h4>${escapeHTML(adminT("game_account", "Game Account"))}</h4>
+                <div class="order-evidence-empty">${escapeHTML(adminT("game_account_historical_unavailable", "Game account data unavailable for this historical order"))}</div>
+            </section>
+        `;
+    }
+    return `
+        <section class="order-detail-section order-game-account">
+            <h4>${escapeHTML(adminT("game_account", "Game Account"))}</h4>
+            ${fields.map(field => `
+                <p>
+                    <span>${escapeHTML(field.label || field.key || "Account")}</span>
+                    <b>${escapeHTML(field.value)}</b>
+                    <button class="order-copy-icon" type="button" data-copy-value="${escapeHTML(field.value)}" aria-label="${escapeHTML(`Copy ${field.label || field.key || "account value"}`)}" title="${escapeHTML(`Copy ${field.label || field.key || "account value"}`)}">
+                        <i class="fa-regular fa-copy" aria-hidden="true"></i>
+                    </button>
+                </p>
+            `).join("")}
+        </section>
+    `;
+}
+
+async function copyOrderOperationalValue(button) {
+    const value = button?.dataset?.copyValue || "";
+    if (!value) return;
+    try {
+        await navigator.clipboard.writeText(value);
+        const icon = button.querySelector("i");
+        icon?.classList.remove("fa-copy", "fa-regular");
+        icon?.classList.add("fa-check", "fa-solid");
+        button.classList.add("is-copied");
+        window.setTimeout(() => {
+            icon?.classList.remove("fa-check", "fa-solid");
+            icon?.classList.add("fa-copy", "fa-regular");
+            button.classList.remove("is-copied");
+        }, 1200);
+    } catch (error) {
+        showAdminToast?.(adminT("copy_failed", "Copy failed"), "error");
+    }
 }
 
 function formatBusinessMoney(value, currency = "") {
@@ -532,6 +580,9 @@ function getOrderActions(order) {
 }
 
 function bindDetailActions(panel, order) {
+    panel.querySelectorAll("[data-copy-value]").forEach(button => {
+        button.addEventListener("click", () => copyOrderOperationalValue(button));
+    });
     panel.querySelector('[data-action="view-evidence"]')?.addEventListener("click", event => {
         openSlipModal(event.currentTarget.dataset.src || "");
     });
@@ -567,10 +618,12 @@ async function approveCommerceManualPayment(order) {
         showAdminToast?.(adminT("something_went_wrong"), "error");
         return;
     }
+    if (commerceManualPaymentActionsInFlight.has(attemptId)) return;
 
     const btn = document.querySelector(`#adminOrderDetailPanel [data-action="confirm-paid"]`);
 
     try {
+        commerceManualPaymentActionsInFlight.add(attemptId);
         window.AZIEL_UI?.button?.setLoading(btn, { text: adminT("loading") });
         const data = await adminFetch(`/api/admin/commerce/payments/${encodeURIComponent(attemptId)}/approve`, {
             method: "POST",
@@ -590,6 +643,7 @@ async function approveCommerceManualPayment(order) {
         console.log("Approve commerce manual payment error:", error);
         showAdminToast?.(adminT("something_went_wrong"), "error");
     } finally {
+        commerceManualPaymentActionsInFlight.delete(attemptId);
         window.AZIEL_UI?.button?.reset(btn);
     }
 }
@@ -600,6 +654,7 @@ async function rejectCommerceManualPayment(order) {
         showAdminToast?.(adminT("something_went_wrong"), "error");
         return;
     }
+    if (commerceManualPaymentActionsInFlight.has(attemptId)) return;
 
     const reason = prompt(`${adminT("reject")}?\n\n${order.orderId}\n\nReason:`);
     if (!reason) return;
@@ -614,6 +669,7 @@ async function rejectCommerceManualPayment(order) {
     const btn = document.querySelector(`#adminOrderDetailPanel [data-action="reject-manual-payment"]`);
 
     try {
+        commerceManualPaymentActionsInFlight.add(attemptId);
         window.AZIEL_UI?.button?.setLoading(btn, { text: adminT("loading") });
         const data = await adminFetch(`/api/admin/commerce/payments/${encodeURIComponent(attemptId)}/reject`, {
             method: "POST",
@@ -633,6 +689,7 @@ async function rejectCommerceManualPayment(order) {
         console.log("Reject commerce manual payment error:", error);
         showAdminToast?.(adminT("something_went_wrong"), "error");
     } finally {
+        commerceManualPaymentActionsInFlight.delete(attemptId);
         window.AZIEL_UI?.button?.reset(btn);
     }
 }

@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>AZIEL 1Tap Shop | Game Top Up Platform</title>
+    <title data-i18n="AZIEL 1Tap Shop | Game Top Up Platform">AZIEL 1Tap Shop | Game Top Up Platform</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
@@ -34,11 +34,10 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
     <link rel="stylesheet" href="css/theme/aziel-design-system.css?v=20260717-edge-width6">
-    <link rel="stylesheet" href="css/theme/aziel-header.css?v=20260717-search-x-focus">
     <link rel="stylesheet" href="css/core/main.css">
     <link rel="stylesheet" href="css/core/layout.css">
     <link rel="stylesheet" href="/css/core/components.css?v=20260708-theme-safe">
-    <link rel="stylesheet" href="css/core/footer.css">
+    <link rel="stylesheet" href="css/core/footer.css?v=20260804-premium-refinement">
 
     <link rel="stylesheet" href="css/theme/wave-background.css">
     <link rel="stylesheet" href="css/support/live-chat.css">
@@ -48,7 +47,10 @@
 
     <link rel="stylesheet" href="css/theme/desktop.css">
     <link rel="stylesheet" href="css/theme/mobile.css?v=20260717-edge-width6">
-    <link rel="stylesheet" href="/css/theme/aziel-header.css?v=20260717-search-x-focus">
+    <link rel="stylesheet" href="/css/home/hero.css?v=20260802-desktop-completion">
+    <link rel="stylesheet" href="/css/home/merchandise-rows.css?v=20260802-desktop-tiles">
+    <link rel="stylesheet" href="/css/home/marketplace-reference.css?v=20260811-rgb-cleanup">
+    <link rel="stylesheet" href="/css/theme/aziel-header.css?v=20260808-global-authority">
 
     <link rel="icon" href="./assets/icons/favicon.ico">
     <link rel="icon" type="image/png" sizes="32x32" href="./assets/icons/favicon-32.png">
@@ -89,200 +91,112 @@
 </head>
 
 <body>
-    <div class="az-bg-wave"></div>
-
     <div id="azHeaderMount" data-nav="home"></div>
 
     <main class="az-home">
 
-        <section class="az-banner-zone" id="bannerZone" data-managed-content-state="resolving">
-            <div class="az-banner-track" id="azBannerTrack">
-                <a href="mlbb.html" class="az-banner-card">
-                    <img src="assets/banners/hero.webp" alt="MLBB Banner" width="860" height="300"
-                        loading="eager" decoding="async" fetchpriority="high">
-                </a>
-
-                <a href="pubg.html" class="az-banner-card">
-                    <img src="assets/banners/pubg-banner.webp" alt="PUBG Banner" width="860" height="300"
-                        loading="eager" decoding="async">
-                </a>
-
-                <a href="freefire.html" class="az-banner-card">
-                    <img src="assets/banners/freefire-banner.webp" alt="Free Fire Banner" width="860" height="300"
-                        loading="lazy" decoding="async">
-                </a>
+        <section id="bannerZone" class="az-banner-zone az-home-hero" aria-label="Featured AZIEL promotion" data-i18n-aria-label="home.featuredPromotion"
+            data-managed-content-state="fallback">
+            <div id="azBannerTrack" class="az-banner-track">
+                <div class="az-banner-card active" style="--az-banner-object-position: center center">
+                    <picture>
+                        <source media="(min-width: 769px)" srcset="assets/banners/hero-desktop-wide.png">
+                        <img src="assets/banners/hero.webp" alt="AZIEL featured game promotion" data-i18n-alt="home.featuredPromotionImage" width="3840" height="2159"
+                            loading="eager" decoding="async" fetchpriority="high">
+                    </picture>
+                </div>
             </div>
-
-            <div class="az-banner-dots" id="azBannerDots">
-                <button class="active" type="button" aria-label="Show MLBB banner" aria-current="true"></button>
-                <button type="button" aria-label="Show PUBG banner" aria-current="false"></button>
-                <button type="button" aria-label="Show Free Fire banner" aria-current="false"></button>
-            </div>
+            <div id="azBannerDots" class="az-banner-dots" aria-label="Banner navigation" data-i18n-aria-label="home.bannerNavigation"></div>
         </section>
 
-        <section class="az-trust-row">
-            <div class="trust-card">
-                <i class="fa-solid fa-bolt"></i>
-                <div>
-                    <strong data-i18n="instantDelivery">Order Tracking</strong>
-                    <span data-i18n="deliveryTime">Status updates</span>
-                </div>
-            </div>
-
-            <div class="trust-card">
-                <i class="fa-solid fa-shield-halved"></i>
-                <div>
-                    <strong data-i18n="secure100">Security Minded</strong>
-                    <span data-i18n="safeTrusted">Account safeguards</span>
-                </div>
-            </div>
-
-            <div class="trust-card">
-                <i class="fa-solid fa-headset"></i>
-                <div>
-                    <strong data-i18n="support247">Support Center</strong>
-                    <span data-i18n="weAreHere">Ticket review</span>
-                </div>
-            </div>
-
-            <div class="trust-card">
-                <i class="fa-solid fa-tags"></i>
-                <div>
-                    <strong data-i18n="bestPrice">Clear Pricing</strong>
-                    <span data-i18n="alwaysLowPrice">Shown at checkout</span>
-                </div>
-            </div>
-        </section>
-
-        <section id="popularGames" class="az-section">
+        <section id="popularGames" class="az-section home-merch-section">
             <div class="az-section-head">
                 <div>
-                    <h2 data-i18n="popularGames">Popular Games</h2>
+                    <h2 data-i18n="home.popularMOBILEGAMES">POPULAR MOBILE GAMES</h2>
                 </div>
                 <a href="mobile-games.html"><span data-i18n="viewAll">View All</span> <i
-                        class="fa-solid fa-angle-right"></i></a>
+                        class="fa-solid fa-angle-right" aria-hidden="true"></i></a>
             </div>
 
-            <div class="popular-game-grid">
+            <div class="popular-game-grid home-merch-row">
                 <a href="mlbb.html" class="popular-game-card" data-name="Mobile Legends MLBB">
                     <img src="assets/games/mlbb.webp" alt="Mobile Legends">
-                    <h3>Mobile Legends</h3>
-                    <p>Diamonds Top Up</p>
+                    <span class="home-card-copy"><h3>Mobile Legends</h3><p>Diamonds</p></span>
+                    <span class="home-card-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span>
                 </a>
 
                 <a href="pubg.html" class="popular-game-card" data-name="PUBG Mobile UC">
                     <img src="assets/games/pubg.webp" alt="PUBG Mobile">
-                    <h3>PUBG Mobile</h3>
-                    <p>UC Top Up</p>
+                    <span class="home-card-copy"><h3>PUBG Mobile</h3><p>UC</p></span>
+                    <span class="home-card-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span>
                 </a>
 
                 <a href="freefire.html" class="popular-game-card" data-name="Free Fire Diamonds">
                     <img src="assets/games/freefire.webp" alt="Free Fire">
-                    <h3>Free Fire</h3>
-                    <p>Diamonds Top Up</p>
+                    <span class="home-card-copy"><h3>Free Fire</h3><p>Diamonds</p></span>
+                    <span class="home-card-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span>
                 </a>
-
-                <!-- <a href="ragnarok.html" class="popular-game-card" data-name="Ragnarok Origin">
-                    <img src="assets/games/ragnarok.webp" alt="Ragnarok Origin">
-                    <h3>Ragnarok Origin</h3>
-                    <p>Coming Soon</p>
-                </a>
- -->
                 <a href="hok.html" class="popular-game-card" data-name="Honor Of Kings">
                     <img src="assets/games/hok.webp" alt="Honor Of Kings">
-                    <h3>Honor Of Kings</h3>
-                    <p>Tokens Top Up</p>
+                    <span class="home-card-copy"><h3>Honor of Kings</h3><p data-i18n="home.tokensPackages">Tokens &amp; Packages</p></span>
+                    <span class="home-card-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span>
+                </a>
+
+                <a href="product.html?product=marvel-rivals" class="popular-game-card" data-name="Marvel Rivals">
+                    <span class="home-product-wordmark home-product-wordmark--popular" data-art-code="marvel-rivals" aria-label="Marvel Rivals"><span data-i18n="home.marvelRIVALS">MARVEL RIVALS</span></span>
+                    <span class="home-card-copy"><h3>Marvel Rivals</h3><p>Top Up</p></span>
+                    <span class="home-card-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span>
+                </a>
+                <a href="product.html?product=blood-strike" class="popular-game-card" data-name="Blood Strike">
+                    <span class="home-product-wordmark home-product-wordmark--popular" data-art-code="blood-strike" aria-label="Blood Strike"><span data-i18n="home.bloodSTRIKE">BLOOD STRIKE</span></span>
+                    <span class="home-card-copy"><h3>Blood Strike</h3><p>Golds, Pass</p></span>
+                    <span class="home-card-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span>
                 </a>
 
             </div>
         </section>
 
-        <section id="categories" class="az-dashboard-grid">
-            <div class="az-panel" id="topUpCategoriesPanel">
-                <div class="az-section-head small">
-                    <h2 data-i18n="topUpCategories">Top Up Categories</h2>
-                    <a href="mobile-games.html" data-i18n="viewAll">View All</a>
+        <section id="allMobileGames" class="az-section home-merch-section" hidden>
+            <div class="az-section-head">
+                <div>
+                    <h2 data-i18n="home.allMOBILEGAMES">ALL MOBILE GAMES</h2>
                 </div>
-
-                <div class="category-grid" id="topUpCategoryGrid">
-                    <a href="mlbb.html"><img src="assets/games/mlbb.webp" alt=""> <span data-i18n="mobileLegend">Mobile
-                            Legend</span></a>
-                    <a href="hok.html"><img src="assets/games/hok.webp" alt=""> <span data-i18n="headOfTheKing">Head of
-                            the King</span></a>
-                    <a href="pubg.html"><img src="assets/games/pubg.webp" alt=""> <span data-i18n="pubgMobile">PUBG
-                            Mobile</span></a>
-                    <a href="freefire.html"><img src="assets/games/freefire.webp" alt=""> <span
-                            data-i18n="freeFire">Free Fire</span></a>
-                    <!-- <a href="genshin.html"><img src="assets/games/genshin.webp" alt=""> <span
-                            data-i18n="genshinImpact">Genshin Impact</span></a> -->
-                    <a href="aov-id.html"><img src="assets/games/aov-id.webp" alt=""> <span
-                            data-i18n="arenaOfValorId">Arena of Valor (ID)</span></a>
-                    <a href="pubg-rp.html"><img src="assets/games/pubg-rp.webp" alt=""> <span
-                            data-i18n="pubgRoyalePass">PUBG Royale Pass</span></a>
-                    <a href="telegram.html"><img src="assets/giftcards/telegram.webp" alt="Telegram TopUp"> <span
-                            data-i18n="telegramTopup">Telegram Top
-                            Up</span></a>
-                    <!-- <a href="ragnarok.html"><img src="assets/games/ragnarok.webp" alt=""> <span
-                            data-i18n="ragnarokOrigin">Ragnarok
-                            Origin</span></a> -->
-                    <!-- <a href="roblox.html"><img src="assets/games/roblox.webp" alt=""> <span
-                            data-i18n="roblox">Roblox</span></a> -->
-                    <!-- <a href="steam.html"><img src="assets/games/steam.webp" alt=""> <span data-i18n="steamWallet">Steam
-                            Wallet</span></a> -->
-                    <a href="mobile-games.html"> <span data-i18n="allGames">All
-                            Games</span></a>
-                </div>
-
+                <a href="mobile-games.html"><span data-i18n="viewAll">View All</span> <i
+                        class="fa-solid fa-angle-right" aria-hidden="true"></i></a>
             </div>
 
-            <div class="az-panel" id="whyChoosePanel">
-                <div class="az-section-head small">
-                    <h2 data-i18n="whyChooseAziel">Why Choose AZIEL?</h2>
-                </div>
+            <div class="home-merch-row home-mobile-games-grid" id="allMobileGamesList"></div>
+        </section>
 
-                <div class="why-grid">
-                    <div>
-                        <i class="fa-solid fa-bolt"></i>
-                        <strong data-i18n="instantTopUp">Trackable Orders</strong>
-                        <span data-i18n="fastEasy">Clear status</span>
-                    </div>
-                    <div>
-                        <i class="fa-solid fa-shield-halved"></i>
-                        <strong data-i18n="securePayment">Payment Review</strong>
-                        <span data-i18n="protected100">Confirmation records</span>
-                    </div>
-                    <div>
-                        <i class="fa-solid fa-gift"></i>
-                        <strong data-i18n="trustedPlatform">Support Records</strong>
-                        <span data-i18n="millionsUsers">Ticket history</span>
-                    </div>
-                    <div>
-                        <i class="fa-solid fa-headset"></i>
-                        <strong data-i18n="support247">Support Center</strong>
-                        <span data-i18n="alwaysHere">Operational review</span>
-                    </div>
+        <section id="socialTopUp" class="az-section home-merch-section" hidden>
+            <div class="az-section-head">
+                <div>
+                    <h2 data-i18n="home.socialTOPUP">SOCIAL TOP UP</h2>
                 </div>
+                <a href="social-topup.html"><span data-i18n="viewAll">View All</span> <i
+                        class="fa-solid fa-angle-right" aria-hidden="true"></i></a>
             </div>
 
-            <div class="az-panel" id="latestPromotionsPanel" data-promotion-preview-state="loading">
-                <div class="az-section-head small">
-                    <h2 data-i18n="latestPromotions">
-                        Latest Promotions
-                        <span id="latestPromotionsCount" class="promotion-count-badge">0</span>
-                    </h2>
-                    <a id="latestPromotionsViewAll" href="/notifications.html?filter=promotions">View All</a>
-                </div>
+            <div class="home-merch-row home-social-topup-grid" id="socialTopUpList"></div>
+        </section>
 
-                <div class="promo-list" id="latestPromotionsList">
-                    <div class="promo-item skeleton" aria-hidden="true"></div>
-                    <div class="promo-item skeleton" aria-hidden="true"></div>
+        <section id="newsPromotions" class="az-section home-merch-section" hidden>
+            <div class="az-section-head">
+                <div>
+                    <h2 data-i18n="home.newsPROMOTIONS">NEWS &amp; PROMOTIONS</h2>
                 </div>
+                <a id="latestPromotionsViewAll" href="/notifications.html?filter=promotions">
+                    <span data-i18n="home.viewAllNews">View all news</span>
+                    <i class="fa-solid fa-angle-right" aria-hidden="true"></i></a>
+            </div>
+            <div id="latestPromotionsPanel" data-promotion-preview-state="idle">
+                <div class="home-promotion-grid" id="latestPromotionsList"></div>
             </div>
         </section>
 
     </main>
 
-    <footer class="site-footer" aria-label="AZIEL footer">
+    <footer class="site-footer" aria-label="AZIEL footer" data-i18n-aria-label="common.footer">
         <div>
             <h3>AZIEL</h3>
             <p data-i18n="footerDescription">
@@ -330,7 +244,7 @@
 
         <div>
             <h4 data-i18n="footer_supported_payments">Supported Payments</h4>
-            <div class="payment-logos" id="footerPaymentLogos" aria-label="Accepted payment methods"></div>
+            <div class="payment-logos" id="footerPaymentLogos" aria-label="Accepted payment methods" data-i18n-aria-label="common.acceptedPaymentMethods"></div>
         </div>
 
         <div class="footer-copy">
@@ -338,39 +252,6 @@
             <span data-i18n="tagline">1 TAP. TOP UP. DONE.</span>
         </div>
     </footer>
-
-    <div id="localeModal" class="az-locale-modal">
-        <div class="az-locale-box">
-            <button id="localeCloseBtn" class="az-locale-close" type="button">×</button>
-
-            <h2 data-i18n="selectLocation">Select your location</h2>
-            <p data-i18n="chooseRegionLanguageCurrency">Choose region, language and currency for AZIEL.</p>
-
-            <label data-i18n="region">Region</label>
-            <select id="regionSelect">
-                <option value="TH">🇹🇭 Thailand</option>
-                <option value="MM">🇲🇲 Myanmar</option>
-            </select>
-
-            <label data-i18n="language">Language</label>
-            <select id="languageSelect">
-                <option value="en">English</option>
-                <option value="my">မြန်မာ</option>
-                <option value="th">ไทย</option>
-            </select>
-
-            <label data-i18n="currency">Currency</label>
-            <select id="currencySelect">
-                <option value="THB">Thailand Baht ฿</option>
-                <option value="MMK">Myanmar Kyat Ks</option>
-                <option value="USD">US Dollar $</option>
-            </select>
-
-            <button id="saveLocaleBtn" class="az-locale-save" type="button">
-                <span data-i18n="savePreferences">Save Preferences</span>
-            </button>
-        </div>
-    </div>
 
     <!-- =======================================
     AZIEL Core
@@ -381,17 +262,18 @@
     <!-- =======================================
     Language Engine
     ======================================= -->
-    <script src="/lang/en.js?v=20260723-language-authority"></script>
-    <script src="/lang/th.js?v=20260723-language-authority"></script>
-    <script src="/lang/my.js?v=20260723-language-authority"></script>
+    <script src="/lang/en.js?v=20260809-g21-explicit"></script>
+    <script src="/lang/th.js?v=20260809-g21-explicit"></script>
+    <script src="/lang/my.js?v=20260809-g21-explicit"></script>
 
-    <script src="/js/i18n.js?v=20260723-language-authority"></script>
+    <script src="/lang/storefront-static.js?v=20260809-g21-explicit"></script>
+    <script src="/js/i18n.js?v=20260809-g21-explicit"></script>
 
     <!-- =======================================
     User
     ======================================= -->
     <script src="/js/user-state.js?v=2026062905"></script>
-    <script src="/js/campaign-runtime.js?v=20260715-phase9"></script>
+    <script src="/js/campaign-runtime.js?v=20260809-placements"></script>
     <script src="/js/auth-check.js"></script>
 
     <!-- =======================================
@@ -404,19 +286,22 @@
     <!-- =======================================
     Theme / Locale
     ======================================= -->
-    <script src="/js/theme.js?v=20260701"></script>
-    <script src="/js/locale-switcher.js?v=20260723-language-authority"></script>
+    <script src="/core/settings/theme.js?v=20260802-canonical"></script>
+    <script src="/js/locale-switcher.js?v=20260809-g21-explicit"></script>
 
     <!-- =======================================
     Page
     ======================================= -->
     <script src="/js/catalog-presentation.js?v=20260714-phase7"></script>
     <script src="/js/catalog-runtime.js?v=20260714-phase7"></script>
+    <script src="/js/storefront-sections.js?v=20260723-catalog-workspace"></script>
     <script src="/js/catalog-discovery.js?v=20260714-phase7"></script>
-    <script src="/js/home.js?v=20260706"></script>
-    <script src="/js/home-banner-runtime.js?v=20260715-phase86"></script>
-    <script src="/js/home-promotion-preview.js?v=20260717-v26"></script>
-    <script src="/js/home-placement-runtime.js?v=20260715-phase11"></script>
+    <script src="/js/home.js?v=20260804-theme-authority"></script>
+    <script src="/js/home-banner-runtime.js?v=20260811-rgb-cleanup"></script>
+    <script src="/js/home-placement-runtime.js?v=20260802-catalog-coverage"></script>
+    <script src="/js/home-promotion-preview.js?v=20260804-home-v3-marketplace"></script>
+    <script src="/js/home-product-accent.js?v=20260802-responsive-hero"></script>
+    <script src="/js/home-footer-accordion.js?v=20260802-mobile"></script>
     <script src="/js/search.js?v=20260717-search-x-focus"></script>
     <script src="/js/live-chat.js"></script>
 

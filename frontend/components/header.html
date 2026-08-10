@@ -2,6 +2,10 @@
 
 <header class="az-header">
 
+    <button class="az-mobile-menu-btn" type="button" aria-label="Open menu" data-i18n-aria-label="header.openMenu" aria-controls="azHeaderNav" aria-expanded="false">
+        <i class="fa-solid fa-bars" aria-hidden="true"></i>
+    </button>
+
     <!-- Logo -->
     <a href="home.html" class="az-logo" aria-label="AZIEL Home">
         <img src="/assets/logo/aziel-wordmark.webp" class="az-logo-img" alt="AZIEL">
@@ -15,39 +19,29 @@
     <!-- Right -->
     <div class="az-header-right">
 
-        <!-- Wallet -->
-        <a href="wallet.html" class="az-wallet-pill">
-            <span id="headerWalletText">0 Ks</span>
-            <i class="fa-solid fa-plus"></i>
-        </a>
-
         <!-- Search -->
-        <button id="azHeaderSearchBtn" class="az-icon-btn az-search-trigger" type="button" aria-label="Search">
+        <button id="azHeaderSearchBtn" class="az-icon-btn az-search-trigger" type="button" aria-label="Search" data-i18n-aria-label="header.search">
             <i class="fa-solid fa-magnifying-glass"></i>
         </button>
 
-        <!-- Notification -->
-        <a href="notifications.html" class="az-icon-btn" aria-label="Notifications">
-
-            <i class="fa-regular fa-bell"></i>
-
-            <span id="headerNotificationCount" class="header-badge" style="display:none;">
+        <!-- Cart -->
+        <a href="tracking.html" id="azHeaderCartBtn" class="az-icon-btn az-cart-trigger" aria-label="Cart" data-i18n-aria-label="header.cart">
+            <i class="fa-solid fa-cart-shopping" aria-hidden="true"></i>
+            <span id="headerCartCount" class="header-badge" style="display:none;">
                 0
             </span>
-
         </a>
 
-        <!-- Language -->
-        <button id="localeOpenBtn" class="az-locale-btn" type="button">
-
-            <span id="localeFlag">🇲🇲</span>
-
+        <!-- Region / Language / Currency -->
+        <button id="storefrontPreferenceBtn" class="az-preference-btn" type="button" aria-label="Region and preferences" aria-haspopup="dialog" aria-expanded="false" aria-controls="azPreferencePanel">
+            <span class="az-preference-flag" data-preference-flag>🇲🇲</span>
+            <span class="az-preference-summary" data-preference-summary>MM · EN · Ks</span>
         </button>
 
         <!-- Profile -->
         <div class="az-profile-menu">
 
-            <button id="profileMenuBtn" class="az-profile-btn" type="button">
+            <button id="profileMenuBtn" class="az-profile-btn" type="button" aria-label="Account menu" data-i18n-aria-label="header.accountMenu" aria-haspopup="true" aria-expanded="false" aria-controls="profileDropdown">
 
                 <div id="avatarText" class="az-avatar">
                     U

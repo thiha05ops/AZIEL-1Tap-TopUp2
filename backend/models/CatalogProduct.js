@@ -20,6 +20,44 @@ const catalogProductSchema = new mongoose.Schema(
             trim: true,
             default: ""
         },
+        productKnowledge: {
+            locales: {
+                en: { type: mongoose.Schema.Types.Mixed, default: undefined },
+                my: { type: mongoose.Schema.Types.Mixed, default: undefined },
+                th: { type: mongoose.Schema.Types.Mixed, default: undefined }
+            },
+            shortDescription: { type: String, trim: true, maxlength: 280, default: "" },
+            about: {
+                summary: { type: String, trim: true, maxlength: 500, default: "" },
+                details: { type: String, trim: true, maxlength: 3000, default: "" }
+            },
+            purchaseNotes: [{
+                _id: false,
+                title: { type: String, trim: true, maxlength: 100, default: "" },
+                body: { type: String, trim: true, maxlength: 800, default: "" }
+            }],
+            packageGuide: {
+                intro: { type: String, trim: true, maxlength: 800, default: "" },
+                groups: [{
+                    _id: false,
+                    title: { type: String, trim: true, maxlength: 100, default: "" },
+                    description: { type: String, trim: true, maxlength: 800, default: "" },
+                    packageCodes: { type: [String], default: [] }
+                }]
+            },
+            faq: [{
+                _id: false,
+                question: { type: String, trim: true, maxlength: 180, default: "" },
+                answer: { type: String, trim: true, maxlength: 1200, default: "" }
+            }]
+        },
+        fulfillment: {
+            manualAllowedRegions: {
+                type: [String],
+                enum: ["MM", "TH"],
+                default: []
+            }
+        },
         enabled: {
             type: Boolean,
             default: true

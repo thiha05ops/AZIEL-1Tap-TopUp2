@@ -79,11 +79,13 @@ function verifyAdminUi() {
 
 function verifyCustomerRuntime() {
     includes("frontend/home.html", "/js/home-placement-runtime.js", "Home page must load SitePlacement runtime.");
-    includes("frontend/home.html", "id=\"topUpCategoriesPanel\"", "Home Top Up panel must have a stable target.");
+    includes("frontend/home.html", "id=\"popularGames\"", "Home Popular Games placement must have a stable target.");
+    includes("frontend/home.html", "id=\"allMobileGamesList\"", "Catalog-owned All Mobile Games must have a stable target.");
     includes("frontend/home.html", "id=\"latestPromotionsPanel\"", "Home Latest Promotions panel must have a stable target.");
     includes("frontend/js/home-placement-runtime.js", "/api/site-placements/home", "Home runtime must call public SitePlacement API.");
-    includes("frontend/js/home-placement-runtime.js", "placement.managed !== true", "Home runtime must preserve static fallback for never-managed placements.");
-    includes("frontend/js/home-placement-runtime.js", "section.hidden = true", "Home runtime must hide managed-empty sections.");
+    includes("frontend/js/home-placement-runtime.js", "if (!catalogReady && !placement)", "Home runtime must preserve static fallback when Catalog and placement data are unavailable.");
+    includes("frontend/js/home-placement-runtime.js", "placement?.managed === true", "Managed placement intent must remain distinct from Catalog fallback.");
+    includes("frontend/js/home-placement-runtime.js", "hideSection(section, target", "Home runtime must hide managed-empty sections.");
     includes("frontend/js/home-placement-runtime.js", "AZIEL_CATALOG_PRESENTATION", "Home runtime must reuse catalog presentation mapping.");
     includes("frontend/js/home-placement-runtime.js", "aziel:shopRegionChanged", "Home runtime must refetch on region changes.");
 }

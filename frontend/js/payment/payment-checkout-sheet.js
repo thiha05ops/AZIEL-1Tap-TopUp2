@@ -42,9 +42,10 @@
 
         modal = document.createElement("div");
         modal.id = "azPaymentCheckoutSheet";
-        modal.className = "az-payment-sheet";
+        const pageMode = window.AZIEL_PAYMENT_PAGE_MODE === true;
+        modal.className = `az-payment-sheet${pageMode ? " az-payment-sheet--page" : ""}`;
         modal.innerHTML = `
-            <div class="az-payment-sheet__panel" role="dialog" aria-modal="true" aria-labelledby="azPaymentSheetTitle">
+            <div class="az-payment-sheet__panel" role="${pageMode ? "region" : "dialog"}" ${pageMode ? "" : 'aria-modal="true"'} aria-labelledby="azPaymentSheetTitle">
                 <button type="button" class="az-payment-sheet__close" data-role="close" aria-label="Close payment instructions">×</button>
 
                 <div class="az-payment-sheet__body">
@@ -52,13 +53,11 @@
                         <h2 id="azPaymentSheetTitle" class="az-payment-sheet__title">Payment</h2>
                         <strong id="azPaymentSheetAmount" class="az-payment-sheet__amount">-</strong>
                         <span id="azPaymentSheetSubtitle" class="az-payment-sheet__subtitle">Transfer the exact amount</span>
+                        <span id="azPaymentSheetQrExpiry" class="az-payment-sheet__qr-expiry" hidden></span>
                     </header>
-
-                    <div id="azPaymentSheetDetails" class="az-payment-sheet__details"></div>
 
                     <figure id="azPaymentSheetQrWrap" class="az-payment-sheet__qr" hidden>
                         <img id="azPaymentSheetQrImage" alt="Payment QR">
-                        <span id="azPaymentSheetQrExpiry" class="az-payment-sheet__qr-expiry" hidden></span>
                         <figcaption id="azPaymentSheetQrFallback" hidden>QR image unavailable. Use the account details above.</figcaption>
                         <button type="button" id="azPaymentSheetRetryQr" class="az-payment-sheet__action" hidden>Retry QR</button>
                         <small id="azPaymentSheetQrDiagnostic" hidden></small>
@@ -73,6 +72,11 @@
 
                     <div id="azPaymentSheetAppFallback" class="az-payment-sheet__fallback" hidden></div>
 
+                    <details class="az-payment-sheet__payment-details">
+                        <summary>Payment details</summary>
+                        <div id="azPaymentSheetDetails" class="az-payment-sheet__details"></div>
+                    </details>
+
                     <section id="azPaymentSheetChecklist" class="az-payment-sheet__checklist" hidden>
                         <span>Payment progress</span>
                         <ol id="azPaymentSheetChecklistSteps"></ol>
@@ -84,6 +88,8 @@
                     </div>
 
                     <p id="azPaymentSheetInstructions" class="az-payment-sheet__instructions"></p>
+
+                    <button type="button" id="azPaymentSheetTransferComplete" class="az-payment-sheet__transfer-complete" hidden>I've completed the transfer</button>
 
                     <button type="button" id="azPaymentSheetOpenApp" class="az-payment-sheet__secondary" hidden>Open Payment App</button>
 
@@ -109,15 +115,15 @@
                     </section>
 
                     <div id="azPaymentSheetMessage" class="az-payment-sheet__message" role="status" aria-live="polite"></div>
+                    <button type="button" id="azPaymentSheetSubmit" class="az-payment-sheet__submit">Submit for Verification</button>
                 </div>
 
                 <div id="azPaymentMobileBankChooser" class="az-payment-sheet__mobile-chooser" hidden></div>
 
-                <button type="button" id="azPaymentSheetSubmit" class="az-payment-sheet__submit">Submit for Verification</button>
             </div>
         `;
 
-        document.body.appendChild(modal);
+        (pageMode ? document.getElementById("paymentSessionMount") : document.body)?.appendChild(modal);
 
         modal.addEventListener("click", event => {
             if (event.target === modal) close("backdrop");
@@ -284,8 +290,7 @@
     }
 
     function isDevelopmentHost() {
-        const host = window.location.hostname;
-        return host === ["local", "host"].join("") || host === ["127", "0", "0", "1"].join(".");
+        return window.AZIEL_DEBUG === true || new URLSearchParams(window.location.search).get("azielDebug") === "true";
     }
 
     function setQrDiagnostic(options = {}, sourceType = "") {
@@ -376,6 +381,7 @@
             "azPaymentSheetSaveQr",
             "azPaymentSheetOpenBankApp",
             "azPaymentSheetContinueReceipt",
+            "azPaymentSheetTransferComplete",
             "azPaymentSheetBackQr",
             "azPaymentSheetSubmit"
         ].forEach(id => {
@@ -929,8 +935,11 @@
         if (continueBtn) {
             continueBtn.hidden = !isMobileFlow || step !== "qr";
             continueBtn.disabled = activeState.expired === true || isRecoveryExpired(activeState);
-            continueBtn.textContent = t("payment_continue_to_receipt", "Continue to Receipt");
-            continueBtn.onclick = () => setMobilePromptPayStep("receipt");
+            continueBtn.textContent = t("payment_transfer_completed", "I've completed the transfer");
+            continueBtn.onclick = () => {
+                activeState.transferConfirmed = true;
+                setMobilePromptPayStep("receipt");
+            };
         }
         if (backBtn) {
             backBtn.hidden = !isMobileFlow || step !== "receipt";
@@ -938,14 +947,14 @@
             backBtn.textContent = t("payment_back_to_qr", "Back to QR");
             backBtn.onclick = () => setMobilePromptPayStep("qr");
         }
-        if (receipt) receipt.hidden = activeState.requiresSlip ? (isMobileFlow && step !== "receipt") : true;
+        if (receipt) receipt.hidden = activeState.requiresSlip ? (!activeState.transferConfirmed || (isMobileFlow && step !== "receipt")) : true;
         if (summary) {
             summary.hidden = !isMobileFlow || step !== "receipt";
             if (isMobileFlow && step === "receipt") renderMobileReceiptSummary(modal, activeState);
         }
         if (submit) submit.hidden = isMobileFlow && step !== "receipt";
-        if (!isMobileFlow && submit) submit.hidden = false;
-        if (!isMobileFlow && receipt) receipt.hidden = !activeState.requiresSlip;
+        if (!isMobileFlow && submit) submit.hidden = activeState.requiresSlip && !activeState.transferConfirmed;
+        if (!isMobileFlow && receipt) receipt.hidden = !activeState.requiresSlip || !activeState.transferConfirmed;
         if (!isMobileFlow && summary) summary.hidden = true;
         if (!isMobileFlow && chooser) {
             chooser.hidden = true;
@@ -1475,10 +1484,7 @@
     }
 
     function attachMobileChooserTapDiagnostics(chooser) {
-        const host = location.hostname;
-        const devName = ["local", "host"].join("");
-        const loopbackHost = ["127", "0", "0", "1"].join(".");
-        if (host !== devName && host !== loopbackHost) return;
+        if (!isDevelopmentHost()) return;
         const sheet = document.getElementById("azPaymentCheckoutSheet");
         const panel = chooser.querySelector(".az-payment-sheet__mobile-chooser-card");
         const list = chooser.querySelector(".az-payment-sheet__mobile-bank-list");
@@ -1518,10 +1524,7 @@
     }
 
     function logMobileBankLauncher(profile = {}) {
-        const host = location.hostname;
-        const devName = ["local", "host"].join("");
-        const loopbackHost = ["127", "0", "0", "1"].join(".");
-        if (host !== devName && host !== loopbackHost) return;
+        if (!isDevelopmentHost()) return;
         console.info("[AZIEL MOBILE BANK LAUNCHER]", {
             key: profile.key || "",
             displayName: profile.label || profile.displayName || profile.appDisplayName || "",
@@ -1685,7 +1688,8 @@
             submitLabel,
             checklistSteps: [],
             completedChecklistActions: new Set(restored.completedChecklistActions || []),
-            mobileStep: "qr"
+            mobileStep: "qr",
+            transferConfirmed: requiresSlip === false
         };
         if (dynamicQr) activeState.submitLabel = t("payment_submit_for_verification", submitLabel);
 
@@ -1762,7 +1766,20 @@
         modal.querySelector("#azPaymentSheetReceiptTitle").textContent = t("payment_upload_receipt_title", "Upload Payment Receipt");
         modal.querySelector("#azPaymentSheetReceiptHelper").textContent = t("payment_receipt_helper", "Choose the screenshot after you finish the transfer.");
         modal.querySelector("#azPaymentSheetUploadLabel").textContent = t("payment_choose_screenshot", "Choose Screenshot");
-        modal.querySelector("#azPaymentSheetReceipt").hidden = !requiresSlip;
+        const transferComplete = modal.querySelector("#azPaymentSheetTransferComplete");
+        if (transferComplete) {
+            transferComplete.hidden = !requiresSlip || isMobileViewport();
+            transferComplete.textContent = t("payment_transfer_completed", "I've completed the transfer");
+            transferComplete.onclick = () => {
+                if (!activeState) return;
+                activeState.transferConfirmed = true;
+                transferComplete.hidden = true;
+                applyMobilePromptPayState();
+                modal.querySelector("#azPaymentSheetSlipInput")?.focus();
+                setMessage("", t("payment_upload_receipt_next", "Transfer completed. Upload your receipt for verification."));
+            };
+        }
+        modal.querySelector("#azPaymentSheetReceipt").hidden = requiresSlip;
         modal.querySelector("#azPaymentSheetSubmit").textContent = dynamicQr
             ? activeState.submitLabel
             : submitLabel;
@@ -1810,8 +1827,10 @@
         activeState.completedChecklistActions?.forEach?.(action => updateChecklist(action));
         setMessage("", options.error || "");
         modal.classList.add("show");
-        document.body.classList.add("az-payment-sheet-open");
-        modal.querySelector("[data-role='close']")?.focus();
+        if (!window.AZIEL_PAYMENT_PAGE_MODE) {
+            document.body.classList.add("az-payment-sheet-open");
+            modal.querySelector("[data-role='close']")?.focus();
+        }
         persistCheckoutState(activeState);
 
         if (activeState.expired) {
@@ -2402,19 +2421,20 @@
 
         const modal = document.createElement("div");
         modal.id = "azRecoveredPaymentMiniSheet";
-        modal.className = `az-payment-sheet show az-payment-sheet--recovery-minimal ${mobile ? "is-mobile-promptpay is-mobile-step-qr" : "is-desktop-promptpay"}`;
+        const pageMode = window.AZIEL_PAYMENT_PAGE_MODE === true;
+        modal.className = `az-payment-sheet show az-payment-sheet--recovery-minimal${pageMode ? " az-payment-sheet--page" : ""} ${mobile ? "is-mobile-promptpay is-mobile-step-qr" : "is-desktop-promptpay"}`;
         modal.innerHTML = `
-            <div class="az-payment-sheet__panel" role="dialog" aria-modal="true" aria-labelledby="azRecoveredPaymentTitle">
+            <div class="az-payment-sheet__panel" role="${pageMode ? "region" : "dialog"}" ${pageMode ? "" : 'aria-modal="true"'} aria-labelledby="azRecoveredPaymentTitle">
                 <button type="button" class="az-payment-sheet__close" data-role="close" aria-label="${escapeHTML(rt(activeState, "close", "Close"))}">×</button>
                 <div class="az-payment-sheet__body">
                     <header class="az-payment-sheet__header">
                         <h2 id="azRecoveredPaymentTitle" class="az-payment-sheet__title">${escapeHTML(rt(activeState, "recoveryResumePayment", "Resume Payment"))}</h2>
                         <strong class="az-payment-sheet__amount">${escapeHTML(`${amount.toLocaleString()} ${options.currency || ""}`.trim())}</strong>
                         ${recoveryProductText(activeState) ? `<span class="az-payment-sheet__subtitle">${escapeHTML(recoveryProductText(activeState))}</span>` : ""}
+                        <span id="azRecoveredPaymentCountdown" class="az-payment-sheet__qr-expiry">${escapeHTML(recoveryCountdownText(activeState))}</span>
                     </header>
                     <figure class="az-payment-sheet__qr">
                         <img id="azRecoveredPaymentQrImage" alt="${escapeHTML(rt(activeState, "payment_promptpay_qr", "PromptPay QR"))}">
-                        <span id="azRecoveredPaymentCountdown" class="az-payment-sheet__qr-expiry">${escapeHTML(recoveryCountdownText(activeState))}</span>
                     </figure>
                     <div id="azPaymentSheetActions" class="az-payment-sheet__actions">
                         <button type="button" id="azPaymentSheetSaveQr" class="az-payment-sheet__action">${escapeHTML(rt(activeState, "payment_save_qr", "Save QR"))}</button>
@@ -2426,11 +2446,12 @@
                         <ol id="azPaymentSheetChecklistSteps"></ol>
                     </section>
                     <div id="azPaymentSheetMobileNav" class="az-payment-sheet__mobile-nav" ${mobile ? "" : "hidden"}>
-                        <button type="button" id="azPaymentSheetContinueReceipt" class="az-payment-sheet__action">${escapeHTML(rt(activeState, "payment_continue_to_receipt", "Continue to Receipt"))}</button>
+                        <button type="button" id="azPaymentSheetContinueReceipt" class="az-payment-sheet__action">${escapeHTML(rt(activeState, "payment_transfer_completed", "I've completed the transfer"))}</button>
                         <button type="button" id="azPaymentSheetBackQr" class="az-payment-sheet__secondary" hidden>${escapeHTML(rt(activeState, "payment_back_to_qr", "Back to QR"))}</button>
                     </div>
+                    <button type="button" id="azRecoveredTransferComplete" class="az-payment-sheet__transfer-complete" ${mobile ? "hidden" : ""}>${escapeHTML(rt(activeState, "payment_transfer_completed", "I've completed the transfer"))}</button>
                     <section id="azPaymentSheetReceiptSummary" class="az-payment-sheet__receipt-summary" hidden></section>
-                    <section id="azPaymentSheetReceipt" class="az-payment-sheet__receipt" ${mobile ? "hidden" : ""}>
+                    <section id="azPaymentSheetReceipt" class="az-payment-sheet__receipt" hidden>
                         <div class="az-payment-sheet__receipt-copy">
                             <strong id="azPaymentSheetReceiptTitle">${escapeHTML(rt(activeState, "payment_upload_receipt_title", "Upload Payment Receipt"))}</strong>
                             <span id="azPaymentSheetReceiptHelper">${escapeHTML(rt(activeState, "payment_receipt_helper", "Choose the screenshot after you finish the transfer."))}</span>
@@ -2447,9 +2468,9 @@
                         </div>
                     </section>
                     <div id="azPaymentSheetMessage" class="az-payment-sheet__message" role="status" aria-live="polite"></div>
+                    <button type="button" id="azPaymentSheetSubmit" class="az-payment-sheet__submit" hidden>${escapeHTML(rt(activeState, "payment_submit_for_verification", "Submit for Verification"))}</button>
                 </div>
                 <div id="azPaymentMobileBankChooser" class="az-payment-sheet__mobile-chooser" hidden></div>
-                <button type="button" id="azPaymentSheetSubmit" class="az-payment-sheet__submit" ${mobile ? "hidden" : ""}>${escapeHTML(rt(activeState, "payment_submit_for_verification", "Submit for Verification"))}</button>
             </div>
         `;
 
@@ -2457,7 +2478,7 @@
         modal.addEventListener("click", event => {
             if (event.target === modal) closeMinimalRecoverySheet("backdrop");
         });
-        document.body.appendChild(modal);
+        (pageMode ? document.getElementById("paymentSessionMount") : document.body)?.appendChild(modal);
         const qrImage = modal.querySelector("#azRecoveredPaymentQrImage");
         if (qrImage) {
             incrementRecoveryCounter("qr");
@@ -2471,7 +2492,7 @@
             const button = event.currentTarget;
             const label = button.textContent;
             button.disabled = true;
-            button.textContent = rt(activeState, "loading", "Loading...");
+            button.textContent = rt(activeState, "loading", "Preparing payment…");
             try {
                 await showRecoveryBankChooser(activeState);
             } catch (error) {
@@ -2482,6 +2503,12 @@
             }
         });
         modal.querySelector("#azPaymentSheetContinueReceipt")?.addEventListener("click", () => updateRecoveryMobileStep("receipt"));
+        modal.querySelector("#azRecoveredTransferComplete")?.addEventListener("click", event => {
+            event.currentTarget.hidden = true;
+            modal.querySelector("#azPaymentSheetReceipt").hidden = false;
+            modal.querySelector("#azPaymentSheetSubmit").hidden = false;
+            modal.querySelector("#azPaymentSheetSlipInput")?.focus();
+        });
         modal.querySelector("#azPaymentSheetBackQr")?.addEventListener("click", () => updateRecoveryMobileStep("qr"));
         bindRecoveryFileInput(activeState);
         bindRecoverySubmit(activeState);

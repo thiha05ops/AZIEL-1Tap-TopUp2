@@ -383,12 +383,23 @@ function normalizeFulfilmentInput(input = {}) {
     if (input === undefined || input === null) input = {};
     assertPlainObject(input, "fulfilmentInput", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT);
     rejectOverrideFields(input, "fulfilmentInput", PROHIBITED_METADATA_FIELDS);
+    const accountFields = Array.isArray(input.accountFields)
+        ? input.accountFields.slice(0, 20).map((field, index) => {
+            assertPlainObject(field, `fulfilmentInput.accountFields.${index}`, ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT);
+            return {
+                key: boundedString(field.key, `fulfilmentInput.accountFields.${index}.key`, ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 80, true),
+                label: boundedString(field.label || field.key, `fulfilmentInput.accountFields.${index}.label`, ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 120),
+                value: boundedString(field.value, `fulfilmentInput.accountFields.${index}.value`, ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, MAX_FIELD_LENGTH)
+            };
+        }).filter(field => field.key && field.value)
+        : [];
     return {
         userId: boundedString(input.userId, "fulfilmentInput.userId", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 120),
         serverId: boundedString(input.serverId, "fulfilmentInput.serverId", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 120),
         zoneId: boundedString(input.zoneId, "fulfilmentInput.zoneId", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 120),
         playerName: boundedString(input.playerName, "fulfilmentInput.playerName", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 160),
-        customFields: normalizeScalarRecord(input.customFields || {}, "fulfilmentInput.customFields", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT)
+        customFields: normalizeScalarRecord(input.customFields || {}, "fulfilmentInput.customFields", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT),
+        accountFields
     };
 }
 

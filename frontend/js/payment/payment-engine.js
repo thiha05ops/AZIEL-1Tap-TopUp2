@@ -50,8 +50,6 @@
 
         const data = await res.json();
 
-        console.log("PAYMENT CREATE DATA:", data);
-
         if (!res.ok || !data.success) {
             throw createPaymentError(data);
         }
@@ -70,8 +68,6 @@
         });
 
         const data = await res.json();
-
-        console.log("MANUAL PAYMENT ATTEMPT DATA:", data);
 
         if (!res.ok || !data.success) {
             throw createPaymentError(data);
@@ -118,6 +114,19 @@
         return data.session;
     }
 
+    function stagePaymentPage(session, orderData, selectedPayment, type) {
+        sessionStorage.setItem("azielPaymentPageSession", JSON.stringify({
+            version: 1,
+            createdAt: new Date().toISOString(),
+            session,
+            orderData,
+            selectedPayment,
+            paymentType: type
+        }));
+        const attemptId = session?.attemptId || session?.manualPaymentAttemptId || "";
+        window.location.href = `payment.html${attemptId ? `?attemptId=${encodeURIComponent(attemptId)}` : ""}`;
+    }
+
     async function start(orderData) {
         const selectedPayment = window.selectedPaymentData || {};
         const type =
@@ -151,6 +160,11 @@
 
                 PaymentUtils.hideLoading();
 
+                if (orderData.pagePresentation === true) {
+                    stagePaymentPage(attemptSession, attemptOrder, selectedPayment, type);
+                    return;
+                }
+
                 if (type === "deeplink") {
                     PaymentDeepLink.show(attemptOrder, attemptSession);
                     return;
@@ -165,6 +179,11 @@
             const canonicalOrder = paymentSession.order || orderData;
 
             PaymentUtils.hideLoading();
+
+            if (orderData.pagePresentation === true) {
+                stagePaymentPage(paymentSession, canonicalOrder, selectedPayment, type);
+                return;
+            }
 
             if (type === "auto") {
                 PaymentPromptPay.show(canonicalOrder, paymentSession);

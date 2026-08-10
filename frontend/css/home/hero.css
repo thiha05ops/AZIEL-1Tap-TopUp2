@@ -1,0 +1,172 @@
+/* AZIEL Home — image-first managed banner surface */
+
+.az-home .az-home-hero.az-banner-zone {
+    position: relative;
+    isolation: isolate;
+    width: min(var(--home-max, 1500px), calc(100% - (var(--home-gutter, clamp(18px, 2.4vw, 36px)) * 2))) !important;
+    height: auto !important;
+    min-height: 0 !important;
+    aspect-ratio: 16 / 5 !important;
+    max-height: none !important;
+    margin: 32px auto 0 !important;
+    overflow: hidden;
+    border: 0;
+    border-radius: 24px;
+    background: transparent;
+    box-shadow: 0 12px 34px color-mix(in srgb, var(--bg, #070716) 20%, transparent);
+}
+
+.az-home .az-home-hero.az-banner-zone::before {
+    display: none !important;
+}
+
+.az-home-hero .az-banner-track {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100% !important;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.az-home-hero .az-banner-card {
+    top: 0;
+    left: 50%;
+    width: 100% !important;
+    max-width: none !important;
+    height: 100% !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent;
+    box-shadow: none !important;
+}
+
+@media (min-width: 769px) {
+    .az-home-hero[data-home-banners-managed="active"]:not([data-banner-count="1"]) .az-banner-card {
+        width: 100% !important;
+    }
+}
+
+.az-home-hero .az-banner-card picture {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    display: block;
+    border-radius: 0 !important;
+}
+
+.az-home-hero .az-banner-card img {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover !important;
+    object-position: var(--az-banner-object-position, center center);
+    border-radius: 0 !important;
+    animation: none !important;
+    transform: none !important;
+}
+
+.az-home-hero .az-banner-arrow {
+    position: absolute;
+    z-index: 25;
+    top: 50%;
+    display: inline-grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, .18);
+    border-radius: 999px;
+    background: rgba(9, 8, 24, .38);
+    color: #fff;
+    transform: translateY(-50%);
+    backdrop-filter: blur(8px);
+    cursor: pointer;
+}
+
+.az-home-hero .az-banner-arrow[hidden] {
+    display: none !important;
+}
+
+.az-home-hero .az-banner-arrow--previous { left: 16px; }
+.az-home-hero .az-banner-arrow--next { right: 16px; }
+
+.az-home-hero .az-banner-arrow:hover { background: rgba(9, 8, 24, .58); }
+.az-home-hero .az-banner-arrow:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--primary) 68%, white);
+    outline-offset: 3px;
+}
+
+.az-home-hero .az-banner-dots {
+    bottom: 12px !important;
+    gap: 7px;
+}
+
+.az-home-hero .az-banner-dots:empty,
+.az-home-hero .az-banner-dots[hidden] {
+    display: none !important;
+}
+
+.az-home-hero .az-banner-dots button {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .56);
+    box-shadow: none;
+}
+
+.az-home-hero .az-banner-dots button.active {
+    width: 20px;
+    background: rgba(255, 255, 255, .9);
+}
+
+@media (max-width: 1024px) {
+    .az-home .az-home-hero.az-banner-zone {
+        width: min(var(--home-max, 1500px), calc(100% - 40px)) !important;
+        aspect-ratio: 2.55 / 1;
+        height: auto !important;
+        min-height: 0 !important;
+        margin-top: 22px !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .az-home .az-home-hero.az-banner-zone {
+        width: calc(100% - 28px) !important;
+        aspect-ratio: 16 / 9 !important;
+        margin: 14px auto 16px !important;
+        border-radius: 11px !important;
+        min-height: 0 !important;
+        height: auto !important;
+    }
+
+    .az-home-hero .az-banner-card {
+        width: 100% !important;
+        max-width: none !important;
+        border-radius: 0 !important;
+    }
+
+    .az-home-hero .az-banner-card img {
+        object-fit: cover !important;
+        object-position: var(--az-banner-object-position, 58% center);
+    }
+
+    .az-home-hero .az-banner-arrow {
+        display: none !important;
+    }
+
+    .az-home-hero .az-banner-dots {
+        display: none !important;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .az-home-hero .az-banner-card,
+    .az-home-hero .az-banner-dots button {
+        animation: none !important;
+        transition: none !important;
+    }
+}

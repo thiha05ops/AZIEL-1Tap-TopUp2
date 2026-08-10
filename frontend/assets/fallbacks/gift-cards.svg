@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">AZIEL gift card placeholder</title>
+  <rect width="64" height="64" rx="14" fill="#f4eee4"/>
+  <path d="M13 27h38v24H13zM11 20h42v9H11z" fill="none" stroke="#9a733c" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M32 20v31M32 20c-8 0-11-3-9-7 2-4 8 0 9 7Zm0 0c8 0 11-3 9-7-2-4-8 0-9 7Z" fill="none" stroke="#9a733c" stroke-width="3" stroke-linejoin="round"/>
+</svg>

@@ -1,0 +1,45 @@
+"use strict";
+
+const assert = require("assert");
+const fs = require("fs");
+const path = require("path");
+const { CANONICAL_PRODUCT_CODES } = require("../catalog/canonicalOperationalCatalog");
+const { CAMPAIGN_PLACEMENTS, CAMPAIGN_PLACEMENT_DEFINITIONS } = require("../catalog/campaignPlacements");
+const { buildCampaignPayload, isProductEligible, rankCampaignCandidates } = require("../services/campaignService");
+
+const root = path.resolve(__dirname, "../..");
+const read = file => fs.readFileSync(path.join(root, file), "utf8");
+assert.deepStrictEqual(CAMPAIGN_PLACEMENTS, ["ENTRY_POPUP", "TOP_NOTICE", "PRODUCT_NOTICE"]);
+assert.strictEqual(CAMPAIGN_PLACEMENT_DEFINITIONS.PRODUCT_NOTICE.requiresProductTarget, true);
+assert.strictEqual(CAMPAIGN_PLACEMENT_DEFINITIONS.TOP_NOTICE.modal, false);
+assert.strictEqual(CAMPAIGN_PLACEMENT_DEFINITIONS.ENTRY_POPUP.maxVisible, 1);
+assert.ok(!CAMPAIGN_PLACEMENTS.includes("HOME_BANNER"));
+assert.ok(!CAMPAIGN_PLACEMENTS.includes("INLINE_NOTICE"));
+assert.strictEqual(CANONICAL_PRODUCT_CODES.length, 16);
+assert.ok(!CANONICAL_PRODUCT_CODES.includes("aovid"));
+const productNotice = buildCampaignPayload({ campaignCode: "MLBB_NOTICE", name: "MLBB Notice", type: "PROMOTION", placement: "PRODUCT_NOTICE", targetProductCode: "mlbb", title: "Bonus", body: "Bonus event", regions: ["TH"], audience: "ALL_VISITORS", frequencyPolicy: "ONCE_PER_DAY", priority: 5, enabled: true });
+assert.strictEqual(productNotice.targetProductCode, "mlbb");
+assert.throws(() => buildCampaignPayload({ ...productNotice, campaignCode: "BAD_NOTICE", targetProductCode: "aovid" }), error => error.code === "CAMPAIGN_PRODUCT_TARGET_INVALID");
+const topNotice = buildCampaignPayload({ ...productNotice, campaignCode: "TOP_NOTICE_TEST", placement: "TOP_NOTICE" });
+assert.strictEqual(topNotice.targetProductCode, "", "Non-product placements must not retain product targeting.");
+assert.strictEqual(isProductEligible({ placement: "PRODUCT_NOTICE", targetProductCode: "mlbb" }, "mlbb"), true);
+assert.strictEqual(isProductEligible({ placement: "PRODUCT_NOTICE", targetProductCode: "mlbb" }, "pubg"), false);
+const ranked = rankCampaignCandidates([{ campaignCode: "LOW", priority: 5 }, { campaignCode: "HIGH", priority: 100 }]);
+assert.strictEqual(ranked[0].campaignCode, "HIGH", "Highest priority must win independently inside a placement query.");
+
+const service = read("backend/services/campaignService.js");
+const runtime = read("frontend/js/campaign-runtime.js");
+const admin = read("frontend/js/admin-campaigns.js");
+const route = read("backend/routes/campaigns.js");
+assert.ok(service.includes("targetProductCode: normalizedProductCode"), "Product candidate query must enforce exact target identity.");
+assert.ok(service.includes("isCanonicalProductCode(requestedProductCode)"), "Product target writes must validate canonical identity.");
+assert.ok(service.includes("priority: -1"), "Priority ordering must remain deterministic.");
+assert.ok(route.includes('router.post("/campaigns/claim"'), "Generic placement claim endpoint must exist.");
+assert.ok(runtime.includes('claimPlacement("TOP_NOTICE")'), "TOP_NOTICE must have a public claim path.");
+assert.ok(runtime.includes('claimPlacement("PRODUCT_NOTICE", productCode)'), "PRODUCT_NOTICE must claim by product.");
+assert.ok(runtime.includes("productCode !== currentProductCode()"), "Stale product responses must not render.");
+assert.ok(runtime.includes("claimControllers.get(placement)?.abort()"), "Each placement must cancel stale requests independently.");
+assert.ok(runtime.includes("campaignDismissalKey"), "All placements must share versioned dismissal semantics.");
+assert.ok(admin.includes("adminCampaignPlacements.map"), "Admin options must derive from backend supported placements.");
+assert.ok(admin.includes('placement !== "PRODUCT_NOTICE"'), "Product target visibility must follow placement.");
+console.log("Campaign placement expansion verification passed.");

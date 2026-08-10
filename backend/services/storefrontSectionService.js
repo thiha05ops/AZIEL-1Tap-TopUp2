@@ -67,6 +67,38 @@ const SYSTEM_SECTIONS = Object.freeze([
         showOnHome: false,
         sortOrder: 5,
         isSystem: true
+    },
+    {
+        key: "popular-game-cards", displayName: "Popular Game Cards", icon: "gift", path: "/gift-cards.html",
+        status: "PUBLISHED", showInGamesMenu: false, showOnHome: true, sortOrder: 10, isSystem: true
+    },
+    {
+        key: "popular-game-topup", displayName: "Popular Game Top-Up", icon: "mobile", path: "/mobile-games.html",
+        status: "PUBLISHED", showInGamesMenu: false, showOnHome: true, sortOrder: 11, isSystem: true
+    },
+    {
+        key: "popular-pc-games", displayName: "Popular PC Games", icon: "desktop", path: "/pc-games.html",
+        status: "PUBLISHED", showInGamesMenu: false, showOnHome: true, sortOrder: 12, isSystem: true
+    },
+    {
+        key: "popular-gift-cards", displayName: "Popular Gift Cards", icon: "gift", path: "/gift-cards.html",
+        status: "PUBLISHED", showInGamesMenu: false, showOnHome: true, sortOrder: 13, isSystem: true
+    },
+    {
+        key: "new-game-cards", displayName: "New Game Cards", icon: "gift", path: "/gift-cards.html",
+        status: "PUBLISHED", showInGamesMenu: false, showOnHome: true, sortOrder: 14, isSystem: true
+    },
+    {
+        key: "new-game-topup", displayName: "New Game Top-Up", icon: "mobile", path: "/mobile-games.html",
+        status: "PUBLISHED", showInGamesMenu: false, showOnHome: true, sortOrder: 15, isSystem: true
+    },
+    {
+        key: "digital-services-home", displayName: "Digital Services", icon: "telegram", path: "/explore.html",
+        status: "PUBLISHED", showInGamesMenu: false, showOnHome: true, sortOrder: 16, isSystem: true
+    },
+    {
+        key: "news-promotions", displayName: "News & Promotions", icon: "gift", path: "/notifications.html?filter=promotions",
+        status: "PUBLISHED", showInGamesMenu: false, showOnHome: true, sortOrder: 17, isSystem: true
     }
 ]);
 

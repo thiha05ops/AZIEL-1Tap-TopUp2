@@ -42,9 +42,12 @@ const {
 const {
     getCatalogProductDetail,
     getCatalogSource,
+    isAdminCanonicalCatalogProduct,
     normalizeProductCode,
+    resolveAdminCatalogProduct,
     toPublicCatalog
 } = require("../services/catalogService");
+const { CANONICAL_OPERATIONAL_PRODUCTS, getCanonicalProduct } = require("../catalog/canonicalOperationalCatalog");
 const {
     AdminPricingControlCenterError,
     bulkBackfillSupplierCosts,
@@ -88,6 +91,63 @@ function projectAdminSource() {
     return {
         source: "database",
         activeSource: getCatalogSource()
+    };
+}
+
+function projectAdminCatalogMetadata(product = {}) {
+    const canonical = getCanonicalProduct(product.productCode) || {};
+    return {
+        operationalCategory: canonical.category || "",
+        platform: canonical.platform || "",
+        market: canonical.market || "",
+        adminCategory: canonical.adminCategory || "",
+        family: canonical.family || "",
+        canonicalRoute: canonical.productRoute || product.productRoute || ""
+    };
+}
+
+function projectAdminCatalogListProduct(product = {}) {
+    return {
+        productCode: product.productCode,
+        name: product.name,
+        enabled: product.enabled,
+        supportedRegions: product.supportedRegions,
+        packageCount: product.packageCount,
+        sortOrder: product.sortOrder,
+        imageUrl: product.imageUrl || "",
+        bannerUrl: product.bannerUrl || "",
+        mobilePackagePreviewUrl: product.mobilePackagePreviewUrl || "",
+        imageAsset: product.imageAsset || null,
+        bannerAsset: product.bannerAsset || null,
+        mobilePackagePreviewAsset: product.mobilePackagePreviewAsset || null,
+        description: product.description || "",
+        productKnowledge: product.productKnowledge || {},
+        featured: product.featured === true,
+        catalogCategory: product.catalogCategory || "",
+        lifecycleStatus: product.lifecycleStatus || "ACTIVE",
+        commerceState: product.commerceState || "HIDDEN",
+        publicDiscoveryEnabled: product.publicDiscoveryEnabled === true,
+        discoverable: product.discoverable === true,
+        purchasable: product.purchasable === true,
+        commerceReadiness: product.commerceReadiness || null,
+        publicReadiness: product.publicReadiness || null,
+        publicState: product.publicState || "HIDDEN",
+        comingSoon: product.comingSoon === true,
+        homepageEnabled: product.homepageEnabled === true,
+        homepageCategory: product.homepageCategory || "",
+        homepageOrder: product.homepageOrder || 0,
+        homepageFlags: product.homepageFlags || [],
+        homepageSections: product.homepageSections || [],
+        productRoute: product.productRoute || "",
+        previewPrice: product.previewPrice || null,
+        marketScope: product.marketScope || "MULTI_REGION",
+        displayMarketLabel: product.displayMarketLabel || "",
+        seo: product.seo || { title: "", description: "" },
+        deleted: product.deleted === true,
+        deletedAt: product.deletedAt || null,
+        updatedAt: product.updatedAt,
+        metadataRecordMissing: product.metadataRecordMissing === true,
+        ...projectAdminCatalogMetadata(product)
     };
 }
 
@@ -186,7 +246,9 @@ router.get("/catalog/:productCode", async (req, res) => {
         if (!product) {
             return res.status(404).json({
                 success: false,
-                message: "Product not found"
+                code: "ADMIN_CATALOG_PRODUCT_NOT_FOUND",
+                productCode: String(req.params.productCode || ""),
+                message: `Product not found: ${String(req.params.productCode || "")}`
             });
         }
 
@@ -207,52 +269,17 @@ router.get("/catalog/:productCode", async (req, res) => {
 
 router.get("/admin/catalog/products", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_READ), async (req, res) => {
     try {
-        const products = await toPublicCatalog({
-            source: "database",
-            includeDisabled: true,
-            includeAssetProjection: true
-        });
+        const adminProducts = (await Promise.all(CANONICAL_OPERATIONAL_PRODUCTS.map(canonical => (
+            resolveAdminCatalogProduct(canonical.productCode, {
+                includeAssetProjection: true,
+                includeAdminPricing: false
+            })
+        )))).filter(Boolean);
 
         return res.json({
             success: true,
             ...projectAdminSource(),
-            products: products.map(product => ({
-                productCode: product.productCode,
-                name: product.name,
-                enabled: product.enabled,
-                supportedRegions: product.supportedRegions,
-                packageCount: product.packageCount,
-                sortOrder: product.sortOrder,
-                imageUrl: product.imageUrl || "",
-                bannerUrl: product.bannerUrl || "",
-                mobilePackagePreviewUrl: product.mobilePackagePreviewUrl || "",
-                imageAsset: product.imageAsset || null,
-                bannerAsset: product.bannerAsset || null,
-                mobilePackagePreviewAsset: product.mobilePackagePreviewAsset || null,
-                description: product.description || "",
-                featured: product.featured === true,
-                catalogCategory: product.catalogCategory || "",
-                lifecycleStatus: product.lifecycleStatus || "ACTIVE",
-                commerceState: product.commerceState || "HIDDEN",
-                publicDiscoveryEnabled: product.publicDiscoveryEnabled === true,
-                discoverable: product.discoverable === true,
-                purchasable: product.purchasable === true,
-                commerceReadiness: product.commerceReadiness || null,
-                comingSoon: product.comingSoon === true,
-                homepageEnabled: product.homepageEnabled === true,
-                homepageCategory: product.homepageCategory || "",
-                homepageOrder: product.homepageOrder || 0,
-                homepageFlags: product.homepageFlags || [],
-                homepageSections: product.homepageSections || [],
-                productRoute: product.productRoute || "",
-                previewPrice: product.previewPrice || null,
-                marketScope: product.marketScope || "MULTI_REGION",
-                displayMarketLabel: product.displayMarketLabel || "",
-                seo: product.seo || { title: "", description: "" },
-                deleted: product.deleted === true,
-                deletedAt: product.deletedAt || null,
-                updatedAt: product.updatedAt
-            }))
+            products: adminProducts.filter(isAdminCanonicalCatalogProduct).map(projectAdminCatalogListProduct)
         });
     } catch (error) {
         console.log("Admin catalog products error:", error?.code || error?.name || "CATALOG_ERROR");
@@ -291,7 +318,10 @@ router.patch("/admin/catalog/products/:productCode/delete", adminMiddleware, req
             changed: result.changed,
             unchanged: !result.changed,
             ...projectAdminSource(),
-            product
+            product: {
+                ...projectAdminCatalogListProduct(product),
+                packages: Array.isArray(product.packages) ? product.packages : []
+            }
         });
     } catch (error) {
         return sendAdminCatalogError(res, error);
@@ -334,10 +364,7 @@ router.patch("/admin/catalog/products/:productCode/restore", adminMiddleware, re
 
 router.get("/admin/catalog/products/:productCode", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_READ), async (req, res) => {
     try {
-        const productCode = normalizeProductCode(req.params.productCode);
-        const product = await getCatalogProductDetail(productCode, {
-            source: "database",
-            includeDisabled: true,
+        const product = await resolveAdminCatalogProduct(req.params.productCode, {
             includeAssetProjection: true,
             includeAdminPricing: true
         });

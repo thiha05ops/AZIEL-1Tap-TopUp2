@@ -38,6 +38,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const btn = document.getElementById("trackBtn");
 
     if (orderIdFromUrl && input) {
+        document.title = `${t("tracking.orderDetail", "Order Detail")} | AZIEL`;
+        const heading = document.querySelector(".tracking-hero h1");
+        const subtitle = document.querySelector(".tracking-hero p");
+        if (heading) heading.textContent = t("tracking.orderDetail", "Order Detail");
+        if (subtitle) subtitle.textContent = t("tracking.orderDetailHelp", "Authoritative payment and fulfillment status for this order.");
         input.value = orderIdFromUrl;
         trackOrder(orderIdFromUrl);
     }
@@ -85,7 +90,8 @@ async function trackOrder(orderId) {
 
     try {
         const res = await fetch(
-            trackingApiUrl(`/api/order/track/${encodeURIComponent(orderId)}`)
+            trackingApiUrl(`/api/order/track/${encodeURIComponent(orderId)}`),
+            { headers: getTrackingAuthHeaders() }
         );
 
         const data = await res.json();
@@ -103,6 +109,7 @@ async function trackOrder(orderId) {
 
         result.innerHTML = `
             <div class="phone-track-card">
+                <div class="tracking-workspace">
                 <div class="order-top">
                     <div>
                         <span class="mini-label">
@@ -117,36 +124,6 @@ async function trackOrder(orderId) {
                     <div class="status-orb ${status}">
                         ${getStatusIcon(status)}
                     </div>
-                </div>
-
-                <div class="order-id-box">
-                    <small>${t("orderId", "Order ID")}</small>
-                    <strong>${escapeHTML(order.orderId || "-")}</strong>
-                </div>
-
-                <div class="order-info-grid">
-                    ${infoItem(t("game", "Game"), order.game || "-")}
-                    ${infoItem(t("package", "Package"), order.packageName || order.selectedPackage || "-")}
-                    ${infoItem(t("userId", "User ID"), order.userId || "-")}
-                    ${infoItem(t("serverId", "Server ID"), order.zoneId || "-")}
-                    ${infoItem(t("amount", "Amount"), `${Number(order.amount || 0).toLocaleString()} ${order.currency || ""}`)}
-                    ${infoItem(t("payment", "Payment"), formatPaymentName(order.paymentMethod || "-"))}
-
-                    ${status === "refunded"
-                ? infoItem(
-                    t("refund", "Refund"),
-                    `${Number(order.refundAmount || order.amount || 0).toLocaleString()} ${order.currency || ""}`
-                )
-                : ""
-            }
-
-                    ${status === "refunded"
-                ? infoItem(
-                    t("refundMethod", "Refund Method"),
-                    formatPaymentName(order.refundMethod || "wallet")
-                )
-                : ""
-            }
                 </div>
 
                 <div class="progress-wrap">
@@ -176,6 +153,26 @@ async function trackOrder(orderId) {
                 <p class="order-note">
                     ${escapeHTML(order.paymentMessage || order.note || getDefaultNote(status))}
                 </p>
+                </div>
+
+                <aside class="tracking-summary" aria-label="Order summary">
+                    <div class="order-id-box">
+                        <small>${t("orderId", "Order ID")}</small>
+                        <strong>${escapeHTML(order.orderId || "-")}</strong>
+                    </div>
+                    <div class="order-info-grid">
+                        ${infoItem(t("game", "Game"), order.game || "-")}
+                        ${infoItem(t("package", "Package"), order.packageName || order.selectedPackage || "-")}
+                        ${infoItem(t("userId", "User ID"), order.userId || "-")}
+                        ${infoItem(t("serverId", "Server ID"), order.zoneId || "-")}
+                        ${infoItem(t("amount", "Amount"), `${Number(order.amount || 0).toLocaleString()} ${order.currency || ""}`)}
+                        ${infoItem(t("payment", "Payment"), formatPaymentName(order.paymentMethod || "-"))}
+                        ${order.paidAt || order.paymentTime ? infoItem(t("paymentTime", "Payment time"), formatDateTime(order.paidAt || order.paymentTime)) : ""}
+                        ${status === "refunded" ? infoItem(t("refund", "Refund"), `${Number(order.refundAmount || order.amount || 0).toLocaleString()} ${order.currency || ""}`) : ""}
+                        ${status === "refunded" ? infoItem(t("refundMethod", "Refund Method"), formatPaymentName(order.refundMethod || "wallet")) : ""}
+                    </div>
+                    <div class="tracking-next-actions"><a href="home.html">${t("backHome", "Back Home")}</a></div>
+                </aside>
             </div>
         `;
 
@@ -819,8 +816,7 @@ async function loadRecentOrders() {
         const recentOrders = data.orders.slice(0, 5);
 
         renderRecentOrdersTerminal(box, requestSequence, recentOrders.map(order => `
-            <div class="recent-order-item"
-                 onclick="trackRecentOrder('${escapeHTML(order.orderId)}')">
+            <button type="button" class="recent-order-item" onclick="trackRecentOrder('${escapeHTML(order.orderId)}')">
 
                 <div class="recent-order-left">
                     <h4>${escapeHTML(order.game || t("game", "Game"))}</h4>
@@ -830,7 +826,8 @@ async function loadRecentOrders() {
                 <div class="recent-order-status ${trackingDisplayStatus(order)}">
                     ${formatStatus(trackingDisplayStatus(order))}
                 </div>
-            </div>
+                <span class="recent-order-view">View Order</span>
+            </button>
         `).join(""));
 
     } catch (error) {
@@ -865,6 +862,8 @@ function waitForRecentOrdersUserReady() {
 function renderRecentOrdersTerminal(box, requestSequence, html) {
     if (requestSequence !== recentOrdersRequestSequence) return false;
     box.removeAttribute("data-i18n");
+    box.classList.remove("recent-orders-skeleton");
+    box.removeAttribute("aria-busy");
     box.innerHTML = html;
     return true;
 }

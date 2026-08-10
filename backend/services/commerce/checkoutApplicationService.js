@@ -243,11 +243,22 @@ function normalizeContact(contact = {}) {
 function normalizeGameAccount(gameAccount = {}) {
     if (gameAccount === undefined || gameAccount === null) return {};
     assertPlainObject(gameAccount, "customerInput.gameAccount");
+    const accountFields = Array.isArray(gameAccount.accountFields)
+        ? gameAccount.accountFields.slice(0, 20).map((field, index) => {
+            assertPlainObject(field, `customerInput.gameAccount.accountFields.${index}`);
+            return {
+                key: normalizeBoundedString(field.key, `customerInput.gameAccount.accountFields.${index}.key`, 80, true),
+                label: normalizeBoundedString(field.label || field.key, `customerInput.gameAccount.accountFields.${index}.label`, 120),
+                value: normalizeBoundedString(field.value, `customerInput.gameAccount.accountFields.${index}.value`, MAX_CUSTOM_FIELD_VALUE_LENGTH)
+            };
+        }).filter(field => field.key && field.value)
+        : [];
     return {
         userId: normalizeBoundedString(gameAccount.userId, "customerInput.gameAccount.userId", 120),
         serverId: normalizeBoundedString(gameAccount.serverId, "customerInput.gameAccount.serverId", 120),
         zoneId: normalizeBoundedString(gameAccount.zoneId, "customerInput.gameAccount.zoneId", 120),
-        playerName: normalizeBoundedString(gameAccount.playerName, "customerInput.gameAccount.playerName", 160)
+        playerName: normalizeBoundedString(gameAccount.playerName, "customerInput.gameAccount.playerName", 160),
+        accountFields
     };
 }
 

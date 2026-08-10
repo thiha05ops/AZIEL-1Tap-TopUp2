@@ -10,7 +10,7 @@ const {
     releaseExpiredReservationsForCode,
     releasePromoRedemption,
     reservePromoUse,
-    resolvePromoPricing,
+    resolvePromoDefinition,
     consumePromoRedemption
 } = require("../promoCodeService");
 
@@ -41,15 +41,17 @@ function catalogItemFrom(catalog = {}) {
     };
 }
 
-async function usageFactsFor(promo, user) {
+async function usageFactsFor(promo, user, { readOnly = false } = {}) {
     const code = promo.code;
     const promoId = String(promo._id);
-    await PromoUsageState.updateOne(
-        { code },
-        { $setOnInsert: { code, consumedCount: 0, reservedCount: 0 } },
-        { upsert: true }
-    );
-    await releaseExpiredReservationsForCode(code);
+    if (!readOnly) {
+        await PromoUsageState.updateOne(
+            { code },
+            { $setOnInsert: { code, consumedCount: 0, reservedCount: 0 } },
+            { upsert: true }
+        );
+        await releaseExpiredReservationsForCode(code);
+    }
 
     const [state, userUsed] = await Promise.all([
         PromoUsageState.findOne({ code }).lean(),
@@ -136,7 +138,7 @@ function buildResolverCandidate(promo, region, currency) {
     };
 }
 
-async function loadCommercePromotionContext({ couponCode, catalog, user, owner, packageContext } = {}) {
+async function loadCommercePromotionContext({ couponCode, catalog, user, owner, packageContext, readOnly = false } = {}) {
     const code = normalizeOptionalCode(couponCode);
     if (!code) {
         return {
@@ -149,22 +151,21 @@ async function loadCommercePromotionContext({ couponCode, catalog, user, owner, 
 
     const promoUser = userForPromo(user, owner);
     const catalogItem = catalogItemFrom(catalog);
-    const legacyPricing = await resolvePromoPricing({
+    const promo = await resolvePromoDefinition({
         promoCode: code,
         catalogItem,
         user: promoUser,
         verifyUserLimit: true
     });
-    const promo = legacyPricing.promo;
-    const usage = await usageFactsFor(promo, promoUser);
+    const usage = await usageFactsFor(promo, promoUser, { readOnly });
 
     return {
-        promotions: [buildResolverCandidate(promo, legacyPricing.region, legacyPricing.currency)],
+        promotions: [buildResolverCandidate(promo, catalogItem.region, catalogItem.currency)],
         campaigns: [],
         context: {
             usage,
-            region: legacyPricing.region,
-            currency: legacyPricing.currency,
+            region: catalogItem.region,
+            currency: catalogItem.currency,
             couponCode: code,
             packageId: text(packageContext?.packageId || packageContext?.packageSnapshot?.packageId),
             packageCode: upper(packageContext?.packageCode || catalogItem.packageCode),

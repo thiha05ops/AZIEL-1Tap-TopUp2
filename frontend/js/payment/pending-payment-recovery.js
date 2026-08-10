@@ -61,7 +61,7 @@
     }
 
     function isDev() {
-        return ["localhost", "127.0.0.1"].includes(window.location.hostname);
+        return window.AZIEL_DEBUG === true || new URLSearchParams(window.location.search).get("azielDebug") === "true";
     }
 
     function recoveryDevLog(label, detail = {}) {
@@ -92,6 +92,9 @@
         }
         if (page === "notifications.html") {
             return { type: "notifications", gameKey: null };
+        }
+        if (page === "checkout.html") {
+            return { type: "checkout", gameKey: null };
         }
         if (gameMap[page]) {
             return { type: "game", gameKey: gameMap[page] };
@@ -784,14 +787,8 @@
             window.AZIEL_PENDING_PAYMENT_RECOVERY.attempts = state.attempts.slice();
             window.AZIEL_PENDING_PAYMENT_RECOVERY.selectedRecovery = state.selectedRecovery;
 
-            await ensureRecoveryCheckoutRuntime();
             removeOverlay();
-            window.dispatchEvent(new CustomEvent(RECOVERY_EVENT, {
-                detail: {
-                    recovery: recoverable,
-                    attempts: state.attempts.slice()
-                }
-            }));
+            window.location.href = `payment.html?attemptId=${encodeURIComponent(recoverable.attemptId)}`;
         } catch (error) {
             if (isDev()) console.warn("Pending payment resume failed:", error.message);
             await fetchRecoverable({ force: true });

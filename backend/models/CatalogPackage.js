@@ -174,6 +174,17 @@ const catalogPackageSchema = new mongoose.Schema(
             required: true,
             trim: true
         },
+        customerNote: {
+            type: String,
+            trim: true,
+            maxlength: 500,
+            default: ""
+        },
+        customerNoteLocales: {
+            en: { type: String, trim: true, maxlength: 500, default: "" },
+            my: { type: String, trim: true, maxlength: 500, default: "" },
+            th: { type: String, trim: true, maxlength: 500, default: "" }
+        },
         enabled: {
             type: Boolean,
             default: true

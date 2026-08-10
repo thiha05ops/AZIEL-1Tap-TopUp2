@@ -1,5 +1,7 @@
 "use strict";
 
+const { runtimeDebug } = require("../utils/runtimeDebug");
+
 const crypto = require("crypto");
 
 const {
@@ -9,6 +11,7 @@ const {
 
 const {
     startCustomerManualPromptPayCheckout,
+    reviewCustomerCheckout,
     CustomerManualPromptPayCheckoutError
 } = require("../services/commerce/customerManualPromptPayCheckoutService");
 
@@ -106,15 +109,34 @@ function createCommerceManualPaymentController(options = {}) {
     }
 
     return Object.freeze({
+        async reviewCheckout(req, res) {
+            try {
+                const result = await reviewCustomerCheckout(
+                    req.body || {},
+                    {
+                        user: req.user,
+                        sessionId:
+                            req.sessionID ||
+                            req.headers["x-session-id"] ||
+                            ""
+                    },
+                    options.checkoutReviewOptions || {}
+                );
+                return respondSuccess(res, result);
+            } catch (error) {
+                return respondError(res, error);
+            }
+        },
+
         async listRecoverable(req, res) {
             try {
-                console.log(
+                runtimeDebug(
                     "[RECOVERY CONTROLLER] Creating recovery service"
                 );
 
                 const recoveryService = getRecoveryService();
 
-                console.log("[RECOVERY CONTROLLER] Service resolved", {
+                runtimeDebug("[RECOVERY CONTROLLER] Service resolved", {
                     serviceAvailable: Boolean(recoveryService),
                     methodAvailable:
                         typeof recoveryService?.listRecoverablePayments ===
@@ -140,7 +162,7 @@ function createCommerceManualPaymentController(options = {}) {
                             ""
                     });
 
-                console.log(
+                runtimeDebug(
                     "[RECOVERY CONTROLLER] Recovery completed",
                     {
                         count: Array.isArray(recoverable)
@@ -153,25 +175,20 @@ function createCommerceManualPaymentController(options = {}) {
                     recoverable
                 });
             } catch (error) {
-                console.error(
-                    "========== RECOVERY ERROR =========="
-                );
-                console.error(error);
-                console.error("name:", error?.name || "");
-                console.error("code:", error?.code || "");
-                console.error("message:", error?.message || "");
-                console.error("details:", error?.details || {});
-                console.error("stack:", error?.stack || "");
-                console.error(
-                    "===================================="
-                );
+                console.error("[RECOVERY CONTROLLER] Recovery failed", {
+                    name: error?.name || "",
+                    code: error?.code || "",
+                    message: error?.message || "",
+                    details: error?.details || {},
+                    stack: error?.stack || ""
+                });
 
                 return respondError(res, error);
             }
         },
 
         async customerPromptPayCheckout(req, res) {
-            console.log("[CONTROLLER STEP 0] Request entered", {
+            runtimeDebug("[CONTROLLER STEP 0] Request entered", {
                 method: req.method,
                 path: req.originalUrl,
                 hasUser: Boolean(req.user),
@@ -179,7 +196,7 @@ function createCommerceManualPaymentController(options = {}) {
             });
 
             try {
-                console.log(
+                runtimeDebug(
                     "[CONTROLLER STEP 1] Before checkout service"
                 );
 
@@ -196,7 +213,7 @@ function createCommerceManualPaymentController(options = {}) {
                         options.checkoutOptions || {}
                     );
 
-                console.log(
+                runtimeDebug(
                     "[CONTROLLER STEP 2] Checkout service completed",
                     {
                         orderId:
@@ -213,7 +230,7 @@ function createCommerceManualPaymentController(options = {}) {
                     }
                 );
 
-                console.log(
+                runtimeDebug(
                     "[CONTROLLER STEP 3] Sending success response"
                 );
 

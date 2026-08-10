@@ -6,6 +6,7 @@ let adminSitePlacements = [];
 let activeSitePlacement = null;
 let activeSitePlacementAvailable = [];
 let activeSitePlacementSelected = [];
+let sitePlacementSavePending = false;
 
 document.addEventListener("DOMContentLoaded", () => {
     initAdminSitePlacementsController();
@@ -44,10 +45,16 @@ async function loadAdminSitePlacements(force = false) {
         <div class="admin-dashboard-skeleton"></div>
     `;
 
-    const data = await adminFetch("/api/admin/site-placements");
+    let data;
+    try {
+        data = await adminFetch("/api/admin/site-placements");
+    } catch (error) {
+        data = { success: false, message: adminT("site_content_unavailable", "Home placements unavailable") };
+    }
 
     if (!data?.success) {
-        list.innerHTML = `<p class="admin-empty-state">${escapeSitePlacementHtml(data?.message || adminT("catalog_data_unavailable", "Catalog data unavailable"))}</p>`;
+        list.innerHTML = `<div class="admin-empty-state site-placement-state"><strong>${escapeSitePlacementHtml(data?.message || adminT("catalog_data_unavailable", "Home placements unavailable"))}</strong><button class="admin-secondary-btn" type="button" data-retry-site-placements>${adminT("retry", "Retry")}</button></div>`;
+        list.querySelector("[data-retry-site-placements]")?.addEventListener("click", () => loadAdminSitePlacements(true));
         return;
     }
 
@@ -70,12 +77,16 @@ function renderAdminSitePlacements() {
         const stateText = placement.managed
             ? (count ? adminT("managed", "Managed") : adminT("managed_empty", "Managed Empty"))
             : adminT("static_fallback", "Static Fallback");
+        const authority = placement.itemType === "product"
+            ? adminT("catalog_owned", "Items managed by Catalog")
+            : adminT("promo_owned", "Items managed by Promo Codes");
 
         return `
             <article class="site-placement-row" data-site-placement="${escapeSitePlacementHtml(placement.placementCode)}">
                 <div class="site-placement-main">
                     <strong>${escapeSitePlacementHtml(sitePlacementLabel(placement))}</strong>
                     <small>${escapeSitePlacementHtml(sitePlacementDescription(placement))}</small>
+                    <small class="site-placement-authority">${escapeSitePlacementHtml(authority)} · ${adminT("placement_order_owned", "Order managed by Site Content")}</small>
                     <b class="admin-status-pill ${stateClass}">${stateText}</b>
                 </div>
                 <div class="site-placement-meta">
@@ -235,7 +246,7 @@ function moveSitePlacementItem(code, direction) {
 }
 
 async function saveSitePlacementEditor() {
-    if (!activeSitePlacement) return;
+    if (!activeSitePlacement || sitePlacementSavePending) return;
 
     const saveBtn = document.getElementById("sitePlacementEditorSave");
     const itemType = activeSitePlacement.itemType;
@@ -244,6 +255,7 @@ async function saveSitePlacementEditor() {
     ));
 
     try {
+        sitePlacementSavePending = true;
         window.AZIEL_UI?.button?.setLoading(saveBtn, { text: adminT("loading", "Loading") });
         const data = await adminFetch(`/api/admin/site-placements/${encodeURIComponent(activeSitePlacement.placementCode)}`, {
             method: "PUT",
@@ -262,7 +274,10 @@ async function saveSitePlacementEditor() {
         await loadAdminSitePlacements(true);
         closeSitePlacementEditor();
         showAdminToast?.(adminT("home_placement_saved", "Home placement saved"), "success");
+    } catch (error) {
+        showAdminToast?.(adminT("site_content_update_failed", "Site Content update failed"), "error");
     } finally {
+        sitePlacementSavePending = false;
         window.AZIEL_UI?.button?.reset(saveBtn);
     }
 }

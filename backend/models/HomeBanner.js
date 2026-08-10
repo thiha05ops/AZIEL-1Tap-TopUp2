@@ -26,6 +26,11 @@ const homeBannerSchema = new mongoose.Schema(
             trim: true,
             default: ""
         },
+        ctaLabelLocales: {
+            en: { type: String, trim: true, maxlength: 40, default: "" },
+            my: { type: String, trim: true, maxlength: 40, default: "" },
+            th: { type: String, trim: true, maxlength: 40, default: "" }
+        },
         ctaTarget: {
             type: String,
             trim: true,

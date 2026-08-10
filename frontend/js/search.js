@@ -11,6 +11,7 @@
     const RECENT_KEY = "azielRecentSearches";
     const SEARCH_LIMIT = 8;
     const DEBOUNCE_MS = 160;
+    const t = (key, fallback, params = {}) => window.AZIEL_I18N?.t?.(key, fallback, params) || fallback;
 
     const state = {
         open: false,
@@ -24,14 +25,14 @@
         debounceTimer: null
     };
 
-    const staticResults = [
-        item("Mobile Games", "Category", "Browse mobile game top-ups", "mobile-games.html", "mobile"),
-        item("PC Games", "Category", "Browse PC game services", "pc-games.html", "desktop"),
-        item("Gift Cards", "Category", "Browse gift cards", "gift-cards.html", "gift"),
-        item("Social Top Up", "Category", "Telegram and social services", "social-topup.html", "telegram"),
-        item("Support Center", "Support", "Get help with orders, payments, wallet, and account issues", "support.html", "support"),
-        item("FAQ", "Support", "Common questions and answers", "faq.html", "help"),
-        item("Contact", "Company", "General and business inquiries", "contact.html", "message")
+    const staticResults = () => [
+        item(t("search.mobileGames", "Mobile Games"), t("search.category", "Category"), t("search.mobileGamesHelp", "Browse mobile game top-ups"), "mobile-games.html", "mobile"),
+        item(t("search.pcGames", "PC Games"), t("search.category", "Category"), t("search.pcGamesHelp", "Browse PC game services"), "pc-games.html", "desktop"),
+        item(t("search.giftCards", "Gift Cards"), t("search.category", "Category"), t("search.giftCardsHelp", "Browse gift cards"), "gift-cards.html", "gift"),
+        item(t("search.socialTopUp", "Social Top Up"), t("search.category", "Category"), t("search.socialTopUpHelp", "Telegram and social services"), "social-topup.html", "telegram"),
+        item(t("search.supportCenter", "Support Center"), t("search.support", "Support"), t("search.supportHelp", "Get help with orders, payments, wallet, and account issues"), "support.html", "support"),
+        item(t("search.faq", "FAQ"), t("search.support", "Support"), t("search.faqHelp", "Common questions and answers"), "faq.html", "help"),
+        item(t("search.contact", "Contact"), t("search.company", "Company"), t("search.contactHelp", "General and business inquiries"), "contact.html", "message")
     ];
 
     function item(title, category, subtitle, url, icon = "search", image = "") {
@@ -80,18 +81,18 @@
                 <div class="az-search-head">
                     <div class="az-search-input-shell">
                         <i class="fa-solid fa-magnifying-glass"></i>
-                        <label id="azSearchTitle" class="sr-only" for="azSearchInput">Search AZIEL</label>
-                        <p id="azSearchHint" class="sr-only">Use arrow keys to move through results, Enter to open a result, and Escape to close search.</p>
-                        <input id="azSearchInput" type="text" inputmode="search" autocomplete="off" spellcheck="false" placeholder="Search games, gift cards..." role="searchbox" aria-autocomplete="list" aria-controls="azSearchBody" aria-expanded="false">
-                        <button id="azSearchClearBtn" class="az-search-clear" type="button" aria-label="Clear search" hidden>
+                        <label id="azSearchTitle" class="sr-only" for="azSearchInput">${escapeHtml(t("search.title", "Search AZIEL"))}</label>
+                        <p id="azSearchHint" class="sr-only">${escapeHtml(t("search.keyboardHelp", "Use arrow keys to move through results, Enter to open a result, and Escape to close search."))}</p>
+                        <input id="azSearchInput" type="text" inputmode="search" autocomplete="off" spellcheck="false" placeholder="${escapeAttr(t("search.placeholder", "Search games, gift cards..."))}" role="searchbox" aria-autocomplete="list" aria-controls="azSearchBody" aria-expanded="false">
+                        <button id="azSearchClearBtn" class="az-search-clear" type="button" aria-label="${escapeAttr(t("search.clear", "Clear search"))}" hidden>
                             <i class="fa-solid fa-xmark"></i>
                         </button>
                     </div>
-                    <button id="azSearchCloseBtn" class="az-search-close" type="button" aria-label="Close search">
+                    <button id="azSearchCloseBtn" class="az-search-close" type="button" aria-label="${escapeAttr(t("search.close", "Close search"))}">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 </div>
-                <div id="azSearchBody" class="az-search-body" role="listbox" aria-label="Search results"></div>
+                <div id="azSearchBody" class="az-search-body" role="listbox" aria-label="${escapeAttr(t("search.results", "Search results"))}"></div>
             </section>
         `;
         document.body.appendChild(overlay);
@@ -174,7 +175,7 @@
     }
 
     async function buildIndex() {
-        const results = [...staticResults];
+        const results = [...staticResults()];
 
         try {
             await ensureCatalogRuntime();
@@ -184,23 +185,23 @@
                 .filter(product => product.route)
                 .forEach(product => {
                     const category = product.category === "pc"
-                        ? "PC Games"
+                            ? t("search.pcGames", "PC Games")
                         : product.category === "gift_card"
-                            ? "Gift Cards"
+                                ? t("search.giftCards", "Gift Cards")
                             : product.category === "social"
-                                ? "Social Top Up"
-                                : "Games";
+                                    ? t("search.socialTopUp", "Social Top Up")
+                                : t("search.games", "Games");
                     results.push(item(
                         product.name || product.productCode,
                         category,
-                        product.searchDescription || product.description || "Top Up",
+                        product.searchDescription || product.description || t("search.topUp", "Top Up"),
                         product.route,
                         "game",
                         window.AZIEL_CATALOG_PRESENTATION?.resolveProductImage?.(product) || product.image || ""
                     ));
                 });
         } catch (error) {
-            state.error = "Catalog search is partially unavailable.";
+            state.error = t("search.catalogPartial", "Catalog search is partially unavailable.");
         }
 
         try {
@@ -213,9 +214,9 @@
             if (response.ok && data?.success) {
                 (data.promotions || []).forEach(promotion => {
                     results.push(item(
-                        promotion.title || "Promotion",
-                        "Promotions",
-                        promotion.summary || promotion.message || "Active offer",
+                        promotion.title || t("search.promotion", "Promotion"),
+                        t("search.promotions", "Promotions"),
+                        promotion.summary || promotion.message || t("search.activeOffer", "Active offer"),
                         promotion.ctaUrl || "/notifications.html?filter=promotions",
                         "gift",
                         promotion.imageUrl || ""
@@ -350,7 +351,7 @@
 
         if (clear) {
             clear.hidden = !state.query;
-            clear.setAttribute("aria-label", "Clear search");
+            clear.setAttribute("aria-label", t("search.clear", "Clear search"));
         }
         input?.setAttribute("aria-expanded", state.open ? "true" : "false");
 
@@ -377,7 +378,7 @@
         }
 
         body.innerHTML = `
-            <div class="az-search-section-label">Results</div>
+            <div class="az-search-section-label">${escapeHtml(t("search.resultsShort", "Results"))}</div>
             ${results.map((result, index) => renderResult(result, index)).join("")}
         `;
         updateActive();
@@ -389,12 +390,12 @@
 
         return `
             ${recent.length ? `
-                <div class="az-search-section-label">Recent</div>
+                <div class="az-search-section-label">${escapeHtml(t("search.recent", "Recent"))}</div>
                 <div class="az-search-recents">
                     ${recent.map(value => `<button type="button" data-recent-search="${escapeAttr(value)}">${escapeHtml(value)}</button>`).join("")}
                 </div>
             ` : ""}
-            <div class="az-search-section-label">Suggestions</div>
+            <div class="az-search-section-label">${escapeHtml(t("search.suggestions", "Suggestions"))}</div>
             ${suggested.map((result, index) => renderResult(result, index)).join("")}
         `;
     }
@@ -418,7 +419,7 @@
 
     function renderSkeletons() {
         return `
-            <div class="az-search-section-label">Searching</div>
+            <div class="az-search-section-label">${escapeHtml(t("search.searching", "Searching"))}</div>
             ${Array.from({ length: 4 }).map(() => `
                 <div class="az-search-result skeleton" aria-hidden="true">
                     <span class="az-search-result-icon"></span>
@@ -435,8 +436,8 @@
         return `
             <div class="az-empty-state az-search-empty">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <strong>No results found</strong>
-                <span>Try searching for:</span>
+                <strong>${escapeHtml(t("search.noResults", "No results found"))}</strong>
+                <span>${escapeHtml(t("search.trySearching", "Try searching for:"))}</span>
                 <ul class="az-search-empty-list">
                     <li>Mobile Legends</li>
                     <li>PUBG</li>
@@ -451,7 +452,7 @@
         const input = overlay ? overlay.querySelector("#azSearchInput") : null;
         if (!input) return;
         const compact = typeof window.matchMedia === "function" && window.matchMedia("(max-width: 360px)").matches;
-        input.placeholder = compact ? "Search games..." : "Search games, gift cards...";
+        input.placeholder = compact ? t("search.placeholderCompact", "Search games...") : t("search.placeholder", "Search games, gift cards...");
     }
 
     function bindRecentButtons() {
@@ -573,6 +574,12 @@
         open,
         refresh: buildIndex
     };
+
+    window.addEventListener("aziel:locale-changed", () => {
+        state.index = [];
+        document.getElementById("azSearchOverlay")?.remove();
+        if (state.open) open(state.lastFocused);
+    });
 
     if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", initLegacySearchBridge);

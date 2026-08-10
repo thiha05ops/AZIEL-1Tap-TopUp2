@@ -2,6 +2,8 @@
 // Compatibility package renderer/selection bridge. Public catalog owns prices.
 
 let selectedPackage = null;
+let pricingRenderRequestId = 0;
+let catalogLoadInFlight = false;
 
 document.addEventListener("DOMContentLoaded", () => {
   document.addEventListener("pricesRendered", bindPackageSelection);
@@ -20,8 +22,14 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+  window.addEventListener("aziel:locale-changed", () => {
+    const selectedCode = selectedPackage?.code || document.querySelector(".pack.active")?.dataset.code || "";
+    renderGamePrices({ reselectCode: selectedCode, reason: "locale_changed" });
+  });
+
   document.addEventListener("aziel:catalog-updated", event => {
     if (event.detail?.status !== "ready") return;
+    if (catalogLoadInFlight) return;
     const selectedCode = selectedPackage?.code || "";
     renderGamePrices({
       reselectCode: selectedCode,
@@ -151,8 +159,57 @@ function showCatalogMessage(packageContainer, message, retry = false) {
   });
 }
 
+function showPackageSkeletons(packageContainer) {
+  packageContainer.setAttribute("aria-busy", "true");
+  packageContainer.innerHTML = Array.from({ length: 8 }, (_, index) => `
+    <div class="pack pack-skeleton az-storefront-skeleton" aria-hidden="true">
+      <span class="pack-skeleton-name"></span>
+      <span class="pack-skeleton-price"></span>
+    </div>
+  `).join("") + '<span class="az-visually-hidden" role="status">Loading available packages</span>';
+}
+
 function t(key, fallback) {
   return window.AZIEL_I18N?.t?.(key) || window.i18n?.t?.(key) || fallback;
+}
+
+async function loadAuthoritativePrice(item) {
+  const response = await fetch("/api/pricing/preview", {
+    method: "POST",
+    cache: "no-store",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({
+      productCode: item.productCode,
+      packageCode: item.packageCode,
+      region: item.region,
+      currency: item.currency
+    })
+  });
+  const data = await response.json().catch(() => ({}));
+  const amount = Number(data.quote?.finalAmount);
+  if (!response.ok || !data.success || !Number.isFinite(amount) || amount <= 0) {
+    throw new Error(data.message || "Authoritative package price unavailable");
+  }
+  return {
+    ...item,
+    amount,
+    price: amount,
+    referencePrice: Number(data.quote.referencePrice || 0),
+    saveAmount: Number(data.quote.saveAmount || 0),
+    discountPercent: Number(data.quote.discountPercent || 0),
+    authoritativePreview: data.quote
+  };
+}
+
+async function settleAuthoritativePrices(items, requestId) {
+  const results = [];
+  const concurrency = 4;
+  for (let index = 0; index < items.length; index += concurrency) {
+    if (requestId !== pricingRenderRequestId) return null;
+    const batch = items.slice(index, index + concurrency);
+    results.push(...await Promise.allSettled(batch.map(loadAuthoritativePrice)));
+  }
+  return results;
 }
 
 function clearSelectedPackage(reason = "cleared") {
@@ -163,6 +220,7 @@ function clearSelectedPackage(reason = "cleared") {
 }
 
 async function renderGamePrices(options = {}) {
+  const requestId = ++pricingRenderRequestId;
   const packageContainer = document.getElementById("packages");
   if (!packageContainer) return;
 
@@ -178,16 +236,21 @@ async function renderGamePrices(options = {}) {
   }
 
   packageContainer.dataset.catalogSynced = "false";
-  showCatalogMessage(packageContainer, "Loading packages...", false);
+  showPackageSkeletons(packageContainer);
 
+  catalogLoadInFlight = true;
   try {
     await catalog.load({ force: Boolean(options.forceRefresh) });
   } catch (error) {
+    if (requestId !== pricingRenderRequestId) return;
     showCatalogMessage(packageContainer, t("catalogPricesUnavailable", "Prices are temporarily unavailable. Please try again shortly."), true);
     clearSelectedPackage("catalog_unavailable");
     emitPricesRendered({ game, hasPackages: false, ready: false, error: true });
     return;
+  } finally {
+    catalogLoadInFlight = false;
   }
+  if (requestId !== pricingRenderRequestId) return;
 
   const product = catalog.getProduct(game);
 
@@ -198,26 +261,50 @@ async function renderGamePrices(options = {}) {
     return;
   }
 
-  const packages = catalog.getPackages(game, getShopRegion());
+  const catalogPackages = catalog.getPackages(game, getShopRegion());
   packageContainer.dataset.catalogSynced = "true";
 
-  if (!packages.length) {
+  if (!catalogPackages.length) {
     showCatalogMessage(packageContainer, t("catalogPackagesUnavailable", "Packages temporarily unavailable."), true);
     clearSelectedPackage("no_regional_packages");
     emitPricesRendered({ game, hasPackages: false, ready: true });
     return;
   }
 
-  packageContainer.innerHTML = packages.map(item => `
+  const previewResults = await settleAuthoritativePrices(catalogPackages, requestId);
+  if (!previewResults) return;
+  if (requestId !== pricingRenderRequestId) return;
+  const packages = previewResults.filter(result => result.status === "fulfilled").map(result => result.value);
+  const failures = previewResults.filter(result => result.status === "rejected");
+  if (failures.length) {
+    console.warn(`Authoritative pricing preview failures: ${JSON.stringify(failures.map(result => result.reason?.message || "Preview unavailable"))}`);
+  }
+  if (!packages.length) {
+    showCatalogMessage(packageContainer, t("catalogPricesUnavailable", "Prices are temporarily unavailable. Please try again shortly."), true);
+    clearSelectedPackage("authoritative_price_unavailable");
+    emitPricesRendered({ game, hasPackages: false, ready: false, error: true });
+    return;
+  }
+
+  packageContainer.innerHTML = packages.map(item => {
+    const artwork = String(item.artwork || "").trim();
+    return `
     <div class="pack"
+         role="button"
+         tabindex="0"
+         aria-pressed="false"
+         aria-label="${escapeAttr(`${item.name}, ${formatPackagePrice(item.amount, item.currency)}`)}"
          data-name="${escapeAttr(item.name)}"
          data-price="${escapeAttr(item.amount)}"
          data-amount="${escapeAttr(item.amount)}"
          data-currency="${escapeAttr(item.currency)}"
          data-region="${escapeAttr(item.region)}"
          data-code="${escapeAttr(item.packageCode)}"
+         data-customer-note="${escapeAttr(item.customerNote || "")}"
+         title="${escapeAttr(item.customerNote || "")}"
          data-product-code="${escapeAttr(item.productCode)}"
          data-icon="${escapeAttr(item.icon)}"
+         data-artwork="${escapeAttr(artwork)}"
          data-fallback-icon="${escapeAttr(item.fallbackIcon || "")}"
          data-reference-price="${escapeAttr(item.referencePrice || 0)}"
          data-save-amount="${escapeAttr(item.saveAmount || 0)}"
@@ -225,17 +312,15 @@ async function renderGamePrices(options = {}) {
          data-show-discount="${item.showDiscount === true}"
          data-show-original-price="${item.showOriginalPrice === true}"
          data-catalog-synced="true">
-      <div class="pack-icon">
-        <img src="${escapeAttr(item.icon)}" alt="${escapeAttr(item.name)}" data-fallback-src="${escapeAttr(item.fallbackIcon || "")}">
-      </div>
+      ${artwork ? `<div class="pack-icon" data-package-media>
+        <img src="${escapeAttr(artwork)}" alt="${escapeAttr(item.artworkAlt || item.name)}" width="88" height="88" loading="lazy" decoding="async">
+      </div>` : ""}
 
       <div class="pack-info">
         <strong class="pack-name">${escapeHtml(item.name)}</strong>
 
         ${item.showDiscount
-      ? `<span class="pack-discount-text">
-                Discount: ${Number(item.discountPercent || 0).toLocaleString()}%
-              </span>`
+      ? `<span class="pack-discount-text">${Number(item.discountPercent || 0).toLocaleString()}% ${escapeHtml(t("product.offerOff", "OFF"))}</span>`
       : ""
     }
       </div>
@@ -253,7 +338,9 @@ async function renderGamePrices(options = {}) {
         </span>
       </div>
     </div>
-  `).join("");
+  `;
+  }).join("");
+  packageContainer.setAttribute("aria-busy", "false");
 
   bindPackageIconFallbacks(packageContainer);
 
@@ -287,6 +374,11 @@ async function renderGamePrices(options = {}) {
 function bindPackageSelection() {
   document.querySelectorAll(".pack").forEach(pack => {
     pack.onclick = () => selectPackage(pack);
+    pack.onkeydown = event => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      selectPackage(pack);
+    };
   });
 }
 
@@ -295,9 +387,11 @@ function selectPackage(packEl) {
 
   document.querySelectorAll(".pack").forEach(item => {
     item.classList.remove("active");
+    item.setAttribute("aria-pressed", "false");
   });
 
   packEl.classList.add("active");
+  packEl.setAttribute("aria-pressed", "true");
   window.AZIEL_MOTION?.emphasize(packEl, "selected");
 
   selectedPackage = {
@@ -311,6 +405,7 @@ function selectPackage(packEl) {
     code: packEl.dataset.code,
     icon: packEl.dataset.icon,
     fallbackIcon: packEl.dataset.fallbackIcon || "",
+    customerNote: packEl.dataset.customerNote || "",
     referencePrice: Number(packEl.dataset.referencePrice || 0),
     saveAmount: Number(packEl.dataset.saveAmount || 0),
     discountPercent: Number(packEl.dataset.discountPercent || 0),
@@ -421,16 +516,13 @@ function getSelectedPackage() {
 }
 
 function bindPackageIconFallbacks(root) {
-  root?.querySelectorAll?.(".pack-icon img[data-fallback-src]")?.forEach(img => {
+  root?.querySelectorAll?.("[data-package-media] img")?.forEach(img => {
     img.onerror = function handlePackageIconError() {
-      const fallback = this.dataset.fallbackSrc || "";
-
-      if (fallback && this.getAttribute("src") !== fallback) {
-        this.src = fallback;
-        return;
-      }
-
       this.onerror = null;
+      const media = this.closest("[data-package-media]");
+      const card = this.closest(".pack");
+      media?.remove();
+      card?.classList.add("pack--text-only");
     };
   });
 }

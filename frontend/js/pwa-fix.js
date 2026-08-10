@@ -215,7 +215,7 @@ async function ensureAzielI18nReady() {
         return;
     }
 
-    await waitForAzielRuntime(() => window.AZIEL_I18N?.getLang, "AZIEL i18n", 3000).catch(() => {});
+    await waitForAzielRuntime(() => window.AZIEL_I18N?.getLang, "AZIEL i18n", 3000).catch(() => { });
 }
 
 window.ensurePendingPaymentRecoveryRuntime = function ensurePendingPaymentRecoveryRuntime() {
@@ -422,26 +422,85 @@ window.ensurePromptPayBankLauncherRuntime = function ensurePromptPayBankLauncher
 
     return window.__AZIEL_PROMPTPAY_BANK_LAUNCHER_RUNTIME_PROMISE__;
 };
-
 function registerAzielServiceWorker() {
     if (!("serviceWorker" in navigator)) return;
-    if (!window.isSecureContext && !["localhost", "127.0.0.1"].includes(location.hostname)) return;
 
-    window.addEventListener("load", () => {
-        navigator.serviceWorker.register("/sw.js", { scope: "/" })
-            .then(registration => {
-                registration.addEventListener("updatefound", () => {
-                    const worker = registration.installing;
-                    if (!worker) return;
-                    worker.addEventListener("statechange", () => {
-                        if (worker.state === "installed" && navigator.serviceWorker.controller) {
-                            window.dispatchEvent(new CustomEvent("aziel:pwaUpdateReady"));
-                        }
-                    });
+    const localHosts = new Set(["localhost", "127.0.0.1"]);
+
+    if (!window.isSecureContext && !localHosts.has(location.hostname)) {
+        return;
+    }
+
+    const notifyUpdateReady = () => {
+        window.dispatchEvent(
+            new CustomEvent("aziel:pwaUpdateReady")
+        );
+    };
+
+    const activateWaitingWorker = registration => {
+        if (!registration?.waiting) return;
+
+        registration.waiting.postMessage({
+            type: "SKIP_WAITING"
+        });
+    };
+
+    window.addEventListener("load", async () => {
+        try {
+            const registration = await navigator.serviceWorker.register(
+                "/sw.js",
+                {
+                    scope: "/",
+                    updateViaCache: "none"
+                }
+            );
+
+            /*
+             * Check immediately instead of waiting for the browser's
+             * normal service-worker update interval.
+             */
+            await registration.update().catch(() => { });
+
+            if (registration.waiting) {
+                activateWaitingWorker(registration);
+            }
+
+            registration.addEventListener("updatefound", () => {
+                const worker = registration.installing;
+
+                if (!worker) return;
+
+                worker.addEventListener("statechange", () => {
+                    if (
+                        worker.state === "installed" &&
+                        navigator.serviceWorker.controller
+                    ) {
+                        notifyUpdateReady();
+                        activateWaitingWorker(registration);
+                    }
                 });
-            })
-            .catch(() => {
-                // PWA installability must never block storefront navigation.
             });
+
+            /*
+             * Recheck periodically while the admin/storefront tab
+             * remains open.
+             */
+            window.setInterval(() => {
+                registration.update().catch(() => { });
+            }, 15 * 60 * 1000);
+
+            document.addEventListener("visibilitychange", () => {
+                if (document.visibilityState === "visible") {
+                    registration.update().catch(() => { });
+                }
+            });
+        } catch (error) {
+            if (localHosts.has(location.hostname)) {
+                console.warn(
+                    "AZIEL Service Worker registration failed:",
+                    error
+                );
+            }
+        }
     }, { once: true });
 }

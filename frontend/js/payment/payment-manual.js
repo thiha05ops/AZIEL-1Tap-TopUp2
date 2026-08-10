@@ -40,11 +40,16 @@
             } catch (error) {
                 // Recovery marker cleanup is best-effort.
             }
-            window.PaymentUtils?.showSuccess?.(
-                orderId,
-                "Slip Submitted",
-                "Waiting for Verification. Your payment slip has been submitted. We'll notify you after verification."
-            );
+            if (window.AZIEL_PAYMENT_PAGE_MODE === true) {
+                sessionStorage.removeItem("azielPaymentPageSession");
+                window.AZIEL_PAYMENT_PAGE?.showCompletion?.({
+                    orderId,
+                    status: data.order?.status || "pending_verification",
+                    paid: ["paid", "processing", "completed"].includes(String(data.order?.status || "").toLowerCase())
+                });
+                return true;
+            }
+            window.PaymentUtils?.showSuccess?.(orderId, "Slip Submitted", "Waiting for Verification. Your payment slip has been submitted. We'll notify you after verification.");
             close("submitted");
             return true;
         }

@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 
 const Order = require("../models/Order");
+const CommerceOrder = require("../models/CommerceOrder");
 const CatalogProduct = require("../models/CatalogProduct");
 const CatalogPackage = require("../models/CatalogPackage");
 const Supplier = require("../models/Supplier");
@@ -8,10 +9,11 @@ const SupplierProductMapping = require("../models/SupplierProductMapping");
 const FulfillmentAttempt = require("../models/FulfillmentAttempt");
 const { SUPPLIER_MODES, SUPPLIER_BALANCE_SOURCES, SUPPLIER_CONFIGURATION_STATUSES } = require("../models/Supplier");
 const { SUPPLIER_EXECUTION_MODES } = require("../models/SupplierProductMapping");
-const { ACTIVE_FULFILLMENT_STATUSES, FULFILLMENT_STATUSES } = require("../models/FulfillmentAttempt");
+const { ACTIVE_FULFILLMENT_STATUSES, FULFILLMENT_STATUSES, FULFILLMENT_ROUTE_TYPES } = require("../models/FulfillmentAttempt");
 const { ADMIN_AUDIT_ACTIONS, writeAdminAudit } = require("./adminAuditService");
 const { ORDER_STATES, getAllowedNextStatuses, transitionOrder } = require("./orderStateService");
 const { getSupplierAdapter, normalizeSupplierResult } = require("./supplierAdapterRegistry");
+const commerceOrderRepository = require("./commerce/orderRepository");
 const {
     FINANCIAL_OUTCOMES,
     acquireFinancialOutcome,
@@ -168,6 +170,7 @@ function projectAttempt(attempt = {}, extras = {}) {
         packageCode: attempt.packageCode,
         region: attempt.region,
         mode: attempt.mode,
+        routeType: attempt.routeType || (attempt.mode === "API" ? FULFILLMENT_ROUTE_TYPES.SUPPLIER_API : FULFILLMENT_ROUTE_TYPES.SUPPLIER_MANUAL),
         status: attempt.status,
         startedByAdminId: attempt.startedByAdminId ? String(attempt.startedByAdminId) : null,
         startedByUsernameSnapshot: attempt.startedByUsernameSnapshot || "",
@@ -439,17 +442,27 @@ async function listMappings(query = {}) {
 }
 
 async function listEligibleMappingsForOrder(orderId) {
-    const order = await Order.findById(orderId).lean();
+    const order = await loadOrderForFulfillment(orderId, { lean: true });
     if (!order) throw new FulfillmentError("ORDER_NOT_FOUND", "Order not found.", 404);
-    const productCode = normalizeProductCode(order.productCode);
-    const packageCode = normalizePackageCode(order.packageCode);
-    const region = normalizeRegion(order.region || "MM");
+    const productCode = normalizeProductCode(order.product?.gameCode || order.productCode);
+    const packageCode = normalizePackageCode(order.product?.packageCode || order.packageCode);
+    const region = normalizeRegion(order.commercial?.region || order.product?.region || order.region || "MM");
     if (!productCode || !packageCode) return [];
 
     const mappings = await listMappings({ productCode, packageCode, region, enabledOnly: true });
     const suppliers = await Supplier.find({ _id: { $in: mappings.map(item => item.supplierId) }, enabled: true }).lean();
     const enabledSupplierIds = new Set(suppliers.map(supplier => String(supplier._id)));
     return mappings.filter(mapping => enabledSupplierIds.has(String(mapping.supplierId)));
+}
+
+async function loadOrderForFulfillment(orderId, { lean = false } = {}) {
+    const value = cleanText(orderId, 160);
+    const commerceCode = value.startsWith("commerce-order:") ? value.slice("commerce-order:".length) : "";
+    let order = null;
+    if (commerceCode) order = await CommerceOrder.findOne({ orderId: commerceCode });
+    else if (mongoose.isValidObjectId(value)) order = await Order.findById(value);
+    if (!order && value) order = await CommerceOrder.findOne({ orderId: value });
+    return lean && order?.toObject ? order.toObject() : order;
 }
 
 async function getOrderFulfillmentSummary(orderIds = []) {
@@ -497,18 +510,63 @@ async function assertOrderEligible(order) {
     }
 }
 
+async function transitionCommerceFulfillment(order, target, reason) {
+    const changedAt = new Date();
+    let currentStatus = String(order.status || "");
+    let currentFulfillment = String(order.fulfilment?.status || "not_started");
+    if (["not_started", "queued"].includes(currentFulfillment)) {
+        await commerceOrderRepository.updateFulfilmentStatus({
+            orderId: order.orderId,
+            fromStatuses: [currentFulfillment],
+            toStatus: "processing",
+            changedAt,
+            reason
+        });
+        currentFulfillment = "processing";
+    }
+    if (currentStatus === "paid") {
+        await commerceOrderRepository.updateOrderStatus({
+            orderId: order.orderId,
+            fromStatuses: ["paid"],
+            toStatus: "processing",
+            changedAt,
+            reason
+        });
+        currentStatus = "processing";
+    }
+    if (target !== "processing") {
+        await commerceOrderRepository.updateFulfilmentStatus({
+            orderId: order.orderId,
+            fromStatuses: [currentFulfillment],
+            toStatus: target,
+            changedAt: new Date(),
+            reason
+        });
+        await commerceOrderRepository.updateOrderStatus({
+            orderId: order.orderId,
+            fromStatuses: [currentStatus],
+            toStatus: target === "completed" ? "completed" : "failed",
+            changedAt: new Date(),
+            reason
+        });
+    }
+}
+
 async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
     const mappingId = cleanText(payload.mappingId || payload.supplierMappingId, 80);
     if (!mappingId) throw new FulfillmentError("SUPPLIER_MAPPING_REQUIRED", "Supplier mapping is required.");
 
     const [order, mapping] = await Promise.all([
-        Order.findById(orderId),
+        loadOrderForFulfillment(orderId),
         SupplierProductMapping.findById(mappingId)
     ]);
 
     await assertOrderEligible(order);
-    const financialAttempts = await listFinancialFulfillmentAttempts(order._id);
-    assertFulfillmentStartAllowed(order, financialAttempts);
+    const isCommerceOrder = order.constructor?.modelName === "CommerceOrder";
+    if (!isCommerceOrder) {
+        const financialAttempts = await listFinancialFulfillmentAttempts(order._id);
+        assertFulfillmentStartAllowed(order, financialAttempts);
+    }
     if (!mapping || !mapping.enabled) throw new FulfillmentError("SUPPLIER_MAPPING_NOT_FOUND", "Supplier mapping not found.", 404);
 
     const supplier = await Supplier.findById(mapping.supplierId);
@@ -516,9 +574,9 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
     if (!supplier.enabled) throw new FulfillmentError("SUPPLIER_DISABLED", "Supplier is disabled.");
 
     if (
-        mapping.productCode !== normalizeProductCode(order.productCode) ||
-        mapping.packageCode !== normalizePackageCode(order.packageCode) ||
-        mapping.region !== normalizeRegion(order.region || "MM")
+        mapping.productCode !== normalizeProductCode(order.product?.gameCode || order.productCode) ||
+        mapping.packageCode !== normalizePackageCode(order.product?.packageCode || order.packageCode) ||
+        mapping.region !== normalizeRegion(order.commercial?.region || order.product?.region || order.region || "MM")
     ) {
         throw new FulfillmentError("SUPPLIER_MAPPING_MISMATCH", "Supplier mapping does not match this order.");
     }
@@ -543,6 +601,7 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
         fulfillmentId: makeFulfillmentId(),
         orderId: order._id,
         orderCode: order.orderId,
+        orderModel: isCommerceOrder ? "CommerceOrder" : "Order",
         supplierId: supplier._id,
         supplierCodeSnapshot: supplier.supplierCode,
         supplierMappingId: mapping._id,
@@ -550,6 +609,9 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
         packageCode: mapping.packageCode,
         region: mapping.region,
         mode: supplier.mode,
+        routeType: supplier.mode === SUPPLIER_MODES.API
+            ? FULFILLMENT_ROUTE_TYPES.SUPPLIER_API
+            : FULFILLMENT_ROUTE_TYPES.SUPPLIER_MANUAL,
         status: FULFILLMENT_STATUSES.IN_PROGRESS,
         idempotencyKey,
         startedByAdminId: adminId(context.admin),
@@ -580,7 +642,9 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
         throw error;
     }
 
-    if (getAllowedNextStatuses(order.status).includes(ORDER_STATES.PROCESSING)) {
+    if (isCommerceOrder) {
+        await transitionCommerceFulfillment(order, "processing", `Fulfillment started ${attempt.fulfillmentId}`);
+    } else if (getAllowedNextStatuses(order.status).includes(ORDER_STATES.PROCESSING)) {
         await transitionOrder(order, ORDER_STATES.PROCESSING, {
             source: "fulfillment",
             actorType: "admin",
@@ -615,17 +679,22 @@ async function resolveFulfillment(fulfillmentId, action, payload = {}, context =
         throw new FulfillmentError("FULFILLMENT_NOT_ACTIVE", "Fulfillment attempt is not active.", 409);
     }
 
-    const order = await Order.findById(attempt.orderId);
+    const isCommerceOrder = attempt.orderModel === "CommerceOrder";
+    const order = isCommerceOrder
+        ? await CommerceOrder.findById(attempt.orderId)
+        : await Order.findById(attempt.orderId);
     if (!order) throw new FulfillmentError("ORDER_NOT_FOUND", "Order not found.", 404);
 
     if (action === "succeed") {
         const supplierReference = cleanText(payload.supplierReference, 160);
         if (!supplierReference) throw new FulfillmentError("SUPPLIER_REFERENCE_REQUIRED", "Supplier reference is required.");
-        const financialAttempts = await listFinancialFulfillmentAttempts(order._id);
-        assertFulfillmentSuccessAllowed(order, financialAttempts.filter(item => item.fulfillmentId !== attempt.fulfillmentId));
-        const lockedOrder = await acquireFinancialOutcome(order._id, FINANCIAL_OUTCOMES.FULFILLMENT_SUCCEEDED);
-        order.financialOutcome = lockedOrder.financialOutcome;
-        order.financialOutcomeAt = lockedOrder.financialOutcomeAt;
+        if (!isCommerceOrder) {
+            const financialAttempts = await listFinancialFulfillmentAttempts(order._id);
+            assertFulfillmentSuccessAllowed(order, financialAttempts.filter(item => item.fulfillmentId !== attempt.fulfillmentId));
+            const lockedOrder = await acquireFinancialOutcome(order._id, FINANCIAL_OUTCOMES.FULFILLMENT_SUCCEEDED);
+            order.financialOutcome = lockedOrder.financialOutcome;
+            order.financialOutcomeAt = lockedOrder.financialOutcomeAt;
+        }
 
         attempt.status = FULFILLMENT_STATUSES.SUCCEEDED;
         attempt.supplierReference = supplierReference;
@@ -639,7 +708,9 @@ async function resolveFulfillment(fulfillmentId, action, payload = {}, context =
         attempt.completedAt = new Date();
         await attempt.save();
 
-        if (getAllowedNextStatuses(order.status).includes(ORDER_STATES.COMPLETED)) {
+        if (isCommerceOrder) {
+            await transitionCommerceFulfillment(order, "completed", `Fulfillment succeeded ${attempt.fulfillmentId}`);
+        } else if (getAllowedNextStatuses(order.status).includes(ORDER_STATES.COMPLETED)) {
             await transitionOrder(order, ORDER_STATES.COMPLETED, {
                 source: "fulfillment",
                 actorType: "admin",
@@ -685,7 +756,9 @@ async function resolveFulfillment(fulfillmentId, action, payload = {}, context =
         attempt.failedAt = new Date();
         await attempt.save();
 
-        if (getAllowedNextStatuses(order.status).includes(ORDER_STATES.FAILED)) {
+        if (isCommerceOrder) {
+            await transitionCommerceFulfillment(order, "failed", `Fulfillment failed: ${failureReason}`);
+        } else if (getAllowedNextStatuses(order.status).includes(ORDER_STATES.FAILED)) {
             await transitionOrder(order, ORDER_STATES.FAILED, {
                 source: "fulfillment",
                 actorType: "admin",

@@ -83,7 +83,7 @@ function verifyFrontendCommandCenter() {
     assert(adminCss.includes(".order-detail-panel") && adminCss.includes("overflow-y: auto"), "Order detail pane must own vertical scrolling");
     assert(adminCss.includes("overscroll-behavior: contain"), "Orders panes should contain scroll chaining");
     assert(adminCss.includes(".admin-body.admin-orders-active #adminGlobalSearch") && adminCss.includes("display: none"), "Global topbar search should be hidden while Orders is active");
-    assert(adminCss.includes(".orders-command-panel > .admin-filter-bar") && adminCss.includes("flex: 0 0 auto"), "Orders-local search row must stay in normal non-scrolling pane flow");
+    assert(/\.orders-command-panel\s*>\s*\.admin-filter-bar/.test(adminCss) && adminCss.includes("flex: 0 0 auto"), "Orders-local search row must stay in normal non-scrolling pane flow");
     assert(adminCss.includes("position: static") && adminCss.includes("z-index: auto"), "Orders-local search row must not float over queue rows");
     assert(adminCss.includes("@media (max-width: 1200px)") && adminCss.includes("height: auto") && adminCss.includes("overflow: visible"), "Non-desktop breakpoint must restore stacked page scrolling");
     assert(adminCss.includes("overflow-x: hidden"), "Responsive Admin layout should prevent full-page horizontal scrolling");

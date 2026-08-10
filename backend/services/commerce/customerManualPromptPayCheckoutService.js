@@ -3,7 +3,11 @@
 const crypto = require("crypto");
 const CatalogPackage = require("../../models/CatalogPackage");
 const PaymentMethod = require("../../models/PaymentMethod");
-const { createAndPersistPricingQuote } = require("./pricingQuoteApplicationService");
+const { loadFulfillmentCapability } = require("../fulfillmentCapabilityService");
+const {
+    createAndPersistPricingQuote,
+    getOwnedPricingQuote
+} = require("./pricingQuoteApplicationService");
 const { checkoutFromQuote } = require("./checkoutApplicationService");
 const orderRepository = require("./orderRepository");
 const { createManualPaymentApplicationService } = require("./manualPaymentApplicationService");
@@ -13,10 +17,12 @@ const {
     reserveCommercePromotion,
     releaseCommercePromotion
 } = require("./commercePromotionBridgeService");
+const { runtimeDebug } = require("../../utils/runtimeDebug");
 
 const ERROR_CODES = Object.freeze({
     INVALID_CHECKOUT_INPUT: "INVALID_CHECKOUT_INPUT",
     PACKAGE_UNAVAILABLE: "PACKAGE_UNAVAILABLE",
+    FULFILLMENT_UNAVAILABLE: "FULFILLMENT_UNAVAILABLE",
     PAYMENT_METHOD_UNAVAILABLE: "PAYMENT_METHOD_UNAVAILABLE",
     COMMERCE_CHECKOUT_FAILED: "COMMERCE_CHECKOUT_FAILED"
 });
@@ -81,6 +87,22 @@ async function loadCatalogPackage(input = {}) {
     return { pkg, price, region, currency, productCode, packageCode };
 }
 
+async function assertAuthoritativeFulfillmentReady(catalog = {}, options = {}) {
+    const capability = await (options.loadCapability || loadFulfillmentCapability)({
+        productCode: catalog.productCode,
+        packageCode: catalog.packageCode,
+        region: catalog.region
+    });
+    if (!capability.fulfillmentAvailable) {
+        throw new CustomerManualPromptPayCheckoutError(
+            ERROR_CODES.FULFILLMENT_UNAVAILABLE,
+            "This product is not currently available in the selected region.",
+            409
+        );
+    }
+    return capability;
+}
+
 async function loadPromptPayMethod(input = {}, region) {
     const requestedKey = text(input.paymentMethod || input.methodCode || "promptpay").toLowerCase();
     const method = await PaymentMethod.findOne({
@@ -133,6 +155,131 @@ function defaultQuoteDependencies(overrides = {}) {
     };
 }
 
+function assertReviewQuoteMatchesCheckout(review, catalog, input = {}) {
+    const expiresAt = review?.expiresAt ? new Date(review.expiresAt) : null;
+    const suppliedCouponCode = text(input.promoCode).toUpperCase();
+    const reviewedCouponCode = text(review?.promotion?.code).toUpperCase();
+    if (
+        !review?.quoteId ||
+        text(review.status).toUpperCase() !== "ISSUED" ||
+        !expiresAt ||
+        !Number.isFinite(expiresAt.getTime()) ||
+        expiresAt <= new Date() ||
+        text(review.package?.packageCode).toUpperCase() !== catalog.packageCode ||
+        text(review.pricing?.currency).toUpperCase() !== catalog.currency ||
+        reviewedCouponCode !== suppliedCouponCode
+    ) {
+        throw new CustomerManualPromptPayCheckoutError(
+            ERROR_CODES.INVALID_CHECKOUT_INPUT,
+            "Checkout review is stale or no longer matches this purchase. Refresh the review before paying.",
+            409
+        );
+    }
+    return review;
+}
+
+async function reviewCustomerCheckout(input = {}, context = {}, dependencies = {}) {
+    const owner = ownerFromUser(context.user, context.sessionId);
+    const catalog = await (dependencies.loadCatalogPackage || loadCatalogPackage)(input);
+    await (dependencies.assertFulfillmentReady || assertAuthoritativeFulfillmentReady)(catalog);
+    const issuedAt = new Date();
+    const pricingContext = await (
+        dependencies.buildPricingContext ||
+        buildProductionPricingContext
+    )({
+        pkg: catalog.pkg,
+        price: catalog.price,
+        catalog,
+        region: catalog.region,
+        currency: catalog.currency,
+        now: issuedAt
+    });
+    const idempotencySeed = text(input.checkoutKey || input.orderId);
+    if (!idempotencySeed) {
+        throw new CustomerManualPromptPayCheckoutError(
+            ERROR_CODES.INVALID_CHECKOUT_INPUT,
+            "Stable checkoutKey is required."
+        );
+    }
+    const suppliedCouponCode = text(input.promoCode);
+    const quoteDependencies = defaultQuoteDependencies({
+        ...(suppliedCouponCode
+            ? {
+                loadPromotionContext: args =>
+                    (dependencies.loadPromotionContext || loadCommercePromotionContext)({
+                        ...args,
+                        catalog,
+                        user: context.user
+                    })
+            }
+            : {}),
+        ...(dependencies.quoteDependencies || {})
+    });
+    const quoteResult = await (
+        dependencies.createAndPersistPricingQuote ||
+        createAndPersistPricingQuote
+    )(
+        {
+            owner,
+            request: {
+                region: catalog.region,
+                currency: catalog.currency,
+                packageIdentity: {
+                    packageRef: String(catalog.pkg._id || ""),
+                    packageCode: catalog.packageCode
+                },
+                paymentMethodId: "",
+                couponCode: suppliedCouponCode,
+                quantity: 1
+            },
+            idempotencyKey: `review-quote:${idempotencySeed}`,
+            validitySeconds: 30 * 60,
+            trace: { issueSource: "customer-checkout-review" },
+            trustedContext: {
+                package: {
+                    ...(pricingContext.packageContext || {}),
+                    packageId:
+                        pricingContext.packageContext?.packageId ||
+                        String(catalog.pkg._id || ""),
+                    packageRef:
+                        pricingContext.packageContext?.packageRef ||
+                        String(catalog.pkg._id || ""),
+                    packageCode: catalog.packageCode,
+                    packageName:
+                        pricingContext.packageContext?.packageName ||
+                        catalog.pkg.name,
+                    gameId:
+                        pricingContext.packageContext?.gameId ||
+                        catalog.productCode,
+                    gameCode:
+                        pricingContext.packageContext?.gameCode ||
+                        catalog.productCode,
+                    gameName:
+                        pricingContext.packageContext?.gameName ||
+                        text(input.game) ||
+                        catalog.productCode,
+                    categoryId:
+                        pricingContext.packageContext?.categoryId ||
+                        "game",
+                    categoryCode:
+                        pricingContext.packageContext?.categoryCode ||
+                        "game"
+                },
+                pricing: pricingContext.pricing
+            }
+        },
+        quoteDependencies
+    );
+
+    return {
+        review: quoteResult.publicQuote,
+        metadata: {
+            idempotentReuse: quoteResult.metadata?.idempotentReuse === true,
+            transactionCreated: false
+        }
+    };
+}
+
 function toCheckoutSession({ checkout, payment, method, catalog }) {
     const qr = payment.qr || {};
     return {
@@ -166,7 +313,7 @@ async function startCustomerManualPromptPayCheckout(
     context = {},
     dependencies = {}
 ) {
-    console.log("[CHECKOUT STEP 0] Request entered", {
+    runtimeDebug("[CHECKOUT STEP 0] Request entered", {
         productCode: input.productCode || input.gameKey || "",
         packageCode: input.packageCode || "",
         region: input.region || "",
@@ -178,16 +325,17 @@ async function startCustomerManualPromptPayCheckout(
 
     const owner = ownerFromUser(context.user, context.sessionId);
 
-    console.log("[CHECKOUT STEP 1] Owner resolved", {
+    runtimeDebug("[CHECKOUT STEP 1] Owner resolved", {
         hasUserId: Boolean(owner.userId),
         hasSessionId: Boolean(owner.sessionId)
     });
 
-    console.log("[CHECKOUT STEP 2] Loading catalog package");
+    runtimeDebug("[CHECKOUT STEP 2] Loading catalog package");
 
-    const catalog = await loadCatalogPackage(input);
+    const catalog = await (dependencies.loadCatalogPackage || loadCatalogPackage)(input);
+    await (dependencies.assertFulfillmentReady || assertAuthoritativeFulfillmentReady)(catalog);
 
-    console.log("[CHECKOUT STEP 3] Catalog package loaded", {
+    runtimeDebug("[CHECKOUT STEP 3] Catalog package loaded", {
         productCode: catalog.productCode,
         packageCode: catalog.packageCode,
         region: catalog.region,
@@ -196,11 +344,11 @@ async function startCustomerManualPromptPayCheckout(
         catalogAmount: Number(catalog.price?.amount || 0)
     });
 
-    console.log("[CHECKOUT STEP 4] Loading PromptPay method");
+    runtimeDebug("[CHECKOUT STEP 4] Loading PromptPay method");
 
     const method = await loadPromptPayMethod(input, catalog.region);
 
-    console.log("[CHECKOUT STEP 5] PromptPay method loaded", {
+    runtimeDebug("[CHECKOUT STEP 5] PromptPay method loaded", {
         key: method.key,
         region: method.region,
         paymentType: method.paymentType,
@@ -211,7 +359,7 @@ async function startCustomerManualPromptPayCheckout(
 
     const issuedAt = new Date();
 
-    console.log("[CHECKOUT STEP 6] Building pricing context");
+    runtimeDebug("[CHECKOUT STEP 6] Building pricing context");
 
     const pricingContext = await (
         dependencies.buildPricingContext ||
@@ -225,7 +373,7 @@ async function startCustomerManualPromptPayCheckout(
         now: issuedAt
     });
 
-    console.log("[CHECKOUT STEP 7] Pricing context ready", {
+    runtimeDebug("[CHECKOUT STEP 7] Pricing context ready", {
         supplierCost:
             pricingContext?.pricing?.pricingInput?.supplierCost ?? null,
         supplierCurrency:
@@ -263,14 +411,34 @@ async function startCustomerManualPromptPayCheckout(
         ...(dependencies.quoteDependencies || {})
     });
 
-    console.log("[CHECKOUT STEP 8] Creating pricing quote", {
+    runtimeDebug("[CHECKOUT STEP 8] Creating pricing quote", {
         idempotencySeed,
         couponCode: suppliedCouponCode,
         validitySeconds:
             Number(method.dynamicQrExpiryMinutes || 15) * 60
     });
 
-    const quoteResult = await createAndPersistPricingQuote(
+    const reviewedQuoteId = text(input.reviewQuoteId);
+    const reviewedQuote = reviewedQuoteId
+        ? assertReviewQuoteMatchesCheckout(
+            await (dependencies.getOwnedPricingQuote || getOwnedPricingQuote)(
+                { quoteId: reviewedQuoteId, owner },
+                dependencies.quoteDependencies || {}
+            ),
+            catalog,
+            input
+        )
+        : null;
+
+    const quoteResult = reviewedQuote
+        ? {
+            publicQuote: reviewedQuote,
+            metadata: {
+                persistenceOutcome: "review_quote_reused",
+                idempotentReuse: true
+            }
+        }
+        : await createAndPersistPricingQuote(
         {
             owner,
             request: {
@@ -324,9 +492,9 @@ async function startCustomerManualPromptPayCheckout(
             }
         },
         quoteDependencies
-    );
+        );
 
-    console.log("[CHECKOUT STEP 9] Pricing quote created", {
+    runtimeDebug("[CHECKOUT STEP 9] Pricing quote created", {
         quoteId: quoteResult?.publicQuote?.quoteId || "",
         status: quoteResult?.publicQuote?.status || "",
         amount:
@@ -341,7 +509,7 @@ async function startCustomerManualPromptPayCheckout(
     let checkoutResult = null;
 
     try {
-        console.log("[CHECKOUT STEP 10] Starting CommerceOrder checkout");
+        runtimeDebug("[CHECKOUT STEP 10] Starting CommerceOrder checkout");
 
         checkoutResult = await checkoutFromQuote(
             {
@@ -355,7 +523,8 @@ async function startCustomerManualPromptPayCheckout(
                 customerInput: {
                     gameAccount: {
                         userId: input.userId || "",
-                        zoneId: input.zoneId || ""
+                        zoneId: input.zoneId || "",
+                        accountFields: Array.isArray(input.accountFields) ? input.accountFields : []
                     },
                     customFields: {
                         username: input.username || "",
@@ -404,7 +573,7 @@ async function startCustomerManualPromptPayCheckout(
                     quote,
                     orderId
                 }) => {
-                    console.log(
+                    runtimeDebug(
                         "[CHECKOUT STEP 10A] Reserving promotion",
                         {
                             orderId,
@@ -451,7 +620,7 @@ async function startCustomerManualPromptPayCheckout(
                                 null
                         });
 
-                    console.log(
+                    runtimeDebug(
                         "[CHECKOUT STEP 10B] Promotion reservation complete",
                         {
                             reserved: Boolean(redemption),
@@ -476,7 +645,7 @@ async function startCustomerManualPromptPayCheckout(
             }
         );
 
-        console.log("[CHECKOUT STEP 11] CommerceOrder created", {
+        runtimeDebug("[CHECKOUT STEP 11] CommerceOrder created", {
             orderId:
                 checkoutResult?.checkout?.orderId || "",
             quoteId:
@@ -503,7 +672,7 @@ async function startCustomerManualPromptPayCheckout(
                 dependencies.manualPaymentOptions || {}
             );
 
-        console.log(
+        runtimeDebug(
             "[CHECKOUT STEP 12] Starting manual payment",
             {
                 orderId:
@@ -513,7 +682,7 @@ async function startCustomerManualPromptPayCheckout(
             }
         );
 
-        const payment =
+        let payment =
             await manualService.initiateManualPayment({
                 orderId:
                     checkoutResult.checkout.orderId,
@@ -522,7 +691,18 @@ async function startCustomerManualPromptPayCheckout(
                     `manual:${idempotencySeed}`
             });
 
-        console.log(
+        if (
+            payment?.retryEligible === true &&
+            typeof manualService.resumeOrRetryManualPayment === "function"
+        ) {
+            payment = await manualService.resumeOrRetryManualPayment({
+                orderId: checkoutResult.checkout.orderId,
+                owner,
+                traceId: `retry:${idempotencySeed}`
+            });
+        }
+
+        runtimeDebug(
             "[CHECKOUT STEP 13] Manual payment created",
             {
                 attemptId: payment?.attemptId || "",
@@ -546,7 +726,7 @@ async function startCustomerManualPromptPayCheckout(
             catalog
         });
 
-        console.log(
+        runtimeDebug(
             "[CHECKOUT STEP 14] Checkout session ready",
             {
                 commerceOrderId:
@@ -587,7 +767,7 @@ async function startCustomerManualPromptPayCheckout(
         );
 
         if (redemption) {
-            console.log(
+            runtimeDebug(
                 "[CHECKOUT CLEANUP] Releasing promotion",
                 {
                     orderId:
@@ -608,7 +788,7 @@ async function startCustomerManualPromptPayCheckout(
                         redemption
                 });
 
-            console.log(
+            runtimeDebug(
                 "[CHECKOUT CLEANUP] Promotion released",
                 {
                     released: Boolean(released)
@@ -635,7 +815,7 @@ async function startCustomerManualPromptPayCheckout(
                     changedAt: new Date()
                 });
 
-                console.log(
+                runtimeDebug(
                     "[CHECKOUT CLEANUP] Order promotion snapshot updated"
                 );
             }
@@ -646,6 +826,9 @@ async function startCustomerManualPromptPayCheckout(
 }
 
 module.exports = Object.freeze({
+    assertReviewQuoteMatchesCheckout,
+    assertAuthoritativeFulfillmentReady,
+    reviewCustomerCheckout,
     startCustomerManualPromptPayCheckout,
     CustomerManualPromptPayCheckoutError,
     ERROR_CODES

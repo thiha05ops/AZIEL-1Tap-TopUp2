@@ -9,7 +9,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-    <title>Login - AZIEL 1Tap</title>
+    <title data-i18n="Login - AZIEL 1Tap">Login - AZIEL 1Tap</title>
 
     <link rel="stylesheet" href="css/core/main.css">
     <link rel="stylesheet" href="css/theme/aziel-header.css?v=20260701">
@@ -32,9 +32,9 @@
 
 
             <div class="auth-brand-content">
-                <span class="auth-pill">1Tap Game Top Up</span>
-                <h1>Welcome back</h1>
-                <p>Sign in to continue your top up orders, wallet, notifications and support.</p>
+                <span class="auth-pill" data-i18n="login.1tapGameTopUp">1Tap Game Top Up</span>
+                <h1 data-i18n="Welcome back">Welcome back</h1>
+                <p data-i18n="login.signInToContinueYourTopUpOrdersWallet">Sign in to continue your top up orders, wallet, notifications and support.</p>
             </div>
         </section>
 
@@ -42,27 +42,27 @@
 
             <div class="auth-card-head">
                 <div>
-                    <h2>Sign in</h2>
-                    <p>Use your username or email</p>
+                    <h2 data-i18n="auth.signIn">Sign in</h2>
+                    <p data-i18n="auth.signInHelp">Use your username or email</p>
                 </div>
-                <a href="register.html">Create</a>
+                <a href="register.html" data-i18n="login.create">Create</a>
             </div>
 
             <div id="msg" class="auth-message"></div>
 
             <form id="loginForm" autocomplete="off">
 
-                <label class="auth-label">Username or Email</label>
+                <label class="auth-label" data-i18n="auth.usernameOrEmail">Username or Email</label>
                 <div class="auth-input">
                     <i class="fa-regular fa-user auth-icon"></i>
-                    <input id="username" type="text" placeholder="Enter username or email" autocomplete="username"
+                    <input id="username" type="text" placeholder="Enter username or email" data-i18n-placeholder="auth.usernamePlaceholder" autocomplete="username"
                         required>
                 </div>
 
-                <label class="auth-label">Password</label>
+                <label class="auth-label" data-i18n="auth.password">Password</label>
                 <div class="auth-input">
                     <i class="fa-solid fa-lock auth-icon"></i>
-                    <input id="password" type="password" placeholder="Enter password" autocomplete="current-password"
+                    <input id="password" type="password" placeholder="Enter password" data-i18n-placeholder="auth.passwordPlaceholder" autocomplete="current-password"
                         required>
                     <button type="button" id="togglePassword" class="password-eye">
                         <i class="fa-regular fa-eye"></i>
@@ -73,28 +73,28 @@
                 <div class="auth-row">
                     <label class="remember">
                         <input type="checkbox" id="rememberMe">
-                        <span>Remember me</span>
+                        <span data-i18n="auth.rememberMe">Remember me</span>
                     </label>
 
-                    <a href="forgot-password.html" class="forgot-link">Forgot password?</a>
+                    <a href="forgot-password.html" class="forgot-link" data-i18n="auth.forgotPassword">Forgot password?</a>
                 </div>
 
-                <button type="submit" id="loginBtn" class="auth-main-btn">
+                <button type="submit" id="loginBtn" class="auth-main-btn" data-i18n="login.signIn">
                     Sign In
                 </button>
 
                 <div class="auth-divider">
-                    <span>or</span>
+                    <span data-i18n="login.or">or</span>
                 </div>
 
                 <a href="/api/auth/google" id="googleLoginBtn" class="google-btn">
                     <img src="assets/google.svg" alt="Google" class="google-icon">
-                    <span class="google-text">Continue with Google</span>
+                    <span class="google-text" data-i18n="auth.continueGoogle">Continue with Google</span>
                 </a>
 
                 <p class="auth-bottom-text">
                     Don’t have an account?
-                    <a href="register.html">Create account</a>
+                    <a href="register.html" data-i18n="auth.createAccount">Create account</a>
                 </p>
 
             </form>
@@ -103,6 +103,11 @@
 
     </main>
 
+    <script src="/lang/en.js?v=20260809-g21-explicit"></script>
+    <script src="/lang/my.js?v=20260809-g21-explicit"></script>
+    <script src="/lang/th.js?v=20260809-g21-explicit"></script>
+    <script src="/lang/storefront-static.js?v=20260809-g21-explicit"></script>
+    <script src="/js/i18n.js?v=20260809-g21-explicit"></script>
     <script src="js/motion.js?v=20260712-m7"></script>
     <script src="js/ui-feedback.js?v=20260712-m6"></script>
     <script src="js/login.js"></script>

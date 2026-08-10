@@ -3,7 +3,9 @@ const MediaAsset = require("../models/MediaAsset");
 const CatalogProduct = require("../models/CatalogProduct");
 const CatalogPackage = require("../models/CatalogPackage");
 const SupplierProductMapping = require("../models/SupplierProductMapping");
+const Supplier = require("../models/Supplier");
 const PackageInventoryState = require("../models/PackageInventoryState");
+const { getCanonicalProduct, isCanonicalProductCode, resolveCanonicalProductRoute } = require("../catalog/canonicalOperationalCatalog");
 const {
     REGION_CURRENCIES,
     getStaticCatalogSnapshot,
@@ -14,6 +16,9 @@ const {
     priceForRegion
 } = require("../catalog/catalogProjection");
 const { projectMediaAsset, projectPublicMediaAsset } = require("./mediaService");
+const { normalizeProductKnowledge, normalizeCustomerNote, normalizeCustomerNoteLocales } = require("../catalog/productKnowledge");
+const { resolvePublicProductReadiness } = require("../catalog/publicProductReadiness");
+const { isManualFulfillmentAllowed } = require("./fulfillmentCapabilityService");
 
 class CatalogError extends Error {
     constructor(code, message, statusCode = 400) {
@@ -483,6 +488,8 @@ function projectCatalogPackage(
         productCode: item.productCode,
         packageCode: item.packageCode,
         name: item.name,
+        customerNote: normalizeCustomerNote(item.customerNote),
+        customerNoteLocales: normalizeCustomerNoteLocales(item.customerNoteLocales, item.customerNote),
         enabled: item.enabled !== false,
         deleted: Boolean(item.deletedAt),
         deletedAt: item.deletedAt || null,
@@ -557,6 +564,12 @@ function projectCatalogProduct(product = {}, packages = [], { includeDisabled = 
         productCode: product.productCode,
         name: product.name,
         description: product.description || "",
+        productKnowledge: normalizeProductKnowledge(product.productKnowledge),
+        fulfillment: {
+            manualAllowedRegions: Array.isArray(product.fulfillment?.manualAllowedRegions)
+                ? product.fulfillment.manualAllowedRegions.filter(region => ["MM", "TH"].includes(region))
+                : []
+        },
         enabled: product.enabled !== false,
         featured: product.featured === true,
         catalogCategory: product.catalogCategory || "",
@@ -570,7 +583,7 @@ function projectCatalogProduct(product = {}, packages = [], { includeDisabled = 
         homepageOrder: Number(product.homepageOrder || 0),
         homepageFlags: Array.isArray(product.homepageFlags) ? product.homepageFlags : [],
         homepageSections: Array.isArray(product.homepageSections) ? product.homepageSections : [],
-        productRoute: product.productRoute || "",
+        productRoute: resolveCanonicalProductRoute(product.productCode, product.productRoute),
         artworkPath: product.artworkPath || "",
         marketScope: product.presentation?.marketScope || "MULTI_REGION",
         displayMarketLabel: product.presentation?.displayMarketLabel || "",
@@ -623,18 +636,47 @@ function projectCatalogProduct(product = {}, packages = [], { includeDisabled = 
     return projection;
 }
 
+function isAdminCanonicalCatalogProduct(product = {}) {
+    return isCanonicalProductCode(product.productCode) && product.deleted !== true;
+}
+
 function projectCommerceReadiness(product = {}, packages = [], mappings = [], inventoryStates = []) {
     const enabledPackages = packages.filter(item => item.enabled !== false && !item.deletedAt);
     const regions = Array.isArray(product.supportedRegions) ? product.supportedRegions : [];
-    const pricing = enabledPackages.some(item => regions.some(region => {
-        const price = item.prices?.[region];
-        return price?.enabled !== false && Number.isFinite(Number(price?.amount)) && Number(price.amount) > 0;
-    }));
-    const fulfillment = mappings.some(item => item.enabled !== false && regions.includes(item.region));
     const unavailablePackageIds = new Set(inventoryStates
         .filter(item => item.availabilityState && item.availabilityState !== "AVAILABLE")
-        .map(item => String(item.packageRef || item.packageId || "")));
-    const availability = enabledPackages.some(item => !unavailablePackageIds.has(String(item._id || item.packageCode || "")));
+        .flatMap(item => [String(item.packageRef || ""), String(item.packageId || item.packageCode || "").toUpperCase()]));
+    const packageAvailable = item => !unavailablePackageIds.has(String(item._id || "")) &&
+        !unavailablePackageIds.has(String(item.packageCode || "").toUpperCase());
+    const mappingMatches = (item, region) => mappings.some(mapping =>
+        mapping.enabled !== false &&
+        mapping.region === region &&
+        String(mapping.productCode || "").toLowerCase() === String(product.productCode || "").toLowerCase() &&
+        String(mapping.packageCode || "").toUpperCase() === String(item.packageCode || "").toUpperCase()
+    );
+    const regional = Object.fromEntries(["MM", "TH"].map(region => {
+        const supported = regions.includes(region);
+        const pricedPackages = enabledPackages.filter(item => {
+            const price = item.prices?.[region];
+            return supported && price?.enabled !== false && Number.isFinite(Number(price?.amount)) && Number(price.amount) > 0;
+        });
+        const manualFulfillmentAllowed = isManualFulfillmentAllowed(product, region);
+        const fulfillmentPackages = pricedPackages.filter(item => manualFulfillmentAllowed || mappingMatches(item, region));
+        const availablePackages = pricedPackages.filter(packageAvailable);
+        return [region, {
+            supported,
+            pricing: pricedPackages.length > 0,
+            fulfillment: fulfillmentPackages.length > 0,
+            availability: availablePackages.length > 0,
+            pricedPackageCount: pricedPackages.length,
+            fulfillmentPackageCount: fulfillmentPackages.length,
+            manualFulfillmentAllowed,
+            availablePackageCount: availablePackages.length
+        }];
+    }));
+    const pricing = Object.values(regional).some(item => item.pricing);
+    const fulfillment = Object.values(regional).some(item => item.fulfillment);
+    const availability = Object.values(regional).some(item => item.availability);
     const checks = {
         catalog: product.enabled !== false && !product.deletedAt,
         packages: enabledPackages.length > 0,
@@ -646,7 +688,34 @@ function projectCommerceReadiness(product = {}, packages = [], mappings = [], in
         artwork: Boolean(String(product.artworkPath || "").trim() || product.presentation?.imageAssetId)
     };
     const missing = Object.entries(checks).filter(([, valid]) => !valid).map(([key]) => key);
-    return { ready: missing.length === 0, checks, missing };
+    return { ready: missing.length === 0, checks, missing, regions: regional };
+}
+
+function applyPackageFulfillmentReadiness(projection, mappings = [], inventoryStates = []) {
+    if (!projection || !Array.isArray(projection.packages)) return projection;
+    const unavailablePackageIds = new Set(inventoryStates
+        .filter(item => item.availabilityState && item.availabilityState !== "AVAILABLE")
+        .flatMap(item => [String(item.packageRef || ""), String(item.packageId || item.packageCode || "").toUpperCase()]));
+    projection.packages.forEach(pkg => {
+        const available = !unavailablePackageIds.has(String(pkg._id || "")) &&
+            !unavailablePackageIds.has(String(pkg.packageCode || "").toUpperCase());
+        pkg.fulfillmentRegions = Object.fromEntries(["MM", "TH"].map(region => [region,
+            available && (isManualFulfillmentAllowed(projection, region) || mappings.some(mapping => mapping.enabled !== false && mapping.region === region &&
+                String(mapping.productCode || "").toLowerCase() === String(projection.productCode || "").toLowerCase() &&
+                String(mapping.packageCode || "").toUpperCase() === String(pkg.packageCode || "").toUpperCase()))
+        ]));
+    });
+    return projection;
+}
+
+function applyPublicReadiness(projection, product, packages, commerceReadiness) {
+    projection.publicReadiness = resolvePublicProductReadiness(product, packages, commerceReadiness);
+    projection.publicState = projection.publicReadiness.state;
+    projection.purchasable = projection.publicState === "AVAILABLE";
+    projection.comingSoon = projection.publicState === "COMING_SOON";
+    projection.discoverable = projection.publicState !== "HIDDEN";
+    projection.commerceState = projection.purchasable ? "PURCHASABLE" : (projection.comingSoon ? "COMING_SOON" : "HIDDEN");
+    return projection;
 }
 
 function toStaticPublicCatalog({ includeDisabled = true } = {}) {
@@ -655,18 +724,25 @@ function toStaticPublicCatalog({ includeDisabled = true } = {}) {
     return snapshot.products
         .map(product => {
             const packages = snapshot.packages.filter(item => item.productCode === product.productCode);
-            return projectCatalogProduct(product, packages, { includeDisabled });
+            const projection = projectCatalogProduct(product, packages, { includeDisabled });
+            if (!projection) return null;
+            const readiness = projectCommerceReadiness(product, packages, [], []);
+            projection.commerceReadiness = readiness;
+            return applyPublicReadiness(projection, product, packages, readiness);
         })
         .filter(Boolean);
 }
 
 async function toDatabasePublicCatalog({ includeDisabled = true, includeAssetProjection = false, includeAdminPricing = false } = {}) {
-    const [products, packages, mappings, inventoryStates] = await Promise.all([
+    const [products, packages, mappings, inventoryStates, enabledSuppliers] = await Promise.all([
         CatalogProduct.find().sort({ sortOrder: 1, productCode: 1 }).lean(),
         CatalogPackage.find().sort({ productCode: 1, sortOrder: 1, packageCode: 1 }).lean(),
         SupplierProductMapping.find({ enabled: true }).lean(),
-        PackageInventoryState.find().lean()
+        PackageInventoryState.find().lean(),
+        Supplier.find({ enabled: true }).select({ _id: 1 }).lean()
     ]);
+    const enabledSupplierIds = new Set(enabledSuppliers.map(item => String(item._id)));
+    const activeMappings = mappings.filter(item => enabledSupplierIds.has(String(item.supplierId)));
     const mediaMap = await loadMediaAssetMap(products, packages);
 
     return products
@@ -682,14 +758,11 @@ async function toDatabasePublicCatalog({ includeDisabled = true, includeAssetPro
             projection.commerceReadiness = projectCommerceReadiness(
                 product,
                 productPackages,
-                mappings.filter(item => item.productCode === product.productCode),
+                activeMappings.filter(item => item.productCode === product.productCode),
                 inventoryStates.filter(item => productPackages.some(pkg => String(pkg._id) === String(item.packageRef) || pkg.packageCode === item.packageCode))
             );
-            projection.purchasable = projection.requestedCommerceState === "PURCHASABLE" && projection.commerceReadiness.ready;
-            projection.commerceState = projection.purchasable ? "PURCHASABLE" : projection.requestedCommerceState;
-            projection.comingSoon = projection.commerceState === "COMING_SOON";
-            projection.temporarilyUnavailable = projection.commerceState === "TEMPORARILY_UNAVAILABLE";
-            projection.discoverable = projection.publicDiscoveryEnabled && projection.commerceState !== "HIDDEN";
+            applyPackageFulfillmentReadiness(projection, activeMappings.filter(item => item.productCode === product.productCode), inventoryStates);
+            applyPublicReadiness(projection, product, productPackages, projection.commerceReadiness);
             if (!includeDisabled && !projection.discoverable) return null;
             return projection;
         })
@@ -716,13 +789,46 @@ async function getCatalogProductDetail(productCode, options = {}) {
 
     if (source === "database") {
         const product = await CatalogProduct.findOne({ productCode: normalizedCode }).lean();
-        if (!product) return null;
+        if (!product) {
+            if (!options.allowCanonicalFallback) return null;
+            const canonical = getCanonicalProduct(normalizedCode);
+            if (!canonical) return null;
+            const fallback = {
+                ...canonical,
+                enabled: true,
+                featured: false,
+                lifecycleStatus: "ACTIVE",
+                commerceState: "HIDDEN",
+                publicDiscoveryEnabled: false,
+                homepageEnabled: false,
+                homepageOrder: 0,
+                homepageFlags: [],
+                homepageSections: [],
+                packages: [],
+                packageCount: 0,
+                description: "",
+                productKnowledge: normalizeProductKnowledge(),
+                seo: { title: "", description: "" },
+                metadataRecordMissing: true
+            };
+            fallback.commerceReadiness = projectCommerceReadiness(fallback, [], [], []);
+            fallback.purchasable = false;
+            fallback.discoverable = false;
+            fallback.comingSoon = false;
+            fallback.temporarilyUnavailable = false;
+            return fallback;
+        }
         const [packages, mappings, inventoryStates] = await Promise.all([
             CatalogPackage.find({ productCode: normalizedCode }).sort({ sortOrder: 1, packageCode: 1 }).lean(),
             SupplierProductMapping.find({ productCode: normalizedCode, enabled: true }).lean(),
             PackageInventoryState.find().lean()
         ]);
         const mediaMap = await loadMediaAssetMap([product], packages);
+        const enabledSupplierIds = new Set((await Supplier.find({
+            _id: { $in: mappings.map(item => item.supplierId) },
+            enabled: true
+        }).select({ _id: 1 }).lean()).map(item => String(item._id)));
+        const activeMappings = mappings.filter(item => enabledSupplierIds.has(String(item.supplierId)));
         const projection = projectCatalogProduct(product, packages, {
             includeDisabled: options.includeDisabled !== false,
             mediaMap,
@@ -734,14 +840,11 @@ async function getCatalogProductDetail(productCode, options = {}) {
         projection.commerceReadiness = projectCommerceReadiness(
             product,
             packages,
-            mappings,
+            activeMappings,
             inventoryStates.filter(item => packageIds.has(String(item.packageRef)) || packages.some(pkg => pkg.packageCode === item.packageCode))
         );
-        projection.purchasable = projection.requestedCommerceState === "PURCHASABLE" && projection.commerceReadiness.ready;
-        projection.commerceState = projection.purchasable ? "PURCHASABLE" : projection.requestedCommerceState;
-        projection.comingSoon = projection.commerceState === "COMING_SOON";
-        projection.temporarilyUnavailable = projection.commerceState === "TEMPORARILY_UNAVAILABLE";
-        projection.discoverable = projection.publicDiscoveryEnabled && projection.commerceState !== "HIDDEN";
+        applyPackageFulfillmentReadiness(projection, activeMappings, inventoryStates);
+        applyPublicReadiness(projection, product, packages, projection.commerceReadiness);
         if (options.includeDisabled === false && !projection.discoverable) return null;
         return projection;
     }
@@ -751,9 +854,75 @@ async function getCatalogProductDetail(productCode, options = {}) {
     return product || null;
 }
 
+async function resolveAdminCatalogProduct(productCode, options = {}) {
+    const canonical = getCanonicalProduct(productCode);
+    if (!canonical) return null;
+
+    const canonicalCode = canonical.productCode;
+    const findProduct = options.findProduct || (code => CatalogProduct.findOne({ productCode: code }).lean());
+    const findPackages = options.findPackages || (code => CatalogPackage.find({ productCode: code }).sort({ sortOrder: 1, packageCode: 1 }).lean());
+    const findMappings = options.findMappings || (code => SupplierProductMapping.find({ productCode: code, enabled: true }).lean());
+    const findInventoryStates = options.findInventoryStates || (() => PackageInventoryState.find().lean());
+    const product = await findProduct(canonicalCode);
+    const [packages, mappings, inventoryStates] = await Promise.all([
+        findPackages(canonicalCode),
+        findMappings(canonicalCode),
+        findInventoryStates()
+    ]);
+    const foundation = product ? {
+        ...canonical,
+        ...product,
+        productCode: canonicalCode,
+        name: product.name || canonical.name,
+        supportedRegions: Array.isArray(product.supportedRegions) ? product.supportedRegions : canonical.supportedRegions
+    } : {
+        ...canonical,
+        enabled: true,
+        featured: false,
+        lifecycleStatus: "ACTIVE",
+        commerceState: "HIDDEN",
+        publicDiscoveryEnabled: false,
+        homepageEnabled: false,
+        homepageOrder: 0,
+        homepageFlags: [],
+        homepageSections: [],
+        description: "",
+        productKnowledge: normalizeProductKnowledge(),
+        seo: { title: "", description: "" }
+    };
+    const mediaMap = options.loadMediaMap
+        ? await options.loadMediaMap([foundation], packages)
+        : await loadMediaAssetMap([foundation], packages);
+    const enabledSupplierIds = options.findMappings
+        ? new Set(mappings.map(item => String(item.supplierId || "")))
+        : new Set((await Supplier.find({
+            _id: { $in: mappings.map(item => item.supplierId) },
+            enabled: true
+        }).select({ _id: 1 }).lean()).map(item => String(item._id)));
+    const activeMappings = mappings.filter(item => enabledSupplierIds.has(String(item.supplierId || "")));
+    const projection = projectCatalogProduct(foundation, packages, {
+        includeDisabled: true,
+        mediaMap,
+        includeAssetProjection: options.includeAssetProjection !== false,
+        includeAdminPricing: options.includeAdminPricing !== false
+    });
+    const packageIds = new Set(packages.map(item => String(item._id)));
+    projection.commerceReadiness = projectCommerceReadiness(
+        foundation,
+        packages,
+        activeMappings,
+        inventoryStates.filter(item => packageIds.has(String(item.packageRef)) || packages.some(pkg => pkg.packageCode === item.packageCode))
+    );
+    applyPackageFulfillmentReadiness(projection, activeMappings, inventoryStates);
+    applyPublicReadiness(projection, foundation, packages, projection.commerceReadiness);
+    projection.metadataRecordMissing = !product;
+    return projection;
+}
+
 module.exports = {
     CatalogError,
     getCatalogProductDetail,
+    resolveAdminCatalogProduct,
     getCatalogSource,
     getPackage,
     getProduct,
@@ -764,5 +933,7 @@ module.exports = {
     resolveOrderCatalog,
     resolvePackagePrice,
     projectCommerceReadiness,
+    applyPublicReadiness,
+    isAdminCanonicalCatalogProduct,
     toPublicCatalog
 };

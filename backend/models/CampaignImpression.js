@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { CAMPAIGN_PLACEMENTS } = require("../catalog/campaignPlacements");
 
 const campaignImpressionSchema = new mongoose.Schema(
     {
@@ -23,7 +24,7 @@ const campaignImpressionSchema = new mongoose.Schema(
         },
         placement: {
             type: String,
-            enum: ["ENTRY_POPUP"],
+            enum: CAMPAIGN_PLACEMENTS,
             required: true
         },
         frequencyPolicy: {

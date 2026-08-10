@@ -1,5 +1,5 @@
 .site-footer {
-    width: min(var(--public-page-max, 1200px), calc(100% - 48px));
+    width: min(var(--public-storefront-max, 1500px), calc(100% - (var(--public-storefront-gutter, 24px) * 2)));
     margin: 72px auto 0;
     padding: 42px 0 max(34px, calc(34px + env(safe-area-inset-bottom)));
 
@@ -38,7 +38,7 @@
 
 .site-footer a:hover,
 .site-footer a:focus-visible {
-    color: #8b5cf6;
+    color: var(--primary);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -49,12 +49,16 @@
 
 .site-footer a:focus-visible,
 .site-footer .payment-logos img:focus-visible {
-    outline: 3px solid rgba(139, 92, 246, .72);
+    outline: 3px solid color-mix(in srgb, var(--primary) 72%, transparent);
     outline-offset: 3px;
 }
 
 .site-footer a:active {
     transform: translateX(3px);
+}
+
+.footer-accordion-trigger {
+    display: none;
 }
 
 .site-footer .payment-logos {
@@ -70,7 +74,7 @@
     object-fit: contain;
     padding: 5px 9px;
     border-radius: 10px;
-    background: rgba(255, 255, 255, .08);
+    background: color-mix(in srgb, var(--surface) 24%, transparent);
     border: 1px solid var(--border);
 }
 
@@ -94,18 +98,18 @@ body.theme-light .site-footer {
 
 body.light .site-footer .payment-logos img,
 body.theme-light .site-footer .payment-logos img {
-    background: rgba(255, 255, 255, .72);
-    border-color: rgba(15, 23, 42, .08);
+    background: color-mix(in srgb, var(--surface) 72%, transparent);
+    border-color: var(--border);
 }
 
 /* Mobile */
 @media (max-width: 900px) {
     .site-footer {
         width: calc(100% - 28px);
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 22px 18px;
-        margin-top: 48px;
-        padding-top: 30px;
+        grid-template-columns: 1fr;
+        gap: 0;
+        margin-top: 36px;
+        padding: 24px 0 max(28px, calc(28px + env(safe-area-inset-bottom)));
     }
 
     .site-footer p,
@@ -113,14 +117,100 @@ body.theme-light .site-footer .payment-logos img {
         font-size: 12.5px;
         line-height: 1.55;
     }
+
+    .site-footer > div:first-child {
+        margin-bottom: 14px;
+    }
+
+    .site-footer > div:first-child p {
+        max-width: 520px;
+        margin: 0;
+    }
+
+    .footer-accordion-group {
+        border-top: 1px solid var(--border);
+    }
+
+    .footer-accordion-group > h4 {
+        display: none;
+    }
+
+    .footer-accordion-trigger {
+        display: flex;
+        width: 100%;
+        min-height: 48px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        color: var(--heading);
+        background: transparent;
+        font: inherit;
+        font-size: 13px;
+        font-weight: 700;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .footer-accordion-trigger i {
+        color: var(--text-muted);
+        font-size: 11px;
+        transition: transform var(--motion-fast, .18s) ease;
+    }
+
+    .footer-accordion-trigger[aria-expanded="true"] i {
+        transform: rotate(180deg);
+    }
+
+    .footer-accordion-trigger:focus-visible {
+        outline: 3px solid rgba(139, 92, 246, .72);
+        outline-offset: 2px;
+    }
+
+    .footer-accordion-panel {
+        padding: 0 0 12px;
+    }
+
+    .footer-accordion-panel[hidden] {
+        display: none !important;
+    }
+
+    .site-footer > div:has(.payment-logos) {
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border);
+    }
+
+    .site-footer > div:has(.payment-logos) h4 {
+        margin-bottom: 8px;
+    }
+
+    .site-footer .payment-logos {
+        flex-wrap: wrap;
+        gap: 8px !important;
+    }
+
+    .site-footer .payment-logos img {
+        width: 48px;
+        height: 28px !important;
+        min-width: 48px !important;
+        padding: 4px 7px !important;
+        border-radius: 8px !important;
+    }
+
+    .footer-copy {
+        margin-top: 16px;
+        padding-top: 16px;
+        line-height: 1.45;
+    }
 }
 
 @media (max-width: 520px) {
     .site-footer {
-        grid-template-columns: 1fr;
-        gap: 18px;
-        margin-top: 38px;
-        padding-bottom: max(96px, calc(80px + env(safe-area-inset-bottom)));
+        margin-top: 30px;
+        padding-bottom: max(82px, calc(68px + env(safe-area-inset-bottom)));
     }
 
     .footer-copy {

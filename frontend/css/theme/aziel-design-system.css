@@ -15,6 +15,25 @@
     --success: #22c55e;
     --warning: #f59e0b;
     --danger: #ef4444;
+    --az-color-scheme: dark;
+    --bg: #070b1d;
+    --bg-soft: #0c1224;
+    --surface: rgba(255, 255, 255, .055);
+    --surface-strong: #10182f;
+    --card: rgba(255, 255, 255, .06);
+    --card-hover: rgba(255, 255, 255, .09);
+    --border: rgba(255, 255, 255, .09);
+    --text: #ffffff;
+    --text-secondary: #b7c0d4;
+    --text-muted: #8a93a8;
+    --heading: #ffffff;
+    --page-bg: #070b1d;
+    --input-bg: rgba(255, 255, 255, .06);
+    --input-text: #ffffff;
+    --soft-panel: rgba(255, 255, 255, .06);
+    --shadow-sm: 0 4px 12px rgba(0, 0, 0, .18);
+    --shadow-md: 0 12px 28px rgba(0, 0, 0, .28);
+    --shadow-lg: 0 24px 60px rgba(0, 0, 0, .38);
 
     --radius-sm: 12px;
     --radius-md: 18px;
@@ -24,6 +43,9 @@
     --transition: var(--motion-duration-normal, .25s) var(--motion-ease-standard, ease);
 
     --az-container: 1200px;
+    --public-storefront-max: 1500px;
+    --public-storefront-gutter: clamp(18px, 2.4vw, 36px);
+    --public-storefront-mobile-gutter: 16px;
     --az-page-x: 92%;
     --az-header-h: 72px;
     --az-page-max: 1200px;
@@ -37,8 +59,6 @@
     --az-section-gap-compact: 22px;
     --az-content-gap: 16px;
     --az-control-gap: 10px;
-    --az-header-height: 72px;
-    --az-header-mobile-height: 96px;
     --az-radius-surface: 16px;
     --az-radius-hero: 24px;
     --az-border-subtle: var(--border);
@@ -104,6 +124,36 @@
     --safe-left: env(safe-area-inset-left);
 }
 
+@media (prefers-color-scheme: light) {
+    :root:not(.theme-dark) {
+        --az-color-scheme: light;
+        --bg: #f5f6fb;
+        --bg-soft: #eef1f7;
+        --surface: rgba(255, 255, 255, .78);
+        --surface-strong: #ffffff;
+        --card: rgba(255, 255, 255, .86);
+        --card-hover: #ffffff;
+        --border: rgba(17, 24, 39, .10);
+        --text: #111827;
+        --text-secondary: #374151;
+        --text-muted: #6b7280;
+        --heading: #111827;
+        --page-bg: #f5f6fb;
+        --input-bg: rgba(255, 255, 255, .86);
+        --input-text: #111827;
+        --soft-panel: rgba(255, 255, 255, .82);
+        --shadow-sm: 0 4px 12px rgba(17, 24, 39, .06);
+        --shadow-md: 0 12px 28px rgba(17, 24, 39, .10);
+        --shadow-lg: 0 24px 60px rgba(17, 24, 39, .14);
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not(.theme-light) {
+        --az-color-scheme: dark;
+    }
+}
+
 @media (max-width: 768px) {
     :root {
         --az-section-gap: 28px;
@@ -117,11 +167,48 @@
     }
 }
 
+/* Shared public-storefront loading primitives. */
+.az-storefront-skeleton {
+    position: relative;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--surface) 82%, transparent) !important;
+}
+
+.az-storefront-skeleton::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--text) 8%, transparent), transparent);
+    transform: translateX(-100%);
+    animation: azStorefrontSkeleton 1.35s ease-in-out infinite;
+}
+
+.az-visually-hidden {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+
+@keyframes azStorefrontSkeleton {
+    to { transform: translateX(100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .az-storefront-skeleton::before { animation: none; }
+}
+
 /* =========================
    DARK / LIGHT VARIABLES
 ========================= */
 
 body.theme-dark {
+    --az-color-scheme: dark;
     --bg: #070b1d;
     --bg-soft: #0c1224;
     --surface: rgba(255, 255, 255, .055);
@@ -140,6 +227,7 @@ body.theme-dark {
 }
 
 body.theme-light {
+    --az-color-scheme: light;
     --bg: #f5f6fb;
     --bg-soft: #eef1f7;
     --surface: rgba(255, 255, 255, .78);
@@ -169,7 +257,7 @@ body.theme-light {
 
 html {
     scroll-behavior: smooth;
-    color-scheme: dark;
+    color-scheme: var(--az-color-scheme, dark);
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
     background: var(--bg, #070b1d);

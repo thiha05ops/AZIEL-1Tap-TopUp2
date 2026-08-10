@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">AZIEL game top-up placeholder</title>
+  <rect width="64" height="64" rx="14" fill="#e9edf8"/>
+  <path d="M20 27c-6 1-9 17-4 20 3 2 7-4 10-7h12c3 3 7 9 10 7 5-3 2-19-4-20-4-1-7 2-12 2s-8-3-12-2Z" fill="none" stroke="#536fa7" stroke-width="3"/>
+  <path d="M23 32v8M19 36h8M40 34h.1M45 39h.1" stroke="#536fa7" stroke-width="3" stroke-linecap="round"/>
+</svg>

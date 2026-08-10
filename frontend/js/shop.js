@@ -2,8 +2,6 @@
 
 document.addEventListener("DOMContentLoaded", () => {
 
-    console.log("Shop Page Loaded ✅");
-
     // hero animation
     const title = document.querySelector(".shop-hero h1");
 

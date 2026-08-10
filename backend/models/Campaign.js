@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { CAMPAIGN_PLACEMENTS } = require("../catalog/campaignPlacements");
 
 const campaignSchema = new mongoose.Schema(
     {
@@ -22,9 +23,16 @@ const campaignSchema = new mongoose.Schema(
         },
         placement: {
             type: String,
-            enum: ["ENTRY_POPUP"],
+            enum: CAMPAIGN_PLACEMENTS,
             required: true,
             default: "ENTRY_POPUP"
+        },
+        targetProductCode: {
+            type: String,
+            trim: true,
+            lowercase: true,
+            default: "",
+            index: true
         },
         title: {
             type: String,
@@ -46,6 +54,11 @@ const campaignSchema = new mongoose.Schema(
             type: String,
             trim: true,
             default: ""
+        },
+        locales: {
+            en: { type: mongoose.Schema.Types.Mixed, default: undefined },
+            my: { type: mongoose.Schema.Types.Mixed, default: undefined },
+            th: { type: mongoose.Schema.Types.Mixed, default: undefined }
         },
         ctaTarget: {
             type: String,
@@ -80,6 +93,10 @@ const campaignSchema = new mongoose.Schema(
             default: 0
         },
         enabled: {
+            type: Boolean,
+            default: false
+        },
+        hasBeenEnabled: {
             type: Boolean,
             default: false
         },

@@ -7,6 +7,7 @@ const { REGION_CURRENCIES, normalizePackageCode, normalizeProductCode, normalize
 const { buildProductionPricingContext } = require("./productionPricingContextService");
 const { createPricingQuote } = require("./pricingQuoteRuntime");
 const { loadCommercePromotionContext } = require("./commercePromotionBridgeService");
+const { resolveCommercePricingPreviewDetailed } = require("./commercePricingPreviewService");
 const { updatePackage } = require("../catalogAdminService");
 const { clearPublishedSupplierCostDraftRows } = require("./pricingWorkspaceDraftService");
 const { resolvePricingSupplier } = require("./pricingSupplierService");
@@ -197,7 +198,7 @@ function previewFromQuote({ quote, context, price, couponCode }) {
     const warnings = [];
 
     if (!supplierConfigured) {
-        warnings.push(warning("UNKNOWN_SUPPLIER_COST", "Supplier cost not configured. Profit and margin are compatibility estimates only."));
+        warnings.push(warning("UNKNOWN_SUPPLIER_COST", "Authoritative supplier cost is unavailable. Profit and margin are not calculated."));
     }
     if (status === PROFITABILITY_STATUS.LOW_MARGIN) warnings.push(warning("LOW_MARGIN", "Margin is below the recommended operating threshold."));
     if (status === PROFITABILITY_STATUS.NEGATIVE_MARGIN) warnings.push(warning("NEGATIVE_MARGIN", "This price creates a loss after business costs."));
@@ -883,106 +884,48 @@ async function previewPackagePricing({ productCode, packageCode, region, priceDr
     if (!existing) {
         throw new AdminPricingControlCenterError("CATALOG_PRICE_NOT_FOUND", "Regional price is not configured.", 404);
     }
-    const price = selectedPrice(existing, priceDraft, normalizedRegion);
-    if (!price.amount || price.amount <= 0) {
-        throw new AdminPricingControlCenterError("INVALID_CONFIGURATION", "Selling price is required.", 400);
-    }
-
-    const draftPackage = {
-        ...pkg,
-        prices: {
-            ...pkg.prices,
-            [normalizedRegion]: price
-        }
-    };
-
-    let context;
+    const draftPrice = selectedPrice(existing, priceDraft, normalizedRegion);
+    let detailed;
     try {
-        context = await buildProductionPricingContext({
-            pkg: draftPackage,
-            price,
-            catalog: {
-                productCode: product.productCode,
-                productName: product.name,
-                packageCode: pkg.packageCode,
-                packageName: pkg.name
-            },
+        detailed = await resolveCommercePricingPreviewDetailed({
+            productCode: product.productCode,
+            packageCode: pkg.packageCode,
             region: normalizedRegion,
-            currency: price.currency
+            currency: existing.currency,
+            promoCode: upper(couponCode)
+        }, {
+            user: actor || null,
+            sessionId: "admin-pricing-preview"
         });
     } catch (error) {
         const isExchangeError = /exchange rate/i.test(error.message || "");
         return {
             success: true,
             region: normalizedRegion,
-            currency: price.currency,
-            sellingPrice: round(price.amount),
-            supplierCost: price.supplierCost == null ? null : round(price.supplierCost),
-            supplierCurrency: price.supplierCurrency || price.currency,
-            supplierCostConfigured: price.supplierCost != null,
+            currency: existing.currency,
+            sellingPrice: round(existing.amount),
+            supplierCost: null,
+            supplierCurrency: existing.supplierCurrency || existing.currency,
+            supplierCostConfigured: false,
             profitabilityStatus: isExchangeError ? PROFITABILITY_STATUS.EXCHANGE_RATE_MISSING : PROFITABILITY_STATUS.INVALID_CONFIGURATION,
             warnings: [],
-            blockingErrors: [warning(isExchangeError ? "EXCHANGE_RATE_MISSING" : "INVALID_CONFIGURATION", error.message || "Pricing preview unavailable.")]
+            blockingErrors: [warning(isExchangeError ? "EXCHANGE_RATE_MISSING" : "PRICING_PREVIEW_UNAVAILABLE", error.message || "Pricing preview unavailable.")],
+            authority: "COMMERCE_PRICING_RUNTIME",
+            authoritative: false
         };
     }
-
-    const code = upper(couponCode);
-    let promotionContext = null;
-    if (code) {
-        try {
-            promotionContext = await loadCommercePromotionContext({
-                couponCode: code,
-                catalog: {
-                    productCode: product.productCode,
-                    productName: product.name,
-                    packageCode: pkg.packageCode,
-                    packageName: pkg.name,
-                    region: normalizedRegion,
-                    currency: price.currency,
-                    amount: price.amount
-                },
-                owner: { userId: "admin-pricing-preview" },
-                packageContext: context.packageContext
-            });
-        } catch (error) {
-            promotionContext = {
-                promotions: [],
-                campaigns: [],
-                context: { couponCode: code },
-                strategy: { mode: "BEST_PRICE" },
-                previewError: error.message || "Coupon preview unavailable."
-            };
-        }
-    }
-
-    const quote = createPricingQuote({
-        quoteId: `admin-preview:${product.productCode}:${pkg.packageCode}:${normalizedRegion}:${Date.now()}`,
-        issuedAt: new Date().toISOString(),
-        validitySeconds: 300,
-        owner: { userId: actor?.id || actor?.username || "admin-pricing-preview" },
-        request: {
-            region: normalizedRegion,
-            currency: price.currency,
-            package: {
-                ...context.packageContext,
-                quantity: 1
-            },
-            couponCode: code
-        },
-        pricingInput: context.pricing.pricingInput,
-        promotionInput: promotionContext ? {
-            promotions: promotionContext.promotions || [],
-            campaigns: promotionContext.campaigns || [],
-            context: promotionContext.context || {},
-            strategy: promotionContext.strategy || {}
-        } : null,
-        versionContext: context.pricing.versionContext
+    const preview = previewFromQuote({
+        quote: detailed.quote,
+        context: detailed.pricingContext,
+        price: existing,
+        couponCode: upper(couponCode)
     });
-
-    const preview = previewFromQuote({ quote, context, price, couponCode: code });
-    if (promotionContext?.previewError) {
-        preview.warnings.push(warning("COUPON_PREVIEW_UNAVAILABLE", promotionContext.previewError));
-    }
+    preview.authority = "COMMERCE_PRICING_RUNTIME";
+    preview.authoritative = true;
+    preview.currentCommercePrice = preview.baseSellingPrice;
+    preview.publishedCatalogPrice = round(existing.amount);
+    preview.publishedPriceDifference = round(preview.currentCommercePrice - preview.publishedCatalogPrice);
+    preview.draftCatalogPrice = round(draftPrice.amount);
     return preview;
 }
 

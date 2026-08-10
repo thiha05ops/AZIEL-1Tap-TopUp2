@@ -5,10 +5,27 @@ document.addEventListener("DOMContentLoaded", () => {
     initDrawer();
     initRegionPayments();
     initWalletPreview();
-    initTheme();
+    initHomeHero();
 
     initAzielBanner();
 });
+
+function initHomeHero() {
+    const searchButton = document.getElementById("homeHeroSearchBtn");
+    if (!searchButton || searchButton.dataset.ready === "true") return;
+
+    searchButton.dataset.ready = "true";
+    searchButton.addEventListener("click", () => {
+        if (window.AZIEL_SEARCH?.open) {
+            window.AZIEL_SEARCH.open(searchButton);
+            return;
+        }
+
+        window.addEventListener("aziel:searchReady", () => {
+            window.AZIEL_SEARCH?.open?.(searchButton);
+        }, { once: true });
+    });
+}
 
 function initUserHeader() {
     const username = localStorage.getItem("username");
@@ -117,29 +134,6 @@ function initWalletPreview() {
     headerWalletText.innerText = `${currency} ${Number(amount).toLocaleString()}`;
 }
 
-function initTheme() {
-    const savedTheme = localStorage.getItem("azielTheme");
-
-    const systemLight =
-        window.matchMedia &&
-        window.matchMedia("(prefers-color-scheme: light)").matches;
-
-    const theme = savedTheme || (systemLight ? "light" : "dark");
-
-    document.body.classList.remove("theme-light", "theme-dark");
-    document.body.classList.add(`theme-${theme}`);
-
-    if (!window.matchMedia) return;
-
-    const media = window.matchMedia("(prefers-color-scheme: light)");
-
-    media.addEventListener("change", e => {
-        if (localStorage.getItem("azielTheme")) return;
-
-        document.body.classList.remove("theme-light", "theme-dark");
-        document.body.classList.add(e.matches ? "theme-light" : "theme-dark");
-    });
-}
 function initAzielBanner() {
     const track = document.getElementById("azBannerTrack");
     const cards = [...document.querySelectorAll(".az-banner-card")];

@@ -67,7 +67,8 @@ function verifyImmediateOverlayRefresh() {
     includes("frontend/js/payment/pending-payment-recovery.js", "RECOVERY_REFRESH_STARTED", "Recovery overlay must trace refresh start in development.");
     includes("frontend/js/payment/pending-payment-recovery.js", "RECOVERY_REFRESH_RESULT", "Recovery overlay must trace refresh results in development.");
     includes("frontend/js/payment/pending-payment-recovery.js", "RECOVERY_OVERLAY_RENDERED", "Recovery overlay must trace rendered overlay in development.");
-    assert(!/location\.(reload|replace)|window\.location\.href/.test(recovery), "Recovery overlay must not use navigation or reload to show after close.");
+    assert(!/location\.(reload|replace)/.test(recovery), "Recovery overlay must not reload or replace the current page after close.");
+    assert(recovery.includes("window.location.href = `payment.html?attemptId="), "Resume must navigate only to the dedicated Payment page for the selected attempt.");
     assert(!/setInterval\([^)]*fetchRecoverable/.test(recovery), "Recovery overlay must not poll recoverable attempts.");
 }
 

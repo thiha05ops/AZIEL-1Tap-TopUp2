@@ -144,7 +144,12 @@ function hasManualPaymentEvidence(order = {}) {
 }
 
 function hasCommercePaymentEvidence(attempt = {}) {
-    return Boolean(attempt.safeMetadata?.receiptAttached && attempt.safeMetadata?.receiptEvidence?.fileReference);
+    const evidence = attempt.safeMetadata?.receiptEvidence;
+    return Boolean(
+        attempt.safeMetadata?.receiptAttached &&
+        evidence?.receiptId &&
+        evidence?.fileReference
+    );
 }
 
 function commerceAdminId(attempt = {}) {
@@ -194,6 +199,42 @@ function commercePaymentEvidence(attempt = {}) {
     };
 }
 
+function projectFulfilmentAccountFields(order = {}) {
+    const input = order.fulfilment?.input || {};
+    const configured = Array.isArray(input.accountFields) ? input.accountFields : [];
+    const fields = configured.map(field => ({
+        key: String(field?.key || "").trim(),
+        label: String(field?.label || field?.key || "").trim(),
+        value: String(field?.value || "").trim()
+    })).filter(field => field.key && field.label && field.value && field.value !== "-");
+
+    if (!fields.length) {
+        const standard = [
+            ["userId", "User ID", input.gameAccount?.userId || input.userId],
+            ["serverId", "Server ID", input.gameAccount?.serverId || input.serverId],
+            ["zoneId", "Zone ID", input.gameAccount?.zoneId || input.zoneId],
+            ["playerName", "Player Name", input.gameAccount?.playerName || input.playerName]
+        ];
+        standard.forEach(([key, label, value]) => {
+            const clean = String(value || "").trim();
+            if (clean && clean !== "-") fields.push({ key, label, value: clean });
+        });
+        const custom = input.customFields || input.gameAccount?.customFields || {};
+        Object.entries(custom).forEach(([key, value]) => {
+            const clean = String(value || "").trim();
+            if (clean && clean !== "-") fields.push({ key, label: key.replace(/[_-]+/g, " ").replace(/\b\w/g, char => char.toUpperCase()), value: clean });
+        });
+    }
+
+    const seen = new Set();
+    return fields.filter(field => {
+        const identity = `${field.key}:${field.value}`;
+        if (seen.has(identity)) return false;
+        seen.add(identity);
+        return true;
+    });
+}
+
 function projectCommerceManualAttempt(attempt = {}, order = {}, options = {}) {
     const product = order.product || {};
     const commercial = order.commercial || {};
@@ -201,6 +242,7 @@ function projectCommerceManualAttempt(attempt = {}, order = {}, options = {}) {
     const paymentStatus = commercePaymentStatusForAttempt(attempt, order);
     const evidence = commercePaymentEvidence(attempt);
 
+    const accountFields = projectFulfilmentAccountFields(order);
     return {
         _id: commerceAdminId(attempt),
         orderId: order.orderId || attempt.orderId || "",
@@ -211,8 +253,14 @@ function projectCommerceManualAttempt(attempt = {}, order = {}, options = {}) {
         game: product.gameName || product.gameCode || "",
         productCode: product.gameCode || product.gameId || "",
         productName: product.gameName || product.gameCode || "",
-        userId: order.owner?.userId || attempt.ownerId || "",
-        zoneId: order.fulfilment?.input?.zoneId || order.fulfilment?.input?.serverId || "",
+        userId: accountFields.find(field => field.key === "userId")?.value || "",
+        zoneId: accountFields.find(field => ["zoneId", "serverId"].includes(field.key))?.value || "",
+        accountFields,
+        customerAccount: {
+            id: order.owner?.userId || attempt.ownerId || "",
+            username: order.customer?.username || order.customer?.contact?.email || "",
+            region: attempt.region || order.commercial?.region || order.product?.region || ""
+        },
         packageName: product.packageName || product.packageCode || "",
         packageCode: product.packageCode || product.packageId || "",
         amount: Number(attempt.amount ?? commercial.totalAmount ?? 0),
@@ -243,8 +291,8 @@ function projectCommerceManualAttempt(attempt = {}, order = {}, options = {}) {
         },
         fulfillmentAttempts: [],
         actions: {
-            canApproveManualPayment: status === "pending_payment",
-            canRejectManualPayment: status === "pending_payment"
+            canApproveManualPayment: status === "pending_payment" && hasCommercePaymentEvidence(attempt),
+            canRejectManualPayment: status === "pending_payment" && hasCommercePaymentEvidence(attempt)
         },
         hasPaymentEvidence: hasCommercePaymentEvidence(attempt),
         isSummary: options.summary === true,
@@ -267,6 +315,9 @@ function projectCommerceOrder(order = {}, options = {}) {
     ));
     const awaitingManualReview = receiptSubmitted && order.status === "pending_payment" && (order.paymentStatus || payment.status) === "pending";
     const awaitingPayment = !receiptSubmitted && order.status === "pending_payment" && ["pending", "unpaid"].includes(order.paymentStatus || payment.status);
+    const accountFields = projectFulfilmentAccountFields(order);
+    const fulfillmentAttempts = Array.isArray(options.fulfillmentAttempts) ? options.fulfillmentAttempts : [];
+    const latestFulfillment = fulfillmentAttempts[0] || null;
     return {
         _id: options.admin ? `commerce-order:${order.orderId}` : order._id,
         orderId: order.orderId || "",
@@ -276,8 +327,14 @@ function projectCommerceOrder(order = {}, options = {}) {
         game: product.gameName || product.gameCode || "",
         productCode: product.gameCode || product.gameId || "",
         productName: product.gameName || product.gameCode || "",
-        userId: fulfilmentInput.gameAccount?.userId || fulfilmentInput.userId || order.owner?.userId || "",
-        zoneId: fulfilmentInput.gameAccount?.zoneId || fulfilmentInput.zoneId || fulfilmentInput.serverId || "",
+        userId: accountFields.find(field => field.key === "userId")?.value || "",
+        zoneId: accountFields.find(field => ["zoneId", "serverId"].includes(field.key))?.value || "",
+        accountFields,
+        customerAccount: {
+            id: order.owner?.userId || "",
+            username: options.username || order.customer?.username || order.customer?.contact?.email || "",
+            region: commercial.region || product.region || ""
+        },
         packageName: product.packageName || product.packageCode || "",
         packageCode: product.packageCode || product.packageId || "",
         amount: Number(commercial.totalAmount || 0),
@@ -303,11 +360,11 @@ function projectCommerceOrder(order = {}, options = {}) {
         refundRequested: false,
         refunded: false,
         allowedNextStatuses: getAllowedNextStatuses(order.status),
-        fulfillment: {
+        fulfillment: latestFulfillment || {
             status: String(order.fulfilment?.status || "not_started").toUpperCase(),
             source: "commerce"
         },
-        fulfillmentAttempts: [],
+        fulfillmentAttempts,
         actions: {},
         hasPaymentEvidence: false,
         isSummary: options.summary === true,
@@ -393,7 +450,12 @@ async function listCommerceOrdersForAdmin({ status = "", search = "", limit = 50
         .sort({ createdAt: -1, _id: -1 })
         .limit(limit)
         .lean();
-    return orders.map(order => projectCommerceOrder(order, { admin: true, summary: true }));
+    const fulfillmentByOrder = await getOrderFulfillmentSummary(orders.map(order => order._id));
+    return orders.map(order => projectCommerceOrder(order, {
+        admin: true,
+        summary: true,
+        fulfillmentAttempts: fulfillmentByOrder.get(String(order._id)) || []
+    }));
 }
 
 async function getCommerceManualOrderForAdmin(id = "", options = {}) {
@@ -412,7 +474,13 @@ async function getCommerceOrderForAdmin(id = "", options = {}) {
     const orderId = commerceOrderIdFromAdminId(id);
     if (!orderId) return null;
     const order = await CommerceOrder.findOne({ orderId }).lean();
-    return order ? projectCommerceOrder(order, { admin: true, ...options }) : null;
+    if (!order) return null;
+    const fulfillmentByOrder = await getOrderFulfillmentSummary([order._id]);
+    return projectCommerceOrder(order, {
+        admin: true,
+        ...options,
+        fulfillmentAttempts: fulfillmentByOrder.get(String(order._id)) || []
+    });
 }
 
 function projectAdminOrder(order, fulfillmentAttempts = []) {
@@ -549,21 +617,26 @@ router.get("/order/user/:username", authMiddleware, async (req, res) => {
 });
 
 // TRACK SINGLE ORDER
-router.get("/order/track/:orderId", async (req, res) => {
+router.get("/order/track/:orderId", authMiddleware, async (req, res) => {
     try {
         let order = await Order.findOne({
-            orderId: req.params.orderId
+            orderId: req.params.orderId,
+            username: getAuthenticatedUsername(req)
         });
 
         if (!order) {
-            const commerceOrder = await CommerceOrder.findOne({ orderId: req.params.orderId }).lean();
+            const commerceOrder = await CommerceOrder.findOne({
+                orderId: req.params.orderId,
+                "owner.type": "USER",
+                "owner.userId": String(req.user?._id || req.user?.id || req.user?.userId || "")
+            }).lean();
             if (commerceOrder) {
                 return res.json({
                     success: true,
                     order: projectCommerceOrder(commerceOrder)
                 });
             }
-            return res.json({
+            return res.status(404).json({
                 success: false,
                 message: "Order not found"
             });

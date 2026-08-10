@@ -2,6 +2,7 @@
    AZIEL TRACKING V2.5
    Shared Theme Compatible
 ========================= */
+@import url("../commerce/purchase-shell.css?v=20260808-unified");
 
 body {
     color: var(--text);

@@ -11,11 +11,12 @@ const {
 const {
     createCommerceManualPaymentController
 } = require("../controllers/commerceManualPaymentController");
+const { runtimeDebug } = require("../utils/runtimeDebug");
 
 function requestProbe(req, res, next) {
     const startedAt = Date.now();
 
-    console.log("[COMMERCE ROUTE PROBE] Request entered", {
+    runtimeDebug("[COMMERCE ROUTE PROBE] Request entered", {
         method: req.method,
         originalUrl: req.originalUrl,
         path: req.path,
@@ -27,7 +28,7 @@ function requestProbe(req, res, next) {
     });
 
     res.once("finish", () => {
-        console.log("[COMMERCE ROUTE PROBE] Response finished", {
+        runtimeDebug("[COMMERCE ROUTE PROBE] Response finished", {
             method: req.method,
             originalUrl: req.originalUrl,
             statusCode: res.statusCode,
@@ -62,6 +63,13 @@ function createCommerceManualPaymentRoutes(options = {}) {
         requestProbe,
         authMiddleware,
         controller.listRecoverable
+    );
+
+    router.post(
+        "/commerce/checkout/review",
+        requestProbe,
+        authMiddleware,
+        controller.reviewCheckout
     );
 
     router.post(

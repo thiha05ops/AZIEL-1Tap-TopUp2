@@ -8,6 +8,7 @@ const optionalAuthMiddleware = require("../middleware/optionalAuthMiddleware");
 const {
     CampaignError,
     claimEntryPopup,
+    claimCampaignPlacement,
     createCampaign,
     listAdminCampaigns,
     removeCampaign,
@@ -112,6 +113,22 @@ router.post("/campaigns/entry-popup/claim", optionalAuthMiddleware, async (req, 
             sessionKey: req.body?.sessionKey
         });
 
+        res.set("Cache-Control", "no-store");
+        return res.json({ success: true, ...result });
+    } catch (error) {
+        return sendCampaignError(res, error);
+    }
+});
+
+router.post("/campaigns/claim", optionalAuthMiddleware, async (req, res) => {
+    try {
+        const result = await claimCampaignPlacement({
+            placement: req.body?.placement,
+            productCode: req.body?.productCode,
+            region: req.body?.region,
+            user: req.user || null,
+            sessionKey: req.body?.sessionKey
+        });
         res.set("Cache-Control", "no-store");
         return res.json({ success: true, ...result });
     } catch (error) {

@@ -1,0 +1,1001 @@
+/* AZIEL Homepage V3: premium product-discovery marketplace. */
+:root {
+    --home-max: var(--public-storefront-max, 1500px);
+    --home-gutter: var(--public-storefront-gutter, clamp(18px, 2.4vw, 36px));
+    --home-gap: 16px;
+}
+
+.az-home-ambient-buffer {
+    display: none !important;
+}
+
+.az-home {
+    position: relative;
+    isolation: isolate;
+    --home-max: var(--public-storefront-max, 1500px);
+    --home-hero-rgb-primary: 139 92 246;
+    --home-hero-rgb-secondary: 59 130 246;
+    --home-hero-atmosphere-opacity: .11;
+    --home-hero-atmosphere-secondary-opacity: .065;
+    --home-page-background:
+        linear-gradient(180deg, rgb(var(--home-hero-rgb-primary) / .035) 0, rgb(var(--home-hero-rgb-primary) / var(--home-hero-atmosphere-opacity)) 190px, rgb(var(--home-hero-rgb-secondary) / var(--home-hero-atmosphere-secondary-opacity)) 430px, transparent 720px),
+        var(--bg);
+    --home-hero-surface: var(--surface-strong);
+    --home-hero-border: var(--border);
+    --home-hero-shadow: var(--shadow-lg), 0 0 0 1px color-mix(in srgb, var(--primary) 8%, transparent);
+    --home-section-title: var(--text);
+    --home-section-link: var(--text-secondary);
+    --home-section-link-hover: var(--primary);
+    --home-popular-surface: var(--surface-strong);
+    --home-popular-body:
+        linear-gradient(180deg,
+            color-mix(in srgb, var(--surface-strong) 92%, var(--card-hover, var(--surface))),
+            var(--surface-strong));
+    --home-popular-border: var(--border);
+    --home-popular-title: var(--text);
+    --home-popular-subtitle: var(--text-muted);
+    --home-popular-shadow: 0 8px 24px color-mix(in srgb, var(--bg) 8%, transparent);
+    --home-popular-hover-shadow: 0 14px 32px color-mix(in srgb, var(--bg) 14%, transparent);
+    --home-all-surface:
+        linear-gradient(180deg, rgba(255, 255, 255, .98), rgba(244, 244, 247, .97));
+    --home-all-border: rgba(17, 24, 39, .10);
+    --home-all-title: #090912;
+    --home-all-subtitle: rgba(9, 9, 18, .62);
+    --home-all-shadow: var(--shadow-sm);
+    --home-promo-surface: var(--surface-strong);
+    --home-promo-border: var(--border);
+    --home-promo-title: var(--text);
+    --home-promo-copy: var(--text-muted);
+    --home-promo-meta: var(--text-secondary);
+    --home-soft-shadow: 0 10px 30px color-mix(in srgb, var(--bg) 12%, transparent);
+    --home-motion: 230ms ease-out;
+    width: 100%;
+    padding: 0 !important;
+    overflow: clip;
+    background: var(--home-page-background) !important;
+    color: var(--text);
+}
+
+.az-home::before {
+    position: absolute;
+    inset: 0 0 auto;
+    z-index: 0;
+    height: min(720px, 82svh);
+    pointer-events: none;
+    background:
+        linear-gradient(180deg,
+            rgb(var(--home-hero-rgb-primary) / .03) 0,
+            rgb(var(--home-hero-rgb-primary) / var(--home-hero-atmosphere-opacity)) 180px,
+            rgb(var(--home-hero-rgb-secondary) / var(--home-hero-atmosphere-secondary-opacity)) 390px,
+            transparent 100%);
+    opacity: 1;
+    transition: background 820ms ease-out, opacity 820ms ease-out;
+    content: "";
+}
+
+.az-home > * {
+    position: relative;
+    z-index: 1;
+}
+
+body.theme-light .az-home {
+    --home-hero-atmosphere-opacity: .075;
+    --home-hero-atmosphere-secondary-opacity: .04;
+    --home-page-background:
+        linear-gradient(180deg, rgb(var(--home-hero-rgb-primary) / .025) 0, rgb(var(--home-hero-rgb-primary) / var(--home-hero-atmosphere-opacity)) 210px, rgb(var(--home-hero-rgb-secondary) / var(--home-hero-atmosphere-secondary-opacity)) 430px, transparent 720px),
+        var(--bg);
+    --home-hero-shadow: 0 10px 30px color-mix(in srgb, var(--bg) 10%, transparent);
+    --home-popular-surface: color-mix(in srgb, var(--surface-strong) 88%, var(--primary) 4%);
+    --home-popular-body:
+        linear-gradient(180deg,
+            color-mix(in srgb, var(--surface-strong) 94%, var(--primary) 3%),
+            color-mix(in srgb, var(--bg-soft) 84%, var(--surface-strong)));
+    --home-popular-border: var(--border);
+    --home-popular-shadow: 0 8px 24px color-mix(in srgb, var(--bg) 8%, transparent);
+    --home-popular-hover-shadow: 0 14px 32px color-mix(in srgb, var(--bg) 12%, transparent);
+}
+
+body.theme-dark .az-home,
+body.dark .az-home {
+    --home-hero-atmosphere-opacity: .13;
+    --home-hero-atmosphere-secondary-opacity: .075;
+    --home-page-background:
+        linear-gradient(180deg, rgb(var(--home-hero-rgb-primary) / .045) 0, rgb(var(--home-hero-rgb-primary) / var(--home-hero-atmosphere-opacity)) 190px, rgb(var(--home-hero-rgb-secondary) / var(--home-hero-atmosphere-secondary-opacity)) 450px, transparent 740px),
+        var(--bg);
+    --home-popular-border: var(--border);
+    --home-all-border: rgba(255, 255, 255, .72);
+    --home-all-shadow: 0 10px 22px rgba(0, 0, 0, .18);
+}
+
+.az-home .az-home-hero.az-banner-zone {
+    width: min(var(--home-max), calc(100% - (var(--home-gutter) * 2))) !important;
+    height: auto !important;
+    min-height: 0 !important;
+    aspect-ratio: 16 / 5 !important;
+    margin: 32px auto 0 !important;
+    overflow: hidden !important;
+    border: 0 !important;
+    border-radius: 24px !important;
+    background: transparent !important;
+    box-shadow: var(--home-hero-shadow) !important;
+}
+
+.az-home-hero .az-banner-track,
+.az-home-hero .az-banner-card,
+.az-home-hero .az-banner-card picture,
+.az-home-hero .az-banner-card img {
+    height: 100% !important;
+}
+
+.az-home-hero .az-banner-card {
+    top: 0 !important;
+    left: 50% !important;
+    width: 100% !important;
+    max-width: none !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.az-home-hero .az-banner-card img {
+    width: 100% !important;
+    display: block !important;
+    object-fit: cover !important;
+    object-position: var(--az-banner-object-position, center center) !important;
+    border-radius: 0 !important;
+}
+
+.az-home-hero .az-banner-arrow {
+    display: none !important;
+}
+
+@media (min-width: 1024px) {
+    .az-home .az-home-hero.az-banner-zone {
+        height: clamp(250px, 24vw, 390px) !important;
+        aspect-ratio: auto !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+    }
+
+    .az-home .az-home-hero[data-banner-count="1"] .az-banner-card {
+        width: min(70%, 1080px) !important;
+        border-radius: 22px !important;
+        overflow: hidden !important;
+        box-shadow: var(--home-hero-shadow) !important;
+    }
+
+    .az-home .az-home-hero[data-home-banners-managed="active"]:not([data-banner-count="1"]).az-banner-zone {
+        overflow: hidden !important;
+    }
+
+    .az-home .az-home-hero[data-home-banners-managed="active"]:not([data-banner-count="1"]) .az-banner-track {
+        overflow: visible !important;
+        cursor: grab;
+        touch-action: pan-y;
+        user-select: none;
+    }
+
+    .az-home .az-home-hero[data-home-banners-managed="active"]:not([data-banner-count="1"]) .az-banner-track.is-dragging {
+        cursor: grabbing;
+    }
+
+    .az-home .az-home-hero[data-home-banners-managed="active"]:not([data-banner-count="1"]) .az-banner-card {
+        width: 66% !important;
+        border-radius: 22px !important;
+        overflow: hidden !important;
+        box-shadow: var(--home-hero-shadow) !important;
+    }
+
+    .az-home .az-home-hero[data-home-banners-managed="active"]:not([data-banner-count="1"]) .az-banner-card:not(.active) {
+        box-shadow: none !important;
+    }
+
+    .az-home .az-home-hero[data-home-banners-managed="active"]:not([data-banner-count="1"]) .az-banner-card.is-side {
+        top: 7% !important;
+        width: 14% !important;
+        height: 86% !important;
+        border-radius: 18px !important;
+        opacity: .68 !important;
+        filter: brightness(.58) saturate(.58) !important;
+    }
+
+    .az-home .az-home-hero[data-home-banners-managed="active"]:not([data-banner-count="1"]) .az-banner-arrow {
+        display: inline-grid !important;
+        width: 46px !important;
+        height: 46px !important;
+        border: 1px solid color-mix(in srgb, var(--text) 18%, transparent) !important;
+        background: color-mix(in srgb, var(--surface) 78%, transparent) !important;
+        color: var(--text) !important;
+        box-shadow: 0 12px 30px color-mix(in srgb, var(--bg) 35%, transparent) !important;
+        backdrop-filter: blur(14px);
+    }
+
+    .az-home .az-home-hero .az-banner-arrow--previous {
+        left: calc(7.5% - 23px) !important;
+    }
+
+    .az-home .az-home-hero .az-banner-arrow--next {
+        right: calc(7.5% - 23px) !important;
+    }
+}
+
+.az-home-hero .az-banner-dots {
+    position: absolute !important;
+    z-index: 12;
+    left: 50% !important;
+    bottom: 13px !important;
+    display: flex !important;
+    transform: translateX(-50%);
+    gap: 9px !important;
+}
+
+.az-home-hero .az-banner-dots:empty,
+.az-home-hero .az-banner-dots[hidden] {
+    display: none !important;
+}
+
+.az-home-hero .az-banner-dots button {
+    width: 8px !important;
+    height: 8px !important;
+    border: 0 !important;
+    border-radius: 999px !important;
+    padding: 0 !important;
+    background: rgba(255, 255, 255, .42) !important;
+    box-shadow: 0 0 16px rgba(0, 0, 0, .35) !important;
+    transition: width var(--home-motion), background var(--home-motion), transform var(--home-motion);
+}
+
+.az-home-hero .az-banner-dots button.active {
+    width: 24px !important;
+    background: rgba(255, 255, 255, .9) !important;
+}
+
+.az-home .home-merch-section {
+    width: min(var(--home-max), calc(100% - (var(--home-gutter) * 2))) !important;
+    margin: 40px auto 0 !important;
+    transform: none !important;
+}
+
+.az-home .az-section-head {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 16px !important;
+    margin: 0 0 14px !important;
+}
+
+.az-home .az-section-head h2 {
+    margin: 0 !important;
+    color: var(--home-section-title) !important;
+    font-size: clamp(17px, 1.25vw, 20px) !important;
+    font-weight: 900 !important;
+    line-height: 1.15 !important;
+    letter-spacing: 0 !important;
+}
+
+.az-home .az-section-head p {
+    display: none !important;
+}
+
+.az-home .az-section-head a {
+    min-height: 38px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    color: var(--home-section-link) !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    text-decoration: none !important;
+    transition: color var(--home-motion), transform var(--home-motion);
+}
+
+.az-home .az-section-head a:hover {
+    color: var(--home-section-link-hover) !important;
+    transform: translateX(2px);
+}
+
+.az-home .home-merch-row {
+    display: grid !important;
+    grid-auto-flow: row !important;
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+    gap: var(--home-gap) !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    scroll-snap-type: none !important;
+}
+
+.az-home #popularGames .popular-game-grid.home-merch-row,
+.az-home #popularGames .popular-game-grid {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    gap: var(--home-gap) !important;
+}
+
+.az-home #popularGames .popular-game-card {
+    position: relative;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: 147px 57px !important;
+    align-content: stretch !important;
+    align-items: stretch !important;
+    column-gap: 0 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: 204px !important;
+    min-height: 204px !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    border: 1px solid var(--home-popular-border) !important;
+    border-radius: 8px !important;
+    color: var(--home-popular-title) !important;
+    background: var(--home-popular-surface) !important;
+    box-shadow: var(--home-popular-shadow) !important;
+    text-decoration: none !important;
+    transition: transform var(--home-motion), border-color var(--home-motion), box-shadow var(--home-motion);
+}
+
+.az-home #popularGames .popular-game-card::before {
+    display: none !important;
+}
+
+.az-home #popularGames.home-merch-section .home-merch-row .popular-game-card img,
+.az-home #popularGames .home-merch-row .popular-game-card img,
+.az-home #popularGames .popular-game-card img,
+.az-home #popularGames .home-product-wordmark {
+    position: static !important;
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    align-self: stretch !important;
+    justify-self: stretch !important;
+    z-index: 1 !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    width: calc(100% + 2px) !important;
+    min-width: calc(100% + 2px) !important;
+    max-width: calc(100% + 2px) !important;
+    height: 147px !important;
+    min-height: 147px !important;
+    max-height: 147px !important;
+    margin: -1px 0 0 -1px !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    object-fit: cover !important;
+    object-position: center center !important;
+    background: var(--home-popular-surface) !important;
+    filter: none !important;
+    transform: none !important;
+    transition: transform var(--home-motion), filter var(--home-motion);
+}
+
+.az-home .home-product-wordmark {
+    position: relative !important;
+    display: grid !important;
+    place-items: center;
+    overflow: hidden;
+    text-align: center;
+    text-decoration: none;
+    isolation: isolate;
+}
+
+.az-home .home-product-wordmark::before {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background:
+        radial-gradient(circle at 18% 20%, rgba(255, 255, 255, .22), transparent 28%),
+        linear-gradient(135deg, rgba(139, 92, 246, .52), rgba(20, 18, 34, .96) 48%, rgba(14, 13, 24, .98));
+    content: "";
+}
+
+.az-home .home-product-wordmark span {
+    max-width: 88%;
+    color: #fff;
+    font-weight: 950;
+    letter-spacing: 0;
+    line-height: .98;
+    text-shadow: 0 6px 22px rgba(0, 0, 0, .34);
+}
+
+.az-home #popularGames .home-product-wordmark span {
+    font-size: clamp(19px, 1.45vw, 25px);
+}
+
+.az-home #popularGames .home-product-wordmark,
+.az-home #allMobileGames .home-product-wordmark {
+    position: relative !important;
+}
+
+.az-home .home-product-wordmark[data-art-code*="blood"]::before {
+    background:
+        radial-gradient(circle at 72% 22%, rgba(255, 80, 92, .34), transparent 30%),
+        linear-gradient(135deg, rgba(138, 20, 28, .72), rgba(20, 18, 24, .98) 52%, rgba(48, 12, 18, .95));
+}
+
+.az-home .home-product-wordmark[data-art-code="marvel-rivals"]::before {
+    background:
+        radial-gradient(circle at 24% 18%, rgba(255, 255, 255, .28), transparent 28%),
+        linear-gradient(135deg, rgba(74, 99, 152, .78), rgba(18, 18, 30, .98) 54%, rgba(118, 28, 58, .78));
+}
+
+.az-home .home-product-wordmark[data-art-code="age-of-empires-mobile"]::before,
+.az-home .home-product-wordmark[data-art-code="lineage-2m"]::before {
+    background:
+        radial-gradient(circle at 50% 0%, rgba(230, 176, 94, .30), transparent 34%),
+        linear-gradient(135deg, rgba(112, 76, 42, .65), rgba(18, 17, 24, .98) 52%, rgba(66, 48, 84, .76));
+}
+
+.az-home .home-product-wordmark[data-art-code="overmortal"]::before,
+.az-home .home-product-wordmark[data-art-code="magic-chess-go-go"]::before {
+    background:
+        radial-gradient(circle at 70% 20%, rgba(112, 211, 255, .28), transparent 30%),
+        linear-gradient(135deg, rgba(74, 48, 142, .70), rgba(17, 16, 28, .98) 52%, rgba(27, 82, 118, .70));
+}
+
+.az-home .home-product-wordmark[data-art-code="lifeafter"]::before {
+    background:
+        radial-gradient(circle at 20% 18%, rgba(178, 207, 230, .28), transparent 28%),
+        linear-gradient(135deg, rgba(44, 73, 89, .78), rgba(15, 16, 20, .98) 55%, rgba(58, 79, 62, .72));
+}
+
+.az-home #popularGames .home-card-copy {
+    position: static !important;
+    z-index: 2;
+    grid-column: 1;
+    grid-row: 2;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+    padding: 9px 58px 10px 16px;
+    background: var(--home-popular-body);
+}
+
+.az-home #popularGames .popular-game-card h3 {
+    margin: 0 0 5px !important;
+    color: var(--home-popular-title) !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    line-height: 1.28 !important;
+    letter-spacing: 0 !important;
+}
+
+.az-home #popularGames .popular-game-card p {
+    margin: 0 !important;
+    color: var(--home-popular-subtitle) !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    line-height: 1.32 !important;
+}
+
+.az-home .home-card-arrow {
+    position: absolute;
+    z-index: 3;
+    right: 14px;
+    bottom: 10px;
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--primary);
+    color: #fff;
+    font-size: 13px;
+    box-shadow: 0 8px 18px color-mix(in srgb, var(--primary) 32%, transparent);
+    transition: transform var(--home-motion), box-shadow var(--home-motion), background var(--home-motion);
+}
+
+.az-home #popularGames .home-card-arrow {
+    right: 14px;
+    bottom: 10px;
+}
+
+.az-home .home-product-price,
+.az-home .home-product-promo,
+.az-home .home-product-state {
+    display: none !important;
+}
+
+.az-home #allMobileGames,
+.az-home #socialTopUp {
+    margin-top: 48px !important;
+}
+
+.az-home #allMobileGames .home-merch-row,
+.az-home #socialTopUp .home-merch-row {
+    grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+}
+
+.az-home #allMobileGames .home-mobile-game-tile,
+.az-home #socialTopUp .home-mobile-game-tile {
+    position: relative;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 32px !important;
+    grid-template-rows: minmax(0, 1fr) 42px !important;
+    align-content: stretch !important;
+    justify-items: stretch !important;
+    min-width: 0 !important;
+    height: 150px !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    border: 1px solid var(--home-all-border) !important;
+    border-radius: 12px !important;
+    color: var(--home-all-title) !important;
+    background: var(--home-all-surface) !important;
+    box-shadow: var(--home-all-shadow) !important;
+    text-decoration: none !important;
+    transition: transform var(--home-motion), box-shadow var(--home-motion), border-color var(--home-motion);
+}
+
+.az-home #allMobileGames .home-mobile-game-tile img,
+.az-home #allMobileGames .home-mobile-game-tile .home-product-wordmark,
+.az-home #socialTopUp .home-mobile-game-tile img,
+.az-home #socialTopUp .home-mobile-game-tile .home-product-wordmark {
+    grid-column: 1 / -1 !important;
+    grid-row: 1 !important;
+    align-self: stretch;
+    justify-self: stretch;
+    width: 100% !important;
+    max-width: none !important;
+    height: 100% !important;
+    padding: 0 !important;
+    object-fit: cover !important;
+    border-radius: 0 !important;
+    background: var(--surface-strong) !important;
+    transform: none !important;
+    filter: none;
+}
+
+.az-home #allMobileGames .home-mobile-game-tile .home-product-wordmark,
+.az-home #socialTopUp .home-mobile-game-tile .home-product-wordmark {
+    display: grid !important;
+    place-items: center !important;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 20%, var(--surface)), var(--surface-strong)) !important;
+    filter: none !important;
+}
+
+.az-home #allMobileGames .home-mobile-game-tile .home-product-wordmark span,
+.az-home #socialTopUp .home-mobile-game-tile .home-product-wordmark span {
+    font-size: 20px;
+}
+
+.az-home #allMobileGames .home-mobile-game-tile > span:not(.home-card-arrow):not(.home-product-wordmark),
+.az-home #socialTopUp .home-mobile-game-tile > span:not(.home-card-arrow):not(.home-product-wordmark) {
+    grid-column: 1;
+    grid-row: 2;
+    min-width: 0;
+    align-self: center;
+    justify-self: stretch;
+    padding: 7px 0 7px 11px;
+    text-align: left;
+}
+
+.az-home #allMobileGames .home-mobile-game-tile strong,
+.az-home #allMobileGames .home-mobile-game-tile small,
+.az-home #socialTopUp .home-mobile-game-tile strong,
+.az-home #socialTopUp .home-mobile-game-tile small {
+    display: block;
+    min-width: 0;
+    text-align: left;
+}
+
+.az-home #allMobileGames .home-mobile-game-tile strong,
+.az-home #socialTopUp .home-mobile-game-tile strong {
+    color: var(--home-all-title) !important;
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: 12.5px !important;
+    font-weight: 700 !important;
+    line-height: 1.22 !important;
+    letter-spacing: 0 !important;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.az-home #allMobileGames .home-mobile-game-tile small,
+.az-home #socialTopUp .home-mobile-game-tile small {
+    margin: 2px 0 0 !important;
+    color: var(--home-all-subtitle) !important;
+    overflow: hidden;
+    font-size: 10.5px !important;
+    font-weight: 500 !important;
+    line-height: 1.24 !important;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.az-home #allMobileGames .home-card-arrow,
+.az-home #socialTopUp .home-card-arrow {
+    right: 9px;
+    top: auto;
+    bottom: auto;
+    grid-column: 2;
+    grid-row: 2;
+    align-self: center;
+    justify-self: center;
+    width: 24px;
+    height: 24px;
+    color: var(--primary);
+    background: color-mix(in srgb, var(--primary) 12%, transparent);
+    box-shadow: none;
+    font-size: 10px;
+    transform: none;
+}
+
+.az-home #newsPromotions {
+    margin-top: 56px !important;
+}
+
+.az-home .home-promotion-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--home-gap);
+}
+
+.az-home .home-promotion-card {
+    display: grid;
+    gap: 10px;
+    min-width: 0;
+    color: var(--home-promo-title);
+    text-decoration: none;
+}
+
+.az-home .home-promotion-card img,
+.az-home .home-promotion-art {
+    width: 100%;
+    aspect-ratio: 2.36 / 1;
+    display: block;
+    overflow: hidden;
+    border: 1px solid var(--home-promo-border);
+    border-radius: 8px;
+    object-fit: cover;
+    background: var(--home-promo-surface);
+    box-shadow: var(--home-popular-shadow);
+}
+
+.az-home .home-promotion-card strong {
+    color: var(--home-promo-title);
+    font-size: 14px;
+    font-weight: 850;
+    line-height: 1.25;
+}
+
+.az-home .home-promotion-card p {
+    margin: -4px 0 0;
+    color: var(--home-promo-copy);
+    font-size: 13px;
+    line-height: 1.35;
+}
+
+.az-home .home-promotion-card small {
+    color: var(--home-promo-meta);
+    font-size: 12px;
+    line-height: 1.2;
+}
+
+.az-home + .site-footer {
+    width: min(var(--home-max), calc(100% - (var(--home-gutter) * 2))) !important;
+    margin-top: 56px !important;
+    padding-top: 40px !important;
+    border-top: 1px solid var(--border) !important;
+    background: var(--page-bg, var(--bg)) !important;
+}
+
+body.theme-light .az-home + .site-footer {
+    background: var(--page-bg, var(--bg)) !important;
+}
+
+.az-home + .site-footer .payment-logos img {
+    background: var(--surface-strong) !important;
+    border-color: var(--border) !important;
+}
+
+@media (hover:hover) and (pointer:fine) {
+    .az-home #popularGames .popular-game-card:hover,
+    .az-home #allMobileGames .home-mobile-game-tile:hover,
+    .az-home .home-promotion-card:hover img,
+    .az-home .home-promotion-card:hover .home-promotion-art {
+        transform: translateY(-4px) !important;
+    }
+
+    .az-home #popularGames .popular-game-card:hover {
+        border-color: var(--border) !important;
+        box-shadow: var(--home-popular-hover-shadow) !important;
+    }
+
+    .az-home #popularGames .popular-game-card:hover img {
+        transform: scale(1.02) !important;
+        filter: saturate(1.06);
+    }
+
+    .az-home #popularGames .popular-game-card:hover .home-card-arrow {
+        transform: scale(1.05);
+    }
+
+    .az-home #allMobileGames .home-mobile-game-tile:hover {
+        border-color: var(--home-all-border) !important;
+        box-shadow: var(--home-soft-shadow) !important;
+    }
+}
+
+@media (max-width: 1100px) {
+    .az-home .home-merch-row {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    }
+
+    .az-home #allMobileGames .home-merch-row,
+    .az-home #socialTopUp .home-merch-row {
+        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    }
+
+    .az-home .home-promotion-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    :root {
+        --home-gutter: 16px;
+        --home-gap: 12px;
+    }
+
+    .az-home {
+        padding-bottom: 40px !important;
+    }
+
+    .az-home .az-home-hero.az-banner-zone {
+        width: calc(100% - 32px) !important;
+        aspect-ratio: 16 / 9 !important;
+        margin-top: 24px !important;
+        border-radius: 16px !important;
+    }
+
+    .az-home-hero .az-banner-card img {
+        object-fit: cover !important;
+        object-position: var(--az-banner-object-position, 58% center) !important;
+    }
+
+    .az-home-hero .az-banner-dots {
+        bottom: 8px !important;
+        gap: 6px !important;
+    }
+
+    .az-home-hero .az-banner-dots button {
+        width: 6px !important;
+        height: 6px !important;
+    }
+
+    .az-home-hero .az-banner-dots button.active {
+        width: 18px !important;
+    }
+
+    .az-home .home-merch-section {
+        width: calc(100% - 32px) !important;
+        max-width: calc(100% - 32px) !important;
+        margin-top: 24px !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        overflow: visible !important;
+    }
+
+    html body main.az-home #popularGames,
+    html body main.az-home #allMobileGames,
+    html body main.az-home #newsPromotions {
+        width: calc(100% - 32px) !important;
+        max-width: calc(100% - 32px) !important;
+        margin-top: 24px !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        transform: none !important;
+    }
+
+    html body main.az-home #popularGames {
+        margin-top: 24px !important;
+    }
+
+    .az-home + .site-footer {
+        width: calc(100% - 24px) !important;
+        margin-top: 32px !important;
+        padding-top: 28px !important;
+    }
+
+    .az-home .az-section-head {
+        margin-bottom: 9px !important;
+    }
+
+    .az-home .az-section-head h2 {
+        font-size: 16px !important;
+    }
+
+    .az-home .az-section-head a {
+        min-height: 34px !important;
+        font-size: 12px !important;
+    }
+
+    .az-home .home-merch-row,
+    .az-home #popularGames .popular-game-grid,
+    .az-home #allMobileGames .home-merch-row,
+    .az-home #socialTopUp .home-merch-row {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 12px !important;
+        overflow: visible !important;
+        scroll-snap-type: none !important;
+        scroll-padding: 0 !important;
+        padding: 0 !important;
+    }
+
+    .az-home #popularGames .popular-game-card {
+        flex: initial !important;
+        min-width: 0 !important;
+        grid-template-rows: 121px 47px !important;
+        height: 168px !important;
+        min-height: 168px !important;
+        padding: 0 !important;
+        scroll-snap-align: none !important;
+    }
+
+    .az-home #popularGames.home-merch-section .home-merch-row .popular-game-card img,
+    .az-home #popularGames .home-merch-row .popular-game-card img,
+    .az-home #popularGames .popular-game-card img,
+    .az-home #popularGames .home-product-wordmark {
+        width: calc(100% + 2px) !important;
+        min-width: calc(100% + 2px) !important;
+        height: 121px !important;
+        min-height: 121px !important;
+        max-height: 121px !important;
+        object-fit: cover !important;
+    }
+
+    .az-home #popularGames .home-product-wordmark span {
+        font-size: 18px;
+    }
+
+    .az-home #popularGames .home-card-copy {
+        padding: 7px 48px 8px 12px;
+    }
+
+    .az-home #popularGames .popular-game-card h3 {
+        font-size: 12px !important;
+        line-height: 1.24 !important;
+    }
+
+    .az-home #popularGames .popular-game-card p {
+        font-size: 10.5px !important;
+        line-height: 1.28 !important;
+    }
+
+    .az-home .home-card-arrow {
+        right: 10px;
+        bottom: 8px;
+        width: 32px;
+        height: 32px;
+    }
+
+    .az-home #allMobileGames .home-mobile-game-tile,
+    .az-home #socialTopUp .home-mobile-game-tile {
+        height: 136px !important;
+        padding: 0 !important;
+        grid-template-columns: minmax(0, 1fr) 28px !important;
+        grid-template-rows: minmax(0, 1fr) 42px !important;
+    }
+
+    .az-home #allMobileGames .home-mobile-game-tile img,
+    .az-home #allMobileGames .home-mobile-game-tile .home-product-wordmark,
+    .az-home #socialTopUp .home-mobile-game-tile img,
+    .az-home #socialTopUp .home-mobile-game-tile .home-product-wordmark {
+        width: 100% !important;
+        max-width: none !important;
+        height: 100% !important;
+        object-fit: cover !important;
+    }
+
+    .az-home #allMobileGames .home-mobile-game-tile .home-product-wordmark span,
+    .az-home #socialTopUp .home-mobile-game-tile .home-product-wordmark span {
+        font-size: 13px;
+    }
+
+    .az-home #allMobileGames .home-mobile-game-tile > span:not(.home-card-arrow):not(.home-product-wordmark),
+    .az-home #socialTopUp .home-mobile-game-tile > span:not(.home-card-arrow):not(.home-product-wordmark) {
+        padding: 6px 0 6px 9px;
+    }
+
+    .az-home #allMobileGames .home-mobile-game-tile strong,
+    .az-home #socialTopUp .home-mobile-game-tile strong {
+        font-size: 10.5px !important;
+        line-height: 1.22 !important;
+    }
+
+    .az-home #allMobileGames .home-mobile-game-tile small,
+    .az-home #socialTopUp .home-mobile-game-tile small {
+        font-size: 9.5px !important;
+        line-height: 1.22 !important;
+    }
+
+    .az-home .home-promotion-grid {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+}
+
+@media (max-width: 480px) {
+    html body main.az-home #allMobileGames,
+    html body main.az-home #socialTopUp {
+        width: calc(100% - 24px) !important;
+        max-width: calc(100% - 24px) !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        overflow: visible !important;
+    }
+
+    .az-home #allMobileGames .home-merch-row,
+    .az-home #socialTopUp .home-merch-row,
+    .az-home #allMobileGamesList,
+    .az-home #socialTopUpList {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 8px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
+        scroll-snap-type: none !important;
+        scroll-padding: 0 !important;
+        justify-content: stretch !important;
+    }
+
+    .az-home #allMobileGames .home-mobile-game-tile,
+    .az-home #socialTopUp .home-mobile-game-tile {
+        width: 100% !important;
+        max-width: none !important;
+        min-width: 0 !important;
+        height: 132px !important;
+        min-height: 132px !important;
+        grid-template-columns: minmax(0, 1fr) 28px !important;
+        grid-template-rows: 88px 44px !important;
+        scroll-snap-align: none !important;
+    }
+
+    .az-home #allMobileGames .home-mobile-game-tile img,
+    .az-home #allMobileGames .home-mobile-game-tile .home-product-wordmark,
+    .az-home #socialTopUp .home-mobile-game-tile img,
+    .az-home #socialTopUp .home-mobile-game-tile .home-product-wordmark {
+        height: 88px !important;
+        min-height: 88px !important;
+        max-height: 88px !important;
+    }
+
+    .az-home #allMobileGames .home-mobile-game-tile > span:not(.home-card-arrow):not(.home-product-wordmark),
+    .az-home #socialTopUp .home-mobile-game-tile > span:not(.home-card-arrow):not(.home-product-wordmark) {
+        padding: 5px 0 5px 9px !important;
+    }
+
+    .az-home #allMobileGames .home-mobile-game-tile strong,
+    .az-home #socialTopUp .home-mobile-game-tile strong {
+        font-size: 11px !important;
+        line-height: 1.18 !important;
+        -webkit-line-clamp: 2;
+    }
+
+    .az-home #allMobileGames .home-mobile-game-tile small,
+    .az-home #socialTopUp .home-mobile-game-tile small {
+        font-size: 9.5px !important;
+        line-height: 1.2 !important;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .az-home-hero .az-banner-card,
+    .az-home-hero .az-banner-dots button,
+    .az-home #popularGames .popular-game-card,
+    .az-home #popularGames .popular-game-card img,
+    .az-home #allMobileGames .home-mobile-game-tile,
+    .az-home .az-section-head a {
+        transition: none !important;
+    }
+}

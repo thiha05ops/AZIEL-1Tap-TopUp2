@@ -7,6 +7,9 @@ window.AZIEL_GAME_FLOW?.init({
     userIdSelector: "#userId",
     zoneIdSelector: "",
     zoneRequired: false,
+    accountFields: [
+        { key: "userId", label: "PUBG Player ID", selector: "#userId", required: true, requiredMessage: "Please enter your PUBG Player ID." }
+    ],
     directWallet: true,
     pendingReturnUrl: "pubg.html"
 });

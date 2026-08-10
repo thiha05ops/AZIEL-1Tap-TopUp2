@@ -106,9 +106,7 @@ async function verifyProductionContextOverrideOwnership() {
             now: new Date("2026-07-29T00:00:00.000Z")
         });
         const override = legacyContext.pricing.pricingInput.appliedPricingRules.find(rule => rule.ruleType === "PRICE_OVERRIDE");
-        assert(override, "legacy catalog amount must become an explicit price override.");
-        assert.strictEqual(override.value, 6500, "legacy override value must preserve catalog customer price.");
-        assert.strictEqual(override.configuration.publishedPriceMode, "LEGACY_COMPATIBILITY_PRICE");
+        assert(!override, "legacy catalog outputs must not override current pricing policy authority.");
 
         const derivedPrice = {
             ...legacyPrice,

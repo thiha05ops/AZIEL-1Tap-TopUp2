@@ -1,6 +1,7 @@
 // frontend/js/reset-password.js
 
 document.addEventListener("DOMContentLoaded", () => {
+    const t = (key, fallback, params) => window.AZIEL_LOCALE?.t?.(key, fallback, params) || fallback;
     const form = document.getElementById("resetPasswordForm");
     const msg = document.getElementById("msg");
     const btn = document.getElementById("resetPasswordBtn");
@@ -15,8 +16,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const usernameInfo = document.getElementById("usernameInfo");
 
     if (username && usernameInfo) {
-        usernameInfo.innerHTML =
-            `Username: <strong>${username}</strong>`;
+        const label = document.createTextNode(t("auth.usernameValue", "Username: {username}", { username }));
+        usernameInfo.replaceChildren(label);
     }
 
     if (!email || verified !== "true") {
@@ -43,17 +44,17 @@ document.addEventListener("DOMContentLoaded", () => {
         const confirmPassword = confirmPasswordInput.value.trim();
 
         if (!newPassword || !confirmPassword) {
-            showMessage("Please fill all password fields.", "error");
+            showMessage(t("validation.passwordFields", "Please fill all password fields."), "error");
             return;
         }
 
         if (newPassword.length < 8) {
-            showMessage("Password must be at least 8 characters.", "error");
+            showMessage(t("validation.passwordEight", "Password must be at least 8 characters."), "error");
             return;
         }
 
         if (newPassword !== confirmPassword) {
-            showMessage("Passwords do not match.", "error");
+            showMessage(t("validation.passwordMismatch", "Passwords do not match."), "error");
             return;
         }
 
@@ -74,7 +75,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await res.json();
 
             if (!data.success) {
-                showMessage(data.message || "Password reset failed.", "error");
+                showMessage(data.message || t("auth.reset.failed", "Password reset failed."), "error");
                 setLoading(false);
                 return;
             }
@@ -83,7 +84,7 @@ document.addEventListener("DOMContentLoaded", () => {
             localStorage.removeItem("resetOTPVerified");
             localStorage.removeItem("resetUsername");
 
-            showMessage("Password updated ✅ Redirecting to login...", "success");
+            showMessage(t("auth.reset.success", "Password updated. Redirecting to login..."), "success");
 
             setTimeout(() => {
                 window.location.href = "login.html";
@@ -91,22 +92,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
         } catch (error) {
             console.log("Reset password error:", error);
-            showMessage("Server error. Please try again.", "error");
+            showMessage(t("common.serverErrorRetry", "Server error. Please try again."), "error");
             setLoading(false);
         }
     });
 
     function setLoading(isLoading) {
         btn.disabled = isLoading;
-        btn.textContent = isLoading ? "Updating..." : "Update Password";
+        btn.textContent = isLoading ? t("auth.reset.updating", "Updating...") : t("auth.reset.submit", "Update Password");
     }
 
     function showMessage(text, type) {
-        msg.innerHTML = `
-            <div class="${type === "success" ? "success-msg" : "error-msg"}">
-                ${escapeHTML(text)}
-            </div>
-        `;
+        const feedback = document.createElement("div");
+        feedback.className = type === "success" ? "success-msg" : "error-msg";
+        feedback.textContent = text;
+        msg.replaceChildren(feedback);
     }
 
     function escapeHTML(value) {

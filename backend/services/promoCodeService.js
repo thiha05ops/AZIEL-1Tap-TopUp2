@@ -299,14 +299,14 @@ function calculateDiscount(promo, catalogItem) {
 
     let discountAmount = 0;
     if (promo.discountType === DISCOUNT_TYPES.PERCENTAGE) {
-        discountAmount = Math.floor(originalAmount * (Number(promo.percentageValue || 0) / 100));
+        discountAmount = Number((originalAmount * (Number(promo.percentageValue || 0) / 100)).toFixed(6));
         const maximum = Number(promo.maximumDiscountAmounts?.[region] || 0);
         if (maximum > 0) discountAmount = Math.min(discountAmount, maximum);
     } else {
         discountAmount = Number(promo.fixedAmounts?.[region] || 0);
     }
 
-    discountAmount = Math.min(Math.max(0, Math.floor(discountAmount)), originalAmount);
+    discountAmount = Math.min(Math.max(0, Number(Number(discountAmount).toFixed(6))), originalAmount);
     return {
         originalAmount,
         discountAmount,
@@ -314,6 +314,26 @@ function calculateDiscount(promo, catalogItem) {
         currency,
         region
     };
+}
+
+async function resolvePromoDefinition({ promoCode, catalogItem, user = null, verifyUserLimit = false } = {}) {
+    const code = normalizeOptionalCode(promoCode);
+    if (!code) return null;
+    const promo = await PromoCode.findOne({ code, archivedAt: null });
+    if (!promo) throw new PromoError("PROMO_NOT_FOUND", "Promo code not found.", 404);
+    const state = activeWindowState(promo);
+    if (state !== "ACTIVE") throw new PromoError(`PROMO_${state}`, "This promo code is not currently active.");
+    assertPromoAppliesToCatalog(promo, catalogItem);
+    if (verifyUserLimit && promo.perUserLimit > 0 && user?.username) {
+        const usedByUser = await PromoRedemption.countDocuments({
+            code,
+            username: user.username,
+            status: { $in: ["RESERVED", "CONSUMED"] },
+            $or: [{ status: "CONSUMED" }, { expiresAt: null }, { expiresAt: { $gt: new Date() } }]
+        });
+        if (usedByUser >= promo.perUserLimit) throw new PromoError("PROMO_USER_LIMIT_REACHED", "You have already used this promo code.");
+    }
+    return promo;
 }
 
 async function resolvePromoPricing({ promoCode, catalogItem, user = null, verifyUserLimit = false } = {}) {
@@ -563,6 +583,7 @@ module.exports = {
     releaseExpiredReservationsForCode,
     reservePromoUse,
     resolvePromoPricing,
+    resolvePromoDefinition,
     resolvePurchasePricing,
     updatePromo
 };

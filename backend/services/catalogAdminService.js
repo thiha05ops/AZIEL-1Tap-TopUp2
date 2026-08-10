@@ -8,6 +8,12 @@ const {
 } = require("../catalog/catalogProjection");
 const { assertAssetCategory } = require("./mediaService");
 const { CATALOG_CATEGORIES, HOMEPAGE_FLAGS, HOMEPAGE_SECTIONS, CATALOG_LIFECYCLE, COMMERCE_STATES } = require("../catalog/catalogTaxonomy");
+const { getCanonicalProduct } = require("../catalog/canonicalOperationalCatalog");
+const { normalizeProductKnowledge, normalizeCustomerNote, normalizeCustomerNoteLocales, ProductKnowledgeError } = require("../catalog/productKnowledge");
+
+function normalizeAdminProductCode(value) {
+    return getCanonicalProduct(value)?.productCode || normalizeProductCode(value);
+}
 
 class CatalogAdminError extends Error {
     constructor(code, message, statusCode = 400) {
@@ -327,6 +333,7 @@ async function buildCreatePackagePayload(product, patch = {}) {
         prices,
         sortOrder: parseSortOrder(patch.sortOrder),
         iconAssetId,
+        customerNote: normalizeCustomerNote(patch.customerNote),
         source: "admin"
     };
 }
@@ -355,6 +362,7 @@ function buildProductPatch(patch = {}) {
         "displayMarketLabel",
         "supportedRegions",
         "seo",
+        "productKnowledge",
         "expectedUpdatedAt"
     ]);
 
@@ -406,6 +414,15 @@ function buildProductPatch(patch = {}) {
         updates["seo.description"] = cleanEditableText(patch.seo.description, MAX_SEO_DESCRIPTION);
     }
 
+    if (Object.prototype.hasOwnProperty.call(patch, "productKnowledge")) {
+        try {
+            updates.productKnowledge = normalizeProductKnowledge(patch.productKnowledge);
+        } catch (error) {
+            if (error instanceof ProductKnowledgeError) throw new CatalogAdminError(error.code, error.message);
+            throw error;
+        }
+    }
+
     return updates;
 }
 
@@ -413,7 +430,7 @@ function buildPackagePatch(document, patch = {}) {
     assertNoImmutableFields(patch, ["_id", "id", "productCode", "packageCode", "source", "createdAt", "updatedAt", "__v"]);
 
     const updates = {};
-    const allowed = new Set(["name", "enabled", "prices", "canonicalSupplierCost", "iconAssetId", "expectedUpdatedAt"]);
+    const allowed = new Set(["name", "enabled", "prices", "canonicalSupplierCost", "iconAssetId", "customerNote", "customerNoteLocales", "expectedUpdatedAt"]);
 
     Object.keys(patch).forEach(key => {
         if (!allowed.has(key)) {
@@ -427,6 +444,23 @@ function buildPackagePatch(document, patch = {}) {
 
     if (Object.prototype.hasOwnProperty.call(patch, "name")) {
         updates.name = normalizePackageName(patch.name);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(patch, "customerNote")) {
+        try {
+            updates.customerNote = normalizeCustomerNote(patch.customerNote);
+        } catch (error) {
+            if (error instanceof ProductKnowledgeError) throw new CatalogAdminError(error.code, error.message);
+            throw error;
+        }
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, "customerNoteLocales")) {
+        try {
+            updates.customerNoteLocales = normalizeCustomerNoteLocales(patch.customerNoteLocales, document.customerNote || "");
+        } catch (error) {
+            if (error instanceof ProductKnowledgeError) throw new CatalogAdminError(error.code, error.message);
+            throw error;
+        }
     }
 
     if (Object.prototype.hasOwnProperty.call(patch, "iconAssetId")) {
@@ -665,14 +699,38 @@ function buildSupplierCostHistoryEntries(document, updates = {}, actor = "admin"
 }
 
 async function updateProduct({ productCode, patch = {}, actor = "admin" }) {
-    const normalizedProductCode = normalizeProductCode(productCode);
-    const product = await CatalogProduct.findOne({ productCode: normalizedProductCode });
+    const normalizedProductCode = normalizeAdminProductCode(productCode);
+    let product = await CatalogProduct.findOne({ productCode: normalizedProductCode });
+    let initializedFromCanonical = false;
 
     if (!product) {
-        throw new CatalogAdminError("CATALOG_PRODUCT_NOT_FOUND", "Product not found.", 404);
+        const canonical = getCanonicalProduct(normalizedProductCode);
+        if (!canonical) {
+            throw new CatalogAdminError("CATALOG_PRODUCT_NOT_FOUND", "Product not found.", 404);
+        }
+        product = await CatalogProduct.findOneAndUpdate(
+            { productCode: normalizedProductCode },
+            {
+                $setOnInsert: {
+                    productCode: canonical.productCode,
+                    name: canonical.name,
+                    enabled: true,
+                    catalogCategory: canonical.catalogCategory,
+                    supportedRegions: canonical.supportedRegions,
+                    sortOrder: canonical.sortOrder,
+                    productRoute: canonical.productRoute,
+                    commerceState: "HIDDEN",
+                    publicDiscoveryEnabled: false,
+                    source: "admin",
+                    metadata: { initializedFromCanonical: true }
+                }
+            },
+            { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
+        );
+        initializedFromCanonical = true;
     }
 
-    assertFresh(product, patch.expectedUpdatedAt);
+    if (!initializedFromCanonical) assertFresh(product, patch.expectedUpdatedAt);
     const updates = buildProductPatch(patch);
 
     if (!Object.keys(updates).length || !hasChanges(product, updates)) {
@@ -725,7 +783,7 @@ async function updateProduct({ productCode, patch = {}, actor = "admin" }) {
 }
 
 async function softDeleteProduct({ productCode, expectedUpdatedAt, actor = "admin" } = {}) {
-    const normalizedProductCode = normalizeProductCode(productCode);
+    const normalizedProductCode = normalizeAdminProductCode(productCode);
     const product = await CatalogProduct.findOne({ productCode: normalizedProductCode });
 
     if (!product) {
@@ -748,7 +806,7 @@ async function softDeleteProduct({ productCode, expectedUpdatedAt, actor = "admi
 }
 
 async function restoreProduct({ productCode, expectedUpdatedAt, actor = "admin" } = {}) {
-    const normalizedProductCode = normalizeProductCode(productCode);
+    const normalizedProductCode = normalizeAdminProductCode(productCode);
     const product = await CatalogProduct.findOne({ productCode: normalizedProductCode });
 
     if (!product) {
@@ -772,7 +830,7 @@ async function restoreProduct({ productCode, expectedUpdatedAt, actor = "admin" 
 }
 
 async function updatePackage({ productCode, packageCode, patch = {}, actor = "admin" }) {
-    const normalizedProductCode = normalizeProductCode(productCode);
+    const normalizedProductCode = normalizeAdminProductCode(productCode);
     const normalizedPackageCode = normalizePackageCode(packageCode);
     const item = await CatalogPackage.findOne({
         productCode: normalizedProductCode,
@@ -839,7 +897,7 @@ async function updatePackage({ productCode, packageCode, patch = {}, actor = "ad
 }
 
 async function softDeletePackage({ productCode, packageCode, expectedUpdatedAt, actor = "admin" } = {}) {
-    const normalizedProductCode = normalizeProductCode(productCode);
+    const normalizedProductCode = normalizeAdminProductCode(productCode);
     const normalizedPackageCode = normalizePackageCode(packageCode);
     const item = await CatalogPackage.findOne({
         productCode: normalizedProductCode,
@@ -866,7 +924,7 @@ async function softDeletePackage({ productCode, packageCode, expectedUpdatedAt, 
 }
 
 async function restorePackage({ productCode, packageCode, expectedUpdatedAt, actor = "admin" } = {}) {
-    const normalizedProductCode = normalizeProductCode(productCode);
+    const normalizedProductCode = normalizeAdminProductCode(productCode);
     const normalizedPackageCode = normalizePackageCode(packageCode);
     const item = await CatalogPackage.findOne({
         productCode: normalizedProductCode,
@@ -894,7 +952,7 @@ async function restorePackage({ productCode, packageCode, expectedUpdatedAt, act
 }
 
 async function createPackage({ productCode, patch = {}, actor = "admin" } = {}) {
-    const normalizedProductCode = normalizeProductCode(productCode);
+    const normalizedProductCode = normalizeAdminProductCode(productCode);
     const product = await CatalogProduct.findOne({ productCode: normalizedProductCode }).lean();
 
     if (!product) {
@@ -940,7 +998,7 @@ async function createPackage({ productCode, patch = {}, actor = "admin" } = {}) 
 }
 
 async function reorderPackages({ productCode, orderedPackageCodes = [], actor = "admin" } = {}) {
-    const normalizedProductCode = normalizeProductCode(productCode);
+    const normalizedProductCode = normalizeAdminProductCode(productCode);
     const product = await CatalogProduct.findOne({ productCode: normalizedProductCode }).lean();
 
     if (!product) {

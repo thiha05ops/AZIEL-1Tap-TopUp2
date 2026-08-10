@@ -4,7 +4,8 @@
     const daily = {
         loaded: false, loading: false, products: [], policies: [], suppliers: [], region: "ALL",
         supplierId: "", selectedProductId: "", edits: new Map(), previews: new Map(), search: "", previewSeq: 0,
-        previewController: null, previewTimer: null, saveTimer: null, publishing: false
+        previewController: null, previewTimer: null, saveTimer: null, publishing: false,
+        loadController: null, loadSeq: 0
     };
     const settings = { loaded: false, loading: false, policies: [], region: "TH", saving: false };
 
@@ -74,7 +75,7 @@
     }
 
     function regionProducts() {
-        return daily.products.filter(product => (product.packages || []).some(pkg => pkg.packageEnabled !== false && pkg.priceEnabled !== false));
+        return daily.products;
     }
 
     function renderProductSelect() {
@@ -91,7 +92,7 @@
     function dailyBlockingReason() {
         if (!daily.products.length) return "Failed to load products.";
         if (!["TH", "MM"].every(region => daily.policies.some(policy => policy.region === region && (policy.active || policy.draft)))) return "Failed to load active Thailand and Myanmar pricing policies.";
-        if (!daily.selectedProductId) return "Select a product with configured regional packages.";
+        if (!daily.selectedProductId) return "Select a product.";
         const supplier = activeSupplier();
         if (!supplier) return "Select an enabled canonical supplier for this region.";
         if (!["MMK", "THB"].includes(upper(supplier.supplierCurrency))) return "Selected supplier has no canonical pricing currency.";
@@ -159,7 +160,8 @@
         const query = daily.search.toLowerCase();
         const rows = regionRows().filter(row => !query || `${row.productName} ${row.packageName} ${row.packageCode}`.toLowerCase().includes(query));
         if (!rows.length) {
-            body.innerHTML = '<tr><td colspan="5" class="empty">No packages available for this product.</td></tr>';
+            const product = daily.products.find(item => item.productId === daily.selectedProductId);
+            body.innerHTML = `<tr><td colspan="5" class="empty"><strong>No pricing packages are configured for ${text(product?.productName || "this product")} yet.</strong><br><small>Configure packages in Admin Catalog to make pricing rows available.</small></td></tr>`;
             $("pricingDailySummary").textContent = "0 packages";
             return;
         }
@@ -282,12 +284,18 @@
     }
 
     async function loadDaily(force = false) {
-        if (daily.loading || (daily.loaded && !force)) return;
+        if ((daily.loading && !force) || (daily.loaded && !force)) return;
+        const previousProductId = daily.selectedProductId;
+        const seq = ++daily.loadSeq;
+        daily.loadController?.abort();
+        daily.loadController = new AbortController();
         daily.loading = true;
         setDailyError("");
         $("pricingDailyState").textContent = "Loading";
         try {
-            const [pricing, supplierResponse] = await Promise.all([pricingFetch("/api/admin/pricing-engine"), pricingFetch("/api/admin/suppliers")]);
+            const requestOptions = { signal: daily.loadController.signal };
+            const [pricing, supplierResponse] = await Promise.all([pricingFetch("/api/admin/pricing-engine", requestOptions), pricingFetch("/api/admin/suppliers", requestOptions)]);
+            if (seq !== daily.loadSeq) return;
             daily.products = Array.isArray(pricing.products) ? pricing.products : [];
             daily.policies = Array.isArray(pricing.policies) ? pricing.policies : [];
             daily.suppliers = Array.isArray(supplierResponse.suppliers) ? supplierResponse.suppliers : [];
@@ -298,17 +306,19 @@
             daily.edits.clear();
             rows.forEach(row => { if (row.savedDraftSupplierCost != null) daily.edits.set(rowKey(row), { value: row.savedDraftSupplierCost, restored: true }); });
             daily.loaded = true;
+            daily.selectedProductId = daily.products.some(product => product.productId === previousProductId) ? previousProductId : "";
             $("pricingDailyState").textContent = "Ready";
             renderProductSelect();
             renderSupplierSelect();
             renderRows();
             schedulePreview();
         } catch (error) {
+            if (error.name === "AbortError" || seq !== daily.loadSeq) return;
             daily.loaded = false;
             setDailyError(error.message);
             $("pricingDailyState").textContent = "Unavailable";
             $("pricingPackageRows").innerHTML = '<tr><td colspan="6" class="empty">Failed to load production pricing.</td></tr>';
-        } finally { daily.loading = false; }
+        } finally { if (seq === daily.loadSeq) daily.loading = false; }
     }
 
     function fillSettings() {

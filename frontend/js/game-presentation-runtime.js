@@ -158,6 +158,7 @@
 
     async function initGameBanners() {
         initHowToAccordion();
+        if (document.documentElement.classList.contains("az-product-detail")) return;
         const root = document.querySelector(".game-banner");
         const productCode = getProductCode();
         if (!root || !productCode) return;
@@ -200,10 +201,13 @@
         button.className = "game-howto-toggle";
         button.setAttribute("aria-expanded", "false");
         button.setAttribute("aria-controls", panelId);
-        button.innerHTML = `
-            <span>${heading.textContent || "How to Top Up"}</span>
-            <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-        `;
+        const label = document.createElement("span");
+        label.dataset.i18n = heading.dataset.i18n || "product.howToTopUp";
+        label.textContent = heading.textContent || window.AZIEL_LOCALE?.t?.("product.howToTopUp", "How to Top Up") || "How to Top Up";
+        const icon = document.createElement("i");
+        icon.className = "fa-solid fa-chevron-down";
+        icon.setAttribute("aria-hidden", "true");
+        button.append(label, icon);
 
         const panel = document.createElement("div");
         panel.className = "game-howto-panel";
@@ -219,14 +223,15 @@
         }
 
         const desktopQuery = window.matchMedia("(min-width: 901px)");
-        setExpanded(desktopQuery.matches);
+        const isProductDetail = document.documentElement.classList.contains("az-product-detail");
+        setExpanded(isProductDetail ? false : desktopQuery.matches);
 
         button.addEventListener("click", () => {
             setExpanded(button.getAttribute("aria-expanded") !== "true");
         });
 
         desktopQuery.addEventListener("change", event => {
-            setExpanded(event.matches);
+            if (!isProductDetail) setExpanded(event.matches);
         });
     }
 

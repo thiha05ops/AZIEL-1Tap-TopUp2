@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title data-i18n="Payment | AZIEL">Payment | AZIEL</title><meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#070716">
+    <link rel="stylesheet" href="/css/core/main.css"><link rel="stylesheet" href="/css/core/layout.css"><link rel="stylesheet" href="/css/theme/aziel-design-system.css"><link rel="stylesheet" href="/css/payment/payment-checkout-sheet.css"><link rel="stylesheet" href="/css/commerce/purchase-shell.css"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"><link rel="stylesheet" href="/css/theme/aziel-header.css?v=20260808-global-authority">
+</head>
+<body class="az-purchase-surface">
+    <div id="azHeaderMount" data-nav="game"></div>
+    <main class="product-checkout-page">
+        <header class="checkout-heading"><a href="payment-method.html" data-i18n="payment.backToMethods">← Back to payment methods</a><p class="checkout-eyebrow" data-i18n="payment.secure">Secure payment</p><h1 id="paymentPageTitle" data-i18n="payment">Payment</h1><p data-i18n="payment.completeSession">Complete payment using the authoritative session below.</p></header>
+        <div class="checkout-layout payment-page-layout">
+            <section id="paymentSessionMount" aria-live="polite"><div class="checkout-card payment-session-skeleton" aria-label="Preparing secure payment" data-i18n-aria-label="payment.preparingSecurePayment"><span class="az-storefront-skeleton"></span><span class="az-storefront-skeleton"></span><span class="az-storefront-skeleton"></span></div></section>
+            <aside class="checkout-card checkout-sidebar"><h2 data-i18n="payment.orderSummary">Order summary</h2><dl><div><dt data-i18n="payment.orderID">Order ID</dt><dd id="paymentOrderId">—</dd></div><div><dt data-i18n="payment.product">Product</dt><dd id="paymentProduct">—</dd></div><div><dt data-i18n="payment.package">Package</dt><dd id="paymentPackage">—</dd></div><div><dt data-i18n="payment.account">Account</dt><dd id="paymentAccount">—</dd></div><div><dt data-i18n="payment.method">Method</dt><dd id="paymentMethodSummary">—</dd></div></dl><div class="checkout-total"><span data-i18n="payment.amount">Amount</span><strong id="paymentAmount">—</strong></div><p id="paymentStatusSummary" class="checkout-feedback" data-i18n="payment.pendingPayment">Pending payment</p></aside>
+        </div>
+    </main>
+    <footer class="purchase-footer"><span data-i18n="payment.yourPaymentSessionIsProtectedByAZIEL">Your payment session is protected by AZIEL.</span><a href="tracking.html" data-i18n="payment.myOrders">My Orders</a></footer>
+    <script>window.AZIEL_PAYMENT_PAGE_MODE = true;</script>
+    <script src="/js/site-settings.js"></script><script src="/lang/en.js?v=20260809-g21-explicit"></script><script src="/lang/th.js?v=20260809-g21-explicit"></script><script src="/lang/my.js?v=20260809-g21-explicit"></script><script src="/lang/storefront-static.js?v=20260809-g21-explicit"></script>
+    <script src="/js/i18n.js?v=20260809-g21-explicit"></script><script src="/js/user-state.js"></script><script src="/js/auth-check.js"></script><script src="/js/header-loader.js"></script><script src="/js/header.js"></script><script src="/js/theme.js"></script><script src="/js/locale-switcher.js?v=20260809-g21-explicit"></script><script src="/js/api.js"></script><script src="/js/payment-display.js"></script><script src="/js/payment-trust-display.js"></script><script src="/js/ui-feedback.js"></script><script src="/js/payment/payment-utils.js"></script><script src="/js/payment/android-app-launch.js"></script><script src="/js/payment/payment-checkout-sheet.js"></script><script src="/js/payment/payment-manual.js"></script><script src="/js/payment-page-runtime.js"></script>
+</body>
+</html>

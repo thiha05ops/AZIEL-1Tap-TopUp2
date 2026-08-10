@@ -82,7 +82,17 @@ function sampleOrder(overrides = {}) {
             provider: "MANUAL_PROMPTPAY",
             status: "pending"
         },
-        fulfilment: { status: "not_started", input: { zoneId: "1234" } },
+        fulfilment: {
+            status: "not_started",
+            input: {
+                userId: "12345678",
+                zoneId: "1124",
+                accountFields: [
+                    { key: "userId", label: "User ID", value: "12345678" },
+                    { key: "zoneId", label: "Server ID", value: "1124" }
+                ]
+            }
+        },
         status: "pending_payment",
         paymentStatus: "pending",
         createdAt: "2026-07-26T11:50:00.000Z",
@@ -106,6 +116,48 @@ function verifyProjectionContract() {
     assert.strictEqual(projected.paymentEvidence.url, "https://res.cloudinary.com/aziel/image/upload/slip.png");
     assert.deepStrictEqual(projected.allowedNextStatuses, ["paid", "failed"]);
     assert.strictEqual(projected.fulfillment.status, "NOT_STARTED");
+    assert.strictEqual(projected.customerAccount.id, "user-1");
+    assert.strictEqual(projected.userId, "12345678");
+    assert.notStrictEqual(projected.userId, projected.customerAccount.id);
+    assert.deepStrictEqual(projected.accountFields, [
+        { key: "userId", label: "User ID", value: "12345678" },
+        { key: "zoneId", label: "Server ID", value: "1124" }
+    ]);
+    assert.strictEqual(projected.actions.canApproveManualPayment, true);
+}
+
+function verifyGenericAndHistoricalAccountProjection() {
+    const pubg = projectCommerceManualAttempt(sampleAttempt(), sampleOrder({
+        owner: { type: "USER", userId: "internal-user-id" },
+        product: { gameName: "PUBG Mobile", gameCode: "pubg", packageName: "UC", packageCode: "pubg-uc" },
+        fulfilment: {
+            status: "not_started",
+            input: { accountFields: [{ key: "playerId", label: "Player ID", value: "PUBG-998877" }] }
+        }
+    }));
+    assert.deepStrictEqual(pubg.accountFields, [{ key: "playerId", label: "Player ID", value: "PUBG-998877" }]);
+    assert.strictEqual(pubg.customerAccount.id, "internal-user-id");
+    assert.strictEqual(pubg.userId, "");
+
+    const historical = projectCommerceManualAttempt(sampleAttempt(), sampleOrder({
+        owner: { type: "USER", userId: "must-not-be-fulfilment" },
+        fulfilment: { status: "not_started", input: {} }
+    }));
+    assert.deepStrictEqual(historical.accountFields, []);
+    assert.strictEqual(historical.userId, "");
+}
+
+function verifyEvidenceAuthorityAlignment() {
+    const missingReceiptId = sampleAttempt({
+        safeMetadata: {
+            receiptAttached: true,
+            receiptEvidence: { fileReference: "payment-slips/legacy.png" }
+        }
+    });
+    const projected = projectCommerceManualAttempt(missingReceiptId, sampleOrder());
+    assert.strictEqual(projected.hasPaymentEvidence, false);
+    assert.deepStrictEqual(projected.allowedNextStatuses, []);
+    assert.strictEqual(projected.actions.canApproveManualPayment, false);
 }
 
 function verifyPaidProjection() {
@@ -138,6 +190,8 @@ function verifyFrontendActionOwnership() {
 }
 
 verifyProjectionContract();
+verifyGenericAndHistoricalAccountProjection();
+verifyEvidenceAuthorityAlignment();
 verifyPaidProjection();
 verifyRouteSourceOwnership();
 verifyFrontendActionOwnership();

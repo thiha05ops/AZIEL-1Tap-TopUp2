@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { CAMPAIGN_PLACEMENTS } = require("../catalog/campaignPlacements");
 
 const campaignClaimStateSchema = new mongoose.Schema(
     {
@@ -15,7 +16,7 @@ const campaignClaimStateSchema = new mongoose.Schema(
         },
         placement: {
             type: String,
-            enum: ["ENTRY_POPUP"],
+            enum: CAMPAIGN_PLACEMENTS,
             required: true
         },
         lastShownAt: {

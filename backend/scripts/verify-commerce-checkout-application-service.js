@@ -103,7 +103,15 @@ function checkoutInput(overrides = {}) {
         idempotencyKey: "idem-checkout-1",
         paymentSelection: { paymentMethodId: "promptpay", paymentChannel: "manual" },
         customerInput: {
-            gameAccount: { userId: "123456", zoneId: "1001", playerName: "Tester" },
+            gameAccount: {
+                userId: "123456",
+                zoneId: "1001",
+                playerName: "Tester",
+                accountFields: [
+                    { key: "userId", label: "User ID", value: "123456" },
+                    { key: "zoneId", label: "Server ID", value: "1001" }
+                ]
+            },
             contact: { email: "USER@EXAMPLE.COM" },
             notes: " deliver fast ",
             customFields: { server: "TH" }

@@ -340,6 +340,24 @@ function createManualPaymentApplicationService(dependencies = {}) {
         });
     }
 
+    async function reconcilePromotionAfterPayment({ order, transition }) {
+        try {
+            const snapshot = transition === "approved"
+                ? await consumeCommercePromotion(order)
+                : await releaseCommercePromotion(order);
+            return await updatePromotionRedemptionSnapshot(order, snapshot);
+        } catch (error) {
+            // The trusted payment event is already persisted. Secondary reconciliation
+            // must not make a successful payment transition look like a failure.
+            deps.logger?.warn?.("Commerce promotion reconciliation failed after manual payment transition:", {
+                orderId: order?.orderId || "",
+                transition,
+                code: error?.code || error?.name || "UNKNOWN"
+            });
+            return order;
+        }
+    }
+
     async function initiateManualPayment(input = {}) {
         try {
             const owner = normalizeOwner(input.owner || {});
@@ -367,6 +385,39 @@ function createManualPaymentApplicationService(dependencies = {}) {
             return toSafePaymentView({ order, attempt });
         } catch (error) {
             throw mapPaymentError(error, "read");
+        }
+    }
+
+    async function resumeOrRetryManualPayment(input = {}) {
+        try {
+            const owner = normalizeOwner(input.owner || {});
+            const orderId = assertId(input.orderId, "orderId");
+            const order = await loadOwnedManualOrder(orderId, owner);
+            const active = await deps.paymentAttemptRepository.findActiveAttemptForOrder({ orderId, owner });
+            if (active) return toSafePaymentView({ order, attempt: active });
+
+            const attempts = await deps.paymentAttemptRepository.findAttemptsForOrder({ orderId });
+            const retryable = attempts.find(attempt =>
+                ["FAILED", "EXPIRED"].includes(normalizeUpper(attempt.status))
+            );
+            if (!retryable) {
+                throw appError(ERROR_CODES.INVALID_STATE, "No retryable payment attempt is available.", 409, "retry");
+            }
+            const result = await orchestrator.retryPayment({
+                attemptId: retryable.attemptId,
+                owner,
+                idempotencyKey: `${retryable.attemptId}:retry`,
+                traceId: input.traceId
+            });
+            const attempt = await deps.paymentAttemptRepository.findAttemptById({ attemptId: result.attemptId });
+            await audit("COMMERCE_MANUAL_PAYMENT_RETRIED", {
+                actor: input.actor || owner,
+                resourceId: result.attemptId,
+                metadata: { orderId, previousAttemptId: retryable.attemptId }
+            });
+            return toSafePaymentView({ order, attempt, paymentResult: result });
+        } catch (error) {
+            throw mapPaymentError(error, "retry");
         }
     }
 
@@ -446,8 +497,7 @@ function createManualPaymentApplicationService(dependencies = {}) {
             });
             const updatedAttempt = await deps.paymentAttemptRepository.findAttemptById({ attemptId });
             let updatedOrder = await deps.commerceOrderRepository.findOrderById(order.orderId);
-            const consumedRedemption = await consumeCommercePromotion(updatedOrder);
-            updatedOrder = await updatePromotionRedemptionSnapshot(updatedOrder, consumedRedemption);
+            updatedOrder = await reconcilePromotionAfterPayment({ order: updatedOrder, transition: "approved" });
             await audit("COMMERCE_MANUAL_PAYMENT_APPROVED", { actor: admin, resourceId: attemptId, metadata: { orderId: order.orderId } });
             await notify("commerce.manualPayment.approved", { orderId: order.orderId, attemptId });
             return toSafePaymentView({ order: updatedOrder, attempt: updatedAttempt, paymentResult: result, admin: true });
@@ -483,8 +533,7 @@ function createManualPaymentApplicationService(dependencies = {}) {
             });
             const updatedAttempt = await deps.paymentAttemptRepository.findAttemptById({ attemptId });
             let updatedOrder = await deps.commerceOrderRepository.findOrderById(order.orderId);
-            const releasedRedemption = await releaseCommercePromotion(updatedOrder);
-            updatedOrder = await updatePromotionRedemptionSnapshot(updatedOrder, releasedRedemption);
+            updatedOrder = await reconcilePromotionAfterPayment({ order: updatedOrder, transition: "rejected" });
             await audit("COMMERCE_MANUAL_PAYMENT_REJECTED", { actor: admin, resourceId: attemptId, metadata: { orderId: order.orderId, reason } });
             await notify("commerce.manualPayment.rejected", { orderId: order.orderId, attemptId });
             return toSafePaymentView({ order: updatedOrder, attempt: updatedAttempt, paymentResult: result, admin: true });
@@ -532,6 +581,7 @@ function createManualPaymentApplicationService(dependencies = {}) {
     return Object.freeze({
         initiateManualPayment,
         getManualPayment,
+        resumeOrRetryManualPayment,
         attachReceiptEvidence,
         approveManualPayment,
         rejectManualPayment,

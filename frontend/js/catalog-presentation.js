@@ -3,6 +3,34 @@
 // Backend catalog owns product/package availability and financial truth.
 
 (function () {
+    const CANONICAL_PRODUCT_ROUTES = Object.freeze({
+        mlbb: "mlbb.html",
+        "mlbb-twilight-weekly-pass": "product.html?product=mlbb-twilight-weekly-pass",
+        pubg: "pubg.html",
+        pubgrp: "pubg-rp.html",
+        freefire: "freefire.html",
+        "marvel-rivals": "product.html?product=marvel-rivals",
+        "blood-strike": "product.html?product=blood-strike",
+        "blood-strike-pass": "product.html?product=blood-strike-pass",
+        "age-of-empires-mobile": "product.html?product=age-of-empires-mobile",
+        "lineage-2m": "product.html?product=lineage-2m",
+        overmortal: "product.html?product=overmortal",
+        "magic-chess-go-go": "product.html?product=magic-chess-go-go",
+        lifeafter: "product.html?product=lifeafter",
+        hok: "hok.html",
+        telegram: "telegram.html",
+        capcut: "product.html?product=capcut"
+    });
+    const CANONICAL_HOME_PRODUCT_GROUPS = Object.freeze({
+        popularMobileGames: Object.freeze(["mlbb", "pubg", "freefire", "hok", "marvel-rivals", "blood-strike"]),
+        mobileGames: Object.freeze([
+            "mlbb", "mlbb-twilight-weekly-pass", "pubg", "pubgrp", "freefire", "marvel-rivals", "blood-strike",
+            "blood-strike-pass", "age-of-empires-mobile", "lineage-2m", "overmortal", "magic-chess-go-go",
+            "lifeafter", "hok"
+        ]),
+        socialTopUp: Object.freeze(["telegram", "capcut"])
+    });
+
     function assetFallback(path) {
         return String(path || "").replace(/^\/+/, "");
     }
@@ -50,7 +78,7 @@
             theme: "pink"
         },
         "marvel-rivals": {
-            route: "coming-soon.html?product=marvel-rivals",
+            route: CANONICAL_PRODUCT_ROUTES["marvel-rivals"],
             image: "assets/fallbacks/game-topup.svg",
             category: "mobile",
             featured: true,
@@ -58,7 +86,7 @@
             searchDescription: "Top Up"
         },
         "blood-strike": {
-            route: "coming-soon.html?product=blood-strike",
+            route: CANONICAL_PRODUCT_ROUTES["blood-strike"],
             image: "assets/fallbacks/game-topup.svg",
             category: "mobile",
             featured: true,
@@ -66,49 +94,49 @@
             searchDescription: "Golds, Pass"
         },
         "age-of-empires-mobile": {
-            route: "coming-soon.html?product=age-of-empires-mobile",
+            route: CANONICAL_PRODUCT_ROUTES["age-of-empires-mobile"],
             image: "assets/fallbacks/game-topup.svg",
             category: "mobile",
             description: "Top Up",
             searchDescription: "Top Up"
         },
         "lineage-2m": {
-            route: "coming-soon.html?product=lineage-2m",
+            route: CANONICAL_PRODUCT_ROUTES["lineage-2m"],
             image: "assets/fallbacks/game-topup.svg",
             category: "mobile",
             description: "Top Up",
             searchDescription: "Top Up"
         },
         overmortal: {
-            route: "coming-soon.html?product=overmortal",
+            route: CANONICAL_PRODUCT_ROUTES.overmortal,
             image: "assets/fallbacks/game-topup.svg",
             category: "mobile",
             description: "Voucher",
             searchDescription: "Voucher"
         },
         "magic-chess-go-go": {
-            route: "coming-soon.html?product=magic-chess-go-go",
+            route: CANONICAL_PRODUCT_ROUTES["magic-chess-go-go"],
             image: "assets/fallbacks/game-topup.svg",
             category: "mobile",
             description: "Top Up",
             searchDescription: "Top Up"
         },
         lifeafter: {
-            route: "coming-soon.html?product=lifeafter",
+            route: CANONICAL_PRODUCT_ROUTES.lifeafter,
             image: "assets/fallbacks/game-topup.svg",
             category: "mobile",
             description: "Credits & Package",
             searchDescription: "Credits & Package"
         },
         "mlbb-twilight-weekly-pass": {
-            route: "coming-soon.html?product=mlbb-twilight-weekly-pass",
+            route: CANONICAL_PRODUCT_ROUTES["mlbb-twilight-weekly-pass"],
             image: "assets/games/mlbb.webp",
             category: "mobile",
             description: "Twilight Pass & Weekly Pass",
             searchDescription: "Twilight Pass & Weekly Pass"
         },
         "blood-strike-pass": {
-            route: "coming-soon.html?product=blood-strike-pass",
+            route: CANONICAL_PRODUCT_ROUTES["blood-strike-pass"],
             image: "assets/fallbacks/game-topup.svg",
             category: "mobile",
             description: "Pass",
@@ -137,6 +165,14 @@
             featured: false,
             description: "Stars & Premium",
             searchDescription: "Stars & Premium"
+        },
+        capcut: {
+            route: CANONICAL_PRODUCT_ROUTES.capcut,
+            image: "assets/fallbacks/digital-services.svg",
+            category: "gift-card",
+            featured: false,
+            description: "Top Up",
+            searchDescription: "Top Up"
         },
         genshin: {
             route: "genshin.html",
@@ -178,7 +214,9 @@
         lifeafter: { name: "LifeAfter", description: "Credits & Package" },
         pubgrp: { name: "PUBG Mobile Royale Pass Pack", description: "Royale Pass Pack" },
         "mlbb-twilight-weekly-pass": { name: "Mobile Legends Twilight Pass & Weekly Pass", description: "Twilight Pass & Weekly Pass" },
-        "blood-strike-pass": { name: "Blood Strike Pass", description: "Pass" }
+        "blood-strike-pass": { name: "Blood Strike Pass", description: "Pass" },
+        telegram: { name: "Telegram Top Up", description: "Stars & Premium" },
+        capcut: { name: "CapCut Top Up", description: "Top Up" }
     });
 
     const DEFAULT_PRODUCT_ICON = "assets/fallbacks/game-topup.svg";
@@ -235,6 +273,10 @@
         return getProductPresentation(productCode)?.image || DEFAULT_PRODUCT_ICON;
     }
 
+    function getCanonicalHomeProductCodes(group = "") {
+        return [...(CANONICAL_HOME_PRODUCT_GROUPS[group] || [])];
+    }
+
     function getHomePresentationRecord(productCode) {
         const code = String(productCode || "").trim().toLowerCase();
         const presentation = getProductPresentation(code);
@@ -245,14 +287,14 @@
             name: record.name,
             description: record.description || presentation.description || "Top Up",
             image: presentation.image,
-            route: presentation.route || `coming-soon.html?product=${encodeURIComponent(code)}`,
+            route: resolveCanonicalProductRoute(code, presentation.route || `coming-soon.html?product=${encodeURIComponent(code)}`),
             category: presentation.category || "mobile",
             enabled: true,
             homepageEnabled: true,
             discoverable: true,
             purchasable: false,
             commerceState: "COMING_SOON",
-            homepageSections: ["POPULAR_GAME_TOPUP"]
+            homepageSections: presentation.category === "gift-card" ? ["SOCIAL_TOPUP"] : ["POPULAR_GAME_TOPUP"]
         };
     }
 
@@ -337,7 +379,7 @@
 
     function buildDisplayProduct(product) {
         const presentation = getProductPresentation(product?.productCode);
-        const route = String(product?.productRoute || presentation?.route || "").trim();
+        const route = resolveCanonicalProductRoute(product?.productCode, product?.productRoute || presentation?.route || "");
         if (!product || !route) return null;
         const authoritativeCategory = String(product.homepageCategory || product.catalogCategory || "").toLowerCase().replaceAll("_", "-");
 
@@ -358,12 +400,16 @@
     }
 
     window.AZIEL_CATALOG_PRESENTATION = {
+        CANONICAL_PRODUCT_ROUTES,
+        CANONICAL_HOME_PRODUCT_GROUPS,
         PRODUCT_PRESENTATION,
         HOME_PRESENTATION_RECORDS,
         DEFAULT_PACKAGE_ICONS,
         getProductPresentation,
         getHomePresentationRecord,
+        getCanonicalHomeProductCodes,
         getProductRoute,
+        resolveCanonicalProductRoute,
         getProductImage,
         resolveProductImage,
         resolveProductBanner,
@@ -375,4 +421,9 @@
         isDiscoverable,
         buildDisplayProduct
     };
+
+    function resolveCanonicalProductRoute(productCode, fallbackRoute = "") {
+        const code = String(productCode || "").trim().toLowerCase();
+        return CANONICAL_PRODUCT_ROUTES[code] || String(fallbackRoute || "").trim();
+    }
 })();

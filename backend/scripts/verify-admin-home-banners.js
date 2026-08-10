@@ -80,7 +80,7 @@ function verifyCustomerRuntime() {
     includes("frontend/home.html", "/js/home-banner-runtime.js", "Home page must load managed HomeBanner runtime.");
     includes("frontend/js/home-banner-runtime.js", "/api/home/banners", "Home runtime must call public HomeBanner API.");
     includes("frontend/js/home-banner-runtime.js", "data.managed !== true", "Home runtime must preserve static fallback for never-managed state.");
-    includes("frontend/js/home-banner-runtime.js", "zone.hidden = true", "Home runtime must hide carousel for managed-empty state.");
+    includes("frontend/js/home-banner-runtime.js", "renderDefaultFallback(zone, track, dotsBox, \"no-eligible-campaigns\")", "Home runtime must render the default hero for managed-empty state.");
     includes("frontend/js/home-banner-runtime.js", "az-banner-card", "Home runtime must preserve existing carousel card class.");
     includes("frontend/js/home-banner-runtime.js", "azBannerDots", "Home runtime must preserve existing dots container.");
 }

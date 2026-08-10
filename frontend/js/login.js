@@ -3,6 +3,7 @@
 function apiUrl(path) {
     return path;
 }
+const authT = (key, fallback, params) => window.AZIEL_LOCALE?.t?.(key, fallback, params) || fallback;
 
 document.addEventListener("DOMContentLoaded", () => {
     let pendingTwoFactorChallengeId = "";
@@ -29,11 +30,17 @@ document.addEventListener("DOMContentLoaded", () => {
     const twoFactorBox = document.createElement("div");
     twoFactorBox.className = "auth-2fa-box";
     twoFactorBox.hidden = true;
-    twoFactorBox.innerHTML = `
-        <label class="auth-label" for="twoFactorCode">Authenticator or recovery code</label>
-        <input id="twoFactorCode" type="text" inputmode="numeric" autocomplete="one-time-code"
-            placeholder="Enter 6-digit code or recovery code">
-    `;
+    const twoFactorLabel = document.createElement("label");
+    twoFactorLabel.className = "auth-label";
+    twoFactorLabel.htmlFor = "twoFactorCode";
+    twoFactorLabel.textContent = authT("auth.twoFactor.label", "Authenticator or recovery code");
+    const twoFactorInput = document.createElement("input");
+    twoFactorInput.id = "twoFactorCode";
+    twoFactorInput.type = "text";
+    twoFactorInput.inputMode = "numeric";
+    twoFactorInput.autocomplete = "one-time-code";
+    twoFactorInput.placeholder = authT("auth.twoFactor.placeholder", "Enter 6-digit code or recovery code");
+    twoFactorBox.append(twoFactorLabel, twoFactorInput);
     msg?.before(twoFactorBox);
 
     if (googleLoginBtn) {
@@ -78,7 +85,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (pendingTwoFactorChallengeId) {
             if (!twoFactorCode) {
-                showMessage("Please enter your authenticator or recovery code.", "error");
+                showMessage(authT("auth.twoFactor.required", "Please enter your authenticator or recovery code."), "error");
                 return;
             }
 
@@ -87,7 +94,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         if (!username || !password) {
-            showMessage("Please enter username/email and password.", "error");
+            showMessage(authT("auth.login.required", "Please enter username/email and password."), "error");
             return;
         }
 
@@ -109,7 +116,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await res.json();
 
             if (!data.success) {
-                showMessage(data.message || "Login failed", "error");
+                showMessage(data.code ? window.AZIEL_LOCALE?.translateError?.(data.code, data.message || authT("auth.login.failed", "Login failed")) : (data.message || authT("auth.login.failed", "Login failed")), "error");
                 setLoading(false);
                 return;
             }
@@ -118,8 +125,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 pendingTwoFactorChallengeId = data.challengeId;
                 twoFactorBox.hidden = false;
                 passwordInput.value = "";
-                btn.textContent = "Verify Code";
-                showMessage(data.message || "Two-factor verification required.", "success");
+                btn.textContent = authT("auth.twoFactor.verify", "Verify Code");
+                showMessage(data.message || authT("auth.twoFactor.requiredMessage", "Two-factor verification required."), "success");
                 setLoading(false);
                 document.getElementById("twoFactorCode")?.focus();
                 return;
@@ -129,7 +136,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         } catch (error) {
             console.log("Login error:", error);
-            showMessage("Server error. Please try again.", "error");
+            showMessage(authT("common.serverErrorRetry", "Server error. Please try again."), "error");
             setLoading(false);
         }
     });
@@ -153,7 +160,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await res.json();
 
             if (!data.success) {
-                showMessage(data.message || "Two-factor verification failed", "error");
+                showMessage(data.message || authT("auth.twoFactor.failed", "Two-factor verification failed"), "error");
                 setLoading(false);
                 return;
             }
@@ -162,7 +169,7 @@ document.addEventListener("DOMContentLoaded", () => {
             completeLogin(data);
         } catch (error) {
             console.log("2FA login error:", error);
-            showMessage("Server error. Please try again.", "error");
+            showMessage(authT("common.serverErrorRetry", "Server error. Please try again."), "error");
             setLoading(false);
         }
     }
@@ -187,7 +194,7 @@ document.addEventListener("DOMContentLoaded", () => {
             sessionStorage.setItem("username", data.user.username);
         }
 
-        showMessage("Login success. Redirecting...", "success");
+        showMessage(authT("auth.login.success", "Login success. Redirecting..."), "success");
 
         const redirectUrl =
             localStorage.getItem("redirectAfterLogin") || "home.html";
@@ -202,26 +209,25 @@ document.addEventListener("DOMContentLoaded", () => {
     function setLoading(isLoading) {
         if (window.AZIEL_UI?.button) {
             if (isLoading) {
-                window.AZIEL_UI.button.setLoading(btn, { text: pendingTwoFactorChallengeId ? "Verifying..." : "Signing in..." });
+                window.AZIEL_UI.button.setLoading(btn, { text: pendingTwoFactorChallengeId ? authT("auth.verifying", "Verifying...") : authT("auth.signingIn", "Signing in...") });
             } else {
                 window.AZIEL_UI.button.reset(btn);
-                btn.textContent = pendingTwoFactorChallengeId ? "Verify Code" : "Sign In";
+                btn.textContent = pendingTwoFactorChallengeId ? authT("auth.twoFactor.verify", "Verify Code") : authT("auth.signIn", "Sign In");
             }
             return;
         }
 
         btn.disabled = isLoading;
         btn.textContent = isLoading
-            ? (pendingTwoFactorChallengeId ? "Verifying..." : "Signing in...")
-            : (pendingTwoFactorChallengeId ? "Verify Code" : "Sign In");
+            ? (pendingTwoFactorChallengeId ? authT("auth.verifying", "Verifying...") : authT("auth.signingIn", "Signing in..."))
+            : (pendingTwoFactorChallengeId ? authT("auth.twoFactor.verify", "Verify Code") : authT("auth.signIn", "Sign In"));
     }
 
     function showMessage(text, type) {
-        msg.innerHTML = `
-            <div class="${type === "success" ? "success-msg" : "error-msg"}">
-                ${escapeHTML(text)}
-            </div>
-        `;
+        const feedback = document.createElement("div");
+        feedback.className = type === "success" ? "success-msg" : "error-msg";
+        feedback.textContent = text;
+        msg.replaceChildren(feedback);
 
         if (window.AZIEL_UI?.toast) {
             window.AZIEL_UI.toast[type === "success" ? "success" : "error"](text);

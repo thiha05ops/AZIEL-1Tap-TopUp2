@@ -11,13 +11,19 @@ let selectedCatalogBanners = [];
 let catalogPackageEditDraft = null;
 let catalogPackageSavePending = false;
 let activeCatalogView = "products";
-let activeCatalogTab = "overview";
+let activeCatalogTab = "general";
 let storefrontSections = [];
 let catalogPackageSearch = "";
 let catalogPackageStatusFilter = "all";
 let catalogHighlightedPackageCode = "";
 let catalogPricingPreviewTimer = null;
 let catalogPricingPreviewRequestId = 0;
+let catalogProductSearch = "";
+let catalogProductRequestId = 0;
+let catalogProductSavePending = false;
+let catalogProductRequestController = null;
+let catalogKnowledgeLocale = "en";
+let catalogKnowledgeDrafts = { en: {}, my: {}, th: {} };
 
 document.addEventListener("DOMContentLoaded", () => {
     initAdminCatalogController();
@@ -32,6 +38,10 @@ function initAdminCatalogController() {
     });
     document.getElementById("refreshStorefrontSectionsBtn")?.addEventListener("click", () => {
         loadStorefrontSections(true);
+    });
+    document.getElementById("adminCatalogSearch")?.addEventListener("input", event => {
+        catalogProductSearch = event.target.value || "";
+        renderCatalogProducts();
     });
 
     document.querySelectorAll("[data-catalog-view]").forEach(btn => {
@@ -103,7 +113,8 @@ async function loadAdminCatalog(force = false) {
     catalogSource = data.source || "";
     catalogActiveSource = data.activeSource || data.source || "";
     catalogProducts = Array.isArray(data.products) ? data.products : [];
-    selectedCatalogProductCode = catalogProducts[0]?.productCode || "";
+    const selectionStillExists = catalogProducts.some(product => product.productCode === selectedCatalogProductCode);
+    selectedCatalogProductCode = selectionStillExists ? selectedCatalogProductCode : (catalogProducts[0]?.productCode || "");
 
     renderCatalogProducts();
 
@@ -141,30 +152,32 @@ function renderCatalogProducts() {
     setCatalogSource(catalogSource || "-");
     setCatalogActiveSource(catalogActiveSource || "-");
 
+    const groupedCatalog = groupCatalogProducts(filterCatalogProducts(catalogProducts));
+
     if (!catalogProducts.length) {
         list.innerHTML = `<p class="admin-empty-state">${adminT("no_products_found", "No products found")}</p>`;
         return;
     }
 
-    list.innerHTML = catalogProducts.map(product => {
-        const active = product.productCode === selectedCatalogProductCode ? "active" : "";
-        const regions = formatRegions(product.supportedRegions);
-        const deleted = product.deleted || product.deletedAt;
-        const statusKey = deleted ? "deleted" : (product.enabled ? "active" : "inactive");
+    if (!groupedCatalog.length) {
+        list.innerHTML = `<p class="admin-empty-state">${adminT("no_products_found", "No products found")}</p>`;
+        return;
+    }
 
-        return `
-            <button class="catalog-product-row ${active} ${deleted ? "is-deleted" : ""}" type="button" data-product-code="${escapeHtml(product.productCode)}">
-                <span>
-                    <strong>${escapeHtml(product.name)}</strong>
-                    <small>${escapeHtml(product.productCode)}</small>
-                </span>
-                <span class="catalog-row-meta">
-                    <b>${adminT(statusKey, deleted ? "Deleted" : (product.enabled ? "Active" : "Inactive"))}</b>
-                    <small>${escapeHtml(regions)} · ${Number(product.packageCount || 0)} ${adminT("packages", "Packages")}</small>
-                </span>
-            </button>
-        `;
-    }).join("");
+    list.innerHTML = groupedCatalog.map(group => `
+        <section class="catalog-category-group" data-catalog-category="${escapeHtml(group.category)}">
+            <header>
+                <h4>${escapeHtml(group.category)}</h4>
+                <span>${group.products.length} products</span>
+            </header>
+            ${group.families.map(family => `
+                <div class="catalog-family-group" data-catalog-family="${escapeHtml(family.family)}">
+                    <h5>${escapeHtml(family.family)}</h5>
+                    ${family.products.map(renderCatalogProductRow).join("")}
+                </div>
+            `).join("")}
+        </section>
+    `).join("");
 
     list.querySelectorAll("[data-product-code]").forEach(btn => {
         btn.addEventListener("click", () => {
@@ -174,8 +187,78 @@ function renderCatalogProducts() {
     });
 }
 
+function renderCatalogProductRow(product) {
+    const active = product.productCode === selectedCatalogProductCode ? "active" : "";
+    const deleted = product.deleted || product.deletedAt;
+    const statusKey = deleted ? "deleted" : (product.enabled ? "active" : "inactive");
+    const market = marketLabel(product.market, product.displayMarketLabel);
+
+    return `
+        <button class="catalog-product-row ${active} ${deleted ? "is-deleted" : ""}" type="button"
+            data-product-code="${escapeHtml(product.productCode)}"
+            data-family="${escapeHtml(product.family || "")}"
+            data-category="${escapeHtml(product.adminCategory || "")}">
+            <span class="catalog-product-row-title">
+                <strong>${escapeHtml(product.name)}</strong>
+                <small>${escapeHtml(market)}</small>
+            </span>
+            <span class="catalog-row-meta">
+                <b>${adminT(statusKey, deleted ? "Deleted" : (product.enabled ? "Active" : "Inactive"))}</b>
+                <small>${Number(product.packageCount || 0)} ${adminT("packages", "Packages")}</small>
+            </span>
+            <span class="catalog-row-edit">${adminT("edit", "Edit")}</span>
+        </button>
+    `;
+}
+
+function filterCatalogProducts(products = []) {
+    const query = catalogProductSearch.trim().toLowerCase();
+    if (!query) return products;
+    return products.filter(product => [
+        product.name,
+        product.productCode,
+        product.family,
+        product.adminCategory,
+        product.market,
+        product.platform,
+        product.operationalCategory
+    ].some(value => String(value || "").toLowerCase().includes(query)));
+}
+
+function groupCatalogProducts(products = []) {
+    const categories = [];
+    products.forEach(product => {
+        const categoryName = product.adminCategory || "Other";
+        const familyName = product.family || product.name || "Other";
+        let category = categories.find(item => item.category === categoryName);
+        if (!category) {
+            category = { category: categoryName, families: [], products: [] };
+            categories.push(category);
+        }
+        let family = category.families.find(item => item.family === familyName);
+        if (!family) {
+            family = { family: familyName, products: [] };
+            category.families.push(family);
+        }
+        family.products.push(product);
+        category.products.push(product);
+    });
+    return categories;
+}
+
+function marketLabel(market = "", fallback = "") {
+    if (fallback) return fallback;
+    if (market === "southeast_asia") return "Southeast Asia";
+    if (market === "global") return "Global";
+    return market || "-";
+}
+
 async function selectCatalogProduct(productCode, rerenderList = true) {
     selectedCatalogProductCode = productCode || "";
+    const requestId = ++catalogProductRequestId;
+    catalogProductRequestController?.abort();
+    const requestController = new AbortController();
+    catalogProductRequestController = requestController;
     if (rerenderList) renderCatalogProducts();
 
     const detail = document.getElementById("adminCatalogDetailPanel");
@@ -183,9 +266,18 @@ async function selectCatalogProduct(productCode, rerenderList = true) {
         detail.innerHTML = `<p data-admin-i18n="loading_catalog">${adminT("loading_catalog", "Loading catalog")}</p>`;
     }
 
-    const data = await adminFetch(`/api/admin/catalog/products/${encodeURIComponent(selectedCatalogProductCode)}`);
+    let data;
+    try {
+        data = await adminFetch(`/api/admin/catalog/products/${encodeURIComponent(selectedCatalogProductCode)}`, {
+            signal: requestController.signal
+        });
+    } catch (error) {
+        if (error?.name === "AbortError") return;
+        renderCatalogDetailError(`${adminT("catalog_data_unavailable", "Catalog data unavailable")} (${selectedCatalogProductCode})`);
+        return;
+    }
 
-    if (!data) return;
+    if (!data || requestId !== catalogProductRequestId || productCode !== selectedCatalogProductCode) return;
 
     if (!data.success) {
         renderCatalogDetailError(data.message || adminT("catalog_data_unavailable", "Catalog data unavailable"));
@@ -196,11 +288,20 @@ async function selectCatalogProduct(productCode, rerenderList = true) {
     catalogActiveSource = data.activeSource || catalogActiveSource;
     setCatalogSource(catalogSource || "-");
     setCatalogActiveSource(catalogActiveSource || "-");
-    const bannerData = await adminFetch(`/api/admin/catalog/products/${encodeURIComponent(selectedCatalogProductCode)}/banners`);
+    let bannerData = null;
+    try {
+        bannerData = await adminFetch(`/api/admin/catalog/products/${encodeURIComponent(selectedCatalogProductCode)}/banners`, {
+            signal: requestController.signal
+        });
+    } catch (error) {
+        if (error?.name !== "AbortError") console.warn("Catalog banner references unavailable:", selectedCatalogProductCode);
+    }
+    if (requestId !== catalogProductRequestId || productCode !== selectedCatalogProductCode) return;
     selectedCatalogBanners = bannerData?.success && Array.isArray(bannerData.banners)
         ? bannerData.banners
         : [];
     renderCatalogDetail(data.product);
+    if (catalogProductRequestController === requestController) catalogProductRequestController = null;
 }
 
 function renderCatalogDetail(product) {
@@ -216,6 +317,9 @@ function renderCatalogDetail(product) {
         product.bannerAsset || product.bannerUrl
     ].filter(Boolean).length;
     const bannerCount = selectedCatalogBanners.length;
+    if (!["general", "packages", "presentation", "availability", "seo", "media"].includes(activeCatalogTab)) {
+        activeCatalogTab = "general";
+    }
 
     detail.innerHTML = `
         <div class="catalog-detail-head catalog-workspace-head">
@@ -255,10 +359,12 @@ function renderCatalogDetail(product) {
         </div>
 
         <div class="catalog-workspace-tabs" role="tablist" aria-label="Product workspace">
-            ${renderCatalogTabButton("overview", "Overview")}
+            ${renderCatalogTabButton("general", "General")}
             ${renderCatalogTabButton("packages", `Packages ${packages.length}`)}
-            ${renderCatalogTabButton("media", `Media ${mediaCount}`)}
-            ${renderCatalogTabButton("banners", `Banners ${bannerCount}`)}
+            ${renderCatalogTabButton("presentation", "Presentation")}
+            ${renderCatalogTabButton("availability", "Availability")}
+            ${renderCatalogTabButton("seo", "SEO")}
+            ${renderCatalogTabButton("media", `Media ${mediaCount + bannerCount}`)}
         </div>
 
         <div class="catalog-workspace-tab-panel" data-catalog-tab-panel="${escapeHtml(activeCatalogTab)}">
@@ -266,7 +372,9 @@ function renderCatalogDetail(product) {
         </div>
     `;
 
-    detail.querySelector("[data-edit-product]")?.addEventListener("click", () => openProductEditor(product));
+    detail.querySelectorAll("[data-edit-product]").forEach(btn => {
+        btn.addEventListener("click", () => openProductEditor(product));
+    });
     detail.querySelector("[data-product-toggle]")?.addEventListener("click", () => toggleProductAvailability(product));
     detail.querySelector("[data-product-restore]")?.addEventListener("click", () => restoreProductRecord(product));
     detail.querySelector('[data-mobile-back="catalog"]')?.addEventListener("click", () => {
@@ -274,7 +382,7 @@ function renderCatalogDetail(product) {
     });
     detail.querySelectorAll("[data-catalog-tab]").forEach(btn => {
         btn.addEventListener("click", () => {
-            activeCatalogTab = btn.dataset.catalogTab || "overview";
+            activeCatalogTab = btn.dataset.catalogTab || "general";
             renderCatalogDetail(product);
         });
     });
@@ -292,6 +400,10 @@ function renderCatalogTabButton(tab, label) {
 }
 
 function renderCatalogTabPanel(product, packages) {
+    const productDeleted = product.deleted || product.deletedAt;
+    const readiness = product.commerceReadiness || { ready: false, missing: ["readiness unavailable"] };
+    const publicReadiness = product.publicReadiness || { state: "HIDDEN", blockers: ["readiness unavailable"], warnings: [] };
+
     if (activeCatalogTab === "packages") {
         return `
             <div class="catalog-package-table-wrap">
@@ -317,28 +429,102 @@ function renderCatalogTabPanel(product, packages) {
         `;
     }
 
+    if (activeCatalogTab === "presentation") {
+        return `
+            <section class="catalog-overview-panel">
+                <article class="catalog-info-card catalog-info-card-wide">
+                    <span>${adminT("presentation", "Presentation")}</span>
+                    <h4>${escapeHtml(product.name)}</h4>
+                    <p>${escapeHtml(product.description || adminT("no_description_provided", "No description provided."))}</p>
+                    <dl>
+                        ${detailDefinition("storefront_title", product.name)}
+                        ${detailDefinition("storefront_subtitle", product.description || "-")}
+                        ${detailDefinition("short_description", product.description || "-")}
+                        ${detailDefinition("canonical_route", product.canonicalRoute || product.productRoute || "-")}
+                        ${detailDefinition("featured", product.featured ? "Yes" : "No")}
+                        ${detailDefinition("home_visibility", product.homepageEnabled ? "Shown on Home" : "Hidden from Home")}
+                    </dl>
+                </article>
+                <article class="catalog-info-card catalog-info-card-wide">
+                    <span>${adminT("presentation_metadata", "Presentation Metadata")}</span>
+                    <dl>
+                        ${detailDefinition("home_category", product.homepageCategory || "-")}
+                        ${detailDefinition("home_order", Number(product.homepageOrder || 0))}
+                        ${detailDefinition("home_flags", (product.homepageFlags || []).join(", ") || "-")}
+                        ${detailDefinition("home_sections", (product.homepageSections || []).join(", ") || "-")}
+                        ${detailDefinition("preview_price", product.previewPrice?.amount ? `${product.previewPrice.amount} ${product.previewPrice.currency || ""}` : "-")}
+                    </dl>
+                </article>
+            </section>
+        `;
+    }
+
+    if (activeCatalogTab === "availability") {
+        return `
+            <section class="catalog-overview-panel">
+                <article class="catalog-info-card catalog-info-card-wide">
+                    <span>${adminT("availability", "Availability")}</span>
+                    <h4>${productDeleted ? "Deleted" : (product.enabled ? "Enabled" : "Disabled")}</h4>
+                    <p>${packages.length ? "Packages are attached to this product." : "No packages are currently attached. The product detail page will show the existing no-package state."}</p>
+                    <dl>
+                        ${detailDefinition("status", productDeleted ? "Deleted" : (product.enabled ? "Enabled" : "Disabled"))}
+                        ${detailDefinition("commerce_state", product.commerceState || "HIDDEN")}
+                        ${detailDefinition("market", marketLabel(product.market, product.displayMarketLabel))}
+                        ${detailDefinition("platform", product.platform || "-")}
+                        ${detailDefinition("supported_regions", formatRegions(product.supportedRegions))}
+                        ${detailDefinition("package_count", Number(product.packageCount || packages.length))}
+                        ${detailDefinition("zero_package_state", packages.length ? "No" : "Yes")}
+                    </dl>
+                </article>
+                <article class="catalog-info-card catalog-info-card-wide">
+                    <span>${adminT("commerce_readiness", "Commerce Readiness")}</span>
+                    <h4>${readiness.ready ? "Ready to publish" : "Missing commerce configuration"}</h4>
+                    <p>${escapeHtml((readiness.missing || []).join(", ") || "All checks passed")}</p>
+                </article>
+                <article class="catalog-info-card catalog-info-card-wide" data-public-readiness>
+                    <span>Public Readiness</span>
+                    <h4>${escapeHtml(publicReadiness.state === "AVAILABLE" ? "Ready" : publicReadiness.state === "COMING_SOON" ? "Coming Soon / Needs Attention" : "Hidden")}</h4>
+                    <p><b>Blockers:</b> ${escapeHtml((publicReadiness.blockers || []).join(", ") || "None")}</p>
+                    <p><b>Warnings:</b> ${escapeHtml((publicReadiness.warnings || []).join(", ") || "None")}</p>
+                    <dl>${["MM", "TH"].map(region => {
+                        const regional = publicReadiness.regions?.[region] || {};
+                        const blockers = Array.isArray(regional.blockers) ? regional.blockers : [];
+                        const value = `${regional.state || "COMING_SOON"}${blockers.length ? ` · ${blockers.join(", ")}` : ""}`;
+                        return detailDefinition(region, value);
+                    }).join("")}</dl>
+                </article>
+            </section>
+        `;
+    }
+
+    if (activeCatalogTab === "seo") {
+        return `
+            <section class="catalog-overview-panel">
+                <article class="catalog-info-card catalog-info-card-wide">
+                    <span>${adminT("seo", "SEO")}</span>
+                    <h4>${escapeHtml(product.seo?.title || adminT("seo_title_not_set", "SEO title not set"))}</h4>
+                    <p>${escapeHtml(product.seo?.description || adminT("seo_description_not_set", "SEO description not set"))}</p>
+                    <dl>
+                        ${detailDefinition("seo_title", product.seo?.title || "-")}
+                        ${detailDefinition("seo_description", product.seo?.description || "-")}
+                    </dl>
+                </article>
+            </section>
+        `;
+    }
+
     if (activeCatalogTab === "media") {
         return `
             <div class="catalog-media-panel">
                 <div class="panel-head catalog-package-head">
-                    <h3 data-admin-i18n="attached_media">${adminT("attached_media", "Attached Media")}</h3>
-                </div>
-                ${renderProductImageControl(product)}
-                ${renderMobilePackagePreviewControl(product)}
-            </div>
-        `;
-    }
-
-    if (activeCatalogTab === "banners") {
-        return `
-            <div class="catalog-banners-panel">
-                <div class="panel-head catalog-package-head">
                     <div>
-                        <h3 data-admin-i18n="banners">${adminT("banners", "Banners")}</h3>
+                        <h3 data-admin-i18n="attached_media">${adminT("attached_media", "Attached Media")}</h3>
                         <span>${selectedCatalogBanners.length} ${adminT("banners", "Banners")}</span>
                     </div>
                     <button class="admin-secondary-btn" type="button" data-add-banner>${adminT("add_banner", "Add Banner")}</button>
                 </div>
+                ${renderProductImageControl(product)}
+                ${renderMobilePackagePreviewControl(product)}
                 ${renderBannerList(selectedCatalogBanners)}
             </div>
         `;
@@ -347,14 +533,16 @@ function renderCatalogTabPanel(product, packages) {
     return `
         <section class="catalog-overview-panel">
             <article class="catalog-info-card catalog-info-card-wide">
-                <span>${adminT("product_information", "Product Information")}</span>
+                <span>${adminT("general", "General")}</span>
                 <h4>${escapeHtml(product.name)}</h4>
-                <p>${escapeHtml(product.description || adminT("no_description_provided", "No description provided."))}</p>
                 <dl>
+                    ${detailDefinition("display_name", product.name)}
                     ${detailDefinition("product_code", product.productCode)}
-                    ${detailDefinition("supported_regions", formatRegions(product.supportedRegions))}
-                    ${detailDefinition("status", product.deleted || product.deletedAt ? "Deleted" : (product.enabled ? "Enabled" : "Disabled"))}
-                    ${detailDefinition("featured", product.featured ? "Yes" : "No")}
+                    ${detailDefinition("category", product.adminCategory || product.operationalCategory || "-")}
+                    ${detailDefinition("family", product.family || "-")}
+                    ${detailDefinition("platform", product.platform || "-")}
+                    ${detailDefinition("market", marketLabel(product.market, product.displayMarketLabel))}
+                    ${detailDefinition("status", productDeleted ? "Deleted" : (product.enabled ? "Enabled" : "Disabled"))}
                 </dl>
             </article>
             <article class="catalog-info-card">
@@ -373,9 +561,9 @@ function renderCatalogTabPanel(product, packages) {
                 </div>
             </article>
             <article class="catalog-info-card catalog-info-card-wide">
-                <span>${adminT("seo", "SEO")}</span>
-                <h4>${escapeHtml(product.seo?.title || adminT("seo_title_not_set", "SEO title not set"))}</h4>
-                <p>${escapeHtml(product.seo?.description || adminT("seo_description_not_set", "SEO description not set"))}</p>
+                <span>${adminT("routing", "Routing")}</span>
+                <h4>${escapeHtml(product.canonicalRoute || product.productRoute || "-")}</h4>
+                <p>Canonical route is read-only for canonical products.</p>
                 <dl>
                     ${detailDefinition("active_runtime_source", catalogActiveSource || "-")}
                 </dl>
@@ -393,6 +581,10 @@ function openProductEditor(product) {
     modal.querySelector("#catalogProductEditTitle").textContent = product.name || "";
     modal.querySelector("#catalogProductCode").value = product.productCode || "";
     modal.querySelector("#catalogProductName").value = product.name || "";
+    modal.querySelector("#catalogProductCanonicalCategory").textContent = product.adminCategory || product.operationalCategory || "-";
+    modal.querySelector("#catalogProductCanonicalPlatform").textContent = product.platform || "-";
+    modal.querySelector("#catalogProductCanonicalMarket").textContent = marketLabel(product.market, product.displayMarketLabel);
+    modal.querySelector("#catalogProductCanonicalStatus").textContent = product.deleted || product.deletedAt ? "Deleted" : (product.enabled ? "Enabled" : "Disabled");
     modal.querySelector("#catalogProductDescription").value = product.description || "";
     modal.querySelector("#catalogProductRegionMM").checked = (product.supportedRegions || []).includes("MM");
     modal.querySelector("#catalogProductRegionTH").checked = (product.supportedRegions || []).includes("TH");
@@ -417,6 +609,14 @@ function openProductEditor(product) {
     modal.querySelector("#catalogProductReadiness").innerHTML = `<strong>${readiness.ready ? "Ready to publish" : "Missing commerce configuration"}</strong><small>${escapeHtml((readiness.missing || []).join(", ") || "All checks passed")}</small>`;
     modal.querySelector("#catalogProductSeoTitle").value = product.seo?.title || "";
     modal.querySelector("#catalogProductSeoDescription").value = product.seo?.description || "";
+    const knowledge = product.productKnowledge || {};
+    catalogKnowledgeDrafts = {
+        en: structuredClone(knowledge.locales?.en || knowledge),
+        my: structuredClone(knowledge.locales?.my || {}),
+        th: structuredClone(knowledge.locales?.th || {})
+    };
+    catalogKnowledgeLocale = "en";
+    loadKnowledgeLocaleDraft();
     modal.querySelector("#catalogProductImageLabel").textContent = product.imageAsset?.name || product.imageUrl || adminT("fallback_static_asset", "Static fallback asset");
     modal.querySelector("#catalogProductMobilePreviewLabel").textContent = product.mobilePackagePreviewAsset?.name || product.mobilePackagePreviewUrl || adminT("fallback_static_asset", "Static fallback asset");
     const deleteBtn = modal.querySelector("#catalogProductDelete");
@@ -458,7 +658,9 @@ function ensureProductEditorModal() {
             </header>
             <nav class="catalog-drawer-tabs" aria-label="${adminT("product_editor_sections", "Product editor sections")}">
                 <button type="button" data-product-drawer-tab="general">${adminT("general", "General")}</button>
-                <button type="button" data-product-drawer-tab="visibility">${adminT("visibility", "Visibility")}</button>
+                <button type="button" data-product-drawer-tab="presentation">${adminT("presentation", "Presentation")}</button>
+                <button type="button" data-product-drawer-tab="knowledge">Knowledge</button>
+                <button type="button" data-product-drawer-tab="availability">${adminT("availability", "Availability")}</button>
                 <button type="button" data-product-drawer-tab="seo">${adminT("seo", "SEO")}</button>
                 <button type="button" data-product-drawer-tab="media">${adminT("media", "Media")}</button>
             </nav>
@@ -466,29 +668,31 @@ function ensureProductEditorModal() {
                 <section data-product-drawer-panel="general">
                     <label>${adminT("product_code", "Product Code")} <input id="catalogProductCode" type="text" readonly></label>
                     <label>${adminT("product_name", "Product Name")} <input id="catalogProductName" type="text" maxlength="120" required></label>
-                    <label>${adminT("description", "Description")} <textarea id="catalogProductDescription" maxlength="1200"></textarea></label>
-                    <fieldset class="catalog-edit-fieldset catalog-chip-fieldset">
-                        <legend>${adminT("supported_regions", "Supported Regions")}</legend>
-                        <label class="catalog-choice-chip"><input id="catalogProductRegionMM" type="checkbox"> Myanmar</label>
-                        <label class="catalog-choice-chip"><input id="catalogProductRegionTH" type="checkbox"> Thailand</label>
-                    </fieldset>
+                    <div class="catalog-readonly-grid">
+                        <p><b>Category</b><span id="catalogProductCanonicalCategory"></span></p>
+                        <p><b>Platform</b><span id="catalogProductCanonicalPlatform"></span></p>
+                        <p><b>Market</b><span id="catalogProductCanonicalMarket"></span></p>
+                        <p><b>Status</b><span id="catalogProductCanonicalStatus"></span></p>
+                    </div>
                 </section>
-                <section data-product-drawer-panel="visibility" hidden>
-                    <label class="catalog-toggle-row"><span>${adminT("enabled", "Enabled")}</span><input id="catalogProductEnabled" type="checkbox"></label>
+                <section data-product-drawer-panel="knowledge" hidden>
+                    <div class="catalog-knowledge-locales" role="tablist" aria-label="Product Knowledge locale">
+                        <button type="button" data-knowledge-locale="en">English <small data-knowledge-status="en"></small></button>
+                        <button type="button" data-knowledge-locale="my">မြန်မာ <small data-knowledge-status="my"></small></button>
+                        <button type="button" data-knowledge-locale="th">ไทย <small data-knowledge-status="th"></small></button>
+                    </div>
+                    <label>Short description <textarea id="catalogKnowledgeShort" maxlength="280"></textarea></label>
+                    <label>About summary <textarea id="catalogKnowledgeAboutSummary" maxlength="500"></textarea></label>
+                    <label>About details <textarea id="catalogKnowledgeAboutDetails" maxlength="3000"></textarea></label>
+                    <fieldset class="catalog-edit-fieldset"><legend>Before You Purchase</legend><div id="catalogKnowledgeNotes"></div><button type="button" class="admin-secondary-btn" data-add-knowledge="note">Add note</button></fieldset>
+                    <fieldset class="catalog-edit-fieldset"><legend>Package Guide</legend><label>Introduction <textarea id="catalogKnowledgeGuideIntro" maxlength="800"></textarea></label><div id="catalogKnowledgeGroups"></div><button type="button" class="admin-secondary-btn" data-add-knowledge="group">Add group</button></fieldset>
+                    <fieldset class="catalog-edit-fieldset"><legend>Frequently Asked Questions</legend><div id="catalogKnowledgeFaq"></div><button type="button" class="admin-secondary-btn" data-add-knowledge="faq">Add FAQ</button></fieldset>
+                    <small>Plain text only. Empty sections are omitted from the storefront.</small>
+                </section>
+                <section data-product-drawer-panel="presentation" hidden>
+                    <label>${adminT("description", "Description")} <textarea id="catalogProductDescription" maxlength="1200"></textarea></label>
+                    <label>Product route <input id="catalogProductRoute" type="text" maxlength="240" readonly></label>
                     <label class="catalog-toggle-row"><span>${adminT("featured", "Featured")}</span><input id="catalogProductFeatured" type="checkbox"></label>
-                    <label>Catalog category <select id="catalogProductCategory">${catalogCategoryOptions()}</select></label>
-                    <label>Commerce state <select id="catalogProductCommerceState"><option value="PURCHASABLE">Purchasable</option><option value="COMING_SOON">Coming Soon</option><option value="TEMPORARILY_UNAVAILABLE">Temporarily Unavailable</option><option value="HIDDEN">Hidden</option></select></label>
-                    <label class="catalog-toggle-row"><span>Public discovery enabled</span><input id="catalogProductDiscoveryEnabled" type="checkbox"></label>
-                    <label>Product route <input id="catalogProductRoute" type="text" maxlength="240" placeholder="mobile-games/product.html"></label>
-                    <label>Market presentation <select id="catalogProductMarketScope"><option value="GLOBAL">Global</option><option value="REGION">Specific region</option><option value="MULTI_REGION">Multiple regions</option></select></label>
-                    <p><b>Authoritative availability</b><br><span id="catalogProductAuthoritativeRegions"></span><br><small>Read-only commerce authority</small></p>
-                    <label>Display market label <input id="catalogProductDisplayMarketLabel" type="text" maxlength="60" placeholder="Use fallback when empty"><small>Presentation only. Does not change selling availability.</small></label>
-                    <fieldset class="catalog-edit-fieldset"><legend>Optional preview pricing</legend>
-                        <label>Amount <input id="catalogProductPreviewAmount" type="number" min="0" step="0.01" placeholder="Leave empty for no preview price"></label>
-                        <label>Currency <select id="catalogProductPreviewCurrency"><option value="THB">THB</option><option value="MMK">MMK</option></select></label>
-                        <label>Label <select id="catalogProductPreviewLabel"><option value="PREVIEW_PRICE">Preview</option><option value="ESTIMATED">Estimated</option><option value="FROM">From</option><option value="NONE">None</option></select></label>
-                        <small>Presentation only. This value never becomes checkout or quote authority.</small>
-                    </fieldset>
                     <label class="catalog-toggle-row"><span>Show on Home</span><input id="catalogProductHomeEnabled" type="checkbox"></label>
                     <label>Home category <select id="catalogProductHomeCategory">${catalogCategoryOptions()}</select></label>
                     <label>Home order <input id="catalogProductHomeOrder" type="number" step="1" value="0"></label>
@@ -498,6 +702,26 @@ function ensureProductEditorModal() {
                     <fieldset class="catalog-edit-fieldset catalog-chip-fieldset"><legend>Discovery flags</legend>
                         ${["POPULAR", "NEW", "TRENDING", "FEATURED"].map(flag => `<label class="catalog-choice-chip"><input type="checkbox" data-home-flag value="${flag}"> ${flag}</label>`).join("")}
                     </fieldset>
+                    <fieldset class="catalog-edit-fieldset"><legend>Optional preview pricing</legend>
+                        <label>Amount <input id="catalogProductPreviewAmount" type="number" min="0" step="0.01" placeholder="Leave empty for no preview price"></label>
+                        <label>Currency <select id="catalogProductPreviewCurrency"><option value="THB">THB</option><option value="MMK">MMK</option></select></label>
+                        <label>Label <select id="catalogProductPreviewLabel"><option value="PREVIEW_PRICE">Preview</option><option value="ESTIMATED">Estimated</option><option value="FROM">From</option><option value="NONE">None</option></select></label>
+                        <small>Presentation only. This value never becomes checkout or quote authority.</small>
+                    </fieldset>
+                </section>
+                <section data-product-drawer-panel="availability" hidden>
+                    <fieldset class="catalog-edit-fieldset catalog-chip-fieldset">
+                        <legend>${adminT("supported_regions", "Supported Regions")}</legend>
+                        <label class="catalog-choice-chip"><input id="catalogProductRegionMM" type="checkbox"> Myanmar</label>
+                        <label class="catalog-choice-chip"><input id="catalogProductRegionTH" type="checkbox"> Thailand</label>
+                    </fieldset>
+                    <label class="catalog-toggle-row"><span>${adminT("enabled", "Enabled")}</span><input id="catalogProductEnabled" type="checkbox"></label>
+                    <label>Catalog category <select id="catalogProductCategory">${catalogCategoryOptions()}</select></label>
+                    <label>Commerce state <select id="catalogProductCommerceState"><option value="PURCHASABLE">Purchasable</option><option value="COMING_SOON">Coming Soon</option><option value="TEMPORARILY_UNAVAILABLE">Temporarily Unavailable</option><option value="HIDDEN">Hidden</option></select></label>
+                    <label class="catalog-toggle-row"><span>Public discovery enabled</span><input id="catalogProductDiscoveryEnabled" type="checkbox"></label>
+                    <label>Market presentation <select id="catalogProductMarketScope"><option value="GLOBAL">Global</option><option value="REGION">Specific region</option><option value="MULTI_REGION">Multiple regions</option></select></label>
+                    <p><b>Authoritative availability</b><br><span id="catalogProductAuthoritativeRegions"></span><br><small>Read-only commerce authority</small></p>
+                    <label>Display market label <input id="catalogProductDisplayMarketLabel" type="text" maxlength="60" placeholder="Use fallback when empty"><small>Presentation only. Does not change selling availability.</small></label>
                     <div id="catalogProductReadiness" class="catalog-pricing-preview-state" aria-live="polite"></div>
                 </section>
                 <section data-product-drawer-panel="seo" hidden>
@@ -535,6 +759,108 @@ function ensureProductEditorModal() {
         if (event.target === modal) modal.classList.remove("show");
     });
     document.body.appendChild(modal);
+    modal.querySelectorAll("[data-add-knowledge]").forEach(button => button.addEventListener("click", () => {
+        const type = button.dataset.addKnowledge;
+        const root = modal.querySelector(`#catalogKnowledge${type === "note" ? "Notes" : type === "group" ? "Groups" : "Faq"}`);
+        appendKnowledgeRow(root, {}, type);
+    }));
+    modal.querySelectorAll("[data-knowledge-locale]").forEach(button => button.addEventListener("click", () => {
+        captureKnowledgeLocaleDraft();
+        catalogKnowledgeLocale = ["en", "my", "th"].includes(button.dataset.knowledgeLocale) ? button.dataset.knowledgeLocale : "en";
+        loadKnowledgeLocaleDraft();
+    }));
+}
+
+function readKnowledgeForm() {
+    const modal = document.getElementById("catalogProductEditModal");
+    return {
+        shortDescription: modal?.querySelector("#catalogKnowledgeShort")?.value || "",
+        about: {
+            summary: modal?.querySelector("#catalogKnowledgeAboutSummary")?.value || "",
+            details: modal?.querySelector("#catalogKnowledgeAboutDetails")?.value || ""
+        },
+        purchaseNotes: readKnowledgeRows(modal?.querySelector("#catalogKnowledgeNotes"), "note"),
+        packageGuide: {
+            intro: modal?.querySelector("#catalogKnowledgeGuideIntro")?.value || "",
+            groups: readKnowledgeRows(modal?.querySelector("#catalogKnowledgeGroups"), "group")
+        },
+        faq: readKnowledgeRows(modal?.querySelector("#catalogKnowledgeFaq"), "faq")
+    };
+}
+
+function captureKnowledgeLocaleDraft() {
+    catalogKnowledgeDrafts[catalogKnowledgeLocale] = readKnowledgeForm();
+    updateKnowledgeLocaleStatuses();
+}
+
+function loadKnowledgeLocaleDraft() {
+    const modal = document.getElementById("catalogProductEditModal");
+    if (!modal) return;
+    const knowledge = catalogKnowledgeDrafts[catalogKnowledgeLocale] || {};
+    modal.querySelector("#catalogKnowledgeShort").value = knowledge.shortDescription || "";
+    modal.querySelector("#catalogKnowledgeAboutSummary").value = knowledge.about?.summary || "";
+    modal.querySelector("#catalogKnowledgeAboutDetails").value = knowledge.about?.details || "";
+    modal.querySelector("#catalogKnowledgeGuideIntro").value = knowledge.packageGuide?.intro || "";
+    renderKnowledgeRows(modal.querySelector("#catalogKnowledgeNotes"), knowledge.purchaseNotes || [], "note");
+    renderKnowledgeRows(modal.querySelector("#catalogKnowledgeGroups"), knowledge.packageGuide?.groups || [], "group");
+    renderKnowledgeRows(modal.querySelector("#catalogKnowledgeFaq"), knowledge.faq || [], "faq");
+    modal.querySelectorAll("[data-knowledge-locale]").forEach(button => {
+        const active = button.dataset.knowledgeLocale === catalogKnowledgeLocale;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-selected", String(active));
+    });
+    updateKnowledgeLocaleStatuses();
+}
+
+function knowledgeLocaleStatus(value = {}) {
+    const fields = [value.shortDescription, value.about?.summary, value.about?.details, value.packageGuide?.intro];
+    const populated = fields.filter(item => String(item || "").trim()).length
+        + (value.purchaseNotes?.length || 0) + (value.packageGuide?.groups?.length || 0) + (value.faq?.length || 0);
+    if (!populated) return "Missing";
+    return populated >= 5 ? "Complete" : "Partial";
+}
+
+function updateKnowledgeLocaleStatuses() {
+    const modal = document.getElementById("catalogProductEditModal");
+    ["en", "my", "th"].forEach(locale => {
+        const node = modal?.querySelector(`[data-knowledge-status="${locale}"]`);
+        if (node) node.textContent = knowledgeLocaleStatus(catalogKnowledgeDrafts[locale]);
+    });
+}
+
+function appendKnowledgeRow(root, value = {}, type) {
+    if (!root) return;
+    const row = document.createElement("div");
+    row.className = "catalog-knowledge-row";
+    const fields = type === "faq"
+        ? [["question", "Question", 180], ["answer", "Answer", 1200]]
+        : type === "group"
+            ? [["title", "Group title", 100], ["description", "Description", 800], ["packageCodes", "Package codes (comma separated)", 1000]]
+            : [["title", "Title", 100], ["body", "Body", 800]];
+    fields.forEach(([key, labelText, max]) => {
+        const label = document.createElement("label"); label.textContent = labelText;
+        const input = document.createElement("textarea"); input.maxLength = max; input.dataset.knowledgeField = key;
+        input.value = Array.isArray(value[key]) ? value[key].join(", ") : (value[key] || "");
+        label.appendChild(input); row.appendChild(label);
+    });
+    const actions = document.createElement("div"); actions.className = "catalog-knowledge-actions";
+    [["↑", -1], ["↓", 1]].forEach(([text, offset]) => { const button = document.createElement("button"); button.type = "button"; button.textContent = text; button.addEventListener("click", () => { const sibling = offset < 0 ? row.previousElementSibling : row.nextElementSibling; if (sibling) root.insertBefore(offset < 0 ? row : sibling, offset < 0 ? sibling : row); }); actions.appendChild(button); });
+    const remove = document.createElement("button"); remove.type = "button"; remove.textContent = "Remove"; remove.addEventListener("click", () => row.remove()); actions.appendChild(remove);
+    row.appendChild(actions); root.appendChild(row);
+}
+
+function renderKnowledgeRows(root, values, type) {
+    root?.replaceChildren();
+    (values || []).forEach(value => appendKnowledgeRow(root, value, type));
+}
+
+function readKnowledgeRows(root, type) {
+    return [...(root?.querySelectorAll(".catalog-knowledge-row") || [])].map(row => {
+        const value = {};
+        row.querySelectorAll("[data-knowledge-field]").forEach(input => value[input.dataset.knowledgeField] = input.value.trim());
+        if (type === "group") value.packageCodes = value.packageCodes.split(",").map(item => item.trim()).filter(Boolean);
+        return value;
+    });
 }
 
 function catalogCategoryOptions() {
@@ -562,6 +888,7 @@ function readProductEditorPayload(product) {
     if (modal.querySelector("#catalogProductRegionTH")?.checked) supportedRegions.push("TH");
 
     const previewAmount = modal.querySelector("#catalogProductPreviewAmount")?.value?.trim() || "";
+    captureKnowledgeLocaleDraft();
     return {
         name: modal.querySelector("#catalogProductName")?.value || "",
         description: modal.querySelector("#catalogProductDescription")?.value || "",
@@ -588,26 +915,40 @@ function readProductEditorPayload(product) {
             title: modal.querySelector("#catalogProductSeoTitle")?.value || "",
             description: modal.querySelector("#catalogProductSeoDescription")?.value || ""
         },
+        productKnowledge: { locales: structuredClone(catalogKnowledgeDrafts) },
         expectedUpdatedAt: product.updatedAt
     };
 }
 
 async function saveProductEditor(product) {
     const modal = document.getElementById("catalogProductEditModal");
-    if (!modal?.classList.contains("show")) return;
+    if (!modal?.classList.contains("show") || catalogProductSavePending) return;
 
     const payload = readProductEditorPayload(product);
     if (!payload.name.trim() || !payload.supportedRegions.length) {
         showAdminToast?.(adminT("catalog_update_failed", "Catalog update failed"), "error");
         return;
     }
+    if (payload.commerceState === "PURCHASABLE" && (product.publicReadiness?.blockers || []).length) {
+        const confirmed = await confirmCatalogAction({
+            title: "Public readiness blockers",
+            message: `This product still has: ${product.publicReadiness.blockers.join(", ")}. It will remain Coming Soon until these blockers are resolved.`,
+            confirmText: "Save intent"
+        });
+        if (!confirmed) return;
+    }
 
-    modal.classList.remove("show");
-    const data = await mutateCatalog(`/api/admin/catalog/products/${encodeURIComponent(product.productCode)}`, payload);
-    if (!data?.success) {
-        modal.classList.add("show");
-    } else {
+    const saveButton = modal.querySelector("#catalogProductSave");
+    catalogProductSavePending = true;
+    window.AZIEL_UI?.button?.setLoading(saveButton, { text: adminT("saving", "Saving") });
+    try {
+        const data = await mutateCatalog(`/api/admin/catalog/products/${encodeURIComponent(product.productCode)}`, payload);
+        if (!data?.success) return;
+        modal.classList.remove("show");
         showAdminToast?.(adminT("product_saved", "Product saved"), "success");
+    } finally {
+        catalogProductSavePending = false;
+        window.AZIEL_UI?.button?.reset(saveButton);
     }
 }
 
@@ -634,6 +975,11 @@ function bindActiveCatalogTab(detail, product, packages) {
         detail.querySelector("[data-remove-product-image]")?.addEventListener("click", () => clearProductImage(product));
         detail.querySelector("[data-change-mobile-preview]")?.addEventListener("click", () => attachMobilePackagePreview(product));
         detail.querySelector("[data-remove-mobile-preview]")?.addEventListener("click", () => clearMobilePackagePreview(product));
+        bindBannerControls(detail, product);
+        bindBannerDrag(detail, product);
+        detail.querySelectorAll("[data-add-banner]").forEach(btn => {
+            btn.addEventListener("click", () => openBannerEditor(product));
+        });
     }
 
     if (activeCatalogTab === "packages") {
@@ -691,13 +1037,6 @@ function bindActiveCatalogTab(detail, product, packages) {
         });
     });
 
-    if (activeCatalogTab === "banners") {
-        bindBannerControls(detail, product);
-        bindBannerDrag(detail, product);
-        detail.querySelectorAll("[data-add-banner]").forEach(btn => {
-            btn.addEventListener("click", () => openBannerEditor(product));
-        });
-    }
 }
 
 function getSelectedProductPackages() {
@@ -874,9 +1213,12 @@ function renderMobilePackagePreviewControl(product) {
 
 function renderPackageTable(packages) {
     if (!packages.length) {
+        const isUnfilteredEmpty = !catalogPackageSearch.trim() && catalogPackageStatusFilter === "all";
         return renderCatalogEmptyState({
             icon: "fa-solid fa-box-open",
-            title: adminT(catalogPackageStatusFilter === "deleted" ? "no_deleted_packages" : "no_packages_found", catalogPackageStatusFilter === "deleted" ? "No deleted packages" : "No packages found"),
+            title: isUnfilteredEmpty
+                ? adminT("no_packages_yet", "No packages yet.")
+                : adminT(catalogPackageStatusFilter === "deleted" ? "no_deleted_packages" : "no_packages_found", catalogPackageStatusFilter === "deleted" ? "No deleted packages" : "No packages found"),
             description: adminT("catalog_empty_packages_helper", "Packages for this product will appear here."),
             action: catalogPackageStatusFilter === "deleted" ? "" : `<button class="admin-primary-btn" type="button" data-add-package>${adminT("add_package", "Add Package")}</button>`
         });
@@ -1073,16 +1415,16 @@ function renderPricingPreviewResult(region, preview) {
             <dl class="catalog-pricing-metrics">
                 <div><dt>${adminT("supplier_cost", "Supplier Cost")}</dt><dd>${preview.supplierCostConfigured ? escapeHtml(formatOptionalMoney(preview.supplierCost, preview.supplierCurrency)) : adminT("supplier_cost_not_configured", "Supplier cost not configured")}</dd></div>
                 <div><dt>${adminT("exchange_rate", "Exchange Rate")}</dt><dd>${preview.conversionRequired ? `${escapeHtml(preview.exchangeRatePair)} @ ${escapeHtml(preview.exchangeRate)}` : adminT("no_conversion_required", "No conversion required")}</dd></div>
-                <div><dt>${adminT("recommended_price", "Recommended Price")}</dt><dd>${escapeHtml(formatOptionalMoney(preview.recommendedSellingPrice, preview.currency))}</dd></div>
-                <div><dt>${adminT("published_price", "Published Price")}</dt><dd>${escapeHtml(formatOptionalMoney(preview.baseSellingPrice, preview.currency))}</dd></div>
+                <div><dt>${adminT("recommended_price", "Current Commerce Price")}</dt><dd>${escapeHtml(formatOptionalMoney(preview.currentCommercePrice ?? preview.recommendedSellingPrice, preview.currency))}</dd></div>
+                <div><dt>${adminT("published_price", "Published Catalog Price")}</dt><dd>${escapeHtml(formatOptionalMoney(preview.publishedCatalogPrice ?? preview.sellingPrice, preview.currency))}</dd></div>
                 <div><dt>${adminT("customer_payable", "Customer Payable")}</dt><dd>${escapeHtml(formatOptionalMoney(preview.finalPayableAmount, preview.currency))}</dd></div>
-                <div><dt>${adminT("price_difference", "Price Difference")}</dt><dd>${escapeHtml(formatOptionalMoney(preview.publishedPriceDifference || 0, preview.currency))}</dd></div>
-                <div><dt>${adminT("discount", "Discount")}</dt><dd>${escapeHtml(formatOptionalMoney(preview.discountAmount || 0, preview.currency))}</dd></div>
+                <div><dt>${adminT("price_difference", "Commerce − Catalog Difference")}</dt><dd>${escapeHtml(formatOptionalMoney(preview.publishedPriceDifference || 0, preview.currency))}</dd></div>
+                <div><dt>${adminT("discount", "Promo Discount")}</dt><dd>${escapeHtml(formatOptionalMoney(preview.discountAmount || 0, preview.currency))}</dd></div>
                 <div><dt>${adminT("net_profit", "Net Profit")}</dt><dd>${preview.netProfit == null ? "-" : escapeHtml(formatOptionalMoney(preview.netProfit, preview.currency))}</dd></div>
                 <div><dt>${adminT("margin", "Margin")}</dt><dd>${preview.marginPercent == null ? "-" : `${escapeHtml(preview.marginPercent)}%`}</dd></div>
             </dl>
             <div class="catalog-pricing-preview-meta">
-                <span>${escapeHtml(preview.exchangeRateSource || preview.exchangeRateProvider || "AZIEL Commerce")}</span>
+                <span>${escapeHtml(preview.authority || "COMMERCE_PRICING_RUNTIME")}</span>
                 <span>${preview.supplierName ? escapeHtml(preview.supplierName) : adminT("supplier_not_named", "Supplier not named")}</span>
             </div>
             ${warnings.length ? `<ul class="catalog-pricing-warnings">${warnings.map(item => `<li><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>${escapeHtml(item.message || item.code)}</li>`).join("")}</ul>` : ""}
@@ -1337,6 +1679,7 @@ function ensurePackageCreateModal() {
             <form>
                 <label>${adminT("package_code", "Package Code")} <input id="catalogCreateCode" type="text" required></label>
                 <label>${adminT("package_name", "Package Name")} <input id="catalogCreateName" type="text" required></label>
+                <label>Customer-facing note <textarea id="catalogCreateCustomerNote" maxlength="500" rows="2"></textarea></label>
                 <label>${adminT("sort_order", "Sort Order")} <input id="catalogCreateSort" type="number" step="1" value="0"></label>
                 <label><input id="catalogCreateEnabled" type="checkbox" checked> ${adminT("enabled", "Enabled")}</label>
                 <label><input id="catalogCreateMMEnabled" type="checkbox" checked> ${adminT("mm_available", "MM Available")}</label>
@@ -1365,6 +1708,7 @@ async function handlePackageCreateSave(product) {
     const payload = {
         packageCode: modal.querySelector("#catalogCreateCode")?.value || "",
         name: modal.querySelector("#catalogCreateName")?.value || "",
+        customerNote: modal.querySelector("#catalogCreateCustomerNote")?.value || "",
         enabled: Boolean(modal.querySelector("#catalogCreateEnabled")?.checked),
         sortOrder: modal.querySelector("#catalogCreateSort")?.value || 0,
         iconAssetId: modal.dataset.iconAssetId || "",
@@ -1969,6 +2313,9 @@ function openPackageEditPanel(product, pkg) {
     modal.querySelector("#catalogEditTitle").textContent = adminT("edit_package", "Edit Package");
     modal.querySelector("#catalogEditPackageCode").value = pkg.packageCode;
     modal.querySelector("#catalogEditPackageName").value = draft?.name ?? pkg.name;
+    modal.querySelector("#catalogEditCustomerNote").value = draft?.customerNoteLocales?.en ?? draft?.customerNote ?? pkg.customerNoteLocales?.en ?? pkg.customerNote ?? "";
+    modal.querySelector("#catalogEditCustomerNoteMy").value = draft?.customerNoteLocales?.my ?? pkg.customerNoteLocales?.my ?? "";
+    modal.querySelector("#catalogEditCustomerNoteTh").value = draft?.customerNoteLocales?.th ?? pkg.customerNoteLocales?.th ?? "";
     modal.querySelector("#catalogEditEnabled").checked = draft?.enabled ?? pkg.enabled !== false;
     modal.dataset.iconAssetId = draft?.iconAssetId ?? (pkg.iconAsset?.assetId || "");
     modal.dataset.iconCleared = draft?.iconCleared ? "true" : "";
@@ -2050,6 +2397,8 @@ async function handlePackageEditSave(product, pkg) {
     try {
         const result = await mutateCatalog(`/api/admin/catalog/products/${encodeURIComponent(product.productCode)}/packages/${encodeURIComponent(pkg.packageCode)}`, {
             name: changeSet.name,
+            customerNote: changeSet.customerNote,
+            customerNoteLocales: changeSet.customerNoteLocales,
             enabled: changeSet.enabled,
             iconAssetId: changeSet.iconAssetId,
             prices: changeSet.prices,
@@ -2149,6 +2498,12 @@ function readPackageEditDraft(product, pkg) {
         productCode: product.productCode,
         packageCode: pkg.packageCode,
         name: String(modal?.querySelector("#catalogEditPackageName")?.value || "").trim(),
+        customerNote: String(modal?.querySelector("#catalogEditCustomerNote")?.value || "").trim(),
+        customerNoteLocales: {
+            en: String(modal?.querySelector("#catalogEditCustomerNote")?.value || "").trim(),
+            my: String(modal?.querySelector("#catalogEditCustomerNoteMy")?.value || "").trim(),
+            th: String(modal?.querySelector("#catalogEditCustomerNoteTh")?.value || "").trim()
+        },
         enabled: Boolean(modal?.querySelector("#catalogEditEnabled")?.checked),
         iconAssetId: modal?.dataset.iconCleared === "true" ? "" : (modal?.dataset.iconAssetId || pkg.iconAsset?.assetId || ""),
         iconCleared: modal?.dataset.iconCleared === "true",
@@ -2226,7 +2581,8 @@ function buildPackageEditChanges(pkg, draft) {
         }
     });
 
-    return { name: nextName, enabled, iconAssetId, prices, changes };
+    if (JSON.stringify(draft.customerNoteLocales) !== JSON.stringify(pkg.customerNoteLocales || { en: pkg.customerNote || "", my: "", th: "" })) changes.push("Customer-facing note locales");
+    return { name: nextName, customerNote: draft.customerNote, customerNoteLocales: draft.customerNoteLocales, enabled, iconAssetId, prices, changes };
 }
 
 function reopenPackageEditPanel(product, pkg, draft) {
@@ -2448,6 +2804,12 @@ function ensurePackageEditModal() {
                                 type="text"
                                 maxlength="120"
                             >
+                        </label>
+                        <label>
+                            Customer-facing note
+                            <textarea id="catalogEditCustomerNote" maxlength="500" rows="2" placeholder="English package guidance (fallback)"></textarea>
+                            <textarea id="catalogEditCustomerNoteMy" maxlength="500" rows="2" placeholder="မြန်မာ package guidance (optional)"></textarea>
+                            <textarea id="catalogEditCustomerNoteTh" maxlength="500" rows="2" placeholder="ไทย package guidance (optional)"></textarea>
                         </label>
                     </div>
 
@@ -2676,13 +3038,10 @@ async function mutateCatalog(url, body, options) {
     }
 
     showAdminToast?.(data.unchanged ? adminT("no_changes_to_save", "No changes to save.") : adminT("catalog_updated", "Catalog updated"), data.unchanged ? "info" : "success");
+    const productCodeToKeep = data.product?.productCode || selectedCatalogProductCode;
     catalogProducts = [];
+    selectedCatalogProductCode = productCodeToKeep;
     await loadAdminCatalog(true);
-    if (data.product?.productCode) {
-        await selectCatalogProduct(data.product.productCode, true);
-    } else if (selectedCatalogProductCode) {
-        await selectCatalogProduct(selectedCatalogProductCode, true);
-    }
 
     return data;
 }

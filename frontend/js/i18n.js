@@ -1,5 +1,5 @@
 // frontend/js/i18n.js
-// AZIEL i18n V3 - Auto Scan Translation Engine
+// AZIEL Storefront Locale Authority. Explicit keys only; no DOM text scraping.
 
 (function () {
     const LANG_KEY = "azielLanguage";
@@ -48,6 +48,7 @@
             }
 
             localStorage.setItem(LANG_KEY, "en");
+            return "en";
         } catch (error) {
             return "en";
         }
@@ -62,6 +63,10 @@
         }
 
         return activeLang;
+    }
+
+    function safeOwn(object, key) {
+        return Boolean(object && typeof key === "string" && !["__proto__", "prototype", "constructor"].includes(key) && Object.prototype.hasOwnProperty.call(object, key));
     }
 
     function getDict(lang = getLang()) {
@@ -100,19 +105,19 @@
 
         const english = window.AZIEL_LANG?.en || {};
         const translated = (
-            dict[value] ||
-            dict[keyOrText] ||
-            english[value] ||
-            english[keyOrText] ||
+            (safeOwn(dict, value) && dict[value]) ||
+            (safeOwn(dict, keyOrText) && dict[keyOrText]) ||
+            (safeOwn(english, value) && english[value]) ||
+            (safeOwn(english, keyOrText) && english[keyOrText]) ||
             fallbackText ||
             value
         );
 
         if (
-            !dict[value] &&
-            !dict[keyOrText] &&
-            !english[value] &&
-            !english[keyOrText]
+            !safeOwn(dict, value) &&
+            !safeOwn(dict, keyOrText) &&
+            !safeOwn(english, value) &&
+            !safeOwn(english, keyOrText)
         ) {
             reportMissingKey(value || keyOrText, getLang());
         }
@@ -139,6 +144,16 @@
                 detail: { lang: nextLang }
             })
         );
+        window.dispatchEvent(
+            new CustomEvent("aziel:locale-changed", {
+                detail: { locale: nextLang }
+            })
+        );
+    }
+
+    function translateError(code, fallback = "Something went wrong.", params = {}) {
+        const normalizedCode = String(code || "UNKNOWN_ERROR").trim().toUpperCase().replace(/[^A-Z0-9_]/g, "_");
+        return t(`errors.${normalizedCode}`, fallback, params);
     }
 
     function shouldSkipElement(el) {
@@ -177,87 +192,15 @@
 
             if (value) el.setAttribute("aria-label", value);
         });
-    }
 
-    function translateAttributes(root, dict) {
-        const attrs = [
-            "placeholder",
-            "title",
-            "aria-label"
-        ];
-
-        root.querySelectorAll("*").forEach(el => {
-            if (shouldSkipElement(el)) return;
-
-            attrs.forEach(attr => {
-                const current = normalizeText(el.getAttribute(attr));
-                if (!current) return;
-
-                if (!el.dataset[`original${toDatasetName(attr)}`]) {
-                    el.dataset[`original${toDatasetName(attr)}`] = current;
-                }
-
-                const original = el.dataset[`original${toDatasetName(attr)}`];
-                const translated = dict[original];
-
-                if (translated) {
-                    el.setAttribute(attr, translated);
-                }
-            });
+        root.querySelectorAll("[data-i18n-aria-description]").forEach(el => {
+            const value = dict[el.dataset.i18nAriaDescription];
+            if (value) el.setAttribute("aria-description", value);
         });
-    }
 
-    function translateTextNodes(root, dict) {
-        const walker = document.createTreeWalker(
-            root,
-            NodeFilter.SHOW_TEXT,
-            {
-                acceptNode(node) {
-                    const parent = node.parentElement;
-
-                    if (!parent || shouldSkipElement(parent)) {
-                        return NodeFilter.FILTER_REJECT;
-                    }
-
-                    const text = normalizeText(node.nodeValue);
-
-                    if (!text) return NodeFilter.FILTER_REJECT;
-                    if (/^[\d\s.,:฿$Ks%()+\-\/]+$/.test(text)) {
-                        return NodeFilter.FILTER_REJECT;
-                    }
-
-                    if (!dict[text]) {
-                        return NodeFilter.FILTER_REJECT;
-                    }
-
-                    return NodeFilter.FILTER_ACCEPT;
-                }
-            }
-        );
-
-        const nodes = [];
-
-        while (walker.nextNode()) {
-            nodes.push(walker.currentNode);
-        }
-
-        nodes.forEach(node => {
-            const original = normalizeText(node.nodeValue);
-
-            if (!node.parentElement.dataset.originalText) {
-                node.parentElement.dataset.originalText = original;
-            }
-
-            const baseText =
-                node.parentElement.dataset.originalText ||
-                original;
-
-            if (dict[baseText]) {
-                node.nodeValue = node.nodeValue.replace(
-                    original,
-                    dict[baseText]
-                );
-            }
+        root.querySelectorAll("[data-i18n-alt]").forEach(el => {
+            const value = dict[el.dataset.i18nAlt];
+            if (value) el.alt = value;
         });
     }
 
@@ -270,46 +213,17 @@
         document.documentElement.lang = lang;
 
         translateDataAttributes(root, dict);
-        translateAttributes(root, dict);
-        translateTextNodes(root, dict);
-    }
-
-    function watchDynamicContent() {
-        const observer = new MutationObserver(mutations => {
-            let shouldTranslate = false;
-
-            for (const mutation of mutations) {
-                if (mutation.addedNodes?.length) {
-                    shouldTranslate = true;
-                    break;
-                }
-            }
-
-            if (!shouldTranslate) return;
-
-            clearTimeout(window.__azielI18nTimer);
-
-            window.__azielI18nTimer = setTimeout(() => {
-                translatePage(document);
-            }, 80);
-        });
-
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true
-        });
-    }
-
-    function toDatasetName(attr) {
-        return attr
-            .replace(/-([a-z])/g, (_, c) => c.toUpperCase())
-            .replace(/^./, c => c.toUpperCase());
     }
 
     window.AZIEL_I18N = {
         t,
         getLang,
         setLang,
+        getLocale: getLang,
+        setLocale: setLang,
+        normalizeLocale: normalizeLang,
+        translateError,
+        supportedLocales: Object.freeze(["en", "my", "th"]),
         translatePage,
         ready() {
             if (!readyPromise) {
@@ -325,10 +239,10 @@
             return Array.from(missingKeys);
         }
     };
+    window.AZIEL_LOCALE = window.AZIEL_I18N;
 
     document.addEventListener("DOMContentLoaded", () => {
         translatePage(document);
-        watchDynamicContent();
     });
 
     window.addEventListener("aziel:headerLoaded", () => {

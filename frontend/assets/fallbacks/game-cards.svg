@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">AZIEL game card placeholder</title>
+  <rect width="64" height="64" rx="14" fill="#eee9f8"/>
+  <path d="M15 21h34v24H15z" fill="none" stroke="#7256a8" stroke-width="3"/>
+  <path d="M21 28h13M21 34h9M40 28h3" stroke="#7256a8" stroke-width="3" stroke-linecap="round"/>
+  <path d="M15 18h34" stroke="#a996cf" stroke-width="2"/>
+</svg>

@@ -1,4 +1,5 @@
 const CommerceOrder = require("../../models/CommerceOrder");
+const { ensurePaidOrderFulfillmentWork } = require("../paidFulfillmentRoutingService");
 const {
     toOrderSnapshotPayload
 } = require("./orderSnapshotRuntime");
@@ -391,14 +392,18 @@ function updateOrderStatus(input, options = {}) {
     });
 }
 
-function updatePaymentStatus(input, options = {}) {
-    return updateStatusField(input, options, {
+async function updatePaymentStatus(input, options = {}) {
+    const order = await updateStatusField(input, options, {
         publicField: "paymentStatus",
         queryField: "paymentStatus",
         nestedField: "payment.status",
         transitions: PAYMENT_TRANSITIONS,
         invalidCode: ERROR_CODES.INVALID_PAYMENT_STATUS_TRANSITION
     });
+    if (normalizeString(input.toStatus) === "paid") {
+        await ensurePaidOrderFulfillmentWork(order, { session: options.session || options.mongoSession || null });
+    }
+    return order;
 }
 
 function updateFulfilmentStatus(input, options = {}) {

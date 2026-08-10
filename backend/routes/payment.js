@@ -10,6 +10,7 @@ const upload = require("../middleware/orderUpload");
 const authMiddleware = require("../middleware/authMiddleware");
 const adminMiddleware = require("../middleware/adminMiddleware");
 const { PERMISSIONS, requireAdminPermission } = require("../services/adminAuthorizationService");
+const { runtimeDebug } = require("../utils/runtimeDebug");
 
 const Order = require("../models/Order");
 const ManualPaymentAttempt = require("../models/ManualPaymentAttempt");
@@ -78,7 +79,7 @@ const manualAttemptLimiter = rateLimit({
 });
 
 function devLog(...args) {
-    if (!isProduction) console.log(...args);
+    runtimeDebug(...args);
 }
 
 function commerceCoreDisabledLegacyPayableResponse(res, legacyFlow) {

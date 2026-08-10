@@ -28,7 +28,7 @@ function verifyBridgeUsesExistingPromoArchitecture() {
         "backend/services/commerce/commercePromotionBridgeService.js",
         [
             "require(\"../promoCodeService\")",
-            "resolvePromoPricing",
+            "resolvePromoDefinition",
             "reservePromoUse",
             "consumePromoRedemption",
             "releasePromoRedemption",
@@ -68,7 +68,7 @@ function verifyManualPromptPayFlow() {
     );
     includes(
         "backend/services/commerce/customerManualPromptPayCheckoutService.js",
-        "toCheckoutSession({ checkout: checkoutResult.checkout, payment, method, catalog })",
+        "const session = toCheckoutSession({",
         "Manual PromptPay session must still render from the Commerce checkout/payment result"
     );
 }
@@ -132,7 +132,7 @@ function verifyFocusedLifecycleAssertions() {
     includesAll(
         "backend/services/commerce/commercePromotionBridgeService.js",
         [
-            "resolvePromoPricing",
+            "resolvePromoDefinition",
             "verifyUserLimit: true",
             "usageFactsFor",
             "maximumDiscountAmount",

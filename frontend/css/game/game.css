@@ -55,8 +55,8 @@
     border-radius: var(--az-radius-hero, 24px);
 }
 
-.game-banner[data-managed-content-state="resolving"] > *,
-.game-banner[data-managed-content-state="preparing"] > * {
+.game-banner[data-managed-content-state="resolving"]>*,
+.game-banner[data-managed-content-state="preparing"]>* {
     opacity: 0;
     pointer-events: none;
 }
@@ -75,11 +75,17 @@
 }
 
 @keyframes gameManagedSkeleton {
-    0% { background-position: 100% 0; }
-    100% { background-position: -100% 0; }
+    0% {
+        background-position: 100% 0;
+    }
+
+    100% {
+        background-position: -100% 0;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
+
     .game-banner[data-managed-content-state="resolving"]::after,
     .game-banner[data-managed-content-state="preparing"]::after {
         animation: none;
@@ -196,6 +202,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+
     .game-howto-toggle i,
     .game-howto-panel {
         transition-duration: 1ms !important;
@@ -1374,7 +1381,7 @@ body.dark .game-page::before {
         transform var(--game-banner-transition-duration) var(--game-banner-transition-ease);
 }
 
-.game-banner > img,
+.game-banner>img,
 .game-banner .banner-overlay,
 .game-banner-managed .game-banner-slider {
     position: absolute;
@@ -1382,7 +1389,7 @@ body.dark .game-page::before {
     z-index: 1;
 }
 
-.game-banner > img,
+.game-banner>img,
 .game-banner-slide img {
     width: 100% !important;
     height: 100% !important;
@@ -1465,10 +1472,7 @@ body.dark .game-page::before {
         width: 100% !important;
         max-width: 100% !important;
         padding:
-            12px
-            max(var(--game-mobile-gutter), env(safe-area-inset-right))
-            78px
-            max(var(--game-mobile-gutter), env(safe-area-inset-left)) !important;
+            12px max(var(--game-mobile-gutter), env(safe-area-inset-right)) 78px max(var(--game-mobile-gutter), env(safe-area-inset-left)) !important;
         box-sizing: border-box !important;
     }
 
@@ -1542,13 +1546,113 @@ body.dark .game-page::before {
 }
 
 @media (prefers-reduced-motion: reduce) {
+
     .game-banner::before,
     .game-page::before,
-    .game-banner > img,
+    .game-banner>img,
     .game-banner-slide,
     .game-banner-slide img,
     .game-banner-dot {
         transition-duration: 1ms !important;
         animation: none !important;
+    }
+}
+
+/* AZIEL catalog discount presentation â€” SEAGM-style information hierarchy */
+
+.pack {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 82px;
+    padding: 14px 16px;
+}
+
+.pack-info {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+}
+
+.pack-name {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    color: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pack-discount-text {
+    display: block;
+    color: #169b37;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+.pack-price-block {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 4px;
+    margin-left: auto;
+}
+
+.pack-original-price {
+    display: block;
+    color: #8b8f99;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.1;
+    text-decoration: line-through;
+    white-space: nowrap;
+}
+
+.pack-price {
+    display: block;
+    color: #00b85a;
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+#summaryDiscountRow[hidden] {
+    display: none !important;
+}
+
+#summaryDiscount {
+    color: #169b37;
+}
+
+/* Preserve compact mobile cards and cloned package-panel rows. */
+@media (max-width: 768px) {
+    .pack {
+        min-height: 76px;
+        padding: 12px;
+        gap: 10px;
+    }
+
+    .pack-name {
+        font-size: 13px;
+    }
+
+    .pack-discount-text,
+    .pack-original-price {
+        font-size: 10px;
+    }
+
+    .pack-price {
+        font-size: 12px;
     }
 }

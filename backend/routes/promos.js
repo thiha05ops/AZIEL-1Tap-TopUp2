@@ -10,14 +10,13 @@ const {
     archivePromo,
     createPromo,
     listAdminPromos,
-    publicQuote,
-    resolvePurchasePricing,
     updatePromo
 } = require("../services/promoCodeService");
 const { CatalogError } = require("../services/catalogService");
+const { resolveCommercePricingPreview, CommercePricingPreviewError } = require("../services/commerce/commercePricingPreviewService");
 
 function sendPromoError(res, error) {
-    if (error instanceof PromoError || error instanceof CatalogError) {
+    if (error instanceof PromoError || error instanceof CatalogError || error instanceof CommercePricingPreviewError) {
         return res.status(error.statusCode || 400).json({
             success: false,
             code: error.code,
@@ -94,17 +93,28 @@ router.delete("/admin/promos/:id", adminMiddleware, requireAdminPermission(PERMI
 
 router.post("/promos/quote", optionalAuthMiddleware, async (req, res) => {
     try {
-        const pricing = await resolvePurchasePricing({
-            payload: req.body,
+        const quote = await resolveCommercePricingPreview(req.body || {}, {
             user: req.user || null,
-            verifyUserLimit: Boolean(req.user?.username)
+            sessionId: req.sessionID || req.headers["x-session-id"] || ""
         });
 
         return res.json({
             success: true,
-            quote: publicQuote(pricing),
+            quote,
             userLimitVerified: Boolean(req.user?.username)
         });
+    } catch (error) {
+        return sendPromoError(res, error);
+    }
+});
+
+router.post("/pricing/preview", optionalAuthMiddleware, async (req, res) => {
+    try {
+        const quote = await resolveCommercePricingPreview(req.body || {}, {
+            user: req.user || null,
+            sessionId: req.sessionID || req.headers["x-session-id"] || ""
+        });
+        return res.json({ success: true, quote });
     } catch (error) {
         return sendPromoError(res, error);
     }

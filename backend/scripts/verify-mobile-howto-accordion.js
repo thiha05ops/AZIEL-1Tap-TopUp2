@@ -14,9 +14,10 @@ function main() {
         "game-howto-toggle",
         "aria-expanded",
         "aria-controls",
-        "setExpanded(desktopQuery.matches)",
+        "setExpanded(isProductDetail ? false : desktopQuery.matches)",
         "button.addEventListener(\"click\"",
-        "desktopQuery.addEventListener(\"change\""
+        "desktopQuery.addEventListener(\"change\"",
+        "if (!isProductDetail) setExpanded(event.matches)"
     ].forEach(token => assert(runtime.includes(token), `game-presentation-runtime.js missing ${token}`));
 
     [

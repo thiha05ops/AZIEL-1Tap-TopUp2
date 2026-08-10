@@ -5,6 +5,7 @@
 let allTickets = [];
 let currentFilter = "all";
 let supportSocketStarted = false;
+const supportT = (key, fallback, params) => window.AZIEL_LOCALE?.t?.(key, fallback, params) || fallback;
 
 function supportApiUrl(path) {
     if (window.AZIEL?.apiUrl) {
@@ -29,6 +30,10 @@ document.addEventListener("DOMContentLoaded", () => {
     initFaq();
     startSupportSocket();
     loadMyTickets();
+});
+window.addEventListener("aziel:locale-changed", () => {
+    renderFaq();
+    renderTickets();
 });
 
 /* ===============================
@@ -81,11 +86,11 @@ function initTicketTabs() {
 
 function getSubjectByType(type) {
     const subjects = {
-        order: "My order is not completed",
-        payment: "Payment issue",
-        wallet: "Wallet balance problem",
-        account: "Account login issue",
-        general: "Need help"
+        order: supportT("support.subject.order", "My order is not completed"),
+        payment: supportT("support.subject.payment", "Payment issue"),
+        wallet: supportT("support.subject.wallet", "Wallet balance problem"),
+        account: supportT("support.subject.account", "Account login issue"),
+        general: supportT("support.subject.general", "Need help")
     };
 
     return subjects[type] || "Need help";
@@ -93,27 +98,39 @@ function getSubjectByType(type) {
 
 const faqData = [
     {
+        questionKey: "support.faq.pending.question",
         question: "My order is still pending",
+        answerKey: "support.faq.pending.answer",
         answer: "Orders are usually completed within a few minutes after payment. If your order is still pending, submit a support ticket with your Order ID."
     },
     {
+        questionKey: "support.faq.payment.question",
         question: "Payment was successful but my order is not completed",
+        answerKey: "support.faq.payment.answer",
         answer: "Payment confirmation may take a short time. If your order remains pending, contact support and include your payment details or Order ID."
     },
     {
+        questionKey: "support.faq.wallet.question",
         question: "Wallet balance not updated",
+        answerKey: "support.faq.wallet.answer",
         answer: "Wallet balance updates automatically after successful payment. If the balance is not updated, create a ticket with your payment method and amount."
     },
     {
+        questionKey: "support.faq.password.question",
         question: "I forgot my password",
+        answerKey: "support.faq.password.answer",
         answer: "Use the Forgot Password page to receive an OTP by email and reset your password securely."
     },
     {
+        questionKey: "support.faq.refund.question",
         question: "Can I cancel or refund my order?",
+        answerKey: "support.faq.refund.answer",
         answer: "Orders that are already processed cannot usually be cancelled. For special cases, submit a support ticket and our team will review it."
     },
     {
+        questionKey: "support.faq.reply.question",
         question: "How long does support take to reply?",
+        answerKey: "support.faq.reply.answer",
         answer: "Our support team replies as soon as possible during working hours. Order and payment issues are handled first."
     }
 ];
@@ -139,12 +156,12 @@ function renderFaq() {
     box.innerHTML = faqData.map((faq, index) => `
         <div class="faq-item ${index === 0 ? "active" : ""}">
             <button class="faq-question" type="button">
-                <span>${escapeHTML(faq.question)}</span>
+                <span>${escapeHTML(supportT(faq.questionKey, faq.question))}</span>
                 <i class="fa-solid fa-chevron-down"></i>
             </button>
 
             <div class="faq-answer">
-                ${escapeHTML(faq.answer)}
+                ${escapeHTML(supportT(faq.answerKey, faq.answer))}
             </div>
         </div>
     `).join("");
@@ -160,7 +177,7 @@ async function submitSupportTicket(e) {
     const username = getSupportUsername();
 
     if (!username) {
-        showFormMessage("Please login first to submit a support ticket.", "error");
+        showFormMessage(supportT("support.loginToSubmit", "Please login first to submit a support ticket."), "error");
         return;
     }
 
@@ -174,7 +191,7 @@ async function submitSupportTicket(e) {
     const screenshot = document.getElementById("ticketScreenshot")?.files[0];
 
     if (!type || !subject || !message) {
-        showFormMessage("Please fill all required fields.", "error");
+        showFormMessage(supportT("validation.requiredFields", "Please fill all required fields."), "error");
         return;
     }
 
@@ -200,11 +217,11 @@ async function submitSupportTicket(e) {
         const data = await safeJson(res);
 
         if (!res.ok || !data.success) {
-            showFormMessage(data.message || "Submit failed. Please try again.", "error");
+            showFormMessage(data.message || supportT("support.submitFailed", "Submit failed. Please try again."), "error");
             return;
         }
 
-        showFormMessage("Support ticket submitted successfully.", "success");
+        showFormMessage(supportT("support.submitSuccess", "Support ticket submitted successfully."), "success");
 
         form?.reset();
         resetCategoryCards();
@@ -213,7 +230,7 @@ async function submitSupportTicket(e) {
 
     } catch (error) {
         console.log("Submit support error:", error);
-        showFormMessage("Server error. Please try again later.", "error");
+        showFormMessage(supportT("common.serverErrorLater", "Server error. Please try again later."), "error");
     } finally {
         setSubmitLoading(false);
     }
@@ -225,7 +242,7 @@ function setSubmitLoading(isLoading) {
 
     if (window.AZIEL_UI?.button) {
         if (isLoading) {
-            window.AZIEL_UI.button.setLoading(btn, { text: "Submitting..." });
+            window.AZIEL_UI.button.setLoading(btn, { text: supportT("support.submitting", "Submitting...") });
         } else {
             window.AZIEL_UI.button.reset(btn);
         }
@@ -235,8 +252,8 @@ function setSubmitLoading(isLoading) {
     btn.disabled = isLoading;
 
     btn.innerHTML = isLoading
-        ? `<i class="fa-solid fa-spinner fa-spin"></i> Submitting...`
-        : `<i class="fa-solid fa-paper-plane"></i> Submit Ticket`;
+        ? `<i class="fa-solid fa-spinner fa-spin"></i> ${escapeHTML(supportT("support.submitting", "Submitting..."))}`
+        : `<i class="fa-solid fa-paper-plane"></i> ${escapeHTML(supportT("support.submit", "Submit Ticket"))}`;
 }
 
 function resetCategoryCards() {
@@ -279,8 +296,8 @@ async function loadMyTickets() {
 
     if (!username) {
         box.innerHTML = renderEmptyState(
-            "Please login first",
-            "You need to login to view your support tickets."
+            supportT("support.loginFirst", "Please login first"),
+            supportT("support.loginToView", "You need to login to view your support tickets.")
         );
         return;
     }
@@ -316,14 +333,14 @@ async function loadMyTickets() {
         if (window.AZIEL_UI?.state?.render) {
             window.AZIEL_UI.state.render(box, {
                 type: "error",
-                title: "Failed to load tickets",
-                message: "Please check your connection and try again later.",
+                title: supportT("support.loadFailed", "Failed to load tickets"),
+                message: supportT("common.checkConnection", "Please check your connection and try again later."),
                 retry: loadMyTickets
             });
         } else {
             box.innerHTML = renderEmptyState(
-                "Failed to load tickets",
-                "Please check your connection and try again later."
+                supportT("support.loadFailed", "Failed to load tickets"),
+                supportT("common.checkConnection", "Please check your connection and try again later.")
             );
         }
     }
@@ -345,13 +362,13 @@ function renderTickets() {
         if (window.AZIEL_UI?.state?.render) {
             window.AZIEL_UI.state.render(box, {
                 type: "empty",
-                title: "No tickets found",
-                message: "Your support tickets will appear here after you submit a ticket."
+                title: supportT("support.noTickets", "No tickets found"),
+                message: supportT("support.noTicketsHelp", "Your support tickets will appear here after you submit a ticket.")
             });
         } else {
             box.innerHTML = renderEmptyState(
-                "No tickets found",
-                "Your support tickets will appear here after you submit a ticket."
+                supportT("support.noTickets", "No tickets found"),
+                supportT("support.noTicketsHelp", "Your support tickets will appear here after you submit a ticket.")
             );
         }
         return;
@@ -379,7 +396,7 @@ function renderTicket(ticket) {
                 <div>
                     <div class="ticket-title">
                         ${getTypeIcon(type)}
-                        ${escapeHTML(ticket.subject || "Support Ticket")}
+                        ${escapeHTML(ticket.subject || supportT("support.ticket", "Support Ticket"))}
                     </div>
 
                     <div class="ticket-meta">
@@ -390,14 +407,14 @@ function renderTicket(ticket) {
                 </div>
 
                 <span class="ticket-status ${escapeHTML(status)}">
-                    ${escapeHTML(status)}
+                    ${escapeHTML(formatStatus(status))}
                 </span>
 
             </div>
 
             ${ticket.orderId ? `
                 <div class="ticket-meta">
-                    <strong>Order ID:</strong> ${escapeHTML(ticket.orderId)}
+                    <strong>${escapeHTML(supportT("support.orderId", "Order ID"))}:</strong> ${escapeHTML(ticket.orderId)}
                 </div>
             ` : ""}
 
@@ -410,13 +427,13 @@ function renderTicket(ticket) {
                     src="${escapeHTML(screenshot)}"
                     class="ticket-image"
                     onclick="window.open('${escapeHTML(screenshot)}', '_blank')"
-                    alt="Support screenshot"
+                    alt="${escapeHTML(supportT("support.screenshotAlt", "Support screenshot"))}"
                 >
             ` : ""}
 
             ${ticket.adminReply ? `
                 <div class="ticket-reply">
-                    <strong>Admin Reply</strong>
+                    <strong>${escapeHTML(supportT("support.adminReply", "Admin Reply"))}</strong>
                     <p>${escapeHTML(ticket.adminReply)}</p>
                 </div>
             ` : ""}
@@ -439,16 +456,16 @@ function renderTicketSkeleton() {
         <div class="ticket-item">
             <div class="ticket-top">
                 <div>
-                    <div class="ticket-title">Loading tickets...</div>
-                    <div class="ticket-meta">Please wait</div>
+                    <div class="ticket-title">${escapeHTML(supportT("support.loadingTickets", "Loading tickets..."))}</div>
+                    <div class="ticket-meta">${escapeHTML(supportT("common.pleaseWait", "Please wait"))}</div>
                 </div>
             </div>
         </div>
         <div class="ticket-item">
             <div class="ticket-top">
                 <div>
-                    <div class="ticket-title">Checking ticket status...</div>
-                    <div class="ticket-meta">Syncing support data</div>
+                    <div class="ticket-title">${escapeHTML(supportT("support.checkingStatus", "Checking ticket status..."))}</div>
+                    <div class="ticket-meta">${escapeHTML(supportT("support.syncing", "Syncing support data"))}</div>
                 </div>
             </div>
         </div>
@@ -523,14 +540,18 @@ function getTypeIcon(type) {
 
 function formatType(type) {
     const names = {
-        order: "Order Issue",
-        payment: "Payment Issue",
-        wallet: "Wallet Issue",
-        account: "Account Issue",
-        general: "General Help"
+        order: supportT("support.type.order", "Order Issue"),
+        payment: supportT("support.type.payment", "Payment Issue"),
+        wallet: supportT("support.type.wallet", "Wallet Issue"),
+        account: supportT("support.type.account", "Account Issue"),
+        general: supportT("support.type.general", "General Help")
     };
 
     return names[type] || "General Help";
+}
+
+function formatStatus(status) {
+    return supportT(`support.status.${normalizeStatus(status)}`, normalizeStatus(status));
 }
 
 function formatTicketDate(value) {
@@ -564,12 +585,12 @@ function startSupportSocket() {
     socket.on("newNotification", data => {
         if (data?.title !== "Support Reply") return;
 
-        showSupportPopup(data.message || "Admin replied to your ticket");
+        showSupportPopup(data.message || supportT("support.adminReplied", "Admin replied to your ticket"));
         loadMyTickets();
     });
 
     socket.on("supportUpdated", data => {
-        showSupportPopup(data?.message || "Your support ticket was updated");
+        showSupportPopup(data?.message || supportT("support.ticketUpdated", "Your support ticket was updated"));
         loadMyTickets();
     });
 }

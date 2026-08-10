@@ -22,7 +22,13 @@ async function loadPaymentMethods() {
         "MM";
 
     if (hasPaymentGrid) {
-        paymentGrid.innerHTML = `<p class="pay-loading">Loading payment methods...</p>`;
+        paymentGrid.setAttribute("aria-busy", "true");
+        paymentGrid.innerHTML = Array.from({ length: 4 }, () => `
+            <div class="pay-card pay-card-skeleton az-storefront-skeleton" aria-hidden="true">
+                <span class="pay-card-skeleton-icon"></span>
+                <span class="pay-card-skeleton-line"></span>
+            </div>
+        `).join("") + '<span class="az-visually-hidden" role="status">Loading payment methods</span>';
         paymentInput.value = "";
         window.selectedPaymentData = null;
         document.dispatchEvent(new Event("paymentChanged"));
@@ -58,6 +64,7 @@ async function loadPaymentMethods() {
         }
 
         paymentGrid.innerHTML = "";
+        paymentGrid.setAttribute("aria-busy", "false");
 
         if (!methods.length) {
             paymentGrid.innerHTML = `<p class="pay-empty">No payment methods available.</p>`;
@@ -380,8 +387,6 @@ function selectPaymentCard(card) {
     localStorage.setItem("selectedPaymentAccountNumber", window.selectedPaymentData.accountNumber);
     localStorage.setItem("selectedPaymentType", window.selectedPaymentData.paymentType);
     localStorage.setItem("selectedPaymentProvider", window.selectedPaymentData.provider);
-
-    console.log("SELECTED PAYMENT =", window.selectedPaymentData);
 
     document.dispatchEvent(
         new CustomEvent("paymentChanged", {

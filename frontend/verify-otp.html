@@ -12,7 +12,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#070716">
 
-    <title>Verify OTP - AZIEL 1Tap</title>
+    <title data-i18n="Verify OTP - AZIEL 1Tap">Verify OTP - AZIEL 1Tap</title>
 
     <link rel="stylesheet" href="css/core/main.css">
     <link rel="stylesheet" href="css/core/components.css">
@@ -34,9 +34,9 @@
             <a href="home.html" class="auth-logo">AZIEL</a>
 
             <div class="auth-brand-content">
-                <span class="auth-pill">Security Check</span>
-                <h1>Verify OTP</h1>
-                <p>Enter the 6-digit code sent to your Gmail account to continue password reset.</p>
+                <span class="auth-pill" data-i18n="verify.otp.securityCheck">Security Check</span>
+                <h1 data-i18n="verify.otp.verifyOTP">Verify OTP</h1>
+                <p data-i18n="verify.otp.enterThe6DigitCodeSentToYourGmail">Enter the 6-digit code sent to your Gmail account to continue password reset.</p>
             </div>
         </section>
 
@@ -44,41 +44,46 @@
 
             <div class="auth-card-head">
                 <div>
-                    <h2>Enter OTP</h2>
-                    <p id="otpEmailText">Check your Gmail inbox</p>
+                    <h2 data-i18n="verify.otp.enterOTP">Enter OTP</h2>
+                    <p id="otpEmailText" data-i18n="verify.otp.checkYourGmailInbox">Check your Gmail inbox</p>
                 </div>
-                <a href="forgot-password.html">Back</a>
+                <a href="forgot-password.html" data-i18n="verify.otp.back">Back</a>
             </div>
 
             <div id="msg" class="auth-message"></div>
 
             <form id="verifyOtpForm">
 
-                <label class="auth-label">6-digit OTP</label>
+                <label class="auth-label" data-i18n="verify.otp.6DigitOTP">6-digit OTP</label>
                 <div class="auth-input">
                     <i class="fa-solid fa-shield-halved auth-icon"></i>
-                    <input id="otp" type="text" inputmode="numeric" maxlength="6" placeholder="Enter OTP" required>
+                    <input id="otp" type="text" inputmode="numeric" maxlength="6" placeholder="Enter OTP" data-i18n-placeholder="auth.otp.placeholder" required>
                 </div>
 
-                <button type="submit" id="verifyOtpBtn" class="auth-main-btn">
+                <button type="submit" id="verifyOtpBtn" class="auth-main-btn" data-i18n="verify.otp.verifyOTP">
                     Verify OTP
                 </button>
 
                 <p class="auth-bottom-text">
-                    Didn’t receive code?
-                    <a href="forgot-password.html">Send again</a>
+                    <span data-i18n="verify.otp.didntReceive">Didn’t receive code?</span>
+                    <a href="forgot-password.html" data-i18n="verify.otp.sendAgain">Send again</a>
                 </p>
 
             </form>
             <div id="usernameBox" class="username-box" style="display:none;">
-                Username: <strong id="usernameText"></strong>
+                <span data-i18n="verify.otp.usernameLabel">Username:</span> <strong id="usernameText"></strong>
             </div>
 
         </section>
 
     </main>
 
-    <script src="js/verify-otp.js"></script>
+    <script src="lang/en.js?v=20260809-g21-explicit"></script>
+    <script src="lang/th.js?v=20260809-g21-explicit"></script>
+    <script src="lang/my.js?v=20260809-g21-explicit"></script>
+    <script src="lang/storefront-static.js?v=20260809-g21-explicit"></script>
+    <script src="js/i18n.js?v=20260809-g21-explicit"></script>
+    <script src="js/verify-otp.js?v=20260809-g21-explicit"></script>
     <script src="js/pwa-fix.js?v=20260723-context-bank-runtime"></script>
     <script src="js/theme.js?v=20260701"></script>
 </body>

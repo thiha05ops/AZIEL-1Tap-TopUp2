@@ -43,8 +43,8 @@ function main() {
     assert(homeBanner.includes("ArrowLeft") && homeBanner.includes("ArrowRight"), "Home carousel must support Left/Right arrows.");
     assert(homeBanner.includes('aria-current="false"') && homeBanner.includes("aria-current"), "Carousel indicators must report current state.");
 
-    assert(homePromotions.includes("aria-label") && homePromotions.includes("promotion-preview-cta"), "Promotion rows/actions must expose accessible labels.");
-    assert(homePromotions.includes('aria-hidden="true"'), "Decorative promotion media must be hidden from assistive tech.");
+    assert(homePromotions.includes('class="home-promotion-card"') && homePromotions.includes("promotion.title"), "Promotion links must receive an accessible name from their visible title.");
+    assert(homePromotions.includes("promotion.imageAltText || promotion.title"), "Promotion media must expose meaningful configured or title fallback alt text.");
 
     assert(notifications.includes('setAttribute("role", "tablist")'), "Notification filters must expose a tablist.");
     assert(notifications.includes('role="tab"'), "Notification filter buttons must expose tab roles.");

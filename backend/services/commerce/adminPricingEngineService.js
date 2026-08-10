@@ -3,6 +3,7 @@
 const mongoose = require("mongoose");
 const CatalogProduct = require("../../models/CatalogProduct");
 const CatalogPackage = require("../../models/CatalogPackage");
+const { CANONICAL_OPERATIONAL_PRODUCTS } = require("../../catalog/canonicalOperationalCatalog");
 const PricingPolicy = require("../../models/PricingPolicy");
 const PriceVersion = require("../../models/PriceVersion");
 const { resolveSupplierCostSnapshot } = require("./supplierCostService");
@@ -265,33 +266,28 @@ function affectedSummaryFromPackages(packages = []) {
 function productsFromPackages(packages = [], productMap = new Map(), supplierCostDraftRows = []) {
     const products = new Map();
     const savedDraftMap = draftRowMap(supplierCostDraftRows);
-    productMap.forEach((product, key) => {
-        const productId = text(product.productCode || key).toLowerCase();
-        if (!productId) return;
+    CANONICAL_OPERATIONAL_PRODUCTS.forEach(canonical => {
+        const productId = canonical.productCode;
+        const product = productMap.get(productId) || {};
         products.set(productId, {
             productId,
             productCode: productId,
-            productName: text(product.name || product.displayName || product.productCode),
-            enabled: product.enabled !== false,
-            supportedRegions: Array.isArray(product.supportedRegions) ? product.supportedRegions.map(upper) : [],
+            productName: canonical.name,
+            family: canonical.family || "",
+            category: canonical.adminCategory || canonical.catalogCategory || canonical.category || "",
+            enabled: true,
+            catalogEnabled: product.productCode ? product.enabled !== false : null,
+            supportedRegions: Array.isArray(product.supportedRegions) && product.supportedRegions.length
+                ? product.supportedRegions.map(upper)
+                : canonical.supportedRegions.map(upper),
             packages: []
         });
     });
     packages.forEach(pkg => {
         const productId = text(pkg.productCode).toLowerCase();
-        if (!productId) return;
+        if (!products.has(productId)) return;
         const product = productMap.get(productId) || productMap.get(text(pkg.productCode));
         const productName = text(product?.name || product?.displayName || pkg.metadata?.gameName || pkg.metadata?.productName || pkg.productCode);
-        if (!products.has(productId)) {
-            products.set(productId, {
-                productId,
-                productCode: productId,
-                productName,
-                enabled: product?.enabled !== false,
-                supportedRegions: Array.isArray(product?.supportedRegions) ? product.supportedRegions.map(upper) : [],
-                packages: []
-            });
-        }
         Object.entries(pkg.prices || {}).forEach(([region, price]) => {
             if (!price) return null;
             const normalizedRegion = upper(region);
@@ -374,7 +370,10 @@ function productsFromPackages(packages = [], productMap = new Map(), supplierCos
         });
     });
 
-    return [...products.values()];
+    return [...products.values()].map(product => ({
+        ...product,
+        packageCount: new Set(product.packages.map(pkg => upper(pkg.packageCode))).size
+    }));
 }
 
 async function readCatalogPackages(trace = null) {

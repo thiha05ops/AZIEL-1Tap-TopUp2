@@ -8,6 +8,7 @@ const {
     parseSortOrder
 } = require("./gameBannerService");
 const { assertAssetCategory, projectMediaAsset } = require("./mediaService");
+const { normalizeTextLocales } = require("../catalog/localizedContent");
 
 const HOME_BANNER_STATE_KEY = "home_banners";
 
@@ -22,6 +23,14 @@ class HomeBannerError extends Error {
 
 function cleanText(value = "", max = 120) {
     return String(value || "").trim().slice(0, max);
+}
+
+function parseCtaLabelLocales(locales, english) {
+    try {
+        return normalizeTextLocales(locales, english, "ctaLabelLocales", 40);
+    } catch (error) {
+        throw new HomeBannerError(error.code || "HOME_BANNER_PATCH_INVALID", error.message);
+    }
 }
 
 function parseBoolean(value, field = "enabled") {
@@ -84,6 +93,7 @@ function projectPublicHomeBanner(banner = {}, mediaMap = new Map()) {
         imageAltText: asset.altText || banner.name || "AZIEL home banner",
         sortOrder: Number(banner.sortOrder || 0),
         ctaLabel: banner.ctaLabel || "",
+        ctaLabelLocales: normalizeTextLocales(banner.ctaLabelLocales, banner.ctaLabel, "ctaLabelLocales", 40),
         ctaTarget: banner.ctaTarget || ""
     };
 }
@@ -99,6 +109,7 @@ function projectAdminHomeBanner(banner = {}, mediaMap = new Map()) {
         enabled: banner.enabled === true,
         sortOrder: Number(banner.sortOrder || 0),
         ctaLabel: banner.ctaLabel || "",
+        ctaLabelLocales: normalizeTextLocales(banner.ctaLabelLocales, banner.ctaLabel, "ctaLabelLocales", 40),
         ctaTarget: banner.ctaTarget || "",
         startsAt: banner.startsAt || null,
         endsAt: banner.endsAt || null,
@@ -130,6 +141,12 @@ function buildHomeBannerPayload(patch = {}, existing = null) {
         ctaLabel: Object.prototype.hasOwnProperty.call(patch, "ctaLabel")
             ? cleanText(patch.ctaLabel, 40)
             : source.ctaLabel || "",
+        ctaLabelLocales: parseCtaLabelLocales(
+            Object.prototype.hasOwnProperty.call(patch, "ctaLabelLocales") ? patch.ctaLabelLocales : source.ctaLabelLocales,
+            Object.prototype.hasOwnProperty.call(patch, "ctaLabel") ? patch.ctaLabel : source.ctaLabel,
+            "ctaLabelLocales",
+            40
+        ),
         ctaTarget: Object.prototype.hasOwnProperty.call(patch, "ctaTarget")
             ? parseCtaTarget(patch.ctaTarget)
             : source.ctaTarget || "",

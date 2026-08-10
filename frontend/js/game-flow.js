@@ -15,6 +15,8 @@
         status: "pending_payment",
         directWallet: false,
         legacyPaymentPreferred: false,
+        paymentSelectionStage: "checkout",
+        checkoutUrl: "checkout.html",
         pendingReturnUrl: window.location.pathname
     };
 
@@ -72,16 +74,14 @@
     }
 
     function bindFieldEvents(flow) {
-        getEl(flow.config.userIdSelector)?.addEventListener("input", () => {
-            updateSummary(flow);
-        });
-
-        getEl(flow.config.zoneIdSelector)?.addEventListener("input", () => {
-            updateSummary(flow);
-        });
-
-        getEl(flow.config.zoneIdSelector)?.addEventListener("change", () => {
-            updateSummary(flow);
+        getAccountFieldDefinitions(flow).forEach(field => {
+            const input = getEl(field.selector);
+            if (!input) return;
+            if (field.required) input.setAttribute("aria-required", "true");
+            ["input", "change"].forEach(eventName => input.addEventListener(eventName, () => {
+                renderAccountFieldError(field, input);
+                updateSummary(flow);
+            }));
         });
     }
 
@@ -210,11 +210,73 @@
         return String(el?.value || "").trim();
     }
 
+    function getAccountFieldDefinitions(flow) {
+        if (Array.isArray(flow.config.accountFields) && flow.config.accountFields.length) {
+            return flow.config.accountFields;
+        }
+
+        return [
+            {
+                key: "userId",
+                selector: flow.config.userIdSelector,
+                required: true,
+                requiredMessage: flow.config.userIdRequiredMessage || "Please enter your account information."
+            },
+            {
+                key: "zoneId",
+                selector: flow.config.zoneIdSelector,
+                required: flow.config.zoneRequired === true,
+                requiredMessage: flow.config.zoneRequiredMessage || "Please enter server information."
+            }
+        ].filter(field => field.selector);
+    }
+
+    function validateAccountField(field) {
+        const input = getEl(field.selector);
+        const value = String(input?.value || "").trim();
+
+        if (field.required && !value) {
+            return { valid: false, reason: field.requiredMessage || `Please enter ${field.label || "this field"}.` };
+        }
+
+        if (value && input && typeof input.checkValidity === "function" && !input.checkValidity()) {
+            return { valid: false, reason: field.invalidMessage || input.validationMessage || `Please enter a valid ${field.label || "value"}.` };
+        }
+
+        if (value && typeof field.validate === "function" && !field.validate(value, input)) {
+            return { valid: false, reason: field.invalidMessage || `Please enter a valid ${field.label || "value"}.` };
+        }
+
+        return { valid: true, reason: "" };
+    }
+
+    function renderAccountFieldError(field, input) {
+        const result = validateAccountField(field);
+        const errorId = `${input.id || field.key || "accountField"}Error`;
+        let error = document.getElementById(errorId);
+
+        if (!result.valid && String(input.value || "").trim()) {
+            if (!error) {
+                error = document.createElement("small");
+                error.id = errorId;
+                error.className = "account-field-error";
+                error.setAttribute("role", "alert");
+                input.insertAdjacentElement("afterend", error);
+            }
+            error.textContent = result.reason;
+            input.setAttribute("aria-invalid", "true");
+            input.setAttribute("aria-describedby", errorId);
+            return;
+        }
+
+        error?.remove();
+        input.removeAttribute("aria-invalid");
+        if (input.getAttribute("aria-describedby") === errorId) input.removeAttribute("aria-describedby");
+    }
+
     function getReadiness(flow) {
         const pkg = getSelectedPackage();
         const payment = getSelectedPayment();
-        const userId = getFieldValue(flow.config.userIdSelector);
-        const zoneId = getFieldValue(flow.config.zoneIdSelector);
         const amount = Number(pkg?.price || 0);
         const promo = getActivePromoQuote(flow, pkg);
         const payableAmount = promo?.finalAmount ?? amount;
@@ -222,50 +284,42 @@
         if (!pkg) {
             return {
                 ready: false,
-                reason: "Please select a package."
-            };
-        }
-
-        if (window.AZIEL_CATALOG && !window.AZIEL_CATALOG.isFresh()) {
-            return {
-                ready: false,
-                reason: t("catalogPricesUnavailable", "Prices are temporarily unavailable. Please try again shortly.")
+                reason: t("product.selectPackagePrompt", "Please select a package.")
             };
         }
 
         if (!amount || amount <= 0) {
             return {
                 ready: false,
-                reason: "This package is not available yet."
+                reason: t("product.packageUnavailable", "This package is not available yet.")
             };
         }
 
-        if (!userId) {
+        for (const field of getAccountFieldDefinitions(flow)) {
+            const validation = validateAccountField(field);
+            if (!validation.valid) return { ready: false, reason: validation.reason };
+        }
+
+        if (flow.config.paymentSelectionStage !== "checkout" && !payment?.key) {
             return {
                 ready: false,
-                reason: flow.config.userIdRequiredMessage || "Please enter your account information."
+                reason: t("product.selectPaymentPrompt", "Please select a payment method.")
             };
         }
 
-        if (flow.config.zoneRequired && !zoneId) {
-            return {
-                ready: false,
-                reason: flow.config.zoneRequiredMessage || "Please enter server information."
-            };
-        }
-
-        if (!payment?.key) {
-            return {
-                ready: false,
-                reason: "Please select a payment method."
-            };
+        if (flow.isSubmitting) {
+            return { ready: false, reason: t("product.continuingCheckout", "Continuing to checkout…") };
         }
 
         return {
             ready: true,
-            reason: payableAmount < amount
-                ? "Promo applied. Ready to continue payment."
-                : "Ready to continue payment."
+            reason: flow.config.paymentSelectionStage === "checkout"
+                ? (payableAmount < amount
+                    ? t("product.readyCheckoutPromo", "Promo applied. Ready to continue to checkout.")
+                    : t("product.readyCheckout", "Ready to continue to checkout."))
+                : (payableAmount < amount
+                    ? t("product.readyPaymentPromo", "Promo applied. Ready to continue payment.")
+                    : t("product.readyPayment", "Ready to continue payment."))
         };
     }
 
@@ -280,7 +334,7 @@
 
         setMotionText(
             flow.config.packageSummarySelector,
-            pkg?.name || "Not selected"
+            pkg?.name || t("product.notSelected", "Not selected")
         );
 
         setMotionText(
@@ -290,11 +344,31 @@
                 : `0 ${symbol}`
         );
 
+        const subtotal = document.getElementById("summaryPrice");
+        const promoRow = document.getElementById("summaryDiscountRow");
+        const promoLabel = document.getElementById("summaryPromoLabel");
+        const promoDiscount = document.getElementById("summaryDiscount");
+        const promoSaved = document.getElementById("summaryPromoSaved");
+        const baseAmount = Number(pkg?.price || 0);
+        const discountAmount = Number(promo?.discountAmount || 0);
+        if (subtotal) subtotal.textContent = pkg ? `${baseAmount.toLocaleString()} ${symbol}` : `0 ${symbol}`;
+        if (promoRow) promoRow.hidden = !promo;
+        if (promoLabel) promoLabel.textContent = promo
+            ? `${t("product.promoDiscount", "Promo")} ${promo.promoCode || ""}`.trim()
+            : t("product.promoDiscount", "Promo discount");
+        if (promoDiscount) promoDiscount.textContent = promo ? `−${discountAmount.toLocaleString()} ${symbol}` : `0 ${symbol}`;
+        if (promoSaved) {
+            promoSaved.hidden = !promo;
+            promoSaved.textContent = promo
+                ? t("product.youSaved", "You saved {amount}").replace("{amount}", `${discountAmount.toLocaleString()} ${symbol}`)
+                : "";
+        }
+
         renderPromoState(flow, promo);
 
         setMotionText(
             flow.config.paymentSummarySelector,
-            payment?.method || "Not selected"
+            payment?.method || t("product.notSelected", "Not selected")
         );
 
         setMotionText(flow.config.noteSelector, readiness.reason);
@@ -339,6 +413,12 @@
             sessionStorage.getItem("username") ||
             "guest";
 
+        const accountFields = getAccountFieldDefinitions(flow).map(field => ({
+            key: String(field.key || "").trim(),
+            label: String(field.label || field.key || "Account field").trim(),
+            value: getFieldValue(field.selector)
+        })).filter(field => field.key && field.value);
+
         return {
             orderId: "AZL-" + Date.now(),
             game: flow.config.game,
@@ -350,13 +430,14 @@
             currency: pkg.currency || currency,
             region: pkg.region || region,
             promoCode: getActivePromoQuote(flow, pkg)?.promoCode || "",
-            paymentMethod: payment.key,
+            paymentMethod: payment?.key || "",
             username,
             userId: getFieldValue(flow.config.userIdSelector),
             zoneId: getFieldValue(flow.config.zoneIdSelector) || "-",
+            accountFields,
             status: flow.config.status || "pending_payment",
-            paymentType: payment.paymentType || "manual",
-            provider: payment.provider || "manual"
+            paymentType: payment?.paymentType || "",
+            provider: payment?.provider || ""
         };
     }
 
@@ -428,6 +509,11 @@
                 if (!promoFresh) return;
             }
 
+            if (flow.config.paymentSelectionStage === "checkout") {
+                stageCheckoutHandoff(orderData, flow);
+                return;
+            }
+
             if (
                 flow.config.directWallet &&
                 orderData.paymentMethod === "wallet"
@@ -455,6 +541,23 @@
             flow.isSubmitting = false;
             updateSummary(flow);
         }
+    }
+
+    function stageCheckoutHandoff(orderData, flow) {
+        const checkoutDraft = {
+            version: 1,
+            createdAt: new Date().toISOString(),
+            returnUrl: flow.config.pendingReturnUrl || window.location.href,
+            order: {
+                ...orderData,
+                paymentMethod: "",
+                paymentType: "",
+                provider: ""
+            }
+        };
+
+        sessionStorage.setItem("azielProductCheckoutDraft", JSON.stringify(checkoutDraft));
+        window.location.href = flow.config.checkoutUrl || "checkout.html";
     }
 
     async function payWithWalletDirect(orderData, flow) {
@@ -503,11 +606,11 @@
         box.id = "azielPromoBox";
         box.className = "aziel-promo-box";
         box.innerHTML = `
-            <label class="aziel-promo-label" for="promoCodeInput">Promo Code</label>
+            <label class="aziel-promo-label" for="promoCodeInput" data-i18n="product.promoCode">${t("product.promoCode", "Promo Code")}</label>
             <div class="aziel-promo-row">
-                <input id="promoCodeInput" type="text" autocomplete="off" maxlength="32" placeholder="Enter promo code">
-                <button id="promoApplyBtn" type="button">Apply</button>
-                <button id="promoRemoveBtn" type="button" hidden>Remove</button>
+                <input id="promoCodeInput" type="text" autocomplete="off" maxlength="32" placeholder="${t("product.enterPromo", "Enter promo code")}" data-i18n-placeholder="product.enterPromo">
+                <button id="promoApplyBtn" type="button" data-i18n="product.applyPromo">${t("product.applyPromo", "Apply")}</button>
+                <button id="promoRemoveBtn" type="button" data-i18n="product.removePromo" hidden>${t("product.removePromo", "Remove")}</button>
             </div>
             <p id="promoFeedback" class="aziel-promo-feedback" aria-live="polite"></p>
         `;
@@ -531,12 +634,12 @@
         const pkg = getSelectedPackage();
 
         if (!pkg) {
-            setPromoFeedback("Select a package before applying a promo code.", "error");
+            setPromoFeedback(t("product.promoSelectPackage", "Select a package before applying a promo code."), "error");
             return;
         }
 
         if (!code) {
-            setPromoFeedback("Enter a promo code.", "error");
+            setPromoFeedback(t("product.promoEnterCode", "Enter a promo code."), "error");
             return;
         }
 
@@ -567,8 +670,9 @@
 
             if (!res.ok || !data.success) {
                 clearPromoQuote(flow, false);
-                setPromoFeedback(data.message || "Promo code could not be applied.", "error");
-                window.AZIEL_UI?.toast?.error(data.message || "Promo code could not be applied.");
+                const message = promoErrorMessage(data);
+                setPromoFeedback(message, "error");
+                window.AZIEL_UI?.toast?.error(message);
                 return;
             }
 
@@ -583,12 +687,12 @@
                     promoCode: data.quote.promoCode || code
                 }
             };
-            setPromoFeedback("Promo applied.", "success");
-            window.AZIEL_UI?.toast?.success("Promo applied.");
+            setPromoFeedback(t("product.promoApplied", "Promo applied."), "success");
+            window.AZIEL_UI?.toast?.success(t("product.promoApplied", "Promo applied."));
         } catch (error) {
             console.log("Promo quote error:", error);
             clearPromoQuote(flow, false);
-            setPromoFeedback("Promo service is unavailable. Please try again.", "error");
+            setPromoFeedback(t("product.promoUnavailable", "Promo service is unavailable. Please try again."), "error");
         } finally {
             if (flow.promo) flow.promo.loading = false;
             updateSummary(flow);
@@ -689,17 +793,29 @@
 
         const loading = Boolean(flow.promo?.loading);
         applyBtn.disabled = loading;
-        applyBtn.textContent = loading ? "Applying..." : "Apply";
+        applyBtn.textContent = loading ? t("product.applyingPromo", "Applying…") : t("product.applyPromo", "Apply");
         removeBtn.hidden = !promo;
         input.disabled = loading;
 
         if (promo) {
             const symbol = promo.currency === "THB" ? "฿" : "Ks";
             setPromoFeedback(
-                `Discount ${Number(promo.discountAmount || 0).toLocaleString()} ${symbol}. Final ${Number(promo.finalAmount || 0).toLocaleString()} ${symbol}.`,
+                `✓ ${promo.promoCode || ""} ${t("product.promoAppliedInline", "applied")} · ${t("product.youSaved", "You saved {amount}").replace("{amount}", `${Number(promo.discountAmount || 0).toLocaleString()} ${symbol}`)}`,
                 "success"
             );
         }
+    }
+
+    function promoErrorMessage(data = {}) {
+        const code = String(data.code || data.error || "").toUpperCase();
+        if (code.includes("EXPIRED")) return t("product.promoExpired", "This promo code has expired.");
+        if (code.includes("INELIGIBLE") || code.includes("MINIMUM") || code.includes("LIMIT")) {
+            return t("product.promoNotEligible", "This promo code is not available for this purchase.");
+        }
+        if (code.includes("NOT_FOUND") || code.includes("INVALID")) {
+            return t("product.promoInvalid", "This promo code is invalid or unavailable.");
+        }
+        return data.message || t("product.promoUnavailable", "Promo service is unavailable. Please try again.");
     }
 
     function setPromoFeedback(message, tone = "") {

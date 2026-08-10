@@ -1,6 +1,7 @@
 // frontend/js/register.js
 
 document.addEventListener("DOMContentLoaded", () => {
+    const t = (key, fallback) => window.AZIEL_LOCALE?.t?.(key, fallback) || fallback;
     const form = document.getElementById("registerForm");
     const msg = document.getElementById("msg");
     const btn = document.getElementById("registerBtn");
@@ -39,22 +40,22 @@ document.addEventListener("DOMContentLoaded", () => {
         const confirmPassword = confirmPasswordInput.value.trim();
 
         if (!username || !email || !password || !confirmPassword) {
-            showMessage("Please fill all required fields.", "error");
+            showMessage(t("validation.requiredFields", "Please fill all required fields."), "error");
             return;
         }
 
         if (!isValidGmail(email)) {
-            showMessage("Please enter a valid Gmail address.", "error");
+            showMessage(t("validation.validGmail", "Please enter a valid Gmail address."), "error");
             return;
         }
 
         if (password.length < 8) {
-            showMessage("Password must be at least 8 characters.", "error");
+            showMessage(t("validation.passwordEight", "Password must be at least 8 characters."), "error");
             return;
         }
 
         if (password !== confirmPassword) {
-            showMessage("Passwords do not match.", "error");
+            showMessage(t("validation.passwordMismatch", "Passwords do not match."), "error");
             return;
         }
 
@@ -76,14 +77,14 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await res.json();
 
             if (!data.success) {
-                showMessage(data.message || "Register failed", "error");
+                showMessage(data.message || t("auth.register.failed", "Register failed"), "error");
                 setLoading(false);
                 return;
             }
 
             localStorage.setItem("verifyEmail", email);
 
-            showMessage("OTP sent. Check your Gmail.", "success");
+            showMessage(t("auth.otp.sentCheckGmail", "OTP sent. Check your Gmail."), "success");
 
             setTimeout(() => {
                 window.location.href = "verify-email.html";
@@ -91,7 +92,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         } catch (error) {
             console.log("Register error:", error);
-            showMessage("Server error. Try again.", "error");
+            showMessage(t("common.serverErrorTryAgain", "Server error. Try again."), "error");
             setLoading(false);
         }
     });
@@ -99,7 +100,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function setLoading(isLoading) {
         if (window.AZIEL_UI?.button) {
             if (isLoading) {
-                window.AZIEL_UI.button.setLoading(btn, { text: "Sending OTP..." });
+                window.AZIEL_UI.button.setLoading(btn, { text: t("auth.otp.sending", "Sending OTP...") });
             } else {
                 window.AZIEL_UI.button.reset(btn);
             }
@@ -107,7 +108,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         btn.disabled = isLoading;
-        btn.textContent = isLoading ? "Sending OTP..." : "Create Account";
+        btn.textContent = isLoading ? t("auth.otp.sending", "Sending OTP...") : t("auth.createAccount", "Create Account");
     }
 
     function isValidGmail(email) {
@@ -115,11 +116,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function showMessage(text, type) {
-        msg.innerHTML = `
-            <div class="${type === "success" ? "success-msg" : "error-msg"}">
-                ${escapeHTML(text)}
-            </div>
-        `;
+        const feedback = document.createElement("div");
+        feedback.className = type === "success" ? "success-msg" : "error-msg";
+        feedback.textContent = text;
+        msg.replaceChildren(feedback);
 
         if (window.AZIEL_UI?.toast) {
             window.AZIEL_UI.toast[type === "success" ? "success" : "error"](text);

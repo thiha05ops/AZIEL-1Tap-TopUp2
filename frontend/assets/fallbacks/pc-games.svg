@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">AZIEL PC game placeholder</title>
+  <rect width="64" height="64" rx="14" fill="#e8eef2"/>
+  <rect x="13" y="16" width="38" height="28" rx="3" fill="none" stroke="#4d7182" stroke-width="3"/>
+  <path d="M25 50h14M32 44v6M19 23h26" stroke="#4d7182" stroke-width="3" stroke-linecap="round"/>
+</svg>
