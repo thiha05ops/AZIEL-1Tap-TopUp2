@@ -4,7 +4,7 @@ const crypto = require("crypto");
 const { isCanonicalProductCode } = require("../../catalog/canonicalOperationalCatalog");
 const CatalogPackage = require("../../models/CatalogPackage");
 const PaymentMethod = require("../../models/PaymentMethod");
-const { paymentMethodReadiness } = require("../paymentProviderRegistry");
+const { paymentMethodCapabilityState } = require("../paymentProviderRegistry");
 const { loadFulfillmentCapability } = require("../fulfillmentCapabilityService");
 const {
     createAndPersistPricingQuote,
@@ -122,7 +122,7 @@ async function loadPromptPayMethod(input = {}, region) {
         region,
         enabled: true
     }).lean();
-    if (!method || method.qrMode !== "aziel_promptpay_dynamic" || paymentMethodReadiness(method).ready !== true) {
+    if (!method || method.qrMode !== "aziel_promptpay_dynamic" || paymentMethodCapabilityState(method).customerVisible !== true) {
         throw new CustomerManualPromptPayCheckoutError(ERROR_CODES.PAYMENT_METHOD_UNAVAILABLE, "PromptPay QR is not available.", 422);
     }
     return method;

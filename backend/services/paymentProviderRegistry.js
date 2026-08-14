@@ -52,6 +52,22 @@ const PROVIDERS_BY_REGION_TYPE = Object.freeze({
     }
 });
 
+const PAYMENT_CONFIGURATION_KINDS = Object.freeze({
+    MANUAL_QR: "MANUAL_QR",
+    MANUAL_BANK_APP: "MANUAL_BANK_APP",
+    PROMPTPAY_DYNAMIC: "PROMPTPAY_DYNAMIC",
+    AZIEL_WALLET: "AZIEL_WALLET",
+    AUTOMATIC_PROVIDER: "AUTOMATIC_PROVIDER"
+});
+
+const APPLICABLE_SECTIONS = Object.freeze({
+    [PAYMENT_CONFIGURATION_KINDS.MANUAL_QR]: ["display", "account", "staticQr", "availability", "manualVerification", "checklist"],
+    [PAYMENT_CONFIGURATION_KINDS.MANUAL_BANK_APP]: ["display", "account", "bankApp", "availability", "manualVerification", "checklist"],
+    [PAYMENT_CONFIGURATION_KINDS.PROMPTPAY_DYNAMIC]: ["display", "promptPay", "bankLaunchers", "availability", "manualVerification", "checklist"],
+    [PAYMENT_CONFIGURATION_KINDS.AZIEL_WALLET]: ["display", "availability", "wallet"],
+    [PAYMENT_CONFIGURATION_KINDS.AUTOMATIC_PROVIDER]: ["display", "availability", "automaticProvider"]
+});
+
 function normalizeProviderKey(value = "") {
     const raw = String(value || "")
         .toLowerCase()
@@ -120,6 +136,23 @@ function hasAndroidLaunchCapability(method = {}) {
     );
 }
 
+function paymentConfigurationKind(method = {}) {
+    const key = normalizeProviderKey(method.key || method.provider || "");
+    const region = String(method.region || "").toUpperCase();
+    const paymentType = String(method.paymentType || "manual").toLowerCase();
+    if (key === "wallet" || paymentType === "wallet") return PAYMENT_CONFIGURATION_KINDS.AZIEL_WALLET;
+    if (region === "TH" && method.qrMode === "aziel_promptpay_dynamic") {
+        return PAYMENT_CONFIGURATION_KINDS.PROMPTPAY_DYNAMIC;
+    }
+    if (paymentType === "auto") return PAYMENT_CONFIGURATION_KINDS.AUTOMATIC_PROVIDER;
+    if (paymentType === "deeplink") return PAYMENT_CONFIGURATION_KINDS.MANUAL_BANK_APP;
+    return PAYMENT_CONFIGURATION_KINDS.MANUAL_QR;
+}
+
+function paymentMethodApplicableSections(method = {}) {
+    return [...(APPLICABLE_SECTIONS[paymentConfigurationKind(method)] || [])];
+}
+
 function hasEnabledBankLauncher(method = {}) {
     return Array.isArray(method.bankLaunchers) &&
         method.bankLaunchers.some(item =>
@@ -143,24 +176,26 @@ function paymentMethodReadiness(method = {}) {
     if (!String(method.method || "").trim() && !provider?.label) missing.push("display name");
     if (!isProviderValidFor(method.region, paymentType, normalizedProvider)) missing.push("valid provider");
 
-    if (paymentType === "wallet" || normalizedProvider === "wallet") {
+    const configurationKind = paymentConfigurationKind(method);
+
+    if (configurationKind === PAYMENT_CONFIGURATION_KINDS.AZIEL_WALLET) {
         return { ready: missing.length === 0, missing };
     }
 
-    if (paymentType === "auto") {
+    if (configurationKind === PAYMENT_CONFIGURATION_KINDS.AUTOMATIC_PROVIDER) {
         return { ready: missing.length === 0, missing };
     }
 
-    const dynamicPromptPay = isAzielDynamicPromptPay(method);
     const confirmationMode = String(method.confirmationMode || "").trim();
-    if (!dynamicPromptPay) {
+    if ([PAYMENT_CONFIGURATION_KINDS.MANUAL_QR, PAYMENT_CONFIGURATION_KINDS.MANUAL_BANK_APP].includes(configurationKind)) {
         if (!String(method.accountName || "").trim()) missing.push("account name");
         if (!String(method.accountNumber || "").trim()) missing.push("account number");
     }
-    const expectsQr = isEnabled(method.enableSaveQr) || ["manual", "deeplink"].includes(paymentType);
+
     const hasQr = Boolean(method.uploadedQrImage || method.qrImageUrl || method.qrImage || method.finalQrImage);
-    if (expectsQr && !hasQr && !dynamicPromptPay) missing.push("QR image");
-    if (dynamicPromptPay) {
+    if (configurationKind === PAYMENT_CONFIGURATION_KINDS.MANUAL_QR && !hasQr) missing.push("QR image");
+
+    if (configurationKind === PAYMENT_CONFIGURATION_KINDS.PROMPTPAY_DYNAMIC) {
         if (String(method.region || "").toUpperCase() !== "TH") missing.push("Thailand region");
         if (confirmationMode && confirmationMode !== "manual_admin") missing.push("manual admin confirmation mode");
         if (paymentType === "auto") missing.push("manual payment type");
@@ -169,13 +204,12 @@ function paymentMethodReadiness(method = {}) {
         if (!hasPromptPayRecipient(method)) missing.push("PromptPay recipient");
     }
 
-    const openAppChecklistEnabled = enabledChecklistUses(method, "open_app");
-    const openAppEnabled = isEnabled(method.enableOpenApp);
-    if (openAppChecklistEnabled && !openAppEnabled) missing.push("open app enabled");
-
-    if (openAppEnabled || openAppChecklistEnabled) {
+    if ([PAYMENT_CONFIGURATION_KINDS.MANUAL_BANK_APP, PAYMENT_CONFIGURATION_KINDS.PROMPTPAY_DYNAMIC].includes(configurationKind)) {
+        const openAppChecklistEnabled = enabledChecklistUses(method, "open_app");
+        const openAppEnabled = isEnabled(method.enableOpenApp);
+        if (openAppChecklistEnabled && !openAppEnabled) missing.push("open app enabled");
         const openAppMode = String(method.openAppMode || "direct").toLowerCase();
-        if (openAppMode === "direct") {
+        if ((openAppEnabled || openAppChecklistEnabled) && openAppMode === "direct") {
             if (!String(method.appDisplayName || "").trim()) missing.push("app display name");
             const hasIosLaunchOrStore = Boolean(String(method.iosAppLaunchUrl || method.appStoreFallbackUrl || method.appStoreUrl || "").trim());
             const hasLegacyDeeplink = Boolean(String(method.deepLinkUrl || "").trim());
@@ -183,7 +217,7 @@ function paymentMethodReadiness(method = {}) {
             if (String(method.androidPackageName || "").trim() && !String(method.androidAppLaunchUrl || "").trim() && !String(method.playStoreFallbackUrl || method.playStoreUrl || "").trim()) {
                 missing.push("Play Store fallback URL");
             }
-        } else if (openAppMode === "bank_chooser" && !hasEnabledBankLauncher(method)) {
+        } else if ((openAppEnabled || openAppChecklistEnabled) && openAppMode === "bank_chooser" && !hasEnabledBankLauncher(method)) {
             missing.push("bank launcher options");
         }
     }
@@ -201,6 +235,21 @@ function paymentMethodReadiness(method = {}) {
     }
 
     return { ready: missing.length === 0, missing };
+}
+
+function paymentMethodCapabilityState(method = {}) {
+    const readiness = paymentMethodReadiness(method);
+    const enabled = method.enabled === true;
+    const maintenance = Boolean(String(method.maintenanceMessage || "").trim());
+    return {
+        configurationKind: paymentConfigurationKind(method),
+        applicableSections: paymentMethodApplicableSections(method),
+        enabled,
+        publicReady: readiness.ready === true,
+        customerVisible: enabled && readiness.ready === true && !maintenance,
+        unavailableReason: maintenance ? "maintenance" : readiness.ready !== true ? "incomplete_configuration" : enabled ? "" : "disabled",
+        missingConfiguration: readiness.missing
+    };
 }
 
 function getPaymentLogo(method = {}) {
@@ -222,5 +271,9 @@ module.exports = {
     validProvidersFor,
     isProviderValidFor,
     defaultProviderFor,
-    paymentMethodReadiness
+    paymentMethodReadiness,
+    paymentMethodCapabilityState,
+    paymentConfigurationKind,
+    paymentMethodApplicableSections,
+    PAYMENT_CONFIGURATION_KINDS
 };

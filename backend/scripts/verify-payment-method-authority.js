@@ -8,6 +8,10 @@ const CommerceOrder = require("../models/CommerceOrder");
 const PaymentAttempt = require("../models/PaymentAttempt");
 const paymentMethodsRoute = require("../routes/paymentMethods");
 const {
+    paymentMethodCapabilityState,
+    PAYMENT_CONFIGURATION_KINDS
+} = require("../services/paymentProviderRegistry");
+const {
     loadPromptPayMethod,
     startCustomerManualPromptPayCheckout,
     ERROR_CODES
@@ -36,7 +40,7 @@ function readyManualMethod(key, method, region = "MM") {
 function publicCapability(methods) {
     return methods
         .map(formatMethod)
-        .filter(method => method.enabled === true && method.publicReady === true);
+        .filter(method => method.customerVisible === true);
 }
 
 async function verifyIsolatedAuthority() {
@@ -45,12 +49,22 @@ async function verifyIsolatedAuthority() {
     assert.strictEqual(isolation.databaseName, "aziel_e2e_mm_payment_authority");
     await mongoose.connect(isolation.mongoUri, { serverSelectionTimeoutMS: 5000 });
 
-    const fixtureKeys = ["ayapay", "kbzpay", "wavepay", "promptpay"];
+    const fixtureKeys = ["ayapay", "kbzpay", "wavepay", "promptpay", "scb", "wallet"];
     await PaymentMethod.deleteMany({ key: { $in: fixtureKeys } });
 
     const mm = await PaymentMethod.create([
-        readyManualMethod("ayapay", "AYA Pay"),
-        readyManualMethod("kbzpay", "KBZPay"),
+        {
+            ...readyManualMethod("ayapay", "AYA Pay"),
+            shortDescription: "Pay using the K PLUS mobile app",
+            badgeText: "Bank App",
+            appDisplayName: "SCB EASY",
+            enableOpenApp: true,
+            openAppMode: "direct",
+            androidPackageName: "com.kasikorn.retail.mbanking.wap",
+            promptPayRecipientType: "PHONE",
+            promptPayRecipientValue: "legacy-contamination"
+        },
+        { ...readyManualMethod("kbzpay", "KBZPay"), maintenanceMessage: "Temporarily unavailable" },
         readyManualMethod("wavepay", "WavePay")
     ]);
     await PaymentMethod.create({
@@ -63,19 +77,88 @@ async function verifyIsolatedAuthority() {
         promptPayRecipientType: "PHONE",
         promptPayRecipientValue: "0000000000"
     });
+    await PaymentMethod.create({
+        key: "scb",
+        method: "SCB",
+        region: "TH",
+        enabled: true,
+        provider: "scb",
+        paymentType: "deeplink",
+        qrMode: "none",
+        accountName: "Synthetic SCB Account",
+        accountNumber: "E2E-SCB",
+        appDisplayName: "SCB EASY",
+        enableOpenApp: true,
+        openAppMode: "direct",
+        iosAppLaunchUrl: "scbeasy://",
+        receiptUploadEnabled: true,
+        slipRequired: true,
+        confirmationMode: "manual_admin"
+    });
+    await PaymentMethod.create({
+        key: "wallet",
+        method: "AZIEL Wallet",
+        region: "MM",
+        enabled: true,
+        provider: "wallet",
+        paymentType: "wallet",
+        qrMode: "none",
+        confirmationMode: "wallet_internal",
+        accountName: "Legacy irrelevant account",
+        uploadedQrImage: "/assets/payment/legacy-wallet-qr.png",
+        appDisplayName: "Legacy irrelevant app"
+    });
 
     assert.deepStrictEqual(
         publicCapability(mm).map(method => method.key).sort(),
-        ["ayapay", "kbzpay", "wavepay"],
-        "Ready enabled Myanmar fixtures must initially be publicly capable."
+        ["ayapay", "wavepay"],
+        "Maintenance must suppress KBZPay while ready AYA Pay and WavePay remain publicly capable."
     );
+
+    const contaminatedAya = mm.find(method => method.key === "ayapay");
+    const ayaCapability = paymentMethodCapabilityState(contaminatedAya);
+    const ayaAdmin = formatAdminMethod(contaminatedAya);
+    assert.strictEqual(ayaCapability.configurationKind, PAYMENT_CONFIGURATION_KINDS.MANUAL_QR);
+    assert.strictEqual(ayaCapability.publicReady, true, "Irrelevant bank-app contamination must not make a complete Manual QR method unready.");
+    assert(!ayaAdmin.applicableSections.includes("bankApp") && !ayaAdmin.applicableSections.includes("promptPay"));
+    assert.strictEqual(ayaAdmin.appDisplayName, "", "AYA Admin projection must not expose stale SCB app identity.");
+    assert.strictEqual(ayaAdmin.androidPackageName, "", "AYA Admin projection must not expose stale K PLUS package identity.");
+    assert.strictEqual(ayaAdmin.promptPayRecipientValue, "", "AYA Admin projection must not expose irrelevant PromptPay recipient state.");
+    assert.strictEqual(ayaAdmin.shortDescription, "", "AYA projection must suppress display text that identifies another payment provider.");
+    assert.strictEqual(ayaAdmin.badgeText, "", "Manual QR projection must suppress a stale Bank App badge.");
+
+    const kbzAdmin = formatAdminMethod(mm.find(method => method.key === "kbzpay"));
+    assert.strictEqual(kbzAdmin.publicReady, true, "Maintenance must remain distinct from configuration readiness.");
+    assert.strictEqual(kbzAdmin.customerVisible, false, "Maintenance must suppress backend customer visibility.");
+    assert.strictEqual(kbzAdmin.unavailableReason, "maintenance");
+
+    applyPaymentMethodPatch(contaminatedAya, {
+        shortDescription: "Canonical AYA manual QR",
+        appDisplayName: "Must not overwrite persisted contamination",
+        androidPackageName: "com.example.must.not.apply",
+        promptPayRecipientValue: "must-not-apply"
+    });
+    await contaminatedAya.save();
+    const ayaAfterSave = await PaymentMethod.findOne({ key: "ayapay" });
+    assert.strictEqual(ayaAfterSave.shortDescription, "Canonical AYA manual QR");
+    assert.strictEqual(ayaAfterSave.appDisplayName, "SCB EASY", "Admin save must ignore irrelevant bank-app fields without deleting historical data.");
+    assert.strictEqual(ayaAfterSave.promptPayRecipientValue, "legacy-contamination", "Admin save must ignore irrelevant PromptPay fields.");
+
+    const scbAdmin = formatAdminMethod(await PaymentMethod.findOne({ key: "scb" }));
+    assert.strictEqual(scbAdmin.configurationKind, PAYMENT_CONFIGURATION_KINDS.MANUAL_BANK_APP);
+    assert(scbAdmin.applicableSections.includes("bankApp") && !scbAdmin.applicableSections.includes("promptPay"));
+    const walletAdmin = formatAdminMethod(await PaymentMethod.findOne({ key: "wallet" }));
+    assert.strictEqual(walletAdmin.configurationKind, PAYMENT_CONFIGURATION_KINDS.AZIEL_WALLET);
+    assert.deepStrictEqual(walletAdmin.applicableSections.sort(), ["availability", "display", "wallet"]);
+    assert.strictEqual(walletAdmin.appDisplayName, "", "Wallet projection must ignore legacy app fields.");
+    assert.strictEqual(walletAdmin.qrImage, "", "Wallet projection must ignore legacy QR fields.");
 
     for (const method of mm) {
         applyPaymentMethodPatch(method, { enabled: false });
         await method.save();
     }
 
-    const persisted = await PaymentMethod.find({ region: "MM" }).sort({ key: 1 });
+    const persisted = await PaymentMethod.find({ key: { $in: ["ayapay", "kbzpay", "wavepay"] } }).sort({ key: 1 });
     assert(persisted.every(method => method.enabled === false), "Admin mutation contract must persist enabled=false.");
     assert(
         persisted.every(method => formatAdminMethod(method).customerVisible === false),

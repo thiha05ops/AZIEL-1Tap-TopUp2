@@ -113,14 +113,14 @@ function verifyRouteAndFrontendContracts() {
     includes("frontend/js/admin-payments.js", "filter(rail => rail.customerVisible === true)", "Customer Display must render only authoritative customer-visible rails.");
     includes("frontend/js/admin-payments.js", "Configured · Disabled", "Configured readiness must remain distinct from enabled storefront state.");
     includes("frontend/js/admin-payments.js", "Unsaved · Disabled", "An unchecked draft must not continue to claim customer visibility before it is saved.");
-    includes("frontend/admin.html", "/js/admin-payments.js?v=20260815-payment-authority", "Admin must publish the repaired payment controller under a fresh versioned asset URL.");
+    includes("frontend/admin.html", "/js/admin-payments.js?v=20260815-canonical-payment-contract", "Admin must publish the repaired payment controller under a fresh versioned asset URL.");
     includes("frontend/js/admin-payments.js", "Automatic Rails", "Automatic rails must have an admin surface.");
     includes("frontend/js/admin-payments.js", "Card", "Card readiness must have an admin surface.");
     includes("frontend/js/admin-payments.js", "rawSecretsReturned", "Frontend must consume safe credential/security projection.");
     includes("frontend/css/admin/admin-design-system.css", ".payment-infrastructure-workspace", "Infrastructure workspace CSS must exist.");
     includes("backend/routes/paymentMethods.js", "router.get(\"/payment-methods\"", "Public payment methods route must remain.");
     includes("backend/routes/paymentMethods.js", ".map(formatMethod)", "Public checkout projection must still use formatMethod.");
-    includes("backend/routes/paymentMethods.js", ".filter(method => method.enabled === true && method.publicReady === true)", "Public capability must exclude disabled or unready methods server-side.");
+    includes("backend/routes/paymentMethods.js", ".filter(method => method.customerVisible === true)", "Public capability must use the canonical backend visibility decision.");
     const adminMethodsGet = paymentRoutes.slice(
         paymentRoutes.indexOf('router.get("/admin/payment-methods"'),
         paymentRoutes.indexOf('router.get("/admin/payment-infrastructure"')

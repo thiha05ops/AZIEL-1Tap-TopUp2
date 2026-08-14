@@ -158,7 +158,7 @@ function renderAdminPaymentMethods(methods) {
                     </button>`;
 
         return `
-            <div class="payment-method-card ${legacyThaiBank ? "is-legacy-thai-bank" : ""}" data-id="${escapeAdminHTML(method._id)}" data-key="${escapeAdminHTML(method.key || "")}" data-region="${escapeAdminHTML(method.region || "")}" data-legacy-thai-bank="${legacyThaiBank ? "true" : "false"}">
+            <div class="payment-method-card ${legacyThaiBank ? "is-legacy-thai-bank" : ""}" data-id="${escapeAdminHTML(method._id)}" data-key="${escapeAdminHTML(method.key || "")}" data-region="${escapeAdminHTML(method.region || "")}" data-configuration-kind="${escapeAdminHTML(method.configurationKind || "MANUAL_QR")}" data-legacy-thai-bank="${legacyThaiBank ? "true" : "false"}">
                 <div class="payment-header">
                     <div class="payment-method-summary-main">
                         <img class="payment-method-summary-logo" src="${escapeAdminHTML(logoUrl)}" alt="${escapeAdminHTML(displayName)} logo" onerror="this.src='/assets/payment/payment-neutral.svg'">
@@ -308,7 +308,7 @@ function renderAdminPaymentMethods(methods) {
                 </div>
                 </section>
 
-                <section class="payment-config-section payment-account-section">
+                <section class="payment-config-section payment-account-section" ${method.applicableSections?.includes("account") ? "" : "hidden"}>
                     <h5>Receiving Account</h5>
 
                 <div class="settings-row">
@@ -346,7 +346,7 @@ function renderAdminPaymentMethods(methods) {
                 <p class="payment-section-help">Copy preview: ${escapeAdminHTML(method.accountName || "Account name")} · ${escapeAdminHTML(method.accountNumber || "Recipient ID")}</p>
                 </section>
 
-                <section class="payment-config-section payment-qr-section">
+                <section class="payment-config-section payment-qr-section" ${method.applicableSections?.some(section => ["staticQr", "promptPay"].includes(section)) ? "" : "hidden"}>
                     <h5>QR Payment</h5>
 
                 <div class="settings-row">
@@ -445,7 +445,7 @@ function renderAdminPaymentMethods(methods) {
                 </div>
                 </section>
 
-                <div class="payment-capability-details">
+                <div class="payment-capability-details payment-bank-app-section" ${method.applicableSections?.includes("bankApp") ? "" : "hidden"}>
                     <h5>Bank App</h5>
 
 	                    <div class="settings-row">
@@ -540,7 +540,7 @@ function renderAdminPaymentMethods(methods) {
 
                 ${method.key === "promptpay" ? renderPromptPayBankLauncherEditor(method) : ""}
 
-                <div class="payment-capability-details">
+                <div class="payment-capability-details payment-customer-actions-section" ${method.applicableSections?.includes("checklist") ? "" : "hidden"}>
                     <h5>Customer Actions</h5>
 
                     <div class="settings-row capability-grid">
@@ -555,7 +555,7 @@ function renderAdminPaymentMethods(methods) {
                     </div>
                 </div>
 
-                <div class="payment-capability-details">
+                <div class="payment-capability-details payment-verification-section" ${method.applicableSections?.includes("manualVerification") ? "" : "hidden"}>
                     <h5>Verification</h5>
 
                     <div class="settings-row capability-grid">
@@ -578,7 +578,7 @@ function renderAdminPaymentMethods(methods) {
                     </div>
                 </div>
 
-                <div class="payment-capability-details">
+                <div class="payment-capability-details payment-checklist-section" ${method.applicableSections?.includes("checklist") ? "" : "hidden"}>
                     <h5>Checklist</h5>
                     <small class="payment-section-help">Allowed actions: save_qr, open_app, upload_receipt, wait_for_confirmation, confirm_payment</small>
                     <div class="pm-checklist-presets">
@@ -1229,7 +1229,8 @@ function getAdminPaymentReadiness(method = {}) {
 
 function getAdminPaymentStatus(method = {}, readiness = { ready: false }) {
     if (!readiness.ready) return { label: "Draft", className: "is-draft" };
-    if (method.enabled) return { label: "Customer Visible", className: "is-enabled" };
+    if (method.customerVisible === true) return { label: "Customer Visible", className: "is-enabled" };
+    if (method.enabled) return { label: "Unavailable", className: "is-draft" };
     return { label: "Configured · Disabled", className: "is-ready" };
 }
 
@@ -2192,6 +2193,7 @@ function collectAdminPaymentFormState(card) {
     const paymentType = card?.querySelector(".pm-type")?.value || "manual";
     return {
         key,
+        configurationKind: card?.dataset.configurationKind || "MANUAL_QR",
         method,
         region: card?.querySelector(".pm-region")?.value || "MM",
         paymentType,
@@ -2432,8 +2434,12 @@ function getPaymentTypeDescription(key, type, provider) {
 function refreshPaymentEditorVisibility(card) {
     if (!card) return;
     const state = collectAdminPaymentFormState(card);
-    const isPromptPay = (state.key === "promptpay" || state.paymentType === "auto") && state.qrMode !== "aziel_promptpay_dynamic";
-    const isWallet = state.key === "wallet" || state.paymentType === "wallet";
+    const kind = state.configurationKind || "MANUAL_QR";
+    const isPromptPay = kind === "AUTOMATIC_PROVIDER";
+    const isPromptPayDynamic = kind === "PROMPTPAY_DYNAMIC";
+    const isWallet = kind === "AZIEL_WALLET";
+    const isBankApp = kind === "MANUAL_BANK_APP";
+    const isManualQr = kind === "MANUAL_QR";
     const qrMode = card.querySelector(".pm-qr-mode");
 
     if (isPromptPay) {
@@ -2456,15 +2462,17 @@ function refreshPaymentEditorVisibility(card) {
         card.querySelector(".pm-empty-preview")
     ].filter(Boolean);
 
-    if (accountSection) accountSection.hidden = isPromptPay || isWallet;
-    if (qrSection) qrSection.hidden = isWallet;
+    if (accountSection) accountSection.hidden = !(isManualQr || isBankApp);
+    if (qrSection) qrSection.hidden = !(isManualQr || isPromptPayDynamic);
+    const bankAppSection = card.querySelector(".payment-bank-app-section");
+    if (bankAppSection) bankAppSection.hidden = !isBankApp;
 
     const activeQrMode = card.querySelector(".pm-qr-mode")?.value || "uploaded_static";
     staticQrRows.forEach(el => {
         el.style.display = activeQrMode === "uploaded_static" ? "" : "none";
     });
     card.querySelectorAll(".pm-promptpay-dynamic-field").forEach(el => {
-        el.hidden = activeQrMode !== "aziel_promptpay_dynamic";
+        el.hidden = !isPromptPayDynamic;
     });
 
     const enableOpenApp = card.querySelector(".pm-enable-open-app")?.checked === true;

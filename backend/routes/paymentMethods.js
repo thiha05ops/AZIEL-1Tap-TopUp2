@@ -20,7 +20,10 @@ const {
     getProviderLabel,
     isProviderValidFor,
     normalizeProviderKey,
+    paymentMethodCapabilityState,
+    paymentConfigurationKind,
     paymentMethodReadiness,
+    PAYMENT_CONFIGURATION_KINDS,
     validProvidersFor
 } = require("../services/paymentProviderRegistry");
 const authMiddleware = require("../middleware/authMiddleware");
@@ -789,33 +792,39 @@ async function syncPromptPayBankLaunchers() {
 }
 
 function capabilityProjection(obj = {}) {
+    const kind = paymentConfigurationKind(obj);
+    const bankAppApplicable = kind === PAYMENT_CONFIGURATION_KINDS.MANUAL_BANK_APP;
+    const promptPayApplicable = kind === PAYMENT_CONFIGURATION_KINDS.PROMPTPAY_DYNAMIC;
+    const qrApplicable = kind === PAYMENT_CONFIGURATION_KINDS.MANUAL_QR || promptPayApplicable;
+    const checklistApplicable = ![PAYMENT_CONFIGURATION_KINDS.AZIEL_WALLET, PAYMENT_CONFIGURATION_KINDS.AUTOMATIC_PROVIDER].includes(kind);
     return {
-        appDisplayName: obj.appDisplayName || "",
-        openAppMode: safeOpenAppMode(obj.openAppMode, obj.enableOpenApp === true ? "direct" : "disabled"),
-        deepLinkUrl: obj.deepLinkUrl || "",
-        appStoreUrl: obj.appStoreUrl || "",
-        playStoreUrl: obj.playStoreUrl || "",
-        appLaunchMode: obj.appLaunchMode || "OFFICIAL_PAYMENT_DEEPLINK",
-        iosAppLaunchUrl: obj.iosAppLaunchUrl || "",
-        androidAppLaunchUrl: obj.androidAppLaunchUrl || "",
-        androidPackageName: obj.androidPackageName || "",
-        appStoreFallbackUrl: obj.appStoreFallbackUrl || obj.appStoreUrl || "",
-        playStoreFallbackUrl: obj.playStoreFallbackUrl || obj.playStoreUrl || "",
-        promptPayRecipientType: obj.promptPayRecipientType || "",
-        promptPayRecipientMasked: maskPromptPayRecipient(obj.promptPayRecipientValue || ""),
-        dynamicQrExpiryMinutes: safePositiveInt(obj.dynamicQrExpiryMinutes, 15),
-        enableSaveQr: obj.enableSaveQr === true,
-        enableOpenApp: obj.enableOpenApp === true,
-        enableChecklist: obj.enableChecklist === true,
-        dynamicQrSupported: obj.dynamicQrSupported === true,
-        amountPrefillSupported: obj.amountPrefillSupported === true,
-        referenceSupported: obj.referenceSupported === true,
-        galleryScanSupported: obj.galleryScanSupported === true,
-        slipRequired: isSlipRequired(obj),
+        configurationKind: kind,
+        appDisplayName: bankAppApplicable ? obj.appDisplayName || "" : "",
+        openAppMode: bankAppApplicable || promptPayApplicable ? safeOpenAppMode(obj.openAppMode, obj.enableOpenApp === true ? "direct" : "disabled") : "disabled",
+        deepLinkUrl: bankAppApplicable ? obj.deepLinkUrl || "" : "",
+        appStoreUrl: bankAppApplicable ? obj.appStoreUrl || "" : "",
+        playStoreUrl: bankAppApplicable ? obj.playStoreUrl || "" : "",
+        appLaunchMode: bankAppApplicable || promptPayApplicable ? obj.appLaunchMode || "OFFICIAL_PAYMENT_DEEPLINK" : "OFFICIAL_PAYMENT_DEEPLINK",
+        iosAppLaunchUrl: bankAppApplicable ? obj.iosAppLaunchUrl || "" : "",
+        androidAppLaunchUrl: bankAppApplicable ? obj.androidAppLaunchUrl || "" : "",
+        androidPackageName: bankAppApplicable ? obj.androidPackageName || "" : "",
+        appStoreFallbackUrl: bankAppApplicable ? obj.appStoreFallbackUrl || obj.appStoreUrl || "" : "",
+        playStoreFallbackUrl: bankAppApplicable ? obj.playStoreFallbackUrl || obj.playStoreUrl || "" : "",
+        promptPayRecipientType: promptPayApplicable ? obj.promptPayRecipientType || "" : "",
+        promptPayRecipientMasked: promptPayApplicable ? maskPromptPayRecipient(obj.promptPayRecipientValue || "") : "",
+        dynamicQrExpiryMinutes: promptPayApplicable ? safePositiveInt(obj.dynamicQrExpiryMinutes, 15) : 0,
+        enableSaveQr: qrApplicable && obj.enableSaveQr === true,
+        enableOpenApp: (bankAppApplicable || promptPayApplicable) && obj.enableOpenApp === true,
+        enableChecklist: checklistApplicable && obj.enableChecklist === true,
+        dynamicQrSupported: promptPayApplicable && obj.dynamicQrSupported === true,
+        amountPrefillSupported: promptPayApplicable && obj.amountPrefillSupported === true,
+        referenceSupported: qrApplicable && obj.referenceSupported === true,
+        galleryScanSupported: (bankAppApplicable || promptPayApplicable) && obj.galleryScanSupported === true,
+        slipRequired: checklistApplicable ? isSlipRequired(obj) : false,
         autoVerificationSupported: obj.autoVerificationSupported === true,
         webhookSupported: obj.webhookSupported === true,
-        checklistSteps: sanitizeChecklistSteps(obj.checklistSteps || []),
-        bankLaunchers: publicBankLaunchersProjection(obj),
+        checklistSteps: checklistApplicable ? sanitizeChecklistSteps(obj.checklistSteps || []) : [],
+        bankLaunchers: promptPayApplicable ? publicBankLaunchersProjection(obj) : [],
         sortOrder: safeSortOrder(obj.sortOrder)
     };
 }
@@ -823,7 +832,7 @@ function capabilityProjection(obj = {}) {
 function publicTrustDisplayForMethod(obj = {}, readiness = { ready: false }) {
     const provider = normalizeProviderKey(obj.provider || obj.key || "");
     const key = String(obj.key || provider || "").trim().toLowerCase();
-    if (obj.enabled !== true || readiness.ready !== true) return null;
+    if (obj.enabled !== true || readiness.ready !== true || String(obj.maintenanceMessage || "").trim()) return null;
 
     const logo = safePublicAssetUrl(obj.logoUrl) || getPaymentLogo({ key, provider });
     if (!logo) return null;
@@ -894,9 +903,33 @@ function toPaymentMethodObject(method = {}) {
     return typeof method.toObject === "function" ? method.toObject() : method;
 }
 
+const PAYMENT_IDENTITY_MARKERS = Object.freeze({
+    ayapay: ["aya pay", "ayapay"],
+    kbzpay: ["kbzpay", "kbz pay"],
+    wavepay: ["wavepay", "wave pay"],
+    promptpay: ["promptpay", "prompt pay"],
+    scb: ["scb", "scb easy"],
+    bangkok_bank: ["bangkok bank"],
+    kplus: ["k plus", "kplus", "kasikorn"],
+    krungsri: ["krungsri"],
+    krungthai: ["krungthai", "ktb next"]
+});
+
+function canonicalDisplayValue(method = {}, value = "") {
+    const text = String(value || "").trim();
+    const normalized = text.toLowerCase();
+    if (!normalized) return "";
+    const ownKey = normalizeProviderKey(method.key || method.provider || "");
+    const foreignIdentity = Object.entries(PAYMENT_IDENTITY_MARKERS).some(([key, markers]) =>
+        key !== ownKey && markers.some(marker => normalized.includes(marker))
+    );
+    return foreignIdentity ? "" : text;
+}
+
 function formatMethod(method) {
     const obj = toPaymentMethodObject(method);
     const provider = normalizeProviderKey(obj.provider || obj.key || "");
+    const configurationKind = paymentConfigurationKind(obj);
     const isDynamicPromptPayQr = obj.qrMode === "aziel_promptpay_dynamic";
     const configuredQrImage = safePublicAssetUrl(
         obj.uploadedQrImage ||
@@ -904,9 +937,10 @@ function formatMethod(method) {
         obj.qrImage ||
         ""
     );
-    const qrImage = isDynamicPromptPayQr ? null : configuredQrImage;
+    const qrImage = configurationKind === PAYMENT_CONFIGURATION_KINDS.MANUAL_QR && !isDynamicPromptPayQr ? configuredQrImage : null;
     const displaySource = Object.assign({}, obj, { provider });
-    const readiness = paymentMethodReadiness(displaySource);
+    const capabilityState = paymentMethodCapabilityState(displaySource);
+    const readiness = { ready: capabilityState.publicReady, missing: capabilityState.missingConfiguration };
 
     const publicMethodName = obj.region === "TH" && obj.key === "promptpay" && isDynamicPromptPayQr
         ? "PromptPay QR"
@@ -925,8 +959,10 @@ function formatMethod(method) {
         qrImageUrl: qrImage,
         uploadedQrImage: qrImage,
         maintenanceMessage: obj.maintenanceMessage || "",
-        shortDescription: obj.shortDescription || "",
-        badgeText: obj.badgeText || "",
+        shortDescription: canonicalDisplayValue(obj, obj.shortDescription),
+        badgeText: configurationKind === PAYMENT_CONFIGURATION_KINDS.MANUAL_QR && String(obj.badgeText || "").trim().toLowerCase() === "bank app"
+            ? ""
+            : canonicalDisplayValue(obj, obj.badgeText),
         recipientLabel: obj.recipientLabel || "",
         referenceInstructions: obj.referenceInstructions || "",
         qrMode: obj.qrMode || "uploaded_static",
@@ -938,6 +974,9 @@ function formatMethod(method) {
         logoUrl: safePublicAssetUrl(obj.logoUrl) || getPaymentLogo(displaySource),
         trustDisplay,
         publicReady: readiness.ready,
+        customerVisible: capabilityState.customerVisible,
+        unavailableReason: capabilityState.unavailableReason,
+        applicableSections: capabilityState.applicableSections,
         missingConfiguration: readiness.missing,
         ...capabilityProjection(obj)
     };
@@ -952,29 +991,32 @@ function formatAdminMethod(method) {
         ""
     );
     const publicMethod = formatMethod(obj);
+    const bankAppApplicable = publicMethod.configurationKind === PAYMENT_CONFIGURATION_KINDS.MANUAL_BANK_APP;
+    const promptPayApplicable = publicMethod.configurationKind === PAYMENT_CONFIGURATION_KINDS.PROMPTPAY_DYNAMIC;
+    const staticQrApplicable = publicMethod.configurationKind === PAYMENT_CONFIGURATION_KINDS.MANUAL_QR;
     return {
         ...publicMethod,
-        qrImage: configuredQrImage,
-        qrImageUrl: configuredQrImage,
-        uploadedQrImage: configuredQrImage,
-        appDisplayName: obj.appDisplayName || "",
-        openAppMode: safeOpenAppMode(obj.openAppMode, obj.enableOpenApp === true ? "direct" : "disabled"),
-        deepLinkUrl: obj.deepLinkUrl || "",
-        appStoreUrl: obj.appStoreUrl || "",
-        playStoreUrl: obj.playStoreUrl || "",
-        appLaunchMode: obj.appLaunchMode || "OFFICIAL_PAYMENT_DEEPLINK",
-        iosAppLaunchUrl: obj.iosAppLaunchUrl || "",
-        androidAppLaunchUrl: obj.androidAppLaunchUrl || "",
-        androidPackageName: obj.androidPackageName || "",
-        appStoreFallbackUrl: obj.appStoreFallbackUrl || obj.appStoreUrl || "",
-        playStoreFallbackUrl: obj.playStoreFallbackUrl || obj.playStoreUrl || "",
-        promptPayRecipientType: obj.promptPayRecipientType || "",
-        promptPayRecipientMasked: maskPromptPayRecipient(obj.promptPayRecipientValue || ""),
-        promptPayRecipientValue: obj.promptPayRecipientValue || "",
-        dynamicQrExpiryMinutes: safePositiveInt(obj.dynamicQrExpiryMinutes, 15),
+        qrImage: staticQrApplicable ? configuredQrImage : "",
+        qrImageUrl: staticQrApplicable ? configuredQrImage : "",
+        uploadedQrImage: staticQrApplicable ? configuredQrImage : "",
+        appDisplayName: bankAppApplicable ? obj.appDisplayName || "" : "",
+        openAppMode: bankAppApplicable || promptPayApplicable ? safeOpenAppMode(obj.openAppMode, obj.enableOpenApp === true ? "direct" : "disabled") : "disabled",
+        deepLinkUrl: bankAppApplicable ? obj.deepLinkUrl || "" : "",
+        appStoreUrl: bankAppApplicable ? obj.appStoreUrl || "" : "",
+        playStoreUrl: bankAppApplicable ? obj.playStoreUrl || "" : "",
+        appLaunchMode: bankAppApplicable || promptPayApplicable ? obj.appLaunchMode || "OFFICIAL_PAYMENT_DEEPLINK" : "OFFICIAL_PAYMENT_DEEPLINK",
+        iosAppLaunchUrl: bankAppApplicable ? obj.iosAppLaunchUrl || "" : "",
+        androidAppLaunchUrl: bankAppApplicable ? obj.androidAppLaunchUrl || "" : "",
+        androidPackageName: bankAppApplicable ? obj.androidPackageName || "" : "",
+        appStoreFallbackUrl: bankAppApplicable ? obj.appStoreFallbackUrl || obj.appStoreUrl || "" : "",
+        playStoreFallbackUrl: bankAppApplicable ? obj.playStoreFallbackUrl || obj.playStoreUrl || "" : "",
+        promptPayRecipientType: promptPayApplicable ? obj.promptPayRecipientType || "" : "",
+        promptPayRecipientMasked: promptPayApplicable ? maskPromptPayRecipient(obj.promptPayRecipientValue || "") : "",
+        promptPayRecipientValue: promptPayApplicable ? obj.promptPayRecipientValue || "" : "",
+        dynamicQrExpiryMinutes: promptPayApplicable ? safePositiveInt(obj.dynamicQrExpiryMinutes, 15) : 0,
         logoUrl: safePublicAssetUrl(obj.logoUrl) || getPaymentLogo(obj),
-        shortDescription: obj.shortDescription || "",
-        badgeText: obj.badgeText || "",
+        shortDescription: publicMethod.shortDescription,
+        badgeText: publicMethod.badgeText,
         recipientLabel: obj.recipientLabel || "",
         referenceInstructions: obj.referenceInstructions || "",
         qrMode: obj.qrMode || "uploaded_static",
@@ -997,7 +1039,7 @@ function formatAdminMethod(method) {
         railType: obj.railType || railTypeForMethod(obj),
         availabilityMode: obj.availabilityMode || (obj.enabled === true ? "MANUAL_ONLY" : "DISABLED"),
         routingPriority: obj.routingPriority || 0,
-        customerVisible: obj.enabled === true && publicMethod.publicReady === true,
+        customerVisible: publicMethod.customerVisible === true,
         providerOptions: validProvidersFor(obj.region, obj.paymentType).map(item => ({
             key: item.key,
             label: item.label
@@ -1035,7 +1077,7 @@ router.get("/payment-methods", async (req, res) => {
             methods: methods
                 .filter(method => !isLegacyThailandBankMethod(method))
                 .map(formatMethod)
-                .filter(method => method.enabled === true && method.publicReady === true)
+                .filter(method => method.customerVisible === true)
         });
     } catch (error) {
         console.log("Payment methods error:", error);
@@ -1307,11 +1349,13 @@ router.get("/admin/payment-infrastructure", adminMiddleware, requireAdminPermiss
             .lean();
 
         return res.json(await getPaymentInfrastructureSnapshot(methods.map(method => {
-            const readiness = paymentMethodReadiness(method);
+            const capability = paymentMethodCapabilityState(method);
             return {
                 ...method,
-                publicReady: readiness.ready,
-                missingConfiguration: readiness.missing
+                publicReady: capability.publicReady,
+                customerVisible: capability.customerVisible,
+                unavailableReason: capability.unavailableReason,
+                missingConfiguration: capability.missingConfiguration
             };
         })));
     } catch (error) {
@@ -1323,7 +1367,48 @@ router.get("/admin/payment-infrastructure", adminMiddleware, requireAdminPermiss
     }
 });
 
+const COMMON_PAYMENT_PATCH_FIELDS = new Set([
+    "method", "region", "enabled", "logoUrl", "shortDescription", "badgeText",
+    "maintenanceMessage", "availabilitySchedule", "paymentType", "provider", "sortOrder"
+]);
+const PAYMENT_PATCH_FIELDS_BY_KIND = Object.freeze({
+    [PAYMENT_CONFIGURATION_KINDS.MANUAL_QR]: new Set([
+        "accountName", "accountNumber", "recipientLabel", "referenceInstructions", "qrMode", "qrImageUrl",
+        "uploadedQrImage", "uploadedQrImageEvidence", "enableSaveQr", "enableChecklist", "referenceSupported",
+        "slipRequired", "receiptUploadEnabled", "confirmationMode", "checklistSteps"
+    ]),
+    [PAYMENT_CONFIGURATION_KINDS.MANUAL_BANK_APP]: new Set([
+        "accountName", "accountNumber", "recipientLabel", "referenceInstructions", "appDisplayName", "openAppMode",
+        "deepLinkUrl", "appStoreUrl", "playStoreUrl", "appLaunchMode", "iosAppLaunchUrl", "androidAppLaunchUrl",
+        "androidPackageName", "appStoreFallbackUrl", "playStoreFallbackUrl", "enableOpenApp", "enableChecklist",
+        "galleryScanSupported", "slipRequired", "receiptUploadEnabled", "confirmationMode", "checklistSteps"
+    ]),
+    [PAYMENT_CONFIGURATION_KINDS.PROMPTPAY_DYNAMIC]: new Set([
+        "promptPayRecipientType", "promptPayRecipientValue", "dynamicQrExpiryMinutes", "bankLaunchers", "enableSaveQr",
+        "enableOpenApp", "enableChecklist", "dynamicQrSupported", "amountPrefillSupported", "referenceSupported",
+        "galleryScanSupported", "slipRequired", "receiptUploadEnabled", "confirmationMode", "checklistSteps", "openAppMode",
+        "appLaunchMode", "qrMode"
+    ]),
+    [PAYMENT_CONFIGURATION_KINDS.AZIEL_WALLET]: new Set([]),
+    [PAYMENT_CONFIGURATION_KINDS.AUTOMATIC_PROVIDER]: new Set([
+        "qrMode", "autoVerificationSupported", "webhookSupported", "confirmationMode"
+    ])
+});
+
+function applicablePaymentMethodPatch(method, body = {}) {
+    const identity = {
+        ...toPaymentMethodObject(method),
+        region: body.region === undefined ? method.region : String(body.region).toUpperCase(),
+        paymentType: body.paymentType === undefined ? method.paymentType : String(body.paymentType).toLowerCase(),
+        qrMode: body.qrMode === undefined ? method.qrMode : String(body.qrMode),
+        provider: canonicalProviderForMethod(method, body.provider)
+    };
+    const allowed = PAYMENT_PATCH_FIELDS_BY_KIND[paymentConfigurationKind(identity)] || new Set();
+    return Object.fromEntries(Object.entries(body).filter(([key]) => COMMON_PAYMENT_PATCH_FIELDS.has(key) || allowed.has(key)));
+}
+
 function applyPaymentMethodPatch(method, body = {}) {
+    body = applicablePaymentMethodPatch(method, body);
     const stringFields = {
         method: 80,
         accountName: 120,
