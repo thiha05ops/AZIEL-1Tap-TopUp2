@@ -160,6 +160,10 @@ function showCatalogMessage(packageContainer, message, retry = false) {
   });
 }
 
+function availabilityMessage(code, fallback = "") {
+  return window.AZIEL_CATALOG?.availabilityMessage?.(code) || fallback || "This product is currently unavailable.";
+}
+
 function showPackageSkeletons(packageContainer) {
   packageContainer.setAttribute("aria-busy", "true");
   packageContainer.innerHTML = Array.from({ length: 8 }, (_, index) => `
@@ -193,7 +197,10 @@ async function loadAuthoritativePrice(item) {
   const data = await response.json().catch(() => ({}));
   const amount = Number(data.quote?.finalAmount);
   if (!response.ok || !data.success || !Number.isFinite(amount) || amount <= 0) {
-    throw new Error(data.message || "Authoritative package price unavailable");
+    const error = new Error(data.message || "Authoritative package price unavailable");
+    error.code = data.availabilityCode || "PRICING_UNAVAILABLE";
+    error.businessUnavailable = ["PRODUCT_HIDDEN", "PRODUCT_DISABLED", "REGION_UNAVAILABLE", "PACKAGE_UNAVAILABLE", "SETUP_INCOMPLETE", "COMING_SOON"].includes(error.code);
+    throw error;
   }
   return {
     ...item,
@@ -234,7 +241,7 @@ async function renderGamePrices(options = {}) {
 
   if (!catalog) {
     packageContainer.dataset.catalogSynced = "false";
-    showCatalogMessage(packageContainer, t("catalogPricesUnavailable", "Prices are temporarily unavailable. Please try again shortly."), false);
+    showCatalogMessage(packageContainer, availabilityMessage("CATALOG_UNAVAILABLE", "Catalog is temporarily unavailable. Please try again shortly."), false);
     clearSelectedPackage("catalog_client_missing");
     emitPricesRendered({ game, hasPackages: false, ready: false });
     finishPackageLoading(packageContainer);
@@ -249,7 +256,7 @@ async function renderGamePrices(options = {}) {
     await catalog.load({ force: Boolean(options.forceRefresh) });
   } catch (error) {
     if (requestId !== pricingRenderRequestId) return;
-    showCatalogMessage(packageContainer, t("catalogPricesUnavailable", "Prices are temporarily unavailable. Please try again shortly."), true);
+    showCatalogMessage(packageContainer, availabilityMessage("CATALOG_UNAVAILABLE", "Catalog is temporarily unavailable. Please try again shortly."), true);
     clearSelectedPackage("catalog_unavailable");
     emitPricesRendered({ game, hasPackages: false, ready: false, error: true });
     finishPackageLoading(packageContainer);
@@ -262,7 +269,7 @@ async function renderGamePrices(options = {}) {
   const product = catalog.getProduct(game);
 
   if (!product) {
-    showCatalogMessage(packageContainer, t("catalogProductUnavailable", "This product is temporarily unavailable."), false);
+    showCatalogMessage(packageContainer, availabilityMessage("PRODUCT_HIDDEN"), false);
     clearSelectedPackage("product_disabled");
     emitPricesRendered({ game, hasPackages: false, ready: true, unavailable: true });
     finishPackageLoading(packageContainer);
@@ -273,7 +280,8 @@ async function renderGamePrices(options = {}) {
   packageContainer.dataset.catalogSynced = "true";
 
   if (!catalogPackages.length) {
-    showCatalogMessage(packageContainer, t("catalogPackagesUnavailable", "Packages temporarily unavailable."), true);
+    const availability = catalog.getAvailability?.(game, getShopRegion()) || { code: "PACKAGE_UNAVAILABLE" };
+    showCatalogMessage(packageContainer, availability.message || availabilityMessage(availability.code), false);
     clearSelectedPackage("no_regional_packages");
     emitPricesRendered({ game, hasPackages: false, ready: true });
     finishPackageLoading(packageContainer);
@@ -289,7 +297,9 @@ async function renderGamePrices(options = {}) {
     console.warn(`Authoritative pricing preview failures: ${JSON.stringify(failures.map(result => result.reason?.message || "Preview unavailable"))}`);
   }
   if (!packages.length) {
-    showCatalogMessage(packageContainer, t("catalogPricesUnavailable", "Prices are temporarily unavailable. Please try again shortly."), true);
+    const businessFailure = failures.find(result => result.reason?.businessUnavailable);
+    const failureCode = businessFailure?.reason?.code || "PRICING_UNAVAILABLE";
+    showCatalogMessage(packageContainer, availabilityMessage(failureCode), !businessFailure);
     clearSelectedPackage("authoritative_price_unavailable");
     emitPricesRendered({ game, hasPackages: false, ready: false, error: true });
     finishPackageLoading(packageContainer);

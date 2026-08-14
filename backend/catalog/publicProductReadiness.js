@@ -2,6 +2,34 @@ const { isCanonicalProductCode, resolveCanonicalProductRoute } = require("./cano
 
 const REGIONS = Object.freeze(["MM", "TH"]);
 
+const PUBLIC_AVAILABILITY = Object.freeze({
+    AVAILABLE: "AVAILABLE",
+    COMING_SOON: "COMING_SOON",
+    PRODUCT_HIDDEN: "PRODUCT_HIDDEN",
+    PRODUCT_DISABLED: "PRODUCT_DISABLED",
+    REGION_UNAVAILABLE: "REGION_UNAVAILABLE",
+    PACKAGE_UNAVAILABLE: "PACKAGE_UNAVAILABLE",
+    SETUP_INCOMPLETE: "SETUP_INCOMPLETE",
+    PRICING_UNAVAILABLE: "PRICING_UNAVAILABLE",
+    CATALOG_UNAVAILABLE: "CATALOG_UNAVAILABLE"
+});
+
+const PUBLIC_AVAILABILITY_MESSAGES = Object.freeze({
+    AVAILABLE: "Available.",
+    COMING_SOON: "Coming soon.",
+    PRODUCT_HIDDEN: "This product is currently unavailable.",
+    PRODUCT_DISABLED: "This product is currently unavailable.",
+    REGION_UNAVAILABLE: "This product is not available in your region.",
+    PACKAGE_UNAVAILABLE: "This package is currently unavailable.",
+    SETUP_INCOMPLETE: "This product is currently unavailable.",
+    PRICING_UNAVAILABLE: "Prices are temporarily unavailable. Please try again shortly.",
+    CATALOG_UNAVAILABLE: "Catalog is temporarily unavailable. Please try again shortly."
+});
+
+function availabilityReason(code) {
+    return PUBLIC_AVAILABILITY_MESSAGES[code] || PUBLIC_AVAILABILITY_MESSAGES.SETUP_INCOMPLETE;
+}
+
 function meaningfulDescription(product = {}) {
     return String(product.productKnowledge?.shortDescription || product.description || "").trim();
 }
@@ -21,6 +49,11 @@ function regionReadiness(product = {}, packages = [], region, commerceReadiness 
     if (!purchasablePackages.length) blockers.push("packagesAndPricing");
     if (!fulfillmentReady) blockers.push("fulfillment");
     if (!availabilityReady) blockers.push("availability");
+    let availabilityCode = PUBLIC_AVAILABILITY.AVAILABLE;
+    if (!supported) availabilityCode = PUBLIC_AVAILABILITY.REGION_UNAVAILABLE;
+    else if (!purchasablePackages.length) availabilityCode = PUBLIC_AVAILABILITY.SETUP_INCOMPLETE;
+    else if (!availabilityReady) availabilityCode = PUBLIC_AVAILABILITY.PACKAGE_UNAVAILABLE;
+    else if (!fulfillmentReady) availabilityCode = PUBLIC_AVAILABILITY.SETUP_INCOMPLETE;
     return {
         region,
         supported,
@@ -30,13 +63,15 @@ function regionReadiness(product = {}, packages = [], region, commerceReadiness 
         availabilityReady,
         blockers,
         warnings: [],
-        state: blockers.length === 0 ? "AVAILABLE" : "COMING_SOON"
+        state: blockers.length === 0 ? "AVAILABLE" : "COMING_SOON",
+        availabilityCode,
+        availabilityReason: availabilityReason(availabilityCode)
     };
 }
 
 function resolvePublicProductReadiness(product = {}, packages = [], commerceReadiness = {}) {
     const canonical = isCanonicalProductCode(product.productCode);
-    const route = resolveCanonicalProductRoute(product.productCode, product.productRoute);
+    const route = resolveCanonicalProductRoute(product.productCode);
     const regions = Object.fromEntries(REGIONS.map(region => [region, regionReadiness(product, packages, region, commerceReadiness)]));
     const blockers = [];
     const warnings = [];
@@ -62,7 +97,29 @@ function resolvePublicProductReadiness(product = {}, packages = [], commerceRead
         const regionAvailable = Object.values(regions).some(item => item.state === "AVAILABLE");
         state = !intentionallyComingSoon && requested === "PURCHASABLE" && blockers.length === 0 && regionAvailable ? "AVAILABLE" : "COMING_SOON";
     }
-    return { state, requestedState: requested, route, blockers: [...new Set(blockers)], warnings: [...new Set(warnings)], regions };
+    const intentionallyComingSoon = String(product.lifecycleStatus || "").toUpperCase() === "COMING_SOON" || requested === "COMING_SOON";
+    let availabilityCode = PUBLIC_AVAILABILITY.AVAILABLE;
+    if (product.enabled === false || product.deletedAt) availabilityCode = PUBLIC_AVAILABILITY.PRODUCT_DISABLED;
+    else if (!discoverable || requested === "HIDDEN") availabilityCode = PUBLIC_AVAILABILITY.PRODUCT_HIDDEN;
+    else if (intentionallyComingSoon) availabilityCode = PUBLIC_AVAILABILITY.COMING_SOON;
+    else if (state !== "AVAILABLE") availabilityCode = PUBLIC_AVAILABILITY.SETUP_INCOMPLETE;
+    return {
+        state,
+        requestedState: requested,
+        route,
+        blockers: [...new Set(blockers)],
+        warnings: [...new Set(warnings)],
+        regions,
+        availabilityCode,
+        availabilityReason: availabilityReason(availabilityCode)
+    };
 }
 
-module.exports = { REGIONS, regionReadiness, resolvePublicProductReadiness };
+module.exports = {
+    PUBLIC_AVAILABILITY,
+    PUBLIC_AVAILABILITY_MESSAGES,
+    REGIONS,
+    availabilityReason,
+    regionReadiness,
+    resolvePublicProductReadiness
+};

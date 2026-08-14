@@ -8,11 +8,15 @@ const {
 } = require("../catalog/catalogProjection");
 const { assertAssetCategory } = require("./mediaService");
 const { CATALOG_CATEGORIES, HOMEPAGE_FLAGS, HOMEPAGE_SECTIONS, CATALOG_LIFECYCLE, COMMERCE_STATES } = require("../catalog/catalogTaxonomy");
-const { getCanonicalProduct } = require("../catalog/canonicalOperationalCatalog");
+const { getCanonicalProduct, resolveCanonicalProductRoute } = require("../catalog/canonicalOperationalCatalog");
 const { normalizeProductKnowledge, normalizeCustomerNote, normalizeCustomerNoteLocales, ProductKnowledgeError } = require("../catalog/productKnowledge");
 
 function normalizeAdminProductCode(value) {
-    return getCanonicalProduct(value)?.productCode || normalizeProductCode(value);
+    const canonical = getCanonicalProduct(value);
+    if (!canonical) {
+        throw new CatalogAdminError("CATALOG_PRODUCT_UNSUPPORTED", "Product is not supported by the canonical catalog.", 409);
+    }
+    return canonical.productCode;
 }
 
 class CatalogAdminError extends Error {
@@ -356,7 +360,7 @@ function buildProductPatch(patch = {}) {
         "homepageOrder",
         "homepageFlags",
         "homepageSections",
-        "productRoute",
+        "manualAllowedRegions",
         "previewPrice",
         "marketScope",
         "displayMarketLabel",
@@ -397,7 +401,7 @@ function buildProductPatch(patch = {}) {
     if (Object.prototype.hasOwnProperty.call(patch, "homepageOrder")) updates.homepageOrder = parseSortOrder(patch.homepageOrder);
     if (Object.prototype.hasOwnProperty.call(patch, "homepageFlags")) updates.homepageFlags = normalizeHomepageFlags(patch.homepageFlags);
     if (Object.prototype.hasOwnProperty.call(patch, "homepageSections")) updates.homepageSections = normalizeHomepageSections(patch.homepageSections);
-    if (Object.prototype.hasOwnProperty.call(patch, "productRoute")) updates.productRoute = cleanEditableText(patch.productRoute, 240);
+    if (Object.prototype.hasOwnProperty.call(patch, "manualAllowedRegions")) updates["fulfillment.manualAllowedRegions"] = normalizeSupportedRegions(patch.manualAllowedRegions);
     if (Object.prototype.hasOwnProperty.call(patch, "previewPrice")) updates["presentation.previewPrice"] = normalizePreviewPrice(patch.previewPrice);
     if (Object.prototype.hasOwnProperty.call(patch, "marketScope")) updates["presentation.marketScope"] = parseEnum(patch.marketScope, ["GLOBAL", "REGION", "MULTI_REGION"], "marketScope");
     if (Object.prototype.hasOwnProperty.call(patch, "displayMarketLabel")) updates["presentation.displayMarketLabel"] = cleanEditableText(patch.displayMarketLabel, 60);
@@ -698,6 +702,20 @@ function buildSupplierCostHistoryEntries(document, updates = {}, actor = "admin"
     return entries;
 }
 
+function classifyProductEnabledTransition(previousEnabled, nextEnabled) {
+    if (previousEnabled && !nextEnabled) return "WITHDRAWAL";
+    if (!previousEnabled && nextEnabled) return "ACTIVATION";
+    return nextEnabled ? "ACTIVE_EDIT" : "INACTIVE_EDIT";
+}
+
+function shouldValidateProductReadiness({ transition, previousCommerceState, nextCommerceState, changedFields = [] } = {}) {
+    if (["WITHDRAWAL", "INACTIVE_EDIT"].includes(transition)) return false;
+    if (nextCommerceState !== "PURCHASABLE") return false;
+    if (transition === "ACTIVATION") return true;
+    if (previousCommerceState !== "PURCHASABLE") return true;
+    return changedFields.includes("supportedRegions");
+}
+
 async function updateProduct({ productCode, patch = {}, actor = "admin" }) {
     const normalizedProductCode = normalizeAdminProductCode(productCode);
     let product = await CatalogProduct.findOne({ productCode: normalizedProductCode });
@@ -732,6 +750,8 @@ async function updateProduct({ productCode, patch = {}, actor = "admin" }) {
 
     if (!initializedFromCanonical) assertFresh(product, patch.expectedUpdatedAt);
     const updates = buildProductPatch(patch);
+    const previousEnabled = product.enabled !== false;
+    const previousCommerceState = product.commerceState || "HIDDEN";
 
     if (!Object.keys(updates).length || !hasChanges(product, updates)) {
         return { changed: false, product: product.toObject(), changedFields: [] };
@@ -740,7 +760,19 @@ async function updateProduct({ productCode, patch = {}, actor = "admin" }) {
     Object.entries(updates).forEach(([path, value]) => {
         product.set(path, value);
     });
-    if (product.commerceState === "PURCHASABLE") {
+    const unsupportedManualRegion = (product.fulfillment?.manualAllowedRegions || [])
+        .find(region => !(product.supportedRegions || []).includes(region));
+    if (unsupportedManualRegion) {
+        throw new CatalogAdminError("CATALOG_FULFILLMENT_REGION_INVALID", "Manual fulfillment regions must be supported by the product.");
+    }
+    const transition = classifyProductEnabledTransition(previousEnabled, product.enabled !== false);
+    const validateReadiness = shouldValidateProductReadiness({
+        transition,
+        previousCommerceState,
+        nextCommerceState: product.commerceState || "HIDDEN",
+        changedFields: Object.keys(updates)
+    });
+    if (validateReadiness) {
         const SupplierProductMapping = require("../models/SupplierProductMapping");
         const PackageInventoryState = require("../models/PackageInventoryState");
         const { projectCommerceReadiness } = require("./catalogService");
@@ -759,11 +791,11 @@ async function updateProduct({ productCode, patch = {}, actor = "admin" }) {
             );
         }
     }
-    if (product.publicDiscoveryEnabled && product.commerceState !== "HIDDEN") {
+    if (product.enabled !== false && product.publicDiscoveryEnabled && product.commerceState !== "HIDDEN") {
         const identityMissing = [
             !product.name && "name",
             !product.catalogCategory && "category",
-            !product.productRoute && "route",
+            !resolveCanonicalProductRoute(product.productCode) && "route",
             !(product.artworkPath || product.presentation?.imageAssetId) && "artwork"
         ].filter(Boolean);
         if (identityMissing.length) {
@@ -1045,6 +1077,7 @@ async function reorderPackages({ productCode, orderedPackageCodes = [], actor = 
 
 module.exports = {
     CatalogAdminError,
+    classifyProductEnabledTransition,
     createPackage,
     reorderPackages,
     restorePackage,
@@ -1052,5 +1085,6 @@ module.exports = {
     softDeletePackage,
     softDeleteProduct,
     updatePackage,
-    updateProduct
+    updateProduct,
+    shouldValidateProductReadiness
 };

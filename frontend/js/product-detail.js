@@ -25,7 +25,7 @@
 
     const productCode = productCodeFromUrl();
     const copy = PRODUCT_COPY[productCode];
-    const route = window.AZIEL_CATALOG_PRESENTATION?.resolveCanonicalProductRoute?.(productCode, "") || "";
+    const route = window.AZIEL_CATALOG_PRESENTATION?.resolveProductRoute?.("", productCode) || "";
 
     if (!copy || !route) {
         document.documentElement.dataset.publicProductState = "HIDDEN";

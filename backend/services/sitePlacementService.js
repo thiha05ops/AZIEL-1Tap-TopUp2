@@ -1,7 +1,9 @@
 const SitePlacement = require("../models/SitePlacement");
 const CatalogProduct = require("../models/CatalogProduct");
 const PromoCode = require("../models/PromoCode");
-const { normalizeProductCode, normalizeRegion, toPublicCatalog } = require("./catalogService");
+const { normalizeRegion, toPublicCatalog } = require("./catalogService");
+const { publicCategoryFor } = require("../catalog/catalogTaxonomy");
+const { isCanonicalProductCode } = require("../catalog/canonicalOperationalCatalog");
 
 const SUPPORTED_PLACEMENTS = Object.freeze({
     HOME_POPULAR_GAMES: {
@@ -57,6 +59,11 @@ function normalizePromoCode(value) {
     return promoCode;
 }
 
+function normalizePlacementProductCode(value) {
+    const productCode = String(value || "").trim().toLowerCase();
+    return /^[a-z0-9][a-z0-9-]{0,79}$/.test(productCode) ? productCode : "";
+}
+
 function projectPlacementDocument(placementCode, doc = null) {
     const definition = SUPPORTED_PLACEMENTS[placementCode];
     const items = Array.isArray(doc?.items) ? doc.items : [];
@@ -85,7 +92,7 @@ function normalizeItems(placementCode, items = []) {
 
     return (Array.isArray(items) ? items : []).map((item, index) => {
         if (definition.itemType === "product") {
-            const productCode = normalizeProductCode(item.productCode || item.code);
+            const productCode = normalizePlacementProductCode(item.productCode || item.code);
             if (!productCode) {
                 throw new SitePlacementError(
                     "SITE_PLACEMENT_PRODUCT_REQUIRED",
@@ -124,12 +131,12 @@ function normalizeItems(placementCode, items = []) {
     });
 }
 
-async function assertProductsExist(items = []) {
+async function assertProductsExist(items = [], placementCode = "") {
     const productCodes = items.map(item => item.productCode).filter(Boolean);
     if (!productCodes.length) return;
 
     const products = await CatalogProduct.find({ productCode: { $in: productCodes } })
-        .select("productCode")
+        .select("productCode catalogCategory")
         .lean();
     const existing = new Set(products.map(product => product.productCode));
     const missing = productCodes.find(productCode => !existing.has(productCode));
@@ -139,6 +146,24 @@ async function assertProductsExist(items = []) {
             "SITE_PLACEMENT_PRODUCT_UNKNOWN",
             `Unknown catalog product: ${missing}`
         );
+    }
+
+    const unsupported = productCodes.find(productCode => !isCanonicalProductCode(productCode));
+    if (unsupported) {
+        throw new SitePlacementError(
+            "SITE_PLACEMENT_PRODUCT_UNSUPPORTED",
+            `Unsupported catalog product: ${unsupported}`
+        );
+    }
+
+    if (placementCode === "HOME_POPULAR_GAMES") {
+        const categoryMismatch = products.find(product => publicCategoryFor(product.catalogCategory) !== "mobile");
+        if (categoryMismatch) {
+            throw new SitePlacementError(
+                "SITE_PLACEMENT_CATEGORY_MISMATCH",
+                "Popular Games only accepts Mobile Game products."
+            );
+        }
     }
 }
 
@@ -180,10 +205,13 @@ async function getAvailableProducts() {
     });
 
     return products
+        .filter(product => isCanonicalProductCode(product.productCode))
         .map(product => ({
             productCode: product.productCode,
             name: product.name,
             enabled: product.enabled !== false,
+            publicCategory: product.publicCategory || "",
+            homepageEnabled: product.homepageEnabled === true,
             supportedRegions: product.supportedRegions || [],
             imageUrl: product.imageUrl || "",
             sortOrder: Number(product.sortOrder || 0)
@@ -218,9 +246,13 @@ async function getAdminPlacement(placementCodeInput) {
     const doc = await SitePlacement.findOne({ placementCode }).lean();
     const placement = projectPlacementDocument(placementCode, doc);
 
-    const availableItems = placement.itemType === "product"
+    let availableItems = placement.itemType === "product"
         ? await getAvailableProducts()
         : await getAvailablePromos();
+
+    if (placementCode === "HOME_POPULAR_GAMES") {
+        availableItems = availableItems.filter(item => item.publicCategory === "mobile");
+    }
 
     return {
         placement,
@@ -234,7 +266,7 @@ async function updateAdminPlacement(placementCodeInput, payload = {}, actor = "a
     const definition = SUPPORTED_PLACEMENTS[placementCode];
 
     if (definition.itemType === "product") {
-        await assertProductsExist(items);
+        await assertProductsExist(items, placementCode);
     } else {
         await assertPromosExist(items);
     }
@@ -320,14 +352,8 @@ async function resolveProductPlacement(placementCode, doc) {
     const items = selectedCodes
         .map(productCode => byCode.get(productCode))
         .filter(Boolean)
-        .map(product => ({
-            itemType: "product",
-            productCode: product.productCode,
-            name: product.name,
-            supportedRegions: product.supportedRegions || [],
-            imageUrl: product.imageUrl || "",
-            imageAltText: product.imageAltText || product.name
-        }));
+        .filter(product => placementCode !== "HOME_POPULAR_GAMES" || product.publicCategory === "mobile")
+        .map(product => ({ ...product, itemType: "product" }));
 
     return projectPublicPlacement(placementCode, doc, items);
 }

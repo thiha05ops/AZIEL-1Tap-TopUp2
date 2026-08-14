@@ -14,8 +14,6 @@ const {
 const { toPublicCatalog } = require("../services/catalogService");
 
 const ROOT = path.join(__dirname, "../..");
-const GENERIC_FALLBACK = "coming-soon.html";
-
 function read(relativePath) {
     return fs.readFileSync(path.join(ROOT, relativePath), "utf8");
 }
@@ -34,7 +32,6 @@ function assertCanonicalRoutes() {
     CANONICAL_OPERATIONAL_PRODUCTS.forEach(product => {
         const route = resolveCanonicalProductRoute(product.productCode);
         assert(route, `${product.productCode} must resolve to a canonical destination.`);
-        assert(!route.includes(GENERIC_FALLBACK), `${product.productCode} must not resolve to generic unavailable fallback.`);
         assertFileExists(`frontend/${routePath(route)}`);
         destinations[product.productCode] = route;
     });
@@ -50,20 +47,18 @@ function assertFrontendUsesCanonicalRouteSource(destinations) {
     const discovery = read("frontend/js/catalog-discovery.js");
     const search = read("frontend/js/search.js");
 
-    assert(presentation.includes("CANONICAL_PRODUCT_ROUTES"), "Frontend presentation must own one canonical route map.");
-    assert(presentation.includes("resolveCanonicalProductRoute"), "Frontend presentation must export canonical route resolver.");
+    assert(!presentation.includes("CANONICAL_PRODUCT_ROUTES"), "Frontend must not duplicate the backend canonical route map.");
+    assert(presentation.includes("resolveProductRoute"), "Frontend presentation must expose only projected-route plus generic fallback handling.");
 
     Object.entries(destinations).forEach(([code, route]) => {
-        assert(presentation.includes(code), `Frontend canonical route map missing ${code}.`);
-        assert(presentation.includes(route), `Frontend canonical route map missing route ${route}.`);
-        assert(!presentation.includes(`coming-soon.html?product=${code}`), `${code} must not point to generic fallback in presentation map.`);
+        assert(route, `${code} backend route missing.`);
     });
 
-    assert(homePlacement.includes("resolveCanonicalProductRoute"), "Home placement cards must use canonical route resolver.");
-    assert(mobileCarousel.includes("resolveCanonicalProductRoute"), "Mobile storefront rows must use canonical route resolver.");
+    assert(homePlacement.includes("resolveProductRoute"), "Home placement cards must consume projected routes.");
+    assert(mobileCarousel.includes("resolveProductRoute"), "Mobile storefront rows must consume projected routes.");
     assert(discovery.includes("product.route"), "Catalog discovery cards must use product.route.");
     assert(search.includes("product.route"), "Search results must use product.route.");
-    assert(homePlacement.includes("coming-soon.html?product="), "Generic fallback must remain for true unavailable/discovery-only products.");
+    assert(presentation.includes("product.html?product="), "One generic defensive product fallback must remain.");
 }
 
 function assertPaymentPricingUntouched() {
@@ -104,7 +99,6 @@ async function assertDatabaseProjection(destinations) {
             const product = byCode.get(code);
             assert(product, `${code} must project from database catalog.`);
             assert.strictEqual(product.productRoute, route, `${code} database projection route mismatch.`);
-            assert(!String(product.productRoute || "").includes(GENERIC_FALLBACK), `${code} database projection must not use fallback.`);
         });
     } finally {
         await mongoose.disconnect();
@@ -117,13 +111,15 @@ async function run() {
     const destinations = assertCanonicalRoutes();
     assertFrontendUsesCanonicalRouteSource(destinations);
     assertPaymentPricingUntouched();
-    const databaseProjection = await assertDatabaseProjection(destinations);
+    const databaseProjection = process.argv.includes("--database")
+        ? await assertDatabaseProjection(destinations)
+        : { skipped: true, reason: "database verification requires --database" };
 
     return {
         canonicalDestinations: destinations,
-        storefrontRouteSource: "frontend/js/catalog-presentation.js::CANONICAL_PRODUCT_ROUTES",
+        storefrontRouteSource: "public Catalog productRoute",
         backendRouteSource: "backend/catalog/canonicalOperationalCatalog.js",
-        fallbackBehavior: "coming-soon.html remains only for non-canonical/unavailable fallback resolution.",
+        fallbackBehavior: "product.html?product=<code> is the dedicated-page and malformed-payload generic fallback.",
         databaseProjection,
         paymentPricingUntouched: true
     };

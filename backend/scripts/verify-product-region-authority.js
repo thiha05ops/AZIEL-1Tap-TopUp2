@@ -1,0 +1,214 @@
+"use strict";
+
+const assert = require("assert");
+const fs = require("fs");
+const path = require("path");
+const mongoose = require("mongoose");
+
+const CatalogProduct = require("../models/CatalogProduct");
+const CatalogPackage = require("../models/CatalogPackage");
+const {
+    CatalogError,
+    applyPackageFulfillmentReadiness,
+    projectCatalogProduct,
+    resolveDatabasePackagePriceFromRows
+} = require("../services/catalogService");
+const { toPublicCatalog } = require("../services/catalogService");
+const {
+    CommercePricingPreviewError,
+    loadCatalogPackage
+} = require("../services/commerce/commercePricingPreviewService");
+
+const ROOT = path.resolve(__dirname, "../..");
+const baseProduct = {
+    productCode: "mlbb",
+    name: "Region Authority Fixture",
+    enabled: true,
+    deletedAt: null,
+    publicDiscoveryEnabled: true,
+    commerceState: "PURCHASABLE",
+    supportedRegions: ["MM", "TH"],
+    fulfillment: { manualAllowedRegions: ["MM", "TH"] }
+};
+const basePackage = {
+    _id: "region-authority-package",
+    productCode: "mlbb",
+    packageCode: "REGION_AUTHORITY_TEST",
+    name: "Region Authority Package",
+    enabled: true,
+    deletedAt: null,
+    prices: {
+        MM: { amount: 1000, currency: "MMK", enabled: true },
+        TH: { amount: 30, currency: "THB", enabled: true }
+    }
+};
+
+function publicProjection(product, pkg = basePackage) {
+    const projection = projectCatalogProduct(product, [pkg], { includeDisabled: false });
+    applyPackageFulfillmentReadiness(projection, [], []);
+    return projection;
+}
+
+async function withCatalogRows(product, pkg, callback) {
+    const originalProductFindOne = CatalogProduct.findOne;
+    const originalPackageFindOne = CatalogPackage.findOne;
+    CatalogProduct.findOne = () => ({ lean: () => Promise.resolve(product) });
+    CatalogPackage.findOne = () => ({ lean: () => Promise.resolve(pkg) });
+    try {
+        return await callback();
+    } finally {
+        CatalogProduct.findOne = originalProductFindOne;
+        CatalogPackage.findOne = originalPackageFindOne;
+    }
+}
+
+async function expectError(promise, ErrorType, code) {
+    let caught = null;
+    try {
+        await promise;
+    } catch (error) {
+        caught = error;
+    }
+    assert(caught instanceof ErrorType, `Expected ${ErrorType.name}, received ${caught?.constructor?.name || "no error"}`);
+    assert.strictEqual(caught.code, code);
+}
+
+function isolatedMongoUri() {
+    require("dotenv").config({ quiet: true });
+    const configured = String(process.env.MONGO_URI || "").trim();
+    if (!configured) throw new Error("MONGO_URI is required for isolated verification.");
+    const parsed = new URL(configured);
+    parsed.pathname = "/aziel_e2e_product_region_authority";
+    const uri = parsed.toString();
+    if (!uri.includes("/aziel_e2e_product_region_authority")) {
+        throw new Error("Isolated verification refused a non-isolated database URI.");
+    }
+    return uri;
+}
+
+async function verifyIsolatedPropagation() {
+    const productCode = "capcut";
+    const packageCode = "REGION_AUTHORITY_ISOLATED";
+    await mongoose.connect(isolatedMongoUri());
+    try {
+        await CatalogPackage.deleteMany({ productCode, packageCode });
+        await CatalogProduct.deleteMany({ productCode });
+        await CatalogProduct.create({
+            ...baseProduct,
+            productCode,
+            name: "Isolated Region Authority Product",
+            description: "Isolated product used only to verify regional catalog authority safely.",
+            artworkPath: "assets/giftcards/capcut.webp",
+            supportedRegions: ["MM", "TH"]
+        });
+        const { _id: ignoredFixtureId, ...persistedPackage } = basePackage;
+        await CatalogPackage.create({
+            ...persistedPackage,
+            productCode,
+            packageCode,
+            name: "Isolated Region Authority Package"
+        });
+
+        let products = await toPublicCatalog({ source: "database", includeDisabled: false });
+        let projected = products.find(item => item.productCode === productCode);
+        assert(projected?.packages[0]?.prices?.TH, "Initial isolated TH public price must be available.");
+
+        await CatalogProduct.updateOne({ productCode }, { $set: { supportedRegions: ["MM"] } });
+        const persisted = await CatalogProduct.findOne({ productCode }).lean();
+        assert.deepStrictEqual(persisted.supportedRegions, ["MM"], "Admin-equivalent region change must persist.");
+
+        products = await toPublicCatalog({ source: "database", includeDisabled: false });
+        projected = products.find(item => item.productCode === productCode);
+        assert(projected, "Product must remain publicly projected for its supported region.");
+        assert.strictEqual(projected.packages[0].prices.TH, undefined);
+        assert.strictEqual(projected.packages[0].fulfillmentRegions.TH, false);
+        await expectError(loadCatalogPackage({ productCode, packageCode, region: "TH", currency: "THB" }), CommercePricingPreviewError, "PRODUCT_REGION_UNAVAILABLE");
+        const storedPackage = await CatalogPackage.findOne({ productCode, packageCode }).lean();
+        await expectError(Promise.resolve().then(() => resolveDatabasePackagePriceFromRows({ productCode, packageCode, region: "TH" }, {
+            products: [persisted],
+            packages: [storedPackage]
+        })), CatalogError, "REGION_NOT_SUPPORTED");
+
+        assert(storedPackage.prices.TH, "Removing product TH support must not delete stored TH package configuration.");
+        await CatalogProduct.updateOne({ productCode }, { $set: { supportedRegions: ["MM", "TH"] } });
+        products = await toPublicCatalog({ source: "database", includeDisabled: false });
+        projected = products.find(item => item.productCode === productCode);
+        assert(projected?.packages[0]?.prices?.TH, "Restoring TH product support must re-expose the stored TH package configuration.");
+        const restoredPreview = await loadCatalogPackage({ productCode, packageCode, region: "TH", currency: "THB" });
+        assert.strictEqual(restoredPreview.price.amount, 30);
+        console.log("Isolated Admin-to-Public region propagation verification passed.");
+    } finally {
+        await CatalogPackage.deleteMany({ productCode, packageCode });
+        await CatalogProduct.deleteMany({ productCode });
+        await mongoose.disconnect();
+    }
+}
+
+async function main() {
+    const mmOnlyProduct = { ...baseProduct, supportedRegions: ["MM"] };
+    const mmOnly = publicProjection(mmOnlyProduct);
+    assert.strictEqual(mmOnly.packages[0].prices.TH, undefined, "Unsupported TH price must not be publicly projected.");
+    assert.strictEqual(mmOnly.packages[0].fulfillmentRegions.TH, false, "Unsupported TH fulfillment must be false.");
+    assert(mmOnly.packages[0].prices.MM, "Supported MM price must remain projected.");
+
+    await withCatalogRows(mmOnlyProduct, basePackage, async () => {
+        await expectError(loadCatalogPackage({
+            productCode: "mlbb", packageCode: basePackage.packageCode, region: "TH", currency: "THB"
+        }), CommercePricingPreviewError, "PRODUCT_REGION_UNAVAILABLE");
+    });
+    await withCatalogRows({ ...baseProduct, publicDiscoveryEnabled: false }, basePackage, async () => {
+        await expectError(loadCatalogPackage({
+            productCode: "mlbb", packageCode: basePackage.packageCode, region: "TH", currency: "THB"
+        }), CommercePricingPreviewError, "PRODUCT_UNAVAILABLE");
+    });
+
+    const supported = publicProjection(baseProduct);
+    assert(supported.packages[0].prices.TH, "Supported TH price must remain projected.");
+    assert.strictEqual(supported.packages[0].fulfillmentRegions.TH, true, "Supported manual TH fulfillment must remain available.");
+    await withCatalogRows(baseProduct, basePackage, async () => {
+        const catalog = await loadCatalogPackage({
+            productCode: "mlbb", packageCode: basePackage.packageCode, region: "TH", currency: "THB"
+        });
+        assert.strictEqual(catalog.price.amount, 30);
+    });
+
+    const thDisabledPackage = {
+        ...basePackage,
+        prices: { ...basePackage.prices, TH: { ...basePackage.prices.TH, enabled: false } }
+    };
+    const packageDisabled = publicProjection(baseProduct, thDisabledPackage);
+    assert.strictEqual(packageDisabled.packages[0].prices.TH, undefined, "Product support must not override package-region disablement.");
+    await withCatalogRows(baseProduct, thDisabledPackage, async () => {
+        await expectError(loadCatalogPackage({
+            productCode: "mlbb", packageCode: basePackage.packageCode, region: "TH", currency: "THB"
+        }), CommercePricingPreviewError, "PACKAGE_UNAVAILABLE");
+    });
+
+    await expectError(Promise.resolve().then(() => resolveDatabasePackagePriceFromRows({
+        productCode: "mlbb", packageCode: basePackage.packageCode, region: "TH"
+    }, { products: [mmOnlyProduct], packages: [basePackage] })), CatalogError, "REGION_NOT_SUPPORTED");
+
+    const underlyingBefore = JSON.stringify(basePackage.prices.TH);
+    publicProjection(mmOnlyProduct);
+    assert.strictEqual(JSON.stringify(basePackage.prices.TH), underlyingBefore, "Projection must not mutate stored package region configuration.");
+    assert(publicProjection(baseProduct).packages[0].prices.TH, "Restoring product TH support must re-expose the existing TH configuration.");
+
+    const adminProjection = projectCatalogProduct(mmOnlyProduct, [basePackage], {
+        includeDisabled: true,
+        includeAdminPricing: true,
+        publicProjection: false
+    });
+    assert(adminProjection.packages[0].prices.TH, "Admin projection must retain unsupported-region configuration for later restoration.");
+
+    const frontend = fs.readFileSync(path.join(ROOT, "frontend/js/catalog-runtime.js"), "utf8");
+    assert(frontend.includes("product.supportedRegions?.includes(normalizedRegion) === false"), "Frontend must defensively reject a region excluded by the server product projection.");
+
+    if (process.argv.includes("--isolated")) await verifyIsolatedPropagation();
+
+    console.log("Product region authority verification passed.");
+}
+
+main().catch(error => {
+    console.error(error);
+    process.exit(1);
+});

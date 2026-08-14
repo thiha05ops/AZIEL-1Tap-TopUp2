@@ -186,7 +186,7 @@
                 .forEach(product => {
                     const category = product.category === "pc"
                             ? t("search.pcGames", "PC Games")
-                        : product.category === "gift_card"
+                        : product.category === "gift-card"
                                 ? t("search.giftCards", "Gift Cards")
                             : product.category === "social"
                                     ? t("search.socialTopUp", "Social Top Up")

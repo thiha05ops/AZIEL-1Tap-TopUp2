@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const CatalogProduct = require("../../models/CatalogProduct");
 const CatalogPackage = require("../../models/CatalogPackage");
 const { REGION_CURRENCIES, normalizePackageCode, normalizeProductCode, normalizeRegion } = require("../../catalog/catalogProjection");
+const { isCanonicalProductCode } = require("../../catalog/canonicalOperationalCatalog");
 const { buildProductionPricingContext } = require("./productionPricingContextService");
 const { createPricingQuote } = require("./pricingQuoteRuntime");
 const { loadCommercePromotionContext } = require("./commercePromotionBridgeService");
@@ -120,6 +121,9 @@ function workspaceRegions(region) {
 }
 
 function normalizeWorkspaceRow(row = {}, index = 0) {
+    if (!isCanonicalProductCode(row.productCode)) {
+        throw new AdminPricingControlCenterError("CATALOG_PRODUCT_UNSUPPORTED", `Row ${index + 1} references an unsupported product.`);
+    }
     const productCode = normalizeProductCode(row.productCode);
     const packageCode = normalizePackageCode(row.packageCode);
     const rawSupplierCost = row.newSupplierCost ?? row.supplierCost;
@@ -862,6 +866,9 @@ async function publishDailyPricing({
 }
 
 async function loadPackage(productCode, packageCode) {
+    if (!isCanonicalProductCode(productCode)) {
+        throw new AdminPricingControlCenterError("CATALOG_PRODUCT_UNSUPPORTED", "Product is not supported by the canonical catalog.", 409);
+    }
     const normalizedProductCode = normalizeProductCode(productCode);
     const normalizedPackageCode = normalizePackageCode(packageCode);
     const [product, pkg] = await Promise.all([
@@ -930,6 +937,9 @@ async function previewPackagePricing({ productCode, packageCode, region, priceDr
 }
 
 function normalizeBulkRow(row = {}) {
+    if (!isCanonicalProductCode(row.productCode)) {
+        throw new AdminPricingControlCenterError("CATALOG_PRODUCT_UNSUPPORTED", "Product is not supported by the canonical catalog.", 409);
+    }
     const region = normalizeRegion(row.region);
     const supplierCost = amount(row.supplierCost);
     if (supplierCost == null) {

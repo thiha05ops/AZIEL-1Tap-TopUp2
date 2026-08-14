@@ -1,6 +1,7 @@
 "use strict";
 
 const crypto = require("crypto");
+const { isCanonicalProductCode } = require("../../catalog/canonicalOperationalCatalog");
 const CatalogPackage = require("../../models/CatalogPackage");
 const PaymentMethod = require("../../models/PaymentMethod");
 const { loadFulfillmentCapability } = require("../fulfillmentCapabilityService");
@@ -71,6 +72,9 @@ async function loadCatalogPackage(input = {}) {
     const packageCode = text(input.packageCode).toUpperCase();
     if (!productCode || !packageCode) {
         throw new CustomerManualPromptPayCheckoutError(ERROR_CODES.INVALID_CHECKOUT_INPUT, "Package selection is required.");
+    }
+    if (!isCanonicalProductCode(productCode)) {
+        throw new CustomerManualPromptPayCheckoutError(ERROR_CODES.PACKAGE_UNAVAILABLE, "Selected package is no longer available.", 409);
     }
 
     const pkg = await CatalogPackage.findOne({

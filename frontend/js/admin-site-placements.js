@@ -76,7 +76,7 @@ function renderAdminSitePlacements() {
         const stateClass = placement.managed ? (count ? "is-ok" : "is-muted") : "is-muted";
         const stateText = placement.managed
             ? (count ? adminT("managed", "Managed") : adminT("managed_empty", "Managed Empty"))
-            : adminT("static_fallback", "Static Fallback");
+            : adminT("not_managed", "Not Managed");
         const authority = placement.itemType === "product"
             ? adminT("catalog_owned", "Items managed by Catalog")
             : adminT("promo_owned", "Items managed by Promo Codes");

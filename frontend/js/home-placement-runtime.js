@@ -1,10 +1,7 @@
-// Home catalog selection: admin placement first, then enabled-catalog curated fallback.
+// Home catalog selection: persisted placement/category authority with presentation-only fallbacks.
 
 (function () {
     const API_URL = "/api/site-placements/home";
-    const FEATURED_MAX_ITEMS = 6;
-    const ALL_MOBILE_MAX_ITEMS = 14;
-    const SOCIAL_TOPUP_MAX_ITEMS = 2;
     const FEATURED_LABELS = Object.freeze({
         mlbb: ["Mobile Legends", "Diamonds"],
         pubg: ["PUBG Mobile", "UC"],
@@ -76,7 +73,7 @@
             fallbackProducts: []
         };
 
-        renderPopularGames(products, placements?.HOME_POPULAR_GAMES, sections, selection, catalogReady);
+        renderPopularGames(placements?.HOME_POPULAR_GAMES, sections, selection, catalogReady);
         renderAllMobileGames(products, sections, selection);
         renderSocialTopUp(products, selection);
 
@@ -110,7 +107,7 @@
             .sort((a, b) => Number(a.homepageOrder || 0) - Number(b.homepageOrder || 0));
     }
 
-    function renderPopularGames(products, placement, sections, selection, catalogReady) {
+    function renderPopularGames(placement, sections, selection, catalogReady) {
         const section = document.getElementById("popularGames");
         const target = section?.querySelector(".popular-game-grid");
         if (!section || !target) return;
@@ -121,30 +118,20 @@
             return;
         }
 
-        if (placement?.managed === true && !(placement.items || []).length) {
+        if (placement?.managed !== true || !(placement.items || []).length) {
             hideSection(section, target, "admin-disabled");
             selection.placements.HOME_POPULAR_GAMES = [];
             selection.groups.push(groupReport("popular-game-top-up", [], "admin-disabled"));
             return;
         }
 
-        if (!catalogReady && !placement) {
-            const staticItems = readRenderedProducts(target);
-            section.hidden = !staticItems.length;
-            selection.groups.push(groupReport("popular-game-top-up", staticItems, "static-fallback"));
+        if (!catalogReady) {
+            hideSection(section, target, "catalog-unavailable");
+            selection.groups.push(groupReport("popular-game-top-up", [], "catalog-unavailable"));
             return;
         }
 
-        const popularCodes = canonicalHomeCodes("popularMobileGames");
-        const productPool = approvedProducts(products, popularCodes);
-        const approvedCodes = new Set(popularCodes);
-        const placed = placement?.managed === true
-            ? (placement.items || []).map(displayProduct).filter(product => approvedCodes.has(codeOf(product)) && product.discoverable === true)
-            : [];
-        const selected = exactOrderedProducts([
-            ...placed,
-            ...productPool
-        ], popularCodes).slice(0, FEATURED_MAX_ITEMS);
+        const selected = selectPopularProducts(placement);
 
         if (!selected.length) {
             hideSection(section, target, "no-enabled-products");
@@ -154,15 +141,13 @@
 
         target.innerHTML = selected.map(product => renderPopularGame(product, "popular-game-top-up")).join("");
         section.hidden = false;
-        section.dataset.homeSelectionSource = placed.length ? "admin-plus-fallback" : "curated-fallback";
+        section.dataset.homeSelectionSource = "admin-placement";
         window.AZIEL_CATALOG_PRESENTATION?.bindImageFallbacks?.(target);
 
-        const placedCodes = placed.map(codeOf);
-        const fallbackCodes = selected.map(codeOf).filter(code => !placedCodes.includes(code));
+        const placedCodes = selected.map(codeOf);
         section.dataset.adminProducts = placedCodes.join(",");
-        section.dataset.fallbackProducts = fallbackCodes.join(",");
+        section.dataset.fallbackProducts = "";
         selection.placements.HOME_POPULAR_GAMES = placedCodes;
-        selection.fallbackProducts.push(...fallbackCodes);
         selection.groups.push(groupReport("popular-game-top-up", selected, section.dataset.homeSelectionSource));
     }
 
@@ -182,9 +167,7 @@
             return;
         }
 
-        const mobileCodes = canonicalHomeCodes("mobileGames");
-        const selected = exactOrderedProducts(approvedProducts(products, mobileCodes), mobileCodes)
-            .slice(0, ALL_MOBILE_MAX_ITEMS);
+        const selected = selectAllMobileProducts(products);
 
         if (!selected.length) {
             hideSection(section, target, "no-enabled-products");
@@ -204,9 +187,7 @@
         const target = document.getElementById("socialTopUpList");
         if (!section || !target) return;
 
-        const socialCodes = canonicalHomeCodes("socialTopUp");
-        const selected = exactOrderedProducts(approvedProducts(products, socialCodes), socialCodes)
-            .slice(0, SOCIAL_TOPUP_MAX_ITEMS);
+        const selected = selectSocialProducts(products);
 
         if (!selected.length) {
             hideSection(section, target, "no-enabled-products");
@@ -216,42 +197,33 @@
 
         target.innerHTML = selected.map(product => renderSocialTopUpProduct(product, "social-topup")).join("");
         section.hidden = false;
-        section.dataset.homeSelectionSource = "canonical-catalog";
+        section.dataset.homeSelectionSource = "catalog-home-placement";
         window.AZIEL_CATALOG_PRESENTATION?.bindImageFallbacks?.(target);
-        selection.groups.push(groupReport("social-topup", selected, "canonical-catalog"));
-    }
-
-    function approvedProducts(products, codes = []) {
-        const byCode = new Map(products.map(product => [codeOf(product), product]));
-        return codes
-            .map(code => byCode.get(code))
-            .filter(product => product?.discoverable === true && product.publicState !== "HIDDEN");
-    }
-
-    function exactOrderedProducts(products, codes = []) {
-        const byCode = new Map(products.map(product => [codeOf(product), product]).filter(([code]) => codes.includes(code)));
-        return codes.map(code => byCode.get(code)).filter(Boolean);
-    }
-
-    function presentationRecord(code) {
-        return window.AZIEL_CATALOG_PRESENTATION?.getHomePresentationRecord?.(code) || null;
-    }
-
-    function canonicalHomeCodes(group = "") {
-        return window.AZIEL_CATALOG_PRESENTATION?.getCanonicalHomeProductCodes?.(group) || [];
+        selection.groups.push(groupReport("social-topup", selected, "catalog-home-placement"));
     }
 
     function displayProduct(product = {}) {
         return window.AZIEL_CATALOG_PRESENTATION?.buildDisplayProduct?.(product) || null;
     }
 
-    function isMobileGameProduct(product = null) {
-        return Boolean(product) && ["mobile", "game", "game-top-up", "mobile-game-topup", "mobile-game"].includes(categoryOf(product));
+    function selectPopularProducts(placement = {}) {
+        if (placement.managed !== true) return [];
+        return uniqueProducts((placement.items || [])
+            .map(displayProduct)
+            .filter(product => product?.enabled !== false && product.discoverable === true && product.publicState !== "HIDDEN")
+            .filter(product => product.publicCategory === "mobile"));
     }
 
-    function inHomeSection(product = {}, section = "") {
-        return Array.isArray(product.homepageSections) && product.homepageSections.includes(section);
+    function selectAllMobileProducts(products = []) {
+        return products.filter(product => product.enabled !== false && product.homepageEnabled === true && product.discoverable === true && product.publicState !== "HIDDEN")
+            .filter(product => product.publicCategory === "mobile");
     }
+
+    function selectSocialProducts(products = []) {
+        return products.filter(product => product.enabled !== false && product.homepageEnabled === true && product.discoverable === true && product.publicState !== "HIDDEN")
+            .filter(product => product.publicCategory === "social");
+    }
+
 
     function categoryFallback(groupId = "") {
         return ({
@@ -346,10 +318,7 @@
     }
 
     function homeRoute(product = {}) {
-        const canonicalRoute = window.AZIEL_CATALOG_PRESENTATION?.resolveCanonicalProductRoute?.(codeOf(product), product.route) || product.route;
-        if (canonicalRoute) return canonicalRoute;
-        if (product.purchasable === true) return product.route;
-        return `coming-soon.html?product=${encodeURIComponent(codeOf(product))}`;
+        return window.AZIEL_CATALOG_PRESENTATION?.resolveProductRoute?.(product.productRoute || product.route, codeOf(product)) || "";
     }
 
     function stateClass(product = {}) {
@@ -410,13 +379,6 @@
         });
     }
 
-    function readRenderedProducts(target) {
-        return [...target.querySelectorAll("a[data-product-code], a[data-name]")].map(item => ({
-            productCode: item.dataset.productCode || item.dataset.name || "",
-            name: item.querySelector("h3, strong")?.textContent?.trim() || item.dataset.name || ""
-        }));
-    }
-
     function hideSection(section, target, reason) {
         section.hidden = true;
         section.dataset.homeHiddenReason = reason;
@@ -429,10 +391,6 @@
 
     function codeOf(product = {}) {
         return String(product.productCode || "").trim().toLowerCase();
-    }
-
-    function categoryOf(product = {}) {
-        return String(product.category || "").trim().toLowerCase().replaceAll("_", "-");
     }
 
     function fallbackAttr(fallback = "") {
@@ -451,6 +409,12 @@
     function escapeAttr(value = "") {
         return escapeHtml(value);
     }
+
+    window.AZIEL_HOME_PLACEMENT_POLICY = Object.freeze({
+        selectPopularProducts,
+        selectAllMobileProducts,
+        selectSocialProducts
+    });
 
     ready(() => {
         refreshHomeCatalog();

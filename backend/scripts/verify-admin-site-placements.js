@@ -26,7 +26,7 @@ function matches(file, pattern, message) {
 function verifyBackendOwnership() {
     includes("backend/models/SitePlacement.js", "mongoose.model(\"SitePlacement\"", "SitePlacement model must exist.");
     includes("backend/models/SitePlacement.js", "placementCode", "SitePlacement must key by placement code.");
-    includes("backend/models/SitePlacement.js", "managed", "SitePlacement must preserve managed/fallback state.");
+    includes("backend/models/SitePlacement.js", "managed", "SitePlacement must preserve explicit management state.");
     includes("backend/models/SitePlacement.js", "HOME_POPULAR_GAMES", "Popular Games placement must be supported.");
     includes("backend/models/SitePlacement.js", "HOME_TOPUP_SHORTCUTS", "Top Up Shortcuts placement must be supported.");
     includes("backend/models/SitePlacement.js", "HOME_LATEST_PROMOTIONS", "Latest Promotions placement must be supported.");
@@ -57,7 +57,7 @@ function verifyRoutes() {
 function verifyPublicProjectionSafety() {
     const service = read("backend/services/sitePlacementService.js");
 
-    assert(service.includes("doc?.managed") && service.includes("return projectPublicPlacement(placementCode, doc, []);"), "Service must preserve never-managed static fallback.");
+    assert(service.includes("doc?.managed") && service.includes("return projectPublicPlacement(placementCode, doc, []);"), "Unmanaged placement must project no runtime membership.");
     assert(service.includes("includeDisabled: false"), "Public product placements must exclude disabled catalog products.");
     assert(service.includes("isPromoEligibleForRegion"), "Public promo placements must use active region eligibility.");
     assert(service.includes("promo.regions.includes(region)"), "Public promo placements must filter by region.");
@@ -83,8 +83,9 @@ function verifyCustomerRuntime() {
     includes("frontend/home.html", "id=\"allMobileGamesList\"", "Catalog-owned All Mobile Games must have a stable target.");
     includes("frontend/home.html", "id=\"latestPromotionsPanel\"", "Home Latest Promotions panel must have a stable target.");
     includes("frontend/js/home-placement-runtime.js", "/api/site-placements/home", "Home runtime must call public SitePlacement API.");
-    includes("frontend/js/home-placement-runtime.js", "if (!catalogReady && !placement)", "Home runtime must preserve static fallback when Catalog and placement data are unavailable.");
-    includes("frontend/js/home-placement-runtime.js", "placement?.managed === true", "Managed placement intent must remain distinct from Catalog fallback.");
+    includes("frontend/js/home-placement-runtime.js", "placement?.managed !== true", "Popular membership must require explicit managed placement.");
+    includes("frontend/js/home-placement-runtime.js", 'section.dataset.homeSelectionSource = "admin-placement"', "Popular membership source must be explicit Admin placement.");
+    assert(!read("frontend/js/home-placement-runtime.js").includes("static-fallback"), "Home runtime must not resurrect static membership.");
     includes("frontend/js/home-placement-runtime.js", "hideSection(section, target", "Home runtime must hide managed-empty sections.");
     includes("frontend/js/home-placement-runtime.js", "AZIEL_CATALOG_PRESENTATION", "Home runtime must reuse catalog presentation mapping.");
     includes("frontend/js/home-placement-runtime.js", "aziel:shopRegionChanged", "Home runtime must refetch on region changes.");

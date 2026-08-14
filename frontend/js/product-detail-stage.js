@@ -232,11 +232,13 @@
         }
         status.replaceChildren();
         const heading = document.createElement("h2");
-        heading.textContent = state === "HIDDEN" ? tr("readiness.unavailable", "Product unavailable") : tr("readiness.comingSoon", "Coming Soon");
+        const availabilityCode = product.availabilityCode || state;
+        const isComingSoon = availabilityCode === "COMING_SOON";
+        heading.textContent = isComingSoon ? tr("readiness.comingSoon", "Coming Soon") : tr("readiness.unavailable", "Product unavailable");
         const copy = document.createElement("p");
-        copy.textContent = state === "HIDDEN"
-            ? tr("readiness.unavailableBody", "This product is not currently published.")
-            : tr("readiness.comingSoonBody", "This product is listed in AZIEL but is not yet available for purchase in your selected region.");
+        copy.textContent = product.availabilityReason || window.AZIEL_CATALOG?.availabilityMessage?.(availabilityCode) || (isComingSoon
+            ? tr("readiness.comingSoonBody", "This product is listed in AZIEL but is not yet available for purchase in your selected region.")
+            : tr("readiness.unavailableBody", "This product is currently unavailable."));
         const explore = document.createElement("a"); explore.href = "/mobile-games.html"; explore.textContent = tr("readiness.continueExploring", "Continue Exploring");
         status.append(heading, copy, explore);
         if (state === "HIDDEN") {
@@ -252,7 +254,12 @@
         const configuredState = product.publicState || product.publicReadiness?.state || (product.purchasable ? "AVAILABLE" : "COMING_SOON");
         const regionalState = product.publicReadiness?.regions?.[region]?.state;
         const hasAccountConfig = document.querySelectorAll(".product-account-card input, .product-account-card select").length > 0;
-        const state = configuredState === "AVAILABLE" && regionalState !== "COMING_SOON" && hasAccountConfig ? "AVAILABLE" : (configuredState === "HIDDEN" ? "HIDDEN" : "COMING_SOON");
+        const regionalCode = product.publicReadiness?.regions?.[region]?.availabilityCode;
+        if (configuredState === "AVAILABLE" && regionalState === "COMING_SOON") {
+            product.availabilityCode = regionalCode || "REGION_UNAVAILABLE";
+            product.availabilityReason = product.publicReadiness?.regions?.[region]?.availabilityReason || product.availabilityReason;
+        }
+        const state = configuredState === "AVAILABLE" && regionalState !== "COMING_SOON" && hasAccountConfig ? "AVAILABLE" : (product.availabilityCode === "COMING_SOON" ? "COMING_SOON" : "HIDDEN");
         document.documentElement.dataset.publicProductState = state;
         if (state !== "AVAILABLE") renderUnavailableState(product, state);
         else {
@@ -266,7 +273,7 @@
         const gameKey = document.getElementById("packages")?.dataset.game || "";
         const product = window.AZIEL_CATALOG?.getProduct?.(gameKey);
         if (!product) {
-            if (window.AZIEL_CATALOG?.getStatus?.() === "ready") renderUnavailableState({}, "HIDDEN");
+            if (window.AZIEL_CATALOG?.getStatus?.() === "ready") resolveDirectAvailability(gameKey);
             return;
         }
         renderProductIdentity(product);
@@ -346,6 +353,29 @@
         }
 
         if (container.children.length) (document.querySelector(".product-lower-info") || orderLayout).insertAdjacentElement("afterend", container);
+    }
+
+    let directAvailabilityRequest = null;
+    function resolveDirectAvailability(productCode) {
+        if (!productCode || directAvailabilityRequest) return directAvailabilityRequest;
+        directAvailabilityRequest = fetch(`/api/catalog/${encodeURIComponent(productCode)}`, {
+            cache: "no-store",
+            headers: { Accept: "application/json" }
+        }).then(async response => {
+            const data = await response.json().catch(() => ({}));
+            if (response.ok && data.success && data.product) return data.product;
+            return {
+                availabilityCode: data.availabilityCode || "PRODUCT_HIDDEN",
+                availabilityReason: data.message || window.AZIEL_CATALOG?.availabilityMessage?.("PRODUCT_HIDDEN")
+            };
+        }).catch(() => ({
+            availabilityCode: "CATALOG_UNAVAILABLE",
+            availabilityReason: window.AZIEL_CATALOG?.availabilityMessage?.("CATALOG_UNAVAILABLE") || "Catalog is temporarily unavailable. Please try again shortly."
+        })).then(result => {
+            renderUnavailableState(result, result.availabilityCode === "COMING_SOON" ? "COMING_SOON" : "HIDDEN");
+            return result;
+        });
+        return directAvailabilityRequest;
     }
 
     function resolveProductKnowledge(source = {}) {

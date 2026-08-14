@@ -16,7 +16,7 @@ assert.deepStrictEqual(COMMERCE_STATES, ["PURCHASABLE", "COMING_SOON", "TEMPORAR
     .forEach(path => assert(CatalogProduct.schema.path(path), `CatalogProduct.${path} must exist`));
 
 const ready = projectCommerceReadiness(
-    { enabled: true, supportedRegions: ["MM"], productRoute: "mlbb.html", artworkPath: "assets/games/mlbb.webp" },
+    { productCode: "mlbb", enabled: true, supportedRegions: ["MM"], fulfillment: { manualAllowedRegions: ["MM"] }, artworkPath: "assets/games/mlbb.webp" },
     [{ _id: "pkg-1", packageCode: "PACK", enabled: true, prices: { MM: { amount: 1000, enabled: true } } }],
     [{ enabled: true, region: "MM" }],
     [{ packageRef: "pkg-1", availabilityState: "AVAILABLE" }]
@@ -51,8 +51,11 @@ assert(adminSource.includes("data-home-section"), "Admin catalog must expose Hom
     .forEach(control => assert(adminSource.includes(control), `Admin catalog must expose ${control}`));
 const homeSource = fs.readFileSync("frontend/js/home-placement-runtime.js", "utf8");
 assert(homeSource.includes("product.discoverable === true"));
-assert(homeSource.includes('canonicalHomeCodes("popularMobileGames")'), "Home must use the approved featured mobile game ordering");
-assert(homeSource.includes("coming-soon.html?product="), "Non-purchasable Home items must route to the unavailable state");
+assert(homeSource.includes("selectPopularProducts"), "Home must use persisted Popular placement membership and order");
+assert(homeSource.includes("selectAllMobileProducts"), "All Mobile Games must derive from projected Home/category authority");
+assert(homeSource.includes("selectSocialProducts"), "Social Top Up must derive from projected Home/category authority");
+assert(!homeSource.includes("canonicalHomeCodes"), "Static code lists must not own runtime Home membership");
+assert(homeSource.includes("resolveProductRoute"), "Home items must consume the backend-projected canonical route");
 assert(!homeSource.includes("renderCatalogTile"), "Home must not render wallet/service catalog tiles");
 assert(!homeSource.includes("displayMarketLabel"), "Home cards must not render catalog market labels");
 assert(!homeSource.includes("stateBadge(product)"), "Home cards must not render commerce-state badges");

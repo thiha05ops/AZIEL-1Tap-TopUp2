@@ -16,6 +16,7 @@ const {
 const BRANCH_KEY = "storefront";
 const QUERY_MAX_TIME_MS = 5000;
 const PRODUCT_LIMIT = 250;
+const CANONICAL_PRICING_PRODUCT_CODES = Object.freeze(CANONICAL_OPERATIONAL_PRODUCTS.map(product => product.productCode));
 const PRICING_BOOTSTRAP_DEADLINE_MS = 7500;
 const CONFIG_KEYS = Object.freeze([
     { region: "TH", currency: "THB" },
@@ -381,7 +382,7 @@ async function readCatalogPackages(trace = null) {
         modelConnection: CatalogPackage.db?.name || "",
         limit: PRODUCT_LIMIT
     });
-    const query = CatalogPackage.find({ deletedAt: null })
+    const query = CatalogPackage.find({ productCode: { $in: CANONICAL_PRICING_PRODUCT_CODES }, deletedAt: null })
         .select("_id productCode packageCode name prices canonicalSupplierCost sortOrder metadata updatedAt")
         .sort({ productCode: 1, sortOrder: 1, packageCode: 1 })
         .limit(PRODUCT_LIMIT);
@@ -398,7 +399,7 @@ async function readCatalogProducts(trace = null) {
         limit: PRODUCT_LIMIT
     });
     const products = await boundedQuery(
-        CatalogProduct.find({ deletedAt: null })
+        CatalogProduct.find({ productCode: { $in: CANONICAL_PRICING_PRODUCT_CODES }, deletedAt: null })
             .select("productCode name displayName supportedRegions enabled")
             .sort({ productCode: 1 })
             .limit(PRODUCT_LIMIT)
@@ -566,7 +567,7 @@ async function runPricingEngineDiagnostics(trace = null) {
         return { count: row ? 1 : 0 };
     }));
     checks.push(await step("catalogPackageQuery", async () => {
-        const query = CatalogPackage.find({ enabled: true, deletedAt: null })
+        const query = CatalogPackage.find({ productCode: { $in: CANONICAL_PRICING_PRODUCT_CODES }, enabled: true, deletedAt: null })
             .select("_id productCode packageCode prices")
             .limit(1);
         const rows = await boundedQuery(query).lean();

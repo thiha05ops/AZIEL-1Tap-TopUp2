@@ -469,7 +469,7 @@
                     const refreshed = await refreshPackageForCheckout(flow, orderData);
                     if (refreshed.unavailable) {
                         window.clearSelectedPackage?.("package_unavailable");
-                        const message = t("catalogPackageUnavailable", "This package is no longer available. Please select another package.");
+                        const message = refreshed.message || t("catalogPackageUnavailable", "This package is no longer available. Please select another package.");
                         setText(flow.config.noteSelector, message);
                         window.PaymentUtils?.showToast?.(message);
                         return;
@@ -489,7 +489,7 @@
                         return;
                     }
                 } catch (error) {
-                    const message = t("catalogPricesUnavailable", "Prices are temporarily unavailable. Please try again shortly.");
+                    const message = window.AZIEL_CATALOG?.availabilityMessage?.("CATALOG_UNAVAILABLE") || "Catalog is temporarily unavailable. Please try again shortly.";
                     setText(flow.config.noteSelector, message);
                     window.PaymentUtils?.showToast?.(message);
                     return;
@@ -548,7 +548,18 @@
 
         if (!refreshedCatalogPackage) {
             await window.renderGamePrices?.();
-            return { ready: false, unavailable: true, priceChanged: false, selectedPackage: null };
+            const availability = window.AZIEL_CATALOG.getAvailability?.(productCode, staleOrderData.region) || {};
+            const availabilityCode = availability.code === "AVAILABLE" ? "PACKAGE_UNAVAILABLE" : (availability.code || "PACKAGE_UNAVAILABLE");
+            return {
+                ready: false,
+                unavailable: true,
+                availabilityCode,
+                message: availabilityCode === availability.code
+                    ? availability.message
+                    : window.AZIEL_CATALOG.availabilityMessage?.(availabilityCode),
+                priceChanged: false,
+                selectedPackage: null
+            };
         }
 
         const refreshResult = await window.renderGamePrices?.({

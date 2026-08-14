@@ -26,8 +26,12 @@
         return window.AZIEL_I18N?.t?.(key) || window.i18n?.t?.(key) || fallback;
     }
 
-    function catalogUnavailableMarkup() {
-        return `<p class="catalog-unavailable">${escapeHtml(t("catalogPricesUnavailable", "Prices are temporarily unavailable. Please try again shortly."))}</p>`;
+    function catalogFailureMarkup() {
+        return `<p class="catalog-unavailable">${escapeHtml(t("catalogUnavailable", "Catalog is temporarily unavailable. Please try again shortly."))}</p>`;
+    }
+
+    function emptyCategoryMarkup() {
+        return `<p class="catalog-empty">${escapeHtml(t("catalogCategoryEmpty", "No products are available in this category yet."))}</p>`;
     }
 
     async function loadCatalog() {
@@ -37,23 +41,20 @@
     }
 
     function activeProducts(category = "") {
-        return window.AZIEL_CATALOG
-            .getProducts(category ? { category } : {})
-            .filter(product => product.route);
+        const products = window.AZIEL_CATALOG.getProducts();
+        return products
+            .filter(product => product.route)
+            .filter(product => !category || (
+                category === "all"
+                    ? ["mobile", "pc"].includes(product.publicCategory)
+                    : product.publicCategory === category
+            ));
     }
 
     function popularProducts() {
         const priority = ["mlbb", "pubg", "freefire", "hok"];
         const byCode = new Map(activeProducts().map(product => [product.productCode, product]));
         return priority.map(code => byCode.get(code)).filter(Boolean);
-    }
-
-    function featuredProducts(category = "mobile") {
-        return activeProducts(category).filter(product => product.featured);
-    }
-
-    function posterProducts(category = "mobile") {
-        return activeProducts(category).filter(product => !product.featured);
     }
 
     function renderPopularCard(product) {
@@ -135,7 +136,7 @@
 
             categoryGrid.innerHTML = [
                 ...categoryProducts.map(renderCategoryCard),
-                `<a href="mobile-games.html"><span>All Games</span></a>`
+                `<a href="all-games.html"><span>All Games</span></a>`
             ].join("");
         }
     }
@@ -143,59 +144,65 @@
     function renderMobileGames() {
         const featuredGrid = document.querySelector(".az-featured-grid");
         const posterGrid = document.querySelector(".az-poster-grid");
-        const featured = featuredProducts("mobile");
-        const posters = posterProducts("mobile");
+        const products = activeProducts("mobile");
+        const featured = products.filter(product => product.featured);
+        const posters = products.filter(product => !product.featured);
 
         if (featuredGrid) {
-            featuredGrid.innerHTML = featured.length
-                ? featured.map(renderFeaturedCard).join("")
-                : catalogUnavailableMarkup();
+            featuredGrid.innerHTML = featured.map(renderFeaturedCard).join("");
         }
 
         if (posterGrid) {
-            posterGrid.innerHTML = posters.length
+            posterGrid.innerHTML = products.length
                 ? posters.map(renderPosterCard).join("")
-                : "";
+                : emptyCategoryMarkup();
         }
     }
 
-    function renderPcGames() {
+    function renderProductCategory(category) {
         const grid = document.querySelector(".home-game-grid");
-        const products = activeProducts("pc");
-        if (!grid || !products.length) return;
-        grid.innerHTML = products.map(renderHomeGameCard).join("");
-    }
-
-    function renderGiftCards() {
-        const grid = document.querySelector(".home-game-grid");
-        const products = activeProducts("gift-card");
+        const products = activeProducts(category);
         if (!grid) return;
         grid.innerHTML = products.length
             ? products.map(renderHomeGameCard).join("")
-            : catalogUnavailableMarkup();
+            : emptyCategoryMarkup();
+    }
+
+    function renderCatalogFailure(page) {
+        if (page === "home.html") {
+            const categoryGrid = document.querySelector(".category-grid");
+            if (categoryGrid) categoryGrid.innerHTML = catalogFailureMarkup();
+            return;
+        }
+        if (page === "mobile-games.html") {
+            document.querySelector(".az-featured-grid")?.replaceChildren();
+            const posterGrid = document.querySelector(".az-poster-grid");
+            if (posterGrid) posterGrid.innerHTML = catalogFailureMarkup();
+            return;
+        }
+        const grid = document.querySelector(".home-game-grid");
+        if (grid) grid.innerHTML = catalogFailureMarkup();
     }
 
     async function renderDiscovery() {
         const page = pageName();
-        const supported = new Set(["home.html", "mobile-games.html", "pc-games.html", "gift-cards.html"]);
+        const supported = new Set(["home.html", "all-games.html", "mobile-games.html", "pc-games.html", "gift-cards.html", "social-topup.html"]);
 
         if (!supported.has(page)) return;
 
         try {
             await loadCatalog();
         } catch (error) {
-            if (page === "mobile-games.html") {
-                document.querySelector(".az-featured-grid")?.replaceChildren();
-                const posterGrid = document.querySelector(".az-poster-grid");
-                if (posterGrid) posterGrid.innerHTML = catalogUnavailableMarkup();
-            }
+            renderCatalogFailure(page);
             return;
         }
 
         if (page === "home.html") renderHome();
+        if (page === "all-games.html") renderProductCategory("all");
         if (page === "mobile-games.html") renderMobileGames();
-        if (page === "pc-games.html") renderPcGames();
-        if (page === "gift-cards.html") renderGiftCards();
+        if (page === "pc-games.html") renderProductCategory("pc");
+        if (page === "gift-cards.html") renderProductCategory("gift-card");
+        if (page === "social-topup.html") renderProductCategory("social");
         window.AZIEL_CATALOG_PRESENTATION?.bindImageFallbacks?.();
     }
 
@@ -206,6 +213,8 @@
 
     window.AZIEL_CATALOG_DISCOVERY = {
         renderDiscovery,
-        activeProducts
+        activeProducts,
+        catalogFailureMarkup,
+        emptyCategoryMarkup
     };
 })();

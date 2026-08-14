@@ -1,17 +1,21 @@
 "use strict";
 
 const crypto = require("crypto");
+const CatalogProduct = require("../../models/CatalogProduct");
 const CatalogPackage = require("../../models/CatalogPackage");
+const { isCanonicalProductCode } = require("../../catalog/canonicalOperationalCatalog");
+const { isProductPubliclyEligible, productSupportsRegion } = require("../../catalog/productRegionAuthority");
 const { createPricingQuote } = require("./pricingQuoteRuntime");
 const { buildProductionPricingContext } = require("./productionPricingContextService");
 const { loadCommercePromotionContext } = require("./commercePromotionBridgeService");
 
 class CommercePricingPreviewError extends Error {
-    constructor(code, message, statusCode = 400) {
+    constructor(code, message, statusCode = 400, availabilityCode = "") {
         super(message);
         this.name = "CommercePricingPreviewError";
         this.code = code;
         this.statusCode = statusCode;
+        this.availabilityCode = availabilityCode;
     }
 }
 
@@ -36,12 +40,19 @@ async function loadCatalogPackage(input = {}) {
     const region = normalizeRegion(input.region);
     const currency = normalizeCurrency(input.currency, region);
     if (!productCode || !packageCode) throw new CommercePricingPreviewError("INVALID_PRICING_PREVIEW", "Package selection is required.");
+    const product = await CatalogProduct.findOne({ productCode }).lean();
+    if (!isCanonicalProductCode(productCode) || !product || !isProductPubliclyEligible(product)) {
+        throw new CommercePricingPreviewError("PRODUCT_UNAVAILABLE", "Selected product is no longer available.", 409, "PRODUCT_DISABLED");
+    }
+    if (!productSupportsRegion(product, region)) {
+        throw new CommercePricingPreviewError("PRODUCT_REGION_UNAVAILABLE", "Selected product is not available in this region.", 409, "REGION_UNAVAILABLE");
+    }
     const pkg = await CatalogPackage.findOne({ productCode, packageCode, enabled: true, deletedAt: null }).lean();
     const price = pkg?.prices?.[region];
     if (!pkg || !price || price.enabled === false || upper(price.currency) !== currency) {
-        throw new CommercePricingPreviewError("PACKAGE_UNAVAILABLE", "Selected package is no longer available.", 409);
+        throw new CommercePricingPreviewError("PACKAGE_UNAVAILABLE", "Selected package is no longer available.", 409, "PACKAGE_UNAVAILABLE");
     }
-    return { pkg, price, productCode, packageCode, region, currency };
+    return { product, pkg, price, productCode, packageCode, region, currency };
 }
 
 function publicPreview(quote, catalog) {
@@ -115,6 +126,7 @@ async function resolveCommercePricingPreview(input = {}, context = {}, dependenc
 }
 
 module.exports = Object.freeze({
+    loadCatalogPackage,
     resolveCommercePricingPreview,
     resolveCommercePricingPreviewDetailed,
     CommercePricingPreviewError

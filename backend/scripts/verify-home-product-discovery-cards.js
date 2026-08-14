@@ -2,18 +2,7 @@ const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
 
-const {
-    CANONICAL_PRODUCT_CODES
-} = require("../catalog/canonicalOperationalCatalog");
-
 const ROOT = path.join(__dirname, "../..");
-const MOBILE_GAMES = Object.freeze([
-    "mlbb", "mlbb-twilight-weekly-pass", "pubg", "pubgrp", "freefire", "marvel-rivals", "blood-strike",
-    "blood-strike-pass", "age-of-empires-mobile", "lineage-2m", "overmortal", "magic-chess-go-go",
-    "lifeafter", "hok"
-]);
-const POPULAR_MOBILE_GAMES = Object.freeze(["mlbb", "pubg", "freefire", "hok", "marvel-rivals", "blood-strike"]);
-const SOCIAL_TOPUP = Object.freeze(["telegram", "capcut"]);
 const NON_CANONICAL_CODES = Object.freeze([
     "aovid", "genshin", "valorant", "roblox", "steam-wallet", "google-play", "apple-gift-card", "discord-nitro"
 ]);
@@ -30,17 +19,6 @@ function assertNotIncludes(source, needle, message) {
     assert(!source.includes(needle), message || `Unexpected ${needle}`);
 }
 
-function parseGroup(source, group) {
-    const pattern = new RegExp(`${group}: Object\\.freeze\\(\\[([\\s\\S]*?)\\]\\)`);
-    const match = source.match(pattern);
-    assert(match, `${group} canonical Home group missing.`);
-    return [...match[1].matchAll(/"([^"]+)"/g)].map(item => item[1]);
-}
-
-function assertSame(actual, expected, label) {
-    assert.deepStrictEqual([...actual].sort(), [...expected].sort(), `${label} mismatch.`);
-}
-
 function functionSnippet(source, name) {
     const start = source.indexOf(`function ${name}`);
     assert(start >= 0, `${name} missing.`);
@@ -54,29 +32,26 @@ async function run() {
     const homeRuntime = read("frontend/js/home-placement-runtime.js");
     const css = read("frontend/css/home/marketplace-reference.css");
 
-    assertIncludes(presentation, "CANONICAL_HOME_PRODUCT_GROUPS", "Home product groups must be centralized in catalog presentation.");
-    assertIncludes(presentation, "getCanonicalHomeProductCodes", "Home must expose canonical product group helper.");
-    assertSame(parseGroup(presentation, "mobileGames"), MOBILE_GAMES, "All Mobile Games canonical products");
-    assertSame(parseGroup(presentation, "popularMobileGames"), POPULAR_MOBILE_GAMES, "Popular Mobile Games canonical products");
-    assertSame(parseGroup(presentation, "socialTopUp"), SOCIAL_TOPUP, "Social Top Up canonical products");
-    assertSame([...MOBILE_GAMES, ...SOCIAL_TOPUP], CANONICAL_PRODUCT_CODES, "Home discovery products must be canonical");
+    assertNotIncludes(presentation, "CANONICAL_HOME_PRODUCT_GROUPS", "Presentation metadata must not own Home membership.");
+    assertNotIncludes(presentation, "getCanonicalHomeProductCodes", "Presentation must not expose code-based Home membership.");
 
     assertIncludes(home, 'id="allMobileGames"', "Home must retain All Mobile Games section.");
     assertIncludes(home, 'id="socialTopUp"', "Home must render Social Top Up section.");
     assertNotIncludes(home, "coming-soon.html?product=marvel-rivals", "Static Marvel Rivals card must not route to fallback.");
     assertNotIncludes(home, "coming-soon.html?product=blood-strike", "Static Blood Strike card must not route to fallback.");
 
-    assertIncludes(homeRuntime, 'canonicalHomeCodes("popularMobileGames")', "Popular cards must use canonical Home group source.");
-    assertIncludes(homeRuntime, 'canonicalHomeCodes("mobileGames")', "All Mobile Games must use canonical Home group source.");
-    assertIncludes(homeRuntime, 'canonicalHomeCodes("socialTopUp")', "Social Top Up must use canonical Home group source.");
+    assertIncludes(homeRuntime, "selectPopularProducts", "Popular cards must use projected Admin placement.");
+    assertIncludes(homeRuntime, "selectAllMobileProducts", "All Mobile Games must use public category and Home eligibility.");
+    assertIncludes(homeRuntime, "selectSocialProducts", "Social Top Up must use public category and Home eligibility.");
+    assertNotIncludes(homeRuntime, "canonicalHomeCodes", "Home runtime must not use code allowlists.");
     assertNotIncludes(homeRuntime, "FEATURED_GAME_ORDER", "Home runtime must not own duplicate Popular product list.");
     assertNotIncludes(homeRuntime, "ALL_MOBILE_GAME_ORDER", "Home runtime must not own duplicate All Mobile product list.");
-    assertIncludes(homeRuntime, "resolveCanonicalProductRoute", "Home cards must use canonical route resolver.");
+    assertIncludes(homeRuntime, "resolveProductRoute", "Home cards must consume the backend-projected route with a generic defensive fallback.");
     assertIncludes(homeRuntime, "renderSocialTopUp", "Social Top Up renderer missing.");
-    const approvedProducts = functionSnippet(homeRuntime, "approvedProducts");
-    assertIncludes(approvedProducts, "product?.discoverable === true", "Home discovery must require computed discoverability.");
-    assertIncludes(approvedProducts, 'product.publicState !== "HIDDEN"', "Hidden products must be excluded from Home discovery.");
-    assertNotIncludes(approvedProducts, "presentationRecord", "Presentation fallbacks must not manufacture cards for hidden products.");
+    const popularSelection = functionSnippet(homeRuntime, "selectPopularProducts");
+    assertIncludes(popularSelection, "product?.enabled !== false", "Popular placement must reject disabled products.");
+    assertIncludes(popularSelection, "product.discoverable === true", "Popular placement must require computed discoverability.");
+    assertIncludes(popularSelection, 'product.publicCategory === "mobile"', "Popular placement must remain Mobile-only.");
 
     const allCard = functionSnippet(homeRuntime, "renderAllMobileGame");
     const popularCard = functionSnippet(homeRuntime, "renderPopularGame");
@@ -88,10 +63,7 @@ async function run() {
         assertNotIncludes(snippet, "coming-soon.html", "Canonical Home card renderers must not route to generic fallback.");
     });
 
-    NON_CANONICAL_CODES.forEach(code => {
-        assertNotIncludes(parseGroup(presentation, "mobileGames").join(","), code, `${code} must not appear in Mobile Games.`);
-        assertNotIncludes(parseGroup(presentation, "socialTopUp").join(","), code, `${code} must not appear in Social Top Up.`);
-    });
+    NON_CANONICAL_CODES.forEach(code => assertNotIncludes(homeRuntime, `"${code}"`, `${code} must not be a Home membership rule.`));
 
     assertIncludes(css, ".az-home #allMobileGames .home-mobile-game-tile img", "All Mobile Games artwork selector missing.");
     assertIncludes(css, "object-fit: cover !important;", "Artwork must use full-card cover treatment.");
@@ -122,9 +94,9 @@ async function run() {
     assertIncludes(home, "marketplace-reference.css?v=20260811-rgb-cleanup", "Home must load the current shared Home stylesheet version.");
 
     return {
-        popularMobileGames: POPULAR_MOBILE_GAMES,
-        allMobileGames: MOBILE_GAMES,
-        socialTopUp: SOCIAL_TOPUP,
+        popularMobileGames: "Admin SitePlacement membership and order",
+        allMobileGames: "eligible homepage-enabled publicCategory=mobile products",
+        socialTopUp: "eligible homepage-enabled publicCategory=social products",
         visualTreatment: "artwork-first product discovery cards",
         mobile375Treatment: "2-column compact grid, 12px gutters, 8px gap, 132px cards, 88px media row",
         canonicalRouting: true,

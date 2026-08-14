@@ -190,7 +190,9 @@ function renderCatalogProducts() {
 function renderCatalogProductRow(product) {
     const active = product.productCode === selectedCatalogProductCode ? "active" : "";
     const deleted = product.deleted || product.deletedAt;
-    const statusKey = deleted ? "deleted" : (product.enabled ? "active" : "inactive");
+    const publicState = String(product.publicState || "HIDDEN").toUpperCase();
+    const statusKey = deleted ? "deleted" : (!product.enabled ? "inactive" : publicState === "AVAILABLE" ? "purchasable" : publicState === "COMING_SOON" ? "needs_setup" : "hidden");
+    const statusText = deleted ? "Deleted" : (!product.enabled ? "Disabled" : publicState === "AVAILABLE" ? "Purchasable" : publicState === "COMING_SOON" ? "Needs Setup" : "Hidden");
     const market = marketLabel(product.market, product.displayMarketLabel);
 
     return `
@@ -203,7 +205,7 @@ function renderCatalogProductRow(product) {
                 <small>${escapeHtml(market)}</small>
             </span>
             <span class="catalog-row-meta">
-                <b>${adminT(statusKey, deleted ? "Deleted" : (product.enabled ? "Active" : "Inactive"))}</b>
+                <b>${adminT(statusKey, statusText)}</b>
                 <small>${Number(product.packageCount || 0)} ${adminT("packages", "Packages")}</small>
             </span>
             <span class="catalog-row-edit">${adminT("edit", "Edit")}</span>
@@ -330,8 +332,8 @@ function renderCatalogDetail(product) {
                 <span>${adminT("product", "Product")}</span>
                 <h3>${escapeHtml(product.name)}</h3>
                 <p>
-                    <b class="admin-status-pill ${productDeleted ? "is-danger" : (product.enabled ? "is-ok" : "is-muted")}">
-                        ${adminT(productDeleted ? "deleted" : (product.enabled ? "enabled" : "disabled"), productDeleted ? "Deleted" : (product.enabled ? "Enabled" : "Disabled"))}
+                    <b class="admin-status-pill ${productDeleted ? "is-danger" : (product.publicState === "AVAILABLE" ? "is-ok" : "is-muted")}">
+                        ${escapeHtml(productDeleted ? "Deleted" : (product.publicState === "AVAILABLE" ? "Purchasable" : product.publicState === "COMING_SOON" ? "Needs Setup" : product.enabled ? "Hidden" : "Disabled"))}
                     </b>
                     ${escapeHtml(product.productCode)} · ${escapeHtml(formatRegions(product.supportedRegions))} ·
                     ${Number(product.packageCount || packages.length)} ${adminT("packages", "Packages")}
@@ -588,6 +590,8 @@ function openProductEditor(product) {
     modal.querySelector("#catalogProductDescription").value = product.description || "";
     modal.querySelector("#catalogProductRegionMM").checked = (product.supportedRegions || []).includes("MM");
     modal.querySelector("#catalogProductRegionTH").checked = (product.supportedRegions || []).includes("TH");
+    modal.querySelector("#catalogProductManualMM").checked = (product.fulfillment?.manualAllowedRegions || []).includes("MM");
+    modal.querySelector("#catalogProductManualTH").checked = (product.fulfillment?.manualAllowedRegions || []).includes("TH");
     modal.querySelector("#catalogProductEnabled").checked = product.enabled !== false;
     modal.querySelector("#catalogProductFeatured").checked = product.featured === true;
     modal.querySelector("#catalogProductCategory").value = product.catalogCategory || "";
@@ -714,6 +718,12 @@ function ensureProductEditorModal() {
                         <legend>${adminT("supported_regions", "Supported Regions")}</legend>
                         <label class="catalog-choice-chip"><input id="catalogProductRegionMM" type="checkbox"> Myanmar</label>
                         <label class="catalog-choice-chip"><input id="catalogProductRegionTH" type="checkbox"> Thailand</label>
+                    </fieldset>
+                    <fieldset class="catalog-edit-fieldset catalog-chip-fieldset">
+                        <legend>Manual Fulfillment Regions</legend>
+                        <label class="catalog-choice-chip"><input id="catalogProductManualMM" type="checkbox"> Myanmar</label>
+                        <label class="catalog-choice-chip"><input id="catalogProductManualTH" type="checkbox"> Thailand</label>
+                        <small>Use manual Admin fulfillment where no enabled supplier mapping is configured.</small>
                     </fieldset>
                     <label class="catalog-toggle-row"><span>${adminT("enabled", "Enabled")}</span><input id="catalogProductEnabled" type="checkbox"></label>
                     <label>Catalog category <select id="catalogProductCategory">${catalogCategoryOptions()}</select></label>
@@ -886,6 +896,9 @@ function readProductEditorPayload(product) {
     const supportedRegions = [];
     if (modal.querySelector("#catalogProductRegionMM")?.checked) supportedRegions.push("MM");
     if (modal.querySelector("#catalogProductRegionTH")?.checked) supportedRegions.push("TH");
+    const manualAllowedRegions = [];
+    if (modal.querySelector("#catalogProductManualMM")?.checked) manualAllowedRegions.push("MM");
+    if (modal.querySelector("#catalogProductManualTH")?.checked) manualAllowedRegions.push("TH");
 
     const previewAmount = modal.querySelector("#catalogProductPreviewAmount")?.value?.trim() || "";
     captureKnowledgeLocaleDraft();
@@ -893,6 +906,7 @@ function readProductEditorPayload(product) {
         name: modal.querySelector("#catalogProductName")?.value || "",
         description: modal.querySelector("#catalogProductDescription")?.value || "",
         supportedRegions,
+        manualAllowedRegions,
         enabled: Boolean(modal.querySelector("#catalogProductEnabled")?.checked),
         featured: Boolean(modal.querySelector("#catalogProductFeatured")?.checked),
         catalogCategory: modal.querySelector("#catalogProductCategory")?.value || "",
@@ -903,7 +917,6 @@ function readProductEditorPayload(product) {
         homepageOrder: Number(modal.querySelector("#catalogProductHomeOrder")?.value || 0),
         homepageFlags: [...modal.querySelectorAll("[data-home-flag]:checked")].map(input => input.value),
         homepageSections: [...modal.querySelectorAll("[data-home-section]:checked")].map(input => input.value),
-        productRoute: modal.querySelector("#catalogProductRoute")?.value || "",
         marketScope: modal.querySelector("#catalogProductMarketScope")?.value || "MULTI_REGION",
         displayMarketLabel: modal.querySelector("#catalogProductDisplayMarketLabel")?.value || "",
         previewPrice: previewAmount ? {

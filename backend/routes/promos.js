@@ -20,6 +20,7 @@ function sendPromoError(res, error) {
         return res.status(error.statusCode || 400).json({
             success: false,
             code: error.code,
+            ...(error.availabilityCode ? { availabilityCode: error.availabilityCode } : {}),
             message: error.message
         });
     }

@@ -47,7 +47,8 @@ const {
     resolveAdminCatalogProduct,
     toPublicCatalog
 } = require("../services/catalogService");
-const { CANONICAL_OPERATIONAL_PRODUCTS, getCanonicalProduct } = require("../catalog/canonicalOperationalCatalog");
+const { CANONICAL_OPERATIONAL_PRODUCTS, getCanonicalProduct, resolveCanonicalProductRoute } = require("../catalog/canonicalOperationalCatalog");
+const { availabilityReason } = require("../catalog/publicProductReadiness");
 const {
     AdminPricingControlCenterError,
     bulkBackfillSupplierCosts,
@@ -102,7 +103,7 @@ function projectAdminCatalogMetadata(product = {}) {
         market: canonical.market || "",
         adminCategory: canonical.adminCategory || "",
         family: canonical.family || "",
-        canonicalRoute: canonical.productRoute || product.productRoute || ""
+        canonicalRoute: resolveCanonicalProductRoute(product.productCode)
     };
 }
 
@@ -112,6 +113,7 @@ function projectAdminCatalogListProduct(product = {}) {
         name: product.name,
         enabled: product.enabled,
         supportedRegions: product.supportedRegions,
+        fulfillment: product.fulfillment || { manualAllowedRegions: [] },
         packageCount: product.packageCount,
         sortOrder: product.sortOrder,
         imageUrl: product.imageUrl || "",
@@ -166,7 +168,9 @@ router.get("/catalog", async (req, res) => {
 
         return res.status(500).json({
             success: false,
-            message: "Catalog data unavailable"
+            code: "CATALOG_UNAVAILABLE",
+            availabilityCode: "CATALOG_UNAVAILABLE",
+            message: availabilityReason("CATALOG_UNAVAILABLE")
         });
     }
 });
@@ -240,15 +244,27 @@ router.get("/public/storefront-sections/:key", async (req, res) => {
 
 router.get("/catalog/:productCode", async (req, res) => {
     try {
-        const product = await getCatalogProductDetail(req.params.productCode, { includeDisabled: false });
+        const product = await getCatalogProductDetail(req.params.productCode, { includeDisabled: true });
 
         res.set("Cache-Control", "no-store");
         if (!product) {
             return res.status(404).json({
                 success: false,
-                code: "ADMIN_CATALOG_PRODUCT_NOT_FOUND",
+                code: "PRODUCT_HIDDEN",
+                availabilityCode: "PRODUCT_HIDDEN",
                 productCode: String(req.params.productCode || ""),
-                message: `Product not found: ${String(req.params.productCode || "")}`
+                message: availabilityReason("PRODUCT_HIDDEN")
+            });
+        }
+
+        if (!product.discoverable) {
+            return res.status(409).json({
+                success: false,
+                code: product.availabilityCode || "PRODUCT_HIDDEN",
+                availabilityCode: product.availabilityCode || "PRODUCT_HIDDEN",
+                productCode: product.productCode,
+                publicState: product.publicState,
+                message: product.availabilityReason || availabilityReason(product.availabilityCode)
             });
         }
 
@@ -262,7 +278,9 @@ router.get("/catalog/:productCode", async (req, res) => {
 
         return res.status(500).json({
             success: false,
-            message: "Catalog data unavailable"
+            code: "CATALOG_UNAVAILABLE",
+            availabilityCode: "CATALOG_UNAVAILABLE",
+            message: availabilityReason("CATALOG_UNAVAILABLE")
         });
     }
 });

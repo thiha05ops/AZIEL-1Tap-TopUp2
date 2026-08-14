@@ -45,9 +45,33 @@ function getCanonicalProduct(productCode = "") {
     return CANONICAL_PRODUCT_MAP.get(String(productCode || "").trim().toLowerCase()) || null;
 }
 
-function resolveCanonicalProductRoute(productCode = "", fallbackRoute = "") {
-    const route = getCanonicalProduct(productCode)?.productRoute || "";
-    return route || String(fallbackRoute || "").trim();
+function normalizeRouteProductCode(productCode = "") {
+    const code = String(productCode || "").trim().toLowerCase();
+    return /^[a-z0-9][a-z0-9-]{0,79}$/.test(code) ? code : "";
+}
+
+function isSafeStorefrontProductRoute(route = "") {
+    const value = String(route || "").trim();
+    if (!value || value.startsWith("/") || value.startsWith("\\") || /[\u0000-\u001f\u007f]/.test(value)) return false;
+    if (/^[a-z][a-z0-9+.-]*:/i.test(value) || value.startsWith("//")) return false;
+    try {
+        const parsed = new URL(value, "https://aziel.invalid/");
+        return parsed.origin === "https://aziel.invalid" && !parsed.username && !parsed.password;
+    } catch (_error) {
+        return false;
+    }
+}
+
+function genericProductRoute(productCode = "") {
+    const code = normalizeRouteProductCode(productCode);
+    return code ? `product.html?product=${encodeURIComponent(code)}` : "";
+}
+
+function resolveCanonicalProductRoute(productCode = "") {
+    const canonicalRoute = getCanonicalProduct(productCode)?.productRoute || "";
+    return isSafeStorefrontProductRoute(canonicalRoute)
+        ? canonicalRoute
+        : genericProductRoute(productCode);
 }
 
 module.exports = Object.freeze({
@@ -57,5 +81,7 @@ module.exports = Object.freeze({
     CANONICAL_PRODUCT_MAP,
     getCanonicalProduct,
     isCanonicalProductCode,
+    isSafeStorefrontProductRoute,
+    genericProductRoute,
     resolveCanonicalProductRoute
 });

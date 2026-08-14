@@ -19,6 +19,7 @@ const PUBLIC_HTML_ALLOWLIST = new Set([
     "/",
     "/home.html",
     "/mobile-games.html",
+    "/all-games.html",
     "/pc-games.html",
     "/gift-cards.html",
     "/social-topup.html",

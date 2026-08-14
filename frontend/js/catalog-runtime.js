@@ -7,6 +7,17 @@
         MM: "MMK",
         TH: "THB"
     };
+    const AVAILABILITY_MESSAGES = Object.freeze({
+        AVAILABLE: "Available.",
+        COMING_SOON: "Coming soon.",
+        PRODUCT_HIDDEN: "This product is currently unavailable.",
+        PRODUCT_DISABLED: "This product is currently unavailable.",
+        REGION_UNAVAILABLE: "This product is not available in your region.",
+        PACKAGE_UNAVAILABLE: "This package is currently unavailable.",
+        SETUP_INCOMPLETE: "This product is currently unavailable.",
+        PRICING_UNAVAILABLE: "Prices are temporarily unavailable. Please try again shortly.",
+        CATALOG_UNAVAILABLE: "Catalog is temporarily unavailable. Please try again shortly."
+    });
 
     let catalog = null;
     let productIndex = new Map();
@@ -148,7 +159,7 @@
             .filter(product => product.enabled !== false)
             .map(product => presentation?.buildDisplayProduct?.(product) || product)
             .filter(Boolean)
-            .filter(product => !category || product.category === category);
+            .filter(product => !category || product.publicCategory === category);
     }
 
     function getProduct(productCode) {
@@ -160,7 +171,7 @@
         const product = getProduct(productCode);
         const presentation = window.AZIEL_CATALOG_PRESENTATION;
 
-        if (!product || product.enabled === false) return [];
+        if (!product || product.enabled === false || product.supportedRegions?.includes(normalizedRegion) === false) return [];
 
         return (product.packages || [])
             .map(item => projectPackage(product, item, normalizedRegion, presentation))
@@ -277,6 +288,28 @@
         );
     }
 
+    function getAvailability(productCode, region = "MM") {
+        if (!isReady()) return { code: "CATALOG_UNAVAILABLE", message: availabilityMessage("CATALOG_UNAVAILABLE") };
+        const product = getProduct(productCode);
+        if (!product) return { code: "PRODUCT_HIDDEN", message: availabilityMessage("PRODUCT_HIDDEN") };
+        const normalizedRegion = normalizeRegion(region);
+        const regional = product.publicReadiness?.regions?.[normalizedRegion];
+        const useRegionalAvailability = product.availabilityCode === "AVAILABLE";
+        const code = useRegionalAvailability && regional?.availabilityCode
+            ? regional.availabilityCode
+            : (product.availabilityCode || product.publicReadiness?.availabilityCode || "SETUP_INCOMPLETE");
+        return {
+            code,
+            message: (useRegionalAvailability ? regional?.availabilityReason : product.availabilityReason) || availabilityMessage(code),
+            product,
+            region: normalizedRegion
+        };
+    }
+
+    function availabilityMessage(code) {
+        return AVAILABILITY_MESSAGES[String(code || "").toUpperCase()] || AVAILABILITY_MESSAGES.SETUP_INCOMPLETE;
+    }
+
     function overlayGamePrices(productCode, fallbackPackages = []) {
         const product = getProduct(productCode);
 
@@ -350,6 +383,8 @@
         getProduct,
         getPackages,
         getPackage,
+        getAvailability,
+        availabilityMessage,
         overlayGamePrices,
         isReady,
         isFresh,
@@ -366,6 +401,8 @@
         ensureFreshForPurchase,
         getPackage,
         getProduct,
+        getAvailability,
+        availabilityMessage,
         overlayGamePrices,
         isFresh,
         getLastError: () => lastError,

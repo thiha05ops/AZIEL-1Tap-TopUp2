@@ -20,4 +20,29 @@ const HOMEPAGE_SECTIONS = Object.freeze([
 const CATALOG_LIFECYCLE = Object.freeze(["ACTIVE", "COMING_SOON"]);
 const COMMERCE_STATES = Object.freeze(["PURCHASABLE", "COMING_SOON", "TEMPORARILY_UNAVAILABLE", "HIDDEN"]);
 
-module.exports = { CATALOG_CATEGORIES, HOMEPAGE_FLAGS, HOMEPAGE_SECTIONS, CATALOG_LIFECYCLE, COMMERCE_STATES };
+const PUBLIC_CATEGORY_BY_CATALOG_CATEGORY = Object.freeze({
+    MOBILE_GAME_TOPUP: "mobile",
+    PC_GAME: "pc",
+    GIFT_CARD: "gift-card",
+    DIGITAL_SERVICE: "social",
+    MOBILE_RECHARGE: "mobile-recharge",
+    ENTERTAINMENT: "entertainment"
+});
+const PUBLIC_CATEGORY_KEYS = Object.freeze([...new Set(Object.values(PUBLIC_CATEGORY_BY_CATALOG_CATEGORY))]);
+const PUBLIC_GAME_CATEGORY_KEYS = Object.freeze(["mobile", "pc"]);
+
+function publicCategoryFor(catalogCategory = "") {
+    return PUBLIC_CATEGORY_BY_CATALOG_CATEGORY[String(catalogCategory || "").trim().toUpperCase()] || "";
+}
+
+module.exports = {
+    CATALOG_CATEGORIES,
+    HOMEPAGE_FLAGS,
+    HOMEPAGE_SECTIONS,
+    CATALOG_LIFECYCLE,
+    COMMERCE_STATES,
+    PUBLIC_CATEGORY_BY_CATALOG_CATEGORY,
+    PUBLIC_CATEGORY_KEYS,
+    PUBLIC_GAME_CATEGORY_KEYS,
+    publicCategoryFor
+};

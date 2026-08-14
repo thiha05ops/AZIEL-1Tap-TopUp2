@@ -20,10 +20,6 @@
         return translated && translated !== key ? translated : fallback;
     }
 
-    function normalizeCategory(value = "") {
-        return String(value || "").trim().toLowerCase().replaceAll("_", "-");
-    }
-
     function catalogProducts() {
         return (window.AZIEL_CATALOG?.getProducts?.() || [])
             .map(product => window.AZIEL_CATALOG_PRESENTATION?.buildDisplayProduct?.(product))
@@ -50,7 +46,7 @@
     function giftCardProducts(products) {
         return products.filter(product => {
             const code = String(product.productCode || "").trim().toLowerCase();
-            const category = normalizeCategory(product.category);
+            const category = product.publicCategory;
             return code !== "telegram" && (category === "gift-card" || category === "digital-card");
         }).slice(0, MAX_ITEMS);
     }
@@ -60,13 +56,12 @@
     }
 
     function pcGameProducts(products) {
-        return products.filter(product => normalizeCategory(product.category) === "pc-game").slice(0, MAX_ITEMS);
+        return products.filter(product => product.publicCategory === "pc").slice(0, MAX_ITEMS);
     }
 
     function digitalServiceProducts(products) {
         return products.filter(product => {
-            const category = normalizeCategory(product.category);
-            return category === "digital-service" || category === "digital-services" || category === "service";
+            return product.publicCategory === "social";
         }).slice(0, MAX_ITEMS);
     }
 
@@ -154,10 +149,7 @@
             : sourceArtwork;
         const fallback = categoryArtwork;
         const fallbackAttribute = fallback ? ` data-fallback-src="${escapeAttr(fallback)}"` : "";
-        const target = window.AZIEL_CATALOG_PRESENTATION?.resolveCanonicalProductRoute?.(product.productCode, product.route) ||
-            (product.purchasable === true
-                ? product.route
-                : `coming-soon.html?product=${encodeURIComponent(String(product.productCode || ""))}`);
+        const target = window.AZIEL_CATALOG_PRESENTATION?.resolveProductRoute?.(product.productRoute || product.route, product.productCode) || "";
         const state = String(product.commerceState || "HIDDEN").toLowerCase().replaceAll("_", "-");
         const priceText = product.priceText || productPriceText(product);
         return `
