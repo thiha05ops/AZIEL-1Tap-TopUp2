@@ -255,7 +255,7 @@ async function acquireDelivery({ deliveryKey, messageType, orderId, recipient })
                 }
             },
             {
-                new: true,
+                returnDocument: "after",
                 upsert: true
             }
         );

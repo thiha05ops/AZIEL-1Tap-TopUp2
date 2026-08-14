@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AZIEL OS · Secure Entry</title>
+    <script>
+        (() => {
+            let adminToken = "";
+            try {
+                adminToken = localStorage.getItem("adminToken") || "";
+            } catch (_) {
+                adminToken = "";
+            }
+
+            const destination = adminToken
+                ? `/admin.html?shell=1${window.location.hash || ""}`
+                : "/admin-login.html";
+            window.location.replace(destination);
+        })();
+    </script>
+</head>
+<body></body>
+</html>

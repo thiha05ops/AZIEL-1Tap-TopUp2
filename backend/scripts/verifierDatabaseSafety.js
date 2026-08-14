@@ -1,7 +1,8 @@
 "use strict";
 
-const SAFE_DATABASE_NAME = /(?:test|local|dev|verifier|sandbox)/i;
+const SAFE_DATABASE_NAME = /(?:test|e2e|local|dev|verifier|sandbox)/i;
 const REQUIRED_MUTATION_FLAG = "AZIEL_ALLOW_MUTATING_VERIFIER";
+const VERIFIER_MONGO_URI_ENV = "AZIEL_VERIFIER_MONGO_URI";
 
 function extractDatabaseName(mongoUri = "") {
     const uri = String(mongoUri || "").trim();
@@ -18,7 +19,8 @@ function extractDatabaseName(mongoUri = "") {
 }
 
 function assertSafeMutatingVerifierDatabase(label = "mutating verifier") {
-    const databaseName = extractDatabaseName(process.env.MONGO_URI);
+    const mongoUri = String(process.env[VERIFIER_MONGO_URI_ENV] || "").trim();
+    const databaseName = extractDatabaseName(mongoUri);
     const explicitOptIn = process.env[REQUIRED_MUTATION_FLAG] === "true";
     const hostedEnvironment = Boolean(
         process.env.RENDER ||
@@ -37,14 +39,19 @@ function assertSafeMutatingVerifierDatabase(label = "mutating verifier") {
         throw new Error(`${label} refused: set ${REQUIRED_MUTATION_FLAG}=true for an explicit test-database run.`);
     }
 
-    if (!databaseName || !SAFE_DATABASE_NAME.test(databaseName)) {
-        throw new Error(`${label} refused: database name must clearly be test/local/dev/verifier/sandbox.`);
+    if (!mongoUri) {
+        throw new Error(`${label} refused: ${VERIFIER_MONGO_URI_ENV} is required; normal MONGO_URI fallback is forbidden.`);
     }
 
-    return { databaseName };
+    if (!databaseName || databaseName.toLowerCase() === "azielshop" || !SAFE_DATABASE_NAME.test(databaseName)) {
+        throw new Error(`${label} refused: database name must clearly be test/e2e/local/dev/verifier/sandbox.`);
+    }
+
+    return { databaseName, mongoUri };
 }
 
 module.exports = {
     assertSafeMutatingVerifierDatabase,
-    extractDatabaseName
+    extractDatabaseName,
+    VERIFIER_MONGO_URI_ENV
 };

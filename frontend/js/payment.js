@@ -32,15 +32,17 @@ async function loadPaymentMethods() {
     }
 
     try {
-        const API_BASE = location.port === "5500" ? `${location.protocol}//${location.hostname === "127.0.0.1" ? "127.0.0.1" : "localhost"}:3000` : "";
-        const res = await fetch(`${API_BASE}/api/payment-methods?region=${region}`);
-        const data = await res.json();
-
-        if (!res.ok || !data.success) {
-            throw new Error(data.message || "Failed to load payment methods");
+        const sharedLoader = window.AZIEL_PAYMENT_TRUST?.fetchPublicPaymentMethods;
+        let rawMethods;
+        if (typeof sharedLoader === "function") {
+            rawMethods = await sharedLoader(region);
+        } else {
+            const API_BASE = location.port === "5500" ? `${location.protocol}//${location.hostname === "127.0.0.1" ? "127.0.0.1" : "localhost"}:3000` : "";
+            const res = await fetch(`${API_BASE}/api/payment-methods?region=${region}`);
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.message || "Failed to load payment methods");
+            rawMethods = Array.isArray(data.methods) ? data.methods : [];
         }
-
-        const rawMethods = Array.isArray(data.methods) ? data.methods : [];
         let methods = rawMethods;
         methods = uniquePaymentMethodsByKey(methods)
             .filter(method => method.enabled === true)

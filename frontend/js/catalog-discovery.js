@@ -2,6 +2,8 @@
 // Renders active customer discovery cards from the public catalog store.
 
 (function () {
+    let renderInFlight = null;
+
     function onReady(callback) {
         if (document.readyState === "loading") {
             document.addEventListener("DOMContentLoaded", callback);
@@ -61,7 +63,7 @@
         const fallback = product.fallbackImage || window.AZIEL_CATALOG_PRESENTATION?.getProductImage?.(product.productCode) || "";
         return `
             <a href="${escapeHtml(product.route)}" class="popular-game-card" data-product-code="${escapeHtml(product.productCode)}" data-name="${escapeHtml(product.name)}">
-                <img src="${escapeHtml(product.image)}" alt="${escapeHtml(product.name)}"${window.AZIEL_CATALOG_PRESENTATION?.imageFallbackAttributes?.(fallback) || ""}>
+                <img src="${escapeHtml(product.image)}" alt="${escapeHtml(product.name)}" loading="lazy" decoding="async"${window.AZIEL_CATALOG_PRESENTATION?.imageFallbackAttributes?.(fallback) || ""}>
                 <h3>${escapeHtml(product.name)}</h3>
                 <p>${escapeHtml(product.description || "Top Up")}</p>
             </a>
@@ -72,7 +74,7 @@
         const fallback = product.fallbackImage || window.AZIEL_CATALOG_PRESENTATION?.getProductImage?.(product.productCode) || "";
         return `
             <a href="${escapeHtml(product.route)}" data-product-code="${escapeHtml(product.productCode)}">
-                <img src="${escapeHtml(product.image)}" alt="${escapeHtml(product.name)}"${window.AZIEL_CATALOG_PRESENTATION?.imageFallbackAttributes?.(fallback) || ""}>
+                <img src="${escapeHtml(product.image)}" alt="${escapeHtml(product.name)}" loading="lazy" decoding="async"${window.AZIEL_CATALOG_PRESENTATION?.imageFallbackAttributes?.(fallback) || ""}>
                 <span>${escapeHtml(product.name)}</span>
             </a>
         `;
@@ -82,7 +84,7 @@
         const fallback = product.fallbackImage || window.AZIEL_CATALOG_PRESENTATION?.getProductImage?.(product.productCode) || "";
         return `
             <a href="${escapeHtml(product.route)}" class="az-featured-card ${escapeHtml(product.theme || "")}" data-product-code="${escapeHtml(product.productCode)}">
-                <img src="${escapeHtml(normalizeImageSrc(product.image))}" alt="${escapeHtml(product.name)}"${window.AZIEL_CATALOG_PRESENTATION?.imageFallbackAttributes?.(normalizeImageSrc(fallback)) || ""}>
+                <img src="${escapeHtml(normalizeImageSrc(product.image))}" alt="${escapeHtml(product.name)}" loading="lazy" decoding="async"${window.AZIEL_CATALOG_PRESENTATION?.imageFallbackAttributes?.(normalizeImageSrc(fallback)) || ""}>
                 <div>
                     <h3>${escapeHtml(product.name)}</h3>
                     <p>${escapeHtml(product.description || "Top Up")}</p>
@@ -95,7 +97,7 @@
         const fallback = product.fallbackImage || window.AZIEL_CATALOG_PRESENTATION?.getProductImage?.(product.productCode) || "";
         return `
             <a href="${escapeHtml(product.route)}" class="az-poster-card" data-product-code="${escapeHtml(product.productCode)}">
-                <img src="${escapeHtml(normalizeImageSrc(product.image))}" alt="${escapeHtml(product.name)}"${window.AZIEL_CATALOG_PRESENTATION?.imageFallbackAttributes?.(normalizeImageSrc(fallback)) || ""}>
+                <img src="${escapeHtml(normalizeImageSrc(product.image))}" alt="${escapeHtml(product.name)}" loading="lazy" decoding="async"${window.AZIEL_CATALOG_PRESENTATION?.imageFallbackAttributes?.(normalizeImageSrc(fallback)) || ""}>
                 <h3>${escapeHtml(product.name)}</h3>
                 <p>${escapeHtml(product.description || "Top Up")}</p>
             </a>
@@ -106,7 +108,7 @@
         const fallback = product.fallbackImage || window.AZIEL_CATALOG_PRESENTATION?.getProductImage?.(product.productCode) || "";
         return `
             <a href="${escapeHtml(product.route)}" class="home-game-card" data-product-code="${escapeHtml(product.productCode)}">
-                <img src="${escapeHtml(normalizeImageSrc(product.image))}" alt="${escapeHtml(product.name)}"${window.AZIEL_CATALOG_PRESENTATION?.imageFallbackAttributes?.(normalizeImageSrc(fallback)) || ""}>
+                <img src="${escapeHtml(normalizeImageSrc(product.image))}" alt="${escapeHtml(product.name)}" loading="lazy" decoding="async"${window.AZIEL_CATALOG_PRESENTATION?.imageFallbackAttributes?.(normalizeImageSrc(fallback)) || ""}>
                 <div>
                     <h3>${escapeHtml(product.name)}</h3>
                     <p>${escapeHtml(product.description || "Top Up")}</p>
@@ -206,13 +208,22 @@
         window.AZIEL_CATALOG_PRESENTATION?.bindImageFallbacks?.();
     }
 
-    onReady(renderDiscovery);
+    function scheduleDiscoveryRender() {
+        if (renderInFlight) return renderInFlight;
+        renderInFlight = renderDiscovery().finally(() => {
+            renderInFlight = null;
+        });
+        return renderInFlight;
+    }
+
+    onReady(scheduleDiscoveryRender);
     document.addEventListener("aziel:catalog-updated", event => {
-        if (event.detail?.status === "ready") renderDiscovery();
+        if (event.detail?.status === "ready") scheduleDiscoveryRender();
     });
 
     window.AZIEL_CATALOG_DISCOVERY = {
         renderDiscovery,
+        scheduleDiscoveryRender,
         activeProducts,
         catalogFailureMarkup,
         emptyCategoryMarkup

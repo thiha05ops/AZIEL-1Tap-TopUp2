@@ -152,7 +152,7 @@ async function setup() {
             supportedRegions: ["TH"], source: "seeded", fulfillment: { manualAllowedRegions: ["TH"] },
             metadata: { azielE2E: true, scope: cfg.scope }
         } },
-        { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true }
+        { upsert: true, returnDocument: "after", setDefaultsOnInsert: true, runValidators: true }
     );
     if (product.metadata?.azielE2E !== true || product.metadata?.scope !== cfg.scope) throw new Error("Catalog product is not owned by this E2E scope.");
 
@@ -167,7 +167,7 @@ async function setup() {
             } },
             source: "seeded", sortOrder: 1, metadata: { azielE2E: true, scope: cfg.scope, gameName: "Mobile Legends E2E" }
         } },
-        { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true }
+        { upsert: true, returnDocument: "after", setDefaultsOnInsert: true, runValidators: true }
     );
     if (pkg.metadata?.azielE2E !== true || pkg.metadata?.scope !== cfg.scope) throw new Error("Catalog package is not owned by this E2E scope.");
 
@@ -184,7 +184,7 @@ async function setup() {
             logoUrl: "/assets/payment/promptpay.png", shortDescription: `Isolated E2E PromptPay fixture (${cfg.scope})`,
             badgeText: "E2E", availabilityMode: "MANUAL_ONLY"
         } },
-        { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true }
+        { upsert: true, returnDocument: "after", setDefaultsOnInsert: true, runValidators: true }
     );
     if (promptPay.providerEnvironment !== "TEST" || !String(promptPay.shortDescription).includes(`(${cfg.scope})`)) {
         throw new Error("PromptPay method is not owned by this E2E scope.");

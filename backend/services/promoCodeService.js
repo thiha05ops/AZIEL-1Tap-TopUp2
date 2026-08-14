@@ -493,7 +493,7 @@ async function reservePromoUse({ pricing, user, orderId = "", manualPaymentAttem
     const state = await PromoUsageState.findOneAndUpdate(
         filter,
         { $inc: { reservedCount: 1 } },
-        { new: true }
+        { returnDocument: "after" }
     );
 
     if (!state) {
@@ -534,7 +534,7 @@ async function consumePromoRedemption(redemptionId, orderId = "") {
                 orderId: orderId || undefined
             }
         },
-        { new: true }
+        { returnDocument: "after" }
     );
 
     if (!redemption) return null;
@@ -556,7 +556,7 @@ async function releasePromoRedemption(redemptionId) {
                 releasedAt: new Date()
             }
         },
-        { new: true }
+        { returnDocument: "after" }
     );
 
     if (!redemption) return null;

@@ -206,7 +206,7 @@ async function mutateWalletWithinSession(input, session) {
     const user = await User.findOneAndUpdate(
         query,
         { $inc: { [path]: inc } },
-        { new: true, session }
+        { returnDocument: "after", session }
     );
 
     if (!user) {
@@ -246,7 +246,7 @@ async function mutateWalletWithoutTransaction(input) {
     const user = await User.findOneAndUpdate(
         query,
         { $inc: { [path]: inc } },
-        { new: true }
+        { returnDocument: "after" }
     );
 
     if (!user) {

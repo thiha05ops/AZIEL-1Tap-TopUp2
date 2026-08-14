@@ -286,7 +286,7 @@ async function updateAdminPlacement(placementCodeInput, payload = {}, actor = "a
         },
         {
             upsert: true,
-            new: true,
+            returnDocument: "after",
             runValidators: true
         }
     ).lean();
@@ -333,7 +333,26 @@ function projectPublicPlacement(placementCode, doc = null, items = []) {
     };
 }
 
-async function resolveProductPlacement(placementCode, doc) {
+function projectPublicPlacementProduct(product = {}) {
+    return {
+        itemType: "product",
+        productCode: product.productCode,
+        name: product.name,
+        enabled: product.enabled !== false,
+        featured: product.featured === true,
+        publicCategory: product.publicCategory || "",
+        commerceState: product.commerceState || "HIDDEN",
+        productRoute: product.productRoute || "",
+        imageUrl: product.imageUrl || "",
+        imageAltText: product.imageAltText || "",
+        publicState: product.publicState || "HIDDEN",
+        purchasable: product.purchasable === true,
+        discoverable: product.discoverable === true,
+        availabilityCode: product.availabilityCode || "SETUP_INCOMPLETE"
+    };
+}
+
+async function resolveProductPlacement(placementCode, doc, publicCatalog = null) {
     if (!doc?.managed) {
         return projectPublicPlacement(placementCode, doc, []);
     }
@@ -343,17 +362,14 @@ async function resolveProductPlacement(placementCode, doc) {
         return projectPublicPlacement(placementCode, doc, []);
     }
 
-    const products = await toPublicCatalog({
-        source: "database",
-        includeDisabled: false
-    });
+    const products = publicCatalog || await toPublicCatalog({ source: "database", includeDisabled: false });
     const byCode = new Map(products.map(product => [product.productCode, product]));
 
     const items = selectedCodes
         .map(productCode => byCode.get(productCode))
         .filter(Boolean)
         .filter(product => placementCode !== "HOME_POPULAR_GAMES" || product.publicCategory === "mobile")
-        .map(product => ({ ...product, itemType: "product" }));
+        .map(projectPublicPlacementProduct);
 
     return projectPublicPlacement(placementCode, doc, items);
 }
@@ -399,12 +415,18 @@ async function resolveHomePlacements(options = {}) {
     }).lean();
     const byCode = new Map(docs.map(doc => [doc.placementCode, doc]));
     const placements = {};
+    const needsProductCatalog = Object.entries(SUPPORTED_PLACEMENTS).some(([placementCode, definition]) => (
+        definition.itemType === "product" && byCode.get(placementCode)?.managed === true
+    ));
+    const publicCatalog = needsProductCatalog
+        ? await toPublicCatalog({ source: "database", includeDisabled: false })
+        : [];
 
     for (const placementCode of Object.keys(SUPPORTED_PLACEMENTS)) {
         const definition = SUPPORTED_PLACEMENTS[placementCode];
         const doc = byCode.get(placementCode) || null;
         placements[placementCode] = definition.itemType === "product"
-            ? await resolveProductPlacement(placementCode, doc)
+            ? await resolveProductPlacement(placementCode, doc, publicCatalog)
             : await resolvePromoPlacement(placementCode, doc, region);
     }
 
@@ -420,6 +442,7 @@ module.exports = {
     getAdminPlacement,
     listAdminPlacements,
     normalizePlacementCode,
+    projectPublicPlacementProduct,
     resolveHomePlacements,
     updateAdminPlacement
 };

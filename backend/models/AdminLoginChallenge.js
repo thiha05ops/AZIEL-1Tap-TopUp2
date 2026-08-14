@@ -33,7 +33,6 @@ const adminLoginChallengeSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
-adminLoginChallengeSchema.index({ challengeId: 1 }, { unique: true });
 adminLoginChallengeSchema.index({ adminId: 1, consumedAt: 1, expiresAt: 1 });
 adminLoginChallengeSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 

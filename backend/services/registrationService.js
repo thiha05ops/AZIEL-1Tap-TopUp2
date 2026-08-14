@@ -200,7 +200,7 @@ async function beginRegistration(input, options = {}) {
             { email: normalized.email },
             { $set: challengeData },
             {
-                new: true,
+                returnDocument: "after",
                 upsert: true,
                 setDefaultsOnInsert: true
             }
@@ -304,7 +304,7 @@ async function verifyRegistrationOtp(input, options = {}) {
             otpAttempts: { $lt: REGISTER_OTP_MAX_ATTEMPTS }
         },
         { $set: { consumedAt: now } },
-        { new: true }
+        { returnDocument: "after" }
     );
 
     if (!consumed) {

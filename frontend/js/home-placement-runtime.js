@@ -37,6 +37,8 @@
     });
 
     let refreshSequence = 0;
+    let refreshInFlight = null;
+    let regionRefreshQueued = false;
     let lastSelection = { groups: [], placements: {}, fallbackProducts: [] };
 
     function ready(fn) {
@@ -80,11 +82,26 @@
         lastSelection = selection;
         window.AZIEL_HOME_SELECTION = Object.freeze({
             getSnapshot: () => JSON.parse(JSON.stringify(lastSelection)),
-            refresh: refreshHomeCatalog
+            refresh: scheduleHomeRefresh
         });
         document.dispatchEvent(new CustomEvent("aziel:home-groups-updated", {
             detail: JSON.parse(JSON.stringify(selection))
         }));
+    }
+
+    function scheduleHomeRefresh(options = {}) {
+        if (refreshInFlight) {
+            if (options.regionChanged) regionRefreshQueued = true;
+            return refreshInFlight;
+        }
+        refreshInFlight = refreshHomeCatalog().finally(() => {
+            refreshInFlight = null;
+            if (regionRefreshQueued) {
+                regionRefreshQueued = false;
+                scheduleHomeRefresh();
+            }
+        });
+        return refreshInFlight;
     }
 
     async function loadPlacements() {
@@ -203,7 +220,8 @@
     }
 
     function displayProduct(product = {}) {
-        return window.AZIEL_CATALOG_PRESENTATION?.buildDisplayProduct?.(product) || null;
+        const canonical = window.AZIEL_CATALOG?.getProduct?.(codeOf(product)) || product;
+        return window.AZIEL_CATALOG_PRESENTATION?.buildDisplayProduct?.(canonical) || null;
     }
 
     function selectPopularProducts(placement = {}) {
@@ -302,7 +320,7 @@
     function renderProductArtwork(product, artwork, groupId, variant = "tile") {
         const code = codeOf(product);
         if (!isGenericArtwork(artwork)) {
-            return `<img src="${escapeAttr(artwork)}" alt="${escapeAttr(product.imageAltText || product.name)}">`;
+            return `<img src="${escapeAttr(artwork)}" alt="${escapeAttr(product.imageAltText || product.name)}" loading="lazy" decoding="async">`;
         }
         const wordmark = WORDMARK_LABELS[code] || String(product.name || code).toUpperCase();
         return `
@@ -417,10 +435,10 @@
     });
 
     ready(() => {
-        refreshHomeCatalog();
-        window.addEventListener("aziel:shopRegionChanged", refreshHomeCatalog);
+        scheduleHomeRefresh();
+        window.addEventListener("aziel:shopRegionChanged", () => scheduleHomeRefresh({ regionChanged: true }));
         document.addEventListener("aziel:catalog-updated", event => {
-            if (event.detail?.status === "ready") refreshHomeCatalog();
+            if (event.detail?.status === "ready") scheduleHomeRefresh();
         });
     });
 })();

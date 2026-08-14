@@ -41,7 +41,7 @@ async function ensurePaidOrderFulfillmentWork(order = {}, options = {}) {
     if (!capability.manualAdminAllowed) return { created: false, reason: "MANUAL_ADMIN_NOT_ALLOWED", attempt: null, capability };
 
     const idempotencyKey = manualAdminIdempotencyKey(identity.orderCode);
-    const queryOptions = { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true };
+    const queryOptions = { upsert: true, returnDocument: "after", setDefaultsOnInsert: true, runValidators: true };
     if (options.session) queryOptions.session = options.session;
     const attemptModel = options.attemptModel || FulfillmentAttempt;
     const commerceOrderModel = options.commerceOrderModel || CommerceOrder;

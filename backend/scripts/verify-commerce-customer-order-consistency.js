@@ -60,7 +60,7 @@ function main() {
     assert(routes.includes('recoverable: normalizedOrderStatus === "pending_payment"'), "Customer DTO must expose canonical recoverability.");
     assert(recovery.includes('RECOVERABLE_ORDER_STATUSES') && recovery.includes('new Set(["pending_payment"])'), "Recovery must include only pending-payment orders.");
     assert(recovery.includes('RECOVERABLE_ORDER_PAYMENT_STATUSES') && recovery.includes('new Set(["pending", "unpaid"])'), "Paid/completed orders must be excluded from recovery.");
-    assert(tracking.includes('|| "me"') && tracking.includes("getTrackingAuthHeaders().Authorization"), "Recent Orders must be token-owned rather than blocked by a missing cached username.");
+    assert(tracking.includes('trackingApiUrl("/api/order/user/me")') && tracking.includes("getTrackingAuthHeaders().Authorization"), "Recent Orders must be token-owned rather than blocked by profile or cached username bootstrap.");
     assert(tracking.includes('orderStatus === "pending"') && tracking.includes('order.receiptSubmitted === true'), "Stale receipt evidence must not override a completed customer order.");
     assert(routes.includes('"owner.userId": String(req.user?._id'), "Commerce visibility must remain owner-isolated.");
 

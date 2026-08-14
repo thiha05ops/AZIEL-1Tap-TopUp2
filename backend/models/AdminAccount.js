@@ -70,7 +70,6 @@ const adminAccountSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
-adminAccountSchema.index({ usernameNormalized: 1 }, { unique: true });
 adminAccountSchema.index({ role: 1, status: 1 });
 
 module.exports = mongoose.model("AdminAccount", adminAccountSchema);

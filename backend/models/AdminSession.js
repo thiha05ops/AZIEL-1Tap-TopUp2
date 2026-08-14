@@ -53,7 +53,6 @@ const adminSessionSchema = new mongoose.Schema(
     }
 );
 
-adminSessionSchema.index({ sessionId: 1 }, { unique: true });
 adminSessionSchema.index({ adminId: 1, revokedAt: 1, expiresAt: 1 });
 adminSessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 

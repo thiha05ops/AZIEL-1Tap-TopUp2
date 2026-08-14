@@ -64,6 +64,4 @@ const sitePlacementSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
-sitePlacementSchema.index({ placementCode: 1 }, { unique: true });
-
 module.exports = mongoose.model("SitePlacement", sitePlacementSchema);

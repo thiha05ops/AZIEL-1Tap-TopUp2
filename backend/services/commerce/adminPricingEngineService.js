@@ -628,7 +628,7 @@ async function saveDraftPricing(payload = {}, admin = {}) {
                     createdBy: actor
                 }
             },
-            { new: true, upsert: true, runValidators: true }
+            { returnDocument: "after", upsert: true, runValidators: true }
         ).lean();
         saved.push(publicPolicy(draft, "draft"));
     }

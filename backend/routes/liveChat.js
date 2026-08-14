@@ -344,7 +344,7 @@ router.delete("/admin/delete/:chatId", adminMiddleware, requireAdminPermission(P
         const chat = await LiveChat.findOneAndUpdate(
             { chatId: req.params.chatId },
             { status: "deleted" },
-            { new: true }
+            { returnDocument: "after" }
         );
 
         if (!chat) {

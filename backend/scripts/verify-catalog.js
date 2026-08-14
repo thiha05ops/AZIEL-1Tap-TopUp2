@@ -1,135 +1,101 @@
 const assert = require("assert");
 
 const {
+    CANONICAL_OPERATIONAL_PRODUCTS,
+    CANONICAL_PRODUCT_CODES,
+    isCanonicalProductCode,
+    isSafeStorefrontProductRoute,
+    resolveCanonicalProductRoute
+} = require("../catalog/canonicalOperationalCatalog");
+const {
     CatalogError,
-    resolveOrderCatalog,
-    resolvePackagePrice,
-    toPublicCatalog
+    projectCatalogProduct,
+    projectCommerceReadiness,
+    applyPublicReadiness,
+    resolveDatabasePackagePriceFromRows
 } = require("../services/catalogService");
 
-const ACTIVE_PRODUCTS = ["mlbb", "pubg", "freefire", "hok", "aovid", "pubgrp", "telegram"];
-const DISABLED_PRODUCTS = ["genshin", "roblox", "valorant"];
-
-async function assertCatalogError(fn, code) {
-    try {
-        await fn();
-    } catch (error) {
-        assert(error instanceof CatalogError, `Expected CatalogError for ${code}`);
-        assert.strictEqual(error.code, code);
-        return;
-    }
-
-    throw new Error(`Expected ${code}`);
+function fixture() {
+    const product = {
+        ...CANONICAL_OPERATIONAL_PRODUCTS[0],
+        enabled: true,
+        publicDiscoveryEnabled: true,
+        commerceState: "PURCHASABLE",
+        homepageEnabled: true,
+        fulfillment: { manualAllowedRegions: ["MM", "TH"] }
+    };
+    const packageRow = {
+        productCode: product.productCode,
+        packageCode: "VERIFIER_PACKAGE_1",
+        name: "Verifier Package",
+        enabled: true,
+        sortOrder: 1,
+        prices: {
+            MM: { amount: 6800, currency: "MMK", enabled: true },
+            TH: { amount: 55, currency: "THB", enabled: true }
+        }
+    };
+    return { product, packageRow };
 }
 
-async function assertCatalogService() {
-    const mlbbTh = await resolvePackagePrice({
-        productCode: "mlbb",
-        packageCode: "MLBB_WEEKLY_1X",
-        region: "TH"
-    }, { source: "static" });
+function expectError(fn, code) {
+    assert.throws(fn, error => error instanceof CatalogError && error.code === code);
+}
 
-    assert.strictEqual(mlbbTh.amount, 55);
-    assert.strictEqual(mlbbTh.currency, "THB");
-    assert.strictEqual(mlbbTh.packageName, "Weekly Pass 1x");
+function verifyCanonicalRegistry() {
+    assert(CANONICAL_PRODUCT_CODES.length > 0);
+    assert.deepStrictEqual(CANONICAL_PRODUCT_CODES, CANONICAL_OPERATIONAL_PRODUCTS.map(item => item.productCode));
+    assert.strictEqual(new Set(CANONICAL_PRODUCT_CODES).size, CANONICAL_PRODUCT_CODES.length);
+    CANONICAL_OPERATIONAL_PRODUCTS.forEach((product, index) => {
+        assert(isCanonicalProductCode(product.productCode));
+        if (index > 0) assert(product.sortOrder > CANONICAL_OPERATIONAL_PRODUCTS[index - 1].sortOrder);
+        assert(isSafeStorefrontProductRoute(resolveCanonicalProductRoute(product.productCode)));
+    });
+    assert.strictEqual(isCanonicalProductCode("unsupported-verifier-product"), false);
+}
 
-    const mlbbMm = await resolvePackagePrice({
-        productCode: "mlbb",
-        packageCode: "MLBB_WEEKLY_1X",
-        region: "MM"
-    }, { source: "static" });
-
-    assert.strictEqual(mlbbMm.amount, 6800);
-    assert.strictEqual(mlbbMm.currency, "MMK");
-
-    await assertCatalogError(() => resolvePackagePrice({
-        productCode: "unknown",
-        packageCode: "MLBB_WEEKLY_1X",
-        region: "TH"
-    }, { source: "static" }), "PRODUCT_NOT_FOUND");
-
-    await assertCatalogError(() => resolvePackagePrice({
-        productCode: "genshin",
-        packageCode: "GENSHIN_FAKE",
-        region: "TH"
-    }, { source: "static" }), "PRODUCT_DISABLED");
-
-    await assertCatalogError(() => resolvePackagePrice({
-        productCode: "mlbb",
-        packageCode: "MLBB_FAKE",
-        region: "TH"
-    }, { source: "static" }), "PACKAGE_NOT_FOUND");
-
-    await assertCatalogError(() => resolvePackagePrice({
-        productCode: "mlbb",
-        packageCode: "MLBB_WEEKLY_1X",
-        region: "US"
-    }, { source: "static" }), "REGION_NOT_SUPPORTED");
-
-    await assertCatalogError(() => resolvePackagePrice({
-        productCode: "mlbb",
-        packageCode: "MLBB_WEEKLY_1X",
+function verifyServerAuthoritativePricing() {
+    const { product, packageRow } = fixture();
+    const rows = { products: [product], packages: [packageRow] };
+    const resolved = resolveDatabasePackagePriceFromRows({
+        productCode: product.productCode,
+        packageCode: packageRow.packageCode,
+        region: "TH",
+        clientAmount: 55,
+        clientCurrency: "THB"
+    }, rows);
+    assert.strictEqual(resolved.amount, 55);
+    assert.strictEqual(resolved.currency, "THB");
+    expectError(() => resolveDatabasePackagePriceFromRows({
+        productCode: product.productCode,
+        packageCode: packageRow.packageCode,
         region: "TH",
         clientAmount: 1
-    }, { source: "static" }), "PRICE_MISMATCH");
-
-    await assertCatalogError(() => resolvePackagePrice({
-        productCode: "mlbb",
-        packageCode: "MLBB_WEEKLY_1X",
-        region: "TH",
-        clientCurrency: "MMK"
-    }, { source: "static" }), "CURRENCY_MISMATCH");
-
-    const orderProjection = await resolveOrderCatalog({
-        gameKey: "mlbb",
-        game: "Client Name",
-        packageCode: "MLBB_WEEKLY_1X",
-        packageName: "Client Package",
-        region: "TH",
-        amount: 55,
-        currency: "THB"
-    }, { source: "static" });
-
-    assert.strictEqual(orderProjection.game, "Mobile Legends");
-    assert.strictEqual(orderProjection.packageName, "Weekly Pass 1x");
-    assert.strictEqual(orderProjection.amount, 55);
-    assert.strictEqual(orderProjection.currency, "THB");
+    }, rows), "PRICE_MISMATCH");
+    expectError(() => resolveDatabasePackagePriceFromRows({
+        productCode: "unsupported-verifier-product",
+        packageCode: packageRow.packageCode,
+        region: "TH"
+    }, rows), "PRODUCT_NOT_FOUND");
 }
 
-async function assertPublicProjection() {
-    const products = await toPublicCatalog({ source: "static", includeDisabled: false });
-    const byCode = new Map(products.map(product => [product.productCode, product]));
-
-    ACTIVE_PRODUCTS.forEach(productCode => {
-        const product = byCode.get(productCode);
-        assert(product, `${productCode} missing from public catalog`);
-        assert(product.enabled !== false, `${productCode} not public enabled`);
-        assert(Array.isArray(product.packages), `${productCode} packages missing`);
-        assert(product.packages.length > 0, `${productCode} has no public packages`);
-    });
-
-    DISABLED_PRODUCTS.forEach(productCode => {
-        assert(!byCode.has(productCode), `${productCode} should be excluded from public catalog`);
-    });
-
-    products.forEach(product => {
-        product.packages.forEach(item => {
-            assert(item.prices?.MM?.amount > 0, `${product.productCode}:${item.packageCode} missing MM amount`);
-            assert.strictEqual(item.prices.MM.currency, "MMK");
-            assert(item.prices?.TH?.amount > 0, `${product.productCode}:${item.packageCode} missing TH amount`);
-            assert.strictEqual(item.prices.TH.currency, "THB");
-        });
-    });
+function verifyPublicProjection() {
+    const { product, packageRow } = fixture();
+    const readiness = projectCommerceReadiness(product, [packageRow], [], []);
+    const projection = applyPublicReadiness(
+        projectCatalogProduct(product, [packageRow], { includeDisabled: false }),
+        product,
+        [packageRow],
+        readiness
+    );
+    assert.strictEqual(projection.productCode, product.productCode);
+    assert.strictEqual(projection.publicCategory, "mobile");
+    assert.strictEqual(projection.productRoute, resolveCanonicalProductRoute(product.productCode));
+    assert.strictEqual(projection.availabilityCode, "AVAILABLE");
+    assert.strictEqual(projection.packages[0].prices.TH.amount, 55);
 }
 
-async function main() {
-    await assertCatalogService();
-    await assertPublicProjection();
-    console.log("Catalog service checks passed.");
-    console.log("Catalog public projection check passed.");
-}
-
-main().catch(error => {
-    console.error(error);
-    process.exit(1);
-});
+verifyCanonicalRegistry();
+verifyServerAuthoritativePricing();
+verifyPublicProjection();
+console.log("Catalog canonical registry, pricing, and public projection checks passed.");

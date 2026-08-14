@@ -199,7 +199,7 @@ async function acquireFinancialOutcome(orderId, outcome, options = {}) {
     const updated = await Order.findOneAndUpdate(
         query,
         { $set: { financialOutcome: outcome, financialOutcomeAt: now } },
-        { new: true, session: options.session || null }
+        { returnDocument: "after", session: options.session || null }
     );
 
     if (!updated) {

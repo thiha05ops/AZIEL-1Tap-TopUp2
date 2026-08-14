@@ -373,7 +373,7 @@ async function updateStatusField(input, options, config) {
         update.$set[config.nestedField] = normalized.toStatus;
     }
     try {
-        const updated = await execQuery(opts.model.findOneAndUpdate(query, update, { new: true, runValidators: true }), opts);
+        const updated = await execQuery(opts.model.findOneAndUpdate(query, update, { returnDocument: "after", runValidators: true }), opts);
         if (!updated) {
             throw new OrderRepositoryError(ERROR_CODES.ORDER_STATE_CONFLICT, "Order state no longer matches expected transition.", {
                 stage: "update",
@@ -447,7 +447,7 @@ async function appendOperationalReference(input = {}, options = {}) {
                 $push: { operationalReferences: structuredClone(reference) },
                 $set: { updatedAt: changedAt }
             },
-            { new: true, runValidators: true }
+            { returnDocument: "after", runValidators: true }
         ), opts);
         if (!updated) throw new OrderRepositoryError(ERROR_CODES.ORDER_NOT_FOUND, "Order not found.", { stage: "update" });
         return plainRecord(updated);
@@ -476,7 +476,7 @@ async function setPromotionRedemptionSnapshot(input = {}, options = {}) {
                     updatedAt: changedAt
                 }
             },
-            { new: true, runValidators: true }
+            { returnDocument: "after", runValidators: true }
         ), opts);
         if (!updated) throw new OrderRepositoryError(ERROR_CODES.ORDER_NOT_FOUND, "Order not found.", { stage: "update" });
         return plainRecord(updated);

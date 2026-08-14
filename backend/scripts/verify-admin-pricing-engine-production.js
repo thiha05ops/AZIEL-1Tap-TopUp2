@@ -19,6 +19,8 @@ const {
     saveDraftPricing
 } = require("../services/commerce/adminPricingEngineService");
 const { buildProductionPricingContext } = require("../services/commerce/productionPricingContextService");
+const { CANONICAL_PRODUCT_CODES } = require("../catalog/canonicalOperationalCatalog");
+const NONCANONICAL_FIXTURE = "pricingenginenoncanonicalfixture";
 
 function read(file) {
     return fs.readFileSync(path.join(root, file), "utf8");
@@ -327,7 +329,7 @@ async function verifyApiGetCompletesQuickly() {
         for (let index = 0; index < 180; index += 1) {
             mock.packages.push({
                 _id: `64f0000000000000001${String(index).padStart(3, "0")}`,
-                productCode: `game${index % 20}`,
+                productCode: CANONICAL_PRODUCT_CODES[index % CANONICAL_PRODUCT_CODES.length],
                 packageCode: `PKG${index}`,
                 name: `Package ${index}`,
                 enabled: true,
@@ -337,7 +339,7 @@ async function verifyApiGetCompletesQuickly() {
                     TH: { amount: 100 + index, currency: "THB", enabled: true },
                     MM: { amount: 10000 + index, currency: "MMK", enabled: true }
                 },
-                metadata: { gameName: `Game ${index % 20}` }
+                metadata: { gameName: `Canonical Fixture ${index % CANONICAL_PRODUCT_CODES.length}` }
             });
         }
 
@@ -355,8 +357,8 @@ async function verifyApiGetCompletesQuickly() {
             assert.strictEqual(response.status, 200, "Pricing Engine GET must return 200.");
             assert.strictEqual(body.success, true, "Pricing Engine GET must return success.");
             assert(elapsedMs < 2000, `Pricing Engine GET should complete under 2s in realistic-volume verifier, got ${elapsedMs}ms.`);
-            assert(Array.isArray(body.products) && body.products.length >= 20, "Pricing Engine GET must return grouped real products.");
-            assert(body.products[0].packages.length > 0, "Pricing Engine GET products must contain package contexts.");
+            assert.deepStrictEqual(body.products.map(product => product.productCode), CANONICAL_PRODUCT_CODES, "Pricing Engine API must project the closed canonical registry in canonical order.");
+            assert(body.products.some(product => product.packages.length > 0), "Pricing Engine GET products must contain package contexts.");
 
             CatalogPackage.find = () => {
                 throw new Error("database unavailable");
@@ -439,6 +441,15 @@ async function verifyMiddlewareAndDeadlineLifecycle() {
 async function verifyDraftPublishAndQuotePickup() {
     const mock = installModelMocks();
     try {
+        mock.packages.push({
+            _id: "64f000000000000000000999",
+            productCode: NONCANONICAL_FIXTURE,
+            packageCode: "NONCANONICAL_PACKAGE",
+            name: "Noncanonical Package",
+            enabled: true,
+            deletedAt: null,
+            prices: { TH: { amount: 10, currency: "THB", enabled: true, supplierCost: 8, supplierCurrency: "THB" } }
+        });
         await saveDraftPricing({
             policies: [{
                 region: "TH",
@@ -458,9 +469,13 @@ async function verifyDraftPublishAndQuotePickup() {
 
         let state = await getPricingConsoleState();
         assert(Array.isArray(state.products), "Pricing Engine load must return products.");
-        assert.strictEqual(state.products.length, 1, "Pricing Engine load must group catalog packages by product.");
-        assert(Array.isArray(state.products[0].packages), "Pricing Engine product must include selectable package contexts.");
-        assert.strictEqual(state.products[0].packages[0].supplierPrice, 1000, "Pricing Engine package context must include real supplier/base price.");
+        assert.deepStrictEqual(state.products.map(product => product.productCode), CANONICAL_PRODUCT_CODES, "Pricing Engine workspace must project every canonical identity exactly once.");
+        assert.strictEqual(new Set(state.products.map(product => product.productCode)).size, CANONICAL_PRODUCT_CODES.length, "Pricing Engine workspace must not duplicate canonical identities.");
+        assert(!state.products.some(product => product.productCode === NONCANONICAL_FIXTURE), "Noncanonical identities must not leak into Pricing Engine workspace.");
+        const mlbb = state.products.find(product => product.productCode === "mlbb");
+        assert(Array.isArray(mlbb.packages), "Canonical Pricing Engine product must include selectable package contexts.");
+        assert.strictEqual(mlbb.packages[0].supplierPrice, 1000, "Pricing Engine package context must include real supplier/base price.");
+        assert(state.products.some(product => product.catalogEnabled === null && product.packages.length === 0), "Missing/incomplete canonical identities must remain visible to Admin without becoming publicly ready.");
         assert.strictEqual(state.policies.find(item => item.region === "TH").draft.config.profitRule.value, 15, "Saved draft must survive backend reload.");
 
         await saveDraftPricing({

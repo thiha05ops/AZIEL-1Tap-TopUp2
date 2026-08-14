@@ -24,12 +24,12 @@ function main() {
     assert(runtime.includes("window.isSecureContext"), "Service worker registration must require a safe context.");
     assert(runtime.includes("aziel:pwaUpdateReady"), "Runtime must expose a restrained update-ready event.");
 
-    assert(sw.includes("PRIVATE_OR_DYNAMIC_PATHS"), "Service worker must declare private path exclusions.");
+    assert(sw.includes("NEVER_CACHE_PREFIXES") && sw.includes("PRIVATE_NAVIGATION_PREFIXES"), "Service worker must declare API and private-navigation exclusions.");
     ["/api/", "/admin", "/account", "/wallet", "/tracking", "/notifications"].forEach(pathPrefix => {
         assert(sw.includes(`"${pathPrefix}"`), `Service worker must never cache ${pathPrefix}.`);
     });
     assert(sw.includes("networkFirstPublicPage"), "Public HTML must use network-first caching.");
-    assert(sw.includes("cacheFirst") && sw.includes("isStaticAsset"), "Static assets must use cache-first caching.");
+    assert(sw.includes("cacheFirstVersionedCodeAsset") && sw.includes("cacheFirstMediaAsset"), "Versioned code and media assets must use safe cache-first strategies.");
     assert(sw.includes("caches.delete"), "Service worker must clean stale cache versions.");
     assert(offline.includes("noindex, nofollow") && offline.includes("You're offline"), "Offline page must be restrained and not indexed.");
 

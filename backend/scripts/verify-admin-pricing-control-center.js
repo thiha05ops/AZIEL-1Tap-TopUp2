@@ -3,6 +3,10 @@
 const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
+const PricingPolicy = require("../models/PricingPolicy");
+const PricingRule = require("../models/PricingRule");
+const PriceVersion = require("../models/PriceVersion");
+const { buildProductionPricingContext } = require("../services/commerce/productionPricingContextService");
 
 const ROOT = path.resolve(__dirname, "../..");
 
@@ -59,9 +63,53 @@ function verifyServerAuthoritativePreview() {
     includes("backend/services/commerce/adminPricingControlCenterService.js", "loadCommercePromotionContext", "Coupon preview must use existing promotion bridge.");
     includes("backend/services/commerce/adminPricingControlCenterService.js", "UNKNOWN_SUPPLIER_COST", "Missing supplier cost status must exist.");
     includes("backend/services/commerce/adminPricingControlCenterService.js", "EXCHANGE_RATE_MISSING", "Missing exchange status must exist.");
-    includes("backend/services/commerce/productionPricingContextService.js", "manualPublishedPriceRule", "Existing catalog prices must become explicit published-price overrides.");
-    includes("backend/services/commerce/productionPricingContextService.js", "POLICY_DERIVED", "Policy-derived packages must be able to remove overrides.");
     includes("backend/services/commerce/adminPricingControlCenterService.js", "bulkBackfillSupplierCosts", "Bulk backfill service must exist.");
+}
+
+function queryResult(value) {
+    const query = {
+        sort() { return query; },
+        limit() { return query; },
+        lean: async () => value
+    };
+    return query;
+}
+
+async function verifyPublishedPriceModeBehavior() {
+    const originals = {
+        policyFindOne: PricingPolicy.findOne,
+        ruleFind: PricingRule.find,
+        versionFind: PriceVersion.find
+    };
+    PricingPolicy.findOne = () => queryResult(null);
+    PricingRule.find = () => queryResult([]);
+    PriceVersion.find = () => queryResult([]);
+    const input = {
+        pkg: { _id: "pricing-control-fixture", productCode: "mlbb", packageCode: "PRICING_CONTROL_FIXTURE", name: "Pricing Control Fixture" },
+        catalog: { productCode: "mlbb", packageCode: "PRICING_CONTROL_FIXTURE", productName: "Mobile Legends" },
+        region: "TH",
+        currency: "THB",
+        now: new Date("2026-08-14T00:00:00.000Z")
+    };
+    try {
+        const manual = await buildProductionPricingContext({
+            ...input,
+            price: { amount: 49, currency: "THB", supplierCost: 40, supplierCurrency: "THB", publishedPriceMode: "MANUAL_OVERRIDE", manualOverrideReason: "Verifier override" }
+        });
+        assert.strictEqual(manual.pricing.pricingInput.appliedPricingRules[0]?.ruleType, "PRICE_OVERRIDE");
+        assert.strictEqual(manual.pricing.pricingInput.appliedPricingRules[0]?.value, 49);
+
+        const policyDerived = await buildProductionPricingContext({
+            ...input,
+            price: { amount: 49, currency: "THB", supplierCost: 40, supplierCurrency: "THB", publishedPriceMode: "POLICY_DERIVED", manualOverrideReason: "" }
+        });
+        assert.strictEqual(policyDerived.pricing.pricingInput.appliedPricingRules.length, 0, "POLICY_DERIVED must not inject a published-price override.");
+        assert.strictEqual(policyDerived.pricing.pricingInput.context.businessRuntime.publishedPriceMode, "POLICY_DERIVED");
+    } finally {
+        PricingPolicy.findOne = originals.policyFindOne;
+        PricingRule.find = originals.ruleFind;
+        PriceVersion.find = originals.versionFind;
+    }
 }
 
 function verifyRoutes() {
@@ -91,11 +139,12 @@ function verifyCss() {
     includes("frontend/css/admin/admin-design-system.css", ".catalog-bulk-cost-row", "Bulk supplier-cost rows need production styling.");
 }
 
-function run() {
+async function run() {
     verifyModel();
     verifyProjectionBoundary();
     verifyAdminPatchAndHistory();
     verifyServerAuthoritativePreview();
+    await verifyPublishedPriceModeBehavior();
     verifyRoutes();
     verifyFrontend();
     verifyCss();
@@ -103,4 +152,7 @@ function run() {
     console.log("Admin Pricing Control Center verifier passed.");
 }
 
-run();
+run().catch(error => {
+    console.error(error);
+    process.exit(1);
+});

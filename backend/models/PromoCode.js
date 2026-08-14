@@ -118,7 +118,6 @@ const promoCodeSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
-promoCodeSchema.index({ code: 1 }, { unique: true });
 promoCodeSchema.index({ enabled: 1, archivedAt: 1, startsAt: 1, endsAt: 1 });
 promoCodeSchema.index({ regions: 1, eligibilityMode: 1 });
 

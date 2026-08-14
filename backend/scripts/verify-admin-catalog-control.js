@@ -4,10 +4,6 @@ const mongoose = require("mongoose");
 const path = require("path");
 const vm = require("vm");
 
-require("dotenv").config({
-    path: path.join(__dirname, "../..", ".env")
-});
-
 const CatalogPackage = require("../models/CatalogPackage");
 const CatalogProduct = require("../models/CatalogProduct");
 const Order = require("../models/Order");
@@ -15,9 +11,11 @@ const User = require("../models/User");
 const WalletTopup = require("../models/WalletTopup");
 const WalletTransaction = require("../models/WalletTransaction");
 const {
+    resolveAdminCatalogProduct,
     resolvePackagePrice,
     toPublicCatalog
 } = require("../services/catalogService");
+const { CANONICAL_OPERATIONAL_PRODUCTS, CANONICAL_PRODUCT_CODES } = require("../catalog/canonicalOperationalCatalog");
 const {
     CatalogAdminError,
     updatePackage,
@@ -28,28 +26,35 @@ const {
 } = require("./verifierDatabaseSafety");
 
 const ROOT = path.join(__dirname, "../..");
-const TEST_PRODUCT = "phase6test";
-const TEST_PACKAGE = "PHASE6_TEST_PACKAGE";
+const TEST_PRODUCT = "capcut";
+const TEST_PACKAGE = "ADMIN_CATALOG_CONTROL_TEST";
+const NONCANONICAL_PRODUCT = "admincatalognoncanonicalfixture";
 
 async function cleanupFixture() {
     await CatalogPackage.deleteOne({ productCode: TEST_PRODUCT, packageCode: TEST_PACKAGE });
     await CatalogProduct.deleteOne({ productCode: TEST_PRODUCT });
+    await CatalogProduct.deleteOne({ productCode: NONCANONICAL_PRODUCT });
 }
 
 async function createFixture() {
     await cleanupFixture();
     await CatalogProduct.create({
         productCode: TEST_PRODUCT,
-        name: "Phase 6 Test Product",
+        name: "Admin Catalog Control Product",
         enabled: true,
+        catalogCategory: "DIGITAL_SERVICE",
+        commerceState: "PURCHASABLE",
+        publicDiscoveryEnabled: true,
+        artworkPath: "assets/fallbacks/digital-services.svg",
         supportedRegions: ["MM", "TH"],
+        fulfillment: { manualAllowedRegions: ["MM", "TH"] },
         source: "admin",
         sortOrder: 9999
     });
     await CatalogPackage.create({
         productCode: TEST_PRODUCT,
         packageCode: TEST_PACKAGE,
-        name: "Phase 6 Test Package",
+        name: "Admin Catalog Control Package",
         enabled: true,
         prices: {
             MM: { amount: 6800, currency: "MMK", enabled: true },
@@ -58,6 +63,23 @@ async function createFixture() {
         source: "admin",
         sortOrder: 1
     });
+}
+
+async function assertCanonicalAdminProjection() {
+    const projected = await Promise.all(CANONICAL_OPERATIONAL_PRODUCTS.map(product => resolveAdminCatalogProduct(product.productCode, {
+        findProduct: async () => null,
+        findPackages: async () => [],
+        findMappings: async () => [],
+        findInventoryStates: async () => [],
+        loadMediaMap: async () => new Map(),
+        includeAssetProjection: false,
+        includeAdminPricing: false
+    })));
+    assert.deepStrictEqual(projected.map(product => product.productCode), CANONICAL_PRODUCT_CODES);
+    assert.strictEqual(new Set(projected.map(product => product.productCode)).size, CANONICAL_PRODUCT_CODES.length);
+    assert(projected.every(product => product.metadataRecordMissing === true), "Missing canonical Mongo records must remain Admin-manageable.");
+    assert.strictEqual(await resolveAdminCatalogProduct(NONCANONICAL_PRODUCT), null, "Noncanonical records must not enter normal Admin projection.");
+    await expectAdminError(updateProduct({ productCode: NONCANONICAL_PRODUCT, patch: { enabled: false }, actor: "verify" }), "CATALOG_PRODUCT_UNSUPPORTED");
 }
 
 async function getFixtureProduct() {
@@ -117,6 +139,31 @@ function assertRouteSecurity() {
     assert(routes.includes('router.patch("/admin/catalog/products/:productCode/packages/:packageCode", adminMiddleware'), "package mutation must require adminMiddleware");
 }
 
+function assertDatabaseSafetyContract() {
+    const originalVerifierUri = process.env.AZIEL_VERIFIER_MONGO_URI;
+    const originalMongoUri = process.env.MONGO_URI;
+    const originalOptIn = process.env.AZIEL_ALLOW_MUTATING_VERIFIER;
+    try {
+        process.env.AZIEL_ALLOW_MUTATING_VERIFIER = "true";
+        process.env.MONGO_URI = "mongodb://example.invalid/azielshop";
+        delete process.env.AZIEL_VERIFIER_MONGO_URI;
+        assert.throws(() => assertSafeMutatingVerifierDatabase("safety-check"), /AZIEL_VERIFIER_MONGO_URI is required/);
+        process.env.AZIEL_VERIFIER_MONGO_URI = "mongodb://example.invalid/azielshop";
+        assert.throws(() => assertSafeMutatingVerifierDatabase("safety-check"), /database name must clearly be/);
+        process.env.AZIEL_VERIFIER_MONGO_URI = "mongodb://example.invalid/aziel_e2e_admin_catalog_control";
+        assert.strictEqual(assertSafeMutatingVerifierDatabase("safety-check").databaseName, "aziel_e2e_admin_catalog_control");
+        process.env.AZIEL_ALLOW_MUTATING_VERIFIER = "false";
+        assert.throws(() => assertSafeMutatingVerifierDatabase("safety-check"), /explicit test-database run/);
+    } finally {
+        if (originalVerifierUri === undefined) delete process.env.AZIEL_VERIFIER_MONGO_URI;
+        else process.env.AZIEL_VERIFIER_MONGO_URI = originalVerifierUri;
+        if (originalMongoUri === undefined) delete process.env.MONGO_URI;
+        else process.env.MONGO_URI = originalMongoUri;
+        if (originalOptIn === undefined) delete process.env.AZIEL_ALLOW_MUTATING_VERIFIER;
+        else process.env.AZIEL_ALLOW_MUTATING_VERIFIER = originalOptIn;
+    }
+}
+
 function assertFrontendOverlay() {
     const runtimeSource = fs.readFileSync(path.join(ROOT, "frontend/js/catalog-runtime.js"), "utf8");
     const pricesSource = fs.readFileSync(path.join(ROOT, "frontend/js/prices.js"), "utf8");
@@ -144,7 +191,7 @@ function assertFrontendOverlay() {
                     productCode: "mlbb",
                     enabled: true,
                     packages: [{
-                        packageCode: "MLBB_WEEKLY_1X",
+                        packageCode: "ADMIN_OVERLAY_FIXTURE",
                         enabled: true,
                         prices: {
                             MM: { amount: 7000, currency: "MMK", enabled: true },
@@ -165,16 +212,16 @@ function assertFrontendOverlay() {
     return sandbox.window.AZIEL_CATALOG_RUNTIME.loadCatalog()
         .then(() => {
             const overlay = sandbox.window.AZIEL_CATALOG_RUNTIME.overlayGamePrices("mlbb", [
-                { code: "MLBB_WEEKLY_1X", name: "Weekly Pass 1x", mmk: 6800, thb: 55 }
+                { code: "ADMIN_OVERLAY_FIXTURE", name: "Overlay Fixture", mmk: 6800, thb: 55 }
             ]);
             assert.strictEqual(overlay.packages[0].mmk, 7000);
             assert.strictEqual(overlay.packages[0].thb, 60);
         });
 }
 
-async function main() {
+async function verifyIsolatedDatabase() {
     const safety = assertSafeMutatingVerifierDatabase("verify-admin-catalog-control");
-    await mongoose.connect(process.env.MONGO_URI, {
+    await mongoose.connect(safety.mongoUri, {
         serverSelectionTimeoutMS: Number(process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS || 10000)
     });
 
@@ -182,7 +229,11 @@ async function main() {
 
     try {
         assertRouteSecurity();
+        const missing = await resolveAdminCatalogProduct(TEST_PRODUCT, { includeAssetProjection: false, includeAdminPricing: false });
+        assert(missing?.metadataRecordMissing === true, "Missing canonical record must remain Admin-manageable.");
         await createFixture();
+        await CatalogProduct.create({ productCode: NONCANONICAL_PRODUCT, name: "Unsupported Fixture", enabled: true });
+        assert(!(await toPublicCatalog({ source: "database", includeDisabled: false })).some(row => row.productCode === NONCANONICAL_PRODUCT));
 
         let product = await getFixtureProduct();
         let item = await getFixturePackage();
@@ -317,6 +368,15 @@ async function main() {
     console.log("Admin catalog control verification checks passed.", {
         database: safety.databaseName
     });
+}
+
+async function main() {
+    assertRouteSecurity();
+    assertDatabaseSafetyContract();
+    await assertCanonicalAdminProjection();
+    await assertFrontendOverlay();
+    if (process.argv.includes("--isolated")) await verifyIsolatedDatabase();
+    console.log("Admin catalog canonical control verification passed.");
 }
 
 main().catch(error => {

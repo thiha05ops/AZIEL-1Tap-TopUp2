@@ -6,6 +6,20 @@
     <title>AZIEL OS · Commerce Operating System</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 
+    <script>
+        // Decide the unauthenticated path before parsing the operational Admin shell.
+        // A stored token is still validated by /api/admin/me and normal Admin RBAC.
+        (() => {
+            let adminToken = "";
+            try {
+                adminToken = localStorage.getItem("adminToken") || "";
+            } catch (_) {
+                adminToken = "";
+            }
+            if (!adminToken) window.location.replace("/admin-login.html");
+        })();
+    </script>
+
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/webp" href="/assets/logo/aziel-icon.webp">
     <meta name="theme-color" content="#070716">

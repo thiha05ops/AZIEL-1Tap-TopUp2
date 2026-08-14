@@ -255,7 +255,7 @@ async function updateStorefrontSection({ key, patch = {}, actor = "admin" } = {}
     const section = await StorefrontSection.findOneAndUpdate(
         { key: normalized },
         { $set: updates },
-        { new: true, runValidators: true }
+        { returnDocument: "after", runValidators: true }
     ).lean();
 
     return {

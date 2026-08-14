@@ -150,6 +150,11 @@ function configureApplication(mongoConnection) {
         return res.redirect(302, `${adminProductionOrigin}${safePath}`);
     });
 
+    app.get("/admin.html", (req, res, next) => {
+        if (req.query.shell === "1") return next();
+        return res.sendFile(path.join(__dirname, "../frontend/admin-entry.html"));
+    });
+
     app.use(express.static(path.join(__dirname, "../frontend")));
 
     app.use(

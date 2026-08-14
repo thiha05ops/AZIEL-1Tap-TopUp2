@@ -6,7 +6,7 @@ let currentTrackingOrder = null;
 let lastStatus = "";
 let liveTrackingTimer = null;
 let recentOrdersRequestSequence = 0;
-let recentOrdersUserReadyPromise = null;
+let recentOrdersAuthKey = null;
 
 function t(key, fallback = "") {
     if (window.AZIEL_I18N?.t) {
@@ -64,7 +64,10 @@ document.addEventListener("DOMContentLoaded", () => {
     liveTrackingTimer = setInterval(checkLiveTracking, 5000);
 });
 
-window.addEventListener("aziel:userChanged", loadRecentOrders);
+window.addEventListener("aziel:userChanged", () => {
+    const authKey = getTrackingAuthHeaders().Authorization || "";
+    if (authKey !== recentOrdersAuthKey) loadRecentOrders();
+});
 
 window.addEventListener("beforeunload", () => {
     if (liveTrackingTimer) {
@@ -783,12 +786,10 @@ async function loadRecentOrders() {
     if (!box) return;
 
     const requestSequence = ++recentOrdersRequestSequence;
-    await waitForRecentOrdersUserReady();
-    if (requestSequence !== recentOrdersRequestSequence) return;
+    const authHeaders = getTrackingAuthHeaders();
+    recentOrdersAuthKey = authHeaders.Authorization || "";
 
-    const username = window.AZIEL?.user?.username || localStorage.getItem("username") || "me";
-
-    if (!getTrackingAuthHeaders().Authorization) {
+    if (!recentOrdersAuthKey) {
         renderRecentOrdersTerminal(box, requestSequence, `
             <p class="empty-orders">
                 ${t("loginRequired", "Login required.")}
@@ -799,9 +800,9 @@ async function loadRecentOrders() {
 
     try {
         const res = await fetch(
-            trackingApiUrl(`/api/order/user/${encodeURIComponent(username)}`),
+            trackingApiUrl("/api/order/user/me"),
             {
-                headers: getTrackingAuthHeaders()
+                headers: authHeaders
             }
         );
 
@@ -844,24 +845,6 @@ async function loadRecentOrders() {
             </p>
         `);
     }
-}
-
-function waitForRecentOrdersUserReady() {
-    if (recentOrdersUserReadyPromise) return recentOrdersUserReadyPromise;
-
-    const hasUser = Boolean(window.AZIEL?.user?.username || localStorage.getItem("username"));
-    const canLoadUser = Boolean(window.AZIEL?.getToken?.() && typeof window.AZIEL?.loadUser === "function");
-    if (hasUser || !canLoadUser) {
-        recentOrdersUserReadyPromise = Promise.resolve();
-        return recentOrdersUserReadyPromise;
-    }
-
-    recentOrdersUserReadyPromise = Promise.race([
-        Promise.resolve(window.AZIEL.loadUser()).catch(() => null),
-        new Promise(resolve => setTimeout(resolve, 2500))
-    ]).then(() => undefined);
-
-    return recentOrdersUserReadyPromise;
 }
 
 function renderRecentOrdersTerminal(box, requestSequence, html) {

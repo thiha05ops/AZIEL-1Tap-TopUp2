@@ -192,7 +192,7 @@ async function acquireDelivery({ deliveryKey, messageType, topupId, recipient })
                 }
             },
             {
-                new: true,
+                returnDocument: "after",
                 upsert: true
             }
         );

@@ -483,7 +483,7 @@ async function updateStatus(input = {}, options = {}) {
         const request = opts.model.findOneAndUpdate(
             { attemptId: normalized.attemptId, status: { $in: normalized.fromStatuses } },
             { $set: set },
-            { new: true, runValidators: true, session: opts.mongoSession || undefined }
+            { returnDocument: "after", runValidators: true, session: opts.mongoSession || undefined }
         );
         const updated = request.exec ? await request.exec() : await request;
         if (updated) return plainRecord(updated);
@@ -550,7 +550,7 @@ async function appendProviderEvent(input = {}, options = {}) {
             $push: { eventHistory: providerEvent },
             $set: { updatedAt: providerEvent.receivedAt }
         },
-        { new: true, runValidators: true, session: opts.mongoSession || undefined }
+        { returnDocument: "after", runValidators: true, session: opts.mongoSession || undefined }
     );
     const updated = request.exec ? await request.exec() : await request;
     if (!updated) {
@@ -617,7 +617,7 @@ async function attachReceiptEvidence(input = {}, options = {}) {
             },
             $push: { eventHistory: receiptEvent }
         },
-        { new: true, runValidators: true, session: opts.mongoSession || undefined }
+        { returnDocument: "after", runValidators: true, session: opts.mongoSession || undefined }
     );
     const updated = request.exec ? await request.exec() : await request;
     if (updated) return plainRecord(updated);
@@ -661,7 +661,7 @@ async function recordFailure(input = {}, options = {}) {
                 updatedAt: changedAt
             }
         },
-        { new: true, runValidators: true, session: opts.mongoSession || undefined }
+        { returnDocument: "after", runValidators: true, session: opts.mongoSession || undefined }
     );
     const updated = request.exec ? await request.exec() : await request;
     if (!updated) throw new PaymentAttemptRepositoryError(ERROR_CODES.PAYMENT_ATTEMPT_NOT_FOUND, "Payment attempt was not found.", { stage: "failure" });
@@ -710,7 +710,7 @@ async function setProviderReference(input = {}, options = {}) {
                     updatedAt: input.changedAt ? new Date(input.changedAt) : new Date()
                 }
             },
-            { new: true, runValidators: true, session: opts.mongoSession || undefined }
+            { returnDocument: "after", runValidators: true, session: opts.mongoSession || undefined }
         );
         const updated = request.exec ? await request.exec() : await request;
         if (!updated) throw new PaymentAttemptRepositoryError(ERROR_CODES.PAYMENT_ATTEMPT_NOT_FOUND, "Payment attempt was not found.", { stage: "reference" });

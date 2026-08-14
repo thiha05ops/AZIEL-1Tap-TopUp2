@@ -383,7 +383,7 @@ async function resolvePaymentRecoveryNotification(input = {}) {
             status: cleanText(input.status || "resolved", "resolved"),
             isRead: true
         },
-        { new: true }
+        { returnDocument: "after" }
     );
 
     const unreadCount = await getUnreadCount(owner);
@@ -497,7 +497,7 @@ async function markNotificationRead(user, id) {
             ...activeFilter(user)
         },
         { isRead: true },
-        { new: true }
+        { returnDocument: "after" }
     );
 
     if (!notification) return null;
@@ -539,7 +539,7 @@ async function deleteNotification(user, id) {
             deletedByUser: true,
             isRead: true
         },
-        { new: true }
+        { returnDocument: "after" }
     );
 
     if (!notification) return null;

@@ -1,7 +1,7 @@
 const CACHE_PREFIX = "aziel-runtime";
 const CORE_CACHE = `${CACHE_PREFIX}-core-v1`;
 const PAGE_CACHE = `${CACHE_PREFIX}-pages-v1`;
-const CODE_CACHE = `${CACHE_PREFIX}-code-v1`;
+const CODE_CACHE = `${CACHE_PREFIX}-code-v2`;
 const MEDIA_CACHE = `${CACHE_PREFIX}-media-v1`;
 
 const CORE_ASSETS = [
@@ -110,7 +110,9 @@ self.addEventListener("fetch", event => {
     }
 
     if (isCodeAsset(url.pathname)) {
-        event.respondWith(networkFirstCodeAsset(request));
+        event.respondWith(isVersionedCodeAsset(url)
+            ? cacheFirstVersionedCodeAsset(request)
+            : networkFirstCodeAsset(request));
         return;
     }
 
@@ -137,6 +139,10 @@ function isPublicHtml(pathname) {
 
 function isCodeAsset(pathname) {
     return /\.(?:js|css|json)$/i.test(pathname);
+}
+
+function isVersionedCodeAsset(url) {
+    return ["v", "version", "build"].some(key => Boolean(url.searchParams.get(key)));
 }
 
 function isMediaAsset(pathname) {
@@ -258,6 +264,18 @@ async function networkFirstCodeAsset(request) {
             statusText: "Asset unavailable"
         });
     }
+}
+
+async function cacheFirstVersionedCodeAsset(request) {
+    const cache = await caches.open(CODE_CACHE);
+    const cached = await cache.match(request);
+    if (cached) return cached;
+
+    const response = await fetch(request, { cache: "no-store" });
+    if (response.ok && response.type === "basic") {
+        await cache.put(request, response.clone());
+    }
+    return response;
 }
 
 /**

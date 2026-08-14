@@ -96,8 +96,8 @@
     }
 
     async function load(options = {}) {
+        if (loadingPromise) return loadingPromise;
         if (!options.force && isFresh()) return catalog;
-        if (!options.force && loadingPromise) return loadingPromise;
 
         status = "loading";
         emitCatalogUpdated({ loading: true, source: options.source || "catalog" });

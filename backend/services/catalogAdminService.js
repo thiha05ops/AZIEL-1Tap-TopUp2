@@ -743,7 +743,7 @@ async function updateProduct({ productCode, patch = {}, actor = "admin" }) {
                     metadata: { initializedFromCanonical: true }
                 }
             },
-            { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
+            { returnDocument: "after", upsert: true, runValidators: true, setDefaultsOnInsert: true }
         );
         initializedFromCanonical = true;
     }

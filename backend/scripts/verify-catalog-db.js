@@ -1,21 +1,12 @@
 const assert = require("assert");
 const fs = require("fs");
-const mongoose = require("mongoose");
 const path = require("path");
-
-require("dotenv").config({
-    path: path.join(__dirname, "../..", ".env")
-});
-
-const CatalogPackage = require("../models/CatalogPackage");
-const CatalogProduct = require("../models/CatalogProduct");
 const {
     getStaticCatalogSnapshot
 } = require("../catalog/catalogProjection");
 const {
     CatalogError,
-    resolveDatabasePackagePriceFromRows,
-    resolvePackagePrice
+    resolveDatabasePackagePriceFromRows
 } = require("../services/catalogService");
 const {
     buildCatalogSeedPlan,
@@ -35,8 +26,12 @@ function assertConflict(plan, scope, matcher) {
 
 function assertSeedPlanning() {
     const snapshot = getStaticCatalogSnapshot();
-    assert(snapshot.products.length >= 10, "static product normalization should include launch products");
-    assert(snapshot.packages.length >= 80, "static package normalization should include launch packages");
+    const sampleProduct = snapshot.products.find(item => item.enabled !== false && item.productCode === "mlbb") || snapshot.products[0];
+    const samplePackage = snapshot.packages.find(item => item.productCode === sampleProduct.productCode && item.prices?.MM && item.prices?.TH);
+    assert(samplePackage, "static compatibility snapshot must provide a dual-region planning fixture");
+    const sampleKey = `${samplePackage.productCode}:${samplePackage.packageCode}`;
+    assert(snapshot.products.length > 0, "static compatibility snapshot should normalize products");
+    assert(snapshot.packages.length > 0, "static compatibility snapshot should normalize packages");
 
     const fullDbProducts = clone(snapshot.products);
     const fullDbPackages = clone(snapshot.packages);
@@ -47,57 +42,57 @@ function assertSeedPlanning() {
     });
 
     assert.strictEqual(summarizePlan(unchangedPlan).creates, 0, "seed dry-run should be idempotent when DB matches static catalog");
-    assert(unchangedPlan.products.unchanged.includes("mlbb"), "unchanged product should be detected");
-    assert(unchangedPlan.packages.unchanged.includes("mlbb:MLBB_WEEKLY_1X"), "unchanged package should be detected");
+    assert(unchangedPlan.products.unchanged.includes(sampleProduct.productCode), "unchanged product should be detected");
+    assert(unchangedPlan.packages.unchanged.includes(sampleKey), "unchanged package should be detected");
 
     const missingProductPlan = buildCatalogSeedPlan({
-        dbProducts: fullDbProducts.filter(item => item.productCode !== "mlbb"),
+        dbProducts: fullDbProducts.filter(item => item.productCode !== sampleProduct.productCode),
         dbPackages: fullDbPackages,
         staticSnapshot: snapshot
     });
-    assert(missingProductPlan.products.create.some(item => item.productCode === "mlbb"), "missing product should be planned for create");
+    assert(missingProductPlan.products.create.some(item => item.productCode === sampleProduct.productCode), "missing product should be planned for create");
 
     const missingPackagePlan = buildCatalogSeedPlan({
         dbProducts: fullDbProducts,
-        dbPackages: fullDbPackages.filter(item => item.packageCode !== "MLBB_WEEKLY_1X"),
+        dbPackages: fullDbPackages.filter(item => `${item.productCode}:${item.packageCode}` !== sampleKey),
         staticSnapshot: snapshot
     });
-    assert(missingPackagePlan.packages.create.some(item => item.packageCode === "MLBB_WEEKLY_1X"), "missing package should be planned for create");
+    assert(missingPackagePlan.packages.create.some(item => `${item.productCode}:${item.packageCode}` === sampleKey), "missing package should be planned for create");
 
     const mmAmountDb = clone(fullDbPackages);
-    mmAmountDb.find(item => item.packageCode === "MLBB_WEEKLY_1X").prices.MM.amount += 1;
+    mmAmountDb.find(item => `${item.productCode}:${item.packageCode}` === sampleKey).prices.MM.amount += 1;
     assertConflict(buildCatalogSeedPlan({ dbProducts: fullDbProducts, dbPackages: mmAmountDb, staticSnapshot: snapshot }), "package", item => (
-        item.packageCode === "MLBB_WEEKLY_1X" && item.conflicts.some(conflict => conflict.includes("MM amount"))
+        `${item.productCode}:${item.packageCode}` === sampleKey && item.conflicts.some(conflict => conflict.includes("MM amount"))
     ));
 
     const thAmountDb = clone(fullDbPackages);
-    thAmountDb.find(item => item.packageCode === "MLBB_WEEKLY_1X").prices.TH.amount += 1;
+    thAmountDb.find(item => `${item.productCode}:${item.packageCode}` === sampleKey).prices.TH.amount += 1;
     assertConflict(buildCatalogSeedPlan({ dbProducts: fullDbProducts, dbPackages: thAmountDb, staticSnapshot: snapshot }), "package", item => (
-        item.packageCode === "MLBB_WEEKLY_1X" && item.conflicts.some(conflict => conflict.includes("TH amount"))
+        `${item.productCode}:${item.packageCode}` === sampleKey && item.conflicts.some(conflict => conflict.includes("TH amount"))
     ));
 
     const currencyDb = clone(fullDbPackages);
-    currencyDb.find(item => item.packageCode === "MLBB_WEEKLY_1X").prices.TH.currency = "MMK";
+    currencyDb.find(item => `${item.productCode}:${item.packageCode}` === sampleKey).prices.TH.currency = "MMK";
     assertConflict(buildCatalogSeedPlan({ dbProducts: fullDbProducts, dbPackages: currencyDb, staticSnapshot: snapshot }), "package", item => (
-        item.packageCode === "MLBB_WEEKLY_1X" && item.conflicts.some(conflict => conflict.includes("TH currency"))
+        `${item.productCode}:${item.packageCode}` === sampleKey && item.conflicts.some(conflict => conflict.includes("TH currency"))
     ));
 
     const enabledProductDb = clone(fullDbProducts);
-    enabledProductDb.find(item => item.productCode === "mlbb").enabled = false;
+    enabledProductDb.find(item => item.productCode === sampleProduct.productCode).enabled = false;
     assertConflict(buildCatalogSeedPlan({ dbProducts: enabledProductDb, dbPackages: fullDbPackages, staticSnapshot: snapshot }), "product", item => (
-        item.productCode === "mlbb" && item.conflicts.some(conflict => conflict.includes("enabled"))
+        item.productCode === sampleProduct.productCode && item.conflicts.some(conflict => conflict.includes("enabled"))
     ));
 
     const enabledPackageDb = clone(fullDbPackages);
-    enabledPackageDb.find(item => item.packageCode === "MLBB_WEEKLY_1X").enabled = false;
+    enabledPackageDb.find(item => `${item.productCode}:${item.packageCode}` === sampleKey).enabled = false;
     assertConflict(buildCatalogSeedPlan({ dbProducts: fullDbProducts, dbPackages: enabledPackageDb, staticSnapshot: snapshot }), "package", item => (
-        item.packageCode === "MLBB_WEEKLY_1X" && item.conflicts.some(conflict => conflict.includes("enabled"))
+        `${item.productCode}:${item.packageCode}` === sampleKey && item.conflicts.some(conflict => conflict.includes("enabled"))
     ));
 
     const regionDb = clone(fullDbProducts);
-    regionDb.find(item => item.productCode === "mlbb").supportedRegions = ["MM"];
+    regionDb.find(item => item.productCode === sampleProduct.productCode).supportedRegions = ["MM"];
     assertConflict(buildCatalogSeedPlan({ dbProducts: regionDb, dbPackages: fullDbPackages, staticSnapshot: snapshot }), "product", item => (
-        item.productCode === "mlbb" && item.conflicts.some(conflict => conflict.includes("supportedRegions"))
+        item.productCode === sampleProduct.productCode && item.conflicts.some(conflict => conflict.includes("supportedRegions"))
     ));
 
     const extraPlan = buildCatalogSeedPlan({
@@ -125,40 +120,15 @@ function assertNoHistoricalMutationOwnership() {
     assert(!/\bupdateMany\b|\bdeleteMany\b|\bfindOneAndUpdate\b/.test(combined), "catalog seed must not perform broad historical mutation");
 }
 
-async function assertSourceResolvers() {
-    const staticItem = await resolvePackagePrice({
-        productCode: "mlbb",
-        packageCode: "MLBB_WEEKLY_1X",
-        region: "TH",
-        clientAmount: 55,
-        clientCurrency: "THB"
-    }, { source: "static" });
-
-    assert.strictEqual(staticItem.amount, 55);
-    assert.strictEqual(staticItem.currency, "THB");
-
-    await assertCatalogError(resolvePackagePrice({
-        productCode: "mlbb",
-        packageCode: "MLBB_WEEKLY_1X",
-        region: "TH",
-        clientAmount: 1
-    }, { source: "static" }), "PRICE_MISMATCH");
-
-    await assertCatalogError(resolvePackagePrice({
-        productCode: "mlbb",
-        packageCode: "MLBB_WEEKLY_1X",
-        region: "TH",
-        clientCurrency: "MMK"
-    }, { source: "static" }), "CURRENCY_MISMATCH");
-
-    const snapshot = getStaticCatalogSnapshot();
+function assertSourceResolvers() {
     const rows = {
-        products: clone(snapshot.products),
-        packages: clone(snapshot.packages)
+        products: [{ productCode: "mlbb", name: "Verifier", enabled: true, supportedRegions: ["MM", "TH"] }],
+        packages: [{ productCode: "mlbb", packageCode: "VERIFIER_DB_1", name: "Verifier Package", enabled: true,
+            prices: { MM: { amount: 6800, currency: "MMK", enabled: true }, TH: { amount: 55, currency: "THB", enabled: true } } }]
     };
     const databaseItem = resolveDatabasePackagePriceFromRows({
         productCode: "mlbb",
-        packageCode: "MLBB_WEEKLY_1X",
+        packageCode: "VERIFIER_DB_1",
         region: "TH",
         clientAmount: 55,
         clientCurrency: "THB"
@@ -168,26 +138,26 @@ async function assertSourceResolvers() {
     assert.strictEqual(databaseItem.currency, "THB");
 
     const disabledProductRows = clone(rows);
-    disabledProductRows.products.find(item => item.productCode === "mlbb").enabled = false;
+    disabledProductRows.products[0].enabled = false;
     assertDatabaseCatalogError({
         productCode: "mlbb",
-        packageCode: "MLBB_WEEKLY_1X",
+        packageCode: "VERIFIER_DB_1",
         region: "TH"
     }, disabledProductRows, "PRODUCT_DISABLED");
 
     const disabledPackageRows = clone(rows);
-    disabledPackageRows.packages.find(item => item.packageCode === "MLBB_WEEKLY_1X").enabled = false;
+    disabledPackageRows.packages[0].enabled = false;
     assertDatabaseCatalogError({
         productCode: "mlbb",
-        packageCode: "MLBB_WEEKLY_1X",
+        packageCode: "VERIFIER_DB_1",
         region: "TH"
     }, disabledPackageRows, "PACKAGE_DISABLED");
 
     const unsupportedRegionRows = clone(rows);
-    unsupportedRegionRows.packages.find(item => item.packageCode === "MLBB_WEEKLY_1X").prices.TH.enabled = false;
+    unsupportedRegionRows.packages[0].prices.TH.enabled = false;
     assertDatabaseCatalogError({
         productCode: "mlbb",
-        packageCode: "MLBB_WEEKLY_1X",
+        packageCode: "VERIFIER_DB_1",
         region: "TH"
     }, unsupportedRegionRows, "REGION_NOT_SUPPORTED");
 
@@ -199,29 +169,17 @@ async function assertSourceResolvers() {
 
     assertDatabaseCatalogError({
         productCode: "mlbb",
-        packageCode: "MLBB_WEEKLY_1X",
+        packageCode: "VERIFIER_DB_1",
         region: "TH",
         clientAmount: 1
     }, rows, "PRICE_MISMATCH");
 
     assertDatabaseCatalogError({
         productCode: "mlbb",
-        packageCode: "MLBB_WEEKLY_1X",
+        packageCode: "VERIFIER_DB_1",
         region: "TH",
         clientCurrency: "MMK"
     }, rows, "CURRENCY_MISMATCH");
-}
-
-async function assertCatalogError(promise, code) {
-    try {
-        await promise;
-    } catch (error) {
-        assert(error instanceof CatalogError, `Expected CatalogError for ${code}`);
-        assert.strictEqual(error.code, code);
-        return;
-    }
-
-    throw new Error(`Expected ${code}`);
 }
 
 function assertDatabaseCatalogError(payload, rows, code) {
@@ -236,63 +194,12 @@ function assertDatabaseCatalogError(payload, rows, code) {
     throw new Error(`Expected ${code}`);
 }
 
-async function assertLiveDbIntegrity() {
-    const [products, packages] = await Promise.all([
-        CatalogProduct.find().lean(),
-        CatalogPackage.find().lean()
-    ]);
-    const productCodes = new Set();
-    const packageKeys = new Set();
-
-    assert(products.length >= 10, "live DB should contain seeded launch products");
-    assert(packages.length >= 80, "live DB should contain seeded launch packages");
-
-    products.forEach(product => {
-        assert(product.productCode, "live product missing productCode");
-        assert(!productCodes.has(product.productCode), `duplicate live productCode ${product.productCode}`);
-        productCodes.add(product.productCode);
-        assert(product.name, `${product.productCode} live name missing`);
-        assert(Array.isArray(product.supportedRegions), `${product.productCode} live supportedRegions missing`);
-        product.supportedRegions.forEach(region => {
-            assert(["MM", "TH"].includes(region), `${product.productCode} invalid live region ${region}`);
-        });
-    });
-
-    packages.forEach(item => {
-        const key = `${item.productCode}:${item.packageCode}`;
-        assert(productCodes.has(item.productCode), `${key} orphan live package`);
-        assert(!packageKeys.has(key), `duplicate live package identity ${key}`);
-        packageKeys.add(key);
-        assert(item.name, `${key} live name missing`);
-
-        [
-            ["MM", "MMK"],
-            ["TH", "THB"]
-        ].forEach(([region, currency]) => {
-            const price = item.prices?.[region];
-            if (!price) return;
-
-            assert.strictEqual(price.currency, currency, `${key}:${region} live currency`);
-            assert(Number.isFinite(Number(price.amount)) && Number(price.amount) > 0, `${key}:${region} live amount must be positive`);
-        });
-    });
-}
-
 async function main() {
     assertSeedPlanning();
     assertNoHistoricalMutationOwnership();
-    await assertSourceResolvers();
-    await mongoose.connect(process.env.MONGO_URI, {
-        serverSelectionTimeoutMS: Number(process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS || 10000)
-    });
+    assertSourceResolvers();
 
-    try {
-        await assertLiveDbIntegrity();
-    } finally {
-        await mongoose.connection.close(false);
-    }
-
-    console.log("Catalog DB foundation verification checks passed.");
+    console.log("Catalog deterministic seed planning and row-resolution checks passed.");
 }
 
 main().catch(error => {

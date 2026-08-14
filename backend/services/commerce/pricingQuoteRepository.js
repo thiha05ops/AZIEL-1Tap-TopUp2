@@ -245,7 +245,7 @@ async function markQuoteUsed({ quoteId, userId = "", sessionId = "", consumedOrd
             consumedOrderId: orderId
         }
     };
-    let request = model.findOneAndUpdate(query, update, { new: true, session: mongoSession || undefined, runValidators: true });
+    let request = model.findOneAndUpdate(query, update, { returnDocument: "after", session: mongoSession || undefined, runValidators: true });
     const updated = request.exec ? await request.exec() : await request;
     if (updated) return { outcome: "success", quote: updated };
 
@@ -270,7 +270,7 @@ async function markQuoteExpired({ quoteId, expiredAt, mongoSession = null, model
     let request = model.findOneAndUpdate(
         { quoteId: normalizedQuoteId, status: STATUS.ISSUED, "lifecycle.status": STATUS.ISSUED, "lifecycle.expiresAt": { $lte: expiredDate } },
         update,
-        { new: true, session: mongoSession || undefined, runValidators: true }
+        { returnDocument: "after", session: mongoSession || undefined, runValidators: true }
     );
     const updated = request.exec ? await request.exec() : await request;
     if (updated) return { outcome: "success", quote: updated };
@@ -297,7 +297,7 @@ async function invalidateQuote({ quoteId, reason, invalidatedAt, mongoSession = 
                 invalidationReason: normalizedReason
             }
         },
-        { new: true, session: mongoSession || undefined, runValidators: true }
+        { returnDocument: "after", session: mongoSession || undefined, runValidators: true }
     );
     const updated = request.exec ? await request.exec() : await request;
     if (updated) return { outcome: "success", quote: updated };
@@ -317,7 +317,7 @@ async function cancelQuote({ quoteId, cancelledAt, reason = "", mongoSession = n
                 invalidationReason: normalizeString(reason)
             }
         },
-        { new: true, session: mongoSession || undefined, runValidators: true }
+        { returnDocument: "after", session: mongoSession || undefined, runValidators: true }
     );
     const updated = request.exec ? await request.exec() : await request;
     if (updated) return { outcome: "success", quote: updated };
