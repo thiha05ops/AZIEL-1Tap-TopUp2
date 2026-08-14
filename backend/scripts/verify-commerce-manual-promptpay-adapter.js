@@ -196,7 +196,7 @@ function createHarness(overrides = {}) {
             async findOwnedOrderById({ orderId, owner: requestedOwner }) {
                 return clone(store.orders.find(order => order.orderId === orderId && matchesOwner(order.owner, requestedOwner)) || null);
             },
-            async findOrderById({ orderId }) {
+            async findOrderById(orderId) {
                 return clone(store.orders.find(order => order.orderId === orderId) || null);
             },
             async updatePaymentStatus({ orderId, fromStatuses, toStatus }, { transactionContext } = {}) {

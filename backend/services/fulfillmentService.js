@@ -510,10 +510,14 @@ async function assertOrderEligible(order) {
     }
 }
 
-async function transitionCommerceFulfillment(order, target, reason) {
+async function transitionCommerceFulfillment(order, target, reason, options = {}) {
     const changedAt = new Date();
     let currentStatus = String(order.status || "");
     let currentFulfillment = String(order.fulfilment?.status || "not_started");
+    const repositoryOptions = {
+        session: options.session || null,
+        mongoSession: options.session || null
+    };
     if (["not_started", "queued"].includes(currentFulfillment)) {
         await commerceOrderRepository.updateFulfilmentStatus({
             orderId: order.orderId,
@@ -521,7 +525,7 @@ async function transitionCommerceFulfillment(order, target, reason) {
             toStatus: "processing",
             changedAt,
             reason
-        });
+        }, repositoryOptions);
         currentFulfillment = "processing";
     }
     if (currentStatus === "paid") {
@@ -531,7 +535,7 @@ async function transitionCommerceFulfillment(order, target, reason) {
             toStatus: "processing",
             changedAt,
             reason
-        });
+        }, repositoryOptions);
         currentStatus = "processing";
     }
     if (target !== "processing") {
@@ -541,15 +545,89 @@ async function transitionCommerceFulfillment(order, target, reason) {
             toStatus: target,
             changedAt: new Date(),
             reason
-        });
+        }, repositoryOptions);
         await commerceOrderRepository.updateOrderStatus({
             orderId: order.orderId,
             fromStatuses: [currentStatus],
             toStatus: target === "completed" ? "completed" : "failed",
             changedAt: new Date(),
             reason
-        });
+        }, repositoryOptions);
     }
+}
+
+async function startManualAdminFulfillment(fulfillmentId, payload = {}, context = {}) {
+    const normalizedId = cleanText(fulfillmentId, 80).toUpperCase();
+    const session = await mongoose.startSession();
+    let projected = null;
+    try {
+        await session.withTransaction(async () => {
+            const attempt = await FulfillmentAttempt.findOne({ fulfillmentId: normalizedId }).session(session);
+            if (!attempt) throw new FulfillmentError("FULFILLMENT_NOT_FOUND", "Fulfillment attempt not found.", 404);
+            if (attempt.routeType !== FULFILLMENT_ROUTE_TYPES.MANUAL_ADMIN) {
+                throw new FulfillmentError("FULFILLMENT_ROUTE_MISMATCH", "Supplier fulfillment must start from its mapped Order command.", 409);
+            }
+            if (attempt.orderModel !== "CommerceOrder") {
+                throw new FulfillmentError("FULFILLMENT_ORDER_TYPE_MISMATCH", "Manual Admin fulfillment requires a CommerceOrder.", 409);
+            }
+            if (attempt.status === FULFILLMENT_STATUSES.IN_PROGRESS) {
+                projected = projectAttempt(attempt, { idempotent: true });
+                return;
+            }
+            if (attempt.status !== FULFILLMENT_STATUSES.PENDING) {
+                throw new FulfillmentError("FULFILLMENT_NOT_STARTABLE", "Fulfillment attempt is not startable.", 409);
+            }
+
+            const order = await CommerceOrder.findById(attempt.orderId).session(session);
+            if (!order) throw new FulfillmentError("ORDER_NOT_FOUND", "Order not found.", 404);
+            if (String(order.status || "") !== "paid") {
+                throw new FulfillmentError("ORDER_NOT_FULFILLMENT_ELIGIBLE", "Order is not eligible for fulfillment.", 409);
+            }
+            if (String(order.paymentStatus || order.payment?.status || "") !== "paid") {
+                throw new FulfillmentError("ORDER_NOT_PAID", "Order payment is not confirmed.", 409);
+            }
+            if (String(order._id) !== String(attempt.orderId) || order.orderId !== attempt.orderCode) {
+                throw new FulfillmentError("FULFILLMENT_ORDER_MISMATCH", "Fulfillment attempt does not match its CommerceOrder.", 409);
+            }
+            const competing = await FulfillmentAttempt.findOne({
+                orderId: order._id,
+                _id: { $ne: attempt._id },
+                status: { $in: [...ACTIVE_FULFILLMENT_STATUSES, FULFILLMENT_STATUSES.SUCCEEDED] }
+            }).session(session).lean();
+            if (competing) throw new FulfillmentError("FULFILLMENT_COMPETING_ATTEMPT", "Another fulfillment attempt already owns this order.", 409);
+
+            attempt.status = FULFILLMENT_STATUSES.IN_PROGRESS;
+            attempt.startedByAdminId = adminId(context.admin);
+            attempt.assignedAdminId = adminId(context.admin);
+            attempt.startedByUsernameSnapshot = context.admin?.username || "";
+            attempt.startedAt = new Date();
+            attempt.supplierResult = normalizeSupplierResult({
+                status: "PENDING",
+                supplierCode: attempt.supplierCodeSnapshot,
+                providerStatus: "MANUAL_ADMIN_IN_PROGRESS",
+                safeMessage: "Manual fulfillment is in progress with AZIEL Admin."
+            });
+            await attempt.save({ session });
+            await transitionCommerceFulfillment(order, "processing", `Fulfillment started ${attempt.fulfillmentId}`, { session });
+            projected = projectAttempt(attempt);
+        });
+    } finally {
+        await session.endSession();
+    }
+
+    await writeAdminAudit({
+        actor: context.admin,
+        req: context.req,
+        action: ADMIN_AUDIT_ACTIONS.FULFILLMENT_STARTED,
+        resourceType: "FulfillmentAttempt",
+        resourceId: normalizedId,
+        metadata: {
+            fulfillmentId: normalizedId,
+            orderId: projected?.orderCode || "",
+            routeType: FULFILLMENT_ROUTE_TYPES.MANUAL_ADMIN
+        }
+    }).catch(() => null);
+    return projected;
 }
 
 async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
@@ -826,6 +904,7 @@ module.exports = {
     projectAttempt,
     resolveFulfillment,
     safeSupplierProjection,
+    startManualAdminFulfillment,
     startFulfillmentForOrder,
     updateMapping,
     updateSupplier

@@ -13,6 +13,7 @@ const {
     listMappings,
     listSuppliers,
     resolveFulfillment,
+    startManualAdminFulfillment,
     startFulfillmentForOrder,
     updateMapping,
     updateSupplier
@@ -143,11 +144,12 @@ router.get("/admin/fulfillments/:fulfillmentId", adminMiddleware, requireAdminPe
 });
 
 router.post("/admin/fulfillments/:fulfillmentId/start", adminMiddleware, requireAdminPermission(PERMISSIONS.FULFILLMENT_EXECUTE), async (req, res) => {
-    return res.status(409).json({
-        success: false,
-        code: "FULFILLMENT_START_REQUIRES_ORDER",
-        message: "Start fulfillment from a paid Order with a supplier mapping."
-    });
+    try {
+        const attempt = await startManualAdminFulfillment(req.params.fulfillmentId, req.body, { admin: req.admin, req });
+        return res.json({ success: true, attempt });
+    } catch (error) {
+        return sendFulfillmentError(res, error);
+    }
 });
 
 router.post("/admin/fulfillments/:fulfillmentId/succeed", adminMiddleware, requireAdminPermission(PERMISSIONS.FULFILLMENT_RESOLVE), async (req, res) => {

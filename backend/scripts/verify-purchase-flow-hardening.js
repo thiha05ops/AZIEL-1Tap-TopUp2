@@ -130,8 +130,12 @@ function verifyStaticFlowHardening() {
     assert(routes.includes('"/commerce/checkout/review"') && routes.includes("authMiddleware"), "authoritative review route must require authentication.");
     assert(checkout.includes("paymentSubmitting") && checkout.includes("if (paymentSubmitting"), "Pay must reject double submission.");
     assert(checkout.includes("authoritativeReview?.quoteId") && checkout.includes('"/api/commerce/checkout/review"'), "Checkout must wait for authoritative review.");
+    assert(checkout.includes("validateReviewForHandoff(authoritativeReview)"), "Review handoff must validate the server-issued quote.");
+    assert(!checkout.includes("validateCatalog(draft.order)"), "Review handoff must not compare authoritative pricing against a raw catalog amount.");
+    assert(checkout.includes("expiresAt.getTime() <= Date.now()"), "Expired review quotes must fail with an actionable error before navigation.");
     assert(!checkout.slice(checkout.indexOf('body: JSON.stringify({'), checkout.indexOf('body: JSON.stringify({') + 700).includes("amount:"), "review request must not submit a client total.");
     assert(recovery.includes('page === "checkout.html"'), "Checkout refresh must load pending-payment recovery.");
+    assert(recovery.includes('"/api/commerce/payments/recoverable"'), "Commerce recovery must remain server-authoritative.");
     assert(read("frontend/checkout.html").includes("pending-payment-recovery.js"), "Checkout must include recovery runtime.");
     assert(engine.includes('"aziel:commerce-pending-payment"'), "payment creation must retain a server-recovery marker.");
     assert(customerService.includes("review-quote:${idempotencySeed}"), "review quote retries must be idempotent.");

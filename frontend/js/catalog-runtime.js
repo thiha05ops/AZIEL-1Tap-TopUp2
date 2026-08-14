@@ -89,7 +89,7 @@
         if (!options.force && loadingPromise) return loadingPromise;
 
         status = "loading";
-        emitCatalogUpdated({ loading: true });
+        emitCatalogUpdated({ loading: true, source: options.source || "catalog" });
 
         loadingPromise = fetch("/api/catalog", {
             cache: "no-store",
@@ -107,7 +107,7 @@
                 lastError = "";
                 status = "ready";
                 buildIndexes(catalog);
-                emitCatalogUpdated({ loading: false });
+                emitCatalogUpdated({ loading: false, source: options.source || "catalog" });
                 return catalog;
             })
             .catch(error => {
@@ -116,7 +116,7 @@
                 loadedAt = 0;
                 status = "error";
                 buildIndexes(null);
-                emitCatalogUpdated({ loading: false, error: lastError });
+                emitCatalogUpdated({ loading: false, error: lastError, source: options.source || "catalog" });
                 throw error;
             })
             .finally(() => {
@@ -136,7 +136,7 @@
     }
 
     async function ensureFreshForPurchase() {
-        await ensureFresh();
+        await load({ force: true, source: "purchase" });
         return isReady();
     }
 

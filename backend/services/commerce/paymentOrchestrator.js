@@ -347,7 +347,15 @@ function createPaymentOrchestrator(dependencies = {}) {
         if (typeof finder !== "function") {
             throw new PaymentOrchestratorError(ERROR_CODES.PAYMENT_VALIDATION_ERROR, "orderRepository.findOrderById is required.", { stage: "dependencies" });
         }
-        const order = await finder.call(deps.orderRepository, { orderId, transactionContext });
+        const order = await finder.call(
+            deps.orderRepository,
+            orderId,
+            {
+                transactionContext,
+                mongoSession: transactionContext?.mongoSession,
+                session: transactionContext?.session
+            }
+        );
         if (!order) {
             throw new PaymentOrchestratorError(ERROR_CODES.PAYMENT_ORDER_NOT_FOUND, "Commerce order was not found.", {
                 stage: "order",
@@ -448,6 +456,20 @@ function createPaymentOrchestrator(dependencies = {}) {
                 reason,
                 owner: order.owner
             }, repositoryOptions);
+            if (
+                targetOrderPaymentStatus === ORDER_PAYMENT_STATUS.PAID &&
+                normalizeString(updatedOrder?.status || order.status) === "pending_payment" &&
+                typeof deps.orderRepository.updateOrderStatus === "function"
+            ) {
+                updatedOrder = await deps.orderRepository.updateOrderStatus({
+                    orderId: order.orderId,
+                    fromStatuses: ["pending_payment"],
+                    toStatus: "paid",
+                    changedAt: deps.clock(),
+                    reason,
+                    owner: order.owner
+                }, repositoryOptions);
+            }
         }
         return { attempt: detachAttempt(updatedAttempt || { ...attempt, status: transition.to }), order: updatedOrder || order };
     }
@@ -741,8 +763,14 @@ function createPaymentOrchestrator(dependencies = {}) {
                     attemptId: attempt.attemptId,
                     providerEvent: {
                         providerEventId: eventId,
+                        provider: result.provider || trustedEvent.provider,
                         providerReference,
+                        providerTransactionId: result.providerTransactionId || trustedEvent.providerTransactionId || providerReference,
+                        eventType: providerEventResult.eventType || trustedEvent.eventType || trustedEvent.type,
                         status: result.status,
+                        amount: result.amount,
+                        currency: result.currency,
+                        occurredAt: providerEventResult.occurredAt || trustedEvent.occurredAt || null,
                         receivedAt: deps.clock(),
                         safeMetadata: result.safeMetadata
                     }
@@ -757,8 +785,14 @@ function createPaymentOrchestrator(dependencies = {}) {
                     attemptId: attempt.attemptId,
                     providerEvent: {
                         providerEventId: eventId,
+                        provider: result.provider || trustedEvent.provider,
                         providerReference,
+                        providerTransactionId: result.providerTransactionId || trustedEvent.providerTransactionId || providerReference,
+                        eventType: providerEventResult.eventType || trustedEvent.eventType || trustedEvent.type,
                         status: result.status,
+                        amount: result.amount,
+                        currency: result.currency,
+                        occurredAt: providerEventResult.occurredAt || trustedEvent.occurredAt || null,
                         receivedAt: deps.clock(),
                         safeMetadata: result.safeMetadata
                     },

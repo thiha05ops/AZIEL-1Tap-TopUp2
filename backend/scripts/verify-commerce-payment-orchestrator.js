@@ -80,6 +80,7 @@ function createStore(options = {}) {
             createAttempt: 0,
             updateAttemptStatus: 0,
             updatePaymentStatus: 0,
+            updateOrderStatus: 0,
             appendProviderEvent: 0,
             recordFailure: 0,
             transactions: 0
@@ -132,7 +133,15 @@ function createDeps(store, overrides = {}) {
             store.calls.transactions += 1;
             const transactionContext = { mongoSession: `session-${store.calls.transactions}`, txId: `tx-${store.calls.transactions}` };
             store.txContexts.push(transactionContext);
-            return callback(transactionContext);
+            const ordersBefore = clone(store.orders);
+            const attemptsBefore = clone(store.attempts);
+            try {
+                return await callback(transactionContext);
+            } catch (error) {
+                store.orders.splice(0, store.orders.length, ...ordersBefore);
+                store.attempts.splice(0, store.attempts.length, ...attemptsBefore);
+                throw error;
+            }
         },
         providerResolver({ intent }) {
             assert.strictEqual(intent.amount, 1490, "provider resolver receives order amount.");
@@ -143,17 +152,32 @@ function createDeps(store, overrides = {}) {
             async findOwnedOrderById({ orderId, owner: requestedOwner }) {
                 return clone(store.orders.find(item => item.orderId === orderId && matchesOwner(item.owner, requestedOwner)) || null);
             },
-            async findOrderById({ orderId }) {
+            async findOrderById(orderId, options = {}) {
+                assert.strictEqual(typeof orderId, "string", "operational order lookup receives the scalar business order id.");
+                if (options.transactionContext) {
+                    assert.strictEqual(options.session, options.transactionContext.session, "operational lookup propagates transaction session.");
+                    assert.strictEqual(options.mongoSession, options.transactionContext.mongoSession, "operational lookup propagates mongo session.");
+                }
                 return clone(store.orders.find(item => item.orderId === orderId) || null);
             },
             async updatePaymentStatus({ orderId, fromStatuses, toStatus }, { transactionContext } = {}) {
                 assert(transactionContext, "order payment update receives transaction context.");
                 store.calls.updatePaymentStatus += 1;
+                if (store.options.failOrderPaymentUpdate) throw Object.assign(new Error("controlled order update failure"), { code: "ORDER_UPDATE_FAILED" });
                 const item = store.orders.find(candidate => candidate.orderId === orderId);
                 assert(item, "order exists for status update.");
                 assert(fromStatuses.includes(currentPaymentStatus(item)), "order status update is conditional.");
                 item.paymentStatus = toStatus;
                 item.payment = { ...(item.payment || {}), status: toStatus };
+                item.updatedAt = NOW.toISOString();
+                return clone(item);
+            },
+            async updateOrderStatus({ orderId, fromStatuses, toStatus }, { transactionContext } = {}) {
+                assert(transactionContext, "top-level order update receives transaction context.");
+                store.calls.updateOrderStatus += 1;
+                const item = store.orders.find(candidate => candidate.orderId === orderId);
+                assert(item && fromStatuses.includes(item.status), "top-level order transition is conditional.");
+                item.status = toStatus;
                 item.updatedAt = NOW.toISOString();
                 return clone(item);
             }
@@ -429,6 +453,7 @@ async function testProviderEvents() {
             provider: "manual_promptpay",
             providerReference: "PREF-EVENT",
             providerEventId: "evt-1",
+            eventType: "MANUAL_PAYMENT_APPROVED",
             status: PAYMENT_STATES.PAID,
             amount: 1490,
             currency: "THB",
@@ -436,11 +461,23 @@ async function testProviderEvents() {
         }
     });
     assert.strictEqual(result.paymentStatus, "paid", "provider event applies.");
+    assert.strictEqual(store.attempts[0].status, PAYMENT_STATES.PAID, "provider event persists the PaymentAttempt PAID enum.");
+    assert.strictEqual(store.orders[0].paymentStatus, "paid", "provider event persists the CommerceOrder payment status.");
+    assert.strictEqual(store.orders[0].status, "paid", "payment approval advances the CommerceOrder top-level status without waiting for fulfilment.");
+    assert.notStrictEqual(
+        `${store.orders[0].status}:${store.orders[0].paymentStatus}`,
+        "pending_payment:paid",
+        "payment approval never exposes pending_payment with a paid payment"
+    );
+    assert.strictEqual(store.calls.updateOrderStatus, 1, "payment approval performs exactly one top-level paid transition.");
+    assert.strictEqual(store.attempts[0].webhookEvents.length, 1, "approval history persists exactly once.");
+    assert.strictEqual(store.attempts[0].webhookEvents[0].eventType, "MANUAL_PAYMENT_APPROVED", "approval history preserves event type.");
     const duplicate = await createOrchestrator(store).handleProviderEvent({
         providerEvent: {
             provider: "manual_promptpay",
             providerReference: "PREF-EVENT",
             providerEventId: "evt-1",
+            eventType: "MANUAL_PAYMENT_APPROVED",
             status: PAYMENT_STATES.PAID,
             amount: 1490,
             currency: "THB",
@@ -448,6 +485,42 @@ async function testProviderEvents() {
         }
     });
     assert.strictEqual(duplicate.idempotent, true, "duplicate provider event ignored safely.");
+    assert.strictEqual(store.attempts[0].webhookEvents.length, 1, "duplicate approval does not append history twice.");
+    assert.strictEqual(store.orders[0].status, "paid", "duplicate approval preserves the paid top-level state.");
+    assert.strictEqual(store.calls.updateOrderStatus, 1, "duplicate approval does not repeat the top-level transition.");
+}
+
+async function testProviderEventAtomicRollback() {
+    const attempt = {
+        attemptId: "ATT-ROLLBACK",
+        orderId: "AZL-ORDER-0001",
+        owner: owner(),
+        status: PAYMENT_STATES.PENDING,
+        provider: "manual_promptpay",
+        providerReference: "PREF-ROLLBACK",
+        amount: 1490,
+        currency: "THB",
+        webhookEvents: []
+    };
+    const store = createStore({
+        order: { paymentStatus: "pending", payment: { ...order().payment, status: "pending" } },
+        attempts: [attempt],
+        failOrderPaymentUpdate: true
+    });
+    await assert.rejects(() => createOrchestrator(store).handleProviderEvent({
+        providerEvent: {
+            provider: "manual_promptpay",
+            providerReference: "PREF-ROLLBACK",
+            providerEventId: "evt-rollback",
+            status: PAYMENT_STATES.PAID,
+            amount: 1490,
+            currency: "THB",
+            orderId: "AZL-ORDER-0001"
+        }
+    }));
+    assert.strictEqual(store.attempts[0].status, PAYMENT_STATES.PENDING, "attempt PAID write rolls back when order update fails.");
+    assert.strictEqual(store.orders[0].paymentStatus, "pending", "order remains pending after rollback.");
+    assert.strictEqual(store.attempts[0].webhookEvents.length, 0, "approval event append rolls back with the transaction.");
 }
 
 async function testProviderEventSafetyFailures() {
@@ -551,6 +624,7 @@ async function run() {
     await testCancelAndExpireIdempotency();
     await testInvalidTransitions();
     await testProviderEvents();
+    await testProviderEventAtomicRollback();
     await testProviderEventSafetyFailures();
     await testPublicRedactionAndDetach();
     await testTransactionAndUnknownOutcome();

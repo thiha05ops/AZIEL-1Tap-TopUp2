@@ -16,10 +16,7 @@ async function loadPaymentMethods() {
     const paymentInput = document.getElementById("paymentMethod");
     const hasPaymentGrid = Boolean(paymentGrid && paymentInput);
 
-    const region =
-        localStorage.getItem("region") ||
-        localStorage.getItem("selectedRegion") ||
-        "MM";
+    const region = resolvePaymentRegion();
 
     if (hasPaymentGrid) {
         paymentGrid.setAttribute("aria-busy", "true");
@@ -86,6 +83,17 @@ async function loadPaymentMethods() {
             document.dispatchEvent(new Event("paymentChanged"));
         }
     }
+}
+
+function resolvePaymentRegion() {
+    try {
+        const draft = JSON.parse(sessionStorage.getItem("azielProductCheckoutDraft") || "null");
+        const draftRegion = String(draft?.order?.region || draft?.review?.pricing?.region || "").toUpperCase();
+        if (draftRegion === "TH" || draftRegion === "MM") return draftRegion;
+    } catch (_) {
+        // Fall through to the storefront preference when no valid checkout draft exists.
+    }
+    return localStorage.getItem("region") || localStorage.getItem("selectedRegion") || "MM";
 }
 
 function getConfiguredThaiBankApps(methods = []) {

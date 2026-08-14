@@ -7,6 +7,7 @@ const path = require("path");
 const {
     commerceAdminId,
     commerceAttemptIdFromAdminId,
+    projectCommerceOrder,
     projectCommerceManualAttempt
 } = require("../routes/order")._test;
 
@@ -126,6 +127,26 @@ function verifyProjectionContract() {
     assert.strictEqual(projected.actions.canApproveManualPayment, true);
 }
 
+function verifyUnifiedCommerceDetailContract() {
+    const projected = projectCommerceOrder(sampleOrder(), {
+        admin: true,
+        paymentAttempt: sampleAttempt(),
+        fulfillmentAttempts: []
+    });
+    assert.strictEqual(projected._id, "commerce-order:AZL-ORDER-0001");
+    assert.strictEqual(projected.isCommerceOrder, true);
+    assert.strictEqual(projected.isCommerceManualPayment, true);
+    assert.strictEqual(projected.commercePaymentAttemptId, "AZP-ATTEMPT-0001");
+    assert.strictEqual(projected.paymentProvider, "MANUAL_PROMPTPAY");
+    assert.strictEqual(projected.transactionId, "AZL-ORDER-0001");
+    assert.strictEqual(projected.hasPaymentEvidence, true);
+    assert.strictEqual(projected.paymentEvidence.receiptId, "RCP-0001");
+    assert.deepStrictEqual(projected.allowedNextStatuses, []);
+    assert.strictEqual(projected.actions.canApproveManualPayment, true);
+    assert.strictEqual(projected.actions.canRejectManualPayment, true);
+    assert.strictEqual(projected.actions.canUseGenericStatus, false);
+}
+
 function verifyGenericAndHistoricalAccountProjection() {
     const pubg = projectCommerceManualAttempt(sampleAttempt(), sampleOrder({
         owner: { type: "USER", userId: "internal-user-id" },
@@ -190,6 +211,7 @@ function verifyFrontendActionOwnership() {
 }
 
 verifyProjectionContract();
+verifyUnifiedCommerceDetailContract();
 verifyGenericAndHistoricalAccountProjection();
 verifyEvidenceAuthorityAlignment();
 verifyPaidProjection();

@@ -208,7 +208,12 @@ function renderTimeline(status, order = null) {
 }
 
 function isAwaitingManualReview(order = {}) {
-    return order.awaitingManualReview === true || order.receiptSubmitted === true;
+    if (order.awaitingManualReview === true) return true;
+    const orderStatus = normalizeStatus(order.orderStatus || order.status);
+    const paymentStatus = normalizeStatus(order.paymentStatus);
+    return order.receiptSubmitted === true &&
+        orderStatus === "pending" &&
+        ["pending", "unpaid", ""].includes(paymentStatus);
 }
 
 function trackingDisplayStatus(order = {}) {
@@ -781,9 +786,9 @@ async function loadRecentOrders() {
     await waitForRecentOrdersUserReady();
     if (requestSequence !== recentOrdersRequestSequence) return;
 
-    const username = window.AZIEL?.user?.username || localStorage.getItem("username");
+    const username = window.AZIEL?.user?.username || localStorage.getItem("username") || "me";
 
-    if (!username) {
+    if (!getTrackingAuthHeaders().Authorization) {
         renderRecentOrdersTerminal(box, requestSequence, `
             <p class="empty-orders">
                 ${t("loginRequired", "Login required.")}

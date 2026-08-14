@@ -502,6 +502,12 @@ function createManualPaymentApplicationService(dependencies = {}) {
             await notify("commerce.manualPayment.approved", { orderId: order.orderId, attemptId });
             return toSafePaymentView({ order: updatedOrder, attempt: updatedAttempt, paymentResult: result, admin: true });
         } catch (error) {
+            deps.logger?.error?.("Commerce manual payment approval failed", {
+                stage: error?.stage || "approval",
+                code: error?.code || error?.name || "UNKNOWN",
+                causeCode: error?.causeCode || "",
+                retryable: error?.retryable === true
+            });
             throw mapPaymentError(error, "approval");
         }
     }

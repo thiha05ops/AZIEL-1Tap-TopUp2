@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const dns = require("dns");
 const fetch = require("node-fetch");
 const nodemailer = require("nodemailer");
+const { recordSuppressedEvent, suppressTestEmail } = require("../e2e/e2eSafety");
 
 const SAFE_EMAIL_FAILURE_MESSAGE = "Email service is temporarily unavailable. Please try again shortly.";
 const SUPPORTED_EMAIL_PROVIDERS = new Set(["brevo", "gmail_smtp"]);
@@ -336,6 +337,10 @@ function logEmailFailure({ operation = "email.send", to = "", messageType = "" }
 }
 
 async function sendEmail({ to, subject, html, text, messageType = "transactional", operation = "email.send" } = {}) {
+    if (suppressTestEmail(to)) {
+        recordSuppressedEvent("email", { operation, recipient: to });
+        return { accepted: [String(to)], suppressed: true, messageId: "aziel-e2e-suppressed" };
+    }
     assertEmailConfig();
     const provider = getEmailProvider();
     activeProvider = provider;

@@ -457,7 +457,7 @@
             return;
         }
 
-        const orderData = buildOrderData(flow);
+        let orderData = buildOrderData(flow);
         const buyBtn = getEl(flow.config.buyButtonSelector);
 
         flow.isSubmitting = true;
@@ -466,29 +466,26 @@
         try {
             if (window.AZIEL_CATALOG) {
                 try {
-                    await window.AZIEL_CATALOG.ensureFreshForPurchase();
-                    const freshPackage = window.AZIEL_CATALOG.getPackage(
-                        flow.config.productCode || flow.config.gameKey,
-                        orderData.packageCode,
-                        orderData.region
-                    );
-
-                    if (!freshPackage) {
+                    const refreshed = await refreshPackageForCheckout(flow, orderData);
+                    if (refreshed.unavailable) {
                         window.clearSelectedPackage?.("package_unavailable");
                         const message = t("catalogPackageUnavailable", "This package is no longer available. Please select another package.");
                         setText(flow.config.noteSelector, message);
                         window.PaymentUtils?.showToast?.(message);
-                        window.renderGamePrices?.();
                         return;
                     }
+                    if (!refreshed.ready) {
+                        const message = t("catalogPricesUnavailable", "Prices are temporarily unavailable. Please try again shortly.");
+                        setText(flow.config.noteSelector, message);
+                        window.PaymentUtils?.showToast?.(message);
+                        return;
+                    }
+                    orderData = buildOrderData(flow);
 
-                    if (Math.abs(Number(freshPackage.amount) - Number(orderData.amount)) > 0.000001) {
+                    if (refreshed.priceChanged) {
                         const message = t("catalogPriceUpdated", "Price updated to the latest catalog price. Please review the new total.");
                         setText(flow.config.noteSelector, message);
                         window.PaymentUtils?.showToast?.(message);
-                        await window.renderGamePrices?.({
-                            reselectCode: orderData.packageCode
-                        });
                         return;
                     }
                 } catch (error) {
@@ -541,6 +538,46 @@
             flow.isSubmitting = false;
             updateSummary(flow);
         }
+    }
+
+    async function refreshPackageForCheckout(flow, staleOrderData) {
+        await window.AZIEL_CATALOG.ensureFreshForPurchase();
+        const productCode = staleOrderData.productCode || flow.config.productCode || flow.config.gameKey || "";
+        const packageCode = staleOrderData.packageCode || "";
+        const refreshedCatalogPackage = window.AZIEL_CATALOG.getPackage(productCode, packageCode, staleOrderData.region);
+
+        if (!refreshedCatalogPackage) {
+            await window.renderGamePrices?.();
+            return { ready: false, unavailable: true, priceChanged: false, selectedPackage: null };
+        }
+
+        const refreshResult = await window.renderGamePrices?.({
+            reselectCode: packageCode,
+            reason: "purchase_review"
+        });
+        const refreshedSelection = refreshResult?.selectedPackage || getSelectedPackage();
+        const sameIdentity = Boolean(
+            refreshedSelection &&
+            String(refreshedSelection.productCode || "").toLowerCase() === String(productCode).toLowerCase() &&
+            String(refreshedSelection.packageCode || refreshedSelection.code || "").toUpperCase() === String(packageCode).toUpperCase()
+        );
+
+        if (!refreshResult?.ready || !sameIdentity) {
+            return {
+                ready: false,
+                unavailable: refreshResult?.unavailable === true,
+                priceChanged: false,
+                selectedPackage: refreshedSelection || null
+            };
+        }
+
+        const latestAmount = Number(refreshedSelection.amount || refreshedSelection.price || 0);
+        return {
+            ready: true,
+            unavailable: false,
+            priceChanged: Math.abs(latestAmount - Number(staleOrderData.amount)) > 0.000001,
+            selectedPackage: refreshedSelection
+        };
     }
 
     function stageCheckoutHandoff(orderData, flow) {
@@ -1090,6 +1127,7 @@
         buildOrderData,
         getSelectedPackage,
         getSelectedPayment,
+        refreshPackageForCheckout,
         updateSummary
     };
 })();

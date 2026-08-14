@@ -93,6 +93,14 @@ function verifyRoutesAndRbac() {
     includes("backend/routes/supplier.js", "adminMiddleware", "Supplier routes must require Admin auth.");
     includes("backend/routes/supplier.js", "requireAdminPermission(PERMISSIONS.SUPPLIERS_MANAGE", "Supplier mutation routes must enforce permissions.");
     includes("backend/routes/supplier.js", "requireAdminPermission(PERMISSIONS.FULFILLMENT_EXECUTE", "Fulfillment execution routes must enforce permissions.");
+    includes("backend/routes/supplier.js", "startManualAdminFulfillment(req.params.fulfillmentId", "Existing MANUAL_ADMIN attempts must delegate to the fulfillment domain start authority.");
+    includes("backend/services/fulfillmentService.js", "async function startManualAdminFulfillment", "MANUAL_ADMIN start authority must exist.");
+    includes("backend/services/fulfillmentService.js", "FULFILLMENT_ROUTE_MISMATCH", "Supplier attempts must remain outside MANUAL_ADMIN start semantics.");
+    includes("backend/services/fulfillmentService.js", "FULFILLMENT_NOT_STARTABLE", "Resolved attempts must be rejected by the start authority.");
+    includes("backend/services/fulfillmentService.js", "idempotent: true", "Duplicate active MANUAL_ADMIN start must be idempotent.");
+    includes("backend/services/fulfillmentService.js", 'String(order.paymentStatus || order.payment?.status || "") !== "paid"', "Unpaid Commerce orders must be rejected.");
+    includes("backend/services/fulfillmentService.js", "session.withTransaction", "MANUAL_ADMIN attempt and CommerceOrder start transitions must be atomic.");
+    includes("backend/services/fulfillmentService.js", 'toStatus: "processing"', "MANUAL_ADMIN start must transition Commerce fulfillment/order to processing.");
     includes("backend/routes/supplier.js", "requireAdminPermission(PERMISSIONS.FULFILLMENT_RESOLVE", "Fulfillment resolve routes must enforce permissions.");
     includes("backend/routes/supplier.js", "MOCK_SUPPLIER_DISABLED", "Legacy mock supplier route must be disabled.");
     includes("backend/routes/order.js", "router.get(\"/admin/orders/:id\"", "Admin must expose a single-order detail refresh endpoint.");
@@ -160,6 +168,8 @@ async function verifyFrontend() {
     assert(!frontend.includes("idempotencyKey: `admin-ui:${order.orderId}:${selected.id}`"), "Retry idempotency key must not be fixed to order + mapping only.");
     includes("frontend/js/admin-orders.js", "refreshAdminOrderDetail", "Orders controller must expose a selected-detail backend refresh.");
     includes("frontend/js/admin-orders.js", "selectedAdminOrderSnapshot", "Orders detail must survive current queue filter changes after retry start.");
+    includes("backend/services/fulfillmentService.js", 'String(order.status || "") !== "paid"', "Manual Admin fulfillment must require the canonical paid top-level order state.");
+    assert(!read("backend/services/fulfillmentService.js").includes('currentStatus === "pending_payment"'), "Fulfillment start must not repair a skipped payment-to-order transition.");
     includes("frontend/js/admin-fulfillment.js", "startFulfillmentForAdminOrder", "Paid Orders must be able to start fulfillment.");
     includes("frontend/js/admin-fulfillment.js", "markFulfillmentSucceeded", "Mark Fulfilled must be explicit.");
     includes("frontend/js/admin-fulfillment.js", "markFulfillmentFailed", "Mark Failed must be explicit.");

@@ -2,6 +2,7 @@ const User = require("../models/User");
 const { verifyUserToken } = require("./authSessionService");
 const { resolveAdminRequest } = require("./adminAuthService");
 const jwt = require("jsonwebtoken");
+const { recordSuppressedEvent, suppressTestRealtime } = require("../e2e/e2eSafety");
 
 const JWT_SECRET = process.env.JWT_SECRET || "aziel_jwt_secret";
 
@@ -221,6 +222,10 @@ function emitToAdmin(eventName, payload = {}) {
 }
 
 async function emitToUsername(username, eventName, payload = {}) {
+    if (suppressTestRealtime(username)) {
+        recordSuppressedEvent("realtime", { event: eventName, recipient: username });
+        return;
+    }
     if (!ioInstance || !username) return;
 
     const user = await findUserByUsername(username);

@@ -29,6 +29,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.addEventListener("aziel:catalog-updated", event => {
     if (event.detail?.status !== "ready") return;
+    if (event.detail?.source === "purchase") return;
     if (catalogLoadInFlight) return;
     const selectedCode = selectedPackage?.code || "";
     renderGamePrices({
@@ -169,6 +170,10 @@ function showPackageSkeletons(packageContainer) {
   `).join("") + '<span class="az-visually-hidden" role="status">Loading available packages</span>';
 }
 
+function finishPackageLoading(packageContainer) {
+  packageContainer?.setAttribute("aria-busy", "false");
+}
+
 function t(key, fallback) {
   return window.AZIEL_I18N?.t?.(key) || window.i18n?.t?.(key) || fallback;
 }
@@ -232,7 +237,8 @@ async function renderGamePrices(options = {}) {
     showCatalogMessage(packageContainer, t("catalogPricesUnavailable", "Prices are temporarily unavailable. Please try again shortly."), false);
     clearSelectedPackage("catalog_client_missing");
     emitPricesRendered({ game, hasPackages: false, ready: false });
-    return;
+    finishPackageLoading(packageContainer);
+    return { ready: false, error: true, selectedPackage: null };
   }
 
   packageContainer.dataset.catalogSynced = "false";
@@ -246,7 +252,8 @@ async function renderGamePrices(options = {}) {
     showCatalogMessage(packageContainer, t("catalogPricesUnavailable", "Prices are temporarily unavailable. Please try again shortly."), true);
     clearSelectedPackage("catalog_unavailable");
     emitPricesRendered({ game, hasPackages: false, ready: false, error: true });
-    return;
+    finishPackageLoading(packageContainer);
+    return { ready: false, error: true, selectedPackage: null };
   } finally {
     catalogLoadInFlight = false;
   }
@@ -258,7 +265,8 @@ async function renderGamePrices(options = {}) {
     showCatalogMessage(packageContainer, t("catalogProductUnavailable", "This product is temporarily unavailable."), false);
     clearSelectedPackage("product_disabled");
     emitPricesRendered({ game, hasPackages: false, ready: true, unavailable: true });
-    return;
+    finishPackageLoading(packageContainer);
+    return { ready: false, unavailable: true, selectedPackage: null };
   }
 
   const catalogPackages = catalog.getPackages(game, getShopRegion());
@@ -268,7 +276,8 @@ async function renderGamePrices(options = {}) {
     showCatalogMessage(packageContainer, t("catalogPackagesUnavailable", "Packages temporarily unavailable."), true);
     clearSelectedPackage("no_regional_packages");
     emitPricesRendered({ game, hasPackages: false, ready: true });
-    return;
+    finishPackageLoading(packageContainer);
+    return { ready: false, unavailable: true, selectedPackage: null };
   }
 
   const previewResults = await settleAuthoritativePrices(catalogPackages, requestId);
@@ -283,7 +292,8 @@ async function renderGamePrices(options = {}) {
     showCatalogMessage(packageContainer, t("catalogPricesUnavailable", "Prices are temporarily unavailable. Please try again shortly."), true);
     clearSelectedPackage("authoritative_price_unavailable");
     emitPricesRendered({ game, hasPackages: false, ready: false, error: true });
-    return;
+    finishPackageLoading(packageContainer);
+    return { ready: false, error: true, selectedPackage: null };
   }
 
   packageContainer.innerHTML = packages.map(item => {
@@ -340,7 +350,7 @@ async function renderGamePrices(options = {}) {
     </div>
   `;
   }).join("");
-  packageContainer.setAttribute("aria-busy", "false");
+  finishPackageLoading(packageContainer);
 
   bindPackageIconFallbacks(packageContainer);
 
@@ -358,17 +368,18 @@ async function renderGamePrices(options = {}) {
 
     if (packToSelect) {
       selectPackage(packToSelect);
-      return;
+      return { ready: true, unavailable: false, selectedPackage };
     }
 
     clearSelectedPackage(options.reason === "region_changed"
       ? "package_missing_after_region_change"
       : "package_missing_after_catalog_refresh");
     window.PaymentUtils?.showToast?.(t("catalogPackageUnavailable", "This package is no longer available. Please select another package."));
-    return;
+    return { ready: false, unavailable: true, selectedPackage: null };
   }
 
   clearSelectedPackage("prices_rendered");
+  return { ready: true, unavailable: false, selectedPackage: null };
 }
 
 function bindPackageSelection() {

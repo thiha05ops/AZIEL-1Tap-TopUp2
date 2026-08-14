@@ -72,6 +72,16 @@ function verifyBackendBridge() {
 
 function verifyFrontendHandoff() {
     includes(
+        "frontend/js/product-checkout.js",
+        "validateReviewForHandoff(authoritativeReview)",
+        "Review must hand off the valid server-issued PricingQuote without a contradictory raw-catalog price comparison."
+    );
+    includes(
+        "frontend/js/payment.js",
+        'sessionStorage.getItem("azielProductCheckoutDraft")',
+        "Payment-method readiness must use the transaction region carried by the checkout draft."
+    );
+    includes(
         "frontend/js/payment/payment-engine.js",
         '"/api/commerce/checkout/manual-promptpay"',
         "Payment engine must call Commerce customer checkout instead of legacy manual creation."

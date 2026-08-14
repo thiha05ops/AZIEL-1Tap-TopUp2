@@ -549,11 +549,15 @@ function getOrderActions(order) {
     const activeFulfillment = order.fulfillment && ["PENDING", "IN_PROGRESS"].includes(order.fulfillment.status);
     const actions = [];
 
-    if (status === "pending_payment" && order.hasPaymentEvidence && allowed.has("paid")) {
+    if (status === "pending_payment" && order.hasPaymentEvidence && (
+        order.actions?.canApproveManualPayment === true || allowed.has("paid")
+    )) {
         actions.push({ action: "confirm-paid", labelKey: "confirm_paid", className: "order-primary-action" });
     }
 
-    if (status === "pending_payment" && order.isCommerceManualPayment && order.hasPaymentEvidence && allowed.has("failed")) {
+    if (status === "pending_payment" && order.isCommerceManualPayment && order.hasPaymentEvidence && (
+        order.actions?.canRejectManualPayment === true || allowed.has("failed")
+    )) {
         actions.push({ action: "reject-manual-payment", labelKey: "reject", className: "order-danger-action" });
     }
 

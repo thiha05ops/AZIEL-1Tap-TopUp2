@@ -36,14 +36,15 @@
         return null;
     }
 
-    async function validateCatalog(order) {
-        await window.AZIEL_CATALOG?.load?.({ force: true });
-        const current = window.AZIEL_CATALOG?.getPackage?.(order.productCode, order.packageCode, order.region);
-        if (!current) throw new Error(t("checkout.packageUnavailable", "This package is no longer available. Return to the product and choose again."));
-        if (Math.abs(Number(current.amount) - Number(order.amount)) > .000001 || current.currency !== order.currency) {
-            throw new Error(t("checkout.priceChanged", "The package price changed. Return to the product to review the latest total."));
+    function validateReviewForHandoff(review) {
+        const expiresAt = new Date(review?.expiresAt || 0);
+        if (!review?.quoteId || String(review.status || "").toUpperCase() !== "ISSUED") {
+            throw new Error(t("checkout.reviewFailed", "Checkout review could not be verified."));
         }
-        return current;
+        if (!Number.isFinite(expiresAt.getTime()) || expiresAt.getTime() <= Date.now()) {
+            throw new Error(t("checkout.reviewExpired", "This checkout review has expired. Refresh the page to get a new total."));
+        }
+        return review;
     }
 
     function render(order) {
@@ -131,7 +132,7 @@
         paymentSubmitting = true;
         button.disabled = true;
         try {
-            await validateCatalog(draft.order);
+            validateReviewForHandoff(authoritativeReview);
             sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ ...draft, review: authoritativeReview }));
             window.location.href = "payment-method.html";
         } catch (error) {
@@ -153,4 +154,8 @@
         updatePaymentReady();
         loadAuthoritativeReview();
     });
+
+    window.AZIEL_PRODUCT_CHECKOUT = {
+        validateReviewForHandoff
+    };
 })();

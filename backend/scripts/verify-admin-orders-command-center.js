@@ -34,7 +34,9 @@ function verifyOrderRouteContracts() {
     assert(source.includes("projectAdminOrder"), "Admin orders should use an explicit projection");
     assert(source.includes("projectCommerceManualAttempt"), "Admin manual review should use an explicit Commerce projection");
     assert(source.includes("allowedNextStatuses"), "Admin order projection should include allowed transitions");
-    assert(source.includes("transitionOrder(order, status"), "Status updates should use canonical transitionOrder");
+    assert(source.includes("adminOrderCommands.transitionStatus"), "Status updates should use the Admin order command authority");
+    assert(read("backend/services/adminOrderCommandService.js").includes("transitionLegacyOrder(resolved.order, status"), "Legacy commands must delegate to canonical transitionOrder through the injected authority");
+    assert(read("backend/services/adminOrderCommandService.js").includes("Commerce order state is controlled by payment and fulfillment commands"), "Commerce generic status mutation must be rejected");
     assert(!source.includes("ManualPaymentAttempt.find"), "Admin order queues must not query ManualPaymentAttempt");
 }
 

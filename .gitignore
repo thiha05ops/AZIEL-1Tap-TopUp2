@@ -6,3 +6,6 @@ node_modules/
 client_secret_*.json
 uploads/.env
 .local-admin-recovery/
+.aziel-e2e/
+.codex-screenshots/
+backend/uploads/payment-slips/

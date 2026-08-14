@@ -125,7 +125,11 @@ function plainRecord(record) {
     if (typeof record.toObject === "function") {
         return record.toObject({ depopulate: true, flattenMaps: true, versionKey: false });
     }
-    return structuredClone(record);
+    const cloned = structuredClone(record);
+    // structuredClone does not preserve BSON ObjectId prototypes. Keep the
+    // canonical identity castable for downstream transactional references.
+    if (record._id != null) cloned._id = String(record._id);
+    return cloned;
 }
 
 function normalizeCheckoutIdentity(snapshot) {
@@ -401,7 +405,15 @@ async function updatePaymentStatus(input, options = {}) {
         invalidCode: ERROR_CODES.INVALID_PAYMENT_STATUS_TRANSITION
     });
     if (normalizeString(input.toStatus) === "paid") {
-        await ensurePaidOrderFulfillmentWork(order, { session: options.session || options.mongoSession || null });
+        try {
+            await ensurePaidOrderFulfillmentWork(order, { session: options.session || options.mongoSession || null });
+        } catch (error) {
+            throw new OrderRepositoryError(ERROR_CODES.ORDER_UPDATE_FAILED, "Commerce order persistence failed.", {
+                stage: "fulfillment_work",
+                causeCode: error?.code || error?.name || "",
+                retryable: error?.retryable === true
+            });
+        }
     }
     return order;
 }

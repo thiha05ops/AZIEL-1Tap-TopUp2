@@ -61,6 +61,10 @@ const { getActivePendingOrderPolicy } = require("../services/pendingOrderPolicy"
 const { normalizePaymentKey } = require("../services/manualPaymentAttemptService");
 const { getOrderFulfillmentSummary } = require("../services/fulfillmentService");
 const {
+    AdminOrderCommandError,
+    createAdminOrderCommandService
+} = require("../services/adminOrderCommandService");
+const {
     StorageError,
     cleanupAfterFailedPersistence,
     logStorageError,
@@ -68,6 +72,13 @@ const {
 } = require("../services/storageService");
 
 const COMMERCE_MANUAL_PROVIDER = "MANUAL_PROMPTPAY";
+
+const adminOrderCommands = createAdminOrderCommandService({
+    LegacyOrder: Order,
+    CommerceOrder,
+    PaymentAttempt,
+    transitionLegacyOrder: transitionOrder
+});
 
 function commerceCoreDisabledLegacyPayableResponse(res, legacyFlow) {
     return res.status(410).json({
@@ -318,6 +329,39 @@ function projectCommerceOrder(order = {}, options = {}) {
     const accountFields = projectFulfilmentAccountFields(order);
     const fulfillmentAttempts = Array.isArray(options.fulfillmentAttempts) ? options.fulfillmentAttempts : [];
     const latestFulfillment = fulfillmentAttempts[0] || null;
+    const paymentAttempt = options.paymentAttempt || null;
+    const paymentEvidence = paymentAttempt ? commercePaymentEvidence(paymentAttempt) : {};
+    const paymentAttemptStatus = String(paymentAttempt?.status || "").toUpperCase();
+    const persistedOrderStatus = String(order.status || "").toLowerCase();
+    const persistedFulfillmentStatus = String(order.fulfilment?.status || "not_started").toLowerCase();
+    const attemptPaymentStatus = paymentAttempt ? commercePaymentStatusForAttempt(paymentAttempt, order) : "";
+    const terminalCompleted = persistedOrderStatus === "completed";
+    const normalizedPaymentStatus = terminalCompleted
+        ? "paid"
+        : (attemptPaymentStatus || order.paymentStatus || payment.status || "");
+    const latestFulfillmentStatus = String(latestFulfillment?.status || "").toUpperCase();
+    const projectedFulfillmentStatus = latestFulfillmentStatus === "SUCCEEDED"
+        ? "completed"
+        : latestFulfillmentStatus === "IN_PROGRESS"
+            ? "processing"
+            : latestFulfillmentStatus === "PENDING"
+                ? "queued"
+                : persistedFulfillmentStatus;
+    const normalizedFulfillmentStatus = terminalCompleted
+        ? "completed"
+        : projectedFulfillmentStatus;
+    const normalizedOrderStatus = terminalCompleted
+        ? "completed"
+        : normalizedFulfillmentStatus === "completed" && normalizedPaymentStatus === "paid"
+            ? "completed"
+            : normalizedFulfillmentStatus === "processing" && normalizedPaymentStatus === "paid"
+                ? "processing"
+                : persistedOrderStatus === "pending_payment" && normalizedPaymentStatus === "paid"
+                    ? "paid"
+                    : persistedOrderStatus;
+    const completedHistory = [...(order.statusHistory || [])].reverse().find(entry => entry?.toStatus === "completed");
+    const canReviewManualPayment = paymentAttempt?.provider === COMMERCE_MANUAL_PROVIDER &&
+        paymentAttemptStatus === "PENDING" && hasCommercePaymentEvidence(paymentAttempt);
     return {
         _id: options.admin ? `commerce-order:${order.orderId}` : order._id,
         orderId: order.orderId || "",
@@ -343,8 +387,8 @@ function projectCommerceOrder(order = {}, options = {}) {
         finalAmount: Number(commercial.totalAmount || 0),
         currency: commercial.currency || "",
         region: commercial.region || product.region || "",
-        paymentMethod: payment.paymentMethodId || "",
-        paymentStatus: order.paymentStatus || payment.status || "",
+        paymentMethod: paymentAttempt?.paymentMethod || payment.paymentMethodId || "",
+        paymentStatus: normalizedPaymentStatus,
         receiptSubmitted,
         awaitingManualReview,
         awaitingPayment,
@@ -353,20 +397,34 @@ function projectCommerceOrder(order = {}, options = {}) {
             : awaitingPayment
                 ? "Payment pending. Awaiting payment."
                 : "",
-        paymentProvider: payment.provider || "",
-        transactionId: "",
+        paymentProvider: paymentAttempt?.provider || payment.provider || "",
+        transactionId: paymentAttempt?.providerReference || "",
+        commercePaymentAttemptId: paymentAttempt?.attemptId || "",
+        manualPaymentAttemptId: paymentAttempt?.attemptId || "",
+        isCommerceManualPayment: paymentAttempt?.provider === COMMERCE_MANUAL_PROVIDER,
+        paymentEvidence,
+        paymentSlip: paymentEvidence.url || "",
         note: order.customer?.notes || "",
-        status: order.status || "",
+        status: normalizedOrderStatus,
+        orderStatus: normalizedOrderStatus,
+        fulfillmentStatus: normalizedFulfillmentStatus,
+        completedAt: terminalCompleted ? (completedHistory?.changedAt || order.updatedAt || null) : null,
+        actionable: ["pending_payment", "paid", "processing"].includes(normalizedOrderStatus),
+        recoverable: normalizedOrderStatus === "pending_payment" && ["pending", "unpaid"].includes(normalizedPaymentStatus),
         refundRequested: false,
         refunded: false,
-        allowedNextStatuses: getAllowedNextStatuses(order.status),
+        allowedNextStatuses: [],
         fulfillment: latestFulfillment || {
-            status: String(order.fulfilment?.status || "not_started").toUpperCase(),
+            status: normalizedFulfillmentStatus.toUpperCase(),
             source: "commerce"
         },
         fulfillmentAttempts,
-        actions: {},
-        hasPaymentEvidence: false,
+        actions: {
+            canApproveManualPayment: canReviewManualPayment,
+            canRejectManualPayment: canReviewManualPayment,
+            canUseGenericStatus: false
+        },
+        hasPaymentEvidence: hasCommercePaymentEvidence(paymentAttempt || {}),
         isSummary: options.summary === true,
         businessSnapshot: options.summary === true ? null : {
             available: Boolean(order.quoteSnapshot?.pricingSnapshot || order.pricing || order.commercialSnapshot),
@@ -391,6 +449,24 @@ function projectCommerceOrder(order = {}, options = {}) {
         createdAt: order.createdAt,
         updatedAt: order.updatedAt
     };
+}
+
+async function projectOwnedCommerceOrders(orders = [], options = {}) {
+    if (!orders.length) return [];
+    const orderIds = orders.map(order => order.orderId).filter(Boolean);
+    const [paymentAttempts, fulfillmentByOrder] = await Promise.all([
+        PaymentAttempt.find({ orderId: { $in: orderIds } }).sort({ updatedAt: -1, createdAt: -1 }).lean(),
+        getOrderFulfillmentSummary(orders.map(order => order._id))
+    ]);
+    const paymentByOrder = new Map();
+    paymentAttempts.forEach(attempt => {
+        if (!paymentByOrder.has(attempt.orderId)) paymentByOrder.set(attempt.orderId, attempt);
+    });
+    return orders.map(order => projectCommerceOrder(order, {
+        ...options,
+        paymentAttempt: paymentByOrder.get(order.orderId) || null,
+        fulfillmentAttempts: fulfillmentByOrder.get(String(order._id)) || []
+    }));
 }
 
 async function listCommerceManualReviewOrders({ search = "", cursor = "", limit = 50 } = {}) {
@@ -577,9 +653,10 @@ router.get("/history/:username", authMiddleware, async (req, res) => {
                 "owner.userId": String(req.user?._id || req.user?.id || req.user?.userId || "")
             }).sort({ createdAt: -1 }).lean()
         ]);
+        const projectedCommerce = await projectOwnedCommerceOrders(commerceOrders, { username });
         const orders = [
             ...legacyOrders,
-            ...commerceOrders.map(order => projectCommerceOrder(order, { username }))
+            ...projectedCommerce
         ].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
         res.json({ success: true, orders });
@@ -603,9 +680,10 @@ router.get("/order/user/:username", authMiddleware, async (req, res) => {
                 "owner.userId": String(req.user?._id || req.user?.id || req.user?.userId || "")
             }).sort({ createdAt: -1 }).lean()
         ]);
+        const projectedCommerce = await projectOwnedCommerceOrders(commerceOrders, { username });
         const orders = [
             ...legacyOrders,
-            ...commerceOrders.map(order => projectCommerceOrder(order, { username }))
+            ...projectedCommerce
         ].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
         res.json({ success: true, orders });
@@ -631,9 +709,10 @@ router.get("/order/track/:orderId", authMiddleware, async (req, res) => {
                 "owner.userId": String(req.user?._id || req.user?.id || req.user?.userId || "")
             }).lean();
             if (commerceOrder) {
+                const [projected] = await projectOwnedCommerceOrders([commerceOrder]);
                 return res.json({
                     success: true,
-                    order: projectCommerceOrder(commerceOrder)
+                    order: projected
                 });
             }
             return res.status(404).json({
@@ -670,9 +749,10 @@ router.get("/order/status/:orderId", authMiddleware, async (req, res) => {
                 "owner.userId": String(req.user?._id || req.user?.id || req.user?.userId || "")
             }).lean();
             if (commerceOrder) {
+                const [projected] = await projectOwnedCommerceOrders([commerceOrder]);
                 return res.json({
                     success: true,
-                    order: projectCommerceOrder(commerceOrder),
+                    order: projected,
                     allowedNextStatuses: getAllowedNextStatuses(commerceOrder.status)
                 });
             }
@@ -885,40 +965,27 @@ router.get("/admin/orders", adminMiddleware, requireAdminPermission(PERMISSIONS.
 
 router.get("/admin/orders/:id", adminMiddleware, requireAdminPermission(PERMISSIONS.ORDERS_READ), async (req, res) => {
     try {
-        const commerceOrderDetail = await getCommerceOrderForAdmin(req.params.id);
-        if (commerceOrderDetail) {
-            return res.json({
-                success: true,
-                order: commerceOrderDetail
-            });
-        }
-
-        const commerceOrder = await getCommerceManualOrderForAdmin(req.params.id);
-        if (commerceOrder) {
-            return res.json({
-                success: true,
-                order: commerceOrder
-            });
-        }
-
-        const order = await Order.findById(req.params.id);
-        if (!order) {
-            return res.status(404).json({
-                success: false,
-                message: "Order not found"
-            });
-        }
-
+        const resolved = await adminOrderCommands.getAdminDetail(req.params.id);
+        const order = resolved.order;
         const fulfillmentByOrder = await getOrderFulfillmentSummary([order._id]);
         const attempts = fulfillmentByOrder.get(String(order._id)) || [];
 
         return res.json({
             success: true,
-            order: projectAdminOrder(order, attempts)
+            order: resolved.orderType === "commerce"
+                ? projectCommerceOrder(order, {
+                    admin: true,
+                    paymentAttempt: resolved.paymentAttempt,
+                    fulfillmentAttempts: attempts
+                })
+                : projectAdminOrder(order, attempts)
         });
     } catch (error) {
         console.log("Admin order detail error:", error);
-        return res.json({ success: false, message: "Server error" });
+        if (error instanceof AdminOrderCommandError) {
+            return res.status(error.statusCode).json({ success: false, code: error.code, message: error.message });
+        }
+        return res.status(500).json({ success: false, code: "ORDER_DETAIL_FAILED", message: "Server error" });
     }
 });
 
@@ -926,13 +993,11 @@ router.get("/admin/orders/:id", adminMiddleware, requireAdminPermission(PERMISSI
 router.put("/admin/orders/:id/status", adminMiddleware, requireAdminPermission(PERMISSIONS.ORDERS_MANAGE), async (req, res) => {
     try {
         const { status } = req.body;
-        const order = await Order.findById(req.params.id);
+        const resolved = await adminOrderCommands.resolve(req.params.id);
+        const order = resolved.order;
 
-        if (!order) {
-            return res.json({
-                success: false,
-                message: "Order not found"
-            });
+        if (resolved.orderType === "commerce") {
+            await adminOrderCommands.transitionStatus({ identifier: req.params.id, status });
         }
 
         if (status === ORDER_STATES.COMPLETED) {
@@ -949,14 +1014,14 @@ router.put("/admin/orders/:id/status", adminMiddleware, requireAdminPermission(P
         }
 
         const previousStatus = order.status;
-        const transition = await transitionOrder(order, status, {
+        const transition = await adminOrderCommands.transitionStatus({ identifier: req.params.id, status, options: {
             source: "admin",
             actorType: "admin",
             actor: req.admin?.username || req.user?.username || "admin",
             reason: "Admin status update",
             paymentStatus: status === ORDER_STATES.PAID ? PAYMENT_STATES.PAID : undefined,
             idempotencyKey: `admin:status:${order.orderId}:${status}`
-        });
+        }});
 
         if (!transition.changed) {
             return res.json({
@@ -1013,10 +1078,11 @@ ${updatedOrder.status}`
     } catch (error) {
         console.log("Update status error:", error);
 
-        res.status(error instanceof OrderStateError ? error.status : 500).json({
+        const commandError = error instanceof AdminOrderCommandError;
+        res.status(commandError ? error.statusCode : (error instanceof OrderStateError ? error.status : 500)).json({
             success: false,
             code: error.code || "ORDER_STATUS_UPDATE_FAILED",
-            message: error instanceof OrderStateError ? error.message : "Server error"
+            message: commandError || error instanceof OrderStateError ? error.message : "Server error"
         });
     }
 });
