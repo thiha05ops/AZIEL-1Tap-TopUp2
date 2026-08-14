@@ -993,6 +993,15 @@ function bindPaymentInfrastructureActions() {
         if (!regionButton || !container.contains(regionButton)) return;
         selectPaymentInfrastructureRegion(regionButton.dataset.paymentInfraRegion || "TH");
     });
+    container.addEventListener("change", event => {
+        const enabledInput = event.target.closest(".payment-method-card .pm-enabled");
+        if (!enabledInput || !container.contains(enabledInput)) return;
+        const card = enabledInput.closest(".payment-method-card");
+        const status = card?.querySelector(".payment-config-status");
+        if (!status) return;
+        status.className = `payment-config-status ${enabledInput.checked ? "is-draft" : "is-ready"}`;
+        status.textContent = enabledInput.checked ? "Unsaved · Pending Save" : "Unsaved · Disabled";
+    });
 }
 
 function selectPaymentInfrastructureRegion(region, options = {}) {

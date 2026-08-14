@@ -1035,6 +1035,7 @@ router.get("/payment-methods", async (req, res) => {
             methods: methods
                 .filter(method => !isLegacyThailandBankMethod(method))
                 .map(formatMethod)
+                .filter(method => method.enabled === true && method.publicReady === true)
         });
     } catch (error) {
         console.log("Payment methods error:", error);

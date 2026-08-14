@@ -152,6 +152,7 @@
     "verify:public-pwa": "node backend/scripts/verify-public-pwa.js",
     "verify:payment-display-labels": "node backend/scripts/verify-payment-display-labels.js",
     "verify:payment-infrastructure": "node backend/scripts/verify-payment-infrastructure.js",
+    "verify:payment-method-authority:isolated": "node backend/scripts/verify-payment-method-authority.js",
     "verify:payment-ux-architecture": "node backend/scripts/verify-payment-ux-architecture.js",
     "verify:payment-provider-integrity": "node backend/scripts/verify-payment-provider-integrity.js",
     "verify:payment-methods-admin-ux": "node backend/scripts/verify-payment-methods-admin-ux.js",
