@@ -1278,8 +1278,6 @@ router.post("/payment-methods/:key/promptpay-qr", authMiddleware, async (req, re
 // GET /api/admin/payment-methods
 router.get("/admin/payment-methods", adminMiddleware, requireAdminPermission(PERMISSIONS.PAYMENT_METHODS_MANAGE), async (req, res) => {
     try {
-        await seedPaymentMethods();
-
         const filter = {};
         if (req.query.region) filter.region = String(req.query.region).toUpperCase();
 
@@ -1302,8 +1300,6 @@ router.get("/admin/payment-methods", adminMiddleware, requireAdminPermission(PER
 
 router.get("/admin/payment-infrastructure", adminMiddleware, requireAdminPermission(PERMISSIONS.PAYMENT_METHODS_MANAGE), async (req, res) => {
     try {
-        await seedPaymentMethods();
-
         const methods = await PaymentMethod
             .find({})
             .sort({ region: 1, sortOrder: 1, method: 1 })

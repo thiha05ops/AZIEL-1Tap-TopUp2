@@ -155,7 +155,7 @@ function projectProvider(provider = {}) {
 
 function projectManualRail(method = {}) {
     const railType = railTypeForMethod(method);
-    const status = method.enabled === true && method.publicReady !== false ? STATUS.READY : method.enabled === true ? STATUS.DEGRADED : STATUS.DISABLED;
+    const status = method.enabled === true && method.publicReady === true ? STATUS.READY : method.enabled === true ? STATUS.DEGRADED : STATUS.DISABLED;
     return {
         id: String(method._id || method.key || ""),
         methodId: String(method._id || ""),
@@ -166,7 +166,7 @@ function projectManualRail(method = {}) {
         label: formatPaymentMethod(method, method.method || method.key || "Payment"),
         displayName: method.method || method.key || "Payment",
         enabled: method.enabled === true,
-        customerVisible: method.enabled === true && method.publicReady !== false,
+        customerVisible: method.enabled === true && method.publicReady === true,
         status,
         provider: method.provider || method.key || "",
         paymentType: method.paymentType || "manual",

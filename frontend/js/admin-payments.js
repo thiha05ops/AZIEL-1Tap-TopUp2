@@ -4,7 +4,9 @@
 let adminPaymentMethods = [];
 let adminPaymentInfrastructure = null;
 let adminPaymentInfrastructureActiveRegion = "TH";
+let adminPaymentInfrastructureActiveTab = "overview";
 let adminPaymentsInitialized = false;
+let paymentInfrastructureActionsBound = false;
 
 const ADMIN_PAYMENT_PROVIDERS = Object.freeze({
     promptpay: { key: "promptpay", label: "PromptPay", region: "TH" },
@@ -674,6 +676,17 @@ function renderPaymentInfrastructureWorkspace(methods = [], configurationMarkup 
     const regions = Array.isArray(infra.regions) ? infra.regions : [];
     const activeRegion = selectedRegion || getPaymentInfrastructureActiveRegion(methods);
     const active = regions.find(region => region.region === activeRegion) || regions[0] || {};
+    const activeTab = Object.prototype.hasOwnProperty.call({
+        overview: true,
+        configuration: true,
+        display: true,
+        accounts: true,
+        providers: true,
+        routing: true,
+        cards: true,
+        webhooks: true,
+        diagnostics: true
+    }, adminPaymentInfrastructureActiveTab) ? adminPaymentInfrastructureActiveTab : "overview";
     const panels = {
         overview: renderPaymentInfrastructureOverview(active, infra),
         configuration: configurationMarkup,
@@ -716,14 +729,14 @@ function renderPaymentInfrastructureWorkspace(methods = [], configurationMarkup 
 
             <section class="payment-infra-main">
                 <div class="payment-infra-tabs" role="tablist" aria-label="Payment infrastructure workspace">
-                    ${Object.keys(panels).map((key, index) => `
-                        <button class="${index === 0 ? "active" : ""}" type="button" data-payment-infra-tab="${key}">
+                    ${Object.keys(panels).map(key => `
+                        <button class="${key === activeTab ? "active" : ""}" type="button" data-payment-infra-tab="${key}">
                             ${escapeAdminHTML(paymentInfrastructureTabLabel(key))}
                         </button>
                     `).join("")}
                 </div>
-                ${Object.entries(panels).map(([key, markup], index) => `
-                    <div class="payment-infra-panel ${index === 0 ? "active" : ""}" data-payment-infra-panel="${key}">
+                ${Object.entries(panels).map(([key, markup]) => `
+                    <div class="payment-infra-panel ${key === activeTab ? "active" : ""}" data-payment-infra-panel="${key}">
                         ${markup}
                     </div>
                 `).join("")}
@@ -739,9 +752,11 @@ function buildFallbackPaymentInfrastructure(methods = []) {
         manualRails: methods.filter(method => (method.region || "") === region && method.paymentType !== "auto" && method.paymentType !== "wallet").map(method => ({
             label: method.method || method.key,
             railType: method.railType || "MANUAL_QR",
-            status: method.enabled ? "READY" : "DISABLED",
+            status: method.enabled === true && method.publicReady === true
+                ? "READY"
+                : method.enabled === true ? "DEGRADED" : "DISABLED",
             enabled: method.enabled === true,
-            customerVisible: method.enabled === true,
+            customerVisible: method.enabled === true && method.publicReady === true,
             capabilities: {
                 saveQr: method.enableSaveQr === true,
                 openApp: method.enableOpenApp === true,
@@ -816,16 +831,17 @@ function renderPaymentRailRow(rail = {}) {
                 <strong>${escapeAdminHTML(rail.label || rail.displayName || rail.key || "Rail")}</strong>
                 <small>${escapeAdminHTML(rail.railType || "Rail")} · ${escapeAdminHTML(rail.availabilityMode || "DISABLED")}</small>
             </div>
-            <span class="payment-infra-status ${escapeAdminHTML(status.toLowerCase())}">${escapeAdminHTML(status)}</span>
-            <p>${escapeAdminHTML(rail.customerVisible ? "Customer visible" : "Not customer visible")}</p>
+            <span class="payment-infra-status ${escapeAdminHTML(status.toLowerCase())}">Rail ${escapeAdminHTML(status)}</span>
+            <p>${escapeAdminHTML(rail.customerVisible ? "Storefront: Visible" : "Storefront: Hidden")}</p>
         </article>
     `;
 }
 
 function renderPaymentInfrastructureCustomerDisplay(region = {}) {
+    const visibleRails = (region.manualRails || []).filter(rail => rail.customerVisible === true);
     return `
         <div class="payment-preview-grid">
-            ${(region.manualRails || []).map(rail => `
+            ${visibleRails.map(rail => `
                 <article class="payment-preview-card">
                     <strong>${escapeAdminHTML(rail.label)}</strong>
                     <span>${escapeAdminHTML(rail.railType)}</span>
@@ -837,7 +853,7 @@ function renderPaymentInfrastructureCustomerDisplay(region = {}) {
                         ${capabilityChip("Receipt", rail.capabilities?.receiptUpload)}
                     </div>
                 </article>
-            `).join("") || `<div class="payment-infra-empty">No manual preview available.</div>`}
+            `).join("") || `<div class="payment-infra-empty">No customer-visible payment rails are available for this region.</div>`}
         </div>
     `;
 }
@@ -959,22 +975,40 @@ function paymentInfraMetric(label, value) {
 }
 
 function bindPaymentInfrastructureActions() {
-    document.querySelectorAll(".payment-infra-tabs [data-payment-infra-tab]").forEach(button => {
-        button.addEventListener("click", () => {
-            const tab = button.dataset.paymentInfraTab;
-            const root = button.closest(".payment-infrastructure-workspace");
-            root?.querySelectorAll("[data-payment-infra-tab]").forEach(item => item.classList.toggle("active", item === button));
+    const container = document.getElementById("paymentMethodsContainer");
+    if (!container || paymentInfrastructureActionsBound) return;
+    paymentInfrastructureActionsBound = true;
+    container.addEventListener("click", event => {
+        const tabButton = event.target.closest("[data-payment-infra-tab]");
+        if (tabButton && container.contains(tabButton)) {
+            const tab = tabButton.dataset.paymentInfraTab || "overview";
+            adminPaymentInfrastructureActiveTab = tab;
+            const root = tabButton.closest(".payment-infrastructure-workspace");
+            root?.querySelectorAll("[data-payment-infra-tab]").forEach(item => item.classList.toggle("active", item === tabButton));
             root?.querySelectorAll("[data-payment-infra-panel]").forEach(panel => panel.classList.toggle("active", panel.dataset.paymentInfraPanel === tab));
-        });
+            return;
+        }
+
+        const regionButton = event.target.closest(".payment-infra-region[data-payment-infra-region]");
+        if (!regionButton || !container.contains(regionButton)) return;
+        selectPaymentInfrastructureRegion(regionButton.dataset.paymentInfraRegion || "TH");
     });
-    document.querySelectorAll(".payment-infra-region").forEach(button => {
-        button.addEventListener("click", () => {
-            const region = button.dataset.paymentInfraRegion || "TH";
-            adminPaymentInfrastructureActiveRegion = region;
-            renderAdminPaymentMethods(adminPaymentMethods);
-            showAdminToast?.(`${region === "MM" ? "Myanmar" : region === "TH" ? "Thailand" : "Future Regions"} payment rails selected.`, "info");
-        });
-    });
+}
+
+function selectPaymentInfrastructureRegion(region, options = {}) {
+    const normalized = String(region || "").trim().toUpperCase();
+    const availableRegions = Array.isArray(adminPaymentInfrastructure?.regions)
+        ? adminPaymentInfrastructure.regions.map(item => String(item.region || "").toUpperCase())
+        : ["MM", "TH", "FUTURE"];
+    if (!availableRegions.includes(normalized)) return false;
+    if (normalized === adminPaymentInfrastructureActiveRegion) return false;
+
+    adminPaymentInfrastructureActiveRegion = normalized;
+    renderAdminPaymentMethods(adminPaymentMethods);
+    if (options.notify !== false) {
+        showAdminToast?.(`${normalized === "MM" ? "Myanmar" : normalized === "TH" ? "Thailand" : "Future Regions"} payment rails selected.`, "info");
+    }
+    return true;
 }
 
 function formatAdminDate(value) {
@@ -1186,8 +1220,8 @@ function getAdminPaymentReadiness(method = {}) {
 
 function getAdminPaymentStatus(method = {}, readiness = { ready: false }) {
     if (!readiness.ready) return { label: "Draft", className: "is-draft" };
-    if (method.enabled) return { label: "Enabled", className: "is-enabled" };
-    return { label: "Ready", className: "is-ready" };
+    if (method.enabled) return { label: "Customer Visible", className: "is-enabled" };
+    return { label: "Configured · Disabled", className: "is-ready" };
 }
 
 function isLegacyThailandBankAdminMethod(method = {}) {
