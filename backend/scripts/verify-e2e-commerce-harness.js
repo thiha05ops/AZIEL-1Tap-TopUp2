@@ -7,6 +7,7 @@ const path = require("path");
 
 const ROOT = path.join(__dirname, "..", "..");
 const safety = require("../e2e/e2eSafety");
+const { resolveMongoUri } = require("../config/db");
 const { getPermissionsForRole, PERMISSIONS } = require("../services/adminAuthorizationService");
 
 function read(relative) {
@@ -26,6 +27,19 @@ function testGateClosed() {
     assert(harness.includes('process.env.AZIEL_E2E_MONGO_URI || ""'), "Harness must require a dedicated database URI");
     assert(!harness.includes("process.env.AZIEL_E2E_MONGO_URI || process.env.MONGO_URI"), "Harness must never fall back to the normal runtime database");
     assert(harness.includes('hostname === "azielplay.com"'), "Harness must reject the production storefront host");
+
+    const isolatedEnv = {
+        NODE_ENV: "test",
+        AZIEL_E2E_TEST_MODE: "true",
+        AZIEL_E2E_TEST_SCOPE: "safe_scope",
+        AZIEL_E2E_TEST_CONFIRM: safety.CONFIRM_VALUE,
+        AZIEL_E2E_MONGO_URI: "mongodb://127.0.0.1:27017/aziel_e2e_safe_scope",
+        MONGO_URI: "mongodb://example.invalid/azielshop"
+    };
+    assert.strictEqual(resolveMongoUri(isolatedEnv), isolatedEnv.AZIEL_E2E_MONGO_URI, "E2E runtime must select only AZIEL_E2E_MONGO_URI.");
+    assert.throws(() => resolveMongoUri({ ...isolatedEnv, AZIEL_E2E_MONGO_URI: "" }), /AZIEL_E2E_MONGO_URI is required/);
+    assert.throws(() => resolveMongoUri({ ...isolatedEnv, AZIEL_E2E_MONGO_URI: "mongodb://example.invalid/aziel_e2e_safe_scope" }), /localhost-only/);
+    assert.throws(() => resolveMongoUri({ ...isolatedEnv, AZIEL_E2E_MONGO_URI: "mongodb://127.0.0.1:27017/azielshop" }), /must not select azielshop/);
 }
 
 function testIdentityAndCustomerIsolation() {

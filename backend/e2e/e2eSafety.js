@@ -39,6 +39,37 @@ function assertE2EMode(env = process.env) {
     );
 }
 
+function assertE2EMongoUri(env = process.env) {
+    assertE2EMode(env);
+    const value = String(env.AZIEL_E2E_MONGO_URI || "").trim();
+    if (!value) {
+        throw new E2ESafetyError(
+            "AZIEL_E2E_MONGO_URI_REQUIRED",
+            "AZIEL_E2E_MONGO_URI is required; normal MONGO_URI fallback is forbidden."
+        );
+    }
+
+    let parsed;
+    try {
+        parsed = new URL(value);
+    } catch (_) {
+        throw new E2ESafetyError("AZIEL_E2E_MONGO_URI_INVALID", "AZIEL_E2E_MONGO_URI is invalid.");
+    }
+
+    const hostname = String(parsed.hostname || "").toLowerCase();
+    const databaseName = decodeURIComponent(parsed.pathname.replace(/^\//, "").split("?")[0]).trim();
+    if (!["127.0.0.1", "localhost", "::1"].includes(hostname)) {
+        throw new E2ESafetyError("AZIEL_E2E_MONGO_HOST_FORBIDDEN", "E2E MongoDB must be localhost-only.");
+    }
+    if (!databaseName || databaseName.toLowerCase() === "azielshop" || !databaseName.toLowerCase().includes("e2e")) {
+        throw new E2ESafetyError(
+            "AZIEL_E2E_MONGO_DATABASE_FORBIDDEN",
+            "E2E MongoDB must select an explicit e2e database and must not select azielshop."
+        );
+    }
+    return { mongoUri: value, databaseName, hostname, port: parsed.port || "27017" };
+}
+
 function customerUsername(scope) {
     if (!isValidScope(scope)) throw new E2ESafetyError("AZIEL_E2E_SCOPE_INVALID", "Invalid E2E scope.");
     return `${TEST_PREFIX}customer_${scope}`;
@@ -99,6 +130,7 @@ module.exports = Object.freeze({
     TEST_PREFIX,
     adminUsername,
     assertE2EMode,
+    assertE2EMongoUri,
     customerUsername,
     isE2EMode,
     isTestEmail,
