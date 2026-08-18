@@ -15,7 +15,10 @@ const {
     resolveCanonicalProductRoute
 } = require("../catalog/canonicalOperationalCatalog");
 const { createPackage, updateProduct } = require("../services/catalogAdminService");
-const { setProductPresentationAsset } = require("../services/catalogPresentationService");
+const {
+    setProductPresentationAsset,
+    clearProductPresentationAsset
+} = require("../services/catalogPresentationService");
 const {
     resolveAdminCatalogProduct,
     resolvePackagePrice,
@@ -28,6 +31,8 @@ const ROOT = path.resolve(__dirname, "../..");
 const PRODUCT_CODE = "capcut";
 const PACKAGE_CODE = "ADMIN_COMPLETENESS_MM";
 const ASSET_ID = "admin-completeness-product-image";
+const HYPHENATED_PRODUCT_CODE = "mlbb-twilight-weekly-pass";
+const HYPHENATED_ASSET_ID = "admin-completeness-hyphenated-product-image";
 
 function read(relativePath) {
     return fs.readFileSync(path.join(ROOT, relativePath), "utf8");
@@ -126,8 +131,19 @@ async function verifyIsolatedLifecycle() {
     try {
         await SitePlacement.deleteMany({ placementCode: "HOME_POPULAR_GAMES" });
         await CatalogPackage.deleteMany({ productCode: { $in: [PRODUCT_CODE, "mlbb"] } });
-        await CatalogProduct.deleteMany({ productCode: { $in: [PRODUCT_CODE, "mlbb", "authoritynoncanonicalfixture"] } });
-        await MediaAsset.deleteMany({ assetId: ASSET_ID });
+        await CatalogProduct.deleteMany({
+            productCode: {
+                $in: [
+                    PRODUCT_CODE,
+                    "mlbb",
+                    HYPHENATED_PRODUCT_CODE,
+                    "authoritynoncanonicalfixture"
+                ]
+            }
+        });
+        await MediaAsset.deleteMany({
+            assetId: { $in: [ASSET_ID, HYPHENATED_ASSET_ID] }
+        });
 
         await CatalogProduct.create({
             productCode: "mlbb",
@@ -140,6 +156,65 @@ async function verifyIsolatedLifecycle() {
             source: "admin"
         });
         const controlBefore = JSON.stringify(await CatalogProduct.findOne({ productCode: "mlbb" }).lean());
+
+        // Regression: canonical DB identities may contain hyphens.
+        // Presentation mutations must query the exact canonical identity.
+        await CatalogProduct.create({
+            productCode: HYPHENATED_PRODUCT_CODE,
+            name: "Hyphenated Presentation Regression Fixture",
+            enabled: true,
+            lifecycleStatus: "ACTIVE",
+            commerceState: "PURCHASABLE",
+            publicDiscoveryEnabled: true,
+            supportedRegions: ["MM", "TH"],
+            source: "admin"
+        });
+
+        await MediaAsset.create({
+            assetId: HYPHENATED_ASSET_ID,
+            name: "Hyphenated Presentation Regression Asset",
+            category: "product_image",
+            url: "/assets/fallbacks/hyphenated-product.svg",
+            mimeType: "image/svg+xml",
+            status: "active",
+            uploadedBy: "isolated-admin-completeness-verifier"
+        });
+
+        let hyphenated = await CatalogProduct.findOne({
+            productCode: HYPHENATED_PRODUCT_CODE
+        });
+
+        await setProductPresentationAsset({
+            productCode: HYPHENATED_PRODUCT_CODE,
+            assetId: HYPHENATED_ASSET_ID,
+            expectedUpdatedAt: new Date(hyphenated.updatedAt).toISOString(),
+            actor: "isolated-admin-completeness-verifier"
+        });
+
+        hyphenated = await CatalogProduct.findOne({
+            productCode: HYPHENATED_PRODUCT_CODE
+        }).lean();
+
+        assert.strictEqual(
+            hyphenated?.presentation?.imageAssetId,
+            HYPHENATED_ASSET_ID,
+            "Hyphenated canonical product identity must support presentation attachment."
+        );
+
+        await clearProductPresentationAsset({
+            productCode: HYPHENATED_PRODUCT_CODE,
+            expectedUpdatedAt: new Date(hyphenated.updatedAt).toISOString(),
+            actor: "isolated-admin-completeness-verifier"
+        });
+
+        hyphenated = await CatalogProduct.findOne({
+            productCode: HYPHENATED_PRODUCT_CODE
+        }).lean();
+
+        assert(
+            !hyphenated?.presentation?.imageAssetId,
+            "Hyphenated canonical product identity must support presentation removal."
+        );
 
         let adminProduct = await resolveAdminCatalogProduct(PRODUCT_CODE);
         assert(adminProduct && adminProduct.metadataRecordMissing === true, "Missing canonical record must remain Admin-manageable.");
@@ -195,7 +270,26 @@ async function verifyIsolatedLifecycle() {
 
         await patchFixture({ enabled: true });
         assert.strictEqual(await publicProduct(), null, "Enabled alone must not mean public.");
-        await patchFixture({ commerceState: "PURCHASABLE", publicDiscoveryEnabled: true });
+        await patchFixture({
+            commerceState: "PURCHASABLE",
+            lifecycleStatus: "ACTIVE",
+            publicDiscoveryEnabled: true
+        });
+
+        stored = await CatalogProduct.findOne({ productCode: PRODUCT_CODE }).lean();
+
+        assert.strictEqual(
+            stored.commerceState,
+            "PURCHASABLE",
+            "Purchasable activation must persist commerceState."
+        );
+
+        assert.strictEqual(
+            stored.lifecycleStatus,
+            "ACTIVE",
+            "Purchasable activation must persist ACTIVE lifecycleStatus."
+        );
+
         let publicReady = await publicProduct();
         assert(publicReady && publicReady.publicState === "AVAILABLE");
         assert.strictEqual(publicReady.publicCategory, "social");
@@ -227,8 +321,19 @@ async function verifyIsolatedLifecycle() {
     } finally {
         await SitePlacement.deleteMany({ placementCode: "HOME_POPULAR_GAMES" });
         await CatalogPackage.deleteMany({ productCode: { $in: [PRODUCT_CODE, "mlbb"] } });
-        await CatalogProduct.deleteMany({ productCode: { $in: [PRODUCT_CODE, "mlbb", "authoritynoncanonicalfixture"] } });
-        await MediaAsset.deleteMany({ assetId: ASSET_ID });
+        await CatalogProduct.deleteMany({
+            productCode: {
+                $in: [
+                    PRODUCT_CODE,
+                    "mlbb",
+                    HYPHENATED_PRODUCT_CODE,
+                    "authoritynoncanonicalfixture"
+                ]
+            }
+        });
+        await MediaAsset.deleteMany({
+            assetId: { $in: [ASSET_ID, HYPHENATED_ASSET_ID] }
+        });
         await mongoose.disconnect();
     }
 }

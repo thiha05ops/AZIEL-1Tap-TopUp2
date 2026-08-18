@@ -1,8 +1,19 @@
 const CatalogPackage = require("../models/CatalogPackage");
 const CatalogProduct = require("../models/CatalogProduct");
-const { normalizePackageCode, normalizeProductCode } = require("../catalog/catalogProjection");
+const { normalizePackageCode } = require("../catalog/catalogProjection");
 const { CatalogAdminError } = require("./catalogAdminService");
 const { assertAssetCategory } = require("./mediaService");
+
+/*
+ * CatalogProduct.productCode is a canonical database identity.
+ * Preserve hyphens used by canonical product codes.
+ */
+function normalizeCatalogProductIdentity(value = "") {
+    return String(value || "")
+        .trim()
+        .toLowerCase();
+}
+
 
 const PRODUCT_PRESENTATION_SLOTS = Object.freeze({
     image: {
@@ -76,7 +87,7 @@ async function setProductPresentationAsset({
     slot = "image",
     actor = "admin"
 } = {}) {
-    const normalizedProductCode = normalizeProductCode(productCode);
+    const normalizedProductCode = normalizeCatalogProductIdentity(productCode);
     const product = await CatalogProduct.findOne({ productCode: normalizedProductCode });
 
     if (!product) {
@@ -114,7 +125,7 @@ async function clearProductPresentationAsset({
     slot = "image",
     actor = "admin"
 } = {}) {
-    const normalizedProductCode = normalizeProductCode(productCode);
+    const normalizedProductCode = normalizeCatalogProductIdentity(productCode);
     const product = await CatalogProduct.findOne({ productCode: normalizedProductCode });
 
     if (!product) {
@@ -150,7 +161,7 @@ async function setPackageIconAsset({
     expectedUpdatedAt,
     actor = "admin"
 } = {}) {
-    const normalizedProductCode = normalizeProductCode(productCode);
+    const normalizedProductCode = normalizeCatalogProductIdentity(productCode);
     const normalizedPackageCode = normalizePackageCode(packageCode);
     const item = await CatalogPackage.findOne({
         productCode: normalizedProductCode,
@@ -189,7 +200,7 @@ async function clearPackageIconAsset({
     expectedUpdatedAt,
     actor = "admin"
 } = {}) {
-    const normalizedProductCode = normalizeProductCode(productCode);
+    const normalizedProductCode = normalizeCatalogProductIdentity(productCode);
     const normalizedPackageCode = normalizePackageCode(packageCode);
     const item = await CatalogPackage.findOne({
         productCode: normalizedProductCode,

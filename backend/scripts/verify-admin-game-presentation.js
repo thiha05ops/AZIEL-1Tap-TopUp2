@@ -152,6 +152,43 @@ function verifySupportedGamePages() {
     });
 }
 
+function verifyCanonicalPresentationIdentityRegression() {
+    const presentationService = read("backend/services/catalogPresentationService.js");
+    const adminCatalog = read("frontend/js/admin-catalog.js");
+
+    assert(
+        presentationService.includes("function normalizeCatalogProductIdentity"),
+        "Presentation service must use a catalog-identity normalizer."
+    );
+
+    assert(
+        presentationService.includes(".trim()") &&
+        presentationService.includes(".toLowerCase()"),
+        "Catalog identity normalization must be bounded to trim/lowercase."
+    );
+
+    assert(
+        !presentationService.includes("normalizeProductCode(productCode)"),
+        "Presentation writes must not use lossy public product-code normalization."
+    );
+
+    assert(
+        presentationService.includes(
+            "const normalizedProductCode = normalizeCatalogProductIdentity(productCode);"
+        ),
+        "Presentation writes must preserve canonical hyphenated product identities."
+    );
+
+    assert(
+        adminCatalog.includes("lifecycleStatus:") &&
+        adminCatalog.includes('=== "PURCHASABLE"') &&
+        adminCatalog.includes('? "ACTIVE"') &&
+        adminCatalog.includes('=== "COMING_SOON"') &&
+        adminCatalog.includes('? "COMING_SOON"'),
+        "Admin product editor must submit lifecycleStatus consistently with commerceState."
+    );
+}
+
 function verifyScopeBoundaries() {
     const changedSurface = [
         "backend/models/CatalogProduct.js",
@@ -183,6 +220,7 @@ function main() {
     verifyAdminCatalogControl();
     verifySharedGameRuntime();
     verifySupportedGamePages();
+    verifyCanonicalPresentationIdentityRegression();
     verifyScopeBoundaries();
     console.log("verify-admin-game-presentation: ok");
 }

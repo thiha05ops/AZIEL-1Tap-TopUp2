@@ -911,6 +911,12 @@ function readProductEditorPayload(product) {
         featured: Boolean(modal.querySelector("#catalogProductFeatured")?.checked),
         catalogCategory: modal.querySelector("#catalogProductCategory")?.value || "",
         commerceState: modal.querySelector("#catalogProductCommerceState")?.value || "HIDDEN",
+        lifecycleStatus:
+            (modal.querySelector("#catalogProductCommerceState")?.value || "HIDDEN") === "PURCHASABLE"
+                ? "ACTIVE"
+                : (modal.querySelector("#catalogProductCommerceState")?.value || "HIDDEN") === "COMING_SOON"
+                    ? "COMING_SOON"
+                    : (product.lifecycleStatus || "ACTIVE"),
         publicDiscoveryEnabled: Boolean(modal.querySelector("#catalogProductDiscoveryEnabled")?.checked),
         homepageEnabled: Boolean(modal.querySelector("#catalogProductHomeEnabled")?.checked),
         homepageCategory: modal.querySelector("#catalogProductHomeCategory")?.value || "",
