@@ -1,5 +1,4 @@
 /* Shared AZIEL customer payment checkout sheet */
-@import url("../commerce/purchase-shell.css?v=20260808-unified");
 
 .az-payment-sheet {
     position: fixed;

@@ -48,7 +48,16 @@ function main() {
     includes("frontend/js/admin-payments.js", 'qrMode: card.querySelector(".pm-qr-mode")?.value || "uploaded_static"', "Admin save payload must send selected qrMode.");
 
     includes("frontend/js/payment/payment-checkout-sheet.js", 'function isDynamicPromptPayMode', "Checkout must have explicit dynamic QR mode ownership.");
-    includes("frontend/js/payment/payment-checkout-sheet.js", 'return isDynamicPromptPayMode(options);', "Dynamic mode should be driven by qrMode, not by static QR availability.");
+    includes(
+        "frontend/js/payment/payment-checkout-sheet.js",
+        'return options.qrMode === "aziel_promptpay_dynamic";',
+        "Dynamic PromptPay mode ownership must be driven directly by qrMode."
+    );
+    includes(
+        "frontend/js/payment/payment-checkout-sheet.js",
+        'return isDynamicPromptPayMode(options) && !isRecoveryMode(options) &&',
+        "Dynamic QR generation eligibility must begin from explicit dynamic PromptPay mode ownership."
+    );
     includes("frontend/js/payment/payment-checkout-sheet.js", 'setQrImage(data.qrImage, "dynamic_response", data.qrPayload)', "Dynamic endpoint response image must be the rendered QR image.");
     includes("frontend/js/payment/payment-checkout-sheet.js", 'renderedQrSourceType(options, qr)', "Checkout must track rendered QR source type.");
     assert(!checkout.includes('dev: qrMode=${options.qrMode || "unknown"}; source=${sourceType || "none"}'), "Checkout must not expose QR diagnostics in customer UI.");

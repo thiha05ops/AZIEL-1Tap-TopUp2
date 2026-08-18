@@ -2299,24 +2299,48 @@
         if (!input || !preview || !image || !name || !submit) return;
 
         input.value = "";
+        state.receiptFile = null;
+
+        /*
+         * Receipt verification action is revealed only after
+         * valid payment evidence has been selected.
+         */
+        submit.hidden = true;
         submit.disabled = true;
+
         input.onchange = () => {
             const file = input.files?.[0] || null;
             state.receiptFile = file;
-            if (!file) return;
-            name.textContent = file.name || rt(state, "payment_receipt_selected", "Selected payment receipt");
+
+            if (!file) {
+                submit.hidden = true;
+                submit.disabled = true;
+                return;
+            }
+
+            name.textContent =
+                file.name ||
+                rt(state, "payment_receipt_selected", "Selected payment receipt");
+
             image.src = URL.createObjectURL(file);
             preview.hidden = false;
+
+            submit.hidden = false;
             submit.disabled = Boolean(state.expired || state.submitting);
+
             updateChecklist("upload_receipt");
             updateRecoveryMessage("", "");
         };
+
         remove.onclick = () => {
             input.value = "";
             state.receiptFile = null;
+
             preview.hidden = true;
             image.removeAttribute("src");
             name.textContent = "";
+
+            submit.hidden = true;
             submit.disabled = true;
         };
     }
@@ -2449,7 +2473,7 @@
                         <button type="button" id="azPaymentSheetContinueReceipt" class="az-payment-sheet__action">${escapeHTML(rt(activeState, "payment_transfer_completed", "I've completed the transfer"))}</button>
                         <button type="button" id="azPaymentSheetBackQr" class="az-payment-sheet__secondary" hidden>${escapeHTML(rt(activeState, "payment_back_to_qr", "Back to QR"))}</button>
                     </div>
-                    <button type="button" id="azRecoveredTransferComplete" class="az-payment-sheet__transfer-complete" ${mobile ? "hidden" : ""}>${escapeHTML(rt(activeState, "payment_transfer_completed", "I've completed the transfer"))}</button>
+                    <button type="button" id="azPaymentSheetTransferComplete" class="az-payment-sheet__transfer-complete" ${mobile ? "hidden" : ""}>${escapeHTML(rt(activeState, "payment_transfer_completed", "I've completed the transfer"))}</button>
                     <section id="azPaymentSheetReceiptSummary" class="az-payment-sheet__receipt-summary" hidden></section>
                     <section id="azPaymentSheetReceipt" class="az-payment-sheet__receipt" hidden>
                         <div class="az-payment-sheet__receipt-copy">
@@ -2503,11 +2527,23 @@
             }
         });
         modal.querySelector("#azPaymentSheetContinueReceipt")?.addEventListener("click", () => updateRecoveryMobileStep("receipt"));
-        modal.querySelector("#azRecoveredTransferComplete")?.addEventListener("click", event => {
+        modal.querySelector("#azPaymentSheetTransferComplete")?.addEventListener("click", event => {
             event.currentTarget.hidden = true;
-            modal.querySelector("#azPaymentSheetReceipt").hidden = false;
-            modal.querySelector("#azPaymentSheetSubmit").hidden = false;
-            modal.querySelector("#azPaymentSheetSlipInput")?.focus();
+
+            const receipt = modal.querySelector("#azPaymentSheetReceipt");
+            const submit = modal.querySelector("#azPaymentSheetSubmit");
+            const slipInput = modal.querySelector("#azPaymentSheetSlipInput");
+
+            if (receipt) receipt.hidden = false;
+
+            /*
+             * Submit remains hidden until a receipt file is selected.
+             * This prevents the modal sticky action from covering the
+             * upload chooser before the customer has attached evidence.
+             */
+            if (submit) submit.hidden = true;
+
+            slipInput?.focus();
         });
         modal.querySelector("#azPaymentSheetBackQr")?.addEventListener("click", () => updateRecoveryMobileStep("qr"));
         bindRecoveryFileInput(activeState);
