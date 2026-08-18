@@ -13,7 +13,7 @@
     border: 0;
     border-radius: 24px;
     background: transparent;
-    box-shadow: 0 12px 34px color-mix(in srgb, var(--bg, #070716) 20%, transparent);
+    box-shadow: 0 12px 34px color-mix(in srgb, var(--bg, #0d0d0f) 20%, transparent);
 }
 
 .az-home .az-home-hero.az-banner-zone::before {

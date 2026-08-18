@@ -52,8 +52,8 @@ body.dark {
     linear-gradient(180deg,
       rgba(var(--banner-rgb), .38) 0px,
       rgba(18, 14, 42, .92) 420px,
-      var(--bg, #070716) 900px,
-      var(--bg, #070716) 100%) !important;
+      var(--bg, #0d0d0f) 900px,
+      var(--bg, #0d0d0f) 100%) !important;
 }
 
 body::before {

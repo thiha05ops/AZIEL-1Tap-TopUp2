@@ -4,7 +4,7 @@
 =========================================================== */
 
 /* ===========================================================
-   LIGHT MODE
+   LIGHT MODE DEFAULTS
 =========================================================== */
 
 :root {
@@ -49,18 +49,47 @@
     --success: #22c55e;
     --warning: #f59e0b;
     --danger: #ef4444;
-
 }
+
+
+/* ===========================================================
+   CANONICAL LIGHT MODE
+=========================================================== */
+
+body.theme-light {
+
+    --bg: #f6f7fb;
+    --surface: #ffffff;
+    --card-bg: rgba(255, 255, 255, .88);
+
+    --text-color: #111827;
+    --text-muted: #6b7280;
+
+    --border-color: rgba(15, 23, 42, .08);
+
+    --input-bg: rgba(255, 255, 255, .96);
+
+    --shadow-sm:
+        0 6px 18px rgba(15, 23, 42, .06);
+
+    --shadow-md:
+        0 18px 45px rgba(15, 23, 42, .08);
+
+    --shadow-lg:
+        0 25px 60px rgba(15, 23, 42, .12);
+}
+
 
 /* ===========================================================
    DARK MODE
 =========================================================== */
 
-body.dark {
+body.dark,
+body.theme-dark {
 
-    --bg: #070716;
+    --bg: #0d0d0f;
 
-    --surface: #0d0f22;
+    --surface: #151517;
 
     --card-bg:
         rgba(12, 13, 28, .82);
@@ -83,23 +112,24 @@ body.dark {
 
     --shadow-lg:
         0 35px 90px rgba(0, 0, 0, .42);
-
 }
+
 
 /* ===========================================================
    GLOBAL
 =========================================================== */
 
 html {
-
-    color-scheme: light;
-
+    color-scheme: var(--az-color-scheme, light);
 }
 
-body.dark {
-
+body.dark,
+body.theme-dark {
     color-scheme: dark;
+}
 
+body.theme-light {
+    color-scheme: light;
 }
 
 body {
@@ -109,12 +139,10 @@ body {
     color: var(--text-color);
 
     transition:
-
         background .25s ease,
-
         color .25s ease;
-
 }
+
 
 /* ===========================================================
    TYPOGRAPHY
@@ -128,29 +156,23 @@ h5,
 h6 {
 
     color: var(--text-color);
-
 }
 
 p,
-
 small,
-
 label,
-
 span {
 
     color: var(--text-muted);
-
 }
+
 
 /* ===========================================================
    FORM
 =========================================================== */
 
 input,
-
 textarea,
-
 select {
 
     background: var(--input-bg);
@@ -158,23 +180,20 @@ select {
     color: var(--text-color);
 
     border: 1px solid var(--border-color);
-
 }
 
 input::placeholder,
-
 textarea::placeholder {
 
     color: var(--text-muted);
-
 }
+
 
 /* ===========================================================
    CARD
 =========================================================== */
 
 .card,
-
 .az-card {
 
     background: var(--card-bg);
@@ -182,8 +201,8 @@ textarea::placeholder {
     border: 1px solid var(--border-color);
 
     box-shadow: var(--shadow-sm);
-
 }
+
 
 /* ===========================================================
    BUTTON
@@ -192,13 +211,11 @@ textarea::placeholder {
 .btn-primary {
 
     background:
-
         linear-gradient(135deg,
             var(--primary),
             var(--primary-hover));
 
     color: #fff;
-
 }
 
 .btn-outline {
@@ -208,8 +225,8 @@ textarea::placeholder {
     color: var(--text-color);
 
     border: 1px solid var(--border-color);
-
 }
+
 
 /* ===========================================================
    LINKS
@@ -220,8 +237,8 @@ a {
     color: inherit;
 
     text-decoration: none;
-
 }
+
 
 /* ===========================================================
    SCROLLBAR
@@ -230,13 +247,11 @@ a {
 ::-webkit-scrollbar {
 
     width: 8px;
-
 }
 
 ::-webkit-scrollbar-track {
 
     background: transparent;
-
 }
 
 ::-webkit-scrollbar-thumb {
@@ -244,14 +259,17 @@ a {
     background: rgba(139, 92, 246, .35);
 
     border-radius: 20px;
-
 }
 
 ::-webkit-scrollbar-thumb:hover {
 
     background: rgba(139, 92, 246, .55);
-
 }
+
+
+/* ===========================================================
+   SYSTEM THEME STATUS BUTTON
+=========================================================== */
 
 .theme-status-btn {
     cursor: default !important;

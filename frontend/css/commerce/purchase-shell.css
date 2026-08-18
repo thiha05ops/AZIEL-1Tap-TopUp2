@@ -4,12 +4,19 @@
     --purchase-max: var(--public-storefront-max, 1500px);
     --purchase-gutter: var(--public-storefront-gutter, clamp(18px, 2.4vw, 36px));
     --purchase-mobile-gutter: var(--public-storefront-mobile-gutter, 16px);
-    --purchase-panel: var(--card);
-    --purchase-panel-soft: var(--surface);
-    --purchase-border: var(--border);
     --purchase-radius: 18px;
     --purchase-gap: 18px;
     --purchase-action-height: 50px;
+}
+
+/*
+ * Theme-dependent purchase aliases must resolve on body,
+ * not :root, so they inherit the active canonical theme tokens.
+ */
+body {
+    --purchase-panel: var(--card);
+    --purchase-panel-soft: var(--surface);
+    --purchase-border: var(--border);
 }
 
 body.az-purchase-surface,
@@ -45,6 +52,7 @@ body.az-purchase-surface,
     background: transparent;
     backdrop-filter: none;
 }
+
 .az-payment-sheet--page .az-payment-sheet__panel,
 .az-payment-sheet--page.is-mobile-promptpay .az-payment-sheet__panel {
     width: 100%;
@@ -53,9 +61,15 @@ body.az-purchase-surface,
     border-radius: var(--purchase-radius);
     box-shadow: var(--shadow-sm);
 }
+
 .az-payment-sheet--page .az-payment-sheet__body,
-.az-payment-sheet--page.is-mobile-promptpay .az-payment-sheet__body { overflow: visible; }
-.az-payment-sheet--page .az-payment-sheet__close { display: none; }
+.az-payment-sheet--page.is-mobile-promptpay .az-payment-sheet__body {
+    overflow: visible;
+}
+
+.az-payment-sheet--page .az-payment-sheet__close {
+    display: none;
+}
 
 .purchase-progress li {
     position: relative;
@@ -93,9 +107,20 @@ body.az-purchase-surface,
 }
 
 .purchase-progress .is-complete,
-.purchase-progress .is-current { color: var(--text); }
-.purchase-progress .is-complete span { border-color: color-mix(in srgb, var(--primary) 38%, var(--purchase-border)); color: var(--primary); }
-.purchase-progress .is-current span { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 12%, var(--purchase-panel)); color: var(--primary); }
+.purchase-progress .is-current {
+    color: var(--text);
+}
+
+.purchase-progress .is-complete span {
+    border-color: color-mix(in srgb, var(--primary) 38%, var(--purchase-border));
+    color: var(--primary);
+}
+
+.purchase-progress .is-current span {
+    border-color: var(--primary);
+    background: color-mix(in srgb, var(--primary) 12%, var(--purchase-panel));
+    color: var(--primary);
+}
 
 .commerce-panel,
 .product-checkout-page .checkout-card,
@@ -140,7 +165,11 @@ body.az-purchase-surface,
     font-size: 12px;
 }
 
-.purchase-footer a { color: var(--primary); font-weight: 700; text-decoration: none; }
+.purchase-footer a {
+    color: var(--primary);
+    font-weight: 700;
+    text-decoration: none;
+}
 
 /* Checkout shares Product Detail's storefront canvas and surface hierarchy. */
 .product-checkout-page {
@@ -149,106 +178,473 @@ body.az-purchase-surface,
     padding: 6px 0 64px;
 }
 
-.checkout-heading { max-width: 760px; margin: 0 0 18px; }
-.checkout-heading h1 { margin: 7px 0; font-size: clamp(28px, 3vw, 40px); line-height: 1.08; }
-.checkout-layout { display: grid; grid-template-columns: minmax(0, 3fr) minmax(280px, 1fr); gap: var(--purchase-gap); align-items: start; }
-.checkout-primary { display: grid; gap: var(--purchase-gap); min-width: 0; }
-.checkout-sidebar { position: sticky; top: calc(var(--az-header-height, 72px) + 18px); min-width: 0; }
-.checkout-card { padding: 20px; }
-.checkout-card h2 { margin: 0 0 16px; color: var(--text); font-size: 14px; font-weight: 800; letter-spacing: .065em; text-transform: uppercase; }
+.checkout-heading {
+    max-width: 760px;
+    margin: 0 0 18px;
+}
+
+.checkout-heading h1 {
+    margin: 7px 0;
+    font-size: clamp(28px, 3vw, 40px);
+    line-height: 1.08;
+}
+
+.checkout-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(280px, 1fr);
+    gap: var(--purchase-gap);
+    align-items: start;
+}
+
+.checkout-primary {
+    display: grid;
+    gap: var(--purchase-gap);
+    min-width: 0;
+}
+
+.checkout-sidebar {
+    position: sticky;
+    top: calc(var(--az-header-height, 72px) + 18px);
+    min-width: 0;
+}
+
+.checkout-card {
+    padding: 20px;
+}
+
+.checkout-card h2 {
+    margin: 0 0 16px;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: .065em;
+    text-transform: uppercase;
+}
+
 .checkout-review dl,
-.checkout-price-breakdown dl { margin: 0; }
+.checkout-price-breakdown dl {
+    margin: 0;
+}
+
 .checkout-review dl div,
-.checkout-price-breakdown dl div { display: flex; justify-content: space-between; gap: 20px; padding: 11px 0; border-bottom: 1px solid var(--purchase-border); }
+.checkout-price-breakdown dl div {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 11px 0;
+    border-bottom: 1px solid var(--purchase-border);
+}
+
 .checkout-review dt,
-.checkout-price-breakdown dt { color: var(--text-muted); font-size: 13px; }
+.checkout-price-breakdown dt {
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
 .checkout-review dd,
-.checkout-price-breakdown dd { min-width: 0; margin: 0; color: var(--text); text-align: right; font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
-.checkout-total { padding-top: 18px; }
-.checkout-total strong { color: var(--primary); font-size: 25px; font-weight: 800; }
-.checkout-payment .payment-grid { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
-.checkout-payment .pay-card { min-height: 92px; border-radius: 13px; box-shadow: none; }
-.checkout-payment .pay-card.active { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 8%, var(--purchase-panel)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 10%, transparent); }
+.checkout-price-breakdown dd {
+    min-width: 0;
+    margin: 0;
+    color: var(--text);
+    text-align: right;
+    font-size: 13px;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.checkout-total {
+    padding-top: 18px;
+}
+
+.checkout-total strong {
+    color: var(--primary);
+    font-size: 25px;
+    font-weight: 800;
+}
+
+.checkout-payment .payment-grid {
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.checkout-payment .pay-card {
+    min-height: 92px;
+    border-radius: 13px;
+    box-shadow: none;
+}
+
+.checkout-payment .pay-card.active {
+    border-color: var(--primary);
+    background: color-mix(in srgb, var(--primary) 8%, var(--purchase-panel));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
 .checkout-payment .pay-logo,
-.checkout-payment .pay-card img { width: 52px; height: 38px; filter: none; }
-.checkout-feedback { min-height: 20px; margin: 14px 0 10px; }
-.checkout-value-skeleton { display: inline-block; width: 88px; height: 14px; border-radius: 999px; color: transparent !important; vertical-align: middle; }
+.checkout-payment .pay-card img {
+    width: 52px;
+    height: 38px;
+    filter: none;
+}
+
+.checkout-feedback {
+    min-height: 20px;
+    margin: 14px 0 10px;
+}
+
+.checkout-value-skeleton {
+    display: inline-block;
+    width: 88px;
+    height: 14px;
+    border-radius: 999px;
+    color: transparent !important;
+    vertical-align: middle;
+}
 
 /* Runtime overlays stay concealed until their explicit show state is known. */
 .order-loading-overlay:not(.show),
 .success-modal:not(.show),
-.payment-confirm-modal:not(.show) { display: none !important; }
+.payment-confirm-modal:not(.show) {
+    display: none !important;
+}
 
 /* Payment Session uses the same compact commerce surface. */
-.az-payment-sheet { background: color-mix(in srgb, var(--bg) 76%, transparent); }
-.az-payment-sheet__panel { border-color: var(--purchase-border); border-radius: var(--purchase-radius); background: var(--surface-strong); box-shadow: var(--shadow-lg); }
-.az-payment-sheet__body { padding: 24px 24px 16px; }
-.az-payment-sheet__title { font-size: 21px; }
-.az-payment-sheet__amount { color: var(--primary); font-size: 30px; }
-.az-payment-sheet__qr img { width: min(224px, 100%); border-radius: 14px; }
+.az-payment-sheet {
+    background: color-mix(in srgb, var(--bg) 76%, transparent);
+}
+
+.az-payment-sheet__panel {
+    border-color: var(--purchase-border);
+    border-radius: var(--purchase-radius);
+    background: var(--surface-strong);
+    box-shadow: var(--shadow-lg);
+}
+
+.az-payment-sheet__body {
+    padding: 24px 24px 16px;
+}
+
+.az-payment-sheet__title {
+    font-size: 21px;
+}
+
+.az-payment-sheet__amount {
+    color: var(--primary);
+    font-size: 30px;
+}
+
+.az-payment-sheet__qr img {
+    width: min(224px, 100%);
+    border-radius: 14px;
+}
+
 .az-payment-sheet__action,
 .az-payment-sheet__secondary,
 .az-payment-sheet__bank-list button,
-.az-payment-sheet__fallback button { border-radius: 12px; }
-.az-payment-sheet__submit { min-height: var(--purchase-action-height); margin: 0 24px 18px; width: calc(100% - 48px); border-radius: 13px; background: linear-gradient(135deg, #7546e8, #8b5cf6); box-shadow: none; }
-.purchase-progress--sheet { width: 100%; margin: 0 0 18px; font-size: 11px; }
-.purchase-progress--sheet li:not(:last-child)::after { min-width: 8px; margin-inline: 8px; }
+.az-payment-sheet__fallback button {
+    border-radius: 12px;
+}
+
+.az-payment-sheet__submit {
+    min-height: var(--purchase-action-height);
+    margin: 0 24px 18px;
+    width: calc(100% - 48px);
+    border-radius: 13px;
+    background: linear-gradient(135deg, #7546e8, #8b5cf6);
+    box-shadow: none;
+}
+
+.purchase-progress--sheet {
+    width: 100%;
+    margin: 0 0 18px;
+    font-size: 11px;
+}
+
+.purchase-progress--sheet li:not(:last-child)::after {
+    min-width: 8px;
+    margin-inline: 8px;
+}
 
 /* Recovery is an entry state for the same Payment Session, not a second app. */
-.az-pending-payment { width: min(var(--purchase-max), calc(100vw - (var(--purchase-gutter) * 2))); }
-.az-pending-payment__shell { border-color: var(--purchase-border); border-radius: var(--purchase-radius); background: var(--surface-strong); color: var(--text); box-shadow: var(--shadow-md); backdrop-filter: blur(14px); }
-.az-pending-payment__content { min-height: 82px; }
-.az-pending-payment__continue { min-height: 42px; border-radius: 12px; background: linear-gradient(135deg, #7546e8, #8b5cf6); box-shadow: none; }
+.az-pending-payment {
+    width: min(var(--purchase-max), calc(100vw - (var(--purchase-gutter) * 2)));
+}
+
+.az-pending-payment__shell {
+    border-color: var(--purchase-border);
+    border-radius: var(--purchase-radius);
+    background: var(--surface-strong);
+    color: var(--text);
+    box-shadow: var(--shadow-md);
+    backdrop-filter: blur(14px);
+}
+
+.az-pending-payment__content {
+    min-height: 82px;
+}
+
+.az-pending-payment__continue {
+    min-height: 42px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #7546e8, #8b5cf6);
+    box-shadow: none;
+}
 
 /* Tracking result: lifecycle workspace plus persistent transaction context. */
 body.az-purchase-surface .tracking-page {
     width: min(var(--purchase-max), calc(100% - (var(--purchase-gutter) * 2)));
     margin: 0 auto 64px;
 }
-.tracking-hero { padding: 20px; margin-bottom: var(--purchase-gap); }
-.tracking-hero h1 { margin: 10px 0 5px; font-size: clamp(28px, 3vw, 40px); }
-.tracking-search-card { padding: 14px; border-radius: var(--purchase-radius); }
-.tracking-search-card h2 { grid-column: 1 / -1; margin: 0; color: var(--text); font-size: 14px; }
-.recent-order-item { width: 100%; color: inherit; text-align: left; font: inherit; cursor: pointer; }
-.recent-order-view { margin-left: auto; color: var(--primary); font-size: 12px; font-weight: 800; }
-.payment-page-link { margin-top: 16px; padding-inline: 18px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
-.az-payment-sheet__transfer-complete { width: 100%; min-height: 48px; margin: 12px 0; border: 1px solid color-mix(in srgb, var(--primary) 42%, var(--purchase-border)); border-radius: 13px; background: color-mix(in srgb, var(--primary) 9%, var(--purchase-panel)); color: var(--primary); font-weight: 800; cursor: pointer; }
-.payment-completion { padding: clamp(24px, 5vw, 48px); text-align: center; }
-.payment-completion__icon { width: 60px; height: 60px; margin: 0 auto 18px; display: grid; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--success) 14%, transparent); color: var(--success); font-size: 30px; font-weight: 900; }
-.payment-completion h2 { margin: 6px 0 10px; font-size: clamp(25px, 3vw, 34px); }
-.payment-completion__actions { margin-top: 22px; display: grid; gap: 10px; }
-.payment-completion__actions a { min-height: 48px; display: inline-flex; align-items: center; justify-content: center; border-radius: 13px; text-decoration: none; font-weight: 800; }
-.payment-completion__actions #paymentBackHome { border: 1px solid var(--purchase-border); background: var(--purchase-panel-soft); color: var(--text); }
-.payment-session-skeleton { min-height: 420px; display: grid; align-content: start; gap: 18px; }
-.payment-session-skeleton span:nth-child(1) { width: 42%; height: 28px; }
-.payment-session-skeleton span:nth-child(2) { width: min(240px, 72%); aspect-ratio: 1; border-radius: 16px; }
-.payment-session-skeleton span:nth-child(3) { width: 100%; height: 48px; border-radius: 13px; }
-.tracking-input-wrap { border-radius: 12px; background: var(--purchase-panel-soft); }
-.recent-track-card { margin: var(--purchase-gap) 0; padding: 18px; border-radius: var(--purchase-radius); }
-.phone-track-card { margin-top: var(--purchase-gap); padding: 20px; border-radius: var(--purchase-radius); display: grid; grid-template-columns: minmax(0, 3fr) minmax(260px, 1fr); gap: var(--purchase-gap); }
+
+.tracking-hero {
+    padding: 20px;
+    margin-bottom: var(--purchase-gap);
+}
+
+.tracking-hero h1 {
+    margin: 10px 0 5px;
+    font-size: clamp(28px, 3vw, 40px);
+}
+
+.tracking-search-card {
+    padding: 14px;
+    border-radius: var(--purchase-radius);
+}
+
+.tracking-search-card h2 {
+    grid-column: 1 / -1;
+    margin: 0;
+    color: var(--text);
+    font-size: 14px;
+}
+
+.recent-order-item {
+    width: 100%;
+    color: inherit;
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+}
+
+.recent-order-view {
+    margin-left: auto;
+    color: var(--primary);
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.payment-page-link {
+    margin-top: 16px;
+    padding-inline: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+}
+
+.az-payment-sheet__transfer-complete {
+    width: 100%;
+    min-height: 48px;
+    margin: 12px 0;
+    border: 1px solid color-mix(in srgb, var(--primary) 42%, var(--purchase-border));
+    border-radius: 13px;
+    background: color-mix(in srgb, var(--primary) 9%, var(--purchase-panel));
+    color: var(--primary);
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.payment-completion {
+    padding: clamp(24px, 5vw, 48px);
+    text-align: center;
+}
+
+.payment-completion__icon {
+    width: 60px;
+    height: 60px;
+    margin: 0 auto 18px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--success) 14%, transparent);
+    color: var(--success);
+    font-size: 30px;
+    font-weight: 900;
+}
+
+.payment-completion h2 {
+    margin: 6px 0 10px;
+    font-size: clamp(25px, 3vw, 34px);
+}
+
+.payment-completion__actions {
+    margin-top: 22px;
+    display: grid;
+    gap: 10px;
+}
+
+.payment-completion__actions a {
+    min-height: 48px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 13px;
+    text-decoration: none;
+    font-weight: 800;
+}
+
+.payment-completion__actions #paymentBackHome {
+    border: 1px solid var(--purchase-border);
+    background: var(--purchase-panel-soft);
+    color: var(--text);
+}
+
+.payment-session-skeleton {
+    min-height: 420px;
+    display: grid;
+    align-content: start;
+    gap: 18px;
+}
+
+.payment-session-skeleton span:nth-child(1) {
+    width: 42%;
+    height: 28px;
+}
+
+.payment-session-skeleton span:nth-child(2) {
+    width: min(240px, 72%);
+    aspect-ratio: 1;
+    border-radius: 16px;
+}
+
+.payment-session-skeleton span:nth-child(3) {
+    width: 100%;
+    height: 48px;
+    border-radius: 13px;
+}
+
+.tracking-input-wrap {
+    border-radius: 12px;
+    background: var(--purchase-panel-soft);
+}
+
+.recent-track-card {
+    margin: var(--purchase-gap) 0;
+    padding: 18px;
+    border-radius: var(--purchase-radius);
+}
+
+.phone-track-card {
+    margin-top: var(--purchase-gap);
+    padding: 20px;
+    border-radius: var(--purchase-radius);
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(260px, 1fr);
+    gap: var(--purchase-gap);
+}
+
 .tracking-workspace,
-.tracking-summary { min-width: 0; }
-.tracking-summary { padding: 16px; border: 1px solid var(--purchase-border); border-radius: 14px; background: var(--purchase-panel-soft); align-self: start; }
-.tracking-summary .order-info-grid { grid-template-columns: 1fr; gap: 0; }
-.tracking-summary .order-info-item { padding: 11px 0; border: 0; border-bottom: 1px solid var(--purchase-border); border-radius: 0; background: transparent; }
-.tracking-summary .order-id-box { border-radius: 12px; }
-.tracking-workspace .order-top h2 { font-size: 28px; }
-.tracking-workspace .status-orb { width: 58px; height: 58px; border-radius: 16px; }
+.tracking-summary {
+    min-width: 0;
+}
+
+.tracking-summary {
+    padding: 16px;
+    border: 1px solid var(--purchase-border);
+    border-radius: 14px;
+    background: var(--purchase-panel-soft);
+    align-self: start;
+}
+
+.tracking-summary .order-info-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+}
+
+.tracking-summary .order-info-item {
+    padding: 11px 0;
+    border: 0;
+    border-bottom: 1px solid var(--purchase-border);
+    border-radius: 0;
+    background: transparent;
+}
+
+.tracking-summary .order-id-box {
+    border-radius: 12px;
+}
+
+.tracking-workspace .order-top h2 {
+    font-size: 28px;
+}
+
+.tracking-workspace .status-orb {
+    width: 58px;
+    height: 58px;
+    border-radius: 16px;
+}
+
 .tracking-workspace .status-orb.pending,
-.tracking-workspace .status-orb.pending_payment { border-color: var(--purchase-border); background: var(--purchase-panel-soft); color: var(--text-muted); }
+.tracking-workspace .status-orb.pending_payment {
+    border-color: var(--purchase-border);
+    background: var(--purchase-panel-soft);
+    color: var(--text-muted);
+}
+
 .tracking-workspace .status-orb.paid,
-.tracking-workspace .status-orb.completed { border-color: color-mix(in srgb, var(--success) 34%, var(--purchase-border)); background: color-mix(in srgb, var(--success) 9%, transparent); color: var(--success); }
-.tracking-workspace .status-orb.processing { border-color: color-mix(in srgb, var(--primary) 34%, var(--purchase-border)); background: color-mix(in srgb, var(--primary) 9%, transparent); color: var(--primary); }
+.tracking-workspace .status-orb.completed {
+    border-color: color-mix(in srgb, var(--success) 34%, var(--purchase-border));
+    background: color-mix(in srgb, var(--success) 9%, transparent);
+    color: var(--success);
+}
+
+.tracking-workspace .status-orb.processing {
+    border-color: color-mix(in srgb, var(--primary) 34%, var(--purchase-border));
+    background: color-mix(in srgb, var(--primary) 9%, transparent);
+    color: var(--primary);
+}
+
 .tracking-workspace .status-orb.failed,
 .tracking-workspace .status-orb.expired,
-.tracking-workspace .status-orb.cancelled { border-color: color-mix(in srgb, var(--danger) 32%, var(--purchase-border)); background: color-mix(in srgb, var(--danger) 8%, transparent); color: var(--danger); }
+.tracking-workspace .status-orb.cancelled {
+    border-color: color-mix(in srgb, var(--danger) 32%, var(--purchase-border));
+    background: color-mix(in srgb, var(--danger) 8%, transparent);
+    color: var(--danger);
+}
+
 .tracking-workspace .status-orb.refund_requested,
-.tracking-workspace .status-orb.refunded { border-color: color-mix(in srgb, var(--warning) 32%, var(--purchase-border)); background: color-mix(in srgb, var(--warning) 8%, transparent); color: var(--warning); }
-.tracking-workspace .track-step { border-radius: 13px; box-shadow: none; }
-.loading-card { min-height: 160px; display: grid; place-items: center; color: transparent; }
-.loading-card::after { content: ""; width: 64%; height: 14px; border-radius: 999px; background: color-mix(in srgb, var(--text) 10%, transparent); }
-.recent-orders-skeleton { display: grid; gap: 10px; }
-.recent-orders-skeleton span { height: 54px; border-radius: 13px; }
+.tracking-workspace .status-orb.refunded {
+    border-color: color-mix(in srgb, var(--warning) 32%, var(--purchase-border));
+    background: color-mix(in srgb, var(--warning) 8%, transparent);
+    color: var(--warning);
+}
+
+.tracking-workspace .track-step {
+    border-radius: 13px;
+    box-shadow: none;
+}
+
+.loading-card {
+    min-height: 160px;
+    display: grid;
+    place-items: center;
+    color: transparent;
+}
+
+.loading-card::after {
+    content: "";
+    width: 64%;
+    height: 14px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--text) 10%, transparent);
+}
+
+.recent-orders-skeleton {
+    display: grid;
+    gap: 10px;
+}
+
+.recent-orders-skeleton span {
+    height: 54px;
+    border-radius: 13px;
+}
 
 /* Final Payment Session density and action hierarchy. */
 .az-payment-sheet {
@@ -275,9 +671,19 @@ body.az-purchase-surface .tracking-page {
 }
 
 .az-payment-sheet__title,
-.az-payment-sheet__subtitle { grid-column: 1 / -1; }
-.az-payment-sheet__title { margin-bottom: 2px; }
-.az-payment-sheet__amount { grid-column: 1; font-size: 28px; }
+.az-payment-sheet__subtitle {
+    grid-column: 1 / -1;
+}
+
+.az-payment-sheet__title {
+    margin-bottom: 2px;
+}
+
+.az-payment-sheet__amount {
+    grid-column: 1;
+    font-size: 28px;
+}
+
 .az-payment-sheet__header .az-payment-sheet__qr-expiry {
     grid-column: 2;
     display: inline-flex;
@@ -290,11 +696,26 @@ body.az-purchase-surface .tracking-page {
     background: color-mix(in srgb, var(--primary) 8%, transparent);
     color: var(--text);
 }
-.az-payment-sheet__header .az-payment-sheet__qr-expiry[hidden] { display: none; }
 
-.az-payment-sheet__qr { margin: 14px 0 9px; gap: 6px; }
-.az-payment-sheet__qr img { width: min(210px, 52vw); padding: 8px; }
-.az-payment-sheet__actions { max-width: 440px; margin: 0 auto 12px; }
+.az-payment-sheet__header .az-payment-sheet__qr-expiry[hidden] {
+    display: none;
+}
+
+.az-payment-sheet__qr {
+    margin: 14px 0 9px;
+    gap: 6px;
+}
+
+.az-payment-sheet__qr img {
+    width: min(210px, 52vw);
+    padding: 8px;
+}
+
+.az-payment-sheet__actions {
+    max-width: 440px;
+    margin: 0 auto 12px;
+}
+
 .az-payment-sheet__action,
 .az-payment-sheet__secondary {
     min-height: 42px;
@@ -303,8 +724,12 @@ body.az-purchase-surface .tracking-page {
     color: var(--text);
     box-shadow: none;
 }
+
 .az-payment-sheet__action:hover,
-.az-payment-sheet__secondary:hover { border-color: color-mix(in srgb, var(--primary) 44%, var(--purchase-border)); transform: none; }
+.az-payment-sheet__secondary:hover {
+    border-color: color-mix(in srgb, var(--primary) 44%, var(--purchase-border));
+    transform: none;
+}
 
 .az-payment-sheet__payment-details {
     margin: 8px 0 12px;
@@ -313,7 +738,11 @@ body.az-purchase-surface .tracking-page {
     background: var(--purchase-panel-soft);
     overflow: hidden;
 }
-.az-payment-sheet__payment-details:has(.az-payment-sheet__details:empty) { display: none; }
+
+.az-payment-sheet__payment-details:has(.az-payment-sheet__details:empty) {
+    display: none;
+}
+
 .az-payment-sheet__payment-details summary {
     min-height: 42px;
     padding: 0 13px;
@@ -326,20 +755,69 @@ body.az-purchase-surface .tracking-page {
     cursor: pointer;
     list-style: none;
 }
-.az-payment-sheet__payment-details summary::-webkit-details-marker { display: none; }
-.az-payment-sheet__payment-details summary::after { content: "+"; color: var(--text-muted); font-size: 16px; }
-.az-payment-sheet__payment-details[open] summary::after { content: "−"; }
-.az-payment-sheet__details { padding: 0 13px 8px; }
-.az-payment-sheet__row { grid-template-columns: minmax(82px, .55fr) minmax(0, 1fr) auto; padding: 9px 0; gap: 9px; }
-.az-payment-sheet__row strong { font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; word-break: break-word; }
-.az-payment-sheet__row button { padding: 6px 9px; background: transparent; color: var(--text-muted); }
 
-.az-payment-sheet__checklist { margin-bottom: 11px; padding: 10px 12px; }
-.az-payment-sheet__checklist ol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.az-payment-sheet__checklist li { font-size: 12px; }
-.az-payment-sheet__receipt { margin-top: 10px; }
-.az-payment-sheet__upload { padding: 12px 14px; }
-.az-payment-sheet__message { margin-top: 9px; }
+.az-payment-sheet__payment-details summary::-webkit-details-marker {
+    display: none;
+}
+
+.az-payment-sheet__payment-details summary::after {
+    content: "+";
+    color: var(--text-muted);
+    font-size: 16px;
+}
+
+.az-payment-sheet__payment-details[open] summary::after {
+    content: "−";
+}
+
+.az-payment-sheet__details {
+    padding: 0 13px 8px;
+}
+
+.az-payment-sheet__row {
+    grid-template-columns: minmax(82px, .55fr) minmax(0, 1fr) auto;
+    padding: 9px 0;
+    gap: 9px;
+}
+
+.az-payment-sheet__row strong {
+    font-size: 13px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.az-payment-sheet__row button {
+    padding: 6px 9px;
+    background: transparent;
+    color: var(--text-muted);
+}
+
+.az-payment-sheet__checklist {
+    margin-bottom: 11px;
+    padding: 10px 12px;
+}
+
+.az-payment-sheet__checklist ol {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.az-payment-sheet__checklist li {
+    font-size: 12px;
+}
+
+.az-payment-sheet__receipt {
+    margin-top: 10px;
+}
+
+.az-payment-sheet__upload {
+    padding: 12px 14px;
+}
+
+.az-payment-sheet__message {
+    margin-top: 9px;
+}
+
 .az-payment-sheet__submit {
     position: static;
     width: 100%;
@@ -349,7 +827,10 @@ body.az-purchase-surface .tracking-page {
     flex: none;
 }
 
-.tracking-next-actions { margin-top: 14px; }
+.tracking-next-actions {
+    margin-top: 14px;
+}
+
 .tracking-next-actions a {
     min-height: 44px;
     display: inline-flex;
@@ -365,42 +846,115 @@ body.az-purchase-surface .tracking-page {
     text-decoration: none;
 }
 
-.success-modal-box.commerce-panel { border-radius: var(--purchase-radius); background: var(--surface-strong); color: var(--text); }
-.success-modal-box.commerce-panel h2 { color: var(--text); }
-.success-modal-box.commerce-panel .checkout-eyebrow { color: var(--primary); }
-.success-modal-box.commerce-panel #backHomeBtn { min-height: 46px; border: 1px solid var(--purchase-border); border-radius: 12px; background: var(--purchase-panel-soft); color: var(--text); }
+.success-modal-box.commerce-panel {
+    border-radius: var(--purchase-radius);
+    background: var(--surface-strong);
+    color: var(--text);
+}
+
+.success-modal-box.commerce-panel h2 {
+    color: var(--text);
+}
+
+.success-modal-box.commerce-panel .checkout-eyebrow {
+    color: var(--primary);
+}
+
+.success-modal-box.commerce-panel #backHomeBtn {
+    min-height: 46px;
+    border: 1px solid var(--purchase-border);
+    border-radius: 12px;
+    background: var(--purchase-panel-soft);
+    color: var(--text);
+}
 
 @media (max-width: 900px) {
+
     .checkout-layout,
-    .phone-track-card { grid-template-columns: 1fr; }
-    .checkout-sidebar { position: static; }
+    .phone-track-card {
+        grid-template-columns: 1fr;
+    }
+
+    .checkout-sidebar {
+        position: static;
+    }
 }
 
 @media (max-width: 768px) {
+
     .purchase-progress,
     .product-checkout-page,
     .tracking-page,
     .purchase-footer {
         width: calc(100% - (var(--purchase-mobile-gutter) * 2));
     }
-    .purchase-progress { margin-top: 12px; font-size: 11px; }
-    .purchase-progress li:not(.is-current) b { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
-    .purchase-progress li:not(:last-child)::after { margin-inline: 7px; }
-    .product-checkout-page { padding-bottom: 42px; }
-    .checkout-heading { margin-bottom: 14px; }
-    .checkout-heading h1 { font-size: 27px; }
+
+    .purchase-progress {
+        margin-top: 12px;
+        font-size: 11px;
+    }
+
+    .purchase-progress li:not(.is-current) b {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+    }
+
+    .purchase-progress li:not(:last-child)::after {
+        margin-inline: 7px;
+    }
+
+    .product-checkout-page {
+        padding-bottom: 42px;
+    }
+
+    .checkout-heading {
+        margin-bottom: 14px;
+    }
+
+    .checkout-heading h1 {
+        font-size: 27px;
+    }
+
     .checkout-card,
     .tracking-hero,
     .tracking-search-card,
     .recent-track-card,
-    .phone-track-card { padding: 15px; }
-    .checkout-payment .payment-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .checkout-payment .pay-card { min-height: 104px; padding: 12px 8px; }
-    .purchase-footer { align-items: flex-start; flex-direction: column; }
-    .az-payment-sheet { align-items: flex-end; padding: max(8px, env(safe-area-inset-top)) 0 0; }
-    .az-payment-sheet.az-payment-sheet--page { padding: 0; }
+    .phone-track-card {
+        padding: 15px;
+    }
+
+    .checkout-payment .payment-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .checkout-payment .pay-card {
+        min-height: 104px;
+        padding: 12px 8px;
+    }
+
+    .purchase-footer {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .az-payment-sheet {
+        align-items: flex-end;
+        padding: max(8px, env(safe-area-inset-top)) 0 0;
+    }
+
+    .az-payment-sheet.az-payment-sheet--page {
+        padding: 0;
+    }
+
     .az-payment-sheet--page .az-payment-sheet__panel,
-    .az-payment-sheet--page.is-mobile-promptpay .az-payment-sheet__panel { max-height: none; border-radius: var(--purchase-radius); }
+    .az-payment-sheet--page.is-mobile-promptpay .az-payment-sheet__panel {
+        max-height: none;
+        border-radius: var(--purchase-radius);
+    }
+
     .az-payment-sheet__panel,
     .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__panel {
         width: 100%;
@@ -408,8 +962,12 @@ body.az-purchase-surface .tracking-page {
         max-height: calc(100dvh - max(8px, env(safe-area-inset-top)));
         border-radius: 18px 18px 0 0;
     }
+
     .az-payment-sheet__body,
-    .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__body { padding: 14px 16px calc(16px + env(safe-area-inset-bottom)); }
+    .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__body {
+        padding: 14px 16px calc(16px + env(safe-area-inset-bottom));
+    }
+
     .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__header {
         position: static;
         margin: 0;
@@ -417,26 +975,191 @@ body.az-purchase-surface .tracking-page {
         background: transparent;
         backdrop-filter: none;
     }
-    .az-payment-sheet__header { grid-template-columns: minmax(0, 1fr) auto; }
-    .az-payment-sheet__amount { font-size: 24px; }
-    .az-payment-sheet__header .az-payment-sheet__qr-expiry { min-height: 26px; padding-inline: 8px; font-size: 11px; }
-    .purchase-progress--sheet { margin-bottom: 12px; }
-    .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__qr { margin-top: 9px; }
-    .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__qr img { width: clamp(188px, 54vw, 214px); }
-    .az-payment-sheet__checklist ol { grid-template-columns: 1fr; }
-    .az-payment-sheet__payment-details { margin-block: 7px 10px; }
-    .az-payment-sheet__row { grid-template-columns: minmax(0, 1fr) auto; }
-    .az-payment-sheet__row span { grid-column: 1 / -1; }
-    .az-payment-sheet__submit { width: 100%; margin: 12px 0 0; min-height: calc(50px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); }
-    .az-payment-sheet.is-mobile-step-receipt .az-payment-sheet__body { padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+
+    .az-payment-sheet__header {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .az-payment-sheet__amount {
+        font-size: 24px;
+    }
+
+    .az-payment-sheet__header .az-payment-sheet__qr-expiry {
+        min-height: 26px;
+        padding-inline: 8px;
+        font-size: 11px;
+    }
+
+    .purchase-progress--sheet {
+        margin-bottom: 12px;
+    }
+
+    .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__qr {
+        margin-top: 9px;
+    }
+
+    .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__qr img {
+        width: clamp(188px, 54vw, 214px);
+    }
+
+    .az-payment-sheet__checklist ol {
+        grid-template-columns: 1fr;
+    }
+
+    .az-payment-sheet__payment-details {
+        margin-block: 7px 10px;
+    }
+
+    .az-payment-sheet__row {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .az-payment-sheet__row span {
+        grid-column: 1 / -1;
+    }
+
+    .az-payment-sheet__submit {
+        width: 100%;
+        margin: 12px 0 0;
+        min-height: calc(50px + env(safe-area-inset-bottom));
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    .az-payment-sheet.is-mobile-step-receipt .az-payment-sheet__body {
+        padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    }
 }
 
 @media (max-width: 390px) {
-    .checkout-payment .payment-grid { grid-template-columns: 1fr; }
+    .checkout-payment .payment-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
+
+
+/* =========================================================
+   AZIEL PAYMENT PAGE — EMBEDDED SHEET FINAL AUTHORITY
+   Standalone payment.html uses the checkout sheet as normal
+   document content, never as a modal / bottom sheet.
+   ========================================================= */
+
+.az-payment-sheet.az-payment-sheet--page {
+    position: static;
+    inset: auto;
+
+    display: block;
+
+    width: 100%;
+    height: auto;
+    min-height: 0;
+
+    padding: 0;
+
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+.az-payment-sheet.az-payment-sheet--page .az-payment-sheet__panel,
+.az-payment-sheet.az-payment-sheet--page.is-mobile-promptpay .az-payment-sheet__panel {
+    width: 100%;
+    max-width: none;
+
+    height: auto;
+    min-height: 0;
+    max-height: none;
+
+    overflow: visible;
+
+    border-radius: var(--purchase-radius);
+    box-shadow: var(--shadow-sm);
+}
+
+.az-payment-sheet.az-payment-sheet--page .az-payment-sheet__body,
+.az-payment-sheet.az-payment-sheet--page.is-mobile-promptpay .az-payment-sheet__body {
+    width: 100%;
+
+    height: auto;
+    min-height: 0;
+    max-height: none;
+
+    overflow: visible;
+}
+
+.az-payment-sheet.az-payment-sheet--page .az-payment-sheet__submit {
+    position: static;
+
+    width: 100%;
+    min-height: 50px;
+
+    margin: 12px 0 0;
+    padding-bottom: 0;
+
+    flex: none;
+}
+
+
+/* Mobile page-mode containment must win after generic bottom-sheet rules. */
+@media (max-width: 768px) {
+
+    .az-payment-sheet.az-payment-sheet--page,
+    .az-payment-sheet.az-payment-sheet--page.is-mobile-promptpay {
+        position: static;
+        inset: auto;
+
+        display: block;
+
+        width: 100%;
+        height: auto;
+        min-height: 0;
+
+        padding: 0;
+    }
+
+    .az-payment-sheet.az-payment-sheet--page .az-payment-sheet__panel,
+    .az-payment-sheet.az-payment-sheet--page.is-mobile-promptpay .az-payment-sheet__panel {
+        width: 100%;
+        max-width: none;
+
+        height: auto;
+        min-height: 0;
+        max-height: none;
+
+        overflow: visible;
+
+        border-radius: var(--purchase-radius);
+    }
+
+    .az-payment-sheet.az-payment-sheet--page .az-payment-sheet__body,
+    .az-payment-sheet.az-payment-sheet--page.is-mobile-promptpay .az-payment-sheet__body {
+        height: auto;
+        min-height: 0;
+        max-height: none;
+
+        overflow: visible;
+
+        padding: 14px 16px 16px;
+    }
+
+    .az-payment-sheet.az-payment-sheet--page .az-payment-sheet__submit {
+        position: static;
+
+        width: 100%;
+        min-height: 50px;
+
+        margin: 12px 0 0;
+        padding-bottom: 0;
+    }
+}
+
+
 @media (prefers-reduced-motion: reduce) {
+
     .purchase-progress *,
     .az-pending-payment,
-    .az-payment-sheet * { animation: none !important; transition: none !important; }
+    .az-payment-sheet * {
+        animation: none !important;
+        transition: none !important;
+    }
 }

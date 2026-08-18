@@ -1,7 +1,7 @@
 // AZIEL G.2.1 semantic storefront UI keys. Extends the shared locale dictionaries.
 (function () {
   window.AZIEL_LANG = window.AZIEL_LANG || {};
-  Object.assign(window.AZIEL_LANG.en = window.AZIEL_LANG.en || {},   {
+  Object.assign(window.AZIEL_LANG.en = window.AZIEL_LANG.en || {}, {
     "home.popularMOBILEGAMES": "POPULAR MOBILE GAMES",
     "home.tokensPackages": "Tokens & Packages",
     "home.marvelRIVALS": "MARVEL RIVALS",
@@ -273,7 +273,7 @@
     "support.adminReplied": "Admin replied to your ticket",
     "support.ticketUpdated": "Your support ticket was updated"
   });
-  Object.assign(window.AZIEL_LANG.my = window.AZIEL_LANG.my || {},   {
+  Object.assign(window.AZIEL_LANG.my = window.AZIEL_LANG.my || {}, {
     "home.popularMOBILEGAMES": "လူကြိုက်များသော မိုဘိုင်းဂိမ်းများ",
     "home.tokensPackages": "တိုကင်များနှင့် Package များ",
     "home.marvelRIVALS": "MARVEL RIVALS",
@@ -545,7 +545,7 @@
     "support.adminReplied": "Admin က သင့် Ticket ကို ပြန်ကြားထားသည်",
     "support.ticketUpdated": "သင့် Support ticket ကို အပ်ဒိတ်လုပ်ထားသည်"
   });
-  Object.assign(window.AZIEL_LANG.th = window.AZIEL_LANG.th || {},   {
+  Object.assign(window.AZIEL_LANG.th = window.AZIEL_LANG.th || {}, {
     "home.popularMOBILEGAMES": "เกมมือถือยอดนิยม",
     "home.tokensPackages": "โทเคนและแพ็กเกจ",
     "home.marvelRIVALS": "MARVEL RIVALS",
@@ -817,7 +817,7 @@
     "support.adminReplied": "Admin ตอบ Ticket ของคุณแล้ว",
     "support.ticketUpdated": "Ticket ของคุณได้รับการอัปเดต"
   });
-  Object.assign(window.AZIEL_LANG.en,   {
+  Object.assign(window.AZIEL_LANG.en, {
     "company": "Company",
     "aboutAziel": "About AZIEL",
     "support": "Support",
@@ -918,7 +918,7 @@
     "digitalServices": "Digital Services",
     "newGames": "New Games",
     "show": "Show",
-    "payment_transfer_completed": "I",
+    "payment_transfer_completed": "I've completed the transfer",
     "payment_upload_receipt_next": "Transfer completed. Upload your receipt for verification.",
     "payment.activeConflict": "An active payment already exists. Resume it before changing payment method.",
     "payment.continueWith": "Continue with {method}.",
@@ -978,7 +978,7 @@
     "walletAdjustment": "Wallet Adjustment",
     "creatingPayment": "Creating Payment..."
   });
-  Object.assign(window.AZIEL_LANG.my,   {
+  Object.assign(window.AZIEL_LANG.my, {
     "company": "ကုမ္ပဏီ",
     "aboutAziel": "AZIEL အကြောင်း",
     "support": "အကူအညီ",
@@ -1139,7 +1139,7 @@
     "walletAdjustment": "Wallet ချိန်ညှိမှု",
     "creatingPayment": "ငွေပေးချေမှု ဖန်တီးနေသည်..."
   });
-  Object.assign(window.AZIEL_LANG.th,   {
+  Object.assign(window.AZIEL_LANG.th, {
     "company": "บริษัท",
     "aboutAziel": "เกี่ยวกับ AZIEL",
     "support": "ช่วยเหลือ",
@@ -1300,19 +1300,19 @@
     "walletAdjustment": "การปรับยอด Wallet",
     "creatingPayment": "กำลังสร้างการชำระเงิน..."
   });
-  Object.assign(window.AZIEL_LANG.en,   {
+  Object.assign(window.AZIEL_LANG.en, {
     "verify.otp.didntReceive": "Didn’t receive code?",
     "verify.otp.usernameLabel": "Username:"
   });
-  Object.assign(window.AZIEL_LANG.my,   {
+  Object.assign(window.AZIEL_LANG.my, {
     "verify.otp.didntReceive": "Didn’t receive code?",
     "verify.otp.usernameLabel": "အသုံးပြုသူအမည်:"
   });
-  Object.assign(window.AZIEL_LANG.th,   {
+  Object.assign(window.AZIEL_LANG.th, {
     "verify.otp.didntReceive": "Didn’t receive code?",
     "verify.otp.usernameLabel": "ชื่อผู้ใช้:"
   });
-  Object.assign(window.AZIEL_LANG.en,   {
+  Object.assign(window.AZIEL_LANG.en, {
     "search.mobileGames": "Mobile Games",
     "search.category": "Category",
     "search.mobileGamesHelp": "Browse mobile game top-ups",
@@ -1350,7 +1350,7 @@
     "search.trySearching": "Try searching for:",
     "search.placeholderCompact": "Search games..."
   });
-  Object.assign(window.AZIEL_LANG.my,   {
+  Object.assign(window.AZIEL_LANG.my, {
     "search.mobileGames": "မိုဘိုင်းဂိမ်းများ",
     "search.category": "အမျိုးအစား",
     "search.mobileGamesHelp": "မိုဘိုင်းဂိမ်း Top-up များ ရှာဖွေရန်",
@@ -1388,7 +1388,7 @@
     "search.trySearching": "ဤအရာများကို ရှာကြည့်ပါ:",
     "search.placeholderCompact": "ဂိမ်းများ ရှာဖွေရန်..."
   });
-  Object.assign(window.AZIEL_LANG.th,   {
+  Object.assign(window.AZIEL_LANG.th, {
     "search.mobileGames": "เกมมือถือ",
     "search.category": "หมวดหมู่",
     "search.mobileGamesHelp": "เลือกดูบริการเติมเงินเกมมือถือ",
@@ -1426,7 +1426,7 @@
     "search.trySearching": "ลองค้นหา:",
     "search.placeholderCompact": "ค้นหาเกม..."
   });
-  Object.assign(window.AZIEL_LANG.en,   {
+  Object.assign(window.AZIEL_LANG.en, {
     "wallet.loadingPaymentMethods": "Loading payment methods...",
     "wallet.paymentMethodsFailed": "Payment methods failed to load.",
     "wallet.noPaymentMethods": "No wallet top-up payment methods available.",
@@ -1446,40 +1446,42 @@
     "wallet.chooseReceipt": "Please choose your payment receipt first.",
     "common.submitting": "Submitting...",
     "wallet.receiptAwaitingAdmin": "Payment receipt submitted. Please wait for admin verification."
-    ,"header.openMenu": "Open menu"
-    ,"header.search": "Search"
-    ,"header.cart": "Orders"
-    ,"header.accountMenu": "Account menu"
-    ,"header.mobileGames": "Mobile Games"
-    ,"header.pcGames": "PC Games"
-    ,"header.webgame": "Webgame"
-    ,"header.socialTopUp": "Social Top Up"
-    ,"header.telegramTopUp": "Telegram Top Up"
-    ,"header.capcutTopUp": "CapCut Top Up"
-    ,"product.category.mobilegametopup": "Mobile Game Top Up"
-    ,"product.category.product": "Product"
-    ,"product.market.global": "Global"
-    ,"product.notSelected": "Not selected"
-    ,"product.selectPackagePrompt": "Please select a package."
-    ,"product.packageUnavailable": "This package is not available yet."
-    ,"product.selectPaymentPrompt": "Please select a payment method."
-    ,"product.continuingCheckout": "Continuing to checkout…"
-    ,"product.readyCheckoutPromo": "Promo applied. Ready to continue to checkout."
-    ,"product.readyCheckout": "Ready to continue to checkout."
-    ,"product.readyPaymentPromo": "Promo applied. Ready to continue payment."
-    ,"product.readyPayment": "Ready to continue payment."
-    ,"storefront.gamesBreadcrumb": "AZIEL / Games"
-    ,"storefront.unavailable": "Unavailable"
-    ,"storefront.sectionPreparing": "Products are being prepared for this section."
-    ,"storefront.sectionUnavailable": "This section is currently unavailable."
-    ,"storefront.exploreGames": "Explore available games"
-    ,"Checkout | AZIEL 1Tap Shop": "Checkout | AZIEL 1Tap Shop"
-    ,"Coming Soon | AZIEL 1Tap Shop": "Coming Soon | AZIEL 1Tap Shop"
-    ,"Payment Method | AZIEL": "Payment Method | AZIEL"
-    ,"Payment | AZIEL": "Payment | AZIEL"
-    ,"AZIEL Product | AZIEL 1Tap Shop": "AZIEL Product | AZIEL 1Tap Shop"
+    , "header.openMenu": "Open menu"
+    , "header.search": "Search"
+    , "header.cart": "Orders"
+    , "header.accountMenu": "Account menu"
+    , "header.mobileGames": "Mobile Games"
+    , "header.pcGames": "PC Games"
+    , "header.webgame": "Webgame"
+    , "header.socialTopUp": "Social Top Up"
+    , "header.telegramTopUp": "Telegram Top Up"
+    , "header.capcutTopUp": "CapCut Top Up"
+    , "header.gameCategories": "Game categories"
+    , "header.socialCategories": "Social top up categories"
+    , "product.category.mobilegametopup": "Mobile Game Top Up"
+    , "product.category.product": "Product"
+    , "product.market.global": "Global"
+    , "product.notSelected": "Not selected"
+    , "product.selectPackagePrompt": "Please select a package."
+    , "product.packageUnavailable": "This package is not available yet."
+    , "product.selectPaymentPrompt": "Please select a payment method."
+    , "product.continuingCheckout": "Continuing to checkout…"
+    , "product.readyCheckoutPromo": "Promo applied. Ready to continue to checkout."
+    , "product.readyCheckout": "Ready to continue to checkout."
+    , "product.readyPaymentPromo": "Promo applied. Ready to continue payment."
+    , "product.readyPayment": "Ready to continue payment."
+    , "storefront.gamesBreadcrumb": "AZIEL / Games"
+    , "storefront.unavailable": "Unavailable"
+    , "storefront.sectionPreparing": "Products are being prepared for this section."
+    , "storefront.sectionUnavailable": "This section is currently unavailable."
+    , "storefront.exploreGames": "Explore available games"
+    , "Checkout | AZIEL 1Tap Shop": "Checkout | AZIEL 1Tap Shop"
+    , "Coming Soon | AZIEL 1Tap Shop": "Coming Soon | AZIEL 1Tap Shop"
+    , "Payment Method | AZIEL": "Payment Method | AZIEL"
+    , "Payment | AZIEL": "Payment | AZIEL"
+    , "AZIEL Product | AZIEL 1Tap Shop": "AZIEL Product | AZIEL 1Tap Shop"
   });
-  Object.assign(window.AZIEL_LANG.my,   {
+  Object.assign(window.AZIEL_LANG.my, {
     "wallet.loadingPaymentMethods": "ငွေပေးချေနည်းများကို ဖွင့်နေသည်...",
     "wallet.paymentMethodsFailed": "ငွေပေးချေနည်းများကို ဖွင့်မရပါ။",
     "wallet.noPaymentMethods": "Wallet ဖြည့်ရန် ငွေပေးချေနည်း မရှိသေးပါ။",
@@ -1499,35 +1501,37 @@
     "wallet.chooseReceipt": "ငွေလွှဲပြေစာကို အရင်ရွေးပါ။",
     "common.submitting": "တင်နေသည်...",
     "wallet.receiptAwaitingAdmin": "ငွေပေးချေပြေစာ တင်ပြီးပါပြီ။ Admin စစ်ဆေးမှုကို စောင့်ပါ။"
-    ,"header.openMenu": "မီနူးကို ဖွင့်ရန်"
-    ,"header.search": "ရှာဖွေရန်"
-    ,"header.cart": "အော်ဒါများ"
-    ,"header.accountMenu": "အကောင့်မီနူး"
-    ,"header.mobileGames": "မိုဘိုင်းဂိမ်းများ"
-    ,"header.pcGames": "PC ဂိမ်းများ"
-    ,"header.webgame": "ဝဘ်ဂိမ်း"
-    ,"header.socialTopUp": "လူမှုကွန်ရက် ငွေဖြည့်ခြင်း"
-    ,"header.telegramTopUp": "Telegram ငွေဖြည့်ခြင်း"
-    ,"header.capcutTopUp": "CapCut ငွေဖြည့်ခြင်း"
-    ,"product.category.mobilegametopup": "မိုဘိုင်းဂိမ်း ငွေဖြည့်ခြင်း"
-    ,"product.category.product": "ထုတ်ကုန်"
-    ,"product.market.global": "ကမ္ဘာလုံးဆိုင်ရာ"
-    ,"product.notSelected": "မရွေးရသေး"
-    ,"product.selectPackagePrompt": "ပက်ကေ့ချ်တစ်ခု ရွေးပါ။"
-    ,"product.packageUnavailable": "ဤပက်ကေ့ချ်ကို မရနိုင်သေးပါ။"
-    ,"product.selectPaymentPrompt": "ငွေပေးချေနည်းတစ်ခု ရွေးပါ။"
-    ,"product.continuingCheckout": "ငွေပေးချေမှုအဆင့်သို့ ဆက်သွားနေသည်…"
-    ,"product.readyCheckoutPromo": "ပရိုမိုးရှင်း အသုံးပြုပြီးပါပြီ။ ငွေပေးချေမှုအဆင့်သို့ ဆက်သွားနိုင်ပါပြီ။"
-    ,"product.readyCheckout": "ငွေပေးချေမှုအဆင့်သို့ ဆက်သွားနိုင်ပါပြီ။"
-    ,"product.readyPaymentPromo": "ပရိုမိုးရှင်း အသုံးပြုပြီးပါပြီ။ ငွေပေးချေနိုင်ပါပြီ။"
-    ,"product.readyPayment": "ငွေပေးချေနိုင်ပါပြီ။"
-    ,"storefront.gamesBreadcrumb": "AZIEL / ဂိမ်းများ"
-    ,"storefront.unavailable": "အသုံးမပြုနိုင်ပါ"
-    ,"storefront.sectionPreparing": "ဤကဏ္ဍအတွက် ထုတ်ကုန်များကို ပြင်ဆင်နေပါသည်။"
-    ,"storefront.sectionUnavailable": "ဤကဏ္ဍကို လက်ရှိ အသုံးမပြုနိုင်ပါ။"
-    ,"storefront.exploreGames": "ရရှိနိုင်သော ဂိမ်းများကို ကြည့်ရန်"
+    , "header.openMenu": "မီနူးကို ဖွင့်ရန်"
+    , "header.search": "ရှာဖွေရန်"
+    , "header.cart": "အော်ဒါများ"
+    , "header.accountMenu": "အကောင့်မီနူး"
+    , "header.mobileGames": "မိုဘိုင်းဂိမ်းများ"
+    , "header.pcGames": "PC ဂိမ်းများ"
+    , "header.webgame": "ဝဘ်ဂိမ်း"
+    , "header.socialTopUp": "လူမှုကွန်ရက် ငွေဖြည့်ခြင်း"
+    , "header.telegramTopUp": "Telegram ငွေဖြည့်ခြင်း"
+    , "header.capcutTopUp": "CapCut ငွေဖြည့်ခြင်း"
+    , "header.gameCategories": "ဂိမ်းအမျိုးအစားများ"
+    , "header.socialCategories": "Social Top Up အမျိုးအစားများ"
+    , "product.category.mobilegametopup": "မိုဘိုင်းဂိမ်း ငွေဖြည့်ခြင်း"
+    , "product.category.product": "ထုတ်ကုန်"
+    , "product.market.global": "ကမ္ဘာလုံးဆိုင်ရာ"
+    , "product.notSelected": "မရွေးရသေး"
+    , "product.selectPackagePrompt": "ပက်ကေ့ချ်တစ်ခု ရွေးပါ။"
+    , "product.packageUnavailable": "ဤပက်ကေ့ချ်ကို မရနိုင်သေးပါ။"
+    , "product.selectPaymentPrompt": "ငွေပေးချေနည်းတစ်ခု ရွေးပါ။"
+    , "product.continuingCheckout": "ငွေပေးချေမှုအဆင့်သို့ ဆက်သွားနေသည်…"
+    , "product.readyCheckoutPromo": "ပရိုမိုးရှင်း အသုံးပြုပြီးပါပြီ။ ငွေပေးချေမှုအဆင့်သို့ ဆက်သွားနိုင်ပါပြီ။"
+    , "product.readyCheckout": "ငွေပေးချေမှုအဆင့်သို့ ဆက်သွားနိုင်ပါပြီ။"
+    , "product.readyPaymentPromo": "ပရိုမိုးရှင်း အသုံးပြုပြီးပါပြီ။ ငွေပေးချေနိုင်ပါပြီ။"
+    , "product.readyPayment": "ငွေပေးချေနိုင်ပါပြီ။"
+    , "storefront.gamesBreadcrumb": "AZIEL / ဂိမ်းများ"
+    , "storefront.unavailable": "အသုံးမပြုနိုင်ပါ"
+    , "storefront.sectionPreparing": "ဤကဏ္ဍအတွက် ထုတ်ကုန်များကို ပြင်ဆင်နေပါသည်။"
+    , "storefront.sectionUnavailable": "ဤကဏ္ဍကို လက်ရှိ အသုံးမပြုနိုင်ပါ။"
+    , "storefront.exploreGames": "ရရှိနိုင်သော ဂိမ်းများကို ကြည့်ရန်"
   });
-  Object.assign(window.AZIEL_LANG.th,   {
+  Object.assign(window.AZIEL_LANG.th, {
     "wallet.loadingPaymentMethods": "กำลังโหลดวิธีชำระเงิน...",
     "wallet.paymentMethodsFailed": "โหลดวิธีชำระเงินไม่สำเร็จ",
     "wallet.noPaymentMethods": "ไม่มีวิธีชำระเงินสำหรับเติม Wallet",
@@ -1547,33 +1551,35 @@
     "wallet.chooseReceipt": "โปรดเลือกรูปสลิปการชำระเงินก่อน",
     "common.submitting": "กำลังส่ง...",
     "wallet.receiptAwaitingAdmin": "ส่งใบเสร็จแล้ว โปรดรอเจ้าหน้าที่ตรวจสอบ"
-    ,"header.openMenu": "เปิดเมนู"
-    ,"header.search": "ค้นหา"
-    ,"header.cart": "คำสั่งซื้อ"
-    ,"header.accountMenu": "เมนูบัญชี"
-    ,"header.mobileGames": "เกมมือถือ"
-    ,"header.pcGames": "เกม PC"
-    ,"header.webgame": "เกมเว็บ"
-    ,"header.socialTopUp": "เติมบริการโซเชียล"
-    ,"header.telegramTopUp": "เติม Telegram"
-    ,"header.capcutTopUp": "เติม CapCut"
-    ,"product.category.mobilegametopup": "เติมเกมมือถือ"
-    ,"product.category.product": "สินค้า"
-    ,"product.market.global": "ทั่วโลก"
-    ,"product.notSelected": "ยังไม่ได้เลือก"
-    ,"product.selectPackagePrompt": "โปรดเลือกแพ็กเกจ"
-    ,"product.packageUnavailable": "แพ็กเกจนี้ยังไม่พร้อมใช้งาน"
-    ,"product.selectPaymentPrompt": "โปรดเลือกวิธีชำระเงิน"
-    ,"product.continuingCheckout": "กำลังไปยังขั้นตอนชำระเงิน…"
-    ,"product.readyCheckoutPromo": "ใช้โปรโมชันแล้ว พร้อมไปยังขั้นตอนชำระเงิน"
-    ,"product.readyCheckout": "พร้อมไปยังขั้นตอนชำระเงิน"
-    ,"product.readyPaymentPromo": "ใช้โปรโมชันแล้ว พร้อมชำระเงิน"
-    ,"product.readyPayment": "พร้อมชำระเงิน"
-    ,"storefront.gamesBreadcrumb": "AZIEL / เกม"
-    ,"storefront.unavailable": "ไม่พร้อมใช้งาน"
-    ,"storefront.sectionPreparing": "กำลังเตรียมสินค้าในหมวดนี้"
-    ,"storefront.sectionUnavailable": "หมวดนี้ไม่พร้อมใช้งานในขณะนี้"
-    ,"storefront.exploreGames": "ดูเกมที่พร้อมใช้งาน"
+    , "header.openMenu": "เปิดเมนู"
+    , "header.search": "ค้นหา"
+    , "header.cart": "คำสั่งซื้อ"
+    , "header.accountMenu": "เมนูบัญชี"
+    , "header.mobileGames": "เกมมือถือ"
+    , "header.pcGames": "เกม PC"
+    , "header.webgame": "เกมเว็บ"
+    , "header.socialTopUp": "เติมบริการโซเชียล"
+    , "header.telegramTopUp": "เติม Telegram"
+    , "header.capcutTopUp": "เติม CapCut"
+    , "header.gameCategories": "หมวดหมู่เกม"
+    , "header.socialCategories": "หมวดหมู่บริการโซเชียล"
+    , "product.category.mobilegametopup": "เติมเกมมือถือ"
+    , "product.category.product": "สินค้า"
+    , "product.market.global": "ทั่วโลก"
+    , "product.notSelected": "ยังไม่ได้เลือก"
+    , "product.selectPackagePrompt": "โปรดเลือกแพ็กเกจ"
+    , "product.packageUnavailable": "แพ็กเกจนี้ยังไม่พร้อมใช้งาน"
+    , "product.selectPaymentPrompt": "โปรดเลือกวิธีชำระเงิน"
+    , "product.continuingCheckout": "กำลังไปยังขั้นตอนชำระเงิน…"
+    , "product.readyCheckoutPromo": "ใช้โปรโมชันแล้ว พร้อมไปยังขั้นตอนชำระเงิน"
+    , "product.readyCheckout": "พร้อมไปยังขั้นตอนชำระเงิน"
+    , "product.readyPaymentPromo": "ใช้โปรโมชันแล้ว พร้อมชำระเงิน"
+    , "product.readyPayment": "พร้อมชำระเงิน"
+    , "storefront.gamesBreadcrumb": "AZIEL / เกม"
+    , "storefront.unavailable": "ไม่พร้อมใช้งาน"
+    , "storefront.sectionPreparing": "กำลังเตรียมสินค้าในหมวดนี้"
+    , "storefront.sectionUnavailable": "หมวดนี้ไม่พร้อมใช้งานในขณะนี้"
+    , "storefront.exploreGames": "ดูเกมที่พร้อมใช้งาน"
   });
   // G.2.3: reviewed customer-presentation translations. Canonical product,
   // package, provider, identifier, and currency names intentionally remain unchanged.
@@ -1639,55 +1645,55 @@
     "walletTopup": "Wallet ငွေဖြည့်ခြင်း",
     "walletPayment": "Wallet ငွေပေးချေမှု",
     "walletRefund": "Wallet ငွေပြန်အမ်းမှု"
-    ,"user": "အသုံးပြုသူ"
-    ,"region": "ဒေသ"
-    ,"regionThailand": "ထိုင်း - THB"
-    ,"regionMyanmar": "မြန်မာ - MMK"
-    ,"verified": "အတည်ပြုပြီး"
-    ,"notVerified": "အတည်မပြုရသေး"
-    ,"linked": "ချိတ်ဆက်ပြီး"
-    ,"notLinked": "မချိတ်ဆက်ရသေး"
-    ,"support.ticket": "အကူအညီတောင်းခံစာ"
-    ,"support.screenshotAlt": "အကူအညီတောင်းခံမှု ဖန်သားပြင်ပုံ"
-    ,"product.enterPromo": "ပရိုမိုးရှင်းကုဒ် ထည့်ပါ"
-    ,"product.promoSelectPackage": "ပရိုမိုးရှင်းကုဒ် မသုံးမီ ပက်ကေ့ချ်ကို ရွေးပါ။"
-    ,"product.promoEnterCode": "ပရိုမိုးရှင်းကုဒ် ထည့်ပါ။"
-    ,"product.promoInvalid": "ဤပရိုမိုးရှင်းကုဒ်သည် မမှန်ကန်ပါ သို့မဟုတ် အသုံးမပြုနိုင်ပါ။"
-    ,"product.promoExpired": "ဤပရိုမိုးရှင်းကုဒ် သက်တမ်းကုန်သွားပါပြီ။"
-    ,"product.promoNotEligible": "ဤဝယ်ယူမှုအတွက် ပရိုမိုးရှင်းကုဒ်ကို အသုံးမပြုနိုင်ပါ။"
-    ,"product.checkAccountFields": "ငွေပေးချေမှုအဆင့်သို့ မဆက်မီ သင့် {fields} ကို သေချာစစ်ဆေးပါ။"
-    ,"product.howTo.checkout": "ငွေပေးချေမှုအဆင့်သို့ ဆက်သွားပြီး ငွေပေးချေနည်းကို ရွေးပါ။"
-    ,"checkout.paymentProtected": "လုံခြုံသော ငွေပေးချေမှု • သင့်ငွေပေးချေမှုကို ကာကွယ်ထားသည်"
-    ,"product.selectPackage": "ပက်ကေ့ချ် ရွေးရန်"
-    ,"selectPackage": "ပက်ကေ့ချ် ရွေးရန်"
-    ,"product.packageGuide": "ပက်ကေ့ချ် လမ်းညွှန်"
-    ,"checkout.continue": "ငွေပေးချေမှုအဆင့်သို့ ဆက်သွားရန်"
-    ,"product.trustLine": "မြန်ဆန်စွာပို့ဆောင်မှု • လုံခြုံသောငွေပေးချေမှု • အော်ဒါခြေရာခံခြင်း"
-    ,"mlbbTrust": "⚡ မြန်ဆန်စွာဖြည့်ပေးခြင်း • 🔒 လုံခြုံသောငွေပေးချေမှု • 📦 အော်ဒါခြေရာခံခြင်း"
-    ,"trackOrder": "အော်ဒါစစ်ရန်"
-    ,"forgot.password.forgotPassword": "စကားဝှက် မေ့နေပါသလား?"
-    ,"AZIEL 1Tap Shop | Game Top Up Platform": "AZIEL 1Tap Shop | ဂိမ်းငွေဖြည့်ပလက်ဖောင်း"
-    ,"Mobile Legends Top Up | AZIEL 1Tap Shop": "Mobile Legends ငွေဖြည့်ခြင်း | AZIEL 1Tap Shop"
-    ,"PUBG Mobile UC Top Up | AZIEL 1Tap Shop": "PUBG Mobile UC ငွေဖြည့်ခြင်း | AZIEL 1Tap Shop"
-    ,"PUBG Royale Pass | AZIEL 1Tap Shop": "PUBG Royale Pass | AZIEL 1Tap Shop"
-    ,"Free Fire Diamonds Top Up | AZIEL 1Tap Shop": "Free Fire Diamonds ငွေဖြည့်ခြင်း | AZIEL 1Tap Shop"
-    ,"Honor of Kings Top Up | AZIEL 1Tap Shop": "Honor of Kings ငွေဖြည့်ခြင်း | AZIEL 1Tap Shop"
-    ,"Genshin Impact Top Up | AZIEL 1Tap Shop": "Genshin Impact ငွေဖြည့်ခြင်း | AZIEL 1Tap Shop"
-    ,"Roblox Top Up | AZIEL 1Tap Shop": "Roblox ငွေဖြည့်ခြင်း | AZIEL 1Tap Shop"
-    ,"Telegram Top Up | AZIEL 1Tap Shop": "Telegram ငွေဖြည့်ခြင်း | AZIEL 1Tap Shop"
-    ,"AZIEL Product | AZIEL 1Tap Shop": "AZIEL ထုတ်ကုန် | AZIEL 1Tap Shop"
-    ,"Checkout | AZIEL 1Tap Shop": "ငွေပေးချေမှု စစ်ဆေးခြင်း | AZIEL 1Tap Shop"
-    ,"Payment Method | AZIEL": "ငွေပေးချေနည်း | AZIEL"
-    ,"Payment | AZIEL": "ငွေပေးချေမှု | AZIEL"
-    ,"Order Tracking - AZIEL": "အော်ဒါခြေရာခံခြင်း - AZIEL"
-    ,"Login - AZIEL 1Tap": "အကောင့်ဝင်ရန် - AZIEL 1Tap"
-    ,"Register - AZIEL 1Tap": "အကောင့်ဖွင့်ရန် - AZIEL 1Tap"
-    ,"Forgot Password - AZIEL 1Tap": "စကားဝှက်မေ့ - AZIEL 1Tap"
-    ,"Reset Password - AZIEL 1Tap": "စကားဝှက်ပြန်သတ်မှတ်ရန် - AZIEL 1Tap"
-    ,"Verify OTP - AZIEL 1Tap": "OTP အတည်ပြုရန် - AZIEL 1Tap"
-    ,"Customer Support - AZIEL": "ဖောက်သည်အကူအညီ - AZIEL"
-    ,"Wallet - AZIEL": "Wallet - AZIEL"
-    ,"Coming Soon | AZIEL 1Tap Shop": "မကြာမီလာမည် | AZIEL 1Tap Shop"
+    , "user": "အသုံးပြုသူ"
+    , "region": "ဒေသ"
+    , "regionThailand": "ထိုင်း - THB"
+    , "regionMyanmar": "မြန်မာ - MMK"
+    , "verified": "အတည်ပြုပြီး"
+    , "notVerified": "အတည်မပြုရသေး"
+    , "linked": "ချိတ်ဆက်ပြီး"
+    , "notLinked": "မချိတ်ဆက်ရသေး"
+    , "support.ticket": "အကူအညီတောင်းခံစာ"
+    , "support.screenshotAlt": "အကူအညီတောင်းခံမှု ဖန်သားပြင်ပုံ"
+    , "product.enterPromo": "ပရိုမိုးရှင်းကုဒ် ထည့်ပါ"
+    , "product.promoSelectPackage": "ပရိုမိုးရှင်းကုဒ် မသုံးမီ ပက်ကေ့ချ်ကို ရွေးပါ။"
+    , "product.promoEnterCode": "ပရိုမိုးရှင်းကုဒ် ထည့်ပါ။"
+    , "product.promoInvalid": "ဤပရိုမိုးရှင်းကုဒ်သည် မမှန်ကန်ပါ သို့မဟုတ် အသုံးမပြုနိုင်ပါ။"
+    , "product.promoExpired": "ဤပရိုမိုးရှင်းကုဒ် သက်တမ်းကုန်သွားပါပြီ။"
+    , "product.promoNotEligible": "ဤဝယ်ယူမှုအတွက် ပရိုမိုးရှင်းကုဒ်ကို အသုံးမပြုနိုင်ပါ။"
+    , "product.checkAccountFields": "ငွေပေးချေမှုအဆင့်သို့ မဆက်မီ သင့် {fields} ကို သေချာစစ်ဆေးပါ။"
+    , "product.howTo.checkout": "ငွေပေးချေမှုအဆင့်သို့ ဆက်သွားပြီး ငွေပေးချေနည်းကို ရွေးပါ။"
+    , "checkout.paymentProtected": "လုံခြုံသော ငွေပေးချေမှု • သင့်ငွေပေးချေမှုကို ကာကွယ်ထားသည်"
+    , "product.selectPackage": "ပက်ကေ့ချ် ရွေးရန်"
+    , "selectPackage": "ပက်ကေ့ချ် ရွေးရန်"
+    , "product.packageGuide": "ပက်ကေ့ချ် လမ်းညွှန်"
+    , "checkout.continue": "ငွေပေးချေမှုအဆင့်သို့ ဆက်သွားရန်"
+    , "product.trustLine": "မြန်ဆန်စွာပို့ဆောင်မှု • လုံခြုံသောငွေပေးချေမှု • အော်ဒါခြေရာခံခြင်း"
+    , "mlbbTrust": "⚡ မြန်ဆန်စွာဖြည့်ပေးခြင်း • 🔒 လုံခြုံသောငွေပေးချေမှု • 📦 အော်ဒါခြေရာခံခြင်း"
+    , "trackOrder": "အော်ဒါစစ်ရန်"
+    , "forgot.password.forgotPassword": "စကားဝှက် မေ့နေပါသလား?"
+    , "AZIEL 1Tap Shop | Game Top Up Platform": "AZIEL 1Tap Shop | ဂိမ်းငွေဖြည့်ပလက်ဖောင်း"
+    , "Mobile Legends Top Up | AZIEL 1Tap Shop": "Mobile Legends ငွေဖြည့်ခြင်း | AZIEL 1Tap Shop"
+    , "PUBG Mobile UC Top Up | AZIEL 1Tap Shop": "PUBG Mobile UC ငွေဖြည့်ခြင်း | AZIEL 1Tap Shop"
+    , "PUBG Royale Pass | AZIEL 1Tap Shop": "PUBG Royale Pass | AZIEL 1Tap Shop"
+    , "Free Fire Diamonds Top Up | AZIEL 1Tap Shop": "Free Fire Diamonds ငွေဖြည့်ခြင်း | AZIEL 1Tap Shop"
+    , "Honor of Kings Top Up | AZIEL 1Tap Shop": "Honor of Kings ငွေဖြည့်ခြင်း | AZIEL 1Tap Shop"
+    , "Genshin Impact Top Up | AZIEL 1Tap Shop": "Genshin Impact ငွေဖြည့်ခြင်း | AZIEL 1Tap Shop"
+    , "Roblox Top Up | AZIEL 1Tap Shop": "Roblox ငွေဖြည့်ခြင်း | AZIEL 1Tap Shop"
+    , "Telegram Top Up | AZIEL 1Tap Shop": "Telegram ငွေဖြည့်ခြင်း | AZIEL 1Tap Shop"
+    , "AZIEL Product | AZIEL 1Tap Shop": "AZIEL ထုတ်ကုန် | AZIEL 1Tap Shop"
+    , "Checkout | AZIEL 1Tap Shop": "ငွေပေးချေမှု စစ်ဆေးခြင်း | AZIEL 1Tap Shop"
+    , "Payment Method | AZIEL": "ငွေပေးချေနည်း | AZIEL"
+    , "Payment | AZIEL": "ငွေပေးချေမှု | AZIEL"
+    , "Order Tracking - AZIEL": "အော်ဒါခြေရာခံခြင်း - AZIEL"
+    , "Login - AZIEL 1Tap": "အကောင့်ဝင်ရန် - AZIEL 1Tap"
+    , "Register - AZIEL 1Tap": "အကောင့်ဖွင့်ရန် - AZIEL 1Tap"
+    , "Forgot Password - AZIEL 1Tap": "စကားဝှက်မေ့ - AZIEL 1Tap"
+    , "Reset Password - AZIEL 1Tap": "စကားဝှက်ပြန်သတ်မှတ်ရန် - AZIEL 1Tap"
+    , "Verify OTP - AZIEL 1Tap": "OTP အတည်ပြုရန် - AZIEL 1Tap"
+    , "Customer Support - AZIEL": "ဖောက်သည်အကူအညီ - AZIEL"
+    , "Wallet - AZIEL": "Wallet - AZIEL"
+    , "Coming Soon | AZIEL 1Tap Shop": "မကြာမီလာမည် | AZIEL 1Tap Shop"
   });
   Object.assign(window.AZIEL_LANG.th, {
     "footerDescription": "แพลตฟอร์มเติมเกมที่รวดเร็ว ปลอดภัย และเชื่อถือได้",
@@ -1710,48 +1716,48 @@
     "loadMore": "โหลดเพิ่มเติม",
     "product.promoDiscount": "ส่วนลดโปรโมชัน",
     "product.promoCode": "รหัสโปรโมชัน"
-    ,"user": "ผู้ใช้"
-    ,"region": "ภูมิภาค"
-    ,"regionThailand": "ไทย - THB"
-    ,"regionMyanmar": "เมียนมา - MMK"
-    ,"verified": "ยืนยันแล้ว"
-    ,"notVerified": "ยังไม่ยืนยัน"
-    ,"linked": "เชื่อมต่อแล้ว"
-    ,"notLinked": "ยังไม่เชื่อมต่อ"
-    ,"support.ticket": "คำร้องขอความช่วยเหลือ"
-    ,"support.screenshotAlt": "ภาพหน้าจอประกอบคำร้อง"
-    ,"product.enterPromo": "กรอกรหัสโปรโมชัน"
-    ,"product.promoSelectPackage": "เลือกแพ็กเกจก่อนใช้รหัสโปรโมชัน"
-    ,"product.promoEnterCode": "กรอกรหัสโปรโมชัน"
-    ,"product.promoInvalid": "รหัสโปรโมชันนี้ไม่ถูกต้องหรือไม่พร้อมใช้งาน"
-    ,"product.promoExpired": "รหัสโปรโมชันนี้หมดอายุแล้ว"
-    ,"product.promoNotEligible": "รหัสโปรโมชันนี้ใช้กับรายการนี้ไม่ได้"
-    ,"product.checkAccountFields": "ตรวจสอบ {fields} ให้ถูกต้องก่อนเข้าสู่ขั้นตอนชำระเงิน"
-    ,"product.howTo.checkout": "ไปยังขั้นตอนชำระเงินและเลือกวิธีชำระเงิน"
-    ,"checkout.paymentProtected": "ชำระเงินอย่างปลอดภัย • การชำระเงินของคุณได้รับการคุ้มครอง"
-    ,"selectPackage": "เลือกแพ็กเกจ"
-    ,"forgot.password.forgotPassword": "ลืมรหัสผ่าน?"
-    ,"AZIEL 1Tap Shop | Game Top Up Platform": "AZIEL 1Tap Shop | แพลตฟอร์มเติมเกม"
-    ,"Mobile Legends Top Up | AZIEL 1Tap Shop": "เติม Mobile Legends | AZIEL 1Tap Shop"
-    ,"PUBG Mobile UC Top Up | AZIEL 1Tap Shop": "เติม PUBG Mobile UC | AZIEL 1Tap Shop"
-    ,"PUBG Royale Pass | AZIEL 1Tap Shop": "PUBG Royale Pass | AZIEL 1Tap Shop"
-    ,"Free Fire Diamonds Top Up | AZIEL 1Tap Shop": "เติม Free Fire Diamonds | AZIEL 1Tap Shop"
-    ,"Honor of Kings Top Up | AZIEL 1Tap Shop": "เติม Honor of Kings | AZIEL 1Tap Shop"
-    ,"Genshin Impact Top Up | AZIEL 1Tap Shop": "เติม Genshin Impact | AZIEL 1Tap Shop"
-    ,"Roblox Top Up | AZIEL 1Tap Shop": "เติม Roblox | AZIEL 1Tap Shop"
-    ,"Telegram Top Up | AZIEL 1Tap Shop": "เติม Telegram | AZIEL 1Tap Shop"
-    ,"AZIEL Product | AZIEL 1Tap Shop": "สินค้า AZIEL | AZIEL 1Tap Shop"
-    ,"Checkout | AZIEL 1Tap Shop": "ตรวจสอบการชำระเงิน | AZIEL 1Tap Shop"
-    ,"Payment Method | AZIEL": "วิธีชำระเงิน | AZIEL"
-    ,"Payment | AZIEL": "การชำระเงิน | AZIEL"
-    ,"Order Tracking - AZIEL": "ติดตามคำสั่งซื้อ - AZIEL"
-    ,"Login - AZIEL 1Tap": "เข้าสู่ระบบ - AZIEL 1Tap"
-    ,"Register - AZIEL 1Tap": "สมัครสมาชิก - AZIEL 1Tap"
-    ,"Forgot Password - AZIEL 1Tap": "ลืมรหัสผ่าน - AZIEL 1Tap"
-    ,"Reset Password - AZIEL 1Tap": "ตั้งรหัสผ่านใหม่ - AZIEL 1Tap"
-    ,"Verify OTP - AZIEL 1Tap": "ยืนยัน OTP - AZIEL 1Tap"
-    ,"Customer Support - AZIEL": "ฝ่ายช่วยเหลือลูกค้า - AZIEL"
-    ,"Wallet - AZIEL": "Wallet - AZIEL"
-    ,"Coming Soon | AZIEL 1Tap Shop": "เร็ว ๆ นี้ | AZIEL 1Tap Shop"
+    , "user": "ผู้ใช้"
+    , "region": "ภูมิภาค"
+    , "regionThailand": "ไทย - THB"
+    , "regionMyanmar": "เมียนมา - MMK"
+    , "verified": "ยืนยันแล้ว"
+    , "notVerified": "ยังไม่ยืนยัน"
+    , "linked": "เชื่อมต่อแล้ว"
+    , "notLinked": "ยังไม่เชื่อมต่อ"
+    , "support.ticket": "คำร้องขอความช่วยเหลือ"
+    , "support.screenshotAlt": "ภาพหน้าจอประกอบคำร้อง"
+    , "product.enterPromo": "กรอกรหัสโปรโมชัน"
+    , "product.promoSelectPackage": "เลือกแพ็กเกจก่อนใช้รหัสโปรโมชัน"
+    , "product.promoEnterCode": "กรอกรหัสโปรโมชัน"
+    , "product.promoInvalid": "รหัสโปรโมชันนี้ไม่ถูกต้องหรือไม่พร้อมใช้งาน"
+    , "product.promoExpired": "รหัสโปรโมชันนี้หมดอายุแล้ว"
+    , "product.promoNotEligible": "รหัสโปรโมชันนี้ใช้กับรายการนี้ไม่ได้"
+    , "product.checkAccountFields": "ตรวจสอบ {fields} ให้ถูกต้องก่อนเข้าสู่ขั้นตอนชำระเงิน"
+    , "product.howTo.checkout": "ไปยังขั้นตอนชำระเงินและเลือกวิธีชำระเงิน"
+    , "checkout.paymentProtected": "ชำระเงินอย่างปลอดภัย • การชำระเงินของคุณได้รับการคุ้มครอง"
+    , "selectPackage": "เลือกแพ็กเกจ"
+    , "forgot.password.forgotPassword": "ลืมรหัสผ่าน?"
+    , "AZIEL 1Tap Shop | Game Top Up Platform": "AZIEL 1Tap Shop | แพลตฟอร์มเติมเกม"
+    , "Mobile Legends Top Up | AZIEL 1Tap Shop": "เติม Mobile Legends | AZIEL 1Tap Shop"
+    , "PUBG Mobile UC Top Up | AZIEL 1Tap Shop": "เติม PUBG Mobile UC | AZIEL 1Tap Shop"
+    , "PUBG Royale Pass | AZIEL 1Tap Shop": "PUBG Royale Pass | AZIEL 1Tap Shop"
+    , "Free Fire Diamonds Top Up | AZIEL 1Tap Shop": "เติม Free Fire Diamonds | AZIEL 1Tap Shop"
+    , "Honor of Kings Top Up | AZIEL 1Tap Shop": "เติม Honor of Kings | AZIEL 1Tap Shop"
+    , "Genshin Impact Top Up | AZIEL 1Tap Shop": "เติม Genshin Impact | AZIEL 1Tap Shop"
+    , "Roblox Top Up | AZIEL 1Tap Shop": "เติม Roblox | AZIEL 1Tap Shop"
+    , "Telegram Top Up | AZIEL 1Tap Shop": "เติม Telegram | AZIEL 1Tap Shop"
+    , "AZIEL Product | AZIEL 1Tap Shop": "สินค้า AZIEL | AZIEL 1Tap Shop"
+    , "Checkout | AZIEL 1Tap Shop": "ตรวจสอบการชำระเงิน | AZIEL 1Tap Shop"
+    , "Payment Method | AZIEL": "วิธีชำระเงิน | AZIEL"
+    , "Payment | AZIEL": "การชำระเงิน | AZIEL"
+    , "Order Tracking - AZIEL": "ติดตามคำสั่งซื้อ - AZIEL"
+    , "Login - AZIEL 1Tap": "เข้าสู่ระบบ - AZIEL 1Tap"
+    , "Register - AZIEL 1Tap": "สมัครสมาชิก - AZIEL 1Tap"
+    , "Forgot Password - AZIEL 1Tap": "ลืมรหัสผ่าน - AZIEL 1Tap"
+    , "Reset Password - AZIEL 1Tap": "ตั้งรหัสผ่านใหม่ - AZIEL 1Tap"
+    , "Verify OTP - AZIEL 1Tap": "ยืนยัน OTP - AZIEL 1Tap"
+    , "Customer Support - AZIEL": "ฝ่ายช่วยเหลือลูกค้า - AZIEL"
+    , "Wallet - AZIEL": "Wallet - AZIEL"
+    , "Coming Soon | AZIEL 1Tap Shop": "เร็ว ๆ นี้ | AZIEL 1Tap Shop"
   });
 })();

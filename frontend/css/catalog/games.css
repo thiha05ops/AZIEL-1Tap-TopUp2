@@ -172,7 +172,7 @@ body.theme-dark {
     background:
         radial-gradient(circle at top right, rgba(139, 92, 246, .24), transparent 34%),
         radial-gradient(circle at top left, rgba(59, 130, 246, .12), transparent 32%),
-        #070716;
+        #0d0d0f;
     color: #ffffff;
 }
 
@@ -368,7 +368,7 @@ body.theme-light .az-header {
 html.theme-dark,
 body.theme-dark,
 body.dark {
-    background: #070716 !important;
+    background: #0d0d0f !important;
 }
 
 html.theme-dark .az-catalog-page,
@@ -377,7 +377,7 @@ body.dark .az-catalog-page {
     background:
         radial-gradient(circle at top right, rgba(139, 92, 246, .24), transparent 36%),
         radial-gradient(circle at top left, rgba(59, 130, 246, .12), transparent 34%),
-        #070716 !important;
+        #0d0d0f !important;
 
     color: #ffffff !important;
 }

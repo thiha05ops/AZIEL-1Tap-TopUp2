@@ -1,9 +1,9 @@
 /* AZIEL V2.5 Notification Center */
 
 :root {
-    --notification-bg: var(--bg, #070b1d);
+    --notification-bg: var(--bg, #0d0d0f);
     --notification-surface: var(--surface, rgba(255, 255, 255, .055));
-    --notification-surface-strong: var(--surface-strong, #10182f);
+    --notification-surface-strong: var(--surface-strong, #1a1a1d);
     --notification-card: var(--card, rgba(255, 255, 255, .06));
     --notification-card-unread: rgba(139, 92, 246, .10);
     --notification-border: var(--border, rgba(255, 255, 255, .09));
@@ -32,9 +32,9 @@ body.theme-light {
 }
 
 body.theme-dark {
-    --notification-bg: var(--bg, #070b1d);
+    --notification-bg: var(--bg, #0d0d0f);
     --notification-surface: var(--surface, rgba(255, 255, 255, .055));
-    --notification-surface-strong: var(--surface-strong, #10182f);
+    --notification-surface-strong: var(--surface-strong, #1a1a1d);
     --notification-card: var(--card, rgba(255, 255, 255, .06));
     --notification-card-unread: rgba(139, 92, 246, .10);
     --notification-border: var(--border, rgba(255, 255, 255, .09));

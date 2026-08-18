@@ -64,7 +64,7 @@ body.theme-dark {
     background:
         radial-gradient(circle at top left, rgba(139, 92, 246, .22), transparent 34%),
         radial-gradient(circle at top right, rgba(59, 130, 246, .12), transparent 32%),
-        var(--bg, #070716);
+        var(--bg, #0d0d0f);
 }
 
 .az-header,
@@ -526,8 +526,8 @@ body.theme-dark .az-profile-dropdown {
 
     background:
         linear-gradient(180deg,
-            rgba(18, 20, 39, .92),
-            rgba(18, 20, 39, .76));
+            rgba(26, 26, 29, .96),
+            rgba(21, 21, 23, .94));
 
     box-shadow:
         0 26px 80px rgba(0, 0, 0, .44),
@@ -688,8 +688,8 @@ body.theme-dark .az-nav-drop-menu {
 
     background:
         linear-gradient(180deg,
-            rgba(18, 20, 39, .92),
-            rgba(18, 20, 39, .76));
+            rgba(26, 26, 29, .96),
+            rgba(21, 21, 23, .94));
 
     box-shadow:
         0 26px 80px rgba(0, 0, 0, .44),
@@ -1410,8 +1410,8 @@ body.theme-dark .az-search-panel {
     border-color: rgba(255, 255, 255, .10);
     background:
         linear-gradient(180deg,
-            rgba(18, 20, 39, .96),
-            rgba(18, 20, 39, .84));
+            rgba(26, 26, 29, .98),
+            rgba(21, 21, 23, .96));
     color: rgba(255, 255, 255, .94);
 }
 
@@ -1931,4 +1931,78 @@ body.theme-dark .az-empty-state span {
         animation: none !important;
         transition: none !important;
     }
+}
+
+
+/* AZIEL DARK HEADER CONTRAST AUTHORITY */
+body.theme-dark .az-header .az-icon-btn,
+body.theme-dark .az-header .az-locale-btn,
+body.theme-dark .az-header .az-preference-btn,
+body.theme-dark .az-header .az-profile-btn {
+    color: #f4f4f5 !important;
+}
+
+body.theme-dark .az-header .az-icon-btn i,
+body.theme-dark .az-header .az-locale-btn i,
+body.theme-dark .az-header .az-preference-btn i,
+body.theme-dark .az-header .az-profile-btn i {
+    color: inherit !important;
+    opacity: 1 !important;
+}
+
+body.theme-dark .az-profile-dropdown {
+    color: #f4f4f5 !important;
+}
+
+body.theme-dark .az-profile-dropdown a,
+body.theme-dark .az-profile-dropdown .dropdown-btn {
+    color: #c4c4c7 !important;
+}
+
+body.theme-dark .az-profile-dropdown a i,
+body.theme-dark .az-profile-dropdown .dropdown-btn i {
+    color: #909098 !important;
+    opacity: 1 !important;
+}
+
+body.theme-dark .az-profile-dropdown a:hover,
+body.theme-dark .az-profile-dropdown .dropdown-btn:hover {
+    color: #c084fc !important;
+}
+
+body.theme-dark .az-profile-dropdown a:hover i,
+body.theme-dark .az-profile-dropdown .dropdown-btn:hover i {
+    color: #c084fc !important;
+}
+
+body.theme-dark .az-search-panel {
+    color: #f4f4f5 !important;
+}
+
+body.theme-dark .az-search-panel input {
+    color: #f4f4f5 !important;
+}
+
+body.theme-dark .az-search-panel input::placeholder {
+    color: #909098 !important;
+}
+
+
+/* AZIEL DARK PROFILE DROPDOWN SURFACE AUTHORITY */
+body.theme-dark .az-profile-dropdown,
+body.dark .az-profile-dropdown {
+    background: #151517 !important;
+    border-color: rgba(255, 255, 255, .10) !important;
+
+    box-shadow:
+        0 26px 80px rgba(0, 0, 0, .44),
+        inset 0 1px 0 rgba(255, 255, 255, .07) !important;
+
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+body.theme-dark .az-profile-dropdown .dropdown-divider,
+body.dark .az-profile-dropdown .dropdown-divider {
+    background: rgba(255, 255, 255, .08) !important;
 }

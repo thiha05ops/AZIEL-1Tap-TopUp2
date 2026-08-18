@@ -727,19 +727,45 @@ async function checkLiveTracking() {
     if (!currentOrderId) return;
 
     try {
+        const authHeaders = getTrackingAuthHeaders();
+
+        // Tracking endpoint is authenticated.
+        // Do not poll when the customer session is unavailable.
+        if (!authHeaders.Authorization) return;
+
         const res = await fetch(
-            trackingApiUrl(`/api/order/track/${encodeURIComponent(currentOrderId)}`)
+            trackingApiUrl(
+                `/api/order/track/${encodeURIComponent(currentOrderId)}`
+            ),
+            {
+                headers: authHeaders
+            }
         );
+
+        if (!res.ok) {
+            // Avoid repeated console/network noise when the session
+            // has expired or the order is no longer accessible.
+            if (res.status === 401 || res.status === 403) return;
+
+            throw new Error(
+                `Live tracking request failed with ${res.status}.`
+            );
+        }
 
         const data = await res.json();
 
         if (!data.success || !data.order) return;
 
         const nextState = trackingStateKey(data.order);
+
         if (nextState !== lastStatus) {
             lastStatus = nextState;
-            showTrackingPopup(trackingDisplayStatus(data.order));
-            trackOrder(currentOrderId);
+
+            showTrackingPopup(
+                trackingDisplayStatus(data.order)
+            );
+
+            await trackOrder(currentOrderId);
         }
     } catch (error) {
         console.log("Live tracking error:", error);

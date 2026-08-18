@@ -15,9 +15,7 @@ body.account-page {
   color: var(--text);
   font-family: Inter, Arial, sans-serif;
   background:
-    radial-gradient(circle at 50% 12%, rgba(124, 58, 237, .16), transparent 28%),
-    radial-gradient(circle at 88% 42%, rgba(168, 85, 247, .10), transparent 30%),
-    linear-gradient(180deg, var(--bg, #070b1d), var(--bg-soft, #0c1224));
+    linear-gradient(180deg, var(--bg, #0d0d0f), var(--bg-soft, #121214));
 }
 
 body.account-page::before {
@@ -964,4 +962,654 @@ body.account-page::after {
     font-size: 140px;
     right: -40px;
   }
+}
+
+
+/* AZIEL ACCOUNT DARK CONTRAST AUTHORITY */
+body.theme-dark.account-page {
+  --account-text-strong: #f4f4f5;
+  --account-text: #c4c4c7;
+  --account-muted: #a1a1aa;
+  --account-icon: #a8a8b3;
+}
+
+body.theme-dark.account-page .profile-info h3,
+body.theme-dark.account-page .page-title h1,
+body.theme-dark.account-page .dash-card strong,
+body.theme-dark.account-page .card-head h2,
+body.theme-dark.account-page .content-card h2,
+body.theme-dark.account-page .recent-order-item strong,
+body.theme-dark.account-page .order-top h3,
+body.theme-dark.account-page .order-game,
+body.theme-dark.account-page .order-bottom strong,
+body.theme-dark.account-page .security-card h3,
+body.theme-dark.account-page .security-section .section-title h2 {
+  color: var(--account-text-strong) !important;
+}
+
+body.theme-dark.account-page .profile-info p,
+body.theme-dark.account-page .gmail-badge,
+body.theme-dark.account-page .page-title p,
+body.theme-dark.account-page .dash-card span,
+body.theme-dark.account-page .card-head a,
+body.theme-dark.account-page .recent-order-item small,
+body.theme-dark.account-page .order-package,
+body.theme-dark.account-page .form-card label,
+body.theme-dark.account-page .security-card p {
+  color: var(--account-muted) !important;
+}
+
+body.theme-dark.account-page .side-link {
+  color: var(--account-text) !important;
+}
+
+body.theme-dark.account-page .side-link i {
+  color: var(--account-icon) !important;
+  opacity: 1 !important;
+}
+
+body.theme-dark.account-page .side-link:hover,
+body.theme-dark.account-page .side-link.active {
+  color: #c084fc !important;
+}
+
+body.theme-dark.account-page .side-link:hover i,
+body.theme-dark.account-page .side-link.active i {
+  color: #c084fc !important;
+}
+
+body.theme-dark.account-page .verified-badge i {
+  color: var(--success) !important;
+}
+
+body.theme-dark.account-page .gmail-badge i {
+  color: #60a5fa !important;
+}
+
+body.theme-dark.account-page .support-link b {
+  color: var(--success) !important;
+}
+
+/* =========================================================
+   AZIEL ACCOUNT — PROFILE POLISH
+   Presentation only. Existing profile runtime remains owner.
+   ========================================================= */
+
+#profile .page-title {
+  max-width: 720px;
+  margin-bottom: 34px;
+}
+
+#profile .page-title h1 {
+  margin-bottom: 8px;
+}
+
+#profile .content-card.form-card {
+  width: 100%;
+  max-width: 720px;
+  padding: 0 0 40px !important;
+  margin: 0 !important;
+}
+
+/* ---------- FIELD STRUCTURE ---------- */
+
+#profile .form-card label {
+  display: block;
+  margin: 0 0 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+
+#profile .form-card label:not(:first-child) {
+  margin-top: 26px;
+}
+
+#profile .form-card input {
+  width: 100%;
+  height: 52px;
+
+  padding: 0;
+
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+
+  background: transparent;
+  color: var(--text);
+
+  font-size: 16px;
+  line-height: 52px;
+  font-weight: 600;
+
+  outline: none;
+
+  transition:
+    border-color .18s ease,
+    color .18s ease;
+}
+
+/* Editable identity */
+
+#profile #displayName {
+  color: var(--text);
+  border-bottom-color: var(--border);
+}
+
+#profile #displayName:hover {
+  border-bottom-color: color-mix(in srgb,
+      var(--text-muted) 55%,
+      var(--border));
+}
+
+#profile #displayName:focus {
+  border-bottom-color: var(--primary);
+}
+
+/* Immutable account identity */
+
+#profile .form-card input[readonly] {
+  color: var(--text-muted);
+  cursor: default;
+  opacity: .82;
+}
+
+#profile .form-card input[readonly]:focus {
+  border-bottom-color: var(--border);
+}
+
+/* ---------- SAVE ACTION ---------- */
+
+#profile #saveProfileBtn {
+  min-width: 150px;
+  min-height: 46px;
+
+  margin-top: 34px;
+  padding: 0 22px;
+
+  border: 0;
+  border-radius: 999px;
+
+  font-size: 14px;
+  font-weight: 700;
+
+  box-shadow: none;
+
+  transition:
+    transform .16s ease,
+    opacity .16s ease,
+    box-shadow .16s ease;
+}
+
+#profile #saveProfileBtn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgba(124, 58, 237, .18);
+}
+
+#profile #saveProfileBtn:active {
+  transform: translateY(0);
+}
+
+/* ---------- DARK THEME ---------- */
+
+body.theme-dark.account-page #profile .form-card input {
+  color: var(--account-text-strong);
+}
+
+body.theme-dark.account-page #profile .form-card input[readonly] {
+  color: var(--account-muted);
+}
+
+body.theme-dark.account-page #profile #displayName:focus {
+  border-bottom-color: #c084fc;
+}
+
+/* ---------- MOBILE ---------- */
+
+@media (max-width: 700px) {
+  #profile .page-title {
+    margin-bottom: 26px;
+  }
+
+  #profile .content-card.form-card {
+    max-width: none;
+    padding-bottom: 28px !important;
+  }
+
+  #profile .form-card label:not(:first-child) {
+    margin-top: 22px;
+  }
+
+  #profile .form-card input {
+    height: 48px;
+    line-height: 48px;
+    font-size: 16px;
+  }
+
+  #profile #saveProfileBtn {
+    width: 100%;
+    min-height: 48px;
+    margin-top: 30px;
+  }
+}
+
+/* =========================================================
+   AZIEL ACCOUNT — PROFILE COMPACT AUTHORITY
+   Final compact profile presentation.
+   Runtime / profile ownership remains unchanged.
+   ========================================================= */
+
+#profile .page-title {
+    margin-bottom: 28px;
+}
+
+#profile .content-card.form-card {
+    padding-bottom: 30px !important;
+}
+
+/* Compact vertical rhythm */
+#profile .form-card label:not(:first-child) {
+    margin-top: 20px;
+}
+
+#profile .form-card input {
+    height: 46px;
+    line-height: 46px;
+}
+
+/* Editable identity */
+#profile #displayName {
+    color: var(--text);
+    font-weight: 650;
+}
+
+#profile #displayName:focus {
+    border-bottom-width: 2px;
+    border-bottom-color: var(--primary);
+}
+
+/* Read-only account identity */
+#profile .form-card input[readonly] {
+    color: var(--text-muted);
+    font-weight: 550;
+    opacity: .78;
+}
+
+/* Save action */
+#profile #saveProfileBtn {
+    margin-top: 26px;
+}
+
+/* Dark presentation */
+body.theme-dark.account-page #profile #displayName {
+    color: var(--account-text-strong) !important;
+}
+
+body.theme-dark.account-page #profile #displayName:focus {
+    border-bottom-color: #c084fc !important;
+}
+
+body.theme-dark.account-page #profile .form-card input[readonly] {
+    color: var(--account-muted) !important;
+    opacity: .78;
+}
+
+/* Mobile */
+@media (max-width: 700px) {
+    #profile .page-title {
+        margin-bottom: 24px;
+    }
+
+    #profile .form-card label:not(:first-child) {
+        margin-top: 18px;
+    }
+
+    #profile .form-card input {
+        height: 46px;
+        line-height: 46px;
+    }
+
+    #profile #saveProfileBtn {
+        margin-top: 26px;
+    }
+}
+
+/* AZIEL ACCOUNT AVATAR ICON AUTHORITY */
+.account-page .avatar-big {
+    display: grid;
+    place-items: center;
+}
+
+.account-page .avatar-big > i {
+    font-size: 18px;
+    line-height: 1;
+    color: #fff;
+}
+
+/* AZIEL ACCOUNT PROFILE SAVE STATE */
+#profile #saveProfileBtn:disabled {
+    opacity: .42;
+    cursor: default;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+#profile #saveProfileBtn:not(:disabled) {
+    opacity: 1;
+}
+
+
+/* =========================================================
+   AZIEL ACCOUNT — ORDERS COMPACT AUTHORITY
+   Compact customer order history presentation.
+   Runtime / order data ownership remains unchanged.
+   ========================================================= */
+
+#history {
+    max-width: 100%;
+}
+
+#history .page-title {
+    margin-bottom: 28px;
+}
+
+#historyList {
+    width: 100%;
+}
+
+/* One order = one compact information row */
+#historyList .order-card {
+    position: relative;
+
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+        "top top"
+        "game status"
+        "bottom action";
+
+    column-gap: 24px !important;
+    row-gap: 5px !important;
+
+    padding: 14px 0 !important;
+    margin: 0 !important;
+
+    border: 0 !important;
+    border-bottom: 1px solid var(--border) !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+/* Order ID */
+#historyList .order-top {
+    grid-area: top;
+
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+
+    min-width: 0;
+    gap: 16px !important;
+}
+
+#historyList .order-top h3 {
+    min-width: 0;
+    margin: 0;
+
+    font-size: 14px;
+    line-height: 1.35;
+    font-weight: 700;
+
+    overflow-wrap: anywhere;
+}
+
+/* Product */
+#historyList .order-game {
+    grid-area: game;
+
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.35;
+    font-weight: 700;
+}
+
+/* Package / amount / action */
+#historyList .order-package {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.4;
+    font-weight: 600;
+}
+
+#historyList .order-bottom {
+    grid-area: bottom;
+
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+
+    min-width: 0;
+    gap: 18px !important;
+}
+
+#historyList .order-bottom strong {
+    margin: 0;
+
+    font-size: 14px;
+    line-height: 1.35;
+    font-weight: 700;
+}
+
+#historyList .order-bottom a {
+    margin-left: auto;
+
+    font-size: 12px;
+    line-height: 1.35;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+/* Status remains visually secondary */
+#historyList .status,
+#historyList [class*="status-"] {
+    min-height: 24px;
+    padding: 0 9px;
+
+    font-size: 10px;
+    font-weight: 700;
+}
+
+/* Desktop: pull status/action toward the right edge */
+@media (min-width: 901px) {
+    #historyList .order-card {
+        grid-template-columns: minmax(0, 1fr) 120px;
+    }
+
+    #historyList .order-top .status,
+    #historyList .order-top [class*="status-"] {
+        justify-self: end;
+    }
+
+    #historyList .order-bottom a {
+        min-width: 90px;
+        text-align: right;
+    }
+}
+
+/* Mobile */
+@media (max-width: 900px) {
+    #history .page-title {
+        margin-bottom: 24px;
+    }
+
+    #historyList .order-card {
+        grid-template-columns: minmax(0, 1fr) auto;
+        column-gap: 12px !important;
+        row-gap: 6px !important;
+
+        padding: 14px 0 !important;
+    }
+
+    #historyList .order-top h3 {
+        font-size: 14px;
+    }
+
+    #historyList .order-game {
+        font-size: 13px;
+    }
+
+    #historyList .order-package {
+        font-size: 12px;
+    }
+
+    #historyList .order-bottom strong {
+        font-size: 13px;
+    }
+
+    #historyList .order-bottom a {
+        font-size: 12px;
+    }
+}
+
+
+/* =========================================================
+   AZIEL ACCOUNT — ORDERS GROUP 2 AUTHORITY
+   Semantic compact order rows.
+   ========================================================= */
+
+#historyList .order-card {
+    display: block !important;
+    padding: 15px 0 !important;
+}
+
+#historyList .order-top {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 16px !important;
+    margin-bottom: 8px;
+}
+
+#historyList .order-top h3 {
+    margin: 0;
+    min-width: 0;
+    font-size: 13px;
+    line-height: 1.35;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+#historyList .order-main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 120px 100px;
+    align-items: center;
+    gap: 20px;
+}
+
+#historyList .order-product {
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+#historyList .order-game {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.35;
+    font-weight: 700;
+}
+
+#historyList .order-package {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 12px;
+    line-height: 1.35;
+    font-weight: 600;
+}
+
+#historyList .order-amount {
+    margin: 0;
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.35;
+    font-weight: 700;
+    text-align: right;
+    white-space: nowrap;
+}
+
+#historyList .order-track-link {
+    color: var(--primary);
+    text-decoration: none;
+    font-size: 12px;
+    line-height: 1.35;
+    font-weight: 700;
+    text-align: right;
+    white-space: nowrap;
+}
+
+#historyList .order-track-link:hover {
+    text-decoration: underline;
+}
+
+#historyList .status,
+#historyList [class*="status-"] {
+    min-height: 24px;
+    padding: 0 9px;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+/* Mobile */
+@media (max-width: 700px) {
+    #historyList .order-card {
+        padding: 14px 0 !important;
+    }
+
+    #historyList .order-top {
+        margin-bottom: 7px;
+        gap: 10px !important;
+    }
+
+    #historyList .order-top h3 {
+        font-size: 13px;
+    }
+
+    #historyList .order-main {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "product product"
+            "amount action";
+        gap: 6px 12px;
+    }
+
+    #historyList .order-product {
+        grid-area: product;
+        display: flex;
+        align-items: baseline;
+        gap: 7px;
+    }
+
+    #historyList .order-game {
+        font-size: 13px;
+    }
+
+    #historyList .order-package {
+        font-size: 12px;
+    }
+
+    #historyList .order-amount {
+        grid-area: amount;
+        text-align: left;
+        font-size: 13px;
+    }
+
+    #historyList .order-track-link {
+        grid-area: action;
+        text-align: right;
+        font-size: 12px;
+    }
 }

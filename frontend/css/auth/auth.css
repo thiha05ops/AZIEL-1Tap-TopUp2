@@ -18,7 +18,7 @@
 body.theme-dark,
 body.dark,
 html.theme-dark {
-  --az-bg: #070b1d;
+  --az-bg: #0d0d0f;
   --az-card: rgba(17, 24, 39, .86);
   --az-card-solid: #111827;
   --az-text: #f8fafc;

@@ -631,16 +631,8 @@ function initThemeButton() {
     if (btn.dataset.ready === "true") return;
 
     btn.dataset.ready = "true";
-
-    btn.addEventListener("click", () => {
-        if (window.AZIEL?.toggleTheme) {
-            window.AZIEL.toggleTheme();
-            return;
-        }
-
-        document.body.classList.toggle("theme-dark");
-        document.body.classList.toggle("theme-light");
-    });
+    btn.disabled = true;
+    btn.setAttribute("aria-disabled", "true");
 }
 
 function initMobileRefreshButton() {
