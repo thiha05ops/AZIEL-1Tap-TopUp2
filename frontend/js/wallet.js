@@ -10,8 +10,18 @@ let walletHistoryPagination = {
     hasMore: false,
     loadingMore: false
 };
+
+let walletHistoryVisibleCount = 10;
 let walletPaymentMethods = [];
 let activeWalletManualIntent = null;
+
+/*
+ * Wallet page async authority.
+ * Prevent stale region/currency responses from overwriting
+ * the currently active wallet presentation.
+ */
+let walletLoadGeneration = 0;
+let walletPaymentMethodsGeneration = 0;
 
 const AUTO_QR_METHODS = ["promptpay"];
 
@@ -224,25 +234,46 @@ async function loadWalletPaymentMethods() {
     if (!paymentGrid || !paymentInput) return;
 
     const region = getWalletRegion();
+    const generation = ++walletPaymentMethodsGeneration;
+
     paymentGrid.innerHTML = `<p class="pay-loading">${escapeWalletHTML(wt("wallet.loadingPaymentMethods", "Loading payment methods..."))}</p>`;
     paymentInput.value = "";
     walletPaymentMethods = [];
+
+    document
+        .querySelectorAll(".pay-card.active")
+        .forEach(card => card.classList.remove("active"));
 
     try {
         const res = await fetch(walletApiUrl(`/api/payment-methods?region=${encodeURIComponent(region)}`), {
             headers: AZIEL.authHeaders?.() || {}
         });
         const data = await res.json();
+
+        if (
+            generation !== walletPaymentMethodsGeneration ||
+            region !== getWalletRegion()
+        ) {
+            return;
+        }
+
         if (!res.ok || !data.success) {
             throw new Error(data.message || "Failed to load payment methods");
         }
 
-    walletPaymentMethods = (Array.isArray(data.methods) ? data.methods : [])
+        walletPaymentMethods = (Array.isArray(data.methods) ? data.methods : [])
             .filter(isWalletFundingMethodAvailable)
             .sort(sortWalletPaymentMethods);
 
         renderWalletPaymentMethods(walletPaymentMethods);
     } catch (error) {
+        if (
+            generation !== walletPaymentMethodsGeneration ||
+            region !== getWalletRegion()
+        ) {
+            return;
+        }
+
         console.log("Wallet payment methods error:", error);
         paymentGrid.innerHTML = `<p class="pay-error">${escapeWalletHTML(wt("wallet.paymentMethodsFailed", "Payment methods failed to load."))}</p>`;
         updateTopupButtonByMethod();
@@ -395,16 +426,24 @@ async function loadWallet() {
     }
 
     const currency = getWalletCurrency();
+    const generation = ++walletLoadGeneration;
 
     try {
         const res = await fetch(
-            walletApiUrl(`/api/wallet/${encodeURIComponent(user.username)}?currency=${currency}&limit=30`),
+            walletApiUrl(`/api/wallet/${encodeURIComponent(user.username)}?currency=${currency}&limit=10`),
             {
                 headers: AZIEL.authHeaders?.() || {}
             }
         );
 
         const data = await res.json();
+
+        if (
+            generation !== walletLoadGeneration ||
+            currency !== getWalletCurrency()
+        ) {
+            return;
+        }
 
         if (!data.success) {
             renderWalletFromState();
@@ -431,6 +470,8 @@ async function loadWallet() {
             ...(data.transactions || []),
             ...(data.topups || [])
         ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+        walletHistoryVisibleCount = 10;
         walletHistoryPagination = {
             nextCursor: data.pagination?.nextCursor || data.nextCursor || "",
             hasMore: Boolean(data.pagination?.hasMore || data.nextCursor),
@@ -440,6 +481,13 @@ async function loadWallet() {
         renderWalletHistory(walletHistoryItems);
 
     } catch (error) {
+        if (
+            generation !== walletLoadGeneration ||
+            currency !== getWalletCurrency()
+        ) {
+            return;
+        }
+
         console.log("Wallet load error:", error);
         renderWalletFromState();
     }
@@ -456,7 +504,7 @@ async function loadMoreWalletHistory() {
     try {
         const params = new URLSearchParams({
             currency,
-            limit: "30",
+            limit: "10",
             cursor: walletHistoryPagination.nextCursor
         });
         const res = await fetch(walletApiUrl(`/api/wallet/${encodeURIComponent(user.username)}?${params.toString()}`), {
@@ -533,7 +581,9 @@ function renderWalletHistory(history) {
         return;
     }
 
-    const rows = history.map(item => {
+    const visibleHistory = history.slice(0, walletHistoryVisibleCount);
+
+    const rows = visibleHistory.map(item => {
         const direction = getWalletDirection(item);
         const isPayment = direction === "debit";
 
@@ -578,14 +628,31 @@ function renderWalletHistory(history) {
         `;
     }).join("");
 
-    const loadMore = walletHistoryPagination.hasMore ? `
+    const hasLocalMore = walletHistoryVisibleCount < history.length;
+    const canLoadMore = hasLocalMore || walletHistoryPagination.hasMore;
+
+    const loadMore = canLoadMore ? `
         <button class="wallet-load-more" id="walletHistoryLoadMoreBtn" type="button" ${walletHistoryPagination.loadingMore ? "disabled" : ""}>
             ${escapeWalletHTML(walletHistoryPagination.loadingMore ? wt("loading", "Loading") : wt("loadMore", "Load More"))}
         </button>
     ` : "";
 
     box.innerHTML = rows + loadMore;
-    document.getElementById("walletHistoryLoadMoreBtn")?.addEventListener("click", loadMoreWalletHistory);
+    document.getElementById("walletHistoryLoadMoreBtn")?.addEventListener("click", async () => {
+        if (walletHistoryVisibleCount < walletHistoryItems.length) {
+            walletHistoryVisibleCount += 10;
+            renderWalletHistory(walletHistoryItems);
+            return;
+        }
+
+        const before = walletHistoryItems.length;
+        await loadMoreWalletHistory();
+
+        if (walletHistoryItems.length > before) {
+            walletHistoryVisibleCount += 10;
+            renderWalletHistory(walletHistoryItems);
+        }
+    });
 
     window.AZIEL_MOTION?.enter(box, "fast");
 
@@ -1187,7 +1254,22 @@ function initWalletSocket() {
     if (!window.AZIEL?.realtime) return;
 
     window.AZIEL.realtime.on("walletUpdated", async data => {
-        const currency = data.currency || getWalletCurrency();
+        const currency = String(
+            data.currency || getWalletCurrency()
+        ).toUpperCase();
+
+        const activeCurrency = String(
+            getWalletCurrency()
+        ).toUpperCase();
+
+        /*
+         * Realtime events may arrive for either ledger.
+         * Only the active shop currency may update this page.
+         */
+        if (currency !== activeCurrency) {
+            return;
+        }
+
         const symbol = currency === "THB" ? "฿" : "Ks";
         const amount = Number(data.amount || data.balance || 0);
 

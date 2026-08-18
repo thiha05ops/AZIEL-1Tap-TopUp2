@@ -903,6 +903,10 @@ router.get("/wallet/:username", authMiddleware, async (req, res) => {
     try {
         const username = req.user.username;
         const currency = getCurrencyKey(req.query.currency || "MMK");
+        const limit = parseLimit(req.query.limit, {
+            defaultLimit: 10,
+            maxLimit: 30
+        });
 
         const user = await User.findOne({ username });
 
@@ -913,13 +917,16 @@ router.get("/wallet/:username", authMiddleware, async (req, res) => {
             });
         }
 
-        const topups = await WalletTopup.find({ username })
+        const topups = await WalletTopup.find({
+            username,
+            currency
+        })
             .sort({ createdAt: -1 })
-            .limit(30);
+            .limit(limit);
 
         const timeline = await getWalletTimeline(username, {
             currency,
-            limit: 30
+            limit
         });
 
         res.json({

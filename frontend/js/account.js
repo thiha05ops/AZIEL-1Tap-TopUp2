@@ -9,6 +9,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
 let currentUser = null;
 let accountRefreshTimer = null;
+
+let profileInitialDisplayName = "";
+let profileSaveInFlight = false;
 let securityState = {
     overview: null,
     sessions: [],
@@ -115,7 +118,8 @@ async function refreshAccountData() {
         return;
     }
 
-    await loadHistory();
+    // Background account refresh must not re-render the Orders list.
+    // Order history is loaded explicitly when History / Overview needs it.
     await loadBellOrders();
 }
 
@@ -205,10 +209,16 @@ function renderProfile() {
     const verified = isVerified(user);
 
     setText("profileName", name);
-    setText("avatarText", name.charAt(0).toUpperCase());
+    const accountAvatar = document.getElementById("accountAvatar");
+    if (accountAvatar) {
+        accountAvatar.innerHTML = '<i class="fa-solid fa-user" aria-hidden="true"></i>';
+        accountAvatar.setAttribute("aria-label", "Account");
+    }
     setText("profileRegion", `${t("region", "Region")}: ${region}`);
 
     setValue("displayName", name);
+    setProfileBaseline(name);
+
     setValue("profileUsername", user.username || "");
     setValue("profileEmail", user.email || "");
 
@@ -457,6 +467,32 @@ function renderWallet() {
     setText("overviewWalletBalance", `${balance.toLocaleString()} ${symbol}`);
     setText("walletBalanceBig", `${balance.toLocaleString()} ${symbol}`);
 }
+function normalizeProfileDisplayName(value = "") {
+    return String(value || "").trim();
+}
+
+function syncProfileSaveState() {
+    const input = document.getElementById("displayName");
+    const button = document.getElementById("saveProfileBtn");
+
+    if (!input || !button) return;
+
+    const current = normalizeProfileDisplayName(input.value);
+    const changed = current !== profileInitialDisplayName;
+    const valid = current.length > 0;
+
+    button.disabled = profileSaveInFlight || !changed || !valid;
+    button.setAttribute(
+        "aria-disabled",
+        button.disabled ? "true" : "false"
+    );
+}
+
+function setProfileBaseline(value) {
+    profileInitialDisplayName = normalizeProfileDisplayName(value);
+    syncProfileSaveState();
+}
+
 async function saveProfile() {
     const token = window.AZIEL?.getToken?.();
 
@@ -465,13 +501,31 @@ async function saveProfile() {
         return;
     }
 
-    const displayName =
-        document.getElementById("displayName")?.value.trim() || "";
+    const displayName = normalizeProfileDisplayName(
+        document.getElementById("displayName")?.value
+    );
 
     if (!displayName) {
         showAccountToast(t("displayNameRequired", "Display name is required"), "error");
+        syncProfileSaveState();
         return;
     }
+
+    if (displayName === profileInitialDisplayName || profileSaveInFlight) {
+        syncProfileSaveState();
+        return;
+    }
+
+    const saveButton = document.getElementById("saveProfileBtn");
+    const originalButtonText = saveButton?.textContent || "Save Profile";
+
+    profileSaveInFlight = true;
+
+    if (saveButton) {
+        saveButton.textContent = t("saving", "Saving...");
+    }
+
+    syncProfileSaveState();
 
     try {
         const res = await fetch(accountApiUrl("/api/profile/me"), {
@@ -500,10 +554,20 @@ async function saveProfile() {
 
         renderAccount();
 
+        setProfileBaseline(getDisplayName(data.user));
+
         showAccountToast(t("profileSaved", "Profile saved"), "success");
     } catch (error) {
         console.log("Save profile error:", error);
         showAccountToast(t("serverError", "Server error"), "error");
+    } finally {
+        profileSaveInFlight = false;
+
+        if (saveButton) {
+            saveButton.textContent = originalButtonText;
+        }
+
+        syncProfileSaveState();
     }
 }
 
@@ -602,6 +666,9 @@ function renderRecent(orders) {
 function orderCard(order) {
     const status = order.status || "pending";
     const orderId = order.orderId || "";
+    const game = order.game || t("game", "Game");
+    const packageName = order.packageName || t("package", "Package");
+    const amount = `${Number(order.amount || 0).toLocaleString()} ${order.currency || getCurrency()}`;
 
     return `
         <div class="order-card">
@@ -613,21 +680,18 @@ function orderCard(order) {
                 </span>
             </div>
 
-            <div class="order-game">
-                ${escapeHTML(order.game || t("game", "Game"))}
-            </div>
+            <div class="order-main">
+                <div class="order-product">
+                    <strong class="order-game">${escapeHTML(game)}</strong>
+                    <span class="order-package">${escapeHTML(packageName)}</span>
+                </div>
 
-            <div class="order-package">
-                ${escapeHTML(order.packageName || t("package", "Package"))}
-            </div>
-
-            <div class="order-bottom">
-                <strong>
-                    ${Number(order.amount || 0).toLocaleString()}
-                    ${escapeHTML(order.currency || getCurrency())}
+                <strong class="order-amount">
+                    ${escapeHTML(amount)}
                 </strong>
 
-                <a href="tracking.html?orderId=${encodeURIComponent(orderId)}">
+                <a class="order-track-link"
+                   href="tracking.html?orderId=${encodeURIComponent(orderId)}">
                     ${t("trackOrder", "Track Order")}
                 </a>
             </div>
@@ -1208,8 +1272,14 @@ function initTabs() {
 
 function initButtons() {
     document
+        .getElementById("displayName")
+        ?.addEventListener("input", syncProfileSaveState);
+
+    document
         .getElementById("saveProfileBtn")
         ?.addEventListener("click", saveProfile);
+
+    syncProfileSaveState();
 
     document
         .getElementById("goWalletTopupBtn")

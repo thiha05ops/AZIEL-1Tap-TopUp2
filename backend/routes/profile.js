@@ -68,17 +68,35 @@ router.put(
                 });
             }
 
-            const cleanRegion = region === "TH" ? "TH" : "MM";
+            // Partial profile update authority:
+            // Only mutate fields explicitly supplied by the client.
+            if (displayName !== undefined) {
+                const cleanDisplayName = String(displayName).trim();
 
-            user.displayName =
-                String(displayName || user.displayName || user.username)
-                    .trim();
+                if (cleanDisplayName) {
+                    user.displayName = cleanDisplayName;
+                }
+            }
 
-            user.telegram = telegram || "";
-            user.phone = phone || "";
-            user.region = cleanRegion;
-            user.mlbbUserId = mlbbUserId || "";
-            user.mlbbServerId = mlbbServerId || "";
+            if (telegram !== undefined) {
+                user.telegram = String(telegram).trim();
+            }
+
+            if (phone !== undefined) {
+                user.phone = String(phone).trim();
+            }
+
+            if (region !== undefined) {
+                user.region = region === "TH" ? "TH" : "MM";
+            }
+
+            if (mlbbUserId !== undefined) {
+                user.mlbbUserId = String(mlbbUserId).trim();
+            }
+
+            if (mlbbServerId !== undefined) {
+                user.mlbbServerId = String(mlbbServerId).trim();
+            }
 
             if (req.file) {
                 photoEvidence = await uploadFile({

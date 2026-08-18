@@ -58,7 +58,14 @@ function verifyHistoryAdminLedgerExclusion() {
     const adminBlock = walletRoute.slice(walletRoute.indexOf("router.get(\"/admin/wallet/topups\""), walletRoute.indexOf("router.get(\"/admin/wallet/topups/:id/context\""));
     const ledgerBlock = read("backend/services/walletService.js");
 
-    assert(historyBlock.includes("WalletTopup.find({ username })"), "wallet history must continue to query durable WalletTopup records.");
+    assert(
+        /WalletTopup\.find\(\s*\{\s*username,\s*currency\s*\}\s*\)/m.test(historyBlock),
+        "wallet history must continue to query durable WalletTopup records scoped to the requested currency."
+    );
+    assert(
+        historyBlock.includes(".limit(limit)"),
+        "wallet history must enforce the requested bounded history limit."
+    );
     assert(!historyBlock.includes("WalletTopupIntent"), "wallet history must exclude temporary intents.");
     assert(adminBlock.includes("WalletTopup.find"), "admin review must continue to query durable WalletTopup records.");
     assert(!adminBlock.includes("WalletTopupIntent"), "admin review must exclude temporary intents.");
