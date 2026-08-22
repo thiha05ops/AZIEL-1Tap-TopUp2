@@ -229,24 +229,40 @@ async function verifyRecipientFallbacks() {
 }
 
 async function verifyCanonicalCommerceOrder() {
-    const order = {
-        orderId: "QA-COMMERCE-COMPLETED",
-        owner: { type: "USER", userId: usersByUsername.get("google_user")._id },
-        customer: { contact: { email: "commerce.customer@example.com" } },
-        product: { gameName: "Canonical Product", packageName: "Canonical Package" },
-        commercial: { totalAmount: 2490, currency: "THB" },
-        payment: { paymentMethodId: "promptpay" },
-        status: "completed"
-    };
-    const before = sentMessages.length;
-    await orderEmailService.notifyOrderTransition(order, { status: "completed" });
-    const sent = sentMessages[sentMessages.length - 1];
-    assert.strictEqual(sentMessages.length, before + 1);
-    assert.strictEqual(sent.to, "commerce.customer@example.com");
-    assert(sent.text.includes("Canonical Product"));
-    assert(sent.text.includes("Canonical Package"));
-    assert(sent.text.includes("2,490 THB"));
-    assert(sent.text.includes("PromptPay"));
+    for (const status of ["processing", "completed"]) {
+        const expectedLabel = status === "completed" ? "Completed" : "Processing";
+        const otherLabel = status === "completed" ? "Processing" : "Completed";
+        const order = {
+            orderId: `QA-COMMERCE-${status.toUpperCase()}`,
+            owner: { type: "USER", userId: usersByUsername.get("google_user")._id },
+            customer: { contact: { email: "commerce.customer@example.com" } },
+            product: { gameName: "Canonical Product", packageName: "Canonical Package" },
+            commercial: { totalAmount: 2490, currency: "THB" },
+            payment: { paymentMethodId: "promptpay" },
+            status
+        };
+        const before = sentMessages.length;
+        await orderEmailService.notifyOrderTransition(order, { status });
+        const sent = sentMessages[sentMessages.length - 1];
+        assert.strictEqual(sentMessages.length, before + 1);
+        assert.strictEqual(sent.to, "commerce.customer@example.com");
+        assert(sent.text.includes("Canonical Product"));
+        assert(sent.text.includes("Canonical Package"));
+        assert(sent.text.includes("2,490 THB"));
+        assert(sent.text.includes("PromptPay"));
+        assert(
+            sent.text.includes(`Current status: ${expectedLabel}`),
+            `${status}: details must render the canonical CommerceOrder status.`
+        );
+        assert(
+            !sent.text.includes(`Current status: ${otherLabel}`),
+            `${status}: details must not render a stale lifecycle status.`
+        );
+        assert(
+            sent.html.includes(`>${expectedLabel}</td>`),
+            `${status}: HTML details must render the canonical CommerceOrder status.`
+        );
+    }
 }
 
 async function main() {

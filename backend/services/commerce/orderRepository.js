@@ -133,7 +133,8 @@ function plainRecord(record) {
     return cloned;
 }
 
-function dispatchLifecycleEmail(order, status) {
+function dispatchLifecycleEmail(order) {
+    const status = normalizeString(order?.status);
     if (!order || !status) return;
     orderEmailService.notifyOrderTransition(order, { status }).catch(error => {
         console.log("Commerce order lifecycle email dispatch failed:", {
@@ -315,7 +316,7 @@ async function createOrderRecord(snapshot, options = {}) {
         }
 
         const created = plainRecord((await opts.model.create([payload], { session: opts.session || undefined }))[0]);
-        dispatchLifecycleEmail(created, created.status || "pending_payment");
+        dispatchLifecycleEmail(created);
         return created;
     } catch (error) {
         if (error instanceof OrderRepositoryError) throw error;
@@ -394,7 +395,11 @@ async function updateStatusField(input, options, config) {
             });
         }
         const projected = plainRecord(updated);
-        dispatchLifecycleEmail(projected, normalized.toStatus);
+        // Lifecycle email authority belongs to the canonical CommerceOrder
+        // status transition. Payment and fulfilment updates can carry values
+        // such as "paid" or "completed" while order.status intentionally
+        // remains at its prior lifecycle state.
+        if (config.dispatchLifecycleEmail === true) dispatchLifecycleEmail(projected);
         return projected;
     } catch (error) {
         if (error instanceof OrderRepositoryError) throw error;
@@ -406,6 +411,7 @@ function updateOrderStatus(input, options = {}) {
     return updateStatusField(input, options, {
         publicField: "orderStatus",
         queryField: "status",
+        dispatchLifecycleEmail: true,
         transitions: ORDER_TRANSITIONS,
         invalidCode: ERROR_CODES.INVALID_ORDER_STATUS_TRANSITION
     });

@@ -2,6 +2,7 @@ const assert = require("assert");
 const mongoose = require("mongoose");
 
 const CommerceOrder = require("../models/CommerceOrder");
+const orderEmailService = require("../services/orderEmailService");
 const { createOrderSnapshot } = require("../services/commerce/orderSnapshotRuntime");
 const { createPricingQuote } = require("../services/commerce/pricingQuoteRuntime");
 const {
@@ -19,6 +20,12 @@ const {
     OrderRepositoryError,
     ERROR_CODES
 } = require("../services/commerce/orderRepository");
+
+const lifecycleEmails = [];
+orderEmailService.notifyOrderTransition = async (order, transition) => {
+    lifecycleEmails.push({ order: clone(order), transition: clone(transition) });
+    return { delivered: true };
+};
 
 const CHECKOUT_TIME = "2026-07-26T12:05:00.000Z";
 
@@ -311,7 +318,10 @@ async function verifyOwnerSafeRetrieval() {
 
 async function verifyStatusMutations() {
     const model = createFakeModel();
+    const emailCountBefore = lifecycleEmails.length;
     const created = await createOrderRecord(snapshot(), { model });
+    assert.strictEqual(lifecycleEmails.length, emailCountBefore + 1, "order creation emits one canonical lifecycle email.");
+    assert.strictEqual(lifecycleEmails.at(-1).transition.status, "pending_payment", "creation email uses persisted order status.");
     const beforeCommercial = clone(created.commercial);
     const paid = await updatePaymentStatus({
         orderId: "AZL-ORDER-0001",
@@ -322,13 +332,23 @@ async function verifyStatusMutations() {
         reason: "payment opened"
     }, { model });
     assert.strictEqual(paid.paymentStatus, "pending", "payment transition succeeds.");
+    assert.strictEqual(lifecycleEmails.length, emailCountBefore + 1, "payment status must not compete with order lifecycle email authority.");
     assert.deepStrictEqual(paid.commercial, beforeCommercial, "commercial unchanged by payment update.");
     await assertRepoError(() => updatePaymentStatus({ orderId: "AZL-ORDER-0001", fromStatuses: ["pending"], toStatus: "waived", changedAt: "2026-07-26T12:06:01.000Z" }, { model }), ERROR_CODES.INVALID_PAYMENT_STATUS_TRANSITION, "invalid payment transition rejected.");
     await assertRepoError(() => updateOrderStatus({ orderId: "AZL-ORDER-0001", fromStatuses: ["paid"], toStatus: "processing", changedAt: "2026-07-26T12:06:02.000Z" }, { model }), ERROR_CODES.ORDER_STATE_CONFLICT, "stale order transition conflicts.");
     const orderPaid = await updateOrderStatus({ orderId: "AZL-ORDER-0001", fromStatuses: ["pending_payment"], toStatus: "paid", changedAt: "2026-07-26T12:06:03.000Z" }, { model });
     assert.strictEqual(orderPaid.status, "paid", "order transition succeeds.");
+    assert.strictEqual(lifecycleEmails.length, emailCountBefore + 2, "canonical order status transition emits lifecycle email.");
+    assert.strictEqual(lifecycleEmails.at(-1).order.status, "paid", "lifecycle email receives the persisted post-transition order snapshot.");
+    assert.strictEqual(lifecycleEmails.at(-1).transition.status, "paid", "lifecycle event derives from persisted order status.");
     const queued = await updateFulfilmentStatus({ orderId: "AZL-ORDER-0001", fromStatuses: ["not_started"], toStatus: "queued", changedAt: "2026-07-26T12:06:04.000Z" }, { model });
     assert.strictEqual(queued.fulfilment.status, "queued", "fulfilment transition succeeds.");
+    assert.strictEqual(lifecycleEmails.length, emailCountBefore + 2, "fulfilment status must not compete with order lifecycle email authority.");
+    await updateOrderStatus({ orderId: "AZL-ORDER-0001", fromStatuses: ["paid"], toStatus: "processing", changedAt: "2026-07-26T12:06:05.000Z" }, { model });
+    const completed = await updateOrderStatus({ orderId: "AZL-ORDER-0001", fromStatuses: ["processing"], toStatus: "completed", changedAt: "2026-07-26T12:06:06.000Z" }, { model });
+    assert.strictEqual(completed.status, "completed", "completed order transition persists canonically.");
+    assert.strictEqual(lifecycleEmails.at(-1).order.status, "completed", "completed lifecycle email receives the persisted completed snapshot.");
+    assert.strictEqual(lifecycleEmails.at(-1).transition.status, "completed", "completed lifecycle event derives from canonical order status.");
     const referenced = await appendOperationalReference({ orderId: "AZL-ORDER-0001", reference: { type: "manual-payment-attempt", id: "mpa-1" }, changedAt: "2026-07-26T12:06:05.000Z" }, { model });
     assert.strictEqual(referenced.operationalReferences.length, 1, "operational reference appended.");
 }
