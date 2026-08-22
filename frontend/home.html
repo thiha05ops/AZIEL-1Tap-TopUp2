@@ -36,7 +36,7 @@
     <link rel="stylesheet" href="css/core/main.css">
     <link rel="stylesheet" href="css/core/layout.css">
     <link rel="stylesheet" href="/css/core/components.css?v=20260708-theme-safe">
-    <link rel="stylesheet" href="css/core/footer.css?v=20260804-premium-refinement">
+    <link rel="stylesheet" href="css/core/footer.css?v=20260822-theme-aware">
 
     <link rel="stylesheet" href="css/theme/wave-background.css">
     <link rel="stylesheet" href="css/support/live-chat.css">
@@ -46,10 +46,10 @@
 
     <link rel="stylesheet" href="css/theme/desktop.css">
     <link rel="stylesheet" href="css/theme/mobile.css?v=20260717-edge-width6">
-    <link rel="stylesheet" href="/css/home/hero.css?v=20260802-desktop-completion">
-    <link rel="stylesheet" href="/css/home/merchandise-rows.css?v=20260802-desktop-tiles">
+    <link rel="stylesheet" href="/css/home/hero.css?v=20260822-mobile-drawer-hero-final2">
     <link rel="stylesheet" href="/css/home/marketplace-reference.css?v=20260811-rgb-cleanup">
-    <link rel="stylesheet" href="/css/theme/aziel-header.css?v=20260808-global-authority">
+    <link rel="stylesheet" href="/css/home/home-product-system.css?v=20260822-mobile-group-snap-align">
+    <link rel="stylesheet" href="/css/theme/aziel-header.css?v=20260822-mobile-drawer-hero-final2">
 
     <link rel="icon" type="image/x-icon" href="/assets/icons/favicon.ico">
     <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32.png">
@@ -121,62 +121,7 @@
                         aria-hidden="true"></i></a>
             </div>
 
-            <div class="popular-game-grid home-merch-row">
-                <a href="mlbb.html" class="popular-game-card" data-name="Mobile Legends MLBB">
-                    <img src="assets/games/mlbb.webp" alt="Mobile Legends">
-                    <span class="home-card-copy">
-                        <h3>Mobile Legends</h3>
-                        <p>Diamonds</p>
-                    </span>
-                    <span class="home-card-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span>
-                </a>
-
-                <a href="pubg.html" class="popular-game-card" data-name="PUBG Mobile UC">
-                    <img src="assets/games/pubg.webp" alt="PUBG Mobile">
-                    <span class="home-card-copy">
-                        <h3>PUBG Mobile</h3>
-                        <p>UC</p>
-                    </span>
-                    <span class="home-card-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span>
-                </a>
-
-                <a href="freefire.html" class="popular-game-card" data-name="Free Fire Diamonds">
-                    <img src="assets/games/freefire.webp" alt="Free Fire">
-                    <span class="home-card-copy">
-                        <h3>Free Fire</h3>
-                        <p>Diamonds</p>
-                    </span>
-                    <span class="home-card-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span>
-                </a>
-                <a href="hok.html" class="popular-game-card" data-name="Honor Of Kings">
-                    <img src="assets/games/hok.webp" alt="Honor Of Kings">
-                    <span class="home-card-copy">
-                        <h3>Honor of Kings</h3>
-                        <p data-i18n="home.tokensPackages">Tokens &amp; Packages</p>
-                    </span>
-                    <span class="home-card-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span>
-                </a>
-
-                <a href="product.html?product=marvel-rivals" class="popular-game-card" data-name="Marvel Rivals">
-                    <span class="home-product-wordmark home-product-wordmark--popular" data-art-code="marvel-rivals"
-                        aria-label="Marvel Rivals"><span data-i18n="home.marvelRIVALS">MARVEL RIVALS</span></span>
-                    <span class="home-card-copy">
-                        <h3>Marvel Rivals</h3>
-                        <p>Top Up</p>
-                    </span>
-                    <span class="home-card-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span>
-                </a>
-                <a href="product.html?product=blood-strike" class="popular-game-card" data-name="Blood Strike">
-                    <span class="home-product-wordmark home-product-wordmark--popular" data-art-code="blood-strike"
-                        aria-label="Blood Strike"><span data-i18n="home.bloodSTRIKE">BLOOD STRIKE</span></span>
-                    <span class="home-card-copy">
-                        <h3>Blood Strike</h3>
-                        <p>Golds, Pass</p>
-                    </span>
-                    <span class="home-card-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span>
-                </a>
-
-            </div>
+            <div class="home-product-panels" id="popularGamesList"></div>
         </section>
 
         <section id="allMobileGames" class="az-section home-merch-section" hidden>
@@ -188,7 +133,7 @@
                         aria-hidden="true"></i></a>
             </div>
 
-            <div class="home-merch-row home-mobile-games-grid" id="allMobileGamesList"></div>
+            <div class="home-product-panels" id="allMobileGamesList"></div>
         </section>
 
         <section id="socialTopUp" class="az-section home-merch-section" hidden>
@@ -200,7 +145,7 @@
                         aria-hidden="true"></i></a>
             </div>
 
-            <div class="home-merch-row home-social-topup-grid" id="socialTopUpList"></div>
+            <div class="home-product-panels" id="socialTopUpList"></div>
         </section>
 
         <section id="newsPromotions" class="az-section home-merch-section" hidden>
@@ -304,8 +249,8 @@
     <!-- =======================================
     Header
     ======================================= -->
-    <script src="/js/header-loader.js?v=20260717-pass3"></script>
-    <script src="/js/header.js?v=20260723-catalog-workspace"></script>
+    <script src="/js/header-loader.js?v=20260822-mobile-drawer-hero-final"></script>
+    <script src="/js/header.js?v=20260822-mobile-drawer-hero-final5"></script>
     <script src="/js/header-scroll.js?v=20260706"></script>
 
     <!-- =======================================

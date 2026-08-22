@@ -47,7 +47,9 @@ function product(overrides = {}) {
         publicState: "AVAILABLE",
         publicCategory: "mobile",
         homepageEnabled: true,
+        homepageSections: ["POPULAR_MOBILE_GAMES", "ALL_MOBILE_GAMES"],
         productRoute: "product.html?product=not-in-static-list",
+        route: "product.html?product=not-in-static-list",
         ...overrides
     };
 }
@@ -57,22 +59,21 @@ function verifyFrontendMembership() {
     const arbitraryMobile = product();
     const historicalStatic = product({ productCode: "mlbb", name: "Historical Static Product", productRoute: "mlbb.html" });
     assert.deepStrictEqual(
-        policy.selectPopularProducts({ managed: true, items: [arbitraryMobile] }).map(item => item.productCode),
+        policy.selectPopularProducts([arbitraryMobile]).map(item => item.productCode),
         ["not-in-static-list"],
-        "Admin placement must admit a product absent from historical allowlists."
+        "Catalog homepageSections must admit a product absent from historical allowlists."
     );
-    assert.strictEqual(policy.selectPopularProducts({ managed: true, items: [] }).length, 0);
-    assert.strictEqual(policy.selectPopularProducts({ managed: false, items: [historicalStatic] }).length, 0, "Unmanaged placement must not resurrect a historical static member.");
-    assert.strictEqual(policy.selectPopularProducts({ managed: true, items: [product({ publicCategory: "pc" })] }).length, 0, "PC category must not enter Popular Mobile.");
-    assert.strictEqual(policy.selectPopularProducts({ managed: true, items: [product({ enabled: false })] }).length, 0, "Disabled placement item must not render.");
+    assert.strictEqual(policy.selectPopularProducts([]).length, 0);
+    assert.strictEqual(policy.selectPopularProducts([{ ...historicalStatic, homepageSections: [] }]).length, 0, "Historical membership must not resurrect a product absent from homepageSections.");
+    assert.strictEqual(policy.selectPopularProducts([product({ enabled: false })]).length, 0, "Disabled catalog product must not render.");
 
     assert.deepStrictEqual(policy.selectAllMobileProducts([
         arbitraryMobile,
-        product({ productCode: "pc", publicCategory: "pc" }),
+        product({ productCode: "pc", publicCategory: "pc", homepageSections: [] }),
         product({ productCode: "home-off", homepageEnabled: false })
     ]).map(item => item.productCode), ["not-in-static-list"], "All Mobile must derive from eligible Home-enabled Mobile products.");
 
-    const arbitrarySocial = product({ productCode: "new-social-service", publicCategory: "social" });
+    const arbitrarySocial = product({ productCode: "new-social-service", publicCategory: "social", homepageSections: ["SOCIAL_TOPUP"] });
     assert.deepStrictEqual(policy.selectSocialProducts([arbitrarySocial]).map(item => item.productCode), ["new-social-service"], "Social membership must not require the former two-code list.");
     assert.strictEqual(policy.selectSocialProducts([{ ...arbitrarySocial, homepageEnabled: false }]).length, 0);
 
@@ -82,6 +83,8 @@ function verifyFrontendMembership() {
     assert(!homeSource.includes("approvedProducts"));
     assert(!homeSource.includes("exactOrderedProducts"));
     assert(!homeSource.includes("static-fallback"));
+    assert(!homeSource.includes("/api/site-placements/home"), "Storefront must not consume retired SitePlacement authority.");
+    assert(fs.readFileSync(path.join(ROOT, "backend/services/sitePlacementService.js"), "utf8").includes("SITE_PLACEMENT_RETIRED"));
     assert(!presentationSource.includes("CANONICAL_HOME_PRODUCT_GROUPS"));
     assert(homeSource.includes('target.innerHTML = ""'), "Empty Home sections must clear stale rendered cards.");
 }

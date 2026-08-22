@@ -12,8 +12,8 @@
     overflow: hidden;
     border: 0;
     border-radius: 24px;
-    background: transparent;
-    box-shadow: 0 12px 34px color-mix(in srgb, var(--bg, #0d0d0f) 20%, transparent);
+    background: var(--surface-strong);
+    box-shadow: var(--shadow-md);
 }
 
 .az-home .az-home-hero.az-banner-zone::before {
@@ -39,7 +39,10 @@
     border-radius: 0 !important;
     background: transparent;
     box-shadow: none !important;
+    transition: opacity 180ms ease;
 }
+
+.az-home-hero .az-banner-card:not(.active) { opacity: .42; }
 
 @media (min-width: 769px) {
     .az-home-hero[data-home-banners-managed="active"]:not([data-banner-count="1"]) .az-banner-card {
@@ -134,31 +137,36 @@
 }
 
 @media (max-width: 768px) {
-    .az-home .az-home-hero.az-banner-zone {
-        width: calc(100% - 28px) !important;
+    html body main.az-home #bannerZone.az-home-hero.az-banner-zone {
+        width: 100% !important;
         aspect-ratio: 16 / 9 !important;
-        margin: 14px auto 16px !important;
-        border-radius: 11px !important;
+        margin: 0 auto 14px !important;
+        border-radius: 0 !important;
         min-height: 0 !important;
         height: auto !important;
     }
 
-    .az-home-hero .az-banner-card {
+    html body main.az-home #bannerZone.az-home-hero .az-banner-card {
         width: 100% !important;
         max-width: none !important;
         border-radius: 0 !important;
     }
 
-    .az-home-hero .az-banner-card img {
-        object-fit: cover !important;
-        object-position: var(--az-banner-object-position, 58% center);
+    html body main.az-home #bannerZone.az-home-hero .az-banner-card img {
+        object-fit: contain !important;
+        object-position: center center !important;
     }
 
-    .az-home-hero .az-banner-arrow {
+    html body main.az-home #bannerZone.az-home-hero .az-banner-card:not(.active) {
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+
+    html body main.az-home #bannerZone.az-home-hero .az-banner-arrow {
         display: none !important;
     }
 
-    .az-home-hero .az-banner-dots {
+    html body main.az-home #bannerZone.az-home-hero .az-banner-dots {
         display: none !important;
     }
 }

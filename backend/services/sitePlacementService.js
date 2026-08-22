@@ -2,15 +2,9 @@ const SitePlacement = require("../models/SitePlacement");
 const CatalogProduct = require("../models/CatalogProduct");
 const PromoCode = require("../models/PromoCode");
 const { normalizeRegion, toPublicCatalog } = require("./catalogService");
-const { publicCategoryFor } = require("../catalog/catalogTaxonomy");
 const { isCanonicalProductCode } = require("../catalog/canonicalOperationalCatalog");
 
 const SUPPORTED_PLACEMENTS = Object.freeze({
-    HOME_POPULAR_GAMES: {
-        placementCode: "HOME_POPULAR_GAMES",
-        label: "Popular Games",
-        itemType: "product"
-    },
     HOME_TOPUP_SHORTCUTS: {
         placementCode: "HOME_TOPUP_SHORTCUTS",
         label: "Top Up Shortcuts",
@@ -23,6 +17,8 @@ const SUPPORTED_PLACEMENTS = Object.freeze({
     }
 });
 
+const RETIRED_PLACEMENTS = Object.freeze(new Set(["HOME_POPULAR_GAMES"]));
+
 class SitePlacementError extends Error {
     constructor(code, message, statusCode = 400) {
         super(message);
@@ -34,6 +30,14 @@ class SitePlacementError extends Error {
 
 function normalizePlacementCode(value) {
     const placementCode = String(value || "").trim().toUpperCase();
+
+    if (RETIRED_PLACEMENTS.has(placementCode)) {
+        throw new SitePlacementError(
+            "SITE_PLACEMENT_RETIRED",
+            "This placement is retired. Manage Home products through Catalog homepageSections.",
+            410
+        );
+    }
 
     if (!SUPPORTED_PLACEMENTS[placementCode]) {
         throw new SitePlacementError(
@@ -156,15 +160,6 @@ async function assertProductsExist(items = [], placementCode = "") {
         );
     }
 
-    if (placementCode === "HOME_POPULAR_GAMES") {
-        const categoryMismatch = products.find(product => publicCategoryFor(product.catalogCategory) !== "mobile");
-        if (categoryMismatch) {
-            throw new SitePlacementError(
-                "SITE_PLACEMENT_CATEGORY_MISMATCH",
-                "Popular Games only accepts Mobile Game products."
-            );
-        }
-    }
 }
 
 async function assertPromosExist(items = []) {
@@ -249,10 +244,6 @@ async function getAdminPlacement(placementCodeInput) {
     let availableItems = placement.itemType === "product"
         ? await getAvailableProducts()
         : await getAvailablePromos();
-
-    if (placementCode === "HOME_POPULAR_GAMES") {
-        availableItems = availableItems.filter(item => item.publicCategory === "mobile");
-    }
 
     return {
         placement,
@@ -368,7 +359,6 @@ async function resolveProductPlacement(placementCode, doc, publicCatalog = null)
     const items = selectedCodes
         .map(productCode => byCode.get(productCode))
         .filter(Boolean)
-        .filter(product => placementCode !== "HOME_POPULAR_GAMES" || product.publicCategory === "mobile")
         .map(projectPublicPlacementProduct);
 
     return projectPublicPlacement(placementCode, doc, items);
@@ -438,6 +428,7 @@ async function resolveHomePlacements(options = {}) {
 
 module.exports = {
     SUPPORTED_PLACEMENTS,
+    RETIRED_PLACEMENTS,
     SitePlacementError,
     getAdminPlacement,
     listAdminPlacements,

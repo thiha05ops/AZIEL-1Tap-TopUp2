@@ -54,9 +54,12 @@
     }
 
     function popularProducts() {
-        const priority = ["mlbb", "pubg", "freefire", "hok"];
-        const byCode = new Map(activeProducts().map(product => [product.productCode, product]));
-        return priority.map(code => byCode.get(code)).filter(Boolean);
+        return activeProducts()
+            .filter(product => product.homepageEnabled === true)
+            .filter(product => (product.homepageSections || []).some(section => (
+                ["POPULAR_MOBILE_GAMES", "POPULAR_GAME_TOPUP"].includes(String(section || "").trim().toUpperCase())
+            )))
+            .sort((a, b) => Number(a.homepageOrder || 0) - Number(b.homepageOrder || 0));
     }
 
     function renderPopularCard(product) {

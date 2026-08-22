@@ -152,25 +152,6 @@
         }
     };
 
-    const HOME_PRESENTATION_RECORDS = Object.freeze({
-        mlbb: { name: "Mobile Legends", description: "Diamonds" },
-        pubg: { name: "PUBG Mobile", description: "UC" },
-        freefire: { name: "Free Fire", description: "Diamonds" },
-        hok: { name: "Honor of Kings", description: "Tokens & Packages" },
-        "marvel-rivals": { name: "Marvel Rivals", description: "Top Up" },
-        "blood-strike": { name: "Blood Strike", description: "Golds, Pass" },
-        "age-of-empires-mobile": { name: "Age of Empires Mobile", description: "Top Up" },
-        "lineage-2m": { name: "Lineage 2M", description: "Top Up" },
-        overmortal: { name: "OverMortal", description: "Voucher" },
-        "magic-chess-go-go": { name: "Magic Chess: Go Go", description: "Top Up" },
-        lifeafter: { name: "LifeAfter", description: "Credits & Package" },
-        pubgrp: { name: "PUBG Mobile Royale Pass Pack", description: "Royale Pass Pack" },
-        "mlbb-twilight-weekly-pass": { name: "Mobile Legends Twilight Pass & Weekly Pass", description: "Twilight Pass & Weekly Pass" },
-        "blood-strike-pass": { name: "Blood Strike Pass", description: "Pass" },
-        telegram: { name: "Telegram Top Up", description: "Stars & Premium" },
-        capcut: { name: "CapCut Top Up", description: "Top Up" }
-    });
-
     const DEFAULT_PRODUCT_ICON = "assets/fallbacks/game-topup.svg";
     const DEFAULT_PACKAGE_ICONS = {
         mlbb: "assets/mlbb/icons/small.webp",
@@ -219,27 +200,6 @@
 
     function getProductImage(productCode) {
         return getProductPresentation(productCode)?.image || DEFAULT_PRODUCT_ICON;
-    }
-
-    function getHomePresentationRecord(productCode) {
-        const code = String(productCode || "").trim().toLowerCase();
-        const presentation = getProductPresentation(code);
-        const record = HOME_PRESENTATION_RECORDS[code];
-        if (!presentation || !record) return null;
-        return {
-            productCode: code,
-            name: record.name,
-            description: record.description || presentation.description || "Top Up",
-            image: presentation.image,
-            route: resolveProductRoute("", code),
-            category: presentation.category || "mobile",
-            enabled: true,
-            homepageEnabled: true,
-            discoverable: true,
-            purchasable: false,
-            commerceState: "COMING_SOON",
-            homepageSections: presentation.category === "gift-card" ? ["SOCIAL_TOPUP"] : ["POPULAR_GAME_TOPUP"]
-        };
     }
 
     function mediaFirst(value, fallback = "") {
@@ -333,21 +293,19 @@
             fallbackImage: presentation?.image || DEFAULT_PRODUCT_ICON,
             banner: resolveProductBanner(product),
             category: String(product.publicCategory || ""),
-            featured: (product.homepageFlags || []).includes("FEATURED") || Boolean(presentation?.featured),
+            featured: product.featured === true || (product.homepageFlags || []).includes("FEATURED"),
             isNew: (product.homepageFlags || []).includes("NEW"),
             trending: (product.homepageFlags || []).includes("TRENDING"),
-            description: product.description || presentation?.description || "",
-            searchDescription: product.description || presentation?.searchDescription || presentation?.description || "",
+            description: product.description || "",
+            searchDescription: product.description || "",
             theme: presentation?.theme || ""
         };
     }
 
     window.AZIEL_CATALOG_PRESENTATION = {
         PRODUCT_PRESENTATION,
-        HOME_PRESENTATION_RECORDS,
         DEFAULT_PACKAGE_ICONS,
         getProductPresentation,
-        getHomePresentationRecord,
         resolveProductRoute,
         getProductImage,
         resolveProductImage,

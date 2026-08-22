@@ -8,7 +8,6 @@ const {
     SitePlacementError,
     getAdminPlacement,
     listAdminPlacements,
-    resolveHomePlacements,
     updateAdminPlacement
 } = require("../services/sitePlacementService");
 
@@ -28,19 +27,6 @@ function sendSitePlacementError(res, error) {
         message: "Site placement data unavailable."
     });
 }
-
-router.get("/site-placements/home", async (req, res) => {
-    try {
-        const result = await resolveHomePlacements({ region: req.query.region });
-        res.set("Cache-Control", "no-store");
-        return res.json({
-            success: true,
-            ...result
-        });
-    } catch (error) {
-        return sendSitePlacementError(res, error);
-    }
-});
 
 router.get("/admin/site-placements", adminMiddleware, requireAdminPermission(PERMISSIONS.SITE_CONTENT_READ), async (req, res) => {
     try {

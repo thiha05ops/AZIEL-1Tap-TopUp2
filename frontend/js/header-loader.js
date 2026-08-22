@@ -54,7 +54,7 @@ async function loadAZIELHeader() {
     const navType = mount.dataset.nav || "home";
 
     try {
-        const res = await fetch("/components/header.html?v=20260706-i18n");
+        const res = await fetch("/components/header.html?v=20260822-mobile-drawer-hero-final");
 
         if (!res.ok) {
             throw new Error(`Header fetch failed: ${res.status}`);
@@ -93,7 +93,15 @@ function renderHeaderNav(navType) {
     const currentPage = location.pathname.split("/").pop() || "home.html";
     const currentHash = location.hash || "";
 
-    nav.innerHTML = items
+    nav.innerHTML = `
+        <div class="az-mobile-drawer-head">
+            <div class="az-mobile-drawer-brand" aria-hidden="true">
+                <img src="/assets/logo/aziel-wordmark.webp" alt="AZIEL">
+            </div>
+            <button class="az-mobile-drawer-close" type="button" aria-label="Close menu">
+                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+            </button>
+        </div>` + items
         .map(([href, key]) => {
             const [hrefPage, hrefHashRaw] = href.split("#");
             const hrefHash = hrefHashRaw ? `#${hrefHashRaw}` : "";

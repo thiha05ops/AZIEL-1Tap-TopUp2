@@ -3,16 +3,21 @@
 document.addEventListener("DOMContentLoaded", () => {
     document.addEventListener("click", event => {
         const menuButton = event.target.closest(".az-mobile-menu-btn");
+        const drawerDismiss = event.target.closest(".az-mobile-drawer-close, .az-mobile-drawer-backdrop");
         const openMobileHeader = document.querySelector(".az-header.mobile-menu-open");
+        if (drawerDismiss) {
+            closeMobileMenu(openMobileHeader, { restoreFocus: true });
+            return;
+        }
         if (!menuButton) {
             if (event.target.closest(".az-header .az-nav a") || (openMobileHeader && !openMobileHeader.contains(event.target))) {
-                openMobileHeader?.classList.remove("mobile-menu-open");
-                openMobileHeader?.querySelector(".az-mobile-menu-btn")?.setAttribute("aria-expanded", "false");
+                closeMobileMenu(openMobileHeader);
             }
             return;
         }
         const header = menuButton.closest(".az-header");
         const open = header?.classList.toggle("mobile-menu-open") === true;
+        document.body.classList.toggle("az-mobile-drawer-open", open);
         header?.querySelectorAll(".az-nav-dropdown.show").forEach(dropdown => {
             dropdown.classList.remove("show");
             dropdown.querySelector(".az-nav-drop-btn")?.setAttribute("aria-expanded", "false");
@@ -25,6 +30,14 @@ document.addEventListener("DOMContentLoaded", () => {
         window.dispatchEvent(new CustomEvent("aziel:headerSurfaceChanged", {
             detail: { open, source: "mobile-menu" }
         }));
+        if (open) {
+            setTimeout(() => header?.querySelector(".az-mobile-drawer-close")?.focus({ preventScroll: true }), 260);
+        }
+    });
+    document.addEventListener("keydown", event => {
+        if (event.key !== "Escape") return;
+        const openMobileHeader = document.querySelector(".az-header.mobile-menu-open");
+        if (openMobileHeader) closeMobileMenu(openMobileHeader, { restoreFocus: true });
     });
     initHeader();
 
@@ -48,6 +61,20 @@ document.addEventListener("DOMContentLoaded", () => {
         renderHeader();
     });
 });
+
+function closeMobileMenu(header, { restoreFocus = false } = {}) {
+    if (!header) return;
+    const wasOpen = header.classList.contains("mobile-menu-open");
+    header.classList.remove("mobile-menu-open");
+    document.body.classList.remove("az-mobile-drawer-open");
+    const menuButton = header.querySelector(".az-mobile-menu-btn");
+    menuButton?.setAttribute("aria-expanded", "false");
+    menuButton?.setAttribute("aria-label", window.AZIEL_LOCALE?.t?.("header.openMenu", "Open menu") || "Open menu");
+    if (wasOpen) {
+        window.dispatchEvent(new CustomEvent("aziel:headerSurfaceChanged", { detail: { open: false, source: "mobile-menu" } }));
+        if (restoreFocus) menuButton?.focus({ preventScroll: true });
+    }
+}
 
 function initHeader() {
     renderHeader();
@@ -264,6 +291,15 @@ function renderHeaderNav() {
     nav.dataset.rendered = "true";
 
     nav.innerHTML = `
+        <div class="az-mobile-drawer-head">
+            <div class="az-mobile-drawer-brand" aria-hidden="true">
+                <img src="/assets/logo/aziel-wordmark.webp" alt="AZIEL">
+            </div>
+            <button class="az-mobile-drawer-close" type="button" aria-label="Close menu">
+                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+            </button>
+        </div>
+
         <a class="az-nav-link az-nav-home" href="home.html" data-i18n="nav_home">Home</a>
 
         <div class="az-nav-dropdown" id="gamesNavDropdown">

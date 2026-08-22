@@ -1383,7 +1383,26 @@
   .az-product-detail .product-lower-info,
   .az-product-detail .product-information-grid,
   .az-product-detail .game-mini-footer {
-    width: calc(100% - (var(--public-storefront-mobile-gutter, 16px) * 2)) !important;
+    width: calc(100% - 24px) !important;
+    max-width: none !important;
+  }
+
+  .az-product-detail .product-identity,
+  .az-product-detail .product-package-card,
+  .az-product-detail #packages {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0;
+  }
+
+  .az-product-detail #packages {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .az-product-detail #packages > .pack {
+    width: 100%;
+    min-width: 0;
   }
 
   .az-product-detail .game-mini-footer {

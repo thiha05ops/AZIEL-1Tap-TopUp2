@@ -10,6 +10,7 @@ const { PERMISSIONS, requireAdminPermission } = require("../services/adminAuthor
 const { ADMIN_AUDIT_ACTIONS, writeAdminAudit } = require("../services/adminAuditService");
 const notificationService = require("../services/notificationService");
 const promotionNotificationService = require("../services/promotionNotificationService");
+const broadcastEmailService = require("../services/broadcastEmailService");
 const { sendPaginationError } = require("../services/paginationService");
 
 function sendPromotionError(res, error) {
@@ -249,8 +250,12 @@ router.post("/notifications/create", adminMiddleware, requireAdminPermission(PER
 // ADMIN: POST /api/notifications/broadcast
 router.post("/notifications/broadcast", adminMiddleware, requireAdminPermission(PERMISSIONS.SETTINGS_MANAGE), async (req, res) => {
     try {
-        const result = await notificationService.createBroadcastNotifications({
+        const recipients = await broadcastEmailService.resolveBroadcastAudience({
             usernames: req.body.usernames,
+            audience: req.body.audience
+        });
+        const result = await notificationService.createBroadcastNotifications({
+            usernames: recipients.map(user => user.username),
             title: req.body.title,
             message: req.body.message,
             type: req.body.type || "announcement",
@@ -258,10 +263,17 @@ router.post("/notifications/broadcast", adminMiddleware, requireAdminPermission(
             action: req.body.action,
             metadata: req.body.metadata
         });
+        const emailResult = await broadcastEmailService.deliverAdminBroadcastEmails({
+            usernames: recipients.map(user => user.username),
+            title: req.body.title,
+            message: req.body.message,
+            type: req.body.type || "announcement"
+        });
 
         res.json({
             success: true,
-            count: result.count
+            count: result.count,
+            email: emailResult.summary
         });
     } catch (error) {
         console.log("Broadcast notification error:", error);

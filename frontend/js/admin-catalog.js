@@ -598,7 +598,6 @@ function openProductEditor(product) {
     modal.querySelector("#catalogProductCommerceState").value = product.commerceState || "HIDDEN";
     modal.querySelector("#catalogProductDiscoveryEnabled").checked = product.publicDiscoveryEnabled === true;
     modal.querySelector("#catalogProductHomeEnabled").checked = product.homepageEnabled === true;
-    modal.querySelector("#catalogProductHomeCategory").value = product.homepageCategory || product.catalogCategory || "";
     modal.querySelector("#catalogProductHomeOrder").value = Number(product.homepageOrder || 0);
     modal.querySelector("#catalogProductRoute").value = product.productRoute || "";
     modal.querySelector("#catalogProductMarketScope").value = product.marketScope || "MULTI_REGION";
@@ -608,7 +607,14 @@ function openProductEditor(product) {
     modal.querySelector("#catalogProductPreviewCurrency").value = product.previewPrice?.currency || "THB";
     modal.querySelector("#catalogProductPreviewLabel").value = product.previewPrice?.label || "PREVIEW_PRICE";
     modal.querySelectorAll("[data-home-flag]").forEach(input => input.checked = (product.homepageFlags || []).includes(input.value));
-    modal.querySelectorAll("[data-home-section]").forEach(input => input.checked = (product.homepageSections || []).includes(input.value));
+    const homeSections = new Set(product.homepageSections || []);
+    if (homeSections.has("POPULAR_GAME_TOPUP")) {
+        homeSections.add("POPULAR_MOBILE_GAMES");
+        homeSections.add("ALL_MOBILE_GAMES");
+    }
+    if (homeSections.has("NEW_GAME_TOPUP")) homeSections.add("ALL_MOBILE_GAMES");
+    if (homeSections.has("DIGITAL_SERVICES")) homeSections.add("SOCIAL_TOPUP");
+    modal.querySelectorAll("[data-home-section]").forEach(input => input.checked = homeSections.has(input.value));
     const readiness = product.commerceReadiness || { ready: false, missing: ["readiness unavailable"] };
     modal.querySelector("#catalogProductReadiness").innerHTML = `<strong>${readiness.ready ? "Ready to publish" : "Missing commerce configuration"}</strong><small>${escapeHtml((readiness.missing || []).join(", ") || "All checks passed")}</small>`;
     modal.querySelector("#catalogProductSeoTitle").value = product.seo?.title || "";
@@ -698,10 +704,9 @@ function ensureProductEditorModal() {
                     <label>Product route <input id="catalogProductRoute" type="text" maxlength="240" readonly></label>
                     <label class="catalog-toggle-row"><span>${adminT("featured", "Featured")}</span><input id="catalogProductFeatured" type="checkbox"></label>
                     <label class="catalog-toggle-row"><span>Show on Home</span><input id="catalogProductHomeEnabled" type="checkbox"></label>
-                    <label>Home category <select id="catalogProductHomeCategory">${catalogCategoryOptions()}</select></label>
-                    <label>Home order <input id="catalogProductHomeOrder" type="number" step="1" value="0"></label>
-                    <fieldset class="catalog-edit-fieldset catalog-chip-fieldset"><legend>Home sections</legend>
-                        ${["POPULAR_GAME_CARDS", "POPULAR_GAME_TOPUP", "POPULAR_PC_GAMES", "POPULAR_GIFT_CARDS", "NEW_GAME_CARDS", "NEW_GAME_TOPUP", "DIGITAL_SERVICES"].map(section => `<label class="catalog-choice-chip"><input type="checkbox" data-home-section value="${section}"> ${section.replaceAll("_", " ")}</label>`).join("")}
+                    <label>Display Order <input id="catalogProductHomeOrder" type="number" step="1" value="0"></label>
+                    <fieldset class="catalog-edit-fieldset catalog-chip-fieldset"><legend>Home Placement — Sections</legend>
+                        ${[["POPULAR_MOBILE_GAMES", "Popular Mobile Games"], ["ALL_MOBILE_GAMES", "All Mobile Games"], ["SOCIAL_TOPUP", "Social Top Up"]].map(([section, label]) => `<label class="catalog-choice-chip"><input type="checkbox" data-home-section value="${section}"> ${label}</label>`).join("")}
                     </fieldset>
                     <fieldset class="catalog-edit-fieldset catalog-chip-fieldset"><legend>Discovery flags</legend>
                         ${["POPULAR", "NEW", "TRENDING", "FEATURED"].map(flag => `<label class="catalog-choice-chip"><input type="checkbox" data-home-flag value="${flag}"> ${flag}</label>`).join("")}
@@ -919,7 +924,7 @@ function readProductEditorPayload(product) {
                     : (product.lifecycleStatus || "ACTIVE"),
         publicDiscoveryEnabled: Boolean(modal.querySelector("#catalogProductDiscoveryEnabled")?.checked),
         homepageEnabled: Boolean(modal.querySelector("#catalogProductHomeEnabled")?.checked),
-        homepageCategory: modal.querySelector("#catalogProductHomeCategory")?.value || "",
+        homepageCategory: product.homepageCategory || product.catalogCategory || "",
         homepageOrder: Number(modal.querySelector("#catalogProductHomeOrder")?.value || 0),
         homepageFlags: [...modal.querySelectorAll("[data-home-flag]:checked")].map(input => input.value),
         homepageSections: [...modal.querySelectorAll("[data-home-section]:checked")].map(input => input.value),

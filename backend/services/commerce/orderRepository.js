@@ -1,5 +1,6 @@
 const CommerceOrder = require("../../models/CommerceOrder");
 const { ensurePaidOrderFulfillmentWork } = require("../paidFulfillmentRoutingService");
+const orderEmailService = require("../orderEmailService");
 const {
     toOrderSnapshotPayload
 } = require("./orderSnapshotRuntime");
@@ -130,6 +131,17 @@ function plainRecord(record) {
     // canonical identity castable for downstream transactional references.
     if (record._id != null) cloned._id = String(record._id);
     return cloned;
+}
+
+function dispatchLifecycleEmail(order, status) {
+    if (!order || !status) return;
+    orderEmailService.notifyOrderTransition(order, { status }).catch(error => {
+        console.log("Commerce order lifecycle email dispatch failed:", {
+            orderId: order.orderId,
+            status,
+            code: error?.code || "ORDER_EMAIL_DISPATCH_FAILED"
+        });
+    });
 }
 
 function normalizeCheckoutIdentity(snapshot) {
@@ -302,8 +314,9 @@ async function createOrderRecord(snapshot, options = {}) {
             });
         }
 
-        const created = await opts.model.create([payload], { session: opts.session || undefined });
-        return plainRecord(Array.isArray(created) ? created[0] : created);
+        const created = plainRecord((await opts.model.create([payload], { session: opts.session || undefined }))[0]);
+        dispatchLifecycleEmail(created, created.status || "pending_payment");
+        return created;
     } catch (error) {
         if (error instanceof OrderRepositoryError) throw error;
         throw classifyPersistenceError(error, payload);
@@ -380,7 +393,9 @@ async function updateStatusField(input, options, config) {
                 metadata: { orderId: normalized.orderId, toStatus: normalized.toStatus }
             });
         }
-        return plainRecord(updated);
+        const projected = plainRecord(updated);
+        dispatchLifecycleEmail(projected, normalized.toStatus);
+        return projected;
     } catch (error) {
         if (error instanceof OrderRepositoryError) throw error;
         throw wrapError(error, ERROR_CODES.ORDER_UPDATE_FAILED, "update");

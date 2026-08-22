@@ -9,6 +9,9 @@ const CATALOG_CATEGORIES = Object.freeze([
 
 const HOMEPAGE_FLAGS = Object.freeze(["POPULAR", "NEW", "TRENDING", "FEATURED"]);
 const HOMEPAGE_SECTIONS = Object.freeze([
+    "POPULAR_MOBILE_GAMES",
+    "ALL_MOBILE_GAMES",
+    "SOCIAL_TOPUP",
     "POPULAR_GAME_CARDS",
     "POPULAR_GAME_TOPUP",
     "POPULAR_PC_GAMES",

@@ -12,11 +12,15 @@ const { formatPaymentDisplayName } = require("./paymentDisplayNameService");
 const STALE_PENDING_MS = 2 * 60 * 1000;
 
 const STATUS_EVENT_MAP = Object.freeze({
+    pending: "ORDER_CREATED_PENDING_PAYMENT",
+    pending_payment: "ORDER_CREATED_PENDING_PAYMENT",
     paid: "PAYMENT_CONFIRMED",
     processing: "ORDER_PROCESSING",
     completed: "ORDER_COMPLETED",
     cancelled: "ORDER_CANCELLED",
     failed: "ORDER_FAILED",
+    payment_failed: "ORDER_FAILED",
+    expired: "ORDER_CANCELLED",
     refund_requested: "REFUND_REQUESTED",
     refund_pending: "REFUND_REQUESTED",
     refund_rejected: "REFUND_REJECTED",
@@ -24,6 +28,11 @@ const STATUS_EVENT_MAP = Object.freeze({
 });
 
 const EVENT_COPY = Object.freeze({
+    ORDER_CREATED_PENDING_PAYMENT: {
+        subject: "Order created — payment pending",
+        title: "Your order has been created",
+        nextStep: "Complete payment to continue. Your package and total will remain subject to the authoritative checkout review."
+    },
     PAYMENT_SLIP_SUBMITTED: {
         subject: "Payment received for review",
         title: "Payment received for review",
@@ -106,8 +115,9 @@ function escapeHtml(value = "") {
 }
 
 function formatMoney(order = {}) {
-    const amount = Number(order.amount || order.finalAmount || 0);
-    return `${amount.toLocaleString()} ${String(order.currency || "").toUpperCase() || "MMK"}`;
+    const amount = Number(order.commercial?.totalAmount ?? order.amount ?? order.finalAmount ?? 0);
+    const currency = order.commercial?.currency || order.currency || "MMK";
+    return `${amount.toLocaleString()} ${String(currency).toUpperCase()}`;
 }
 
 function statusLabel(status = "") {
@@ -140,10 +150,10 @@ function buildOrderEmail(order = {}, eventType) {
 
     const fields = [
         ["Order ID", orderId],
-        ["Product", order.productName || order.game || ""],
-        ["Package", order.packageName || ""],
+        ["Product", order.product?.gameName || order.productName || order.game || ""],
+        ["Package", order.product?.packageName || order.packageName || ""],
         ["Amount", formatMoney(order)],
-        ["Payment method", paymentLabel(order.paymentMethod || "")],
+        ["Payment method", paymentLabel(order.payment?.paymentMethodId || order.paymentMethod || "")],
         ["Current status", statusLabel(order.status)]
     ].filter(([, value]) => String(value || "").trim());
 
@@ -202,10 +212,10 @@ function buildOrderEmail(order = {}, eventType) {
 }
 
 async function resolveRecipient(order = {}) {
-    const snapshotEmail = normalizeEmail(order.customerEmail);
+    const snapshotEmail = normalizeEmail(order.customer?.contact?.email || order.customerEmail);
     if (snapshotEmail) return snapshotEmail;
 
-    const userId = String(order.customerUserId || "").trim();
+    const userId = String(order.owner?.userId || order.customerUserId || "").trim();
     if (userId) {
         const user = await User.findById(userId).select("email").lean();
         const email = normalizeEmail(user?.email);

@@ -98,6 +98,8 @@ function verifyOrderEmailOwnership() {
 
     includes("backend/services/orderStateService.js", "notifyOrderTransition(order, entry)", "Order transitions must trigger lifecycle email from canonical state owner.");
     includes("backend/services/orderStateService.js", "orderEmailService.notifyOrderTransition(order, entry).catch", "Email failure must be isolated from order transition.");
+    includes("backend/services/commerce/orderRepository.js", "dispatchLifecycleEmail", "Canonical CommerceOrder transitions must dispatch lifecycle email events.");
+    includes("backend/services/commerce/orderRepository.js", "orderEmailService.notifyOrderTransition", "CommerceOrder email dispatch must reuse the idempotent order email service.");
     includes("backend/routes/payment.js", "notifyManualPaymentSubmitted(order)", "Payment slip submitted email must be sent after slip save.");
     includes("backend/routes/order.js", "notifyManualPaymentSubmitted(order)", "Legacy manual slip path must use same email owner.");
     includes("backend/services/orderEmailService.js", "order.customerEmail", "Order email recipient must prefer customerEmail snapshot.");

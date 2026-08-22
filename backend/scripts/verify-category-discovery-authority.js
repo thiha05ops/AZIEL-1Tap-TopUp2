@@ -97,9 +97,15 @@ async function verifyFrontendContract() {
     assert.notStrictEqual(membership.emptyMarkup, membership.failureMarkup);
 
     const discoverySource = fs.readFileSync(path.join(ROOT, "frontend/js/catalog-discovery.js"), "utf8");
+    const presentationSource = fs.readFileSync(path.join(ROOT, "frontend/js/catalog-presentation.js"), "utf8");
     assert(discoverySource.includes('href="all-games.html"'));
     assert(!discoverySource.includes('<a href="mobile-games.html"><span>All Games</span></a>'));
     assert(!/activeProducts\([^)]*\)[\s\S]{0,200}\["mlbb"/.test(discoverySource), "Category membership must not use hardcoded product codes.");
+    assert(!discoverySource.includes('const priority = ["mlbb", "pubg", "freefire", "hok"]'), "Popular discovery order must come from catalog Home placement fields.");
+    assert(!presentationSource.includes('Boolean(presentation?.featured)'), "Presentation fallbacks must not override Admin featured authority.");
+    assert(!presentationSource.includes('presentation?.description ||'), "Presentation fallbacks must not override Admin product descriptions.");
+    assert(!presentationSource.includes("HOME_PRESENTATION_RECORDS"), "Dead Home product truth registry must remain retired.");
+    assert(!fs.existsSync(path.join(ROOT, "frontend/js/script.js")), "Unreferenced static package authority must remain removed.");
     assert(fs.existsSync(path.join(ROOT, "frontend/all-games.html")));
 }
 

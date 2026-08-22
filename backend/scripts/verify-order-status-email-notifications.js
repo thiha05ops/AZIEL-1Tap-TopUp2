@@ -228,8 +228,30 @@ async function verifyRecipientFallbacks() {
     assert.strictEqual(missing.reason, "missing_recipient", "Missing email skip reason should be stable.");
 }
 
+async function verifyCanonicalCommerceOrder() {
+    const order = {
+        orderId: "QA-COMMERCE-COMPLETED",
+        owner: { type: "USER", userId: usersByUsername.get("google_user")._id },
+        customer: { contact: { email: "commerce.customer@example.com" } },
+        product: { gameName: "Canonical Product", packageName: "Canonical Package" },
+        commercial: { totalAmount: 2490, currency: "THB" },
+        payment: { paymentMethodId: "promptpay" },
+        status: "completed"
+    };
+    const before = sentMessages.length;
+    await orderEmailService.notifyOrderTransition(order, { status: "completed" });
+    const sent = sentMessages[sentMessages.length - 1];
+    assert.strictEqual(sentMessages.length, before + 1);
+    assert.strictEqual(sent.to, "commerce.customer@example.com");
+    assert(sent.text.includes("Canonical Product"));
+    assert(sent.text.includes("Canonical Package"));
+    assert(sent.text.includes("2,490 THB"));
+    assert(sent.text.includes("PromptPay"));
+}
+
 async function main() {
     const statuses = [
+        ["pending_payment", "ORDER_CREATED_PENDING_PAYMENT"],
         ["paid", "PAYMENT_CONFIRMED"],
         ["processing", "ORDER_PROCESSING"],
         ["completed", "ORDER_COMPLETED"],
@@ -249,6 +271,7 @@ async function main() {
         await verifyLifecycleStatus(status, eventType);
     }
     await verifyRecipientFallbacks();
+    await verifyCanonicalCommerceOrder();
 
     console.log("Order status email notification verification passed.");
 }

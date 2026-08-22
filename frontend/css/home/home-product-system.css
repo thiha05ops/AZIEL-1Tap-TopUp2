@@ -1,0 +1,307 @@
+/* AZIEL Home Product System — Admin-placed, artwork-first merchandise. */
+.az-home {
+    --home-product-bg: var(--bg);
+    --home-product-surface: var(--surface);
+    --home-product-card: var(--card);
+    --home-product-card-hover: var(--card-hover);
+    --home-product-border: var(--border);
+    --home-product-text: var(--text);
+    --home-product-muted: var(--text-muted);
+    /* Legacy marketplace-reference.css owns the page background with !important. */
+    background: var(--home-page-background, var(--home-product-bg)) !important;
+}
+
+.az-home .home-merch-section {
+    width: min(1220px, calc(100% - 48px));
+    margin: 36px auto 0;
+}
+.az-home .home-merch-section[hidden] { display: none; }
+.az-home .home-merch-section > .az-section-head { min-height: 32px; margin: 0 0 14px; }
+.az-home .home-merch-section .az-section-head h2 {
+    position: relative;
+    margin: 0;
+    color: var(--home-product-text) !important;
+    font-size: clamp(18px, 1.5vw, 22px);
+    font-weight: 650 !important;
+    line-height: 1.3;
+    letter-spacing: -.015em;
+}
+.az-home .home-merch-section .az-section-head a {
+    gap: 5px;
+    min-height: 32px;
+    padding: 4px 0;
+    color: var(--home-product-muted);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.home-product-panels {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 190px));
+    justify-content: start;
+    gap: 20px;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+}
+.home-product-panel,
+.home-product-panel:has(.home-product-item:only-child),
+.home-product-panel:has(.home-product-item:first-child:nth-last-child(2)) { display: contents; }
+
+.home-product-item {
+    position: relative;
+    display: block;
+    justify-self: center;
+    width: 100%;
+    max-width: 190px;
+    min-width: 0;
+    padding: 8px;
+    border: 1px solid var(--home-product-border);
+    border-radius: 10px;
+    background: var(--home-product-card);
+    box-shadow: var(--shadow-sm);
+    color: var(--home-product-text);
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+.az-home .home-merch-section .az-section-head h2::before {
+    content: "";
+    display: inline-block;
+    width: 3px;
+    height: .78em;
+    margin-right: 9px;
+    border-radius: 999px;
+    background: var(--primary);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+.home-product-item img {
+    box-sizing: border-box;
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1 / 1;
+    padding: 0;
+    border-radius: 8px;
+    background: transparent;
+    object-fit: contain;
+    object-position: center;
+}
+.home-product-copy { display: block; min-width: 0; margin-top: 9px; }
+.home-product-copy strong,
+.home-product-copy small { display: block; overflow: hidden; }
+.home-product-copy strong {
+    display: -webkit-box;
+    color: var(--home-product-text);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.3;
+    white-space: normal;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+.home-product-copy small {
+    margin-top: 3px;
+    color: var(--home-product-muted);
+    font-size: 12px;
+    line-height: 1.35;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.home-product-item .home-product-state {
+    display: inline-flex;
+    position: static;
+    margin-top: 5px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: rgba(139, 92, 246, .15);
+    color: #b9a0ff;
+    font-size: 10px;
+    font-weight: 650;
+}
+.home-product-item.is-temporarily-unavailable { opacity: .68; }
+.home-product-item:focus-visible { outline: 2px solid #8b5cf6; outline-offset: 3px; }
+
+#popularGames .home-product-panels { grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 210px)); gap: 20px; }
+#popularGames .home-product-item { max-width: 210px; padding: 10px; }
+#popularGames .home-product-copy strong { font-size: 15px; }
+#popularGames .home-product-copy small { font-size: 12.5px; }
+
+@media (hover: hover) and (pointer: fine) {
+    .home-product-item:hover {
+        border-color: color-mix(in srgb, var(--primary) 34%, var(--home-product-border));
+        background: var(--home-product-card-hover);
+        box-shadow: var(--shadow-md);
+        transform: translateY(-1px);
+    }
+}
+
+@media (max-width: 1023px) and (min-width: 721px) {
+    .home-product-panels { grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); }
+    #popularGames .home-product-panels { grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); }
+}
+
+@media (min-width: 721px) {
+    .az-home #allMobileGames,
+    .az-home #socialTopUp {
+        margin-top: 38px;
+        padding-top: 38px;
+        border-top: 1px solid var(--home-product-border);
+    }
+}
+
+@media (max-width: 720px) {
+    .home-mobile-group-rail {
+        display: flex;
+        align-items: flex-start;
+        width: calc(100% - 24px);
+        margin: 30px auto 0;
+        gap: 10px;
+        padding: 0 0 8px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        overscroll-behavior-inline: contain;
+        scroll-snap-type: x mandatory;
+        scroll-padding-inline: 0;
+        scrollbar-width: none;
+    }
+    .home-mobile-group-rail::after {
+        content: "";
+        flex: 0 0 calc(100% - clamp(238px, calc(100vw - 89px), 341px) - 10px);
+        width: calc(100% - clamp(238px, calc(100vw - 89px), 341px) - 10px);
+        pointer-events: none;
+    }
+    .home-mobile-group-rail::-webkit-scrollbar { display: none; }
+    html body main.az-home .home-mobile-group-rail > section.home-merch-section {
+        flex: 0 0 clamp(238px, calc(100vw - 89px), 341px);
+        width: clamp(238px, calc(100vw - 89px), 341px);
+        margin: 0 !important;
+        padding: 12px;
+        border: 1px solid var(--home-product-border);
+        border-radius: 12px;
+        background: var(--home-product-surface);
+        overflow: visible;
+        scroll-snap-align: start;
+    }
+    html body main.az-home .home-mobile-group-rail > #popularGames.home-merch-section,
+    html body main.az-home .home-mobile-group-rail > #allMobileGames.home-merch-section,
+    html body main.az-home .home-mobile-group-rail > #socialTopUp.home-merch-section {
+        margin: 0 !important;
+    }
+    .az-home .home-mobile-group-rail > .home-merch-section[hidden] { display: none; }
+    .az-home .home-mobile-group-rail .az-section-head {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) auto !important;
+        align-items: start !important;
+        width: 100%;
+        min-height: 30px;
+        gap: 8px !important;
+        margin-bottom: 9px !important;
+    }
+    .az-home .home-mobile-group-rail .az-section-head > div {
+        min-width: 0;
+    }
+    .az-home .home-mobile-group-rail .az-section-head h2 {
+        display: block;
+        min-width: 0;
+        overflow: hidden;
+        font-size: clamp(11px, 3vw, 14px) !important;
+        font-weight: 700 !important;
+        line-height: 1.2 !important;
+        white-space: nowrap;
+        text-overflow: clip;
+    }
+    .az-home .home-mobile-group-rail .az-section-head a {
+        flex: 0 0 auto;
+        min-height: 28px;
+        font-size: 11px;
+        white-space: nowrap;
+    }
+    .home-product-panels,
+    #popularGames .home-product-panels,
+    #allMobileGames .home-product-panels,
+    #socialTopUp .home-product-panels {
+        display: block !important;
+        width: 100%;
+        margin-inline: 0;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        overflow: visible;
+    }
+    .home-product-panel,
+    .home-product-panel:has(.home-product-item:only-child),
+    .home-product-panel:has(.home-product-item:first-child:nth-last-child(2)) {
+        display: grid;
+        grid-template-columns: 1fr;
+        width: 100%;
+        max-width: none;
+        gap: 6px;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+    }
+    .home-product-item,
+    #popularGames .home-product-item {
+        display: grid;
+        grid-template-columns: 50px minmax(0, 1fr);
+        align-items: center;
+        justify-self: stretch;
+        width: auto;
+        max-width: none;
+        min-width: 0;
+        min-height: 62px;
+        gap: 8px;
+        padding: 6px;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        box-shadow: none;
+    }
+    .home-product-item img {
+        width: 50px;
+        height: 50px;
+        aspect-ratio: auto;
+        padding: 2px;
+        border-radius: 8px;
+        object-fit: contain;
+    }
+    .home-product-copy { margin-top: 0; }
+    .home-product-copy strong,
+    #popularGames .home-product-copy strong {
+        display: -webkit-box;
+        overflow: hidden;
+        color: var(--home-product-text);
+        font-size: 13.5px;
+        font-weight: 600;
+        line-height: 1.25;
+        white-space: normal;
+        text-overflow: clip;
+        overflow-wrap: anywhere;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+    }
+    .home-product-copy small,
+    #popularGames .home-product-copy small {
+        min-height: 1.35em;
+        margin-top: 3px;
+        color: var(--home-product-muted);
+        font-size: 11.5px;
+        line-height: 1.35;
+        white-space: normal;
+    }
+    .home-mobile-group-rail .home-product-item:hover {
+        border-color: transparent;
+        background: color-mix(in srgb, var(--primary) 5%, transparent);
+        box-shadow: none;
+        transform: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) { .home-product-item { transition: none; } }

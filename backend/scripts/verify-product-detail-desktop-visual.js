@@ -30,7 +30,10 @@ assert(desktopCss.includes("repeat(auto-fit, minmax(min(220px, 100%), 1fr))"), "
 assert(desktopCss.includes("white-space: normal !important"), "package names must wrap instead of ellipsizing commerce information");
 assert(desktopCss.includes("var(--public-storefront-gutter"), "Product Detail must use the shared Home/storefront gutter");
 assert(desktopCss.includes("var(--public-storefront-mobile-gutter"), "Product Detail must use the shared storefront mobile gutter");
-assert(desktopCss.includes(".order-left { display: contents; }"), "existing functional cards must be composed without changing runtime ownership");
+assert(
+    /\.order-left\s*\{[^}]*\bdisplay\s*:\s*contents\s*;/s.test(desktopCss),
+    "existing functional cards must be composed without changing runtime ownership"
+);
 assert(desktopCss.includes(".az-product-detail [hidden]"), "readiness-hidden Product Detail UI must override layout display rules");
 assert(desktopCss.includes("display: none !important"), "readiness-hidden Product Detail UI must be removed from layout");
 assert(!desktopCss.includes("--text-main"), "Product Knowledge must not use an undefined light-theme foreground token");
@@ -44,7 +47,10 @@ assert(desktopCss.includes("grid-template-columns: minmax(0, 1fr)"), "mobile Pro
 
 productPages.forEach(page => {
     const html = read(`frontend/${page}`);
-    assert(html.includes("/css/game/product-detail-desktop.css?v=20260811-footer-alignment"), `${page} must load the current shared Product Detail presentation layer`);
+    assert(
+        /href=["']\/css\/game\/product-detail-desktop\.css(?:\?[^"']*)?["']/.test(html),
+        `${page} must load the current shared Product Detail presentation layer`
+    );
     assert(html.includes('id="packages"'), `${page} must retain shared package rendering`);
     assert(html.includes('id="buyBtn"'), `${page} must retain Buy Now/checkout handoff`);
     assert(html.includes("/js/product-detail-stage.js?v="), `${page} must load staged checkout presentation`);
@@ -61,7 +67,11 @@ assert(productStage.includes('image.addEventListener("error", () => media.remove
 assert(productStage.includes('button.setAttribute("aria-expanded", "false")'), "lower information rows must use accessible accordion state");
 assert(gameFlow.includes('paymentSelectionStage: "checkout"'), "Product Detail flow must defer payment choice to Checkout");
 assert(gameFlow.includes('sessionStorage.setItem("azielProductCheckoutDraft"'), "Product Detail must stage the existing order payload for Checkout");
-assert(checkout.includes("AZIEL_CATALOG?.getPackage"), "Checkout must revalidate the selected canonical package");
+assert(
+    checkout.includes('fetch("/api/commerce/checkout/review"')
+        && checkout.includes("packageCode: draft.order.packageCode"),
+    "Checkout must revalidate the selected canonical package"
+);
 assert(checkout.includes('window.location.href = "payment-method.html"'), "Checkout Review must hand off to the page-based Payment Method authority");
 assert(read("frontend/checkout.html").includes('id="checkoutPayButton"'), "Checkout Review must retain its Payment Method handoff action");
 assert(!read("frontend/checkout.html").includes('id="paymentGrid"'), "Payment method selection must not be embedded in Checkout Review");

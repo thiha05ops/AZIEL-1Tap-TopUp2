@@ -8,7 +8,8 @@ const fs = require("fs");
 
 assert.deepStrictEqual(CATALOG_CATEGORIES, ["MOBILE_GAME_TOPUP", "PC_GAME", "GIFT_CARD", "DIGITAL_SERVICE", "MOBILE_RECHARGE", "ENTERTAINMENT"]);
 assert.deepStrictEqual(HOMEPAGE_FLAGS, ["POPULAR", "NEW", "TRENDING", "FEATURED"]);
-assert.strictEqual(HOMEPAGE_SECTIONS.length, 7);
+assert.deepStrictEqual(HOMEPAGE_SECTIONS.slice(0, 3), ["POPULAR_MOBILE_GAMES", "ALL_MOBILE_GAMES", "SOCIAL_TOPUP"]);
+assert(HOMEPAGE_SECTIONS.includes("POPULAR_GAME_TOPUP") && HOMEPAGE_SECTIONS.includes("NEW_GAME_TOPUP") && HOMEPAGE_SECTIONS.includes("DIGITAL_SERVICES"), "Legacy Home section values must remain schema-compatible");
 assert.deepStrictEqual(COMMERCE_STATES, ["PURCHASABLE", "COMING_SOON", "TEMPORARILY_UNAVAILABLE", "HIDDEN"]);
 ["catalogCategory", "homepageEnabled", "homepageCategory", "homepageOrder", "homepageFlags", "homepageSections", "lifecycleStatus", "commerceState", "publicDiscoveryEnabled", "productRoute", "artworkPath"]
     .forEach(path => assert(CatalogProduct.schema.path(path), `CatalogProduct.${path} must exist`));
@@ -44,7 +45,7 @@ assert.strictEqual(plan.ambiguous.length, 1);
 assert.strictEqual(plan.ambiguous[0].productCode, "mystery");
 
 const adminSource = fs.readFileSync("frontend/js/admin-catalog.js", "utf8");
-["catalogProductCategory", "catalogProductHomeEnabled", "catalogProductHomeCategory", "catalogProductHomeOrder", "data-home-flag", "catalogProductCommerceState", "catalogProductDiscoveryEnabled", "catalogProductReadiness"]
+["catalogProductCategory", "catalogProductHomeEnabled", "catalogProductHomeOrder", "data-home-flag", "catalogProductCommerceState", "catalogProductDiscoveryEnabled", "catalogProductReadiness"]
     .forEach(control => assert(adminSource.includes(control), `Admin catalog must expose ${control}`));
 assert(adminSource.includes("data-home-section"), "Admin catalog must expose Home section membership");
 ["catalogProductPreviewAmount", "catalogProductPreviewCurrency", "catalogProductPreviewLabel", "catalogProductMarketScope", "catalogProductDisplayMarketLabel", "catalogProductAuthoritativeRegions"]
@@ -59,7 +60,7 @@ assert(homeSource.includes("resolveProductRoute"), "Home items must consume the 
 assert(!homeSource.includes("renderCatalogTile"), "Home must not render wallet/service catalog tiles");
 assert(!homeSource.includes("displayMarketLabel"), "Home cards must not render catalog market labels");
 assert(!homeSource.includes("stateBadge(product)"), "Home cards must not render commerce-state badges");
-assert(homeSource.includes("renderAllMobileGame"), "Home must render the All Mobile Games grid");
+assert(homeSource.includes("renderPanels"), "Home must render grouped product panels");
 assert(!homeSource.includes("MM • TH") && !homeSource.includes("TH • MM"));
 const homeHtml = fs.readFileSync("frontend/home.html", "utf8");
 assert(homeHtml.includes('/core/settings/theme.js'), "Home must load the canonical AZIEL theme runtime");
@@ -78,8 +79,8 @@ const heroCss = fs.readFileSync("frontend/css/home/hero.css", "utf8");
 const marketplaceCss = fs.readFileSync("frontend/css/home/marketplace-reference.css", "utf8");
 assert(marketplaceCss.includes("aspect-ratio: 16 / 5"), "Home Hero must use the requested 16:5 banner ratio");
 assert(marketplaceCss.includes(".az-home-hero .az-banner-arrow") && marketplaceCss.includes("display: none !important"), "Hero arrows must remain hidden");
-const storefrontCss = fs.readFileSync("frontend/css/home/merchandise-rows.css", "utf8");
-assert(storefrontCss.includes("calc((100vw - var(--home-max, 1280px)) / 2)"), "Desktop header must align to the Home container");
+const storefrontCss = fs.readFileSync("frontend/css/home/home-product-system.css", "utf8");
+assert(storefrontCss.includes("width: min(1220px"), "Home products must align to the compact storefront container");
 const commerceFiles = fs.readdirSync("backend/services/commerce").filter(name => name.endsWith(".js"));
 commerceFiles.forEach(name => {
     const source = fs.readFileSync(`backend/services/commerce/${name}`, "utf8");
@@ -88,7 +89,7 @@ commerceFiles.forEach(name => {
 });
 
 assert(INVENTORY.length >= 30, "Marketplace seed must provide complete catalog breadth");
-HOMEPAGE_SECTIONS.filter(section => section !== "NEW_GAME_TOPUP").forEach(section => {
+HOMEPAGE_SECTIONS.filter(section => !["POPULAR_MOBILE_GAMES", "ALL_MOBILE_GAMES", "SOCIAL_TOPUP", "NEW_GAME_TOPUP"].includes(section)).forEach(section => {
     const members = INVENTORY.filter(product => product.homepageSections.includes(section));
     assert(members.length >= 4 && members.length <= 6, `${section} must contain four to six curated records`);
 });

@@ -9,6 +9,7 @@ const {
     verifyRegistrationOtp
 } = require("../services/registrationService");
 const { buildProductionReadiness } = require("../config/security");
+const { SAFE_EMAIL_FAILURE_MESSAGE } = require("../services/emailTransportService");
 
 const env = {
     NODE_ENV: "test",
@@ -314,7 +315,7 @@ async function main() {
                 env
             }
         ),
-        /Could not send verification OTP/
+        error => error?.code === "REGISTRATION_EMAIL_SEND_FAILED" && error?.message === SAFE_EMAIL_FAILURE_MESSAGE
     );
     assert.strictEqual(mailFailPendingModel.records.length, 0);
 

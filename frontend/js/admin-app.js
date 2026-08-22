@@ -620,16 +620,6 @@ function initAdminBroadcast() {
         }
 
         try {
-            const usersData = await adminFetch("/api/admin/users");
-
-            if (!usersData?.success || !Array.isArray(usersData.users)) {
-                throw new Error("Failed to load users");
-            }
-
-            const usernames = usersData.users
-                .map(user => user.username)
-                .filter(Boolean);
-
             let category = "announcements";
 
             if (type === "promo") category = "promotions";
@@ -643,7 +633,7 @@ function initAdminBroadcast() {
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
-                    usernames,
+                    audience: "ALL_ACTIVE_CUSTOMERS",
                     title,
                     message,
                     type,
@@ -655,7 +645,7 @@ function initAdminBroadcast() {
                 throw new Error(data?.message || "Broadcast failed");
             }
 
-            showAdminToast(`Broadcast sent to ${data.count || usernames.length} users`, "success");
+            showAdminToast(`Broadcast sent to ${data.count || 0} users · ${data.email?.delivered || 0} emails`, data.email?.failed ? "warning" : "success");
 
             document.getElementById("broadcastTitle").value = "";
             document.getElementById("broadcastMessage").value = "";

@@ -27,7 +27,7 @@ function verifyBackendOwnership() {
     includes("backend/models/SitePlacement.js", "mongoose.model(\"SitePlacement\"", "SitePlacement model must exist.");
     includes("backend/models/SitePlacement.js", "placementCode", "SitePlacement must key by placement code.");
     includes("backend/models/SitePlacement.js", "managed", "SitePlacement must preserve explicit management state.");
-    includes("backend/models/SitePlacement.js", "HOME_POPULAR_GAMES", "Popular Games placement must be supported.");
+    includes("backend/models/SitePlacement.js", "HOME_POPULAR_GAMES", "Historical Popular Games records must remain readable.");
     includes("backend/models/SitePlacement.js", "HOME_TOPUP_SHORTCUTS", "Top Up Shortcuts placement must be supported.");
     includes("backend/models/SitePlacement.js", "HOME_LATEST_PROMOTIONS", "Latest Promotions placement must be supported.");
     includes("backend/services/sitePlacementService.js", "require(\"../models/SitePlacement\")", "SitePlacement service must own placement records.");
@@ -36,19 +36,20 @@ function verifyBackendOwnership() {
     includes("backend/services/sitePlacementService.js", "toPublicCatalog", "SitePlacement public projection must reuse catalog projection.");
     includes("backend/services/sitePlacementService.js", "SITE_PLACEMENT_DUPLICATE_PRODUCT", "Product duplicates must be rejected.");
     includes("backend/services/sitePlacementService.js", "SITE_PLACEMENT_DUPLICATE_PROMO", "Promo duplicates must be rejected.");
+    includes("backend/services/sitePlacementService.js", "SITE_PLACEMENT_RETIRED", "Retired Home product placement writes must be rejected.");
 }
 
 function verifyRoutes() {
     const routes = read("backend/routes/sitePlacements.js");
 
     [
-        "router.get(\"/site-placements/home\"",
         "router.get(\"/admin/site-placements\", adminMiddleware",
         "router.get(\"/admin/site-placements/:placementCode\", adminMiddleware",
         "router.put(\"/admin/site-placements/:placementCode\", adminMiddleware"
     ].forEach(pattern => {
         assert(routes.includes(pattern), `backend/routes/sitePlacements.js: missing ${pattern}`);
     });
+    assert(!routes.includes('router.get("/site-placements/home"'), "Legacy SitePlacement must not expose a public Home projection.");
 
     includes("backend/server.js", "const sitePlacementRoutes = require(\"./routes/sitePlacements\");", "Server must import SitePlacement routes.");
     includes("backend/server.js", "app.use(\"/api\", sitePlacementRoutes);", "Server must mount SitePlacement routes.");
@@ -78,13 +79,13 @@ function verifyAdminUi() {
 }
 
 function verifyCustomerRuntime() {
-    includes("frontend/home.html", "/js/home-placement-runtime.js", "Home page must load SitePlacement runtime.");
+    includes("frontend/home.html", "/js/home-placement-runtime.js", "Home page must load catalog Home runtime.");
     includes("frontend/home.html", "id=\"popularGames\"", "Home Popular Games placement must have a stable target.");
     includes("frontend/home.html", "id=\"allMobileGamesList\"", "Catalog-owned All Mobile Games must have a stable target.");
     includes("frontend/home.html", "id=\"latestPromotionsPanel\"", "Home Latest Promotions panel must have a stable target.");
-    includes("frontend/js/home-placement-runtime.js", "/api/site-placements/home", "Home runtime must call public SitePlacement API.");
-    includes("frontend/js/home-placement-runtime.js", "placement?.managed !== true", "Popular membership must require explicit managed placement.");
-    includes("frontend/js/home-placement-runtime.js", 'section.dataset.homeSelectionSource = "admin-placement"', "Popular membership source must be explicit Admin placement.");
+    assert(!read("frontend/js/home-placement-runtime.js").includes("/api/site-placements/home"), "Home runtime must not consume legacy SitePlacement authority.");
+    includes("frontend/js/home-placement-runtime.js", "product.homepageSections", "Home membership must come from catalog homepageSections.");
+    includes("frontend/js/home-placement-runtime.js", 'section.dataset.homeSelectionSource = "catalog-homepage-sections"', "Home membership source must be explicit catalog placement.");
     assert(!read("frontend/js/home-placement-runtime.js").includes("static-fallback"), "Home runtime must not resurrect static membership.");
     includes("frontend/js/home-placement-runtime.js", "hideSection(section, target", "Home runtime must hide managed-empty sections.");
     includes("frontend/js/home-placement-runtime.js", "AZIEL_CATALOG_PRESENTATION", "Home runtime must reuse catalog presentation mapping.");
