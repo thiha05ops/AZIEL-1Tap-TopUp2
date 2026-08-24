@@ -5,6 +5,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initAdminLayoutController();
     initAdminSidebarState();
     initAdminNavigation();
+    initAdminMobileShell();
     initAdminMobileSidebar();
     initAdminNavSearch();
     initAdminSearch();
@@ -108,7 +109,7 @@ function initAdminNavigation() {
             const target = btn.dataset.section;
             openAdminSection(target);
 
-            if (window.innerWidth <= 900) {
+            if (window.innerWidth < 1024) {
                 window.AZIEL_ADMIN_LAYOUT?.closeDrawer?.();
             }
         });
@@ -193,6 +194,7 @@ function openAdminSection(sectionName, updateHash = true, context = {}) {
             item.removeAttribute("aria-current");
         }
     });
+    syncAdminMobileNavigation(sectionName);
 
     document.body.dataset.adminSection = sectionName;
     document.body.classList.toggle("admin-orders-active", sectionName === "orders");
@@ -268,7 +270,8 @@ function updateAdminSectionPill(sectionName) {
 }
 
 function initAdminLayoutController() {
-    const mediaQuery = window.matchMedia("(max-width: 768px)");
+    const mediaQuery = window.matchMedia("(max-width: 767px)");
+    const compactQuery = window.matchMedia("(max-width: 1023px)");
     let drawerReturnFocus = null;
 
     function isMobile() {
@@ -295,7 +298,7 @@ function initAdminLayoutController() {
         document.body.classList.remove("admin-sidebar-open");
         document.body.classList.remove("admin-drawer-lock");
         document.getElementById("adminMenuToggle")?.setAttribute("aria-expanded", "false");
-        document.getElementById("adminSidebar")?.setAttribute("aria-hidden", isMobile() ? "true" : "false");
+        document.getElementById("adminSidebar")?.setAttribute("aria-hidden", compactQuery.matches ? "true" : "false");
         if (drawerReturnFocus && typeof drawerReturnFocus.focus === "function") {
             drawerReturnFocus.focus({ preventScroll: true });
         }
@@ -328,31 +331,203 @@ function initAdminLayoutController() {
         }
     }
 
-    mediaQuery.addEventListener?.("change", event => {
-        document.body.classList.toggle("admin-is-mobile", event.matches);
-        if (!event.matches) {
-            closeDrawer();
-            ["orders", "wallet", "catalog", "fulfillment"].forEach(showList);
-            document.getElementById("adminSidebar")?.setAttribute("aria-hidden", "false");
-        } else {
-            document.getElementById("adminSidebar")?.setAttribute("aria-hidden", document.body.classList.contains("admin-sidebar-open") ? "false" : "true");
-        }
+    function syncArchitecture() {
+        const phone = mediaQuery.matches;
+        const compact = compactQuery.matches;
+        document.body.classList.toggle("admin-is-mobile", phone);
+        document.body.classList.toggle("admin-is-tablet", compact && !phone);
+        closeAdminMobileSurface();
+        closeDrawer();
+        ["orders", "wallet", "catalog", "fulfillment"].forEach(showList);
+        document.getElementById("adminSidebar")?.setAttribute("aria-hidden", compact ? "true" : "false");
         window.dispatchEvent(new CustomEvent("aziel:admin-layout-change", {
-            detail: { mobile: event.matches }
+            detail: { mobile: phone, tablet: compact && !phone }
         }));
-    });
+    }
+
+    mediaQuery.addEventListener?.("change", syncArchitecture);
+    compactQuery.addEventListener?.("change", syncArchitecture);
 
     document.body.classList.toggle("admin-is-mobile", isMobile());
-    document.getElementById("adminSidebar")?.setAttribute("aria-hidden", isMobile() ? "true" : "false");
+    document.body.classList.toggle("admin-is-tablet", compactQuery.matches && !isMobile());
+    document.getElementById("adminSidebar")?.setAttribute("aria-hidden", compactQuery.matches ? "true" : "false");
     document.addEventListener("keydown", trapDrawerFocus);
 
     window.AZIEL_ADMIN_LAYOUT = {
         isMobile,
+        isTablet: () => compactQuery.matches && !mediaQuery.matches,
         openDrawer,
         closeDrawer,
         showDetail,
         showList
     };
+}
+
+let adminMobileSurfaceState = null;
+let adminMobileSurfaceReturnFocus = null;
+
+function initAdminMobileShell() {
+    document.querySelectorAll("[data-mobile-section]").forEach(item => {
+        item.addEventListener("click", () => {
+            openAdminSection(item.dataset.mobileSection);
+            closeAdminMobileSurface();
+        });
+    });
+
+    const openMoreButtons = [
+        document.getElementById("adminMobileMoreBtn"),
+        document.getElementById("adminMobileHeaderMoreBtn")
+    ].filter(Boolean);
+    openMoreButtons.forEach(button => button.addEventListener("click", () => openAdminMobileSurface("more", button)));
+
+    document.getElementById("adminMobileContextBtn")?.addEventListener("click", handleAdminMobileContextAction);
+    document.getElementById("adminMobileNotificationsBtn")?.addEventListener("click", () => {
+        window.open("/notifications.html", "_blank", "noopener,noreferrer");
+    });
+
+    document.querySelectorAll("[data-admin-mobile-close]").forEach(button => {
+        button.addEventListener("click", closeAdminMobileSurface);
+    });
+
+    const mobileSearch = document.getElementById("adminMobileGlobalSearch");
+    mobileSearch?.addEventListener("input", () => {
+        const canonicalSearch = document.getElementById("adminGlobalSearch");
+        if (!canonicalSearch) return;
+        canonicalSearch.value = mobileSearch.value;
+        canonicalSearch.dispatchEvent(new Event("input", { bubbles: true }));
+        syncAdminMobileNavigation(document.body.dataset.adminSection || "dashboard");
+    });
+    mobileSearch?.addEventListener("keydown", event => {
+        if (event.key === "Enter") closeAdminMobileSurface();
+    });
+
+    document.getElementById("adminMobileMoreSearch")?.addEventListener("input", filterAdminMobileMore);
+    document.getElementById("adminMoreLogoutBtn")?.addEventListener("click", () => {
+        if (typeof adminLogout === "function") adminLogout();
+    });
+
+    document.addEventListener("keydown", event => {
+        if (!adminMobileSurfaceState) return;
+        if (event.key === "Escape") {
+            event.preventDefault();
+            closeAdminMobileSurface();
+        } else if (event.key === "Tab") {
+            trapAdminMobileSurfaceFocus(event);
+        }
+    });
+
+    window.addEventListener("aziel:admin-auth-ready", () => {
+        window.AZIEL_ADMIN_AUTH?.applyPermissionVisibility?.(document.getElementById("adminMobileBottomNav"));
+        window.AZIEL_ADMIN_AUTH?.applyPermissionVisibility?.(document.getElementById("adminMobileMore"));
+        filterAdminMobileMore();
+    });
+    window.addEventListener("aziel:admin-layout-change", event => {
+        document.querySelectorAll(".admin-mobile-action-overflow").forEach(disclosure => {
+            disclosure.open = !event.detail?.mobile;
+        });
+    });
+}
+
+function handleAdminMobileContextAction(event) {
+    const section = document.body.dataset.adminSection || "dashboard";
+    if (section === "dashboard") {
+        const filters = document.getElementById("dashboardMobileFilters");
+        if (filters) {
+            filters.setAttribute("open", "");
+            setTimeout(() => document.getElementById("dashboardPresetSelect")?.focus({ preventScroll: true }), 0);
+            return;
+        }
+    }
+    const targets = {
+        orders: "orderSearchInput",
+        wallet: "walletQueueSearch",
+        catalog: "adminCatalogSearch",
+        "pricing-engine": "pricingPackageSearch",
+        media: "mediaSearchInput",
+        users: "customerSearchInput"
+    };
+    const target = document.getElementById(targets[section]);
+    if (target && !target.hidden) {
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+        setTimeout(() => target.focus({ preventScroll: true }), 250);
+        return;
+    }
+    openAdminMobileSurface("search", event.currentTarget);
+}
+
+function openAdminMobileSurface(name, opener = document.activeElement) {
+    if (!window.AZIEL_ADMIN_LAYOUT?.isMobile?.()) return;
+    closeAdminMobileSurface(false);
+    const surface = document.getElementById(name === "more" ? "adminMobileMore" : "adminMobileSearch");
+    if (!surface) return;
+    adminMobileSurfaceState = name;
+    adminMobileSurfaceReturnFocus = opener;
+    surface.hidden = false;
+    document.body.classList.add("admin-mobile-surface-open");
+    document.querySelectorAll("#adminMobileMoreBtn, #adminMobileHeaderMoreBtn").forEach(button => {
+        button.setAttribute("aria-expanded", name === "more" ? "true" : "false");
+    });
+    const firstFocus = surface.querySelector("input, button:not([hidden]), a[href]");
+    setTimeout(() => firstFocus?.focus?.({ preventScroll: true }), 0);
+}
+
+function closeAdminMobileSurface(restoreFocus = true) {
+    document.querySelectorAll(".admin-mobile-surface").forEach(surface => { surface.hidden = true; });
+    document.body?.classList.remove("admin-mobile-surface-open");
+    document.querySelectorAll("#adminMobileMoreBtn, #adminMobileHeaderMoreBtn").forEach(button => button.setAttribute("aria-expanded", "false"));
+    if (restoreFocus && adminMobileSurfaceReturnFocus?.focus) {
+        adminMobileSurfaceReturnFocus.focus({ preventScroll: true });
+    }
+    adminMobileSurfaceState = null;
+    adminMobileSurfaceReturnFocus = null;
+}
+
+function trapAdminMobileSurfaceFocus(event) {
+    const surface = document.getElementById(adminMobileSurfaceState === "more" ? "adminMobileMore" : "adminMobileSearch");
+    const focusable = Array.from(surface?.querySelectorAll("button:not([disabled]):not([hidden]), a[href]:not([hidden]), input:not([disabled]), select:not([disabled])") || [])
+        .filter(element => element.offsetParent !== null);
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+    }
+}
+
+function filterAdminMobileMore() {
+    const input = document.getElementById("adminMobileMoreSearch");
+    const term = input?.value.trim().toLowerCase() || "";
+    document.querySelectorAll("[data-mobile-more-group]").forEach(group => {
+        let visible = 0;
+        group.querySelectorAll("[data-mobile-section], a[href]").forEach(item => {
+            const allowed = !item.classList.contains("admin-permission-hidden");
+            const matches = !term || item.textContent.toLowerCase().includes(term);
+            item.hidden = !allowed || !matches;
+            if (allowed && matches) visible += 1;
+        });
+        group.hidden = visible === 0;
+    });
+}
+
+function syncAdminMobileNavigation(sectionName) {
+    const primarySections = new Set(["dashboard", "orders", "wallet", "catalog"]);
+    document.querySelectorAll("#adminMobileBottomNav [data-mobile-section]").forEach(item => {
+        const active = item.dataset.mobileSection === sectionName;
+        item.classList.toggle("active", active);
+        if (active) item.setAttribute("aria-current", "page");
+        else item.removeAttribute("aria-current");
+    });
+    const more = document.getElementById("adminMobileMoreBtn");
+    if (more) {
+        const active = !primarySections.has(sectionName);
+        more.classList.toggle("active", active);
+        if (active) more.setAttribute("aria-current", "page");
+        else more.removeAttribute("aria-current");
+    }
 }
 
 function getAdminDrawerFocusable() {

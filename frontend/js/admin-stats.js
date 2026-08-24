@@ -7,6 +7,9 @@ let adminDashboardLoading = false;
 let lastAdminDashboard = null;
 let dashboardChartMode = "MMK";
 let dashboardActivityMode = "orders";
+const adminDashboardPhoneQuery = typeof window.matchMedia === "function"
+    ? window.matchMedia("(max-width: 767px)")
+    : { matches: false, addEventListener() {} };
 
 const DASHBOARD_STATE_KEY = "aziel.admin.dashboard.filters";
 const DASHBOARD_DEFAULT_FILTERS = Object.freeze({
@@ -21,6 +24,11 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function initAdminDashboard() {
+    syncDashboardResponsiveState();
+    adminDashboardPhoneQuery.addEventListener?.("change", () => {
+        syncDashboardResponsiveState();
+        if (lastAdminDashboard?.kpis) renderKpis(lastAdminDashboard.kpis);
+    });
     bindDashboardControls();
     loadAdminDashboard();
 
@@ -58,12 +66,22 @@ function initAdminDashboard() {
     });
 }
 
+function syncDashboardResponsiveState() {
+    const phone = adminDashboardPhoneQuery.matches;
+    const analytics = document.querySelector(".dashboard-mobile-analytics");
+    const filters = document.getElementById("dashboardMobileFilters");
+
+    if (analytics) analytics.open = !phone;
+    if (filters) filters.open = !phone;
+}
+
 function bindDashboardControls() {
     const preset = document.getElementById("dashboardPresetSelect");
     const region = document.getElementById("dashboardRegionSelect");
     const refresh = document.getElementById("refreshDashboardBtn");
     const apply = document.getElementById("dashboardApplyCustomBtn");
     const cancel = document.getElementById("dashboardCancelCustomBtn");
+    const mobileFilterClose = document.getElementById("dashboardMobileFilterClose");
 
     const filters = getDashboardFilters();
     if (preset) preset.value = filters.preset;
@@ -103,6 +121,9 @@ function bindDashboardControls() {
         if (preset) preset.value = next.preset;
         syncCustomRangeVisibility();
         loadAdminDashboard(true);
+    });
+    mobileFilterClose?.addEventListener("click", () => {
+        document.getElementById("dashboardMobileFilters")?.removeAttribute("open");
     });
 
     document.querySelectorAll("[data-dashboard-chart]").forEach(button => {
@@ -216,7 +237,8 @@ function renderRangeMeta(dashboard) {
 
 function renderKpis(kpis) {
     const box = document.getElementById("dashboardKpis");
-    if (!box) return;
+    const secondaryBox = document.getElementById("dashboardSecondaryKpis");
+    if (!box || !secondaryBox) return;
 
     const cards = [
         {
@@ -287,8 +309,14 @@ function renderKpis(kpis) {
         }
     ];
 
-    box.innerHTML = cards.map(card => renderKpiCard(card)).join("");
-    box.querySelectorAll("[data-dashboard-open]").forEach(card => {
+    if (adminDashboardPhoneQuery.matches) {
+        box.innerHTML = cards.slice(0, 4).map(card => renderKpiCard(card)).join("");
+        secondaryBox.innerHTML = cards.slice(4).map(card => renderKpiCard(card)).join("");
+    } else {
+        box.innerHTML = cards.map(card => renderKpiCard(card)).join("");
+        secondaryBox.innerHTML = "";
+    }
+    document.querySelectorAll("#dashboardKpis [data-dashboard-open], #dashboardSecondaryKpis [data-dashboard-open]").forEach(card => {
         card.addEventListener("click", () => {
             const params = card.dataset.status ? { status: card.dataset.status } : {};
             window.openAdminSection?.(card.dataset.dashboardOpen, true, params);

@@ -532,14 +532,25 @@ function renderOrderActions(order) {
         return `<div class="order-action-row muted">${escapeHTML(adminT("view_details_only"))}</div>`;
     }
 
+    const [primaryAction, ...secondaryActions] = actions;
     return `
         <div class="order-action-row">
-            ${actions.map(action => `
-                <button class="${escapeHTML(action.className)}" type="button" data-action="${escapeHTML(action.action)}">
-                    ${escapeHTML(adminT(action.labelKey))}
-                </button>
-            `).join("")}
+            ${renderOrderActionButton(primaryAction)}
+            ${secondaryActions.length ? `
+                <details class="admin-mobile-action-overflow" ${window.AZIEL_ADMIN_LAYOUT?.isMobile?.() ? "" : "open"}>
+                    <summary aria-label="More order actions"><i class="fa-solid fa-ellipsis" aria-hidden="true"></i><span>More</span></summary>
+                    <div class="admin-mobile-action-menu">${secondaryActions.map(renderOrderActionButton).join("")}</div>
+                </details>
+            ` : ""}
         </div>
+    `;
+}
+
+function renderOrderActionButton(action) {
+    return `
+        <button class="${escapeHTML(action.className)}" type="button" data-action="${escapeHTML(action.action)}">
+            ${escapeHTML(adminT(action.labelKey))}
+        </button>
     `;
 }
 

@@ -93,7 +93,7 @@ assertIncludes(css, ".admin-body.admin-sidebar-collapsed .admin-app", "Collapsed
 assertIncludes(css, ".admin-body.admin-sidebar-collapsed .admin-nav::after", "Collapsed tooltip rule must exist.");
 assertIncludes(css, ".admin-nav-search", "Navigation search styling must exist.");
 assertIncludes(css, "@media (min-width: 769px)", "Desktop/tablet sidebar ownership must be explicit.");
-assertIncludes(css, "@media (max-width: 768px)", "Mobile drawer breakpoint must remain.");
+assertIncludes(css, "@media (max-width: 767px)", "Phone presentation breakpoint must remain aligned with the shell controller.");
 assertIncludes(css, "background: rgba(2, 6, 23, .18)", "Mobile backdrop must stay light utility-drawer style.");
 assertIncludes(css, "@media (prefers-reduced-motion: reduce)", "Reduced motion contract must remain available.");
 

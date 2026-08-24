@@ -495,9 +495,14 @@ function renderTopupActions(topup, currentBalance, expectedBalance) {
             <button class="order-primary-action" type="button" data-wallet-action="approve">
                 ${escapeHTML(adminT("approve_topup"))}
             </button>
-            <button class="order-danger-action" type="button" data-wallet-action="reject">
-                ${escapeHTML(adminT("reject_topup"))}
-            </button>
+            <details class="admin-mobile-action-overflow" ${window.AZIEL_ADMIN_LAYOUT?.isMobile?.() ? "" : "open"}>
+                <summary aria-label="More wallet actions"><i class="fa-solid fa-ellipsis" aria-hidden="true"></i><span>More</span></summary>
+                <div class="admin-mobile-action-menu">
+                    <button class="order-danger-action" type="button" data-wallet-action="reject">
+                        ${escapeHTML(adminT("reject_topup"))}
+                    </button>
+                </div>
+            </details>
             <small class="wallet-expected-balance">
                 ${escapeHTML(adminT("expected_balance"))}: ${expectedBalance.toLocaleString()} ${escapeHTML(topup.currency || "")}
             </small>

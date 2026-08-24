@@ -207,6 +207,9 @@ function verifyFrontendContract() {
     assert(js.includes("formatMoney(value.MMK, \"MMK\")"), "KPI rendering must keep MMK separate");
     assert(js.includes("formatMoney(value.THB, \"THB\")"), "KPI rendering must keep THB separate");
     assert(js.includes("window.loadAdminDashboard = loadAdminDashboard"), "Existing dashboard refresh contract must remain");
+    assert(js.includes("box.innerHTML = cards.map"), "Desktop Dashboard must render all KPI cards in its canonical grid");
+    assert(js.includes("analytics.open = !phone"), "Desktop analytics must not depend on opening More analytics");
+    assert(js.includes("filters.open = !phone"), "Desktop filters must remain fully expanded");
     assert(js.includes('timeZone: "Asia/Bangkok"'), "Dashboard date chip must be Bangkok-timezone stable");
     assert(!js.includes("localStorage.setItem(DASHBOARD_STATE_KEY"), "Dashboard filters must not use localStorage as source of truth");
 
@@ -214,7 +217,7 @@ function verifyFrontendContract() {
     assert(css.includes(".dashboard-kpi-grid"), "Dashboard KPI grid CSS must exist");
     assert(css.includes("@media (max-width: 680px)"), "Dashboard mobile breakpoint must exist");
     assert(css.includes("@media (prefers-reduced-motion: reduce)"), "Dashboard must respect reduced motion");
-    assert(html.includes("command-center-payment-renderer"), "Admin page must bust cached dashboard runtime after payment renderer fixes");
+    assert(html.includes("admin-stats.js?v=20260824-phase2-desktop-repair"), "Admin page must bust cached dashboard runtime after responsive restoration changes");
 }
 
 function createElement(id = "") {

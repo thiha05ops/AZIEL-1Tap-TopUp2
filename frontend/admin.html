@@ -36,9 +36,11 @@
     <link rel="stylesheet" href="/css/admin/admin.css?v=20260722-promptpay-parent">
     <link rel="stylesheet" href="/css/admin/admin-wallet.css?v=20260706-2">
     <link rel="stylesheet" href="/css/admin/admin-support.css?v=20260706-2">
-    <link rel="stylesheet" href="/css/admin/admin-live-chat.css?v=20260706-2">
-    <link rel="stylesheet" href="/css/admin/admin-design-system.css?v=20260729-pricing-final">
+    <link rel="stylesheet" href="/css/admin/admin-live-chat.css?v=20260824-mobile-boundary">
+    <link rel="stylesheet" href="/css/admin/admin-design-system.css?v=20260824-mobile-boundary">
     <link rel="stylesheet" href="/css/admin/admin-os-brand.css?v=20260729-os-mark">
+    <!-- Global responsive shell owner: phone <768px, tablet 768-1023px, desktop >=1024px. -->
+    <link rel="stylesheet" href="/css/admin/admin-mobile-shell.css?v=20260824-phase2-desktop-repair">
     <link rel="stylesheet" href="/css/campaign/campaign-popup.css?v=20260715-visual">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -295,6 +297,15 @@
                     </div>
                 </div>
 
+                <nav class="admin-mobile-header-actions" aria-label="Current section actions">
+                    <button id="adminMobileContextBtn" class="admin-mobile-icon-btn" type="button"
+                        aria-label="Search this section"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i></button>
+                    <button id="adminMobileNotificationsBtn" class="admin-mobile-icon-btn" type="button"
+                        aria-label="Notifications"><i class="fa-solid fa-bell" aria-hidden="true"></i></button>
+                    <button id="adminMobileHeaderMoreBtn" class="admin-mobile-icon-btn" type="button"
+                        aria-label="Open More menu" aria-controls="adminMobileMore" aria-expanded="false"><i class="fa-solid fa-ellipsis" aria-hidden="true"></i></button>
+                </nav>
+
             </header>
 
             <section class="admin-section active" id="section-dashboard">
@@ -305,7 +316,10 @@
                             <h3>Dashboard</h3>
                             <p>Commerce operations overview using live AZIEL data for the selected period.</p>
                         </div>
+                        <details id="dashboardMobileFilters" class="dashboard-mobile-filter-disclosure">
+                            <summary id="dashboardMobileFilterSummary"><i class="fa-solid fa-filter" aria-hidden="true"></i> Filters</summary>
                         <form id="dashboardFilters" class="dashboard-filter-bar" aria-label="Dashboard filters">
+                            <button id="dashboardMobileFilterClose" class="dashboard-mobile-filter-close" type="button" aria-label="Close Dashboard filters"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
                             <label>
                                 <span>Date range</span>
                                 <select id="dashboardPresetSelect">
@@ -344,6 +358,7 @@
                             <span id="dashboardLastUpdated" class="dashboard-updated"
                                 data-admin-i18n="last_updated">Last updated</span>
                         </form>
+                        </details>
                     </header>
 
                     <div id="dashboardRangeMeta" class="dashboard-range-meta" aria-live="polite"></div>
@@ -355,6 +370,13 @@
                         <div class="admin-dashboard-skeleton"></div>
                         <div class="admin-dashboard-skeleton"></div>
                     </div>
+
+                    <details class="dashboard-mobile-analytics">
+                        <summary>
+                            <span><i class="fa-solid fa-chart-simple" aria-hidden="true"></i> More analytics</span>
+                            <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                        </summary>
+                        <div id="dashboardSecondaryKpis" class="dashboard-kpi-grid dashboard-secondary-kpis" aria-live="polite"></div>
 
                     <div class="dashboard-primary-grid">
                         <article class="panel dashboard-chart-panel">
@@ -459,6 +481,7 @@
                             <div id="dashboardQuickActions" class="dashboard-quick-actions" aria-live="polite"></div>
                         </aside>
                     </div>
+                    </details>
                 </div>
 
             </section>
@@ -1522,6 +1545,81 @@ TH</textarea></label>
             </section>
 
         </main>
+
+        <nav id="adminMobileBottomNav" class="admin-mobile-bottom-nav" aria-label="Primary Admin navigation">
+            <button type="button" data-mobile-section="dashboard" data-admin-permission="DASHBOARD_READ"><i class="fa-solid fa-house" aria-hidden="true"></i><span>Home</span></button>
+            <button type="button" data-mobile-section="orders" data-admin-permission="ORDERS_READ"><i class="fa-solid fa-box" aria-hidden="true"></i><span>Orders</span></button>
+            <button type="button" data-mobile-section="wallet" data-admin-permission="WALLET_READ"><i class="fa-solid fa-wallet" aria-hidden="true"></i><span>Wallet</span></button>
+            <button type="button" data-mobile-section="catalog" data-admin-permission="CATALOG_READ"><i class="fa-solid fa-layer-group" aria-hidden="true"></i><span>Catalog</span></button>
+            <button id="adminMobileMoreBtn" type="button" aria-label="Open More menu" aria-controls="adminMobileMore" aria-expanded="false"><i class="fa-solid fa-table-cells-large" aria-hidden="true"></i><span>More</span></button>
+        </nav>
+    </div>
+
+    <div id="adminMobileSearch" class="admin-mobile-surface" role="dialog" aria-modal="true"
+        aria-labelledby="adminMobileSearchTitle" hidden>
+        <div class="admin-mobile-surface-backdrop" data-admin-mobile-close="search"></div>
+        <section class="admin-mobile-sheet admin-mobile-search-sheet">
+            <header class="admin-mobile-sheet-head">
+                <div><span>AZIEL OS</span><h2 id="adminMobileSearchTitle">Search Admin</h2></div>
+                <button class="admin-mobile-icon-btn" type="button" data-admin-mobile-close="search" aria-label="Close search"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+            </header>
+            <label class="admin-mobile-search-field">
+                <span class="sr-only">Search orders, customers, wallet, catalog, or modules</span>
+                <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                <input id="adminMobileGlobalSearch" type="search" autocomplete="off" placeholder="Search orders, customers, wallet, catalog...">
+            </label>
+            <p class="admin-mobile-search-help">Search routes through the existing AZIEL Admin workspace.</p>
+        </section>
+    </div>
+
+    <div id="adminMobileMore" class="admin-mobile-surface" role="dialog" aria-modal="true"
+        aria-labelledby="adminMobileMoreTitle" hidden>
+        <div class="admin-mobile-surface-backdrop" data-admin-mobile-close="more"></div>
+        <section class="admin-mobile-sheet admin-mobile-more-sheet">
+            <header class="admin-mobile-sheet-head">
+                <div><span>AZIEL OS</span><h2 id="adminMobileMoreTitle">More</h2></div>
+                <button class="admin-mobile-icon-btn" type="button" data-admin-mobile-close="more" aria-label="Close More menu"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+            </header>
+            <label class="admin-mobile-search-field">
+                <span class="sr-only">Search Admin destinations</span>
+                <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                <input id="adminMobileMoreSearch" type="search" autocomplete="off" placeholder="Find a module...">
+            </label>
+            <nav class="admin-mobile-more-nav" aria-label="More Admin destinations">
+                <section class="admin-mobile-more-group" data-mobile-more-group><h3>Growth</h3><div class="admin-mobile-more-grid">
+                    <button type="button" data-mobile-section="campaigns" data-admin-permission="CAMPAIGNS_READ"><i class="fa-solid fa-bullseye"></i><span>Campaigns</span></button>
+                    <button type="button" data-mobile-section="promos" data-admin-permission="PROMOS_READ"><i class="fa-solid fa-ticket"></i><span>Promo Codes</span></button>
+                    <button type="button" data-mobile-section="site-content" data-admin-permission="SITE_CONTENT_READ"><i class="fa-solid fa-images"></i><span>Home Banners</span></button>
+                    <button type="button" data-mobile-section="website" data-admin-permission="SITE_CONTENT_READ"><i class="fa-solid fa-globe"></i><span>Game Banners</span></button>
+                    <button type="button" data-mobile-section="media" data-admin-permission="MEDIA_READ"><i class="fa-solid fa-photo-film"></i><span>Media Library</span></button>
+                </div></section>
+                <section class="admin-mobile-more-group" data-mobile-more-group><h3>Pricing</h3><div class="admin-mobile-more-grid">
+                    <button type="button" data-mobile-section="pricing-engine" data-admin-permission="CATALOG_READ"><i class="fa-solid fa-scale-balanced"></i><span>Daily Pricing</span></button>
+                    <button type="button" data-mobile-section="pricing-settings" data-admin-permission="CATALOG_MANAGE"><i class="fa-solid fa-sliders"></i><span>Pricing Settings</span></button>
+                </div></section>
+                <section class="admin-mobile-more-group" data-mobile-more-group><h3>Operations</h3><div class="admin-mobile-more-grid">
+                    <button type="button" data-mobile-section="fulfillment" data-admin-permission="SUPPLIERS_READ,FULFILLMENT_READ"><i class="fa-solid fa-truck-ramp-box"></i><span>Fulfillment</span></button>
+                    <button type="button" data-mobile-section="payments" data-admin-permission="PAYMENT_METHODS_READ,PAYMENT_METHODS_MANAGE"><i class="fa-solid fa-credit-card"></i><span>Payments</span></button>
+                </div></section>
+                <section class="admin-mobile-more-group" data-mobile-more-group><h3>Customers</h3><div class="admin-mobile-more-grid">
+                    <button type="button" data-mobile-section="users" data-admin-permission="USERS_READ"><i class="fa-solid fa-users"></i><span>Users</span></button>
+                    <button type="button" data-mobile-section="broadcast" data-admin-permission="SETTINGS_MANAGE"><i class="fa-solid fa-bullhorn"></i><span>Broadcast</span></button>
+                    <button type="button" data-mobile-section="support" data-admin-permission="SUPPORT_READ"><i class="fa-solid fa-headset"></i><span>Support</span></button>
+                    <button type="button" data-mobile-section="chat" data-admin-permission="LIVE_CHAT_READ"><i class="fa-solid fa-comments"></i><span>Chat</span></button>
+                </div></section>
+                <section class="admin-mobile-more-group" data-mobile-more-group><h3>Creative</h3><div class="admin-mobile-more-grid">
+                    <a href="/admin-design-studio.html" data-admin-permission="DESIGN_STUDIO_READ"><i class="fa-solid fa-palette"></i><span>Design Studio</span></a>
+                </div></section>
+                <section class="admin-mobile-more-group" data-mobile-more-group><h3>Administration</h3><div class="admin-mobile-more-grid">
+                    <button type="button" data-mobile-section="admin-security" data-admin-permission="ADMIN_ACCOUNTS_READ,ADMIN_SESSIONS_READ,AUDIT_LOG_READ"><i class="fa-solid fa-user-shield"></i><span>Security</span></button>
+                    <button type="button" data-mobile-section="settings" data-admin-permission="SETTINGS_MANAGE"><i class="fa-solid fa-gear"></i><span>Settings</span></button>
+                </div></section>
+            </nav>
+            <footer class="admin-mobile-more-footer">
+                <select id="adminMoreLocaleSelect" class="admin-locale-select" aria-label="Admin language"><option value="en">English</option><option value="my">မြန်မာ</option><option value="th">ไทย</option></select>
+                <button id="adminMoreLogoutBtn" class="admin-logout-btn" type="button">Logout</button>
+            </footer>
+        </section>
     </div>
 
     <div id="orderDetailModal" class="admin-modal">
@@ -1557,7 +1655,7 @@ TH</textarea></label>
     <script src="/lang/admin/my.js?v=20260724-admin-nav"></script>
     <script src="/lang/admin/th.js?v=20260724-admin-nav"></script>
 
-    <script src="/js/admin/admin-i18n.js?v=20260713-phase1"></script>
+    <script src="/js/admin/admin-i18n.js?v=20260824-mobile-shell"></script>
     <script src="/js/admin/admin-ui.js?v=20260715-phase15"></script>
     <script src="/js/admin/admin-action-modal.js?v=20260714-phase4"></script>
 
@@ -1576,18 +1674,18 @@ TH</textarea></label>
     <script src="/js/os/compatibility/admin-navigation-adapter.js?v=20260724-os-kernel"></script>
     <script src="/js/os/kernel.js?v=20260724-os-kernel"></script>
 
-    <script src="/js/admin-app.js?v=20260724-admin-nav"></script>
+    <script src="/js/admin-app.js?v=20260824-phase2"></script>
     <script src="/js/os/kernel-bootstrap.js?v=20260724-os-kernel"></script>
 
     <script src="/js/os/configuration/configuration-client.js?v=20260724-config-registry"></script>
     <script src="/js/os/configuration/configuration-runtime-bridge.js?v=20260724-config-registry"></script>
 
-    <script src="/js/admin-stats.js?v=20260723-command-center-payment-renderer"></script>
+    <script src="/js/admin-stats.js?v=20260824-phase2-desktop-repair"></script>
     <script src="/js/admin-website-runtime.js?v=20260724-website-runtime"></script>
     <script src="/js/admin-fulfillment.js?v=20260715-phase13-qa4"></script>
 
     <script src="/js/payment-display.js?v=20260718-labels"></script>
-    <script src="/js/admin-orders.js?v=20260715-phase13-qa4"></script>
+    <script src="/js/admin-orders.js?v=20260824-phase2"></script>
 
     <script src="/js/admin/admin-media-selector.js?v=20260714-phase8"></script>
     <script src="/js/admin-media.js?v=20260714-phase8"></script>
@@ -1607,7 +1705,7 @@ TH</textarea></label>
     <script src="/js/payment/android-app-launch.js?v=20260722"></script>
     <script src="/js/admin-payments.js?v=20260815-canonical-payment-contract"></script>
 
-    <script src="/js/admin-wallet.js?v=20260714-phase4"></script>
+    <script src="/js/admin-wallet.js?v=20260824-phase2"></script>
     <script src="/js/admin-users.js?v=20260723-customer-crm"></script>
     <script src="/js/admin-settings.js?v=20260713-phase1"></script>
 

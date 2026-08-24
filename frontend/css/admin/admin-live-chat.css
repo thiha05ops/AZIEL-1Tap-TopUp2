@@ -212,7 +212,7 @@ body {
     margin-top: 30px;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
     .admin-chat-page {
         grid-template-columns: 1fr;
     }

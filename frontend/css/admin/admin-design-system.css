@@ -3047,7 +3047,7 @@ button.customer-record-row:hover {
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   .customer-crm-workspace {
     display: block;
     height: auto;
@@ -6730,7 +6730,7 @@ button.media-asset-card {
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
 
   html,
   body.admin-body {
