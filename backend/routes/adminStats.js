@@ -3,7 +3,8 @@
 const express = require("express");
 const router = express.Router();
 
-const Order = require("../models/Order");
+const CommerceOrder = require("../models/CommerceOrder");
+const PaymentAttempt = require("../models/PaymentAttempt");
 const User = require("../models/User");
 const WalletTopup = require("../models/WalletTopup");
 const SupportTicket = require("../models/SupportTicket");
@@ -24,16 +25,15 @@ const ORDER_STATUSES = Object.freeze([
     "processing",
     "completed",
     "cancelled",
+    "payment_failed",
     "failed",
     "expired",
-    "refund_requested",
     "refund_pending",
-    "refund_rejected",
     "refunded"
 ]);
 const SALES_STATUSES = Object.freeze(["paid", "processing", "completed"]);
-const FAILED_STATUSES = Object.freeze(["failed", "cancelled", "expired"]);
-const REFUND_STATUSES = Object.freeze(["refund_requested", "refund_pending"]);
+const FAILED_STATUSES = Object.freeze(["payment_failed", "failed", "cancelled", "expired"]);
+const REFUND_STATUSES = Object.freeze(["refund_pending"]);
 
 function getBangkokTodayBounds(now = new Date()) {
     const parts = new Intl.DateTimeFormat("en-CA", {
@@ -190,13 +190,10 @@ function buildRangeFromRequest(query = {}, now = new Date()) {
 
 function manualPaymentReviewQuery() {
     return {
-        status: "pending_payment",
-        $or: [
-            { paymentSlip: { $type: "string", $ne: "" } },
-            { "paymentEvidence.url": { $type: "string", $ne: "" } },
-            { "paymentEvidence.key": { $type: "string", $ne: "" } },
-            { "paymentEvidence.storageKey": { $type: "string", $ne: "" } }
-        ]
+        provider: "MANUAL_PROMPTPAY",
+        status: "PENDING",
+        "safeMetadata.receiptAttached": true,
+        "safeMetadata.receiptEvidence.fileReference": { $type: "string", $ne: "" }
     };
 }
 
@@ -236,7 +233,7 @@ function actionTarget(section, params = {}) {
 }
 
 function orderRegionQuery(region) {
-    if (REGIONS.includes(region)) return { region };
+    if (REGIONS.includes(region)) return { "commercial.region": region };
     return {};
 }
 
@@ -292,6 +289,10 @@ function formatAmount(value) {
     return Number(Number(value || 0).toFixed(2));
 }
 
+function sumPendingAttention(queues = {}) {
+    return Object.values(queues).reduce((sum, value) => sum + Number(value || 0), 0);
+}
+
 function bucketKey(date, grouping) {
     const parts = getBangkokParts(date);
     if (grouping === "hour") {
@@ -327,7 +328,7 @@ function makeBuckets(range) {
 }
 
 function stableProductName(order = {}) {
-    return order.productName || order.game || order.productCode || "Unknown Product";
+    return order.product?.gameName || order.product?.gameCode || order.product?.gameId || "Unknown Product";
 }
 
 function buildOrderStatusGroups(rows = []) {
@@ -340,8 +341,8 @@ function buildOrderStatusGroups(rows = []) {
         { key: "paid", label: "Paid", statuses: ["paid"], count: raw.paid || 0, target: actionTarget("orders", { status: "paid" }) },
         { key: "processing", label: "Processing", statuses: ["processing"], count: raw.processing || 0, target: actionTarget("orders", { status: "processing" }) },
         { key: "completed", label: "Completed", statuses: ["completed"], count: raw.completed || 0, target: actionTarget("orders", { status: "completed" }) },
-        { key: "failed_cancelled", label: "Failed / Cancelled", statuses: ["failed", "cancelled", "expired"], count: (raw.failed || 0) + (raw.cancelled || 0) + (raw.expired || 0), target: actionTarget("orders", { status: "failed" }) },
-        { key: "refunds", label: "Refunds", statuses: ["refund_requested", "refund_pending", "refund_rejected", "refunded"], count: (raw.refund_requested || 0) + (raw.refund_pending || 0) + (raw.refund_rejected || 0) + (raw.refunded || 0), target: actionTarget("orders", { status: "refund_requested" }) }
+        { key: "failed_cancelled", label: "Failed / Cancelled", statuses: FAILED_STATUSES, count: FAILED_STATUSES.reduce((sum, status) => sum + (raw[status] || 0), 0), target: actionTarget("orders", { status: "failed" }) },
+        { key: "refunds", label: "Refunds", statuses: ["refund_pending", "refunded"], count: (raw.refund_pending || 0) + (raw.refunded || 0), target: actionTarget("orders", { status: "refund_pending" }) }
     ];
 }
 
@@ -366,16 +367,16 @@ function buildPaymentDistribution(paymentRows = [], eligibleOrderCount = 0) {
 }
 
 async function aggregateCurrencyAmount(match) {
-    return currencyTotals(await Order.aggregate([
+    return currencyTotals(await CommerceOrder.aggregate([
         { $match: match },
-        { $group: { _id: "$currency", total: { $sum: "$amount" } } }
+        { $group: { _id: "$commercial.currency", total: { $sum: "$commercial.totalAmount" } } }
     ]));
 }
 
 async function aggregateCurrencyCount(match) {
-    return currencyCounts(await Order.aggregate([
+    return currencyCounts(await CommerceOrder.aggregate([
         { $match: match },
-        { $group: { _id: "$currency", count: { $sum: 1 } } }
+        { $group: { _id: "$commercial.currency", count: { $sum: 1 } } }
     ]));
 }
 
@@ -384,28 +385,13 @@ async function buildCommandCenterDashboard(query = {}, now = new Date(), admin =
     const region = normalizeFilterRegion(query.region);
     const orderRegion = orderRegionQuery(region);
     const salesMatch = dateMatch("updatedAt", range, region, {
-        status: { $in: SALES_STATUSES },
-        refunded: { $ne: true }
+        status: { $in: SALES_STATUSES }
     });
     const previousSalesMatch = dateMatch("updatedAt", range.comparison, region, {
-        status: { $in: SALES_STATUSES },
-        refunded: { $ne: true }
+        status: { $in: SALES_STATUSES }
     });
     const orderCreatedMatch = dateMatch("createdAt", range, region);
     const previousOrderCreatedMatch = dateMatch("createdAt", range.comparison, region);
-    const refundMatch = dateMatch("refundedAt", range, region, {
-        $or: [
-            { refunded: true },
-            { status: "refunded" }
-        ]
-    });
-    const previousRefundMatch = dateMatch("refundedAt", range.comparison, region, {
-        $or: [
-            { refunded: true },
-            { status: "refunded" }
-        ]
-    });
-
     const manualReview = manualPaymentReviewQuery();
     const processingTooLongCutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
@@ -446,49 +432,49 @@ async function buildCommandCenterDashboard(query = {}, now = new Date(), admin =
         aggregateCurrencyAmount(previousSalesMatch),
         aggregateCurrencyCount(salesMatch),
         aggregateCurrencyCount(previousSalesMatch),
-        Order.countDocuments(orderCreatedMatch),
-        Order.countDocuments(previousOrderCreatedMatch),
-        Order.countDocuments(dateMatch("createdAt", range, region, { status: "completed" })),
-        Order.countDocuments(dateMatch("createdAt", range.comparison, region, { status: "completed" })),
-        Order.countDocuments(dateMatch("createdAt", range, region, { status: { $in: FAILED_STATUSES } })),
-        Order.countDocuments(dateMatch("createdAt", range.comparison, region, { status: { $in: FAILED_STATUSES } })),
-        Order.countDocuments(refundMatch),
-        Order.countDocuments(previousRefundMatch),
-        Order.aggregate([{ $match: refundMatch }, { $group: { _id: "$currency", total: { $sum: "$refundAmount" } } }]).then(currencyTotals),
-        Order.aggregate([{ $match: previousRefundMatch }, { $group: { _id: "$currency", total: { $sum: "$refundAmount" } } }]).then(currencyTotals),
+        CommerceOrder.countDocuments(orderCreatedMatch),
+        CommerceOrder.countDocuments(previousOrderCreatedMatch),
+        CommerceOrder.countDocuments(dateMatch("createdAt", range, region, { status: "completed" })),
+        CommerceOrder.countDocuments(dateMatch("createdAt", range.comparison, region, { status: "completed" })),
+        CommerceOrder.countDocuments(dateMatch("createdAt", range, region, { status: { $in: FAILED_STATUSES } })),
+        CommerceOrder.countDocuments(dateMatch("createdAt", range.comparison, region, { status: { $in: FAILED_STATUSES } })),
+        Promise.resolve(0),
+        Promise.resolve(0),
+        Promise.resolve(emptyCurrencyTotals()),
+        Promise.resolve(emptyCurrencyTotals()),
         User.countDocuments({ createdAt: { $gte: range.start, $lt: range.end }, ...(region === "ALL" ? {} : { region }) }),
         User.countDocuments({ createdAt: { $gte: range.comparison.start, $lt: range.comparison.end }, ...(region === "ALL" ? {} : { region }) }),
-        Order.aggregate([
+        CommerceOrder.aggregate([
             { $match: orderCreatedMatch },
             { $group: { _id: "$status", count: { $sum: 1 } } }
         ]),
-        Order.aggregate([
+        CommerceOrder.aggregate([
             { $match: orderRegion },
             { $group: { _id: "$status", count: { $sum: 1 } } }
         ]),
-        Order.find(salesMatch).select("amount currency createdAt updatedAt productCode productName game paymentMethod region status").lean(),
-        Order.find(orderCreatedMatch).select("amount currency createdAt updatedAt productCode productName game paymentMethod region status refunded refundAmount").lean(),
-        Order.aggregate([
+        CommerceOrder.find(salesMatch).select("commercial product createdAt updatedAt payment status").lean(),
+        CommerceOrder.find(orderCreatedMatch).select("commercial product createdAt updatedAt payment status").lean(),
+        CommerceOrder.aggregate([
             { $match: orderCreatedMatch },
             {
                 $group: {
-                    _id: "$region",
+                    _id: "$commercial.region",
                     orders: { $sum: 1 },
                     completed: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } },
-                    pendingAttention: { $sum: { $cond: [{ $in: ["$status", ["pending_payment", "paid", "refund_requested", "refund_pending"]] }, 1, 0] } },
+                    pendingAttention: { $sum: { $cond: [{ $in: ["$status", ["pending_payment", "paid", "refund_pending"]] }, 1, 0] } },
                     failed: { $sum: { $cond: [{ $in: ["$status", FAILED_STATUSES] }, 1, 0] } }
                 }
             }
         ]),
-        Order.aggregate([
+        CommerceOrder.aggregate([
             { $match: salesMatch },
             {
                 $group: {
-                    _id: { method: "$paymentMethod", region: "$region", currency: "$currency" },
+                    _id: { method: "$payment.paymentMethodId", region: "$commercial.region", currency: "$commercial.currency" },
                     orders: { $sum: 1 },
                     paidCompleted: { $sum: 1 },
                     failed: { $sum: 0 },
-                    sales: { $sum: "$amount" }
+                    sales: { $sum: "$commercial.totalAmount" }
                 }
             },
             { $sort: { orders: -1 } }
@@ -501,20 +487,20 @@ async function buildCommandCenterDashboard(query = {}, now = new Date(), admin =
             messages: { $elemMatch: { sender: "user", readByAdmin: false } }
         }),
         FulfillmentAttempt.countDocuments({ status: "FAILED", createdAt: { $gte: range.start, $lt: range.end } }),
-        Order.find(orderRegion).sort({ updatedAt: -1 }).limit(8).select("orderId username status game productName packageName currency amount updatedAt").lean(),
+        CommerceOrder.find(orderRegion).sort({ updatedAt: -1 }).limit(8).select("orderId owner status product commercial updatedAt").lean(),
         WalletTopup.find(region === "ALL" ? {} : { region }).sort({ updatedAt: -1 }).limit(5).select("topupId username status amount currency updatedAt").lean(),
         User.find(region === "ALL" ? {} : { region }).sort({ createdAt: -1 }).limit(5).select("username displayName region createdAt").lean(),
         SupportTicket.find({ status: { $nin: ["solved", "closed"] } }).sort({ updatedAt: -1 }).limit(5).select("ticketId username subject status updatedAt unreadByAdmin").lean()
     ]);
 
     const pendingAttention = {
-        manualPaymentReviews: await Order.countDocuments({ ...manualReview, ...orderRegion }),
-        paidOrders: await Order.countDocuments({ status: "paid", ...orderRegion }),
-        processingTooLong: await Order.countDocuments({ status: "processing", updatedAt: { $lt: processingTooLongCutoff }, ...orderRegion }),
+        manualPaymentReviews: await PaymentAttempt.countDocuments({ ...manualReview, ...(region === "ALL" ? {} : { region }) }),
+        paidOrders: await CommerceOrder.countDocuments({ status: "paid", ...orderRegion }),
+        processingTooLong: await CommerceOrder.countDocuments({ status: "processing", updatedAt: { $lt: processingTooLongCutoff }, ...orderRegion }),
         walletTopups: walletTopupsPending,
         support: supportUnread || supportOpen,
         liveChat: liveChatUnread,
-        refunds: await Order.countDocuments({ status: { $in: REFUND_STATUSES }, ...orderRegion }),
+        refunds: await CommerceOrder.countDocuments({ status: { $in: REFUND_STATUSES }, ...orderRegion }),
         failedFulfillment
     };
 
@@ -528,12 +514,12 @@ async function buildCommandCenterDashboard(query = {}, now = new Date(), admin =
     salesOrders.forEach(order => {
         const key = bucketKey(order.updatedAt || order.createdAt, range.grouping);
         const bucket = bucketByKey.get(key);
-        if (bucket) bucket[normalizeCurrency(order.currency)] += Number(order.amount || 0);
+        if (bucket) bucket[normalizeCurrency(order.commercial?.currency)] += Number(order.commercial?.totalAmount || 0);
     });
 
     const topGameMap = new Map();
     salesOrders.forEach(order => {
-        const key = order.productCode || stableProductName(order);
+        const key = order.product?.gameCode || order.product?.gameId || stableProductName(order);
         const current = topGameMap.get(key) || {
             key,
             name: stableProductName(order),
@@ -541,7 +527,7 @@ async function buildCommandCenterDashboard(query = {}, now = new Date(), admin =
             sales: emptyCurrencyTotals()
         };
         current.orders += 1;
-        current.sales[normalizeCurrency(order.currency)] += Number(order.amount || 0);
+        current.sales[normalizeCurrency(order.commercial?.currency)] += Number(order.commercial?.totalAmount || 0);
         topGameMap.set(key, current);
     });
     const totalEligibleOrders = salesOrders.length || 0;
@@ -558,15 +544,15 @@ async function buildCommandCenterDashboard(query = {}, now = new Date(), admin =
     const regionPerformance = ["MM", "TH", "UNKNOWN"].map(regionKey => {
         const row = regionRows.find(item => normalizeRegion(item._id) === regionKey) || {};
         const regionSales = salesOrders
-            .filter(order => normalizeRegion(order.region) === regionKey)
+            .filter(order => normalizeRegion(order.commercial?.region) === regionKey)
             .reduce((totals, order) => {
-                totals[normalizeCurrency(order.currency)] += Number(order.amount || 0);
+                totals[normalizeCurrency(order.commercial?.currency)] += Number(order.commercial?.totalAmount || 0);
                 return totals;
             }, emptyCurrencyTotals());
         const regionSalesCounts = salesOrders
-            .filter(order => normalizeRegion(order.region) === regionKey)
+            .filter(order => normalizeRegion(order.commercial?.region) === regionKey)
             .reduce((totals, order) => {
-                totals[normalizeCurrency(order.currency)] += 1;
+                totals[normalizeCurrency(order.commercial?.currency)] += 1;
                 return totals;
             }, emptyCurrencyTotals());
         return {
@@ -629,14 +615,16 @@ async function buildCommandCenterDashboard(query = {}, now = new Date(), admin =
             salesDateField: "updatedAt",
             orderVolumeDateField: "createdAt",
             salesStatuses: SALES_STATUSES,
-            pendingAttentionStatuses: ["pending_payment with evidence", "paid", "processing older than 24h", "refund_requested", "refund_pending"],
+            pendingAttentionScope: "Current global operational backlog; not restricted to the selected analytics date range, except failed fulfillment attempts.",
+            pendingAttentionStatuses: ["pending manual payment evidence", "paid", "processing older than 24h", "refund_pending"],
+            refundMetrics: "unsupported: CommerceOrder has no authoritative refund amount and refund timestamp fields",
             currencyRule: "MMK and THB are always reported separately. No FX conversion is applied."
         },
         kpis: {
             grossSales: { current: grossSales, previous: previousGrossSales, comparison: compareCurrency(grossSales, previousGrossSales) },
             orders: compareNumber(orderCount, previousOrderCount),
             completedOrders: compareNumber(completedCount, previousCompletedCount),
-            pendingAttention: compareNumber(Object.values(pendingAttention).reduce((sum, value) => sum + Number(value || 0), 0), 0),
+            pendingAttention: compareNumber(sumPendingAttention(pendingAttention), 0),
             failedCancelled: compareNumber(failedCancelledCount, previousFailedCancelledCount),
             refunds: { count: compareNumber(refundCount, previousRefundCount), amount: compareCurrency(refundAmounts.current, refundAmounts.previous) },
             averageOrderValue: {
@@ -663,7 +651,7 @@ async function buildCommandCenterDashboard(query = {}, now = new Date(), admin =
             { key: "walletTopups", label: "Pending wallet top-ups", count: pendingAttention.walletTopups, severity: "warning", oldestWaitingAt: null, target: actionTarget("wallet", { status: "pending" }) },
             { key: "support", label: "Support needs attention", count: pendingAttention.support, severity: "info", oldestWaitingAt: null, target: actionTarget("support", { filter: supportMode }) },
             { key: "liveChat", label: "Unread live chat", count: pendingAttention.liveChat, severity: "info", oldestWaitingAt: null, target: actionTarget("chat", { filter: "unread" }) },
-            { key: "refunds", label: "Refund review", count: pendingAttention.refunds, severity: "danger", oldestWaitingAt: null, target: actionTarget("orders", { status: "refund_requested" }) },
+            { key: "refunds", label: "Refund review", count: pendingAttention.refunds, severity: "danger", oldestWaitingAt: null, target: actionTarget("orders", { status: "refund_pending" }) },
             { key: "failedFulfillment", label: "Failed fulfillment attempts", count: pendingAttention.failedFulfillment, severity: "danger", oldestWaitingAt: null, target: actionTarget("fulfillment", { status: "FAILED" }) }
         ],
         recentActivity: {
@@ -671,9 +659,9 @@ async function buildCommandCenterDashboard(query = {}, now = new Date(), admin =
                 type: "order",
                 id: order.orderId,
                 title: order.orderId,
-                subtitle: `${order.game || order.productName || "Order"} · ${order.username || "-"}`,
-                amount: order.amount,
-                currency: normalizeCurrency(order.currency),
+                subtitle: `${order.product?.gameName || order.product?.gameCode || "Order"} · ${order.product?.packageCode || "-"}`,
+                amount: order.commercial?.totalAmount,
+                currency: normalizeCurrency(order.commercial?.currency),
                 status: order.status,
                 at: order.updatedAt,
                 target: actionTarget("orders", { status: order.status })
@@ -715,7 +703,7 @@ async function buildCommandCenterDashboard(query = {}, now = new Date(), admin =
             walletTopups: { count: pendingAttention.walletTopups, target: actionTarget("wallet", { status: "pending" }), severity: "warning" },
             support: { count: supportActionCount, target: actionTarget("support", { filter: supportMode }), severity: "info", mode: supportMode },
             liveChat: { count: pendingAttention.liveChat, target: actionTarget("chat", { filter: "unread" }), severity: "info" },
-            refunds: { count: pendingAttention.refunds, target: actionTarget("orders", { status: "refund_requested" }), severity: "danger" }
+            refunds: { count: pendingAttention.refunds, target: actionTarget("orders", { status: "refund_pending" }), severity: "danger" }
         },
         today: {
             orders: orderCount,
@@ -727,12 +715,12 @@ async function buildCommandCenterDashboard(query = {}, now = new Date(), admin =
         recentOperations: recentOrders.map(order => ({
             type: "order",
             orderId: order.orderId,
-            username: order.username,
+            username: "",
             status: order.status,
-            game: order.game,
-            packageName: order.packageName,
-            amount: order.amount,
-            currency: normalizeCurrency(order.currency),
+            game: order.product?.gameName || order.product?.gameCode || "",
+            packageName: order.product?.packageCode || "",
+            amount: order.commercial?.totalAmount,
+            currency: normalizeCurrency(order.commercial?.currency),
             updatedAt: order.updatedAt
         })),
         timezone: DASHBOARD_TIMEZONE,
@@ -762,13 +750,13 @@ router.get("/admin/dashboard/command-center", adminMiddleware, requireAdminPermi
 router.get("/admin/stats", adminMiddleware, requireAdminPermission(PERMISSIONS.DASHBOARD_READ), async (req, res) => {
     try {
         const dashboard = await buildCommandCenterDashboard({ preset: "today", region: "ALL" }, new Date(), req.admin);
-        const totalOrders = await Order.countDocuments();
+        const totalOrders = await CommerceOrder.countDocuments();
         const [pendingOrders, processingOrders, completedOrders, cancelledOrders, paidOrders, totalUsers] = await Promise.all([
-            Order.countDocuments({ status: "pending_payment" }),
-            Order.countDocuments({ status: "processing" }),
-            Order.countDocuments({ status: "completed" }),
-            Order.countDocuments({ status: { $in: ["cancelled", "failed", "expired"] } }),
-            Order.countDocuments({ status: "paid" }),
+            CommerceOrder.countDocuments({ status: "pending_payment" }),
+            CommerceOrder.countDocuments({ status: "processing" }),
+            CommerceOrder.countDocuments({ status: "completed" }),
+            CommerceOrder.countDocuments({ status: { $in: FAILED_STATUSES } }),
+            CommerceOrder.countDocuments({ status: "paid" }),
             User.countDocuments()
         ]);
         const completedOrderValue = dashboard.today.completedOrderValue || emptyCurrencyTotals();
@@ -806,9 +794,13 @@ router._adminDashboardInternals = {
     buildCommandCenterDashboard,
     buildPaymentDistribution,
     manualPaymentReviewQuery,
+    orderRegionQuery,
+    dateMatch,
+    sumPendingAttention,
     normalizeCurrency,
     normalizeRegion,
     SALES_STATUSES,
+    FAILED_STATUSES,
     ORDER_STATUSES
 };
 

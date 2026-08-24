@@ -4,7 +4,8 @@ const path = require("path");
 const vm = require("vm");
 
 const adminStatsRouter = require("../routes/adminStats");
-const Order = require("../models/Order");
+const CommerceOrder = require("../models/CommerceOrder");
+const PaymentAttempt = require("../models/PaymentAttempt");
 const WalletTopup = require("../models/WalletTopup");
 const SupportTicket = require("../models/SupportTicket");
 const LiveChat = require("../models/LiveChat");
@@ -22,24 +23,23 @@ function read(relativePath) {
 function verifyManualEvidenceQuery() {
     const query = internals.manualPaymentReviewQuery();
 
-    assert.strictEqual(query.status, "pending_payment");
-    assert(Array.isArray(query.$or), "Manual review query should require evidence");
-    assert(query.$or.some(condition => condition.paymentSlip), "paymentSlip should count as evidence");
-    assert(query.$or.some(condition => condition["paymentEvidence.url"]), "paymentEvidence.url should count as evidence");
-    assert(query.$or.some(condition => condition["paymentEvidence.key"]), "paymentEvidence.key should count as evidence");
-    assert(query.$or.some(condition => condition["paymentEvidence.storageKey"]), "paymentEvidence.storageKey should count as evidence");
+    assert.strictEqual(query.provider, "MANUAL_PROMPTPAY");
+    assert.strictEqual(query.status, "PENDING");
+    assert.strictEqual(query["safeMetadata.receiptAttached"], true);
+    assert(query["safeMetadata.receiptEvidence.fileReference"], "Manual review query should require canonical receipt evidence");
 }
 
 function verifyModelTruthFields() {
-    assert(Order.schema.path("status"), "Order.status must exist");
-    assert(Order.schema.path("amount"), "Order.amount must exist");
-    assert(Order.schema.path("currency"), "Order.currency must exist");
-    assert(Order.schema.path("region"), "Order.region must exist");
-    assert(Order.schema.path("paymentMethod"), "Order.paymentMethod must exist");
-    assert(Order.schema.path("refundAmount"), "Order.refundAmount must exist");
-    assert(Order.schema.path("refundedAt"), "Order.refundedAt must exist");
-    assert(Order.schema.path("paymentSlip"), "Order.paymentSlip must exist");
-    assert(Order.schema.path("paymentEvidence.url"), "Order.paymentEvidence.url must exist");
+    assert(CommerceOrder.schema.path("status"), "CommerceOrder.status must exist");
+    assert(CommerceOrder.schema.path("commercial.totalAmount"), "Canonical amount must exist");
+    assert(CommerceOrder.schema.path("commercial.currency"), "Canonical currency must exist");
+    assert(CommerceOrder.schema.path("commercial.region"), "Canonical region must exist");
+    assert(CommerceOrder.schema.path("product.gameCode"), "Canonical game code must exist");
+    assert(CommerceOrder.schema.path("product.gameName"), "Canonical game name must exist");
+    assert(CommerceOrder.schema.path("payment.paymentMethodId"), "Canonical payment method must exist");
+    assert(!CommerceOrder.schema.path("refundAmount"), "Refund amount must not be fabricated");
+    assert(!CommerceOrder.schema.path("refundedAt"), "Refund timestamp must not be fabricated");
+    assert(PaymentAttempt.schema.path("safeMetadata"), "Canonical payment evidence authority must exist");
     assert(WalletTopup.schema.path("status"), "WalletTopup.status must exist");
     assert(SupportTicket.schema.path("unreadByAdmin"), "SupportTicket.unreadByAdmin must exist");
     assert(LiveChat.schema.path("messages"), "LiveChat.messages must exist");
@@ -53,17 +53,30 @@ function verifyStatusTaxonomy() {
         "processing",
         "completed",
         "cancelled",
+        "payment_failed",
         "failed",
         "expired",
-        "refund_requested",
         "refund_pending",
-        "refund_rejected",
         "refunded"
     ];
     expected.forEach(status => {
         assert(internals.ORDER_STATUSES.includes(status), `${status} must be a dashboard-recognized order status`);
     });
     assert.deepStrictEqual(internals.SALES_STATUSES, ["paid", "processing", "completed"], "Sales statuses must be explicit");
+    assert(internals.FAILED_STATUSES.includes("payment_failed"), "payment_failed must be a failed/cancelled status");
+    assert(!internals.ORDER_STATUSES.includes("refund_requested"), "Unsupported refund_requested must not be invented");
+}
+
+function verifyCanonicalQuerySemantics() {
+    assert.deepStrictEqual(internals.orderRegionQuery("ALL"), {}, "ALL must add no region predicate");
+    assert.deepStrictEqual(internals.orderRegionQuery("TH"), { "commercial.region": "TH" });
+    assert.deepStrictEqual(internals.orderRegionQuery("MM"), { "commercial.region": "MM" });
+    const range = internals.buildRangeFromRequest({ preset: "today" }, new Date("2026-07-13T12:00:00.000Z"));
+    const match = internals.dateMatch("createdAt", range, "TH", { status: "completed" });
+    assert.strictEqual(match.createdAt.$gte.toISOString(), "2026-07-12T17:00:00.000Z", "Exact start boundary must be inclusive");
+    assert.strictEqual(match.createdAt.$lt.toISOString(), "2026-07-13T17:00:00.000Z", "Exact end boundary must be exclusive");
+    assert.strictEqual(match["commercial.region"], "TH");
+    assert.strictEqual(internals.sumPendingAttention({ manual: 9, wallet: 79, support: 6, empty: 0 }), 94, "Pending Attention must be a deterministic operational-queue sum");
 }
 
 function verifyTimezoneBoundary() {
@@ -118,6 +131,13 @@ function verifyRouteContracts() {
     assert(statsSource.includes("hasPermission(admin, item.permission)"), "Quick actions must be filtered by existing RBAC permissions");
     assert(statsSource.includes('router.get("/admin/stats", adminMiddleware'), "Legacy Dashboard API must remain available");
     assert(statsSource.includes("formatPaymentDisplayName"), "Payment method distribution must use centralized display names");
+    assert(statsSource.includes('const CommerceOrder = require("../models/CommerceOrder")'), "Dashboard must use canonical CommerceOrder authority");
+    assert(!statsSource.includes('require("../models/Order")'), "Dashboard must not import legacy Order authority");
+    assert(statsSource.includes('$sum: "$commercial.totalAmount"'), "Gross Sales must use canonical total amount");
+    assert(statsSource.includes('_id: "$commercial.currency"'), "Currency aggregation must use canonical currency");
+    assert(statsSource.includes('method: "$payment.paymentMethodId"'), "Payment distribution must use canonical payment method");
+    assert(statsSource.includes('order.product?.gameCode'), "Top games/recent activity must use canonical product fields");
+    assert(statsSource.includes("refundMetrics"), "Response must document unsupported canonical refund totals");
     assert(statsSource.includes("{ $match: salesMatch }"), "Payment method distribution must use Gross Sales eligible status/date scope");
     assert(statsSource.includes("buildPaymentDistribution(paymentRows, totalEligibleOrders)"), "Payment method response must use the shared mapper");
     assert(statsSource.includes("currencyRule"), "Dashboard response must document currency separation");
@@ -187,6 +207,7 @@ function verifyFrontendContract() {
     assert(js.includes("formatMoney(value.MMK, \"MMK\")"), "KPI rendering must keep MMK separate");
     assert(js.includes("formatMoney(value.THB, \"THB\")"), "KPI rendering must keep THB separate");
     assert(js.includes("window.loadAdminDashboard = loadAdminDashboard"), "Existing dashboard refresh contract must remain");
+    assert(js.includes('timeZone: "Asia/Bangkok"'), "Dashboard date chip must be Bangkok-timezone stable");
     assert(!js.includes("localStorage.setItem(DASHBOARD_STATE_KEY"), "Dashboard filters must not use localStorage as source of truth");
 
     assert(css.includes(".dashboard-command-center"), "Dashboard command center CSS must exist");
@@ -323,9 +344,7 @@ function verifyIndexesAndNoChartDependency() {
     const deps = { ...(packageJson.dependencies || {}), ...(packageJson.devDependencies || {}) };
     assert(!deps["chart.js"] && !deps.apexcharts && !deps.recharts, "Dashboard should not add a chart dependency for this pass");
 
-    assert(Order.schema.indexes().some(([fields]) => fields.createdAt === -1), "Order createdAt index should support date range reads");
-    assert(Order.schema.indexes().some(([fields]) => fields.status === 1 && fields.createdAt === -1), "Order status/date index should support dashboard queues");
-    assert(Order.schema.indexes().some(([fields]) => fields.status === 1 && fields.updatedAt === -1 && fields.region === 1 && fields.currency === 1), "Order status/updatedAt/region/currency index should support sales aggregation");
+    assert(CommerceOrder.schema.indexes().some(([fields]) => fields.status === 1 && fields.createdAt === -1), "CommerceOrder status/date index should support dashboard reads");
     assert(WalletTopup.schema.indexes().some(([fields]) => fields.status === 1 && fields.createdAt === -1), "Wallet topup status/date index should support attention counts");
 }
 
@@ -333,6 +352,7 @@ function main() {
     verifyManualEvidenceQuery();
     verifyModelTruthFields();
     verifyStatusTaxonomy();
+    verifyCanonicalQuerySemantics();
     verifyTimezoneBoundary();
     verifyDatePresets();
     verifyCurrencyNormalization();

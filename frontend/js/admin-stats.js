@@ -267,7 +267,7 @@ function renderKpis(kpis) {
             type: "refund",
             value: kpis.refunds,
             section: "orders",
-            status: "refund_requested"
+            status: "refund_pending"
         },
         {
             title: "Average Order Value",
@@ -738,7 +738,7 @@ function formatDate(date, subtractEnd = false) {
     const parsed = new Date(date);
     if (Number.isNaN(parsed.getTime())) return "-";
     const display = subtractEnd ? new Date(parsed.getTime() - 1) : parsed;
-    return display.toLocaleDateString();
+    return new Intl.DateTimeFormat(undefined, { timeZone: "Asia/Bangkok" }).format(display);
 }
 
 function escapeHTML(value) {
