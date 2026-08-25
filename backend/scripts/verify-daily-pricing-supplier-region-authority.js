@@ -8,6 +8,7 @@ const mongoose = require("mongoose");
 const PricingPolicy = require("../models/PricingPolicy");
 const { batchPreviewDailyPricing, loadDailyPricingWorkspace } = require("../services/commerce/adminPricingControlCenterService");
 const { resolveExchangeRate } = require("../services/commerce/exchangeRateService");
+const { SUPPLIER_CURRENCY } = require("../constants/commerce");
 
 (async () => {
     await mongoose.connect(process.env.MONGO_URI);
@@ -40,8 +41,8 @@ const { resolveExchangeRate } = require("../services/commerce/exchangeRateServic
     await assert.rejects(() => batchPreviewDailyPricing({ supplierId: wondd.id, region: "MM", rows: [{ mappingId: ml86.mappingId, productCode: "mlbb", packageCode: "MLBB_86", newSupplierCost: 41 }] }), error => error.code === "PRICING_SUPPLIER_REGION_UNAVAILABLE");
 
     const mmPolicy = await PricingPolicy.findOne({ status: "ACTIVE", region: "MM", currency: "MMK" }).sort({ updatedAt: -1 }).lean();
-    assert.strictEqual(mmPolicy?.metadata?.supplierCurrency, "THB");
-    assert(Number(mmPolicy?.metadata?.exchangeRate) > 0, "Active MM policy must contain an authoritative THB/MMK rate.");
+    assert(SUPPLIER_CURRENCY.includes(mmPolicy?.metadata?.supplierCurrency), "Active MM policy must identify a supported supplier currency.");
+    assert(Number(mmPolicy?.metadata?.exchangeRate) > 0, "Active MM policy must contain an authoritative supplier/MMK rate.");
     const originalDirect = process.env.COMMERCE_EXCHANGE_RATE_THB_MMK;
     const originalLegacy = process.env.EXCHANGE_RATE_THB_MMK;
     const originalTable = process.env.COMMERCE_EXCHANGE_RATES;

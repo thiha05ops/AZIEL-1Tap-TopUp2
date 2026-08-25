@@ -9,3 +9,6 @@ uploads/.env
 .aziel-e2e/
 .codex-screenshots/
 backend/uploads/payment-slips/
+
+# Runtime customer uploads
+backend/uploads/wallet-slips/

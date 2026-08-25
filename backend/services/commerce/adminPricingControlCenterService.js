@@ -14,6 +14,7 @@ const { resolveCommercePricingPreviewDetailed } = require("./commercePricingPrev
 const { updatePackage } = require("../catalogAdminService");
 const { clearPublishedSupplierCostDraftRows } = require("./pricingWorkspaceDraftService");
 const { resolvePricingSupplier } = require("./pricingSupplierService");
+const { SUPPLIER_CURRENCY } = require("../../constants/commerce");
 
 const PROFITABILITY_STATUS = Object.freeze({
     HEALTHY: "HEALTHY",
@@ -35,7 +36,7 @@ const PAYMENT_FEE_METHODS = Object.freeze([
 
 async function loadDailyPricingWorkspace({ supplierId = "", productCode = "", region = "ALL" } = {}) {
     const normalizedRegion = upper(region || "ALL");
-    const enabledMappingRefs = await SupplierProductMapping.find({ enabled: true }).select("supplierId productCode packageCode").lean();
+    const enabledMappingRefs = await SupplierProductMapping.find({}).select("supplierId productCode packageCode").lean();
     const activeMappedPackages = enabledMappingRefs.length ? await CatalogPackage.find({
         $or: enabledMappingRefs.map(item => ({ productCode: item.productCode, packageCode: item.packageCode })),
         deletedAt: null
@@ -49,11 +50,11 @@ async function loadDailyPricingWorkspace({ supplierId = "", productCode = "", re
         id: String(item._id), supplierId: String(item._id), supplierCode: upper(item.supplierCode),
         name: text(item.name), supplierName: text(item.name), supplierCurrency: upper(item.supplierCurrency || item.balanceCurrency || item.metadata?.supplierCurrency),
         supportedRegions: Array.isArray(item.supportedRegions) ? item.supportedRegions.map(upper) : [], enabled: item.enabled !== false
-    })).filter(item => ["THB", "MMK"].includes(item.supplierCurrency));
+    })).filter(item => SUPPLIER_CURRENCY.includes(item.supplierCurrency));
     const selected = projectedSuppliers.find(item => item.id === text(supplierId)) || projectedSuppliers[0] || null;
     if (!selected) return { success: true, suppliers: [], selectedSupplierId: "", products: [], rows: [] };
 
-    const mappingQuery = { supplierId: selected.id, enabled: true };
+    const mappingQuery = { supplierId: selected.id };
     if (text(productCode)) mappingQuery.productCode = text(productCode).toLowerCase();
     const mappings = await SupplierProductMapping.find(mappingQuery).sort({ productCode: 1, packageCode: 1 }).lean();
     const packageKeys = mappings.map(item => ({ productCode: item.productCode, packageCode: item.packageCode }));
@@ -67,9 +68,17 @@ async function loadDailyPricingWorkspace({ supplierId = "", productCode = "", re
     const rows = mappings.flatMap(mapping => {
         const pkg = packageMap.get(`${mapping.productCode}:${mapping.packageCode}`);
         if (!pkg) return [];
-        const supplierCost = Number(mapping.mappingMetadata?.supplierCost?.netDealerPrice);
+        const supplierCostEvidence = mapping.supplierCostAuthority?.rawSupplierCost != null
+            ? mapping.supplierCostAuthority
+            : mapping.mappingMetadata?.supplierCost || {};
+        const supplierCost = Number(supplierCostEvidence.rawSupplierCost ?? supplierCostEvidence.priceUsd ?? supplierCostEvidence.netDealerPrice);
         const mappingRegion = upper(mapping.region);
-        const offered = normalizedRegion === "ALL" || normalizedRegion === mappingRegion;
+        const previewEligible = Number.isFinite(supplierCost) &&
+            mapping.mappingMetadata?.readiness?.supplierMapped === true &&
+            Boolean(text(mapping.supplierProductCode)) &&
+            Boolean(text(mapping.supplierPackageCode)) &&
+            (normalizedRegion === "ALL" || normalizedRegion === mappingRegion);
+        const offered = mapping.enabled === true && previewEligible;
         const price = pkg.prices?.[mappingRegion] || null;
         return [{
             rowId: String(mapping._id), mappingId: String(mapping._id), supplierId: selected.id, supplierCode: selected.supplierCode,
@@ -77,9 +86,16 @@ async function loadDailyPricingWorkspace({ supplierId = "", productCode = "", re
             packageId: String(pkg._id), packageCode: pkg.packageCode, packageName: pkg.name,
             supplierProductCode: mapping.supplierProductCode, supplierPackageCode: mapping.supplierPackageCode,
             executionMode: mapping.executionMode, mappingRegion, targetRegion: normalizedRegion,
-            offered, offerabilityReason: offered ? "" : `No enabled ${selected.supplierCode} mapping exists for ${normalizedRegion}.`,
+            offered, previewEligible,
+            offerabilityReason: offered ? "" : mapping.enabled !== true ? "Supplier mapping is disabled pending production readiness." : `No enabled ${selected.supplierCode} mapping exists for ${normalizedRegion}.`,
+            previewabilityReason: previewEligible ? "" : "Exact supplier mapping and raw supplier cost are required for pricing preview.",
             supplierCost: Number.isFinite(supplierCost) ? supplierCost : null, supplierCurrency: selected.supplierCurrency,
-            supplierCostTimestamp: mapping.mappingMetadata?.supplierCost?.capturedAt || null,
+            supplierCostTimestamp: supplierCostEvidence.capturedAt || null,
+            supplierCostSource: supplierCostEvidence.source || "supplier_mapping",
+            providerProductCode: mapping.supplierProductCode,
+            providerOfferCode: mapping.supplierPackageCode,
+            fundingCost: Number(supplierCostEvidence.fundingCost || 0),
+            otherAcquisitionCost: Number(supplierCostEvidence.otherAcquisitionCost || 0),
             mappingReadiness: mapping.mappingMetadata?.readiness || {}, packageEnabled: pkg.enabled !== false,
             priceEnabled: price?.enabled !== false && Boolean(price), region: mappingRegion, currency: price?.currency || REGION_CURRENCIES[mappingRegion],
             publishedPrice: price?.amount ?? null, publishedPriceMode: price?.publishedPriceMode || "",
@@ -133,6 +149,11 @@ function safeNumber(value) {
 function round(value) {
     const numeric = Number(value);
     return Number.isFinite(numeric) ? Number(numeric.toFixed(2)) : null;
+}
+
+function precise(value) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? Number(numeric.toFixed(6)) : null;
 }
 
 function selectedPrice(existing = {}, draft = {}, region) {
@@ -200,7 +221,7 @@ function normalizeWorkspaceRow(row = {}, index = 0) {
     if (rawSupplierCost != null && rawSupplierCost !== "" && newSupplierCost == null) {
         throw new AdminPricingControlCenterError("WORKSPACE_SUPPLIER_COST_INVALID", `Row ${index + 1} requires a positive supplier cost.`);
     }
-    if (!["MMK", "THB"].includes(supplierCurrency)) {
+    if (!SUPPLIER_CURRENCY.includes(supplierCurrency)) {
         throw new AdminPricingControlCenterError("WORKSPACE_SUPPLIER_CURRENCY_INVALID", `Row ${index + 1} has an unsupported supplier currency.`);
     }
     return {
@@ -213,6 +234,11 @@ function normalizeWorkspaceRow(row = {}, index = 0) {
         supplierName: text(row.supplierName),
         supplierVersion: text(row.supplierVersion),
         supplierCostTimestamp: row.supplierCostTimestamp || new Date().toISOString(),
+        supplierCostSource: text(row.supplierCostSource || "supplier_mapping"),
+        providerProductCode: text(row.providerProductCode || row.supplierProductCode),
+        providerOfferCode: text(row.providerOfferCode || row.supplierPackageCode),
+        fundingCost: amount(row.fundingCost) || 0,
+        otherAcquisitionCost: amount(row.otherAcquisitionCost) || 0,
         pricingNote: text(row.pricingNote),
         expectedUpdatedAt: row.expectedUpdatedAt || null,
         manualPublishedPrice: amount(row.manualPublishedPrice),
@@ -322,6 +348,8 @@ function previewFromQuote({ quote, context, price, couponCode }) {
         publishedPriceMode: price.publishedPriceMode || "LEGACY_COMPATIBILITY_PRICE",
         manualOverrideReason: price.manualOverrideReason || "",
         supplierCost: supplierConfigured ? round(supplierSnapshot.amount) : null,
+        rawSupplierCost: supplierConfigured ? precise(supplierSnapshot.rawSupplierCost ?? supplierSnapshot.amount) : null,
+        rawSupplierCurrency: supplierSnapshot.rawSupplierCurrency || supplierSnapshot.currency || "",
         supplierCurrency: supplierSnapshot.currency || price.supplierCurrency || price.currency,
         supplierCostConfigured: supplierConfigured,
         supplierName: supplierSnapshot.supplierName || "",
@@ -332,8 +360,16 @@ function previewFromQuote({ quote, context, price, couponCode }) {
         exchangeRateSource: exchangeSnapshot?.source || "",
         exchangeRateProvider: exchangeSnapshot?.provider || "",
         exchangeRateCapturedAt: exchangeSnapshot?.capturedAt || null,
+        exchangeRateEffectiveAt: exchangeSnapshot?.effectiveAt || null,
+        exchangeRateExpiresAt: exchangeSnapshot?.expiresAt || null,
+        exchangeRateMaxAgeSeconds: exchangeSnapshot?.maxAgeSeconds || null,
         conversionRequired: Boolean(exchangeSnapshot && exchangeSnapshot.sourceCurrency !== exchangeSnapshot.targetCurrency),
         convertedSupplierCost,
+        fxConvertedCost: supplierConfigured ? precise(pricing.result?.fxConvertedCost ?? convertedSupplierCost) : null,
+        fundingCost: supplierConfigured ? precise(pricing.result?.fundingCost || 0) : null,
+        otherAcquisitionCost: supplierConfigured ? precise(pricing.result?.otherAcquisitionCost || 0) : null,
+        landedCost: supplierConfigured ? precise(pricing.result?.landedCost ?? convertedSupplierCost) : null,
+        landedCurrency: supplierConfigured ? pricing.result?.landedCurrency || quote.commercialSnapshot.currency : "",
         recommendedSellingPrice: round(pricing.result?.preOverridePrice ?? pricing.result?.regularPrice ?? commercial.originalPrice),
         manualPublishedPrice: pricing.result?.preOverridePrice != null ? round(commercial.originalPrice) : null,
         publishedPriceDifference: pricing.result?.preOverridePrice != null
@@ -446,6 +482,13 @@ async function previewLoadedPackageRegion({ product, pkg, region, row, couponCod
         supplierName: row.supplierName || existing.supplierName || "",
         supplierVersion: row.supplierVersion || existing.supplierVersion || "",
         supplierCostTimestamp: row.supplierCostTimestamp || existing.supplierCostTimestamp || new Date().toISOString(),
+        rawSupplierCost: row.newSupplierCost,
+        rawSupplierCurrency: row.supplierCurrency,
+        supplierCostSource: row.supplierCostSource,
+        providerProductCode: row.providerProductCode,
+        providerOfferCode: row.providerOfferCode,
+        fundingCost: row.fundingCost,
+        otherAcquisitionCost: row.otherAcquisitionCost,
         pricingNote: row.pricingNote || existing.pricingNote || ""
     };
     if (row.publishedPriceMode) priceDraft.publishedPriceMode = row.publishedPriceMode;
@@ -529,8 +572,16 @@ function withRegionalContract(row = {}) {
     (row.regions || []).forEach(item => {
         regionalResults[item.region] = {
             storeCurrency: item.currency,
+            rawSupplierCost: item.rawSupplierCost ?? item.supplierCost,
+            rawSupplierCurrency: item.rawSupplierCurrency || item.supplierCurrency,
             exchangeRate: item.exchangeRate,
-            convertedSupplierCost: item.convertedSupplierCost,
+            exchangeRateSource: item.exchangeRateSource,
+            exchangeRateCapturedAt: item.exchangeRateCapturedAt,
+            fxConvertedCost: item.fxConvertedCost ?? item.convertedSupplierCost,
+            fundingCost: item.fundingCost,
+            otherAcquisitionCost: item.otherAcquisitionCost,
+            landedCost: item.landedCost,
+            landedCurrency: item.landedCurrency,
             sellingPrice: item.recommendedSellingPrice,
             gatewayFee: item.gatewayFee,
             platformFee: item.platformFee,
@@ -587,10 +638,16 @@ async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = nu
     const resolvedInputRows = rows.map(row => {
         const pkg = packagesById.get(text(row.packageId));
         const mapping = mappingMap.get(text(row.mappingId));
-        if (text(row.mappingId) && (!mapping || String(mapping.supplierId) !== supplier.supplierId || mapping.enabled !== true)) {
+        if (supplier.mode === "API" && !mapping) {
+            return { ...row, productCode: row.productCode || row.productId, newSupplierCost: null, authorityError: "SUPPLIER_MAPPING_REQUIRED" };
+        }
+        if (text(row.mappingId) && (!mapping || String(mapping.supplierId) !== supplier.supplierId)) {
             return { ...row, productCode: row.productCode || row.productId, newSupplierCost: null, authorityError: "SUPPLIER_MAPPING_UNAVAILABLE" };
         }
-        const authoritativeCost = Number(mapping?.mappingMetadata?.supplierCost?.netDealerPrice);
+        const supplierCostEvidence = mapping?.supplierCostAuthority?.rawSupplierCost != null
+            ? mapping.supplierCostAuthority
+            : mapping?.mappingMetadata?.supplierCost || {};
+        const authoritativeCost = Number(supplierCostEvidence.rawSupplierCost ?? supplierCostEvidence.priceUsd ?? supplierCostEvidence.netDealerPrice);
         const mapped = mapping ? {
             productCode: mapping.productCode,
             packageCode: mapping.packageCode,
@@ -600,7 +657,12 @@ async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = nu
             mappingRegion: mapping.region,
             mappingReadiness: mapping.mappingMetadata?.readiness || {},
             newSupplierCost: Number.isFinite(authoritativeCost) ? authoritativeCost : null,
-            supplierCostTimestamp: mapping.mappingMetadata?.supplierCost?.capturedAt || row.supplierCostTimestamp
+            supplierCostTimestamp: supplierCostEvidence.capturedAt || row.supplierCostTimestamp,
+            supplierCostSource: supplierCostEvidence.source || "supplier_mapping",
+            providerProductCode: mapping.supplierProductCode,
+            providerOfferCode: mapping.supplierPackageCode,
+            fundingCost: Number(supplierCostEvidence.fundingCost || 0),
+            otherAcquisitionCost: Number(supplierCostEvidence.otherAcquisitionCost || 0)
         } : {};
         return pkg ? { ...row, ...mapped, productCode: mapped.productCode || row.productCode || row.productId || pkg.productCode, packageCode: mapped.packageCode || pkg.packageCode } : { ...row, ...mapped, productCode: mapped.productCode || row.productCode || row.productId };
     });
@@ -714,6 +776,11 @@ async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = nu
             mappingReadiness: row.mappingReadiness || {},
             supplierVersion: row.supplierVersion || existingPrices.find(price => price?.supplierVersion)?.supplierVersion || "",
             supplierCostTimestamp: row.supplierCostTimestamp,
+            supplierCostSource: row.supplierCostSource,
+            providerProductCode: row.providerProductCode,
+            providerOfferCode: row.providerOfferCode,
+            fundingCost: row.fundingCost,
+            otherAcquisitionCost: row.otherAcquisitionCost,
             expectedUpdatedAt: row.expectedUpdatedAt || pkg.updatedAt,
             changed,
             selected: row.selected !== false,
@@ -775,6 +842,28 @@ async function publishDailyPricing({
     ])));
     const suppliersByRegion = new Map(supplierEntries);
 
+    // Pricing preview may use a disabled mapping as read-only supplier-cost
+    // evidence. Publication remains a production action and therefore keeps
+    // the stricter enabled-mapping boundary.
+    const selectedMappingIds = rows
+        .filter(row => row.selected !== false)
+        .map(row => text(row.mappingId))
+        .filter(id => mongoose.Types.ObjectId.isValid(id));
+    if (selectedMappingIds.length) {
+        const enabledMappings = await SupplierProductMapping.countDocuments({
+            _id: { $in: selectedMappingIds },
+            supplierId,
+            enabled: true
+        });
+        if (enabledMappings !== new Set(selectedMappingIds).size) {
+            throw new AdminPricingControlCenterError(
+                "SUPPLIER_MAPPING_PUBLICATION_NOT_READY",
+                "Publishing requires an enabled production-ready supplier mapping.",
+                409
+            );
+        }
+    }
+
     /*
      * Preview all requested regions in one pass. This produces one authoritative
      * calculated result per package and region from the active pricing policies.
@@ -806,7 +895,12 @@ async function publishDailyPricing({
                     newSupplierCost: previewRow.newSupplierCost,
                     supplierCurrency: previewRow.supplierCurrency,
                     supplierName: previewRow.supplierName,
-                    supplierCostTimestamp: previewRow.supplierCostTimestamp
+                    supplierCostTimestamp: previewRow.supplierCostTimestamp,
+                    supplierCostSource: previewRow.supplierCostSource,
+                    providerProductCode: previewRow.providerProductCode,
+                    providerOfferCode: previewRow.providerOfferCode,
+                    fundingCost: previewRow.fundingCost,
+                    otherAcquisitionCost: previewRow.otherAcquisitionCost
                 } : {})
             }, index);
             normalizedInputByKey.set(rowKey(normalized), normalized);
@@ -887,6 +981,22 @@ async function publishDailyPricing({
                 manualOverrideReason: "",
                 supplierCost: normalized.newSupplierCost,
                 supplierCurrency: supplier.supplierCurrency,
+                rawSupplierCost: normalized.newSupplierCost,
+                rawSupplierCurrency: supplier.supplierCurrency,
+                supplierCostSource: normalized.supplierCostSource,
+                providerProductCode: normalized.providerProductCode,
+                providerOfferCode: normalized.providerOfferCode,
+                fxRate: regionalPreview.exchangeRate,
+                fxRateSource: regionalPreview.exchangeRateSource,
+                fxRateCapturedAt: regionalPreview.exchangeRateCapturedAt,
+                fxRateEffectiveAt: regionalPreview.exchangeSnapshot?.effectiveAt || null,
+                fxRateExpiresAt: regionalPreview.exchangeRateExpiresAt || null,
+                fxRateMaxAgeSeconds: regionalPreview.exchangeRateMaxAgeSeconds || null,
+                fxConvertedCost: regionalPreview.fxConvertedCost,
+                fundingCost: regionalPreview.fundingCost || 0,
+                otherAcquisitionCost: regionalPreview.otherAcquisitionCost || 0,
+                landedCost: regionalPreview.landedCost,
+                landedCurrency: regionalPreview.landedCurrency,
                 supplierId: supplier.supplierId,
                 supplierCode: supplier.supplierCode,
                 supplierName: supplier.supplierName,
@@ -913,7 +1023,23 @@ async function publishDailyPricing({
                 supplierName: canonicalSupplier.supplierName,
                 amount: normalized.newSupplierCost,
                 currency: canonicalSupplier.supplierCurrency,
-                capturedAt: normalized.supplierCostTimestamp
+                capturedAt: normalized.supplierCostTimestamp,
+                rawSupplierCost: normalized.newSupplierCost,
+                rawSupplierCurrency: canonicalSupplier.supplierCurrency,
+                supplierCostSource: normalized.supplierCostSource,
+                providerProductCode: normalized.providerProductCode,
+                providerOfferCode: normalized.providerOfferCode,
+                fxRate: pricePatches[publishableRegions[0]].fxRate,
+                fxRateSource: pricePatches[publishableRegions[0]].fxRateSource,
+                fxRateCapturedAt: pricePatches[publishableRegions[0]].fxRateCapturedAt,
+                fxRateEffectiveAt: pricePatches[publishableRegions[0]].fxRateEffectiveAt,
+                fxRateExpiresAt: pricePatches[publishableRegions[0]].fxRateExpiresAt,
+                fxRateMaxAgeSeconds: pricePatches[publishableRegions[0]].fxRateMaxAgeSeconds,
+                fxConvertedCost: pricePatches[publishableRegions[0]].fxConvertedCost,
+                fundingCost: pricePatches[publishableRegions[0]].fundingCost,
+                otherAcquisitionCost: pricePatches[publishableRegions[0]].otherAcquisitionCost,
+                landedCost: pricePatches[publishableRegions[0]].landedCost,
+                landedCurrency: pricePatches[publishableRegions[0]].landedCurrency
             },
             prices: pricePatches,
             expectedUpdatedAt: normalized.expectedUpdatedAt || row.expectedUpdatedAt

@@ -1,0 +1,350 @@
+{
+  "apply": true,
+  "created": [],
+  "reused": [
+    "MLBB_42",
+    "MLBB_56",
+    "MLBB_284",
+    "MLBB_570",
+    "MLBB_716"
+  ],
+  "verified": [
+    {
+      "packageCode": "MLBB_42",
+      "identity": "42 Diamonds",
+      "offerId": "42_diamonds",
+      "rawUsd": 0.7,
+      "previousUsd": 0.7,
+      "priceDriftUsd": 0
+    },
+    {
+      "packageCode": "MLBB_56",
+      "identity": "70 Diamonds",
+      "offerId": "70_diamonds",
+      "rawUsd": 1.16,
+      "previousUsd": 1.16,
+      "priceDriftUsd": 0
+    },
+    {
+      "packageCode": "MLBB_284",
+      "identity": "284 Diamonds",
+      "offerId": "284_diamonds",
+      "rawUsd": 4.63,
+      "previousUsd": 4.63,
+      "priceDriftUsd": 0
+    },
+    {
+      "packageCode": "MLBB_570",
+      "identity": "429 Diamonds",
+      "offerId": "429_diamonds",
+      "rawUsd": 5.722,
+      "previousUsd": 5.712,
+      "priceDriftUsd": 0.01
+    },
+    {
+      "packageCode": "MLBB_716",
+      "identity": "716 Diamonds",
+      "offerId": "716_diamonds",
+      "rawUsd": 11.59,
+      "previousUsd": 11.59,
+      "priceDriftUsd": 0
+    }
+  ],
+  "orderFields": [
+    "player_id",
+    "server_id"
+  ],
+  "validationFields": [
+    "player_id",
+    "zone_id"
+  ],
+  "economics": [
+    {
+      "canonicalPackage": "MLBB_42",
+      "providerOffer": "42_diamonds",
+      "rawUsd": 0.7,
+      "fxRate": 33.52,
+      "convertedThb": 23.464,
+      "landedThb": 23.464,
+      "sellingThb": 26.96,
+      "profitThb": 2,
+      "blockingErrors": []
+    },
+    {
+      "canonicalPackage": "MLBB_56",
+      "providerOffer": "70_diamonds",
+      "rawUsd": 1.16,
+      "fxRate": 33.52,
+      "convertedThb": 38.8832,
+      "landedThb": 38.8832,
+      "sellingThb": 42.38,
+      "profitThb": 2,
+      "blockingErrors": []
+    },
+    {
+      "canonicalPackage": "MLBB_284",
+      "providerOffer": "284_diamonds",
+      "rawUsd": 4.63,
+      "fxRate": 33.52,
+      "convertedThb": 155.1976,
+      "landedThb": 155.1976,
+      "sellingThb": 158.7,
+      "profitThb": 2,
+      "blockingErrors": []
+    },
+    {
+      "canonicalPackage": "MLBB_570",
+      "providerOffer": "429_diamonds",
+      "rawUsd": 5.722,
+      "fxRate": 33.52,
+      "convertedThb": 191.80144,
+      "landedThb": 191.80144,
+      "sellingThb": 195.3,
+      "profitThb": 2,
+      "blockingErrors": []
+    },
+    {
+      "canonicalPackage": "MLBB_716",
+      "providerOffer": "716_diamonds",
+      "rawUsd": 11.59,
+      "fxRate": 33.52,
+      "convertedThb": 388.4968,
+      "landedThb": 388.4968,
+      "sellingThb": 392,
+      "profitThb": 2,
+      "blockingErrors": []
+    }
+  ],
+  "supplierComparisons": [
+    {
+      "canonicalPackage": "MLBB_570",
+      "wonddPackcode": "ML00429",
+      "wonddThb": 197,
+      "fazerLandedThb": 191.80144,
+      "classification": "FAZERCARDS_CHEAPER"
+    }
+  ],
+  "safety": {
+    "realFazerCardsOrderCalls": 0,
+    "liveValidationPostCalls": 0,
+    "providerBalanceBeforeUsd": 0,
+    "providerBalanceAfterUsd": 0,
+    "providerBalanceSpentUsd": 0,
+    "fazerCardsMlbbMappings": 5,
+    "fazerCardsMlbbEnabledMappings": 0,
+    "globalFazerCardsGate": "OFF",
+    "wonddMappingsModified": 0,
+    "pricesPublished": 0,
+    "customerOrdersModified": 0,
+    "publicStorefrontChanged": false
+  },
+  "newCandidates": [
+    {
+      "offerId": "1084_diamonds",
+      "identity": "1084 Diamonds",
+      "rawUsd": 17.41,
+      "classification": "ADD_CANDIDATE"
+    },
+    {
+      "offerId": "14_diamonds",
+      "identity": "14 Diamonds",
+      "rawUsd": 0.23,
+      "classification": "ADD_CANDIDATE"
+    },
+    {
+      "offerId": "140_diamonds",
+      "identity": "140 Diamonds",
+      "rawUsd": 2.31,
+      "classification": "ADD_CANDIDATE"
+    },
+    {
+      "offerId": "355_diamonds",
+      "identity": "355 Diamonds",
+      "rawUsd": 5.8,
+      "classification": "ADD_CANDIDATE"
+    },
+    {
+      "offerId": "1446_diamonds",
+      "identity": "1446 Diamonds",
+      "rawUsd": 23.11,
+      "classification": "ADD_CANDIDATE"
+    },
+    {
+      "offerId": "2976_diamonds",
+      "identity": "2976 Diamonds",
+      "rawUsd": 46.36,
+      "classification": "ADD_CANDIDATE"
+    },
+    {
+      "offerId": "7502_diamonds",
+      "identity": "7502 Diamonds",
+      "rawUsd": 115.68,
+      "classification": "ADD_CANDIDATE"
+    },
+    {
+      "offerId": "5_diamonds",
+      "identity": "5 Diamonds",
+      "rawUsd": 0.08,
+      "classification": "ADD_CANDIDATE"
+    },
+    {
+      "offerId": "12_diamonds",
+      "identity": "12 Diamonds",
+      "rawUsd": 0.224,
+      "classification": "ADD_CANDIDATE"
+    },
+    {
+      "offerId": "19_diamonds",
+      "identity": "19 Diamonds",
+      "rawUsd": 0.3533,
+      "classification": "ADD_CANDIDATE"
+    },
+    {
+      "offerId": "28_diamonds",
+      "identity": "28 Diamonds",
+      "rawUsd": 0.5059,
+      "classification": "ADD_CANDIDATE"
+    },
+    {
+      "offerId": "170_diamonds",
+      "identity": "170 Diamonds",
+      "rawUsd": 2.927,
+      "classification": "ADD_CANDIDATE"
+    },
+    {
+      "offerId": "240_diamonds",
+      "identity": "240 Diamonds",
+      "rawUsd": 4.141,
+      "classification": "ADD_CANDIDATE"
+    },
+    {
+      "offerId": "296_diamonds",
+      "identity": "296 Diamonds",
+      "rawUsd": 5.11,
+      "classification": "ADD_CANDIDATE"
+    },
+    {
+      "offerId": "2010_diamonds",
+      "identity": "2010 Diamonds",
+      "rawUsd": 31.9168,
+      "classification": "ADD_CANDIDATE"
+    }
+  ],
+  "specialRestricted": [
+    {
+      "offerId": "500_65_diamonds_first_top_up_bonus",
+      "identity": "500 + 65 Diamonds (First Top-Up Bonus)",
+      "classification": "AMBIGUOUS"
+    },
+    {
+      "offerId": "250_25_diamonds_first_top_up_bonus",
+      "identity": "250 + 25 Diamonds (First Top-Up Bonus)",
+      "classification": "AMBIGUOUS"
+    },
+    {
+      "offerId": "150_15_diamonds_first_top_up_bonus",
+      "identity": "150 + 15 Diamonds (First Top-Up Bonus)",
+      "classification": "AMBIGUOUS"
+    },
+    {
+      "offerId": "50_5_diamonds_first_top_up_bonus",
+      "identity": "50 + 5 Diamonds (First Top-Up Bonus)",
+      "classification": "AMBIGUOUS"
+    },
+    {
+      "offerId": "7740_1548_diamonds",
+      "identity": "7740 + 1548 Diamonds",
+      "classification": "REGION_RESTRICTED"
+    },
+    {
+      "offerId": "4649_883_diamonds",
+      "identity": "4649 + 883 Diamonds",
+      "classification": "REGION_RESTRICTED"
+    },
+    {
+      "offerId": "3099_589_diamonds",
+      "identity": "3099 + 589 Diamonds",
+      "classification": "REGION_RESTRICTED"
+    },
+    {
+      "offerId": "1860_335_diamonds",
+      "identity": "1860 + 335 Diamonds",
+      "classification": "REGION_RESTRICTED"
+    },
+    {
+      "offerId": "625_81_diamonds",
+      "identity": "625 + 81 Diamonds",
+      "classification": "REGION_RESTRICTED"
+    },
+    {
+      "offerId": "234_23_diamonds",
+      "identity": "234 + 23 Diamonds",
+      "classification": "REGION_RESTRICTED"
+    },
+    {
+      "offerId": "156_16_diamonds",
+      "identity": "156 + 16 Diamonds",
+      "classification": "REGION_RESTRICTED"
+    },
+    {
+      "offerId": "78_8_diamonds",
+      "identity": "78 + 8 Diamonds",
+      "classification": "REGION_RESTRICTED"
+    },
+    {
+      "offerId": "10_1_diamonds",
+      "identity": "10 + 1 Diamonds",
+      "classification": "AMBIGUOUS"
+    },
+    {
+      "offerId": "20_2_diamonds",
+      "identity": "20 + 2 Diamonds",
+      "classification": "AMBIGUOUS"
+    },
+    {
+      "offerId": "51_5_diamonds",
+      "identity": "51 + 5 Diamonds",
+      "classification": "AMBIGUOUS"
+    },
+    {
+      "offerId": "102_10_diamonds",
+      "identity": "102 + 10 Diamonds",
+      "classification": "AMBIGUOUS"
+    },
+    {
+      "offerId": "504_66_diamonds",
+      "identity": "504 + 66 Diamonds",
+      "classification": "AMBIGUOUS"
+    },
+    {
+      "offerId": "1007_156_diamonds",
+      "identity": "1007 + 156 Diamonds",
+      "classification": "AMBIGUOUS"
+    },
+    {
+      "offerId": "2015_383_diamonds",
+      "identity": "2015 + 383 Diamonds",
+      "classification": "AMBIGUOUS"
+    },
+    {
+      "offerId": "weekly_pass",
+      "identity": "Weekly Pass",
+      "classification": "SPECIAL"
+    },
+    {
+      "offerId": "weekly_elite_pack",
+      "identity": "Weekly Elite Pack",
+      "classification": "SPECIAL"
+    },
+    {
+      "offerId": "twilight_pass",
+      "identity": "Twilight Pass",
+      "classification": "SPECIAL"
+    },
+    {
+      "offerId": "monthly_elite_pack",
+      "identity": "Monthly Elite Pack",
+      "classification": "SPECIAL"
+    }
+  ]
+}

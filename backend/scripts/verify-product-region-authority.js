@@ -21,7 +21,7 @@ const {
 
 const ROOT = path.resolve(__dirname, "../..");
 const baseProduct = {
-    productCode: "mlbb",
+    productCode: "pubg",
     name: "Region Authority Fixture",
     enabled: true,
     deletedAt: null,
@@ -32,7 +32,7 @@ const baseProduct = {
 };
 const basePackage = {
     _id: "region-authority-package",
-    productCode: "mlbb",
+    productCode: "pubg",
     packageCode: "REGION_AUTHORITY_TEST",
     name: "Region Authority Package",
     enabled: true,
@@ -153,12 +153,12 @@ async function main() {
 
     await withCatalogRows(mmOnlyProduct, basePackage, async () => {
         await expectError(loadCatalogPackage({
-            productCode: "mlbb", packageCode: basePackage.packageCode, region: "TH", currency: "THB"
+            productCode: "pubg", packageCode: basePackage.packageCode, region: "TH", currency: "THB"
         }), CommercePricingPreviewError, "PRODUCT_REGION_UNAVAILABLE");
     });
     await withCatalogRows({ ...baseProduct, publicDiscoveryEnabled: false }, basePackage, async () => {
         await expectError(loadCatalogPackage({
-            productCode: "mlbb", packageCode: basePackage.packageCode, region: "TH", currency: "THB"
+            productCode: "pubg", packageCode: basePackage.packageCode, region: "TH", currency: "THB"
         }), CommercePricingPreviewError, "PRODUCT_UNAVAILABLE");
     });
 
@@ -167,7 +167,7 @@ async function main() {
     assert.strictEqual(supported.packages[0].fulfillmentRegions.TH, true, "Supported manual TH fulfillment must remain available.");
     await withCatalogRows(baseProduct, basePackage, async () => {
         const catalog = await loadCatalogPackage({
-            productCode: "mlbb", packageCode: basePackage.packageCode, region: "TH", currency: "THB"
+            productCode: "pubg", packageCode: basePackage.packageCode, region: "TH", currency: "THB"
         });
         assert.strictEqual(catalog.price.amount, 30);
     });
@@ -180,12 +180,12 @@ async function main() {
     assert.strictEqual(packageDisabled.packages[0].prices.TH, undefined, "Product support must not override package-region disablement.");
     await withCatalogRows(baseProduct, thDisabledPackage, async () => {
         await expectError(loadCatalogPackage({
-            productCode: "mlbb", packageCode: basePackage.packageCode, region: "TH", currency: "THB"
+            productCode: "pubg", packageCode: basePackage.packageCode, region: "TH", currency: "THB"
         }), CommercePricingPreviewError, "PACKAGE_UNAVAILABLE");
     });
 
     await expectError(Promise.resolve().then(() => resolveDatabasePackagePriceFromRows({
-        productCode: "mlbb", packageCode: basePackage.packageCode, region: "TH"
+        productCode: "pubg", packageCode: basePackage.packageCode, region: "TH"
     }, { products: [mmOnlyProduct], packages: [basePackage] })), CatalogError, "REGION_NOT_SUPPORTED");
 
     const underlyingBefore = JSON.stringify(basePackage.prices.TH);

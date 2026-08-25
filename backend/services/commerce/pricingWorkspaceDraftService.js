@@ -2,7 +2,7 @@
 
 const PricingWorkspaceDraft = require("../../models/PricingWorkspaceDraft");
 const CatalogPackage = require("../../models/CatalogPackage");
-const { CURRENCY, REGION } = require("../../constants/commerce");
+const { SUPPLIER_CURRENCY, REGION } = require("../../constants/commerce");
 const { normalizePackageCode, normalizeProductCode, normalizeRegion } = require("../../catalog/catalogProjection");
 const { resolvePricingSupplier } = require("./pricingSupplierService");
 
@@ -17,7 +17,7 @@ function upper(value) {
 function amount(value) {
     if (value == null || value === "") return null;
     const numeric = Number(value);
-    return Number.isFinite(numeric) && numeric > 0 ? Number(numeric.toFixed(2)) : null;
+    return Number.isFinite(numeric) && numeric > 0 ? Number(numeric.toFixed(6)) : null;
 }
 
 function actorName(admin = {}) {
@@ -34,8 +34,7 @@ function actorOwner(admin = {}) {
 
 function normalizeSupplierCurrency(value, region) {
     const currency = upper(value || (region === "MM" ? "THB" : "THB"));
-    if (!CURRENCY.includes(currency)) return region === "MM" ? "THB" : "THB";
-    if (region === "TH") return "THB";
+    if (!SUPPLIER_CURRENCY.includes(currency)) return "THB";
     return currency;
 }
 
@@ -63,6 +62,13 @@ function normalizeDraftRows(rows = [], region = "ALL", supplier = {}) {
             packageId: text(row.packageId),
             packageCode,
             stagedSupplierCost,
+            rawSupplierCost: stagedSupplierCost,
+            supplierCostCapturedAt: row.supplierCostTimestamp || null,
+            supplierCostSource: text(row.supplierCostSource),
+            providerProductCode: text(row.providerProductCode || row.supplierProductCode),
+            providerOfferCode: text(row.providerOfferCode || row.supplierPackageCode),
+            fundingCost: amount(row.fundingCost) || 0,
+            otherAcquisitionCost: amount(row.otherAcquisitionCost) || 0,
             expectedUpdatedAt: row.expectedUpdatedAt || null,
             pricingNote: text(row.pricingNote),
             selected: row.selected !== false,
@@ -140,6 +146,13 @@ function publicDraftRow(doc, row) {
         packageId: row.packageId || "",
         packageCode: row.packageCode,
         stagedSupplierCost: row.stagedSupplierCost,
+        rawSupplierCost: row.rawSupplierCost ?? row.stagedSupplierCost,
+        supplierCostCapturedAt: row.supplierCostCapturedAt || null,
+        supplierCostSource: row.supplierCostSource || "",
+        providerProductCode: row.providerProductCode || "",
+        providerOfferCode: row.providerOfferCode || "",
+        fundingCost: row.fundingCost || 0,
+        otherAcquisitionCost: row.otherAcquisitionCost || 0,
         status: row.status || "DRAFT",
         version: row.version || doc.version || 1,
         expectedUpdatedAt: row.expectedUpdatedAt || null,
@@ -197,6 +210,13 @@ async function saveSupplierCostDraftRows({ rows = [], region = "ALL", supplierId
                 packageId: row.packageId || previous?.packageId || "",
                 packageCode: row.packageCode,
                 stagedSupplierCost: row.stagedSupplierCost,
+                rawSupplierCost: row.rawSupplierCost,
+                supplierCostCapturedAt: row.supplierCostCapturedAt,
+                supplierCostSource: row.supplierCostSource,
+                providerProductCode: row.providerProductCode,
+                providerOfferCode: row.providerOfferCode,
+                fundingCost: row.fundingCost,
+                otherAcquisitionCost: row.otherAcquisitionCost,
                 expectedUpdatedAt: row.expectedUpdatedAt || previous?.expectedUpdatedAt || null,
                 pricingNote: row.pricingNote || previous?.pricingNote || "",
                 status: "DRAFT",

@@ -1,0 +1,201 @@
+{
+  "apply": true,
+  "created": [
+    "HOK_16_TOKENS",
+    "HOK_80_TOKENS",
+    "HOK_240_TOKENS",
+    "HOK_400_TOKENS",
+    "HOK_560_TOKENS"
+  ],
+  "reused": [],
+  "verified": [
+    {
+      "packageCode": "HOK_16_TOKENS",
+      "identity": "16 Tokens",
+      "offerId": "16_tokens",
+      "rawUsd": 0.1686
+    },
+    {
+      "packageCode": "HOK_80_TOKENS",
+      "identity": "80 Tokens",
+      "offerId": "80_tokens",
+      "rawUsd": 0.84
+    },
+    {
+      "packageCode": "HOK_240_TOKENS",
+      "identity": "240 Tokens",
+      "offerId": "240_tokens",
+      "rawUsd": 2.51
+    },
+    {
+      "packageCode": "HOK_400_TOKENS",
+      "identity": "400 Tokens",
+      "offerId": "400_tokens",
+      "rawUsd": 4.19
+    },
+    {
+      "packageCode": "HOK_560_TOKENS",
+      "identity": "560 Tokens",
+      "offerId": "560_tokens",
+      "rawUsd": 5.87
+    }
+  ],
+  "pricingPreview": [
+    {
+      "canonicalPackage": "HOK_16_TOKENS",
+      "offerId": "16_tokens",
+      "rawUsd": 0.1686,
+      "fxRate": 33.52,
+      "convertedThb": 5.651472,
+      "landedThb": 5.651472,
+      "sellingThb": 9.15,
+      "profitThb": 2,
+      "blockingErrors": []
+    },
+    {
+      "canonicalPackage": "HOK_80_TOKENS",
+      "offerId": "80_tokens",
+      "rawUsd": 0.84,
+      "fxRate": 33.52,
+      "convertedThb": 28.1568,
+      "landedThb": 28.1568,
+      "sellingThb": 31.66,
+      "profitThb": 2,
+      "blockingErrors": []
+    },
+    {
+      "canonicalPackage": "HOK_240_TOKENS",
+      "offerId": "240_tokens",
+      "rawUsd": 2.51,
+      "fxRate": 33.52,
+      "convertedThb": 84.1352,
+      "landedThb": 84.1352,
+      "sellingThb": 87.64,
+      "profitThb": 2,
+      "blockingErrors": []
+    },
+    {
+      "canonicalPackage": "HOK_400_TOKENS",
+      "offerId": "400_tokens",
+      "rawUsd": 4.19,
+      "fxRate": 33.52,
+      "convertedThb": 140.4488,
+      "landedThb": 140.4488,
+      "sellingThb": 143.95,
+      "profitThb": 2,
+      "blockingErrors": []
+    },
+    {
+      "canonicalPackage": "HOK_560_TOKENS",
+      "offerId": "560_tokens",
+      "rawUsd": 5.87,
+      "fxRate": 33.52,
+      "convertedThb": 196.7624,
+      "landedThb": 196.7624,
+      "sellingThb": 200.26,
+      "profitThb": 2,
+      "blockingErrors": []
+    }
+  ],
+  "newCandidates": [
+    {
+      "offerId": "830_tokens",
+      "name": "830 Tokens",
+      "rawUsd": 8.38
+    },
+    {
+      "offerId": "1245_tokens",
+      "name": "1245 Tokens",
+      "rawUsd": 12.57
+    },
+    {
+      "offerId": "2508_tokens",
+      "name": "2508 Tokens",
+      "rawUsd": 25.15
+    },
+    {
+      "offerId": "4180_tokens",
+      "name": "4180 Tokens",
+      "rawUsd": 41.92
+    },
+    {
+      "offerId": "8360_tokens",
+      "name": "8360 Tokens",
+      "rawUsd": 83.84
+    }
+  ],
+  "excludedSpecial": [
+    {
+      "offerId": "double_token_lucky_bag",
+      "name": "Double Token Lucky Bag",
+      "rawUsd": 0.265,
+      "classification": "SPECIAL"
+    },
+    {
+      "offerId": "honor_point_value_pack",
+      "name": "Honor Point Value Pack",
+      "rawUsd": 0.265,
+      "classification": "SPECIAL"
+    },
+    {
+      "offerId": "standard_purchase_rebate_pack",
+      "name": "Standard Purchase Rebate Pack",
+      "rawUsd": 0.33,
+      "classification": "SPECIAL"
+    },
+    {
+      "offerId": "weekly_card",
+      "name": "Weekly Card",
+      "rawUsd": 0.9555,
+      "classification": "PASS/SUBSCRIPTION"
+    },
+    {
+      "offerId": "premium_purchase_rebate_pack",
+      "name": "Premium Purchase Rebate Pack",
+      "rawUsd": 1.1776,
+      "classification": "SPECIAL"
+    },
+    {
+      "offerId": "weekly_card_plus",
+      "name": "Weekly Card Plus",
+      "rawUsd": 2.8183,
+      "classification": "PASS/SUBSCRIPTION"
+    }
+  ],
+  "liveCatalogContract": {
+    "categoryId": "honor_of_kings",
+    "fields": [
+      {
+        "key": "player_id",
+        "label": "Player ID",
+        "type": "text"
+      }
+    ],
+    "absentFields": [
+      "server_id",
+      "zone_id",
+      "region"
+    ],
+    "explicitRegionRestriction": false,
+    "directDelivery": true,
+    "offerCount": 16,
+    "note": "Honor of Kings top-up.\nEnter your Player ID before placing the order.\nThe selected product is delivered directly to your account after the order is placed."
+  },
+  "thailandRegionAuthority": "FAZERCARDS_SUPPORT_CONFIRMED_ACCEPTANCE_WHEN_CATALOG_HAS_NO_RESTRICTION",
+  "validation": "NOT_AVAILABLE_NOT_ADVERTISED",
+  "safety": {
+    "realFazerCardsOrderCalls": 0,
+    "liveValidationCalls": 0,
+    "providerBalanceBeforeUsd": 0,
+    "providerBalanceAfterUsd": 0,
+    "providerBalanceSpentUsd": 0,
+    "hokMappings": 5,
+    "hokMappingsEnabled": 0,
+    "globalFazerCardsGate": "OFF",
+    "pricesPublished": 0,
+    "publicStorefrontChanged": false,
+    "wonddModified": 0,
+    "customerOrdersModified": 0,
+    "walletsModified": 0
+  }
+}

@@ -36,7 +36,7 @@ function assertCanonicalRoutes() {
         destinations[product.productCode] = route;
     });
 
-    assert.strictEqual(Object.keys(destinations).length, 16, "All 16 canonical products must have routes.");
+    assert.strictEqual(Object.keys(destinations).length, 17, "All 17 canonical products must have routes.");
     return destinations;
 }
 

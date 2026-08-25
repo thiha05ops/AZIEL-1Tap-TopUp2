@@ -7,7 +7,7 @@ const { normalizeProductKnowledge, normalizeCustomerNote } = require("../catalog
 
 const root = path.resolve(__dirname, "../..");
 const read = file => fs.readFileSync(path.join(root, file), "utf8");
-assert.equal(CANONICAL_OPERATIONAL_PRODUCTS.length, 16, "All 16 canonical products must remain available");
+assert.equal(CANONICAL_OPERATIONAL_PRODUCTS.length, 17, "All 17 canonical products must remain available");
 assert(!CANONICAL_OPERATIONAL_PRODUCTS.some(item => item.productCode === "aovid"), "aovid must not be reintroduced");
 assert.deepEqual(Object.keys(seeds).sort(), ["freefire", "hok", "mlbb", "mlbb-twilight-weekly-pass", "pubg", "pubgrp"]);
 Object.values(seeds).forEach(normalizeProductKnowledge);
@@ -23,4 +23,4 @@ assert(!stage.includes('faqLink.href = "faq.html"'), "Legacy FAQ-only fallback m
 const prices = read("frontend/js/prices.js");
 assert(prices.includes("data-customer-note"), "Package note must be available as a subtle affordance");
 
-console.log("Product knowledge system verification passed for 16 canonical products.");
+console.log("Product knowledge system verification passed for 17 canonical products.");

@@ -34,6 +34,9 @@ const EXPECTED_GROUPS = Object.freeze({
         LifeAfter: ["lifeafter"],
         "Honor of Kings": ["hok"]
     },
+    "PC Games": {
+        Valorant: ["valorant"]
+    },
     "Social Top Up": {
         Telegram: ["telegram"],
         CapCut: ["capcut"]
@@ -80,7 +83,7 @@ function assertCanonicalGroupingSource() {
         });
     });
 
-    assert.deepStrictEqual([...seen].sort(), [...CANONICAL_PRODUCT_CODES].sort(), "Grouping must cover exactly the 16 canonical products.");
+    assert.deepStrictEqual([...seen].sort(), [...CANONICAL_PRODUCT_CODES].sort(), "Grouping must cover exactly the 17 canonical products.");
 }
 
 function assertAdminUiSource() {
@@ -128,7 +131,7 @@ async function assertDatabaseState() {
             CatalogProduct.find().lean()
         ]);
         const adminVisible = products.filter(isAdminCanonicalCatalogProduct);
-        assert.strictEqual(adminVisible.length, 16, "Exactly 16 canonical products must be Admin-visible.");
+        assert.strictEqual(adminVisible.length, 17, "Exactly 17 canonical products must be Admin-visible.");
         assert.deepStrictEqual(
             adminVisible.map(product => product.productCode).sort(),
             [...CANONICAL_PRODUCT_CODES].sort(),

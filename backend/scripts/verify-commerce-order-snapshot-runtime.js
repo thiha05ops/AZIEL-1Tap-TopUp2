@@ -285,7 +285,7 @@ async function verifyCheckoutIntegration() {
         findOwnedQuote: () => clone(store.quote),
         findOrderByQuoteId: () => null,
         findOrderByCheckoutIdempotency: () => null,
-        validateOperationalPackageState: () => ({ allowed: true }),
+        validateOperationalPackageState: () => ({ allowed: true, supplierRouteSnapshot: { routeType: "SUPPLIER_API", supplierMappingId: "mapping-1", supplierId: "supplier-1", supplierCode: "WONDD", productCode: "mlbb", packageCode: "MLBB_7740", region: "TH", supplierProductCode: "mlbb", supplierPackageCode: "ML07740", executionMode: "API", selectedRole: "PRIMARY", selectedAt: CHECKOUT_TIME } }),
         validateFulfilmentInput: ({ customerInput }) => ({ valid: true, normalisedFulfilmentInput: customerInput.gameAccount }),
         validatePaymentMethod: ({ paymentSelection }) => ({ valid: true, paymentSnapshot: paymentSelection, nextAction: "OPEN_MANUAL_PAYMENT" }),
         createOrderRecord: ({ orderSnapshot }) => {
@@ -316,6 +316,7 @@ async function verifyCheckoutIntegration() {
         { key: "userId", label: "User ID", value: "123" },
         { key: "zoneId", label: "Server ID", value: "456" }
     ], "checkout persists the exact configured account-field labels and submitted values.");
+    assert.strictEqual(store.orders[0].fulfilment.routeSnapshot.supplierMappingId, "mapping-1", "checkout freezes the selected supplier mapping.");
     assert.strictEqual(result.checkout.orderId, "AZL-ORDER-0001", "checkout public result still works.");
     assert(!JSON.stringify(result.checkout).includes("requestFingerprint"), "public redaction still excludes fingerprint.");
 

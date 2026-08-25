@@ -1,0 +1,2651 @@
+{
+  "generatedAt": "2026-08-25T20:43:04.037Z",
+  "productsInScope": [
+    "mlbb",
+    "pubg",
+    "freefire",
+    "hok"
+  ],
+  "newProductsAdded": 0,
+  "newPackagesAdded": 0,
+  "packageCount": 89,
+  "mappingCount": 71,
+  "primaryMappings": 0,
+  "matrix": [
+    {
+      "product": "freefire",
+      "packageCode": "FF_100_DIA",
+      "public": false,
+      "sellingPriceThb": 33.17,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [],
+      "supplierMappings": []
+    },
+    {
+      "product": "freefire",
+      "packageCode": "FF_WONDD_F00033",
+      "public": true,
+      "sellingPriceThb": 13.5,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "FAZERCARDS",
+          "supplierCurrency": "USD",
+          "rawSupplierCost": 0.29,
+          "landedThbCost": 0,
+          "enabled": false,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": false,
+          "featureGate": "OFF",
+          "inputContract": [
+            "player_id"
+          ],
+          "blockers": [
+            "MAPPING_DISABLED",
+            "FULFILLMENT_NOT_READY",
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        },
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 10,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "freefire",
+      "packageCode": "FF_WONDD_F00068",
+      "public": true,
+      "sellingPriceThb": 23.5,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "FAZERCARDS",
+          "supplierCurrency": "USD",
+          "rawSupplierCost": 0.58,
+          "landedThbCost": 0,
+          "enabled": false,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": false,
+          "featureGate": "OFF",
+          "inputContract": [
+            "player_id"
+          ],
+          "blockers": [
+            "MAPPING_DISABLED",
+            "FULFILLMENT_NOT_READY",
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        },
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 20,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "freefire",
+      "packageCode": "FF_WONDD_F00172",
+      "public": true,
+      "sellingPriceThb": 53.5,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "FAZERCARDS",
+          "supplierCurrency": "USD",
+          "rawSupplierCost": 1.46,
+          "landedThbCost": 0,
+          "enabled": false,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": false,
+          "featureGate": "OFF",
+          "inputContract": [
+            "player_id"
+          ],
+          "blockers": [
+            "MAPPING_DISABLED",
+            "FULFILLMENT_NOT_READY",
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        },
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 50,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "freefire",
+      "packageCode": "FF_WONDD_F00517",
+      "public": true,
+      "sellingPriceThb": 153.5,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "FAZERCARDS",
+          "supplierCurrency": "USD",
+          "rawSupplierCost": 4.38,
+          "landedThbCost": 0,
+          "enabled": false,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": false,
+          "featureGate": "OFF",
+          "inputContract": [
+            "player_id"
+          ],
+          "blockers": [
+            "MAPPING_DISABLED",
+            "FULFILLMENT_NOT_READY",
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        },
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 150,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "freefire",
+      "packageCode": "FF_WONDD_F00690",
+      "public": true,
+      "sellingPriceThb": 203.5,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "FAZERCARDS",
+          "supplierCurrency": "USD",
+          "rawSupplierCost": 5.84,
+          "landedThbCost": 0,
+          "enabled": false,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": false,
+          "featureGate": "OFF",
+          "inputContract": [
+            "player_id"
+          ],
+          "blockers": [
+            "MAPPING_DISABLED",
+            "FULFILLMENT_NOT_READY",
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        },
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 200,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "freefire",
+      "packageCode": "FF_WONDD_F01052",
+      "public": true,
+      "sellingPriceThb": 303.5,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "FAZERCARDS",
+          "supplierCurrency": "USD",
+          "rawSupplierCost": 8.76,
+          "landedThbCost": 0,
+          "enabled": false,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": false,
+          "featureGate": "OFF",
+          "inputContract": [
+            "player_id"
+          ],
+          "blockers": [
+            "MAPPING_DISABLED",
+            "FULFILLMENT_NOT_READY",
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        },
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 300,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "freefire",
+      "packageCode": "FF_WONDD_F01801",
+      "public": true,
+      "sellingPriceThb": 503.5,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "FAZERCARDS",
+          "supplierCurrency": "USD",
+          "rawSupplierCost": 14.59,
+          "landedThbCost": 0,
+          "enabled": false,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": false,
+          "featureGate": "OFF",
+          "inputContract": [
+            "player_id"
+          ],
+          "blockers": [
+            "MAPPING_DISABLED",
+            "FULFILLMENT_NOT_READY",
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        },
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 500,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "freefire",
+      "packageCode": "FF_WONDD_F03698",
+      "public": true,
+      "sellingPriceThb": 1003.5,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "FAZERCARDS",
+          "supplierCurrency": "USD",
+          "rawSupplierCost": 29.18,
+          "landedThbCost": 0,
+          "enabled": false,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": false,
+          "featureGate": "OFF",
+          "inputContract": [
+            "player_id"
+          ],
+          "blockers": [
+            "MAPPING_DISABLED",
+            "FULFILLMENT_NOT_READY",
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        },
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 1000,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "freefire",
+      "packageCode": "FF_WONDD_FBIG06",
+      "public": true,
+      "sellingPriceThb": 10.17,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 6.67,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "freefire",
+      "packageCode": "FF_WONDD_FBIG10",
+      "public": true,
+      "sellingPriceThb": 20.17,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 16.67,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "freefire",
+      "packageCode": "FF_WONDD_FBIG15",
+      "public": true,
+      "sellingPriceThb": 20.17,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 16.67,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "freefire",
+      "packageCode": "FF_WONDD_FBIG20",
+      "public": true,
+      "sellingPriceThb": 20.17,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 16.67,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "freefire",
+      "packageCode": "FF_WONDD_FBIG25",
+      "public": true,
+      "sellingPriceThb": 20.17,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 16.67,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "freefire",
+      "packageCode": "FF_WONDD_FBIG30",
+      "public": true,
+      "sellingPriceThb": 26.83,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 23.33,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "freefire",
+      "packageCode": "FF_WONDD_FBPC84",
+      "public": true,
+      "sellingPriceThb": 93.5,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 90,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "freefire",
+      "packageCode": "FF_WONDD_FDIM32",
+      "public": true,
+      "sellingPriceThb": 36.83,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 33.33,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "freefire",
+      "packageCode": "FF_WONDD_FDIM63",
+      "public": true,
+      "sellingPriceThb": 70.27,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 66.77,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "freefire",
+      "packageCode": "FF_WONDD_FMON280",
+      "public": true,
+      "sellingPriceThb": 303.5,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 300,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "freefire",
+      "packageCode": "FF_210_DIA",
+      "public": false,
+      "sellingPriceThb": 66.36,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [],
+      "supplierMappings": []
+    },
+    {
+      "product": "freefire",
+      "packageCode": "FF_310_DIA",
+      "public": true,
+      "sellingPriceThb": 93.5,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "FAZERCARDS",
+          "supplierCurrency": "USD",
+          "rawSupplierCost": 2.63,
+          "landedThbCost": 0,
+          "enabled": false,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": false,
+          "featureGate": "OFF",
+          "inputContract": [
+            "player_id"
+          ],
+          "blockers": [
+            "MAPPING_DISABLED",
+            "FULFILLMENT_NOT_READY",
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        },
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 90,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "freefire",
+      "packageCode": "FF_520_DIA",
+      "public": false,
+      "sellingPriceThb": 138.63,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [],
+      "supplierMappings": []
+    },
+    {
+      "product": "freefire",
+      "packageCode": "FF_530_DIA",
+      "public": false,
+      "sellingPriceThb": 165.88,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [],
+      "supplierMappings": []
+    },
+    {
+      "product": "freefire",
+      "packageCode": "FF_1060_DIA",
+      "public": false,
+      "sellingPriceThb": 276.07,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [],
+      "supplierMappings": []
+    },
+    {
+      "product": "freefire",
+      "packageCode": "FF_1080_DIA",
+      "public": false,
+      "sellingPriceThb": 331.76,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [],
+      "supplierMappings": []
+    },
+    {
+      "product": "freefire",
+      "packageCode": "FF_2180_DIA",
+      "public": false,
+      "sellingPriceThb": 565.87,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [],
+      "supplierMappings": []
+    },
+    {
+      "product": "hok",
+      "packageCode": "HOK_WEEKLY_CARD",
+      "public": true,
+      "sellingPriceThb": 33.62,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [],
+      "supplierMappings": []
+    },
+    {
+      "product": "hok",
+      "packageCode": "HOK_WEEKLY_CARD_PLUS",
+      "public": true,
+      "sellingPriceThb": 99.21,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [],
+      "supplierMappings": []
+    },
+    {
+      "product": "hok",
+      "packageCode": "HOK_16_TOKENS",
+      "public": true,
+      "sellingPriceThb": 6.45,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "FAZERCARDS",
+          "supplierCurrency": "USD",
+          "rawSupplierCost": 0.1686,
+          "landedThbCost": 0,
+          "enabled": false,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": false,
+          "featureGate": "OFF",
+          "inputContract": [
+            "player_id"
+          ],
+          "blockers": [
+            "MAPPING_DISABLED",
+            "FULFILLMENT_NOT_READY",
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "hok",
+      "packageCode": "HOK_80_TOKENS",
+      "public": true,
+      "sellingPriceThb": 29.59,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "FAZERCARDS",
+          "supplierCurrency": "USD",
+          "rawSupplierCost": 0.84,
+          "landedThbCost": 0,
+          "enabled": false,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": false,
+          "featureGate": "OFF",
+          "inputContract": [
+            "player_id"
+          ],
+          "blockers": [
+            "MAPPING_DISABLED",
+            "FULFILLMENT_NOT_READY",
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "hok",
+      "packageCode": "HOK_240_TOKENS",
+      "public": true,
+      "sellingPriceThb": 89.39,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "FAZERCARDS",
+          "supplierCurrency": "USD",
+          "rawSupplierCost": 2.51,
+          "landedThbCost": 0,
+          "enabled": false,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": false,
+          "featureGate": "OFF",
+          "inputContract": [
+            "player_id"
+          ],
+          "blockers": [
+            "MAPPING_DISABLED",
+            "FULFILLMENT_NOT_READY",
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "hok",
+      "packageCode": "HOK_400_TOKENS",
+      "public": true,
+      "sellingPriceThb": 149.19,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "FAZERCARDS",
+          "supplierCurrency": "USD",
+          "rawSupplierCost": 4.19,
+          "landedThbCost": 0,
+          "enabled": false,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": false,
+          "featureGate": "OFF",
+          "inputContract": [
+            "player_id"
+          ],
+          "blockers": [
+            "MAPPING_DISABLED",
+            "FULFILLMENT_NOT_READY",
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "hok",
+      "packageCode": "HOK_560_TOKENS",
+      "public": true,
+      "sellingPriceThb": 208.98,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "FAZERCARDS",
+          "supplierCurrency": "USD",
+          "rawSupplierCost": 5.87,
+          "landedThbCost": 0,
+          "enabled": false,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": false,
+          "featureGate": "OFF",
+          "inputContract": [
+            "player_id"
+          ],
+          "blockers": [
+            "MAPPING_DISABLED",
+            "FULFILLMENT_NOT_READY",
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "hok",
+      "packageCode": "HOK_800_30_TOKENS",
+      "public": true,
+      "sellingPriceThb": 298.68,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [],
+      "supplierMappings": []
+    },
+    {
+      "product": "hok",
+      "packageCode": "HOK_1200_45_TOKENS",
+      "public": true,
+      "sellingPriceThb": 448.17,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [],
+      "supplierMappings": []
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_WONDD_ML00257",
+      "public": true,
+      "sellingPriceThb": 118.5,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 115,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_WONDD_ML00275",
+      "public": true,
+      "sellingPriceThb": 155.07,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 151.57,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_WONDD_ML00343",
+      "public": true,
+      "sellingPriceThb": 167.5,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 164,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_WONDD_ML00600",
+      "public": true,
+      "sellingPriceThb": 274.5,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 271,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_WONDD_ML00706",
+      "public": true,
+      "sellingPriceThb": 315.5,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 312,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_WONDD_ML00792",
+      "public": true,
+      "sellingPriceThb": 356.5,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 353,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_WONDD_ML01049",
+      "public": true,
+      "sellingPriceThb": 468.5,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 465,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_WONDD_ML02195",
+      "public": true,
+      "sellingPriceThb": 942.5,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 939,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_WONDD_ML03688",
+      "public": true,
+      "sellingPriceThb": 1562.5,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 1559,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_WONDD_ML05532",
+      "public": true,
+      "sellingPriceThb": 2335.5,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 2332,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_WONDD_ML09288",
+      "public": true,
+      "sellingPriceThb": 3842.5,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 3839,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_WONDD_MLFT055",
+      "public": true,
+      "sellingPriceThb": 29.5,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 26,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_WONDD_MLFT165",
+      "public": true,
+      "sellingPriceThb": 79.5,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 76,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_WONDD_MLFT275",
+      "public": true,
+      "sellingPriceThb": 126.5,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 123,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_WONDD_MLFT565",
+      "public": true,
+      "sellingPriceThb": 253.5,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 250,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_WONDD_MLOTW01",
+      "public": true,
+      "sellingPriceThb": 53.5,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 50,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_WONDD_MLTMP01",
+      "public": true,
+      "sellingPriceThb": 263.5,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 260,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_11_1",
+      "public": false,
+      "sellingPriceThb": 6.2,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "PACKAGE_DISABLED"
+      ],
+      "supplierMappings": []
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_13_1",
+      "public": false,
+      "sellingPriceThb": 11.51,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [],
+      "supplierMappings": []
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_42",
+      "public": false,
+      "sellingPriceThb": 26.87,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "FAZERCARDS",
+          "supplierCurrency": "USD",
+          "rawSupplierCost": 0.7,
+          "landedThbCost": 0,
+          "enabled": false,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": false,
+          "featureGate": "OFF",
+          "inputContract": [
+            "player_id",
+            "server_id"
+          ],
+          "blockers": [
+            "MAPPING_DISABLED",
+            "FULFILLMENT_NOT_READY",
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_56",
+      "public": false,
+      "sellingPriceThb": 42.64,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "FAZERCARDS",
+          "supplierCurrency": "USD",
+          "rawSupplierCost": 1.16,
+          "landedThbCost": 0,
+          "enabled": false,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": false,
+          "featureGate": "OFF",
+          "inputContract": [
+            "player_id",
+            "server_id"
+          ],
+          "blockers": [
+            "MAPPING_DISABLED",
+            "FULFILLMENT_NOT_READY",
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_86",
+      "public": true,
+      "sellingPriceThb": 44.5,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 41,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_112",
+      "public": false,
+      "sellingPriceThb": 56,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "PACKAGE_DISABLED"
+      ],
+      "supplierMappings": []
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_172",
+      "public": true,
+      "sellingPriceThb": 85.5,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 82,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_284",
+      "public": false,
+      "sellingPriceThb": 161.96,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "FAZERCARDS",
+          "supplierCurrency": "USD",
+          "rawSupplierCost": 4.63,
+          "landedThbCost": 0,
+          "enabled": false,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": false,
+          "featureGate": "OFF",
+          "inputContract": [
+            "player_id",
+            "server_id"
+          ],
+          "blockers": [
+            "MAPPING_DISABLED",
+            "FULFILLMENT_NOT_READY",
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_344",
+      "public": false,
+      "sellingPriceThb": 169.42,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [],
+      "supplierMappings": []
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_570",
+      "public": true,
+      "sellingPriceThb": 200.5,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "FAZERCARDS",
+          "supplierCurrency": "USD",
+          "rawSupplierCost": 5.722,
+          "landedThbCost": 0,
+          "enabled": false,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": false,
+          "featureGate": "OFF",
+          "inputContract": [
+            "player_id",
+            "server_id"
+          ],
+          "blockers": [
+            "MAPPING_DISABLED",
+            "FULFILLMENT_NOT_READY",
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        },
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 197,
+          "landedThbCost": null,
+          "enabled": true,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": true,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_716",
+      "public": false,
+      "sellingPriceThb": 399.41,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "FAZERCARDS",
+          "supplierCurrency": "USD",
+          "rawSupplierCost": 11.59,
+          "landedThbCost": 0,
+          "enabled": false,
+          "role": "DISABLED",
+          "pricingReady": true,
+          "fulfillmentReady": false,
+          "featureGate": "OFF",
+          "inputContract": [
+            "player_id",
+            "server_id"
+          ],
+          "blockers": [
+            "MAPPING_DISABLED",
+            "FULFILLMENT_NOT_READY",
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_1163",
+      "public": false,
+      "sellingPriceThb": 545,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [],
+      "supplierMappings": []
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_1160_186",
+      "public": false,
+      "sellingPriceThb": 662.1,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [],
+      "supplierMappings": []
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_1360_335",
+      "public": false,
+      "sellingPriceThb": 989,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "PACKAGE_DISABLED"
+      ],
+      "supplierMappings": []
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_2015_475",
+      "public": false,
+      "sellingPriceThb": 1490,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "PACKAGE_DISABLED"
+      ],
+      "supplierMappings": []
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_5000_1000",
+      "public": false,
+      "sellingPriceThb": 3097.69,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [],
+      "supplierMappings": []
+    },
+    {
+      "product": "mlbb",
+      "packageCode": "MLBB_7740_1548",
+      "public": false,
+      "sellingPriceThb": 4163.29,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [],
+      "supplierMappings": []
+    },
+    {
+      "product": "pubg",
+      "packageCode": "PUBG_60_UC",
+      "public": true,
+      "sellingPriceThb": 32.31,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "FAZERCARDS",
+          "supplierCurrency": "USD",
+          "rawSupplierCost": 0.8874,
+          "landedThbCost": 0,
+          "enabled": false,
+          "role": "DISABLED",
+          "pricingReady": false,
+          "fulfillmentReady": false,
+          "featureGate": "OFF",
+          "inputContract": [
+            "player_id"
+          ],
+          "blockers": [
+            "MAPPING_DISABLED",
+            "PRICING_NOT_READY",
+            "FULFILLMENT_NOT_READY",
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        },
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 37.17,
+          "landedThbCost": 0,
+          "enabled": false,
+          "role": "DISABLED",
+          "pricingReady": false,
+          "fulfillmentReady": false,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "MAPPING_DISABLED",
+            "PRICING_NOT_READY",
+            "INPUT_NOT_READY",
+            "FULFILLMENT_NOT_READY",
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "pubg",
+      "packageCode": "PUBG_FAZER_1800_UC",
+      "public": false,
+      "sellingPriceThb": null,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": false,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION",
+        "NEEDS_PRICING",
+        "PACKAGE_DISABLED"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "FAZERCARDS",
+          "supplierCurrency": "USD",
+          "rawSupplierCost": 22.2105,
+          "landedThbCost": 0,
+          "enabled": false,
+          "role": "DISABLED",
+          "pricingReady": false,
+          "fulfillmentReady": false,
+          "featureGate": "OFF",
+          "inputContract": [
+            "player_id"
+          ],
+          "blockers": [
+            "MAPPING_DISABLED",
+            "PRICING_NOT_READY",
+            "FULFILLMENT_NOT_READY",
+            "PRODUCTION_PRICE_NOT_PUBLISHED",
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "pubg",
+      "packageCode": "PUBG_FAZER_325_UC",
+      "public": false,
+      "sellingPriceThb": null,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": false,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION",
+        "NEEDS_PRICING",
+        "PACKAGE_DISABLED"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "FAZERCARDS",
+          "supplierCurrency": "USD",
+          "rawSupplierCost": 4.4421,
+          "landedThbCost": 0,
+          "enabled": false,
+          "role": "DISABLED",
+          "pricingReady": false,
+          "fulfillmentReady": false,
+          "featureGate": "OFF",
+          "inputContract": [
+            "player_id"
+          ],
+          "blockers": [
+            "MAPPING_DISABLED",
+            "PRICING_NOT_READY",
+            "FULFILLMENT_NOT_READY",
+            "PRODUCTION_PRICE_NOT_PUBLISHED",
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "pubg",
+      "packageCode": "PUBG_FAZER_3850_UC",
+      "public": false,
+      "sellingPriceThb": null,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": false,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION",
+        "NEEDS_PRICING",
+        "PACKAGE_DISABLED"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "FAZERCARDS",
+          "supplierCurrency": "USD",
+          "rawSupplierCost": 44.421,
+          "landedThbCost": 0,
+          "enabled": false,
+          "role": "DISABLED",
+          "pricingReady": false,
+          "fulfillmentReady": false,
+          "featureGate": "OFF",
+          "inputContract": [
+            "player_id"
+          ],
+          "blockers": [
+            "MAPPING_DISABLED",
+            "PRICING_NOT_READY",
+            "FULFILLMENT_NOT_READY",
+            "PRODUCTION_PRICE_NOT_PUBLISHED",
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "pubg",
+      "packageCode": "PUBG_FAZER_660_UC",
+      "public": false,
+      "sellingPriceThb": null,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": false,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION",
+        "NEEDS_PRICING",
+        "PACKAGE_DISABLED"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "FAZERCARDS",
+          "supplierCurrency": "USD",
+          "rawSupplierCost": 8.8697,
+          "landedThbCost": 0,
+          "enabled": false,
+          "role": "DISABLED",
+          "pricingReady": false,
+          "fulfillmentReady": false,
+          "featureGate": "OFF",
+          "inputContract": [
+            "player_id"
+          ],
+          "blockers": [
+            "MAPPING_DISABLED",
+            "PRICING_NOT_READY",
+            "FULFILLMENT_NOT_READY",
+            "PRODUCTION_PRICE_NOT_PUBLISHED",
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "pubg",
+      "packageCode": "PUBG_FAZER_8100_UC",
+      "public": false,
+      "sellingPriceThb": null,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": false,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION",
+        "NEEDS_PRICING",
+        "PACKAGE_DISABLED"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "FAZERCARDS",
+          "supplierCurrency": "USD",
+          "rawSupplierCost": 88.0051,
+          "landedThbCost": 0,
+          "enabled": false,
+          "role": "DISABLED",
+          "pricingReady": false,
+          "fulfillmentReady": false,
+          "featureGate": "OFF",
+          "inputContract": [
+            "player_id"
+          ],
+          "blockers": [
+            "MAPPING_DISABLED",
+            "PRICING_NOT_READY",
+            "FULFILLMENT_NOT_READY",
+            "PRODUCTION_PRICE_NOT_PUBLISHED",
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "pubg",
+      "packageCode": "PUBG_WONDD_UC00325",
+      "public": false,
+      "sellingPriceThb": null,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": false,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION",
+        "NEEDS_PRICING",
+        "PACKAGE_DISABLED"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 177.94,
+          "landedThbCost": 0,
+          "enabled": false,
+          "role": "DISABLED",
+          "pricingReady": false,
+          "fulfillmentReady": false,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "MAPPING_DISABLED",
+            "PRICING_NOT_READY",
+            "INPUT_NOT_READY",
+            "FULFILLMENT_NOT_READY",
+            "PRODUCTION_PRICE_NOT_PUBLISHED",
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "pubg",
+      "packageCode": "PUBG_WONDD_UC00660",
+      "public": false,
+      "sellingPriceThb": null,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": false,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION",
+        "NEEDS_PRICING",
+        "PACKAGE_DISABLED"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 356.97,
+          "landedThbCost": 0,
+          "enabled": false,
+          "role": "DISABLED",
+          "pricingReady": false,
+          "fulfillmentReady": false,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "MAPPING_DISABLED",
+            "PRICING_NOT_READY",
+            "INPUT_NOT_READY",
+            "FULFILLMENT_NOT_READY",
+            "PRODUCTION_PRICE_NOT_PUBLISHED",
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "pubg",
+      "packageCode": "PUBG_WONDD_UC01800",
+      "public": false,
+      "sellingPriceThb": null,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": false,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION",
+        "NEEDS_PRICING",
+        "PACKAGE_DISABLED"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 888,
+          "landedThbCost": 0,
+          "enabled": false,
+          "role": "DISABLED",
+          "pricingReady": false,
+          "fulfillmentReady": false,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "MAPPING_DISABLED",
+            "PRICING_NOT_READY",
+            "INPUT_NOT_READY",
+            "FULFILLMENT_NOT_READY",
+            "PRODUCTION_PRICE_NOT_PUBLISHED",
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "pubg",
+      "packageCode": "PUBG_WONDD_UC03850",
+      "public": false,
+      "sellingPriceThb": null,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": false,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION",
+        "NEEDS_PRICING",
+        "PACKAGE_DISABLED"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 1733.41,
+          "landedThbCost": 0,
+          "enabled": false,
+          "role": "DISABLED",
+          "pricingReady": false,
+          "fulfillmentReady": false,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "MAPPING_DISABLED",
+            "PRICING_NOT_READY",
+            "INPUT_NOT_READY",
+            "FULFILLMENT_NOT_READY",
+            "PRODUCTION_PRICE_NOT_PUBLISHED",
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "pubg",
+      "packageCode": "PUBG_WONDD_UC08100",
+      "public": false,
+      "sellingPriceThb": null,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": false,
+      "fulfillmentReady": true,
+      "blockers": [
+        "NEEDS_SUPPLIER_SELECTION",
+        "NEEDS_PRICING",
+        "PACKAGE_DISABLED"
+      ],
+      "supplierMappings": [
+        {
+          "supplier": "WONDD",
+          "supplierCurrency": "THB",
+          "rawSupplierCost": 3432.23,
+          "landedThbCost": 0,
+          "enabled": false,
+          "role": "DISABLED",
+          "pricingReady": false,
+          "fulfillmentReady": false,
+          "featureGate": "OFF",
+          "inputContract": [],
+          "blockers": [
+            "MAPPING_DISABLED",
+            "PRICING_NOT_READY",
+            "INPUT_NOT_READY",
+            "FULFILLMENT_NOT_READY",
+            "PRODUCTION_PRICE_NOT_PUBLISHED",
+            "CONTROLLED_TEST_EVIDENCE_MISSING",
+            "PROVIDER_FEATURE_GATE_OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "product": "pubg",
+      "packageCode": "PUBG_300_25_UC",
+      "public": true,
+      "sellingPriceThb": 152.4,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [],
+      "supplierMappings": []
+    },
+    {
+      "product": "pubg",
+      "packageCode": "PUBG_600_60_UC",
+      "public": true,
+      "sellingPriceThb": 303.11,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [],
+      "supplierMappings": []
+    },
+    {
+      "product": "pubg",
+      "packageCode": "PUBG_1500_300_UC",
+      "public": true,
+      "sellingPriceThb": 749.82,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [],
+      "supplierMappings": []
+    },
+    {
+      "product": "pubg",
+      "packageCode": "PUBG_3000_850_UC",
+      "public": true,
+      "sellingPriceThb": 1512.75,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [],
+      "supplierMappings": []
+    },
+    {
+      "product": "pubg",
+      "packageCode": "PUBG_6000_2100_UC",
+      "public": true,
+      "sellingPriceThb": 3022.8,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [],
+      "supplierMappings": []
+    },
+    {
+      "product": "pubg",
+      "packageCode": "PUBG_12000_4200_UC",
+      "public": true,
+      "sellingPriceThb": 6043.08,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [],
+      "supplierMappings": []
+    },
+    {
+      "product": "pubg",
+      "packageCode": "PUBG_18000_6300_UC",
+      "public": true,
+      "sellingPriceThb": 9368.67,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [],
+      "supplierMappings": []
+    },
+    {
+      "product": "pubg",
+      "packageCode": "PUBG_24000_8400_UC",
+      "public": true,
+      "sellingPriceThb": 12487.68,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [],
+      "supplierMappings": []
+    },
+    {
+      "product": "pubg",
+      "packageCode": "PUBG_30000_10500_UC",
+      "public": true,
+      "sellingPriceThb": 15615.67,
+      "manualAdminAllowed": true,
+      "primarySupplier": "NONE",
+      "backupSuppliers": [],
+      "pricingReady": true,
+      "fulfillmentReady": true,
+      "blockers": [],
+      "supplierMappings": []
+    }
+  ],
+  "safety": {
+    "realFazerCardsOrders": 0,
+    "realWonddTopups": 0,
+    "liveValidationCalls": 0,
+    "providerBalanceSpent": 0,
+    "publicPackagesAccidentallyEnabled": 0,
+    "valorantPublic": false,
+    "newGameMutations": 0
+  }
+}

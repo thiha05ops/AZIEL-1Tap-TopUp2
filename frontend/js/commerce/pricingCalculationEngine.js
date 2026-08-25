@@ -1,5 +1,6 @@
 (function (root) {
-    const CURRENCY = Object.freeze(["MMK", "THB"]);
+    const STOREFRONT_CURRENCY = Object.freeze(["MMK", "THB"]);
+    const SUPPLIER_CURRENCY = Object.freeze(["MMK", "THB", "USD"]);
     const RULE_SCOPE = Object.freeze(["GLOBAL", "REGION", "GAME", "CATEGORY", "TIER", "PACKAGE"]);
     const RULE_TYPE = Object.freeze(["MARKUP_PERCENT", "MARKUP_FIXED", "PROFIT_MARGIN_PERCENT", "PROFIT_FIXED", "FEE_PERCENT", "FEE_FIXED", "PRICE_OVERRIDE", "ROUNDING"]);
     const ROUNDING_MODE = Object.freeze(["NONE", "NEAREST", "UP", "DOWN", "PSYCHOLOGICAL"]);
@@ -56,9 +57,9 @@
         return Object.is(normalized, -0) ? 0 : normalized;
     }
 
-    function currency(value, field) {
+    function currency(value, field, domain) {
         const normalized = String(value || "").toUpperCase();
-        if (!CURRENCY.includes(normalized)) fail(ERROR_CODES.UNSUPPORTED_CURRENCY, "Unsupported currency.", { field, currency: normalized });
+        if (!domain.includes(normalized)) fail(ERROR_CODES.UNSUPPORTED_CURRENCY, "Unsupported currency.", { field, currency: normalized });
         return normalized;
     }
 
@@ -167,7 +168,16 @@
         if (data.sourceCurrency !== input.supplierCurrency || data.targetCurrency !== input.targetCurrency) {
             fail(ERROR_CODES.EXCHANGE_PAIR_MISMATCH, "Exchange pair does not match requested conversion.", { sourceCurrency: data.sourceCurrency, targetCurrency: data.targetCurrency });
         }
-        return { rate, metadata: Object.freeze({ sourceCurrency: data.sourceCurrency, targetCurrency: data.targetCurrency, asOf: data.asOf || null, source: data.source || "" }) };
+        const capturedValue = data.capturedAt || data.asOf || null;
+        const capturedAt = capturedValue ? new Date(capturedValue) : null;
+        const maxAgeSeconds = Number(data.maxAgeSeconds);
+        const expiresAt = data.expiresAt ? new Date(data.expiresAt) : null;
+        const evaluatedAt = new Date(input.context?.evaluationTime || Date.now());
+        if (!Number.isFinite(evaluatedAt.getTime())) fail(ERROR_CODES.INVALID_EXCHANGE_RATE, "Pricing evaluation time is invalid.", { field: "context.evaluationTime" });
+        if (data.requireFreshness === true && (!capturedAt || !Number.isFinite(capturedAt.getTime()) || !Number.isFinite(maxAgeSeconds) || maxAgeSeconds <= 0)) fail(ERROR_CODES.INVALID_EXCHANGE_RATE, "Bounded FX freshness evidence is required.", { field: "exchangeRate.capturedAt" });
+        if (expiresAt && (!Number.isFinite(expiresAt.getTime()) || evaluatedAt > expiresAt)) fail(ERROR_CODES.INVALID_EXCHANGE_RATE, "Exchange rate is stale.", { field: "exchangeRate.expiresAt" });
+        if (Number.isFinite(maxAgeSeconds) && maxAgeSeconds > 0 && (!capturedAt || !Number.isFinite(capturedAt.getTime()) || evaluatedAt.getTime() - capturedAt.getTime() > maxAgeSeconds * 1000)) fail(ERROR_CODES.INVALID_EXCHANGE_RATE, "Exchange rate is stale.", { field: "exchangeRate.capturedAt" });
+        return { rate, metadata: Object.freeze({ sourceCurrency: data.sourceCurrency, targetCurrency: data.targetCurrency, asOf: capturedValue, capturedAt: capturedValue, effectiveAt: data.effectiveAt || null, expiresAt: data.expiresAt || null, maxAgeSeconds: Number.isFinite(maxAgeSeconds) && maxAgeSeconds > 0 ? maxAgeSeconds : null, source: data.source || "" }) };
     }
 
     function roundingRule(rule) {
@@ -236,8 +246,8 @@
 
     function calculateBasePrice(input) {
         if (!input || typeof input !== "object" || Array.isArray(input)) fail(ERROR_CODES.INVALID_INPUT, "Calculation input must be an object.", { field: "input" });
-        const supplierCurrency = currency(input.supplierCurrency, "supplierCurrency");
-        const targetCurrency = currency(input.targetCurrency, "targetCurrency");
+        const supplierCurrency = currency(input.supplierCurrency, "supplierCurrency", SUPPLIER_CURRENCY);
+        const targetCurrency = currency(input.targetCurrency, "targetCurrency", STOREFRONT_CURRENCY);
         const supplierCost = amount(finite(input.supplierCost, ERROR_CODES.INVALID_SUPPLIER_COST, "supplierCost"));
         const policy = input.policy && typeof input.policy === "object" ? input.policy : {};
         if (!policy.profitRule) fail(ERROR_CODES.INVALID_INPUT, "policy.profitRule is required.", { field: "policy.profitRule" });
@@ -254,6 +264,12 @@
         subtotal = exchangeData.rate ? amount(subtotal * exchangeData.rate) : subtotal;
         const postExchangeSubtotal = subtotal;
         trace(breakdown, { stage: "EXCHANGE", label: "Currency exchange", inputAmount: preExchangeSubtotal, ruleType: exchangeData.rate ? "RATE" : "NONE", ruleValue: exchangeData.rate, amountAdded: amount(postExchangeSubtotal - preExchangeSubtotal), outputAmount: postExchangeSubtotal, currency: targetCurrency });
+        const acquisition = input.acquisitionCosts && typeof input.acquisitionCosts === "object" ? input.acquisitionCosts : {};
+        const fundingCost = amount(finite(acquisition.fundingCost ?? 0, ERROR_CODES.INVALID_SUPPLIER_COST, "acquisitionCosts.fundingCost"));
+        const otherAcquisitionCost = amount(finite(acquisition.otherAcquisitionCost ?? 0, ERROR_CODES.INVALID_SUPPLIER_COST, "acquisitionCosts.otherAcquisitionCost"));
+        if (fundingCost) { const beforeFunding = subtotal; subtotal = amount(subtotal + fundingCost); trace(breakdown, { stage: "FUNDING_COST", label: "Funding/acquisition adjustment", inputAmount: beforeFunding, amountAdded: fundingCost, outputAmount: subtotal, currency: targetCurrency }); }
+        if (otherAcquisitionCost) { const beforeOther = subtotal; subtotal = amount(subtotal + otherAcquisitionCost); trace(breakdown, { stage: "OTHER_ACQUISITION_COST", label: "Other supplier acquisition cost", inputAmount: beforeOther, amountAdded: otherAcquisitionCost, outputAmount: subtotal, currency: targetCurrency }); }
+        const landedCost = subtotal;
         const supplierFee = applyMoney(subtotal, policy.supplierFee, "policy.supplierFee");
         let before = subtotal;
         subtotal = amount(subtotal + supplierFee.amount);
@@ -318,6 +334,8 @@
             currency: targetCurrency,
             supplierCurrency,
             supplierCost,
+            rawSupplierCurrency: supplierCurrency,
+            rawSupplierCost: supplierCost,
             supplierFeeAmount: supplierFee.amount,
             businessCostAmount: businessCost.amount,
             costBeforeProfit,
@@ -326,6 +344,11 @@
             exchangeRateApplied: exchangeData.rate,
             exchangeRateMetadata: exchangeData.metadata,
             postExchangeSubtotal,
+            fxConvertedCost: postExchangeSubtotal,
+            fundingCost,
+            otherAcquisitionCost,
+            landedCost,
+            landedCurrency: targetCurrency,
             gatewayFeeAmount: gatewayFee.amount,
             platformFeeAmount: platformFee.amount,
             pricingRuleFeeAmount,

@@ -1,6 +1,6 @@
 "use strict";
 
-const { CURRENCY, REGION } = require("../../constants/commerce");
+const { STOREFRONT_CURRENCY, SUPPLIER_CURRENCY, REGION } = require("../../constants/commerce");
 
 function text(value) {
     return String(value || "").trim();
@@ -32,12 +32,19 @@ function regionCostFromMetadata(pkg = {}, region) {
 
 function normalizeSupplierCost({ raw = {}, price = {}, pkg = {}, region, currency, now = new Date(), source } = {}) {
     if (!raw || typeof raw !== "object") return null;
-    const cost = amount(raw.amount ?? raw.supplierCost ?? raw.cost);
-    const supplierCurrency = upper(raw.currency || raw.supplierCurrency || currency);
-    if (cost === null || !CURRENCY.includes(supplierCurrency)) return null;
+    const cost = amount(raw.rawSupplierCost ?? raw.amount ?? raw.supplierCost ?? raw.cost);
+    const supplierCurrency = upper(raw.rawSupplierCurrency || raw.currency || raw.supplierCurrency || currency);
+    if (cost === null || !SUPPLIER_CURRENCY.includes(supplierCurrency)) return null;
     return {
         amount: cost,
         currency: supplierCurrency,
+        rawSupplierCost: cost,
+        rawSupplierCurrency: supplierCurrency,
+        supplierCostSource: text(raw.supplierCostSource || source),
+        providerProductCode: text(raw.providerProductCode),
+        providerOfferCode: text(raw.providerOfferCode),
+        fundingCost: amount(raw.fundingCost) || 0,
+        otherAcquisitionCost: amount(raw.otherAcquisitionCost) || 0,
         supplierName: text(raw.supplierName || raw.supplier || pkg.metadata?.supplierName || "AZIEL Supplier"),
         supplierVersion: text(raw.supplierVersion || raw.version || pkg.metadata?.supplierVersion || "v1"),
         costTimestamp: timestamp(raw.costTimestamp || raw.supplierCostTimestamp || raw.updatedAt || price.updatedAt || pkg.updatedAt, now),
@@ -67,12 +74,17 @@ function resolveSupplierCostSnapshot({ pkg = {}, price = {}, region, currency, n
     const normalizedRegion = upper(region);
     const normalizedCurrency = upper(currency || price.currency);
     if (!REGION.includes(normalizedRegion)) throw new Error(`Unsupported supplier cost region: ${normalizedRegion || "(empty)"}`);
-    if (!CURRENCY.includes(normalizedCurrency)) throw new Error(`Unsupported supplier cost currency: ${normalizedCurrency || "(empty)"}`);
+    if (!STOREFRONT_CURRENCY.includes(normalizedCurrency)) throw new Error(`Unsupported storefront currency: ${normalizedCurrency || "(empty)"}`);
 
     const direct = normalizeSupplierCost({
         raw: {
-            amount: price.supplierCost,
-            currency: price.supplierCurrency,
+            rawSupplierCost: price.rawSupplierCost ?? price.supplierCost,
+            rawSupplierCurrency: price.rawSupplierCurrency || price.supplierCurrency,
+            supplierCostSource: price.supplierCostSource,
+            providerProductCode: price.providerProductCode,
+            providerOfferCode: price.providerOfferCode,
+            fundingCost: price.fundingCost,
+            otherAcquisitionCost: price.otherAcquisitionCost,
             supplierName: price.supplierName,
             supplierVersion: price.supplierVersion,
             costTimestamp: price.supplierCostTimestamp

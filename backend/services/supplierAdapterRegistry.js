@@ -71,6 +71,9 @@ function getSupplierAdapter(supplier) {
     if (String(supplier?.supplierCode || "").trim().toUpperCase() === "WONDD") {
         return require("./suppliers/wonddAdapter");
     }
+    if (String(supplier?.supplierCode || "").trim().toUpperCase() === "FAZERCARDS") {
+        return require("./suppliers/fazercardsAdapter");
+    }
 
     return {
         isConfigured() {

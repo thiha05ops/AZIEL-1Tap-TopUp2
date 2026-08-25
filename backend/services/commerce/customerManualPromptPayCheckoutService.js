@@ -10,6 +10,7 @@ const {
     createAndPersistPricingQuote,
     getOwnedPricingQuote
 } = require("./pricingQuoteApplicationService");
+const { resolveCheckoutRouteSnapshot } = require("../supplierProductionSelectionService");
 const { checkoutFromQuote } = require("./checkoutApplicationService");
 const orderRepository = require("./orderRepository");
 const { createManualPaymentApplicationService } = require("./manualPaymentApplicationService");
@@ -551,9 +552,10 @@ async function startCustomerManualPromptPayCheckout(
                 }
             },
             {
-                validateOperationalPackageState: async () => ({
-                    allowed: true
-                }),
+                validateOperationalPackageState: async ({ quote }) => {
+                    const route = await resolveCheckoutRouteSnapshot({ productCode: quote.packageSnapshot?.gameCode, packageCode: quote.packageSnapshot?.packageCode, region: quote.commercialSnapshot?.region });
+                    return route.ready ? { allowed: true, supplierRouteSnapshot: route.routeSnapshot } : { allowed: false, reasonCode: route.blockers[0] || "PRIMARY_SUPPLIER_NOT_READY" };
+                },
 
                 validateFulfilmentInput: async ({
                     customerInput

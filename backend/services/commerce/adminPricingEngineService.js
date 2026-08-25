@@ -7,6 +7,7 @@ const { CANONICAL_OPERATIONAL_PRODUCTS } = require("../../catalog/canonicalOpera
 const PricingPolicy = require("../../models/PricingPolicy");
 const PriceVersion = require("../../models/PriceVersion");
 const { resolveSupplierCostSnapshot } = require("./supplierCostService");
+const { STOREFRONT_CURRENCY, SUPPLIER_CURRENCY } = require("../../constants/commerce");
 const {
     draftRowMap,
     listSupplierCostDraftRows,
@@ -80,6 +81,9 @@ function roundingRule(input = {}, fallback = {}) {
 function neutralPolicyConfig() {
     return {
         exchangeRate: 1,
+        exchangeRateSource: "manual_admin",
+        exchangeRateCapturedAt: "",
+        exchangeRateMaxAgeSeconds: 86400,
         supplierCurrency: "THB",
         minimumProfitAmount: 0,
         supplierFee: { enabled: false, type: "PERCENT", value: 0 },
@@ -96,6 +100,9 @@ function configFromPolicy(policy = null) {
     const metadata = policy?.metadata || {};
     return {
         exchangeRate: number(metadata.exchangeRate, 1),
+        exchangeRateSource: text(metadata.exchangeRateSource || "manual_admin"),
+        exchangeRateCapturedAt: text(metadata.exchangeRateCapturedAt || ""),
+        exchangeRateMaxAgeSeconds: number(metadata.exchangeRateMaxAgeSeconds, 86400),
         supplierCurrency: upper(metadata.supplierCurrency || "THB"),
         minimumProfitAmount: number(policy?.minimumProfitAmount, 0),
         supplierFee: moneyRule(policy?.defaultSupplierFee),
@@ -111,7 +118,10 @@ function configFromPolicy(policy = null) {
 function policyFieldsFromConfig(config = {}, fallback = neutralPolicyConfig()) {
     const normalized = {
         exchangeRate: number(config.exchangeRate, number(fallback.exchangeRate, 1)),
-        supplierCurrency: ["MMK", "THB"].includes(upper(config.supplierCurrency))
+        exchangeRateSource: text(config.exchangeRateSource || fallback.exchangeRateSource || "manual_admin"),
+        exchangeRateCapturedAt: text(config.exchangeRateCapturedAt || fallback.exchangeRateCapturedAt || ""),
+        exchangeRateMaxAgeSeconds: number(config.exchangeRateMaxAgeSeconds, number(fallback.exchangeRateMaxAgeSeconds, 86400)),
+        supplierCurrency: SUPPLIER_CURRENCY.includes(upper(config.supplierCurrency))
             ? upper(config.supplierCurrency)
             : upper(fallback.supplierCurrency || "THB"),
         minimumProfitAmount: number(config.minimumProfitAmount, number(fallback.minimumProfitAmount, 0)),
@@ -123,6 +133,18 @@ function policyFieldsFromConfig(config = {}, fallback = neutralPolicyConfig()) {
         profitRule: profitRule(config.profitRule, fallback.profitRule),
         roundingRule: roundingRule(config.roundingRule, fallback.roundingRule)
     };
+
+    if (!STOREFRONT_CURRENCY.includes(normalized.supplierCurrency)) {
+        const capturedAt = new Date(normalized.exchangeRateCapturedAt || "");
+        if (!normalized.exchangeRateSource || !Number.isFinite(capturedAt.getTime()) || normalized.exchangeRateMaxAgeSeconds < 60 || normalized.exchangeRate <= 0) {
+            throw new AdminPricingEngineError(
+                "PRICING_FX_AUTHORITY_REQUIRED",
+                "External supplier currency requires a positive rate, authority source, captured-at timestamp, and maximum age of at least 60 seconds.",
+                409
+            );
+        }
+        normalized.exchangeRateCapturedAt = capturedAt.toISOString();
+    }
 
     return {
         config: normalized,
@@ -138,7 +160,10 @@ function policyFieldsFromConfig(config = {}, fallback = neutralPolicyConfig()) {
             metadata: {
                 pricingConsole: true,
                 exchangeRate: normalized.exchangeRate,
-                supplierCurrency: normalized.supplierCurrency
+                supplierCurrency: normalized.supplierCurrency,
+                exchangeRateSource: normalized.exchangeRateSource,
+                exchangeRateCapturedAt: normalized.exchangeRateCapturedAt,
+                exchangeRateMaxAgeSeconds: normalized.exchangeRateMaxAgeSeconds
             }
         }
     };
@@ -301,7 +326,7 @@ function productsFromPackages(packages = [], productMap = new Map(), supplierCos
             });
             const supplierCostConfigured = supplierCost.configured === true;
             const canonicalSupplierCost = pkg.canonicalSupplierCost || {};
-            const canonicalSupplierCostConfigured = canonicalSupplierCost.amount != null && ["MMK", "THB"].includes(upper(canonicalSupplierCost.currency));
+            const canonicalSupplierCostConfigured = canonicalSupplierCost.amount != null && SUPPLIER_CURRENCY.includes(upper(canonicalSupplierCost.currency));
             const savedDraft = savedDraftMap.get(`${productId}:${upper(pkg.packageCode)}`) || null;
             const savedDraftConfigured = savedDraft?.stagedSupplierCost != null;
             const effectiveSupplierCostConfigured = savedDraftConfigured || canonicalSupplierCostConfigured || supplierCostConfigured;

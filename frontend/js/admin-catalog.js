@@ -1235,6 +1235,18 @@ function renderMobilePackagePreviewControl(product) {
     `;
 }
 
+function packageFamilyOptions(productCode) {
+    const common = [{ code: "OTHER_SPECIAL", name: "Other / Special", sortOrder: 90 }];
+    const options = {
+        mlbb: [{ code: "DIAMONDS", name: "Diamonds", sortOrder: 10 }, { code: "FIRST_TOP_UP", name: "First Top-Up", sortOrder: 20 }, { code: "WEEKLY_PASS", name: "Weekly Pass", sortOrder: 30 }, { code: "TWILIGHT_PASS", name: "Twilight Pass", sortOrder: 40 }],
+        "mlbb-twilight-weekly-pass": [{ code: "WEEKLY_PASS", name: "Weekly Pass", sortOrder: 10 }, { code: "TWILIGHT_PASS", name: "Twilight Pass", sortOrder: 20 }],
+        pubg: [{ code: "UC", name: "UC", sortOrder: 10 }, { code: "ROYALE_PASS", name: "Royale Pass", sortOrder: 20 }], pubgrp: [{ code: "ROYALE_PASS", name: "Royale Pass", sortOrder: 10 }],
+        freefire: [{ code: "DIAMONDS", name: "Diamonds", sortOrder: 10 }, { code: "LEVEL_UP_PASS", name: "Level Up Pass", sortOrder: 20 }, { code: "BP_CARD", name: "BP Card", sortOrder: 30 }, { code: "MEMBERSHIP_WEEKLY_LITE", name: "Membership · Weekly Lite", sortOrder: 40 }, { code: "MEMBERSHIP_WEEKLY", name: "Membership · Weekly", sortOrder: 41 }, { code: "MEMBERSHIP_MONTHLY", name: "Membership · Monthly", sortOrder: 42 }],
+        hok: [{ code: "TOKENS", name: "Tokens", sortOrder: 10 }, { code: "CARDS_PASSES", name: "Cards / Passes", sortOrder: 20 }], telegram: [{ code: "STARS_TOP_UP", name: "Top Up · Stars", sortOrder: 10 }, { code: "PREMIUM", name: "Premium", sortOrder: 20 }], valorant: [{ code: "VALORANT_POINTS", name: "Valorant Points", sortOrder: 10 }]
+    };
+    return [...(options[String(productCode || "").toLowerCase()] || []), ...common];
+}
+
 function renderPackageTable(packages) {
     if (!packages.length) {
         const isUnfilteredEmpty = !catalogPackageSearch.trim() && catalogPackageStatusFilter === "all";
@@ -1254,6 +1266,7 @@ function renderPackageTable(packages) {
                 <span>Order</span>
                 <span data-admin-i18n="package_code">${adminT("package_code", "Package Code")}</span>
                 <span data-admin-i18n="package_name">${adminT("package_name", "Package Name")}</span>
+                <span>Family / Group</span>
                 <span data-admin-i18n="package_icon">${adminT("package_icon", "Package Icon")}</span>
                 <span data-admin-i18n="mmk_price">${adminT("mmk_price", "MMK Price")}</span>
                 <span data-admin-i18n="thb_price">${adminT("thb_price", "THB Price")}</span>
@@ -1271,6 +1284,7 @@ function renderPackageTable(packages) {
                     </span>
                     <span><b>${escapeHtml(item.packageCode)}</b></span>
                     <span>${escapeHtml(item.name)}${item.supplierSupport?.TH ? `<small><b class="admin-status-pill ${item.supplierSupport.TH.status === "SUPPORTED_READY" ? "is-ok" : item.supplierSupport.TH.status === "SUPPORTED_NOT_READY" ? "is-warning" : "is-muted"}">${escapeHtml(item.supplierSupport.TH.status === "SUPPORTED_READY" ? "SUPPORTED / READY" : item.supplierSupport.TH.status === "SUPPORTED_NOT_READY" ? "SUPPORTED / NOT READY" : "UNSUPPORTED BY WONDD")}</b></small>` : ""}</span>
+                    <span><b>${escapeHtml(item.packageFamily?.name || "Other / Special")}</b><small>${escapeHtml(item.packageFamily?.code || "OTHER_SPECIAL")}</small></span>
                     <span class="catalog-icon-cell">${renderPackageIconControl(item)}</span>
                     <span>${renderPackageBusinessPrice(item.prices?.MM, "MM")}</span>
                     <span>${renderPackageBusinessPrice(item.prices?.TH, "TH")}</span>
@@ -2337,6 +2351,9 @@ function openPackageEditPanel(product, pkg) {
     modal.querySelector("#catalogEditTitle").textContent = adminT("edit_package", "Edit Package");
     modal.querySelector("#catalogEditPackageCode").value = pkg.packageCode;
     modal.querySelector("#catalogEditPackageName").value = draft?.name ?? pkg.name;
+    const familySelect = modal.querySelector("#catalogEditPackageFamily");
+    familySelect.innerHTML = packageFamilyOptions(product.productCode).map(item => `<option value="${escapeHtml(item.code)}">${escapeHtml(item.name)}</option>`).join("");
+    familySelect.value = draft?.packageFamily?.code || pkg.packageFamily?.code || "OTHER_SPECIAL";
     modal.querySelector("#catalogEditCustomerNote").value = draft?.customerNoteLocales?.en ?? draft?.customerNote ?? pkg.customerNoteLocales?.en ?? pkg.customerNote ?? "";
     modal.querySelector("#catalogEditCustomerNoteMy").value = draft?.customerNoteLocales?.my ?? pkg.customerNoteLocales?.my ?? "";
     modal.querySelector("#catalogEditCustomerNoteTh").value = draft?.customerNoteLocales?.th ?? pkg.customerNoteLocales?.th ?? "";
@@ -2421,6 +2438,7 @@ async function handlePackageEditSave(product, pkg) {
     try {
         const result = await mutateCatalog(`/api/admin/catalog/products/${encodeURIComponent(product.productCode)}/packages/${encodeURIComponent(pkg.packageCode)}`, {
             name: changeSet.name,
+            packageFamily: changeSet.packageFamily,
             customerNote: changeSet.customerNote,
             customerNoteLocales: changeSet.customerNoteLocales,
             enabled: changeSet.enabled,
@@ -2522,6 +2540,7 @@ function readPackageEditDraft(product, pkg) {
         productCode: product.productCode,
         packageCode: pkg.packageCode,
         name: String(modal?.querySelector("#catalogEditPackageName")?.value || "").trim(),
+        packageFamily: packageFamilyOptions(product.productCode).find(item => item.code === modal?.querySelector("#catalogEditPackageFamily")?.value) || { code: "OTHER_SPECIAL", name: "Other / Special", sortOrder: 90 },
         customerNote: String(modal?.querySelector("#catalogEditCustomerNote")?.value || "").trim(),
         customerNoteLocales: {
             en: String(modal?.querySelector("#catalogEditCustomerNote")?.value || "").trim(),
@@ -2559,6 +2578,7 @@ function buildPackageEditChanges(pkg, draft) {
     if (nextName && nextName !== pkg.name) {
         changes.push(`${adminT("package_name", "Package Name")}: ${pkg.name} → ${nextName}`);
     }
+    if (draft.packageFamily?.code !== pkg.packageFamily?.code) changes.push(`Family: ${pkg.packageFamily?.name || "Other / Special"} → ${draft.packageFamily?.name}`);
 
     if (draft.enabled !== (pkg.enabled !== false)) {
         enabled = draft.enabled;
@@ -2606,7 +2626,7 @@ function buildPackageEditChanges(pkg, draft) {
     });
 
     if (JSON.stringify(draft.customerNoteLocales) !== JSON.stringify(pkg.customerNoteLocales || { en: pkg.customerNote || "", my: "", th: "" })) changes.push("Customer-facing note locales");
-    return { name: nextName, customerNote: draft.customerNote, customerNoteLocales: draft.customerNoteLocales, enabled, iconAssetId, prices, changes };
+    return { name: nextName, packageFamily: draft.packageFamily, customerNote: draft.customerNote, customerNoteLocales: draft.customerNoteLocales, enabled, iconAssetId, prices, changes };
 }
 
 function reopenPackageEditPanel(product, pkg, draft) {
@@ -2745,7 +2765,7 @@ function ensureBulkSupplierCostModal() {
             <h3>${adminT("bulk_supplier_cost", "Bulk Supplier Cost")}</h3>
             <div class="catalog-bulk-cost-controls">
                 <label>${adminT("supplier_name", "Supplier Name")}<input id="catalogBulkSupplierName" type="text" maxlength="120"></label>
-                <label>${adminT("supplier_currency", "Supplier Currency")}<select id="catalogBulkSupplierCurrency"><option value="THB">THB</option><option value="MMK">MMK</option></select></label>
+                <label>${adminT("supplier_currency", "Supplier Currency")}<select id="catalogBulkSupplierCurrency"><option value="THB">THB</option><option value="MMK">MMK</option><option value="USD">USD</option></select></label>
                 <label>${adminT("supplier_version", "Supplier Version")}<input id="catalogBulkSupplierVersion" type="text" maxlength="80"></label>
                 <label>${adminT("supplier_cost_timestamp", "Cost Timestamp")}<input id="catalogBulkSupplierTimestamp" type="date"></label>
                 <label class="catalog-regional-note">${adminT("pricing_note", "Pricing Note")}<textarea id="catalogBulkPricingNote" rows="2" maxlength="240"></textarea></label>
@@ -2828,6 +2848,11 @@ function ensurePackageEditModal() {
                                 type="text"
                                 maxlength="120"
                             >
+                        </label>
+                        <label>
+                            Family / Group
+                            <select id="catalogEditPackageFamily"></select>
+                            <small>Presentation taxonomy only; supplier and fulfillment authority are separate.</small>
                         </label>
                         <label>
                             Customer-facing note

@@ -201,6 +201,7 @@
             productName: product.name,
             packageCode: normalizePackageCode(item.packageCode),
             name: item.name,
+            packageFamily: item.packageFamily || null,
 
             amount,
             price: amount,
@@ -345,6 +346,7 @@
                         ...fallback,
                         productCode: product.productCode,
                         name: item.name,
+                        packageFamily: item.packageFamily || null,
                         code: packageCode,
                         packageCode,
                         mmk: Number(item.prices?.MM?.amount || 0),

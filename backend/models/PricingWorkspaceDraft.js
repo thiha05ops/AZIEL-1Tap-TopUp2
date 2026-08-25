@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const { CURRENCY, REGION } = require("../constants/commerce");
+const { SUPPLIER_CURRENCY, REGION } = require("../constants/commerce");
 
 const packageRowSchema = new mongoose.Schema(
     {
@@ -19,6 +19,13 @@ const packageRowSchema = new mongoose.Schema(
             min: 0,
             required: true
         },
+        rawSupplierCost: { type: Number, min: 0, default: null },
+        supplierCostCapturedAt: { type: Date, default: null },
+        supplierCostSource: { type: String, trim: true, default: "" },
+        providerProductCode: { type: String, trim: true, default: "" },
+        providerOfferCode: { type: String, trim: true, default: "" },
+        fundingCost: { type: Number, min: 0, default: 0 },
+        otherAcquisitionCost: { type: Number, min: 0, default: 0 },
         expectedUpdatedAt: {
             type: Date,
             default: null
@@ -66,7 +73,7 @@ const pricingWorkspaceDraftSchema = new mongoose.Schema(
         },
         supplierCurrency: {
             type: String,
-            enum: CURRENCY,
+            enum: SUPPLIER_CURRENCY,
             required: true
         },
         supplierId: {

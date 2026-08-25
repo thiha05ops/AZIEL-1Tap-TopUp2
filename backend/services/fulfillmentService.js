@@ -13,6 +13,7 @@ const { ACTIVE_FULFILLMENT_STATUSES, FULFILLMENT_STATUSES, FULFILLMENT_ROUTE_TYP
 const { ADMIN_AUDIT_ACTIONS, writeAdminAudit } = require("./adminAuditService");
 const { ORDER_STATES, getAllowedNextStatuses, transitionOrder } = require("./orderStateService");
 const { getSupplierAdapter, normalizeSupplierResult } = require("./supplierAdapterRegistry");
+const { setProductionRole } = require("./supplierProductionSelectionService");
 const commerceOrderRepository = require("./commerce/orderRepository");
 const {
     FINANCIAL_OUTCOMES,
@@ -89,7 +90,7 @@ function normalizeBalanceAmount(value = 0) {
 
 function normalizeBalanceCurrency(value = "") {
     const currency = cleanText(value, 3).toUpperCase();
-    if (!["", "MMK", "THB"].includes(currency)) {
+    if (!["", "MMK", "THB", "USD"].includes(currency)) {
         throw new FulfillmentError("INVALID_BALANCE_CURRENCY", "Invalid supplier balance currency.");
     }
     return currency;
@@ -138,7 +139,7 @@ function safeSupplierProjection(supplier = {}) {
     };
 }
 
-function projectMapping(mapping = {}, supplier = null) {
+function projectMapping(mapping = {}, supplier = null, extras = {}) {
     return {
         id: String(mapping._id || mapping.id || ""),
         supplierId: String(mapping.supplierId || ""),
@@ -151,12 +152,14 @@ function projectMapping(mapping = {}, supplier = null) {
         supplierDisplayName: mapping.supplierDisplayName || "",
         region: mapping.region,
         enabled: Boolean(mapping.enabled),
+        productionRole: mapping.productionRole || "DISABLED",
         executionMode: mapping.executionMode,
         readiness: mapping.mappingMetadata?.readiness || {},
-        supplierCost: mapping.mappingMetadata?.supplierCost || null,
+        supplierCost: mapping.supplierCostAuthority || mapping.mappingMetadata?.supplierCost || null,
         serviceId: mapping.mappingMetadata?.serviceId || "",
         createdAt: mapping.createdAt,
         updatedAt: mapping.updatedAt
+        , ...extras
     };
 }
 
@@ -223,6 +226,9 @@ async function createSupplier(payload = {}, context = {}) {
     try {
         await supplier.save();
     } catch (error) {
+        if (error?.code === "MAPPING_NOT_PRODUCTION_READY" || error?.code === "INVALID_PRODUCTION_ROLE") {
+            throw new FulfillmentError(error.code, error.message, 409);
+        }
         if (error?.code === 11000) {
             throw new FulfillmentError("SUPPLIER_ALREADY_EXISTS", "Supplier code already exists.", 409);
         }
@@ -403,6 +409,7 @@ async function updateMapping(supplierId, mappingId, payload = {}, context = {}) 
 
     try {
         await mapping.save();
+        if (payload.productionRole !== undefined) await setProductionRole(mapping._id, payload.productionRole);
     } catch (error) {
         if (error?.code === 11000) {
             throw new FulfillmentError("SUPPLIER_MAPPING_ALREADY_EXISTS", "Supplier mapping already exists.", 409);
@@ -425,7 +432,7 @@ async function updateMapping(supplierId, mappingId, payload = {}, context = {}) 
         }
     }).catch(() => null);
 
-    return projectMapping(mapping, supplier);
+    return projectMapping(await SupplierProductMapping.findById(mapping._id).lean(), supplier);
 }
 
 async function listMappings(query = {}) {
@@ -441,7 +448,18 @@ async function listMappings(query = {}) {
         Supplier.find().lean()
     ]);
     const supplierById = new Map(suppliers.map(supplier => [String(supplier._id), supplier]));
-    return mappings.map(mapping => projectMapping(mapping, supplierById.get(String(mapping.supplierId))));
+    const { assessProductionMapping } = require("./supplierProductionSelectionService");
+    return Promise.all(mappings.map(async mapping => {
+        const assessment = await assessProductionMapping(mapping);
+        const price = assessment.package?.prices?.[mapping.region] || {};
+        return projectMapping(mapping, supplierById.get(String(mapping.supplierId)), {
+            productionReady: assessment.ready,
+            productionBlockers: assessment.blockers,
+            productionSellingPrice: Number.isFinite(Number(price.amount)) ? Number(price.amount) : null,
+            productionCurrency: price.currency || "",
+            landedCost: Number.isFinite(Number(price.landedCost)) ? Number(price.landedCost) : null
+        });
+    }));
 }
 
 async function listEligibleMappingsForOrder(orderId) {
@@ -455,7 +473,7 @@ async function listEligibleMappingsForOrder(orderId) {
     const mappings = await listMappings({ productCode, packageCode, region, enabledOnly: true });
     const suppliers = await Supplier.find({ _id: { $in: mappings.map(item => item.supplierId) }, enabled: true }).lean();
     const enabledSupplierIds = new Set(suppliers.map(supplier => String(supplier._id)));
-    return mappings.filter(mapping => enabledSupplierIds.has(String(mapping.supplierId)));
+    return mappings.filter(mapping => enabledSupplierIds.has(String(mapping.supplierId)) && mapping.productionRole === "PRIMARY");
 }
 
 async function loadOrderForFulfillment(orderId, { lean = false } = {}) {
@@ -648,7 +666,8 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
         const financialAttempts = await listFinancialFulfillmentAttempts(order._id);
         assertFulfillmentStartAllowed(order, financialAttempts);
     }
-    if (!mapping || !mapping.enabled) throw new FulfillmentError("SUPPLIER_MAPPING_NOT_FOUND", "Supplier mapping not found.", 404);
+    if (!mapping || mapping.archivedAt || !mapping.enabled) throw new FulfillmentError("SUPPLIER_MAPPING_NOT_FOUND", "Supplier mapping not found.", 404);
+    if (mapping.productionRole !== "PRIMARY") throw new FulfillmentError("SUPPLIER_MAPPING_NOT_PRIMARY", "The mapping is not the explicitly selected PRIMARY production route.", 409);
 
     const supplier = await Supplier.findById(mapping.supplierId);
     if (!supplier) throw new FulfillmentError("SUPPLIER_NOT_FOUND", "Supplier not found.", 404);
@@ -660,6 +679,10 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
         mapping.region !== normalizeRegion(order.commercial?.region || order.product?.region || order.region || "MM")
     ) {
         throw new FulfillmentError("SUPPLIER_MAPPING_MISMATCH", "Supplier mapping does not match this order.");
+    }
+    const routeSnapshot = order.fulfilment?.routeSnapshot || order.quoteSnapshot?.supplierRouteSnapshot || null;
+    if (isCommerceOrder && (!routeSnapshot || String(routeSnapshot.supplierMappingId || "") !== String(mapping._id))) {
+        throw new FulfillmentError("ORDER_SUPPLIER_ROUTE_MISMATCH", "This order is bound to a different supplier route snapshot.", 409);
     }
 
     const adapter = getSupplierAdapter(supplier);
@@ -701,6 +724,11 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
         if (!adapter.isAutoFulfillmentEnabled(mapping.productCode)) {
             throw new FulfillmentError("WONDD_AUTO_FULFILLMENT_DISABLED", "Live WonDD fulfillment is disabled for this product.", 409);
         }
+    }
+    if (supplier.supplierCode === "FAZERCARDS") {
+        const { validateFazerCardsMapping } = require("./suppliers/fazercardsFulfillmentProcessor");
+        try { validateFazerCardsMapping(mapping); } catch (error) { throw new FulfillmentError(error.code || "FAZERCARDS_PACKAGE_NOT_PRODUCTION_READY", error.message, 409); }
+        if (!adapter.isAutoFulfillmentEnabled(mapping.productCode)) throw new FulfillmentError("FAZERCARDS_AUTO_FULFILLMENT_DISABLED", "Live FazerCards PUBG fulfillment is disabled.", 409);
     }
 
     const existingActive = await FulfillmentAttempt.findOne({ orderId: order._id, status: { $in: ACTIVE_FULFILLMENT_STATUSES } }).lean();
@@ -786,10 +814,7 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
         }
     }).catch(() => null);
 
-    if (supplier.supplierCode === "WONDD" && supplier.mode === SUPPLIER_MODES.API) {
-        const attemptId = attempt._id;
-        setImmediate(() => require("./suppliers/wonddFulfillmentProcessor").processor.submit(attemptId).catch(() => null));
-    }
+    if (supplier.mode === SUPPLIER_MODES.API) require("./suppliers/supplierFulfillmentDispatcher").dispatchSubmission(supplier.supplierCode, attempt._id);
 
     return projectAttempt(attempt);
 }

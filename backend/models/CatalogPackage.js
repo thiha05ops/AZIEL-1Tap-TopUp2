@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { SUPPLIER_CURRENCY, STOREFRONT_CURRENCY } = require("../constants/commerce");
 
 const regionalPriceSchema = new mongoose.Schema(
     {
@@ -8,7 +9,7 @@ const regionalPriceSchema = new mongoose.Schema(
         },
         currency: {
             type: String,
-            enum: ["MMK", "THB"],
+            enum: STOREFRONT_CURRENCY,
             required: true
         },
         referencePrice: {
@@ -55,9 +56,25 @@ const regionalPriceSchema = new mongoose.Schema(
         },
         supplierCurrency: {
             type: String,
-            enum: ["MMK", "THB"],
+            enum: SUPPLIER_CURRENCY,
             default: null
         },
+        rawSupplierCost: { type: Number, min: 0, default: null },
+        rawSupplierCurrency: { type: String, enum: SUPPLIER_CURRENCY, default: null },
+        supplierCostSource: { type: String, trim: true, default: "" },
+        providerProductCode: { type: String, trim: true, default: "" },
+        providerOfferCode: { type: String, trim: true, default: "" },
+        fxRate: { type: Number, min: 0, default: null },
+        fxRateSource: { type: String, trim: true, default: "" },
+        fxRateCapturedAt: { type: Date, default: null },
+        fxRateEffectiveAt: { type: Date, default: null },
+        fxRateExpiresAt: { type: Date, default: null },
+        fxRateMaxAgeSeconds: { type: Number, min: 0, default: null },
+        fxConvertedCost: { type: Number, min: 0, default: null },
+        fundingCost: { type: Number, min: 0, default: 0 },
+        otherAcquisitionCost: { type: Number, min: 0, default: 0 },
+        landedCost: { type: Number, min: 0, default: null },
+        landedCurrency: { type: String, enum: STOREFRONT_CURRENCY, default: null },
         supplierName: {
             type: String,
             trim: true,
@@ -111,12 +128,12 @@ const supplierCostHistorySchema = new mongoose.Schema(
         },
         previousSupplierCurrency: {
             type: String,
-            enum: ["MMK", "THB", ""],
+            enum: [...SUPPLIER_CURRENCY, ""],
             default: ""
         },
         newSupplierCurrency: {
             type: String,
-            enum: ["MMK", "THB", ""],
+            enum: [...SUPPLIER_CURRENCY, ""],
             default: ""
         },
         supplierName: {
@@ -174,6 +191,13 @@ const catalogPackageSchema = new mongoose.Schema(
             required: true,
             trim: true
         },
+        packageFamily: {
+            code: { type: String, trim: true, uppercase: true, maxlength: 80, default: "" },
+            name: { type: String, trim: true, maxlength: 120, default: "" },
+            sortOrder: { type: Number, min: 0, default: 90 },
+            parentCode: { type: String, trim: true, uppercase: true, maxlength: 80, default: "" },
+            authority: { type: String, trim: true, maxlength: 120, default: "CANONICAL_PACKAGE_FAMILY" }
+        },
         customerNote: {
             type: String,
             trim: true,
@@ -223,9 +247,25 @@ const catalogPackageSchema = new mongoose.Schema(
             },
             currency: {
                 type: String,
-                enum: ["MMK", "THB"],
+                enum: SUPPLIER_CURRENCY,
                 default: null
             },
+            rawSupplierCost: { type: Number, min: 0, default: null },
+            rawSupplierCurrency: { type: String, enum: SUPPLIER_CURRENCY, default: null },
+            supplierCostSource: { type: String, trim: true, default: "" },
+            providerProductCode: { type: String, trim: true, default: "" },
+            providerOfferCode: { type: String, trim: true, default: "" },
+            fxRate: { type: Number, min: 0, default: null },
+            fxRateSource: { type: String, trim: true, default: "" },
+            fxRateCapturedAt: { type: Date, default: null },
+            fxRateEffectiveAt: { type: Date, default: null },
+            fxRateExpiresAt: { type: Date, default: null },
+            fxRateMaxAgeSeconds: { type: Number, min: 0, default: null },
+            fxConvertedCost: { type: Number, min: 0, default: null },
+            fundingCost: { type: Number, min: 0, default: 0 },
+            otherAcquisitionCost: { type: Number, min: 0, default: 0 },
+            landedCost: { type: Number, min: 0, default: null },
+            landedCurrency: { type: String, enum: STOREFRONT_CURRENCY, default: null },
             capturedAt: {
                 type: Date,
                 default: null

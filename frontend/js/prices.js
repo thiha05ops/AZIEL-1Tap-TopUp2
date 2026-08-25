@@ -306,7 +306,15 @@ async function renderGamePrices(options = {}) {
     return { ready: false, error: true, selectedPackage: null };
   }
 
-  packageContainer.innerHTML = packages.map(item => {
+  const familyGroups = [];
+  packages.forEach(item => {
+    const family = item.packageFamily?.code ? item.packageFamily : { code: "OTHER_SPECIAL", name: t("product.otherSpecial", "Other / Special"), sortOrder: 90 };
+    let group = familyGroups.find(entry => entry.code === family.code);
+    if (!group) { group = { ...family, packages: [] }; familyGroups.push(group); }
+    group.packages.push(item);
+  });
+  familyGroups.sort((a, b) => Number(a.sortOrder || 90) - Number(b.sortOrder || 90));
+  const renderPackage = item => {
     const artwork = String(item.artwork || "").trim();
     return `
     <div class="pack"
@@ -359,7 +367,13 @@ async function renderGamePrices(options = {}) {
       </div>
     </div>
   `;
-  }).join("");
+  };
+  packageContainer.innerHTML = familyGroups.map(group => `
+    <section class="package-family-section" data-package-family="${escapeAttr(group.code)}">
+      <h3 class="package-family-title">${escapeHtml(group.name)}</h3>
+      <div class="package-family-grid">${group.packages.map(renderPackage).join("")}</div>
+    </section>
+  `).join("");
   finishPackageLoading(packageContainer);
 
   bindPackageIconFallbacks(packageContainer);

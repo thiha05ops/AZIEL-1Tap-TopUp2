@@ -6,6 +6,7 @@ const CatalogPackage = require("../../models/CatalogPackage");
 const PaymentMethod = require("../../models/PaymentMethod");
 const { loadFulfillmentCapability } = require("../fulfillmentCapabilityService");
 const { createAndPersistPricingQuote } = require("./pricingQuoteApplicationService");
+const { resolveCheckoutRouteSnapshot } = require("../supplierProductionSelectionService");
 const { checkoutFromQuote } = require("./checkoutApplicationService");
 const orderRepository = require("./orderRepository");
 const { buildProductionPricingContext } = require("./productionPricingContextService");
@@ -270,7 +271,10 @@ async function startCustomerWalletCheckout(input = {}, context = {}, dependencie
                 source: "customer-wallet"
             }
         }, {
-            validateOperationalPackageState: async () => ({ allowed: true }),
+            validateOperationalPackageState: async ({ quote }) => {
+                const route = await resolveCheckoutRouteSnapshot({ productCode: quote.packageSnapshot?.gameCode, packageCode: quote.packageSnapshot?.packageCode, region: quote.commercialSnapshot?.region });
+                return route.ready ? { allowed: true, supplierRouteSnapshot: route.routeSnapshot } : { allowed: false, reasonCode: route.blockers[0] || "PRIMARY_SUPPLIER_NOT_READY" };
+            },
             validateFulfilmentInput: async ({ customerInput }) => ({ allowed: true, normalisedFulfilmentInput: customerInput }),
             validatePaymentMethod: async () => ({
                 allowed: true,

@@ -22,11 +22,11 @@ const { buildWonddGameId } = require("../services/suppliers/wonddGameIdFormatter
     assert.strictEqual(new Set(mappings.map(item => item.supplierPackageCode)).size, mappings.length);
     assert.strictEqual(new Set(mappings.map(item => `${item.productCode}:${item.packageCode}`)).size, mappings.length);
     const enabled = mappings.filter(item => item.enabled);
-    assert.strictEqual(enabled.length, 20);
-    assert(enabled.every(item => item.productCode === "mlbb"));
-    assert.strictEqual(mappings.filter(item => item.mappingMetadata?.readiness?.inputReady).length, 20);
-    assert.strictEqual(mappings.filter(item => item.mappingMetadata?.readiness?.pricingReady).length, 21);
-    assert.strictEqual(mappings.filter(item => item.mappingMetadata?.readiness?.fulfillmentReady && item.enabled).length, 20);
+    assert.strictEqual(enabled.length, 39);
+    assert.deepStrictEqual([...new Set(enabled.map(item => item.productCode))].sort(), ["freefire", "mlbb"]);
+    assert.strictEqual(mappings.filter(item => item.mappingMetadata?.readiness?.inputReady).length, 39);
+    assert.strictEqual(mappings.filter(item => item.mappingMetadata?.readiness?.pricingReady).length, 39);
+    assert.strictEqual(mappings.filter(item => item.mappingMetadata?.readiness?.fulfillmentReady && item.enabled).length, 39);
     const supportedProducts = Object.values(WONDD_FAMILIES).filter(item => item.productCode).map(item => item.productCode);
     assert.strictEqual(await Product.countDocuments({ productCode: { $in: supportedProducts } }), 10);
     assert.strictEqual(await Package.countDocuments({ "metadata.wondd.packcode": { $exists: true } }), 131);

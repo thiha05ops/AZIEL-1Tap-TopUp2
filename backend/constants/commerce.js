@@ -59,7 +59,12 @@ const PRICE_VERSION_STATUS = Object.freeze([
 
 const ROUNDING_MODE = Object.freeze(["NONE", "NEAREST", "UP", "DOWN", "PSYCHOLOGICAL"]);
 
-const CURRENCY = Object.freeze(["MMK", "THB"]);
+// Customer settlement remains deliberately narrower than supplier cost.
+// Keep CURRENCY as the backwards-compatible storefront/settlement alias.
+const STOREFRONT_CURRENCY = Object.freeze(["MMK", "THB"]);
+const SUPPLIER_CURRENCY = Object.freeze(["MMK", "THB", "USD"]);
+const PRICING_CALCULATION_CURRENCY = Object.freeze([...new Set([...STOREFRONT_CURRENCY, ...SUPPLIER_CURRENCY])]);
+const CURRENCY = STOREFRONT_CURRENCY;
 
 const REGION = Object.freeze(["MM", "TH"]);
 
@@ -93,6 +98,9 @@ module.exports = Object.freeze({
     PRICE_VERSION_STATUS,
     ROUNDING_MODE,
     CURRENCY,
+    STOREFRONT_CURRENCY,
+    SUPPLIER_CURRENCY,
+    PRICING_CALCULATION_CURRENCY,
     REGION,
     ELIGIBILITY_OPERATOR,
     ELIGIBILITY_COMPARATOR

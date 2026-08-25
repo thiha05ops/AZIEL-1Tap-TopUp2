@@ -478,6 +478,12 @@
     gap: 12px !important;
 }
 
+.packages:has(.package-family-section) { display: block !important; }
+.package-family-section + .package-family-section { margin-top: 22px; }
+.package-family-title { margin: 0 0 10px; font-size: 15px; font-weight: 800; color: var(--text); }
+.package-family-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 767px) { .package-family-grid { grid-template-columns: 1fr; } .package-family-section + .package-family-section { margin-top: 18px; } }
+
 .pack {
     position: relative !important;
 

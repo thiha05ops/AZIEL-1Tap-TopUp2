@@ -1,0 +1,304 @@
+{
+  "apply": true,
+  "created": [
+    "FF_WONDD_F00033",
+    "FF_WONDD_F00068",
+    "FF_WONDD_F00172",
+    "FF_310_DIA",
+    "FF_WONDD_F00517",
+    "FF_WONDD_F00690",
+    "FF_WONDD_F01052",
+    "FF_WONDD_F01801",
+    "FF_WONDD_F03698"
+  ],
+  "reused": [],
+  "verified": [
+    {
+      "packageCode": "FF_WONDD_F00033",
+      "canonicalDisplayName": "33 Diamonds",
+      "offerId": "33_diamonds",
+      "providerDisplayName": "33 Diamonds",
+      "rawUsd": 0.29
+    },
+    {
+      "packageCode": "FF_WONDD_F00068",
+      "canonicalDisplayName": "68 Diamonds",
+      "offerId": "68_diamonds",
+      "providerDisplayName": "68 Diamonds",
+      "rawUsd": 0.58
+    },
+    {
+      "packageCode": "FF_WONDD_F00172",
+      "canonicalDisplayName": "172 Diamonds",
+      "offerId": "172_diamonds",
+      "providerDisplayName": "172 Diamonds",
+      "rawUsd": 1.46
+    },
+    {
+      "packageCode": "FF_310_DIA",
+      "canonicalDisplayName": "310 Diamonds",
+      "offerId": "310_diamonds",
+      "providerDisplayName": "310 Diamonds",
+      "rawUsd": 2.63
+    },
+    {
+      "packageCode": "FF_WONDD_F00517",
+      "canonicalDisplayName": "517 Diamonds",
+      "offerId": "517_diamonds",
+      "providerDisplayName": "517 Diamonds",
+      "rawUsd": 4.38
+    },
+    {
+      "packageCode": "FF_WONDD_F00690",
+      "canonicalDisplayName": "690 Diamonds",
+      "offerId": "690_diamonds",
+      "providerDisplayName": "690 Diamonds",
+      "rawUsd": 5.84
+    },
+    {
+      "packageCode": "FF_WONDD_F01052",
+      "canonicalDisplayName": "1,052 Diamonds",
+      "offerId": "1052_diamonds",
+      "providerDisplayName": "1052 Diamonds",
+      "rawUsd": 8.76
+    },
+    {
+      "packageCode": "FF_WONDD_F01801",
+      "canonicalDisplayName": "1,801 Diamonds",
+      "offerId": "1801_diamonds",
+      "providerDisplayName": "1801 Diamonds",
+      "rawUsd": 14.59
+    },
+    {
+      "packageCode": "FF_WONDD_F03698",
+      "canonicalDisplayName": "3,698 Diamonds",
+      "offerId": "3698_diamonds",
+      "providerDisplayName": "3698 Diamonds",
+      "rawUsd": 29.18
+    }
+  ],
+  "pricingPreview": [
+    {
+      "canonicalPackage": "FF_WONDD_F00033",
+      "offerId": "33_diamonds",
+      "rawUsd": 0.29,
+      "fxRate": 33.52,
+      "convertedThb": 9.7208,
+      "landedThb": 9.7208,
+      "sellingThb": 13.22,
+      "profitThb": 2,
+      "blockingErrors": []
+    },
+    {
+      "canonicalPackage": "FF_WONDD_F00068",
+      "offerId": "68_diamonds",
+      "rawUsd": 0.58,
+      "fxRate": 33.52,
+      "convertedThb": 19.4416,
+      "landedThb": 19.4416,
+      "sellingThb": 22.94,
+      "profitThb": 2,
+      "blockingErrors": []
+    },
+    {
+      "canonicalPackage": "FF_WONDD_F00172",
+      "offerId": "172_diamonds",
+      "rawUsd": 1.46,
+      "fxRate": 33.52,
+      "convertedThb": 48.9392,
+      "landedThb": 48.9392,
+      "sellingThb": 52.44,
+      "profitThb": 2,
+      "blockingErrors": []
+    },
+    {
+      "canonicalPackage": "FF_310_DIA",
+      "offerId": "310_diamonds",
+      "rawUsd": 2.63,
+      "fxRate": 33.52,
+      "convertedThb": 88.1576,
+      "landedThb": 88.1576,
+      "sellingThb": 91.66,
+      "profitThb": 2,
+      "blockingErrors": []
+    },
+    {
+      "canonicalPackage": "FF_WONDD_F00517",
+      "offerId": "517_diamonds",
+      "rawUsd": 4.38,
+      "fxRate": 33.52,
+      "convertedThb": 146.8176,
+      "landedThb": 146.8176,
+      "sellingThb": 150.32,
+      "profitThb": 2,
+      "blockingErrors": []
+    },
+    {
+      "canonicalPackage": "FF_WONDD_F00690",
+      "offerId": "690_diamonds",
+      "rawUsd": 5.84,
+      "fxRate": 33.52,
+      "convertedThb": 195.7568,
+      "landedThb": 195.7568,
+      "sellingThb": 199.26,
+      "profitThb": 2,
+      "blockingErrors": []
+    },
+    {
+      "canonicalPackage": "FF_WONDD_F01052",
+      "offerId": "1052_diamonds",
+      "rawUsd": 8.76,
+      "fxRate": 33.52,
+      "convertedThb": 293.6352,
+      "landedThb": 293.6352,
+      "sellingThb": 297.14,
+      "profitThb": 2,
+      "blockingErrors": []
+    },
+    {
+      "canonicalPackage": "FF_WONDD_F01801",
+      "offerId": "1801_diamonds",
+      "rawUsd": 14.59,
+      "fxRate": 33.52,
+      "convertedThb": 489.0568,
+      "landedThb": 489.0568,
+      "sellingThb": 492.56,
+      "profitThb": 2,
+      "blockingErrors": []
+    },
+    {
+      "canonicalPackage": "FF_WONDD_F03698",
+      "offerId": "3698_diamonds",
+      "rawUsd": 29.18,
+      "fxRate": 33.52,
+      "convertedThb": 978.1136,
+      "landedThb": 978.1136,
+      "sellingThb": 981.61,
+      "profitThb": 2,
+      "blockingErrors": []
+    }
+  ],
+  "supplierComparisons": [
+    {
+      "canonicalPackage": "FF_WONDD_F00033",
+      "wonddPackcode": "F00033",
+      "wonddThb": 10,
+      "fazerLandedThb": 9.7208,
+      "differenceThb": -0.2792,
+      "cheaperSupplier": "FAZERCARDS"
+    },
+    {
+      "canonicalPackage": "FF_WONDD_F00068",
+      "wonddPackcode": "F00068",
+      "wonddThb": 20,
+      "fazerLandedThb": 19.4416,
+      "differenceThb": -0.5584,
+      "cheaperSupplier": "FAZERCARDS"
+    },
+    {
+      "canonicalPackage": "FF_WONDD_F00172",
+      "wonddPackcode": "F00172",
+      "wonddThb": 50,
+      "fazerLandedThb": 48.9392,
+      "differenceThb": -1.0608,
+      "cheaperSupplier": "FAZERCARDS"
+    },
+    {
+      "canonicalPackage": "FF_310_DIA",
+      "wonddPackcode": "F00310",
+      "wonddThb": 90,
+      "fazerLandedThb": 88.1576,
+      "differenceThb": -1.8424,
+      "cheaperSupplier": "FAZERCARDS"
+    },
+    {
+      "canonicalPackage": "FF_WONDD_F00517",
+      "wonddPackcode": "F00517",
+      "wonddThb": 150,
+      "fazerLandedThb": 146.8176,
+      "differenceThb": -3.1824,
+      "cheaperSupplier": "FAZERCARDS"
+    },
+    {
+      "canonicalPackage": "FF_WONDD_F00690",
+      "wonddPackcode": "F00690",
+      "wonddThb": 200,
+      "fazerLandedThb": 195.7568,
+      "differenceThb": -4.2432,
+      "cheaperSupplier": "FAZERCARDS"
+    },
+    {
+      "canonicalPackage": "FF_WONDD_F01052",
+      "wonddPackcode": "F01052",
+      "wonddThb": 300,
+      "fazerLandedThb": 293.6352,
+      "differenceThb": -6.3648,
+      "cheaperSupplier": "FAZERCARDS"
+    },
+    {
+      "canonicalPackage": "FF_WONDD_F01801",
+      "wonddPackcode": "F01801",
+      "wonddThb": 500,
+      "fazerLandedThb": 489.0568,
+      "differenceThb": -10.9432,
+      "cheaperSupplier": "FAZERCARDS"
+    },
+    {
+      "canonicalPackage": "FF_WONDD_F03698",
+      "wonddPackcode": "F03698",
+      "wonddThb": 1000,
+      "fazerLandedThb": 978.1136,
+      "differenceThb": -21.8864,
+      "cheaperSupplier": "FAZERCARDS"
+    }
+  ],
+  "newCandidates": [],
+  "ambiguousSpecial": [
+    {
+      "offerId": "weekly_mini_pack",
+      "name": "Weekly Mini Pack",
+      "rawUsd": 0.96,
+      "classification": "SPECIAL"
+    },
+    {
+      "offerId": "weekly_pack",
+      "name": "Weekly Pack",
+      "rawUsd": 2.04,
+      "classification": "SPECIAL"
+    },
+    {
+      "offerId": "monthly_pack",
+      "name": "Monthly Pack",
+      "rawUsd": 8.73,
+      "classification": "SPECIAL"
+    }
+  ],
+  "currentAuthority": {
+    "canonicalPackageCount": 26,
+    "wonddMappingCount": 19,
+    "fazerCardsOfferCount": 12,
+    "inputContract": [
+      {
+        "key": "player_id",
+        "label": "Player ID",
+        "type": "text"
+      }
+    ],
+    "validationCategory": "free_fire",
+    "regionRestriction": "THAILAND_REGION_LOCKED",
+    "categoryNote": "Region: Thailand\nFree Fire top-up.\nEnter your Player ID before placing the order.\nMake sure your Free Fire account is registered in the Thailand region — packs are region-locked.\nThe selected product is delivered directly to your account after the order is placed."
+  },
+  "safety": {
+    "realFazerCardsOrderCalls": 0,
+    "liveValidationPostCalls": 0,
+    "providerBalanceBeforeUsd": 0,
+    "providerBalanceAfterUsd": 0,
+    "providerBalanceSpentUsd": 0,
+    "fazerCardsFreeFireMappings": 9,
+    "fazerCardsFreeFireEnabledMappings": 0,
+    "globalFazerCardsGate": "OFF",
+    "wonddFreeFireMappingsModified": 0,
+    "pricesPublished": 0,
+    "publicStorefrontChanged": false
+  }
+}

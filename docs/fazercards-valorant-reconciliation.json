@@ -1,0 +1,55 @@
+{
+  "generatedAt": "2026-08-25T15:50:00.000Z",
+  "status": "PASS_RECONCILIATION_BLOCKED_ROLLOUT",
+  "currentAzielAuthority": {
+    "dbProductExists": true,
+    "productCode": "valorant",
+    "enabled": false,
+    "deleted": true,
+    "closedCanonicalOperationalAuthority": false,
+    "route": "coming-soon.html?product=valorant",
+    "publicStorefrontAvailable": false,
+    "publicDiscoveryEnabled": false,
+    "commerceState": "HIDDEN",
+    "lifecycleStatus": "COMING_SOON",
+    "supportedRegions": [],
+    "packageCount": 6,
+    "supplierMappingCount": 6,
+    "customerInputSchema": "UNCONFIRMED/INACTIVE",
+    "fulfillmentReady": false
+  },
+  "categories": [
+    { "categoryId": "valorant_id", "name": "Valorant (ID)", "region": "Indonesia", "deliveryType": "DIRECT_TOPUP", "fields": [{ "key": "riot_id", "label": "Riot ID", "type": "text", "format": "Name#TAG" }], "offerCount": 6, "regionAuthority": "TH_EXCLUDED", "regionLocked": true },
+    { "categoryId": "valorant_kh", "name": "Valorant (KH)", "region": "Cambodia", "deliveryType": "DIRECT_TOPUP", "fields": [{ "key": "riot_id", "label": "Riot ID", "type": "text", "format": "Name#TAG" }], "offerCount": 6, "regionAuthority": "TH_EXCLUDED", "regionLocked": true },
+    { "categoryId": "valorant_my", "name": "Valorant (MY)", "region": "Malaysia", "deliveryType": "DIRECT_TOPUP", "fields": [{ "key": "riot_id", "label": "Riot ID", "type": "text", "format": "Name#TAG" }], "offerCount": 6, "regionAuthority": "TH_EXCLUDED", "regionLocked": true },
+    { "categoryId": "valorant_ph", "name": "Valorant (PH)", "region": "Philippines", "deliveryType": "DIRECT_TOPUP", "fields": [{ "key": "riot_id", "label": "Riot ID", "type": "text", "format": "Name#TAG" }], "offerCount": 6, "regionAuthority": "TH_EXCLUDED", "regionLocked": true },
+    { "categoryId": "valorant_sg", "name": "Valorant (SG)", "region": "Singapore", "deliveryType": "DIRECT_TOPUP", "fields": [{ "key": "riot_id", "label": "Riot ID", "type": "text", "format": "Name#TAG" }], "offerCount": 6, "regionAuthority": "TH_EXCLUDED", "regionLocked": true },
+    { "categoryId": "valorant_th", "name": "Valorant (TH)", "region": "Thailand", "deliveryType": "DIRECT_TOPUP", "fields": [{ "key": "riot_id", "label": "Riot ID", "type": "text", "format": "Name#TAG" }], "offerCount": 6, "regionAuthority": "TH_SUPPORTED", "regionLocked": true },
+    { "categoryId": "valorant_vn", "name": "Valorant (VN)", "region": "Vietnam", "deliveryType": "DIRECT_TOPUP", "fields": [{ "key": "riot_id", "label": "Riot ID", "type": "text", "format": "Name#TAG" }], "offerCount": 6, "regionAuthority": "TH_EXCLUDED", "regionLocked": true }
+  ],
+  "viableCategory": "valorant_th",
+  "validation": { "available": false, "advertised": false },
+  "inputContract": { "classification": "AZIEL_INPUT_CHANGE_REQUIRED", "providerFields": [{ "key": "riot_id", "label": "Riot ID", "type": "text", "format": "Name#TAG" }], "passwordRequired": false },
+  "currentAzielPackages": [
+    { "packageCode": "VAL_WONDD_VL00475", "displayName": "Valorant 475 Point", "enabled": false },
+    { "packageCode": "VAL_WONDD_VL01000", "displayName": "Valorant 1000 Point", "enabled": false },
+    { "packageCode": "VAL_WONDD_VL02050", "displayName": "Valorant 2050 Point", "enabled": false },
+    { "packageCode": "VAL_WONDD_VL03650", "displayName": "Valorant 3650 Point", "enabled": false },
+    { "packageCode": "VAL_WONDD_VL05350", "displayName": "Valorant 5350 Point", "enabled": false },
+    { "packageCode": "VAL_WONDD_VL11000", "displayName": "Valorant 11000 Point", "enabled": false }
+  ],
+  "thOffers": [
+    { "offerId": "475_vp", "name": "475 VP", "rawUsd": 3.7, "fxRate": 33.52, "convertedThb": 124.024, "landedThb": 124.024, "sellingThb": 127.524, "profitThb": 2, "classification": "NEW_CANONICAL_CANDIDATE" },
+    { "offerId": "1000_vp", "name": "1000 VP", "rawUsd": 7.4, "fxRate": 33.52, "convertedThb": 248.048, "landedThb": 248.048, "sellingThb": 251.548, "profitThb": 2, "classification": "NEW_CANONICAL_CANDIDATE" },
+    { "offerId": "2050_vp", "name": "2050 VP", "rawUsd": 14.81, "fxRate": 33.52, "convertedThb": 496.4312, "landedThb": 496.4312, "sellingThb": 499.9312, "profitThb": 2, "classification": "NEW_CANONICAL_CANDIDATE" },
+    { "offerId": "3650_vp", "name": "3650 VP", "rawUsd": 26.19, "fxRate": 33.52, "convertedThb": 877.8888, "landedThb": 877.8888, "sellingThb": 881.3888, "profitThb": 2, "classification": "NEW_CANONICAL_CANDIDATE" },
+    { "offerId": "5350_vp", "name": "5350 VP", "rawUsd": 37.58, "fxRate": 33.52, "convertedThb": 1259.6816, "landedThb": 1259.6816, "sellingThb": 1263.1816, "profitThb": 2, "classification": "NEW_CANONICAL_CANDIDATE" },
+    { "offerId": "11000_vp", "name": "11000 VP", "rawUsd": 75.17, "fxRate": 33.52, "convertedThb": 2519.6984, "landedThb": 2519.6984, "sellingThb": 2523.1984, "profitThb": 2, "classification": "NEW_CANONICAL_CANDIDATE" }
+  ],
+  "exactExistingMatches": 0,
+  "newCanonicalCandidates": 6,
+  "ambiguousUnsafe": 6,
+  "canonicalDecision": "CANONICAL_REPAIR_REQUIRED",
+  "productionMutations": 0,
+  "safety": { "realFazerCardsOrderCalls": 0, "liveValidationPostCalls": 0, "providerBalanceBeforeUsd": 0, "providerBalanceAfterUsd": 0, "providerBalanceSpentUsd": 0, "valorantMappingsCreated": 0, "valorantMappingsEnabled": 0, "canonicalProductMutations": 0, "pricesPublished": 0, "publicStorefrontChanged": false, "wonddModified": 0 }
+}

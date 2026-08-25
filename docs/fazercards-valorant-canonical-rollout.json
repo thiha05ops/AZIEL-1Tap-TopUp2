@@ -1,0 +1,203 @@
+{
+  "apply": true,
+  "provider": {
+    "categoryId": "valorant_th",
+    "region": "Thailand",
+    "delivery": "DIRECT_TOPUP",
+    "fields": [
+      {
+        "key": "riot_id",
+        "label": "Riot ID",
+        "type": "text"
+      }
+    ],
+    "format": "Name#TAG",
+    "offerCount": 6,
+    "note": "Region: Thailand\nValorant top-up.\nEnter your Riot ID before placing the order (format: Name#TAG).\nMake sure your Riot account is registered in the Thailand region — codes are region-locked.\nThe selected product is delivered directly to your account after the order is placed."
+  },
+  "verified": [
+    {
+      "packageCode": "VALORANT_475_VP",
+      "name": "475 VP",
+      "offerId": "475_vp",
+      "rawUsd": 3.7
+    },
+    {
+      "packageCode": "VALORANT_1000_VP",
+      "name": "1000 VP",
+      "offerId": "1000_vp",
+      "rawUsd": 7.4
+    },
+    {
+      "packageCode": "VALORANT_2050_VP",
+      "name": "2050 VP",
+      "offerId": "2050_vp",
+      "rawUsd": 14.81
+    },
+    {
+      "packageCode": "VALORANT_3650_VP",
+      "name": "3650 VP",
+      "offerId": "3650_vp",
+      "rawUsd": 26.19
+    },
+    {
+      "packageCode": "VALORANT_5350_VP",
+      "name": "5350 VP",
+      "offerId": "5350_vp",
+      "rawUsd": 37.58
+    },
+    {
+      "packageCode": "VALORANT_11000_VP",
+      "name": "11000 VP",
+      "offerId": "11000_vp",
+      "rawUsd": 75.17
+    }
+  ],
+  "createdPackages": [
+    "VALORANT_475_VP",
+    "VALORANT_1000_VP",
+    "VALORANT_2050_VP",
+    "VALORANT_3650_VP",
+    "VALORANT_5350_VP",
+    "VALORANT_11000_VP"
+  ],
+  "reusedPackages": [],
+  "createdMappings": [
+    "VALORANT_475_VP",
+    "VALORANT_1000_VP",
+    "VALORANT_2050_VP",
+    "VALORANT_3650_VP",
+    "VALORANT_5350_VP",
+    "VALORANT_11000_VP"
+  ],
+  "reusedMappings": [],
+  "legacyDisposition": [
+    {
+      "packageCode": "VAL_WONDD_VL00475",
+      "classification": "UNUSED",
+      "historicalOrderReferences": 0,
+      "action": "PRESERVED_DISABLED_NOT_REINTERPRETED_AS_VP"
+    },
+    {
+      "packageCode": "VAL_WONDD_VL01000",
+      "classification": "UNUSED",
+      "historicalOrderReferences": 0,
+      "action": "PRESERVED_DISABLED_NOT_REINTERPRETED_AS_VP"
+    },
+    {
+      "packageCode": "VAL_WONDD_VL02050",
+      "classification": "UNUSED",
+      "historicalOrderReferences": 0,
+      "action": "PRESERVED_DISABLED_NOT_REINTERPRETED_AS_VP"
+    },
+    {
+      "packageCode": "VAL_WONDD_VL03650",
+      "classification": "UNUSED",
+      "historicalOrderReferences": 0,
+      "action": "PRESERVED_DISABLED_NOT_REINTERPRETED_AS_VP"
+    },
+    {
+      "packageCode": "VAL_WONDD_VL05350",
+      "classification": "UNUSED",
+      "historicalOrderReferences": 0,
+      "action": "PRESERVED_DISABLED_NOT_REINTERPRETED_AS_VP"
+    },
+    {
+      "packageCode": "VAL_WONDD_VL11000",
+      "classification": "UNUSED",
+      "historicalOrderReferences": 0,
+      "action": "PRESERVED_DISABLED_NOT_REINTERPRETED_AS_VP"
+    }
+  ],
+  "pricingPreview": [
+    {
+      "packageCode": "VALORANT_475_VP",
+      "offerId": "475_vp",
+      "rawUsd": 3.7,
+      "fxRate": 33.52,
+      "convertedThb": 124.024,
+      "landedThb": 124.024,
+      "sellingThb": 127.52,
+      "profitThb": 2,
+      "blockingErrors": []
+    },
+    {
+      "packageCode": "VALORANT_1000_VP",
+      "offerId": "1000_vp",
+      "rawUsd": 7.4,
+      "fxRate": 33.52,
+      "convertedThb": 248.048,
+      "landedThb": 248.048,
+      "sellingThb": 251.55,
+      "profitThb": 2,
+      "blockingErrors": []
+    },
+    {
+      "packageCode": "VALORANT_2050_VP",
+      "offerId": "2050_vp",
+      "rawUsd": 14.81,
+      "fxRate": 33.52,
+      "convertedThb": 496.4312,
+      "landedThb": 496.4312,
+      "sellingThb": 499.93,
+      "profitThb": 2,
+      "blockingErrors": []
+    },
+    {
+      "packageCode": "VALORANT_3650_VP",
+      "offerId": "3650_vp",
+      "rawUsd": 26.19,
+      "fxRate": 33.52,
+      "convertedThb": 877.8888,
+      "landedThb": 877.8888,
+      "sellingThb": 881.39,
+      "profitThb": 2,
+      "blockingErrors": []
+    },
+    {
+      "packageCode": "VALORANT_5350_VP",
+      "offerId": "5350_vp",
+      "rawUsd": 37.58,
+      "fxRate": 33.52,
+      "convertedThb": 1259.6816,
+      "landedThb": 1259.6816,
+      "sellingThb": 1263.18,
+      "profitThb": 2,
+      "blockingErrors": []
+    },
+    {
+      "packageCode": "VALORANT_11000_VP",
+      "offerId": "11000_vp",
+      "rawUsd": 75.17,
+      "fxRate": 33.52,
+      "convertedThb": 2519.6984,
+      "landedThb": 2519.6984,
+      "sellingThb": 2523.2,
+      "profitThb": 2,
+      "blockingErrors": []
+    }
+  ],
+  "gates": {
+    "canonical": true,
+    "operationalModelReady": true,
+    "thailandAuthority": true,
+    "inputReady": true,
+    "packagesReady": true,
+    "mappingsPrepared": true,
+    "publicDiscovery": false,
+    "checkout": false,
+    "mappingsEnabled": 0,
+    "fulfillment": false,
+    "pricesPublished": false
+  },
+  "safety": {
+    "realOrderCalls": 0,
+    "liveValidationCalls": 0,
+    "balanceBeforeUsd": 0,
+    "balanceAfterUsd": 0,
+    "balanceSpentUsd": 0,
+    "customerOrdersModified": 0,
+    "walletsModified": 0,
+    "wonddModified": 0
+  }
+}

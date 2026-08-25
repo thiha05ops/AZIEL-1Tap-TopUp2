@@ -14,7 +14,7 @@ assert.equal(resolvePublicProductReadiness(product, [], { checks: { fulfillment:
 assert.equal(resolvePublicProductReadiness({ ...product, publicDiscoveryEnabled: false }, [pricedPackage], { checks: { fulfillment: true, availability: true } }).state, "HIDDEN");
 assert.equal(resolvePublicProductReadiness({ ...product, lifecycleStatus: "COMING_SOON" }, [pricedPackage], { checks: { fulfillment: true, availability: true } }).state, "COMING_SOON");
 assert.equal(resolvePublicProductReadiness({ ...product, productCode: "aovid" }, [pricedPackage], { checks: { fulfillment: true, availability: true } }).state, "HIDDEN");
-assert.equal(CANONICAL_OPERATIONAL_PRODUCTS.length, 16);
+assert.equal(CANONICAL_OPERATIONAL_PRODUCTS.length, 17);
 
 const root = path.resolve(__dirname, "../..");
 const stage = fs.readFileSync(path.join(root, "frontend/js/product-detail-stage.js"), "utf8");
@@ -28,7 +28,7 @@ const productDetailCss = fs.readFileSync(path.join(root, "frontend/css/game/prod
 assert(productDetailCss.includes(".az-product-detail [hidden]"));
 assert(productDetailCss.includes("display: none !important"));
 const home = fs.readFileSync(path.join(root, "frontend/js/home-placement-runtime.js"), "utf8");
-assert(home.includes(".filter(product => product.discoverable === true)"));
+assert(home.includes("product.discoverable === true") && home.includes("product.publicState !== \"HIDDEN\""));
 assert(home.includes("readinessBadge(product)"));
 
 console.log("Storefront product readiness verification passed.");

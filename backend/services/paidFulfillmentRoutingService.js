@@ -31,14 +31,21 @@ async function ensurePaidOrderFulfillmentWork(order = {}, options = {}) {
     const paymentStatus = String(order.paymentStatus || order.payment?.status || "").toLowerCase();
     if (paymentStatus !== "paid") return { created: false, reason: "ORDER_NOT_PAID", attempt: null };
 
-    const capability = await (options.loadCapability || loadFulfillmentCapability)({
-        productCode: identity.productCode,
-        packageCode: identity.packageCode,
-        region: identity.region,
-        session: options.session || null
-    });
-    if (capability.automatedAvailable) return { created: false, reason: "AUTOMATED_ROUTE_AVAILABLE", attempt: null, capability };
-    if (!capability.manualAdminAllowed) return { created: false, reason: "MANUAL_ADMIN_NOT_ALLOWED", attempt: null, capability };
+    const routeSnapshot = order.fulfilment?.routeSnapshot || null;
+    let capability = null;
+    if (routeSnapshot) {
+        if (routeSnapshot.productCode !== identity.productCode || routeSnapshot.packageCode !== identity.packageCode || routeSnapshot.region !== identity.region) return { created: false, reason: "ORDER_ROUTE_SNAPSHOT_MISMATCH", attempt: null };
+        if (routeSnapshot.routeType !== FULFILLMENT_ROUTE_TYPES.MANUAL_ADMIN) return { created: false, reason: "SUPPLIER_ROUTE_SNAPSHOT_BOUND", attempt: null, routeSnapshot };
+    } else {
+        capability = await (options.loadCapability || loadFulfillmentCapability)({
+            productCode: identity.productCode,
+            packageCode: identity.packageCode,
+            region: identity.region,
+            session: options.session || null
+        });
+        if (capability.automatedAvailable) return { created: false, reason: "AUTOMATED_ROUTE_AVAILABLE", attempt: null, capability };
+        if (!capability.manualAdminAllowed) return { created: false, reason: "MANUAL_ADMIN_NOT_ALLOWED", attempt: null, capability };
+    }
 
     const idempotencyKey = manualAdminIdempotencyKey(identity.orderCode);
     const queryOptions = { upsert: true, returnDocument: "after", setDefaultsOnInsert: true, runValidators: true };
@@ -84,7 +91,7 @@ async function ensurePaidOrderFulfillmentWork(order = {}, options = {}) {
             updateOptions
         );
     }
-    return { created: true, reason: "MANUAL_ADMIN_QUEUED", attempt, capability };
+    return { created: true, reason: "MANUAL_ADMIN_QUEUED", attempt, capability, routeSnapshot };
 }
 
 module.exports = {

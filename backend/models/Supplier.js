@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { SUPPLIER_CURRENCY } = require("../constants/commerce");
 
 const SUPPLIER_MODES = Object.freeze({
     MANUAL: "MANUAL",
@@ -50,7 +51,7 @@ const supplierSchema = new mongoose.Schema(
         },
         supplierCurrency: {
             type: String,
-            enum: ["MMK", "THB", ""],
+            enum: [...SUPPLIER_CURRENCY, ""],
             default: ""
         },
         capabilities: {
@@ -63,7 +64,7 @@ const supplierSchema = new mongoose.Schema(
         },
         balanceCurrency: {
             type: String,
-            enum: ["MMK", "THB", ""],
+            enum: [...SUPPLIER_CURRENCY, ""],
             default: ""
         },
         balanceSource: {

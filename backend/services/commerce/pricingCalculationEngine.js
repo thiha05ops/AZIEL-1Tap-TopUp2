@@ -1,4 +1,4 @@
-const { CURRENCY, PRICING_RULE_SCOPE, PRICING_RULE_TYPE, ROUNDING_MODE } = require("../../constants/commerce");
+const { STOREFRONT_CURRENCY, SUPPLIER_CURRENCY, PRICING_RULE_SCOPE, PRICING_RULE_TYPE, ROUNDING_MODE } = require("../../constants/commerce");
 
 const ERROR_CODES = Object.freeze({
     INVALID_INPUT: "INVALID_INPUT",
@@ -52,8 +52,8 @@ function assertPlainInput(input) {
     }
 }
 
-function assertCurrency(currency, field) {
-    if (!CURRENCY.includes(currency)) {
+function assertCurrency(currency, field, domain) {
+    if (!domain.includes(currency)) {
         throw new CommerceCalculationError(ERROR_CODES.UNSUPPORTED_CURRENCY, "Unsupported currency.", { field, currency });
     }
 }
@@ -257,14 +257,46 @@ function validateExchange(input) {
         });
     }
 
+    const capturedAtValue = rateData.capturedAt || rateData.asOf || null;
+    const capturedAt = capturedAtValue ? new Date(capturedAtValue) : null;
+    const maxAgeSeconds = Number(rateData.maxAgeSeconds);
+    const expiresAt = rateData.expiresAt ? new Date(rateData.expiresAt) : null;
+    const evaluatedAt = new Date(input.context?.evaluationTime || Date.now());
+    if (!Number.isFinite(evaluatedAt.getTime())) {
+        throw new CommerceCalculationError(ERROR_CODES.INVALID_EXCHANGE_RATE, "Pricing evaluation time is invalid.", { field: "context.evaluationTime" });
+    }
+    if (rateData.requireFreshness === true && (!capturedAt || !Number.isFinite(capturedAt.getTime()) || !Number.isFinite(maxAgeSeconds) || maxAgeSeconds <= 0)) {
+        throw new CommerceCalculationError(ERROR_CODES.INVALID_EXCHANGE_RATE, "Bounded FX freshness evidence is required.", { field: "exchangeRate.capturedAt" });
+    }
+    if (expiresAt && (!Number.isFinite(expiresAt.getTime()) || evaluatedAt > expiresAt)) {
+        throw new CommerceCalculationError(ERROR_CODES.INVALID_EXCHANGE_RATE, "Exchange rate is stale.", { field: "exchangeRate.expiresAt" });
+    }
+    if (Number.isFinite(maxAgeSeconds) && maxAgeSeconds > 0) {
+        if (!capturedAt || !Number.isFinite(capturedAt.getTime()) || evaluatedAt.getTime() - capturedAt.getTime() > maxAgeSeconds * 1000) {
+            throw new CommerceCalculationError(ERROR_CODES.INVALID_EXCHANGE_RATE, "Exchange rate is stale.", { field: "exchangeRate.capturedAt" });
+        }
+    }
+
     return {
         rate,
         metadata: Object.freeze({
             sourceCurrency: rateData.sourceCurrency,
             targetCurrency: rateData.targetCurrency,
-            asOf: rateData.asOf || null,
+            asOf: capturedAtValue,
+            capturedAt: capturedAtValue,
+            effectiveAt: rateData.effectiveAt || null,
+            expiresAt: rateData.expiresAt || null,
+            maxAgeSeconds: Number.isFinite(maxAgeSeconds) && maxAgeSeconds > 0 ? maxAgeSeconds : null,
             source: rateData.source || ""
         })
+    };
+}
+
+function normalizeAcquisitionCosts(input = {}) {
+    const raw = input.acquisitionCosts && typeof input.acquisitionCosts === "object" ? input.acquisitionCosts : {};
+    return {
+        fundingCost: normalizeAmount(assertFiniteNumber(raw.fundingCost ?? 0, ERROR_CODES.INVALID_SUPPLIER_COST, "acquisitionCosts.fundingCost")),
+        otherAcquisitionCost: normalizeAmount(assertFiniteNumber(raw.otherAcquisitionCost ?? 0, ERROR_CODES.INVALID_SUPPLIER_COST, "acquisitionCosts.otherAcquisitionCost"))
     };
 }
 
@@ -380,8 +412,8 @@ function calculateBasePrice(input) {
     assertPlainInput(input);
     const supplierCurrency = String(input.supplierCurrency || "").toUpperCase();
     const targetCurrency = String(input.targetCurrency || "").toUpperCase();
-    assertCurrency(supplierCurrency, "supplierCurrency");
-    assertCurrency(targetCurrency, "targetCurrency");
+    assertCurrency(supplierCurrency, "supplierCurrency", SUPPLIER_CURRENCY);
+    assertCurrency(targetCurrency, "targetCurrency", STOREFRONT_CURRENCY);
 
     const supplierCost = normalizeAmount(assertFiniteNumber(input.supplierCost, ERROR_CODES.INVALID_SUPPLIER_COST, "supplierCost"));
     const policy = input.policy && typeof input.policy === "object" ? input.policy : {};
@@ -421,6 +453,19 @@ function calculateBasePrice(input) {
         outputAmount: postExchangeSubtotal,
         currency: targetCurrency
     });
+
+    const acquisitionCosts = normalizeAcquisitionCosts(input);
+    if (acquisitionCosts.fundingCost) {
+        const beforeFunding = subtotal;
+        subtotal = normalizeAmount(subtotal + acquisitionCosts.fundingCost);
+        breakdownStage(breakdown, { stage: "FUNDING_COST", label: "Funding/acquisition adjustment", inputAmount: beforeFunding, amountAdded: acquisitionCosts.fundingCost, outputAmount: subtotal, currency: targetCurrency });
+    }
+    if (acquisitionCosts.otherAcquisitionCost) {
+        const beforeOtherAcquisition = subtotal;
+        subtotal = normalizeAmount(subtotal + acquisitionCosts.otherAcquisitionCost);
+        breakdownStage(breakdown, { stage: "OTHER_ACQUISITION_COST", label: "Other supplier acquisition cost", inputAmount: beforeOtherAcquisition, amountAdded: acquisitionCosts.otherAcquisitionCost, outputAmount: subtotal, currency: targetCurrency });
+    }
+    const landedCost = subtotal;
 
     const supplierFee = applyMonetaryRule(subtotal, policy.supplierFee, "policy.supplierFee");
     const beforeSupplierFee = subtotal;
@@ -591,6 +636,8 @@ function calculateBasePrice(input) {
         currency: targetCurrency,
         supplierCurrency,
         supplierCost,
+        rawSupplierCurrency: supplierCurrency,
+        rawSupplierCost: supplierCost,
         supplierFeeAmount: supplierFee.amount,
         businessCostAmount: businessCost.amount,
         costBeforeProfit,
@@ -599,6 +646,11 @@ function calculateBasePrice(input) {
         exchangeRateApplied: exchange.rate,
         exchangeRateMetadata: exchange.metadata,
         postExchangeSubtotal,
+        fxConvertedCost: postExchangeSubtotal,
+        fundingCost: acquisitionCosts.fundingCost,
+        otherAcquisitionCost: acquisitionCosts.otherAcquisitionCost,
+        landedCost,
+        landedCurrency: targetCurrency,
         gatewayFeeAmount: gatewayFee.amount,
         platformFeeAmount: platformFee.amount,
         pricingRuleFeeAmount,

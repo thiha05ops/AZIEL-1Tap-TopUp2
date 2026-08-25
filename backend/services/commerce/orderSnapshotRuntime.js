@@ -403,6 +403,35 @@ function normalizeFulfilmentInput(input = {}) {
     };
 }
 
+function normalizeSupplierRouteSnapshot(route, quote) {
+    if (route === undefined || route === null) return null;
+    assertPlainObject(route, "supplierRouteSnapshot", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT);
+    const normalized = {
+        routeType: boundedString(route.routeType || "SUPPLIER_API", "supplierRouteSnapshot.routeType", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 40, true),
+        supplierMappingId: boundedString(route.supplierMappingId, "supplierRouteSnapshot.supplierMappingId", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 80),
+        supplierId: boundedString(route.supplierId, "supplierRouteSnapshot.supplierId", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 80),
+        supplierCode: boundedString(route.supplierCode, "supplierRouteSnapshot.supplierCode", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 40, true),
+        productCode: boundedString(route.productCode, "supplierRouteSnapshot.productCode", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 80, true).toLowerCase(),
+        packageCode: boundedString(route.packageCode, "supplierRouteSnapshot.packageCode", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 120, true).toUpperCase(),
+        region: boundedString(route.region, "supplierRouteSnapshot.region", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 2, true).toUpperCase(),
+        supplierProductCode: boundedString(route.supplierProductCode, "supplierRouteSnapshot.supplierProductCode", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 120),
+        supplierPackageCode: boundedString(route.supplierPackageCode, "supplierRouteSnapshot.supplierPackageCode", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 120),
+        executionMode: boundedString(route.executionMode, "supplierRouteSnapshot.executionMode", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 20),
+        selectedRole: boundedString(route.selectedRole, "supplierRouteSnapshot.selectedRole", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 30, true),
+        selectedAt: canonicalDate(route.selectedAt, "supplierRouteSnapshot.selectedAt")
+    };
+    if (normalized.productCode !== normalizeString(quote.packageSnapshot?.gameCode).toLowerCase() || normalized.packageCode !== normalizeString(quote.packageSnapshot?.packageCode).toUpperCase() || normalized.region !== normalizeString(quote.commercialSnapshot?.region).toUpperCase()) {
+        throw new OrderSnapshotRuntimeError(ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, "Supplier route does not match quoted package authority.", { stage: "fulfilment-route" });
+    }
+    if (normalized.routeType === "MANUAL_ADMIN" && (normalized.supplierMappingId || normalized.supplierId || normalized.supplierCode !== "AZIEL_ADMIN")) {
+        throw new OrderSnapshotRuntimeError(ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, "Manual Admin route must not contain supplier mapping identity.", { stage: "fulfilment-route" });
+    }
+    if (normalized.routeType !== "MANUAL_ADMIN" && (!normalized.supplierMappingId || !normalized.supplierId || normalized.selectedRole !== "PRIMARY")) {
+        throw new OrderSnapshotRuntimeError(ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, "Supplier API route requires a PRIMARY mapping snapshot.", { stage: "fulfilment-route" });
+    }
+    return normalized;
+}
+
 function normalizeContact(contact = {}) {
     if (contact === undefined || contact === null) return {};
     assertPlainObject(contact, "contact", ORDER_SNAPSHOT_ERROR_CODES.INVALID_CONTACT_INPUT);
@@ -451,6 +480,7 @@ function normalizeInput(input) {
             "requestFingerprint",
             "paymentSnapshot",
             "fulfilmentInput",
+            "supplierRouteSnapshot",
             "contact",
             "notes",
             "requestMetadata",
@@ -482,6 +512,7 @@ function normalizeInput(input) {
         requestFingerprint,
         paymentSnapshot: normalizePaymentSnapshot(input.paymentSnapshot || {}, commercial, policy),
         fulfilmentInput: normalizeFulfilmentInput(input.fulfilmentInput || {}),
+        supplierRouteSnapshot: normalizeSupplierRouteSnapshot(input.supplierRouteSnapshot, quote),
         contact: normalizeContact(input.contact || {}),
         notes: boundedString(input.notes, "notes", ORDER_SNAPSHOT_ERROR_CODES.INVALID_ORDER_SNAPSHOT_INPUT, MAX_FIELD_LENGTH),
         requestMetadata: normalizeMetadata(input.requestMetadata || {}),
@@ -588,6 +619,7 @@ function createOrderSnapshot(input) {
             },
             fulfilment: {
                 input: clonePlain(normalized.fulfilmentInput),
+                routeSnapshot: clonePlain(normalized.supplierRouteSnapshot),
                 status: statuses.fulfilmentStatus
             },
             customer: {

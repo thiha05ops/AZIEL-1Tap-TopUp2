@@ -559,6 +559,7 @@ function openSupplierEditor(supplierId) {
             <option value="" ${!supplier.balanceCurrency ? "selected" : ""}>-</option>
             <option value="MMK" ${supplier.balanceCurrency === "MMK" ? "selected" : ""}>MMK</option>
             <option value="THB" ${supplier.balanceCurrency === "THB" ? "selected" : ""}>THB</option>
+            <option value="USD" ${supplier.balanceCurrency === "USD" ? "selected" : ""}>USD</option>
         </select></label>
         <label class="fulfillment-checkbox"><input id="editSupplierEnabledInput" type="checkbox" ${supplier.enabled ? "checked" : ""}> <span>${escapeFulfillmentHtml(adminT("enabled", "Enabled"))}</span></label>
         <p id="supplierEditorError" class="admin-action-modal-error"></p>
@@ -710,12 +711,31 @@ function renderMappings() {
                 <small>${escapeFulfillmentHtml(adminT("region", "Region"))}: ${escapeFulfillmentHtml(mapping.region)} · ${escapeFulfillmentHtml(adminT("execution_mode", "Execution Mode"))}: ${escapeFulfillmentHtml(mapping.executionMode)}</small>
                 <small>${escapeFulfillmentHtml(adminT("supplier_product_code", "Supplier Product Code"))}: ${escapeFulfillmentHtml(mapping.supplierProductCode)}</small>
                 <small>${escapeFulfillmentHtml(adminT("supplier_package_code", "Supplier Package Code"))}: ${escapeFulfillmentHtml(mapping.supplierPackageCode)}</small>
-                <small>${escapeFulfillmentHtml(adminT("supplier_cost", "Supplier Cost"))}: ${mapping.supplierCost?.netDealerPrice ?? adminT("not_configured", "Not configured")} ${mapping.supplierCost ? "THB" : ""}</small>
+                <small>${escapeFulfillmentHtml(adminT("supplier_cost", "Raw Supplier Cost"))}: ${mapping.supplierCost?.rawSupplierCost ?? mapping.supplierCost?.amount ?? adminT("not_configured", "Not configured")} ${escapeFulfillmentHtml(mapping.supplierCost?.supplierCurrency || "")}</small>
+                <small>Landed THB: ${mapping.landedCost ?? "-"} · Production price: ${mapping.productionSellingPrice ?? "-"} ${escapeFulfillmentHtml(mapping.productionCurrency || "")}</small>
                 <small>${escapeFulfillmentHtml(adminT("readiness", "Readiness"))}: ${escapeFulfillmentHtml([mapping.readiness?.supplierMapped ? "Mapped" : "Unmapped", mapping.readiness?.inputReady ? "Input ready" : "Input pending", mapping.readiness?.pricingReady ? "Pricing ready" : "Pricing pending", mapping.readiness?.fulfillmentReady ? "Fulfillment ready" : "Fulfillment disabled"].join(" · "))}</small>
+                <small>Production blockers: ${escapeFulfillmentHtml((mapping.productionBlockers || []).join(" · ") || "None")}</small>
+                <label>Production role
+                    <select data-mapping-role data-supplier-id="${escapeFulfillmentHtml(mapping.supplierId)}" data-mapping-id="${escapeFulfillmentHtml(mapping.id)}">
+                        ${["PRIMARY", "BACKUP", "DISABLED"].map(role => `<option value="${role}" ${mapping.productionRole === role ? "selected" : ""}>${role}</option>`).join("")}
+                    </select>
+                </label>
             </div>
             <span class="admin-status ${mapping.enabled ? "completed" : "cancelled"}">${escapeFulfillmentHtml(mapping.enabled ? adminT("enabled", "Enabled") : adminT("disabled", "Disabled"))}</span>
         </article>
     `).join("");
+    list.querySelectorAll("[data-mapping-role]").forEach(select => select.addEventListener("change", async event => {
+        const node = event.currentTarget; node.disabled = true;
+        try {
+            const data = await adminFetch(`/api/admin/suppliers/${encodeURIComponent(node.dataset.supplierId)}/mappings/${encodeURIComponent(node.dataset.mappingId)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ productionRole: node.value }) });
+            if (!data?.success) throw new Error(data?.message || "Unable to update production role.");
+            fulfillmentReferenceState.mappingsLoaded = false; await loadMappings({ force: true, showLoading: true });
+            showAdminToast?.("Production supplier role updated.", "success");
+        } catch (error) {
+            showAdminToast?.(error.message || "Unable to update production role.", "error");
+            fulfillmentReferenceState.mappingsLoaded = false; await loadMappings({ force: true, showLoading: true });
+        }
+    }));
 }
 
 function renderAttempts() {

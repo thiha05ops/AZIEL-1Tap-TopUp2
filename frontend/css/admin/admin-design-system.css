@@ -8963,7 +8963,7 @@ body.theme-light.admin-body .pricing-cost-input-shell {
 
 .catalog-package-row {
   grid-template-columns:
-    64px minmax(150px, .85fr) minmax(190px, 1.15fr) 84px minmax(135px, .8fr) minmax(135px, .8fr) 104px minmax(150px, auto);
+    64px minmax(130px, .75fr) minmax(170px, 1.05fr) minmax(140px, .85fr) 84px minmax(120px, .72fr) minmax(120px, .72fr) 104px minmax(150px, auto);
 }
 
 .catalog-package-actions {
@@ -9002,7 +9002,7 @@ body.theme-light.admin-body .pricing-cost-input-shell {
 
   .catalog-package-row {
     grid-template-columns:
-      58px minmax(135px, .8fr) minmax(170px, 1fr) 72px minmax(120px, .72fr) minmax(120px, .72fr) 94px 138px;
+      58px minmax(120px, .72fr) minmax(155px, .9fr) minmax(125px, .75fr) 72px minmax(110px, .68fr) minmax(110px, .68fr) 94px 138px;
   }
 }
 

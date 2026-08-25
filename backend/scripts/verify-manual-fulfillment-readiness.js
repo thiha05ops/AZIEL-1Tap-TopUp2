@@ -22,7 +22,7 @@ const product = {
 };
 const pkg = { _id: "pkg1", productCode: "mlbb", packageCode: "MLBB_1", enabled: true, deletedAt: null, customerNote: "note", prices: { MM: { amount: 1000, enabled: true }, TH: { amount: 30, enabled: true } } };
 const supplier = { _id: "supplier1", enabled: true, mode: "API", supportedRegions: ["MM", "TH"] };
-const apiMapping = { supplierId: "supplier1", productCode: "mlbb", packageCode: "MLBB_1", region: "MM", enabled: true, executionMode: "API" };
+const apiMapping = { supplierId: "supplier1", productCode: "mlbb", packageCode: "MLBB_1", region: "MM", enabled: true, productionRole: "PRIMARY", executionMode: "API" };
 
 function publicStateFor(testProduct, packages, mappings) {
     const commerce = projectCommerceReadiness(testProduct, packages, mappings, []);
@@ -74,6 +74,14 @@ function publicStateFor(testProduct, packages, mappings) {
     assert.equal(first.attempt.supplierMappingId, null);
     assert.equal(retry.attempt.fulfillmentId, first.attempt.fulfillmentId);
     assert.equal(insertCount, 1);
+
+    // Snapshot authority wins over later capability changes.
+    const snapshottedManualOrder = { ...paidOrder, orderId: "AZL-2", fulfilment: { routeSnapshot: { routeType: "MANUAL_ADMIN", supplierCode: "AZIEL_ADMIN", productCode: "mlbb", packageCode: "MLBB_1", region: "MM" } } };
+    const frozenManual = await ensurePaidOrderFulfillmentWork(snapshottedManualOrder, { ...routingOptions, loadCapability: async () => automatedCapability });
+    assert.equal(frozenManual.reason, "MANUAL_ADMIN_QUEUED");
+    const snapshottedApiOrder = { ...paidOrder, orderId: "AZL-3", fulfilment: { routeSnapshot: { routeType: "SUPPLIER_API", supplierMappingId: "mapping-1", supplierCode: "WONDD", productCode: "mlbb", packageCode: "MLBB_1", region: "MM" } } };
+    const frozenApi = await ensurePaidOrderFulfillmentWork(snapshottedApiOrder, { ...routingOptions, loadCapability: async () => manualCapability });
+    assert.equal(frozenApi.reason, "SUPPLIER_ROUTE_SNAPSHOT_BOUND");
 
     // I: archived package stays excluded even with a stale mapping.
     assert.equal(publicStateFor(noManual, [{ ...pkg, deletedAt: new Date() }], [apiMapping]).projection.publicReadiness.regions.MM.state, "COMING_SOON");

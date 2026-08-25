@@ -44,7 +44,7 @@
 
     function eligibleSuppliers() {
         return daily.suppliers.filter(supplier => supplier.enabled !== false &&
-            ["MMK", "THB"].includes(upper(supplier.supplierCurrency)));
+            ["MMK", "THB", "USD"].includes(upper(supplier.supplierCurrency)));
     }
 
     function activeSupplier() {
@@ -94,7 +94,7 @@
         if (!daily.selectedProductId) return "Select a product.";
         const supplier = activeSupplier();
         if (!supplier) return "Select an enabled canonical supplier for this region.";
-        if (!["MMK", "THB"].includes(upper(supplier.supplierCurrency))) return "Selected supplier has no canonical pricing currency.";
+        if (!["MMK", "THB", "USD"].includes(upper(supplier.supplierCurrency))) return "Selected supplier has no canonical pricing currency.";
         return "";
     }
 
@@ -130,14 +130,15 @@
     }
 
     function statusView(row, preview, regionFilter = ["TH", "MM"]) {
-        if (row.offered === false) return { status: "BLOCKED", reason: row.offerabilityReason || "Not offered in the selected region", regions: [] };
-        if (!daily.edits.has(rowKey(row)) && row.savedDraftSupplierCost == null && row.publishedSupplierPrice == null) return { status: "MISSING", reason: "Supplier cost required", regions: [] };
+        if (row.previewEligible === false) return { status: "BLOCKED", reason: row.previewabilityReason || "Supplier cost is unavailable for preview", regions: [] };
+        if (!daily.edits.has(rowKey(row)) && row.supplierCost == null && row.savedDraftSupplierCost == null && row.publishedSupplierPrice == null) return { status: "MISSING", reason: "Supplier cost required", regions: [] };
         const regions = (preview?.regions || []).filter(item => row.regionalRows?.[item.region] && regionFilter.includes(item.region));
         if (!regions.length) return { status: "WARNING", reason: "Preview pending", regions: [] };
         const blocked = regions.find(item => item.blockingErrors?.length || ["NEGATIVE_MARGIN", "PRICE_BELOW_COST", "INVALID_CONFIGURATION", "EXCHANGE_RATE_MISSING"].includes(item.profitabilityStatus));
         if (blocked) return { status: "BLOCKED", reason: `${blocked.region}: ${blocked.blockingErrors?.[0]?.message || "Pricing blocked"}`, regions };
         const warned = regions.find(item => item.warnings?.length || item.profitabilityStatus === "LOW_MARGIN");
         if (warned) return { status: "WARNING", reason: `${warned.region}: ${warned.warnings?.[0]?.message || "Commercial warning"}`, regions };
+        if (row.offered === false) return { status: "WARNING", reason: `Preview only · ${row.offerabilityReason || "Production mapping is disabled"}`, regions };
         return { status: "READY", reason: "All active regions ready", regions };
     }
 
@@ -151,7 +152,11 @@
         const profit = result?.netProfit;
         const margin = result?.marginPercent;
         const reason = result?.blockingErrors?.[0]?.message || result?.warnings?.[0]?.message || "";
-        return `<div class="pricing-region-result"><strong>${money(sellingPrice, currency)}</strong><span>Profit ${money(profit, currency)}</span><span>Margin ${margin == null ? "-" : `${Number(margin).toFixed(2)}%`}</span>${reason ? `<small>${reason}</small>` : ""}</div>`;
+        const rawCost = result?.rawSupplierCost ?? result?.supplierCost;
+        const rawCurrency = result?.rawSupplierCurrency || result?.supplierCurrency || activeSupplier()?.supplierCurrency;
+        const landed = result?.landedCost;
+        const fx = result?.conversionRequired ? `${result.exchangeRatePair} @ ${result.exchangeRate}` : "rate 1";
+        return `<div class="pricing-region-result"><strong>${money(sellingPrice, currency)}</strong><span>Raw ${money(rawCost, rawCurrency)}</span><span>FX ${text(fx)}</span><span>Landed ${money(landed, result?.landedCurrency || currency)}</span><span>Profit ${money(profit, currency)}</span><span>Margin ${margin == null ? "-" : `${Number(margin).toFixed(2)}%`}</span>${reason ? `<small>${reason}</small>` : ""}</div>`;
     }
 
     function renderRows() {
@@ -174,7 +179,7 @@
             const blocked = dailyBlockingReason();
             return `<tr data-pricing-row="${key}">
                 <td><strong>${text(row.packageName)}</strong><small>${text(row.productName)} · ${upper(row.packageCode)}</small><details class="pricing-mobile-regions"><summary>Regional prices</summary><div><b>Thailand</b>${regionalResult(row, preview, "TH")}</div><div><b>Myanmar</b>${regionalResult(row, preview, "MM")}</div></details></td>
-                <td><label class="pricing-cost-input"><input type="number" min="0.01" step="0.01" value="${value}" data-supplier-cost="${key}" ${blocked ? `disabled title="${blocked}"` : ""}><span>${supplier?.supplierCurrency || "-"}</span></label></td>
+                <td><label class="pricing-cost-input"><input type="number" min="0.000001" step="0.000001" value="${value}" data-supplier-cost="${key}" ${blocked ? `disabled title="${blocked}"` : ""}><span>${supplier?.supplierCurrency || "-"}</span></label></td>
                 <td class="pricing-desktop-region">${regionalResult(row, preview, "TH")}</td><td class="pricing-desktop-region">${regionalResult(row, preview, "MM")}</td>
                 <td><span class="pricing-status is-${view.status.toLowerCase()}">${view.status}</span><small>${view.reason}</small></td>
             </tr>`;
@@ -185,7 +190,7 @@
 
     function updatePublishState() {
         const regions = daily.region === "ALL" ? ["TH", "MM"] : [daily.region];
-        const publishable = regionRows().filter(row => daily.edits.has(rowKey(row)) && ["READY", "WARNING"].includes(statusView(row, previewFor(row), regions).status));
+        const publishable = regionRows().filter(row => row.offered !== false && daily.edits.has(rowKey(row)) && ["READY", "WARNING"].includes(statusView(row, previewFor(row), regions).status));
         $("pricingPublishBtn").disabled = daily.publishing || !activeSupplier() || !publishable.length;
     }
 
@@ -202,7 +207,7 @@
 
     function buildPreviewRows() {
         const supplier = activeSupplier();
-        return regionRows().filter(row => row.offered !== false && (daily.edits.has(rowKey(row)) || row.savedDraftSupplierCost != null || row.publishedSupplierPrice != null)).map(row => ({
+        return regionRows().filter(row => row.previewEligible !== false && (daily.edits.has(rowKey(row)) || row.supplierCost != null || row.savedDraftSupplierCost != null || row.publishedSupplierPrice != null)).map(row => ({
             rowId: rowKey(row), productCode: row.productCode, packageCode: row.packageCode,
             mappingId: row.mappingId,
             newSupplierCost: daily.edits.has(rowKey(row)) ? daily.edits.get(rowKey(row)).value : (row.supplierCost ?? row.savedDraftSupplierCost ?? row.publishedSupplierPrice),
@@ -270,7 +275,8 @@
     async function publishRows() {
         const publishRegion = authoritativePreviewRegion(regionRows());
         const regions = publishRegion === "ALL" ? ["TH", "MM"] : [publishRegion];
-        const rows = buildWorkspaceRows().filter(row => ["READY", "WARNING"].includes(statusView(row, daily.previews.get(rowKey(row)), regions).status));
+        const offeredKeys = new Set(regionRows().filter(row => row.offered !== false).map(rowKey));
+        const rows = buildWorkspaceRows().filter(row => offeredKeys.has(rowKey(row)) && ["READY", "WARNING"].includes(statusView(row, daily.previews.get(rowKey(row)), regions).status));
         if (!rows.length) return;
         const hasWarning = rows.some(row => statusView(row, daily.previews.get(rowKey(row)), regions).status === "WARNING");
         if (hasWarning && !window.confirm("Some rows have commercial warnings. Publish these server-calculated prices?")) return;
@@ -339,6 +345,9 @@
         const currency = settings.region === "TH" ? "THB" : "MMK";
         form.elements.supplierCurrency.value = config.supplierCurrency || "THB";
         form.elements.exchangeRate.value = number(config.exchangeRate, 1);
+        form.elements.exchangeRateSource.value = config.exchangeRateSource || "manual_admin";
+        form.elements.exchangeRateCapturedAt.value = config.exchangeRateCapturedAt ? new Date(config.exchangeRateCapturedAt).toISOString().slice(0, 16) : "";
+        form.elements.exchangeRateMaxAgeSeconds.value = number(config.exchangeRateMaxAgeSeconds, 86400);
         form.elements.profitType.value = config.profitRule?.type || "PERCENT";
         form.elements.profitValue.value = number(config.profitRule?.value);
         form.elements.gatewayType.value = config.gatewayFee?.type || "PERCENT";
@@ -389,6 +398,9 @@
             ...base,
             supplierCurrency: form.elements.supplierCurrency.value,
             exchangeRate: number(form.elements.exchangeRate.value),
+            exchangeRateSource: form.elements.exchangeRateSource.value.trim(),
+            exchangeRateCapturedAt: form.elements.exchangeRateCapturedAt.value ? new Date(form.elements.exchangeRateCapturedAt.value).toISOString() : "",
+            exchangeRateMaxAgeSeconds: number(form.elements.exchangeRateMaxAgeSeconds.value, 86400),
             minimumProfitAmount: number(form.elements.minimumProfitAmount.value),
             profitRule: { type: form.elements.profitType.value, value: number(form.elements.profitValue.value) },
             gatewayFee: { enabled: number(form.elements.gatewayValue.value) > 0, type: form.elements.gatewayType.value, value: number(form.elements.gatewayValue.value) },

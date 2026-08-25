@@ -9,7 +9,7 @@ const root = path.resolve(__dirname, "../..");
 const service = fs.readFileSync(path.join(root, "backend/services/commerce/adminPricingEngineService.js"), "utf8");
 const frontend = fs.readFileSync(path.join(root, "frontend/js/admin-pricing-engine.js"), "utf8");
 
-assert.strictEqual(CANONICAL_OPERATIONAL_PRODUCTS.length, 16, "Operational catalog must expose the expected 16 identities.");
+assert.strictEqual(CANONICAL_OPERATIONAL_PRODUCTS.length, 17, "Operational catalog must expose the expected 17 identities.");
 assert.ok(service.includes('require("../../catalog/canonicalOperationalCatalog")'), "Pricing projection must import canonical catalog authority.");
 assert.ok(service.includes("CANONICAL_OPERATIONAL_PRODUCTS.forEach"), "Every canonical identity must seed the pricing projection.");
 assert.ok(service.includes("if (!products.has(productId)) return;"), "DB-only package products must not enter the selector projection.");

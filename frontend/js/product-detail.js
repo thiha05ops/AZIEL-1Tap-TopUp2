@@ -11,7 +11,8 @@
         overmortal: ["OverMortal Voucher", "Mobile Game", "Select an available OverMortal voucher package."],
         "magic-chess-go-go": ["Magic Chess: Go Go Top Up", "Mobile Game", "Select an available Magic Chess: Go Go top-up package."],
         lifeafter: ["LifeAfter Credits & Packages", "Mobile Game", "Select an available LifeAfter credits or package option."],
-        capcut: ["CapCut Top Up", "Social Top Up", "Select an available CapCut top-up package."]
+        capcut: ["CapCut Top Up", "Social Top Up", "Select an available CapCut top-up package."],
+        valorant: ["Valorant", "Thailand", "Select an available Valorant Points package."]
     });
 
     function productCodeFromUrl() {
@@ -40,13 +41,20 @@
     applyText("[data-product-summary-name]", name);
     applyText("#selectedPackageTitle", "Select Package");
 
+    const isValorant = productCode === "valorant";
+    if (isValorant) {
+        applyText('label[for="userId"]', "Riot ID");
+        document.getElementById("userId")?.setAttribute("placeholder", "Name#TAG");
+    }
+
     window.AZIEL_GAME_FLOW?.init({
         game: name,
         gameKey: productCode,
         userIdSelector: "#userId",
         zoneIdSelector: "",
         zoneRequired: false,
-        userIdRequiredMessage: `Please enter your ${name} account ID or username.`,
+        userIdRequiredMessage: isValorant ? "Please enter your Riot ID (Name#TAG)." : `Please enter your ${name} account ID or username.`,
+        accountFields: isValorant ? [{ key: "riotId", label: "Riot ID", selector: "#userId", required: true, requiredMessage: "Please enter your Riot ID (Name#TAG)." }] : undefined,
         pendingReturnUrl: `product.html?product=${encodeURIComponent(productCode)}`
     });
 })();

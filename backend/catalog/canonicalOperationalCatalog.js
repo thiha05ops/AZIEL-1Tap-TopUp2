@@ -13,6 +13,7 @@ const CANONICAL_OPERATIONAL_PRODUCTS = Object.freeze([
     product("magic-chess-go-go", "Magic Chess: Go Go Top Up", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 120, "product.html?product=magic-chess-go-go", "Mobile Games", "Magic Chess: Go Go"),
     product("lifeafter", "LifeAfter Credits & Packages", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 130, "product.html?product=lifeafter", "Mobile Games", "LifeAfter"),
     product("hok", "Honor of Kings Tokens & Packages", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 140, "hok.html", "Mobile Games", "Honor of Kings"),
+    product("valorant", "Valorant", "games", "pc", "thailand", "PC_GAME", 145, "product.html?product=valorant", "PC Games", "Valorant", ["TH"]),
     product("telegram", "Telegram Top Up", "social_topup", "service", "global", "DIGITAL_SERVICE", 150, "telegram.html", "Social Top Up", "Telegram"),
     product("capcut", "CapCut Top Up", "social_topup", "service", "global", "DIGITAL_SERVICE", 160, "product.html?product=capcut", "Social Top Up", "CapCut")
 ]);
@@ -21,7 +22,7 @@ const CANONICAL_PRODUCT_CODES = Object.freeze(CANONICAL_OPERATIONAL_PRODUCTS.map
 const CANONICAL_PRODUCT_CODE_SET = new Set(CANONICAL_PRODUCT_CODES);
 const CANONICAL_PRODUCT_MAP = new Map(CANONICAL_OPERATIONAL_PRODUCTS.map(item => [item.productCode, item]));
 
-function product(productCode, name, category, platform, market, catalogCategory, sortOrder, productRoute = "", adminCategory = "", family = "") {
+function product(productCode, name, category, platform, market, catalogCategory, sortOrder, productRoute = "", adminCategory = "", family = "", supportedRegions = ["MM", "TH"]) {
     return Object.freeze({
         productCode,
         name,
@@ -33,7 +34,7 @@ function product(productCode, name, category, platform, market, catalogCategory,
         productRoute,
         adminCategory,
         family,
-        supportedRegions: Object.freeze(["MM", "TH"])
+        supportedRegions: Object.freeze([...supportedRegions])
     });
 }
 

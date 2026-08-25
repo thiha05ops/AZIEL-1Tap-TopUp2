@@ -731,12 +731,18 @@
                         <label><span>Supplier Currency</span><select name="supplierCurrency">
                                 <option value="THB">THB</option>
                                 <option value="MMK">MMK</option>
+                                <option value="USD">USD</option>
                             </select></label>
                         <div class="pricing-v3-readonly"><span>Store Currency</span><strong
                                 id="pricingSettingsStoreCurrency">THB</strong></div>
                         <label><span>Exchange Rate</span><input name="exchangeRate" type="number" min="0.0001"
                                 step="0.0001" required><small id="pricingExchangeDirection">1 THB = 1
                                 THB</small></label>
+                        <label><span>FX Authority Source</span><input name="exchangeRateSource" type="text"
+                                maxlength="80" placeholder="Manual acquisition rate"></label>
+                        <label><span>FX Captured At</span><input name="exchangeRateCapturedAt" type="datetime-local"></label>
+                        <label><span>FX Maximum Age (seconds)</span><input name="exchangeRateMaxAgeSeconds" type="number"
+                                min="60" step="60" value="86400"></label>
                         <fieldset>
                             <legend>Profit Policy</legend><select name="profitType">
                                 <option value="PERCENT">Percentage</option>
@@ -1301,6 +1307,7 @@ TH</textarea></label>
                                         <option value="">-</option>
                                         <option value="MMK">MMK</option>
                                         <option value="THB">THB</option>
+                                        <option value="USD">USD</option>
                                     </select></label>
                                 <label class="fulfillment-checkbox"><input id="supplierEnabledInput" type="checkbox"
                                         checked> <span data-admin-i18n="enabled">Enabled</span></label>

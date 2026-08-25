@@ -491,6 +491,23 @@ function projectCatalogPackage(
             prices[region].supplierCostTimestamp =
                 price.supplierCostTimestamp || null;
 
+            prices[region].rawSupplierCost = price.rawSupplierCost == null ? null : Number(price.rawSupplierCost);
+            prices[region].rawSupplierCurrency = price.rawSupplierCurrency || "";
+            prices[region].supplierCostSource = price.supplierCostSource || "";
+            prices[region].providerProductCode = price.providerProductCode || "";
+            prices[region].providerOfferCode = price.providerOfferCode || "";
+            prices[region].fxRate = price.fxRate == null ? null : Number(price.fxRate);
+            prices[region].fxRateSource = price.fxRateSource || "";
+            prices[region].fxRateCapturedAt = price.fxRateCapturedAt || null;
+            prices[region].fxRateEffectiveAt = price.fxRateEffectiveAt || null;
+            prices[region].fxRateExpiresAt = price.fxRateExpiresAt || null;
+            prices[region].fxRateMaxAgeSeconds = price.fxRateMaxAgeSeconds == null ? null : Number(price.fxRateMaxAgeSeconds);
+            prices[region].fxConvertedCost = price.fxConvertedCost == null ? null : Number(price.fxConvertedCost);
+            prices[region].fundingCost = price.fundingCost == null ? 0 : Number(price.fundingCost);
+            prices[region].otherAcquisitionCost = price.otherAcquisitionCost == null ? 0 : Number(price.otherAcquisitionCost);
+            prices[region].landedCost = price.landedCost == null ? null : Number(price.landedCost);
+            prices[region].landedCurrency = price.landedCurrency || "";
+
             prices[region].pricingNote =
                 price.pricingNote || "";
         }
@@ -504,6 +521,7 @@ function projectCatalogPackage(
         productCode: item.productCode,
         packageCode: item.packageCode,
         name: item.name,
+        packageFamily: item.packageFamily?.code ? { code: item.packageFamily.code, name: item.packageFamily.name, sortOrder: Number(item.packageFamily.sortOrder || 0), parentCode: item.packageFamily.parentCode || "" } : null,
         customerNote: normalizeCustomerNote(item.customerNote),
         customerNoteLocales: normalizeCustomerNoteLocales(item.customerNoteLocales, item.customerNote),
         enabled: item.enabled !== false,

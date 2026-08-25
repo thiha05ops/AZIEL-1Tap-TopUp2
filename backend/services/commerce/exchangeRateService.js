@@ -1,6 +1,6 @@
 "use strict";
 
-const { CURRENCY } = require("../../constants/commerce");
+const { STOREFRONT_CURRENCY, SUPPLIER_CURRENCY } = require("../../constants/commerce");
 
 function text(value) {
     return String(value || "").trim();
@@ -10,9 +10,9 @@ function upper(value) {
     return text(value).toUpperCase();
 }
 
-function assertCurrency(value, field) {
+function assertCurrency(value, field, domain) {
     const currency = upper(value);
-    if (!CURRENCY.includes(currency)) {
+    if (!domain.includes(currency)) {
         throw new Error(`Unsupported ${field}: ${currency || "(empty)"}`);
     }
     return currency;
@@ -38,8 +38,8 @@ function envRateFor(sourceCurrency, targetCurrency) {
 }
 
 function resolveExchangeRate({ sourceCurrency, targetCurrency, now = new Date() } = {}) {
-    const source = assertCurrency(sourceCurrency, "sourceCurrency");
-    const target = assertCurrency(targetCurrency, "targetCurrency");
+    const source = assertCurrency(sourceCurrency, "sourceCurrency", SUPPLIER_CURRENCY);
+    const target = assertCurrency(targetCurrency, "targetCurrency", STOREFRONT_CURRENCY);
 
     if (source === target) {
         return {
@@ -57,13 +57,22 @@ function resolveExchangeRate({ sourceCurrency, targetCurrency, now = new Date() 
         throw new Error(`Missing authoritative exchange rate for ${source}_${target}.`);
     }
 
+    const pair = `${source}_${target}`;
+    const capturedAt = text(process.env[`COMMERCE_EXCHANGE_RATE_${pair}_CAPTURED_AT`]);
+    const maxAgeSeconds = Number(process.env[`COMMERCE_EXCHANGE_RATE_${pair}_MAX_AGE_SECONDS`]);
+    const requireFreshness = !STOREFRONT_CURRENCY.includes(source);
+    if (requireFreshness && (!capturedAt || !Number.isFinite(new Date(capturedAt).getTime()) || !Number.isFinite(maxAgeSeconds) || maxAgeSeconds <= 0)) {
+        throw new Error(`Bounded authoritative exchange-rate freshness is required for ${pair}.`);
+    }
     return {
         rate,
         source: "environment",
         provider: "AZIEL_COMMERCE",
         sourceCurrency: source,
         targetCurrency: target,
-        capturedAt: now.toISOString()
+        capturedAt: capturedAt || now.toISOString(),
+        maxAgeSeconds: Number.isFinite(maxAgeSeconds) && maxAgeSeconds > 0 ? maxAgeSeconds : null,
+        requireFreshness
     };
 }
 

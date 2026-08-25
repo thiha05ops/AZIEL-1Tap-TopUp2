@@ -78,6 +78,7 @@ const productSchema = new mongoose.Schema(
 const fulfilmentSchema = new mongoose.Schema(
     {
         input: { type: mongoose.Schema.Types.Mixed, default: {}, immutable: true },
+        routeSnapshot: { type: mongoose.Schema.Types.Mixed, default: null, immutable: true },
         status: { type: String, enum: FULFILMENT_STATUSES, default: "not_started" },
         references: { type: [mongoose.Schema.Types.Mixed], default: [] }
     },

@@ -10,6 +10,7 @@ const { assertAssetCategory } = require("./mediaService");
 const { CATALOG_CATEGORIES, HOMEPAGE_FLAGS, HOMEPAGE_SECTIONS, CATALOG_LIFECYCLE, COMMERCE_STATES } = require("../catalog/catalogTaxonomy");
 const { getCanonicalProduct, resolveCanonicalProductRoute } = require("../catalog/canonicalOperationalCatalog");
 const { normalizeProductKnowledge, normalizeCustomerNote, normalizeCustomerNoteLocales, ProductKnowledgeError } = require("../catalog/productKnowledge");
+const { SUPPLIER_CURRENCY } = require("../constants/commerce");
 
 function normalizeAdminProductCode(value) {
     const canonical = getCanonicalProduct(value);
@@ -170,7 +171,7 @@ function parseNullablePrice(value, field = "supplierCost") {
 function parseSupplierCurrency(value, fallback = "") {
     const currency = String(value || fallback || "").trim().toUpperCase();
     if (!currency) return "";
-    if (!["MMK", "THB"].includes(currency)) {
+    if (!SUPPLIER_CURRENCY.includes(currency)) {
         throw new CatalogAdminError("CATALOG_PATCH_INVALID", "Supplier currency is not supported.");
     }
     return currency;
@@ -434,7 +435,7 @@ function buildPackagePatch(document, patch = {}) {
     assertNoImmutableFields(patch, ["_id", "id", "productCode", "packageCode", "source", "createdAt", "updatedAt", "__v"]);
 
     const updates = {};
-    const allowed = new Set(["name", "enabled", "prices", "canonicalSupplierCost", "iconAssetId", "customerNote", "customerNoteLocales", "expectedUpdatedAt"]);
+    const allowed = new Set(["name", "enabled", "prices", "canonicalSupplierCost", "iconAssetId", "customerNote", "customerNoteLocales", "packageFamily", "expectedUpdatedAt"]);
 
     Object.keys(patch).forEach(key => {
         if (!allowed.has(key)) {
@@ -448,6 +449,11 @@ function buildPackagePatch(document, patch = {}) {
 
     if (Object.prototype.hasOwnProperty.call(patch, "name")) {
         updates.name = normalizePackageName(patch.name);
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, "packageFamily")) {
+        const { validateFamily } = require("../catalog/canonicalPackageFamilies");
+        const family = validateFamily(document.productCode, patch.packageFamily);
+        updates.packageFamily = { ...family, authority: "ADMIN_CANONICAL_PACKAGE_FAMILY" };
     }
 
     if (Object.prototype.hasOwnProperty.call(patch, "customerNote")) {
@@ -480,6 +486,25 @@ function buildPackagePatch(document, patch = {}) {
         updates["canonicalSupplierCost.amount"] = parseNullablePrice(snapshot.amount, "canonicalSupplierCost.amount");
         updates["canonicalSupplierCost.currency"] = parseSupplierCurrency(snapshot.currency, "");
         updates["canonicalSupplierCost.capturedAt"] = parseNullableDate(snapshot.capturedAt, "canonicalSupplierCost.capturedAt");
+        ["rawSupplierCost", "fxRate", "fxRateMaxAgeSeconds", "fxConvertedCost", "fundingCost", "otherAcquisitionCost", "landedCost"].forEach(key => {
+            if (Object.prototype.hasOwnProperty.call(snapshot, key)) updates[`canonicalSupplierCost.${key}`] = parseNullablePrice(snapshot[key], `canonicalSupplierCost.${key}`);
+        });
+        ["rawSupplierCurrency"].forEach(key => {
+            if (Object.prototype.hasOwnProperty.call(snapshot, key)) updates[`canonicalSupplierCost.${key}`] = parseSupplierCurrency(snapshot[key], "");
+        });
+        ["landedCurrency"].forEach(key => {
+            if (Object.prototype.hasOwnProperty.call(snapshot, key)) {
+                const value = String(snapshot[key] || "").trim().toUpperCase();
+                if (!["MMK", "THB"].includes(value)) throw new CatalogAdminError("CATALOG_PATCH_INVALID", "Landed currency is not a storefront currency.");
+                updates[`canonicalSupplierCost.${key}`] = value;
+            }
+        });
+        ["supplierCostSource", "providerProductCode", "providerOfferCode", "fxRateSource"].forEach(key => {
+            if (Object.prototype.hasOwnProperty.call(snapshot, key)) updates[`canonicalSupplierCost.${key}`] = cleanEditableText(snapshot[key], MAX_SUPPLIER_VERSION);
+        });
+        ["fxRateCapturedAt", "fxRateEffectiveAt", "fxRateExpiresAt"].forEach(key => {
+            if (Object.prototype.hasOwnProperty.call(snapshot, key)) updates[`canonicalSupplierCost.${key}`] = parseNullableDate(snapshot[key], `canonicalSupplierCost.${key}`);
+        });
     }
 
     if (patch.prices !== undefined) {
@@ -516,6 +541,22 @@ function buildPackagePatch(document, patch = {}) {
                 "supplierName",
                 "supplierVersion",
                 "supplierCostTimestamp",
+                "rawSupplierCost",
+                "rawSupplierCurrency",
+                "supplierCostSource",
+                "providerProductCode",
+                "providerOfferCode",
+                "fxRate",
+                "fxRateSource",
+                "fxRateCapturedAt",
+                "fxRateEffectiveAt",
+                "fxRateExpiresAt",
+                "fxRateMaxAgeSeconds",
+                "fxConvertedCost",
+                "fundingCost",
+                "otherAcquisitionCost",
+                "landedCost",
+                "landedCurrency",
                 "pricingNote"
             ]);
             Object.keys(pricePatch).forEach(key => {
@@ -642,6 +683,21 @@ function buildPackagePatch(document, patch = {}) {
             if (Object.prototype.hasOwnProperty.call(pricePatch, "supplierCostTimestamp")) {
                 updates[`prices.${region}.supplierCostTimestamp`] = parseNullableDate(pricePatch.supplierCostTimestamp, `${region}.supplierCostTimestamp`);
             }
+            ["rawSupplierCost", "fxRate", "fxRateMaxAgeSeconds", "fxConvertedCost", "fundingCost", "otherAcquisitionCost", "landedCost"].forEach(key => {
+                if (Object.prototype.hasOwnProperty.call(pricePatch, key)) updates[`prices.${region}.${key}`] = parseNullablePrice(pricePatch[key], `${region}.${key}`);
+            });
+            if (Object.prototype.hasOwnProperty.call(pricePatch, "rawSupplierCurrency")) updates[`prices.${region}.rawSupplierCurrency`] = parseSupplierCurrency(pricePatch.rawSupplierCurrency, "");
+            if (Object.prototype.hasOwnProperty.call(pricePatch, "landedCurrency")) {
+                const landedCurrency = String(pricePatch.landedCurrency || "").trim().toUpperCase();
+                if (!["MMK", "THB"].includes(landedCurrency)) throw new CatalogAdminError("CATALOG_PATCH_INVALID", "Landed currency is not a storefront currency.");
+                updates[`prices.${region}.landedCurrency`] = landedCurrency;
+            }
+            ["supplierCostSource", "providerProductCode", "providerOfferCode", "fxRateSource"].forEach(key => {
+                if (Object.prototype.hasOwnProperty.call(pricePatch, key)) updates[`prices.${region}.${key}`] = cleanEditableText(pricePatch[key], MAX_SUPPLIER_VERSION);
+            });
+            ["fxRateCapturedAt", "fxRateEffectiveAt", "fxRateExpiresAt"].forEach(key => {
+                if (Object.prototype.hasOwnProperty.call(pricePatch, key)) updates[`prices.${region}.${key}`] = parseNullableDate(pricePatch[key], `${region}.${key}`);
+            });
             if (Object.prototype.hasOwnProperty.call(pricePatch, "pricingNote")) {
                 updates[`prices.${region}.pricingNote`] = cleanEditableText(pricePatch.pricingNote, MAX_PRICING_NOTE);
             }

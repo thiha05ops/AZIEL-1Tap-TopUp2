@@ -1,0 +1,3853 @@
+{
+  "generatedAt": "2026-08-25T14:49:02.141Z",
+  "status": "PASS",
+  "category": {
+    "categoryId": "mobile_legends_global",
+    "name": "Mobile Legends (Global)",
+    "note": "Region: Global\nMobile Legends top-up.\nNot available for Indonesia and BR regions.\n\nThe following packs are not available for MY/SG/PH/ID/RU regions:\n78+8, 156+16, 234+23, 625+81, 1860+335, 3099+589, 4649+883, 7740+1548 Diamonds, Weekly Pass.\n\nFirst Top-Up Bonus:\n50+5 → 50+50\n150+15 → 150+150\n250+25 → 250+250\n500+65 → 500+500",
+    "offerCount": 43
+  },
+  "currentCanonicalPackages": [
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_ML00257",
+      "displayName": "257 Diamonds",
+      "enabled": true,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 118.5
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_ML00275",
+      "displayName": "275 Diamonds",
+      "enabled": true,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 155.07
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_ML00343",
+      "displayName": "343 Diamonds",
+      "enabled": true,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 167.5
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_ML00600",
+      "displayName": "600 Diamonds",
+      "enabled": true,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 274.5
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_ML00706",
+      "displayName": "706 Diamonds",
+      "enabled": true,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 315.5
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_ML00792",
+      "displayName": "792 Diamonds",
+      "enabled": true,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 356.5
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_ML01049",
+      "displayName": "1049 Diamonds",
+      "enabled": true,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 468.5
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_ML02195",
+      "displayName": "2195 Diamonds",
+      "enabled": true,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 942.5
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_ML03688",
+      "displayName": "3688 Diamonds",
+      "enabled": true,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 1562.5
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_ML05532",
+      "displayName": "5532 Diamonds",
+      "enabled": true,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 2335.5
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_ML09288",
+      "displayName": "9288 Diamonds",
+      "enabled": true,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 3842.5
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_MLFT055",
+      "displayName": "55 Diamonds – First Top-Up",
+      "enabled": true,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 29.5
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_MLFT165",
+      "displayName": "165 Diamonds – First Top-Up",
+      "enabled": true,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 79.5
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_MLFT275",
+      "displayName": "275 Diamonds – First Top-Up",
+      "enabled": true,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 126.5
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_MLFT565",
+      "displayName": "565 Diamonds – First Top-Up",
+      "enabled": true,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 253.5
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_MLOTW01",
+      "displayName": "One-Time Weekly Pass",
+      "enabled": true,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 53.5
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_MLTMP01",
+      "displayName": "Twilight Miya Pass",
+      "enabled": true,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 263.5
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_11_1",
+      "displayName": "11+1 diamond",
+      "enabled": false,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 6.2
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_13_1",
+      "displayName": "13+1 Diamonds",
+      "enabled": true,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 11.51
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_42",
+      "displayName": "42 Diamonds",
+      "enabled": true,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 26.87
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_56",
+      "displayName": "70 Diamonds",
+      "enabled": true,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 42.64
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_86",
+      "displayName": "86 Diamonds",
+      "enabled": true,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 44.5
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_112",
+      "displayName": "112 Diamonds",
+      "enabled": false,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 56
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_172",
+      "displayName": "172 Diamonds",
+      "enabled": true,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 85.5
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_284",
+      "displayName": "284 Diamonds",
+      "enabled": true,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 161.96
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_344",
+      "displayName": "344 Diamonds",
+      "enabled": true,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 169.42
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_570",
+      "displayName": "429 Diamonds",
+      "enabled": true,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 200.5
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_716",
+      "displayName": "716 Diamonds",
+      "enabled": true,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 399.41
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_1163",
+      "displayName": "1160 Diamonds",
+      "enabled": true,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 545
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_1160_186",
+      "displayName": "1160+186 Diamonds",
+      "enabled": true,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 662.1
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_1360_335",
+      "displayName": "1360+335 Diamonds",
+      "enabled": false,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 989
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_2015_475",
+      "displayName": "2015+475 Diamonds",
+      "enabled": false,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 1490
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_5000_1000",
+      "displayName": "5000+1000 Diamonds",
+      "enabled": true,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 3097.69
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_7740_1548",
+      "displayName": "7740+1548 Diamonds",
+      "enabled": true,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 4163.29
+    },
+    {
+      "productCode": "mlbb-twilight-weekly-pass",
+      "packageCode": "MLBB-WEEKLY.PASS",
+      "displayName": "Weekly Pass",
+      "enabled": true,
+      "deleted": false,
+      "thAvailable": true,
+      "thSellingPrice": 70
+    }
+  ],
+  "wonddMappings": [
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_172",
+      "servicecode": "mlbb",
+      "packcode": "ML00172",
+      "enabled": true,
+      "executionMode": "API",
+      "supplierCostThb": 82,
+      "fulfillmentReady": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_570",
+      "servicecode": "mlbb",
+      "packcode": "ML00429",
+      "enabled": true,
+      "executionMode": "API",
+      "supplierCostThb": 197,
+      "fulfillmentReady": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_86",
+      "servicecode": "mlbb",
+      "packcode": "ML00086",
+      "enabled": true,
+      "executionMode": "API",
+      "supplierCostThb": 41,
+      "fulfillmentReady": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_ML00257",
+      "servicecode": "mlbb",
+      "packcode": "ML00257",
+      "enabled": true,
+      "executionMode": "API",
+      "supplierCostThb": 115,
+      "fulfillmentReady": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_ML00275",
+      "servicecode": "mlbb",
+      "packcode": "ML00275",
+      "enabled": true,
+      "executionMode": "API",
+      "supplierCostThb": 151.57,
+      "fulfillmentReady": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_ML00343",
+      "servicecode": "mlbb",
+      "packcode": "ML00343",
+      "enabled": true,
+      "executionMode": "API",
+      "supplierCostThb": 164,
+      "fulfillmentReady": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_ML00600",
+      "servicecode": "mlbb",
+      "packcode": "ML00600",
+      "enabled": true,
+      "executionMode": "API",
+      "supplierCostThb": 271,
+      "fulfillmentReady": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_ML00706",
+      "servicecode": "mlbb",
+      "packcode": "ML00706",
+      "enabled": true,
+      "executionMode": "API",
+      "supplierCostThb": 312,
+      "fulfillmentReady": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_ML00792",
+      "servicecode": "mlbb",
+      "packcode": "ML00792",
+      "enabled": true,
+      "executionMode": "API",
+      "supplierCostThb": 353,
+      "fulfillmentReady": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_ML01049",
+      "servicecode": "mlbb",
+      "packcode": "ML01049",
+      "enabled": true,
+      "executionMode": "API",
+      "supplierCostThb": 465,
+      "fulfillmentReady": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_ML02195",
+      "servicecode": "mlbb",
+      "packcode": "ML02195",
+      "enabled": true,
+      "executionMode": "API",
+      "supplierCostThb": 939,
+      "fulfillmentReady": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_ML03688",
+      "servicecode": "mlbb",
+      "packcode": "ML03688",
+      "enabled": true,
+      "executionMode": "API",
+      "supplierCostThb": 1559,
+      "fulfillmentReady": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_ML05532",
+      "servicecode": "mlbb",
+      "packcode": "ML05532",
+      "enabled": true,
+      "executionMode": "API",
+      "supplierCostThb": 2332,
+      "fulfillmentReady": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_ML09288",
+      "servicecode": "mlbb",
+      "packcode": "ML09288",
+      "enabled": true,
+      "executionMode": "API",
+      "supplierCostThb": 3839,
+      "fulfillmentReady": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_MLFT055",
+      "servicecode": "mlbb",
+      "packcode": "MLFT055",
+      "enabled": true,
+      "executionMode": "API",
+      "supplierCostThb": 26,
+      "fulfillmentReady": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_MLFT165",
+      "servicecode": "mlbb",
+      "packcode": "MLFT165",
+      "enabled": true,
+      "executionMode": "API",
+      "supplierCostThb": 76,
+      "fulfillmentReady": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_MLFT275",
+      "servicecode": "mlbb",
+      "packcode": "MLFT275",
+      "enabled": true,
+      "executionMode": "API",
+      "supplierCostThb": 123,
+      "fulfillmentReady": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_MLFT565",
+      "servicecode": "mlbb",
+      "packcode": "MLFT565",
+      "enabled": true,
+      "executionMode": "API",
+      "supplierCostThb": 250,
+      "fulfillmentReady": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_MLOTW01",
+      "servicecode": "mlbb",
+      "packcode": "MLOTW01",
+      "enabled": true,
+      "executionMode": "API",
+      "supplierCostThb": 50,
+      "fulfillmentReady": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_WONDD_MLTMP01",
+      "servicecode": "mlbb",
+      "packcode": "MLTMP01",
+      "enabled": true,
+      "executionMode": "API",
+      "supplierCostThb": 260,
+      "fulfillmentReady": true
+    }
+  ],
+  "fazercardsOffers": [
+    {
+      "offerId": "500_65_diamonds_first_top_up_bonus",
+      "providerName": "500 + 65 Diamonds (First Top-Up Bonus)",
+      "priceUsd": 7.3616,
+      "landedThb": 246.760832,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "BONUS_VARIANT",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "250_25_diamonds_first_top_up_bonus",
+      "providerName": "250 + 25 Diamonds (First Top-Up Bonus)",
+      "priceUsd": 3.5858,
+      "landedThb": 120.196016,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "BONUS_VARIANT",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "150_15_diamonds_first_top_up_bonus",
+      "providerName": "150 + 15 Diamonds (First Top-Up Bonus)",
+      "priceUsd": 2.2351,
+      "landedThb": 74.920552,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "BONUS_VARIANT",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "50_5_diamonds_first_top_up_bonus",
+      "providerName": "50 + 5 Diamonds (First Top-Up Bonus)",
+      "priceUsd": 0.7427,
+      "landedThb": 24.895304,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "BONUS_VARIANT",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "1084_diamonds",
+      "providerName": "1084 Diamonds",
+      "priceUsd": 17.41,
+      "landedThb": 583.5832,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "NEW_CANONICAL_PACKAGE_CANDIDATE",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "7740_1548_diamonds",
+      "providerName": "7740 + 1548 Diamonds",
+      "priceUsd": 115.191,
+      "landedThb": 3861.20232,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "REGION_RESTRICTED",
+      "canonical": {
+        "_id": "6a55806c91ffdd98b64caa5c",
+        "productCode": "mlbb",
+        "packageCode": "MLBB_7740_1548",
+        "name": "7740+1548 Diamonds",
+        "enabled": true,
+        "prices": {
+          "MM": {
+            "amount": 541966.86,
+            "currency": "MMK",
+            "enabled": true,
+            "discountLabel": "",
+            "manualOverrideReason": "",
+            "pricingNote": "",
+            "publishedPriceMode": "POLICY_DERIVED",
+            "showDiscount": true,
+            "showOriginalPrice": true,
+            "showSaveAmount": true,
+            "supplierCode": "SEAGM",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCurrency": "THB",
+            "supplierCost": 4137.12,
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "supplierId": "6a57678d4b1de0ef6650682c",
+            "referencePrice": 604098.5
+          },
+          "TH": {
+            "amount": 4163.29,
+            "currency": "THB",
+            "enabled": true,
+            "discountLabel": "",
+            "manualOverrideReason": "",
+            "pricingNote": "",
+            "publishedPriceMode": "POLICY_DERIVED",
+            "showDiscount": true,
+            "showOriginalPrice": true,
+            "showSaveAmount": true,
+            "supplierCode": "SEAGM",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCurrency": "THB",
+            "supplierCost": 4137.12,
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "supplierId": "6a57678d4b1de0ef6650682c",
+            "referencePrice": 4648.45
+          }
+        },
+        "sortOrder": 21,
+        "source": "seeded",
+        "__v": 3,
+        "createdAt": "2026-07-14T00:18:52.136Z",
+        "updatedAt": "2026-08-11T14:24:55.432Z",
+        "iconAssetId": "media_0069617c449ca5d8a85d0c42",
+        "canonicalSupplierCost": {
+          "supplierCode": "SEAGM",
+          "supplierName": "SEAGM",
+          "amount": 4137.12,
+          "capturedAt": "2026-08-11T13:39:45.537Z",
+          "currency": "THB",
+          "supplierId": "6a57678d4b1de0ef6650682c"
+        },
+        "customerNote": "",
+        "customerNoteLocales": {
+          "en": "",
+          "my": "",
+          "th": ""
+        },
+        "deletedBy": "",
+        "supplierCostHistory": [
+          {
+            "region": "MM",
+            "previousSupplierCost": null,
+            "newSupplierCost": null,
+            "previousSupplierCurrency": "",
+            "newSupplierCurrency": "MMK",
+            "supplierName": "",
+            "supplierVersion": "",
+            "supplierCostTimestamp": null,
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T12:20:12.399Z"
+          },
+          {
+            "region": "TH",
+            "previousSupplierCost": null,
+            "newSupplierCost": null,
+            "previousSupplierCurrency": "",
+            "newSupplierCurrency": "THB",
+            "supplierName": "",
+            "supplierVersion": "",
+            "supplierCostTimestamp": null,
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T12:20:12.399Z"
+          },
+          {
+            "region": "MM",
+            "previousSupplierCost": null,
+            "newSupplierCost": 4137.12,
+            "previousSupplierCurrency": "MMK",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:39:46.342Z"
+          },
+          {
+            "region": "TH",
+            "previousSupplierCost": null,
+            "newSupplierCost": 4137.12,
+            "previousSupplierCurrency": "THB",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:39:46.342Z"
+          }
+        ]
+      },
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR",
+        "PACK_EXCLUDES_MY_SG_PH_ID_RU"
+      ],
+      "canonicalProductCode": "mlbb",
+      "canonicalPackageCode": "MLBB_7740_1548",
+      "canonicalDisplayName": "7740+1548 Diamonds"
+    },
+    {
+      "offerId": "4649_883_diamonds",
+      "providerName": "4649 + 883 Diamonds",
+      "priceUsd": 69.354,
+      "landedThb": 2324.74608,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "REGION_RESTRICTED",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR",
+        "PACK_EXCLUDES_MY_SG_PH_ID_RU"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "3099_589_diamonds",
+      "providerName": "3099 + 589 Diamonds",
+      "priceUsd": 45.933,
+      "landedThb": 1539.67416,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "REGION_RESTRICTED",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR",
+        "PACK_EXCLUDES_MY_SG_PH_ID_RU"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "1860_335_diamonds",
+      "providerName": "1860 + 335 Diamonds",
+      "priceUsd": 27.533,
+      "landedThb": 922.90616,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "REGION_RESTRICTED",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR",
+        "PACK_EXCLUDES_MY_SG_PH_ID_RU"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "625_81_diamonds",
+      "providerName": "625 + 81 Diamonds",
+      "priceUsd": 9.096,
+      "landedThb": 304.89792,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "REGION_RESTRICTED",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR",
+        "PACK_EXCLUDES_MY_SG_PH_ID_RU"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "234_23_diamonds",
+      "providerName": "234 + 23 Diamonds",
+      "priceUsd": 3.35,
+      "landedThb": 112.292,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "REGION_RESTRICTED",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR",
+        "PACK_EXCLUDES_MY_SG_PH_ID_RU"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "156_16_diamonds",
+      "providerName": "156 + 16 Diamonds",
+      "priceUsd": 2.31,
+      "landedThb": 77.4312,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "REGION_RESTRICTED",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR",
+        "PACK_EXCLUDES_MY_SG_PH_ID_RU"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "78_8_diamonds",
+      "providerName": "78 + 8 Diamonds",
+      "priceUsd": 1.17,
+      "landedThb": 39.2184,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "REGION_RESTRICTED",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR",
+        "PACK_EXCLUDES_MY_SG_PH_ID_RU"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "10_1_diamonds",
+      "providerName": "10 + 1 Diamonds",
+      "priceUsd": 0.21,
+      "landedThb": 7.0392,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "BONUS_VARIANT",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "20_2_diamonds",
+      "providerName": "20 + 2 Diamonds",
+      "priceUsd": 0.43,
+      "landedThb": 14.4136,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "BONUS_VARIANT",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "51_5_diamonds",
+      "providerName": "51 + 5 Diamonds",
+      "priceUsd": 1.06,
+      "landedThb": 35.5312,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "BONUS_VARIANT",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "102_10_diamonds",
+      "providerName": "102 + 10 Diamonds",
+      "priceUsd": 2.1,
+      "landedThb": 70.392,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "BONUS_VARIANT",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "504_66_diamonds",
+      "providerName": "504 + 66 Diamonds",
+      "priceUsd": 9.06,
+      "landedThb": 303.6912,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "BONUS_VARIANT",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "1007_156_diamonds",
+      "providerName": "1007 + 156 Diamonds",
+      "priceUsd": 20.58,
+      "landedThb": 689.8416,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "BONUS_VARIANT",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "2015_383_diamonds",
+      "providerName": "2015 + 383 Diamonds",
+      "priceUsd": 41.16,
+      "landedThb": 1379.6832,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "BONUS_VARIANT",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "14_diamonds",
+      "providerName": "14 Diamonds",
+      "priceUsd": 0.23,
+      "landedThb": 7.7096,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "NEW_CANONICAL_PACKAGE_CANDIDATE",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "42_diamonds",
+      "providerName": "42 Diamonds",
+      "priceUsd": 0.7,
+      "landedThb": 23.464,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "EXACT_EXISTING_PACKAGE",
+      "canonical": {
+        "_id": "6a55806c91ffdd98b64caa4e",
+        "productCode": "mlbb",
+        "packageCode": "MLBB_42",
+        "name": "42 Diamonds",
+        "enabled": true,
+        "prices": {
+          "MM": {
+            "amount": 3109.96,
+            "currency": "MMK",
+            "enabled": true,
+            "discountLabel": "",
+            "manualOverrideReason": "",
+            "pricingNote": "",
+            "publishedPriceMode": "POLICY_DERIVED",
+            "showDiscount": true,
+            "showOriginalPrice": true,
+            "showSaveAmount": true,
+            "supplierCode": "SEAGM",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCost": 23.74,
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "supplierCurrency": "THB",
+            "supplierId": "6a57678d4b1de0ef6650682c",
+            "referencePrice": 3762.2
+          },
+          "TH": {
+            "amount": 26.87,
+            "currency": "THB",
+            "enabled": true,
+            "discountLabel": "",
+            "manualOverrideReason": "",
+            "pricingNote": "",
+            "publishedPriceMode": "POLICY_DERIVED",
+            "showDiscount": true,
+            "showOriginalPrice": true,
+            "showSaveAmount": true,
+            "supplierCode": "SEAGM",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCost": 23.74,
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "supplierCurrency": "THB",
+            "supplierId": "6a57678d4b1de0ef6650682c",
+            "referencePrice": 28.94
+          }
+        },
+        "sortOrder": 7,
+        "source": "seeded",
+        "__v": 2,
+        "createdAt": "2026-07-14T00:18:52.136Z",
+        "updatedAt": "2026-08-11T13:51:28.219Z",
+        "canonicalSupplierCost": {
+          "supplierCode": "SEAGM",
+          "supplierName": "SEAGM",
+          "amount": 23.74,
+          "capturedAt": "2026-08-11T13:39:45.537Z",
+          "currency": "THB",
+          "supplierId": "6a57678d4b1de0ef6650682c"
+        },
+        "customerNote": "",
+        "customerNoteLocales": {
+          "en": "",
+          "my": "",
+          "th": ""
+        },
+        "deletedBy": "",
+        "iconAssetId": "media_7a2cc9b4d5c7f0015691e8d7",
+        "supplierCostHistory": [
+          {
+            "region": "MM",
+            "previousSupplierCost": null,
+            "newSupplierCost": 23.74,
+            "previousSupplierCurrency": "",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:39:45.732Z"
+          },
+          {
+            "region": "TH",
+            "previousSupplierCost": null,
+            "newSupplierCost": 23.74,
+            "previousSupplierCurrency": "",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:39:45.732Z"
+          }
+        ]
+      },
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "mlbb",
+      "canonicalPackageCode": "MLBB_42",
+      "canonicalDisplayName": "42 Diamonds"
+    },
+    {
+      "offerId": "70_diamonds",
+      "providerName": "70 Diamonds",
+      "priceUsd": 1.16,
+      "landedThb": 38.8832,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "EXACT_EXISTING_PACKAGE",
+      "canonical": {
+        "_id": "6a55806c91ffdd98b64caa4f",
+        "productCode": "mlbb",
+        "packageCode": "MLBB_56",
+        "name": "70 Diamonds",
+        "enabled": true,
+        "prices": {
+          "MM": {
+            "amount": 5164.06,
+            "currency": "MMK",
+            "enabled": true,
+            "manualOverrideReason": "",
+            "pricingNote": "",
+            "publishedPriceMode": "POLICY_DERIVED",
+            "supplierCode": "SEAGM",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCost": 39.42,
+            "supplierCostTimestamp": "2026-08-11T13:53:56.538Z",
+            "supplierCurrency": "THB",
+            "supplierId": "6a57678d4b1de0ef6650682c",
+            "discountLabel": "",
+            "showDiscount": true,
+            "showOriginalPrice": true,
+            "showSaveAmount": true,
+            "referencePrice": 6249.1
+          },
+          "TH": {
+            "amount": 42.64,
+            "currency": "THB",
+            "enabled": true,
+            "manualOverrideReason": "",
+            "pricingNote": "",
+            "publishedPriceMode": "POLICY_DERIVED",
+            "supplierCode": "SEAGM",
+            "supplierCost": 39.42,
+            "supplierCostTimestamp": "2026-08-11T13:53:56.538Z",
+            "supplierCurrency": "THB",
+            "supplierId": "6a57678d4b1de0ef6650682c",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "discountLabel": "",
+            "showDiscount": true,
+            "showOriginalPrice": true,
+            "showSaveAmount": true,
+            "referencePrice": 48.07
+          }
+        },
+        "sortOrder": 8,
+        "source": "seeded",
+        "__v": 4,
+        "createdAt": "2026-07-14T00:18:52.136Z",
+        "updatedAt": "2026-08-11T13:53:56.627Z",
+        "canonicalSupplierCost": {
+          "amount": 39.42,
+          "capturedAt": "2026-08-11T13:53:56.538Z",
+          "currency": "THB",
+          "supplierCode": "SEAGM",
+          "supplierId": "6a57678d4b1de0ef6650682c",
+          "supplierName": "SEAGM"
+        },
+        "deletedBy": "",
+        "iconAssetId": "media_40bf56600f9f80d2d2e691ae",
+        "supplierCostHistory": [
+          {
+            "region": "TH",
+            "previousSupplierCost": null,
+            "newSupplierCost": 37.46,
+            "previousSupplierCurrency": "",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-07-30T13:04:02.054Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-07-30T13:04:02.181Z"
+          },
+          {
+            "region": "MM",
+            "previousSupplierCost": null,
+            "newSupplierCost": 37.46,
+            "previousSupplierCurrency": "",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-07-30T13:16:39.079Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-07-30T13:16:41.156Z"
+          },
+          {
+            "region": "TH",
+            "previousSupplierCost": 37.46,
+            "newSupplierCost": 37.46,
+            "previousSupplierCurrency": "THB",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-07-30T13:16:39.079Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-07-30T13:16:41.156Z"
+          },
+          {
+            "region": "MM",
+            "previousSupplierCost": 37.46,
+            "newSupplierCost": 30.66,
+            "previousSupplierCurrency": "THB",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:39:45.746Z"
+          },
+          {
+            "region": "TH",
+            "previousSupplierCost": 37.46,
+            "newSupplierCost": 30.66,
+            "previousSupplierCurrency": "THB",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:39:45.746Z"
+          },
+          {
+            "region": "MM",
+            "previousSupplierCost": 30.66,
+            "newSupplierCost": 39.42,
+            "previousSupplierCurrency": "THB",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:53:56.538Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:53:56.549Z"
+          },
+          {
+            "region": "TH",
+            "previousSupplierCost": 30.66,
+            "newSupplierCost": 39.42,
+            "previousSupplierCurrency": "THB",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:53:56.538Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:53:56.549Z"
+          }
+        ],
+        "customerNote": "",
+        "customerNoteLocales": {
+          "en": "",
+          "my": "",
+          "th": ""
+        }
+      },
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "mlbb",
+      "canonicalPackageCode": "MLBB_56",
+      "canonicalDisplayName": "70 Diamonds"
+    },
+    {
+      "offerId": "140_diamonds",
+      "providerName": "140 Diamonds",
+      "priceUsd": 2.31,
+      "landedThb": 77.4312,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "NEW_CANONICAL_PACKAGE_CANDIDATE",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "284_diamonds",
+      "providerName": "284 Diamonds",
+      "priceUsd": 4.63,
+      "landedThb": 155.1976,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "EXACT_EXISTING_PACKAGE",
+      "canonical": {
+        "_id": "6a55806c91ffdd98b64caa53",
+        "productCode": "mlbb",
+        "packageCode": "MLBB_284",
+        "name": "284 Diamonds",
+        "enabled": true,
+        "prices": {
+          "MM": {
+            "amount": 20707.33,
+            "currency": "MMK",
+            "enabled": true,
+            "discountLabel": "",
+            "manualOverrideReason": "",
+            "pricingNote": "",
+            "publishedPriceMode": "POLICY_DERIVED",
+            "showDiscount": true,
+            "showOriginalPrice": true,
+            "showSaveAmount": true,
+            "supplierCode": "SEAGM",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCost": 158.07,
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "supplierCurrency": "THB",
+            "supplierId": "6a57678d4b1de0ef6650682c",
+            "referencePrice": 24791
+          },
+          "TH": {
+            "amount": 161.96,
+            "currency": "THB",
+            "enabled": true,
+            "discountLabel": "",
+            "manualOverrideReason": "",
+            "pricingNote": "",
+            "publishedPriceMode": "POLICY_DERIVED",
+            "showDiscount": true,
+            "showOriginalPrice": true,
+            "showSaveAmount": true,
+            "supplierCode": "SEAGM",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCost": 158.07,
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "supplierCurrency": "THB",
+            "supplierId": "6a57678d4b1de0ef6650682c",
+            "referencePrice": 192.77
+          }
+        },
+        "sortOrder": 12,
+        "source": "seeded",
+        "__v": 2,
+        "createdAt": "2026-07-14T00:18:52.136Z",
+        "updatedAt": "2026-08-11T14:10:01.089Z",
+        "canonicalSupplierCost": {
+          "supplierCode": "SEAGM",
+          "supplierName": "SEAGM",
+          "amount": 158.07,
+          "capturedAt": "2026-08-11T13:39:45.537Z",
+          "currency": "THB",
+          "supplierId": "6a57678d4b1de0ef6650682c"
+        },
+        "customerNote": "",
+        "customerNoteLocales": {
+          "en": "",
+          "my": "",
+          "th": ""
+        },
+        "deletedBy": "",
+        "iconAssetId": "media_6ec60637f0ac94c661a99aaf",
+        "supplierCostHistory": [
+          {
+            "region": "MM",
+            "previousSupplierCost": null,
+            "newSupplierCost": 158.07,
+            "previousSupplierCurrency": "",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:39:45.934Z"
+          },
+          {
+            "region": "TH",
+            "previousSupplierCost": null,
+            "newSupplierCost": 158.07,
+            "previousSupplierCurrency": "",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:39:45.934Z"
+          }
+        ]
+      },
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "mlbb",
+      "canonicalPackageCode": "MLBB_284",
+      "canonicalDisplayName": "284 Diamonds"
+    },
+    {
+      "offerId": "355_diamonds",
+      "providerName": "355 Diamonds",
+      "priceUsd": 5.8,
+      "landedThb": 194.416,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "NEW_CANONICAL_PACKAGE_CANDIDATE",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "429_diamonds",
+      "providerName": "429 Diamonds",
+      "priceUsd": 5.712,
+      "landedThb": 191.46624,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "EXACT_EXISTING_PACKAGE",
+      "canonical": {
+        "_id": "6a55806c91ffdd98b64caa55",
+        "productCode": "mlbb",
+        "packageCode": "MLBB_570",
+        "name": "429 Diamonds",
+        "enabled": true,
+        "prices": {
+          "MM": {
+            "amount": 31061.65,
+            "currency": "MMK",
+            "enabled": true,
+            "discountLabel": "",
+            "manualOverrideReason": "",
+            "pricingNote": "",
+            "publishedPriceMode": "POLICY_DERIVED",
+            "showDiscount": true,
+            "showOriginalPrice": true,
+            "showSaveAmount": true,
+            "supplierCode": "SEAGM",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCost": 237.11,
+            "supplierCostTimestamp": "2026-08-11T13:45:06.734Z",
+            "supplierCurrency": "THB",
+            "supplierId": "6a57678d4b1de0ef6650682c",
+            "referencePrice": 37589.5
+          },
+          "TH": {
+            "amount": 200.5,
+            "currency": "THB",
+            "enabled": true,
+            "discountLabel": "",
+            "manualOverrideReason": "",
+            "pricingNote": "WonDD netpricedealer authority; packcode ML00429",
+            "publishedPriceMode": "POLICY_DERIVED",
+            "showDiscount": true,
+            "showOriginalPrice": true,
+            "showSaveAmount": true,
+            "supplierCode": "WONDD",
+            "supplierName": "WonDD",
+            "supplierVersion": "WONDD_CATALOG_2026-08-25T09:20:35.879Z",
+            "supplierCost": 197,
+            "supplierCostTimestamp": "2026-08-25T09:20:35.879Z",
+            "supplierCurrency": "THB",
+            "supplierId": "6a8d535a25a23944b761fddb",
+            "referencePrice": 289.15
+          }
+        },
+        "sortOrder": 14,
+        "source": "seeded",
+        "__v": 5,
+        "createdAt": "2026-07-14T00:18:52.136Z",
+        "updatedAt": "2026-08-25T09:25:06.952Z",
+        "canonicalSupplierCost": {
+          "supplierCode": "WONDD",
+          "supplierName": "WonDD",
+          "amount": 197,
+          "capturedAt": "2026-08-25T09:20:35.879Z",
+          "currency": "THB",
+          "supplierId": "6a8d535a25a23944b761fddb"
+        },
+        "customerNote": "",
+        "customerNoteLocales": {
+          "en": "",
+          "my": "",
+          "th": ""
+        },
+        "deletedBy": "",
+        "iconAssetId": "media_f738e5e4b5c97e0d540b87cd",
+        "supplierCostHistory": [
+          {
+            "region": "MM",
+            "previousSupplierCost": null,
+            "newSupplierCost": 0.01,
+            "previousSupplierCurrency": "",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:39:46.217Z"
+          },
+          {
+            "region": "TH",
+            "previousSupplierCost": null,
+            "newSupplierCost": 0.01,
+            "previousSupplierCurrency": "",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:39:46.217Z"
+          },
+          {
+            "region": "MM",
+            "previousSupplierCost": 0.01,
+            "newSupplierCost": 237.1,
+            "previousSupplierCurrency": "THB",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:44:39.433Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:44:39.441Z"
+          },
+          {
+            "region": "TH",
+            "previousSupplierCost": 0.01,
+            "newSupplierCost": 237.1,
+            "previousSupplierCurrency": "THB",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:44:39.433Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:44:39.441Z"
+          },
+          {
+            "region": "MM",
+            "previousSupplierCost": 237.1,
+            "newSupplierCost": 237.11,
+            "previousSupplierCurrency": "THB",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:45:06.734Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:45:06.740Z"
+          },
+          {
+            "region": "TH",
+            "previousSupplierCost": 237.1,
+            "newSupplierCost": 237.11,
+            "previousSupplierCurrency": "THB",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:45:06.734Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:45:06.740Z"
+          },
+          {
+            "region": "TH",
+            "previousSupplierCost": 237.11,
+            "newSupplierCost": 197,
+            "previousSupplierCurrency": "THB",
+            "newSupplierCurrency": "THB",
+            "supplierName": "WonDD",
+            "supplierVersion": "WONDD_CATALOG_2026-08-25T09:20:35.879Z",
+            "supplierCostTimestamp": "2026-08-25T09:20:35.879Z",
+            "pricingNote": "WonDD netpricedealer authority; packcode ML00429",
+            "changedBy": "wondd-mlbb-production-rollout",
+            "changedAt": "2026-08-25T09:25:00.036Z"
+          }
+        ],
+        "metadata": {
+          "wondd": {
+            "serviceId": "9622",
+            "serviceCode": "mlbb",
+            "packcode": "ML00429",
+            "supplierName": "Mobile Legends 429 Diamond",
+            "point": 429,
+            "amount": 197,
+            "discount": 0,
+            "netDealerPrice": 197,
+            "capturedAt": "2026-08-25T09:20:35.879Z"
+          },
+          "wonddReadiness": {
+            "supplierMapped": true,
+            "inputReady": true,
+            "pricingReady": true,
+            "fulfillmentReady": true,
+            "enabled": true
+          }
+        }
+      },
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "mlbb",
+      "canonicalPackageCode": "MLBB_570",
+      "canonicalDisplayName": "429 Diamonds"
+    },
+    {
+      "offerId": "716_diamonds",
+      "providerName": "716 Diamonds",
+      "priceUsd": 11.59,
+      "landedThb": 388.4968,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "EXACT_EXISTING_PACKAGE",
+      "canonical": {
+        "_id": "6a55806c91ffdd98b64caa56",
+        "productCode": "mlbb",
+        "packageCode": "MLBB_716",
+        "name": "716 Diamonds",
+        "enabled": true,
+        "prices": {
+          "MM": {
+            "amount": 51640.59,
+            "currency": "MMK",
+            "enabled": true,
+            "discountLabel": "",
+            "manualOverrideReason": "",
+            "pricingNote": "",
+            "publishedPriceMode": "POLICY_DERIVED",
+            "showDiscount": true,
+            "showOriginalPrice": true,
+            "showSaveAmount": true,
+            "supplierCode": "SEAGM",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCost": 394.2,
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "supplierCurrency": "THB",
+            "supplierId": "6a57678d4b1de0ef6650682c",
+            "referencePrice": 62500.7
+          },
+          "TH": {
+            "amount": 399.41,
+            "currency": "THB",
+            "enabled": true,
+            "discountLabel": "",
+            "manualOverrideReason": "",
+            "pricingNote": "",
+            "publishedPriceMode": "POLICY_DERIVED",
+            "showDiscount": true,
+            "showOriginalPrice": true,
+            "showSaveAmount": true,
+            "supplierCode": "SEAGM",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCost": 394.2,
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "supplierCurrency": "THB",
+            "supplierId": "6a57678d4b1de0ef6650682c",
+            "referencePrice": 481.9
+          }
+        },
+        "sortOrder": 15,
+        "source": "seeded",
+        "__v": 2,
+        "createdAt": "2026-07-14T00:18:52.136Z",
+        "updatedAt": "2026-08-11T14:13:02.029Z",
+        "canonicalSupplierCost": {
+          "supplierCode": "SEAGM",
+          "supplierName": "SEAGM",
+          "amount": 394.2,
+          "capturedAt": "2026-08-11T13:39:45.537Z",
+          "currency": "THB",
+          "supplierId": "6a57678d4b1de0ef6650682c"
+        },
+        "customerNote": "",
+        "customerNoteLocales": {
+          "en": "",
+          "my": "",
+          "th": ""
+        },
+        "deletedBy": "",
+        "iconAssetId": "media_f738e5e4b5c97e0d540b87cd",
+        "supplierCostHistory": [
+          {
+            "region": "MM",
+            "previousSupplierCost": null,
+            "newSupplierCost": 394.2,
+            "previousSupplierCurrency": "",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:39:46.231Z"
+          },
+          {
+            "region": "TH",
+            "previousSupplierCost": null,
+            "newSupplierCost": 394.2,
+            "previousSupplierCurrency": "",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:39:46.231Z"
+          }
+        ]
+      },
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "mlbb",
+      "canonicalPackageCode": "MLBB_716",
+      "canonicalDisplayName": "716 Diamonds"
+    },
+    {
+      "offerId": "1446_diamonds",
+      "providerName": "1446 Diamonds",
+      "priceUsd": 23.11,
+      "landedThb": 774.6472,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "NEW_CANONICAL_PACKAGE_CANDIDATE",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "2976_diamonds",
+      "providerName": "2976 Diamonds",
+      "priceUsd": 46.36,
+      "landedThb": 1553.9872,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "NEW_CANONICAL_PACKAGE_CANDIDATE",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "7502_diamonds",
+      "providerName": "7502 Diamonds",
+      "priceUsd": 115.68,
+      "landedThb": 3877.5936,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "NEW_CANONICAL_PACKAGE_CANDIDATE",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "weekly_pass",
+      "providerName": "Weekly Pass",
+      "priceUsd": 1.4487,
+      "landedThb": 48.560424,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "PASS_OR_SUBSCRIPTION",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR",
+        "PACK_EXCLUDES_MY_SG_PH_ID_RU"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "weekly_elite_pack",
+      "providerName": "Weekly Elite Pack",
+      "priceUsd": 0.7605,
+      "landedThb": 25.49196,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "PASS_OR_SUBSCRIPTION",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "twilight_pass",
+      "providerName": "Twilight Pass",
+      "priceUsd": 7.6963,
+      "landedThb": 257.979976,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "PASS_OR_SUBSCRIPTION",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "5_diamonds",
+      "providerName": "5 Diamonds",
+      "priceUsd": 0.08,
+      "landedThb": 2.6816,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "NEW_CANONICAL_PACKAGE_CANDIDATE",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "12_diamonds",
+      "providerName": "12 Diamonds",
+      "priceUsd": 0.224,
+      "landedThb": 7.50848,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "NEW_CANONICAL_PACKAGE_CANDIDATE",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "19_diamonds",
+      "providerName": "19 Diamonds",
+      "priceUsd": 0.3533,
+      "landedThb": 11.842616,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "NEW_CANONICAL_PACKAGE_CANDIDATE",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "28_diamonds",
+      "providerName": "28 Diamonds",
+      "priceUsd": 0.5059,
+      "landedThb": 16.957768,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "NEW_CANONICAL_PACKAGE_CANDIDATE",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "170_diamonds",
+      "providerName": "170 Diamonds",
+      "priceUsd": 2.927,
+      "landedThb": 98.11304,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "NEW_CANONICAL_PACKAGE_CANDIDATE",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "240_diamonds",
+      "providerName": "240 Diamonds",
+      "priceUsd": 4.141,
+      "landedThb": 138.80632,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "NEW_CANONICAL_PACKAGE_CANDIDATE",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "296_diamonds",
+      "providerName": "296 Diamonds",
+      "priceUsd": 5.1,
+      "landedThb": 170.952,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "NEW_CANONICAL_PACKAGE_CANDIDATE",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "2010_diamonds",
+      "providerName": "2010 Diamonds",
+      "priceUsd": 31.906,
+      "landedThb": 1069.48912,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "NEW_CANONICAL_PACKAGE_CANDIDATE",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "monthly_elite_pack",
+      "providerName": "Monthly Elite Pack",
+      "priceUsd": 3.7577,
+      "landedThb": 125.958104,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "PASS_OR_SUBSCRIPTION",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    }
+  ],
+  "exactMatches": [
+    {
+      "offerId": "42_diamonds",
+      "providerName": "42 Diamonds",
+      "priceUsd": 0.7,
+      "landedThb": 23.464,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "EXACT_EXISTING_PACKAGE",
+      "canonical": {
+        "_id": "6a55806c91ffdd98b64caa4e",
+        "productCode": "mlbb",
+        "packageCode": "MLBB_42",
+        "name": "42 Diamonds",
+        "enabled": true,
+        "prices": {
+          "MM": {
+            "amount": 3109.96,
+            "currency": "MMK",
+            "enabled": true,
+            "discountLabel": "",
+            "manualOverrideReason": "",
+            "pricingNote": "",
+            "publishedPriceMode": "POLICY_DERIVED",
+            "showDiscount": true,
+            "showOriginalPrice": true,
+            "showSaveAmount": true,
+            "supplierCode": "SEAGM",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCost": 23.74,
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "supplierCurrency": "THB",
+            "supplierId": "6a57678d4b1de0ef6650682c",
+            "referencePrice": 3762.2
+          },
+          "TH": {
+            "amount": 26.87,
+            "currency": "THB",
+            "enabled": true,
+            "discountLabel": "",
+            "manualOverrideReason": "",
+            "pricingNote": "",
+            "publishedPriceMode": "POLICY_DERIVED",
+            "showDiscount": true,
+            "showOriginalPrice": true,
+            "showSaveAmount": true,
+            "supplierCode": "SEAGM",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCost": 23.74,
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "supplierCurrency": "THB",
+            "supplierId": "6a57678d4b1de0ef6650682c",
+            "referencePrice": 28.94
+          }
+        },
+        "sortOrder": 7,
+        "source": "seeded",
+        "__v": 2,
+        "createdAt": "2026-07-14T00:18:52.136Z",
+        "updatedAt": "2026-08-11T13:51:28.219Z",
+        "canonicalSupplierCost": {
+          "supplierCode": "SEAGM",
+          "supplierName": "SEAGM",
+          "amount": 23.74,
+          "capturedAt": "2026-08-11T13:39:45.537Z",
+          "currency": "THB",
+          "supplierId": "6a57678d4b1de0ef6650682c"
+        },
+        "customerNote": "",
+        "customerNoteLocales": {
+          "en": "",
+          "my": "",
+          "th": ""
+        },
+        "deletedBy": "",
+        "iconAssetId": "media_7a2cc9b4d5c7f0015691e8d7",
+        "supplierCostHistory": [
+          {
+            "region": "MM",
+            "previousSupplierCost": null,
+            "newSupplierCost": 23.74,
+            "previousSupplierCurrency": "",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:39:45.732Z"
+          },
+          {
+            "region": "TH",
+            "previousSupplierCost": null,
+            "newSupplierCost": 23.74,
+            "previousSupplierCurrency": "",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:39:45.732Z"
+          }
+        ]
+      },
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "mlbb",
+      "canonicalPackageCode": "MLBB_42",
+      "canonicalDisplayName": "42 Diamonds"
+    },
+    {
+      "offerId": "70_diamonds",
+      "providerName": "70 Diamonds",
+      "priceUsd": 1.16,
+      "landedThb": 38.8832,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "EXACT_EXISTING_PACKAGE",
+      "canonical": {
+        "_id": "6a55806c91ffdd98b64caa4f",
+        "productCode": "mlbb",
+        "packageCode": "MLBB_56",
+        "name": "70 Diamonds",
+        "enabled": true,
+        "prices": {
+          "MM": {
+            "amount": 5164.06,
+            "currency": "MMK",
+            "enabled": true,
+            "manualOverrideReason": "",
+            "pricingNote": "",
+            "publishedPriceMode": "POLICY_DERIVED",
+            "supplierCode": "SEAGM",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCost": 39.42,
+            "supplierCostTimestamp": "2026-08-11T13:53:56.538Z",
+            "supplierCurrency": "THB",
+            "supplierId": "6a57678d4b1de0ef6650682c",
+            "discountLabel": "",
+            "showDiscount": true,
+            "showOriginalPrice": true,
+            "showSaveAmount": true,
+            "referencePrice": 6249.1
+          },
+          "TH": {
+            "amount": 42.64,
+            "currency": "THB",
+            "enabled": true,
+            "manualOverrideReason": "",
+            "pricingNote": "",
+            "publishedPriceMode": "POLICY_DERIVED",
+            "supplierCode": "SEAGM",
+            "supplierCost": 39.42,
+            "supplierCostTimestamp": "2026-08-11T13:53:56.538Z",
+            "supplierCurrency": "THB",
+            "supplierId": "6a57678d4b1de0ef6650682c",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "discountLabel": "",
+            "showDiscount": true,
+            "showOriginalPrice": true,
+            "showSaveAmount": true,
+            "referencePrice": 48.07
+          }
+        },
+        "sortOrder": 8,
+        "source": "seeded",
+        "__v": 4,
+        "createdAt": "2026-07-14T00:18:52.136Z",
+        "updatedAt": "2026-08-11T13:53:56.627Z",
+        "canonicalSupplierCost": {
+          "amount": 39.42,
+          "capturedAt": "2026-08-11T13:53:56.538Z",
+          "currency": "THB",
+          "supplierCode": "SEAGM",
+          "supplierId": "6a57678d4b1de0ef6650682c",
+          "supplierName": "SEAGM"
+        },
+        "deletedBy": "",
+        "iconAssetId": "media_40bf56600f9f80d2d2e691ae",
+        "supplierCostHistory": [
+          {
+            "region": "TH",
+            "previousSupplierCost": null,
+            "newSupplierCost": 37.46,
+            "previousSupplierCurrency": "",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-07-30T13:04:02.054Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-07-30T13:04:02.181Z"
+          },
+          {
+            "region": "MM",
+            "previousSupplierCost": null,
+            "newSupplierCost": 37.46,
+            "previousSupplierCurrency": "",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-07-30T13:16:39.079Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-07-30T13:16:41.156Z"
+          },
+          {
+            "region": "TH",
+            "previousSupplierCost": 37.46,
+            "newSupplierCost": 37.46,
+            "previousSupplierCurrency": "THB",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-07-30T13:16:39.079Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-07-30T13:16:41.156Z"
+          },
+          {
+            "region": "MM",
+            "previousSupplierCost": 37.46,
+            "newSupplierCost": 30.66,
+            "previousSupplierCurrency": "THB",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:39:45.746Z"
+          },
+          {
+            "region": "TH",
+            "previousSupplierCost": 37.46,
+            "newSupplierCost": 30.66,
+            "previousSupplierCurrency": "THB",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:39:45.746Z"
+          },
+          {
+            "region": "MM",
+            "previousSupplierCost": 30.66,
+            "newSupplierCost": 39.42,
+            "previousSupplierCurrency": "THB",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:53:56.538Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:53:56.549Z"
+          },
+          {
+            "region": "TH",
+            "previousSupplierCost": 30.66,
+            "newSupplierCost": 39.42,
+            "previousSupplierCurrency": "THB",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:53:56.538Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:53:56.549Z"
+          }
+        ],
+        "customerNote": "",
+        "customerNoteLocales": {
+          "en": "",
+          "my": "",
+          "th": ""
+        }
+      },
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "mlbb",
+      "canonicalPackageCode": "MLBB_56",
+      "canonicalDisplayName": "70 Diamonds"
+    },
+    {
+      "offerId": "284_diamonds",
+      "providerName": "284 Diamonds",
+      "priceUsd": 4.63,
+      "landedThb": 155.1976,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "EXACT_EXISTING_PACKAGE",
+      "canonical": {
+        "_id": "6a55806c91ffdd98b64caa53",
+        "productCode": "mlbb",
+        "packageCode": "MLBB_284",
+        "name": "284 Diamonds",
+        "enabled": true,
+        "prices": {
+          "MM": {
+            "amount": 20707.33,
+            "currency": "MMK",
+            "enabled": true,
+            "discountLabel": "",
+            "manualOverrideReason": "",
+            "pricingNote": "",
+            "publishedPriceMode": "POLICY_DERIVED",
+            "showDiscount": true,
+            "showOriginalPrice": true,
+            "showSaveAmount": true,
+            "supplierCode": "SEAGM",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCost": 158.07,
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "supplierCurrency": "THB",
+            "supplierId": "6a57678d4b1de0ef6650682c",
+            "referencePrice": 24791
+          },
+          "TH": {
+            "amount": 161.96,
+            "currency": "THB",
+            "enabled": true,
+            "discountLabel": "",
+            "manualOverrideReason": "",
+            "pricingNote": "",
+            "publishedPriceMode": "POLICY_DERIVED",
+            "showDiscount": true,
+            "showOriginalPrice": true,
+            "showSaveAmount": true,
+            "supplierCode": "SEAGM",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCost": 158.07,
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "supplierCurrency": "THB",
+            "supplierId": "6a57678d4b1de0ef6650682c",
+            "referencePrice": 192.77
+          }
+        },
+        "sortOrder": 12,
+        "source": "seeded",
+        "__v": 2,
+        "createdAt": "2026-07-14T00:18:52.136Z",
+        "updatedAt": "2026-08-11T14:10:01.089Z",
+        "canonicalSupplierCost": {
+          "supplierCode": "SEAGM",
+          "supplierName": "SEAGM",
+          "amount": 158.07,
+          "capturedAt": "2026-08-11T13:39:45.537Z",
+          "currency": "THB",
+          "supplierId": "6a57678d4b1de0ef6650682c"
+        },
+        "customerNote": "",
+        "customerNoteLocales": {
+          "en": "",
+          "my": "",
+          "th": ""
+        },
+        "deletedBy": "",
+        "iconAssetId": "media_6ec60637f0ac94c661a99aaf",
+        "supplierCostHistory": [
+          {
+            "region": "MM",
+            "previousSupplierCost": null,
+            "newSupplierCost": 158.07,
+            "previousSupplierCurrency": "",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:39:45.934Z"
+          },
+          {
+            "region": "TH",
+            "previousSupplierCost": null,
+            "newSupplierCost": 158.07,
+            "previousSupplierCurrency": "",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:39:45.934Z"
+          }
+        ]
+      },
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "mlbb",
+      "canonicalPackageCode": "MLBB_284",
+      "canonicalDisplayName": "284 Diamonds"
+    },
+    {
+      "offerId": "429_diamonds",
+      "providerName": "429 Diamonds",
+      "priceUsd": 5.712,
+      "landedThb": 191.46624,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "EXACT_EXISTING_PACKAGE",
+      "canonical": {
+        "_id": "6a55806c91ffdd98b64caa55",
+        "productCode": "mlbb",
+        "packageCode": "MLBB_570",
+        "name": "429 Diamonds",
+        "enabled": true,
+        "prices": {
+          "MM": {
+            "amount": 31061.65,
+            "currency": "MMK",
+            "enabled": true,
+            "discountLabel": "",
+            "manualOverrideReason": "",
+            "pricingNote": "",
+            "publishedPriceMode": "POLICY_DERIVED",
+            "showDiscount": true,
+            "showOriginalPrice": true,
+            "showSaveAmount": true,
+            "supplierCode": "SEAGM",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCost": 237.11,
+            "supplierCostTimestamp": "2026-08-11T13:45:06.734Z",
+            "supplierCurrency": "THB",
+            "supplierId": "6a57678d4b1de0ef6650682c",
+            "referencePrice": 37589.5
+          },
+          "TH": {
+            "amount": 200.5,
+            "currency": "THB",
+            "enabled": true,
+            "discountLabel": "",
+            "manualOverrideReason": "",
+            "pricingNote": "WonDD netpricedealer authority; packcode ML00429",
+            "publishedPriceMode": "POLICY_DERIVED",
+            "showDiscount": true,
+            "showOriginalPrice": true,
+            "showSaveAmount": true,
+            "supplierCode": "WONDD",
+            "supplierName": "WonDD",
+            "supplierVersion": "WONDD_CATALOG_2026-08-25T09:20:35.879Z",
+            "supplierCost": 197,
+            "supplierCostTimestamp": "2026-08-25T09:20:35.879Z",
+            "supplierCurrency": "THB",
+            "supplierId": "6a8d535a25a23944b761fddb",
+            "referencePrice": 289.15
+          }
+        },
+        "sortOrder": 14,
+        "source": "seeded",
+        "__v": 5,
+        "createdAt": "2026-07-14T00:18:52.136Z",
+        "updatedAt": "2026-08-25T09:25:06.952Z",
+        "canonicalSupplierCost": {
+          "supplierCode": "WONDD",
+          "supplierName": "WonDD",
+          "amount": 197,
+          "capturedAt": "2026-08-25T09:20:35.879Z",
+          "currency": "THB",
+          "supplierId": "6a8d535a25a23944b761fddb"
+        },
+        "customerNote": "",
+        "customerNoteLocales": {
+          "en": "",
+          "my": "",
+          "th": ""
+        },
+        "deletedBy": "",
+        "iconAssetId": "media_f738e5e4b5c97e0d540b87cd",
+        "supplierCostHistory": [
+          {
+            "region": "MM",
+            "previousSupplierCost": null,
+            "newSupplierCost": 0.01,
+            "previousSupplierCurrency": "",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:39:46.217Z"
+          },
+          {
+            "region": "TH",
+            "previousSupplierCost": null,
+            "newSupplierCost": 0.01,
+            "previousSupplierCurrency": "",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:39:46.217Z"
+          },
+          {
+            "region": "MM",
+            "previousSupplierCost": 0.01,
+            "newSupplierCost": 237.1,
+            "previousSupplierCurrency": "THB",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:44:39.433Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:44:39.441Z"
+          },
+          {
+            "region": "TH",
+            "previousSupplierCost": 0.01,
+            "newSupplierCost": 237.1,
+            "previousSupplierCurrency": "THB",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:44:39.433Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:44:39.441Z"
+          },
+          {
+            "region": "MM",
+            "previousSupplierCost": 237.1,
+            "newSupplierCost": 237.11,
+            "previousSupplierCurrency": "THB",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:45:06.734Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:45:06.740Z"
+          },
+          {
+            "region": "TH",
+            "previousSupplierCost": 237.1,
+            "newSupplierCost": 237.11,
+            "previousSupplierCurrency": "THB",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:45:06.734Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:45:06.740Z"
+          },
+          {
+            "region": "TH",
+            "previousSupplierCost": 237.11,
+            "newSupplierCost": 197,
+            "previousSupplierCurrency": "THB",
+            "newSupplierCurrency": "THB",
+            "supplierName": "WonDD",
+            "supplierVersion": "WONDD_CATALOG_2026-08-25T09:20:35.879Z",
+            "supplierCostTimestamp": "2026-08-25T09:20:35.879Z",
+            "pricingNote": "WonDD netpricedealer authority; packcode ML00429",
+            "changedBy": "wondd-mlbb-production-rollout",
+            "changedAt": "2026-08-25T09:25:00.036Z"
+          }
+        ],
+        "metadata": {
+          "wondd": {
+            "serviceId": "9622",
+            "serviceCode": "mlbb",
+            "packcode": "ML00429",
+            "supplierName": "Mobile Legends 429 Diamond",
+            "point": 429,
+            "amount": 197,
+            "discount": 0,
+            "netDealerPrice": 197,
+            "capturedAt": "2026-08-25T09:20:35.879Z"
+          },
+          "wonddReadiness": {
+            "supplierMapped": true,
+            "inputReady": true,
+            "pricingReady": true,
+            "fulfillmentReady": true,
+            "enabled": true
+          }
+        }
+      },
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "mlbb",
+      "canonicalPackageCode": "MLBB_570",
+      "canonicalDisplayName": "429 Diamonds"
+    },
+    {
+      "offerId": "716_diamonds",
+      "providerName": "716 Diamonds",
+      "priceUsd": 11.59,
+      "landedThb": 388.4968,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "EXACT_EXISTING_PACKAGE",
+      "canonical": {
+        "_id": "6a55806c91ffdd98b64caa56",
+        "productCode": "mlbb",
+        "packageCode": "MLBB_716",
+        "name": "716 Diamonds",
+        "enabled": true,
+        "prices": {
+          "MM": {
+            "amount": 51640.59,
+            "currency": "MMK",
+            "enabled": true,
+            "discountLabel": "",
+            "manualOverrideReason": "",
+            "pricingNote": "",
+            "publishedPriceMode": "POLICY_DERIVED",
+            "showDiscount": true,
+            "showOriginalPrice": true,
+            "showSaveAmount": true,
+            "supplierCode": "SEAGM",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCost": 394.2,
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "supplierCurrency": "THB",
+            "supplierId": "6a57678d4b1de0ef6650682c",
+            "referencePrice": 62500.7
+          },
+          "TH": {
+            "amount": 399.41,
+            "currency": "THB",
+            "enabled": true,
+            "discountLabel": "",
+            "manualOverrideReason": "",
+            "pricingNote": "",
+            "publishedPriceMode": "POLICY_DERIVED",
+            "showDiscount": true,
+            "showOriginalPrice": true,
+            "showSaveAmount": true,
+            "supplierCode": "SEAGM",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCost": 394.2,
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "supplierCurrency": "THB",
+            "supplierId": "6a57678d4b1de0ef6650682c",
+            "referencePrice": 481.9
+          }
+        },
+        "sortOrder": 15,
+        "source": "seeded",
+        "__v": 2,
+        "createdAt": "2026-07-14T00:18:52.136Z",
+        "updatedAt": "2026-08-11T14:13:02.029Z",
+        "canonicalSupplierCost": {
+          "supplierCode": "SEAGM",
+          "supplierName": "SEAGM",
+          "amount": 394.2,
+          "capturedAt": "2026-08-11T13:39:45.537Z",
+          "currency": "THB",
+          "supplierId": "6a57678d4b1de0ef6650682c"
+        },
+        "customerNote": "",
+        "customerNoteLocales": {
+          "en": "",
+          "my": "",
+          "th": ""
+        },
+        "deletedBy": "",
+        "iconAssetId": "media_f738e5e4b5c97e0d540b87cd",
+        "supplierCostHistory": [
+          {
+            "region": "MM",
+            "previousSupplierCost": null,
+            "newSupplierCost": 394.2,
+            "previousSupplierCurrency": "",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:39:46.231Z"
+          },
+          {
+            "region": "TH",
+            "previousSupplierCost": null,
+            "newSupplierCost": 394.2,
+            "previousSupplierCurrency": "",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:39:46.231Z"
+          }
+        ]
+      },
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "mlbb",
+      "canonicalPackageCode": "MLBB_716",
+      "canonicalDisplayName": "716 Diamonds"
+    }
+  ],
+  "newCandidates": [
+    {
+      "offerId": "1084_diamonds",
+      "providerName": "1084 Diamonds",
+      "priceUsd": 17.41,
+      "landedThb": 583.5832,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "NEW_CANONICAL_PACKAGE_CANDIDATE",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "14_diamonds",
+      "providerName": "14 Diamonds",
+      "priceUsd": 0.23,
+      "landedThb": 7.7096,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "NEW_CANONICAL_PACKAGE_CANDIDATE",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "140_diamonds",
+      "providerName": "140 Diamonds",
+      "priceUsd": 2.31,
+      "landedThb": 77.4312,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "NEW_CANONICAL_PACKAGE_CANDIDATE",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "355_diamonds",
+      "providerName": "355 Diamonds",
+      "priceUsd": 5.8,
+      "landedThb": 194.416,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "NEW_CANONICAL_PACKAGE_CANDIDATE",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "1446_diamonds",
+      "providerName": "1446 Diamonds",
+      "priceUsd": 23.11,
+      "landedThb": 774.6472,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "NEW_CANONICAL_PACKAGE_CANDIDATE",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "2976_diamonds",
+      "providerName": "2976 Diamonds",
+      "priceUsd": 46.36,
+      "landedThb": 1553.9872,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "NEW_CANONICAL_PACKAGE_CANDIDATE",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "7502_diamonds",
+      "providerName": "7502 Diamonds",
+      "priceUsd": 115.68,
+      "landedThb": 3877.5936,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "NEW_CANONICAL_PACKAGE_CANDIDATE",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "5_diamonds",
+      "providerName": "5 Diamonds",
+      "priceUsd": 0.08,
+      "landedThb": 2.6816,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "NEW_CANONICAL_PACKAGE_CANDIDATE",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "12_diamonds",
+      "providerName": "12 Diamonds",
+      "priceUsd": 0.224,
+      "landedThb": 7.50848,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "NEW_CANONICAL_PACKAGE_CANDIDATE",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "19_diamonds",
+      "providerName": "19 Diamonds",
+      "priceUsd": 0.3533,
+      "landedThb": 11.842616,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "NEW_CANONICAL_PACKAGE_CANDIDATE",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "28_diamonds",
+      "providerName": "28 Diamonds",
+      "priceUsd": 0.5059,
+      "landedThb": 16.957768,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "NEW_CANONICAL_PACKAGE_CANDIDATE",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "170_diamonds",
+      "providerName": "170 Diamonds",
+      "priceUsd": 2.927,
+      "landedThb": 98.11304,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "NEW_CANONICAL_PACKAGE_CANDIDATE",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "240_diamonds",
+      "providerName": "240 Diamonds",
+      "priceUsd": 4.141,
+      "landedThb": 138.80632,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "NEW_CANONICAL_PACKAGE_CANDIDATE",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "296_diamonds",
+      "providerName": "296 Diamonds",
+      "priceUsd": 5.1,
+      "landedThb": 170.952,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "NEW_CANONICAL_PACKAGE_CANDIDATE",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "2010_diamonds",
+      "providerName": "2010 Diamonds",
+      "priceUsd": 31.906,
+      "landedThb": 1069.48912,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "NEW_CANONICAL_PACKAGE_CANDIDATE",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    }
+  ],
+  "ambiguousOffers": [
+    {
+      "offerId": "500_65_diamonds_first_top_up_bonus",
+      "providerName": "500 + 65 Diamonds (First Top-Up Bonus)",
+      "priceUsd": 7.3616,
+      "landedThb": 246.760832,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "BONUS_VARIANT",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "250_25_diamonds_first_top_up_bonus",
+      "providerName": "250 + 25 Diamonds (First Top-Up Bonus)",
+      "priceUsd": 3.5858,
+      "landedThb": 120.196016,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "BONUS_VARIANT",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "150_15_diamonds_first_top_up_bonus",
+      "providerName": "150 + 15 Diamonds (First Top-Up Bonus)",
+      "priceUsd": 2.2351,
+      "landedThb": 74.920552,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "BONUS_VARIANT",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "50_5_diamonds_first_top_up_bonus",
+      "providerName": "50 + 5 Diamonds (First Top-Up Bonus)",
+      "priceUsd": 0.7427,
+      "landedThb": 24.895304,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "BONUS_VARIANT",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "7740_1548_diamonds",
+      "providerName": "7740 + 1548 Diamonds",
+      "priceUsd": 115.191,
+      "landedThb": 3861.20232,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "REGION_RESTRICTED",
+      "canonical": {
+        "_id": "6a55806c91ffdd98b64caa5c",
+        "productCode": "mlbb",
+        "packageCode": "MLBB_7740_1548",
+        "name": "7740+1548 Diamonds",
+        "enabled": true,
+        "prices": {
+          "MM": {
+            "amount": 541966.86,
+            "currency": "MMK",
+            "enabled": true,
+            "discountLabel": "",
+            "manualOverrideReason": "",
+            "pricingNote": "",
+            "publishedPriceMode": "POLICY_DERIVED",
+            "showDiscount": true,
+            "showOriginalPrice": true,
+            "showSaveAmount": true,
+            "supplierCode": "SEAGM",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCurrency": "THB",
+            "supplierCost": 4137.12,
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "supplierId": "6a57678d4b1de0ef6650682c",
+            "referencePrice": 604098.5
+          },
+          "TH": {
+            "amount": 4163.29,
+            "currency": "THB",
+            "enabled": true,
+            "discountLabel": "",
+            "manualOverrideReason": "",
+            "pricingNote": "",
+            "publishedPriceMode": "POLICY_DERIVED",
+            "showDiscount": true,
+            "showOriginalPrice": true,
+            "showSaveAmount": true,
+            "supplierCode": "SEAGM",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCurrency": "THB",
+            "supplierCost": 4137.12,
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "supplierId": "6a57678d4b1de0ef6650682c",
+            "referencePrice": 4648.45
+          }
+        },
+        "sortOrder": 21,
+        "source": "seeded",
+        "__v": 3,
+        "createdAt": "2026-07-14T00:18:52.136Z",
+        "updatedAt": "2026-08-11T14:24:55.432Z",
+        "iconAssetId": "media_0069617c449ca5d8a85d0c42",
+        "canonicalSupplierCost": {
+          "supplierCode": "SEAGM",
+          "supplierName": "SEAGM",
+          "amount": 4137.12,
+          "capturedAt": "2026-08-11T13:39:45.537Z",
+          "currency": "THB",
+          "supplierId": "6a57678d4b1de0ef6650682c"
+        },
+        "customerNote": "",
+        "customerNoteLocales": {
+          "en": "",
+          "my": "",
+          "th": ""
+        },
+        "deletedBy": "",
+        "supplierCostHistory": [
+          {
+            "region": "MM",
+            "previousSupplierCost": null,
+            "newSupplierCost": null,
+            "previousSupplierCurrency": "",
+            "newSupplierCurrency": "MMK",
+            "supplierName": "",
+            "supplierVersion": "",
+            "supplierCostTimestamp": null,
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T12:20:12.399Z"
+          },
+          {
+            "region": "TH",
+            "previousSupplierCost": null,
+            "newSupplierCost": null,
+            "previousSupplierCurrency": "",
+            "newSupplierCurrency": "THB",
+            "supplierName": "",
+            "supplierVersion": "",
+            "supplierCostTimestamp": null,
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T12:20:12.399Z"
+          },
+          {
+            "region": "MM",
+            "previousSupplierCost": null,
+            "newSupplierCost": 4137.12,
+            "previousSupplierCurrency": "MMK",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:39:46.342Z"
+          },
+          {
+            "region": "TH",
+            "previousSupplierCost": null,
+            "newSupplierCost": 4137.12,
+            "previousSupplierCurrency": "THB",
+            "newSupplierCurrency": "THB",
+            "supplierName": "SEAGM",
+            "supplierVersion": "",
+            "supplierCostTimestamp": "2026-08-11T13:39:45.537Z",
+            "pricingNote": "",
+            "changedBy": "azl15m5.ops5",
+            "changedAt": "2026-08-11T13:39:46.342Z"
+          }
+        ]
+      },
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR",
+        "PACK_EXCLUDES_MY_SG_PH_ID_RU"
+      ],
+      "canonicalProductCode": "mlbb",
+      "canonicalPackageCode": "MLBB_7740_1548",
+      "canonicalDisplayName": "7740+1548 Diamonds"
+    },
+    {
+      "offerId": "4649_883_diamonds",
+      "providerName": "4649 + 883 Diamonds",
+      "priceUsd": 69.354,
+      "landedThb": 2324.74608,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "REGION_RESTRICTED",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR",
+        "PACK_EXCLUDES_MY_SG_PH_ID_RU"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "3099_589_diamonds",
+      "providerName": "3099 + 589 Diamonds",
+      "priceUsd": 45.933,
+      "landedThb": 1539.67416,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "REGION_RESTRICTED",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR",
+        "PACK_EXCLUDES_MY_SG_PH_ID_RU"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "1860_335_diamonds",
+      "providerName": "1860 + 335 Diamonds",
+      "priceUsd": 27.533,
+      "landedThb": 922.90616,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "REGION_RESTRICTED",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR",
+        "PACK_EXCLUDES_MY_SG_PH_ID_RU"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "625_81_diamonds",
+      "providerName": "625 + 81 Diamonds",
+      "priceUsd": 9.096,
+      "landedThb": 304.89792,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "REGION_RESTRICTED",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR",
+        "PACK_EXCLUDES_MY_SG_PH_ID_RU"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "234_23_diamonds",
+      "providerName": "234 + 23 Diamonds",
+      "priceUsd": 3.35,
+      "landedThb": 112.292,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "REGION_RESTRICTED",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR",
+        "PACK_EXCLUDES_MY_SG_PH_ID_RU"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "156_16_diamonds",
+      "providerName": "156 + 16 Diamonds",
+      "priceUsd": 2.31,
+      "landedThb": 77.4312,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "REGION_RESTRICTED",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR",
+        "PACK_EXCLUDES_MY_SG_PH_ID_RU"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "78_8_diamonds",
+      "providerName": "78 + 8 Diamonds",
+      "priceUsd": 1.17,
+      "landedThb": 39.2184,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "REGION_RESTRICTED",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR",
+        "PACK_EXCLUDES_MY_SG_PH_ID_RU"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "10_1_diamonds",
+      "providerName": "10 + 1 Diamonds",
+      "priceUsd": 0.21,
+      "landedThb": 7.0392,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "BONUS_VARIANT",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "20_2_diamonds",
+      "providerName": "20 + 2 Diamonds",
+      "priceUsd": 0.43,
+      "landedThb": 14.4136,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "BONUS_VARIANT",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "51_5_diamonds",
+      "providerName": "51 + 5 Diamonds",
+      "priceUsd": 1.06,
+      "landedThb": 35.5312,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "BONUS_VARIANT",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "102_10_diamonds",
+      "providerName": "102 + 10 Diamonds",
+      "priceUsd": 2.1,
+      "landedThb": 70.392,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "BONUS_VARIANT",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "504_66_diamonds",
+      "providerName": "504 + 66 Diamonds",
+      "priceUsd": 9.06,
+      "landedThb": 303.6912,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "BONUS_VARIANT",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "1007_156_diamonds",
+      "providerName": "1007 + 156 Diamonds",
+      "priceUsd": 20.58,
+      "landedThb": 689.8416,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "BONUS_VARIANT",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "2015_383_diamonds",
+      "providerName": "2015 + 383 Diamonds",
+      "priceUsd": 41.16,
+      "landedThb": 1379.6832,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "BONUS_VARIANT",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "weekly_pass",
+      "providerName": "Weekly Pass",
+      "priceUsd": 1.4487,
+      "landedThb": 48.560424,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "PASS_OR_SUBSCRIPTION",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR",
+        "PACK_EXCLUDES_MY_SG_PH_ID_RU"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "weekly_elite_pack",
+      "providerName": "Weekly Elite Pack",
+      "priceUsd": 0.7605,
+      "landedThb": 25.49196,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "PASS_OR_SUBSCRIPTION",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "twilight_pass",
+      "providerName": "Twilight Pass",
+      "priceUsd": 7.6963,
+      "landedThb": 257.979976,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "PASS_OR_SUBSCRIPTION",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    },
+    {
+      "offerId": "monthly_elite_pack",
+      "providerName": "Monthly Elite Pack",
+      "priceUsd": 3.7577,
+      "landedThb": 125.958104,
+      "availability": "LISTED_CURRENTLY",
+      "classification": "PASS_OR_SUBSCRIPTION",
+      "canonical": null,
+      "restrictions": [
+        "CATEGORY_EXCLUDES_ID_AND_BR"
+      ],
+      "canonicalProductCode": "",
+      "canonicalPackageCode": "",
+      "canonicalDisplayName": ""
+    }
+  ],
+  "supplierEconomics": [
+    {
+      "canonicalPackageCode": "MLBB_570",
+      "canonicalDisplayName": "429 Diamonds",
+      "wonddPackcode": "ML00429",
+      "wonddRawThb": 197,
+      "fazerOfferId": "429_diamonds",
+      "fazerRawUsd": 5.712,
+      "fxRate": 33.52,
+      "fazerLandedThb": 191.46624,
+      "differenceThb": -5.53376,
+      "cheaperSupplier": "FAZERCARDS"
+    }
+  ],
+  "regionRestrictions": [
+    {
+      "scope": "CATEGORY",
+      "excluded": [
+        "ID",
+        "BR"
+      ],
+      "evidence": "Provider category note"
+    },
+    {
+      "scope": "SELECTED_PACKS",
+      "excluded": [
+        "MY",
+        "SG",
+        "PH",
+        "ID",
+        "RU"
+      ],
+      "offers": [
+        "7740_1548_diamonds",
+        "4649_883_diamonds",
+        "3099_589_diamonds",
+        "1860_335_diamonds",
+        "625_81_diamonds",
+        "234_23_diamonds",
+        "156_16_diamonds",
+        "78_8_diamonds",
+        "weekly_pass"
+      ],
+      "evidence": "Provider category note"
+    }
+  ],
+  "inputContract": [
+    {
+      "source": "OFFERS_GET",
+      "fields": [
+        {
+          "key": "player_id",
+          "label": "Player ID",
+          "type": "text"
+        },
+        {
+          "key": "server_id",
+          "label": "Server ID",
+          "type": "text"
+        }
+      ],
+      "normalizedAzielMapping": {
+        "userId": "player_id",
+        "zoneId": "UNRESOLVED_SERVER_ID_VS_ZONE_ID"
+      },
+      "trimming": "Adapter trims strings",
+      "missingFieldBehavior": "Current MLBB order payload support is not implemented; adapter's existing top-up builder only sends player_id",
+      "numericRequirement": "NOT_EXPLICITLY_STATED_BY_PROVIDER_METADATA"
+    },
+    {
+      "source": "VALIDATION_CAPABILITY_GET",
+      "validationCategory": "mobile_legends",
+      "fields": [
+        {
+          "key": "player_id",
+          "label": "User ID",
+          "type": "text"
+        },
+        {
+          "key": "zone_id",
+          "label": "Zone ID",
+          "type": "text"
+        }
+      ],
+      "playerNameReturned": "UNKNOWN_WITHOUT_LIVE_VALIDATION",
+      "mandatoryBeforeOrder": "NOT_PROVEN_BY_READ_ONLY_METADATA"
+    }
+  ],
+  "recommendedCanonicalPlan": [
+    {
+      "packageCode": "MLBB_WONDD_ML00257",
+      "recommendation": "KEEP",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_WONDD_ML00275",
+      "recommendation": "KEEP",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_WONDD_ML00343",
+      "recommendation": "KEEP",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_WONDD_ML00600",
+      "recommendation": "KEEP",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_WONDD_ML00706",
+      "recommendation": "KEEP",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_WONDD_ML00792",
+      "recommendation": "KEEP",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_WONDD_ML01049",
+      "recommendation": "KEEP",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_WONDD_ML02195",
+      "recommendation": "KEEP",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_WONDD_ML03688",
+      "recommendation": "KEEP",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_WONDD_ML05532",
+      "recommendation": "KEEP",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_WONDD_ML09288",
+      "recommendation": "KEEP",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_WONDD_MLFT055",
+      "recommendation": "KEEP",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_WONDD_MLFT165",
+      "recommendation": "KEEP",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_WONDD_MLFT275",
+      "recommendation": "KEEP",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_WONDD_MLFT565",
+      "recommendation": "KEEP",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_WONDD_MLOTW01",
+      "recommendation": "KEEP",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_WONDD_MLTMP01",
+      "recommendation": "KEEP",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_11_1",
+      "recommendation": "LEGACY_KEEP_PRIVATE",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_13_1",
+      "recommendation": "KEEP",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_42",
+      "recommendation": "KEEP",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_56",
+      "recommendation": "KEEP",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_86",
+      "recommendation": "KEEP",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_112",
+      "recommendation": "LEGACY_KEEP_PRIVATE",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_172",
+      "recommendation": "KEEP",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_284",
+      "recommendation": "KEEP",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_344",
+      "recommendation": "KEEP",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_570",
+      "recommendation": "KEEP",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_716",
+      "recommendation": "KEEP",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_1163",
+      "recommendation": "KEEP",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_1160_186",
+      "recommendation": "KEEP",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_1360_335",
+      "recommendation": "LEGACY_KEEP_PRIVATE",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_2015_475",
+      "recommendation": "LEGACY_KEEP_PRIVATE",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_5000_1000",
+      "recommendation": "KEEP",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB_7740_1548",
+      "recommendation": "KEEP",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "packageCode": "MLBB-WEEKLY.PASS",
+      "recommendation": "KEEP",
+      "reason": "Canonical identity is independent of FazerCards coverage."
+    },
+    {
+      "offerId": "1084_diamonds",
+      "recommendation": "ADD_CANDIDATE",
+      "reason": "Plain denomination is unambiguous, but production creation is deferred."
+    },
+    {
+      "offerId": "14_diamonds",
+      "recommendation": "ADD_CANDIDATE",
+      "reason": "Plain denomination is unambiguous, but production creation is deferred."
+    },
+    {
+      "offerId": "140_diamonds",
+      "recommendation": "ADD_CANDIDATE",
+      "reason": "Plain denomination is unambiguous, but production creation is deferred."
+    },
+    {
+      "offerId": "355_diamonds",
+      "recommendation": "ADD_CANDIDATE",
+      "reason": "Plain denomination is unambiguous, but production creation is deferred."
+    },
+    {
+      "offerId": "1446_diamonds",
+      "recommendation": "ADD_CANDIDATE",
+      "reason": "Plain denomination is unambiguous, but production creation is deferred."
+    },
+    {
+      "offerId": "2976_diamonds",
+      "recommendation": "ADD_CANDIDATE",
+      "reason": "Plain denomination is unambiguous, but production creation is deferred."
+    },
+    {
+      "offerId": "7502_diamonds",
+      "recommendation": "ADD_CANDIDATE",
+      "reason": "Plain denomination is unambiguous, but production creation is deferred."
+    },
+    {
+      "offerId": "5_diamonds",
+      "recommendation": "ADD_CANDIDATE",
+      "reason": "Plain denomination is unambiguous, but production creation is deferred."
+    },
+    {
+      "offerId": "12_diamonds",
+      "recommendation": "ADD_CANDIDATE",
+      "reason": "Plain denomination is unambiguous, but production creation is deferred."
+    },
+    {
+      "offerId": "19_diamonds",
+      "recommendation": "ADD_CANDIDATE",
+      "reason": "Plain denomination is unambiguous, but production creation is deferred."
+    },
+    {
+      "offerId": "28_diamonds",
+      "recommendation": "ADD_CANDIDATE",
+      "reason": "Plain denomination is unambiguous, but production creation is deferred."
+    },
+    {
+      "offerId": "170_diamonds",
+      "recommendation": "ADD_CANDIDATE",
+      "reason": "Plain denomination is unambiguous, but production creation is deferred."
+    },
+    {
+      "offerId": "240_diamonds",
+      "recommendation": "ADD_CANDIDATE",
+      "reason": "Plain denomination is unambiguous, but production creation is deferred."
+    },
+    {
+      "offerId": "296_diamonds",
+      "recommendation": "ADD_CANDIDATE",
+      "reason": "Plain denomination is unambiguous, but production creation is deferred."
+    },
+    {
+      "offerId": "2010_diamonds",
+      "recommendation": "ADD_CANDIDATE",
+      "reason": "Plain denomination is unambiguous, but production creation is deferred."
+    },
+    {
+      "offerId": "500_65_diamonds_first_top_up_bonus",
+      "recommendation": "DO_NOT_MAP",
+      "reason": "BONUS_VARIANT"
+    },
+    {
+      "offerId": "250_25_diamonds_first_top_up_bonus",
+      "recommendation": "DO_NOT_MAP",
+      "reason": "BONUS_VARIANT"
+    },
+    {
+      "offerId": "150_15_diamonds_first_top_up_bonus",
+      "recommendation": "DO_NOT_MAP",
+      "reason": "BONUS_VARIANT"
+    },
+    {
+      "offerId": "50_5_diamonds_first_top_up_bonus",
+      "recommendation": "DO_NOT_MAP",
+      "reason": "BONUS_VARIANT"
+    },
+    {
+      "offerId": "7740_1548_diamonds",
+      "recommendation": "DO_NOT_MAP",
+      "reason": "REGION_RESTRICTED"
+    },
+    {
+      "offerId": "4649_883_diamonds",
+      "recommendation": "DO_NOT_MAP",
+      "reason": "REGION_RESTRICTED"
+    },
+    {
+      "offerId": "3099_589_diamonds",
+      "recommendation": "DO_NOT_MAP",
+      "reason": "REGION_RESTRICTED"
+    },
+    {
+      "offerId": "1860_335_diamonds",
+      "recommendation": "DO_NOT_MAP",
+      "reason": "REGION_RESTRICTED"
+    },
+    {
+      "offerId": "625_81_diamonds",
+      "recommendation": "DO_NOT_MAP",
+      "reason": "REGION_RESTRICTED"
+    },
+    {
+      "offerId": "234_23_diamonds",
+      "recommendation": "DO_NOT_MAP",
+      "reason": "REGION_RESTRICTED"
+    },
+    {
+      "offerId": "156_16_diamonds",
+      "recommendation": "DO_NOT_MAP",
+      "reason": "REGION_RESTRICTED"
+    },
+    {
+      "offerId": "78_8_diamonds",
+      "recommendation": "DO_NOT_MAP",
+      "reason": "REGION_RESTRICTED"
+    },
+    {
+      "offerId": "10_1_diamonds",
+      "recommendation": "DO_NOT_MAP",
+      "reason": "BONUS_VARIANT"
+    },
+    {
+      "offerId": "20_2_diamonds",
+      "recommendation": "DO_NOT_MAP",
+      "reason": "BONUS_VARIANT"
+    },
+    {
+      "offerId": "51_5_diamonds",
+      "recommendation": "DO_NOT_MAP",
+      "reason": "BONUS_VARIANT"
+    },
+    {
+      "offerId": "102_10_diamonds",
+      "recommendation": "DO_NOT_MAP",
+      "reason": "BONUS_VARIANT"
+    },
+    {
+      "offerId": "504_66_diamonds",
+      "recommendation": "DO_NOT_MAP",
+      "reason": "BONUS_VARIANT"
+    },
+    {
+      "offerId": "1007_156_diamonds",
+      "recommendation": "DO_NOT_MAP",
+      "reason": "BONUS_VARIANT"
+    },
+    {
+      "offerId": "2015_383_diamonds",
+      "recommendation": "DO_NOT_MAP",
+      "reason": "BONUS_VARIANT"
+    },
+    {
+      "offerId": "weekly_pass",
+      "recommendation": "DO_NOT_MAP",
+      "reason": "PASS_OR_SUBSCRIPTION"
+    },
+    {
+      "offerId": "weekly_elite_pack",
+      "recommendation": "DO_NOT_MAP",
+      "reason": "PASS_OR_SUBSCRIPTION"
+    },
+    {
+      "offerId": "twilight_pass",
+      "recommendation": "DO_NOT_MAP",
+      "reason": "PASS_OR_SUBSCRIPTION"
+    },
+    {
+      "offerId": "monthly_elite_pack",
+      "recommendation": "DO_NOT_MAP",
+      "reason": "PASS_OR_SUBSCRIPTION"
+    }
+  ],
+  "fxAuthority": {
+    "rate": 33.52,
+    "source": "manual_admin",
+    "capturedAt": "2026-08-25T09:52:00.000Z",
+    "maximumAgeSeconds": 86400,
+    "policyCode": "AZIEL_PRICING_TH_THB_V50"
+  },
+  "controlledTestCandidate": {
+    "offerId": "5_diamonds",
+    "providerName": "5 Diamonds",
+    "priceUsd": 0.08,
+    "landedThb": 2.6816,
+    "availability": "LISTED_CURRENTLY",
+    "classification": "NEW_CANONICAL_PACKAGE_CANDIDATE",
+    "canonical": null,
+    "restrictions": [
+      "CATEGORY_EXCLUDES_ID_AND_BR"
+    ],
+    "canonicalProductCode": "",
+    "canonicalPackageCode": "",
+    "canonicalDisplayName": "",
+    "assessment": "LOWEST_COST_PLAIN_DENOMINATION_BUT_NOT_READY_UNTIL_CANONICAL_IDENTITY_AND_SERVER_ID_FIELD_ARE_RESOLVED"
+  },
+  "safety": {
+    "realFazerCardsOrderCalls": 0,
+    "liveValidationCalls": 0,
+    "wonddTopupCalls": 0,
+    "providerBalanceBeforeUsd": 0,
+    "providerBalanceAfterUsd": 0,
+    "providerBalanceSpentUsd": 0,
+    "productionDataMutations": 0,
+    "fazerCardsMappingsCreated": 0,
+    "fazerCardsMappingsEnabled": 0,
+    "wonddMappingsModified": 0,
+    "pricesPublished": 0,
+    "publicStorefrontChanged": false
+  }
+}

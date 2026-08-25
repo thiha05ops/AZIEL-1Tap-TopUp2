@@ -57,6 +57,7 @@ const websiteRuntimeRoutes = require("./routes/websiteRuntime");
 const configurationRegistryRoutes = require("./routes/configurationRegistry");
 const commerceManualPaymentRoutes = require("./routes/commerceManualPaymentRoutes");
 const adminPricingEngineRoutes = require("./routes/adminPricingEngine");
+const fazercardsWebhookRoutes = require("./routes/fazercardsWebhook");
 const realtime = require("./services/realtime");
 
 // EXPRESS APP
@@ -120,6 +121,9 @@ function configureApplication(mongoConnection) {
     app.use("/api/register", authLimiter);
     app.use("/api/verify-email", authLimiter);
     app.use("/api/password", authLimiter);
+
+    // Must precede JSON parsing so FazerCards HMAC verifies the exact raw bytes.
+    app.use("/api", fazercardsWebhookRoutes);
 
     app.use(express.json({ limit: jsonBodyLimit }));
     app.use(express.urlencoded({
@@ -284,6 +288,13 @@ async function startServer() {
         wonddProcessor.recoverDue().catch(() => null);
         const wonddRecoveryTimer = setInterval(() => wonddProcessor.recoverDue().catch(() => null), 15 * 60 * 1000);
         wonddRecoveryTimer.unref?.();
+    }
+
+    if (String(process.env.FAZERCARDS_PUBG_AUTO_FULFILLMENT_ENABLED || "").trim().toLowerCase() === "true") {
+        const fazerCardsProcessor = require("./services/suppliers/fazercardsFulfillmentProcessor").processor;
+        fazerCardsProcessor.recoverDue().catch(() => null);
+        const fazerCardsRecoveryTimer = setInterval(() => fazerCardsProcessor.recoverDue().catch(() => null), 15 * 60 * 1000);
+        fazerCardsRecoveryTimer.unref?.();
     }
 
     return server;

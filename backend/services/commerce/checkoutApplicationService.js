@@ -796,7 +796,7 @@ async function executeCheckoutTransaction(context, deps) {
     }
 
     validateQuoteForCheckout(quote, context.checkoutTime);
-    await validatePackage(quote, preflightContext, deps);
+    const packageValidation = await validatePackage(quote, preflightContext, deps);
     const fulfilmentInput = await validateFulfilment(quote, preflightContext, deps);
     const paymentValidation = await validatePayment(quote, preflightContext, deps);
     const promotionValidation = await validatePromotion(quote, preflightContext, deps);
@@ -814,6 +814,7 @@ async function executeCheckoutTransaction(context, deps) {
             nextAction: paymentValidation.nextAction
         },
         fulfilmentInput,
+        supplierRouteSnapshot: packageValidation.supplierRouteSnapshot || null,
         requestMetadata: normalized.requestMetadata,
         promotionRedemptionSnapshot: promotionValidation.promotionRedemptionSnapshot
     });

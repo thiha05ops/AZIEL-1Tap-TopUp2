@@ -2,6 +2,7 @@
 
 const mongoose = require("mongoose");
 const Supplier = require("../../models/Supplier");
+const { SUPPLIER_CURRENCY } = require("../../constants/commerce");
 
 class PricingSupplierError extends Error {
     constructor(code, message, statusCode = 400) {
@@ -30,6 +31,7 @@ function projectPricingSupplier(supplier = {}) {
         supplierCode: upper(supplier.supplierCode),
         supplierName: text(supplier.name),
         supplierCurrency: supplierCurrency(supplier),
+        mode: upper(supplier.mode || "MANUAL"),
         supportedRegions: Array.isArray(supplier.supportedRegions) ? supplier.supportedRegions.map(upper) : [],
         enabled: supplier.enabled !== false
     };
@@ -49,7 +51,7 @@ async function resolvePricingSupplier({ supplierId, region = "" } = {}) {
     if (projected.supportedRegions.length && normalizedRegion && normalizedRegion !== "ALL" && !projected.supportedRegions.includes(normalizedRegion)) {
         throw new PricingSupplierError("PRICING_SUPPLIER_REGION_UNAVAILABLE", "Selected supplier does not support this region.", 409);
     }
-    if (!["MMK", "THB"].includes(projected.supplierCurrency)) {
+    if (!SUPPLIER_CURRENCY.includes(projected.supplierCurrency)) {
         throw new PricingSupplierError("PRICING_SUPPLIER_CURRENCY_MISSING", "Selected supplier has no pricing currency configured.", 409);
     }
     return projected;

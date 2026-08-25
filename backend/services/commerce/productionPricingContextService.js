@@ -5,6 +5,7 @@ const PricingRule = require("../../models/PricingRule");
 const PriceVersion = require("../../models/PriceVersion");
 const { resolveExchangeRate } = require("./exchangeRateService");
 const { resolveSupplierCostSnapshot } = require("./supplierCostService");
+const { STOREFRONT_CURRENCY } = require("../../constants/commerce");
 
 const DEFAULT_BRANCH = "storefront";
 
@@ -211,6 +212,12 @@ function isoDate(value, fallback = new Date()) {
         : date.toISOString();
 }
 
+function strictIsoDate(value, field) {
+    const date = new Date(value || "");
+    if (!Number.isFinite(date.getTime())) throw new Error(`${field} must be a valid timestamp.`);
+    return date.toISOString();
+}
+
 function resolveProductionExchangeRate({
     policy,
     supplierCurrency,
@@ -230,19 +237,28 @@ function resolveProductionExchangeRate({
 
     const metadata = policy?.metadata || {};
     const policyRate = Number(metadata.exchangeRate);
+    const requiresBoundedFreshness = !STOREFRONT_CURRENCY.includes(source);
 
     if (
         upper(metadata.supplierCurrency) === source &&
+        (!metadata.targetCurrency || upper(metadata.targetCurrency) === target) &&
         Number.isFinite(policyRate) &&
         policyRate > 0
     ) {
+        const capturedAt = requiresBoundedFreshness
+            ? strictIsoDate(metadata.exchangeRateCapturedAt, "exchangeRateCapturedAt")
+            : isoDate(metadata.exchangeRateCapturedAt || policy.updatedAt, now);
         return {
             rate: policyRate,
-            source: "pricing_policy",
+            source: text(metadata.exchangeRateSource || "pricing_policy"),
             provider: "AZIEL_COMMERCE",
             sourceCurrency: source,
             targetCurrency: target,
-            capturedAt: isoDate(policy.updatedAt, now)
+            capturedAt,
+            effectiveAt: metadata.exchangeRateEffectiveAt ? isoDate(metadata.exchangeRateEffectiveAt, now) : null,
+            expiresAt: metadata.exchangeRateExpiresAt ? isoDate(metadata.exchangeRateExpiresAt, now) : null,
+            maxAgeSeconds: Number(metadata.exchangeRateMaxAgeSeconds) > 0 ? Number(metadata.exchangeRateMaxAgeSeconds) : null,
+            requireFreshness: requiresBoundedFreshness
         };
     }
 
@@ -305,6 +321,10 @@ async function buildProductionPricingContext({
                 supplierCurrency: supplierCost.currency,
                 targetCurrency: normalizedCurrency,
                 exchangeRate: supplierCost.currency === normalizedCurrency ? null : exchangeRate,
+                acquisitionCosts: {
+                    fundingCost: amount(supplierCost.fundingCost),
+                    otherAcquisitionCost: amount(supplierCost.otherAcquisitionCost)
+                },
                 policy: policyFromRecord(policy),
                 appliedPricingRules,
                 context: {
@@ -341,5 +361,6 @@ async function buildProductionPricingContext({
 
 module.exports = Object.freeze({
     buildProductionPricingContext,
-    neutralPolicy
+    neutralPolicy,
+    resolveProductionExchangeRate
 });
