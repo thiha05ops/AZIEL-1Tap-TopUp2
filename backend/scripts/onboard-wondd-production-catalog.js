@@ -42,7 +42,7 @@ function priceReadiness(pkg, cost) {
 }
 
 async function main() {
-    if (String(process.env.WONDD_MLBB_AUTO_FULFILLMENT_ENABLED || "").trim().toLowerCase() === "true" || String(process.env.WONDD_AUTO_FULFILLMENT_ENABLED_PRODUCTS || "").trim()) {
+    if (String(process.env.WONDD_MLBB_AUTO_FULFILLMENT_ENABLED || "").trim().toLowerCase() === "true" || String(process.env.WONDD_FREEFIRE_AUTO_FULFILLMENT_ENABLED || "").trim().toLowerCase() === "true" || String(process.env.WONDD_AUTO_FULFILLMENT_ENABLED_PRODUCTS || "").trim()) {
         throw new Error("WonDD live fulfillment gates must be disabled during catalog onboarding.");
     }
     if (!Number.isFinite(CAPTURED_AT.getTime()) || Date.now() - CAPTURED_AT.getTime() > 24 * 60 * 60 * 1000) throw new Error("WonDD catalog audit is stale; refresh it first.");
@@ -102,7 +102,7 @@ async function main() {
             pkg.metadata = {
                 ...(pkg.metadata || {}),
                 wondd: { serviceId: String(game.serviceid), serviceCode: config.serviceCode, packcode: row.packcode, supplierName: row.name, point: row.point ?? null, amount: Number(row.amount), discount: Number(row.discount), netDealerPrice: cost, capturedAt: audit.capturedAt },
-                wonddReadiness: { supplierMapped: true, inputReady: hasWonddGameIdFormatter(config.productCode), pricingReady: pricing.ready, fulfillmentReady: config.productCode === "mlbb" && pricing.ready, enabled: config.productCode === "mlbb" && pricing.ready }
+                wonddReadiness: { supplierMapped: true, inputReady: hasWonddGameIdFormatter(config.productCode), pricingReady: pricing.ready, fulfillmentReady: hasWonddGameIdFormatter(config.productCode) && pricing.ready, enabled: hasWonddGameIdFormatter(config.productCode) && pricing.ready }
             };
             if (pricing.ready && (!pkg.prices.TH.supplierCode || pkg.packageCode === "MLBB_86")) {
                 pkg.prices.TH.supplierCost = cost;
@@ -115,7 +115,7 @@ async function main() {
             }
             if (APPLY) await pkg.save();
 
-            const isProven = config.productCode === "mlbb" && pricing.ready && hasWonddGameIdFormatter(config.productCode);
+            const isProven = pricing.ready && hasWonddGameIdFormatter(config.productCode);
             const readiness = { supplierMapped: true, inputReady: hasWonddGameIdFormatter(config.productCode), pricingReady: pricing.ready, fulfillmentReady: isProven, enabled: isProven };
             const metadata = { serviceId: String(game.serviceid), serviceCode: config.serviceCode, supplierCost: { amount: Number(row.amount), discount: Number(row.discount), netDealerPrice: cost, currency: "THB", capturedAt: audit.capturedAt }, readiness, blocker: isProven ? "" : (!readiness.inputReady ? "INPUT_NEEDS_CONFIRMATION" : pricing.blocker || "CONTROLLED_ENABLEMENT_REQUIRED") };
             if (!mapping) {

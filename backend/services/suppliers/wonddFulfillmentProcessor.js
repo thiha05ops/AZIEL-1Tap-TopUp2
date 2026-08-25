@@ -28,14 +28,14 @@ async function transitionCommerceOrder(order, target, reason) {
 
 function validateWonddMapping(mapping = {}) {
     if (!mapping || !mapping.enabled || String(mapping.supplierCode || "").toUpperCase() !== "WONDD") {
-        const error = new Error("A verified WonDD MLBB package mapping is required.");
+        const error = new Error("A verified WonDD package mapping is required.");
         error.code = "WONDD_PACKAGE_MAPPING_MISSING";
         throw error;
     }
     const productCode = String(mapping.productCode || "").trim().toLowerCase();
     const expectedServiceCode = CONFIRMED_SERVICE_CODES[productCode];
     if (String(mapping.executionMode || "API").toUpperCase() !== "API" || !expectedServiceCode || String(mapping.supplierProductCode || "").trim().toLowerCase() !== expectedServiceCode.toLowerCase() || !String(mapping.supplierPackageCode || "").trim()) {
-        const error = new Error("WonDD mapping must explicitly contain servicecode mlbb and a packcode.");
+        const error = new Error("WonDD mapping must explicitly contain its confirmed servicecode and packcode.");
         error.code = "WONDD_PACKAGE_MAPPING_MISSING";
         throw error;
     }
@@ -142,7 +142,7 @@ function createWonddFulfillmentProcessor(deps = {}) {
     }
 
     async function recoverDue() {
-        if (!adapter.isMlbbAutoFulfillmentEnabled() && !String(process.env.WONDD_AUTO_FULFILLMENT_ENABLED_PRODUCTS || "").trim()) return { recovered: 0, disabled: true };
+        if (!adapter.isAutoFulfillmentEnabled("mlbb") && !adapter.isAutoFulfillmentEnabled("freefire") && !String(process.env.WONDD_AUTO_FULFILLMENT_ENABLED_PRODUCTS || "").trim()) return { recovered: 0, disabled: true };
         const attempts = await Attempt.find({ supplierCodeSnapshot: "WONDD", status: "IN_PROGRESS", supplierReference: { $ne: "" }, "supplierRequest.submissionState": "ACCEPTED", $or: [{ "supplierRequest.nextRecoveryAt": null }, { "supplierRequest.nextRecoveryAt": { $lte: new Date() } }] }).limit(50);
         attempts.forEach(item => schedule(() => poll(item._id, 0).catch(() => null), 0));
         return { recovered: attempts.length, disabled: false };

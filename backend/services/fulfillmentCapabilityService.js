@@ -25,18 +25,19 @@ function classifyMapping(mapping = {}, supplier = {}) {
     return supplierMode === "API" && executionMode === "API" ? "SUPPLIER_API" : "SUPPLIER_MANUAL";
 }
 
-function isWonddMlbbThScope({ productCode = "", region = "" } = {}) {
-    return String(productCode || "").trim().toLowerCase() === "mlbb" && normalizeRegion(region) === "TH";
+function isWonddAutoTopupThScope({ productCode = "", region = "" } = {}) {
+    return ["mlbb", "freefire"].includes(String(productCode || "").trim().toLowerCase()) && normalizeRegion(region) === "TH";
 }
 
-function isProductionReadyWonddMlbbMapping(mapping = {}, supplier = {}) {
+function isProductionReadyWonddMapping(mapping = {}, supplier = {}) {
     const readiness = mapping.mappingMetadata?.readiness || {};
+    const productCode = String(mapping.productCode || "").trim().toLowerCase();
     return mapping.enabled === true &&
         String(mapping.supplierCode || supplier.supplierCode || "").trim().toUpperCase() === "WONDD" &&
         String(supplier.supplierCode || mapping.supplierCode || "").trim().toUpperCase() === "WONDD" &&
         String(mapping.region || "").trim().toUpperCase() === "TH" &&
-        String(mapping.productCode || "").trim().toLowerCase() === "mlbb" &&
-        String(mapping.supplierProductCode || "").trim().toLowerCase() === "mlbb" &&
+        ["mlbb", "freefire"].includes(productCode) &&
+        String(mapping.supplierProductCode || "").trim().toLowerCase() === productCode &&
         Boolean(String(mapping.supplierPackageCode || "").trim()) &&
         String(mapping.executionMode || "").trim().toUpperCase() === "API" &&
         String(supplier.mode || "").trim().toUpperCase() === "API" &&
@@ -58,7 +59,7 @@ function eligibleMappingsForPackage({ mappings = [], suppliers = [], productCode
         if (String(mapping.packageCode || "").toUpperCase() !== normalizedPackage) return [];
         if (normalizeRegion(mapping.region) !== normalizedRegion) return [];
         if (Array.isArray(supplier.supportedRegions) && supplier.supportedRegions.length && !supplier.supportedRegions.includes(normalizedRegion)) return [];
-        if (isWonddMlbbThScope({ productCode: normalizedProduct, region: normalizedRegion }) && !isProductionReadyWonddMlbbMapping(mapping, supplier)) return [];
+        if (isWonddAutoTopupThScope({ productCode: normalizedProduct, region: normalizedRegion }) && !isProductionReadyWonddMapping(mapping, supplier)) return [];
         return [{ mapping, supplier, routeType: classifyMapping(mapping, supplier) }];
     });
 }
@@ -67,7 +68,7 @@ function resolveFulfillmentCapability({ product = {}, mappings = [], suppliers =
     const eligible = eligibleMappingsForPackage({ mappings, suppliers, productCode, packageCode, region });
     const automatedRoutes = eligible.filter(item => item.routeType === "SUPPLIER_API");
     const supplierManualRoutes = eligible.filter(item => item.routeType === "SUPPLIER_MANUAL");
-    const manualAdminAllowed = isWonddMlbbThScope({ productCode, region }) ? false : isManualFulfillmentAllowed(product, region);
+    const manualAdminAllowed = isWonddAutoTopupThScope({ productCode, region }) ? false : isManualFulfillmentAllowed(product, region);
     return {
         manualAdminAllowed,
         automatedAvailable: automatedRoutes.length > 0,
@@ -105,8 +106,10 @@ module.exports = {
     REGIONS,
     classifyMapping,
     eligibleMappingsForPackage,
-    isProductionReadyWonddMlbbMapping,
-    isWonddMlbbThScope,
+    isProductionReadyWonddMapping,
+    isProductionReadyWonddMlbbMapping: isProductionReadyWonddMapping,
+    isWonddAutoTopupThScope,
+    isWonddMlbbThScope: isWonddAutoTopupThScope,
     isManualFulfillmentAllowed,
     loadFulfillmentCapability,
     manualAllowedRegions,

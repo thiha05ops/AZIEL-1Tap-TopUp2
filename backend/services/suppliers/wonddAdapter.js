@@ -2,6 +2,7 @@ const defaultFetch = require("node-fetch");
 
 const DEFAULT_API_URL = "https://www.wondd.com/member/bot-game.php";
 const WONDD_MLBB_SERVICE_CODE = "mlbb";
+const WONDD_FREEFIRE_SERVICE_CODE = "freefire";
 const PLAYER_ID_PATTERN = /^\d+$/;
 const { CONFIRMED_SERVICE_CODES } = require("./wonddCatalogConfig");
 const ERROR_MAP = Object.freeze({
@@ -37,9 +38,11 @@ function createWonddAdapter(options = {}) {
     const credentials = () => ({ username: clean(env.WONDD_USERNAME), password: clean(env.WONDD_PASSWORD) });
     const isConfigured = () => Boolean(credentials().username && credentials().password);
     const isMlbbAutoFulfillmentEnabled = () => clean(env.WONDD_MLBB_AUTO_FULFILLMENT_ENABLED).toLowerCase() === "true";
+    const isFreefireAutoFulfillmentEnabled = () => clean(env.WONDD_FREEFIRE_AUTO_FULFILLMENT_ENABLED).toLowerCase() === "true";
     const isAutoFulfillmentEnabled = productCode => {
         const product = clean(productCode).toLowerCase();
         if (product === "mlbb" && isMlbbAutoFulfillmentEnabled()) return true;
+        if (product === "freefire") return isFreefireAutoFulfillmentEnabled();
         return clean(env.WONDD_AUTO_FULFILLMENT_ENABLED_PRODUCTS).toLowerCase().split(",").map(item => item.trim()).filter(Boolean).includes(product);
     };
 
@@ -76,14 +79,16 @@ function createWonddAdapter(options = {}) {
         const gameId = clean(input.gameId);
         if (!Object.values(CONFIRMED_SERVICE_CODES).some(code => code.toLowerCase() === serviceCode)) throw new WonddAdapterError("WONDD_SERVICE_MAPPING_INVALID", "WonDD servicecode is not supplier-confirmed.", { category: "CONFIGURATION" });
         if (!packCode) throw new WonddAdapterError("WONDD_PACKAGE_MAPPING_MISSING", "A verified WonDD packcode mapping is required.", { category: "CONFIGURATION" });
-        validateBuiltGameId(gameId);
-        return { method: "topup", servicecode: WONDD_MLBB_SERVICE_CODE, packcode: packCode, gameid: gameId };
+        const productCode = clean(input.productCode || Object.keys(CONFIRMED_SERVICE_CODES).find(key => CONFIRMED_SERVICE_CODES[key].toLowerCase() === serviceCode)).toLowerCase();
+        validateBuiltGameId(productCode, gameId);
+        return { method: "topup", servicecode: serviceCode, packcode: packCode, gameid: gameId };
     }
 
     function dryRunTopup(input = {}) {
         const payload = buildTopupPayload(input);
         if (!isConfigured()) throw new WonddAdapterError("WONDD_NOT_CONFIGURED", "WonDD credentials are not configured.", { category: "CONFIGURATION" });
-        return { status: "DRY_RUN_VALID", configured: true, liveEnabled: isMlbbAutoFulfillmentEnabled(), payload: { method: payload.method, servicecode: payload.servicecode, packcode: payload.packcode, gameid: maskGameId(payload.gameid) } };
+        const productCode = clean(input.productCode || Object.keys(CONFIRMED_SERVICE_CODES).find(key => CONFIRMED_SERVICE_CODES[key].toLowerCase() === clean(input.serviceCode).toLowerCase())).toLowerCase();
+        return { status: "DRY_RUN_VALID", configured: true, liveEnabled: isAutoFulfillmentEnabled(productCode), payload: { method: payload.method, servicecode: payload.servicecode, packcode: payload.packcode, gameid: maskGameId(payload.gameid) } };
     }
 
     async function submitTopup(input = {}) {
@@ -106,7 +111,7 @@ function createWonddAdapter(options = {}) {
         return failure || normalizeWonddStatus(response, orderId);
     }
 
-    return { isConfigured, isMlbbAutoFulfillmentEnabled, isAutoFulfillmentEnabled, getBalance, buildTopupPayload, dryRunTopup, submitTopup, checkStatus };
+    return { isConfigured, isMlbbAutoFulfillmentEnabled, isFreefireAutoFulfillmentEnabled, isAutoFulfillmentEnabled, getBalance, buildTopupPayload, dryRunTopup, submitTopup, checkStatus };
 }
 
 function buildWonddMlbbGameId(userId, zoneId) {
@@ -119,7 +124,11 @@ function buildWonddMlbbGameId(userId, zoneId) {
     return `${user} ${zone}`;
 }
 
-function validateBuiltGameId(value) {
+function validateBuiltGameId(productCode, value) {
+    if (productCode === "freefire") {
+        if (!clean(value)) throw new WonddAdapterError("WONDD_FREEFIRE_PLAYER_ID_REQUIRED", "Free Fire Player ID is required.", { category: "CONFIGURATION" });
+        return;
+    }
     const parts = String(value || "").split(" ");
     if (parts.length !== 2 || !PLAYER_ID_PATTERN.test(parts[0]) || !PLAYER_ID_PATTERN.test(parts[1])) throw new WonddAdapterError("WONDD_MLBB_GAME_ID_INVALID", "WonDD MLBB gameid must contain numeric User ID and Zone ID separated by one space.");
 }
@@ -150,4 +159,4 @@ function mask(value) { const text = clean(value); return text.length <= 4 ? "***
 function maskGameId(value) { return String(value || "").split(" ").map(mask).join(" "); }
 
 const adapter = createWonddAdapter();
-module.exports = { ...adapter, createWonddAdapter, buildWonddMlbbGameId, normalizeWonddError, normalizeWonddStatus, WonddAdapterError, WONDD_MLBB_SERVICE_CODE };
+module.exports = { ...adapter, createWonddAdapter, buildWonddMlbbGameId, normalizeWonddError, normalizeWonddStatus, WonddAdapterError, WONDD_MLBB_SERVICE_CODE, WONDD_FREEFIRE_SERVICE_CODE };

@@ -1,7 +1,7 @@
 {
   "auditType": "READ_ONLY_WONDD_CATALOG",
   "endpoint": "https://www.wondd.com/member/bot-game-packlist.php",
-  "capturedAt": "2026-08-25T09:20:35.879Z",
+  "capturedAt": "2026-08-25T11:13:49.982Z",
   "request": {
     "method": "POST",
     "authentication": "application/x-www-form-urlencoded credentials (values omitted)",

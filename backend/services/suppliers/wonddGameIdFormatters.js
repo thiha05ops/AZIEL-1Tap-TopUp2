@@ -3,6 +3,13 @@ const { buildWonddMlbbGameId, WonddAdapterError } = require("./wonddAdapter");
 const FORMATTERS = Object.freeze({
     mlbb(input = {}) {
         return buildWonddMlbbGameId(input.userId || input.playerId, input.zoneId || input.serverId);
+    },
+    freefire(input = {}) {
+        const playerId = String(input.userId ?? input.playerId ?? "").trim();
+        if (!playerId) {
+            throw new WonddAdapterError("WONDD_FREEFIRE_PLAYER_ID_REQUIRED", "Free Fire Player ID is required.", { category: "CONFIGURATION" });
+        }
+        return playerId;
     }
 });
 

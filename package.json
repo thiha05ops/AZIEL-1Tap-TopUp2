@@ -67,6 +67,8 @@
     "onboard:wondd-catalog": "node backend/scripts/onboard-wondd-production-catalog.js",
     "verify:wondd-catalog": "node -r dotenv/config backend/scripts/verify-wondd-production-catalog.js",
     "verify:wondd-mlbb-rollout": "node backend/scripts/verify-wondd-mlbb-production-rollout.js",
+    "rollout:wondd-freefire": "node backend/scripts/rollout-wondd-freefire-production.js",
+    "verify:wondd-freefire-rollout": "node backend/scripts/verify-wondd-freefire-production-rollout.js",
     "clean:mlbb-storefront": "node backend/scripts/clean-mlbb-storefront-authority.js",
     "verify:mlbb-storefront": "node backend/scripts/verify-mlbb-storefront-authority.js",
     "verify:media-presentation": "node backend/scripts/verify-media-presentation.js",

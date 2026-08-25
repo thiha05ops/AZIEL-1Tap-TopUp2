@@ -277,6 +277,7 @@ async function startServer() {
 
     if (
         String(process.env.WONDD_MLBB_AUTO_FULFILLMENT_ENABLED || "").trim().toLowerCase() === "true" ||
+        String(process.env.WONDD_FREEFIRE_AUTO_FULFILLMENT_ENABLED || "").trim().toLowerCase() === "true" ||
         String(process.env.WONDD_AUTO_FULFILLMENT_ENABLED_PRODUCTS || "").trim()
     ) {
         const wonddProcessor = require("./services/suppliers/wonddFulfillmentProcessor").processor;

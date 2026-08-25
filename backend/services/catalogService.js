@@ -742,14 +742,15 @@ function applyPackageFulfillmentReadiness(projection, mappings = [], inventorySt
 }
 
 function applyAdminSupplierSupport(projection, mappings = []) {
-    if (!projection || projection.productCode !== "mlbb" || !Array.isArray(projection.packages)) return projection;
+    if (!projection || !["mlbb", "freefire"].includes(projection.productCode) || !Array.isArray(projection.packages)) return projection;
+    const productCode = projection.productCode;
     projection.packages.forEach(pkg => {
         const exact = mappings.filter(mapping =>
             String(mapping.supplierCode || "").toUpperCase() === "WONDD" &&
             String(mapping.region || "").toUpperCase() === "TH" &&
-            String(mapping.productCode || "").toLowerCase() === "mlbb" &&
+            String(mapping.productCode || "").toLowerCase() === productCode &&
             String(mapping.packageCode || "").toUpperCase() === String(pkg.packageCode || "").toUpperCase() &&
-            String(mapping.supplierProductCode || "").toLowerCase() === "mlbb" &&
+            String(mapping.supplierProductCode || "").toLowerCase() === productCode &&
             Boolean(String(mapping.supplierPackageCode || "").trim()) &&
             String(mapping.executionMode || "").toUpperCase() === "API"
         );
@@ -767,7 +768,7 @@ function applyAdminSupplierSupport(projection, mappings = []) {
 }
 
 function applyPublicPackageEligibility(projection) {
-    if (!projection || projection.productCode !== "mlbb" || !Array.isArray(projection.packages)) return projection;
+    if (!projection || !["mlbb", "freefire"].includes(projection.productCode) || !Array.isArray(projection.packages)) return projection;
     projection.packages = projection.packages.filter(pkg =>
         pkg.enabled !== false &&
         pkg.fulfillmentRegions?.TH === true &&
