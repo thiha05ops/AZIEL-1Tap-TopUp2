@@ -25,6 +25,27 @@ function classifyMapping(mapping = {}, supplier = {}) {
     return supplierMode === "API" && executionMode === "API" ? "SUPPLIER_API" : "SUPPLIER_MANUAL";
 }
 
+function isWonddMlbbThScope({ productCode = "", region = "" } = {}) {
+    return String(productCode || "").trim().toLowerCase() === "mlbb" && normalizeRegion(region) === "TH";
+}
+
+function isProductionReadyWonddMlbbMapping(mapping = {}, supplier = {}) {
+    const readiness = mapping.mappingMetadata?.readiness || {};
+    return mapping.enabled === true &&
+        String(mapping.supplierCode || supplier.supplierCode || "").trim().toUpperCase() === "WONDD" &&
+        String(supplier.supplierCode || mapping.supplierCode || "").trim().toUpperCase() === "WONDD" &&
+        String(mapping.region || "").trim().toUpperCase() === "TH" &&
+        String(mapping.productCode || "").trim().toLowerCase() === "mlbb" &&
+        String(mapping.supplierProductCode || "").trim().toLowerCase() === "mlbb" &&
+        Boolean(String(mapping.supplierPackageCode || "").trim()) &&
+        String(mapping.executionMode || "").trim().toUpperCase() === "API" &&
+        String(supplier.mode || "").trim().toUpperCase() === "API" &&
+        readiness.supplierMapped === true &&
+        readiness.inputReady === true &&
+        readiness.pricingReady === true &&
+        readiness.fulfillmentReady === true;
+}
+
 function eligibleMappingsForPackage({ mappings = [], suppliers = [], productCode = "", packageCode = "", region = "" } = {}) {
     const normalizedProduct = String(productCode || "").trim().toLowerCase();
     const normalizedPackage = String(packageCode || "").trim().toUpperCase();
@@ -37,6 +58,7 @@ function eligibleMappingsForPackage({ mappings = [], suppliers = [], productCode
         if (String(mapping.packageCode || "").toUpperCase() !== normalizedPackage) return [];
         if (normalizeRegion(mapping.region) !== normalizedRegion) return [];
         if (Array.isArray(supplier.supportedRegions) && supplier.supportedRegions.length && !supplier.supportedRegions.includes(normalizedRegion)) return [];
+        if (isWonddMlbbThScope({ productCode: normalizedProduct, region: normalizedRegion }) && !isProductionReadyWonddMlbbMapping(mapping, supplier)) return [];
         return [{ mapping, supplier, routeType: classifyMapping(mapping, supplier) }];
     });
 }
@@ -45,7 +67,7 @@ function resolveFulfillmentCapability({ product = {}, mappings = [], suppliers =
     const eligible = eligibleMappingsForPackage({ mappings, suppliers, productCode, packageCode, region });
     const automatedRoutes = eligible.filter(item => item.routeType === "SUPPLIER_API");
     const supplierManualRoutes = eligible.filter(item => item.routeType === "SUPPLIER_MANUAL");
-    const manualAdminAllowed = isManualFulfillmentAllowed(product, region);
+    const manualAdminAllowed = isWonddMlbbThScope({ productCode, region }) ? false : isManualFulfillmentAllowed(product, region);
     return {
         manualAdminAllowed,
         automatedAvailable: automatedRoutes.length > 0,
@@ -83,6 +105,8 @@ module.exports = {
     REGIONS,
     classifyMapping,
     eligibleMappingsForPackage,
+    isProductionReadyWonddMlbbMapping,
+    isWonddMlbbThScope,
     isManualFulfillmentAllowed,
     loadFulfillmentCapability,
     manualAllowedRegions,

@@ -152,6 +152,9 @@ function projectMapping(mapping = {}, supplier = null) {
         region: mapping.region,
         enabled: Boolean(mapping.enabled),
         executionMode: mapping.executionMode,
+        readiness: mapping.mappingMetadata?.readiness || {},
+        supplierCost: mapping.mappingMetadata?.supplierCost || null,
+        serviceId: mapping.mappingMetadata?.serviceId || "",
         createdAt: mapping.createdAt,
         updatedAt: mapping.updatedAt
     };
@@ -663,6 +666,42 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
     if (supplier.mode === SUPPLIER_MODES.API && !adapter.isConfigured()) {
         throw new FulfillmentError("SUPPLIER_ADAPTER_NOT_CONFIGURED", "Supplier API adapter is not configured.", 409);
     }
+    if (supplier.supplierCode === "WONDD") {
+        const { CONFIRMED_SERVICE_CODES } = require("./suppliers/wonddCatalogConfig");
+        const { hasWonddGameIdFormatter } = require("./suppliers/wonddGameIdFormatters");
+        const expectedServiceCode = CONFIRMED_SERVICE_CODES[mapping.productCode];
+        if (mapping.executionMode !== SUPPLIER_EXECUTION_MODES.API || !expectedServiceCode || String(mapping.supplierProductCode || "").trim().toLowerCase() !== expectedServiceCode.toLowerCase() || !String(mapping.supplierPackageCode || "").trim()) {
+            throw new FulfillmentError("WONDD_PACKAGE_MAPPING_MISSING", "A verified WonDD servicecode and packcode mapping is required.", 409);
+        }
+        if (!hasWonddGameIdFormatter(mapping.productCode)) {
+            throw new FulfillmentError("WONDD_INPUT_CONTRACT_NOT_CONFIGURED", "WonDD player input contract is not configured.", 409);
+        }
+        const readiness = mapping.mappingMetadata?.readiness || {};
+        const catalogPackage = await CatalogPackage.findOne({
+            productCode: mapping.productCode,
+            packageCode: mapping.packageCode,
+            deletedAt: null
+        }).lean();
+        const regionalPrice = catalogPackage?.prices?.[mapping.region];
+        const supplierCost = Number(regionalPrice?.supplierCost);
+        const sellingPrice = Number(regionalPrice?.amount);
+        if (
+            readiness.supplierMapped !== true ||
+            readiness.inputReady !== true ||
+            readiness.pricingReady !== true ||
+            readiness.fulfillmentReady !== true ||
+            !catalogPackage?.enabled ||
+            regionalPrice?.enabled === false ||
+            !Number.isFinite(supplierCost) ||
+            !Number.isFinite(sellingPrice) ||
+            sellingPrice <= supplierCost
+        ) {
+            throw new FulfillmentError("WONDD_PACKAGE_NOT_PRODUCTION_READY", "WonDD package production readiness is incomplete.", 409);
+        }
+        if (!adapter.isAutoFulfillmentEnabled(mapping.productCode)) {
+            throw new FulfillmentError("WONDD_AUTO_FULFILLMENT_DISABLED", "Live WonDD fulfillment is disabled for this product.", 409);
+        }
+    }
 
     const existingActive = await FulfillmentAttempt.findOne({ orderId: order._id, status: { $in: ACTIVE_FULFILLMENT_STATUSES } }).lean();
     if (existingActive) throw new FulfillmentError("FULFILLMENT_ALREADY_ACTIVE", "Fulfillment is already active for this order.", 409);
@@ -746,6 +785,11 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
             packageCode: mapping.packageCode
         }
     }).catch(() => null);
+
+    if (supplier.supplierCode === "WONDD" && supplier.mode === SUPPLIER_MODES.API) {
+        const attemptId = attempt._id;
+        setImmediate(() => require("./suppliers/wonddFulfillmentProcessor").processor.submit(attemptId).catch(() => null));
+    }
 
     return projectAttempt(attempt);
 }

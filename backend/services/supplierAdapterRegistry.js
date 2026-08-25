@@ -68,6 +68,10 @@ function sanitizeProviderMetadata(value, depth = 0) {
 function getSupplierAdapter(supplier) {
     if (String(supplier?.mode || "").toUpperCase() === "MANUAL") return manualSupplierAdapter;
 
+    if (String(supplier?.supplierCode || "").trim().toUpperCase() === "WONDD") {
+        return require("./suppliers/wonddAdapter");
+    }
+
     return {
         isConfigured() {
             return false;

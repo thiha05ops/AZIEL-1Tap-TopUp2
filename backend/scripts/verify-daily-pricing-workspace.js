@@ -35,7 +35,8 @@ function main() {
     includes(frontend, "published.publishedPriceMode === \"POLICY_DERIVED\"", "Legacy compatibility prices must not render as V3 selling prices.");
     includes(frontend, "dailyBlockingReason", "Disabled inputs must expose their exact blocking contract.");
     includes(frontend, "/workspace/preview", "Daily Pricing must use server preview.");
-    includes(frontend, 'region: "ALL"', "One supplier-cost edit must preview all active regions.");
+    includes(frontend, "authoritativePreviewRegion", "Preview scope must follow the selected authoritative region and mapped regions.");
+    includes(frontend, "daily.region", "Region selection must be sent to the server preview.");
     includes(frontend, "regionalResult", "Daily Pricing must render independent regional results.");
     includes(frontend, "margin == null", "Calculated zero margin must not render as missing.");
     includes(frontend, "daily.previewSeq", "Stale preview sequencing must exist.");
@@ -52,7 +53,8 @@ function main() {
     includes(control, "publishedPriceMode: \"POLICY_DERIVED\"", "Publish must persist policy-derived price mode.");
     includes(control, "amount: calculatedPrice", "Publish must persist server-calculated selling price.");
     includes(control, "regionalResults", "Preview API must return the cross-region result contract.");
-    includes(control, "regionalPublishes", "Publish must support all-region server recalculation.");
+    includes(control, "selectedRegions", "Publish must support selected-region server recalculation.");
+    includes(control, "loadDailyPricingWorkspace", "Workspace rows must be loaded through supplier mapping authority.");
     includes(control, "canonicalSupplierCost", "Publish must persist one canonical supplier-cost snapshot.");
     includes(drafts, "resolvePricingSupplier", "Draft save must validate canonical supplier.");
     includes(drafts, "supplierId: group.supplierId", "Draft must snapshot canonical supplier identity.");

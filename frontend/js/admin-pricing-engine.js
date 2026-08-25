@@ -44,7 +44,6 @@
 
     function eligibleSuppliers() {
         return daily.suppliers.filter(supplier => supplier.enabled !== false &&
-            (!supplier.supportedRegions?.length || daily.region === "ALL" || supplier.supportedRegions.includes(daily.region)) &&
             ["MMK", "THB"].includes(upper(supplier.supplierCurrency)));
     }
 
@@ -131,6 +130,7 @@
     }
 
     function statusView(row, preview, regionFilter = ["TH", "MM"]) {
+        if (row.offered === false) return { status: "BLOCKED", reason: row.offerabilityReason || "Not offered in the selected region", regions: [] };
         if (!daily.edits.has(rowKey(row)) && row.savedDraftSupplierCost == null && row.publishedSupplierPrice == null) return { status: "MISSING", reason: "Supplier cost required", regions: [] };
         const regions = (preview?.regions || []).filter(item => row.regionalRows?.[item.region] && regionFilter.includes(item.region));
         if (!regions.length) return { status: "WARNING", reason: "Preview pending", regions: [] };
@@ -142,7 +142,7 @@
     }
 
     function regionalResult(row, preview, region) {
-        if (!row.regionalRows?.[region]) return '<span class="pricing-region-empty">Not offered</span>';
+        if (!row.regionalRows?.[region]) return `<span class="pricing-region-empty">Not offered${row.offerabilityReason && daily.region === region ? ` · ${text(row.offerabilityReason)}` : ""}</span>`;
         const result = preview?.regions?.find(item => item.region === region);
         const published = row.regionalRows[region];
         const canonicalPublished = published.publishedPriceMode === "POLICY_DERIVED" && published.publishedSupplierCostConfigured === true && published.publishedSupplierId;
@@ -168,7 +168,7 @@
         const supplier = activeSupplier();
         body.innerHTML = rows.map(row => {
             const key = rowKey(row);
-            const value = daily.edits.has(key) ? daily.edits.get(key).value : (row.savedDraftSupplierCost ?? row.publishedSupplierPrice ?? "");
+            const value = daily.edits.has(key) ? daily.edits.get(key).value : (row.supplierCost ?? row.savedDraftSupplierCost ?? row.publishedSupplierPrice ?? "");
             const preview = previewFor(row);
             const view = statusView(row, preview);
             const blocked = dailyBlockingReason();
@@ -193,6 +193,7 @@
         const supplier = activeSupplier();
         return regionRows().filter(row => daily.edits.has(rowKey(row))).map(row => ({
             rowId: rowKey(row), productCode: row.productCode, packageCode: row.packageCode,
+            mappingId: row.mappingId,
             newSupplierCost: daily.edits.get(rowKey(row)).value,
             supplierCurrency: supplier.supplierCurrency, supplierName: supplier.name,
             expectedUpdatedAt: row.updatedAt, selected: true
@@ -201,12 +202,19 @@
 
     function buildPreviewRows() {
         const supplier = activeSupplier();
-        return regionRows().filter(row => daily.edits.has(rowKey(row)) || row.savedDraftSupplierCost != null || row.publishedSupplierPrice != null).map(row => ({
+        return regionRows().filter(row => row.offered !== false && (daily.edits.has(rowKey(row)) || row.savedDraftSupplierCost != null || row.publishedSupplierPrice != null)).map(row => ({
             rowId: rowKey(row), productCode: row.productCode, packageCode: row.packageCode,
-            newSupplierCost: daily.edits.has(rowKey(row)) ? daily.edits.get(rowKey(row)).value : (row.savedDraftSupplierCost ?? row.publishedSupplierPrice),
+            mappingId: row.mappingId,
+            newSupplierCost: daily.edits.has(rowKey(row)) ? daily.edits.get(rowKey(row)).value : (row.supplierCost ?? row.savedDraftSupplierCost ?? row.publishedSupplierPrice),
             supplierCurrency: supplier.supplierCurrency, supplierName: supplier.name,
             expectedUpdatedAt: row.updatedAt, selected: daily.edits.has(rowKey(row))
         }));
+    }
+
+    function authoritativePreviewRegion(rows) {
+        if (daily.region !== "ALL") return daily.region;
+        const regions = [...new Set(rows.map(row => upper(row.mappingRegion)).filter(Boolean))];
+        return regions.length === 1 ? regions[0] : "ALL";
     }
 
     function schedulePreview() {
@@ -225,7 +233,7 @@
         try {
             const result = await pricingFetch("/api/admin/pricing-engine/workspace/preview", {
                 method: "POST", signal: daily.previewController.signal,
-                body: JSON.stringify({ supplierId: daily.supplierId, region: "ALL", rows })
+                body: JSON.stringify({ supplierId: daily.supplierId, region: authoritativePreviewRegion(regionRows()), rows })
             });
             if (seq !== daily.previewSeq) return;
             (result.rows || []).forEach(row => daily.previews.set(rowKey(row), row));
@@ -260,7 +268,8 @@
     }
 
     async function publishRows() {
-        const regions = daily.region === "ALL" ? ["TH", "MM"] : [daily.region];
+        const publishRegion = authoritativePreviewRegion(regionRows());
+        const regions = publishRegion === "ALL" ? ["TH", "MM"] : [publishRegion];
         const rows = buildWorkspaceRows().filter(row => ["READY", "WARNING"].includes(statusView(row, daily.previews.get(rowKey(row)), regions).status));
         if (!rows.length) return;
         const hasWarning = rows.some(row => statusView(row, daily.previews.get(rowKey(row)), regions).status === "WARNING");
@@ -269,7 +278,7 @@
         updatePublishState();
         $("pricingDailyState").textContent = "Publishing";
         try {
-            const result = await pricingFetch("/api/admin/pricing-engine/workspace/publish", { method: "POST", body: JSON.stringify({ supplierId: daily.supplierId, region: daily.region, rows }) });
+            const result = await pricingFetch("/api/admin/pricing-engine/workspace/publish", { method: "POST", body: JSON.stringify({ supplierId: daily.supplierId, region: publishRegion, rows }) });
             const successKeys = new Set((result.draftCleanup?.clearedKeys || []).map(upper));
             successKeys.forEach(key => { daily.edits.delete(key); daily.previews.delete(key); });
             $("pricingDailyState").textContent = `${result.summary?.published || 0} published`;
@@ -294,11 +303,14 @@
         $("pricingDailyState").textContent = "Loading";
         try {
             const requestOptions = { signal: daily.loadController.signal };
-            const [pricing, supplierResponse] = await Promise.all([pricingFetch("/api/admin/pricing-engine", requestOptions), pricingFetch("/api/admin/suppliers", requestOptions)]);
+            const workspaceParams = new URLSearchParams({ region: daily.region });
+            if (daily.supplierId) workspaceParams.set("supplierId", daily.supplierId);
+            const [pricing, workspace] = await Promise.all([pricingFetch("/api/admin/pricing-engine", requestOptions), pricingFetch(`/api/admin/pricing-engine/workspace?${workspaceParams}`, requestOptions)]);
             if (seq !== daily.loadSeq) return;
-            daily.products = Array.isArray(pricing.products) ? pricing.products : [];
+            daily.products = Array.isArray(workspace.products) ? workspace.products : [];
             daily.policies = Array.isArray(pricing.policies) ? pricing.policies : [];
-            daily.suppliers = Array.isArray(supplierResponse.suppliers) ? supplierResponse.suppliers : [];
+            daily.suppliers = Array.isArray(workspace.suppliers) ? workspace.suppliers : [];
+            daily.supplierId = workspace.selectedSupplierId || daily.supplierId;
             if (!daily.products.length) throw new Error("Failed to load products: production catalog returned no products.");
             if (!daily.policies.length) throw new Error("Failed to load pricing policy.");
             const rows = regionRows();
@@ -409,9 +421,9 @@
     function bind() {
         if (document.documentElement.dataset.pricingV3Bound === "true") return;
         document.documentElement.dataset.pricingV3Bound = "true";
-        $("pricingRegionSelect")?.addEventListener("change", event => { daily.region = event.target.value; renderSupplierSelect(); renderRows(); updatePublishState(); });
+        $("pricingRegionSelect")?.addEventListener("change", event => { daily.region = event.target.value; daily.edits.clear(); daily.previews.clear(); loadDaily(true); });
         $("pricingProductSelect")?.addEventListener("change", event => { daily.selectedProductId = event.target.value; daily.search = ""; $("pricingPackageSearch").value = ""; daily.previews.clear(); renderRows(); schedulePreview(); });
-        $("pricingSupplierSelect")?.addEventListener("change", event => { daily.supplierId = event.target.value; daily.previews.clear(); $("pricingSupplierCurrency").textContent = activeSupplier()?.supplierCurrency || "-"; if (daily.edits.size) schedulePreview(); renderRows(); });
+        $("pricingSupplierSelect")?.addEventListener("change", event => { daily.supplierId = event.target.value; daily.edits.clear(); daily.previews.clear(); loadDaily(true); });
         $("pricingPackageSearch")?.addEventListener("input", event => { daily.search = event.target.value; renderRows(); });
         $("pricingPackageRows")?.addEventListener("input", event => { const key = event.target.dataset.supplierCost; if (!key) return; const value = Number(event.target.value); if (Number.isFinite(value) && value > 0) daily.edits.set(key, { value }); else daily.edits.delete(key); daily.previews.delete(key); $("pricingDraftState").textContent = "Unsaved Changes"; schedulePreview(); updatePublishState(); });
         $("pricingPublishBtn")?.addEventListener("click", publishRows);

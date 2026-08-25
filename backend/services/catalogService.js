@@ -19,7 +19,7 @@ const { projectMediaAsset, projectPublicMediaAsset } = require("./mediaService")
 const { normalizeProductKnowledge, normalizeCustomerNote, normalizeCustomerNoteLocales } = require("../catalog/productKnowledge");
 const { resolvePublicProductReadiness } = require("../catalog/publicProductReadiness");
 const { normalizeProductRegions, productSupportsRegion } = require("../catalog/productRegionAuthority");
-const { isManualFulfillmentAllowed } = require("./fulfillmentCapabilityService");
+const { isManualFulfillmentAllowed, isProductionReadyWonddMlbbMapping, isWonddMlbbThScope } = require("./fulfillmentCapabilityService");
 const { publicCategoryFor } = require("../catalog/catalogTaxonomy");
 
 class CatalogError extends Error {
@@ -680,7 +680,8 @@ function projectCommerceReadiness(product = {}, packages = [], mappings = [], in
         mapping.enabled !== false &&
         mapping.region === region &&
         String(mapping.productCode || "").toLowerCase() === String(product.productCode || "").toLowerCase() &&
-        String(mapping.packageCode || "").toUpperCase() === String(item.packageCode || "").toUpperCase()
+        String(mapping.packageCode || "").toUpperCase() === String(item.packageCode || "").toUpperCase() &&
+        (!isWonddMlbbThScope({ productCode: product.productCode, region }) || isProductionReadyWonddMlbbMapping(mapping, { supplierCode: mapping.supplierCode, mode: mapping.executionMode }))
     );
     const regional = Object.fromEntries(["MM", "TH"].map(region => {
         const supported = regions.includes(region);
@@ -688,7 +689,7 @@ function projectCommerceReadiness(product = {}, packages = [], mappings = [], in
             const price = item.prices?.[region];
             return supported && price?.enabled !== false && Number.isFinite(Number(price?.amount)) && Number(price.amount) > 0;
         });
-        const manualFulfillmentAllowed = isManualFulfillmentAllowed(product, region);
+        const manualFulfillmentAllowed = isWonddMlbbThScope({ productCode: product.productCode, region }) ? false : isManualFulfillmentAllowed(product, region);
         const fulfillmentPackages = pricedPackages.filter(item => manualFulfillmentAllowed || mappingMatches(item, region));
         const availablePackages = pricedPackages.filter(packageAvailable);
         return [region, {
@@ -727,13 +728,54 @@ function applyPackageFulfillmentReadiness(projection, mappings = [], inventorySt
     projection.packages.forEach(pkg => {
         const available = !unavailablePackageIds.has(String(pkg._id || "")) &&
             !unavailablePackageIds.has(String(pkg.packageCode || "").toUpperCase());
-        pkg.fulfillmentRegions = Object.fromEntries(["MM", "TH"].map(region => [region,
-            productSupportsRegion(projection, region) && available &&
-            (isManualFulfillmentAllowed(projection, region) || mappings.some(mapping => mapping.enabled !== false && mapping.region === region &&
+        pkg.fulfillmentRegions = Object.fromEntries(["MM", "TH"].map(region => {
+            const strictWonddScope = isWonddMlbbThScope({ productCode: projection.productCode, region });
+            const mapped = mappings.some(mapping => mapping.enabled !== false && mapping.region === region &&
                 String(mapping.productCode || "").toLowerCase() === String(projection.productCode || "").toLowerCase() &&
-                String(mapping.packageCode || "").toUpperCase() === String(pkg.packageCode || "").toUpperCase()))
-        ]));
+                String(mapping.packageCode || "").toUpperCase() === String(pkg.packageCode || "").toUpperCase() &&
+                (!strictWonddScope || isProductionReadyWonddMlbbMapping(mapping, { supplierCode: mapping.supplierCode, mode: mapping.executionMode })));
+            const manual = !strictWonddScope && isManualFulfillmentAllowed(projection, region);
+            return [region, productSupportsRegion(projection, region) && available && (manual || mapped)];
+        }));
     });
+    return projection;
+}
+
+function applyAdminSupplierSupport(projection, mappings = []) {
+    if (!projection || projection.productCode !== "mlbb" || !Array.isArray(projection.packages)) return projection;
+    projection.packages.forEach(pkg => {
+        const exact = mappings.filter(mapping =>
+            String(mapping.supplierCode || "").toUpperCase() === "WONDD" &&
+            String(mapping.region || "").toUpperCase() === "TH" &&
+            String(mapping.productCode || "").toLowerCase() === "mlbb" &&
+            String(mapping.packageCode || "").toUpperCase() === String(pkg.packageCode || "").toUpperCase() &&
+            String(mapping.supplierProductCode || "").toLowerCase() === "mlbb" &&
+            Boolean(String(mapping.supplierPackageCode || "").trim()) &&
+            String(mapping.executionMode || "").toUpperCase() === "API"
+        );
+        const readyMapping = exact.find(mapping => isProductionReadyWonddMlbbMapping(mapping, { supplierCode: "WONDD", mode: "API" }));
+        const price = pkg.prices?.TH;
+        pkg.supplierSupport = {
+            TH: {
+                status: readyMapping && pkg.enabled !== false && price?.enabled !== false ? "SUPPORTED_READY" : exact.length ? "SUPPORTED_NOT_READY" : "UNSUPPORTED_WONDD",
+                mappingCount: exact.length,
+                blocker: !exact.length ? "NO_ELIGIBLE_WONDD_MAPPING" : !readyMapping ? "MAPPING_NOT_READY" : pkg.enabled === false ? "PACKAGE_DISABLED" : price?.enabled === false || !price ? "TH_PRICE_DISABLED" : ""
+            }
+        };
+    });
+    return projection;
+}
+
+function applyPublicPackageEligibility(projection) {
+    if (!projection || projection.productCode !== "mlbb" || !Array.isArray(projection.packages)) return projection;
+    projection.packages = projection.packages.filter(pkg =>
+        pkg.enabled !== false &&
+        pkg.fulfillmentRegions?.TH === true &&
+        pkg.prices?.TH?.enabled !== false &&
+        Number.isFinite(Number(pkg.prices?.TH?.amount)) &&
+        Number(pkg.prices.TH.amount) > 0
+    );
+    projection.packageCount = projection.packages.length;
     return projection;
 }
 
@@ -797,6 +839,7 @@ async function toDatabasePublicCatalog({ includeDisabled = true, includeAssetPro
                 inventoryStates.filter(item => productPackages.some(pkg => String(pkg._id) === String(item.packageRef) || pkg.packageCode === item.packageCode))
             );
             applyPackageFulfillmentReadiness(projection, activeMappings.filter(item => item.productCode === product.productCode), inventoryStates);
+            if (!includeAdminPricing) applyPublicPackageEligibility(projection);
             applyPublicReadiness(projection, product, productPackages, projection.commerceReadiness);
             if (!includeDisabled && !projection.discoverable) return null;
             return projection;
@@ -879,6 +922,7 @@ async function getCatalogProductDetail(productCode, options = {}) {
             inventoryStates.filter(item => packageIds.has(String(item.packageRef)) || packages.some(pkg => pkg.packageCode === item.packageCode))
         );
         applyPackageFulfillmentReadiness(projection, activeMappings, inventoryStates);
+        if (!options.includeAdminPricing) applyPublicPackageEligibility(projection);
         applyPublicReadiness(projection, product, packages, projection.commerceReadiness);
         if (options.includeDisabled === false && !projection.discoverable) return null;
         return projection;
@@ -896,7 +940,7 @@ async function resolveAdminCatalogProduct(productCode, options = {}) {
     const canonicalCode = canonical.productCode;
     const findProduct = options.findProduct || (code => CatalogProduct.findOne({ productCode: code }).lean());
     const findPackages = options.findPackages || (code => CatalogPackage.find({ productCode: code }).sort({ sortOrder: 1, packageCode: 1 }).lean());
-    const findMappings = options.findMappings || (code => SupplierProductMapping.find({ productCode: code, enabled: true }).lean());
+    const findMappings = options.findMappings || (code => SupplierProductMapping.find({ productCode: code }).lean());
     const findInventoryStates = options.findInventoryStates || (() => PackageInventoryState.find().lean());
     const product = await findProduct(canonicalCode);
     const [packages, mappings, inventoryStates] = await Promise.all([
@@ -934,7 +978,7 @@ async function resolveAdminCatalogProduct(productCode, options = {}) {
             _id: { $in: mappings.map(item => item.supplierId) },
             enabled: true
         }).select({ _id: 1 }).lean()).map(item => String(item._id)));
-    const activeMappings = mappings.filter(item => enabledSupplierIds.has(String(item.supplierId || "")));
+    const activeMappings = mappings.filter(item => item.enabled === true && enabledSupplierIds.has(String(item.supplierId || "")));
     const projection = projectCatalogProduct(foundation, packages, {
         includeDisabled: true,
         mediaMap,
@@ -950,6 +994,7 @@ async function resolveAdminCatalogProduct(productCode, options = {}) {
         inventoryStates.filter(item => packageIds.has(String(item.packageRef)) || packages.some(pkg => pkg.packageCode === item.packageCode))
     );
     applyPackageFulfillmentReadiness(projection, activeMappings, inventoryStates);
+    applyAdminSupplierSupport(projection, mappings);
     applyPublicReadiness(projection, foundation, packages, projection.commerceReadiness);
     projection.metadataRecordMissing = !product;
     return projection;
@@ -957,6 +1002,8 @@ async function resolveAdminCatalogProduct(productCode, options = {}) {
 
 module.exports = {
     applyPackageFulfillmentReadiness,
+    applyAdminSupplierSupport,
+    applyPublicPackageEligibility,
     CatalogError,
     getCatalogProductDetail,
     resolveAdminCatalogProduct,

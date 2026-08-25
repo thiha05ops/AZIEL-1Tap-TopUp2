@@ -710,6 +710,8 @@ function renderMappings() {
                 <small>${escapeFulfillmentHtml(adminT("region", "Region"))}: ${escapeFulfillmentHtml(mapping.region)} · ${escapeFulfillmentHtml(adminT("execution_mode", "Execution Mode"))}: ${escapeFulfillmentHtml(mapping.executionMode)}</small>
                 <small>${escapeFulfillmentHtml(adminT("supplier_product_code", "Supplier Product Code"))}: ${escapeFulfillmentHtml(mapping.supplierProductCode)}</small>
                 <small>${escapeFulfillmentHtml(adminT("supplier_package_code", "Supplier Package Code"))}: ${escapeFulfillmentHtml(mapping.supplierPackageCode)}</small>
+                <small>${escapeFulfillmentHtml(adminT("supplier_cost", "Supplier Cost"))}: ${mapping.supplierCost?.netDealerPrice ?? adminT("not_configured", "Not configured")} ${mapping.supplierCost ? "THB" : ""}</small>
+                <small>${escapeFulfillmentHtml(adminT("readiness", "Readiness"))}: ${escapeFulfillmentHtml([mapping.readiness?.supplierMapped ? "Mapped" : "Unmapped", mapping.readiness?.inputReady ? "Input ready" : "Input pending", mapping.readiness?.pricingReady ? "Pricing ready" : "Pricing pending", mapping.readiness?.fulfillmentReady ? "Fulfillment ready" : "Fulfillment disabled"].join(" · "))}</small>
             </div>
             <span class="admin-status ${mapping.enabled ? "completed" : "cancelled"}">${escapeFulfillmentHtml(mapping.enabled ? adminT("enabled", "Enabled") : adminT("disabled", "Disabled"))}</span>
         </article>

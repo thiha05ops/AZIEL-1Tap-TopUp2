@@ -275,6 +275,16 @@ async function startServer() {
         });
     });
 
+    if (
+        String(process.env.WONDD_MLBB_AUTO_FULFILLMENT_ENABLED || "").trim().toLowerCase() === "true" ||
+        String(process.env.WONDD_AUTO_FULFILLMENT_ENABLED_PRODUCTS || "").trim()
+    ) {
+        const wonddProcessor = require("./services/suppliers/wonddFulfillmentProcessor").processor;
+        wonddProcessor.recoverDue().catch(() => null);
+        const wonddRecoveryTimer = setInterval(() => wonddProcessor.recoverDue().catch(() => null), 15 * 60 * 1000);
+        wonddRecoveryTimer.unref?.();
+    }
+
     return server;
 }
 

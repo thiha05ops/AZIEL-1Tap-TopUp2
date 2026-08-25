@@ -34,6 +34,15 @@ const mmMapping = {
     enabled: true,
     supplierId: "supplier-1"
 };
+const wonddThMapping = {
+    ...mmMapping,
+    region: "TH",
+    supplierCode: "WONDD",
+    supplierProductCode: "mlbb",
+    supplierPackageCode: "MLTEST",
+    executionMode: "API",
+    mappingMetadata: { readiness: { supplierMapped: true, inputReady: true, pricingReady: true, fulfillmentReady: true } }
+};
 
 function readiness(packages, mappings, overrides = {}) {
     const subject = { ...product, ...overrides };
@@ -52,7 +61,7 @@ assert.strictEqual(mmOnly.state, "AVAILABLE");
 assert.strictEqual(mmOnly.regions.MM.state, "AVAILABLE");
 assert.strictEqual(mmOnly.regions.TH.state, "COMING_SOON");
 
-const bothRegions = readiness([pkg], [mmMapping, { ...mmMapping, region: "TH" }]);
+const bothRegions = readiness([pkg], [mmMapping, wonddThMapping]);
 assert.strictEqual(bothRegions.regions.MM.state, "AVAILABLE");
 assert.strictEqual(bothRegions.regions.TH.state, "AVAILABLE");
 
@@ -60,7 +69,7 @@ assert.notStrictEqual(readiness([], []).state, "AVAILABLE");
 assert.strictEqual(readiness([pkg], [mmMapping], { commerceState: "HIDDEN" }).state, "HIDDEN");
 assert.strictEqual(readiness([pkg], [mmMapping], { productCode: "aovid" }).state, "HIDDEN");
 
-const futureMapping = readiness([pkg], [{ ...mmMapping, region: "TH" }]);
+const futureMapping = readiness([pkg], [wonddThMapping]);
 assert.strictEqual(futureMapping.regions.TH.state, "AVAILABLE", "A legitimate future mapping must enable readiness without product exceptions.");
 
 const root = path.resolve(__dirname, "../..");

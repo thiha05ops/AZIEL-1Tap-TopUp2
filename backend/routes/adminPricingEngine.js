@@ -16,6 +16,7 @@ const {
 } = require("../services/commerce/adminPricingEngineService");
 const {
     batchPreviewDailyPricing,
+    loadDailyPricingWorkspace,
     publishDailyPricing
 } = require("../services/commerce/adminPricingControlCenterService");
 
@@ -297,6 +298,14 @@ router.post("/admin/pricing-engine/workspace/preview", adminMiddleware, requireA
             actor: req.admin || null
         });
         return res.json(result);
+    } catch (error) {
+        return sendPricingError(req, res, error);
+    }
+});
+
+router.get("/admin/pricing-engine/workspace", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_READ), async (req, res) => {
+    try {
+        return res.json(await loadDailyPricingWorkspace({ supplierId: req.query?.supplierId || "", productCode: req.query?.productCode || "", region: req.query?.region || "ALL" }));
     } catch (error) {
         return sendPricingError(req, res, error);
     }

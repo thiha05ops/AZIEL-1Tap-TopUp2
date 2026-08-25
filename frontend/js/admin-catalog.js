@@ -1270,7 +1270,7 @@ function renderPackageTable(packages) {
                         <small>${Number(item.sortOrder || index + 1)}</small>
                     </span>
                     <span><b>${escapeHtml(item.packageCode)}</b></span>
-                    <span>${escapeHtml(item.name)}</span>
+                    <span>${escapeHtml(item.name)}${item.supplierSupport?.TH ? `<small><b class="admin-status-pill ${item.supplierSupport.TH.status === "SUPPORTED_READY" ? "is-ok" : item.supplierSupport.TH.status === "SUPPORTED_NOT_READY" ? "is-warning" : "is-muted"}">${escapeHtml(item.supplierSupport.TH.status === "SUPPORTED_READY" ? "SUPPORTED / READY" : item.supplierSupport.TH.status === "SUPPORTED_NOT_READY" ? "SUPPORTED / NOT READY" : "UNSUPPORTED BY WONDD")}</b></small>` : ""}</span>
                     <span class="catalog-icon-cell">${renderPackageIconControl(item)}</span>
                     <span>${renderPackageBusinessPrice(item.prices?.MM, "MM")}</span>
                     <span>${renderPackageBusinessPrice(item.prices?.TH, "TH")}</span>
