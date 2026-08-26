@@ -18,7 +18,9 @@ const CATEGORY = "honor_of_kings";
 const EXACT = Object.freeze([
     ["HOK_16_TOKENS", "16 Tokens", "16_tokens"], ["HOK_80_TOKENS", "80 Tokens", "80_tokens"],
     ["HOK_240_TOKENS", "240 Tokens", "240_tokens"], ["HOK_400_TOKENS", "400 Tokens", "400_tokens"],
-    ["HOK_560_TOKENS", "560 Tokens", "560_tokens"]
+    ["HOK_560_TOKENS", "560 Tokens", "560_tokens"], ["HOK_830_TOKENS", "830 Tokens", "830_tokens"],
+    ["HOK_1245_TOKENS", "1245 Tokens", "1245_tokens"], ["HOK_2508_TOKENS", "2508 Tokens", "2508_tokens"],
+    ["HOK_4180_TOKENS", "4180 Tokens", "4180_tokens"], ["HOK_8360_TOKENS", "8360 Tokens", "8360_tokens"]
 ]);
 const OUT_JSON = path.join(__dirname, "../../docs/fazercards-hok-reconciliation.json");
 const OUT_MD = path.join(__dirname, "../../docs/fazercards-hok-reconciliation.md");

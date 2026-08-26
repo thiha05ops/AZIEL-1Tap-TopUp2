@@ -1,5 +1,5 @@
 (function () {
-    const LOGO_URL = "/assets/logo/aziel-icon.webp";
+    const LOGO_URL = "/assets/brand/aziel-icon.svg";
     const HISTORY_LIMIT = 100;
     const MIN_LAYER_SIZE = 8;
     const SUPPORTED_TOOLS = ["select", "hand", "zoom", "text", "image", "logo", "shape", "crop"];

@@ -1,6 +1,7 @@
 (function () {
     const t = (key, fallback, params) => window.AZIEL_LOCALE?.t?.(key, fallback, params) || fallback;
     const SESSION_KEY = "azielPaymentPageSession";
+    const authority = window.AZIEL_PAYMENT_SESSION_AUTHORITY;
     let redirectTimer = null;
     let countdownTimer = null;
     let completionState = null;
@@ -81,8 +82,19 @@
         redirectTimer = window.setTimeout(() => window.location.replace(`tracking.html?orderId=${encodeURIComponent(orderId)}`), 5000);
     }
 
-    async function recover() {
-        const marker = (() => { try { return JSON.parse(localStorage.getItem("aziel:commerce-pending-payment") || "null"); } catch (_) { return null; } })();
+    function readMarker() {
+        try { return JSON.parse(localStorage.getItem("aziel:commerce-pending-payment") || "null"); } catch (_) { return null; }
+    }
+
+    function showRecovered(recovery) {
+        document.getElementById("paymentPageTitle").textContent = t("payment.resume", "Resume payment");
+        document.getElementById("paymentSessionMount").innerHTML = "";
+        renderSummary(recovery, recovery, { method: recovery.paymentName || "PromptPay QR" });
+        window.PaymentCheckoutSheet.openRecoveredPayment(recovery);
+        return true;
+    }
+
+    async function recover(marker) {
         if (!marker?.orderId || !marker?.attemptId) return false;
         const res = await fetch(`/api/commerce/orders/${encodeURIComponent(marker.orderId)}/payments/manual-promptpay?attemptId=${encodeURIComponent(marker.attemptId)}`, { headers: window.PaymentUtils?.authHeaders?.() || {} });
         const data = await res.json().catch(() => ({}));
@@ -96,18 +108,45 @@
             recoverableExpiresAt: payment.expiresAt, qrMode: payment.qr?.mode || "aziel_promptpay_dynamic",
             qrImageUrl: payment.qr?.image || "", dynamicQr: { qrImage: payment.qr?.image || "", expiresAt: payment.expiresAt }
         };
-        document.getElementById("paymentPageTitle").textContent = t("payment.resume", "Resume payment");
-        document.getElementById("paymentSessionMount").innerHTML = "";
-        renderSummary(marker, recovery, { method: recovery.paymentName });
-        window.PaymentCheckoutSheet.openRecoveredPayment(recovery);
-        return true;
+        return showRecovered(recovery);
+    }
+
+    async function recoverRequestedAttempt(request, marker) {
+        if (authority?.markerMatchesRequest(marker, request)) return recover(marker);
+        const res = await fetch("/api/commerce/payments/recoverable", { headers: window.PaymentUtils?.authHeaders?.() || {} });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success || !Array.isArray(data.recoverable)) return false;
+        const exact = data.recoverable.find(item => (
+            String(item?.attemptId || "") === request.attemptId &&
+            (!request.orderId || String(item?.orderId || item?.commerceOrderId || "") === request.orderId)
+        ));
+        return exact ? showRecovered(exact) : false;
     }
 
     document.addEventListener("DOMContentLoaded", async () => {
         const staged = readSession();
-        if (staged?.session && staged?.orderData && stagedSessionIsActive(staged)) { showStaged(staged); return; }
-        if (staged) sessionStorage.removeItem(SESSION_KEY);
-        try { if (await recover()) return; } catch (error) { console.warn("Payment recovery failed", error); }
+        const requestParams = new URLSearchParams(window.location.search);
+        const requestedAttemptId = String(requestParams.get("attemptId") || "").trim();
+        const requestedOrderId = String(requestParams.get("orderId") || "").trim();
+        const requestedIdentity = { attemptId: requestedAttemptId, orderId: requestedOrderId };
+        const marker = readMarker();
+        if (
+            staged?.session &&
+            staged?.orderData &&
+            stagedSessionIsActive(staged) &&
+            (!requestedAttemptId || authority?.stagedSessionMatchesRequest(staged, requestedIdentity))
+        ) {
+            showStaged(staged);
+            return;
+        }
+        if (staged && (!requestedAttemptId || !authority?.stagedSessionMatchesRequest(staged, requestedIdentity))) {
+            sessionStorage.removeItem(SESSION_KEY);
+        }
+        try {
+            if (requestedAttemptId) {
+                if (await recoverRequestedAttempt(requestedIdentity, marker)) return;
+            } else if (await recover(marker)) return;
+        } catch (error) { console.warn("Payment recovery failed", error); }
         const mount = document.getElementById("paymentSessionMount");
         const unavailable = document.createElement("section"); unavailable.className = "checkout-card";
         const heading = document.createElement("h2"); heading.textContent = t("payment.sessionUnavailable", "Payment session unavailable");

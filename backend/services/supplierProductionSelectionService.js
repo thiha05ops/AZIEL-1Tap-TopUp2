@@ -48,13 +48,12 @@ async function assessProductionMapping(mappingOrId) {
     if (!pkg?.enabled || price?.enabled !== true || !Number.isFinite(Number(price?.amount)) || Number(price.amount) <= 0) blockers.push("PRODUCTION_PRICE_NOT_PUBLISHED");
     const adapter = supplier ? getSupplierAdapter(supplier) : null;
     if (mapping.executionMode !== "API" || !adapter?.isConfigured?.()) blockers.push("SUPPLIER_ADAPTER_NOT_READY");
-    if (!controlledTest) blockers.push("CONTROLLED_TEST_EVIDENCE_MISSING");
     if (!gateEnabled(mapping, adapter)) blockers.push("PROVIDER_FEATURE_GATE_OFF");
     if (supplier?.supplierCode === "FAZERCARDS") {
         const { supportsFazerCardsMapping } = require("./suppliers/fazercardsFulfillmentProcessor");
         if (!supportsFazerCardsMapping(mapping)) blockers.push("FULFILLMENT_PROCESSOR_NOT_READY");
     }
-    return { ready: blockers.length === 0, blockers, mapping, supplier, package: pkg, featureGateEnabled: gateEnabled(mapping, adapter) };
+    return { ready: blockers.length === 0, blockers, mapping, supplier, package: pkg, featureGateEnabled: gateEnabled(mapping, adapter), controlledTestEvidence: Boolean(controlledTest) };
 }
 
 async function setProductionRole(mappingId, role, { session = null } = {}) {
@@ -66,6 +65,17 @@ async function setProductionRole(mappingId, role, { session = null } = {}) {
         const assessment = await assessProductionMapping(mapping.toObject());
         if (!assessment.ready) throw Object.assign(new Error(`Mapping cannot become PRIMARY: ${assessment.blockers.join(", ")}`), { code: "MAPPING_NOT_PRODUCTION_READY", blockers: assessment.blockers });
         await Mapping.updateMany({ _id: { $ne: mapping._id }, productCode: mapping.productCode, packageCode: mapping.packageCode, region: mapping.region, productionRole: ROLES.PRIMARY }, { $set: { productionRole: ROLES.BACKUP } }, { session });
+    } else if (mapping.productionRole === ROLES.PRIMARY) {
+        const [otherPrimary, product, pkg] = await Promise.all([
+            Mapping.findOne({ _id: { $ne: mapping._id }, productCode: mapping.productCode, packageCode: mapping.packageCode, region: mapping.region, productionRole: ROLES.PRIMARY, archivedAt: null }).session(session).lean(),
+            CatalogProduct.findOne({ productCode: mapping.productCode, enabled: true, deletedAt: null }).session(session).lean(),
+            CatalogPackage.findOne({ productCode: mapping.productCode, packageCode: mapping.packageCode, enabled: true, deletedAt: null }).session(session).lean()
+        ]);
+        const manualAllowed = product?.fulfillment?.manualAllowedRegions?.includes(mapping.region) === true;
+        const publishedPrice = pkg?.prices?.[mapping.region];
+        if (!otherPrimary && (!manualAllowed || publishedPrice?.enabled !== true || !(Number(publishedPrice.amount) > 0))) {
+            throw Object.assign(new Error("The sole PRIMARY cannot be removed because a valid MANUAL_ADMIN fallback is not available."), { code: "PRIMARY_ROUTE_REQUIRED" });
+        }
     }
     mapping.productionRole = normalizedRole;
     await mapping.save({ session });

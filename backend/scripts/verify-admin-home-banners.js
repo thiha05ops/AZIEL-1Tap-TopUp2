@@ -73,7 +73,7 @@ function verifyAdminUi() {
     includes("frontend/js/admin-home-banners.js", "category: \"home_banner\"", "Admin media selector must filter home_banner assets.");
     includes("frontend/js/admin-media.js", "value=\"home_banner\"", "Media upload modal must allow home_banner.");
     includes("frontend/css/admin/admin-design-system.css", ".home-banner-row", "Admin CSS must style HomeBanner rows.");
-    matches("frontend/css/admin/admin-design-system.css", /@media\s*\(max-width:\s*768px\)[\s\S]*\.home-banner-row/, "Admin HomeBanner rows must have mobile rules.");
+    matches("frontend/css/admin/admin-design-system.css", /@media\s*\(max-width:\s*767px\)[\s\S]*\.home-banner-row/, "Admin HomeBanner rows must use the canonical phone breakpoint.");
 }
 
 function verifyCustomerRuntime() {

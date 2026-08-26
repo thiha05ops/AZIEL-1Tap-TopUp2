@@ -13,7 +13,7 @@ const { ACTIVE_FULFILLMENT_STATUSES, FULFILLMENT_STATUSES, FULFILLMENT_ROUTE_TYP
 const { ADMIN_AUDIT_ACTIONS, writeAdminAudit } = require("./adminAuditService");
 const { ORDER_STATES, getAllowedNextStatuses, transitionOrder } = require("./orderStateService");
 const { getSupplierAdapter, normalizeSupplierResult } = require("./supplierAdapterRegistry");
-const { setProductionRole } = require("./supplierProductionSelectionService");
+const { assessProductionMapping, setProductionRole } = require("./supplierProductionSelectionService");
 const commerceOrderRepository = require("./commerce/orderRepository");
 const {
     FINANCIAL_OUTCOMES,
@@ -387,6 +387,9 @@ async function updateMapping(supplierId, mappingId, payload = {}, context = {}) 
     if (!mapping) throw new FulfillmentError("SUPPLIER_MAPPING_NOT_FOUND", "Supplier mapping not found.", 404);
     const supplier = await Supplier.findById(supplierId);
     if (!supplier) throw new FulfillmentError("SUPPLIER_NOT_FOUND", "Supplier not found.", 404);
+    if (payload.productionRole !== undefined && String(context.admin?.role || "").toUpperCase() !== "OWNER") {
+        throw new FulfillmentError("OWNER_ROUTING_AUTHORITY_REQUIRED", "Only the Owner can change production supplier routing.", 403);
+    }
 
     if (payload.productCode !== undefined || payload.packageCode !== undefined || payload.region !== undefined) {
         const productCode = normalizeProductCode(payload.productCode || mapping.productCode);
@@ -448,18 +451,56 @@ async function listMappings(query = {}) {
         Supplier.find().lean()
     ]);
     const supplierById = new Map(suppliers.map(supplier => [String(supplier._id), supplier]));
-    const { assessProductionMapping } = require("./supplierProductionSelectionService");
     return Promise.all(mappings.map(async mapping => {
         const assessment = await assessProductionMapping(mapping);
         const price = assessment.package?.prices?.[mapping.region] || {};
         return projectMapping(mapping, supplierById.get(String(mapping.supplierId)), {
             productionReady: assessment.ready,
             productionBlockers: assessment.blockers,
+            featureGateEnabled: assessment.featureGateEnabled === true,
+            controlledTestEvidence: assessment.controlledTestEvidence === true,
             productionSellingPrice: Number.isFinite(Number(price.amount)) ? Number(price.amount) : null,
             productionCurrency: price.currency || "",
             landedCost: Number.isFinite(Number(price.landedCost)) ? Number(price.landedCost) : null
         });
     }));
+}
+
+async function setMappingProductionRole(mappingId, productionRole, context = {}) {
+    if (String(context.admin?.role || "").toUpperCase() !== "OWNER") {
+        throw new FulfillmentError("OWNER_ROUTING_AUTHORITY_REQUIRED", "Only the Owner can change production supplier routing.", 403);
+    }
+    const before = await SupplierProductMapping.findById(mappingId).lean();
+    if (!before) throw new FulfillmentError("SUPPLIER_MAPPING_NOT_FOUND", "Supplier mapping not found.", 404);
+    try {
+        await setProductionRole(mappingId, productionRole);
+    } catch (error) {
+        throw new FulfillmentError(error.code || "PRODUCTION_ROLE_UPDATE_FAILED", error.message, 409);
+    }
+    const after = await SupplierProductMapping.findById(mappingId).lean();
+    await writeAdminAudit({
+        actor: context.admin,
+        req: context.req,
+        action: ADMIN_AUDIT_ACTIONS.SUPPLIER_MAPPING_UPDATED,
+        resourceType: "SupplierProductMapping",
+        resourceId: String(mappingId),
+        metadata: {
+            productCode: after.productCode,
+            packageCode: after.packageCode,
+            region: after.region,
+            supplierCode: after.supplierCode,
+            previousProductionRole: before.productionRole,
+            productionRole: after.productionRole
+        }
+    }).catch(() => null);
+    const supplier = await Supplier.findById(after.supplierId).lean();
+    const assessment = await assessProductionMapping(after);
+    return projectMapping(after, supplier, {
+        productionReady: assessment.ready,
+        productionBlockers: assessment.blockers,
+        featureGateEnabled: assessment.featureGateEnabled === true,
+        controlledTestEvidence: assessment.controlledTestEvidence === true
+    });
 }
 
 async function listEligibleMappingsForOrder(orderId) {
@@ -973,6 +1014,7 @@ module.exports = {
     projectAttempt,
     resolveFulfillment,
     safeSupplierProjection,
+    setMappingProductionRole,
     startManualAdminFulfillment,
     startFulfillmentForOrder,
     updateMapping,

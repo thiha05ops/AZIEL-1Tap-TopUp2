@@ -83,9 +83,18 @@ body.auth-page {
   display: inline-flex;
   text-decoration: none;
   color: #fff;
-  font-size: 36px;
-  font-weight: 950;
-  letter-spacing: 1px;
+}
+
+.auth-logo img {
+  display: block;
+  width: min(220px, 48vw);
+  height: 52px;
+  object-fit: contain;
+  object-position: left center;
+}
+
+.auth-mobile-logo {
+  display: none;
 }
 
 .auth-brand-content {
@@ -388,6 +397,19 @@ body.auth-page {
 
   .auth-brand-panel {
     display: none;
+  }
+
+  .auth-mobile-logo {
+    display: inline-flex;
+    margin-bottom: 24px;
+  }
+
+  .auth-mobile-logo img {
+    display: block;
+    width: 164px;
+    height: 38px;
+    object-fit: contain;
+    object-position: left center;
   }
 
   .auth-card {

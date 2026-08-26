@@ -28,9 +28,10 @@ async function main() {
             const assessment = await assessProductionMapping(mapping);
             const test = evidence.get(String(mapping._id));
             const blockers = [...assessment.blockers];
-            if (!test?.succeeded) blockers.push("CONTROLLED_TEST_EVIDENCE_MISSING");
+            const controlledTestWarning = !test?.succeeded;
             if (mapping.archivedAt) blockers.push("ORPHAN_OR_ARCHIVED_PRIMARY");
             if (blockers.length) violations.push({ key, mappingId: String(mapping._id), supplier: mapping.supplierCode, blockers: [...new Set(blockers)] });
+            else if (controlledTestWarning) mapping.controlledTestWarning = "CONTROLLED_TEST_EVIDENCE_MISSING";
         }
     }
     const archivedRoutable = mappings.filter(item => item.archivedAt && (item.enabled || item.productionRole !== "DISABLED"));

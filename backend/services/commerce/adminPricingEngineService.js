@@ -5,6 +5,7 @@ const CatalogProduct = require("../../models/CatalogProduct");
 const CatalogPackage = require("../../models/CatalogPackage");
 const { CANONICAL_OPERATIONAL_PRODUCTS } = require("../../catalog/canonicalOperationalCatalog");
 const PricingPolicy = require("../../models/PricingPolicy");
+const ExchangeRateAuthority = require("../../models/ExchangeRateAuthority");
 const PriceVersion = require("../../models/PriceVersion");
 const { resolveSupplierCostSnapshot } = require("./supplierCostService");
 const { STOREFRONT_CURRENCY, SUPPLIER_CURRENCY } = require("../../constants/commerce");
@@ -80,12 +81,8 @@ function roundingRule(input = {}, fallback = {}) {
 
 function neutralPolicyConfig() {
     return {
-        exchangeRate: 1,
-        exchangeRateSource: "manual_admin",
-        exchangeRateCapturedAt: "",
-        exchangeRateMaxAgeSeconds: 86400,
-        supplierCurrency: "THB",
         minimumProfitAmount: 0,
+        maximumProfitAmount: null,
         supplierFee: { enabled: false, type: "PERCENT", value: 0 },
         businessCost: { enabled: false, type: "FIXED", value: 0 },
         gatewayFee: { enabled: false, type: "PERCENT", value: 0 },
@@ -97,14 +94,9 @@ function neutralPolicyConfig() {
 }
 
 function configFromPolicy(policy = null) {
-    const metadata = policy?.metadata || {};
     return {
-        exchangeRate: number(metadata.exchangeRate, 1),
-        exchangeRateSource: text(metadata.exchangeRateSource || "manual_admin"),
-        exchangeRateCapturedAt: text(metadata.exchangeRateCapturedAt || ""),
-        exchangeRateMaxAgeSeconds: number(metadata.exchangeRateMaxAgeSeconds, 86400),
-        supplierCurrency: upper(metadata.supplierCurrency || "THB"),
         minimumProfitAmount: number(policy?.minimumProfitAmount, 0),
+        maximumProfitAmount: policy?.maximumProfitAmount == null ? null : number(policy.maximumProfitAmount),
         supplierFee: moneyRule(policy?.defaultSupplierFee),
         businessCost: moneyRule(policy?.defaultBusinessCost),
         gatewayFee: moneyRule(policy?.defaultGatewayFee),
@@ -116,15 +108,12 @@ function configFromPolicy(policy = null) {
 }
 
 function policyFieldsFromConfig(config = {}, fallback = neutralPolicyConfig()) {
+    const maximumProfitInput = Object.prototype.hasOwnProperty.call(config, "maximumProfitAmount")
+        ? config.maximumProfitAmount
+        : fallback.maximumProfitAmount;
     const normalized = {
-        exchangeRate: number(config.exchangeRate, number(fallback.exchangeRate, 1)),
-        exchangeRateSource: text(config.exchangeRateSource || fallback.exchangeRateSource || "manual_admin"),
-        exchangeRateCapturedAt: text(config.exchangeRateCapturedAt || fallback.exchangeRateCapturedAt || ""),
-        exchangeRateMaxAgeSeconds: number(config.exchangeRateMaxAgeSeconds, number(fallback.exchangeRateMaxAgeSeconds, 86400)),
-        supplierCurrency: SUPPLIER_CURRENCY.includes(upper(config.supplierCurrency))
-            ? upper(config.supplierCurrency)
-            : upper(fallback.supplierCurrency || "THB"),
         minimumProfitAmount: number(config.minimumProfitAmount, number(fallback.minimumProfitAmount, 0)),
+        maximumProfitAmount: maximumProfitInput == null || maximumProfitInput === "" ? null : number(maximumProfitInput),
         supplierFee: moneyRule(config.supplierFee, fallback.supplierFee),
         businessCost: moneyRule(config.businessCost, fallback.businessCost),
         gatewayFee: moneyRule(config.gatewayFee, fallback.gatewayFee),
@@ -133,17 +122,8 @@ function policyFieldsFromConfig(config = {}, fallback = neutralPolicyConfig()) {
         profitRule: profitRule(config.profitRule, fallback.profitRule),
         roundingRule: roundingRule(config.roundingRule, fallback.roundingRule)
     };
-
-    if (!STOREFRONT_CURRENCY.includes(normalized.supplierCurrency)) {
-        const capturedAt = new Date(normalized.exchangeRateCapturedAt || "");
-        if (!normalized.exchangeRateSource || !Number.isFinite(capturedAt.getTime()) || normalized.exchangeRateMaxAgeSeconds < 60 || normalized.exchangeRate <= 0) {
-            throw new AdminPricingEngineError(
-                "PRICING_FX_AUTHORITY_REQUIRED",
-                "External supplier currency requires a positive rate, authority source, captured-at timestamp, and maximum age of at least 60 seconds.",
-                409
-            );
-        }
-        normalized.exchangeRateCapturedAt = capturedAt.toISOString();
+    if (normalized.maximumProfitAmount != null && normalized.maximumProfitAmount < normalized.minimumProfitAmount) {
+        throw new AdminPricingEngineError("PRICING_PROFIT_GUARDRAILS_INVALID", "Maximum profit must be greater than or equal to minimum profit.");
     }
 
     return {
@@ -157,16 +137,78 @@ function policyFieldsFromConfig(config = {}, fallback = neutralPolicyConfig()) {
             defaultProfitRule: normalized.profitRule,
             defaultRoundingRule: normalized.roundingRule,
             minimumProfitAmount: normalized.minimumProfitAmount,
-            metadata: {
-                pricingConsole: true,
-                exchangeRate: normalized.exchangeRate,
-                supplierCurrency: normalized.supplierCurrency,
-                exchangeRateSource: normalized.exchangeRateSource,
-                exchangeRateCapturedAt: normalized.exchangeRateCapturedAt,
-                exchangeRateMaxAgeSeconds: normalized.exchangeRateMaxAgeSeconds
-            }
+            maximumProfitAmount: normalized.maximumProfitAmount,
+            metadata: { pricingConsole: true, authorityModel: "REGION_BUSINESS_POLICY" }
         }
     };
+}
+
+function publicFxAuthority(row) {
+    return {
+        id: row?._id ? String(row._id) : "",
+        fromCurrency: upper(row?.fromCurrency),
+        toCurrency: upper(row?.toCurrency),
+        rate: Number(row?.rate),
+        source: text(row?.source),
+        capturedAt: row?.capturedAt || null,
+        maximumAgeSeconds: Number(row?.maximumAgeSeconds || 0),
+        status: upper(row?.status),
+        enabled: row?.enabled === true,
+        authoritative: row?.authoritative === true,
+        updatedAt: row?.updatedAt || null
+    };
+}
+
+async function listFxAuthorities() {
+    const rows = await ExchangeRateAuthority.find({ status: "ACTIVE" })
+        .sort({ fromCurrency: 1, toCurrency: 1, effectiveFrom: -1, updatedAt: -1 })
+        .lean();
+    const seen = new Set();
+    return rows.filter(row => {
+        const key = `${row.fromCurrency}_${row.toCurrency}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    }).map(publicFxAuthority);
+}
+
+async function saveFxAuthorities(entries = [], admin = {}) {
+    if (!Array.isArray(entries) || !entries.length) return listFxAuthorities();
+    const actor = text(admin.username || admin.email || admin.id || "admin");
+    const now = new Date();
+    for (const entry of entries) {
+        const fromCurrency = upper(entry.fromCurrency);
+        const toCurrency = upper(entry.toCurrency);
+        if (!SUPPLIER_CURRENCY.includes(fromCurrency) || !STOREFRONT_CURRENCY.includes(toCurrency) || fromCurrency === toCurrency) {
+            throw new AdminPricingEngineError("FX_PAIR_UNSUPPORTED", `Unsupported FX authority pair ${fromCurrency}_${toCurrency}.`);
+        }
+        const rate = Number(entry.rate);
+        const capturedAt = new Date(entry.capturedAt || "");
+        const maximumAgeSeconds = Number(entry.maximumAgeSeconds);
+        if (!Number.isFinite(rate) || rate <= 0 || !text(entry.source) || !Number.isFinite(capturedAt.getTime()) || !Number.isFinite(maximumAgeSeconds) || maximumAgeSeconds < 60) {
+            throw new AdminPricingEngineError("FX_AUTHORITY_INVALID", `${fromCurrency}_${toCurrency} requires a positive rate, source, captured-at timestamp, and maximum age of at least 60 seconds.`);
+        }
+        await ExchangeRateAuthority.updateMany({ fromCurrency, toCurrency, status: "ACTIVE" }, {
+            $set: { status: "INACTIVE", effectiveUntil: now, updatedBy: actor }
+        });
+        await ExchangeRateAuthority.create({
+            code: `AZIEL_FX_${fromCurrency}_${toCurrency}_${now.getTime()}`,
+            fromCurrency,
+            toCurrency,
+            rate,
+            source: text(entry.source),
+            capturedAt,
+            maximumAgeSeconds,
+            status: "ACTIVE",
+            authoritative: true,
+            enabled: true,
+            effectiveFrom: now,
+            metadata: { authorityModel: "CURRENCY_PAIR", adminManaged: true },
+            createdBy: actor,
+            updatedBy: actor
+        });
+    }
+    return listFxAuthorities();
 }
 
 function draftCode(region, currency) {
@@ -460,7 +502,7 @@ async function readConsolePolicies(now = new Date(), trace = null) {
             }
         ]
     })
-        .select("name code status region currency defaultSupplierFee defaultBusinessCost defaultPlatformCost defaultGatewayFee defaultTax defaultProfitRule defaultRoundingRule metadata createdAt updatedAt updatedBy effectiveFrom effectiveUntil")
+        .select("name code status region currency defaultSupplierFee defaultBusinessCost defaultPlatformCost defaultGatewayFee defaultTax defaultProfitRule defaultRoundingRule minimumProfitAmount maximumProfitAmount minimumProfitMarginPercent allowBelowMarginOverride metadata createdAt updatedAt updatedBy effectiveFrom effectiveUntil")
         .sort({ status: 1, effectiveFrom: -1, updatedAt: -1, _id: -1 });
     const policies = await boundedQuery(query).lean();
     serviceTrace(trace, "ACTIVE_POLICY_QUERY_COMPLETED", {
@@ -475,17 +517,21 @@ async function readConsolePolicies(now = new Date(), trace = null) {
 function latestPolicyForKey(policies = [], status, region, currency) {
     return policies.find(policy => policy.status === status && policy.region === region && policy.currency === currency) || null;
 }
+function visibleDraftPolicy(policies = [], region, currency) {
+    return policies.find(policy => policy.status === "DRAFT" && policy.code === draftCode(region, currency) && policy.metadata?.pendingOwnerReview === true) || null;
+}
 
 async function getPricingConsoleState(options = {}) {
     const trace = options.trace || null;
     const startedAt = Date.now();
     serviceTrace(trace, "STATE_SERVICE_STARTED");
-    const [version, catalogPackages, catalogProducts, policyRecords, supplierCostDraftRows] = await Promise.all([
+    const [version, catalogPackages, catalogProducts, policyRecords, supplierCostDraftRows, fxAuthorities] = await Promise.all([
         latestVersion(trace),
         readCatalogPackages(trace),
         readCatalogProducts(trace),
         readConsolePolicies(new Date(), trace),
-        listSupplierCostDraftRows()
+        listSupplierCostDraftRows(),
+        listFxAuthorities()
     ]);
     serviceTrace(trace, "PRODUCT_GROUPING_STARTED");
     const affected = affectedSummaryFromPackages(catalogPackages);
@@ -500,12 +546,12 @@ async function getPricingConsoleState(options = {}) {
     const policies = [];
     for (const item of CONFIG_KEYS) {
         const active = latestPolicyForKey(policyRecords, "ACTIVE", item.region, item.currency);
-        const draft = policyRecords.find(policy => policy.status === "DRAFT" && policy.code === draftCode(item.region, item.currency)) || null;
+        const draft = visibleDraftPolicy(policyRecords, item.region, item.currency);
         policies.push({
             region: item.region,
             currency: item.currency,
-            active: publicPolicy(active, active ? "active" : "neutral", { ...neutralPolicyConfig(), exchangeRate: item.region === "MM" ? 118 : 1 }),
-            draft: publicPolicy(draft, draft ? "draft" : "active-copy", active ? configFromPolicy(active) : { ...neutralPolicyConfig(), exchangeRate: item.region === "MM" ? 118 : 1 })
+            active: publicPolicy(active, active ? "active" : "neutral", neutralPolicyConfig()),
+            draft: publicPolicy(draft, draft ? "draft" : "active-copy", active ? configFromPolicy(active) : neutralPolicyConfig())
         });
     }
     serviceTrace(trace, "RESPONSE_MAPPING_COMPLETED", {
@@ -536,7 +582,8 @@ async function getPricingConsoleState(options = {}) {
         } : null,
         affected,
         products,
-        policies
+        policies,
+        fxAuthorities
     });
 }
 
@@ -617,7 +664,7 @@ function normalizeDraftPayload(payload = {}) {
         if (!supported) {
             throw new AdminPricingEngineError("PRICING_CONTEXT_UNSUPPORTED", "Unsupported pricing region or currency.");
         }
-        return { region, currency, config: policyFieldsFromConfig(entry.config || {}).config };
+        return { region, currency, config: entry.config && typeof entry.config === "object" ? entry.config : {} };
     });
 }
 
@@ -632,7 +679,8 @@ async function saveDraftPricing(payload = {}, admin = {}) {
         const { fields } = policyFieldsFromConfig(entry.config, fallback);
         fields.metadata = {
             ...(fields.metadata || {}),
-            draftSavedAt: new Date().toISOString()
+            draftSavedAt: new Date().toISOString(),
+            pendingOwnerReview: true
         };
         const draft = await PricingPolicy.findOneAndUpdate(
             { code: draftCode(entry.region, entry.currency) },
@@ -728,6 +776,7 @@ async function publishPricing(admin = {}, options = {}) {
             defaultProfitRule: draft.defaultProfitRule,
             defaultRoundingRule: draft.defaultRoundingRule,
             minimumProfitAmount: draft.minimumProfitAmount,
+            maximumProfitAmount: draft.maximumProfitAmount == null ? null : draft.maximumProfitAmount,
             minimumProfitMarginPercent: draft.minimumProfitMarginPercent,
             metadata: {
                 ...(draft.metadata || {}),
@@ -740,6 +789,14 @@ async function publishPricing(admin = {}, options = {}) {
         });
         policyIds.push(active._id);
         newValues.push({ region: draft.region, currency: draft.currency, config: compactValues(active) });
+        await PricingPolicy.updateOne({ _id: draft._id }, {
+            $set: {
+                status: "INACTIVE",
+                "metadata.pendingOwnerReview": false,
+                "metadata.publishedAt": now.toISOString(),
+                updatedBy: actor
+            }
+        });
     }
 
     if (requestedRegions.size) {
@@ -807,6 +864,8 @@ module.exports = {
     neutralPolicyConfig,
     publishPricing,
     runPricingEngineDiagnostics,
+    saveFxAuthorities,
     saveDraftPricing,
     withBootstrapDeadline
+    ,_pricingPolicyPersistenceContract: Object.freeze({ configFromPolicy, policyFieldsFromConfig, visibleDraftPolicy })
 };

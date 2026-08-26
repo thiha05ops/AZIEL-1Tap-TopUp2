@@ -11,6 +11,7 @@ const {
     getPricingConsoleState,
     publishPricing,
     runPricingEngineDiagnostics,
+    saveFxAuthorities,
     saveDraftPricing,
     withBootstrapDeadline
 } = require("../services/commerce/adminPricingEngineService");
@@ -18,6 +19,7 @@ const {
     batchPreviewDailyPricing,
     loadDailyPricingWorkspace,
     publishDailyPricing
+    ,savePackageProfitOverride
 } = require("../services/commerce/adminPricingControlCenterService");
 
 const PRICING_ENGINE_REQUEST_TIMEOUT_MS = 8000;
@@ -255,6 +257,15 @@ router.put("/admin/pricing-engine/draft", adminMiddleware, requireAdminPermissio
     }
 });
 
+router.put("/admin/pricing-engine/fx-authorities", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_MANAGE), requireOwner, async (req, res) => {
+    try {
+        const fxAuthorities = await saveFxAuthorities(req.body?.fxAuthorities || [], req.admin || {});
+        return res.json({ success: true, fxAuthorities });
+    } catch (error) {
+        return sendPricingError(req, res, error);
+    }
+});
+
 router.post("/admin/pricing-engine/publish", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_MANAGE), requireOwner, async (req, res) => {
     try {
         const result = await publishPricing(req.admin || {}, { regions: req.body?.regions || [] });
@@ -309,6 +320,11 @@ router.get("/admin/pricing-engine/workspace", adminMiddleware, requireAdminPermi
     } catch (error) {
         return sendPricingError(req, res, error);
     }
+});
+
+router.put("/admin/pricing-engine/workspace/profit-override", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_MANAGE), requireOwner, async (req, res) => {
+    try { return res.json(await savePackageProfitOverride({ ...req.body, actor: req.admin || null })); }
+    catch (error) { return sendPricingError(req, res, error); }
 });
 
 router.post("/admin/pricing-engine/workspace/publish", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_MANAGE), requireOwner, async (req, res) => {

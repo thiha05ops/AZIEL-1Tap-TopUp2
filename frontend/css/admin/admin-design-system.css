@@ -8540,6 +8540,11 @@ body.theme-light.admin-body .pricing-cost-input-shell {
   color: var(--admin-text-muted);
 }
 
+.pricing-fx-authorities { grid-column: 1 / -1; }
+.pricing-fx-authorities > p { margin: 0 0 12px; color: var(--admin-text-muted); font-size: 12px; }
+.pricing-fx-row { display: grid; grid-template-columns: minmax(90px, .6fr) repeat(4, minmax(120px, 1fr)); gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--admin-border); }
+@media (max-width: 767px) { .pricing-fx-row { grid-template-columns: 1fr; } }
+
 @media (max-width: 980px) {
 
   .pricing-v3-toolbar,

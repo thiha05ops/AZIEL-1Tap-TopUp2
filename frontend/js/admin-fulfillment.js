@@ -714,10 +714,11 @@ function renderMappings() {
                 <small>${escapeFulfillmentHtml(adminT("supplier_cost", "Raw Supplier Cost"))}: ${mapping.supplierCost?.rawSupplierCost ?? mapping.supplierCost?.amount ?? adminT("not_configured", "Not configured")} ${escapeFulfillmentHtml(mapping.supplierCost?.supplierCurrency || "")}</small>
                 <small>Landed THB: ${mapping.landedCost ?? "-"} · Production price: ${mapping.productionSellingPrice ?? "-"} ${escapeFulfillmentHtml(mapping.productionCurrency || "")}</small>
                 <small>${escapeFulfillmentHtml(adminT("readiness", "Readiness"))}: ${escapeFulfillmentHtml([mapping.readiness?.supplierMapped ? "Mapped" : "Unmapped", mapping.readiness?.inputReady ? "Input ready" : "Input pending", mapping.readiness?.pricingReady ? "Pricing ready" : "Pricing pending", mapping.readiness?.fulfillmentReady ? "Fulfillment ready" : "Fulfillment disabled"].join(" · "))}</small>
+                <small>Provider gate: ${mapping.featureGateEnabled ? "ON" : "OFF"} · Controlled test: ${mapping.controlledTestEvidence ? "PASS" : "No evidence"}</small>
                 <small>Production blockers: ${escapeFulfillmentHtml((mapping.productionBlockers || []).join(" · ") || "None")}</small>
                 <label>Production role
-                    <select data-mapping-role data-supplier-id="${escapeFulfillmentHtml(mapping.supplierId)}" data-mapping-id="${escapeFulfillmentHtml(mapping.id)}">
-                        ${["PRIMARY", "BACKUP", "DISABLED"].map(role => `<option value="${role}" ${mapping.productionRole === role ? "selected" : ""}>${role}</option>`).join("")}
+                    <select data-mapping-role data-mapping-id="${escapeFulfillmentHtml(mapping.id)}" data-admin-permission="OWNER_ROUTING_MANAGE">
+                        ${["PRIMARY", "BACKUP", "DISABLED"].map(role => `<option value="${role}" ${mapping.productionRole === role ? "selected" : ""} ${role === "PRIMARY" && !mapping.productionReady ? "disabled" : ""}>${role}</option>`).join("")}
                     </select>
                 </label>
             </div>
@@ -727,7 +728,7 @@ function renderMappings() {
     list.querySelectorAll("[data-mapping-role]").forEach(select => select.addEventListener("change", async event => {
         const node = event.currentTarget; node.disabled = true;
         try {
-            const data = await adminFetch(`/api/admin/suppliers/${encodeURIComponent(node.dataset.supplierId)}/mappings/${encodeURIComponent(node.dataset.mappingId)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ productionRole: node.value }) });
+            const data = await adminFetch(`/api/admin/supplier-mappings/${encodeURIComponent(node.dataset.mappingId)}/production-role`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ productionRole: node.value }) });
             if (!data?.success) throw new Error(data?.message || "Unable to update production role.");
             fulfillmentReferenceState.mappingsLoaded = false; await loadMappings({ force: true, showLoading: true });
             showAdminToast?.("Production supplier role updated.", "success");
@@ -736,6 +737,7 @@ function renderMappings() {
             fulfillmentReferenceState.mappingsLoaded = false; await loadMappings({ force: true, showLoading: true });
         }
     }));
+    window.AZIEL_ADMIN_AUTH?.applyPermissionVisibility?.(list);
 }
 
 function renderAttempts() {

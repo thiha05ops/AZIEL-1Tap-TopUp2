@@ -58,7 +58,7 @@ function verifyCampaignModalUx() {
     assert(css.includes("overflow-y: auto;"), "Campaign modal scroll container must scroll vertically.");
     assert(css.includes(".campaign-editor-grid"), "Campaign modal must have grouped two-column grid.");
     assert(css.includes("grid-template-columns: repeat(2, minmax(0, 1fr));"), "Campaign modal desktop grid must be two-column.");
-    matches("frontend/css/admin/admin-design-system.css", /@media\s*\(max-width:\s*768px\)[\s\S]*\.campaign-editor-grid,[\s\S]*\.campaign-media-control\s*\{[\s\S]*grid-template-columns:\s*1fr;/, "Campaign modal must collapse to one column on mobile.");
+    matches("frontend/css/admin/admin-design-system.css", /@media\s*\(max-width:\s*767px\)[\s\S]*\.campaign-editor-grid,[\s\S]*\.campaign-media-control\s*\{[\s\S]*grid-template-columns:\s*1fr;/, "Campaign modal must collapse at the canonical phone breakpoint.");
     assert(!controller.includes("/api/campaigns/entry-popup/claim"), "Admin Campaign editor must not change customer Campaign runtime semantics.");
 }
 

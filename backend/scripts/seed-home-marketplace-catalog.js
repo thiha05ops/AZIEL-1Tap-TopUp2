@@ -2,7 +2,7 @@ require("dotenv").config();
 const mongoose = require("mongoose");
 const CatalogProduct = require("../models/CatalogProduct");
 
-const LEGACY_PLACEHOLDER_ART = "assets/logo/aziel-icon.webp";
+const LEGACY_PLACEHOLDER_ART = "/assets/brand/aziel-icon.svg";
 const SEED_VERSION = 3;
 const CATEGORY_FALLBACKS = Object.freeze({
     POPULAR_GAME_CARDS: "assets/fallbacks/game-cards.svg",
@@ -34,7 +34,7 @@ const INVENTORY = Object.freeze([
     item("overmortal", "OverMortal", "Voucher", "MOBILE_GAME_TOPUP", ["NEW_GAME_TOPUP"], 3),
     item("magic-chess-go-go", "Magic Chess: Go Go", "Top Up", "MOBILE_GAME_TOPUP", ["NEW_GAME_TOPUP"], 4),
     item("lifeafter", "LifeAfter", "Credits & Package", "MOBILE_GAME_TOPUP", ["NEW_GAME_TOPUP"], 5),
-    item("mlbb-twilight-weekly-pass", "Mobile Legends Twilight Pass & Weekly Pass", "Twilight Pass & Weekly Pass", "MOBILE_GAME_TOPUP", ["NEW_GAME_TOPUP"], 6, "assets/games/mlbb.webp"),
+    item("mlbb-twilight-weekly-pass", "Mobile Legends Twilight Pass & Weekly Diamonds", "Twilight Pass & Weekly Diamonds", "MOBILE_GAME_TOPUP", ["NEW_GAME_TOPUP"], 6, "assets/games/mlbb.webp"),
     item("blood-strike-pass", "Blood Strike Pass", "Pass", "MOBILE_GAME_TOPUP", ["NEW_GAME_TOPUP"], 7),
 
     item("ea-sports-fc", "EA Sports FC", "FC Points and content", "PC_GAME", ["POPULAR_PC_GAMES"], 1),

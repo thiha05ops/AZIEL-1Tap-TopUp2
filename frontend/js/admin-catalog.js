@@ -424,7 +424,6 @@ function renderCatalogTabPanel(product, packages) {
                         <option value="disabled" ${catalogPackageStatusFilter === "disabled" ? "selected" : ""}>Disabled</option>
                         <option value="deleted" ${catalogPackageStatusFilter === "deleted" ? "selected" : ""}>Deleted</option>
                     </select>
-                    <button class="admin-secondary-btn" type="button" data-bulk-supplier-cost>${adminT("bulk_supplier_cost", "Bulk Supplier Cost")}</button>
                 </div>
                 ${renderPackageTable(filterPackages(packages))}
             </div>
@@ -1238,11 +1237,12 @@ function renderMobilePackagePreviewControl(product) {
 function packageFamilyOptions(productCode) {
     const common = [{ code: "OTHER_SPECIAL", name: "Other / Special", sortOrder: 90 }];
     const options = {
-        mlbb: [{ code: "DIAMONDS", name: "Diamonds", sortOrder: 10 }, { code: "FIRST_TOP_UP", name: "First Top-Up", sortOrder: 20 }, { code: "WEEKLY_PASS", name: "Weekly Pass", sortOrder: 30 }, { code: "TWILIGHT_PASS", name: "Twilight Pass", sortOrder: 40 }],
-        "mlbb-twilight-weekly-pass": [{ code: "WEEKLY_PASS", name: "Weekly Pass", sortOrder: 10 }, { code: "TWILIGHT_PASS", name: "Twilight Pass", sortOrder: 20 }],
+        mlbb: [{ code: "DIAMONDS", name: "Diamonds", sortOrder: 10 }, { code: "FIRST_TOP_UP", name: "First Top-Up", sortOrder: 20 }],
+        "mlbb-twilight-weekly-pass": [{ code: "WEEKLY_PASS", name: "Weekly Diamonds", sortOrder: 10 }, { code: "TWILIGHT_PASS", name: "Twilight Pass", sortOrder: 20 }],
         pubg: [{ code: "UC", name: "UC", sortOrder: 10 }, { code: "ROYALE_PASS", name: "Royale Pass", sortOrder: 20 }], pubgrp: [{ code: "ROYALE_PASS", name: "Royale Pass", sortOrder: 10 }],
-        freefire: [{ code: "DIAMONDS", name: "Diamonds", sortOrder: 10 }, { code: "LEVEL_UP_PASS", name: "Level Up Pass", sortOrder: 20 }, { code: "BP_CARD", name: "BP Card", sortOrder: 30 }, { code: "MEMBERSHIP_WEEKLY_LITE", name: "Membership · Weekly Lite", sortOrder: 40 }, { code: "MEMBERSHIP_WEEKLY", name: "Membership · Weekly", sortOrder: 41 }, { code: "MEMBERSHIP_MONTHLY", name: "Membership · Monthly", sortOrder: 42 }],
-        hok: [{ code: "TOKENS", name: "Tokens", sortOrder: 10 }, { code: "CARDS_PASSES", name: "Cards / Passes", sortOrder: 20 }], telegram: [{ code: "STARS_TOP_UP", name: "Top Up · Stars", sortOrder: 10 }, { code: "PREMIUM", name: "Premium", sortOrder: 20 }], valorant: [{ code: "VALORANT_POINTS", name: "Valorant Points", sortOrder: 10 }]
+        freefire: [{ code: "DIAMONDS", name: "Diamonds", sortOrder: 10 }],
+        "freefire-pass-membership": [{ code: "LEVEL_UP_PASS", name: "Level Up Pass", sortOrder: 10 }, { code: "BP_CARD", name: "BP Card", sortOrder: 20 }, { code: "MEMBERSHIP", name: "Membership", sortOrder: 30 }],
+        hok: [{ code: "TOKENS", name: "Tokens", sortOrder: 10 }], "hok-pass-cards": [{ code: "CARDS_PASSES", name: "Cards / Passes", sortOrder: 10 }], telegram: [{ code: "STARS_TOP_UP", name: "Top Up · Stars", sortOrder: 10 }, { code: "PREMIUM", name: "Premium", sortOrder: 20 }], valorant: [{ code: "VALORANT_POINTS", name: "Valorant Points", sortOrder: 10 }]
     };
     return [...(options[String(productCode || "").toLowerCase()] || []), ...common];
 }
@@ -2635,37 +2635,36 @@ function reopenPackageEditPanel(product, pkg, draft) {
 }
 
 function renderRegionalPricingEditor(region, label, currency) {
-    const priceLabel = region === "MM" ? adminT("mmk_price", "MMK Price") : adminT("thb_price", "THB Price");
+    const priceLabel = region === "MM" ? adminT("mmk_price", "Published MMK Price") : adminT("thb_price", "Published THB Price");
     return `
         <fieldset class="catalog-edit-fieldset catalog-regional-pricing" data-region="${escapeHtml(region)}">
-            <legend>${escapeHtml(label)} ${adminT("pricing", "Pricing")}</legend>
+            <legend>${escapeHtml(label)} ${adminT("pricing", "Presentation")}</legend>
             <div class="catalog-regional-pricing-grid">
-                <label>${priceLabel}<input id="catalogEdit${region}" data-pricing-preview-input type="number" step="0.01" min="0"></label>
+                <label>${priceLabel}<input id="catalogEdit${region}" type="number" step="0.01" min="0" readonly title="Published through Daily Pricing"></label>
                 <label>${adminT("selling_currency", "Selling Currency")}<input type="text" value="${escapeHtml(currency)}" readonly></label>
                 <label>${adminT("reference_price", "Original / Reference Price")}<input id="catalogEdit${region}ReferencePrice" data-pricing-preview-input type="number" step="0.01" min="0" placeholder="${adminT("optional_reference_price", "Optional original price")}"></label>
                 <label>${adminT("discount_label", "Discount Label")}<input id="catalogEdit${region}DiscountLabel" data-pricing-preview-input type="text" maxlength="40" placeholder="${adminT("discount_label_example", "HOT DEAL")}"></label>
                 <label class="catalog-toggle-row"><span>${adminT("show_discount_badge", "Show Discount Badge")}</span><input id="catalogEdit${region}ShowDiscount" data-pricing-preview-input type="checkbox"></label>
                 <label class="catalog-toggle-row"><span>${adminT("show_original_price", "Show Original Price")}</span><input id="catalogEdit${region}ShowOriginalPrice" data-pricing-preview-input type="checkbox" checked></label>
                 <label class="catalog-toggle-row"><span>${adminT("show_save_amount", "Show Save Amount")}</span><input id="catalogEdit${region}ShowSaveAmount" data-pricing-preview-input type="checkbox" checked></label>
-                <label>${adminT("published_price_mode", "Published Price Mode")}
-                    <select id="catalogEdit${region}PublishedPriceMode" data-pricing-preview-input>
+                <div hidden aria-hidden="true">
+                    <select id="catalogEdit${region}PublishedPriceMode">
                         <option value="LEGACY_COMPATIBILITY_PRICE">${adminT("legacy_compatibility_price", "Legacy compatibility price")}</option>
                         <option value="MANUAL_OVERRIDE">${adminT("manual_override", "Manual override")}</option>
                         <option value="POLICY_DERIVED">${adminT("policy_derived", "Policy derived")}</option>
                     </select>
-                </label>
-                <label>${adminT("manual_override_reason", "Override Reason")}<input id="catalogEdit${region}ManualOverrideReason" data-pricing-preview-input type="text" maxlength="240" placeholder="${adminT("required_for_manual_override", "Required for manual override")}"></label>
-                <label>${adminT("supplier_cost", "Supplier Cost")}<input id="catalogEdit${region}SupplierCost" data-pricing-preview-input type="number" step="0.01" min="0" placeholder="${adminT("supplier_cost_not_configured", "Supplier cost not configured")}"></label>
-                <label>${adminT("supplier_currency", "Supplier Currency")}
-                    <select id="catalogEdit${region}SupplierCurrency" data-pricing-preview-input>
+                    <input id="catalogEdit${region}ManualOverrideReason" type="text">
+                    <input id="catalogEdit${region}SupplierCost" type="number">
+                    <select id="catalogEdit${region}SupplierCurrency">
                         <option value="${escapeHtml(currency)}">${escapeHtml(currency)}</option>
                         <option value="${currency === "MMK" ? "THB" : "MMK"}">${currency === "MMK" ? "THB" : "MMK"}</option>
                     </select>
-                </label>
-                <label>${adminT("supplier_name", "Supplier Name")}<input id="catalogEdit${region}SupplierName" data-pricing-preview-input type="text" maxlength="120"></label>
-                <label>${adminT("supplier_version", "Supplier Version")}<input id="catalogEdit${region}SupplierVersion" data-pricing-preview-input type="text" maxlength="80"></label>
-                <label>${adminT("supplier_cost_timestamp", "Cost Timestamp")}<input id="catalogEdit${region}SupplierCostTimestamp" data-pricing-preview-input type="date"></label>
-                <label class="catalog-regional-note">${adminT("pricing_note", "Pricing Note")}<textarea id="catalogEdit${region}PricingNote" data-pricing-preview-input maxlength="240" rows="2"></textarea></label>
+                    <input id="catalogEdit${region}SupplierName" type="text">
+                    <input id="catalogEdit${region}SupplierVersion" type="text">
+                    <input id="catalogEdit${region}SupplierCostTimestamp" type="date">
+                    <textarea id="catalogEdit${region}PricingNote"></textarea>
+                </div>
+                <small class="catalog-regional-note">Selling price and supplier economics are managed in Daily Pricing. Supplier routing is managed in Fulfillment.</small>
             </div>
         </fieldset>
     `;

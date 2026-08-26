@@ -290,7 +290,10 @@ async function startServer() {
         wonddRecoveryTimer.unref?.();
     }
 
-    if (String(process.env.FAZERCARDS_PUBG_AUTO_FULFILLMENT_ENABLED || "").trim().toLowerCase() === "true") {
+    const fazerCardsRecoveryEnabled = ["pubg", "mlbb", "freefire", "hok"].some(product =>
+        require("./services/suppliers/fazercardsAdapter").isAutoFulfillmentEnabled(product)
+    );
+    if (fazerCardsRecoveryEnabled) {
         const fazerCardsProcessor = require("./services/suppliers/fazercardsFulfillmentProcessor").processor;
         fazerCardsProcessor.recoverDue().catch(() => null);
         const fazerCardsRecoveryTimer = setInterval(() => fazerCardsProcessor.recoverDue().catch(() => null), 15 * 60 * 1000);

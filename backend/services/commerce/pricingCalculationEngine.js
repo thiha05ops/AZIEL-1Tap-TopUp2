@@ -559,8 +559,24 @@ function calculateBasePrice(input) {
     const profitRule = profitRuleOverride
         ? { enabled: true, type: profitRuleOverride.ruleType.endsWith("_PERCENT") ? "PERCENT" : "FIXED", value: profitRuleOverride.value }
         : policy.profitRule;
-    const profit = applyMonetaryRule(subtotal, profitRule, "policy.profitRule");
+    const packageOverride = policy.packageProfitOverride || { mode: "INHERIT", value: null };
+    const overrideMode = String(packageOverride.mode || "INHERIT").toUpperCase();
+    const effectiveProfitRule = overrideMode === "FIXED_AMOUNT"
+        ? { enabled: true, type: "FIXED", value: packageOverride.value }
+        : overrideMode === "PERCENTAGE"
+            ? { enabled: true, type: "PERCENT", value: packageOverride.value }
+            : profitRule;
+    const profit = applyMonetaryRule(landedCost, effectiveProfitRule, "policy.profitRule");
     let profitAmount = profit.amount;
+    const baseProfitAmount = profitAmount;
+    const minimumProfitAmount = policy.minimumProfitAmount == null ? null : assertFiniteNumber(policy.minimumProfitAmount, ERROR_CODES.INVALID_MONETARY_RULE, "policy.minimumProfitAmount");
+    const maximumProfitAmount = policy.maximumProfitAmount == null ? null : assertFiniteNumber(policy.maximumProfitAmount, ERROR_CODES.INVALID_MONETARY_RULE, "policy.maximumProfitAmount");
+    if (maximumProfitAmount != null && minimumProfitAmount != null && maximumProfitAmount < minimumProfitAmount) throw new CommerceCalculationError(ERROR_CODES.INVALID_MONETARY_RULE, "Maximum profit must be greater than or equal to minimum profit.");
+    if (overrideMode !== "FIXED_AMOUNT") {
+        if (minimumProfitAmount != null) profitAmount = Math.max(profitAmount, minimumProfitAmount);
+        if (maximumProfitAmount != null) profitAmount = Math.min(profitAmount, maximumProfitAmount);
+        profitAmount = normalizeAmount(profitAmount);
+    }
     rules.filter(rule => ["MARKUP_PERCENT", "MARKUP_FIXED"].includes(rule.ruleType)).forEach(rule => {
         profitAmount = normalizeAmount(profitAmount + ruleAmount(subtotal, rule));
     });
@@ -573,6 +589,10 @@ function calculateBasePrice(input) {
         ruleType: profit.rule.type,
         ruleValue: profit.rule.value,
         amountAdded: profitAmount,
+        baseProfitAmount,
+        minimumProfitAmount,
+        maximumProfitAmount,
+        packageOverrideMode: overrideMode,
         outputAmount: subtotal,
         currency: targetCurrency
     });
@@ -642,6 +662,10 @@ function calculateBasePrice(input) {
         businessCostAmount: businessCost.amount,
         costBeforeProfit,
         profitAmount,
+        baseProfitAmount,
+        minimumProfitAmount,
+        maximumProfitAmount,
+        packageProfitOverride: Object.freeze({ mode: overrideMode, value: packageOverride.value ?? null }),
         preExchangeSubtotal,
         exchangeRateApplied: exchange.rate,
         exchangeRateMetadata: exchange.metadata,

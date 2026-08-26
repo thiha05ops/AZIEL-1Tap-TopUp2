@@ -1,4 +1,5 @@
 const { buildWonddMlbbGameId, WonddAdapterError } = require("./wonddAdapter");
+const { gameFamilyForProduct } = require("../commerce/canonicalGameInputContract");
 
 const FORMATTERS = Object.freeze({
     mlbb(input = {}) {
@@ -14,11 +15,11 @@ const FORMATTERS = Object.freeze({
 });
 
 function hasWonddGameIdFormatter(productCode = "") {
-    return typeof FORMATTERS[String(productCode).trim().toLowerCase()] === "function";
+    return typeof FORMATTERS[gameFamilyForProduct(productCode).toLowerCase()] === "function";
 }
 
 function buildWonddGameId(productCode, input = {}) {
-    const formatter = FORMATTERS[String(productCode || "").trim().toLowerCase()];
+    const formatter = FORMATTERS[gameFamilyForProduct(productCode).toLowerCase()];
     if (!formatter) {
         throw new WonddAdapterError("WONDD_INPUT_CONTRACT_NOT_CONFIGURED", "WonDD player input contract is not configured.", { category: "CONFIGURATION" });
     }

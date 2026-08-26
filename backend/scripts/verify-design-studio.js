@@ -29,7 +29,7 @@ function verifyFiles() {
 
 function verifyAdminNavigation() {
     const adminHtml = read("frontend/admin.html");
-    assert.strictEqual(count(adminHtml, "admin-design-studio.html"), 1, "Admin page must contain exactly one Design Studio sidebar entry");
+    assert.strictEqual(count(adminHtml, "admin-design-studio.html"), 2, "Admin page must contain one desktop and one phone More-menu Design Studio entry");
     assert.ok(adminHtml.includes('data-admin-permission="DESIGN_STUDIO_READ"'), "Design Studio nav must be permission-gated");
     assert.ok(adminHtml.includes('fa-palette'), "Design Studio nav must use the existing Font Awesome icon library");
 }

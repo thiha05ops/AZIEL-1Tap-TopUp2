@@ -41,9 +41,8 @@ function main() {
     notIncludes("frontend/home.html", "AZIEL OS", "Public storefront Home must not inherit Admin OS branding.");
     includes("frontend/admin.html", "data-aziel-os-brand=\"sidebar\"", "Expanded sidebar must use the reusable AZIEL OS SVG brand component.");
     includes("frontend/admin-login.html", "data-aziel-os-brand=\"login\"", "Login must use the reusable AZIEL OS SVG brand component.");
-    includes("frontend/js/admin-os-brand.js", "linearGradient", "AZIEL OS mark must use SVG gradient surfaces.");
-    includes("frontend/js/admin-os-brand.js", "feGaussianBlur", "AZIEL OS mark must use restrained SVG glow.");
-    includes("frontend/js/admin-os-brand.js", "admin-logo-fallback", "AZIEL OS SVG must retain image fallback.");
+    includes("frontend/js/admin-os-brand.js", "/assets/brand/aziel-icon.svg", "AZIEL OS must use the canonical compact brand mark.");
+    notIncludes("frontend/js/admin-os-brand.js", "<svg", "AZIEL OS must not embed a duplicate inline brand mark.");
 
     assertOrder("frontend/admin.html", [
         "<span class=\"admin-nav-label\">Home</span>",
@@ -61,7 +60,7 @@ function main() {
     includes("frontend/admin.html", "Dashboard</h3>", "Dashboard must use operations-centre naming.");
     includes("frontend/admin.html", "Commerce operations overview using live AZIEL data", "Dashboard must state live-data operating scope.");
     includes("frontend/admin.html", "<h3>Pricing</h3>", "Pricing Workspace must migrate to Pricing naming.");
-    includes("frontend/admin.html", "Daily Supplier Workspace", "Pricing Workspace subtitle must reflect daily supplier workflow.");
+    includes("frontend/admin.html", "Update supplier costs and publish server-calculated prices.", "Daily Pricing subtitle must describe its current authority.");
     includes("frontend/admin.html", "pricing-business-rules-drawer", "Business Rules must be outside the default daily flow.");
     includes("frontend/admin.html", "Publish All Disabled", "Unsafe pricing publish-all action must stay disabled.");
 
@@ -69,7 +68,7 @@ function main() {
     includes("frontend/css/admin/admin-design-system.css", "--aziel-os-purple", "AZIEL OS accent token must exist.");
     includes("frontend/css/admin/admin-design-system.css", "--aziel-os-focus-ring", "AZIEL OS focus ring token must exist.");
     includes("frontend/css/admin/admin-design-system.css", "@media (prefers-reduced-motion", "Admin design system must respect reduced motion.");
-    includes("frontend/css/admin/admin-os-brand.css", ".aziel-os-svg-mark", "Admin SVG mark styling must exist.");
+    includes("frontend/css/admin/admin-os-brand.css", ".aziel-os-brand-mark", "Canonical Admin mark styling must exist.");
     includes("frontend/css/admin/admin-os-brand.css", ".admin-body.admin-sidebar-collapsed", "Collapsed sidebar must show compact AZIEL OS mark.");
     includes("frontend/css/admin/admin-design-system.css", ".admin-icon-btn", "Reusable topbar icon button style must exist.");
 

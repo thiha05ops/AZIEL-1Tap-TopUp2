@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "aziel-runtime";
-const CORE_CACHE = `${CACHE_PREFIX}-core-v1`;
+const CORE_CACHE = `${CACHE_PREFIX}-core-v4`;
 const PAGE_CACHE = `${CACHE_PREFIX}-pages-v1`;
 const CODE_CACHE = `${CACHE_PREFIX}-code-v2`;
 const MEDIA_CACHE = `${CACHE_PREFIX}-media-v1`;
@@ -7,12 +7,13 @@ const MEDIA_CACHE = `${CACHE_PREFIX}-media-v1`;
 const CORE_ASSETS = [
     "/offline.html",
     "/manifest.json",
-    "/assets/logo/aziel-wordmark.webp",
-    "/icons/aziel-app-icon-192.png",
-    "/icons/aziel-app-icon-512.png",
-    "/icons/aziel-app-icon-maskable-192.png",
-    "/icons/aziel-app-icon-maskable-512.png",
-    "/icons/apple-touch-icon.png"
+    "/assets/brand/favicon-16.png",
+    "/assets/brand/favicon-32.png",
+    "/assets/brand/favicon-48.png",
+    "/assets/brand/aziel-logo-primary.svg",
+    "/assets/brand/icon-192.png",
+    "/assets/brand/icon-512.png",
+    "/assets/brand/apple-touch-icon.png"
 ];
 
 const PUBLIC_HTML_ALLOWLIST = new Set([

@@ -16,11 +16,11 @@ const { loadDailyPricingWorkspace, batchPreviewDailyPricing } = require("../serv
 const APPLY = process.argv.includes("--apply");
 const CATEGORY = "free_fire_th";
 const EXACT = Object.freeze([
-    ["FF_WONDD_F00033", "33 Diamonds", "33_diamonds"], ["FF_WONDD_F00068", "68 Diamonds", "68_diamonds"],
-    ["FF_WONDD_F00172", "172 Diamonds", "172_diamonds"], ["FF_310_DIA", "310 Diamonds", "310_diamonds"],
-    ["FF_WONDD_F00517", "517 Diamonds", "517_diamonds"], ["FF_WONDD_F00690", "690 Diamonds", "690_diamonds"],
-    ["FF_WONDD_F01052", "1,052 Diamonds", "1052_diamonds"], ["FF_WONDD_F01801", "1,801 Diamonds", "1801_diamonds"],
-    ["FF_WONDD_F03698", "3,698 Diamonds", "3698_diamonds"]
+    ["FF_33_DIA", "33 Diamonds", "33_diamonds"], ["FF_68_DIA", "68 Diamonds", "68_diamonds"],
+    ["FF_172_DIA", "172 Diamonds", "172_diamonds"], ["FF_310_DIA", "310 Diamonds", "310_diamonds"],
+    ["FF_517_DIA", "517 Diamonds", "517_diamonds"], ["FF_690_DIA", "690 Diamonds", "690_diamonds"],
+    ["FF_1052_DIA", "1,052 Diamonds", "1052_diamonds"], ["FF_1801_DIA", "1,801 Diamonds", "1801_diamonds"],
+    ["FF_3698_DIA", "3,698 Diamonds", "3698_diamonds"]
 ]);
 const OUT_JSON = path.join(__dirname, "../../docs/fazercards-freefire-th-reconciliation.json");
 const OUT_MD = path.join(__dirname, "../../docs/fazercards-freefire-th-reconciliation.md");

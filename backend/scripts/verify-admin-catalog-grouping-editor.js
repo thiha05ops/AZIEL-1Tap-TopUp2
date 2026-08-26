@@ -24,7 +24,7 @@ const EXPECTED_GROUPS = Object.freeze({
     "Mobile Games": {
         "Mobile Legends": ["mlbb", "mlbb-twilight-weekly-pass"],
         "PUBG Mobile": ["pubg", "pubgrp"],
-        "Free Fire": ["freefire"],
+        "Free Fire": ["freefire", "freefire-pass-membership"],
         "Marvel Rivals": ["marvel-rivals"],
         "Blood Strike": ["blood-strike", "blood-strike-pass"],
         "Age of Empires Mobile": ["age-of-empires-mobile"],
@@ -32,7 +32,7 @@ const EXPECTED_GROUPS = Object.freeze({
         OverMortal: ["overmortal"],
         "Magic Chess: Go Go": ["magic-chess-go-go"],
         LifeAfter: ["lifeafter"],
-        "Honor of Kings": ["hok"]
+        "Honor of Kings": ["hok", "hok-pass-cards"]
     },
     "PC Games": {
         Valorant: ["valorant"]
@@ -83,7 +83,7 @@ function assertCanonicalGroupingSource() {
         });
     });
 
-    assert.deepStrictEqual([...seen].sort(), [...CANONICAL_PRODUCT_CODES].sort(), "Grouping must cover exactly the 17 canonical products.");
+    assert.deepStrictEqual([...seen].sort(), [...CANONICAL_PRODUCT_CODES].sort(), "Grouping must cover every canonical product authority.");
 }
 
 function assertAdminUiSource() {
@@ -125,13 +125,13 @@ async function assertDatabaseState() {
                 source: "database",
                 includeDisabled: true,
                 includeAssetProjection: false,
-                includeAdminPricing: false
+                includeAdminPricing: true
             }),
             packageCountsByProduct(),
             CatalogProduct.find().lean()
         ]);
         const adminVisible = products.filter(isAdminCanonicalCatalogProduct);
-        assert.strictEqual(adminVisible.length, 17, "Exactly 17 canonical products must be Admin-visible.");
+        assert.strictEqual(adminVisible.length, CANONICAL_PRODUCT_CODES.length, "Every canonical product must be Admin-visible.");
         assert.deepStrictEqual(
             adminVisible.map(product => product.productCode).sort(),
             [...CANONICAL_PRODUCT_CODES].sort(),

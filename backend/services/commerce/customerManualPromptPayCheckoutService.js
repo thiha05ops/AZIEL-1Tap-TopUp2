@@ -3,6 +3,7 @@
 const crypto = require("crypto");
 const { isCanonicalProductCode } = require("../../catalog/canonicalOperationalCatalog");
 const CatalogPackage = require("../../models/CatalogPackage");
+const { findCatalogPackageByIdentity } = require("./catalogPackageIdentityService");
 const PaymentMethod = require("../../models/PaymentMethod");
 const { paymentMethodCapabilityState } = require("../paymentProviderRegistry");
 const { loadFulfillmentCapability } = require("../fulfillmentCapabilityService");
@@ -79,9 +80,7 @@ async function loadCatalogPackage(input = {}) {
         throw new CustomerManualPromptPayCheckoutError(ERROR_CODES.PACKAGE_UNAVAILABLE, "Selected package is no longer available.", 409);
     }
 
-    const pkg = await CatalogPackage.findOne({
-        productCode,
-        packageCode,
+    const pkg = await findCatalogPackageByIdentity(productCode, packageCode, {
         enabled: true,
         deletedAt: null
     }).lean();
@@ -90,7 +89,7 @@ async function loadCatalogPackage(input = {}) {
         throw new CustomerManualPromptPayCheckoutError(ERROR_CODES.PACKAGE_UNAVAILABLE, "Selected package is no longer available.", 409);
     }
 
-    return { pkg, price, region, currency, productCode, packageCode };
+    return { pkg, price, region, currency, productCode, packageCode: pkg.packageCode };
 }
 
 async function assertAuthoritativeFulfillmentReady(catalog = {}, options = {}) {

@@ -119,7 +119,7 @@
     }
     function presentationArtwork(product = {}, groupId = "") {
         const image = String(product.image || "");
-        if (image && !image.includes("assets/logo/aziel-icon")) return image;
+        if (image && !image.includes("assets/brand/aziel-icon")) return image;
         return groupId === "social-topup" ? "assets/fallbacks/digital-services.svg" : "assets/fallbacks/game-topup.svg";
     }
     function homeRoute(product = {}) { return window.AZIEL_CATALOG_PRESENTATION?.resolveProductRoute?.(product.productRoute || product.route, codeOf(product)) || ""; }

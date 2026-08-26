@@ -89,7 +89,7 @@ function openPaymentConfirmModal(order, payment) {
 
     const logo = document.getElementById("modalPaymentLogo");
     if (logo) {
-        logo.src = payment.logo || "assets/logo.png";
+        logo.src = payment.logo || "/assets/brand/aziel-icon.svg";
         logo.style.display = "block";
     }
 

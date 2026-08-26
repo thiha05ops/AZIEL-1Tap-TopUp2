@@ -435,7 +435,7 @@ function buildPackagePatch(document, patch = {}) {
     assertNoImmutableFields(patch, ["_id", "id", "productCode", "packageCode", "source", "createdAt", "updatedAt", "__v"]);
 
     const updates = {};
-    const allowed = new Set(["name", "enabled", "prices", "canonicalSupplierCost", "iconAssetId", "customerNote", "customerNoteLocales", "packageFamily", "expectedUpdatedAt"]);
+    const allowed = new Set(["name", "enabled", "prices", "canonicalSupplierCost", "iconAssetId", "customerNote", "customerNoteLocales", "packageFamily", "expectedUpdatedAt", "pricingPublicationEvidence"]);
 
     Object.keys(patch).forEach(key => {
         if (!allowed.has(key)) {
@@ -475,6 +475,12 @@ function buildPackagePatch(document, patch = {}) {
 
     if (Object.prototype.hasOwnProperty.call(patch, "iconAssetId")) {
         updates.iconAssetId = cleanEditableText(patch.iconAssetId, 96);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(patch, "pricingPublicationEvidence")) {
+        if (!Array.isArray(patch.pricingPublicationEvidence) || patch.pricingPublicationEvidence.length > 2) {
+            throw new CatalogAdminError("CATALOG_PATCH_INVALID", "Pricing publication evidence must contain at most one entry per region.");
+        }
     }
 
     if (Object.prototype.hasOwnProperty.call(patch, "canonicalSupplierCost")) {
@@ -959,6 +965,10 @@ async function updatePackage({ productCode, packageCode, patch = {}, actor = "ad
     }
 
     const supplierCostHistoryEntries = buildSupplierCostHistoryEntries(item, updates, actor);
+    const previousPublishedPrices = Object.fromEntries(["TH", "MM"].map(region => [
+        region,
+        item.prices?.[region]?.amount == null ? null : Number(item.prices[region].amount)
+    ]));
 
     Object.entries(updates).forEach(([path, value]) => {
         item.set(path, value);
@@ -970,6 +980,29 @@ async function updatePackage({ productCode, packageCode, patch = {}, actor = "ad
         item.supplierCostHistory = item.supplierCostHistory
             .concat(supplierCostHistoryEntries)
             .slice(-MAX_SUPPLIER_COST_HISTORY);
+    }
+    if (Array.isArray(patch.pricingPublicationEvidence) && patch.pricingPublicationEvidence.length) {
+        const publishedAt = new Date();
+        const entries = patch.pricingPublicationEvidence.map(evidence => {
+            const region = normalizeRegion(evidence.region);
+            const nextAmount = updates[`prices.${region}.amount`];
+            return {
+                region,
+                previousPublishedPrice: previousPublishedPrices[region],
+                newPublishedPrice: nextAmount == null ? null : Number(nextAmount),
+                currency: REGION_CURRENCIES[region],
+                supplierBasis: evidence.supplierBasis || {},
+                fxBasis: evidence.fxBasis || {},
+                appliedProfit: evidence.appliedProfit == null ? null : Number(evidence.appliedProfit),
+                pricingPolicy: evidence.pricingPolicy || {},
+                packageProfitOverride: evidence.packageProfitOverride || { mode: "INHERIT", value: null },
+                publishedBy: actor || "admin",
+                publishedAt
+            };
+        });
+        item.pricingPublicationHistory = (Array.isArray(item.pricingPublicationHistory) ? item.pricingPublicationHistory : [])
+            .concat(entries)
+            .slice(-100);
     }
     await item.save();
     console.log("Catalog package updated:", {

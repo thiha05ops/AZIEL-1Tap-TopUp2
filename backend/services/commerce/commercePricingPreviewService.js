@@ -3,6 +3,7 @@
 const crypto = require("crypto");
 const CatalogProduct = require("../../models/CatalogProduct");
 const CatalogPackage = require("../../models/CatalogPackage");
+const { findCatalogPackageByIdentity } = require("./catalogPackageIdentityService");
 const { isCanonicalProductCode } = require("../../catalog/canonicalOperationalCatalog");
 const { isProductPubliclyEligible, productSupportsRegion } = require("../../catalog/productRegionAuthority");
 const { createPricingQuote } = require("./pricingQuoteRuntime");
@@ -47,12 +48,12 @@ async function loadCatalogPackage(input = {}) {
     if (!productSupportsRegion(product, region)) {
         throw new CommercePricingPreviewError("PRODUCT_REGION_UNAVAILABLE", "Selected product is not available in this region.", 409, "REGION_UNAVAILABLE");
     }
-    const pkg = await CatalogPackage.findOne({ productCode, packageCode, enabled: true, deletedAt: null }).lean();
+    const pkg = await findCatalogPackageByIdentity(productCode, packageCode, { enabled: true, deletedAt: null }).lean();
     const price = pkg?.prices?.[region];
     if (!pkg || !price || price.enabled === false || upper(price.currency) !== currency) {
         throw new CommercePricingPreviewError("PACKAGE_UNAVAILABLE", "Selected package is no longer available.", 409, "PACKAGE_UNAVAILABLE");
     }
-    return { product, pkg, price, productCode, packageCode, region, currency };
+    return { product, pkg, price, productCode, packageCode: pkg.packageCode, region, currency };
 }
 
 function publicPreview(quote, catalog) {

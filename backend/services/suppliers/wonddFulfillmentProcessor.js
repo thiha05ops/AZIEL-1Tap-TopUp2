@@ -6,6 +6,7 @@ const wonddAdapter = require("./wonddAdapter");
 const { normalizeSupplierResult } = require("../supplierAdapterRegistry");
 const { CONFIRMED_SERVICE_CODES } = require("./wonddCatalogConfig");
 const { buildWonddGameId, hasWonddGameIdFormatter } = require("./wonddGameIdFormatters");
+const { providerGameCodeForProduct } = require("../commerce/canonicalGameInputContract");
 
 const POLL_DELAYS_MS = Object.freeze([0, 5000, 10000, 20000, 30000, 60000]);
 
@@ -32,7 +33,7 @@ function validateWonddMapping(mapping = {}) {
         error.code = "WONDD_PACKAGE_MAPPING_MISSING";
         throw error;
     }
-    const productCode = String(mapping.productCode || "").trim().toLowerCase();
+    const productCode = providerGameCodeForProduct(mapping.productCode) || String(mapping.productCode || "").trim().toLowerCase();
     const expectedServiceCode = CONFIRMED_SERVICE_CODES[productCode];
     if (String(mapping.executionMode || "API").toUpperCase() !== "API" || !expectedServiceCode || String(mapping.supplierProductCode || "").trim().toLowerCase() !== expectedServiceCode.toLowerCase() || !String(mapping.supplierPackageCode || "").trim()) {
         const error = new Error("WonDD mapping must explicitly contain its confirmed servicecode and packcode.");
@@ -103,7 +104,7 @@ function createWonddFulfillmentProcessor(deps = {}) {
         if (!order) throw Object.assign(new Error("CommerceOrder not found."), { code: "ORDER_NOT_FOUND" });
         validateWonddMapping(mapping);
         const input = order.fulfilment?.input || {};
-        const productCode = String(mapping.productCode).toLowerCase();
+        const productCode = providerGameCodeForProduct(mapping.productCode) || String(mapping.productCode).toLowerCase();
         const serviceCode = CONFIRMED_SERVICE_CODES[productCode];
         const gameId = buildWonddGameId(productCode, input);
         attempt.supplierRequest = { ...(attempt.supplierRequest || {}), submissionState: "SUBMISSION_IN_FLIGHT", submissionStartedAt: new Date(), serviceCode, packCodeConfigured: true, playerInputValidated: true };
@@ -131,7 +132,7 @@ function createWonddFulfillmentProcessor(deps = {}) {
         if (!order) throw Object.assign(new Error("CommerceOrder not found."), { code: "ORDER_NOT_FOUND" });
         validateWonddMapping(mapping);
         const input = order.fulfilment?.input || {};
-        const productCode = String(mapping.productCode).toLowerCase();
+        const productCode = providerGameCodeForProduct(mapping.productCode) || String(mapping.productCode).toLowerCase();
         return adapter.dryRunTopup({ productCode, serviceCode: CONFIRMED_SERVICE_CODES[productCode], packCode: mapping.supplierPackageCode, gameId: buildWonddGameId(productCode, input) });
     }
 

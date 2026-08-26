@@ -10,11 +10,11 @@ const adapter = require("../services/suppliers/fazercardsAdapter");
 const APPLY = process.argv.includes("--apply");
 const OFFERS = Object.freeze([
     ["PUBG_60_UC", "60 UC", "60_uc", 0.8874, true],
-    ["PUBG_FAZER_325_UC", "325 UC", "325_uc", 4.4421, false],
-    ["PUBG_FAZER_660_UC", "660 UC", "660_uc", 8.8697, false],
-    ["PUBG_FAZER_1800_UC", "1800 UC", "1800_uc", 22.1743, false],
-    ["PUBG_FAZER_3850_UC", "3850 UC", "3850_uc", 44.3487, false],
-    ["PUBG_FAZER_8100_UC", "8100 UC", "8100_uc", 88.0051, false]
+    ["PUBG_325_UC", "325 UC", "325_uc", 4.4421, false],
+    ["PUBG_660_UC", "660 UC", "660_uc", 8.8697, false],
+    ["PUBG_1800_UC", "1800 UC", "1800_uc", 22.1743, false],
+    ["PUBG_3850_UC", "3850 UC", "3850_uc", 44.3487, false],
+    ["PUBG_8100_UC", "8100 UC", "8100_uc", 88.0051, false]
 ]);
 
 function rows(payload) { return payload.offers || payload.data?.offers || payload.data || []; }

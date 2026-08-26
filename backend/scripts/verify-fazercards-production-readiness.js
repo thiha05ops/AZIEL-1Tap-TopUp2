@@ -9,7 +9,7 @@ const CatalogPackage = require("../models/CatalogPackage");
 const adapter = require("../services/suppliers/fazercardsAdapter");
 const { loadDailyPricingWorkspace, batchPreviewDailyPricing } = require("../services/commerce/adminPricingControlCenterService");
 
-const EXPECTED = new Map([["60_uc", "PUBG_60_UC"], ["325_uc", "PUBG_FAZER_325_UC"], ["660_uc", "PUBG_FAZER_660_UC"], ["1800_uc", "PUBG_FAZER_1800_UC"], ["3850_uc", "PUBG_FAZER_3850_UC"], ["8100_uc", "PUBG_FAZER_8100_UC"]]);
+const EXPECTED = new Map([["60_uc", "PUBG_60_UC"], ["325_uc", "PUBG_325_UC"], ["660_uc", "PUBG_660_UC"], ["1800_uc", "PUBG_1800_UC"], ["3850_uc", "PUBG_3850_UC"], ["8100_uc", "PUBG_8100_UC"]]);
 async function main() {
     assert.notStrictEqual(String(process.env.FAZERCARDS_PUBG_AUTO_FULFILLMENT_ENABLED).toLowerCase(), "true", "live gate must be OFF");
     const before = await adapter.getBalance();
@@ -25,10 +25,10 @@ async function main() {
         assert.strictEqual(mapping.mappingMetadata?.validation?.categoryId, "pubg_mobile");
         assert.deepStrictEqual(mapping.mappingMetadata?.validation?.requiredFields, ["player_id"]);
     }
-    const scoped = await CatalogPackage.find({ productCode: "pubg", packageCode: { $in: [...EXPECTED.values()].filter(code => code.includes("_FAZER_")) } }).lean();
-    assert.strictEqual(scoped.length, 5); assert(scoped.every(pkg => pkg.enabled === false && !pkg.prices?.TH));
+    const scoped = await CatalogPackage.find({ productCode: "pubg", packageCode: { $in: [...EXPECTED.values()].filter(code => code !== "PUBG_60_UC") }, deletedAt: null }).lean();
+    assert.strictEqual(scoped.length, 5); assert(scoped.every(pkg => pkg.enabled === true && !pkg.prices?.TH && pkg.aliases.some(alias => alias.includes("_FAZER_"))));
     const workspace = await loadDailyPricingWorkspace({ supplierId: String(supplier._id), productCode: "pubg", region: "TH" });
-    assert.strictEqual(workspace.rows.length, 6); assert(workspace.rows.every(row => row.supplierCurrency === "USD" && Number(row.supplierCost) > 0 && row.offered === false));
+    assert.strictEqual(workspace.rows.length, 6); assert(workspace.rows.every(row => row.supplierCurrency === "USD" && Number(row.supplierCost) > 0 && row.fulfillmentMappingEnabled === false));
     assert(workspace.rows.every(row => row.previewEligible === true));
     const preview = await batchPreviewDailyPricing({
         supplierId: String(supplier._id),

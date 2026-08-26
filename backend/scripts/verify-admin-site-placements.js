@@ -73,7 +73,7 @@ function verifyAdminUi() {
     includes("frontend/js/admin-site-placements.js", "activeSitePlacement.itemType", "Admin controller must respect backend item type.");
     includes("frontend/js/admin-site-placements.js", "managed: true", "Saving a placement must mark it managed.");
     includes("frontend/css/admin/admin-design-system.css", ".site-placement-row", "Admin CSS must style SitePlacement rows.");
-    matches("frontend/css/admin/admin-design-system.css", /@media\s*\(max-width:\s*768px\)[\s\S]*\.site-placement-row/, "SitePlacement admin UI must include mobile rules.");
+    matches("frontend/css/admin/admin-design-system.css", /@media\s*\(max-width:\s*767px\)[\s\S]*\.site-placement-row/, "SitePlacement admin UI must use the canonical phone breakpoint.");
     includes("frontend/lang/admin/en.js", "home_placements", "English admin locale must include Home Placements.");
     includes("frontend/lang/admin/my.js", "home_placements", "Myanmar admin locale must include Home Placements.");
 }

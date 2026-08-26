@@ -1,9 +1,10 @@
 "use strict";
 
 const PricingPolicy = require("../../models/PricingPolicy");
+const PackagePricingOverride = require("../../models/PackagePricingOverride");
 const PricingRule = require("../../models/PricingRule");
 const PriceVersion = require("../../models/PriceVersion");
-const { resolveExchangeRate } = require("./exchangeRateService");
+const { loadActiveExchangeRateAuthority, resolveExchangeRate, snapshotFromAuthority } = require("./exchangeRateService");
 const { resolveSupplierCostSnapshot } = require("./supplierCostService");
 const { STOREFRONT_CURRENCY } = require("../../constants/commerce");
 
@@ -61,6 +62,7 @@ function policyFromRecord(policy) {
         tax: policy.defaultTax || { enabled: false, type: "FIXED", value: 0 },
         roundingRule: policy.defaultRoundingRule || { enabled: false, mode: "NONE", increment: 0, psychologicalEnding: 0 },
         minimumProfitAmount: amount(policy.minimumProfitAmount),
+        maximumProfitAmount: policy.maximumProfitAmount == null ? null : amount(policy.maximumProfitAmount),
         minimumProfitMarginPercent: amount(policy.minimumProfitMarginPercent)
     };
 }
@@ -81,19 +83,15 @@ function ruleSnapshot(rule) {
     };
 }
 
-function manualPublishedPriceRule({ price = {}, packageContext = {}, region, currency } = {}) {
+function publishedCustomerPriceRule({ price = {}, packageContext = {}, region, currency } = {}) {
     const mode = upper(price.publishedPriceMode || "LEGACY_COMPATIBILITY_PRICE");
-
-    // Legacy catalog prices are historical outputs, not calculation authority.
-    // Only an explicit MANUAL_OVERRIDE may replace the policy-derived result.
-    if (mode !== "MANUAL_OVERRIDE") return null;
     const publishedAmount = Number(price.amount);
-    if (!Number.isFinite(publishedAmount) || publishedAmount < 0) return null;
-    const reason = text(price.manualOverrideReason) || (
-        mode === "MANUAL_OVERRIDE"
-            ? "Manual published-price override."
-            : "Legacy catalog selling price preserved during pricing-policy migration."
-    );
+    if (!Number.isFinite(publishedAmount) || publishedAmount <= 0) {
+        throw new Error(`Published customer price is unavailable for ${packageContext.packageCode} in ${upper(region)}.`);
+    }
+    const reason = text(price.manualOverrideReason) || (mode === "MANUAL_OVERRIDE"
+        ? "Manual published-price override."
+        : "Owner-published customer price.");
 
     return {
         id: `catalog-published-price:${packageContext.packageCode}:${upper(region)}`,
@@ -220,6 +218,7 @@ function strictIsoDate(value, field) {
 
 function resolveProductionExchangeRate({
     policy,
+    fxAuthority,
     supplierCurrency,
     targetCurrency,
     now = new Date()
@@ -234,6 +233,12 @@ function resolveProductionExchangeRate({
             now
         });
     }
+
+    if (fxAuthority) return snapshotFromAuthority(fxAuthority, {
+        sourceCurrency: source,
+        targetCurrency: target,
+        now
+    });
 
     const metadata = policy?.metadata || {};
     const policyRate = Number(metadata.exchangeRate);
@@ -293,18 +298,28 @@ async function buildProductionPricingContext({
         now
     });
 
+    const fxAuthority = supplierCost.currency === normalizedCurrency ? null : await loadActiveExchangeRateAuthority({
+        sourceCurrency: supplierCost.currency,
+        targetCurrency: normalizedCurrency,
+        now
+    });
     const exchangeRate = resolveProductionExchangeRate({
         policy,
+        fxAuthority,
         supplierCurrency: supplierCost.currency,
         targetCurrency: normalizedCurrency,
         now
     });
-    const [version, rules] = await Promise.all([
+    const [version, rules, packageOverride] = await Promise.all([
         loadPublishedVersion({ policy, pkg, region: normalizedRegion, now }),
-        loadActiveRules({ policy, packageContext, region: normalizedRegion, currency: normalizedCurrency, now })
+        loadActiveRules({ policy, packageContext, region: normalizedRegion, currency: normalizedCurrency, now }),
+        includePublishedPriceOverride ? null : PackagePricingOverride.findOne({ productCode: packageContext.gameCode, packageCode: packageContext.packageCode, region: normalizedRegion }).lean()
     ]);
+    // Customer preview/quote/checkout always freeze the explicitly published
+    // regional catalog amount. Admin Daily Pricing passes false so its preview
+    // remains a calculation workspace driven by current cost/FX/policy inputs.
     const priceOverrideRule = includePublishedPriceOverride
-        ? manualPublishedPriceRule({
+        ? publishedCustomerPriceRule({
             price,
             packageContext,
             region: normalizedRegion,
@@ -325,7 +340,7 @@ async function buildProductionPricingContext({
                     fundingCost: amount(supplierCost.fundingCost),
                     otherAcquisitionCost: amount(supplierCost.otherAcquisitionCost)
                 },
-                policy: policyFromRecord(policy),
+                policy: { ...policyFromRecord(policy), packageProfitOverride: packageOverride?.profitOverride || { mode: "INHERIT", value: null } },
                 appliedPricingRules,
                 context: {
                     evaluationTime: now.toISOString(),
@@ -361,6 +376,7 @@ async function buildProductionPricingContext({
 
 module.exports = Object.freeze({
     buildProductionPricingContext,
+    publishedCustomerPriceRule,
     neutralPolicy,
     resolveProductionExchangeRate
 });

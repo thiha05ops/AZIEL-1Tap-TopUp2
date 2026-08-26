@@ -187,7 +187,7 @@ function verifyFrontend() {
     includes("frontend/js/admin-security.js", "await window.AZIEL_ADMIN_AUTH?.loadMe?.()", "Successful 2FA setup must refresh backend admin truth.");
     includes("frontend/js/admin-security.js", "modal.id === \"admin2FAModal\"", "Closing setup modal must clear transient setup DOM state.");
     includes("frontend/css/admin/admin-design-system.css", ".admin-2fa-manual-key", "Manual setup key must be visually distinct and bounded.");
-    matches("frontend/css/admin/admin-design-system.css", /@media\s*\(max-width:\s*768px\)[\s\S]*\.admin-security-card/, "Admin security UI must have mobile rules.");
+    matches("frontend/css/admin/admin-design-system.css", /@media\s*\(max-width:\s*767px\)[\s\S]*\.admin-security-card/, "Admin security UI must use the canonical phone breakpoint.");
     includes("frontend/lang/admin/en.js", "admin_accounts", "English admin security i18n must exist.");
     includes("frontend/lang/admin/my.js", "admin_accounts", "Myanmar admin security i18n must exist.");
     includes("frontend/lang/admin/en.js", "enable_two_factor_authentication", "English 2FA setup i18n must exist.");

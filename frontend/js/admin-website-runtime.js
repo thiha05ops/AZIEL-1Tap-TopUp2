@@ -434,7 +434,6 @@
             </section>
             <section class="website-owner-action-grid" aria-label="Home management tasks">
                 ${ownerActionCard("Hero Banner", "Open the existing Home Banner owner to manage the top storefront banner.", "home", "Review")}
-                ${ownerActionCard("Placements", "Review assigned home placements and draft state.", "configuration", "Draft Status")}
                 ${ownerActionCard("Featured", "Check featured storefront sections and owner readiness.", "home", "Review")}
                 ${ownerActionCard("Trending", "Review visible content used by high-priority home areas.", "home", "Review")}
                 ${ownerActionCard("Sections", "Review storefront sections without changing public behavior here.", "home", "Review")}
@@ -477,7 +476,6 @@
                 ${ownerActionCard("Promotions", "Check active campaign and promotional placements.", "campaigns", "Open Promotions")}
                 ${ownerActionCard("Regions", "Review Myanmar and Thailand storefront coverage.", "regions", "Open Regions")}
                 ${ownerActionCard("Preview Website", "See the public website by route, region, and viewport.", "preview", "Open Preview")}
-                ${ownerActionCard("Publish Status", "Check readiness, draft status, validation, and safe next steps.", "configuration", "Check Status")}
             </section>
             <details class="website-developer-tools">
                 <summary>

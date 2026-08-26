@@ -1,6 +1,7 @@
 "use strict";
 
 const { STOREFRONT_CURRENCY, SUPPLIER_CURRENCY } = require("../../constants/commerce");
+const ExchangeRateAuthority = require("../../models/ExchangeRateAuthority");
 
 function text(value) {
     return String(value || "").trim();
@@ -76,6 +77,50 @@ function resolveExchangeRate({ sourceCurrency, targetCurrency, now = new Date() 
     };
 }
 
+async function loadActiveExchangeRateAuthority({ sourceCurrency, targetCurrency, now = new Date() } = {}) {
+    const source = assertCurrency(sourceCurrency, "sourceCurrency", SUPPLIER_CURRENCY);
+    const target = assertCurrency(targetCurrency, "targetCurrency", STOREFRONT_CURRENCY);
+    if (source === target) return null;
+    return ExchangeRateAuthority.findOne({
+        fromCurrency: source,
+        toCurrency: target,
+        status: "ACTIVE",
+        enabled: true,
+        authoritative: true,
+        $and: [
+            { $or: [{ effectiveFrom: null }, { effectiveFrom: { $exists: false } }, { effectiveFrom: { $lte: now } }] },
+            { $or: [{ effectiveUntil: null }, { effectiveUntil: { $exists: false } }, { effectiveUntil: { $gte: now } }] }
+        ]
+    }).sort({ effectiveFrom: -1, updatedAt: -1, _id: -1 }).lean();
+}
+
+function snapshotFromAuthority(authority, { sourceCurrency, targetCurrency, now = new Date() } = {}) {
+    const source = assertCurrency(sourceCurrency, "sourceCurrency", SUPPLIER_CURRENCY);
+    const target = assertCurrency(targetCurrency, "targetCurrency", STOREFRONT_CURRENCY);
+    if (source === target) return resolveExchangeRate({ sourceCurrency: source, targetCurrency: target, now });
+    const rate = Number(authority?.rate);
+    const capturedAt = new Date(authority?.capturedAt || "");
+    const maximumAgeSeconds = Number(authority?.maximumAgeSeconds);
+    if (!authority || !Number.isFinite(rate) || rate <= 0) throw new Error(`Missing authoritative exchange rate for ${source}_${target}.`);
+    if (!Number.isFinite(capturedAt.getTime()) || !Number.isFinite(maximumAgeSeconds) || maximumAgeSeconds < 60) {
+        throw new Error(`Bounded authoritative exchange-rate freshness is required for ${source}_${target}.`);
+    }
+    return {
+        rate,
+        source: text(authority.source),
+        provider: "AZIEL_COMMERCE",
+        sourceCurrency: source,
+        targetCurrency: target,
+        capturedAt: capturedAt.toISOString(),
+        maxAgeSeconds: maximumAgeSeconds,
+        requireFreshness: true,
+        authorityId: text(authority._id),
+        authorityCode: text(authority.code)
+    };
+}
+
 module.exports = Object.freeze({
+    loadActiveExchangeRateAuthority,
+    snapshotFromAuthority,
     resolveExchangeRate
 });

@@ -14,7 +14,7 @@ assert.equal(resolvePublicProductReadiness(product, [], { checks: { fulfillment:
 assert.equal(resolvePublicProductReadiness({ ...product, publicDiscoveryEnabled: false }, [pricedPackage], { checks: { fulfillment: true, availability: true } }).state, "HIDDEN");
 assert.equal(resolvePublicProductReadiness({ ...product, lifecycleStatus: "COMING_SOON" }, [pricedPackage], { checks: { fulfillment: true, availability: true } }).state, "COMING_SOON");
 assert.equal(resolvePublicProductReadiness({ ...product, productCode: "aovid" }, [pricedPackage], { checks: { fulfillment: true, availability: true } }).state, "HIDDEN");
-assert.equal(CANONICAL_OPERATIONAL_PRODUCTS.length, 17);
+assert.equal(CANONICAL_OPERATIONAL_PRODUCTS.length, 19);
 
 const root = path.resolve(__dirname, "../..");
 const stage = fs.readFileSync(path.join(root, "frontend/js/product-detail-stage.js"), "utf8");

@@ -17,7 +17,7 @@ function main() {
     assert.strictEqual(manifest.scope, "/", "Manifest scope must be root.");
     assert.strictEqual(manifest.display, "standalone", "Manifest display must be standalone.");
     assert.strictEqual(manifest.theme_color, "#070716", "Manifest theme color must match storefront shell.");
-    assert(manifest.icons.some(icon => icon.purpose === "maskable"), "Manifest must include a maskable icon.");
+    assert(manifest.icons.every(icon => icon.purpose === "any"), "Manifest must not claim maskable support without canonical maskable artwork.");
     assert(Array.isArray(manifest.shortcuts) && manifest.shortcuts.length >= 3, "Manifest should expose useful shortcuts.");
 
     assert(runtime.includes("registerAzielServiceWorker"), "Shared runtime must own service worker registration.");

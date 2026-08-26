@@ -92,8 +92,8 @@
         "mlbb-twilight-weekly-pass": {
             image: "assets/games/mlbb.webp",
             category: "mobile",
-            description: "Twilight Pass & Weekly Pass",
-            searchDescription: "Twilight Pass & Weekly Pass"
+            description: "Twilight Pass & Weekly Diamonds",
+            searchDescription: "Twilight Pass & Weekly Diamonds"
         },
         "blood-strike-pass": {
             image: "assets/fallbacks/game-topup.svg",

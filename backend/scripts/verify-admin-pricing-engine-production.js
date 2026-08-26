@@ -11,6 +11,7 @@ const root = path.join(__dirname, "..", "..");
 const CatalogProduct = require("../models/CatalogProduct");
 const CatalogPackage = require("../models/CatalogPackage");
 const PricingPolicy = require("../models/PricingPolicy");
+const ExchangeRateAuthority = require("../models/ExchangeRateAuthority");
 const PricingWorkspaceDraft = require("../models/PricingWorkspaceDraft");
 const PriceVersion = require("../models/PriceVersion");
 const {
@@ -116,6 +117,7 @@ function installModelMocks() {
         policyFindOneAndUpdate: PricingPolicy.findOneAndUpdate,
         policyCreate: PricingPolicy.create,
         policyUpdateOne: PricingPolicy.updateOne,
+        fxFind: ExchangeRateAuthority.find,
         workspaceDraftFind: PricingWorkspaceDraft.find,
         workspaceDraftFindOne: PricingWorkspaceDraft.findOne,
         workspaceDraftFindOneAndUpdate: PricingWorkspaceDraft.findOneAndUpdate,
@@ -173,6 +175,7 @@ function installModelMocks() {
         if (doc) Object.assign(doc, update.$set || {}, { updatedAt: new Date().toISOString() });
         return { modifiedCount: doc ? 1 : 0 };
     };
+    ExchangeRateAuthority.find = () => chain([]);
     PricingWorkspaceDraft.find = query => chain(workspaceDrafts.filter(draft => matches(draft, query)));
     PricingWorkspaceDraft.findOne = query => chain(workspaceDrafts.filter(draft => matches(draft, query)).at(-1) || null);
     PricingWorkspaceDraft.findOneAndUpdate = (query, update) => {
@@ -223,6 +226,7 @@ function installModelMocks() {
             PricingPolicy.findOneAndUpdate = originals.policyFindOneAndUpdate;
             PricingPolicy.create = originals.policyCreate;
             PricingPolicy.updateOne = originals.policyUpdateOne;
+            ExchangeRateAuthority.find = originals.fxFind;
             PricingWorkspaceDraft.find = originals.workspaceDraftFind;
             PricingWorkspaceDraft.findOne = originals.workspaceDraftFindOne;
             PricingWorkspaceDraft.findOneAndUpdate = originals.workspaceDraftFindOneAndUpdate;

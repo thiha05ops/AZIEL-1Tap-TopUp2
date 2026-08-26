@@ -204,10 +204,10 @@ function main() {
             region: "TH",
             enabled: true,
             publicReady: true,
-            logoUrl: "/assets/logo.png",
+            logoUrl: "/assets/brand/aziel-icon.svg",
             sortOrder: 90,
             paymentType: "wallet",
-            trustDisplay: { enabled: true, logo: "/assets/logo.png", label: "AZIEL Wallet", sortOrder: 90, group: "wallet" }
+            trustDisplay: { enabled: true, logo: "/assets/brand/aziel-icon.svg", label: "AZIEL Wallet", sortOrder: 90, group: "wallet" }
         },
         {
             key: "kbzpay",

@@ -37,7 +37,7 @@ function projectPricingSupplier(supplier = {}) {
     };
 }
 
-async function resolvePricingSupplier({ supplierId, region = "" } = {}) {
+async function resolvePricingSupplier({ supplierId, region = "", requireFulfillmentRegion = true } = {}) {
     const id = text(supplierId);
     if (!mongoose.Types.ObjectId.isValid(id)) {
         throw new PricingSupplierError("PRICING_SUPPLIER_REQUIRED", "Select a valid supplier.");
@@ -48,7 +48,7 @@ async function resolvePricingSupplier({ supplierId, region = "" } = {}) {
     }
     const projected = projectPricingSupplier(supplier);
     const normalizedRegion = upper(region);
-    if (projected.supportedRegions.length && normalizedRegion && normalizedRegion !== "ALL" && !projected.supportedRegions.includes(normalizedRegion)) {
+    if (requireFulfillmentRegion && projected.supportedRegions.length && normalizedRegion && normalizedRegion !== "ALL" && !projected.supportedRegions.includes(normalizedRegion)) {
         throw new PricingSupplierError("PRICING_SUPPLIER_REGION_UNAVAILABLE", "Selected supplier does not support this region.", 409);
     }
     if (!SUPPLIER_CURRENCY.includes(projected.supplierCurrency)) {

@@ -98,7 +98,7 @@ function verifyAdminUi() {
     includes("frontend/js/admin-campaigns.js", "campaignSavePending", "Admin save must prevent duplicate submits.");
     includes("frontend/js/admin-campaigns.js", "previewCampaign", "Admin preview must exist.");
     assert(!read("frontend/admin.html").includes("/js/campaign-runtime.js"), "Customer campaign runtime must not be loaded in Admin.");
-    matches("frontend/css/admin/admin-design-system.css", /@media\s*\(max-width:\s*768px\)[\s\S]*\.campaign-row/, "Campaign mobile UI must use existing max-width: 768px breakpoint.");
+    matches("frontend/css/admin/admin-design-system.css", /@media\s*\(max-width:\s*767px\)[\s\S]*\.campaign-row/, "Campaign phone UI must use the canonical max-width: 767px breakpoint.");
 }
 
 function verifyRuntime() {

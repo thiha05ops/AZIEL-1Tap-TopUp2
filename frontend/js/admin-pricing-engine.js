@@ -7,7 +7,7 @@
         previewController: null, previewTimer: null, saveTimer: null, publishing: false,
         loadController: null, loadSeq: 0
     };
-    const settings = { loaded: false, loading: false, policies: [], region: "TH", saving: false };
+    const settings = { loaded: false, loading: false, policies: [], fxAuthorities: [], region: "TH", saving: false };
 
     const $ = (id) => document.getElementById(id);
     const text = (value) => String(value || "").trim();
@@ -136,14 +136,17 @@
         if (!regions.length) return { status: "WARNING", reason: "Preview pending", regions: [] };
         const blocked = regions.find(item => item.blockingErrors?.length || ["NEGATIVE_MARGIN", "PRICE_BELOW_COST", "INVALID_CONFIGURATION", "EXCHANGE_RATE_MISSING"].includes(item.profitabilityStatus));
         if (blocked) return { status: "BLOCKED", reason: `${blocked.region}: ${blocked.blockingErrors?.[0]?.message || "Pricing blocked"}`, regions };
-        const warned = regions.find(item => item.warnings?.length || item.profitabilityStatus === "LOW_MARGIN");
+        const warned = regions.find(item => item.warnings?.length);
         if (warned) return { status: "WARNING", reason: `${warned.region}: ${warned.warnings?.[0]?.message || "Commercial warning"}`, regions };
         if (row.offered === false) return { status: "WARNING", reason: `Preview only · ${row.offerabilityReason || "Production mapping is disabled"}`, regions };
         return { status: "READY", reason: "All active regions ready", regions };
     }
 
     function regionalResult(row, preview, region) {
-        if (!row.regionalRows?.[region]) return `<span class="pricing-region-empty">Not offered${row.offerabilityReason && daily.region === region ? ` · ${text(row.offerabilityReason)}` : ""}</span>`;
+        if (!row.regionalRows?.[region]) {
+            const reason = row.regionalAvailability?.[region]?.reason || (row.offerabilityReason && daily.region === region ? row.offerabilityReason : "");
+            return `<span class="pricing-region-empty">Not offered${reason ? ` · ${text(reason)}` : ""}</span>`;
+        }
         const result = preview?.regions?.find(item => item.region === region);
         const published = row.regionalRows[region];
         const canonicalPublished = published.publishedPriceMode === "POLICY_DERIVED" && published.publishedSupplierCostConfigured === true && published.publishedSupplierId;
@@ -151,12 +154,21 @@
         const currency = result?.currency || published.currency;
         const profit = result?.netProfit;
         const margin = result?.marginPercent;
+        const publishedPrice = result?.currentPublishedPrice ?? published.publishedPrice;
+        const changeEvidence = result
+            ? `<span>Published ${money(publishedPrice, currency)} · Preview ${money(sellingPrice, currency)} · ${result.changed ? "CHANGED" : "UNCHANGED"}</span>`
+            : "";
         const reason = result?.blockingErrors?.[0]?.message || result?.warnings?.[0]?.message || "";
         const rawCost = result?.rawSupplierCost ?? result?.supplierCost;
         const rawCurrency = result?.rawSupplierCurrency || result?.supplierCurrency || activeSupplier()?.supplierCurrency;
         const landed = result?.landedCost;
         const fx = result?.conversionRequired ? `${result.exchangeRatePair} @ ${result.exchangeRate}` : "rate 1";
-        return `<div class="pricing-region-result"><strong>${money(sellingPrice, currency)}</strong><span>Raw ${money(rawCost, rawCurrency)}</span><span>FX ${text(fx)}</span><span>Landed ${money(landed, result?.landedCurrency || currency)}</span><span>Profit ${money(profit, currency)}</span><span>Margin ${margin == null ? "-" : `${Number(margin).toFixed(2)}%`}</span>${reason ? `<small>${reason}</small>` : ""}</div>`;
+        const override = result?.packageProfitOverride || { mode: "INHERIT", value: null };
+        const profitEvidence = override.mode !== "INHERIT"
+            ? `Package override ${override.mode === "PERCENTAGE" ? `${override.value}%` : money(override.value, currency)}`
+            : `Default profit ${money(result?.baseProfit, currency)}`;
+        const guardrails = override.mode === "FIXED_AMOUNT" ? "Exact fixed override" : `Min ${money(result?.minimumProfitAmount, currency)} · Max ${result?.maximumProfitAmount == null ? "Unlimited" : money(result.maximumProfitAmount, currency)}`;
+        return `<div class="pricing-region-result"><strong>${money(sellingPrice, currency)}</strong>${changeEvidence}<span>Raw ${money(rawCost, rawCurrency)}</span><span>FX ${text(fx)}</span><span>Landed ${money(landed, result?.landedCurrency || currency)}</span><span>${profitEvidence}</span><span>${guardrails}</span><span>Applied profit ${money(profit, currency)}</span><span>Margin ${margin == null ? "-" : `${Number(margin).toFixed(2)}%`}</span>${reason ? `<small>${reason}</small>` : ""}</div>`;
     }
 
     function renderRows() {
@@ -177,9 +189,16 @@
             const preview = previewFor(row);
             const view = statusView(row, preview);
             const blocked = dailyBlockingReason();
+            const overrideRegions = daily.region === "ALL" ? ["TH", "MM"] : [daily.region];
+            const profitControls = overrideRegions.map(region => {
+                const override = row.regionalRows[region]?.profitOverride || { mode: "INHERIT", value: null };
+                const currency = region === "TH" ? "THB" : "MMK";
+                return `<div class="pricing-profit-control" data-profit-control data-product-code="${text(row.productCode)}" data-package-code="${text(row.packageCode)}" data-region="${region}"><small>${region}</small><select data-profit-mode><option value="INHERIT" ${override.mode === "INHERIT" ? "selected" : ""}>Inherit</option><option value="FIXED_AMOUNT" ${override.mode === "FIXED_AMOUNT" ? "selected" : ""}>Fixed Amount</option><option value="PERCENTAGE" ${override.mode === "PERCENTAGE" ? "selected" : ""}>Percentage</option></select><input data-profit-value type="number" min="0" step="0.01" value="${override.value ?? ""}" placeholder="${override.mode === "PERCENTAGE" ? "%" : currency}" ${override.mode === "INHERIT" ? "disabled" : ""}></div>`;
+            }).join("");
             return `<tr data-pricing-row="${key}">
                 <td><strong>${text(row.packageName)}</strong><small>${text(row.productName)} · ${upper(row.packageCode)}</small><details class="pricing-mobile-regions"><summary>Regional prices</summary><div><b>Thailand</b>${regionalResult(row, preview, "TH")}</div><div><b>Myanmar</b>${regionalResult(row, preview, "MM")}</div></details></td>
                 <td><label class="pricing-cost-input"><input type="number" min="0.000001" step="0.000001" value="${value}" data-supplier-cost="${key}" ${blocked ? `disabled title="${blocked}"` : ""}><span>${supplier?.supplierCurrency || "-"}</span></label></td>
+                <td>${profitControls}</td>
                 <td class="pricing-desktop-region">${regionalResult(row, preview, "TH")}</td><td class="pricing-desktop-region">${regionalResult(row, preview, "MM")}</td>
                 <td><span class="pricing-status is-${view.status.toLowerCase()}">${view.status}</span><small>${view.reason}</small></td>
             </tr>`;
@@ -188,9 +207,23 @@
         updatePublishState();
     }
 
+    async function saveProfitOverride(control) {
+        const mode = control.querySelector("[data-profit-mode]").value;
+        const input = control.querySelector("[data-profit-value]");
+        input.disabled = mode === "INHERIT";
+        const value = mode === "INHERIT" ? null : Number(input.value);
+        if (mode !== "INHERIT" && (!Number.isFinite(value) || value < 0)) return;
+        await pricingFetch("/api/admin/pricing-engine/workspace/profit-override", { method: "PUT", body: JSON.stringify({ productCode: control.dataset.productCode, packageCode: control.dataset.packageCode, region: control.dataset.region, profitOverride: { mode, value } }) });
+        daily.loaded = false; daily.previews.clear(); await loadDaily(true);
+    }
+
     function updatePublishState() {
         const regions = daily.region === "ALL" ? ["TH", "MM"] : [daily.region];
-        const publishable = regionRows().filter(row => row.offered !== false && daily.edits.has(rowKey(row)) && ["READY", "WARNING"].includes(statusView(row, previewFor(row), regions).status));
+        const publishable = regionRows().filter(row => {
+            const preview = previewFor(row);
+            return daily.edits.has(rowKey(row)) && preview?.changed === true && preview?.publishEligible === true &&
+                ["READY", "WARNING"].includes(statusView(row, preview, regions).status);
+        });
         $("pricingPublishBtn").disabled = daily.publishing || !activeSupplier() || !publishable.length;
     }
 
@@ -216,10 +249,10 @@
         }));
     }
 
-    function authoritativePreviewRegion(rows) {
-        if (daily.region !== "ALL") return daily.region;
-        const regions = [...new Set(rows.map(row => upper(row.mappingRegion)).filter(Boolean))];
-        return regions.length === 1 ? regions[0] : "ALL";
+    function authoritativePreviewRegion() {
+        // Supplier mapping region is fulfillment/provider scope. Daily Pricing
+        // target region is canonical storefront authority and is independent.
+        return daily.region;
     }
 
     function schedulePreview() {
@@ -238,7 +271,7 @@
         try {
             const result = await pricingFetch("/api/admin/pricing-engine/workspace/preview", {
                 method: "POST", signal: daily.previewController.signal,
-                body: JSON.stringify({ supplierId: daily.supplierId, region: authoritativePreviewRegion(regionRows()), rows })
+                body: JSON.stringify({ supplierId: daily.supplierId, region: authoritativePreviewRegion(), rows })
             });
             if (seq !== daily.previewSeq) return;
             (result.rows || []).forEach(row => daily.previews.set(rowKey(row), row));
@@ -273,10 +306,13 @@
     }
 
     async function publishRows() {
-        const publishRegion = authoritativePreviewRegion(regionRows());
+        const publishRegion = authoritativePreviewRegion();
         const regions = publishRegion === "ALL" ? ["TH", "MM"] : [publishRegion];
-        const offeredKeys = new Set(regionRows().filter(row => row.offered !== false).map(rowKey));
-        const rows = buildWorkspaceRows().filter(row => offeredKeys.has(rowKey(row)) && ["READY", "WARNING"].includes(statusView(row, daily.previews.get(rowKey(row)), regions).status));
+        const rows = buildWorkspaceRows().filter(row => {
+            const preview = daily.previews.get(rowKey(row));
+            return preview?.changed === true && preview?.publishEligible === true &&
+                ["READY", "WARNING"].includes(statusView(row, preview, regions).status);
+        });
         if (!rows.length) return;
         const hasWarning = rows.some(row => statusView(row, daily.previews.get(rowKey(row)), regions).status === "WARNING");
         if (hasWarning && !window.confirm("Some rows have commercial warnings. Publish these server-calculated prices?")) return;
@@ -343,11 +379,6 @@
         const form = $("pricingSettingsForm");
         const config = policyConfig(settings.region, "settings");
         const currency = settings.region === "TH" ? "THB" : "MMK";
-        form.elements.supplierCurrency.value = config.supplierCurrency || "THB";
-        form.elements.exchangeRate.value = number(config.exchangeRate, 1);
-        form.elements.exchangeRateSource.value = config.exchangeRateSource || "manual_admin";
-        form.elements.exchangeRateCapturedAt.value = config.exchangeRateCapturedAt ? new Date(config.exchangeRateCapturedAt).toISOString().slice(0, 16) : "";
-        form.elements.exchangeRateMaxAgeSeconds.value = number(config.exchangeRateMaxAgeSeconds, 86400);
         form.elements.profitType.value = config.profitRule?.type || "PERCENT";
         form.elements.profitValue.value = number(config.profitRule?.value);
         form.elements.gatewayType.value = config.gatewayFee?.type || "PERCENT";
@@ -357,10 +388,12 @@
         form.elements.roundingMode.value = config.roundingRule?.mode || "NONE";
         form.elements.roundingIncrement.value = number(config.roundingRule?.increment);
         form.elements.minimumProfitAmount.value = number(config.minimumProfitAmount);
+        form.elements.maximumProfitAmount.value = config.maximumProfitAmount == null ? "" : number(config.maximumProfitAmount);
         $("pricingSettingsStoreCurrency").textContent = currency;
-        $("pricingExchangeDirection").textContent = `1 ${form.elements.supplierCurrency.value} = ${form.elements.exchangeRate.value} ${currency}`;
+        renderFxAuthorities();
         $("pricingRoundingUnit").textContent = currency;
         $("pricingMinimumProfitUnit").textContent = currency;
+        $("pricingMaximumProfitUnit").textContent = currency;
         updateSettingUnits();
     }
 
@@ -370,7 +403,23 @@
         [["profit", "profitType"], ["gateway", "gatewayType"], ["platform", "platformType"]].forEach(([unit, field]) => {
             form.querySelector(`[data-unit-for="${unit}"]`).textContent = form.elements[field].value === "PERCENT" ? "%" : currency;
         });
-        $("pricingExchangeDirection").textContent = `1 ${form.elements.supplierCurrency.value} = ${form.elements.exchangeRate.value || 0} ${currency}`;
+    }
+
+    function renderFxAuthorities() {
+        const pairs = [["USD", "THB"], ["USD", "MMK"], ["THB", "MMK"]];
+        $("pricingFxAuthorityRows").innerHTML = pairs.map(([from, to]) => {
+            const fx = settings.fxAuthorities.find(item => item.fromCurrency === from && item.toCurrency === to) || {};
+            const captured = fx.capturedAt ? new Date(fx.capturedAt).toISOString().slice(0, 16) : "";
+            return `<div class="pricing-fx-row" data-fx-pair="${from}_${to}"><strong>${from} → ${to}</strong><input data-fx="rate" type="number" min="0.000001" step="0.000001" value="${fx.rate || ""}" placeholder="Rate"><input data-fx="source" maxlength="80" value="${text(fx.source || "manual_admin")}" placeholder="Authority source"><input data-fx="capturedAt" type="datetime-local" value="${captured}"><input data-fx="maximumAgeSeconds" type="number" min="60" step="60" value="${number(fx.maximumAgeSeconds, 86400)}"></div>`;
+        }).join("");
+    }
+
+    function readFxAuthorities() {
+        return [...document.querySelectorAll("[data-fx-pair]")].map(row => {
+            const [fromCurrency, toCurrency] = row.dataset.fxPair.split("_");
+            const captured = row.querySelector('[data-fx="capturedAt"]').value;
+            return { fromCurrency, toCurrency, rate: number(row.querySelector('[data-fx="rate"]').value), source: row.querySelector('[data-fx="source"]').value.trim(), capturedAt: captured ? new Date(captured).toISOString() : "", maximumAgeSeconds: number(row.querySelector('[data-fx="maximumAgeSeconds"]').value, 86400) };
+        }).filter(item => item.rate > 0);
     }
 
     async function loadSettings(force = false) {
@@ -379,6 +428,7 @@
         try {
             const pricing = await pricingFetch("/api/admin/pricing-engine");
             settings.policies = Array.isArray(pricing.policies) ? pricing.policies : [];
+            settings.fxAuthorities = Array.isArray(pricing.fxAuthorities) ? pricing.fxAuthorities : [];
             if (!settings.policies.length) throw new Error("Failed to load pricing policy.");
             settings.loaded = true;
             fillSettings();
@@ -396,12 +446,8 @@
         const base = policyConfig(settings.region, "settings");
         return {
             ...base,
-            supplierCurrency: form.elements.supplierCurrency.value,
-            exchangeRate: number(form.elements.exchangeRate.value),
-            exchangeRateSource: form.elements.exchangeRateSource.value.trim(),
-            exchangeRateCapturedAt: form.elements.exchangeRateCapturedAt.value ? new Date(form.elements.exchangeRateCapturedAt.value).toISOString() : "",
-            exchangeRateMaxAgeSeconds: number(form.elements.exchangeRateMaxAgeSeconds.value, 86400),
             minimumProfitAmount: number(form.elements.minimumProfitAmount.value),
+            maximumProfitAmount: form.elements.maximumProfitAmount.value === "" ? null : number(form.elements.maximumProfitAmount.value),
             profitRule: { type: form.elements.profitType.value, value: number(form.elements.profitValue.value) },
             gatewayFee: { enabled: number(form.elements.gatewayValue.value) > 0, type: form.elements.gatewayType.value, value: number(form.elements.gatewayValue.value) },
             platformCost: { enabled: number(form.elements.platformValue.value) > 0, type: form.elements.platformType.value, value: number(form.elements.platformValue.value) },
@@ -416,7 +462,9 @@
         $("pricingSettingsSave").disabled = true;
         $("pricingSettingsState").textContent = "Saving";
         try {
-            const policies = settings.policies.map(item => ({ region: item.region, currency: item.currency, config: item.region === settings.region ? readSettingsConfig() : structuredClone(item.draft?.config || item.active?.config || {}) }));
+            const selectedPolicy = settings.policies.find(item => item.region === settings.region);
+            const policies = [{ region: selectedPolicy.region, currency: selectedPolicy.currency, config: readSettingsConfig() }];
+            await pricingFetch("/api/admin/pricing-engine/fx-authorities", { method: "PUT", body: JSON.stringify({ fxAuthorities: readFxAuthorities() }) });
             await pricingFetch("/api/admin/pricing-engine/draft", { method: "PUT", body: JSON.stringify({ policies }) });
             await pricingFetch("/api/admin/pricing-engine/publish", { method: "POST", body: JSON.stringify({ regions: [settings.region] }) });
             $("pricingSettingsState").textContent = "Settings saved";
@@ -438,6 +486,7 @@
         $("pricingSupplierSelect")?.addEventListener("change", event => { daily.supplierId = event.target.value; daily.edits.clear(); daily.previews.clear(); loadDaily(true); });
         $("pricingPackageSearch")?.addEventListener("input", event => { daily.search = event.target.value; renderRows(); });
         $("pricingPackageRows")?.addEventListener("input", event => { const key = event.target.dataset.supplierCost; if (!key) return; const value = Number(event.target.value); if (Number.isFinite(value) && value > 0) daily.edits.set(key, { value }); else daily.edits.delete(key); daily.previews.delete(key); $("pricingDraftState").textContent = "Unsaved Changes"; schedulePreview(); updatePublishState(); });
+        $("pricingPackageRows")?.addEventListener("change", event => { const control = event.target.closest("[data-profit-control]"); if (!control) return; saveProfitOverride(control).catch(error => setDailyError(error.message)); });
         $("pricingPublishBtn")?.addEventListener("click", publishRows);
         $("pricingSettingsRegion")?.addEventListener("change", event => { settings.region = event.target.value; fillSettings(); });
         $("pricingSettingsForm")?.addEventListener("input", updateSettingUnits);

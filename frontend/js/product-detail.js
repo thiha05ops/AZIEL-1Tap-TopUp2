@@ -2,7 +2,7 @@
 
 (function () {
     const PRODUCT_COPY = Object.freeze({
-        "mlbb-twilight-weekly-pass": ["Mobile Legends Twilight Pass & Weekly Pass", "Mobile Game", "Select an available Twilight or Weekly Pass package."],
+        "mlbb-twilight-weekly-pass": ["Mobile Legends Twilight Pass & Weekly Diamonds", "Mobile Game", "Select an available Weekly Diamonds or Twilight Pass package."],
         "marvel-rivals": ["Marvel Rivals Top Up", "Mobile Game", "Select an available Marvel Rivals top-up package."],
         "blood-strike": ["Blood Strike Golds", "Mobile Game", "Select an available Blood Strike Golds package."],
         "blood-strike-pass": ["Blood Strike Pass", "Mobile Game", "Select an available Blood Strike Pass package."],
@@ -25,6 +25,14 @@
     }
 
     const productCode = productCodeFromUrl();
+    if (productCode === "mlbb-twilight-weekly-pass") {
+        window.location.replace("mlbb.html?product=mlbb-twilight-weekly-pass");
+        return;
+    }
+    if (productCode === "freefire-pass-membership") {
+        window.location.replace("freefire.html?product=freefire-pass-membership");
+        return;
+    }
     const copy = PRODUCT_COPY[productCode];
     const route = window.AZIEL_CATALOG_PRESENTATION?.resolveProductRoute?.("", productCode) || "";
 
@@ -41,20 +49,27 @@
     applyText("[data-product-summary-name]", name);
     applyText("#selectedPackageTitle", "Select Package");
 
-    const isValorant = productCode === "valorant";
-    if (isValorant) {
-        applyText('label[for="userId"]', "Riot ID");
-        document.getElementById("userId")?.setAttribute("placeholder", "Name#TAG");
+    const contract = window.AZIEL_GAME_INPUT_CONTRACTS?.forProduct?.(productCode);
+    const accountCard = document.getElementById("userId")?.closest(".form-card");
+    const firstField = contract?.accountFields?.[0];
+    if (firstField) {
+        applyText('label[for="userId"]', firstField.label);
+        document.getElementById("userId")?.setAttribute("placeholder", firstField.key === "riotId" ? "Name#TAG" : `Enter ${firstField.label}`);
+    }
+    if (contract?.accountFields?.some(field => field.key === "zoneId") && !document.getElementById("serverId")) {
+        const label = document.createElement("label"); label.htmlFor = "serverId"; label.textContent = "Zone ID";
+        const input = document.createElement("input"); input.type = "text"; input.id = "serverId"; input.inputMode = "numeric"; input.placeholder = "Enter Zone ID";
+        accountCard?.append(label, input);
     }
 
     window.AZIEL_GAME_FLOW?.init({
         game: name,
         gameKey: productCode,
         userIdSelector: "#userId",
-        zoneIdSelector: "",
-        zoneRequired: false,
-        userIdRequiredMessage: isValorant ? "Please enter your Riot ID (Name#TAG)." : `Please enter your ${name} account ID or username.`,
-        accountFields: isValorant ? [{ key: "riotId", label: "Riot ID", selector: "#userId", required: true, requiredMessage: "Please enter your Riot ID (Name#TAG)." }] : undefined,
+        zoneIdSelector: contract?.accountFields?.some(field => field.key === "zoneId") ? "#serverId" : "",
+        zoneRequired: contract?.accountFields?.some(field => field.key === "zoneId") || false,
+        userIdRequiredMessage: firstField?.requiredMessage || `Please enter your ${name} account information.`,
+        accountFields: contract?.accountFields,
         pendingReturnUrl: `product.html?product=${encodeURIComponent(productCode)}`
     });
 })();

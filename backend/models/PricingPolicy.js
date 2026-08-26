@@ -85,6 +85,11 @@ const pricingPolicySchema = new mongoose.Schema(
             min: 0,
             default: 0
         },
+        maximumProfitAmount: {
+            type: Number,
+            min: 0,
+            default: null
+        },
         minimumProfitMarginPercent: {
             type: Number,
             min: 0,
@@ -115,6 +120,11 @@ const pricingPolicySchema = new mongoose.Schema(
 );
 
 pricingPolicySchema.pre("validate", validateStartBeforeEnd("effectiveFrom", "effectiveUntil"));
+pricingPolicySchema.pre("validate", function validateProfitGuardrails() {
+    if (this.maximumProfitAmount != null && Number(this.maximumProfitAmount) < Number(this.minimumProfitAmount || 0)) {
+        this.invalidate("maximumProfitAmount", "Maximum profit must be greater than or equal to minimum profit.");
+    }
+});
 applyMetadataValidation(pricingPolicySchema);
 
 pricingPolicySchema.index({ code: 1 }, { unique: true });

@@ -83,7 +83,7 @@ async function main() {
     assert.strictEqual(mm.finalAmount, 1703);
     const mmPromo = await preview("MM", true);
     assert.strictEqual(mmPromo.discountAmount, 170.3);
-    assert.strictEqual(mmPromo.finalAmount, 1532.7);
+    assert.strictEqual(mmPromo.finalAmount, 1533, "MMK customer settlement authority rounds the final payable amount to zero decimals");
 
     const tampered = await resolveCommercePricingPreview({
         productCode: "mlbb", packageCode: "MLBB_22", region: "TH", currency: "THB",

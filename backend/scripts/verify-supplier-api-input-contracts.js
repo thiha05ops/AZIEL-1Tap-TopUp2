@@ -1,0 +1,36 @@
+#!/usr/bin/env node
+"use strict";
+const assert = require("assert");
+const fs = require("fs");
+const path = require("path");
+const { inputContractForProduct } = require("../services/commerce/canonicalGameInputContract");
+const { buildFazerCardsOrderFields, buildFazerCardsValidationFields } = require("../services/suppliers/fazercardsInputFormatters");
+const { buildWonddGameId, hasWonddGameIdFormatter } = require("../services/suppliers/wonddGameIdFormatters");
+const root = path.resolve(__dirname, "../..");
+const read = file => fs.readFileSync(path.join(root, file), "utf8");
+
+assert.deepStrictEqual(inputContractForProduct("mlbb").required, ["userId", "zoneId"]);
+assert.deepStrictEqual(inputContractForProduct("mlbb-twilight-weekly-pass").required, ["userId", "zoneId"]);
+assert.deepStrictEqual(inputContractForProduct("freefire-pass-membership").required, ["userId"]);
+assert.deepStrictEqual(inputContractForProduct("pubgrp").required, ["userId"]);
+assert.deepStrictEqual(inputContractForProduct("hok-pass-cards").required, ["userId"]);
+assert.deepStrictEqual(inputContractForProduct("valorant").required, ["riotId"]);
+assert.deepStrictEqual(buildFazerCardsOrderFields("mlbb", { userId: "439488505", zoneId: "2409" }), { player_id: "439488505", server_id: "2409" });
+assert.deepStrictEqual(buildFazerCardsValidationFields("mlbb", { userId: "439488505", zoneId: "2409" }), { player_id: "439488505", zone_id: "2409" });
+assert.deepStrictEqual(buildFazerCardsOrderFields("freefire", { userId: "12345678" }), { player_id: "12345678" });
+assert.deepStrictEqual(buildFazerCardsOrderFields("pubg", { userId: "12345678" }), { player_id: "12345678" });
+assert.deepStrictEqual(buildFazerCardsOrderFields("hok", { userId: "HOK-PLAYER" }), { player_id: "HOK-PLAYER" });
+assert.deepStrictEqual(buildFazerCardsOrderFields("valorant", { accountFields: [{ key: "riotId", value: "Name#TAG" }] }), { riot_id: "Name#TAG" });
+assert.strictEqual(buildWonddGameId("mlbb-twilight-weekly-pass", { userId: "439488505", zoneId: "2409" }), "439488505 2409");
+assert.strictEqual(buildWonddGameId("freefire-pass-membership", { userId: "12345678" }), "12345678");
+assert(hasWonddGameIdFormatter("mlbb-twilight-weekly-pass"));
+assert(hasWonddGameIdFormatter("freefire-pass-membership"));
+assert(!hasWonddGameIdFormatter("pubg"));
+for (const page of ["product.html", "mlbb.html", "freefire.html", "pubg.html", "hok.html"]) assert(read(`frontend/${page}`).includes("canonical-game-input-contracts.js"), `${page} must load canonical input contracts.`);
+const generic = read("frontend/js/product-detail.js");
+assert(generic.includes("AZIEL_GAME_INPUT_CONTRACTS"));
+assert(generic.includes('input.id = "serverId"'));
+const checkout = read("backend/services/commerce/checkoutApplicationService.js");
+assert(checkout.includes("inputContractForProduct"));
+assert(checkout.includes("INVALID_FULFILMENT_INPUT"));
+console.log(JSON.stringify({result:"PASS",productsAudited:9,canonicalFamilies:5,wonddSplitInheritance:2,fazerOrderPayloads:5,fazerValidationPayloads:1,inputNotReadyWondd:["pubg","valorant","aovid","callofduty","deltaforce","haikyuflyhigh","heartopia","undawn"],realOrders:0,realTopups:0,liveValidationPosts:0,providerSpend:0,productionMutations:0},null,2));

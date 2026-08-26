@@ -1,9 +1,10 @@
 const CANONICAL_OPERATIONAL_PRODUCTS = Object.freeze([
     product("mlbb", "Mobile Legends Diamonds", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 10, "mlbb.html", "Mobile Games", "Mobile Legends"),
-    product("mlbb-twilight-weekly-pass", "Mobile Legends Twilight Pass & Weekly Pass", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 20, "product.html?product=mlbb-twilight-weekly-pass", "Mobile Games", "Mobile Legends"),
+    product("mlbb-twilight-weekly-pass", "Mobile Legends Twilight Pass & Weekly Diamonds", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 20, "mlbb.html?product=mlbb-twilight-weekly-pass", "Mobile Games", "Mobile Legends"),
     product("pubg", "PUBG Mobile UC", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 30, "pubg.html", "Mobile Games", "PUBG Mobile"),
-    product("pubgrp", "PUBG Mobile Royale Pass Pack", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 40, "pubg-rp.html", "Mobile Games", "PUBG Mobile"),
+    product("pubgrp", "PUBG Mobile Pass", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 40, "pubg-rp.html", "Mobile Games", "PUBG Mobile"),
     product("freefire", "Free Fire Diamonds", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 50, "freefire.html", "Mobile Games", "Free Fire"),
+    product("freefire-pass-membership", "Free Fire Pass & Membership", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 55, "freefire.html?product=freefire-pass-membership", "Mobile Games", "Free Fire"),
     product("marvel-rivals", "Marvel Rivals Top Up", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 60, "product.html?product=marvel-rivals", "Mobile Games", "Marvel Rivals"),
     product("blood-strike", "Blood Strike Golds", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 70, "product.html?product=blood-strike", "Mobile Games", "Blood Strike"),
     product("blood-strike-pass", "Blood Strike Pass", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 80, "product.html?product=blood-strike-pass", "Mobile Games", "Blood Strike"),
@@ -12,7 +13,8 @@ const CANONICAL_OPERATIONAL_PRODUCTS = Object.freeze([
     product("overmortal", "OverMortal Voucher", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 110, "product.html?product=overmortal", "Mobile Games", "OverMortal"),
     product("magic-chess-go-go", "Magic Chess: Go Go Top Up", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 120, "product.html?product=magic-chess-go-go", "Mobile Games", "Magic Chess: Go Go"),
     product("lifeafter", "LifeAfter Credits & Packages", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 130, "product.html?product=lifeafter", "Mobile Games", "LifeAfter"),
-    product("hok", "Honor of Kings Tokens & Packages", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 140, "hok.html", "Mobile Games", "Honor of Kings"),
+    product("hok", "Honor of Kings Tokens", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 140, "hok.html", "Mobile Games", "Honor of Kings"),
+    product("hok-pass-cards", "Honor of Kings Pass & Cards", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 142, "product.html?product=hok-pass-cards", "Mobile Games", "Honor of Kings"),
     product("valorant", "Valorant", "games", "pc", "thailand", "PC_GAME", 145, "product.html?product=valorant", "PC Games", "Valorant", ["TH"]),
     product("telegram", "Telegram Top Up", "social_topup", "service", "global", "DIGITAL_SERVICE", 150, "telegram.html", "Social Top Up", "Telegram"),
     product("capcut", "CapCut Top Up", "social_topup", "service", "global", "DIGITAL_SERVICE", 160, "product.html?product=capcut", "Social Top Up", "CapCut")

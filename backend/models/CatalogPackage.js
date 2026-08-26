@@ -186,6 +186,14 @@ const catalogPackageSchema = new mongoose.Schema(
             trim: true,
             uppercase: true
         },
+        aliases: {
+            type: [String],
+            default: []
+        },
+        productAliases: {
+            type: [String],
+            default: []
+        },
         name: {
             type: String,
             required: true,
@@ -288,6 +296,10 @@ const catalogPackageSchema = new mongoose.Schema(
             type: [supplierCostHistorySchema],
             default: []
         },
+        pricingPublicationHistory: {
+            type: [mongoose.Schema.Types.Mixed],
+            default: []
+        },
         iconAssetId: {
             type: String,
             trim: true,
@@ -316,5 +328,6 @@ catalogPackageSchema.index({ productCode: 1, sortOrder: 1 });
 catalogPackageSchema.index({ enabled: 1 });
 catalogPackageSchema.index({ iconAssetId: 1 });
 catalogPackageSchema.index({ productCode: 1, deletedAt: 1 });
+catalogPackageSchema.index({ productAliases: 1, packageCode: 1 });
 
 module.exports = mongoose.model("CatalogPackage", catalogPackageSchema);

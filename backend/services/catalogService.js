@@ -882,7 +882,8 @@ async function toPublicCatalog(options = {}) {
 
 async function getCatalogProductDetail(productCode, options = {}) {
     const source = options.source || getCatalogSource();
-    const normalizedCode = normalizeProductCode(productCode);
+    const requestedCode = String(productCode || "").trim().toLowerCase();
+    const normalizedCode = getCanonicalProduct(requestedCode)?.productCode || normalizeProductCode(requestedCode);
 
     if (source === "database") {
         const product = await CatalogProduct.findOne({ productCode: normalizedCode }).lean();

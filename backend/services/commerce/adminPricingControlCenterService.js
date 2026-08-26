@@ -5,8 +5,9 @@ const CatalogProduct = require("../../models/CatalogProduct");
 const CatalogPackage = require("../../models/CatalogPackage");
 const Supplier = require("../../models/Supplier");
 const SupplierProductMapping = require("../../models/SupplierProductMapping");
+const PackagePricingOverride = require("../../models/PackagePricingOverride");
 const { REGION_CURRENCIES, normalizePackageCode, normalizeProductCode, normalizeRegion } = require("../../catalog/catalogProjection");
-const { isCanonicalProductCode } = require("../../catalog/canonicalOperationalCatalog");
+const { CANONICAL_PRODUCT_CODES, isCanonicalProductCode } = require("../../catalog/canonicalOperationalCatalog");
 const { buildProductionPricingContext } = require("./productionPricingContextService");
 const { createPricingQuote } = require("./pricingQuoteRuntime");
 const { loadCommercePromotionContext } = require("./commercePromotionBridgeService");
@@ -15,6 +16,7 @@ const { updatePackage } = require("../catalogAdminService");
 const { clearPublishedSupplierCostDraftRows } = require("./pricingWorkspaceDraftService");
 const { resolvePricingSupplier } = require("./pricingSupplierService");
 const { SUPPLIER_CURRENCY } = require("../../constants/commerce");
+const { finalizeCustomerPayableAmount } = require("./customerPayableAmountService");
 
 const PROFITABILITY_STATUS = Object.freeze({
     HEALTHY: "HEALTHY",
@@ -59,15 +61,18 @@ async function loadDailyPricingWorkspace({ supplierId = "", productCode = "", re
     const mappings = await SupplierProductMapping.find(mappingQuery).sort({ productCode: 1, packageCode: 1 }).lean();
     const packageKeys = mappings.map(item => ({ productCode: item.productCode, packageCode: item.packageCode }));
     const productCodes = [...new Set(mappings.map(item => item.productCode))];
-    const [packages, products] = await Promise.all([
+    const [packages, products, overrides] = await Promise.all([
         packageKeys.length ? CatalogPackage.find({ $or: packageKeys, deletedAt: null }).lean() : [],
-        productCodes.length ? CatalogProduct.find({ productCode: { $in: productCodes } }).lean() : []
+        productCodes.length ? CatalogProduct.find({ productCode: { $in: productCodes } }).lean() : [],
+        productCodes.length ? PackagePricingOverride.find({ productCode: { $in: productCodes } }).lean() : []
     ]);
+    const overrideMap = new Map(overrides.map(item => [`${item.productCode}:${item.packageCode}:${item.region}`, item.profitOverride]));
     const packageMap = new Map(packages.map(item => [`${item.productCode}:${item.packageCode}`, item]));
     const productMap = new Map(products.map(item => [item.productCode, item]));
     const rows = mappings.flatMap(mapping => {
         const pkg = packageMap.get(`${mapping.productCode}:${mapping.packageCode}`);
         if (!pkg) return [];
+        const product = productMap.get(mapping.productCode);
         const supplierCostEvidence = mapping.supplierCostAuthority?.rawSupplierCost != null
             ? mapping.supplierCostAuthority
             : mapping.mappingMetadata?.supplierCost || {};
@@ -76,18 +81,20 @@ async function loadDailyPricingWorkspace({ supplierId = "", productCode = "", re
         const previewEligible = Number.isFinite(supplierCost) &&
             mapping.mappingMetadata?.readiness?.supplierMapped === true &&
             Boolean(text(mapping.supplierProductCode)) &&
-            Boolean(text(mapping.supplierPackageCode)) &&
-            (normalizedRegion === "ALL" || normalizedRegion === mappingRegion);
-        const offered = mapping.enabled === true && previewEligible;
-        const price = pkg.prices?.[mappingRegion] || null;
-        return [{
+            Boolean(text(mapping.supplierPackageCode));
+        const pricingRegions = canonicalPricingRegions(product, pkg, normalizedRegion);
+        return pricingRegions.map(pricingRegion => {
+            const price = pkg.prices?.[pricingRegion] || null;
+            return {
             rowId: String(mapping._id), mappingId: String(mapping._id), supplierId: selected.id, supplierCode: selected.supplierCode,
-            productCode: mapping.productCode, productName: productMap.get(mapping.productCode)?.name || mapping.productCode,
+            productCode: mapping.productCode, productName: product?.name || mapping.productCode,
             packageId: String(pkg._id), packageCode: pkg.packageCode, packageName: pkg.name,
             supplierProductCode: mapping.supplierProductCode, supplierPackageCode: mapping.supplierPackageCode,
             executionMode: mapping.executionMode, mappingRegion, targetRegion: normalizedRegion,
-            offered, previewEligible,
-            offerabilityReason: offered ? "" : mapping.enabled !== true ? "Supplier mapping is disabled pending production readiness." : `No enabled ${selected.supplierCode} mapping exists for ${normalizedRegion}.`,
+            offered: true, previewEligible,
+            regionalAvailability: regionalAvailability(product, pkg),
+            fulfillmentMappingEnabled: mapping.enabled === true,
+            offerabilityReason: "",
             previewabilityReason: previewEligible ? "" : "Exact supplier mapping and raw supplier cost are required for pricing preview.",
             supplierCost: Number.isFinite(supplierCost) ? supplierCost : null, supplierCurrency: selected.supplierCurrency,
             supplierCostTimestamp: supplierCostEvidence.capturedAt || null,
@@ -97,13 +104,15 @@ async function loadDailyPricingWorkspace({ supplierId = "", productCode = "", re
             fundingCost: Number(supplierCostEvidence.fundingCost || 0),
             otherAcquisitionCost: Number(supplierCostEvidence.otherAcquisitionCost || 0),
             mappingReadiness: mapping.mappingMetadata?.readiness || {}, packageEnabled: pkg.enabled !== false,
-            priceEnabled: price?.enabled !== false && Boolean(price), region: mappingRegion, currency: price?.currency || REGION_CURRENCIES[mappingRegion],
+            priceEnabled: price?.enabled !== false && Boolean(price), region: pricingRegion, currency: price?.currency || REGION_CURRENCIES[pricingRegion],
             publishedPrice: price?.amount ?? null, publishedPriceMode: price?.publishedPriceMode || "",
             publishedSupplierPrice: Number.isFinite(supplierCost) ? supplierCost : null,
             publishedSupplierCurrency: selected.supplierCurrency, publishedSupplierId: selected.id,
             publishedSupplierCode: selected.supplierCode, publishedSupplierCostConfigured: Number.isFinite(supplierCost),
             updatedAt: pkg.updatedAt || null
-        }];
+            ,profitOverride: overrideMap.get(`${mapping.productCode}:${pkg.packageCode}:${pricingRegion}`) || { mode: "INHERIT", value: null }
+            };
+        });
     });
     const grouped = [...new Set(rows.map(item => item.productCode))].map(code => ({
         productId: code, productCode: code, productName: productMap.get(code)?.name || code,
@@ -128,6 +137,13 @@ function text(value) {
 
 function upper(value) {
     return text(value).toUpperCase();
+}
+
+function canonicalPricingProductCode(value) {
+    const exact = text(value).toLowerCase();
+    if (isCanonicalProductCode(exact)) return exact;
+    const compact = normalizeProductCode(exact);
+    return CANONICAL_PRODUCT_CODES.find(code => normalizeProductCode(code) === compact) || exact;
 }
 
 function amount(value) {
@@ -197,7 +213,7 @@ function uniqueRows(rows = []) {
 }
 
 function rowKey(row = {}) {
-    return `${normalizeProductCode(row.productCode)}:${normalizePackageCode(row.packageCode)}`;
+    return `${canonicalPricingProductCode(row.productCode)}:${normalizePackageCode(row.packageCode)}`;
 }
 
 function workspaceRegions(region) {
@@ -206,11 +222,30 @@ function workspaceRegions(region) {
     return [normalizeRegion(normalized)];
 }
 
+function canonicalPricingRegions(product = {}, pkg = {}, region = "ALL") {
+    if (product.enabled === false || pkg.enabled === false) return [];
+    const supported = new Set((product.supportedRegions || []).map(upper));
+    return workspaceRegions(region).filter(regionCode =>
+        supported.has(regionCode) && pkg.prices?.[regionCode]?.enabled !== false
+    );
+}
+
+function regionalAvailability(product = {}, pkg = {}) {
+    return Object.fromEntries(WORKSPACE_REGIONS.map(regionCode => {
+        let reason = "";
+        if (product.enabled === false) reason = "Canonical product is disabled.";
+        else if (pkg.enabled === false) reason = "Canonical package is disabled.";
+        else if (!(product.supportedRegions || []).map(upper).includes(regionCode)) reason = `Canonical product is not offered in ${regionCode}.`;
+        else if (pkg.prices?.[regionCode]?.enabled === false) reason = `Canonical package price is disabled in ${regionCode}.`;
+        return [regionCode, { eligible: !reason, reason }];
+    }));
+}
+
 function normalizeWorkspaceRow(row = {}, index = 0) {
     if (!isCanonicalProductCode(row.productCode)) {
         throw new AdminPricingControlCenterError("CATALOG_PRODUCT_UNSUPPORTED", `Row ${index + 1} references an unsupported product.`);
     }
-    const productCode = normalizeProductCode(row.productCode);
+    const productCode = canonicalPricingProductCode(row.productCode);
     const packageCode = normalizePackageCode(row.packageCode);
     const rawSupplierCost = row.newSupplierCost ?? row.supplierCost;
     const newSupplierCost = rawSupplierCost == null || rawSupplierCost === "" ? null : positiveAmount(rawSupplierCost);
@@ -275,15 +310,22 @@ function invalidWorkspaceRow(row = {}, index = 0, error) {
     };
 }
 
-function statusFromQuote({ quote, supplierConfigured }) {
+function statusFromPricingEvidence({ supplierConfigured, priceBelowCost = false, netProfit = null, minimumProfitAmount = 0 } = {}) {
     if (!supplierConfigured) return PROFITABILITY_STATUS.UNKNOWN_SUPPLIER_COST;
-    const business = quote?.pricingSnapshot?.businessRuntime || {};
-    const profit = safeNumber(business.netProfit);
-    const margin = safeNumber(business.marginPercent);
-    if (business.priceBelowCost === true) return PROFITABILITY_STATUS.PRICE_BELOW_COST;
+    const profit = safeNumber(netProfit);
+    if (priceBelowCost === true) return PROFITABILITY_STATUS.PRICE_BELOW_COST;
     if (profit != null && profit < 0) return PROFITABILITY_STATUS.NEGATIVE_MARGIN;
-    if (margin != null && margin < 8) return PROFITABILITY_STATUS.LOW_MARGIN;
+    if (profit != null && profit + Number.EPSILON < Number(minimumProfitAmount ?? 0)) return PROFITABILITY_STATUS.INVALID_CONFIGURATION;
     return PROFITABILITY_STATUS.HEALTHY;
+}
+
+function statusFromQuote({ quote, supplierConfigured }) {
+    const business = quote?.pricingSnapshot?.businessRuntime || {};
+    return statusFromPricingEvidence({
+        supplierConfigured,
+        priceBelowCost: business.priceBelowCost === true,
+        netProfit: business.netProfit
+    });
 }
 
 function previewFromQuote({ quote, context, price, couponCode }) {
@@ -300,9 +342,6 @@ function previewFromQuote({ quote, context, price, couponCode }) {
     if (!supplierConfigured) {
         warnings.push(warning("UNKNOWN_SUPPLIER_COST", "Authoritative supplier cost is unavailable. Profit and margin are not calculated."));
     }
-    if (status === PROFITABILITY_STATUS.LOW_MARGIN) warnings.push(warning("LOW_MARGIN", "Margin is below the recommended operating threshold."));
-    if (status === PROFITABILITY_STATUS.NEGATIVE_MARGIN) warnings.push(warning("NEGATIVE_MARGIN", "This price creates a loss after business costs."));
-    if (status === PROFITABILITY_STATUS.PRICE_BELOW_COST) warnings.push(warning("PRICE_BELOW_COST", "Selling price is below supplier cost."));
     if (couponCode && !promotion?.selectedPromotion) {
         warnings.push(warning("COUPON_NOT_APPLIED", "Coupon was not eligible for this package preview."));
     }
@@ -314,12 +353,20 @@ function previewFromQuote({ quote, context, price, couponCode }) {
     const grossProfit = supplierConfigured ? round(pricing.result?.calculatedProfitAmount) : null;
     const netProfit = supplierConfigured ? round(pricing.result?.calculatedProfitAmount ?? business.netProfit) : null;
     const marginPercent = supplierConfigured ? round(pricing.result?.calculatedMarginPercent ?? business.marginPercent) : null;
-    const minimumProfitAmount = Number(context.pricing.pricingInput.policy?.minimumProfitAmount || 0);
-    const minimumMarginPercent = Number(context.pricing.pricingInput.policy?.minimumProfitMarginPercent || 0);
-    if (netProfit != null && netProfit < 0) status = PROFITABILITY_STATUS.NEGATIVE_MARGIN;
-    if (netProfit != null && netProfit >= 0 && (netProfit < minimumProfitAmount || (marginPercent != null && marginPercent < minimumMarginPercent))) {
-        status = PROFITABILITY_STATUS.LOW_MARGIN;
+    const minimumProfitAmount = Number(context.pricing.pricingInput.policy?.minimumProfitAmount ?? 0);
+    const minimumMarginPercent = Number(context.pricing.pricingInput.policy?.minimumProfitMarginPercent ?? 0);
+    const blockingErrors = [];
+    status = statusFromPricingEvidence({
+        supplierConfigured,
+        priceBelowCost: business.priceBelowCost === true,
+        netProfit,
+        minimumProfitAmount
+    });
+    if (status === PROFITABILITY_STATUS.INVALID_CONFIGURATION && netProfit != null && netProfit >= 0) {
+        blockingErrors.push(warning("MINIMUM_PROFIT_NOT_APPLIED", "Calculated profit is below the authoritative minimum profit guardrail."));
     }
+    if (status === PROFITABILITY_STATUS.NEGATIVE_MARGIN) blockingErrors.push(warning("NEGATIVE_MARGIN", "This price creates a loss after business costs."));
+    if (status === PROFITABILITY_STATUS.PRICE_BELOW_COST) blockingErrors.push(warning("PRICE_BELOW_COST", "Selling price is below supplier cost."));
     const paymentFeeSimulation = PAYMENT_FEE_METHODS.map(method => {
         const providerCost = round((finalPayable || 0) * method.providerCostRate);
         const netProfit = business.netProfit == null ? null : round((business.netProfit || 0) - (providerCost || 0));
@@ -339,6 +386,10 @@ function previewFromQuote({ quote, context, price, couponCode }) {
     const publishedPrice = round(commercial.originalPrice);
     const saveAmount = referencePrice && publishedPrice ? round(referencePrice - publishedPrice) : 0;
     const displayDiscountPercent = referencePrice && saveAmount > 0 ? round((saveAmount / referencePrice) * 100) : 0;
+    const recommendedSellingPrice = round(pricing.result?.preOverridePrice ?? pricing.result?.regularPrice ?? commercial.originalPrice);
+    const publishedCustomerPrice = finalizeCustomerPayableAmount(price.amount, quote.commercialSnapshot.currency);
+    const previewCustomerPrice = finalizeCustomerPayableAmount(recommendedSellingPrice, quote.commercialSnapshot.currency);
+    const publishedPriceDifference = Number((previewCustomerPrice - publishedCustomerPrice).toFixed(quote.commercialSnapshot.currency === "MMK" ? 0 : 2));
 
     return {
         success: true,
@@ -370,11 +421,11 @@ function previewFromQuote({ quote, context, price, couponCode }) {
         otherAcquisitionCost: supplierConfigured ? precise(pricing.result?.otherAcquisitionCost || 0) : null,
         landedCost: supplierConfigured ? precise(pricing.result?.landedCost ?? convertedSupplierCost) : null,
         landedCurrency: supplierConfigured ? pricing.result?.landedCurrency || quote.commercialSnapshot.currency : "",
-        recommendedSellingPrice: round(pricing.result?.preOverridePrice ?? pricing.result?.regularPrice ?? commercial.originalPrice),
+        recommendedSellingPrice: previewCustomerPrice,
+        currentPublishedPrice: publishedCustomerPrice,
+        changed: previewCustomerPrice !== publishedCustomerPrice,
         manualPublishedPrice: pricing.result?.preOverridePrice != null ? round(commercial.originalPrice) : null,
-        publishedPriceDifference: pricing.result?.preOverridePrice != null
-            ? round(commercial.originalPrice - pricing.result.preOverridePrice)
-            : 0,
+        publishedPriceDifference,
         baseSellingPrice: round(commercial.originalPrice),
         discountAmount: round(commercial.discountAmount || 0),
         finalPayableAmount: finalPayable,
@@ -389,6 +440,10 @@ function previewFromQuote({ quote, context, price, couponCode }) {
         netRevenue: round(business.netRevenue),
         grossProfit,
         netProfit,
+        baseProfit: pricing.result?.baseProfitAmount ?? netProfit,
+        appliedProfit: pricing.result?.profitAmount ?? netProfit,
+        maximumProfitAmount: pricing.result?.maximumProfitAmount ?? null,
+        packageProfitOverride: pricing.result?.packageProfitOverride || { mode: "INHERIT", value: null },
         marginPercent,
         profitabilityStatus: status,
         minimumProfitAmount,
@@ -401,7 +456,7 @@ function previewFromQuote({ quote, context, price, couponCode }) {
             discountAmount: round(commercial.discountAmount || 0)
         } : null,
         warnings,
-        blockingErrors: []
+        blockingErrors
     };
 }
 
@@ -557,13 +612,13 @@ function rowStatusFromRegional(regional = []) {
     const warnings = regional.flatMap(item => item.warnings || []);
     if (blockingErrors.length) return "Blocked";
     if (regional.some(item => item.profitabilityStatus === PROFITABILITY_STATUS.NEGATIVE_MARGIN || item.profitabilityStatus === PROFITABILITY_STATUS.PRICE_BELOW_COST)) return "Blocked";
-    if (regional.some(item => item.profitabilityStatus === PROFITABILITY_STATUS.LOW_MARGIN) || warnings.length) return "Warning";
+    if (warnings.length) return "Warning";
     return "Ready";
 }
 
 function operatorRegionStatus(item = {}) {
     if (item.blockingErrors?.length || [PROFITABILITY_STATUS.NEGATIVE_MARGIN, PROFITABILITY_STATUS.PRICE_BELOW_COST, PROFITABILITY_STATUS.INVALID_CONFIGURATION, PROFITABILITY_STATUS.EXCHANGE_RATE_MISSING].includes(item.profitabilityStatus)) return "BLOCKED";
-    if (item.warnings?.length || item.profitabilityStatus === PROFITABILITY_STATUS.LOW_MARGIN) return "WARNING";
+    if (item.warnings?.length) return "WARNING";
     return item.supplierCostConfigured === false ? "MISSING" : "READY";
 }
 
@@ -626,7 +681,7 @@ async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = nu
         throw new AdminPricingControlCenterError("WORKSPACE_PREVIEW_TOO_LARGE", `Daily pricing preview is limited to ${MAX_WORKSPACE_ROWS} rows.`);
     }
 
-    const supplier = await resolvePricingSupplier({ supplierId, region });
+    const supplier = await resolvePricingSupplier({ supplierId, region, requireFulfillmentRegion: false });
     const mappingIds = rows.map(row => text(row.mappingId)).filter(id => mongoose.Types.ObjectId.isValid(id));
     const mappingMap = mappingIds.length
         ? new Map((await SupplierProductMapping.find({ _id: { $in: mappingIds } }).lean()).map(mapping => [String(mapping._id), mapping]))
@@ -730,7 +785,8 @@ async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = nu
                 regions: []
             };
         }
-        const regional = await Promise.all(workspaceRegions(region).map(region => previewLoadedPackageRegion({
+        const requestedRegions = canonicalPricingRegions(product, pkg, region);
+        const regional = await Promise.all(requestedRegions.map(region => previewLoadedPackageRegion({
             product,
             pkg,
             region,
@@ -738,7 +794,6 @@ async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = nu
             couponCode,
             actor
         })));
-        const requestedRegions = workspaceRegions(region);
         const existingPrices = WORKSPACE_REGIONS.map(regionCode => pkg.prices?.[regionCode]).filter(Boolean);
         const selectedExistingPrices = requestedRegions
             .map(regionCode => pkg.prices?.[regionCode])
@@ -746,10 +801,7 @@ async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = nu
         const selectedExistingPrice = selectedExistingPrices[0] || null;
         const oldSupplierCost = selectedExistingPrice?.supplierCost ?? null;
         const oldSupplierCurrency = selectedExistingPrice?.supplierCurrency || "";
-        const changed = selectedExistingPrices.some(existingPrice => (
-            Number(existingPrice?.supplierCost) !== Number(row.newSupplierCost) ||
-            upper(existingPrice?.supplierCurrency) !== row.supplierCurrency
-        ));
+        const changed = regional.some(regionalPreview => regionalPreview.changed === true);
         const blockingErrors = regional.flatMap(item => item.blockingErrors || []);
         const warnings = regional.flatMap(item => item.warnings || []);
         if (duplicateKeys.includes(rowKey(row))) {
@@ -838,27 +890,32 @@ async function publishDailyPricing({
      */
     const supplierEntries = await Promise.all(selectedRegions.map(async selectedRegion => ([
         selectedRegion,
-        await resolvePricingSupplier({ supplierId, region: selectedRegion })
+        await resolvePricingSupplier({ supplierId, region: selectedRegion, requireFulfillmentRegion: false })
     ])));
     const suppliersByRegion = new Map(supplierEntries);
 
-    // Pricing preview may use a disabled mapping as read-only supplier-cost
-    // evidence. Publication remains a production action and therefore keeps
-    // the stricter enabled-mapping boundary.
+    // Mapping identity and authoritative cost are pricing authority. Mapping
+    // enablement is fulfillment transport authority and must not gate pricing.
     const selectedMappingIds = rows
         .filter(row => row.selected !== false)
         .map(row => text(row.mappingId))
         .filter(id => mongoose.Types.ObjectId.isValid(id));
     if (selectedMappingIds.length) {
-        const enabledMappings = await SupplierProductMapping.countDocuments({
+        const publicationMappings = await SupplierProductMapping.find({
             _id: { $in: selectedMappingIds },
-            supplierId,
-            enabled: true
+            supplierId
+        }).select("_id supplierProductCode supplierPackageCode supplierCostAuthority mappingMetadata").lean();
+        const authoritativeMappings = publicationMappings.filter(mapping => {
+            const evidence = mapping.supplierCostAuthority?.rawSupplierCost != null
+                ? mapping.supplierCostAuthority
+                : mapping.mappingMetadata?.supplierCost || {};
+            const cost = Number(evidence.rawSupplierCost ?? evidence.priceUsd ?? evidence.netDealerPrice);
+            return Boolean(text(mapping.supplierProductCode)) && Boolean(text(mapping.supplierPackageCode)) && Number.isFinite(cost);
         });
-        if (enabledMappings !== new Set(selectedMappingIds).size) {
+        if (authoritativeMappings.length !== new Set(selectedMappingIds).size) {
             throw new AdminPricingControlCenterError(
-                "SUPPLIER_MAPPING_PUBLICATION_NOT_READY",
-                "Publishing requires an enabled production-ready supplier mapping.",
+                "SUPPLIER_COST_AUTHORITY_NOT_READY",
+                "Publishing requires an exact supplier mapping with authoritative supplier cost.",
                 409
             );
         }
@@ -944,6 +1001,20 @@ async function publishDailyPricing({
             continue;
         }
 
+        if (row.changed !== true) {
+            selectedRegions.forEach(selectedRegion => {
+                results.push({
+                    region: selectedRegion,
+                    productCode: row.productCode,
+                    packageCode: row.packageCode,
+                    published: false,
+                    skipped: true,
+                    reason: "No changes"
+                });
+            });
+            continue;
+        }
+
         const pricePatches = {};
         const publishableRegions = [];
 
@@ -951,6 +1022,18 @@ async function publishDailyPricing({
             const regionalPreview = (row.regions || []).find(item => item.region === selectedRegion);
             const calculatedPrice = Number(regionalPreview?.recommendedSellingPrice);
             const regionalBlockingErrors = regionalPreview?.blockingErrors || [];
+
+            if (regionalPreview && regionalPreview.changed !== true) {
+                results.push({
+                    region: selectedRegion,
+                    productCode: row.productCode,
+                    packageCode: row.packageCode,
+                    published: false,
+                    skipped: true,
+                    reason: "No changes"
+                });
+                continue;
+            }
 
             if (
                 !regionalPreview ||
@@ -1042,6 +1125,33 @@ async function publishDailyPricing({
                 landedCurrency: pricePatches[publishableRegions[0]].landedCurrency
             },
             prices: pricePatches,
+            pricingPublicationEvidence: publishableRegions.map(selectedRegion => {
+                const regionalPreview = row.regions.find(item => item.region === selectedRegion);
+                return {
+                    region: selectedRegion,
+                    supplierBasis: {
+                        supplierId: suppliersByRegion.get(selectedRegion).supplierId,
+                        supplierCode: suppliersByRegion.get(selectedRegion).supplierCode,
+                        rawSupplierCost: normalized.newSupplierCost,
+                        supplierCurrency: suppliersByRegion.get(selectedRegion).supplierCurrency,
+                        supplierCostSource: normalized.supplierCostSource,
+                        providerProductCode: normalized.providerProductCode,
+                        providerOfferCode: normalized.providerOfferCode
+                    },
+                    fxBasis: {
+                        rate: regionalPreview.exchangeRate,
+                        source: regionalPreview.exchangeRateSource,
+                        capturedAt: regionalPreview.exchangeRateCapturedAt
+                    },
+                    appliedProfit: regionalPreview.appliedProfit ?? regionalPreview.netProfit,
+                    pricingPolicy: {
+                        source: regionalPreview.effectivePolicySource,
+                        versionId: regionalPreview.policyVersionId,
+                        versionNumber: regionalPreview.policyVersionNumber
+                    },
+                    packageProfitOverride: regionalPreview.packageProfitOverride || { mode: "INHERIT", value: null }
+                };
+            }),
             expectedUpdatedAt: normalized.expectedUpdatedAt || row.expectedUpdatedAt
         };
 
@@ -1108,7 +1218,7 @@ async function loadPackage(productCode, packageCode) {
     if (!isCanonicalProductCode(productCode)) {
         throw new AdminPricingControlCenterError("CATALOG_PRODUCT_UNSUPPORTED", "Product is not supported by the canonical catalog.", 409);
     }
-    const normalizedProductCode = normalizeProductCode(productCode);
+    const normalizedProductCode = canonicalPricingProductCode(productCode);
     const normalizedPackageCode = normalizePackageCode(packageCode);
     const [product, pkg] = await Promise.all([
         CatalogProduct.findOne({ productCode: normalizedProductCode }).lean(),
@@ -1121,6 +1231,19 @@ async function loadPackage(productCode, packageCode) {
         throw new AdminPricingControlCenterError("CATALOG_PACKAGE_NOT_FOUND", "Package not found.", 404);
     }
     return { product, pkg };
+}
+
+async function savePackageProfitOverride({ productCode, packageCode, region, profitOverride = {}, actor = null } = {}) {
+    const normalizedProductCode = String(productCode || "").trim().toLowerCase();
+    const normalizedPackageCode = normalizePackageCode(packageCode);
+    const normalizedRegion = normalizeRegion(region);
+    await loadPackage(normalizedProductCode, normalizedPackageCode);
+    const mode = upper(profitOverride.mode || "INHERIT");
+    if (!["INHERIT", "FIXED_AMOUNT", "PERCENTAGE"].includes(mode)) throw new AdminPricingControlCenterError("PROFIT_OVERRIDE_MODE_INVALID", "Profit override mode is invalid.");
+    const value = mode === "INHERIT" ? null : Number(profitOverride.value);
+    if (mode !== "INHERIT" && (!Number.isFinite(value) || value < 0 || (mode === "PERCENTAGE" && value > 100))) throw new AdminPricingControlCenterError("PROFIT_OVERRIDE_VALUE_INVALID", "Profit override value is invalid.");
+    const row = await PackagePricingOverride.findOneAndUpdate({ productCode: normalizedProductCode, packageCode: normalizedPackageCode, region: normalizedRegion }, { $set: { profitOverride: { mode, value }, updatedBy: text(actor?.username || actor?.id || "admin") } }, { upsert: true, new: true, runValidators: true }).lean();
+    return { success: true, productCode: row.productCode, packageCode: row.packageCode, region: row.region, profitOverride: row.profitOverride, publishedPricesChanged: false };
 }
 
 async function previewPackagePricing({ productCode, packageCode, region, priceDraft = {}, couponCode = "", actor = null } = {}) {
@@ -1185,7 +1308,7 @@ function normalizeBulkRow(row = {}) {
         throw new AdminPricingControlCenterError("INVALID_SUPPLIER_COST", "Each row requires a valid supplier cost.");
     }
     return {
-        productCode: normalizeProductCode(row.productCode),
+        productCode: canonicalPricingProductCode(row.productCode),
         packageCode: normalizePackageCode(row.packageCode),
         region,
         supplierCost,
@@ -1260,9 +1383,12 @@ async function bulkBackfillSupplierCosts({ rows = [], overwrite = false, actor =
 module.exports = Object.freeze({
     AdminPricingControlCenterError,
     PROFITABILITY_STATUS,
+    statusFromPricingEvidence,
+    rowStatusFromRegional,
     batchPreviewDailyPricing,
     loadDailyPricingWorkspace,
     bulkBackfillSupplierCosts,
     publishDailyPricing,
     previewPackagePricing
+    ,savePackageProfitOverride
 });

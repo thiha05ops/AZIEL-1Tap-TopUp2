@@ -97,7 +97,7 @@ function verifyPublicRendering() {
         includes(file, "method.accountName && method.accountNumber", "bank methods must require account name and number");
         includes(file, "bank-neutral.svg", "bank cards must use neutral bank fallback");
         includes(file, "payment-neutral.svg", "generic methods must use neutral payment fallback");
-        notIncludes(file, "assets/logo.png';", "bank cards must not fallback to AZIEL Wallet logo");
+        notIncludes(file, "/assets/brand/aziel-icon.svg';", "bank cards must not fallback to AZIEL Wallet logo");
     });
 
     includes("frontend/js/payment-display.js", "kplus: \"K PLUS\"", "K PLUS must have display label");

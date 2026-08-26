@@ -1,4 +1,5 @@
 const PLAYER_ID_PATTERN = /^\d{5,32}$/;
+const { gameFamilyForProduct } = require("../commerce/canonicalGameInputContract");
 
 class FazerCardsInputError extends Error {
     constructor(code, message) {
@@ -19,7 +20,7 @@ function normalizedInput(input = {}) {
 }
 
 function buildFazerCardsOrderFields(productCode, input = {}) {
-    const product = String(productCode || "").trim().toLowerCase();
+    const product = gameFamilyForProduct(productCode).toLowerCase();
     const { playerId, zoneId, riotId } = normalizedInput(input);
     if (product === "mlbb") {
         if (!playerId || !zoneId) throw new FazerCardsInputError("FAZERCARDS_MLBB_INPUT_INVALID", "MLBB User ID and Zone ID are required.");
@@ -43,7 +44,7 @@ function buildFazerCardsOrderFields(productCode, input = {}) {
 }
 
 function buildFazerCardsValidationFields(productCode, input = {}) {
-    const product = String(productCode || "").trim().toLowerCase();
+    const product = gameFamilyForProduct(productCode).toLowerCase();
     const { playerId, zoneId } = normalizedInput(input);
     if (product === "mlbb") {
         if (!playerId || !zoneId) throw new FazerCardsInputError("FAZERCARDS_MLBB_INPUT_INVALID", "MLBB User ID and Zone ID are required.");

@@ -51,14 +51,19 @@ function stubModels({ packageAmount = 1490 } = {}) {
         key: query?.key || "promptpay",
         region: "TH",
         enabled: true,
+        publicReady: true,
         method: query?.key === "wallet" ? "AZIEL Wallet" : "PromptPay QR",
         provider: query?.key === "wallet" ? "wallet" : "promptpay",
         paymentType: query?.key === "wallet" ? "wallet" : "manual",
         qrMode: "aziel_promptpay_dynamic",
+        dynamicQrSupported: true,
+        amountPrefillSupported: true,
+        promptPayRecipientType: "PHONE",
+        promptPayRecipientValue: "0812345678",
         receiptUploadEnabled: true,
         slipRequired: true,
         enableSaveQr: true,
-        enableOpenApp: true,
+        enableOpenApp: false,
         enableChecklist: true,
         dynamicQrExpiryMinutes: 15
     });
@@ -117,6 +122,7 @@ function pricingContext({ finalAmount = 1500 } = {}) {
 
 function commerceDeps({ records, createdOrders, orderIds = ["AZL-000001"], quoteIds = ["AZQ-000001"] } = {}) {
     return {
+        assertFulfillmentReady: async () => ({ fulfillmentAvailable: true }),
         quoteDependencies: {
             getIssuedAt: () => new Date("2026-07-26T12:00:00.000Z"),
             generateQuoteId: () => quoteIds.shift() || `AZQ-${Date.now()}`,
@@ -132,6 +138,18 @@ function commerceDeps({ records, createdOrders, orderIds = ["AZL-000001"], quote
             }
         },
         checkoutDependencies: {
+            validateOperationalPackageState: async ({ quote }) => ({
+                allowed: true,
+                supplierRouteSnapshot: {
+                    routeType: "MANUAL_ADMIN",
+                    supplierCode: "AZIEL_ADMIN",
+                    productCode: quote.packageSnapshot?.gameCode || "mlbb",
+                    packageCode: quote.packageSnapshot?.packageCode || "WEEKLY",
+                    region: quote.commercialSnapshot?.region || "TH",
+                    selectedRole: "MANUAL_FALLBACK",
+                    selectedAt: "2026-07-26T12:01:00.000Z"
+                }
+            }),
             findOwnedQuote: async ({ quoteId }) => records.get(quoteId) || null,
             findOrderByQuoteId: async () => null,
             findOrderByCheckoutIdempotency: async () => null,
@@ -229,7 +247,8 @@ async function verifyWalletAuthoritativeAmount() {
             currency: "THB",
             region: "TH",
             paymentMethod: "wallet",
-            userId: "12345"
+            userId: "12345",
+            zoneId: "6789"
         }, {
             user: { _id: "user-1", username: "alice" },
             sessionId: "session-1"
@@ -289,7 +308,8 @@ async function verifyPriceChangeDoesNotMutateExistingOrder() {
             currency: "THB",
             region: "TH",
             paymentMethod: "promptpay",
-            userId: "12345"
+            userId: "12345",
+            zoneId: "6789"
         }, {
             user: { _id: "user-1", username: "alice" },
             sessionId: "session-1"
@@ -307,7 +327,8 @@ async function verifyPriceChangeDoesNotMutateExistingOrder() {
             currency: "THB",
             region: "TH",
             paymentMethod: "promptpay",
-            userId: "12345"
+            userId: "12345",
+            zoneId: "6789"
         }, {
             user: { _id: "user-1", username: "alice" },
             sessionId: "session-1"

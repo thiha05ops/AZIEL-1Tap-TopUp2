@@ -21,8 +21,7 @@
     </script>
 
     <link rel="manifest" href="/manifest.json">
-    <link rel="icon" type="image/webp" href="/assets/logo/aziel-icon.webp">
-    <meta name="theme-color" content="#070716">
+<meta name="theme-color" content="#070716">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="AZIEL OS">
@@ -38,12 +37,16 @@
     <link rel="stylesheet" href="/css/admin/admin-support.css?v=20260706-2">
     <link rel="stylesheet" href="/css/admin/admin-live-chat.css?v=20260824-mobile-boundary">
     <link rel="stylesheet" href="/css/admin/admin-design-system.css?v=20260824-mobile-boundary">
-    <link rel="stylesheet" href="/css/admin/admin-os-brand.css?v=20260729-os-mark">
+    <link rel="stylesheet" href="/css/admin/admin-os-brand.css?v=20260827-brand">
     <!-- Global responsive shell owner: phone <768px, tablet 768-1023px, desktop >=1024px. -->
     <link rel="stylesheet" href="/css/admin/admin-mobile-shell.css?v=20260824-phase2-desktop-repair">
     <link rel="stylesheet" href="/css/campaign/campaign-popup.css?v=20260715-visual">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="icon" type="image/png" sizes="16x16" href="/assets/brand/favicon-16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/brand/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="48x48" href="/assets/brand/favicon-48.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/brand/apple-touch-icon.png">
 </head>
 
 <body class="admin-body">
@@ -56,7 +59,7 @@
 
             <div class="admin-sidebar-head admin-sidebar-header">
                 <div class="admin-logo" data-aziel-os-brand="sidebar">
-                    <img class="admin-logo-fallback" src="/assets/logo/aziel-icon.webp" alt="AZIEL OS" width="38"
+                    <img class="admin-logo-fallback" src="/assets/brand/aziel-icon.svg" alt="AZIEL OS" width="38"
                         height="38" decoding="async">
                     <div class="admin-logo-copy">
                         <h1>AZIEL OS</h1>
@@ -517,7 +520,7 @@
                         <button type="button" role="tab" aria-selected="false" data-website-runtime-tab="preview"
                             data-admin-i18n="preview">Preview</button>
                         <button type="button" role="tab" aria-selected="false"
-                            data-website-runtime-tab="configuration">Publish Status</button>
+                            data-website-runtime-tab="configuration" hidden>Draft Diagnostics</button>
                         <button class="website-runtime-tab--developer" type="button" role="tab" aria-selected="false"
                             data-website-runtime-tab="navigation" hidden>Navigation</button>
                         <button class="website-runtime-tab--developer" type="button" role="tab" aria-selected="false"
@@ -693,6 +696,7 @@
                                 <tr>
                                     <th>Package</th>
                                     <th>Supplier Cost</th>
+                                    <th>Profit</th>
                                     <th>Thailand</th>
                                     <th>Myanmar</th>
                                     <th>Status</th>
@@ -728,21 +732,13 @@
                                 <option value="TH">Thailand</option>
                                 <option value="MM">Myanmar</option>
                             </select></label>
-                        <label><span>Supplier Currency</span><select name="supplierCurrency">
-                                <option value="THB">THB</option>
-                                <option value="MMK">MMK</option>
-                                <option value="USD">USD</option>
-                            </select></label>
                         <div class="pricing-v3-readonly"><span>Store Currency</span><strong
                                 id="pricingSettingsStoreCurrency">THB</strong></div>
-                        <label><span>Exchange Rate</span><input name="exchangeRate" type="number" min="0.0001"
-                                step="0.0001" required><small id="pricingExchangeDirection">1 THB = 1
-                                THB</small></label>
-                        <label><span>FX Authority Source</span><input name="exchangeRateSource" type="text"
-                                maxlength="80" placeholder="Manual acquisition rate"></label>
-                        <label><span>FX Captured At</span><input name="exchangeRateCapturedAt" type="datetime-local"></label>
-                        <label><span>FX Maximum Age (seconds)</span><input name="exchangeRateMaxAgeSeconds" type="number"
-                                min="60" step="60" value="86400"></label>
+                        <fieldset class="pricing-fx-authorities">
+                            <legend>Independent FX Authorities</legend>
+                            <p>Rates belong to currency pairs and apply to every supplier using that pair.</p>
+                            <div id="pricingFxAuthorityRows"></div>
+                        </fieldset>
                         <fieldset>
                             <legend>Profit Policy</legend><select name="profitType">
                                 <option value="PERCENT">Percentage</option>
@@ -774,6 +770,8 @@
                                 step="1" required><small id="pricingRoundingUnit">THB</small></label>
                         <label><span>Minimum Profit</span><input name="minimumProfitAmount" type="number" min="0"
                                 step="0.01" required><small id="pricingMinimumProfitUnit">THB</small></label>
+                        <label><span>Maximum Profit</span><input name="maximumProfitAmount" type="number" min="0"
+                                step="0.01" placeholder="Unlimited"><small id="pricingMaximumProfitUnit">THB</small></label>
                     </form>
                 </div>
             </section>
@@ -1666,7 +1664,7 @@ TH</textarea></label>
     <script src="/js/admin/admin-ui.js?v=20260715-phase15"></script>
     <script src="/js/admin/admin-action-modal.js?v=20260714-phase4"></script>
 
-    <script src="/js/admin-os-brand.js?v=20260729-os-mark"></script>
+    <script src="/js/admin-os-brand.js?v=20260827-brand"></script>
     <script src="/js/admin-auth.js?v=20260715-phase12"></script>
 
     <script src="/js/os/kernel-errors.js?v=20260724-os-kernel"></script>
@@ -1689,7 +1687,7 @@ TH</textarea></label>
 
     <script src="/js/admin-stats.js?v=20260824-phase2-desktop-repair"></script>
     <script src="/js/admin-website-runtime.js?v=20260724-website-runtime"></script>
-    <script src="/js/admin-fulfillment.js?v=20260715-phase13-qa4"></script>
+    <script src="/js/admin-fulfillment.js?v=20260827-owner-routing"></script>
 
     <script src="/js/payment-display.js?v=20260718-labels"></script>
     <script src="/js/admin-orders.js?v=20260824-phase2"></script>

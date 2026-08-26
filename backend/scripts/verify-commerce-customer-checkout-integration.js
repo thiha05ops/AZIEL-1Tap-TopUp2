@@ -46,8 +46,8 @@ function verifyBackendBridge() {
     );
     includes(
         "backend/services/commerce/customerManualPromptPayCheckoutService.js",
-        "CatalogPackage.findOne",
-        "customer checkout bridge must load server-owned catalog package context."
+        "findCatalogPackageByIdentity",
+        "customer checkout bridge must load server-owned canonical package/alias context."
     );
     includes(
         "backend/services/commerce/customerManualPromptPayCheckoutService.js",

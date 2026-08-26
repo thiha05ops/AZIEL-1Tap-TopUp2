@@ -386,7 +386,7 @@ function getPaymentLogo(key) {
         krungthai: "assets/payment/bank-neutral.svg",
         mmqr: "assets/payment/payment-neutral.svg",
         manualbank: "assets/payment/bank-neutral.svg",
-        wallet: "assets/logo.png"
+        wallet: "/assets/brand/aziel-icon.svg"
     };
 
     return logos[normalizedKey] || "assets/payment/payment-neutral.svg";

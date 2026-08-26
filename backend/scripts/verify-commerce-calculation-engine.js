@@ -132,7 +132,7 @@ function verifyPricingRules() {
         ]
     }));
     assert.deepStrictEqual(result.appliedRules.map(rule => rule.code), ["PACKAGE-MARKUP", "REGION-FEE"], "rule precedence and stopFurtherProcessing must be deterministic.");
-    almostEqual(result.profitAmount, 15.2, "markup rule should add to profit stage after customer-side fee cost.");
+    almostEqual(result.profitAmount, 15, "markup rule should add after landed-cost profit calculation.");
     almostEqual(result.pricingRuleFeeAmount, 2, "fee rule should add after platform fee stage.");
 
     const override = calculateBasePrice(baseInput({
@@ -281,7 +281,7 @@ function verifyWorkedExamples() {
             roundingRule: { enabled: true, mode: "NEAREST", increment: 100 }
         }
     });
-    almostEqual(mmk.regularPrice, 10800, "documented MMK original price example.");
+    almostEqual(mmk.regularPrice, 10600, "MMK landed-cost profit example.");
 
     const thb = calculateBasePrice({
         supplierCost: 950,
@@ -296,7 +296,7 @@ function verifyWorkedExamples() {
             roundingRule: { enabled: true, mode: "PSYCHOLOGICAL", psychologicalEnding: 9 }
         }
     });
-    almostEqual(thb.regularPrice, 1159, "documented THB original price example.");
+    almostEqual(thb.regularPrice, 1149, "THB landed-cost profit example.");
 }
 
 function main() {

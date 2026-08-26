@@ -6,10 +6,8 @@ const ROOT = path.resolve(__dirname, "../..");
 const FRONTEND = path.join(ROOT, "frontend");
 
 const ICONS = [
-    ["/icons/aziel-app-icon-192.png", 192, 192, "any"],
-    ["/icons/aziel-app-icon-512.png", 512, 512, "any"],
-    ["/icons/aziel-app-icon-maskable-192.png", 192, 192, "maskable"],
-    ["/icons/aziel-app-icon-maskable-512.png", 512, 512, "maskable"]
+    ["/assets/brand/icon-192.png", 192, 192, "any"],
+    ["/assets/brand/icon-512.png", 512, 512, "any"]
 ];
 
 function read(file) {
@@ -68,21 +66,28 @@ function main() {
         assert.deepStrictEqual(pngDimensions(file), { width, height }, `${src} must be ${width}x${height}.`);
     });
 
-    const appleIcon = publicFile("/icons/apple-touch-icon.png");
+    const appleIcon = publicFile("/assets/brand/apple-touch-icon.png");
     assert(fs.existsSync(appleIcon), "Apple touch icon must resolve from the public root.");
-    assert.deepStrictEqual(pngDimensions(appleIcon), { width: 180, height: 180 }, "Apple touch icon must be 180x180.");
+    assert.deepStrictEqual(pngDimensions(appleIcon), { width: 192, height: 192 }, "Apple touch icon must match the supplied canonical artwork.");
+
+    [16, 32, 48].forEach(size => {
+        const favicon = publicFile(`/assets/brand/favicon-${size}.png`);
+        assert(fs.existsSync(favicon), `Canonical ${size}px favicon must resolve from the public root.`);
+        assert.deepStrictEqual(pngDimensions(favicon), { width: size, height: size }, `favicon-${size}.png must be ${size}x${size}.`);
+    });
 
     const sw = read("frontend/sw.js");
     [
-        "/icons/aziel-app-icon-192.png",
-        "/icons/aziel-app-icon-512.png",
-        "/icons/aziel-app-icon-maskable-192.png",
-        "/icons/aziel-app-icon-maskable-512.png",
-        "/icons/apple-touch-icon.png"
+        "/assets/brand/icon-192.png",
+        "/assets/brand/icon-512.png",
+        "/assets/brand/apple-touch-icon.png",
+        "/assets/brand/favicon-16.png",
+        "/assets/brand/favicon-32.png",
+        "/assets/brand/favicon-48.png"
     ].forEach(src => assert(sw.includes(`"${src}"`), `Service worker must precache ${src}.`));
 
-    assert(!sw.includes("/assets/icons/icon-192.png"), "Service worker must not precache old 192 app icon.");
-    assert(!sw.includes("/assets/icons/icon-512.png"), "Service worker must not precache old 512 app icon.");
+    assert(!sw.includes("/icons/aziel-app-icon"), "Service worker must not precache legacy app icons.");
+    assert(!sw.includes("/assets/icons/"), "Service worker must not precache legacy icon paths.");
 
     htmlFiles().forEach(name => {
         const html = read(`frontend/${name}`);
@@ -92,17 +97,14 @@ function main() {
         assert(manifestLinks[0].includes('href="/manifest.json"'), `${name} manifest link must use /manifest.json.`);
         assert.strictEqual(appleLinks.length, 1, `${name} must have exactly one Apple touch icon link.`);
         assert(appleLinks[0].includes('sizes="180x180"'), `${name} Apple touch icon must declare 180x180.`);
-        assert(appleLinks[0].includes('href="/icons/apple-touch-icon.png"'), `${name} Apple touch icon must use the app icon path.`);
+        assert(appleLinks[0].includes('href="/assets/brand/apple-touch-icon.png"'), `${name} Apple touch icon must use the app icon path.`);
     });
 
     [
-        "frontend/assets/logo.png",
-        "frontend/assets/logo/aziel-icon.webp",
-        "frontend/assets/logo/aziel-wordmark.webp",
-        "frontend/assets/icons/favicon.ico",
-        "frontend/assets/icons/favicon-16.png",
-        "frontend/assets/icons/favicon-32.png"
-    ].forEach(file => assert(fs.existsSync(path.join(ROOT, file)), `${file} must remain present.`));
+        "aziel-logo-primary.svg", "aziel-logo-light.svg", "aziel-logo-dark.svg", "aziel-icon.svg",
+        "favicon-16.png", "favicon-32.png", "favicon-48.png", "apple-touch-icon.png",
+        "icon-192.png", "icon-512.png", "og-image.png"
+    ].forEach(name => assert(fs.existsSync(path.join(ROOT, "frontend/assets/brand", name)), `${name} must exist in the canonical brand directory.`));
 
     console.log("PWA icon verification passed.");
 }

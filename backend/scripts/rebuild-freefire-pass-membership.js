@@ -1,0 +1,19 @@
+#!/usr/bin/env node
+"use strict";
+const assert = require("assert");
+const crypto = require("crypto");
+const path = require("path");
+require("dotenv").config({ path: path.resolve(__dirname, "../../.env"), quiet: true });
+const mongoose = require("mongoose");
+const Product = require("../models/CatalogProduct");
+const Package = require("../models/CatalogPackage");
+const Mapping = require("../models/SupplierProductMapping");
+const APPLY = process.argv.includes("--apply");
+const CODE = "freefire-pass-membership";
+const EXPECTED = ["FF_LEVEL_6_UP_PASS","FF_LEVEL_10_UP_PASS","FF_LEVEL_15_UP_PASS","FF_LEVEL_20_UP_PASS","FF_LEVEL_25_UP_PASS","FF_LEVEL_30_UP_PASS","FF_BP_CARD","FF_WEEKLY_MEMBERSHIP_LITE","FF_WEEKLY_MEMBERSHIP","FF_MONTHLY_MEMBERSHIP"].sort();
+const HISTORICAL = ["commerceorders","orders","pricingquotes","paymentattempts","fulfillmentattempts","manualpaymentattempts"];
+const hash = value => crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex");
+const protectedPackage = row => ({ _id:String(row._id), productCode:row.productCode, packageCode:row.packageCode, name:row.name, prices:row.prices, enabled:row.enabled, aliases:row.aliases, productAliases:row.productAliases, canonicalSupplierCost:row.canonicalSupplierCost });
+async function snapshot(){const [products,packages,mappings,historical]=await Promise.all([Product.countDocuments({deletedAt:null}),Package.find({productCode:CODE,deletedAt:null}).sort({packageCode:1}).lean(),Mapping.find({productCode:CODE}).sort({_id:1}).lean(),Promise.all(HISTORICAL.map(async collection=>({collection,count:await mongoose.connection.collection(collection).countDocuments({$or:[{productCode:CODE},{"product.productCode":CODE},{"packageSnapshot.gameCode":CODE},{"fulfillment.routeSnapshot.productCode":CODE}]})})))]);return{products,packages,mappings,historical};}
+async function main(){await mongoose.connect(process.env.MONGO_URI);const product=await Product.findOne({productCode:CODE}).lean();assert(product);const before=await snapshot();assert.deepStrictEqual(before.packages.map(x=>x.packageCode).sort(),EXPECTED);assert.strictEqual(before.mappings.length,10);const protectedHash=hash(before.packages.map(protectedPackage)),mappingHash=hash(before.mappings),historyHash=hash(before.historical);if(APPLY){const session=await mongoose.startSession();try{await session.withTransaction(async()=>{await Product.updateOne({_id:product._id},{$addToSet:{aliases:{$each:["Free Fire Pass and Membership","Free Fire Membership & Pass"]}}},{session});await Package.updateMany({productCode:CODE,"packageFamily.parentCode":"MEMBERSHIP",deletedAt:null},{$set:{packageFamily:{code:"MEMBERSHIP",name:"Membership",sortOrder:30,parentCode:"",authority:"CANONICAL_PACKAGE_FAMILY_V1"}}},{session});});}finally{await session.endSession();}}const after=await snapshot();assert.strictEqual(hash(after.packages.map(protectedPackage)),protectedHash);assert.strictEqual(hash(after.mappings),mappingHash);assert.strictEqual(hash(after.historical),historyHash);if(APPLY){assert(after.packages.filter(x=>x.packageCode.includes("MEMBERSHIP")).every(x=>x.packageFamily.code==="MEMBERSHIP"));}console.log(JSON.stringify({result:"PASS",mode:APPLY?"APPLY":"DRY_RUN",countsBefore:{products:before.products,packages:before.packages.length,mappings:before.mappings.length},countsAfter:{products:after.products,packages:after.packages.length,mappings:after.mappings.length},productId:String(product._id),packageIds:after.packages.map(x=>String(x._id)),packageCodes:after.packages.map(x=>x.packageCode),mappingIds:after.mappings.map(x=>String(x._id)),historicalReferences:after.historical,pricesChanged:0,supplierCostsChanged:0,rolesChanged:0,gatesChanged:0,realOrders:0,realTopups:0,providerSpend:0},null,2));}
+main().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>mongoose.disconnect().catch(()=>null));

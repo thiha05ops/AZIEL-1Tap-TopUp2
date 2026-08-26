@@ -68,7 +68,7 @@
             bangkok_bank: assetLogo("bank-neutral.svg"),
             krungsri: assetLogo("bank-neutral.svg"),
             krungthai: assetLogo("bank-neutral.svg"),
-            wallet: "/assets/logo.png"
+            wallet: "/assets/brand/aziel-icon.svg"
         };
         return logos[normalized] || assetLogo("payment-neutral.svg");
     }

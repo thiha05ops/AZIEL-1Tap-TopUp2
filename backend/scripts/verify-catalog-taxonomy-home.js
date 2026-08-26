@@ -104,7 +104,7 @@ assert.deepStrictEqual(
     "All Mobile Games seed supplement must match the approved assortment"
 );
 assert(INVENTORY.every(product => product.previewPrice === undefined), "Marketplace seed must not invent preview prices");
-assert(!INVENTORY.some(product => product.artworkPath === "assets/logo/aziel-icon.webp"), "The universal AZIEL placeholder must not remain");
+assert(!INVENTORY.some(product => product.artworkPath === "/assets/brand/aziel-icon.svg"), "The universal AZIEL placeholder must not remain");
 [
     "game-cards.svg",
     "game-topup.svg",

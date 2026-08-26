@@ -28,6 +28,8 @@ assert(adminFrontend.includes("Promo Discount"));
 assert(!adminFrontend.includes("LEGACY_CATALOG_COMPATIBILITY"), "Admin UI must not present compatibility provenance as current authority.");
 
 const ownership = read("backend/services/commerce/productionPricingContextService.js");
-assert(ownership.includes('mode !== "MANUAL_OVERRIDE"'), "Only explicit MANUAL_OVERRIDE may become a price override.");
+assert(ownership.includes("publishedCustomerPriceRule"), "Customer pricing must freeze the published regional amount.");
+assert(ownership.includes("includePublishedPriceOverride ? null : PackagePricingOverride"), "Package overrides must be calculation-preview authority, not an unpublished customer-price mutation.");
+assert(adminService.includes("includePublishedPriceOverride: false"), "Daily Pricing must explicitly calculate without the published customer-price override.");
 
 console.log("Admin pricing preview authority verification passed.");

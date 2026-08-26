@@ -195,7 +195,7 @@ async function verifyFrontend() {
     includes("frontend/css/admin/admin-design-system.css", ".fulfillment-state", "Fulfillment empty/error states must be styled.");
     includes("frontend/css/admin/admin-design-system.css", ".fulfillment-view-panel.active", "Fulfillment panels must have their own active display rule.");
     includes("frontend/css/admin/admin-design-system.css", "#section-fulfillment [hidden]", "Fulfillment hidden ownership must be scoped.");
-    matches("frontend/css/admin/admin-design-system.css", /@media\s*\(max-width:\s*768px\)[\s\S]*\.fulfillment-form-grid/, "Fulfillment mobile rules must use existing breakpoint.");
+    matches("frontend/css/admin/admin-design-system.css", /@media\s*\(max-width:\s*767px\)[\s\S]*\.fulfillment-form-grid/, "Fulfillment phone rules must use the established max-width 767px breakpoint.");
     matches("frontend/css/admin/admin-design-system.css", /\.fulfillment-view-panel\.active\s*\{\s*display:\s*grid;/, "Active fulfillment views must not remain display:none.");
     includes("frontend/js/admin-security.js", "#section-admin-security [data-admin-security-view]", "Admin Security tab binding must be scoped away from Fulfillment tabs.");
     assert(!/querySelectorAll\("\.admin-security-tab"\)/.test(adminSecurity), "Admin Security must not bind every admin-security-tab globally.");

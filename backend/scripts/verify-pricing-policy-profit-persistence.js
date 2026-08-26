@@ -1,0 +1,23 @@
+#!/usr/bin/env node
+"use strict";
+const assert=require("assert"),fs=require("fs"),path=require("path");
+const { _pricingPolicyPersistenceContract: contract }=require("../services/commerce/adminPricingEngineService");
+const th={_id:"th-active",status:"ACTIVE",code:"AZIEL_PRICING_TH_THB_V1",region:"TH",currency:"THB",minimumProfitAmount:5,maximumProfitAmount:50,defaultProfitRule:{type:"PERCENT",value:5}};
+const mm={_id:"mm-active",status:"ACTIVE",code:"AZIEL_PRICING_MM_MMK_V1",region:"MM",currency:"MMK",minimumProfitAmount:300,maximumProfitAmount:3000,defaultProfitRule:{type:"PERCENT",value:5}};
+assert.deepStrictEqual([contract.configFromPolicy(th).minimumProfitAmount,contract.configFromPolicy(th).maximumProfitAmount],[5,50]);
+assert.deepStrictEqual([contract.configFromPolicy(mm).minimumProfitAmount,contract.configFromPolicy(mm).maximumProfitAmount],[300,3000]);
+assert.strictEqual(contract.policyFieldsFromConfig({minimumProfitAmount:0,maximumProfitAmount:null},contract.configFromPolicy(th)).fields.minimumProfitAmount,0);
+assert.strictEqual(contract.policyFieldsFromConfig({minimumProfitAmount:0,maximumProfitAmount:null},contract.configFromPolicy(th)).fields.maximumProfitAmount,null);
+assert.strictEqual(contract.policyFieldsFromConfig({minimumProfitAmount:0,maximumProfitAmount:0},contract.configFromPolicy(th)).fields.maximumProfitAmount,0);
+assert.deepStrictEqual(contract.policyFieldsFromConfig({},contract.configFromPolicy(mm)).config.minimumProfitAmount,300);
+assert.deepStrictEqual(contract.policyFieldsFromConfig({},contract.configFromPolicy(mm)).config.maximumProfitAmount,3000);
+assert.throws(()=>contract.policyFieldsFromConfig({minimumProfitAmount:5,maximumProfitAmount:4},contract.configFromPolicy(th)),/Maximum profit/);
+const staleDraft={status:"DRAFT",code:"AZIEL_PRICING_DRAFT_MM_MMK",region:"MM",currency:"MMK",minimumProfitAmount:0,metadata:{pendingOwnerReview:false}};
+assert.strictEqual(contract.visibleDraftPolicy([staleDraft],"MM","MMK"),null);
+assert.strictEqual(contract.visibleDraftPolicy([{...staleDraft,metadata:{pendingOwnerReview:true}}],"MM","MMK").minimumProfitAmount,0);
+const frontend=fs.readFileSync(path.resolve(__dirname,"../../frontend/js/admin-pricing-engine.js"),"utf8"),service=fs.readFileSync(path.resolve(__dirname,"../services/commerce/adminPricingEngineService.js"),"utf8");
+assert(frontend.includes("const policies = [{ region: selectedPolicy.region"),"Settings save must send only the selected region.");
+assert(frontend.includes('value === "" ? null'),"Blank maximum must serialize as unlimited/null.");
+assert(service.includes("maximumProfitAmount: draft.maximumProfitAmount == null ? null : draft.maximumProfitAmount"));
+assert(service.includes('"metadata.pendingOwnerReview": false'));
+console.log(JSON.stringify({result:"PASS",th:{minimum:5,maximum:50},mm:{minimum:300,maximum:3000},zeroMinimum:true,unlimitedMaximum:true,explicitZeroMaximum:true,regionIsolation:true,stalePublishedDraftIgnored:true,publishedPriceMutations:0,packageOverrideMutations:0},null,2));

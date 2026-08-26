@@ -381,7 +381,9 @@ function createManualPaymentApplicationService(dependencies = {}) {
             const attempt = input.attemptId
                 ? await deps.paymentAttemptRepository.findAttemptByIdForOwner({ attemptId: assertId(input.attemptId, "attemptId"), owner })
                 : await deps.paymentAttemptRepository.findActiveAttemptForOrder({ orderId, owner });
-            if (!attempt) throw appError(ERROR_CODES.NOT_FOUND, "Payment attempt was not found.", 404, "attempt");
+            if (!attempt || normalizeString(attempt.orderId) !== orderId) {
+                throw appError(ERROR_CODES.NOT_FOUND, "Payment attempt was not found.", 404, "attempt");
+            }
             return toSafePaymentView({ order, attempt });
         } catch (error) {
             throw mapPaymentError(error, "read");

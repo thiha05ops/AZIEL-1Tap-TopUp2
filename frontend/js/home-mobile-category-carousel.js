@@ -144,7 +144,7 @@
     function renderProduct(product = {}, categoryId = "") {
         const categoryArtwork = categoryFallback(categoryId);
         const sourceArtwork = String(product.image || "");
-        const artwork = !sourceArtwork || sourceArtwork.includes("assets/logo/aziel-icon") || sourceArtwork.includes("assets/fallbacks/")
+        const artwork = !sourceArtwork || sourceArtwork.includes("assets/brand/aziel-icon") || sourceArtwork.includes("assets/fallbacks/")
             ? categoryArtwork
             : sourceArtwork;
         const fallback = categoryArtwork;

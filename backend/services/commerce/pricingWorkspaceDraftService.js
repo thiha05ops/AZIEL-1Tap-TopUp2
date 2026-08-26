@@ -4,6 +4,7 @@ const PricingWorkspaceDraft = require("../../models/PricingWorkspaceDraft");
 const CatalogPackage = require("../../models/CatalogPackage");
 const { SUPPLIER_CURRENCY, REGION } = require("../../constants/commerce");
 const { normalizePackageCode, normalizeProductCode, normalizeRegion } = require("../../catalog/catalogProjection");
+const { CANONICAL_PRODUCT_CODES, isCanonicalProductCode } = require("../../catalog/canonicalOperationalCatalog");
 const { resolvePricingSupplier } = require("./pricingSupplierService");
 
 function text(value) {
@@ -12,6 +13,13 @@ function text(value) {
 
 function upper(value) {
     return text(value).toUpperCase();
+}
+
+function canonicalPricingProductCode(value) {
+    const exact = text(value).toLowerCase();
+    if (isCanonicalProductCode(exact)) return exact;
+    const compact = normalizeProductCode(exact);
+    return CANONICAL_PRODUCT_CODES.find(code => normalizeProductCode(code) === compact) || exact;
 }
 
 function amount(value) {
@@ -45,7 +53,7 @@ function normalizeDraftRows(rows = [], region = "ALL", supplier = {}) {
         throw new Error("Unsupported Pricing Workspace draft region.");
     }
     return (Array.isArray(rows) ? rows : []).map((row, index) => {
-        const productId = normalizeProductCode(row.productCode || row.productId);
+        const productId = canonicalPricingProductCode(row.productCode || row.productId);
         const packageCode = normalizePackageCode(row.packageCode);
         const stagedSupplierCost = amount(row.newSupplierCost ?? row.supplierCost ?? row.stagedSupplierCost);
         const supplierCurrency = normalizeSupplierCurrency(supplier.supplierCurrency, normalizedRegion);
@@ -116,7 +124,7 @@ async function validateCatalogRows(rows = []) {
         packageCode: { $in: packageCodes },
         deletedAt: null
     }).select("productCode packageCode prices").lean();
-    const packageMap = new Map(packages.map(pkg => [`${normalizeProductCode(pkg.productCode)}:${normalizePackageCode(pkg.packageCode)}`, pkg]));
+    const packageMap = new Map(packages.map(pkg => [`${canonicalPricingProductCode(pkg.productCode)}:${normalizePackageCode(pkg.packageCode)}`, pkg]));
     rows.forEach(row => {
         const pkg = packageMap.get(`${row.productId}:${row.packageCode}`);
         if (!pkg) {
@@ -270,21 +278,21 @@ async function saveSupplierCostDraftRows({ rows = [], region = "ALL", supplierId
 
 async function clearPublishedSupplierCostDraftRows({ rows = [], region = "" } = {}) {
     const publishedRows = (Array.isArray(rows) ? rows : []).filter(row => row?.published === true);
-    const candidateKeys = new Set(publishedRows.map(row => `${normalizeProductCode(row.productCode)}:${normalizePackageCode(row.packageCode)}`));
+    const candidateKeys = new Set(publishedRows.map(row => `${canonicalPricingProductCode(row.productCode)}:${normalizePackageCode(row.packageCode)}`));
     if (!candidateKeys.size) return { cleared: 0, clearedKeys: [] };
     const packages = await CatalogPackage.find({
-        $or: publishedRows.map(row => ({ productCode: normalizeProductCode(row.productCode), packageCode: normalizePackageCode(row.packageCode) })),
+        $or: publishedRows.map(row => ({ productCode: canonicalPricingProductCode(row.productCode), packageCode: normalizePackageCode(row.packageCode) })),
         deletedAt: null
     }).select("productCode packageCode prices").lean();
     const keys = new Set(packages.filter(pkg => {
-        const result = publishedRows.find(row => normalizeProductCode(row.productCode) === normalizeProductCode(pkg.productCode) && normalizePackageCode(row.packageCode) === normalizePackageCode(pkg.packageCode));
+        const result = publishedRows.find(row => canonicalPricingProductCode(row.productCode) === canonicalPricingProductCode(pkg.productCode) && normalizePackageCode(row.packageCode) === normalizePackageCode(pkg.packageCode));
         const activePrices = REGION.map(region => pkg.prices?.[region]).filter(price => price?.enabled !== false && price?.currency);
         return activePrices.length > 0 && activePrices.every(price => (
             price.publishedPriceMode === "POLICY_DERIVED" &&
             price.supplierCost != null &&
             Number(price.supplierCost) === Number(result?.supplierCost)
         ));
-    }).map(pkg => `${normalizeProductCode(pkg.productCode)}:${normalizePackageCode(pkg.packageCode)}`));
+    }).map(pkg => `${canonicalPricingProductCode(pkg.productCode)}:${normalizePackageCode(pkg.packageCode)}`));
     if (!keys.size) return { cleared: 0, clearedKeys: [] };
 
     const docs = await PricingWorkspaceDraft.find({ region: "ALL", status: "DRAFT" });

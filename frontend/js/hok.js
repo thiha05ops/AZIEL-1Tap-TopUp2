@@ -7,6 +7,7 @@ window.AZIEL_GAME_FLOW?.init({
     userIdSelector: "#userId",
     zoneIdSelector: "",
     zoneRequired: false,
+    accountFields: window.AZIEL_GAME_INPUT_CONTRACTS?.forProduct("hok")?.accountFields,
     directWallet: true,
     legacyPaymentPreferred: true,
     pendingReturnUrl: "hok.html"

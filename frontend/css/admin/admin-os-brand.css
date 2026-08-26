@@ -9,14 +9,14 @@
   min-width: 0;
 }
 
-.aziel-os-svg-mark {
+.aziel-os-brand-mark {
   width: clamp(72px, 44%, 86px);
   height: auto;
   display: block;
-  overflow: visible;
+  object-fit: contain;
 }
 
-.aziel-os-svg-mark.is-compact {
+.aziel-os-brand-mark.is-compact {
   width: 36px;
 }
 
@@ -52,26 +52,12 @@
   white-space: nowrap;
 }
 
-.admin-logo-fallback {
-  display: none;
-}
-
 .admin-logo[data-aziel-os-brand] {
   display: grid;
   justify-items: center;
   gap: 8px;
   min-height: 128px;
   padding: 8px 4px 12px;
-}
-
-.admin-logo[data-aziel-os-brand] .admin-logo-fallback,
-.admin-entry-brand-lockup[data-aziel-os-brand] .admin-logo-fallback {
-  display: block;
-}
-
-.admin-logo[data-aziel-os-brand] .aziel-os-brand-inner + .admin-logo-fallback,
-.admin-entry-brand-lockup[data-aziel-os-brand] .aziel-os-brand-inner + .admin-logo-fallback {
-  display: none;
 }
 
 .admin-entry-brand-lockup {
@@ -84,7 +70,7 @@
   justify-items: start;
 }
 
-.admin-entry-brand-lockup .aziel-os-svg-mark {
+.admin-entry-brand-lockup .aziel-os-brand-mark {
   width: clamp(116px, 22vw, 168px);
 }
 
@@ -109,12 +95,12 @@
   display: none;
 }
 
-.admin-body.admin-sidebar-collapsed .admin-logo[data-aziel-os-brand] .aziel-os-svg-mark {
+.admin-body.admin-sidebar-collapsed .admin-logo[data-aziel-os-brand] .aziel-os-brand-mark {
   width: 36px;
 }
 
 @media (max-width: 760px) {
-  .admin-entry-brand-lockup .aziel-os-svg-mark {
+  .admin-entry-brand-lockup .aziel-os-brand-mark {
     width: 96px;
   }
 
@@ -125,11 +111,5 @@
   .admin-entry-brand-lockup .aziel-os-subtitle {
     white-space: normal;
     text-align: left;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .aziel-os-svg-mark * {
-    transition: none !important;
   }
 }

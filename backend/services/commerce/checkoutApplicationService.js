@@ -17,6 +17,7 @@ const {
 const {
     createOrderSnapshot: createRuntimeOrderSnapshot
 } = require("./orderSnapshotRuntime");
+const { inputContractForProduct, gameFamilyForProduct } = require("./canonicalGameInputContract");
 
 const CHECKOUT_APPLICATION_SERVICE_VERSION = "2.5.4";
 const MAX_ID_LENGTH = 200;
@@ -523,7 +524,25 @@ async function validateFulfilment(quote, context, deps) {
         customerInput: context.normalized.customerInput,
         transactionContext: context.transactionContext
     }), ERROR_CODES.INVALID_FULFILMENT_INPUT, "fulfilment");
-    return result.normalisedFulfilmentInput || result.normalizedFulfilmentInput || result.fulfilmentInput || context.normalized.customerInput;
+    const normalized = result.normalisedFulfilmentInput || result.normalizedFulfilmentInput || result.fulfilmentInput || context.normalized.customerInput;
+    const gameAccount = normalized.gameAccount || normalized;
+    const productCode = quote?.packageSnapshot?.gameCode || quote?.packageSnapshot?.productCode || quote?.request?.productCode || "";
+    const contract = inputContractForProduct(productCode);
+    if (contract) {
+        const accountFields = Array.isArray(gameAccount.accountFields) ? gameAccount.accountFields : [];
+        const value = key => normalizeString(gameAccount[key] || accountFields.find(field => normalizeString(field?.key) === key)?.value);
+        for (const key of contract.required) {
+            if (!value(key)) throw new CheckoutApplicationError(ERROR_CODES.INVALID_FULFILMENT_INPUT, `${key} is required for ${contract.family}.`, { stage: "fulfilment", metadata: { productCode, field: key } });
+        }
+        const family = gameFamilyForProduct(productCode);
+        if (family === "MLBB" && (!/^\d+$/.test(value("userId")) || !/^\d+$/.test(value("zoneId")))) {
+            throw new CheckoutApplicationError(ERROR_CODES.INVALID_FULFILMENT_INPUT, "MLBB User ID and Zone ID must be numeric.", { stage: "fulfilment", metadata: { productCode } });
+        }
+        if (family === "PUBG" && !/^\d{5,32}$/.test(value("userId"))) {
+            throw new CheckoutApplicationError(ERROR_CODES.INVALID_FULFILMENT_INPUT, "PUBG Player ID must be numeric.", { stage: "fulfilment", metadata: { productCode } });
+        }
+    }
+    return normalized;
 }
 
 function quoteBoundPaymentMethod(quote) {

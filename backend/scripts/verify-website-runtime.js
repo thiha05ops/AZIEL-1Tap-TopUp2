@@ -113,8 +113,8 @@ function verifyAdminWorkspaceAndKernelIntegration() {
     includes("frontend/admin.html", "id=\"section-website\"", "Website workspace section must exist.");
     includes("frontend/admin.html", "Website Workspace", "Website section must present owner-first workspace label.");
     includes("frontend/admin.html", "What do you want to do today?", "Website landing must answer the owner task question.");
-    includes("frontend/admin.html", "Manage Home", "Owner task navigation must expose Manage Home.");
-    includes("frontend/admin.html", "Publish Status", "Owner task navigation must expose Publish Status.");
+    includes("frontend/admin.html", 'data-website-runtime-tab="home"', "Owner task navigation must expose Manage Home.");
+    includes("frontend/admin.html", 'data-website-runtime-tab="configuration" hidden', "Runtime-only draft controls must remain hidden until publication is implemented.");
     includes("frontend/admin.html", "website-runtime-tab--developer", "Developer tabs must remain available without dominating owner navigation.");
     includes("frontend/admin.html", "/js/admin-website-runtime.js", "Website runtime frontend controller must load.");
     includes("frontend/js/admin-app.js", "website:", "Website section title must be registered.");
@@ -191,7 +191,7 @@ function verifyResponsiveAndI18n() {
     includes("frontend/css/admin/admin-design-system.css", ".website-runtime-health-grid", "Runtime health grid must be styled.");
     includes("frontend/css/admin/admin-design-system.css", ".website-runtime-migration-list", "Migration queue must be styled.");
     includes("frontend/css/admin/admin-design-system.css", ".website-runtime-search", "Inventory search must be styled.");
-    includes("frontend/css/admin/admin-design-system.css", "@media (max-width: 768px)", "Mobile responsive ownership must remain.");
+    includes("frontend/css/admin/admin-design-system.css", "@media (max-width: 767px)", "Phone responsive ownership must remain at the established breakpoint.");
     [
         "website",
         "website_sub",

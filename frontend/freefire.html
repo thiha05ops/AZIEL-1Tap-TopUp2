@@ -13,18 +13,17 @@
     <meta property="og:description"
         content="Free Fire diamond top-up service with clear checkout pricing, payment choices, and AZIEL order tracking.">
     <meta property="og:url" content="https://azielplay.com/freefire.html">
-    <meta property="og:image" content="https://azielplay.com/assets/logo/aziel-wordmark.webp">
+    <meta property="og:image" content="https://azielplay.com/assets/brand/og-image.png">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Free Fire Diamonds Top Up | AZIEL 1Tap Shop">
     <meta name="twitter:description"
         content="Free Fire diamond top-up service with clear checkout pricing, payment choices, and AZIEL order tracking.">
-    <meta name="twitter:image" content="https://azielplay.com/assets/logo/aziel-wordmark.webp">
+    <meta name="twitter:image" content="https://azielplay.com/assets/brand/og-image.png">
     <script
         type="application/ld+json">{"@context":"https://schema.org","@type":"Service","name":"Free Fire top-up service","provider":{"@type":"Organization","name":"AZIEL 1Tap Shop","url":"https://azielplay.com"},"areaServed":["Myanmar","Thailand"],"serviceType":"Digital top-up service","url":"https://azielplay.com/freefire.html"}</script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <link rel="manifest" href="/manifest.json">
-    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="AZIEL">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
@@ -41,9 +40,10 @@
     <script src="/js/product-detail-stage.js?v=20260809-readiness-presentation" defer></script>
     <meta name="theme-color" content="#070716">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="icon" type="image/x-icon" href="/assets/icons/favicon.ico">
-    <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/assets/icons/favicon-16.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/assets/brand/favicon-16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/brand/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="48x48" href="/assets/brand/favicon-48.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/brand/apple-touch-icon.png">
 </head>
 
 <body>
@@ -56,7 +56,7 @@
 
                 <div class="banner-overlay">
                     <span class="game-tag" data-i18n="mobileGame">Mobile Game</span>
-                    <h1 data-i18n="freeFire">Free Fire</h1>
+                    <h1 data-freefire-product-name>Free Fire Diamonds</h1>
                     <p data-i18n="freefireHeroDescription">
                         Fast and secure diamond top up for Myanmar and Thailand players.
                     </p>
@@ -68,12 +68,12 @@
 
                 <div class="step-row">
                     <span>1</span>
-                    <p data-i18n="stepFreefirePlayerId">Enter your Free Fire Player ID.</p>
+                    <p>Enter your User ID.</p>
                 </div>
 
                 <div class="step-row">
                     <span>2</span>
-                    <p data-i18n="stepFreefirePackage">Select your diamond package.</p>
+                    <p data-freefire-package-instruction>Select your diamond package.</p>
                 </div>
 
                 <div class="step-row">
@@ -90,6 +90,7 @@
                     <span data-i18n="freefireTrust">⚡ Fast diamond delivery • 🔒 Secure payment • 📦 Order
                         tracking</span>
                 </div>
+                <p>Check your User ID carefully before checkout.</p>
             </div>
         </section>
 
@@ -101,9 +102,8 @@
                         <h2 data-i18n="accountInformation">Account Information</h2>
                     </div>
 
-                    <label for="userId" data-i18n="playerId">Player ID</label>
-                    <input type="text" id="userId" data-i18n-placeholder="enterFreefirePlayerId"
-                        placeholder="Enter Free Fire Player ID">
+                    <label for="userId">User ID</label>
+                    <input type="text" id="userId" placeholder="Enter User ID">
                 </div>
 
                 <div class="form-card">
@@ -146,7 +146,7 @@
 
                 <div class="summary-line">
                     <span data-i18n="game">Game</span>
-                    <b data-i18n="freeFire">Free Fire</b>
+                    <b data-freefire-product-name>Free Fire Diamonds</b>
                 </div>
 
                 <div class="summary-line">
@@ -208,7 +208,7 @@
                 <p><b><span data-i18n="package">Package</span>:</b> <span id="modalPackage"></span></p>
                 <p><b><span data-i18n="amount">Amount</span>:</b> <span id="modalAmount"></span></p>
                 <p><b><span data-i18n="payment">Payment</span>:</b> <span id="modalPayment"></span></p>
-                <p><b><span data-i18n="playerId">Player ID</span>:</b> <span id="modalUserId"></span></p>
+                <p><b><span>User ID</span>:</b> <span id="modalUserId"></span></p>
             </div>
 
             <div class="payment-modal-qr">
@@ -306,7 +306,8 @@
     <script src="/js/payment/payment-manual.js?v=20260723-close-event"></script>
     <script src="/js/payment/payment-engine.js?v=20260707-v3"></script>
 
-    <script src="/js/freefire.js?v=20260707-v3"></script>
+    <script src="/js/canonical-game-input-contracts.js?v=20260826-input-authority"></script>
+    <script src="/js/freefire.js?v=20260826-input-authority"></script>
 
     <script src="/js/live-chat.js"></script>
     <script src="/js/pwa-fix.js?v=20260723-context-bank-runtime"></script>

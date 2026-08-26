@@ -124,7 +124,11 @@
             paymentType: type
         }));
         const attemptId = session?.attemptId || session?.manualPaymentAttemptId || "";
-        window.location.href = `payment.html${attemptId ? `?attemptId=${encodeURIComponent(attemptId)}` : ""}`;
+        const orderId = session?.commerceOrderId || session?.orderId || orderData?.commerceOrderId || orderData?.orderId || "";
+        const params = new URLSearchParams();
+        if (orderId) params.set("orderId", orderId);
+        if (attemptId) params.set("attemptId", attemptId);
+        window.location.href = `payment.html${params.toString() ? `?${params.toString()}` : ""}`;
     }
 
     async function start(orderData) {

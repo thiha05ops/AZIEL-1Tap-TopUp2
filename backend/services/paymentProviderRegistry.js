@@ -10,7 +10,7 @@ const PROVIDERS = Object.freeze({
     ayapay: { key: "ayapay", label: "AYA Pay", region: "MM", logo: "/assets/payment/ayapay.png" },
     mmqr: { key: "mmqr", label: "MMQR", region: "MM", logo: "/assets/payment/payment-neutral.svg" },
     manual_bank: { key: "manual_bank", label: "Manual Bank Transfer", region: "MM", logo: "/assets/payment/bank-neutral.svg" },
-    wallet: { key: "wallet", label: "AZIEL Wallet", region: "GLOBAL", logo: "/assets/logo.png" }
+    wallet: { key: "wallet", label: "AZIEL Wallet", region: "GLOBAL", logo: "/assets/brand/aziel-icon.svg" }
 });
 
 const ALIASES = Object.freeze({

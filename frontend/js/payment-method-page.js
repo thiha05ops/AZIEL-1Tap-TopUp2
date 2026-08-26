@@ -2,6 +2,7 @@
     const t = (key, fallback, params) => window.AZIEL_LOCALE?.t?.(key, fallback, params) || fallback;
     const DRAFT_KEY = "azielProductCheckoutDraft";
     const PAYMENT_SESSION_KEY = "azielPaymentPageSession";
+    const authority = window.AZIEL_PAYMENT_SESSION_AUTHORITY;
     let draft = null;
     let activeTransaction = null;
     let submitting = false;
@@ -26,10 +27,13 @@
     async function continueToPayment() {
         const payment = window.selectedPaymentData;
         if (submitting || !payment?.key) return;
-        if (activeTransaction?.session?.attemptId) {
+        if (activeTransaction?.session?.attemptId && authority?.stagedSessionMatchesDraft(activeTransaction, draft)) {
             const activeKey = activeTransaction.selectedPayment?.key || activeTransaction.session?.paymentMethod;
             if (activeKey && payment.key !== activeKey) { update(); return; }
-            window.location.href = `payment.html?attemptId=${encodeURIComponent(activeTransaction.session.attemptId)}`;
+            const orderId = authority?.orderId(activeTransaction) || "";
+            const params = new URLSearchParams({ attemptId: activeTransaction.session.attemptId });
+            if (orderId) params.set("orderId", orderId);
+            window.location.href = `payment.html?${params.toString()}`;
             return;
         }
         if (!draft?.review?.quoteId) return;
@@ -54,12 +58,18 @@
     document.addEventListener("DOMContentLoaded", () => {
         try { draft = JSON.parse(sessionStorage.getItem(DRAFT_KEY) || "null"); } catch (_) { draft = null; }
         try { activeTransaction = JSON.parse(sessionStorage.getItem(PAYMENT_SESSION_KEY) || "null"); } catch (_) { activeTransaction = null; }
+        if (draft?.review?.quoteId && !authority?.stagedSessionMatchesDraft(activeTransaction, draft)) {
+            activeTransaction = null;
+            sessionStorage.removeItem(PAYMENT_SESSION_KEY);
+        }
         if (!draft?.order && !activeTransaction?.orderData) { window.location.replace("checkout.html"); return; }
-        if (activeTransaction?.orderData) draft = { ...draft, order: activeTransaction.orderData, review: draft?.review || {} };
+        if (activeTransaction?.orderData && authority?.stagedSessionMatchesDraft(activeTransaction, draft)) {
+            draft = { ...draft, order: activeTransaction.orderData, review: draft?.review || {} };
+        }
         document.getElementById("methodProduct").textContent = draft.order.game;
         document.getElementById("methodPackage").textContent = draft.order.packageName;
         document.getElementById("methodTotal").textContent = money(draft.review.pricing?.quotedTotalAmount, draft.review.pricing?.currency);
-        if (activeTransaction?.session) {
+        if (activeTransaction?.session && authority?.stagedSessionMatchesDraft(activeTransaction, draft)) {
             document.getElementById("methodTotal").textContent = money(activeTransaction.session.amount, activeTransaction.session.currency);
             document.getElementById("methodFeedback").textContent = t("payment.activeReady", "An active payment is ready to resume.");
         }

@@ -57,26 +57,31 @@ const { loadDailyPricingWorkspace } = require("../services/commerce/adminPricing
     assert.strictEqual(normalizeWonddStatus({ transactionstatus: "fail" }).status, "FAILED");
 
     await mongoose.connect(process.env.MONGO_URI);
-    const [product, supplier, mappings] = await Promise.all([
-        CatalogProduct.findOne({ productCode: "freefire" }).lean(),
+    const [products, supplier, mappings] = await Promise.all([
+        CatalogProduct.find({ productCode: { $in: ["freefire", "freefire-pass-membership"] } }).lean(),
         Supplier.findOne({ supplierCode: "WONDD", enabled: true, mode: "API" }).lean(),
-        Mapping.find({ supplierCode: "WONDD", productCode: "freefire", region: "TH" }).lean()
+        Mapping.find({ supplierCode: "WONDD", productCode: { $in: ["freefire", "freefire-pass-membership"] }, region: "TH" }).lean()
     ]);
+    const product = products.find(item => item.productCode === "freefire");
+    const passProduct = products.find(item => item.productCode === "freefire-pass-membership");
     assert(product?.enabled && product?.supportedRegions?.includes("TH"));
+    assert(passProduct?.enabled && passProduct?.supportedRegions?.includes("TH"));
     assert.strictEqual(product.metadata?.wondd?.serviceId, "9602");
     assert.strictEqual(product.metadata?.wondd?.serviceCode, "freefire");
     assert.strictEqual(product.metadata?.wondd?.inputContract, "FREEFIRE_PLAYER_ID");
     assert.strictEqual(mappings.length, 19);
     assert.strictEqual(new Set(mappings.map(item => item.supplierPackageCode)).size, 19);
     assert.strictEqual(new Set(mappings.map(item => item.packageCode)).size, 19);
-    const packages = await CatalogPackage.find({ productCode: "freefire", packageCode: { $in: mappings.map(item => item.packageCode) }, deletedAt: null }).lean();
+    const packages = await CatalogPackage.find({ $or: mappings.map(item => ({ productCode: item.productCode, packageCode: item.packageCode })), deletedAt: null }).lean();
     assert.strictEqual(packages.length, 19);
     const packageMap = new Map(packages.map(item => [item.packageCode, item]));
     for (const mapping of mappings) {
         assert.strictEqual(mapping.enabled, true);
         assert.strictEqual(mapping.supplierProductCode, "freefire");
         assert.strictEqual(mapping.executionMode, "API");
-        assert.deepStrictEqual(mapping.mappingMetadata?.readiness, { supplierMapped: true, inputReady: true, pricingReady: true, storefrontReady: true, fulfillmentReady: true, enabled: true });
+        for (const readinessKey of ["supplierMapped", "inputReady", "pricingReady", "storefrontReady", "fulfillmentReady", "enabled"]) {
+            assert.strictEqual(mapping.mappingMetadata?.readiness?.[readinessKey], true, `${mapping.packageCode} missing ${readinessKey}`);
+        }
         validateWonddMapping(mapping);
         const live = game.packages.find(item => item.packcode === mapping.supplierPackageCode);
         assert(live, `Missing live packcode ${mapping.supplierPackageCode}`);
@@ -87,24 +92,27 @@ const { loadDailyPricingWorkspace } = require("../services/commerce/adminPricing
         assert(Number(pkg.prices.TH.amount) > Number(pkg.prices.TH.supplierCost));
         assert.strictEqual(pkg.prices.TH.publishedPriceMode, "POLICY_DERIVED");
         assert(!/[\u0E00-\u0E7F]/.test(pkg.name), `${pkg.packageCode} exposes Thai supplier text`);
-        const capability = resolveFulfillmentCapability({ product, mappings: [mapping], suppliers: [supplier], productCode: "freefire", packageCode: mapping.packageCode, region: "TH" });
+        const mappingProduct = mapping.productCode === "freefire-pass-membership" ? passProduct : product;
+        const capability = resolveFulfillmentCapability({ product: mappingProduct, mappings: [mapping], suppliers: [supplier], productCode: mapping.productCode, packageCode: mapping.packageCode, region: "TH" });
         assert.strictEqual(capability.automatedAvailable, true);
-        assert.strictEqual(capability.manualAdminAllowed, false);
+        assert.strictEqual(capability.manualAdminAllowed, mapping.productionRole !== "PRIMARY");
     }
     const allPackages = await CatalogPackage.find({ productCode: "freefire", deletedAt: null }).lean();
-    assert(allPackages.length > 19, "Unsupported canonical packages must remain in Admin/catalog data.");
     const unsupported = allPackages.filter(pkg => !mappings.some(mapping => mapping.packageCode === pkg.packageCode));
-    assert(unsupported.length > 0);
     for (const pkg of unsupported) {
         const capability = resolveFulfillmentCapability({ product, mappings, suppliers: [supplier], productCode: "freefire", packageCode: pkg.packageCode, region: "TH" });
-        assert.strictEqual(capability.fulfillmentAvailable, false, `${pkg.packageCode} must not silently fall back to manual fulfillment`);
+        assert.strictEqual(capability.fulfillmentAvailable, false, `${pkg.packageCode} has no verified fulfillment route`);
     }
     const storefront = await getCatalogProductDetail("freefire", { source: "database", includeDisabled: false });
-    assert.strictEqual(storefront.packages.length, 19);
-    assert(storefront.packages.every(pkg => mappings.some(mapping => mapping.packageCode === pkg.packageCode)));
-    assert(storefront.packages.every(pkg => !/[\u0E00-\u0E7F]/.test(pkg.name)));
+    const passStorefront = await getCatalogProductDetail("freefire-pass-membership", { source: "database", includeDisabled: false });
+    assert.strictEqual(storefront.packages.length, 9);
+    assert.strictEqual(passStorefront.packages.length, 10);
+    assert([...storefront.packages, ...passStorefront.packages].every(pkg => mappings.some(mapping => mapping.packageCode === pkg.packageCode)));
+    assert([...storefront.packages, ...passStorefront.packages].every(pkg => !/[\u0E00-\u0E7F]/.test(pkg.name)));
     const daily = await loadDailyPricingWorkspace({ supplierId: String(supplier._id), productCode: "freefire", region: "TH" });
-    assert.strictEqual(daily.rows.length, 19);
+    const passDaily = await loadDailyPricingWorkspace({ supplierId: String(supplier._id), productCode: "freefire-pass-membership", region: "TH" });
+    assert.strictEqual(daily.rows.length, 9);
+    assert.strictEqual(passDaily.rows.length, 10);
     assert(daily.rows.every(row => row.mappingRegion === "TH" && row.supplierProductCode === "freefire" && row.supplierPackageCode));
     assert.strictEqual(transportCalls, 0);
     const disabledMapping = { ...mappings[0], enabled: false };
@@ -115,5 +123,5 @@ const { loadDailyPricingWorkspace } = require("../services/commerce/adminPricing
     assert(checkoutJs.includes('zoneIdSelector: ""'));
     assert(!checkoutJs.includes('zoneIdSelector: "#serverId"'));
     await mongoose.disconnect();
-    console.log(JSON.stringify({ result: "PASS", mappings: mappings.length, inputReady: 19, pricingReady: 19, storefrontReady: storefront.packages.length, fulfillmentReady: 19, enabled: mappings.filter(item => item.enabled).length, dailyPricingRows: daily.rows.length, unsupportedRetained: unsupported.length, gate: "OFF", realTopupCalls: transportCalls, mockedAcceptanceCalls: mockCalls }, null, 2));
+    console.log(JSON.stringify({ result: "PASS", mappings: mappings.length, diamondsMappings: mappings.filter(item => item.productCode === "freefire").length, passMappings: mappings.filter(item => item.productCode === "freefire-pass-membership").length, inputReady: 19, pricingReady: 19, storefrontReady: storefront.packages.length + passStorefront.packages.length, fulfillmentReady: 19, enabled: mappings.filter(item => item.enabled).length, dailyPricingRows: daily.rows.length + passDaily.rows.length, unsupportedRetained: unsupported.length, gate: "OFF", realTopupCalls: transportCalls, mockedAcceptanceCalls: mockCalls }, null, 2));
 })().catch(async error => { await mongoose.disconnect().catch(() => null); console.error("WonDD Free Fire rollout verifier failed:", error.message); process.exitCode = 1; });

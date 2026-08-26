@@ -9,9 +9,12 @@ const {
     PromotionResolverError
 } = require("./promotionResolver");
 const { CURRENCY, REGION } = require("../../constants/commerce");
+const {
+    finalizeCustomerPayableAmount
+} = require("./customerPayableAmountService");
 
-const QUOTE_RUNTIME_VERSION = "2.4.1";
-const QUOTE_SPECIFICATION_VERSION = "2.4.0";
+const QUOTE_RUNTIME_VERSION = "2.4.2";
+const QUOTE_SPECIFICATION_VERSION = "2.4.1";
 const DEFAULT_PAYLOAD_VERSION = "commerce.quote.v1";
 const DEFAULT_INTEGRITY_ALGORITHM = "canonical-json-sha256-deferred";
 const MAX_SAFE_AMOUNT = 1_000_000_000_000;
@@ -314,8 +317,9 @@ function runPricingCalculation(pricingInput) {
         return calculateBasePrice(pricingInput);
     } catch (error) {
         if (error instanceof CommerceCalculationError) {
-            throw new PricingQuoteRuntimeError(ERROR_CODES.PRICING_CALCULATION_FAILED, "Base pricing calculation failed.", {
+            throw new PricingQuoteRuntimeError(ERROR_CODES.PRICING_CALCULATION_FAILED, `Base pricing calculation failed: ${error.message}`, {
                 code: error.code,
+                message: error.message,
                 details: error.details
             });
         }
@@ -553,7 +557,13 @@ function createPricingQuote(input) {
         ? normalizeAmount(promotionResult.candidateFinalPrice, "quotedUnitPrice")
         : originalPrice;
     const quantity = packageSnapshot.quantity;
-    const quotedTotalAmount = normalizeAmount(quotedUnitPrice * quantity, "quotedTotalAmount");
+    // Pricing and promotion calculations retain internal precision. The quote is
+    // the single settlement boundary: every downstream order, payment attempt,
+    // provider payload and customer display consumes this finalized total.
+    const quotedTotalAmount = finalizeCustomerPayableAmount(
+        normalizeAmount(quotedUnitPrice * quantity, "quotedTotalAmount"),
+        currency
+    );
     validateFinalAmounts(quotedUnitPrice, quantity, quotedTotalAmount);
 
     const warnings = [];

@@ -1296,7 +1296,7 @@ function getAdminPaymentLogo(method = {}) {
         ayapay: "/assets/payment/ayapay.png",
         mmqr: "/assets/payment/payment-neutral.svg",
         manual_bank: "/assets/payment/bank-neutral.svg",
-        wallet: "/assets/logo.png"
+        wallet: "/assets/brand/aziel-icon.svg"
     };
     return logos[key] || "/assets/payment/payment-neutral.svg";
 }

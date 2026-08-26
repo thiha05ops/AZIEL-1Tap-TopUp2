@@ -13,6 +13,7 @@ const {
     listMappings,
     listSuppliers,
     resolveFulfillment,
+    setMappingProductionRole,
     startManualAdminFulfillment,
     startFulfillmentForOrder,
     updateMapping,
@@ -102,6 +103,15 @@ router.get("/admin/supplier-mappings", adminMiddleware, requireAdminPermission(P
     try {
         const mappings = await listMappings(req.query);
         return res.json({ success: true, mappings });
+    } catch (error) {
+        return sendFulfillmentError(res, error);
+    }
+});
+
+router.patch("/admin/supplier-mappings/:mappingId/production-role", adminMiddleware, requireAdminPermission(PERMISSIONS.OWNER_ROUTING_MANAGE), async (req, res) => {
+    try {
+        const mapping = await setMappingProductionRole(req.params.mappingId, req.body?.productionRole, { admin: req.admin, req });
+        return res.json({ success: true, mapping });
     } catch (error) {
         return sendFulfillmentError(res, error);
     }

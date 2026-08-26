@@ -293,7 +293,7 @@ function renderHeaderNav() {
     nav.innerHTML = `
         <div class="az-mobile-drawer-head">
             <div class="az-mobile-drawer-brand" aria-hidden="true">
-                <img src="/assets/logo/aziel-wordmark.webp" alt="AZIEL">
+                <img src="/assets/brand/aziel-logo-primary.svg" alt="AZIEL">
             </div>
             <button class="az-mobile-drawer-close" type="button" aria-label="Close menu">
                 <i class="fa-solid fa-xmark" aria-hidden="true"></i>

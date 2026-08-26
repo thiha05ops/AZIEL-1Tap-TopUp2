@@ -194,7 +194,7 @@ function getWalletMethod(region) {
         enabled: true,
         paymentType: "wallet",
         provider: "wallet",
-        logo: "assets/logo.png",
+        logo: "/assets/brand/aziel-icon.svg",
         accountName: "",
         accountNumber: "",
         maintenanceMessage: "Pay instantly using your AZIEL wallet balance."
@@ -539,7 +539,7 @@ function getPaymentLogo(key) {
         krungthai: "assets/payment/bank-neutral.svg",
         mmqr: "assets/payment/payment-neutral.svg",
         manualbank: "assets/payment/bank-neutral.svg",
-        wallet: "assets/logo.png"
+        wallet: "/assets/brand/aziel-icon.svg"
     };
 
     return logos[normalizePaymentKey(key)] || "assets/payment/payment-neutral.svg";
