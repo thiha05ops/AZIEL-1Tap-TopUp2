@@ -241,18 +241,7 @@ function configureApplication(mongoConnection) {
             });
         }
 
-        console.log("API error:", {
-            name: err?.name,
-            message: err?.message,
-            code: err?.code,
-            status: err?.status,
-            oauthError: err?.oauthError
-                ? {
-                    statusCode: err.oauthError.statusCode,
-                    data: err.oauthError.data
-                }
-                : null
-        });
+        console.log("API error:", err);
 
         return res.status(500).json({
             success: false,
