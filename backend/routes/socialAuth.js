@@ -44,7 +44,12 @@ router.get(
                 ? String(req.query.code).slice(-8)
                 : null,
             error: req.query.error || null,
-            userAgent: req.get("user-agent") || null
+            userAgent: req.get("user-agent") || null,
+            requestId: req.get("x-request-id") || null,
+            purpose: req.get("purpose") || null,
+            secPurpose: req.get("sec-purpose") || null,
+            referer: req.get("referer") || null,
+            timestamp: Date.now()
         });
 
         next();
