@@ -1379,11 +1379,16 @@
 
 @media (max-width: 768px) {
 
+  .az-product-detail .game-page {
+    padding-right: max(16px, env(safe-area-inset-right)) !important;
+    padding-left: max(16px, env(safe-area-inset-left)) !important;
+  }
+
   .az-product-detail .order-layout,
   .az-product-detail .product-lower-info,
   .az-product-detail .product-information-grid,
   .az-product-detail .game-mini-footer {
-    width: calc(100% - 24px) !important;
+    width: 100% !important;
     max-width: none !important;
   }
 
@@ -1396,8 +1401,45 @@
   }
 
   .az-product-detail #packages {
+    display: block !important;
+  }
+
+  .az-product-detail .package-family-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: 8px !important;
+    gap: 10px !important;
+  }
+
+  .az-product-detail .pack {
+    min-height: 104px !important;
+    grid-template-rows: auto minmax(0, 1fr) auto !important;
+    align-items: start !important;
+    align-content: start !important;
+  }
+
+  .az-product-detail .pack-icon {
+    grid-row: 1 / -1 !important;
+    align-self: start;
+  }
+
+  .az-product-detail .pack-info {
+    grid-row: 1;
+    display: grid;
+    align-content: start;
+    gap: 5px;
+  }
+
+  .az-product-detail .pack-price-block {
+    width: 100%;
+    margin-top: 8px;
+    grid-row: 3;
+    align-self: end;
+    justify-self: stretch;
+    justify-content: flex-end;
+    text-align: right;
+  }
+
+  .az-product-detail .pack-price {
+    margin-left: auto;
   }
 
   .az-product-detail #packages > .pack {

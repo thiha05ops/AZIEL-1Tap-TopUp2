@@ -25,6 +25,11 @@ let walletPaymentMethodsGeneration = 0;
 
 const AUTO_QR_METHODS = ["promptpay"];
 
+const WALLET_PRESENTATION_BY_REGION = Object.freeze({
+    TH: Object.freeze({ minimum: 100, presets: [100, 300, 500, 1000], prefix: "฿", suffix: "THB" }),
+    MM: Object.freeze({ minimum: 1000, presets: [1000, 3000, 5000, 10000], prefix: "Ks", suffix: "Ks" })
+});
+
 function wt(key, fallback = "") {
     if (window.AZIEL_I18N?.t) return window.AZIEL_I18N.t(key, fallback);
     return fallback || key;
@@ -86,6 +91,7 @@ function bindWalletEvents() {
     window.addEventListener("aziel:walletChanged", renderWalletFromState);
 
     window.addEventListener("aziel:shopRegionChanged", async () => {
+        updateWalletAmountPresentation();
         await loadWalletPaymentMethods();
         await loadWallet();
         updateTopupButtonByMethod();
@@ -126,6 +132,56 @@ function getWalletSymbol() {
     return AZIEL.getShopSymbol?.() ||
         AZIEL.getSymbol?.() ||
         (getWalletCurrency() === "THB" ? "฿" : "Ks");
+}
+
+function getWalletPresentation() {
+    return WALLET_PRESENTATION_BY_REGION[getWalletRegion()] || WALLET_PRESENTATION_BY_REGION.MM;
+}
+
+function formatWalletMinimum(config = getWalletPresentation()) {
+    const amount = Number(config.minimum).toLocaleString();
+    return getWalletRegion() === "TH" ? `฿${amount}` : `${amount} Ks`;
+}
+
+function updateWalletAmountPresentation() {
+    const config = getWalletPresentation();
+    const input = document.getElementById("topupAmount");
+    const prefix = document.getElementById("walletAmountPrefix");
+    const hint = document.getElementById("walletMinimumHint");
+    const buttons = [...document.querySelectorAll(".quick-amounts button")];
+
+    if (input) input.min = String(config.minimum);
+    if (prefix) prefix.textContent = config.prefix;
+    if (hint) hint.textContent = `Minimum top-up ${formatWalletMinimum(config)}`;
+    buttons.forEach((button, index) => {
+        const amount = config.presets[index];
+        if (!amount) return;
+        button.dataset.amount = String(amount);
+        button.textContent = Number(amount).toLocaleString();
+    });
+    syncWalletAmountControl({ showValidation: false });
+}
+
+function syncWalletAmountControl({ showValidation = true } = {}) {
+    const config = getWalletPresentation();
+    const input = document.getElementById("topupAmount");
+    const validation = document.getElementById("walletAmountValidation");
+    const buttons = [...document.querySelectorAll(".quick-amounts button")];
+    if (!input) return false;
+
+    const amount = Number(input.value);
+    buttons.forEach(button => {
+        button.classList.toggle("active", input.value !== "" && Number(button.dataset.amount) === amount);
+    });
+
+    const valid = Number.isFinite(amount) && amount >= config.minimum;
+    input.setAttribute("aria-invalid", String(input.value !== "" && !valid));
+    if (validation) {
+        validation.textContent = showValidation && input.value !== "" && !valid
+            ? `Minimum top-up amount is ${formatWalletMinimum(config)}.`
+            : "";
+    }
+    return valid;
 }
 
 function normalizePaymentKey(value) {
@@ -738,15 +794,13 @@ function initQuickAmounts() {
 
     buttons.forEach(btn => {
         btn.addEventListener("click", () => {
-            buttons.forEach(b => b.classList.remove("active"));
-            btn.classList.add("active");
             input.value = btn.dataset.amount || "";
+            syncWalletAmountControl();
         });
     });
 
-    input.addEventListener("input", () => {
-        buttons.forEach(b => b.classList.remove("active"));
-    });
+    input.addEventListener("input", () => syncWalletAmountControl());
+    updateWalletAmountPresentation();
 }
 
 function bindPaymentMethodUI() {
@@ -816,8 +870,14 @@ async function submitTopup() {
     const currency = getWalletCurrency();
     const region = getWalletRegion();
 
-    if (!amount || amount <= 0) {
-        showWalletToast(wt("enterAmountAlert", "Please enter amount."), "error");
+    if (!syncWalletAmountControl()) {
+        const config = getWalletPresentation();
+        showWalletToast(
+            document.getElementById("topupAmount")?.value
+                ? `Minimum top-up amount is ${formatWalletMinimum(config)}.`
+                : wt("enterAmountAlert", "Please enter amount."),
+            "error"
+        );
         return;
     }
 
@@ -1376,6 +1436,7 @@ function resetTopupForm() {
     quickBtns.forEach(btn => btn.classList.remove("active"));
     payCards.forEach(card => card.classList.remove("active"));
 
+    syncWalletAmountControl({ showValidation: false });
     updateTopupButtonByMethod();
 }
 

@@ -20,7 +20,7 @@
     <link rel="stylesheet" href="/css/core/components.css">
     <link rel="stylesheet" href="/css/game/payment-grid.css?v=20260722-promptpay-platform">
     <link rel="stylesheet" href="/css/payment/payment-checkout-sheet.css?v=20260722-promptpay-platform">
-    <link rel="stylesheet" href="/css/account/wallet.css">
+    <link rel="stylesheet" href="/css/account/wallet.css?v=20260827-mobile-amount-ui">
     <link rel="stylesheet" href="/css/support/live-chat.css?v=20260630">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -80,8 +80,14 @@
 
                 <label for="topupAmount" data-i18n="amount">Amount</label>
 
-                <input type="number" id="topupAmount" placeholder="Enter amount" data-i18n-placeholder="enterAmount"
-                    min="1">
+                <div class="wallet-amount-control">
+                    <span id="walletAmountPrefix" class="wallet-amount-prefix" aria-hidden="true">Ks</span>
+                    <input type="number" id="topupAmount" placeholder="Enter amount" data-i18n-placeholder="enterAmount"
+                        min="1" inputmode="numeric" aria-describedby="walletMinimumHint walletAmountValidation">
+                </div>
+
+                <p id="walletMinimumHint" class="wallet-minimum-hint">Minimum top-up 1,000 Ks</p>
+                <p id="walletAmountValidation" class="wallet-amount-validation" role="status" aria-live="polite"></p>
 
                 <div class="quick-amounts">
                     <button type="button" data-amount="100">100</button>
@@ -231,7 +237,7 @@
     <script src="/js/ui-feedback.js?v=20260712-m6"></script>
     <script src="/js/payment/android-app-launch.js?v=20260722-open-app"></script>
     <script src="/js/payment/payment-checkout-sheet.js?v=20260723-context-bank-runtime"></script>
-    <script src="/js/wallet.js?v=20260809-g21-explicit"></script>
+    <script src="/js/wallet.js?v=20260827-mobile-amount-ui"></script>
     <script src="/js/live-chat.js?v=202606301"></script>
     <script src="/js/pwa-fix.js?v=20260723-context-bank-runtime"></script>
 

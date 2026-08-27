@@ -227,6 +227,16 @@ body {
     color: var(--text-muted);
 }
 
+.wallet-amount-control {
+    display: contents;
+}
+
+.wallet-amount-prefix,
+.wallet-minimum-hint,
+.wallet-amount-validation {
+    display: none;
+}
+
 .wallet-card input:focus,
 .wallet-card select:focus {
     border-bottom-color: var(--primary);
@@ -1062,17 +1072,49 @@ body {
         padding: 28px 16px 80px !important;
     }
 
+    .wallet-amount-control {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        align-items: center;
+        gap: 12px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .wallet-amount-control:focus-within { border-bottom-color: var(--primary); }
+    .wallet-amount-control input[type="number"] { border-bottom: 0; }
+
+    .wallet-amount-prefix {
+        display: inline;
+        color: var(--text);
+        font-size: 20px;
+        font-weight: 900;
+    }
+
+    .wallet-minimum-hint,
+    .wallet-amount-validation {
+        display: block;
+        margin: 8px 0 0;
+        font-size: 12px;
+        line-height: 1.4;
+        font-weight: 700;
+    }
+
+    .wallet-minimum-hint { color: var(--text-muted); }
+    .wallet-amount-validation { min-height: 17px; color: var(--danger); }
+
     .wallet-title-row {
-        margin-bottom: 30px !important;
+        margin-bottom: 18px !important;
     }
 
     .wallet-title-row h1 {
-        font-size: 42px !important;
+        margin-top: 12px !important;
+        font-size: 38px !important;
         line-height: .95 !important;
         letter-spacing: -2px !important;
     }
 
     .wallet-title-row p {
+        margin-top: 10px !important;
         font-size: 14px !important;
         line-height: 1.55 !important;
     }
@@ -1080,6 +1122,13 @@ body {
     .wallet-balance-top {
         align-items: flex-start !important;
     }
+
+    .wallet-balance-card {
+        padding-bottom: 20px !important;
+        margin-bottom: 22px !important;
+    }
+
+    .wallet-balance-note { margin-top: 10px; font-size: 13px; }
 
     .wallet-balance-top h1 {
         font-size: 46px !important;
@@ -1135,9 +1184,11 @@ body {
     }
 
     .wallet-balance-top {
-        flex-direction: column !important;
-        gap: 18px !important;
+        flex-direction: row !important;
+        gap: 12px !important;
     }
+
+    .wallet-icon { width: 42px !important; height: 42px !important; }
 
     .wallet-balance-top h1 {
         font-size: 42px !important;
