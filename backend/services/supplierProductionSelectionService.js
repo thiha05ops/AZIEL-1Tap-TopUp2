@@ -18,6 +18,14 @@ function gateEnabled(mapping, adapter) {
     try { return adapter?.isAutoFulfillmentEnabled?.(mapping.productCode) === true; } catch { return false; }
 }
 
+function gateBlocker(mapping, adapter) {
+    try {
+        return adapter?.autoFulfillmentGateState?.(mapping.productCode)?.blockerCode === "SUPPLIER_AUTO_FULFILLMENT_DISABLED"
+            ? "SUPPLIER_AUTO_FULFILLMENT_DISABLED"
+            : "PROVIDER_FEATURE_GATE_OFF";
+    } catch { return "PROVIDER_FEATURE_GATE_OFF"; }
+}
+
 async function assessProductionMapping(mappingOrId) {
     const mapping = typeof mappingOrId === "object" && mappingOrId
         ? mappingOrId
@@ -51,7 +59,7 @@ async function assessProductionMapping(mappingOrId) {
     if (!pkg?.enabled || price?.enabled !== true || !Number.isFinite(Number(price?.amount)) || Number(price.amount) <= 0) blockers.push("PRODUCTION_PRICE_NOT_PUBLISHED");
     const adapter = supplier ? getSupplierAdapter(supplier) : null;
     if (mapping.executionMode !== "API" || !adapter?.isConfigured?.()) blockers.push("SUPPLIER_ADAPTER_NOT_READY");
-    if (!gateEnabled(mapping, adapter)) blockers.push("PROVIDER_FEATURE_GATE_OFF");
+    if (!gateEnabled(mapping, adapter)) blockers.push(gateBlocker(mapping, adapter));
     if (supplier?.supplierCode === "FAZERCARDS") {
         const { supportsFazerCardsMapping } = require("./suppliers/fazercardsFulfillmentProcessor");
         if (!supportsFazerCardsMapping(mapping)) blockers.push("FULFILLMENT_PROCESSOR_NOT_READY");

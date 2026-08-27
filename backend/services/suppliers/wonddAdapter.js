@@ -5,6 +5,7 @@ const WONDD_MLBB_SERVICE_CODE = "mlbb";
 const WONDD_FREEFIRE_SERVICE_CODE = "freefire";
 const PLAYER_ID_PATTERN = /^\d+$/;
 const { CONFIRMED_SERVICE_CODES } = require("./wonddCatalogConfig");
+const { effectiveAutoFulfillmentGateState } = require("../../config/supplierAutoFulfillmentGate");
 const ERROR_MAP = Object.freeze({
     E00: { code: "WONDD_DATABASE_ERROR", category: "OPERATIONAL", retryable: true },
     E01: { code: "WONDD_ACCOUNT_CONFIGURATION_ERROR", category: "CONFIGURATION", retryable: false },
@@ -39,11 +40,17 @@ function createWonddAdapter(options = {}) {
     const isConfigured = () => Boolean(credentials().username && credentials().password);
     const isMlbbAutoFulfillmentEnabled = () => clean(env.WONDD_MLBB_AUTO_FULFILLMENT_ENABLED).toLowerCase() === "true";
     const isFreefireAutoFulfillmentEnabled = () => clean(env.WONDD_FREEFIRE_AUTO_FULFILLMENT_ENABLED).toLowerCase() === "true";
-    const isAutoFulfillmentEnabled = productCode => {
+    const isProductAutoFulfillmentEnabled = productCode => {
         const product = clean(productCode).toLowerCase();
         if (product === "mlbb" && isMlbbAutoFulfillmentEnabled()) return true;
         if (product === "freefire") return isFreefireAutoFulfillmentEnabled();
         return clean(env.WONDD_AUTO_FULFILLMENT_ENABLED_PRODUCTS).toLowerCase().split(",").map(item => item.trim()).filter(Boolean).includes(product);
+    };
+    const autoFulfillmentGateState = productCode => effectiveAutoFulfillmentGateState({ supplierCode: "WONDD", productGateEnabled: isProductAutoFulfillmentEnabled(productCode), env });
+    const isAutoFulfillmentEnabled = productCode => autoFulfillmentGateState(productCode).effectiveGateEnabled;
+    const hasAnyAutoFulfillmentEnabled = () => {
+        const products = ["mlbb", "freefire", ...clean(env.WONDD_AUTO_FULFILLMENT_ENABLED_PRODUCTS).toLowerCase().split(",").map(item => item.trim()).filter(Boolean)];
+        return [...new Set(products)].some(isAutoFulfillmentEnabled);
     };
 
     async function postWonDD(params = {}, requestOptions = {}) {
@@ -94,7 +101,8 @@ function createWonddAdapter(options = {}) {
     async function submitTopup(input = {}) {
         const payload = buildTopupPayload(input);
         const productCode = clean(input.productCode || Object.keys(CONFIRMED_SERVICE_CODES).find(key => CONFIRMED_SERVICE_CODES[key].toLowerCase() === clean(input.serviceCode).toLowerCase()));
-        if (!isAutoFulfillmentEnabled(productCode)) throw new WonddAdapterError("WONDD_AUTO_FULFILLMENT_DISABLED", "Live WonDD fulfillment is disabled for this product.", { category: "CONFIGURATION" });
+        const gate = autoFulfillmentGateState(productCode);
+        if (!gate.effectiveGateEnabled) throw new WonddAdapterError(gate.blockerCode === "SUPPLIER_AUTO_FULFILLMENT_DISABLED" ? gate.blockerCode : "WONDD_AUTO_FULFILLMENT_DISABLED", "Live WonDD fulfillment is disabled.", { category: "CONFIGURATION" });
         const response = await postWonDD(payload, { submission: true });
         const failure = normalizeWonddError(response);
         if (failure) return failure;
@@ -111,7 +119,7 @@ function createWonddAdapter(options = {}) {
         return failure || normalizeWonddStatus(response, orderId);
     }
 
-    return { isConfigured, isMlbbAutoFulfillmentEnabled, isFreefireAutoFulfillmentEnabled, isAutoFulfillmentEnabled, getBalance, buildTopupPayload, dryRunTopup, submitTopup, checkStatus };
+    return { isConfigured, isMlbbAutoFulfillmentEnabled, isFreefireAutoFulfillmentEnabled, isProductAutoFulfillmentEnabled, autoFulfillmentGateState, isAutoFulfillmentEnabled, hasAnyAutoFulfillmentEnabled, getBalance, buildTopupPayload, dryRunTopup, submitTopup, checkStatus };
 }
 
 function buildWonddMlbbGameId(userId, zoneId) {

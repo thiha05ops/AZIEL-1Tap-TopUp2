@@ -781,13 +781,17 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
             throw new FulfillmentError("WONDD_PACKAGE_NOT_PRODUCTION_READY", "WonDD package production readiness is incomplete.", 409);
         }
         if (!adapter.isAutoFulfillmentEnabled(mapping.productCode)) {
-            throw new FulfillmentError("WONDD_AUTO_FULFILLMENT_DISABLED", "Live WonDD fulfillment is disabled for this product.", 409);
+            const gate = adapter.autoFulfillmentGateState?.(mapping.productCode);
+            throw new FulfillmentError(gate?.blockerCode === "SUPPLIER_AUTO_FULFILLMENT_DISABLED" ? gate.blockerCode : "WONDD_AUTO_FULFILLMENT_DISABLED", "Live WonDD fulfillment is disabled.", 409);
         }
     }
     if (supplier.supplierCode === "FAZERCARDS") {
         const { validateFazerCardsMapping } = require("./suppliers/fazercardsFulfillmentProcessor");
         try { validateFazerCardsMapping(mapping); } catch (error) { throw new FulfillmentError(error.code || "FAZERCARDS_PACKAGE_NOT_PRODUCTION_READY", error.message, 409); }
-        if (!adapter.isAutoFulfillmentEnabled(mapping.productCode)) throw new FulfillmentError("FAZERCARDS_AUTO_FULFILLMENT_DISABLED", "Live FazerCards PUBG fulfillment is disabled.", 409);
+        if (!adapter.isAutoFulfillmentEnabled(mapping.productCode)) {
+            const gate = adapter.autoFulfillmentGateState?.(mapping.productCode);
+            throw new FulfillmentError(gate?.blockerCode === "SUPPLIER_AUTO_FULFILLMENT_DISABLED" ? gate.blockerCode : "FAZERCARDS_AUTO_FULFILLMENT_DISABLED", "Live FazerCards fulfillment is disabled.", 409);
+        }
     }
 
     const existingActive = await FulfillmentAttempt.findOne({ orderId: order._id, status: { $in: ACTIVE_FULFILLMENT_STATUSES } }).lean();

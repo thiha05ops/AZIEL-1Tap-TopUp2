@@ -50,7 +50,11 @@ function basicCandidateBlockers({ mapping = {}, supplier = {}, pkg = {}, custome
     const price = pkg?.prices?.[market];
     if (!pkg?.enabled || pkg?.deletedAt || price?.enabled !== true || !Number.isFinite(Number(price?.amount)) || Number(price.amount) <= 0) blockers.push("CUSTOMER_MARKET_PRICE_NOT_PUBLISHED");
     if (!adapter?.isConfigured?.()) blockers.push("SUPPLIER_ADAPTER_NOT_READY");
-    if (!gateEnabled(mapping, adapter)) blockers.push("PROVIDER_FEATURE_GATE_OFF");
+    if (!gateEnabled(mapping, adapter)) {
+        let blocker = "PROVIDER_FEATURE_GATE_OFF";
+        try { if (adapter?.autoFulfillmentGateState?.(mapping.productCode)?.blockerCode === "SUPPLIER_AUTO_FULFILLMENT_DISABLED") blocker = "SUPPLIER_AUTO_FULFILLMENT_DISABLED"; } catch { /* fail closed */ }
+        blockers.push(blocker);
+    }
     if (upper(supplier?.supplierCode || mapping.supplierCode) === "FAZERCARDS") {
         const { supportsFazerCardsMapping } = require("./suppliers/fazercardsFulfillmentProcessor");
         if (!supportsFazerCardsMapping(mapping)) blockers.push("FULFILLMENT_PROCESSOR_NOT_READY");

@@ -1,6 +1,7 @@
 const defaultFetch = require("node-fetch");
 const crypto = require("crypto");
 const { sanitizeProviderMetadata } = require("../supplierAdapterRegistry");
+const { effectiveAutoFulfillmentGateState } = require("../../config/supplierAutoFulfillmentGate");
 
 const DEFAULT_BASE_URL = "https://api.fzr.cards/api/v2";
 const clean = value => String(value == null ? "" : value).trim();
@@ -39,10 +40,12 @@ function createFazerCardsAdapter(options = {}) {
     const apiKey = () => clean(env.FAZERCARDS_API_KEY);
     const isConfigured = () => Boolean(apiKey());
     const PRODUCT_GATE_KEYS = Object.freeze({ pubg: "FAZERCARDS_PUBG_AUTO_FULFILLMENT_ENABLED", mlbb: "FAZERCARDS_MLBB_AUTO_FULFILLMENT_ENABLED", freefire: "FAZERCARDS_FREEFIRE_AUTO_FULFILLMENT_ENABLED", hok: "FAZERCARDS_HOK_AUTO_FULFILLMENT_ENABLED", valorant: "FAZERCARDS_VALORANT_AUTO_FULFILLMENT_ENABLED" });
-    const isAutoFulfillmentEnabled = product => {
+    const isProductAutoFulfillmentEnabled = product => {
         const key = PRODUCT_GATE_KEYS[clean(product).toLowerCase()];
         return Boolean(key) && clean(env[key]).toLowerCase() === "true";
     };
+    const autoFulfillmentGateState = product => effectiveAutoFulfillmentGateState({ supplierCode: "FAZERCARDS", productGateEnabled: isProductAutoFulfillmentEnabled(product), env });
+    const isAutoFulfillmentEnabled = product => autoFulfillmentGateState(product).effectiveGateEnabled;
 
     async function request(path, options = {}) {
         if (!isConfigured()) throw new FazerCardsAdapterError("FAZERCARDS_NOT_CONFIGURED", "FazerCards credentials are not configured.", { statusCode: 409 });
@@ -120,7 +123,8 @@ function createFazerCardsAdapter(options = {}) {
     }
 
     async function submitTopup({ categoryId, offerId, fields, idempotencyKey, productCode }) {
-        if (!isAutoFulfillmentEnabled(productCode)) throw new FazerCardsAdapterError("FAZERCARDS_AUTO_FULFILLMENT_DISABLED", "Live FazerCards fulfillment is disabled for this product.", { statusCode: 409 });
+        const gate = autoFulfillmentGateState(productCode);
+        if (!gate.effectiveGateEnabled) throw new FazerCardsAdapterError(gate.blockerCode === "SUPPLIER_AUTO_FULFILLMENT_DISABLED" ? gate.blockerCode : "FAZERCARDS_AUTO_FULFILLMENT_DISABLED", "Live FazerCards fulfillment is disabled.", { statusCode: 409 });
         const orderPayload = buildTopupPayload({ categoryId, offerId, fields });
         if (!clean(idempotencyKey)) throw new FazerCardsAdapterError("FAZERCARDS_IDEMPOTENCY_KEY_REQUIRED", "FazerCards Idempotency-Key is required.", { statusCode: 409 });
         const payload = await request("/topups/order", { method: "POST", body: orderPayload, idempotencyKey: clean(idempotencyKey), submission: true });
@@ -137,7 +141,7 @@ function createFazerCardsAdapter(options = {}) {
         const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
         return crypto.timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(supplied, "hex"));
     }
-    return { isConfigured, isAutoFulfillmentEnabled, getAccount, getBalance, getTopupCategories, getTopupOffers, getOrder, buildValidationPayload, normalizeValidation, validatePlayerId, buildTopupPayload, dryRunTopup, submitTopup, checkStatus, verifyWebhookSignature };
+    return { isConfigured, isProductAutoFulfillmentEnabled, autoFulfillmentGateState, isAutoFulfillmentEnabled, getAccount, getBalance, getTopupCategories, getTopupOffers, getOrder, buildValidationPayload, normalizeValidation, validatePlayerId, buildTopupPayload, dryRunTopup, submitTopup, checkStatus, verifyWebhookSignature };
 }
 
 const adapter = createFazerCardsAdapter();

@@ -143,7 +143,10 @@ function createWonddFulfillmentProcessor(deps = {}) {
     }
 
     async function recoverDue() {
-        if (!adapter.isAutoFulfillmentEnabled("mlbb") && !adapter.isAutoFulfillmentEnabled("freefire") && !String(process.env.WONDD_AUTO_FULFILLMENT_ENABLED_PRODUCTS || "").trim()) return { recovered: 0, disabled: true };
+        const recoveryEnabled = typeof adapter.hasAnyAutoFulfillmentEnabled === "function"
+            ? adapter.hasAnyAutoFulfillmentEnabled()
+            : adapter.isAutoFulfillmentEnabled?.("mlbb") === true || adapter.isAutoFulfillmentEnabled?.("freefire") === true;
+        if (!recoveryEnabled) return { recovered: 0, disabled: true };
         const attempts = await Attempt.find({ supplierCodeSnapshot: "WONDD", status: "IN_PROGRESS", supplierReference: { $ne: "" }, "supplierRequest.submissionState": "ACCEPTED", $or: [{ "supplierRequest.nextRecoveryAt": null }, { "supplierRequest.nextRecoveryAt": { $lte: new Date() } }] }).limit(50);
         attempts.forEach(item => schedule(() => poll(item._id, 0).catch(() => null), 0));
         return { recovered: attempts.length, disabled: false };
