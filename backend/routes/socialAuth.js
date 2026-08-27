@@ -32,11 +32,31 @@ router.get(
 
 router.get(
     "/auth/google/callback",
+
+    (req, res, next) => {
+        console.log("Google callback request:", {
+            method: req.method,
+            path: req.path,
+            host: req.get("host"),
+            protocol: req.protocol,
+            hasCode: Boolean(req.query.code),
+            codeSuffix: req.query.code
+                ? String(req.query.code).slice(-8)
+                : null,
+            error: req.query.error || null,
+            userAgent: req.get("user-agent") || null
+        });
+
+        next();
+    },
+
     googleConfigured,
+
     passport.authenticate("google", {
         failureRedirect: `${getFrontendUrl()}/login.html`,
         session: false
     }),
+
     async (req, res) => {
         try {
             if (!req.user) {
@@ -52,15 +72,24 @@ router.get(
             const params = new URLSearchParams({
                 token: issued.token,
                 username: req.user.username || "",
-                displayName: req.user.displayName || req.user.username || "",
+                displayName:
+                    req.user.displayName ||
+                    req.user.username ||
+                    "",
                 email: req.user.email || "",
                 region: req.user.region || "MM",
                 role: req.user.role || "user"
             });
 
-            return res.redirect(`${getFrontendUrl()}/google-success.html?${params.toString()}`);
+            return res.redirect(
+                `${getFrontendUrl()}/google-success.html?${params.toString()}`
+            );
         } catch (error) {
-            console.log("Google callback error:", error?.message || error);
+            console.log(
+                "Google callback error:",
+                error?.message || error
+            );
+
             return res.redirect(`${getFrontendUrl()}/login.html`);
         }
     }
