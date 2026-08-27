@@ -38,7 +38,10 @@ async function ensurePaidOrderFulfillmentWork(order = {}, options = {}) {
     const routeSnapshot = order.fulfilment?.routeSnapshot || null;
     let capability = null;
     if (routeSnapshot) {
-        if (routeSnapshot.productCode !== identity.productCode || routeSnapshot.packageCode !== identity.packageCode || routeSnapshot.region !== identity.region) return { created: false, reason: "ORDER_ROUTE_SNAPSHOT_MISMATCH", attempt: null };
+        const routeCustomerMarket = Number(routeSnapshot.snapshotVersion) === 2
+            ? String(routeSnapshot.customerMarket || "").trim().toUpperCase()
+            : String(routeSnapshot.region || "").trim().toUpperCase();
+        if (routeSnapshot.productCode !== identity.productCode || routeSnapshot.packageCode !== identity.packageCode || routeCustomerMarket !== identity.region) return { created: false, reason: "ORDER_ROUTE_SNAPSHOT_MISMATCH", attempt: null };
         if (routeSnapshot.routeType === FULFILLMENT_ROUTE_TYPES.SUPPLIER_API) {
             const mappingId = String(routeSnapshot.supplierMappingId || "").trim();
             if (!mappingId) return { created: false, reason: "SUPPLIER_ROUTE_MAPPING_MISSING", attempt: null, routeSnapshot };

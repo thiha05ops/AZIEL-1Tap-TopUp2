@@ -6,6 +6,13 @@
   "scripts": {
     "verify:refresh-supplier-cost-authority": "node backend/scripts/verify-refresh-existing-supplier-cost-authority.js",
     "verify:wallet-paid-auto-fulfillment": "node backend/scripts/verify-wallet-paid-auto-fulfillment.js",
+    "verify:market-decoupled-fulfillment-phase1": "node backend/scripts/verify-market-decoupled-fulfillment-phase1.js",
+    "verify:supplier-fulfillment-eligibility-phase2": "node backend/scripts/verify-supplier-fulfillment-eligibility-phase2.js",
+    "verify:market-decoupled-fulfillment-phase3": "node backend/scripts/verify-market-decoupled-fulfillment-phase3.js",
+    "verify:market-decoupled-fulfillment-phase4": "node backend/scripts/verify-market-decoupled-fulfillment-phase4.js",
+    "pilot:mm-wondd-mlbb-eligibility": "node backend/scripts/migrate-mm-wondd-mlbb-pilot-eligibility.js",
+    "compare:mm-wondd-mlbb-pilot-route": "node backend/scripts/compare-mm-wondd-mlbb-pilot-route.js",
+    "backfill:supplier-fulfillment-eligibility": "node backend/scripts/backfill-supplier-fulfillment-eligibility.js",
     "start": "node backend/server.js",
     "audit:duplicate-emails": "node backend/scripts/audit-duplicate-emails.js",
     "repair:duplicate-email": "node backend/scripts/repair-duplicate-email.js",

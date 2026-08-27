@@ -6,6 +6,34 @@ const SUPPLIER_EXECUTION_MODES = Object.freeze({
     API: "API"
 });
 const PRODUCTION_ROLES = Object.freeze(["PRIMARY", "BACKUP", "DISABLED"]);
+const FULFILLMENT_ELIGIBILITY_MODES = Object.freeze(["UNKNOWN", "GLOBAL", "CUSTOMER_MARKET_ALLOWLIST"]);
+const FULFILLMENT_ELIGIBILITY_EVIDENCE_CODES = Object.freeze(["", "PROVIDER_CONFIRMED", "CONTROLLED_TEST", "LEGACY_EFFECTIVE_SCOPE"]);
+
+const fulfillmentEligibilitySchema = new mongoose.Schema(
+    {
+        mode: { type: String, enum: FULFILLMENT_ELIGIBILITY_MODES, required: true, default: "UNKNOWN" },
+        allowedCustomerMarkets: {
+            type: [String],
+            enum: ["MM", "TH"],
+            required: true,
+            default: [],
+            validate: {
+                validator(markets) {
+                    const values = Array.isArray(markets) ? markets : [];
+                    if (["UNKNOWN", "GLOBAL"].includes(this.mode)) return values.length === 0;
+                    if (this.mode === "CUSTOMER_MARKET_ALLOWLIST") return values.length > 0;
+                    return false;
+                },
+                message: "Fulfillment eligibility mode and allowedCustomerMarkets are inconsistent."
+            }
+        },
+        evidenceCode: { type: String, enum: FULFILLMENT_ELIGIBILITY_EVIDENCE_CODES, default: "" },
+        evidenceSource: { type: String, trim: true, maxlength: 500, default: "" },
+        verifiedAt: { type: Date, default: null },
+        version: { type: Number, min: 1, required: true, default: 1 }
+    },
+    { _id: false }
+);
 
 const supplierProductMappingSchema = new mongoose.Schema(
     {
@@ -86,6 +114,10 @@ const supplierProductMappingSchema = new mongoose.Schema(
         mappingMetadata: {
             type: mongoose.Schema.Types.Mixed,
             default: {}
+        },
+        fulfillmentEligibility: {
+            type: fulfillmentEligibilitySchema,
+            default: undefined
         }
     },
     {
@@ -109,3 +141,5 @@ supplierProductMappingSchema.index(
 module.exports = mongoose.model("SupplierProductMapping", supplierProductMappingSchema);
 module.exports.SUPPLIER_EXECUTION_MODES = SUPPLIER_EXECUTION_MODES;
 module.exports.PRODUCTION_ROLES = PRODUCTION_ROLES;
+module.exports.FULFILLMENT_ELIGIBILITY_MODES = FULFILLMENT_ELIGIBILITY_MODES;
+module.exports.FULFILLMENT_ELIGIBILITY_EVIDENCE_CODES = FULFILLMENT_ELIGIBILITY_EVIDENCE_CODES;

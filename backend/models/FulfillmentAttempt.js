@@ -78,6 +78,11 @@ const fulfillmentAttemptSchema = new mongoose.Schema(
             enum: ["MM", "TH"],
             required: true
         },
+        customerMarket: {
+            type: String,
+            enum: ["MM", "TH"],
+            default: undefined
+        },
         mode: {
             type: String,
             enum: ["MANUAL", "API"],

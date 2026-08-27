@@ -14,6 +14,9 @@ const { ADMIN_AUDIT_ACTIONS, writeAdminAudit } = require("./adminAuditService");
 const { ORDER_STATES, getAllowedNextStatuses, transitionOrder } = require("./orderStateService");
 const { getSupplierAdapter, normalizeSupplierResult } = require("./supplierAdapterRegistry");
 const { assessProductionMapping, setProductionRole } = require("./supplierProductionSelectionService");
+const { basicCandidateBlockers } = require("./supplierEligibilityRouteResolver");
+const { isCustomerMarketEligible } = require("./supplierFulfillmentEligibilityService");
+const { matchesPilotRoute } = require("../config/mmWonddMlbbPilot");
 const commerceOrderRepository = require("./commerce/orderRepository");
 const {
     FINANCIAL_OUTCOMES,
@@ -714,14 +717,24 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
     if (!supplier) throw new FulfillmentError("SUPPLIER_NOT_FOUND", "Supplier not found.", 404);
     if (!supplier.enabled) throw new FulfillmentError("SUPPLIER_DISABLED", "Supplier is disabled.");
 
+    const routeSnapshot = order.fulfilment?.routeSnapshot || order.quoteSnapshot?.supplierRouteSnapshot || null;
+    const customerMarket = normalizeRegion(order.commercial?.region || order.product?.region || order.region || "MM");
+    const scopedPilotV2 = isCommerceOrder && Number(routeSnapshot?.snapshotVersion) === 2 &&
+        String(routeSnapshot?.customerMarket || "").toUpperCase() === customerMarket &&
+        matchesPilotRoute({ mapping, customerMarket }) &&
+        String(routeSnapshot?.supplierCode || "").toUpperCase() === String(mapping.supplierCode || "").toUpperCase() &&
+        String(routeSnapshot?.productCode || "").toLowerCase() === String(mapping.productCode || "").toLowerCase() &&
+        String(routeSnapshot?.packageCode || "").toUpperCase() === String(mapping.packageCode || "").toUpperCase() &&
+        String(routeSnapshot?.supplierProductCode || "").toLowerCase() === String(mapping.supplierProductCode || "").toLowerCase() &&
+        String(routeSnapshot?.supplierPackageCode || "").toUpperCase() === String(mapping.supplierPackageCode || "").toUpperCase() &&
+        isCustomerMarketEligible(routeSnapshot?.eligibility, customerMarket);
     if (
         mapping.productCode !== normalizeProductCode(order.product?.gameCode || order.productCode) ||
         mapping.packageCode !== normalizePackageCode(order.product?.packageCode || order.packageCode) ||
-        mapping.region !== normalizeRegion(order.commercial?.region || order.product?.region || order.region || "MM")
+        (!scopedPilotV2 && mapping.region !== customerMarket)
     ) {
         throw new FulfillmentError("SUPPLIER_MAPPING_MISMATCH", "Supplier mapping does not match this order.");
     }
-    const routeSnapshot = order.fulfilment?.routeSnapshot || order.quoteSnapshot?.supplierRouteSnapshot || null;
     if (isCommerceOrder && (!routeSnapshot || String(routeSnapshot.supplierMappingId || "") !== String(mapping._id))) {
         throw new FulfillmentError("ORDER_SUPPLIER_ROUTE_MISMATCH", "This order is bound to a different supplier route snapshot.", 409);
     }
@@ -746,10 +759,15 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
             packageCode: mapping.packageCode,
             deletedAt: null
         }).lean();
-        const regionalPrice = catalogPackage?.prices?.[mapping.region];
+        const regionalPrice = catalogPackage?.prices?.[scopedPilotV2 ? customerMarket : mapping.region];
         const supplierCost = Number(regionalPrice?.supplierCost);
         const sellingPrice = Number(regionalPrice?.amount);
-        if (
+        const mappingForAssessment = mapping.toObject ? mapping.toObject() : mapping;
+        const pilotAssessment = scopedPilotV2 ? basicCandidateBlockers({ mapping: { ...mappingForAssessment, fulfillmentEligibility: routeSnapshot.eligibility }, supplier: supplier.toObject ? supplier.toObject() : supplier, pkg: catalogPackage, customerMarket, adapter }) : null;
+        if (scopedPilotV2 && pilotAssessment.blockers.length) {
+            throw new FulfillmentError("WONDD_PILOT_NOT_PRODUCTION_READY", `WonDD pilot readiness is incomplete: ${pilotAssessment.blockers.join(",")}`, 409);
+        }
+        if (!scopedPilotV2 && (
             readiness.supplierMapped !== true ||
             readiness.inputReady !== true ||
             readiness.pricingReady !== true ||
@@ -759,7 +777,7 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
             !Number.isFinite(supplierCost) ||
             !Number.isFinite(sellingPrice) ||
             sellingPrice <= supplierCost
-        ) {
+        )) {
             throw new FulfillmentError("WONDD_PACKAGE_NOT_PRODUCTION_READY", "WonDD package production readiness is incomplete.", 409);
         }
         if (!adapter.isAutoFulfillmentEnabled(mapping.productCode)) {
@@ -794,6 +812,7 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
         productCode: mapping.productCode,
         packageCode: mapping.packageCode,
         region: mapping.region,
+        ...(scopedPilotV2 ? { customerMarket } : {}),
         mode: supplier.mode,
         routeType: supplier.mode === SUPPLIER_MODES.API
             ? FULFILLMENT_ROUTE_TYPES.SUPPLIER_API

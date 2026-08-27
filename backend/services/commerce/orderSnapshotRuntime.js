@@ -1,3 +1,8 @@
+const {
+    CUSTOMER_MARKETS,
+    validateFulfillmentEligibility
+} = require("../supplierFulfillmentEligibilityService");
+
 const ORDER_SNAPSHOT_RUNTIME_VERSION = "2.5.2";
 const ORDER_SNAPSHOT_SPECIFICATION_VERSION = "2.5.2";
 const ORDER_SNAPSHOT_SCHEMA_VERSION = "commerce.order-snapshot.v1";
@@ -406,6 +411,11 @@ function normalizeFulfilmentInput(input = {}) {
 function normalizeSupplierRouteSnapshot(route, quote) {
     if (route === undefined || route === null) return null;
     assertPlainObject(route, "supplierRouteSnapshot", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT);
+    const snapshotVersion = route.snapshotVersion === undefined ? 1 : Number(route.snapshotVersion);
+    if (![1, 2].includes(snapshotVersion)) {
+        throw new OrderSnapshotRuntimeError(ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, "Unsupported supplier route snapshot version.", { stage: "fulfilment-route" });
+    }
+    const commercialMarket = normalizeString(quote.commercialSnapshot?.region).toUpperCase();
     const normalized = {
         routeType: boundedString(route.routeType || "SUPPLIER_API", "supplierRouteSnapshot.routeType", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 40, true),
         supplierMappingId: boundedString(route.supplierMappingId, "supplierRouteSnapshot.supplierMappingId", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 80),
@@ -413,14 +423,23 @@ function normalizeSupplierRouteSnapshot(route, quote) {
         supplierCode: boundedString(route.supplierCode, "supplierRouteSnapshot.supplierCode", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 40, true),
         productCode: boundedString(route.productCode, "supplierRouteSnapshot.productCode", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 80, true).toLowerCase(),
         packageCode: boundedString(route.packageCode, "supplierRouteSnapshot.packageCode", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 120, true).toUpperCase(),
-        region: boundedString(route.region, "supplierRouteSnapshot.region", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 2, true).toUpperCase(),
+        ...(snapshotVersion === 1
+            ? { region: boundedString(route.region, "supplierRouteSnapshot.region", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 2, true).toUpperCase() }
+            : {
+                snapshotVersion: 2,
+                customerMarket: boundedString(route.customerMarket, "supplierRouteSnapshot.customerMarket", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 2, true).toUpperCase()
+            }),
         supplierProductCode: boundedString(route.supplierProductCode, "supplierRouteSnapshot.supplierProductCode", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 120),
         supplierPackageCode: boundedString(route.supplierPackageCode, "supplierRouteSnapshot.supplierPackageCode", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 120),
         executionMode: boundedString(route.executionMode, "supplierRouteSnapshot.executionMode", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 20),
         selectedRole: boundedString(route.selectedRole, "supplierRouteSnapshot.selectedRole", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 30, true),
         selectedAt: canonicalDate(route.selectedAt, "supplierRouteSnapshot.selectedAt")
     };
-    if (normalized.productCode !== normalizeString(quote.packageSnapshot?.gameCode).toLowerCase() || normalized.packageCode !== normalizeString(quote.packageSnapshot?.packageCode).toUpperCase() || normalized.region !== normalizeString(quote.commercialSnapshot?.region).toUpperCase()) {
+    const routeCustomerMarket = snapshotVersion === 1 ? normalized.region : normalized.customerMarket;
+    if (!CUSTOMER_MARKETS.includes(routeCustomerMarket)) {
+        throw new OrderSnapshotRuntimeError(ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, "Supplier route customer market is invalid.", { stage: "fulfilment-route" });
+    }
+    if (normalized.productCode !== normalizeString(quote.packageSnapshot?.gameCode).toLowerCase() || normalized.packageCode !== normalizeString(quote.packageSnapshot?.packageCode).toUpperCase() || routeCustomerMarket !== commercialMarket) {
         throw new OrderSnapshotRuntimeError(ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, "Supplier route does not match quoted package authority.", { stage: "fulfilment-route" });
     }
     if (normalized.routeType === "MANUAL_ADMIN" && (normalized.supplierMappingId || normalized.supplierId || normalized.supplierCode !== "AZIEL_ADMIN")) {
@@ -428,6 +447,16 @@ function normalizeSupplierRouteSnapshot(route, quote) {
     }
     if (normalized.routeType !== "MANUAL_ADMIN" && (!normalized.supplierMappingId || !normalized.supplierId || normalized.selectedRole !== "PRIMARY")) {
         throw new OrderSnapshotRuntimeError(ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, "Supplier API route requires a PRIMARY mapping snapshot.", { stage: "fulfilment-route" });
+    }
+    if (snapshotVersion === 2 && normalized.routeType !== "MANUAL_ADMIN") {
+        const eligibility = validateFulfillmentEligibility(route.eligibility);
+        if (!eligibility.valid) {
+            throw new OrderSnapshotRuntimeError(ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, "Supplier route eligibility evidence is invalid.", { stage: "fulfilment-route", metadata: { errors: eligibility.errors } });
+        }
+        if (!normalized.supplierProductCode || !normalized.supplierPackageCode) {
+            throw new OrderSnapshotRuntimeError(ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, "Supplier API route requires exact provider identity.", { stage: "fulfilment-route" });
+        }
+        normalized.eligibility = clonePlain(eligibility.value);
     }
     return normalized;
 }
@@ -710,6 +739,7 @@ module.exports = Object.freeze({
     createOrderSnapshot,
     validateOrderSnapshotInput,
     toOrderSnapshotPayload,
+    normalizeSupplierRouteSnapshot,
     OrderSnapshotRuntimeError,
     ORDER_SNAPSHOT_ERROR_CODES,
     ORDER_SNAPSHOT_RUNTIME_VERSION,

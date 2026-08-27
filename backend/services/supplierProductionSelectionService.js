@@ -6,6 +6,9 @@ const Supplier = require("../models/Supplier");
 const Mapping = require("../models/SupplierProductMapping");
 const FulfillmentAttempt = require("../models/FulfillmentAttempt");
 const { getSupplierAdapter } = require("./supplierAdapterRegistry");
+const { resolveFulfillmentRoutingMode, FULFILLMENT_ROUTING_MODES } = require("../config/fulfillmentRoutingMode");
+const { resolveEligibilityPrimaryRoute, OUTCOMES: ELIGIBILITY_OUTCOMES } = require("./supplierEligibilityRouteResolver");
+const { isPilotEnabled, matchesPilotRoute } = require("../config/mmWonddMlbbPilot");
 
 const ROLES = Object.freeze({ PRIMARY: "PRIMARY", BACKUP: "BACKUP", DISABLED: "DISABLED" });
 const CORE_PRODUCTS = new Set(["mlbb", "pubg", "freefire", "hok"]);
@@ -89,7 +92,7 @@ async function resolvePrimaryRouteSnapshot({ productCode, packageCode, region })
     return { ready: true, blockers: [], routeSnapshot: Object.freeze({ routeType: "SUPPLIER_API", supplierMappingId: String(mapping._id), supplierId: String(mapping.supplierId), supplierCode: mapping.supplierCode, productCode: mapping.productCode, packageCode: mapping.packageCode, region: mapping.region, supplierProductCode: mapping.supplierProductCode, supplierPackageCode: mapping.supplierPackageCode, executionMode: mapping.executionMode, selectedRole: ROLES.PRIMARY, selectedAt: new Date().toISOString() }) };
 }
 
-async function resolveCheckoutRouteSnapshot({ productCode, packageCode, region }) {
+async function resolveLegacyCheckoutRouteSnapshot({ productCode, packageCode, region }) {
     const primary = await resolvePrimaryRouteSnapshot({ productCode, packageCode, region });
     if (primary.ready) return primary;
     const normalizedProduct = clean(productCode).toLowerCase();
@@ -107,4 +110,70 @@ async function resolveCheckoutRouteSnapshot({ productCode, packageCode, region }
     return { ready: false, blockers: [...primary.blockers, !manualAllowed ? "MANUAL_ADMIN_NOT_ALLOWED" : "MANUAL_PRICE_NOT_PUBLISHED"], routeSnapshot: null };
 }
 
-module.exports = { ROLES, CORE_PRODUCTS, assessProductionMapping, setProductionRole, resolvePrimaryRouteSnapshot, resolveCheckoutRouteSnapshot };
+function compareRoutingDecisions({ legacy, shadow }) {
+    const legacySupplier = legacy?.routeSnapshot?.routeType === "SUPPLIER_API" ? clean(legacy.routeSnapshot.supplierCode).toUpperCase() : "";
+    const shadowSupplier = shadow?.outcome === ELIGIBILITY_OUTCOMES.ELIGIBLE ? clean(shadow.routeSnapshot?.supplierCode).toUpperCase() : "";
+    if (shadow?.outcome === ELIGIBILITY_OUTCOMES.AMBIGUOUS_PRIMARY_ROUTE) return { match: false, classification: "SHADOW_AMBIGUOUS" };
+    if (shadow?.blockerCodes?.some(code => code === "FULFILLMENT_ELIGIBILITY_UNKNOWN" || code.startsWith("FULFILLMENT_ELIGIBILITY_"))) return { match: false, classification: "SHADOW_UNKNOWN" };
+    if (legacySupplier && shadowSupplier) return { match: legacySupplier === shadowSupplier, classification: legacySupplier === shadowSupplier ? "MATCH" : "DIFFERENT_SUPPLIER" };
+    if (legacySupplier) return { match: false, classification: "LEGACY_ONLY" };
+    if (shadowSupplier) return { match: false, classification: "ELIGIBILITY_ONLY" };
+    return { match: true, classification: "MATCH" };
+}
+
+function pilotV2Snapshot(shadow, customerMarket) {
+    const { region: _legacyRegion, ...route } = shadow.routeSnapshot;
+    return Object.freeze({
+        ...route,
+        snapshotVersion: 2,
+        customerMarket: clean(customerMarket).toUpperCase(),
+        eligibility: shadow.eligibility
+    });
+}
+
+function createRoutingAuthority({ legacyResolver = resolveLegacyCheckoutRouteSnapshot, eligibilityResolver = resolveEligibilityPrimaryRoute, modeResolver = resolveFulfillmentRoutingMode, pilotEnabledResolver = isPilotEnabled, diagnosticsObserver = null } = {}) {
+    return async function route({ productCode, packageCode, region, includeDiagnostics = false }) {
+        const routingMode = modeResolver();
+        const legacy = await legacyResolver({ productCode, packageCode, region });
+        if (routingMode === FULFILLMENT_ROUTING_MODES.LEGACY_REGION) return legacy;
+        const shadow = await eligibilityResolver({ productCode, packageCode, customerMarket: region });
+        const comparison = compareRoutingDecisions({ legacy, shadow });
+        const diagnostics = Object.freeze({
+            productCode: clean(productCode).toLowerCase(),
+            packageCode: clean(packageCode).toUpperCase(),
+            customerMarket: clean(region).toUpperCase(),
+            routingMode,
+            legacyRouteType: legacy?.routeSnapshot?.routeType || "NONE",
+            legacySupplierCode: legacy?.routeSnapshot?.supplierCode || "",
+            shadowOutcome: shadow.outcome,
+            shadowSupplierCode: shadow?.routeSnapshot?.supplierCode || "",
+            comparisonClassification: comparison.classification,
+            blockerCodes: shadow.blockerCodes || []
+        });
+        if (typeof diagnosticsObserver === "function") {
+            try { diagnosticsObserver(diagnostics); } catch { /* Observability must never alter route selection. */ }
+        }
+        const pilotSelected = routingMode === FULFILLMENT_ROUTING_MODES.DUAL_READ &&
+            pilotEnabledResolver() === true &&
+            shadow.outcome === ELIGIBILITY_OUTCOMES.ELIGIBLE &&
+            matchesPilotRoute({ mapping: shadow.routeSnapshot, productCode, packageCode, customerMarket: region });
+        if (pilotSelected) {
+            const result = { ready: true, blockers: [], routeSnapshot: pilotV2Snapshot(shadow, region) };
+            return includeDiagnostics ? { ...result, diagnostics: Object.freeze({ ...diagnostics, scopedPilotOverride: true }) } : result;
+        }
+        if (routingMode === FULFILLMENT_ROUTING_MODES.DUAL_READ) return includeDiagnostics ? { ...legacy, diagnostics } : legacy;
+        if (routingMode === FULFILLMENT_ROUTING_MODES.ELIGIBILITY_PRIMARY) {
+            if (shadow.outcome === ELIGIBILITY_OUTCOMES.ELIGIBLE) {
+                const result = { ready: true, blockers: [], routeSnapshot: shadow.routeSnapshot };
+                return includeDiagnostics ? { ...result, diagnostics } : result;
+            }
+            const result = { ready: false, blockers: shadow.blockerCodes, routeSnapshot: null };
+            return includeDiagnostics ? { ...result, diagnostics } : result;
+        }
+        throw Object.assign(new Error(`Unsupported fulfillment routing mode: ${routingMode}`), { code: "FULFILLMENT_ROUTING_MODE_INVALID" });
+    };
+}
+
+const resolveCheckoutRouteSnapshot = createRoutingAuthority();
+
+module.exports = { ROLES, CORE_PRODUCTS, assessProductionMapping, setProductionRole, resolvePrimaryRouteSnapshot, resolveLegacyCheckoutRouteSnapshot, resolveCheckoutRouteSnapshot, compareRoutingDecisions, pilotV2Snapshot, createRoutingAuthority };
