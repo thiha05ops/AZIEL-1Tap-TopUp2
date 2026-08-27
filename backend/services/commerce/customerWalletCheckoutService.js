@@ -321,7 +321,7 @@ async function startCustomerWalletCheckout(input = {}, context = {}, dependencie
             currency: orderCurrency,
             type: "wallet.payment",
             source: "commerce_wallet_payment",
-            referenceType: "commerce_order",
+            referenceType: "order",
             referenceId: checkoutResult.checkout.orderId,
             orderId: checkoutResult.checkout.orderId,
             idempotencyKey: `wallet:commerce-order:${checkoutResult.checkout.orderId}:payment`,
