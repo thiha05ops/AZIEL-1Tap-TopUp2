@@ -6,6 +6,7 @@
     let draft = null;
     let activeTransaction = null;
     let submitting = false;
+    let completed = false;
 
     function money(amount, currency) {
         return `${Number(amount || 0).toLocaleString()} ${String(currency).toUpperCase() === "THB" ? "฿" : "Ks"}`;
@@ -14,11 +15,13 @@
     function update() {
         const payment = window.selectedPaymentData;
         const button = document.getElementById("methodContinue");
-        if (button) button.disabled = Boolean(!payment?.key || submitting);
+        if (button) button.disabled = Boolean(completed || !payment?.key || submitting);
         const feedback = document.getElementById("methodFeedback");
         if (feedback) {
             const activeKey = activeTransaction?.selectedPayment?.key;
-            feedback.textContent = activeKey && payment?.key && payment.key !== activeKey
+            feedback.textContent = completed
+                ? t("payment.success.processing", "Your order is being processed.")
+                : activeKey && payment?.key && payment.key !== activeKey
                 ? t("payment.activeConflict", "An active payment already exists. Resume it before changing payment method.")
                 : payment?.key ? t("payment.continueWith", "Continue with {method}.", { method: payment.method || payment.key }) : t("payment.selectMethod", "Select a payment method.");
         }
@@ -26,7 +29,7 @@
 
     async function continueToPayment() {
         const payment = window.selectedPaymentData;
-        if (submitting || !payment?.key) return;
+        if (completed || submitting || !payment?.key) return;
         if (activeTransaction?.session?.attemptId && authority?.stagedSessionMatchesDraft(activeTransaction, draft)) {
             const activeKey = activeTransaction.selectedPayment?.key || activeTransaction.session?.paymentMethod;
             if (activeKey && payment.key !== activeKey) { update(); return; }
@@ -74,6 +77,16 @@
             document.getElementById("methodFeedback").textContent = t("payment.activeReady", "An active payment is ready to resume.");
         }
         document.addEventListener("paymentChanged", update);
+        window.addEventListener("aziel:payment-completed", () => {
+            completed = true;
+            submitting = false;
+            const grid = document.getElementById("paymentGrid");
+            if (grid) {
+                grid.setAttribute("aria-disabled", "true");
+                grid.inert = true;
+            }
+            update();
+        });
         document.getElementById("methodContinue")?.addEventListener("click", continueToPayment);
         update();
     });

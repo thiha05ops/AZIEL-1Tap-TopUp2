@@ -51,7 +51,7 @@
         window.PaymentManual.show(order, session);
     }
 
-    function showCompletion({ orderId, paid = false } = {}) {
+    function showCompletion({ orderId, paid = false, amount = null, currency = "" } = {}) {
         if (!orderId) return;
         let remaining = 5;
         completionState = { orderId, paid };
@@ -62,13 +62,15 @@
         section.setAttribute("role", "status");
         const icon = document.createElement("div"); icon.className = "payment-completion__icon"; icon.textContent = "✓";
         const eyebrow = document.createElement("p"); eyebrow.className = "checkout-eyebrow"; eyebrow.textContent = t("order.statusLabel", "Order status");
-        const title = document.createElement("h2"); title.textContent = paid ? t("payment.success.title", "Payment successful") : t("payment.submitted.title", "Payment submitted");
-        const body = document.createElement("p"); body.textContent = paid ? t("payment.success.processing", "Your order is being processed.") : t("payment.submitted.awaiting", "Your receipt is awaiting verification.");
+        const title = document.createElement("h2"); title.textContent = paid ? t("payment.success.title", "Payment Successful") : t("payment.submitted.title", "Payment submitted");
+        const body = document.createElement("p"); body.textContent = paid ? t("payment.success.receivedProcessing", "Your payment has been received. Your order is being processed.") : t("payment.submitted.awaiting", "Your receipt is awaiting verification.");
         const countdown = document.createElement("p"); countdown.id = "paymentRedirectCountdown"; countdown.textContent = t("payment.redirectCountdown", "Redirecting to order tracking in {seconds} seconds", { seconds: remaining });
         const actions = document.createElement("div"); actions.className = "payment-completion__actions";
-        const track = document.createElement("a"); track.id = "trackOrderNow"; track.className = "primary-commerce-action"; track.href = `tracking.html?orderId=${encodeURIComponent(orderId)}`; track.textContent = t("payment.trackOrderNow", "Track Order Now");
+        const track = document.createElement("a"); track.id = "trackOrderNow"; track.className = "primary-commerce-action"; track.href = `tracking.html?orderId=${encodeURIComponent(orderId)}`; track.textContent = t("payment.trackOrderNow", "Track Order");
         const home = document.createElement("a"); home.id = "paymentBackHome"; home.href = "home.html"; home.textContent = t("payment.backHome", "Back to Home");
         actions.append(track, home); section.append(icon, eyebrow, title, body, countdown, actions); mount.replaceChildren(section);
+        text("paymentOrderId", orderId);
+        if (amount != null) text("paymentAmount", money(amount, currency));
         text("paymentStatusSummary", paid ? t("payment.state.paid", "Paid") : t("payment.state.pendingVerification", "Pending verification"));
         const cancelTimers = () => { clearTimeout(redirectTimer); clearInterval(countdownTimer); };
         document.getElementById("trackOrderNow")?.addEventListener("click", cancelTimers);
@@ -130,6 +132,22 @@
         const requestedOrderId = String(requestParams.get("orderId") || "").trim();
         const requestedIdentity = { attemptId: requestedAttemptId, orderId: requestedOrderId };
         const marker = readMarker();
+        const stagedCompletionOrderId = String(staged?.completion?.orderId || "").trim();
+        if (staged?.completion?.paid === true && stagedCompletionOrderId) {
+            const completionOrder = staged.orderData || {};
+            const completionSession = staged.session || staged.completion;
+            const completionPayment = staged.selectedPayment || { method: "AZIEL Wallet", key: "wallet" };
+            renderSummary(completionOrder, completionSession, completionPayment);
+            showCompletion({
+                orderId: stagedCompletionOrderId,
+                paid: true,
+                amount: staged.completion.amount,
+                currency: staged.completion.currency
+            });
+            sessionStorage.removeItem("azielProductCheckoutDraft");
+            sessionStorage.removeItem(SESSION_KEY);
+            return;
+        }
         if (
             staged?.session &&
             staged?.orderData &&
@@ -165,10 +183,10 @@
         const section = document.querySelector(".payment-completion");
         if (!section) return;
         section.querySelector(".checkout-eyebrow").textContent = t("order.statusLabel", "Order status");
-        section.querySelector("h2").textContent = paid ? t("payment.success.title", "Payment successful") : t("payment.submitted.title", "Payment submitted");
-        section.querySelector("h2 + p").textContent = paid ? t("payment.success.processing", "Your order is being processed.") : t("payment.submitted.awaiting", "Your receipt is awaiting verification.");
+        section.querySelector("h2").textContent = paid ? t("payment.success.title", "Payment Successful") : t("payment.submitted.title", "Payment submitted");
+        section.querySelector("h2 + p").textContent = paid ? t("payment.success.receivedProcessing", "Your payment has been received. Your order is being processed.") : t("payment.submitted.awaiting", "Your receipt is awaiting verification.");
         document.getElementById("paymentRedirectCountdown").textContent = t("payment.redirectCountdown", "Redirecting to order tracking in {seconds} seconds", { seconds: completionRemaining });
-        document.getElementById("trackOrderNow").textContent = t("payment.trackOrderNow", "Track Order Now");
+        document.getElementById("trackOrderNow").textContent = t("payment.trackOrderNow", "Track Order");
         document.getElementById("paymentBackHome").textContent = t("payment.backHome", "Back to Home");
         text("paymentStatusSummary", paid ? t("payment.state.paid", "Paid") : t("payment.state.pendingVerification", "Pending verification"));
     });

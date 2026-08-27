@@ -131,6 +131,24 @@
         window.location.href = `payment.html${params.toString() ? `?${params.toString()}` : ""}`;
     }
 
+    function stageWalletCompletion(result, orderData, selectedPayment) {
+        const orderId = String(result?.orderId || "").trim();
+        if (!orderId) throw createPaymentError({ message: "Wallet payment completed without an order reference." });
+        const amount = Number(result.amount ?? orderData.amount ?? 0);
+        const currency = String(result.currency || orderData.currency || "").trim().toUpperCase();
+        sessionStorage.setItem("azielPaymentPageSession", JSON.stringify({
+            version: 1,
+            createdAt: new Date().toISOString(),
+            completion: { paid: true, orderId, amount, currency },
+            session: { commerceOrderId: orderId, orderId, amount, currency, paymentStatus: "paid" },
+            orderData: { ...orderData, ...(result.order || {}), orderId, commerceOrderId: orderId, amount, currency },
+            selectedPayment,
+            paymentType: "wallet"
+        }));
+        window.dispatchEvent(new CustomEvent("aziel:payment-completed", { detail: { orderId, paymentType: "wallet" } }));
+        window.location.href = `payment.html?orderId=${encodeURIComponent(orderId)}`;
+    }
+
     async function start(orderData) {
         const selectedPayment = window.selectedPaymentData || {};
         const type =
@@ -142,7 +160,17 @@
 
         try {
             if (type === "wallet" || selectedPayment.key === "wallet") {
-                await PaymentWallet.pay(orderData);
+                const walletResult = await PaymentWallet.pay(orderData);
+                if (!walletResult?.success) return;
+                if (orderData.pagePresentation === true) {
+                    stageWalletCompletion(walletResult, orderData, selectedPayment);
+                    return;
+                }
+                PaymentUtils.showSuccess(
+                    walletResult.orderId,
+                    "Payment Successful",
+                    "Your payment has been received. Your order is being processed."
+                );
                 return;
             }
 
@@ -212,7 +240,8 @@
         start,
         createPaymentSession,
         createManualAttempt,
-        createCommerceManualPromptPayCheckout
+        createCommerceManualPromptPayCheckout,
+        stageWalletCompletion
     };
 
 })();

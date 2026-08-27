@@ -20,20 +20,25 @@
             if (!res.ok || !data.success) {
                 window.AZIEL_UI?.toast?.error(data.message || "Wallet payment failed.") ||
                     PaymentUtils.showToast(data.message || "Wallet payment failed.");
-                return;
+                return { success: false, error: data.message || "Wallet payment failed." };
             }
 
-            PaymentUtils.showSuccess(
-                data.order?.orderId || orderData.orderId,
-                "Wallet Payment Success",
-                "Paid with AZIEL Wallet. Admin will process your top-up soon."
-            );
+            const orderId = String(data.order?.orderId || data.orderId || orderData.orderId || "").trim();
+            return {
+                success: true,
+                orderId,
+                amount: Number(data.order?.amount ?? data.amount ?? orderData.amount ?? 0),
+                currency: String(data.order?.currency || data.currency || orderData.currency || "").trim().toUpperCase(),
+                order: data.order || null,
+                data
+            };
 
         } catch (error) {
             console.log("Wallet payment error:", error);
             PaymentUtils.hideLoading();
             window.AZIEL_UI?.toast?.error("Server error") ||
                 PaymentUtils.showToast("Server error");
+            return { success: false, error: "Server error" };
         }
     }
 

@@ -107,6 +107,7 @@
     "verify:wallet-submission-checkout": "node backend/scripts/verify-wallet-submission-checkout.js",
     "verify:wallet-checkout-contrast": "node backend/scripts/verify-wallet-checkout-contrast.js",
     "verify:shared-payment-checkout": "node backend/scripts/verify-shared-payment-checkout.js",
+    "verify:wallet-payment-completion-ux": "node backend/scripts/verify-wallet-payment-completion-ux.js",
     "verify:pending-payment-recovery-foundation": "node backend/scripts/verify-pending-payment-recovery-foundation.js",
     "verify:pending-payment-resume-overlay": "node backend/scripts/verify-pending-payment-resume-overlay.js",
     "verify:pending-payment-recovery-checkout": "node backend/scripts/verify-pending-payment-recovery-checkout.js",
