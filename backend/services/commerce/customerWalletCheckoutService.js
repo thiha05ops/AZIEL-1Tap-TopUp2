@@ -18,6 +18,7 @@ const {
     reserveCommercePromotion
 } = require("./commercePromotionBridgeService");
 const { debitWallet } = require("../walletService");
+const { ensurePaidOrderFulfillmentWork } = require("../paidFulfillmentRoutingService");
 
 const ERROR_CODES = Object.freeze({
     INVALID_CHECKOUT_INPUT: "INVALID_CHECKOUT_INPUT",
@@ -154,6 +155,13 @@ async function markCommerceOrderPaid(orderId, owner, dependencies = {}) {
             changedAt,
             reason: "Paid with AZIEL Wallet"
         });
+    }
+
+    order = await repo.findOwnedOrderById({ orderId, owner: repositoryOwner(owner) }) || order;
+    try {
+        await (dependencies.ensurePaidOrderFulfillmentWork || ensurePaidOrderFulfillmentWork)(order);
+    } catch (error) {
+        await dependencies.onPaidFulfillmentError?.(error, order);
     }
 
     return order;
@@ -379,6 +387,7 @@ async function startCustomerWalletCheckout(input = {}, context = {}, dependencie
 
 module.exports = Object.freeze({
     startCustomerWalletCheckout,
+    markCommerceOrderPaid,
     assertAuthoritativeFulfillmentReady,
     CustomerWalletCheckoutError,
     ERROR_CODES

@@ -79,9 +79,17 @@ function publicStateFor(testProduct, packages, mappings) {
     const snapshottedManualOrder = { ...paidOrder, orderId: "AZL-2", fulfilment: { routeSnapshot: { routeType: "MANUAL_ADMIN", supplierCode: "AZIEL_ADMIN", productCode: "mlbb", packageCode: "MLBB_1", region: "MM" } } };
     const frozenManual = await ensurePaidOrderFulfillmentWork(snapshottedManualOrder, { ...routingOptions, loadCapability: async () => automatedCapability });
     assert.equal(frozenManual.reason, "MANUAL_ADMIN_QUEUED");
-    const snapshottedApiOrder = { ...paidOrder, orderId: "AZL-3", fulfilment: { routeSnapshot: { routeType: "SUPPLIER_API", supplierMappingId: "mapping-1", supplierCode: "WONDD", productCode: "mlbb", packageCode: "MLBB_1", region: "MM" } } };
-    const frozenApi = await ensurePaidOrderFulfillmentWork(snapshottedApiOrder, { ...routingOptions, loadCapability: async () => manualCapability });
-    assert.equal(frozenApi.reason, "SUPPLIER_ROUTE_SNAPSHOT_BOUND");
+    const snapshottedApiOrder = { ...paidOrder, status: "paid", orderId: "AZL-3", fulfilment: { routeSnapshot: { routeType: "SUPPLIER_API", supplierMappingId: "mapping-1", supplierCode: "WONDD", productCode: "mlbb", packageCode: "MLBB_1", region: "MM" } } };
+    let supplierStarts = 0;
+    const frozenApi = await ensurePaidOrderFulfillmentWork(snapshottedApiOrder, {
+        ...routingOptions,
+        loadCapability: async () => { throw new Error("Immutable supplier snapshots must not be re-resolved."); },
+        findAttemptByIdempotency: async () => null,
+        startSupplierFulfillment: async (_orderCode, payload) => { supplierStarts += 1; return { fulfillmentId: "FUL-AUTO-1", supplierMappingId: payload.mappingId }; }
+    });
+    assert.equal(frozenApi.reason, "SUPPLIER_FULFILLMENT_STARTED");
+    assert.equal(frozenApi.attempt.supplierMappingId, "mapping-1");
+    assert.equal(supplierStarts, 1);
 
     // I: archived package stays excluded even with a stale mapping.
     assert.equal(publicStateFor(noManual, [{ ...pkg, deletedAt: new Date() }], [apiMapping]).projection.publicReadiness.regions.MM.state, "COMING_SOON");

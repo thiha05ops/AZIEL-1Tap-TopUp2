@@ -407,14 +407,26 @@ async function updateStatusField(input, options, config) {
     }
 }
 
-function updateOrderStatus(input, options = {}) {
-    return updateStatusField(input, options, {
+async function updateOrderStatus(input, options = {}) {
+    const order = await updateStatusField(input, options, {
         publicField: "orderStatus",
         queryField: "status",
         dispatchLifecycleEmail: true,
         transitions: ORDER_TRANSITIONS,
         invalidCode: ERROR_CODES.INVALID_ORDER_STATUS_TRANSITION
     });
+    if (normalizeString(input.toStatus) === "paid") {
+        try {
+            await ensurePaidOrderFulfillmentWork(order, { session: options.session || options.mongoSession || null });
+        } catch (error) {
+            throw new OrderRepositoryError(ERROR_CODES.ORDER_UPDATE_FAILED, "Commerce order persistence failed.", {
+                stage: "fulfillment_work",
+                causeCode: error?.code || error?.name || "",
+                retryable: error?.retryable === true
+            });
+        }
+    }
+    return order;
 }
 
 async function updatePaymentStatus(input, options = {}) {

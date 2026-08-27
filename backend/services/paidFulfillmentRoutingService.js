@@ -19,6 +19,10 @@ function manualAdminIdempotencyKey(orderCode = "") {
     return `fulfillment:manual-admin:${String(orderCode || "").trim()}`;
 }
 
+function supplierApiIdempotencyKey(orderCode = "", mappingId = "") {
+    return `fulfillment:start:${String(orderCode || "").trim()}:${String(mappingId || "").trim()}`;
+}
+
 function makeFulfillmentId() {
     return `FUL-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
 }
@@ -35,6 +39,28 @@ async function ensurePaidOrderFulfillmentWork(order = {}, options = {}) {
     let capability = null;
     if (routeSnapshot) {
         if (routeSnapshot.productCode !== identity.productCode || routeSnapshot.packageCode !== identity.packageCode || routeSnapshot.region !== identity.region) return { created: false, reason: "ORDER_ROUTE_SNAPSHOT_MISMATCH", attempt: null };
+        if (routeSnapshot.routeType === FULFILLMENT_ROUTE_TYPES.SUPPLIER_API) {
+            const mappingId = String(routeSnapshot.supplierMappingId || "").trim();
+            if (!mappingId) return { created: false, reason: "SUPPLIER_ROUTE_MAPPING_MISSING", attempt: null, routeSnapshot };
+            if (String(order.status || "").toLowerCase() !== "paid") return { created: false, reason: "ORDER_LIFECYCLE_NOT_PAID", attempt: null, routeSnapshot };
+            const idempotencyKey = supplierApiIdempotencyKey(identity.orderCode, mappingId);
+            const findAttempt = options.findAttemptByIdempotency || (async key => FulfillmentAttempt.findOne({ idempotencyKey: key }).lean());
+            const existing = await findAttempt(idempotencyKey);
+            if (existing) return { created: false, reason: "SUPPLIER_FULFILLMENT_ALREADY_BOUND", attempt: existing, routeSnapshot };
+            const startSupplierFulfillment = options.startSupplierFulfillment || ((orderCode, payload, context) => require("./fulfillmentService").startFulfillmentForOrder(orderCode, payload, context));
+            try {
+                const attempt = await startSupplierFulfillment(identity.orderCode, {
+                    mappingId,
+                    supplierMappingId: mappingId,
+                    idempotencyKey
+                }, { source: "paid_order_automatic_fulfillment" });
+                return { created: true, reason: "SUPPLIER_FULFILLMENT_STARTED", attempt, routeSnapshot };
+            } catch (error) {
+                const racedAttempt = await findAttempt(idempotencyKey).catch(() => null);
+                if (racedAttempt) return { created: false, reason: "SUPPLIER_FULFILLMENT_ALREADY_BOUND", attempt: racedAttempt, routeSnapshot };
+                return { created: false, reason: "SUPPLIER_FULFILLMENT_START_FAILED", attempt: null, routeSnapshot, errorCode: error?.code || error?.name || "SUPPLIER_FULFILLMENT_START_FAILED" };
+            }
+        }
         if (routeSnapshot.routeType !== FULFILLMENT_ROUTE_TYPES.MANUAL_ADMIN) return { created: false, reason: "SUPPLIER_ROUTE_SNAPSHOT_BOUND", attempt: null, routeSnapshot };
     } else {
         capability = await (options.loadCapability || loadFulfillmentCapability)({
@@ -97,5 +123,6 @@ async function ensurePaidOrderFulfillmentWork(order = {}, options = {}) {
 module.exports = {
     ensurePaidOrderFulfillmentWork,
     fulfillmentIdentity,
-    manualAdminIdempotencyKey
+    manualAdminIdempotencyKey,
+    supplierApiIdempotencyKey
 };
