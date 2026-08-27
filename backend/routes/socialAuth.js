@@ -1,8 +1,12 @@
 const express = require("express");
+const crypto = require("crypto");
 const passport = require("../config/passport");
 const { issueUserSession } = require("../services/authSessionService");
 
 const router = express.Router();
+
+const googleCallbackFlights = new Map();
+const GOOGLE_CALLBACK_RESULT_TTL_MS = 15_000;
 
 function googleConfigured(req, res, next) {
     if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
@@ -20,6 +24,65 @@ function getFrontendUrl() {
     ).replace(/\/$/, "");
 }
 
+function hashAuthorizationCode(code) {
+    return crypto
+        .createHash("sha256")
+        .update(String(code))
+        .digest("hex");
+}
+
+function authenticateGoogleCallback(req, res) {
+    return new Promise((resolve, reject) => {
+        const middleware = passport.authenticate(
+            "google",
+            {
+                session: false
+            },
+            (error, user, info) => {
+                if (error) {
+                    return reject(error);
+                }
+
+                return resolve({
+                    user: user || null,
+                    info: info || null
+                });
+            }
+        );
+
+        middleware(req, res, error => {
+            if (error) {
+                reject(error);
+            }
+        });
+    });
+}
+
+async function completeGoogleCallback(req, res) {
+    const { user } = await authenticateGoogleCallback(req, res);
+
+    if (!user) {
+        return `${getFrontendUrl()}/login.html`;
+    }
+
+    const issued = await issueUserSession(user, req, {
+        provider: "google",
+        eventType: "google.login",
+        eventTitle: "Google sign-in"
+    });
+
+    const params = new URLSearchParams({
+        token: issued.token,
+        username: user.username || "",
+        displayName: user.displayName || user.username || "",
+        email: user.email || "",
+        region: user.region || "MM",
+        role: user.role || "user"
+    });
+
+    return `${getFrontendUrl()}/google-success.html?${params.toString()}`;
+}
+
 router.get(
     "/auth/google",
     googleConfigured,
@@ -32,67 +95,45 @@ router.get(
 
 router.get(
     "/auth/google/callback",
-
-    (req, res, next) => {
-        console.log("Google callback request:", {
-            method: req.method,
-            path: req.path,
-            host: req.get("host"),
-            protocol: req.protocol,
-            hasCode: Boolean(req.query.code),
-            codeSuffix: req.query.code
-                ? String(req.query.code).slice(-8)
-                : null,
-            error: req.query.error || null,
-            userAgent: req.get("user-agent") || null,
-            requestId: req.get("x-request-id") || null,
-            purpose: req.get("purpose") || null,
-            secPurpose: req.get("sec-purpose") || null,
-            referer: req.get("referer") || null,
-            timestamp: Date.now()
-        });
-
-        next();
-    },
-
     googleConfigured,
-
-    passport.authenticate("google", {
-        failureRedirect: `${getFrontendUrl()}/login.html`,
-        session: false
-    }),
-
     async (req, res) => {
-        try {
-            if (!req.user) {
-                return res.redirect(`${getFrontendUrl()}/login.html`);
+        const authorizationCode = String(req.query.code || "").trim();
+
+        if (!authorizationCode) {
+            return res.redirect(`${getFrontendUrl()}/login.html`);
+        }
+
+        const callbackKey = hashAuthorizationCode(authorizationCode);
+
+        let flight = googleCallbackFlights.get(callbackKey);
+
+        if (!flight) {
+            flight = {
+                promise: completeGoogleCallback(req, res)
+            };
+
+            googleCallbackFlights.set(callbackKey, flight);
+
+            const cleanupTimer = setTimeout(() => {
+                if (googleCallbackFlights.get(callbackKey) === flight) {
+                    googleCallbackFlights.delete(callbackKey);
+                }
+            }, GOOGLE_CALLBACK_RESULT_TTL_MS);
+
+            if (typeof cleanupTimer.unref === "function") {
+                cleanupTimer.unref();
             }
+        }
 
-            const issued = await issueUserSession(req.user, req, {
-                provider: "google",
-                eventType: "google.login",
-                eventTitle: "Google sign-in"
-            });
-
-            const params = new URLSearchParams({
-                token: issued.token,
-                username: req.user.username || "",
-                displayName:
-                    req.user.displayName ||
-                    req.user.username ||
-                    "",
-                email: req.user.email || "",
-                region: req.user.region || "MM",
-                role: req.user.role || "user"
-            });
-
-            return res.redirect(
-                `${getFrontendUrl()}/google-success.html?${params.toString()}`
-            );
+        try {
+            const redirectUrl = await flight.promise;
+            return res.redirect(redirectUrl);
         } catch (error) {
             console.log(
                 "Google callback error:",
-                error?.message || error
+                error?.code ||
+                error?.message ||
+                "unknown_google_oauth_error"
             );
 
             return res.redirect(`${getFrontendUrl()}/login.html`);
