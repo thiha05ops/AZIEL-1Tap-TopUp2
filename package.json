@@ -4,6 +4,7 @@
   "description": "AZIEL 1Tap TopUp Shop",
   "main": "backend/server.js",
   "scripts": {
+    "verify:refresh-supplier-cost-authority": "node backend/scripts/verify-refresh-existing-supplier-cost-authority.js",
     "start": "node backend/server.js",
     "audit:duplicate-emails": "node backend/scripts/audit-duplicate-emails.js",
     "repair:duplicate-email": "node backend/scripts/repair-duplicate-email.js",

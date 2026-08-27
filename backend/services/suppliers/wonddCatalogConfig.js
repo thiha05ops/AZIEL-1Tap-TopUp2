@@ -20,4 +20,27 @@ function familyForServiceId(serviceId) {
     return WONDD_FAMILIES[String(serviceId)] || null;
 }
 
-module.exports = { WONDD_FAMILIES, CONFIRMED_SERVICE_CODES, familyForServiceId };
+function resolveFamilyForServiceCode(serviceCode, families = WONDD_FAMILIES) {
+    const normalized = String(serviceCode == null ? "" : serviceCode).trim().toLowerCase();
+    if (!normalized) {
+        const error = new Error("WonDD supplier servicecode is required.");
+        error.code = "WONDD_SERVICE_CODE_MISSING";
+        throw error;
+    }
+
+    const matches = Object.entries(families).filter(([, family]) => (
+        String(family?.serviceCode || "").trim().toLowerCase() === normalized
+    ));
+    if (matches.length !== 1) {
+        const error = new Error(matches.length
+            ? `WonDD supplier servicecode is ambiguous: ${serviceCode}`
+            : `WonDD supplier servicecode is not authoritative: ${serviceCode}`);
+        error.code = matches.length ? "WONDD_SERVICE_CODE_AMBIGUOUS" : "WONDD_SERVICE_CODE_UNKNOWN";
+        throw error;
+    }
+
+    const [serviceId, family] = matches[0];
+    return { serviceId, family };
+}
+
+module.exports = { WONDD_FAMILIES, CONFIRMED_SERVICE_CODES, familyForServiceId, resolveFamilyForServiceCode };
