@@ -166,7 +166,8 @@
             orderData.paymentType ||
             "manual";
 
-        PaymentUtils.showLoading();
+        const useBlockingLoader = orderData.pagePresentation !== true;
+        if (useBlockingLoader) PaymentUtils.showLoading();
 
         try {
             if (type === "wallet" || selectedPayment.key === "wallet") {
@@ -203,7 +204,7 @@
                     game: attemptSession.productName
                 };
 
-                PaymentUtils.hideLoading();
+                if (useBlockingLoader) PaymentUtils.hideLoading();
 
                 if (orderData.pagePresentation === true) {
                     stagePaymentPage(attemptSession, attemptOrder, selectedPayment, type);
@@ -223,7 +224,7 @@
             paymentSession.selectedPaymentMethod = selectedPayment;
             const canonicalOrder = paymentSession.order || orderData;
 
-            PaymentUtils.hideLoading();
+            if (useBlockingLoader) PaymentUtils.hideLoading();
 
                 if (orderData.pagePresentation === true) {
                     stagePaymentPage(paymentSession, canonicalOrder, selectedPayment, type);
@@ -245,7 +246,7 @@
 
         } catch (error) {
             console.log("Payment engine error:", error);
-            PaymentUtils.hideLoading();
+            if (useBlockingLoader) PaymentUtils.hideLoading();
             showPaymentError(error);
             return { success: false, navigating: false, errorCode: error?.code || "PAYMENT_START_FAILED" };
         }

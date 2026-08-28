@@ -27,6 +27,26 @@ html {
     min-height: calc(var(--az-header-height, 64px) + env(safe-area-inset-top));
 }
 
+/* First-frame compatibility shell for public pages that still fetch the shared
+   header component. It reserves the canonical surface instead of painting an
+   empty strip; header-loader replaces it with the interactive component. */
+#azHeaderMount:empty {
+    box-sizing: border-box;
+    min-height: 72px;
+    border-bottom: 1px solid var(--border);
+    background:
+        url("/assets/brand/aziel-logo-primary.svg") left max(18px, calc((100% - var(--public-storefront-max, 1500px)) / 2)) center / 112px auto no-repeat,
+        var(--bg);
+}
+
+@media (max-width: 900px) {
+    #azHeaderMount:empty {
+        min-height: 64px;
+        background-position: center;
+        background-size: 96px auto;
+    }
+}
+
 @media (max-width: 900px) {
     #azHeaderMount { min-height: calc(var(--az-header-mobile-height, 64px) + env(safe-area-inset-top)); }
 }

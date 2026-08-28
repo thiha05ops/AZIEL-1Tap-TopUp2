@@ -18,6 +18,7 @@
     <meta name="twitter:image" content="https://azielplay.com/assets/brand/og-image.png">
     <script type="application/ld+json">{"@context":"https://schema.org","@type":"Service","name":"PUBG Mobile UC top-up service","provider":{"@type":"Organization","name":"AZIEL 1Tap Shop","url":"https://azielplay.com"},"areaServed":["Myanmar","Thailand"],"serviceType":"Digital top-up service","url":"https://azielplay.com/pubg.html"}</script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <script>(function(){var d=document.documentElement,m=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';d.classList.add('theme-'+m);d.dataset.theme=m;}());</script>
     <link rel="manifest" href="/manifest.json">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="AZIEL">
@@ -26,14 +27,14 @@
 
     <link rel="stylesheet" href="/css/core/main.css">
     <link rel="stylesheet" href="/css/core/layout.css">
-    <link rel="stylesheet" href="/css/theme/aziel-design-system.css?v=20260808-global-authority">
-    <link rel="stylesheet" href="/css/theme/aziel-header.css?v=20260808-global-authority">
-    <link rel="stylesheet" href="/css/game/game.css?v=20260712-summary-sync">
-    <link rel="stylesheet" href="/css/game/product-detail-desktop.css?v=20260822-mobile-width-utilization">
-    <link rel="stylesheet" href="/css/game/payment-grid.css?v=20260722-promptpay-platform">
-    <link rel="stylesheet" href="/css/payment/payment-checkout-sheet.css?v=20260722-promptpay-platform">
+    <link rel="stylesheet" href="/css/theme/aziel-design-system.css?v=20260829-p4">
+    <link rel="stylesheet" href="/css/theme/aziel-header.css?v=20260829-p4">
+    <link rel="stylesheet" href="/css/game/game.css?v=20260829-p4">
+    <link rel="stylesheet" href="/css/game/product-detail-desktop.css?v=20260829-p4">
+    <link rel="stylesheet" href="/css/game/payment-grid.css?v=20260829-p4">
+    <link rel="stylesheet" href="/css/payment/payment-checkout-sheet.css?v=20260829-p4">
     <link rel="stylesheet" href="/css/support/live-chat.css">
-    <script src="/js/product-detail-stage.js?v=20260809-readiness-presentation" defer></script>
+    <script src="/js/product-detail-stage.js?v=20260829-p4" defer></script>
 <meta name="theme-color" content="#070716">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="icon" type="image/png" sizes="16x16" href="/assets/brand/favicon-16.png">
@@ -42,12 +43,12 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/assets/brand/apple-touch-icon.png">
 </head>
 
-<body>
-    <div id="azHeaderMount" data-nav="game"></div>
+<body class="az-purchase-surface">
+    <div id="azHeaderMount" data-nav="game"><header class="az-header"><button class="az-mobile-menu-btn" type="button" aria-label="Open menu"><i class="fa-solid fa-bars"></i></button><a href="home.html" class="az-logo" aria-label="AZIEL Home"><img src="/assets/brand/aziel-logo-primary.svg" class="az-logo-img" alt="AZIEL"></a><nav class="az-nav"><a href="home.html">Home</a><a href="home.html#popularGames">Games</a><a href="wallet.html">Wallet</a><a href="tracking.html">Orders</a><a href="support.html">Support</a></nav><div class="az-header-right"><span class="az-icon-btn" aria-hidden="true"><i class="fa-solid fa-magnifying-glass"></i></span><span class="az-profile-btn" aria-hidden="true"><span class="az-avatar">G</span></span></div></header></div>
 
     <main class="game-page">
         <section class="game-hero">
-            <div class="game-banner" data-managed-content-state="resolving">
+            <div class="game-banner product-identity" data-managed-content-state="resolving">
                 <img id="gameBanner" alt="PUBG Mobile">
 
                 <div class="banner-overlay">
@@ -59,7 +60,7 @@
                 </div>
             </div>
 
-            <div class="game-info">
+            <div class="game-info product-lower-info">
                 <h2 data-i18n="howToTopUp">How to Top Up</h2>
 
                 <div class="step-row">
@@ -264,48 +265,45 @@
     <script src="/js/asset.js"></script>
     <script src="/js/site-settings.js"></script>
 
-    <script src="/lang/en.js?v=20260809-g21-explicit"></script>
-    <script src="/lang/th.js?v=20260809-g21-explicit"></script>
-    <script src="/lang/my.js?v=20260809-g21-explicit"></script>
-    <script src="/lang/storefront-static.js?v=20260809-g21-explicit"></script>
-    <script src="/js/i18n.js?v=20260809-g21-explicit"></script>
+    <script src="/js/locale-loader.js?v=20260829-p4"></script>
+    <script src="/js/i18n.js?v=20260829-p4"></script>
 
     <script src="/js/user-state.js"></script>
-    <script src="/js/campaign-runtime.js?v=20260809-placements"></script>
+    <script src="/js/campaign-runtime.js?v=20260829-p4"></script>
     <script src="/js/auth-check.js"></script>
 
-    <script src="/js/header-loader.js?v=20260717-pass3"></script>
-    <script src="/js/header.js?v=20260723-catalog-workspace"></script>
+    <script src="/js/header-loader.js?v=20260829-p4"></script>
+    <script src="/js/header.js?v=20260829-p4"></script>
 
-    <script src="/core/settings/theme.js?v=20260817-system-authority"></script>
-    <script src="/js/locale-switcher.js?v=20260809-g21-explicit"></script>
+    <script src="/core/settings/theme.js?v=20260829-p4"></script>
+    <script src="/js/locale-switcher.js?v=20260829-p4"></script>
     <script src="/js/api.js"></script>
-    <script src="/js/motion.js?v=20260712-m7"></script>
-    <script src="/js/catalog-presentation.js?v=20260714-phase7"></script>
-    <script src="/js/catalog-runtime.js?v=20260714-phase7"></script>
-    <script src="/js/game-presentation-runtime.js?v=20260715-phase85"></script>
-    <script src="/js/prices.js?v=20260714-phase7"></script>
-    <script src="/js/purchase-transition-lock.js?v=20260828-journey-phase1"></script>
-    <script src="/js/game-flow.js?v=20260828-journey-phase1"></script>
-    <script src="/js/payment-display.js?v=20260718-labels"></script>
-    <script src="/js/payment-trust-display.js?v=20260722-region-trust"></script>
-    <script src="/js/payment.js?v=20260723-bank-launcher-runtime"></script>
+    <script src="/js/motion.js?v=20260829-p4"></script>
+    <script src="/js/catalog-presentation.js?v=20260829-p4"></script>
+    <script src="/js/catalog-runtime.js?v=20260829-p4"></script>
+    <script src="/js/game-presentation-runtime.js?v=20260829-p4"></script>
+    <script src="/js/prices.js?v=20260829-p4"></script>
+    <script src="/js/purchase-transition-lock.js?v=20260829-p4"></script>
+    <script src="/js/game-flow.js?v=20260829-p4"></script>
+    <script src="/js/payment-display.js?v=20260829-p4"></script>
+    <script src="/js/payment-trust-display.js?v=20260829-p4"></script>
+    <script src="/js/payment.js?v=20260829-p4"></script>
 
-    <script src="/js/ui-feedback.js?v=20260712-m6"></script>
-    <script src="/js/payment/payment-utils.js?v=20260707-v3"></script>
-    <script src="/js/payment/android-app-launch.js?v=20260722-open-app"></script>
-    <script src="/js/payment/payment-checkout-sheet.js?v=20260723-context-bank-runtime"></script>
-    <script src="/js/payment/payment-wallet.js?v=20260707-v3"></script>
-    <script src="/js/payment/payment-promptpay.js?v=20260707-v3"></script>
-    <script src="/js/payment/payment-deeplink.js?v=20260723-close-event"></script>
-    <script src="/js/payment/payment-manual.js?v=20260723-close-event"></script>
-    <script src="/js/payment/payment-engine.js?v=20260707-v3"></script>
+    <script src="/js/ui-feedback.js?v=20260829-p4"></script>
+    <script src="/js/payment/payment-utils.js?v=20260829-p4"></script>
+    <script src="/js/payment/android-app-launch.js?v=20260829-p4"></script>
+    <script src="/js/payment/payment-checkout-sheet.js?v=20260829-p4"></script>
+    <script src="/js/payment/payment-wallet.js?v=20260829-p4"></script>
+    <script src="/js/payment/payment-promptpay.js?v=20260829-p4"></script>
+    <script src="/js/payment/payment-deeplink.js?v=20260829-p4"></script>
+    <script src="/js/payment/payment-manual.js?v=20260829-p4"></script>
+    <script src="/js/payment/payment-engine.js?v=20260829-p4"></script>
 
-    <script src="/js/canonical-game-input-contracts.js?v=20260826-input-authority"></script>
-    <script src="/js/pubg.js?v=20260826-input-authority"></script>
+    <script src="/js/canonical-game-input-contracts.js?v=20260829-p4"></script>
+    <script src="/js/pubg.js?v=20260829-p4"></script>
 
     <script src="/js/live-chat.js"></script>
-    <script src="/js/pwa-fix.js?v=20260723-context-bank-runtime"></script>
+    <script src="/js/pwa-fix.js?v=20260829-p4"></script>
 <script>
         document.addEventListener("DOMContentLoaded", () => {
             const banner = document.getElementById("gameBanner");

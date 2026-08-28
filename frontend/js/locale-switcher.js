@@ -207,10 +207,10 @@
         const nextCurrency = currencyByRegion(nextRegion);
         const nextLang = normalizeLang(pending.language);
 
-        persistLanguage(nextLang);
-
         if (window.AZIEL_I18N?.setLang) {
-            window.AZIEL_I18N.setLang(nextLang);
+            await window.AZIEL_I18N.setLang(nextLang);
+        } else {
+            persistLanguage(nextLang);
         }
 
         if (window.AZIEL?.setShopRegion) {

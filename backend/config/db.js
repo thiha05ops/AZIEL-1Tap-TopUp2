@@ -18,6 +18,15 @@ function resolveMongoUri(env = process.env) {
 
     const mongoUri = String(env.MONGO_URI || "").trim();
     if (!mongoUri) throw new Error("MONGO_URI is required.");
+    let parsed;
+    try {
+        parsed = new URL(mongoUri);
+    } catch {
+        throw new Error("MONGO_URI must be a valid MongoDB connection URI.");
+    }
+    if (!["mongodb:", "mongodb+srv:"].includes(parsed.protocol) || !parsed.hostname) {
+        throw new Error("MONGO_URI must use mongodb:// or mongodb+srv:// with a host.");
+    }
     return mongoUri;
 }
 

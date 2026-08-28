@@ -195,9 +195,10 @@ function verifyStartupAndHealth(findings) {
 
     [
         ["validateProductionReadiness();", "STARTUP_READINESS_BEFORE_DB"],
-        ["const mongoConnection = await connectDB();", "STARTUP_AWAITS_MONGO"],
-        ["configureApplication(mongoConnection);", "STARTUP_CONFIGURES_AFTER_MONGO"],
-        ["server.listen(PORT", "STARTUP_LISTENS_AFTER_CONFIG"],
+        ["configureBaseApplication();", "STARTUP_BASE_APP_BEFORE_LISTEN"],
+        ["server.listen(options.port || PORT", "STARTUP_LISTENS_AFTER_BASE_CONFIG"],
+        ["attemptMongoConnection(options.connectDatabase || connectDB)", "STARTUP_CONNECTS_DB_AFTER_LISTEN"],
+        ["databaseReadinessGate", "STARTUP_DATABASE_GATE"],
         ["process.once(\"SIGTERM\"", "SHUTDOWN_SIGTERM"],
         ["process.once(\"SIGINT\"", "SHUTDOWN_SIGINT"],
         ["io.close()", "SHUTDOWN_SOCKET_CLOSE"],

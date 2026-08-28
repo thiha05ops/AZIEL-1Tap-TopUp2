@@ -9,6 +9,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 let currentUser = null;
 let accountRefreshTimer = null;
+let accountRefreshInFlight = false;
 
 let profileInitialDisplayName = "";
 let profileSaveInFlight = false;
@@ -95,12 +96,25 @@ async function initAccount() {
         window.AZIEL_I18N?.translatePage?.(document);
     });
 
-    accountRefreshTimer = setInterval(async () => {
-        await window.AZIEL?.loadWallet?.();
-        await refreshAccountData();
-        renderAccount();
-    }, 10000);
+    accountRefreshTimer = setInterval(refreshVisibleAccountData, 10000);
 }
+
+async function refreshVisibleAccountData() {
+    if (document.hidden || accountRefreshInFlight) return;
+    accountRefreshInFlight = true;
+    try {
+        await Promise.all([
+            window.AZIEL?.loadWallet?.(),
+            refreshAccountData()
+        ]);
+    } finally {
+        accountRefreshInFlight = false;
+    }
+}
+
+document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && currentUser) refreshVisibleAccountData();
+});
 
 window.addEventListener("beforeunload", () => {
     if (accountRefreshTimer) {

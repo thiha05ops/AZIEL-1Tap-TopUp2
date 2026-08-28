@@ -43,6 +43,17 @@ async function loadAZIELHeader() {
     const mount = document.getElementById("azHeaderMount");
     if (!mount) return;
 
+    // Public pages ship the canonical visual shell in their HTML so the header
+    // belongs to the first paint. Reconcile that shell in place; the component
+    // fetch remains a compatibility fallback for pages not migrated yet.
+    if (mount.dataset.headerCanonical === "true" && mount.querySelector(":scope > .az-header")) {
+        renderHeaderNav(mount.dataset.nav || "home");
+        azielHeaderLoaded = true;
+        translateHeaderContent();
+        window.dispatchEvent(new Event("aziel:headerLoaded"));
+        return;
+    }
+
     if (azielHeaderLoading || azielHeaderLoaded) {
         renderHeaderNav(mount.dataset.nav || "home");
         translateHeaderContent();

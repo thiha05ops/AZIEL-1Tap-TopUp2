@@ -1,8 +1,8 @@
 const CACHE_PREFIX = "aziel-runtime";
 const CORE_CACHE = `${CACHE_PREFIX}-core-v4`;
 const PAGE_CACHE = `${CACHE_PREFIX}-pages-v1`;
-const CODE_CACHE = `${CACHE_PREFIX}-code-v2`;
-const MEDIA_CACHE = `${CACHE_PREFIX}-media-v1`;
+const CODE_CACHE = `${CACHE_PREFIX}-code-v3-phase4`;
+const MEDIA_CACHE = `${CACHE_PREFIX}-media-v2-phase4`;
 
 const CORE_ASSETS = [
     "/offline.html",
@@ -285,7 +285,8 @@ async function cacheFirstVersionedCodeAsset(request) {
  */
 async function cacheFirstMediaAsset(request) {
     const cache = await caches.open(MEDIA_CACHE);
-    const cacheKey = createNormalizedCacheKey(request);
+    const url = new URL(request.url);
+    const cacheKey = isVersionedCodeAsset(url) ? request : createNormalizedCacheKey(request);
     const cached = await cache.match(cacheKey);
 
     if (cached) return cached;

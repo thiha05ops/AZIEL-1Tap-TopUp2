@@ -26,7 +26,7 @@ body.dark {
 }
 
 html {
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
 }
 
 /* =========================
@@ -122,22 +122,13 @@ main {
 
 .az-banner-zone[data-managed-content-state="resolving"] .az-banner-card,
 .az-banner-zone[data-managed-content-state="preparing"] .az-banner-card {
-  opacity: 0;
-  pointer-events: none;
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .az-banner-zone[data-managed-content-state="resolving"]::after,
 .az-banner-zone[data-managed-content-state="preparing"]::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  height: 300px;
-  border-radius: 28px;
-  background:
-    linear-gradient(90deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, .12), rgba(255, 255, 255, .05)),
-    rgba(255, 255, 255, .045);
-  background-size: 220% 100%;
-  animation: azManagedSkeleton 1.2s ease-in-out infinite;
+  content: none;
 }
 
 @keyframes azManagedSkeleton {

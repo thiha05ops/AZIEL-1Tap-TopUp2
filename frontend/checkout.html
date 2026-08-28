@@ -7,14 +7,14 @@
     <meta name="robots" content="noindex, nofollow">
     <link rel="stylesheet" href="/css/core/main.css">
     <link rel="stylesheet" href="/css/core/layout.css">
-    <link rel="stylesheet" href="/css/theme/aziel-design-system.css?v=20260701">
-    <link rel="stylesheet" href="/css/game/payment-grid.css?v=20260722-promptpay-platform">
-    <link rel="stylesheet" href="/css/payment/payment-checkout-sheet.css?v=20260722-promptpay-platform">
-    <link rel="stylesheet" href="/css/payment/pending-payment-recovery.css?v=20260723-recovery-ux">
-    <link rel="stylesheet" href="/css/payment/product-checkout.css?v=20260808-product-stage">
-    <link rel="stylesheet" href="/css/commerce/purchase-shell.css?v=20260808-unified">
+    <link rel="stylesheet" href="/css/theme/aziel-design-system.css?v=20260829-p4">
+    <link rel="stylesheet" href="/css/game/payment-grid.css?v=20260829-p4">
+    <link rel="stylesheet" href="/css/payment/payment-checkout-sheet.css?v=20260829-p4">
+    <link rel="stylesheet" href="/css/payment/pending-payment-recovery.css?v=20260829-p4">
+    <link rel="stylesheet" href="/css/payment/product-checkout.css?v=20260829-p4">
+    <link rel="stylesheet" href="/css/commerce/purchase-shell.css?v=20260829-p4">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="/css/theme/aziel-header.css?v=20260808-global-authority">
+    <link rel="stylesheet" href="/css/theme/aziel-header.css?v=20260829-p4">
     <meta name="theme-color" content="#070716">
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/png" sizes="16x16" href="/assets/brand/favicon-16.png">
@@ -71,6 +71,10 @@
                     <input id="paymentMethod" type="hidden">
                 </div>
                 <p id="checkoutFeedback" class="checkout-feedback" aria-live="polite" data-i18n="checkout.verifyingYourOrderSecurely">Verifying your order securely.</p>
+                <div id="checkoutRecoveryActions" class="checkout-recovery-actions" hidden>
+                    <button id="checkoutRetryReview" class="checkout-retry-action" type="button">Retry review</button>
+                    <a id="checkoutChangePackage" href="home.html">Change package</a>
+                </div>
                 <button id="checkoutPayButton" class="primary-commerce-action" type="button" disabled>Select a payment method</button>
             </aside>
         </div>
@@ -79,17 +83,17 @@
 
     <div id="orderLoadingOverlay" class="order-loading-overlay" aria-hidden="true"><div class="order-loading-box"><span class="az-storefront-skeleton checkout-value-skeleton"></span><span class="az-visually-hidden" data-i18n="checkout.processingCheckout">Processing checkout</span></div></div>
     <script src="/js/asset.js"></script><script src="/js/site-settings.js"></script>
-    <script src="/lang/en.js?v=20260809-g21-explicit"></script><script src="/lang/th.js?v=20260809-g21-explicit"></script><script src="/lang/my.js?v=20260809-g21-explicit"></script><script src="/lang/storefront-static.js?v=20260809-g21-explicit"></script>
-    <script src="/js/i18n.js?v=20260809-g21-explicit"></script>
+    <script src="/js/locale-loader.js?v=20260829-p4"></script>
+    <script src="/js/i18n.js?v=20260829-p4"></script>
     <script src="/js/user-state.js"></script><script src="/js/auth-check.js"></script><script src="/js/header-loader.js"></script><script src="/js/header.js"></script>
-    <script src="/core/settings/theme.js?v=20260817-system-authority"></script><script src="/js/locale-switcher.js?v=20260809-g21-explicit"></script><script src="/js/api.js"></script>
+    <script src="/core/settings/theme.js?v=20260829-p4"></script><script src="/js/locale-switcher.js?v=20260829-p4"></script><script src="/js/api.js"></script>
     <script src="/js/catalog-presentation.js"></script><script src="/js/catalog-runtime.js"></script>
     <script src="/js/payment-display.js"></script><script src="/js/payment-trust-display.js"></script><script src="/js/payment.js"></script>
-    <script src="/js/purchase-transition-lock.js?v=20260828-journey-phase1"></script>
+    <script src="/js/purchase-transition-lock.js?v=20260829-p4"></script>
     <script src="/js/ui-feedback.js"></script><script src="/js/payment/payment-utils.js"></script><script src="/js/payment/android-app-launch.js"></script>
     <script src="/js/payment/payment-checkout-sheet.js"></script><script src="/js/payment/payment-wallet.js"></script><script src="/js/payment/payment-promptpay.js"></script>
     <script src="/js/payment/payment-deeplink.js"></script><script src="/js/payment/payment-manual.js"></script><script src="/js/payment/payment-session-authority.js"></script><script src="/js/payment/payment-engine.js"></script>
-    <script src="/js/payment/pending-payment-recovery.js?v=20260808-checkout-recovery"></script>
-    <script src="/js/product-checkout.js?v=20260808-product-stage"></script>
+    <script src="/js/payment/pending-payment-recovery.js?v=20260829-p4"></script>
+    <script src="/js/product-checkout.js?v=20260829-p4"></script>
 </body>
 </html>

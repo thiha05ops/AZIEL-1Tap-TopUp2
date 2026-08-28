@@ -53,54 +53,41 @@ function verifyManagedRuntimeInteraction() {
     const runtime = read("frontend/js/home-banner-runtime.js");
 
     [
-        "track.addEventListener(\"pointerdown\"",
-        "track.addEventListener(\"pointermove\"",
-        "track.addEventListener(\"pointerup\"",
-        "track.addEventListener(\"pointercancel\"",
+        "listen(track, \"pointerdown\"",
+        "listen(track, \"pointermove\"",
+        "listen(track, \"pointerup\"",
+        "listen(track, \"pointercancel\"",
         "track.setPointerCapture",
         "track.releasePointerCapture",
         "DRAG_THRESHOLD",
         "clampDrag",
         "finishDrag",
-        "renderCards(dragCurrentX)",
+        "scheduleGestureRender(dragCurrentX)",
         "pauseAuto",
         "scheduleAuto",
-        "document.addEventListener(\"visibilitychange\"",
-        "track.addEventListener(\"mouseenter\"",
-        "track.addEventListener(\"mouseleave\"",
-        "track.addEventListener(\"keydown\"",
+        "listen(document, \"visibilitychange\"",
+        "listen(track, \"mouseenter\"",
+        "listen(track, \"mouseleave\"",
+        "listen(track, \"keydown\"",
         "ArrowLeft",
         "ArrowRight",
         "event.preventDefault()",
-        "track.addEventListener(\"click\"",
-        "track.addEventListener(\"dragstart\"",
+        "listen(track, \"click\"",
+        "listen(track, \"dragstart\"",
         "commitBannerVisualState(track.closest(\".az-banner-zone\"))",
         "zone.style.setProperty(\"--az-banner-ambient-image\"",
         "zone.style.setProperty(\"--az-banner-active-position\""
     ].forEach(snippet => assert(runtime.includes(snippet), `Home managed carousel runtime missing ${snippet}`));
 
-    assert(!runtime.includes("createElement(\"canvas\")"), "Home carousel runtime must not use canvas color extraction.");
+    assert(runtime.includes("AbortController") && runtime.includes("cleanupCarouselController"), "Carousel listeners and timers must have one cleanup owner.");
+    assert(runtime.includes("requestAnimationFrame") && runtime.includes("carouselMetrics"), "Pointer rendering must be frame-batched and use cached geometry.");
 }
 
 function verifyStaticRuntimeFallback() {
     const runtime = read("frontend/js/home.js");
-
-    [
-        "track.addEventListener(\"pointerdown\"",
-        "track.addEventListener(\"pointermove\"",
-        "track.addEventListener(\"pointerup\"",
-        "render(dragCurrentX)",
-        "--az-banner-ambient-image",
-        "touch-action"
-    ].forEach(snippet => {
-        if (snippet === "touch-action") {
-            assert(read("frontend/css/home/aziel-home.css").includes("touch-action: pan-y"), "Static carousel must inherit pan-y touch-action.");
-            return;
-        }
-        assert(runtime.includes(snippet), `Home static carousel runtime missing ${snippet}`);
-    });
-
-    assert(!runtime.includes("createElement(\"canvas\")"), "Home static carousel must not use canvas color extraction.");
+    assert(!runtime.includes("initAzielBanner"), "home.js must not retain duplicate carousel ownership.");
+    assert(!runtime.includes("pointermove"), "home.js must not bind a second drag controller.");
+    assert(read("frontend/css/home/aziel-home.css").includes("touch-action: pan-y"), "Canonical carousel must preserve native vertical touch scrolling.");
 }
 
 function main() {

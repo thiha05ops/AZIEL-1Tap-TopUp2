@@ -275,7 +275,7 @@ body.theme-light {
 }
 
 html {
-    scroll-behavior: smooth;
+    scroll-behavior: auto;
     color-scheme: var(--az-color-scheme, dark);
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;

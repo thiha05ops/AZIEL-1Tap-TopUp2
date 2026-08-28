@@ -37,7 +37,7 @@ function verifyConsolidatedJourney() {
     const shell = read("frontend/css/commerce/purchase-shell.css");
     assert(productStage.includes('"Buy Now"') && !productStage.includes('"Continue to Checkout"'));
     assert(gameFlow.includes('acquire("PREPARING_CHECKOUT"'));
-    assert(gameFlow.indexOf('acquire("PREPARING_CHECKOUT"') < gameFlow.indexOf("refreshPackageForCheckout(flow, orderData)"), "Product lock must be acquired before async checkout preparation.");
+    assert(gameFlow.indexOf("stageCheckoutHandoff(orderData, flow)") < gameFlow.indexOf("refreshPackageForCheckout(flow, orderData)"), "Checkout-stage products must navigate before legacy authoritative preparation.");
     assert(gameFlow.includes("flow.purchaseNavigationCommitted"));
     assert(checkout.includes('id="paymentGrid"') && checkout.includes('id="paymentMethod"'));
     assert(checkout.includes("purchase-transition-lock.js"));

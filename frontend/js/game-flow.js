@@ -441,6 +441,19 @@
         };
     }
 
+    function validateCheckoutDraftIdentity(orderData) {
+        if (!String(orderData?.productCode || orderData?.gameKey || "").trim()) {
+            return t("checkout.productUnavailable", "This product is not available yet.");
+        }
+        if (!String(orderData?.packageCode || "").trim()) {
+            return t("checkout.packageUnavailable", "Please select an available package.");
+        }
+        if (!String(orderData?.region || "").trim()) {
+            return t("checkout.regionRequired", "Please select a region.");
+        }
+        return "";
+    }
+
     async function submitOrder(flow) {
         if (flow.isSubmitting) return;
 
@@ -458,6 +471,11 @@
         }
 
         let orderData = buildOrderData(flow);
+        const checkoutIdentityError = validateCheckoutDraftIdentity(orderData);
+        if (checkoutIdentityError) {
+            setText(flow.config.noteSelector, checkoutIdentityError);
+            return;
+        }
         const buyBtn = getEl(flow.config.buyButtonSelector);
         const transition = window.AZIEL_PURCHASE_TRANSITION?.acquire("PREPARING_CHECKOUT", {
             controls: [
@@ -476,6 +494,14 @@
         if (buyBtn) buyBtn.disabled = true;
 
         try {
+            // Checkout-stage products hand off their safe local snapshot immediately.
+            // Canonical catalog, region, promotion, quote, and total validation belongs
+            // to the destination review and never trusts this draft's amount.
+            if (flow.config.paymentSelectionStage === "checkout") {
+                stageCheckoutHandoff(orderData, flow);
+                return;
+            }
+
             if (window.AZIEL_CATALOG) {
                 try {
                     const refreshed = await refreshPackageForCheckout(flow, orderData);
@@ -516,11 +542,6 @@
             if (orderData.promoCode) {
                 const promoFresh = await refreshPromoBeforeSubmit(flow, orderData);
                 if (!promoFresh) return;
-            }
-
-            if (flow.config.paymentSelectionStage === "checkout") {
-                stageCheckoutHandoff(orderData, flow);
-                return;
             }
 
             if (
@@ -608,9 +629,10 @@
 
     function stageCheckoutHandoff(orderData, flow) {
         const checkoutDraft = {
-            version: 1,
+            version: 2,
             createdAt: new Date().toISOString(),
             returnUrl: flow.config.pendingReturnUrl || window.location.href,
+            authoritativeStatus: "pending",
             order: {
                 ...orderData,
                 paymentMethod: "",
@@ -680,6 +702,7 @@
         `;
 
         summaryContainer.appendChild(box);
+        document.dispatchEvent(new CustomEvent("aziel:promo-controls-ready", { detail: { box } }));
 
         box.querySelector("#promoApplyBtn")?.addEventListener("click", () => applyPromoCode(flow));
         box.querySelector("#promoRemoveBtn")?.addEventListener("click", () => {

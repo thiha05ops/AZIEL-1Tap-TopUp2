@@ -294,6 +294,30 @@ body.az-purchase-surface,
     margin: 14px 0 10px;
 }
 
+.checkout-recovery-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+
+.checkout-recovery-actions[hidden] {
+    display: none;
+}
+
+.checkout-retry-action,
+.checkout-recovery-actions a {
+    min-height: 42px;
+    padding: 9px 14px;
+    border: 1px solid var(--az-border, rgba(255, 255, 255, 0.16));
+    border-radius: 10px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    text-decoration: none;
+}
+
 .checkout-value-skeleton {
     display: inline-block;
     width: 88px;

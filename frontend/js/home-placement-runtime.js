@@ -17,6 +17,9 @@
     let refreshInFlight = null;
     let regionRefreshQueued = false;
     let lastSelection = { groups: [] };
+    let lastProducts = [];
+    let lastCatalogReady = false;
+    let mobileLayoutActive = null;
 
     function ready(fn) { if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", fn); else fn(); }
     async function refreshHomeCatalog() {
@@ -26,6 +29,11 @@
         syncMobileGroupRail();
         const catalogReady = result[0].status === "fulfilled" && Boolean(window.AZIEL_CATALOG);
         const products = catalogReady ? catalogProducts() : [];
+        lastProducts = products;
+        lastCatalogReady = catalogReady;
+        renderHomeSections(products, catalogReady);
+    }
+    function renderHomeSections(products, catalogReady) {
         const selection = { groups: [] };
         SECTION_CONFIG.forEach(config => renderSection(config, products, selection, catalogReady));
         lastSelection = selection;
@@ -67,6 +75,7 @@
             return;
         }
         target.innerHTML = renderPanels(selected, config.report, isMobileViewport() ? selected.length : DESKTOP_PANEL_SIZE);
+        target.removeAttribute("aria-busy");
         section.hidden = false;
         section.dataset.homeSelectionSource = "catalog-homepage-sections";
         delete section.dataset.homeHiddenReason;
@@ -93,7 +102,10 @@
         const sections = SECTION_CONFIG.map(config => document.getElementById(config.id)).filter(Boolean);
         if (!main || !sections.length) return;
         let rail = document.getElementById(MOBILE_GROUP_RAIL_ID);
-        if (isMobileViewport()) {
+        const mobile = isMobileViewport();
+        if (mobileLayoutActive === mobile && (mobile ? Boolean(rail) : !rail)) return;
+        mobileLayoutActive = mobile;
+        if (mobile) {
             if (!rail) {
                 rail = document.createElement("div");
                 rail.id = MOBILE_GROUP_RAIL_ID;
@@ -139,6 +151,9 @@
         scheduleHomeRefresh();
         window.addEventListener("aziel:shopRegionChanged", () => scheduleHomeRefresh({ regionChanged: true }));
         document.addEventListener("aziel:catalog-updated", event => { if (event.detail?.status === "ready") scheduleHomeRefresh(); });
-        window.matchMedia?.(MOBILE_QUERY).addEventListener?.("change", () => scheduleHomeRefresh());
+        window.matchMedia?.(MOBILE_QUERY).addEventListener?.("change", () => {
+            syncMobileGroupRail();
+            renderHomeSections(lastProducts, lastCatalogReady);
+        });
     });
 })();

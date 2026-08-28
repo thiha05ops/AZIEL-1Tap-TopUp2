@@ -2,6 +2,9 @@
 // Runtime owner for Admin-managed Home hero banners.
 
 (function () {
+    if (window.__azielHomeBannerRuntimeReady) return;
+    window.__azielHomeBannerRuntimeReady = true;
+
     const t = (key, fallback, params) => window.AZIEL_LOCALE?.t?.(key, fallback, params) || fallback;
     const API_URL = "/api/home/banners";
     const AUTO_DELAY = 5600;
@@ -13,9 +16,9 @@
     const DEFAULT_HOME_HERO = Object.freeze({
         id: "aziel-default-home-hero",
         name: "AZIEL default home hero",
-        imageUrl: "assets/banners/hero.webp",
-        desktopImageUrl: "assets/banners/hero-desktop-wide.png",
-        mobileImageUrl: "assets/banners/hero.webp",
+        imageUrl: "assets/banners/hero-mobile.webp?v=20260829-p4",
+        desktopImageUrl: "assets/banners/hero-desktop-wide.webp?v=20260829-p4",
+        mobileImageUrl: "assets/banners/hero-mobile.webp?v=20260829-p4",
         imageAltText: "AZIEL featured game promotion",
         ctaTarget: "#",
         objectPosition: "center center",
@@ -37,7 +40,13 @@
     let autoResumeTimer = null;
     let ambientBufferIndex = 0;
     let userPaused = false;
+    let carouselAbort = null;
+    let renderFrame = 0;
+    let pendingDragOffset = 0;
+    let carouselMetrics = { desktop: false, step: 0 };
     const colorCache = new Map();
+    const desktopMedia = window.matchMedia(DESKTOP_CAROUSEL_QUERY);
+    const reducedMotionMedia = window.matchMedia("(prefers-reduced-motion: reduce)");
 
     const DRAG_LIMIT = 180;
     const DRAG_THRESHOLD = 56;
@@ -58,6 +67,7 @@
         const dotsBox = document.getElementById("azBannerDots");
 
         if (!zone || !track || !dotsBox) return;
+        cleanupCarouselController();
         zone.setAttribute("data-managed-content-state", "resolving");
 
         try {
@@ -80,11 +90,9 @@
             }
 
             zone.setAttribute("data-managed-content-state", "preparing");
-            await preloadImages([
-                DEFAULT_HOME_HERO.desktopImageUrl,
-                DEFAULT_HOME_HERO.mobileImageUrl,
-                ...banners.slice(0, 2).flatMap(banner => [banner.imageUrl, banner.desktopImageUrl, banner.mobileImageUrl])
-            ]);
+            // The fallback picture is already requested by the document and
+            // remains visible. Only prepare managed media before swapping it in.
+            await preloadFirstResponsiveBanner(banners[0]);
 
             const managedTrack = track.cloneNode(false);
             const managedDotsBox = dotsBox.cloneNode(false);
@@ -110,8 +118,7 @@
     }
 
     function renderDefaultFallback(zone, track = null, dotsBox = null, reason = "fallback") {
-        clearTimeout(autoResumeTimer);
-        clearInterval(autoTimer);
+        cleanupCarouselController();
         const activeTrack = track || zone.querySelector("#azBannerTrack");
         const activeDotsBox = dotsBox || zone.querySelector("#azBannerDots");
 
@@ -135,8 +142,8 @@
         return `
             <div class="az-banner-card active" data-home-banner-id="${escapeAttr(DEFAULT_HOME_HERO.id)}" data-home-banner-source="default" style="--az-banner-object-position: ${escapeAttr(DEFAULT_HOME_HERO.objectPosition)}">
                 <picture>
-                    <source media="(min-width: 769px)" srcset="${escapeAttr(DEFAULT_HOME_HERO.desktopImageUrl)}">
-                    <img src="${escapeAttr(DEFAULT_HOME_HERO.mobileImageUrl)}" alt="${escapeAttr(DEFAULT_HOME_HERO.imageAltText)}" width="3840" height="2159" loading="eager" decoding="async" fetchpriority="high" style="object-position: var(--az-banner-object-position)">
+                    <source media="(min-width: 769px)" srcset="${escapeAttr(DEFAULT_HOME_HERO.desktopImageUrl)}" type="image/webp">
+                    <img src="${escapeAttr(DEFAULT_HOME_HERO.mobileImageUrl)}" alt="${escapeAttr(DEFAULT_HOME_HERO.imageAltText)}" width="1280" height="719" loading="eager" decoding="async" fetchpriority="high" style="object-position: var(--az-banner-object-position)">
                 </picture>
             </div>
         `;
@@ -179,9 +186,12 @@
         updateHeroAtmosphere(zone, image);
     }
 
-    async function preloadImages(urls = []) {
-        const uniqueUrls = [...new Set(urls.filter(Boolean))];
-        await Promise.all(uniqueUrls.map(preloadImage));
+    async function preloadFirstResponsiveBanner(banner = {}) {
+        const desktop = window.matchMedia("(min-width: 769px)").matches;
+        const selectedUrl = desktop
+            ? (banner.desktopImageUrl || banner.imageUrl)
+            : (banner.mobileImageUrl || banner.imageUrl);
+        if (selectedUrl) await preloadImage(selectedUrl);
     }
 
     async function preloadImage(url) {
@@ -210,7 +220,7 @@
         track.innerHTML = banners.map((banner, index) => {
             const target = normalizeTarget(banner.ctaTarget);
             const label = banner.imageAltText || banner.name || "AZIEL banner";
-            const loading = index < 2 ? "eager" : "lazy";
+            const loading = index === 0 ? "eager" : "lazy";
             const fetchPriority = index === 0 ? "high" : "auto";
 
             const desktopImage = banner.desktopImageUrl || banner.imageUrl;
@@ -247,7 +257,9 @@
     }
 
     function bindManagedCarousel(track, dotsBox) {
-        clearInterval(autoTimer);
+        cleanupCarouselController();
+        carouselAbort = new AbortController();
+        const listen = (target, type, handler, options = {}) => target.addEventListener(type, handler, { ...options, signal: carouselAbort.signal });
         current = 0;
         cards = [...track.querySelectorAll(".az-banner-card")];
         dots = [...dotsBox.querySelectorAll("button")];
@@ -272,17 +284,18 @@
         };
 
         setArrowVisibility(track.closest(".az-banner-zone"), true);
-        bindHeroArrows(track.closest(".az-banner-zone"), goTo);
+        bindHeroArrows(track.closest(".az-banner-zone"), goTo, listen);
 
         dots.forEach((dot, index) => {
-            dot.addEventListener("click", () => {
+            listen(dot, "click", () => {
                 pauseForInteraction(goTo);
                 goTo(index);
             });
         });
 
-        track.addEventListener("pointerdown", event => {
+        listen(track, "pointerdown", event => {
             if (event.button !== undefined && event.button !== 0) return;
+            measureCarousel(track);
             isDragging = true;
             didDrag = false;
             dragStartX = event.clientX;
@@ -295,7 +308,7 @@
             track.setPointerCapture?.(event.pointerId);
         });
 
-        track.addEventListener("pointermove", event => {
+        listen(track, "pointermove", event => {
             if (!isDragging) return;
             dragCurrentX = clampDrag(event.clientX - dragStartX);
             const elapsed = Math.max(1, event.timeStamp - dragLastTime);
@@ -303,10 +316,10 @@
             dragLastX = event.clientX;
             dragLastTime = event.timeStamp;
             if (Math.abs(dragCurrentX) > DRAG_CLICK_THRESHOLD) didDrag = true;
-            if (window.matchMedia?.(DESKTOP_CAROUSEL_QUERY)?.matches === true) renderCards(dragCurrentX);
+            if (carouselMetrics.desktop) scheduleGestureRender(dragCurrentX);
         });
 
-        track.addEventListener("pointerup", event => {
+        listen(track, "pointerup", event => {
             if (!isDragging) return;
             isDragging = false;
             track.classList.remove("is-dragging");
@@ -314,7 +327,7 @@
             finishDrag(goTo);
         });
 
-        track.addEventListener("pointercancel", event => {
+        listen(track, "pointercancel", event => {
             isDragging = false;
             track.classList.remove("is-dragging");
             track.releasePointerCapture?.(event.pointerId);
@@ -324,17 +337,17 @@
             scheduleAuto(goTo);
         });
 
-        track.addEventListener("click", event => {
+        listen(track, "click", event => {
             if (!didDrag) return;
             event.preventDefault();
             event.stopPropagation();
             didDrag = false;
-        }, true);
+        }, { capture: true });
 
-        track.addEventListener("dragstart", event => event.preventDefault());
-        track.addEventListener("mouseenter", pauseAuto);
-        track.addEventListener("mouseleave", () => scheduleAuto(goTo));
-        track.addEventListener("keydown", event => {
+        listen(track, "dragstart", event => event.preventDefault());
+        listen(track, "mouseenter", pauseAuto);
+        listen(track, "mouseleave", () => scheduleAuto(goTo));
+        listen(track, "keydown", event => {
             if (event.key === "ArrowLeft") {
                 event.preventDefault();
                 pauseForInteraction(goTo);
@@ -347,18 +360,63 @@
             }
         });
 
-        document.addEventListener("visibilitychange", () => {
+        listen(document, "visibilitychange", () => {
             if (document.hidden) pauseAuto();
             else scheduleAuto(goTo);
         });
 
-        window.addEventListener("resize", () => renderCards(0));
+        listen(desktopMedia, "change", () => scheduleCarouselMeasure(track));
+        listen(reducedMotionMedia, "change", event => {
+            if (event.matches) pauseAuto();
+            else scheduleAuto(goTo);
+        });
+        listen(window, "resize", () => scheduleCarouselMeasure(track), { passive: true });
+        measureCarousel(track);
         goTo(0);
         startAuto(goTo);
     }
 
+    function cleanupCarouselController() {
+        carouselAbort?.abort();
+        carouselAbort = null;
+        clearTimeout(autoResumeTimer);
+        clearInterval(autoTimer);
+        cancelAnimationFrame(renderFrame);
+        renderFrame = 0;
+        autoResumeTimer = null;
+        autoTimer = null;
+        isDragging = false;
+    }
+
+    function measureCarousel(track) {
+        const stageWidth = track?.clientWidth || 0;
+        const viewportWidth = window.innerWidth;
+        carouselMetrics = {
+            desktop: desktopMedia.matches,
+            step: (stageWidth * .397) + Math.max(24, Math.min(32, viewportWidth * .02))
+        };
+    }
+
+    function scheduleCarouselMeasure(track) {
+        if (renderFrame) return;
+        renderFrame = requestAnimationFrame(() => {
+            renderFrame = 0;
+            measureCarousel(track);
+            renderCards(0);
+        });
+    }
+
+    function scheduleGestureRender(offset) {
+        pendingDragOffset = offset;
+        if (renderFrame) return;
+        renderFrame = requestAnimationFrame(() => {
+            renderFrame = 0;
+            renderCards(pendingDragOffset);
+        });
+    }
+
     function startAuto(goTo) {
-        if (userPaused || cards.length < 2 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        if (userPaused || cards.length < 2 || reducedMotionMedia.matches || document.hidden) return;
         clearTimeout(autoResumeTimer);
         clearInterval(autoTimer);
         autoTimer = setInterval(() => goTo(current + 1), AUTO_DELAY);
@@ -410,16 +468,17 @@
         zone.append(previous, next);
     }
 
-    function bindHeroArrows(zone, goTo) {
-        if (!zone || zone.dataset.heroArrowsReady === "true") return;
-        zone.dataset.heroArrowsReady = "true";
-        zone.querySelector(".az-banner-arrow--previous")?.addEventListener("click", event => {
+    function bindHeroArrows(zone, goTo, listen) {
+        if (!zone || typeof listen !== "function") return;
+        const previous = zone.querySelector(".az-banner-arrow--previous");
+        const next = zone.querySelector(".az-banner-arrow--next");
+        if (previous) listen(previous, "click", event => {
             event.preventDefault();
             event.stopPropagation();
             pauseForInteraction(goTo);
             goTo(current - 1);
         });
-        zone.querySelector(".az-banner-arrow--next")?.addEventListener("click", event => {
+        if (next) listen(next, "click", event => {
             event.preventDefault();
             event.stopPropagation();
             pauseForInteraction(goTo);
@@ -432,6 +491,8 @@
     }
 
     function finishDrag(goTo) {
+        cancelAnimationFrame(renderFrame);
+        renderFrame = 0;
         const diff = dragCurrentX;
         const velocity = dragVelocity;
         dragCurrentX = 0;
@@ -449,10 +510,19 @@
     }
 
     function renderCards(dragOffset = 0) {
-        const desktopCarousel = window.matchMedia?.(DESKTOP_CAROUSEL_QUERY)?.matches === true;
-        const stageWidth = cards[current]?.closest(".az-banner-track")?.clientWidth || 0;
-        const desktopGap = Math.max(24, Math.min(32, window.innerWidth * .02));
-        const desktopStep = (stageWidth * .397) + desktopGap;
+        const desktopCarousel = carouselMetrics.desktop;
+        const desktopStep = carouselMetrics.step;
+
+        if (isDragging && dragOffset && desktopCarousel && cards.length > 1) {
+            cards.forEach((card, index) => {
+                const offset = getShortestOffset(index);
+                if (Math.abs(offset) > 1) return;
+                const isSide = Math.abs(offset) === 1;
+                const x = (offset * desktopStep) + dragOffset;
+                card.style.transform = `translateX(calc(-50% + ${x}px)) scale(${isSide ? ".96" : "1"})`;
+            });
+            return;
+        }
 
         cards.forEach((card, index) => {
             const isActive = index === current;

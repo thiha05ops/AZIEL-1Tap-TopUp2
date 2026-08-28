@@ -57,8 +57,8 @@ function verifyRuntimeFallbacks() {
 
     includes(runtime, 'const API_URL = "/api/home/banners"', "Hero runtime must use the Home campaign/banner API.");
     includes(runtime, "DEFAULT_HOME_HERO", "Hero runtime must own an independent default hero config.");
-    includes(runtime, "assets/banners/hero-desktop-wide.png", "Default desktop hero asset missing.");
-    includes(runtime, "assets/banners/hero.webp", "Default mobile hero asset missing.");
+    includes(runtime, "assets/banners/hero-desktop-wide.webp?v=20260829-p4", "Default optimized desktop hero asset missing.");
+    includes(runtime, "assets/banners/hero-mobile.webp?v=20260829-p4", "Default optimized mobile hero asset missing.");
     includes(runtime, "renderDefaultFallback(zone, track, dotsBox, \"api-unmanaged\")", "Unmanaged/no campaign API response must use default fallback.");
     includes(runtime, "renderDefaultFallback(zone, track, dotsBox, \"no-eligible-campaigns\")", "No eligible campaigns must use default fallback.");
     includes(runtime, "renderDefaultFallback(zone, track, dotsBox, \"api-failure\")", "API failure must use default fallback.");
@@ -74,8 +74,8 @@ function verifyRuntimeFallbacks() {
     includes(runtime, "bindManagedCarousel", "Multiple campaigns must preserve carousel behavior.");
     includes(runtime, "dotsBox.hidden = true", "Single/default banner must hide dots.");
 
-    includes(homeHtml, "assets/banners/hero-desktop-wide.png", "HTML default desktop hero must remain available before JS.");
-    includes(homeHtml, "assets/banners/hero.webp", "HTML default mobile hero must remain available before JS.");
+    includes(homeHtml, "assets/banners/hero-desktop-wide.webp?v=20260829-p4", "HTML default desktop hero must remain available before JS.");
+    includes(homeHtml, "assets/banners/hero-mobile.webp?v=20260829-p4", "HTML default mobile hero must remain available before JS.");
     includes(homeHtml, "data-managed-content-state=\"fallback\"", "HTML must start with safe fallback state.");
 
     includes(service, "isEligibleBanner(item, now)", "Home campaign selection must respect enabled/date eligibility.");

@@ -98,15 +98,14 @@
         safeNote.textContent = tr("checkout.paymentProtected", "Secure Checkout • Your payment is protected");
     }
 
-    function movePromoCard() {
-        const promo = document.getElementById("azielPromoBox");
+    function movePromoCard(promo = document.getElementById("azielPromoBox")) {
         if (!promo || promo.closest(".product-promo-card") || !summary) return;
         const card = document.createElement("section");
         card.className = "product-promo-card";
         card.appendChild(promo);
         summary.insertAdjacentElement("afterend", card);
     }
-    new MutationObserver(movePromoCard).observe(document.body, { childList: true, subtree: true });
+    document.addEventListener("aziel:promo-controls-ready", event => movePromoCard(event.detail?.box), { once: true });
     movePromoCard();
 
     function createInfoSection(title) {

@@ -125,8 +125,18 @@
         return interpolate(translated, params);
     }
 
-    function setLang(lang) {
+    async function setLang(lang) {
         const nextLang = normalizeLang(lang);
+        const previousLang = getLang();
+
+        try {
+            await window.AZIEL_LOCALE_LOADER?.load?.(nextLang);
+        } catch (error) {
+            // Offline switching must leave the already rendered locale intact.
+            if (window.AZIEL_LANG?.[previousLang]) return previousLang;
+            if (nextLang !== "en" && window.AZIEL_LANG?.en) return setLang("en");
+            throw error;
+        }
 
         try {
             localStorage.setItem(LANG_KEY, nextLang);
@@ -144,6 +154,7 @@
                 detail: { lang: nextLang }
             })
         );
+        return nextLang;
         window.dispatchEvent(
             new CustomEvent("aziel:locale-changed", {
                 detail: { locale: nextLang }
@@ -227,8 +238,9 @@
         translatePage,
         ready() {
             if (!readyPromise) {
-                readyPromise = Promise.resolve().then(() => {
-                    getLang();
+                readyPromise = Promise.resolve().then(async () => {
+                    const lang = getLang();
+                    await window.AZIEL_LOCALE_LOADER?.load?.(lang);
                     return activeLang;
                 });
             }

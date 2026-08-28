@@ -3,6 +3,7 @@
 
 (function () {
     const CACHE_TTL_MS = 45000;
+    const STARTUP_RETRY_DELAYS_MS = Object.freeze([750, 1500, 3000]);
     const REGION_CURRENCIES = {
         MM: "MMK",
         TH: "THB"
@@ -95,6 +96,24 @@
         return Boolean(catalog && status === "ready");
     }
 
+    function wait(delayMs) {
+        return new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+
+    async function fetchCatalog(attempt = 0) {
+        const response = await fetch("/api/catalog", {
+            cache: "no-store",
+            headers: { Accept: "application/json" }
+        });
+        const data = await response.json().catch(() => ({}));
+        const startupUnavailable = response.status === 503 && data?.code === "SERVICE_TEMPORARILY_UNAVAILABLE";
+        if (startupUnavailable && attempt < STARTUP_RETRY_DELAYS_MS.length) {
+            await wait(STARTUP_RETRY_DELAYS_MS[attempt]);
+            return fetchCatalog(attempt + 1);
+        }
+        return { response, data };
+    }
+
     async function load(options = {}) {
         if (loadingPromise) return loadingPromise;
         if (!options.force && isFresh()) return catalog;
@@ -102,13 +121,8 @@
         status = "loading";
         emitCatalogUpdated({ loading: true, source: options.source || "catalog" });
 
-        loadingPromise = fetch("/api/catalog", {
-            cache: "no-store",
-            headers: { Accept: "application/json" }
-        })
-            .then(async response => {
-                const data = await response.json().catch(() => ({}));
-
+        loadingPromise = fetchCatalog()
+            .then(({ response, data }) => {
                 if (!response.ok || !data.success || !Array.isArray(data.products)) {
                     throw new Error(data.message || "Catalog unavailable");
                 }

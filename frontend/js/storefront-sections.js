@@ -17,6 +17,7 @@
 
     let sections = null;
     let loadingPromise = null;
+    const STARTUP_RETRY_DELAYS_MS = Object.freeze([750, 1500, 3000]);
 
     function clone(value) {
         return JSON.parse(JSON.stringify(value));
@@ -49,16 +50,30 @@
         return clone(FALLBACK_SECTIONS);
     }
 
+    function wait(delayMs) {
+        return new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+
+    async function fetchSections(attempt = 0) {
+        const response = await fetch("/api/public/storefront-sections", {
+            cache: "no-store",
+            headers: { Accept: "application/json" }
+        });
+        const data = await response.json().catch(() => ({}));
+        const startupUnavailable = response.status === 503 && data?.code === "SERVICE_TEMPORARILY_UNAVAILABLE";
+        if (startupUnavailable && attempt < STARTUP_RETRY_DELAYS_MS.length) {
+            await wait(STARTUP_RETRY_DELAYS_MS[attempt]);
+            return fetchSections(attempt + 1);
+        }
+        return { response, data };
+    }
+
     async function load(options = {}) {
         if (sections && !options.force) return sections;
         if (loadingPromise && !options.force) return loadingPromise;
 
-        loadingPromise = fetch("/api/public/storefront-sections", {
-            cache: "no-store",
-            headers: { Accept: "application/json" }
-        })
-            .then(async response => {
-                const data = await response.json().catch(() => ({}));
+        loadingPromise = fetchSections()
+            .then(({ response, data }) => {
                 if (!response.ok || !data.success || !Array.isArray(data.sections)) {
                     throw new Error(data.message || "Storefront sections unavailable");
                 }

@@ -67,6 +67,11 @@
     cursor: pointer;
     transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
 }
+
+.home-product-panel--loading .home-product-item {
+    min-height: 188px;
+    pointer-events: none;
+}
 .az-home .home-merch-section .az-section-head h2::before {
     content: "";
     display: inline-block;

@@ -28,11 +28,11 @@ function main() {
     const fulfillmentService = read("backend/services/fulfillmentService.js");
     const server = read("backend/server.js");
 
-    assert(homeBanner.includes("banners.slice(0, 2).flatMap"), "Home managed banners must preload only current and next responsive hero sources.");
+    assert(homeBanner.includes("preloadFirstResponsiveBanner(banners[0])"), "Home managed banners must preload only the first browser-selected responsive source.");
     assert(gameRuntime.includes("banners.slice(0, 2).map"), "Game managed banners must preload only current and next hero.");
-    assert(homeBanner.includes('const loading = index < 2 ? "eager" : "lazy"'), "Home late banner images must lazy-load.");
+    assert(homeBanner.includes('const loading = index === 0 ? "eager" : "lazy"'), "Only the first Home banner image may load eagerly.");
     assert(gameRuntime.includes('const loading = index < 2 ? "eager" : "lazy"'), "Game late banner images must lazy-load.");
-    assert(home.includes('fetchpriority="high"') && home.includes('width="3840" height="2159"'), "Static home hero must reserve dimensions and prioritize the first slide.");
+    assert(home.includes('fetchpriority="high"') && home.includes('width="1280" height="719"'), "Static home hero must reserve responsive dimensions and prioritize the first slide.");
     assert(header.includes('window.addEventListener("scroll"') && header.includes("{ passive: true }"), "Header scroll listener must be passive.");
     assert(header.includes("window.__azielCanonicalHeaderScrollReady"), "Header must guard duplicate scroll listener initialization.");
     assert(homeBanner.includes("ensureHomeAmbientBuffers") && homeBanner.includes("i < 2"), "Home ambient buffers must be capped at two.");
