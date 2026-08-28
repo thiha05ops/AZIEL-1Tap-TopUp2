@@ -138,6 +138,49 @@ async function loadActivePolicy({ region, currency, now = new Date() } = {}) {
     }).sort({ effectiveFrom: -1, updatedAt: -1, _id: -1 }).lean());
 }
 
+function publishedVersionPolicyQuery(policy) {
+    if (!policy?._id) return {};
+    return {
+        $or: [
+            { pricingPolicyId: policy._id },
+            { pricingPolicyId: null },
+            { "metadata.policyIds": String(policy._id) }
+        ]
+    };
+}
+
+function isPublishedStorefrontVersion(version = {}) {
+    return upper(version.status) === "PUBLISHED" && text(version.branchKey) === DEFAULT_BRANCH;
+}
+
+function priceVersionMatchesPolicy(version = {}, policy = {}) {
+    if (!policy?._id) return true;
+    const policyId = text(policy._id);
+    const directPolicyId = text(version.pricingPolicyId?._id || version.pricingPolicyId);
+    const metadataPolicyIds = Array.isArray(version.metadata?.policyIds) ? version.metadata.policyIds.map(text) : [];
+    return !directPolicyId || directPolicyId === policyId || metadataPolicyIds.includes(policyId);
+}
+
+function priceVersionAppliesToPackage(version = {}, pkg = {}) {
+    const affected = Array.isArray(version.affectedPackages) ? version.affectedPackages : [];
+    if (!affected.length) return true;
+    const packageId = text(pkg?._id);
+    const packageCode = upper(pkg?.packageCode);
+    return affected.some(item => (
+        (packageId && text(item.packageRef?._id || item.packageRef) === packageId) ||
+        (packageCode && upper(item.packageId) === packageCode) ||
+        (packageCode && upper(item.packageCode) === packageCode)
+    ));
+}
+
+function findPublishedVersionForPackage({ versions = [], policy, pkg } = {}) {
+    return versions.find(version => (
+        isPublishedStorefrontVersion(version) &&
+        priceVersionMatchesPolicy(version, policy) &&
+        priceVersionAppliesToPackage(version, pkg)
+    )) || null;
+}
+
 async function loadPublishedVersion({ policy, pkg, region, now = new Date() } = {}) {
     const packageId = text(pkg?._id);
     const packageCode = upper(pkg?.packageCode);
@@ -145,23 +188,11 @@ async function loadPublishedVersion({ policy, pkg, region, now = new Date() } = 
         status: "PUBLISHED",
         branchKey: DEFAULT_BRANCH
     };
-    if (policy?._id) {
-        query.$or = [
-            { pricingPolicyId: policy._id },
-            { pricingPolicyId: null },
-            { "metadata.policyIds": String(policy._id) }
-        ];
-    }
+    Object.assign(query, publishedVersionPolicyQuery(policy));
 
     const candidates = await PriceVersion.find(query).sort({ publishedAt: -1, versionNumber: -1, updatedAt: -1 }).limit(20).lean();
     return plain(candidates.find(version => {
-        const affected = Array.isArray(version.affectedPackages) ? version.affectedPackages : [];
-        if (!affected.length) return true;
-        return affected.some(item => (
-            text(item.packageRef) === packageId ||
-            upper(item.packageId) === packageCode ||
-            upper(item.packageCode) === packageCode
-        ));
+        return priceVersionAppliesToPackage(version, { _id: packageId, packageCode });
     }) || candidates[0] || {
         versionId: `catalog:${text(pkg?.productCode).toLowerCase()}:${packageCode}:${upper(region)}`,
         versionNumber: 1,
@@ -378,5 +409,10 @@ module.exports = Object.freeze({
     buildProductionPricingContext,
     publishedCustomerPriceRule,
     neutralPolicy,
-    resolveProductionExchangeRate
+    resolveProductionExchangeRate,
+    publishedVersionPolicyQuery,
+    isPublishedStorefrontVersion,
+    priceVersionMatchesPolicy,
+    priceVersionAppliesToPackage,
+    findPublishedVersionForPackage
 });

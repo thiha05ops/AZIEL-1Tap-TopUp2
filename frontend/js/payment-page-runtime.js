@@ -48,13 +48,22 @@
         window.selectedPaymentData = payment;
         document.getElementById("paymentSessionMount").innerHTML = "";
         renderSummary(order, session, payment);
+        if (window.AZIEL_MM_PAYMENT_SHELL?.supports?.(staged)) {
+            document.getElementById("paymentPageTitle").textContent = t("payment", "Payment");
+            window.AZIEL_MM_PAYMENT_SHELL.show(staged, { onSubmitted: ({ orderId, amount, currency, methodName, reference }) => {
+                sessionStorage.removeItem(SESSION_KEY);
+                sessionStorage.removeItem("azielProductCheckoutDraft");
+                showCompletion({ orderId, paid: false, amount, currency, methodName, reference, manualSubmission: true });
+            } });
+            return;
+        }
         window.PaymentManual.show(order, session);
     }
 
-    function showCompletion({ orderId, paid = false, amount = null, currency = "" } = {}) {
+    function showCompletion({ orderId, paid = false, amount = null, currency = "", methodName = "", reference = "", manualSubmission = false } = {}) {
         if (!orderId) return;
         let remaining = 5;
-        completionState = { orderId, paid };
+        completionState = { orderId, paid, manualSubmission };
         completionRemaining = remaining;
         const mount = document.getElementById("paymentSessionMount");
         const section = document.createElement("section");
@@ -62,13 +71,15 @@
         section.setAttribute("role", "status");
         const icon = document.createElement("div"); icon.className = "payment-completion__icon"; icon.textContent = "✓";
         const eyebrow = document.createElement("p"); eyebrow.className = "checkout-eyebrow"; eyebrow.textContent = t("order.statusLabel", "Order status");
-        const title = document.createElement("h2"); title.textContent = paid ? t("payment.success.title", "Payment Successful") : t("payment.submitted.title", "Payment submitted");
-        const body = document.createElement("p"); body.textContent = paid ? t("payment.success.receivedProcessing", "Your payment has been received. Your order is being processed.") : t("payment.submitted.awaiting", "Your receipt is awaiting verification.");
+        const title = document.createElement("h2"); title.textContent = paid ? t("payment.success.title", "Payment Successful") : t("payment.submitted.title", "Payment Submitted");
+        const body = document.createElement("p"); body.textContent = paid ? t("payment.success.receivedProcessing", "Your payment has been received. Your order is being processed.") : t("payment.submitted.awaiting", "Your receipt has been received. Your payment is waiting for verification.");
+        const details = document.createElement("dl"); details.className = "payment-completion__details";
+        [[t("payment.amount", "Amount"), amount != null ? money(amount, currency) : ""], [t("payment.method", "Payment Method"), methodName], [t("payment.reference", "Reference"), reference]].forEach(([label, value]) => { if (!value) return; const row = document.createElement("div"); const dt = document.createElement("dt"); dt.textContent = label; const dd = document.createElement("dd"); dd.textContent = value; row.append(dt, dd); details.append(row); });
         const countdown = document.createElement("p"); countdown.id = "paymentRedirectCountdown"; countdown.textContent = t("payment.redirectCountdown", "Redirecting to order tracking in {seconds} seconds", { seconds: remaining });
         const actions = document.createElement("div"); actions.className = "payment-completion__actions";
         const track = document.createElement("a"); track.id = "trackOrderNow"; track.className = "primary-commerce-action"; track.href = `tracking.html?orderId=${encodeURIComponent(orderId)}`; track.textContent = t("payment.trackOrderNow", "Track Order");
         const home = document.createElement("a"); home.id = "paymentBackHome"; home.href = "home.html"; home.textContent = t("payment.backHome", "Back to Home");
-        actions.append(track, home); section.append(icon, eyebrow, title, body, countdown, actions); mount.replaceChildren(section);
+        actions.append(track, home); section.append(icon, eyebrow, title, body); if (details.childElementCount) section.append(details); section.append(countdown, actions); mount.replaceChildren(section);
         text("paymentOrderId", orderId);
         if (amount != null) text("paymentAmount", money(amount, currency));
         text("paymentStatusSummary", paid ? t("payment.state.paid", "Paid") : t("payment.state.pendingVerification", "Pending verification"));
@@ -92,6 +103,14 @@
         document.getElementById("paymentPageTitle").textContent = t("payment.resume", "Resume payment");
         document.getElementById("paymentSessionMount").innerHTML = "";
         renderSummary(recovery, recovery, { method: recovery.paymentName || "PromptPay QR" });
+        if (String(recovery.provider || "").toUpperCase() === "MANUAL_ADMIN" || String(recovery.region || "").toUpperCase() === "MM") {
+            if (recovery.receiptSubmitted === true || recovery.receiptEvidence?.attached === true) {
+                showCompletion({ orderId: recovery.orderId || recovery.commerceOrderId, paid: false, amount: recovery.amount, currency: recovery.currency, methodName: recovery.paymentName || recovery.paymentMethod, reference: recovery.reference, manualSubmission: true });
+                return true;
+            }
+            window.AZIEL_MM_PAYMENT_SHELL.show({ session: recovery, orderData: recovery, selectedPayment: recovery, paymentType: "manual" }, { onSubmitted: ({ orderId, amount, currency, methodName, reference }) => showCompletion({ orderId, paid: false, amount, currency, methodName, reference, manualSubmission: true }) });
+            return true;
+        }
         window.PaymentCheckoutSheet.openRecoveredPayment(recovery);
         return true;
     }
@@ -108,7 +127,11 @@
             paymentMethod: marker.paymentMethod || "promptpay", paymentName: "PromptPay QR",
             amount: payment.amount, currency: payment.currency || "THB", resumable: true,
             recoverableExpiresAt: payment.expiresAt, qrMode: payment.qr?.mode || "aziel_promptpay_dynamic",
-            qrImageUrl: payment.qr?.image || "", dynamicQr: { qrImage: payment.qr?.image || "", expiresAt: payment.expiresAt }
+            provider: payment.provider || "", region: payment.region || marker.region || "", paymentMethod: payment.paymentMethod || marker.paymentMethod || "", paymentName: payment.paymentInstructions?.title || marker.paymentMethod || "PromptPay QR",
+            accountName: payment.paymentInstructions?.accountName || "", accountNumber: payment.paymentInstructions?.accountNumber || "", reference: payment.paymentInstructions?.reference || payment.qr?.encodedReference || payment.attemptId || marker.attemptId,
+            receiptUploadEnabled: payment.paymentInstructions?.receiptUploadEnabled !== false, slipRequired: payment.paymentInstructions?.slipRequired !== false, receiptEvidence: payment.receiptEvidence || null,
+            enableOpenApp: payment.paymentInstructions?.enableOpenApp === true, openAppMode: payment.paymentInstructions?.openAppMode || "disabled", deepLinkUrl: payment.paymentInstructions?.deepLinkUrl || "",
+            qrImageUrl: payment.qr?.image || "", qrImage: payment.qr?.image || "", dynamicQr: payment.qr?.image ? { qrImage: payment.qr.image, expiresAt: payment.expiresAt } : null
         };
         return showRecovered(recovery);
     }
@@ -183,8 +206,8 @@
         const section = document.querySelector(".payment-completion");
         if (!section) return;
         section.querySelector(".checkout-eyebrow").textContent = t("order.statusLabel", "Order status");
-        section.querySelector("h2").textContent = paid ? t("payment.success.title", "Payment Successful") : t("payment.submitted.title", "Payment submitted");
-        section.querySelector("h2 + p").textContent = paid ? t("payment.success.receivedProcessing", "Your payment has been received. Your order is being processed.") : t("payment.submitted.awaiting", "Your receipt is awaiting verification.");
+        section.querySelector("h2").textContent = paid ? t("payment.success.title", "Payment Successful") : t("payment.submitted.title", "Payment Submitted");
+        section.querySelector("h2 + p").textContent = paid ? t("payment.success.receivedProcessing", "Your payment has been received. Your order is being processed.") : t("payment.submitted.awaiting", "Your receipt has been received. Your payment is waiting for verification.");
         document.getElementById("paymentRedirectCountdown").textContent = t("payment.redirectCountdown", "Redirecting to order tracking in {seconds} seconds", { seconds: completionRemaining });
         document.getElementById("trackOrderNow").textContent = t("payment.trackOrderNow", "Track Order");
         document.getElementById("paymentBackHome").textContent = t("payment.backHome", "Back to Home");

@@ -5,7 +5,8 @@ const paymentAttemptRepository = require("./paymentAttemptRepository");
 
 const SERVICE_VERSION = "commerce.payment-recovery.v1";
 const MANUAL_PROMPTPAY_PROVIDER = "MANUAL_PROMPTPAY";
-const MANUAL_PROMPTPAY_PROVIDER_ALIASES = Object.freeze(["promptpay", MANUAL_PROMPTPAY_PROVIDER]);
+const MANUAL_ADMIN_PROVIDER = "MANUAL_ADMIN";
+const MANUAL_PROMPTPAY_PROVIDER_ALIASES = Object.freeze(["promptpay", MANUAL_PROMPTPAY_PROVIDER, MANUAL_ADMIN_PROVIDER]);
 const RECOVERABLE_STATUSES = Object.freeze(["PENDING"]);
 const RECOVERABLE_ORDER_STATUSES = Object.freeze(new Set(["pending_payment"]));
 const RECOVERABLE_ORDER_PAYMENT_STATUSES = Object.freeze(new Set(["pending", "unpaid"]));
@@ -71,14 +72,36 @@ function orderRecoverable(order = {}) {
 function attemptRecoverable(attempt = {}, order = {}, owner = {}, now = new Date()) {
     if (!attempt?.attemptId || !order?.orderId) return false;
     if (!sameOwner(owner, attempt.owner) || !sameOwner(owner, order.owner)) return false;
-    if (!normalizeManualPromptPayProvider(attempt.provider)) return false;
+    const provider = text(attempt.provider).toUpperCase();
+    if (!normalizeManualPromptPayProvider(provider) && provider !== MANUAL_ADMIN_PROVIDER) return false;
     if (!RECOVERABLE_STATUSES.includes(text(attempt.status).toUpperCase())) return false;
     if (!notExpired(attempt, now)) return false;
-    if (hasReceiptEvidence(attempt)) return false;
     if (!orderRecoverable(order)) return false;
+    if (provider === MANUAL_ADMIN_PROVIDER) return true;
+    if (hasReceiptEvidence(attempt)) return false;
     const qr = attempt.qr || {};
     return Boolean(qr.image && (qr.mode || "aziel_promptpay_dynamic") === "aziel_promptpay_dynamic");
 }
+
+function projectRecoverableManualAdminAttempt({ attempt = {}, order = {}, now = new Date() } = {}) {
+    const product = order.product || {}, commercial = order.commercial || {}, instructions = attempt.paymentInstructions || {}, qr = attempt.qr || null;
+    const receiptSubmitted = hasReceiptEvidence(attempt);
+    const reference = instructions.reference || attempt.providerReference || attempt.attemptId;
+    return {
+        architecture: "commerce", commerce: true, commerceRecoveryVersion: SERVICE_VERSION,
+        orderId: order.orderId || attempt.orderId || "", commerceOrderId: order.orderId || attempt.orderId || "", quoteId: order.quoteId || attempt.quoteId || "", attemptId: attempt.attemptId || "",
+        reference, orderReference: reference, productCode: product.gameCode || product.gameId || "", productName: product.gameName || "", packageCode: product.packageCode || "", packageName: product.packageName || "",
+        gameUserData: { userId: order.fulfilment?.input?.userId || "", zoneId: order.fulfilment?.input?.zoneId || "" }, amount: Number(attempt.amount ?? commercial.totalAmount ?? 0), currency: attempt.currency || commercial.currency || "", region: attempt.region || commercial.region || "",
+        paymentMethod: attempt.paymentMethod || attempt.paymentMethodId || order.payment?.paymentMethodId || "", paymentType: "manual", provider: "MANUAL_ADMIN", paymentName: instructions.title || "Manual Payment",
+        qrMode: qr?.mode || "none", qrImage: qr?.image || "", accountName: instructions.accountName || "", accountNumber: instructions.accountNumber || "", confirmationMode: "manual_admin",
+        receiptUploadEnabled: instructions.receiptUploadEnabled !== false, slipRequired: instructions.slipRequired !== false, enableOpenApp: instructions.enableOpenApp === true, openAppMode: instructions.openAppMode || "disabled", deepLinkUrl: instructions.deepLinkUrl || "", appDisplayName: instructions.appDisplayName || "",
+        instructions: cloneInstructions(instructions), createdAt: attempt.createdAt || order.createdAt || "", expiresAt: attempt.expiresAt || "", recoverableExpiresAt: attempt.expiresAt || "", remainingSeconds: remainingSeconds(attempt, now),
+        receiptSubmitted, resumable: !receiptSubmitted,
+        dynamicQr: qr?.image ? { orderReference: reference, encodedReference: qr.encodedReference || "", qrImage: qr.image, expiresAt: attempt.expiresAt || "" } : null
+    };
+}
+
+function cloneInstructions(value) { return value && typeof value === "object" ? structuredClone(value) : {}; }
 
 function remainingSeconds(attempt = {}, now = new Date()) {
     const expiresAt = attempt.expiresAt ? new Date(attempt.expiresAt) : null;
@@ -260,13 +283,9 @@ function createCommercePaymentRecoveryService(dependencies = {}) {
                 continue;
             }
 
-            recoverable.push(
-                projectRecoverableCommerceAttempt({
-                    attempt,
-                    order,
-                    now
-                })
-            );
+            recoverable.push(text(attempt.provider).toUpperCase() === MANUAL_ADMIN_PROVIDER
+                ? projectRecoverableManualAdminAttempt({ attempt, order, now })
+                : projectRecoverableCommerceAttempt({ attempt, order, now }));
         }
 
         return recoverable;
@@ -286,6 +305,7 @@ module.exports = Object.freeze({
     RECOVERABLE_STATUSES,
     createCommercePaymentRecoveryService,
     projectRecoverableCommerceAttempt,
+    projectRecoverableManualAdminAttempt,
     attemptRecoverable,
     CommercePaymentRecoveryError
 });

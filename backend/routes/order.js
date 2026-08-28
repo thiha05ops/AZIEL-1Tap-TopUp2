@@ -72,6 +72,7 @@ const {
 } = require("../services/storageService");
 
 const COMMERCE_MANUAL_PROVIDER = "MANUAL_PROMPTPAY";
+const COMMERCE_MANUAL_PROVIDERS = Object.freeze([COMMERCE_MANUAL_PROVIDER, "MANUAL_ADMIN"]);
 
 const adminOrderCommands = createAdminOrderCommandService({
     LegacyOrder: Order,
@@ -360,7 +361,7 @@ function projectCommerceOrder(order = {}, options = {}) {
                     ? "paid"
                     : persistedOrderStatus;
     const completedHistory = [...(order.statusHistory || [])].reverse().find(entry => entry?.toStatus === "completed");
-    const canReviewManualPayment = paymentAttempt?.provider === COMMERCE_MANUAL_PROVIDER &&
+    const canReviewManualPayment = COMMERCE_MANUAL_PROVIDERS.includes(paymentAttempt?.provider) &&
         paymentAttemptStatus === "PENDING" && hasCommercePaymentEvidence(paymentAttempt);
     return {
         _id: options.admin ? `commerce-order:${order.orderId}` : order._id,
@@ -401,7 +402,7 @@ function projectCommerceOrder(order = {}, options = {}) {
         transactionId: paymentAttempt?.providerReference || "",
         commercePaymentAttemptId: paymentAttempt?.attemptId || "",
         manualPaymentAttemptId: paymentAttempt?.attemptId || "",
-        isCommerceManualPayment: paymentAttempt?.provider === COMMERCE_MANUAL_PROVIDER,
+        isCommerceManualPayment: COMMERCE_MANUAL_PROVIDERS.includes(paymentAttempt?.provider),
         paymentEvidence,
         paymentSlip: paymentEvidence.url || "",
         note: order.customer?.notes || "",
@@ -471,7 +472,7 @@ async function projectOwnedCommerceOrders(orders = [], options = {}) {
 
 async function listCommerceManualReviewOrders({ search = "", cursor = "", limit = 50 } = {}) {
     const query = {
-        provider: COMMERCE_MANUAL_PROVIDER,
+        provider: { $in: COMMERCE_MANUAL_PROVIDERS },
         status: "PENDING",
         "safeMetadata.receiptAttached": true,
         "safeMetadata.receiptEvidence.fileReference": { $type: "string", $ne: "" }
@@ -539,7 +540,7 @@ async function getCommerceManualOrderForAdmin(id = "", options = {}) {
     if (!attemptId) return null;
     const attempt = await PaymentAttempt.findOne({
         attemptId,
-        provider: COMMERCE_MANUAL_PROVIDER
+        provider: { $in: COMMERCE_MANUAL_PROVIDERS }
     }).lean();
     if (!attempt) return null;
     const order = await CommerceOrder.findOne({ orderId: attempt.orderId }).lean();

@@ -14,6 +14,7 @@ const {
     reviewCustomerCheckout,
     CustomerManualPromptPayCheckoutError
 } = require("../services/commerce/customerManualPromptPayCheckoutService");
+const { startCustomerManualPaymentCheckout, CustomerManualPaymentCheckoutError } = require("../services/commerce/customerManualPaymentCheckoutService");
 
 const {
     createCommercePaymentRecoveryService,
@@ -56,6 +57,9 @@ function respondError(res, error) {
             code: error.code,
             message: error.message
         });
+    }
+    if (error instanceof CustomerManualPaymentCheckoutError) {
+        return res.status(error.statusCode || 400).json({ success: false, error: error.code, code: error.code, message: error.message });
     }
 
     if (error instanceof ManualPaymentApplicationError) {
@@ -253,6 +257,15 @@ function createCommerceManualPaymentController(options = {}) {
                     }
                 );
 
+                return respondError(res, error);
+            }
+        },
+
+        async customerManualPaymentCheckout(req, res) {
+            try {
+                const result = await startCustomerManualPaymentCheckout(req.body || {}, { user: req.user, sessionId: req.sessionID || req.headers["x-session-id"] || "" }, options.manualCheckoutOptions || {});
+                return respondSuccess(res, result, 201);
+            } catch (error) {
                 return respondError(res, error);
             }
         },

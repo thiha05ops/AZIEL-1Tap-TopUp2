@@ -104,7 +104,7 @@ function verifyPresentationContracts() {
 
     assert(!wallet.includes("Admin will process your top-up soon"), "obsolete admin-processing copy must be removed");
     assert(wallet.includes("data.order?.orderId || data.orderId || orderData.orderId"), "returned Commerce order ID must have priority");
-    assert(engine.includes("if (!walletResult?.success) return;"), "failed Wallet payments must not enter completion");
+    assert(engine.includes("if (!walletResult?.success) return { success: false, navigating: false };"), "failed Wallet payments must not enter completion and must permit the caller to unlock");
     assert(engine.includes("if (orderData.pagePresentation === true)"), "page presentation must use the canonical completion handoff");
     assert(methodPage.includes("if (completed || submitting || !payment?.key) return;"), "completed checkout cannot submit again");
     assert(methodPage.includes('window.addEventListener("aziel:payment-completed"'), "payment selection must lock on success");

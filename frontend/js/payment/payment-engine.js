@@ -114,6 +114,16 @@
         return data.session;
     }
 
+    async function createCommerceManualPaymentCheckout(orderData) {
+        const res = await fetch(PaymentUtils.apiUrl("/api/commerce/checkout/manual-payment"), { method: "POST", headers: { "Content-Type": "application/json", ...PaymentUtils.authHeaders() }, body: JSON.stringify(orderData) });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw createPaymentError(data);
+        if (data.session?.commerceOrderId && data.session?.attemptId) {
+            try { localStorage.setItem("aziel:commerce-pending-payment", JSON.stringify({ commerce: true, orderId: data.session.commerceOrderId, attemptId: data.session.attemptId, productName: data.session.productName || orderData.game || "", packageName: data.session.packageName || orderData.packageName || "", productCode: orderData.productCode || orderData.gameKey || "", gameKey: orderData.gameKey || orderData.productCode || "", region: data.session.region || orderData.region || "", paymentMethod: data.session.paymentMethod || orderData.paymentMethod || "", createdAt: new Date().toISOString() })); } catch (_) { /* best effort */ }
+        }
+        return data.session;
+    }
+
     function stagePaymentPage(session, orderData, selectedPayment, type) {
         sessionStorage.setItem("azielPaymentPageSession", JSON.stringify({
             version: 1,
@@ -161,21 +171,24 @@
         try {
             if (type === "wallet" || selectedPayment.key === "wallet") {
                 const walletResult = await PaymentWallet.pay(orderData);
-                if (!walletResult?.success) return;
+                if (!walletResult?.success) return { success: false, navigating: false };
                 if (orderData.pagePresentation === true) {
                     stageWalletCompletion(walletResult, orderData, selectedPayment);
-                    return;
+                    return { success: true, navigating: true, paymentType: "wallet" };
                 }
                 PaymentUtils.showSuccess(
                     walletResult.orderId,
                     "Payment Successful",
                     "Your payment has been received. Your order is being processed."
                 );
-                return;
+                return { success: true, navigating: false, paymentType: "wallet" };
             }
 
             if (type === "manual" || type === "deeplink") {
-                const attemptSession = await createCommerceManualPromptPayCheckout(orderData);
+                const market = String(orderData.region || selectedPayment.region || "").toUpperCase();
+                const attemptSession = market === "MM"
+                    ? await createCommerceManualPaymentCheckout(orderData)
+                    : await createCommerceManualPromptPayCheckout(orderData);
                 attemptSession.selectedPaymentMethod = selectedPayment;
                 const attemptOrder = attemptSession.order || {
                     ...orderData,
@@ -194,16 +207,16 @@
 
                 if (orderData.pagePresentation === true) {
                     stagePaymentPage(attemptSession, attemptOrder, selectedPayment, type);
-                    return;
+                    return { success: true, navigating: true, paymentType: type };
                 }
 
                 if (type === "deeplink") {
                     PaymentDeepLink.show(attemptOrder, attemptSession);
-                    return;
+                    return { success: true, navigating: false, paymentType: type };
                 }
 
                 PaymentManual.show(attemptOrder, attemptSession);
-                return;
+                return { success: true, navigating: false, paymentType: type };
             }
 
             const paymentSession = await createPaymentSession(orderData);
@@ -212,27 +225,29 @@
 
             PaymentUtils.hideLoading();
 
-            if (orderData.pagePresentation === true) {
-                stagePaymentPage(paymentSession, canonicalOrder, selectedPayment, type);
-                return;
+                if (orderData.pagePresentation === true) {
+                    stagePaymentPage(paymentSession, canonicalOrder, selectedPayment, type);
+                    return { success: true, navigating: true, paymentType: type };
             }
 
             if (type === "auto") {
                 PaymentPromptPay.show(canonicalOrder, paymentSession);
-                return;
+                return { success: true, navigating: false, paymentType: type };
             }
 
             if (type === "deeplink") {
                 PaymentDeepLink.show(canonicalOrder, paymentSession);
-                return;
+                return { success: true, navigating: false, paymentType: type };
             }
 
             PaymentManual.show(canonicalOrder, paymentSession);
+            return { success: true, navigating: false, paymentType: type };
 
         } catch (error) {
             console.log("Payment engine error:", error);
             PaymentUtils.hideLoading();
             showPaymentError(error);
+            return { success: false, navigating: false, errorCode: error?.code || "PAYMENT_START_FAILED" };
         }
     }
 
@@ -241,6 +256,7 @@
         createPaymentSession,
         createManualAttempt,
         createCommerceManualPromptPayCheckout,
+        createCommerceManualPaymentCheckout,
         stageWalletCompletion
     };
 

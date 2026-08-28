@@ -3,7 +3,7 @@
 
 const assert = require("assert");
 const { WONDD_FAMILIES, resolveFamilyForServiceCode } = require("../services/suppliers/wonddCatalogConfig");
-const { parseScopeArgs, buildScopedMappingQuery, mappingMutationFilter, applyCostAuthorityUpdates, resolveWonddFamilyForMapping, findWonddCatalogOffer } = require("./refresh-existing-supplier-cost-authority");
+const { parseScopeArgs, buildScopedMappingQuery, mappingMutationFilter, applyCostAuthorityUpdates, resolveWonddFamilyForMapping, findWonddCatalogOffer, reconcileWonddMapping } = require("./refresh-existing-supplier-cost-authority");
 
 (async () => {
 const direct = resolveWonddFamilyForMapping({
@@ -47,6 +47,18 @@ assert.strictEqual(findWonddCatalogOffer(offers, "9602", "FBPC85"), null);
 assert.strictEqual(findWonddCatalogOffer(offers, "9602", "fbpc84"), null);
 assert.strictEqual(findWonddCatalogOffer(offers, "9622", "FBPC84"), null);
 
+const reconciliationNow = new Date("2026-08-28T00:00:00.000Z");
+const reconMapping = { _id: "ff-pass", supplierCode: "WONDD", productCode: "freefire-pass-membership", packageCode: "FF_PASS", supplierProductCode: "freefire", supplierPackageCode: "FBPC84", enabled: true, archivedAt: null, supplierCostAuthority: { rawSupplierCost: 84, supplierCurrency: "THB", source: "WONDD_LIVE_PACKLIST", capturedAt: "2026-08-25T00:00:00.000Z" }, mappingMetadata: { costAuthorityMaximumAgeSeconds: 86400 } };
+const sameCost = reconcileWonddMapping(reconMapping, [exactOffer], reconciliationNow);
+assert.strictEqual(sameCost.classification, "EXACT_MATCH_SAME_COST");
+assert.strictEqual(sameCost.exactIdentityMatch, true);
+assert.strictEqual(sameCost.currentAgeSeconds, 259200);
+assert.strictEqual(reconcileWonddMapping({ ...reconMapping, supplierCostAuthority: { ...reconMapping.supplierCostAuthority, rawSupplierCost: 80 } }, [exactOffer], reconciliationNow).classification, "EXACT_MATCH_COST_CHANGED");
+assert.strictEqual(reconcileWonddMapping(reconMapping, [], reconciliationNow).classification, "MISSING_PROVIDER_OFFER");
+assert.strictEqual(reconcileWonddMapping(reconMapping, [exactOffer, { ...exactOffer }], reconciliationNow).classification, "AMBIGUOUS_PROVIDER_OFFER");
+assert.strictEqual(reconcileWonddMapping({ ...reconMapping, supplierPackageCode: "" }, [exactOffer], reconciliationNow).classification, "INVALID_MAPPING");
+assert.strictEqual(reconcileWonddMapping(reconMapping, [{ ...exactOffer, packcode: "fbpc84" }], reconciliationNow).classification, "MISSING_PROVIDER_OFFER", "Packcodes must never be fuzzy or case-normalized.");
+
 const scope = parseScopeArgs(["--supplier=WONDD", "--product=mlbb"]);
 assert.deepStrictEqual(scope, { supplier: "WONDD", product: "mlbb", requested: true });
 assert.deepStrictEqual(buildScopedMappingQuery(scope), { supplierCode: "WONDD", archivedAt: null, enabled: true, productCode: "mlbb" });
@@ -78,6 +90,8 @@ console.log(JSON.stringify({
     missingSupplierFamilyRejected: true,
     ambiguousSupplierFamilyRejected: true,
     exactPackcodeRequired: true,
+    reconciliationClassificationsVerified: true,
+    fuzzyPackcodeMatches: 0,
     scopedSupplier: scope.supplier,
     scopedProduct: scope.product,
     scopedApplyOutsideMutations: 0,

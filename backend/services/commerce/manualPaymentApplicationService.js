@@ -7,6 +7,8 @@ const paymentAttemptRepository = require("./paymentAttemptRepository");
 const { createPaymentOrchestrator, PaymentOrchestratorError } = require("./paymentOrchestrator");
 const { createProviderRegistry } = require("./providerRegistry");
 const { createManualPromptPayProvider } = require("./manualPromptPayProviderFactory");
+const { createManualAdminAdapter, MANUAL_ADMIN_PROVIDER_ID } = require("./providers/manualAdminAdapter");
+const { paymentMethodCapabilityState } = require("../paymentProviderRegistry");
 const PaymentMethod = require("../../models/PaymentMethod");
 const {
     consumeCommercePromotion,
@@ -15,6 +17,7 @@ const {
 
 const SERVICE_VERSION = "commerce.manual-payment-application.v1";
 const MANUAL_PROVIDER_ID = "MANUAL_PROMPTPAY";
+const MANUAL_PROVIDER_IDS = Object.freeze(new Set([MANUAL_PROVIDER_ID, MANUAL_ADMIN_PROVIDER_ID]));
 const ERROR_CODES = Object.freeze({
     VALIDATION_ERROR: "VALIDATION_ERROR",
     UNAUTHENTICATED: "UNAUTHENTICATED",
@@ -102,6 +105,14 @@ function isManualPromptPayOrder(order = {}) {
     return provider === MANUAL_PROVIDER_ID || provider === "MANUAL_PROMPTPAY" || method === "promptpay" || method === "aziel_promptpay_dynamic";
 }
 
+function isManualAdminOrder(order = {}) {
+    return paymentProviderOf(order) === MANUAL_ADMIN_PROVIDER_ID;
+}
+
+function isSupportedManualOrder(order = {}) {
+    return isManualPromptPayOrder(order) || isManualAdminOrder(order);
+}
+
 function fingerprint(input = {}) {
     return crypto.createHash("sha256").update(JSON.stringify(input)).digest("hex");
 }
@@ -138,10 +149,42 @@ async function defaultManualPromptPayConfigurationProvider() {
     };
 }
 
-function createProviderResolver(configProvider, providerOptions = {}) {
+async function defaultManualAdminConfigurationProvider({ intent } = {}) {
+    const methodKey = normalizeString(intent?.paymentMethodId).toLowerCase();
+    const region = normalizeUpper(intent?.region);
+    const method = await PaymentMethod.findOne({ key: methodKey, region, enabled: true }).lean();
+    const capability = method ? paymentMethodCapabilityState(method) : null;
+    if (!method || capability?.customerVisible !== true || !["manual", "deeplink"].includes(normalizeString(method.paymentType).toLowerCase()) || method.confirmationMode !== "manual_admin") {
+        throw appError(ERROR_CODES.PROVIDER_UNAVAILABLE, "Manual payment method is unavailable.", 503, "provider");
+    }
+    return {
+        methodKey: method.key,
+        methodName: method.method,
+        region: method.region,
+        currency: intent.currency,
+        accountName: method.accountName,
+        accountNumber: method.accountNumber,
+        qrImage: method.uploadedQrImage || method.qrImageUrl || "",
+        qrMode: method.qrMode,
+        referenceInstructions: method.referenceInstructions,
+        receiptUploadEnabled: method.receiptUploadEnabled !== false,
+        slipRequired: method.slipRequired !== false,
+        enableOpenApp: method.enableOpenApp === true,
+        openAppMode: method.openAppMode,
+        deepLinkUrl: method.deepLinkUrl,
+        appDisplayName: method.appDisplayName,
+        confirmationMode: method.confirmationMode
+    };
+}
+
+function createProviderResolver(configProvider, providerOptions = {}, manualAdminConfigProvider = defaultManualAdminConfigurationProvider) {
     let cached = null;
     let cachedSignature = "";
     return async function providerResolver({ intent }) {
+        if (normalizeUpper(intent?.provider) === MANUAL_ADMIN_PROVIDER_ID) {
+            const config = await manualAdminConfigProvider({ intent });
+            return createManualAdminAdapter({ configuration: config, ...providerOptions });
+        }
         if (!isManualPromptPayOrder({ payment: intent.paymentSnapshot || { provider: intent.provider, paymentMethodId: intent.paymentMethodId } })) {
             throw appError(ERROR_CODES.UNSUPPORTED_PAYMENT_METHOD, "Commerce order is not configured for Manual PromptPay.", 422, "provider");
         }
@@ -218,6 +261,9 @@ function toSafePaymentView({ order = {}, attempt = {}, paymentResult = null, adm
         orderId: order.orderId || source.orderId || attempt.orderId || "",
         attemptId: source.attemptId || attempt.attemptId || "",
         paymentStatus: normalizeString(source.paymentStatus || attempt.status || order.paymentStatus).toLowerCase(),
+        provider: normalizeString(attempt.provider || order.payment?.provider || source.provider),
+        paymentMethod: normalizeString(attempt.paymentMethod || attempt.paymentMethodId || order.payment?.paymentMethodId),
+        region: normalizeString(attempt.region || order.commercial?.region).toUpperCase(),
         amount: Number(source.amount ?? attempt.amount ?? order.commercial?.totalAmount ?? 0),
         currency: normalizeString(source.currency || attempt.currency || order.commercial?.currency).toUpperCase(),
         qr: qr ? {
@@ -235,7 +281,6 @@ function toSafePaymentView({ order = {}, attempt = {}, paymentResult = null, adm
         retryEligible: ["failed", "expired"].includes(normalizeString(source.paymentStatus || attempt.status).toLowerCase()),
         failure: safeFailure(attempt),
         ...(admin ? {
-            provider: attempt.provider || MANUAL_PROVIDER_ID,
             providerReference: attempt.providerReference || "",
             rawProviderStatus: attempt.rawProviderStatus || ""
         } : {})
@@ -275,6 +320,7 @@ function createManualPaymentApplicationService(dependencies = {}) {
         auditLogger: dependencies.auditLogger || { write: async () => null },
         notificationPort: dependencies.notificationPort || { publish: async () => null },
         manualPromptPayConfigurationProvider: dependencies.manualPromptPayConfigurationProvider || defaultManualPromptPayConfigurationProvider,
+        manualAdminConfigurationProvider: dependencies.manualAdminConfigurationProvider || defaultManualAdminConfigurationProvider,
         providerOptions: dependencies.providerOptions || {},
         clock: dependencies.clock || (() => new Date()),
         idGenerator: dependencies.idGenerator || ((prefix = "ID") => `${prefix}-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`),
@@ -283,7 +329,7 @@ function createManualPaymentApplicationService(dependencies = {}) {
     const orchestrator = deps.paymentOrchestrator || createPaymentOrchestrator({
         orderRepository: deps.commerceOrderRepository,
         paymentAttemptPort: deps.paymentAttemptRepository,
-        providerResolver: createProviderResolver(deps.manualPromptPayConfigurationProvider, deps.providerOptions),
+        providerResolver: createProviderResolver(deps.manualPromptPayConfigurationProvider, deps.providerOptions, deps.manualAdminConfigurationProvider),
         transactionRunner: deps.transactionRunner,
         clock: deps.clock,
         idGenerator: deps.idGenerator,
@@ -293,8 +339,8 @@ function createManualPaymentApplicationService(dependencies = {}) {
     async function loadOwnedManualOrder(orderId, owner) {
         const order = await deps.commerceOrderRepository.findOwnedOrderById({ orderId, owner });
         if (!order) throw appError(ERROR_CODES.NOT_FOUND, "Commerce order was not found.", 404, "order");
-        if (!isManualPromptPayOrder(order)) {
-            throw appError(ERROR_CODES.UNSUPPORTED_PAYMENT_METHOD, "Commerce order is not configured for Manual PromptPay.", 422, "payment");
+        if (!isSupportedManualOrder(order)) {
+            throw appError(ERROR_CODES.UNSUPPORTED_PAYMENT_METHOD, "Commerce order is not configured for manual payment.", 422, "payment");
         }
         return order;
     }
@@ -302,8 +348,8 @@ function createManualPaymentApplicationService(dependencies = {}) {
     async function loadOperationalAttempt(attemptId) {
         const attempt = await deps.paymentAttemptRepository.findAttemptById({ attemptId });
         if (!attempt) throw appError(ERROR_CODES.NOT_FOUND, "Payment attempt was not found.", 404, "attempt");
-        if (normalizeUpper(attempt.provider) !== MANUAL_PROVIDER_ID) {
-            throw appError(ERROR_CODES.UNSUPPORTED_PAYMENT_METHOD, "Payment attempt is not Manual PromptPay.", 422, "attempt");
+        if (!MANUAL_PROVIDER_IDS.has(normalizeUpper(attempt.provider))) {
+            throw appError(ERROR_CODES.UNSUPPORTED_PAYMENT_METHOD, "Payment attempt is not a supported manual payment.", 422, "attempt");
         }
         const order = await deps.commerceOrderRepository.findOrderById(attempt.orderId);
         if (!order) throw appError(ERROR_CODES.NOT_FOUND, "Commerce order was not found.", 404, "order");
@@ -431,8 +477,8 @@ function createManualPaymentApplicationService(dependencies = {}) {
             const order = await loadOwnedManualOrder(orderId, owner);
             const attempt = await deps.paymentAttemptRepository.findAttemptByIdForOwner({ attemptId, owner });
             if (!attempt || attempt.orderId !== orderId) throw appError(ERROR_CODES.NOT_FOUND, "Payment attempt was not found.", 404, "attempt");
-            if (normalizeUpper(attempt.provider) !== MANUAL_PROVIDER_ID) {
-                throw appError(ERROR_CODES.UNSUPPORTED_PAYMENT_METHOD, "Receipt attempt is not Manual PromptPay.", 422, "receipt");
+            if (!MANUAL_PROVIDER_IDS.has(normalizeUpper(attempt.provider))) {
+                throw appError(ERROR_CODES.UNSUPPORTED_PAYMENT_METHOD, "Receipt attempt is not a supported manual payment.", 422, "receipt");
             }
             if (!ACTIVE_EVIDENCE_STATUSES.has(normalizeUpper(attempt.status))) {
                 throw appError(ERROR_CODES.INVALID_STATE, "Receipt cannot be attached to this payment state.", 409, "receipt");
@@ -477,12 +523,12 @@ function createManualPaymentApplicationService(dependencies = {}) {
             const attemptId = assertId(input.attemptId, "attemptId");
             const { attempt, order } = await loadOperationalAttempt(attemptId);
             const receipt = attempt.safeMetadata?.receiptEvidence || null;
-            if (!receipt?.receiptId) throw appError(ERROR_CODES.INVALID_STATE, "Manual PromptPay approval requires receipt evidence.", 409, "approval");
+            if (attempt.safeMetadata?.receiptRequired !== false && !receipt?.receiptId) throw appError(ERROR_CODES.INVALID_STATE, "Manual payment approval requires receipt evidence.", 409, "approval");
             const providerEventId = normalizeString(input.providerEventId || deps.idGenerator("manual-approval"));
             const result = await orchestrator.handleProviderEvent({
                 trustedOperational: true,
                 providerEvent: {
-                    provider: MANUAL_PROVIDER_ID,
+                    provider: normalizeUpper(attempt.provider),
                     providerReference: attempt.providerReference,
                     providerEventId,
                     eventType: "MANUAL_PAYMENT_APPROVED",
@@ -525,7 +571,7 @@ function createManualPaymentApplicationService(dependencies = {}) {
             const result = await orchestrator.handleProviderEvent({
                 trustedOperational: true,
                 providerEvent: {
-                    provider: MANUAL_PROVIDER_ID,
+                    provider: normalizeUpper(attempt.provider),
                     providerReference: attempt.providerReference,
                     providerEventId,
                     eventType: "MANUAL_PAYMENT_REJECTED",

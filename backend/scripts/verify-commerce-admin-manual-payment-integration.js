@@ -197,7 +197,8 @@ function verifyRouteSourceOwnership() {
     assert(!manualReviewBlock.includes("paymentEvidence.url"), "manual review route must not use legacy Order.paymentEvidence.");
     includes("backend/routes/order.js", "const PaymentAttempt = require(\"../models/PaymentAttempt\")", "admin manual review must read PaymentAttempt.");
     includes("backend/routes/order.js", "const CommerceOrder = require(\"../models/CommerceOrder\")", "admin manual review must join CommerceOrder.");
-    includes("backend/routes/order.js", "provider: COMMERCE_MANUAL_PROVIDER", "manual review must be limited to Manual PromptPay attempts.");
+    includes("backend/routes/order.js", "provider: { $in: COMMERCE_MANUAL_PROVIDERS }", "manual review must be limited to supported Commerce manual attempts.");
+    includes("backend/routes/order.js", '"MANUAL_ADMIN"', "manual review must include Commerce-native MM manual-admin attempts.");
     includes("backend/routes/order.js", "status: \"PENDING\"", "manual review must show pending attempts.");
     includes("backend/routes/order.js", "\"safeMetadata.receiptAttached\": true", "manual review must require submitted receipt evidence.");
 }

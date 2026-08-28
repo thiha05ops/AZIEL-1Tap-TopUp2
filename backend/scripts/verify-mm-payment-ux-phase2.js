@@ -1,0 +1,54 @@
+#!/usr/bin/env node
+"use strict";
+const assert = require("assert");
+const fs = require("fs");
+const path = require("path");
+const root = path.resolve(__dirname, "../..");
+const read = file => fs.readFileSync(path.join(root, file), "utf8");
+
+const html = read("frontend/payment.html");
+const runtime = read("frontend/js/payment-page-runtime.js");
+const shell = read("frontend/js/payment/mm-payment-shell.js");
+const shellCss = read("frontend/css/payment/mm-payment-shell.css");
+const manual = read("frontend/js/payment/payment-manual.js");
+const utils = read("frontend/js/payment/payment-utils.js");
+const engine = read("frontend/js/payment/payment-engine.js");
+const sheet = read("frontend/js/payment/payment-checkout-sheet.js");
+const adminApplication = read("backend/services/commerce/manualPaymentApplicationService.js");
+
+assert(html.includes("mm-payment-shell.css") && html.includes("mm-payment-shell.js"), "Dedicated MM shell assets must load on the canonical payment page.");
+assert(html.includes("purchase-transition-lock.js"), "Phase 1 transition lock must guard payment submission.");
+assert(!html.includes("authoritative session below") && !html.includes("payment.secure"), "Payment page must not expose internal or unnecessary system wording.");
+assert(shell.includes('region === "MM"') && shell.includes('["manual", "deeplink", "deep_link"]'), "Dedicated shell must fail closed to MM manual/deeplink staged sessions.");
+assert(shell.includes('acquire?.("SUBMITTING_PAYMENT"'), "Submit must acquire the shared transition lock before asynchronous work.");
+assert(shell.includes('input.required = slipRequired') && shell.includes("receiptUploadEnabled !== false"), "Backend/session slip configuration must remain authoritative.");
+assert(shell.includes("submit.disabled = slipRequired") && shell.includes("submit.disabled = slipRequired && !file"), "Required slip must visibly gate submission until selected.");
+assert(shell.includes('input.accept = "image/*"') && shell.includes("fileState.textContent = file?.name") && shell.includes("URL.createObjectURL(file)"), "Existing image contract, filename state, and preview must be presented.");
+assert(shell.includes('t("payment.chooseSlip", "Choose payment slip")') && shell.includes('t("payment.replaceSlip", "Replace payment slip")'), "Custom uploader must present choose and replace states.");
+assert(shell.includes("preview.hidden = true") && shell.includes('preview.removeAttribute("src")') && shellCss.includes(".mm-payment-shell__preview[hidden]"), "Empty slip preview must remain fully hidden until a valid image URL exists.");
+assert(shell.includes("displayReference(content)") && shell.includes("copyValue(action, content)") && shell.includes("data.dataset.fullValue"), "Long references must display compactly while Copy retains the complete server value.");
+assert(shell.includes('detailToggle.setAttribute("aria-expanded"') && shell.includes('detailToggle.setAttribute("aria-controls"') && shell.includes('window.matchMedia("(max-width: 768px)")'), "Mobile secondary account details must use a keyboard-accessible disclosure that defaults from the mobile breakpoint.");
+assert(shell.includes("if (accountNumberDetail) details.append(accountNumberDetail)") && shellCss.includes(".mm-payment-shell__account-number { order: 1; }"), "Account number must remain immediately visible on mobile.");
+assert(shellCss.includes(".mm-payment-shell__detail-extra[hidden] { display: none; }") && shellCss.includes(".mm-payment-shell__detail-extra { display: contents; }"), "Secondary account details must collapse only on mobile and remain expanded on desktop.");
+assert(shell.includes("PaymentManual.submitReceipt"), "Dedicated shell must reuse the shared manual receipt submission primitive.");
+assert(manual.includes("/payments/${encodeURIComponent(attemptId)}/receipt"), "Receipt endpoint must remain unchanged.");
+assert(manual.includes("submitCommerceReceipt"), "MM Commerce sessions must use the canonical Commerce evidence endpoint.");
+assert(engine.includes('market === "MM"') && engine.includes("createCommerceManualPaymentCheckout(orderData)"), "MM normal flow must use Commerce-native manual checkout authority.");
+assert(engine.includes('"/api/commerce/checkout/manual-payment"'), "MM manual checkout must call the dedicated Commerce route.");
+assert(engine.includes("createCommerceManualPromptPayCheckout(orderData)"), "TH PromptPay must retain its Commerce checkout authority.");
+assert(runtime.includes("AZIEL_MM_PAYMENT_SHELL?.supports") && runtime.includes("showCompletion({ orderId, paid: false"), "MM submission must enter the canonical pending-verification completion presentation.");
+assert(runtime.includes('"Payment Submitted"') && runtime.includes("waiting for verification"), "Post-submit copy must distinguish evidence submission from paid payment.");
+assert(runtime.includes('track.textContent = t("payment.trackOrderNow", "Track Order")'), "Pending completion must lead to canonical order tracking.");
+assert(shellCss.includes("max-width: 980px") && shellCss.includes("minmax(0, 620px)") && shellCss.includes("minmax(260px, 320px)"), "Desktop payment layout must remain centered, bounded, and two-column.");
+assert(shellCss.includes("margin-inline: auto"), "The complete desktop payment composition must be naturally centered.");
+assert(shellCss.includes("width: calc(100% - 32px)") && shellCss.includes("grid-template-columns: minmax(0, 1fr)"), "Mobile payment layout must use one 16px gutter and one column.");
+assert(shellCss.includes("overflow-wrap: anywhere") && shellCss.includes("min-height: 44px"), "Long account values and mobile copy targets must remain viewport-safe and usable.");
+assert(runtime.includes("window.PaymentManual.show(order, session)"), "Existing PromptPay/manual fallback must remain available.");
+assert(runtime.includes("openRecoveredPayment") && sheet.includes("openRecoveredPayment"), "Historical/recovery payment sheet must remain intact.");
+assert(shell.includes('acquire?.("SUBMITTING_PAYMENT"') && shell.includes("lock.release()"), "Duplicate submission must lock immediately and recoverable failures must unlock.");
+assert(adminApplication.includes("approveManualPayment"), "Admin approval must remain the paid-transition authority.");
+assert(!shell.includes("PaymentWallet") && engine.includes("PaymentWallet.pay(orderData)"), "Wallet fast path must remain outside the MM shell.");
+assert(!html.includes("Your payment session is protected by AZIEL.") && html.includes("payment.myOrders"), "Payment footer must retain useful navigation without nonfunctional session copy.");
+for (const forbidden of ["Payment Successful", "paymentStatus =", "supplierCode", "fulfillmentEligibility"]) assert(!shell.includes(forbidden), `MM shell must not own ${forbidden}.`);
+
+console.log(JSON.stringify({ result: "PASS", dedicatedMmScreen: true, authoritativeMethodConfiguration: true, commerceNativeManualCheckout: true, canonicalReceiptEndpointReused: true, slipRequiredHonored: true, duplicateSubmissionLocked: true, pendingVerificationCopy: true, promptPayFrozen: true, walletFrozen: true, recoverySheetPreserved: true, providerCalls: 0 }, null, 2));

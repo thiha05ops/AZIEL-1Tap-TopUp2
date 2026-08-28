@@ -2,6 +2,30 @@
 // AZIEL Manual QR Payment V2.5
 
 (function () {
+    async function submitCommerceReceipt(orderData, paymentSession, file, setMessage) {
+        const orderId = paymentSession.commerceOrderId || orderData.commerceOrderId || paymentSession.orderId || orderData.orderId;
+        const attemptId = paymentSession.attemptId || orderData.commercePaymentAttemptId || orderData.manualPaymentAttemptId;
+        if (!orderId || !attemptId) throw new Error("Payment attempt is unavailable.");
+        const fd = new FormData();
+        fd.append("slip", file);
+        const res = await fetch(`/api/commerce/orders/${encodeURIComponent(orderId)}/payments/${encodeURIComponent(attemptId)}/receipt`, { method: "POST", headers: window.PaymentUtils?.authHeaders?.() || {}, body: fd });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) throw new Error(data.message || "Submission failed. Please try again.");
+        setMessage?.("success", data.message || "Payment slip submitted");
+        try { localStorage.removeItem("aziel:commerce-pending-payment"); } catch (_) { /* best effort */ }
+        return { orderId, data };
+    }
+
+    async function submitReceipt(orderData, paymentSession, file, setMessage) {
+        if (paymentSession.commerce === true || paymentSession.commerceOrderId || orderData.commerceOrderId) {
+            return submitCommerceReceipt(orderData, paymentSession, file, setMessage);
+        }
+        const messageAdapter = { set innerHTML(value) { setMessage?.(String(value).includes("error-msg") ? "error" : "success", String(value || "").replace(/<[^>]*>/g, "").trim()); } };
+        const data = await window.PaymentUtils.submitSlip(orderData, file, messageAdapter, null, { showSuccess: false, returnData: true });
+        if (!data || data === false) throw new Error("Submission failed. Please try again.");
+        return { orderId: data.order?.orderId || orderData.orderId || paymentSession.orderId || "", data };
+    }
+
     function show(orderData, paymentSession) {
         const payment = {
             ...(window.selectedPaymentData || {}),
@@ -19,27 +43,8 @@
                 ? false
                 : paymentSession.slipRequired !== false && payment.slipRequired !== false;
 
-        async function submitCommerceReceipt(file, setMessage, close) {
-            const orderId = paymentSession.commerceOrderId || orderData.commerceOrderId || paymentSession.orderId || orderData.orderId;
-            const attemptId = paymentSession.attemptId || orderData.commercePaymentAttemptId || orderData.manualPaymentAttemptId;
-            if (!orderId || !attemptId) throw new Error("Payment attempt is unavailable.");
-            const fd = new FormData();
-            fd.append("slip", file);
-            const res = await fetch(`/api/commerce/orders/${encodeURIComponent(orderId)}/payments/${encodeURIComponent(attemptId)}/receipt`, {
-                method: "POST",
-                headers: window.PaymentUtils?.authHeaders?.() || {},
-                body: fd
-            });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok || !data.success) {
-                throw new Error(data.message || "Submission failed. Please try again.");
-            }
-            setMessage("success", data.message || "Payment slip submitted");
-            try {
-                localStorage.removeItem("aziel:commerce-pending-payment");
-            } catch (error) {
-                // Recovery marker cleanup is best-effort.
-            }
+        async function submitFromSheet(file, setMessage, close) {
+            const { orderId, data } = await submitCommerceReceipt(orderData, paymentSession, file, setMessage);
             if (window.AZIEL_PAYMENT_PAGE_MODE === true) {
                 sessionStorage.removeItem("azielPaymentPageSession");
                 window.AZIEL_PAYMENT_PAGE?.showCompletion?.({
@@ -99,7 +104,7 @@
             loadingText: "Submitting receipt...",
             onSubmit: async ({ file, setMessage, close }) => {
                 if (paymentSession.commerce === true || paymentSession.commerceOrderId || orderData.commerceOrderId) {
-                    return submitCommerceReceipt(file, setMessage, close);
+                    return submitFromSheet(file, setMessage, close);
                 }
                 const msgAdapter = {
                     set innerHTML(value) {
@@ -118,6 +123,8 @@
     }
 
     window.PaymentManual = {
-        show
+        show,
+        submitCommerceReceipt,
+        submitReceipt
     };
 })();

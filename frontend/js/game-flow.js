@@ -459,8 +459,20 @@
 
         let orderData = buildOrderData(flow);
         const buyBtn = getEl(flow.config.buyButtonSelector);
+        const transition = window.AZIEL_PURCHASE_TRANSITION?.acquire("PREPARING_CHECKOUT", {
+            controls: [
+                buyBtn,
+                document.querySelector(".order-left"),
+                document.getElementById("packages"),
+                document.getElementById("azielPromoBox")
+            ],
+            statusNode: getEl(flow.config.noteSelector),
+            message: t("checkout.preparing", "Preparing checkout...")
+        });
+        if (!transition) return;
 
         flow.isSubmitting = true;
+        flow.purchaseNavigationCommitted = false;
         if (buyBtn) buyBtn.disabled = true;
 
         try {
@@ -535,8 +547,11 @@
 
             await window.AZIEL_PAYMENT.start(orderData);
         } finally {
-            flow.isSubmitting = false;
-            updateSummary(flow);
+            if (!flow.purchaseNavigationCommitted) {
+                transition.release();
+                flow.isSubmitting = false;
+                updateSummary(flow);
+            }
         }
     }
 
@@ -605,6 +620,7 @@
         };
 
         sessionStorage.setItem("azielProductCheckoutDraft", JSON.stringify(checkoutDraft));
+        flow.purchaseNavigationCommitted = true;
         window.location.href = flow.config.checkoutUrl || "checkout.html";
     }
 

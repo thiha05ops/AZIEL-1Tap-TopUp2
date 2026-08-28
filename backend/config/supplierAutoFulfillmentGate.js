@@ -2,7 +2,8 @@
 
 const SUPPLIER_GATE_MODES = Object.freeze({
     LEGACY_PRODUCT_ONLY: "LEGACY_PRODUCT_ONLY",
-    SUPPLIER_AND_PRODUCT: "SUPPLIER_AND_PRODUCT"
+    SUPPLIER_AND_PRODUCT: "SUPPLIER_AND_PRODUCT",
+    SUPPLIER_ONLY: "SUPPLIER_ONLY"
 });
 const SUPPLIER_GATE_KEYS = Object.freeze({
     WONDD: "WONDD_AUTO_FULFILLMENT_ENABLED",
@@ -34,12 +35,16 @@ function isSupplierAutoFulfillmentEnabled(supplierCode, env = process.env) {
 function effectiveAutoFulfillmentGateState({ supplierCode, productGateEnabled, env = process.env } = {}) {
     const supplier = supplierAutoFulfillmentGateState(supplierCode, env);
     const productEnabled = productGateEnabled === true;
-    const effectiveGateEnabled = supplier.supported && productEnabled && (
-        supplier.mode === SUPPLIER_GATE_MODES.LEGACY_PRODUCT_ONLY || supplier.supplierGateEnabled
+    const effectiveGateEnabled = supplier.supported && (
+        supplier.mode === SUPPLIER_GATE_MODES.LEGACY_PRODUCT_ONLY
+            ? productEnabled
+            : supplier.mode === SUPPLIER_GATE_MODES.SUPPLIER_AND_PRODUCT
+                ? supplier.supplierGateEnabled && productEnabled
+                : supplier.supplierGateEnabled
     );
     const blockerCode = effectiveGateEnabled ? "" : !supplier.supported
         ? "SUPPLIER_AUTO_FULFILLMENT_UNSUPPORTED"
-        : supplier.mode === SUPPLIER_GATE_MODES.SUPPLIER_AND_PRODUCT && !supplier.supplierGateEnabled
+        : supplier.mode !== SUPPLIER_GATE_MODES.LEGACY_PRODUCT_ONLY && !supplier.supplierGateEnabled
             ? "SUPPLIER_AUTO_FULFILLMENT_DISABLED"
             : "PRODUCT_AUTO_FULFILLMENT_DISABLED";
     return Object.freeze({ ...supplier, productGateEnabled: productEnabled, effectiveGateEnabled, blockerCode });

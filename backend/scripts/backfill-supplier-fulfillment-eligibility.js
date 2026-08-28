@@ -13,6 +13,7 @@ const EVIDENCE_STRENGTH = Object.freeze({
     "": 0,
     LEGACY_EFFECTIVE_SCOPE: 1,
     CONTROLLED_TEST: 2,
+    OPERATOR_CONFIRMED_CAPABILITY: 3,
     PROVIDER_CONFIRMED: 3
 });
 const VALID_MARKETS = Object.freeze(["MM", "TH"]);
@@ -216,7 +217,7 @@ function buildMigrationPlan(mappings = [], options = {}) {
         bySupplierProduct[key] ||= {
             total: 0,
             eligibilityModes: { UNKNOWN: 0, GLOBAL: 0, CUSTOMER_MARKET_ALLOWLIST: 0 },
-            evidenceClasses: { UNKNOWN: 0, PROVIDER_CONFIRMED: 0, LEGACY_EFFECTIVE_SCOPE: 0 }
+            evidenceClasses: { UNKNOWN: 0, PROVIDER_CONFIRMED: 0, OPERATOR_CONFIRMED_CAPABILITY: 0, LEGACY_EFFECTIVE_SCOPE: 0 }
         };
         const group = bySupplierProduct[key];
         group.total += 1;
@@ -224,7 +225,7 @@ function buildMigrationPlan(mappings = [], options = {}) {
         group.evidenceClasses[change.after.evidenceCode || "UNKNOWN"] += 1;
     });
     const orderedGroups = Object.fromEntries(Object.entries(bySupplierProduct).sort(([a], [b]) => a.localeCompare(b)));
-    const evidenceCounts = { UNKNOWN: 0, PROVIDER_CONFIRMED: 0, LEGACY_EFFECTIVE_SCOPE: 0, GLOBAL: 0 };
+    const evidenceCounts = { UNKNOWN: 0, PROVIDER_CONFIRMED: 0, OPERATOR_CONFIRMED_CAPABILITY: 0, LEGACY_EFFECTIVE_SCOPE: 0, GLOBAL: 0 };
     changes.forEach(change => {
         evidenceCounts[change.after.evidenceCode || "UNKNOWN"] += 1;
         if (change.after.mode === "GLOBAL") evidenceCounts.GLOBAL += 1;

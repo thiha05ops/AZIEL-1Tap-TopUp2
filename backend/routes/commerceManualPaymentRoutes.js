@@ -80,6 +80,13 @@ function createCommerceManualPaymentRoutes(options = {}) {
     );
 
     router.post(
+        "/commerce/checkout/manual-payment",
+        requestProbe,
+        authMiddleware,
+        controller.customerManualPaymentCheckout
+    );
+
+    router.post(
         "/commerce/orders/:orderId/payments/manual-promptpay/initiate",
         requestProbe,
         authMiddleware,

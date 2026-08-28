@@ -20,8 +20,8 @@
 
     const buyButton = document.getElementById("buyBtn");
     if (buyButton) {
-        buyButton.textContent = tr("checkout.continue", "Continue to Checkout");
-        buyButton.dataset.i18n = "checkout.continue";
+        buyButton.textContent = tr("checkout.buyNow", "Buy Now");
+        buyButton.dataset.i18n = "checkout.buyNow";
     }
 
     const accountHeading = document.querySelector(".order-left > .form-card:first-child .card-title h2");

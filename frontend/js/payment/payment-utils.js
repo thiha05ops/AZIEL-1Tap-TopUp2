@@ -269,7 +269,7 @@
         qr.style.padding = "10px";
     }
 
-    async function submitSlip(orderData, file, msgEl, btnEl) {
+    async function submitSlip(orderData, file, msgEl, btnEl, options = {}) {
         if (!file) {
             setMsg(msgEl, "Please upload payment slip.", "error");
             setManualSlipButtonState(btnEl, "initial");
@@ -318,12 +318,14 @@
                 "Waiting for Verification. Your payment slip has been submitted. We'll notify you after verification.",
                 "success"
             );
-            showSuccess(
-                data.order?.orderId || orderData.orderId,
-                "Slip Submitted",
-                "Waiting for Verification. Your payment slip has been submitted. We'll notify you after verification."
-            );
-            return true;
+            if (options.showSuccess !== false) {
+                showSuccess(
+                    data.order?.orderId || orderData.orderId,
+                    "Slip Submitted",
+                    "Waiting for Verification. Your payment slip has been submitted. We'll notify you after verification."
+                );
+            }
+            return options.returnData === true ? data : true;
 
         } catch (error) {
             console.log("Submit slip error:", error);

@@ -60,8 +60,13 @@
                     <div><dt data-i18n="checkout.package">Package</dt><dd id="checkoutSummaryPackage">—</dd></div>
                 </dl>
                 <div class="checkout-total"><span data-i18n="checkout.finalTotal">Final total</span><strong id="checkoutSummaryTotal">—</strong></div>
+                <div class="checkout-payment" aria-labelledby="checkoutPaymentTitle">
+                    <h2 id="checkoutPaymentTitle" data-i18n="footer_payment_methods">Payment methods</h2>
+                    <div id="paymentGrid" class="payment-grid"></div>
+                    <input id="paymentMethod" type="hidden">
+                </div>
                 <p id="checkoutFeedback" class="checkout-feedback" aria-live="polite" data-i18n="checkout.verifyingYourOrderSecurely">Verifying your order securely.</p>
-                <button id="checkoutPayButton" class="primary-commerce-action" type="button" data-i18n="checkout.continuePaymentMethod" disabled>Continue to Payment Method</button>
+                <button id="checkoutPayButton" class="primary-commerce-action" type="button" disabled>Select a payment method</button>
             </aside>
         </div>
     </main>
@@ -75,9 +80,10 @@
     <script src="/core/settings/theme.js?v=20260817-system-authority"></script><script src="/js/locale-switcher.js?v=20260809-g21-explicit"></script><script src="/js/api.js"></script>
     <script src="/js/catalog-presentation.js"></script><script src="/js/catalog-runtime.js"></script>
     <script src="/js/payment-display.js"></script><script src="/js/payment-trust-display.js"></script><script src="/js/payment.js"></script>
+    <script src="/js/purchase-transition-lock.js?v=20260828-journey-phase1"></script>
     <script src="/js/ui-feedback.js"></script><script src="/js/payment/payment-utils.js"></script><script src="/js/payment/android-app-launch.js"></script>
     <script src="/js/payment/payment-checkout-sheet.js"></script><script src="/js/payment/payment-wallet.js"></script><script src="/js/payment/payment-promptpay.js"></script>
-    <script src="/js/payment/payment-deeplink.js"></script><script src="/js/payment/payment-manual.js"></script><script src="/js/payment/payment-engine.js"></script>
+    <script src="/js/payment/payment-deeplink.js"></script><script src="/js/payment/payment-manual.js"></script><script src="/js/payment/payment-session-authority.js"></script><script src="/js/payment/payment-engine.js"></script>
     <script src="/js/payment/pending-payment-recovery.js?v=20260808-checkout-recovery"></script>
     <script src="/js/product-checkout.js?v=20260808-product-stage"></script>
 </body>

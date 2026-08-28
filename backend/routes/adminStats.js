@@ -190,7 +190,7 @@ function buildRangeFromRequest(query = {}, now = new Date()) {
 
 function manualPaymentReviewQuery() {
     return {
-        provider: "MANUAL_PROMPTPAY",
+        provider: { $in: ["MANUAL_PROMPTPAY", "MANUAL_ADMIN"] },
         status: "PENDING",
         "safeMetadata.receiptAttached": true,
         "safeMetadata.receiptEvidence.fileReference": { $type: "string", $ne: "" }

@@ -1,6 +1,9 @@
 // frontend/js/login.js
 
 function apiUrl(path) {
+    if (location.port === "5500") {
+        return `${location.protocol}//${location.hostname}:3000${path}`;
+    }
     return path;
 }
 const authT = (key, fallback, params) => window.AZIEL_LOCALE?.t?.(key, fallback, params) || fallback;

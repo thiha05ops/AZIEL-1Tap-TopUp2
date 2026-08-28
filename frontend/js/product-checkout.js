@@ -1,10 +1,11 @@
 (function () {
-    const t = (key, fallback) => window.AZIEL_LOCALE?.t?.(key, fallback) || fallback;
+    const t = (key, fallback, params) => window.AZIEL_LOCALE?.t?.(key, fallback, params) || fallback.replace(/\{(\w+)\}/g, (_, name) => params?.[name] ?? `{${name}}`);
     const STORAGE_KEY = "azielProductCheckoutDraft";
     let draft = null;
     let authoritativeReview = null;
     let reviewLoading = false;
     let paymentSubmitting = false;
+    let paymentCommitted = false;
 
     function symbol(currency) {
         return String(currency).toUpperCase() === "THB" ? "฿" : "Ks";
@@ -33,7 +34,7 @@
     }
 
     function selectedPayment() {
-        return null;
+        return window.selectedPaymentData || null;
     }
 
     function validateReviewForHandoff(review) {
@@ -119,27 +120,60 @@
 
     function updatePaymentReady() {
         const button = document.getElementById("checkoutPayButton");
-        const ready = Boolean(authoritativeReview?.quoteId && !reviewLoading && !paymentSubmitting);
+        const payment = selectedPayment();
+        const ready = Boolean(authoritativeReview?.quoteId && payment?.key && !reviewLoading && !paymentSubmitting && !paymentCommitted);
         if (button) button.disabled = !ready;
+        if (button) {
+            const pricing = authoritativeReview?.pricing || {};
+            const method = payment?.method || payment?.appDisplayName || payment?.key || "";
+            button.textContent = !payment?.key
+                ? t("payment.selectMethod", "Select a payment method")
+                : payment.paymentType === "wallet" || payment.key === "wallet"
+                    ? `${t("payment.pay", "Pay")} ${formatMoney(pricing.quotedTotalAmount, pricing.currency)}`
+                    : t("payment.continueWith", `Continue with ${method}`, { method });
+        }
         if (reviewLoading) return;
         if (!authoritativeReview?.quoteId) return;
-        feedback(t("checkout.totalReady", "Your authoritative total is ready."));
+        feedback(payment?.key ? t("payment.continueWith", "Continue with {method}.", { method: payment.method || payment.key }) : t("payment.selectMethod", "Select a payment method."));
     }
 
     async function continuePayment() {
-        if (paymentSubmitting || !draft?.order || !authoritativeReview?.quoteId) return;
+        const payment = selectedPayment();
+        if (paymentSubmitting || paymentCommitted || !draft?.order || !authoritativeReview?.quoteId || !payment?.key) return;
         const button = document.getElementById("checkoutPayButton");
+        const lock = window.AZIEL_PURCHASE_TRANSITION?.acquire("PREPARING_PAYMENT", {
+            controls: [button, document.getElementById("paymentGrid"), document.getElementById("checkoutBackLink")],
+            statusNode: document.getElementById("checkoutFeedback"),
+            message: t("payment.preparing", "Preparing payment...")
+        });
+        if (!lock) return;
         paymentSubmitting = true;
         button.disabled = true;
         try {
             validateReviewForHandoff(authoritativeReview);
             sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ ...draft, review: authoritativeReview }));
-            window.location.href = "payment-method.html";
+            const pricing = authoritativeReview.pricing || {};
+            const result = await window.AZIEL_PAYMENT.start({
+                ...draft.order,
+                checkoutKey: draft.order.orderId,
+                amount: pricing.quotedTotalAmount,
+                currency: pricing.currency,
+                reviewQuoteId: authoritativeReview.quoteId,
+                paymentMethod: payment.key,
+                paymentType: payment.paymentType || "manual",
+                provider: payment.provider || "manual",
+                pagePresentation: true
+            });
+            paymentCommitted = result?.success === true && result?.navigating === true;
+            if (!paymentCommitted) lock.release();
         } catch (error) {
             feedback(error?.message || t("checkout.couldNotContinue", "Checkout could not continue."), true);
+            lock.release();
         } finally {
-            paymentSubmitting = false;
-            updatePaymentReady();
+            if (!paymentCommitted) {
+                paymentSubmitting = false;
+                updatePaymentReady();
+            }
         }
     }
 
@@ -151,6 +185,7 @@
         }
         render(draft.order);
         document.getElementById("checkoutPayButton")?.addEventListener("click", continuePayment);
+        document.addEventListener("paymentChanged", updatePaymentReady);
         updatePaymentReady();
         loadAuthoritativeReview();
     });
