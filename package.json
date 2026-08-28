@@ -13,6 +13,7 @@
     "verify:market-decoupled-fulfillment-phase5a": "node backend/scripts/verify-market-decoupled-fulfillment-phase5a.js",
     "verify:market-decoupled-fulfillment-phase5b": "node backend/scripts/verify-market-decoupled-fulfillment-phase5b.js",
     "verify:market-decoupled-fulfillment-phase5c": "node backend/scripts/verify-market-decoupled-fulfillment-phase5c.js",
+    "verify:phase5c-production-cutover": "node backend/scripts/verify-phase5c-production-cutover.js",
     "verify:mm-supplier-mapping-rollout": "node backend/scripts/verify-mm-supplier-mapping-rollout.js",
     "verify:customer-purchase-journey-phase1": "node backend/scripts/verify-customer-purchase-journey-phase1.js",
     "verify:mm-payment-ux-phase2": "node backend/scripts/verify-mm-payment-ux-phase2.js",
