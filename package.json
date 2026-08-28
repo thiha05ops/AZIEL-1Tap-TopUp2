@@ -236,6 +236,7 @@
     "verify:pricing-ownership-runtime": "node backend/scripts/verify-pricing-ownership-runtime.js",
     "verify:multi-currency-supplier-pricing": "node backend/scripts/verify-multi-currency-supplier-pricing.js",
     "verify:daily-pricing-workspace": "node backend/scripts/verify-daily-pricing-workspace.js",
+    "verify:daily-pricing-selective-publish": "node backend/scripts/verify-daily-pricing-selective-publish.js",
     "verify:daily-pricing-authority": "node backend/scripts/verify-daily-pricing-supplier-region-authority.js",
     "verify:daily-pricing-canonical": "node backend/scripts/verify-daily-pricing-canonical-consistency.js",
     "verify:commerce-checkout-application-service": "node backend/scripts/verify-commerce-checkout-application-service.js",

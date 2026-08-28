@@ -50,8 +50,8 @@ function main() {
     includes(route, "supplierId: req.body?.supplierId", "Routes must forward canonical supplierId.");
     includes(route, "regions: req.body?.regions", "Settings publish must carry the selected region only.");
     includes(control, "resolvePricingSupplier", "Preview and publish must resolve canonical supplier.");
-    includes(control, "publishedPriceMode: \"POLICY_DERIVED\"", "Publish must persist policy-derived price mode.");
-    includes(control, "amount: calculatedPrice", "Publish must persist server-calculated selling price.");
+    includes(control, 'publishedPriceMode: priceMode === "CALCULATED" ? "POLICY_DERIVED" : "MANUAL_OVERRIDE"', "Publish must persist the existing policy-derived/manual-override authority.");
+    includes(control, "amount: finalPrice", "Publish must persist the server-authoritative final preview price.");
     includes(control, "regionalResults", "Preview API must return the cross-region result contract.");
     includes(control, "selectedRegions", "Publish must support selected-region server recalculation.");
     includes(control, "loadDailyPricingWorkspace", "Workspace rows must be loaded through supplier mapping authority.");

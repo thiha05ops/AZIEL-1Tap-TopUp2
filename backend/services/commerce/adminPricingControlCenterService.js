@@ -172,6 +172,87 @@ function precise(value) {
     return Number.isFinite(numeric) ? Number(numeric.toFixed(6)) : null;
 }
 
+function normalizePriceInstruction(input = {}, region) {
+    const mode = upper(input.mode || "CALCULATED");
+    if (!["CALCULATED", "MANUAL_OVERRIDE", "ADJUSTMENT"].includes(mode)) {
+        throw new AdminPricingControlCenterError("WORKSPACE_PRICE_MODE_INVALID", `${region} price mode is invalid.`);
+    }
+    if (mode === "CALCULATED") return { mode, adjustmentType: "", value: null, reason: "" };
+    const value = Number(input.value);
+    if (!Number.isFinite(value) || (mode === "MANUAL_OVERRIDE" && value <= 0)) {
+        throw new AdminPricingControlCenterError("WORKSPACE_PRICE_VALUE_INVALID", `${region} price value is invalid.`);
+    }
+    const adjustmentType = mode === "ADJUSTMENT" ? upper(input.adjustmentType || "FIXED") : "";
+    if (mode === "ADJUSTMENT" && !["FIXED", "PERCENTAGE"].includes(adjustmentType)) {
+        throw new AdminPricingControlCenterError("WORKSPACE_ADJUSTMENT_TYPE_INVALID", `${region} adjustment type is invalid.`);
+    }
+    if (adjustmentType === "PERCENTAGE" && Math.abs(value) > 100) {
+        throw new AdminPricingControlCenterError("WORKSPACE_ADJUSTMENT_VALUE_INVALID", `${region} percentage adjustment must be between -100 and 100.`);
+    }
+    return { mode, adjustmentType, value, reason: text(input.reason) };
+}
+
+function resolveWorkspacePriceInstruction({ instruction = {}, calculatedPrice, currency, region } = {}) {
+    const normalized = normalizePriceInstruction(instruction, region);
+    const calculated = finalizeCustomerPayableAmount(calculatedPrice, currency);
+    let finalPrice = calculated;
+    if (normalized.mode === "MANUAL_OVERRIDE") finalPrice = finalizeCustomerPayableAmount(normalized.value, currency);
+    if (normalized.mode === "ADJUSTMENT") {
+        const delta = normalized.adjustmentType === "PERCENTAGE"
+            ? calculated * (normalized.value / 100)
+            : normalized.value;
+        finalPrice = finalizeCustomerPayableAmount(calculated + delta, currency);
+    }
+    if (!Number.isFinite(finalPrice) || finalPrice <= 0) {
+        throw new AdminPricingControlCenterError("WORKSPACE_FINAL_PRICE_INVALID", `${region} final preview price must be positive.`);
+    }
+    const reason = normalized.reason || (normalized.mode === "MANUAL_OVERRIDE"
+        ? "Daily Pricing exact manual override."
+        : normalized.mode === "ADJUSTMENT"
+            ? `Daily Pricing ${normalized.adjustmentType.toLowerCase()} adjustment ${normalized.value >= 0 ? "+" : ""}${normalized.value}${normalized.adjustmentType === "PERCENTAGE" ? "%" : ""}.`
+            : "");
+    return { ...normalized, calculatedPrice: calculated, finalPrice, reason };
+}
+
+function buildWorkspacePricePatch({ regionalPreview = {}, normalized = {}, supplier = {}, row = {} } = {}) {
+    const finalPrice = Number(regionalPreview.finalPreviewPrice ?? regionalPreview.recommendedSellingPrice);
+    const priceMode = regionalPreview.priceMode || "CALCULATED";
+    const patch = {
+        amount: finalPrice,
+        publishedPriceMode: priceMode === "CALCULATED" ? "POLICY_DERIVED" : "MANUAL_OVERRIDE",
+        manualOverrideReason: priceMode === "CALCULATED" ? "" : regionalPreview.manualOverrideReason,
+        pricingNote: priceMode === "ADJUSTMENT" ? regionalPreview.manualOverrideReason : normalized.pricingNote
+    };
+    if (normalized.supplierCostEdited === true) {
+        Object.assign(patch, {
+            supplierCost: normalized.newSupplierCost,
+            supplierCurrency: supplier.supplierCurrency,
+            rawSupplierCost: normalized.newSupplierCost,
+            rawSupplierCurrency: supplier.supplierCurrency,
+            supplierCostSource: normalized.supplierCostSource,
+            providerProductCode: normalized.providerProductCode,
+            providerOfferCode: normalized.providerOfferCode,
+            fxRate: regionalPreview.exchangeRate,
+            fxRateSource: regionalPreview.exchangeRateSource,
+            fxRateCapturedAt: regionalPreview.exchangeRateCapturedAt,
+            fxRateEffectiveAt: regionalPreview.exchangeSnapshot?.effectiveAt || null,
+            fxRateExpiresAt: regionalPreview.exchangeRateExpiresAt || null,
+            fxRateMaxAgeSeconds: regionalPreview.exchangeRateMaxAgeSeconds || null,
+            fxConvertedCost: regionalPreview.fxConvertedCost,
+            fundingCost: regionalPreview.fundingCost || 0,
+            otherAcquisitionCost: regionalPreview.otherAcquisitionCost || 0,
+            landedCost: regionalPreview.landedCost,
+            landedCurrency: regionalPreview.landedCurrency,
+            supplierId: supplier.supplierId,
+            supplierCode: supplier.supplierCode,
+            supplierName: supplier.supplierName,
+            supplierVersion: normalized.supplierVersion || row.supplierVersion || "",
+            supplierCostTimestamp: normalized.supplierCostTimestamp
+        });
+    }
+    return patch;
+}
+
 function selectedPrice(existing = {}, draft = {}, region) {
     const currency = REGION_CURRENCIES[region];
     const merged = {
@@ -279,6 +360,11 @@ function normalizeWorkspaceRow(row = {}, index = 0) {
         manualPublishedPrice: amount(row.manualPublishedPrice),
         manualOverrideReason: text(row.manualOverrideReason),
         publishedPriceMode: upper(row.publishedPriceMode || ""),
+        priceInstructions: Object.fromEntries(WORKSPACE_REGIONS.map(region => [
+            region,
+            normalizePriceInstruction(row.priceInstructions?.[region] || {}, region)
+        ])),
+        supplierCostEdited: row.supplierCostEdited === true,
         mappingId: text(row.mappingId),
         supplierProductCode: text(row.supplierProductCode),
         supplierPackageCode: text(row.supplierPackageCode),
@@ -590,7 +676,81 @@ async function previewLoadedPackageRegion({ product, pkg, region, row, couponCod
             promotionInput: null,
             versionContext: context.pricing.versionContext
         });
-        const preview = previewFromQuote({ quote, context, price, couponCode: upper(couponCode) });
+        const calculatedPreview = previewFromQuote({ quote, context, price, couponCode: upper(couponCode) });
+        const instruction = resolveWorkspacePriceInstruction({
+            instruction: row.priceInstructions?.[region],
+            calculatedPrice: calculatedPreview.recommendedSellingPrice,
+            currency: price.currency,
+            region
+        });
+        let preview = {
+            ...calculatedPreview,
+            priceMode: instruction.mode,
+            adjustmentType: instruction.adjustmentType,
+            adjustmentValue: instruction.mode === "ADJUSTMENT" ? instruction.value : null,
+            manualOverrideValue: instruction.mode === "MANUAL_OVERRIDE" ? instruction.value : null,
+            calculatedPrice: instruction.calculatedPrice,
+            finalPreviewPrice: instruction.finalPrice,
+            recommendedSellingPrice: instruction.finalPrice,
+            manualOverrideReason: instruction.reason,
+            changed: instruction.finalPrice !== calculatedPreview.currentPublishedPrice,
+            publishedPriceDifference: Number((instruction.finalPrice - calculatedPreview.currentPublishedPrice).toFixed(price.currency === "MMK" ? 0 : 2))
+        };
+        if (instruction.mode !== "CALCULATED") {
+            const overridePrice = {
+                ...price,
+                amount: instruction.finalPrice,
+                publishedPriceMode: "MANUAL_OVERRIDE",
+                manualOverrideReason: instruction.reason
+            };
+            const overridePackage = {
+                ...pkg,
+                prices: { ...pkg.prices, [region]: overridePrice }
+            };
+            const overrideContext = await buildProductionPricingContext({
+                pkg: overridePackage,
+                price: overridePrice,
+                catalog: {
+                    productCode: product.productCode,
+                    productName: product.name,
+                    packageCode: pkg.packageCode,
+                    packageName: pkg.name
+                },
+                region,
+                currency: overridePrice.currency,
+                includePublishedPriceOverride: true
+            });
+            const overrideQuote = createPricingQuote({
+                quoteId: `daily-pricing-override-preview:${product.productCode}:${pkg.packageCode}:${region}:${Date.now()}`,
+                issuedAt: new Date().toISOString(),
+                validitySeconds: 300,
+                owner: { userId: actor?.id || actor?.username || "admin-pricing-workspace" },
+                request: {
+                    region,
+                    currency: overridePrice.currency,
+                    package: { ...overrideContext.packageContext, quantity: 1 },
+                    couponCode: upper(couponCode)
+                },
+                pricingInput: overrideContext.pricing.pricingInput,
+                promotionInput: null,
+                versionContext: overrideContext.pricing.versionContext
+            });
+            const validated = previewFromQuote({ quote: overrideQuote, context: overrideContext, price: overridePrice, couponCode: upper(couponCode) });
+            preview = {
+                ...validated,
+                priceMode: instruction.mode,
+                adjustmentType: instruction.adjustmentType,
+                adjustmentValue: instruction.mode === "ADJUSTMENT" ? instruction.value : null,
+                manualOverrideValue: instruction.mode === "MANUAL_OVERRIDE" ? instruction.value : null,
+                calculatedPrice: instruction.calculatedPrice,
+                finalPreviewPrice: instruction.finalPrice,
+                recommendedSellingPrice: instruction.finalPrice,
+                currentPublishedPrice: calculatedPreview.currentPublishedPrice,
+                manualOverrideReason: instruction.reason,
+                changed: instruction.finalPrice !== calculatedPreview.currentPublishedPrice,
+                publishedPriceDifference: Number((instruction.finalPrice - calculatedPreview.currentPublishedPrice).toFixed(price.currency === "MMK" ? 0 : 2))
+            };
+        }
         return {
             ...preview,
             productCode: product.productCode,
@@ -614,6 +774,14 @@ function rowStatusFromRegional(regional = []) {
     if (regional.some(item => item.profitabilityStatus === PROFITABILITY_STATUS.NEGATIVE_MARGIN || item.profitabilityStatus === PROFITABILITY_STATUS.PRICE_BELOW_COST)) return "Blocked";
     if (warnings.length) return "Warning";
     return "Ready";
+}
+
+function selectedPublicationDecision(row = {}) {
+    if (row.changed !== true) return { action: "NO_OP", reason: "No changes" };
+    if (row.publishEligible !== true || (row.blockingErrors || []).length) {
+        return { action: "BLOCKED", reason: "Blocked by pricing preview" };
+    }
+    return { action: "PUBLISH", reason: "" };
 }
 
 function operatorRegionStatus(item = {}) {
@@ -837,7 +1005,10 @@ async function batchPreviewDailyPricing({ rows = [], couponCode = "", actor = nu
             changed,
             selected: row.selected !== false,
             status: rowStatusFromRegional(regional),
-            publishEligible: !blockingErrors.length && row.selected !== false,
+            // Operational pricing readiness is independent from explicit admin
+            // selection intent. Folding row.selected into this flag deadlocks
+            // initially-unselected READY rows in the browser.
+            publishEligible: !blockingErrors.length,
             warnings,
             blockingErrors,
             regions: regional,
@@ -1001,7 +1172,8 @@ async function publishDailyPricing({
             continue;
         }
 
-        if (row.changed !== true) {
+        const publicationDecision = selectedPublicationDecision(row);
+        if (publicationDecision.action === "NO_OP") {
             selectedRegions.forEach(selectedRegion => {
                 results.push({
                     region: selectedRegion,
@@ -1009,7 +1181,7 @@ async function publishDailyPricing({
                     packageCode: row.packageCode,
                     published: false,
                     skipped: true,
-                    reason: "No changes"
+                    reason: publicationDecision.reason
                 });
             });
             continue;
@@ -1020,7 +1192,7 @@ async function publishDailyPricing({
 
         for (const selectedRegion of selectedRegions) {
             const regionalPreview = (row.regions || []).find(item => item.region === selectedRegion);
-            const calculatedPrice = Number(regionalPreview?.recommendedSellingPrice);
+            const calculatedPrice = Number(regionalPreview?.finalPreviewPrice ?? regionalPreview?.recommendedSellingPrice);
             const regionalBlockingErrors = regionalPreview?.blockingErrors || [];
 
             if (regionalPreview && regionalPreview.changed !== true) {
@@ -1058,35 +1230,7 @@ async function publishDailyPricing({
             }
 
             const supplier = suppliersByRegion.get(selectedRegion);
-            pricePatches[selectedRegion] = {
-                amount: calculatedPrice,
-                publishedPriceMode: "POLICY_DERIVED",
-                manualOverrideReason: "",
-                supplierCost: normalized.newSupplierCost,
-                supplierCurrency: supplier.supplierCurrency,
-                rawSupplierCost: normalized.newSupplierCost,
-                rawSupplierCurrency: supplier.supplierCurrency,
-                supplierCostSource: normalized.supplierCostSource,
-                providerProductCode: normalized.providerProductCode,
-                providerOfferCode: normalized.providerOfferCode,
-                fxRate: regionalPreview.exchangeRate,
-                fxRateSource: regionalPreview.exchangeRateSource,
-                fxRateCapturedAt: regionalPreview.exchangeRateCapturedAt,
-                fxRateEffectiveAt: regionalPreview.exchangeSnapshot?.effectiveAt || null,
-                fxRateExpiresAt: regionalPreview.exchangeRateExpiresAt || null,
-                fxRateMaxAgeSeconds: regionalPreview.exchangeRateMaxAgeSeconds || null,
-                fxConvertedCost: regionalPreview.fxConvertedCost,
-                fundingCost: regionalPreview.fundingCost || 0,
-                otherAcquisitionCost: regionalPreview.otherAcquisitionCost || 0,
-                landedCost: regionalPreview.landedCost,
-                landedCurrency: regionalPreview.landedCurrency,
-                supplierId: supplier.supplierId,
-                supplierCode: supplier.supplierCode,
-                supplierName: supplier.supplierName,
-                supplierVersion: normalized.supplierVersion || row.supplierVersion || "",
-                supplierCostTimestamp: normalized.supplierCostTimestamp,
-                pricingNote: normalized.pricingNote
-            };
+            pricePatches[selectedRegion] = buildWorkspacePricePatch({ regionalPreview, normalized, supplier, row });
             publishableRegions.push(selectedRegion);
         }
 
@@ -1100,7 +1244,7 @@ async function publishDailyPricing({
          */
         const canonicalSupplier = suppliersByRegion.get(publishableRegions[0]);
         const patch = {
-            canonicalSupplierCost: {
+            ...(normalized.supplierCostEdited === true ? { canonicalSupplierCost: {
                 supplierId: canonicalSupplier.supplierId,
                 supplierCode: canonicalSupplier.supplierCode,
                 supplierName: canonicalSupplier.supplierName,
@@ -1123,7 +1267,7 @@ async function publishDailyPricing({
                 otherAcquisitionCost: pricePatches[publishableRegions[0]].otherAcquisitionCost,
                 landedCost: pricePatches[publishableRegions[0]].landedCost,
                 landedCurrency: pricePatches[publishableRegions[0]].landedCurrency
-            },
+            } } : {}),
             prices: pricePatches,
             pricingPublicationEvidence: publishableRegions.map(selectedRegion => {
                 const regionalPreview = row.regions.find(item => item.region === selectedRegion);
@@ -1150,6 +1294,10 @@ async function publishDailyPricing({
                         versionNumber: regionalPreview.policyVersionNumber
                     },
                     packageProfitOverride: regionalPreview.packageProfitOverride || { mode: "INHERIT", value: null }
+                    ,priceMode: regionalPreview.priceMode || "CALCULATED"
+                    ,calculatedPrice: regionalPreview.calculatedPrice
+                    ,finalPreviewPrice: regionalPreview.finalPreviewPrice ?? regionalPreview.recommendedSellingPrice
+                    ,manualOverrideReason: regionalPreview.manualOverrideReason || ""
                 };
             }),
             expectedUpdatedAt: normalized.expectedUpdatedAt || row.expectedUpdatedAt
@@ -1385,6 +1533,9 @@ module.exports = Object.freeze({
     PROFITABILITY_STATUS,
     statusFromPricingEvidence,
     rowStatusFromRegional,
+    selectedPublicationDecision,
+    resolveWorkspacePriceInstruction,
+    buildWorkspacePricePatch,
     batchPreviewDailyPricing,
     loadDailyPricingWorkspace,
     bulkBackfillSupplierCosts,

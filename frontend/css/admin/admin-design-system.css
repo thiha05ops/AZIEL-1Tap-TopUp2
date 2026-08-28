@@ -8389,6 +8389,21 @@ body.theme-light.admin-body .pricing-cost-input-shell {
   background: var(--admin-surface);
 }
 
+.pricing-selection-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pricing-selection-column {
+  width: 58px;
+}
+
+.pricing-v3-table input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
+
 .pricing-v3-table {
   width: 100%;
   min-width: 780px;
@@ -8460,13 +8475,26 @@ body.theme-light.admin-body .pricing-cost-input-shell {
   background: rgba(22, 132, 91, .12);
 }
 
+.pricing-status.is-unchanged {
+  color: var(--admin-text-muted);
+  background: color-mix(in srgb, var(--admin-text-muted) 12%, transparent);
+}
+
+.pricing-status.is-price_changed,
+.pricing-status.is-cost_changed,
+.pricing-status.is-manual_override {
+  color: #6d4bd1;
+  background: rgba(109, 75, 209, .14);
+}
+
 .pricing-status.is-warning {
   color: #a76600;
   background: rgba(196, 126, 15, .14);
 }
 
 .pricing-status.is-blocked,
-.pricing-status.is-missing {
+.pricing-status.is-missing,
+.pricing-status.is-not_ready {
   color: #c23d51;
   background: rgba(194, 61, 81, .12);
 }
@@ -8475,6 +8503,26 @@ body.theme-light.admin-body .pricing-cost-input-shell {
   display: grid;
   gap: 3px;
   min-width: 125px;
+}
+
+.pricing-price-control {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr);
+  gap: 5px;
+  margin: 5px 0;
+}
+
+.pricing-price-control select,
+.pricing-price-control input {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  padding: 0 7px;
+  border: 1px solid var(--admin-border);
+  border-radius: 5px;
+  background: var(--admin-bg);
+  color: var(--admin-text);
+  font-size: 11px;
 }
 
 .pricing-region-result span,

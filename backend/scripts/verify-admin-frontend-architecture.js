@@ -276,7 +276,7 @@ function verifyModuleIntegrationAndRegressions() {
     assert(html.indexOf('data-section="catalog"') < html.indexOf('data-section="pricing-engine"'), "Pricing Engine should sit after Catalog in Commerce navigation.");
     assert(html.indexOf('<span class="admin-nav-label">Growth</span>') < html.indexOf('data-section="promos"'), "Promo Codes should live in the Growth navigation group.");
     assert(html.indexOf('<span class="admin-nav-label" data-admin-i18n="commerce">Commerce</span>') < html.indexOf('data-section="catalog"'), "Catalog should live in the Commerce navigation group.");
-    assert(html.includes("Update supplier costs and publish server-calculated prices."), "Daily Pricing operations subtitle must render.");
+    assert(html.includes("Preview calculated prices, fine-tune selected packages, and publish explicitly."), "Daily Pricing operations subtitle must render.");
     assert(html.includes('data-section="pricing-settings"') && html.includes('id="section-pricing-settings"'), "Pricing Settings must be an independent Admin destination.");
     assert(html.includes("Independent FX Authorities") && html.includes("Profit Policy") && html.includes("Gateway Fee") && html.includes("Minimum Profit") && html.includes("Maximum Profit"), "Pricing Settings controls must render.");
     assert(!html.includes("FALLBACK_PRODUCT") && !html.includes("pricingFlow"), "Legacy demo preview surfaces must be absent.");

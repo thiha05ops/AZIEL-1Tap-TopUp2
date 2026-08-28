@@ -47,7 +47,11 @@ async function verifyRuntimeExamples() {
     });
     assert.strictEqual(th.exchangeRateApplied, null, "Thailand same-currency pricing must not require exchange.");
     almostEqual(th.postExchangeSubtotal, 40, "Thailand converted supplier cost");
-    almostEqual(th.regularPrice, 53, "Thailand recommended price");
+    almostEqual(th.gatewayFeeAmount, 0.8, "Thailand gateway fee");
+    almostEqual(th.platformFeeAmount, 3, "Thailand platform fee");
+    almostEqual(th.landedCost, 40, "Thailand landed-cost profit basis");
+    almostEqual(th.profitAmount, 8, "Thailand profit calculated from landed cost");
+    almostEqual(th.regularPrice, 52, "Thailand recommended price after rounding");
 
     const mm = calculateBasePrice({
         supplierCost: 40,
@@ -77,15 +81,21 @@ async function verifyProductionContextOverrideOwnership() {
     const PricingPolicy = require("../models/PricingPolicy");
     const PricingRule = require("../models/PricingRule");
     const PriceVersion = require("../models/PriceVersion");
+    const ExchangeRateAuthority = require("../models/ExchangeRateAuthority");
+    const PackagePricingOverride = require("../models/PackagePricingOverride");
     const originalPolicyFindOne = PricingPolicy.findOne;
     const originalRuleFind = PricingRule.find;
     const originalVersionFind = PriceVersion.find;
+    const originalRateFindOne = ExchangeRateAuthority.findOne;
+    const originalOverrideFindOne = PackagePricingOverride.findOne;
     process.env.COMMERCE_EXCHANGE_RATE_THB_MMK = "120";
 
     try {
         PricingPolicy.findOne = () => ({ sort: () => ({ lean: () => Promise.resolve(null) }) });
         PricingRule.find = () => ({ sort: () => ({ lean: () => Promise.resolve([]) }) });
         PriceVersion.find = () => ({ sort: () => ({ limit: () => ({ lean: () => Promise.resolve([]) }) }) });
+        ExchangeRateAuthority.findOne = () => ({ sort: () => ({ lean: () => Promise.resolve(null) }) });
+        PackagePricingOverride.findOne = () => ({ lean: () => Promise.resolve(null) });
 
         const legacyPrice = {
             amount: 6500,
@@ -103,6 +113,7 @@ async function verifyProductionContextOverrideOwnership() {
             catalog: { productCode: "mlbb", packageCode: "MLBB_TEST", productName: "Mobile Legends" },
             region: "MM",
             currency: "MMK",
+            includePublishedPriceOverride: false,
             now: new Date("2026-07-29T00:00:00.000Z")
         });
         const override = legacyContext.pricing.pricingInput.appliedPricingRules.find(rule => rule.ruleType === "PRICE_OVERRIDE");
@@ -119,6 +130,7 @@ async function verifyProductionContextOverrideOwnership() {
             catalog: { productCode: "mlbb", packageCode: "MLBB_TEST", productName: "Mobile Legends" },
             region: "MM",
             currency: "MMK",
+            includePublishedPriceOverride: false,
             now: new Date("2026-07-29T00:00:00.000Z")
         });
         assert(!derivedContext.pricing.pricingInput.appliedPricingRules.some(rule => rule.ruleType === "PRICE_OVERRIDE"), "policy-derived pricing must remove catalog price override.");
@@ -126,6 +138,8 @@ async function verifyProductionContextOverrideOwnership() {
         PricingPolicy.findOne = originalPolicyFindOne;
         PricingRule.find = originalRuleFind;
         PriceVersion.find = originalVersionFind;
+        ExchangeRateAuthority.findOne = originalRateFindOne;
+        PackagePricingOverride.findOne = originalOverrideFindOne;
         if (originalRate === undefined) delete process.env.COMMERCE_EXCHANGE_RATE_THB_MMK;
         else process.env.COMMERCE_EXCHANGE_RATE_THB_MMK = originalRate;
     }

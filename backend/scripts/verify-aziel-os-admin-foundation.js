@@ -60,9 +60,10 @@ function main() {
     includes("frontend/admin.html", "Dashboard</h3>", "Dashboard must use operations-centre naming.");
     includes("frontend/admin.html", "Commerce operations overview using live AZIEL data", "Dashboard must state live-data operating scope.");
     includes("frontend/admin.html", "<h3>Pricing</h3>", "Pricing Workspace must migrate to Pricing naming.");
-    includes("frontend/admin.html", "Update supplier costs and publish server-calculated prices.", "Daily Pricing subtitle must describe its current authority.");
-    includes("frontend/admin.html", "pricing-business-rules-drawer", "Business Rules must be outside the default daily flow.");
-    includes("frontend/admin.html", "Publish All Disabled", "Unsafe pricing publish-all action must stay disabled.");
+    includes("frontend/admin.html", "Preview calculated prices, fine-tune selected packages, and publish explicitly.", "Daily Pricing subtitle must describe its current authority.");
+    includes("frontend/admin.html", "id=\"section-pricing-settings\"", "Pricing Settings must remain the separate policy authority.");
+    includes("frontend/admin.html", "Publish Selected (0)", "Daily Pricing must default to explicit zero-row publication selection.");
+    includes("frontend/admin.html", "pricingSelectVisible", "Daily Pricing must expose explicit filtered selection instead of unsafe publish-all.");
 
     includes("frontend/css/admin/admin-design-system.css", "--aziel-os-bg", "AZIEL OS design tokens must exist.");
     includes("frontend/css/admin/admin-design-system.css", "--aziel-os-purple", "AZIEL OS accent token must exist.");
@@ -75,7 +76,7 @@ function main() {
     includes("frontend/js/admin-app.js", "document.title = `${titleText} · AZIEL OS`", "Page-specific titles must end with AZIEL OS.");
     includes("frontend/js/admin-app.js", "AZIEL OS V2.5", "Admin controller must identify OS V2.5.");
 
-    includes("frontend/js/admin-pricing-engine.js", "stagedChangesByPackageId: new Map()", "Pricing migration must preserve explicit staged-row state.");
+    includes("frontend/js/admin-pricing-engine.js", "priceEdits: new Map(), selected: new Set()", "Pricing workspace must preserve separate commercial-edit and explicit selection state.");
     includes("backend/services/commerce/adminPricingControlCenterService.js", "WORKSPACE_PUBLISH_ALL_DISABLED", "Pricing backend must keep publish-all disabled.");
 
     console.log("AZIEL OS Admin foundation verifier passed.");

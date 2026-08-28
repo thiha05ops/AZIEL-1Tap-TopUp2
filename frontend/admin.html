@@ -665,12 +665,12 @@
                     <header class="pricing-v3-header">
                         <div><span class="admin-status-pill is-purple">Commerce</span>
                             <h2>Daily Pricing</h2>
-                            <p>Update supplier costs and publish server-calculated prices.</p>
+                            <p>Preview calculated prices, fine-tune selected packages, and publish explicitly.</p>
                         </div>
                         <div class="pricing-v3-header-actions"><span id="pricingDailyState"
                                 class="admin-status-pill">Loading</span><button id="pricingPublishBtn"
                                 class="admin-primary-btn" type="button" disabled><i class="fa-solid fa-cloud-arrow-up"
-                                    aria-hidden="true"></i> Publish Changes</button></div>
+                                    aria-hidden="true"></i> Publish Selected (0)</button></div>
                     </header>
                     <div id="pricingDailyBlocking" class="pricing-v3-blocking" role="alert" hidden></div>
                     <div class="pricing-v3-toolbar">
@@ -690,10 +690,16 @@
                         <label class="pricing-v3-search"><span>Packages</span><input id="pricingPackageSearch"
                                 type="search" placeholder="Search product or package" autocomplete="off"></label>
                     </div>
+                    <div class="pricing-selection-actions" aria-label="Pricing row selection">
+                        <button id="pricingSelectVisible" class="admin-secondary-btn" type="button">Select All Visible</button>
+                        <button id="pricingSelectChanged" class="admin-secondary-btn" type="button">Select All Changed</button>
+                        <button id="pricingClearSelection" class="admin-secondary-btn" type="button">Clear Selection</button>
+                    </div>
                     <div class="pricing-v3-table-wrap">
                         <table class="pricing-v3-table">
                             <thead>
                                 <tr>
+                                    <th class="pricing-selection-column">Select</th>
                                     <th>Package</th>
                                     <th>Supplier Cost</th>
                                     <th>Profit</th>
@@ -704,7 +710,7 @@
                             </thead>
                             <tbody id="pricingPackageRows">
                                 <tr>
-                                    <td colspan="5" class="empty">Loading production pricing...</td>
+                                    <td colspan="7" class="empty">Loading production pricing...</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -1698,6 +1704,7 @@ TH</textarea></label>
     <!-- UPDATED -->
     <script src="/js/admin-catalog.js?v=20260731-discount-v1"></script>
 
+    <script src="/js/admin-pricing-selection-state.js?v=20260828-selection-authority"></script>
     <script src="/js/admin-pricing-engine.js?v=20260730-pricing-v3"></script>
     <script src="/js/admin-home-banners.js?v=20260715-phase86"></script>
     <script src="/js/admin-site-placements.js?v=20260715-phase11"></script>
