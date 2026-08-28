@@ -51,6 +51,8 @@ function verifyCarouselGeometry() {
 
 function verifyManagedRuntimeInteraction() {
     const runtime = read("frontend/js/home-banner-runtime.js");
+    const markup = read("frontend/home.html");
+    const heroCss = read("frontend/css/home/marketplace-reference.css");
 
     [
         "listen(track, \"pointerdown\"",
@@ -81,6 +83,11 @@ function verifyManagedRuntimeInteraction() {
 
     assert(runtime.includes("AbortController") && runtime.includes("cleanupCarouselController"), "Carousel listeners and timers must have one cleanup owner.");
     assert(runtime.includes("requestAnimationFrame") && runtime.includes("carouselMetrics"), "Pointer rendering must be frame-batched and use cached geometry.");
+    assert(!markup.includes('class="az-banner-arrow'), "Home markup must not provide a legacy second arrow pair.");
+    assert(runtime.includes('zone.querySelectorAll(".az-banner-arrow").forEach(button => button.remove())'), "Canonical runtime must remove stale arrow controls before creating its pair.");
+    assert.strictEqual((runtime.match(/zone\.append\(previous, next\)/g) || []).length, 1, "Canonical runtime must create exactly one previous/next pair.");
+    assert(heroCss.includes(".az-banner-arrow--previous") && heroCss.includes(".az-banner-arrow--next"), "Desktop must position one previous and one next control.");
+    assert(/\.az-home-hero \.az-banner-arrow\s*\{\s*display:\s*none\s*!important;/.test(heroCss), "Base/mobile carousel controls must remain visually hidden.");
 }
 
 function verifyStaticRuntimeFallback() {

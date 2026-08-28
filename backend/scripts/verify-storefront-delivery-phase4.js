@@ -21,7 +21,13 @@ function verifyLocales() {
         assert(!/lang\/(?:en|my|th|storefront-static)\.js/.test(html), `${file} must not preload inactive locale sources.`);
         assert(html.indexOf("locale-loader.js") < html.indexOf("i18n.js"), `${file} must load its active dictionary before i18n.`);
         const versions = [...html.matchAll(/\?v=([^"'\s>]+)/g)].map(match => match[1]);
-        assert(versions.every(version => version === "20260829-p4"), `${file} has inconsistent public asset versions.`);
+        const allowedVersions = file === "frontend/home.html"
+            ? new Set(["20260829-p4", "20260829-arrow-controls"])
+            : new Set(["20260829-p4"]);
+        assert(versions.every(version => allowedVersions.has(version)), `${file} has an unexpected public asset version.`);
+        if (file === "frontend/home.html") {
+            assert.strictEqual((html.match(/home-banner-runtime\.js\?v=20260829-arrow-controls/g) || []).length, 1, "Home carousel fix must use one cache-busted canonical runtime.");
+        }
     }
 
     for (const lang of ["en", "my", "th"]) {

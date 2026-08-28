@@ -452,7 +452,11 @@
     }
 
     function ensureHeroArrows(zone) {
-        if (!zone || zone.querySelector(".az-banner-arrow")) return;
+        if (!zone) return;
+        // The canonical runtime owns the complete control pair. Remove any
+        // stale/legacy controls before binding so one controller never
+        // inherits duplicate visual buttons.
+        zone.querySelectorAll(".az-banner-arrow").forEach(button => button.remove());
         const previous = document.createElement("button");
         previous.type = "button";
         previous.className = "az-banner-arrow az-banner-arrow--previous";
