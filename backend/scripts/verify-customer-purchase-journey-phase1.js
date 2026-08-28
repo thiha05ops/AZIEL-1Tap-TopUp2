@@ -33,6 +33,8 @@ function verifyConsolidatedJourney() {
     const runtime = read("frontend/js/product-checkout.js");
     const gameFlow = read("frontend/js/game-flow.js");
     const productStage = read("frontend/js/product-detail-stage.js");
+    const paymentMethods = read("frontend/js/payment.js");
+    const shell = read("frontend/css/commerce/purchase-shell.css");
     assert(productStage.includes('"Buy Now"') && !productStage.includes('"Continue to Checkout"'));
     assert(gameFlow.includes('acquire("PREPARING_CHECKOUT"'));
     assert(gameFlow.indexOf('acquire("PREPARING_CHECKOUT"') < gameFlow.indexOf("refreshPackageForCheckout(flow, orderData)"), "Product lock must be acquired before async checkout preparation.");
@@ -45,6 +47,14 @@ function verifyConsolidatedJourney() {
     assert(runtime.includes("authoritativeReview.pricing") && runtime.includes("reviewQuoteId: authoritativeReview.quoteId"));
     assert(runtime.includes('payment.paymentType === "wallet"') && runtime.includes('t("payment.pay", "Pay")'));
     assert(runtime.includes('t("payment.continueWith"'));
+    assert(checkout.includes('id="checkoutPriceToggle"') && checkout.includes('aria-controls="checkoutPriceContent"') && checkout.includes('data-mobile-expanded="false"'), "Mobile price details must be an accessible collapsed disclosure.");
+    assert(shell.includes("@media (max-width: 600px)") && shell.includes(".checkout-sidebar > h2") && shell.includes(".checkout-primary") && shell.includes("display: contents") && shell.includes("align-items: stretch"), "Mobile checkout hierarchy must remove duplicate summary presentation, span the content column, and reorder payment before price details.");
+    assert(shell.includes(".checkout-payment .pay-card") && shell.includes("min-height: 60px"), "Mobile payment rows must remain compact with accessible target sizing.");
+    assert(runtime.includes('replace(/\\.\\s*$/, "")') && runtime.includes('classList.add("is-redundant-action")') && runtime.includes('classList.remove("is-redundant-action")'), "Mobile CTA punctuation and redundant status suppression must preserve non-routine feedback.");
+    assert(shell.includes(".checkout-feedback.is-redundant-action:not(.is-error)"), "Only non-error redundant action feedback may be hidden on mobile.");
+    assert(!paymentMethods.includes('card.className = `pay-card ${index === 0 ? "active" : ""}`'), "Payment cards must not look selected before selectedPaymentData is established.");
+    assert(paymentMethods.includes("if (firstCard) selectPaymentCard(firstCard)"), "The existing intentional first eligible payment default must be preserved.");
+    assert(paymentMethods.includes('card.setAttribute("aria-pressed", "true")') && paymentMethods.includes('event.key !== "Enter"'), "Payment selection must expose state and keyboard activation.");
 }
 
 function verifyPaymentCompatibility() {

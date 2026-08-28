@@ -221,6 +221,10 @@ body.az-purchase-surface,
     text-transform: uppercase;
 }
 
+.checkout-price-toggle {
+    display: none;
+}
+
 .checkout-review dl,
 .checkout-price-breakdown dl {
     margin: 0;
@@ -1033,6 +1037,246 @@ body.az-purchase-surface .tracking-page {
 @media (max-width: 390px) {
     .checkout-payment .payment-grid {
         grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 600px) {
+    .product-checkout-page {
+        padding-top: 0;
+    }
+
+    .checkout-heading {
+        margin-bottom: 10px;
+    }
+
+    .checkout-heading .checkout-eyebrow,
+    .checkout-heading h1 + p {
+        display: none;
+    }
+
+    .checkout-heading h1 {
+        margin: 8px 0 0;
+        font-size: 25px;
+    }
+
+    .checkout-layout {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .checkout-primary {
+        display: contents;
+    }
+
+    .checkout-review {
+        order: 1;
+        padding: 13px 15px;
+    }
+
+    .checkout-review h2 {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+    }
+
+    .checkout-review dl {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 3px 12px;
+    }
+
+    .checkout-review dl div {
+        min-width: 0;
+        padding: 0;
+        border: 0;
+    }
+
+    .checkout-review dl div:nth-child(1),
+    .checkout-review dl div:nth-child(2) {
+        grid-column: 1 / -1;
+        display: block;
+    }
+
+    .checkout-review dl div:nth-child(3),
+    .checkout-review dl div:nth-child(4) {
+        display: flex;
+        justify-content: flex-start;
+        gap: 5px;
+        color: var(--text-muted);
+    }
+
+    .checkout-review dl div:nth-child(4) {
+        justify-content: flex-end;
+    }
+
+    .checkout-review dl div:nth-child(1) dt,
+    .checkout-review dl div:nth-child(2) dt {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+    }
+
+    .checkout-review dl div:nth-child(1) dd {
+        font-size: 16px;
+    }
+
+    .checkout-review dl div:nth-child(2) dd {
+        margin-top: 2px;
+        color: var(--text-muted);
+        font-size: 13px;
+    }
+
+    .checkout-review dt,
+    .checkout-review dd {
+        min-width: 0;
+        text-align: left;
+        font-size: 12px;
+        overflow-wrap: anywhere;
+    }
+
+    .checkout-review dl div:nth-child(3) dt::after {
+        content: ":";
+    }
+
+    .checkout-sidebar {
+        order: 2;
+        padding: 14px 15px 15px;
+    }
+
+    .checkout-sidebar > h2,
+    .checkout-sidebar > dl {
+        display: none;
+    }
+
+    .checkout-sidebar > .checkout-total {
+        align-items: center;
+        padding: 0 0 12px;
+        border-bottom: 1px solid var(--purchase-border);
+    }
+
+    .checkout-sidebar > .checkout-total span {
+        font-size: 13px;
+        font-weight: 700;
+    }
+
+    .checkout-sidebar > .checkout-total strong {
+        font-size: 27px;
+    }
+
+    .checkout-payment {
+        padding-top: 12px;
+    }
+
+    .checkout-payment h2 {
+        margin-bottom: 9px;
+        font-size: 12px;
+    }
+
+    .checkout-payment .payment-grid {
+        grid-template-columns: 1fr;
+        gap: 7px;
+    }
+
+    .checkout-payment .pay-card {
+        min-height: 60px;
+        padding: 8px 42px 8px 10px;
+        flex-direction: row;
+        justify-content: flex-start;
+        gap: 11px;
+        border-radius: 11px;
+    }
+
+    .checkout-payment .pay-logo,
+    .checkout-payment .pay-card img {
+        flex: 0 0 auto;
+        width: 42px;
+        height: 34px;
+    }
+
+    .checkout-payment .pay-info {
+        min-width: 0;
+        align-items: flex-start;
+        gap: 2px;
+        text-align: left;
+    }
+
+    .checkout-payment .pay-description,
+    .checkout-payment .pay-message,
+    .checkout-payment .pay-bank-chips {
+        display: none;
+    }
+
+    .checkout-payment .pay-card.active::after {
+        top: 50%;
+        right: 12px;
+        transform: translateY(-50%);
+    }
+
+    .checkout-feedback {
+        min-height: 0;
+        margin: 9px 0 7px;
+        font-size: 12px;
+    }
+
+    .checkout-feedback.is-redundant-action:not(.is-error) {
+        display: none;
+    }
+
+    .checkout-sidebar .primary-commerce-action {
+        min-height: 48px;
+    }
+
+    .checkout-price-breakdown {
+        order: 3;
+        padding: 0;
+        overflow: hidden;
+    }
+
+    .checkout-price-breakdown > h2 {
+        display: none;
+    }
+
+    .checkout-price-toggle {
+        display: flex;
+        width: 100%;
+        min-height: 46px;
+        padding: 10px 15px;
+        align-items: center;
+        justify-content: space-between;
+        border: 0;
+        background: transparent;
+        color: var(--text);
+        font: inherit;
+        font-size: 13px;
+        font-weight: 750;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .checkout-price-breakdown[data-mobile-expanded="false"] .checkout-price-content {
+        display: none;
+    }
+
+    .checkout-price-toggle[aria-expanded="true"] span[aria-hidden="true"] {
+        transform: rotate(180deg);
+    }
+
+    .checkout-price-content {
+        padding: 0 15px 13px;
+    }
+
+    .checkout-price-content > .checkout-total {
+        display: none;
+    }
+
+    .checkout-price-breakdown dl div {
+        padding: 8px 0;
     }
 }
 

@@ -237,7 +237,10 @@ function buildPaymentCard(method, index) {
     }
 
     const card = document.createElement("div");
-    card.className = `pay-card ${index === 0 ? "active" : ""}`;
+    card.className = "pay-card";
+    card.setAttribute("role", "button");
+    card.setAttribute("tabindex", "0");
+    card.setAttribute("aria-pressed", "false");
     card.__paymentMethod = normalizeSelectedPaymentMethod(method, {
         key,
         displayName,
@@ -307,6 +310,11 @@ function buildPaymentCard(method, index) {
     `;
 
     card.addEventListener("click", () => selectPaymentCard(card));
+    card.addEventListener("keydown", event => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        selectPaymentCard(card);
+    });
     return card;
 }
 
@@ -336,8 +344,12 @@ function selectPaymentCard(card) {
         ? card.__paymentMethod
         : {};
 
-    document.querySelectorAll(".pay-card").forEach(c => c.classList.remove("active"));
+    document.querySelectorAll(".pay-card").forEach(c => {
+        c.classList.remove("active");
+        c.setAttribute("aria-pressed", "false");
+    });
     card.classList.add("active");
+    card.setAttribute("aria-pressed", "true");
     window.AZIEL_MOTION?.emphasize(card, "selected");
 
     if (paymentInput) {

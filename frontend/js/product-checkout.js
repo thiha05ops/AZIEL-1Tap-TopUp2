@@ -16,6 +16,15 @@
         if (!node) return;
         node.textContent = message;
         node.classList.toggle("is-error", error);
+        node.classList.remove("is-redundant-action");
+    }
+
+    function isMobileCheckout() {
+        return window.matchMedia?.("(max-width: 600px)")?.matches === true;
+    }
+
+    function mobileActionLabel(label) {
+        return isMobileCheckout() ? String(label || "").replace(/\.\s*$/, "") : label;
     }
 
     function formatMoney(amount, currency) {
@@ -126,21 +135,33 @@
         if (button) {
             const pricing = authoritativeReview?.pricing || {};
             const method = payment?.method || payment?.appDisplayName || payment?.key || "";
-            button.textContent = !payment?.key
+            const actionLabel = !payment?.key
                 ? t("payment.selectMethod", "Select a payment method")
                 : payment.paymentType === "wallet" || payment.key === "wallet"
                     ? `${t("payment.pay", "Pay")} ${formatMoney(pricing.quotedTotalAmount, pricing.currency)}`
                     : t("payment.continueWith", `Continue with ${method}`, { method });
+            button.textContent = payment?.key ? mobileActionLabel(actionLabel) : actionLabel;
         }
         if (reviewLoading) return;
         if (!authoritativeReview?.quoteId) return;
         feedback(payment?.key ? t("payment.continueWith", "Continue with {method}.", { method: payment.method || payment.key }) : t("payment.selectMethod", "Select a payment method."));
+        if (payment?.key) document.getElementById("checkoutFeedback")?.classList.add("is-redundant-action");
+    }
+
+    function togglePriceDetails() {
+        const section = document.querySelector(".checkout-price-breakdown");
+        const button = document.getElementById("checkoutPriceToggle");
+        if (!section || !button) return;
+        const expanded = section.dataset.mobileExpanded !== "true";
+        section.dataset.mobileExpanded = String(expanded);
+        button.setAttribute("aria-expanded", String(expanded));
     }
 
     async function continuePayment() {
         const payment = selectedPayment();
         if (paymentSubmitting || paymentCommitted || !draft?.order || !authoritativeReview?.quoteId || !payment?.key) return;
         const button = document.getElementById("checkoutPayButton");
+        document.getElementById("checkoutFeedback")?.classList.remove("is-redundant-action");
         const lock = window.AZIEL_PURCHASE_TRANSITION?.acquire("PREPARING_PAYMENT", {
             controls: [button, document.getElementById("paymentGrid"), document.getElementById("checkoutBackLink")],
             statusNode: document.getElementById("checkoutFeedback"),
@@ -185,6 +206,7 @@
         }
         render(draft.order);
         document.getElementById("checkoutPayButton")?.addEventListener("click", continuePayment);
+        document.getElementById("checkoutPriceToggle")?.addEventListener("click", togglePriceDetails);
         document.addEventListener("paymentChanged", updatePaymentReady);
         updatePaymentReady();
         loadAuthoritativeReview();

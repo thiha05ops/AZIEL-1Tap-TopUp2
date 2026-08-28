@@ -43,14 +43,19 @@
                         <div><dt data-i18n="locale_region">Region</dt><dd id="checkoutRegion">—</dd></div>
                     </dl>
                 </section>
-                <section class="checkout-card checkout-price-breakdown" aria-labelledby="priceTitle">
+                <section class="checkout-card checkout-price-breakdown" aria-labelledby="priceTitle" data-mobile-expanded="false">
                     <h2 id="priceTitle" data-i18n="checkout.priceBreakdown">Price breakdown</h2>
-                    <dl>
-                        <div><dt data-i18n="checkout.basePrice">Base price</dt><dd id="checkoutBasePrice" class="az-storefront-skeleton checkout-value-skeleton" aria-label="Verifying base price" data-i18n-aria-label="checkout.verifyingBasePrice">&nbsp;</dd></div>
-                        <div><dt data-i18n="checkout.discount">Discount</dt><dd id="checkoutDiscount">—</dd></div>
-                        <div><dt data-i18n="checkout.promo">Promo</dt><dd id="checkoutPromo">—</dd></div>
-                    </dl>
-                    <div class="checkout-total"><span data-i18n="checkout.authoritativeTotal">Authoritative total</span><strong id="checkoutTotal" class="az-storefront-skeleton checkout-value-skeleton" aria-label="Verifying authoritative total" data-i18n-aria-label="checkout.verifyingTotal">&nbsp;</strong></div>
+                    <button id="checkoutPriceToggle" class="checkout-price-toggle" type="button" aria-expanded="false" aria-controls="checkoutPriceContent">
+                        <span data-i18n="checkout.priceDetails">Price details</span><span aria-hidden="true">⌄</span>
+                    </button>
+                    <div id="checkoutPriceContent" class="checkout-price-content">
+                        <dl>
+                            <div><dt data-i18n="checkout.basePrice">Base price</dt><dd id="checkoutBasePrice" class="az-storefront-skeleton checkout-value-skeleton" aria-label="Verifying base price" data-i18n-aria-label="checkout.verifyingBasePrice">&nbsp;</dd></div>
+                            <div><dt data-i18n="checkout.discount">Discount</dt><dd id="checkoutDiscount">—</dd></div>
+                            <div><dt data-i18n="checkout.promo">Promo</dt><dd id="checkoutPromo">—</dd></div>
+                        </dl>
+                        <div class="checkout-total"><span data-i18n="checkout.authoritativeTotal">Authoritative total</span><strong id="checkoutTotal" class="az-storefront-skeleton checkout-value-skeleton" aria-label="Verifying authoritative total" data-i18n-aria-label="checkout.verifyingTotal">&nbsp;</strong></div>
+                    </div>
                 </section>
             </div>
             <aside class="checkout-card checkout-sidebar" aria-labelledby="summaryTitle">
