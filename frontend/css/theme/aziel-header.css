@@ -47,6 +47,24 @@ html {
     }
 }
 
+/* Home-only header scale: the canonical sticky mount remains in document flow. */
+body.az-home-page {
+    --az-header-height: 72px;
+    --az-header-mobile-height: 66px;
+}
+
+@media (max-width: 768px) {
+    body.az-home-page {
+        --az-header-mobile-height: 60px;
+    }
+}
+
+@media (min-width: 901px) and (max-width: 1100px) {
+    body.az-home-page {
+        --az-header-height: 66px;
+    }
+}
+
 @media (max-width: 900px) {
     #azHeaderMount { min-height: calc(var(--az-header-mobile-height, 64px) + env(safe-area-inset-top)); }
 }
@@ -2337,5 +2355,24 @@ body.dark .az-profile-dropdown .dropdown-divider {
     .az-mobile-drawer-backdrop,
     .az-mobile-drawer-head {
         display: none !important;
+    }
+}
+
+/* Home header/hero proportion overrides stay last to preserve one height authority. */
+@media (min-width: 1101px) {
+    body.az-home-page .az-header {
+        min-height: calc(72px + env(safe-area-inset-top)) !important;
+    }
+}
+
+@media (min-width: 769px) and (max-width: 1100px) {
+    body.az-home-page .az-header {
+        min-height: calc(66px + env(safe-area-inset-top)) !important;
+    }
+}
+
+@media (max-width: 768px) {
+    body.az-home-page .az-header {
+        min-height: calc(60px + env(safe-area-inset-top)) !important;
     }
 }

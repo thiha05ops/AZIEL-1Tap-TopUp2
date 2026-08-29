@@ -47,9 +47,9 @@
     <link rel="stylesheet" href="css/theme/desktop.css">
     <link rel="stylesheet" href="css/theme/mobile.css?v=20260829-p4">
     <!-- marketplace-reference.css is the canonical Home hero geometry owner. -->
-    <link rel="stylesheet" href="/css/home/marketplace-reference.css?v=20260829-p4">
+    <link rel="stylesheet" href="/css/home/marketplace-reference.css?v=20260829-header-hero-seam-r3">
     <link rel="stylesheet" href="/css/home/home-product-system.css?v=20260829-p4">
-    <link rel="stylesheet" href="/css/theme/aziel-header.css?v=20260829-p4">
+    <link rel="stylesheet" href="/css/theme/aziel-header.css?v=20260829-header-hero-seam-r3">
 <meta name="theme-color" content="#070716">
 
     <script type="application/ld+json">
@@ -87,7 +87,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/assets/brand/apple-touch-icon.png">
 </head>
 
-<body>
+<body class="az-home-page">
     <div id="azHeaderMount" data-nav="home" data-header-canonical="true">
         <header class="az-header">
             <button class="az-mobile-menu-btn" type="button" aria-label="Open menu" data-i18n-aria-label="header.openMenu" aria-controls="azHeaderNav" aria-expanded="false"><i class="fa-solid fa-bars" aria-hidden="true"></i></button>
@@ -109,7 +109,7 @@
             data-i18n-aria-label="home.featuredPromotion" data-managed-content-state="fallback"
             data-hero-authority="default" data-banner-count="1">
             <div id="azBannerTrack" class="az-banner-track">
-                <div class="az-banner-card active" style="--az-banner-object-position: center center">
+                <div class="az-banner-card active" data-home-banner-source="default" style="--az-banner-object-position: center center; --az-banner-card-image: url('/assets/banners/hero-desktop-wide.webp?v=20260829-p4')">
                     <picture>
                         <source media="(min-width: 769px)" srcset="assets/banners/hero-desktop-wide.webp?v=20260829-p4" type="image/webp">
                         <img src="assets/banners/hero-mobile.webp?v=20260829-p4" alt="AZIEL featured game promotion"
@@ -281,7 +281,7 @@
     <script src="/js/storefront-sections.js?v=20260829-p4"></script>
     <script src="/js/catalog-discovery.js?v=20260829-p4"></script>
     <script src="/js/home.js?v=20260829-p4"></script>
-    <script src="/js/home-banner-runtime.js?v=20260829-arrow-controls"></script>
+    <script src="/js/home-banner-runtime.js?v=20260829-dynamic-ambient-r2"></script>
     <script src="/js/home-placement-runtime.js?v=20260829-p4"></script>
     <script src="/js/home-promotion-preview.js?v=20260829-p4"></script>
     <script src="/js/home-product-accent.js?v=20260829-p4"></script>

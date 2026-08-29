@@ -20,10 +20,10 @@ const railCss = read("frontend/css/home/home-product-system.css");
 assert(!home.includes("initAzielBanner"), "home.js must not own carousel state.");
 assert(banners.includes("__azielHomeBannerRuntimeReady"), "Canonical banner runtime must be idempotent.");
 assert(banners.includes("AbortController") && banners.includes("cleanupCarouselController"), "Carousel refresh must remove old listeners/timers.");
-assert(banners.includes("scheduleGestureRender(dragCurrentX)"), "Pointer moves must be requestAnimationFrame-batched.");
+assert(banners.includes("scheduleGestureRender(dragVirtualPosition)"), "Pointer moves must be requestAnimationFrame-batched.");
 assert(banners.includes("measureCarousel(track)") && banners.includes("carouselMetrics.step"), "Gesture geometry must be cached outside repeated writes.");
-const renderCards = banners.slice(banners.indexOf("function renderCards"), banners.indexOf("function getShortestOffset"));
-assert(!renderCards.includes("clientWidth") && !renderCards.includes("getBoundingClientRect"), "Gesture rendering must not force layout reads.");
+const gestureWrite = banners.slice(banners.indexOf("function renderPhysicalPosition"), banners.indexOf("function updateSlideState"));
+assert(gestureWrite.includes("track.style.transform") && !gestureWrite.includes("clientWidth") && !gestureWrite.includes("getBoundingClientRect"), "Gesture rendering must be transform-only and must not force layout reads.");
 assert(banners.includes("reducedMotionMedia.matches") && banners.includes('listen(reducedMotionMedia, "change"'), "Autoplay must honor reduced-motion changes.");
 
 assert(placement.includes("mobileLayoutActive === mobile"), "Section relocation must be idempotent.");

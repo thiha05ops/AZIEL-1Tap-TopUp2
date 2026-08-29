@@ -1,4 +1,16 @@
 /* AZIEL Homepage V3: premium product-discovery marketplace. */
+@property --home-hero-ambient-primary {
+    syntax: "<color>";
+    inherits: true;
+    initial-value: rgb(139 92 246);
+}
+
+@property --home-hero-ambient-secondary {
+    syntax: "<color>";
+    inherits: true;
+    initial-value: rgb(59 130 246);
+}
+
 :root {
     --home-max: var(--public-storefront-max, 1500px);
     --home-gutter: var(--public-storefront-gutter, clamp(18px, 2.4vw, 36px));
@@ -11,14 +23,18 @@
 
 .az-home {
     position: relative;
+    display: flow-root;
     isolation: isolate;
     --home-max: var(--public-storefront-max, 1500px);
     --home-hero-rgb-primary: 139 92 246;
     --home-hero-rgb-secondary: 59 130 246;
+    --home-hero-ambient-primary: rgb(139 92 246);
+    --home-hero-ambient-secondary: rgb(59 130 246);
     --home-hero-atmosphere-opacity: .11;
     --home-hero-atmosphere-secondary-opacity: .065;
     --home-page-background:
-        linear-gradient(180deg, rgb(var(--home-hero-rgb-primary) / .035) 0, rgb(var(--home-hero-rgb-primary) / var(--home-hero-atmosphere-opacity)) 190px, rgb(var(--home-hero-rgb-secondary) / var(--home-hero-atmosphere-secondary-opacity)) 430px, transparent 720px),
+        radial-gradient(ellipse 72% 430px at 50% 210px, color-mix(in srgb, var(--home-hero-ambient-primary) 20%, transparent), transparent 72%),
+        linear-gradient(180deg, color-mix(in srgb, var(--home-hero-ambient-primary) 12%, var(--bg)) 0, color-mix(in srgb, var(--home-hero-ambient-secondary) 8%, var(--bg)) 420px, var(--bg) 780px),
         var(--bg);
     --home-hero-surface: var(--surface-strong);
     --home-hero-border: var(--border);
@@ -50,27 +66,16 @@
     --home-soft-shadow: 0 10px 30px color-mix(in srgb, var(--bg) 12%, transparent);
     --home-motion: 230ms ease-out;
     width: 100%;
+    margin-top: 0 !important;
     padding: 0 !important;
     overflow: clip;
     background: var(--home-page-background) !important;
     color: var(--text);
+    transition: --home-hero-ambient-primary 560ms ease, --home-hero-ambient-secondary 560ms ease;
 }
 
 .az-home::before {
-    position: absolute;
-    inset: 0 0 auto;
-    z-index: 0;
-    height: min(720px, 82svh);
-    pointer-events: none;
-    background:
-        linear-gradient(180deg,
-            rgb(var(--home-hero-rgb-primary) / .03) 0,
-            rgb(var(--home-hero-rgb-primary) / var(--home-hero-atmosphere-opacity)) 180px,
-            rgb(var(--home-hero-rgb-secondary) / var(--home-hero-atmosphere-secondary-opacity)) 390px,
-            transparent 100%);
-    opacity: 1;
-    transition: background 820ms ease-out, opacity 820ms ease-out;
-    content: "";
+    content: none !important;
 }
 
 .az-home > * {
@@ -82,7 +87,8 @@ body.theme-light .az-home {
     --home-hero-atmosphere-opacity: .075;
     --home-hero-atmosphere-secondary-opacity: .04;
     --home-page-background:
-        linear-gradient(180deg, rgb(var(--home-hero-rgb-primary) / .025) 0, rgb(var(--home-hero-rgb-primary) / var(--home-hero-atmosphere-opacity)) 210px, rgb(var(--home-hero-rgb-secondary) / var(--home-hero-atmosphere-secondary-opacity)) 430px, transparent 720px),
+        radial-gradient(ellipse 70% 400px at 50% 210px, color-mix(in srgb, var(--home-hero-ambient-primary) 12%, transparent), transparent 74%),
+        linear-gradient(180deg, color-mix(in srgb, var(--home-hero-ambient-primary) 7%, var(--bg)) 0, color-mix(in srgb, var(--home-hero-ambient-secondary) 4%, var(--bg)) 410px, var(--bg) 740px),
         var(--bg);
     --home-hero-shadow: 0 10px 30px color-mix(in srgb, var(--bg) 10%, transparent);
     --home-popular-surface: color-mix(in srgb, var(--surface-strong) 88%, var(--primary) 4%);
@@ -100,7 +106,8 @@ body.dark .az-home {
     --home-hero-atmosphere-opacity: .13;
     --home-hero-atmosphere-secondary-opacity: .075;
     --home-page-background:
-        linear-gradient(180deg, rgb(var(--home-hero-rgb-primary) / .045) 0, rgb(var(--home-hero-rgb-primary) / var(--home-hero-atmosphere-opacity)) 190px, rgb(var(--home-hero-rgb-secondary) / var(--home-hero-atmosphere-secondary-opacity)) 450px, transparent 740px),
+        radial-gradient(ellipse 74% 450px at 50% 220px, color-mix(in srgb, var(--home-hero-ambient-primary) 24%, transparent), transparent 72%),
+        linear-gradient(180deg, color-mix(in srgb, var(--home-hero-ambient-primary) 15%, var(--bg)) 0, color-mix(in srgb, var(--home-hero-ambient-secondary) 9%, var(--bg)) 450px, var(--bg) 820px),
         var(--bg);
     --home-popular-border: var(--border);
     --home-all-border: rgba(255, 255, 255, .72);
@@ -113,11 +120,30 @@ body.dark .az-home {
     min-height: 0 !important;
     aspect-ratio: 16 / 5 !important;
     margin: 32px auto 0 !important;
-    overflow: hidden !important;
+    overflow: visible !important;
     border: 0 !important;
     border-radius: 24px !important;
     background: transparent !important;
     box-shadow: var(--home-hero-shadow) !important;
+}
+
+.az-home .az-home-hero.az-banner-zone::before {
+    content: "" !important;
+    position: absolute;
+    inset: -28px -20px -24px;
+    z-index: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(ellipse at 50% 46%, color-mix(in srgb, var(--home-hero-ambient-primary) 28%, transparent), transparent 68%),
+        radial-gradient(ellipse at 50% 58%, color-mix(in srgb, var(--home-hero-ambient-secondary) 16%, transparent), transparent 78%);
+    transition: --home-hero-ambient-primary 560ms ease, --home-hero-ambient-secondary 560ms ease;
+}
+
+.az-home-hero .az-banner-track {
+    position: relative;
+    z-index: 1;
+    overflow: hidden !important;
+    border-radius: inherit;
 }
 
 .az-home-hero .az-banner-track,
@@ -134,25 +160,28 @@ body.dark .az-home {
     max-width: none !important;
     border: 0 !important;
     border-radius: 0 !important;
-    background: transparent !important;
+    background:
+        linear-gradient(rgb(7 7 18 / .26), rgb(7 7 18 / .48)),
+        var(--az-banner-card-image, none) center / cover no-repeat,
+        #100d22 !important;
     box-shadow: none !important;
+    transform: translateX(-50%);
 }
 
 .az-home-hero .az-banner-card img {
     width: 100% !important;
+    height: 100% !important;
     display: block !important;
-    object-fit: cover !important;
+    object-fit: contain !important;
     object-position: var(--az-banner-object-position, center center) !important;
     border-radius: 0 !important;
 }
 
-.az-home-hero .az-banner-arrow {
-    display: none !important;
-}
-
 @media (min-width: 1024px) {
     .az-home .az-home-hero.az-banner-zone {
-        height: clamp(250px, 24vw, 390px) !important;
+        height: clamp(280px, 28vw, 330px) !important;
+        min-height: 280px !important;
+        max-height: 330px !important;
         aspect-ratio: auto !important;
         border-radius: 0 !important;
         box-shadow: none !important;
@@ -165,59 +194,76 @@ body.dark .az-home {
         box-shadow: var(--home-hero-shadow) !important;
     }
 
-    .az-home .az-home-hero[data-home-banners-managed="active"]:not([data-banner-count="1"]).az-banner-zone {
-        overflow: hidden !important;
-    }
+}
 
-    .az-home .az-home-hero[data-home-banners-managed="active"]:not([data-banner-count="1"]) .az-banner-track {
-        overflow: visible !important;
-        cursor: grab;
-        touch-action: pan-y;
-        user-select: none;
+@media (min-width: 1200px) {
+    .az-home .az-home-hero.az-banner-zone {
+        height: clamp(330px, 26.5vw, 390px) !important;
+        min-height: 330px !important;
+        max-height: 390px !important;
     }
+}
 
-    .az-home .az-home-hero[data-home-banners-managed="active"]:not([data-banner-count="1"]) .az-banner-track.is-dragging {
-        cursor: grabbing;
+@media (min-width: 769px) and (max-width: 1023px) {
+    .az-home .az-home-hero.az-banner-zone {
+        height: clamp(240px, 27vw, 280px) !important;
+        min-height: 240px !important;
+        max-height: 280px !important;
+        aspect-ratio: auto !important;
     }
+}
 
-    .az-home .az-home-hero[data-home-banners-managed="active"]:not([data-banner-count="1"]) .az-banner-card {
-        width: 66% !important;
-        border-radius: 22px !important;
-        overflow: hidden !important;
-        box-shadow: var(--home-hero-shadow) !important;
-    }
+.az-home .az-home-hero[data-home-banners-managed="active"]:not([data-banner-count="1"]).az-banner-zone {
+    overflow: hidden !important;
+}
 
-    .az-home .az-home-hero[data-home-banners-managed="active"]:not([data-banner-count="1"]) .az-banner-card:not(.active) {
-        box-shadow: none !important;
-    }
+.az-home .az-home-hero[data-home-banners-managed="active"]:not([data-banner-count="1"]) .az-banner-track {
+    display: flex !important;
+    align-items: stretch;
+    width: max-content !important;
+    max-width: none !important;
+    gap: var(--az-banner-slide-gap, 16px);
+    overflow: visible !important;
+    border-radius: 0;
+    cursor: grab;
+    touch-action: pan-y;
+    user-select: none;
+    will-change: transform;
+}
 
-    .az-home .az-home-hero[data-home-banners-managed="active"]:not([data-banner-count="1"]) .az-banner-card.is-side {
-        top: 7% !important;
-        width: 14% !important;
-        height: 86% !important;
-        border-radius: 18px !important;
-        opacity: .68 !important;
-        filter: brightness(.58) saturate(.58) !important;
-    }
+.az-home .az-home-hero[data-home-banners-managed="active"]:not([data-banner-count="1"]) .az-banner-track.is-dragging {
+    cursor: grabbing;
+}
 
-    .az-home .az-home-hero[data-home-banners-managed="active"]:not([data-banner-count="1"]) .az-banner-arrow {
-        display: inline-grid !important;
-        width: 46px !important;
-        height: 46px !important;
-        border: 1px solid color-mix(in srgb, var(--text) 18%, transparent) !important;
-        background: color-mix(in srgb, var(--surface) 78%, transparent) !important;
-        color: var(--text) !important;
-        box-shadow: 0 12px 30px color-mix(in srgb, var(--bg) 35%, transparent) !important;
-        backdrop-filter: blur(14px);
-    }
+.az-home .az-home-hero[data-home-banners-managed="active"]:not([data-banner-count="1"]) .az-banner-card {
+    position: relative !important;
+    inset: auto !important;
+    flex: 0 0 var(--az-banner-slide-width, 72vw);
+    width: var(--az-banner-slide-width, 72vw) !important;
+    height: 100% !important;
+    border-radius: 18px !important;
+    overflow: hidden !important;
+    opacity: .56 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    transform: none !important;
+    transition: opacity 240ms ease-out;
+    pointer-events: none;
+}
 
-    .az-home .az-home-hero .az-banner-arrow--previous {
-        left: calc(7.5% - 23px) !important;
-    }
+.az-home .az-home-hero[data-home-banners-managed="active"]:not([data-banner-count="1"]) .az-banner-card.active {
+    opacity: 1 !important;
+    pointer-events: auto;
+}
 
-    .az-home .az-home-hero .az-banner-arrow--next {
-        right: calc(7.5% - 23px) !important;
-    }
+.az-home .az-home-hero[data-home-banners-managed="active"]:not([data-banner-count="1"]) .az-banner-card picture,
+.az-home .az-home-hero[data-home-banners-managed="active"]:not([data-banner-count="1"]) .az-banner-card img {
+    position: absolute;
+    inset: 0;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    border-radius: inherit !important;
 }
 
 .az-home-hero .az-banner-dots {
@@ -743,19 +789,32 @@ body.theme-light .az-home + .site-footer {
         --home-gap: 12px;
     }
 
-    .az-home {
+    .az-home,
+    body.theme-light .az-home,
+    body.theme-dark .az-home,
+    body.dark .az-home {
         padding-bottom: 40px !important;
+        --home-page-background:
+            radial-gradient(ellipse 86% 280px at 50% 150px, color-mix(in srgb, var(--home-hero-ambient-primary) 12%, transparent), transparent 74%),
+            linear-gradient(180deg, color-mix(in srgb, var(--home-hero-ambient-primary) 8%, var(--bg)) 0, color-mix(in srgb, var(--home-hero-ambient-secondary) 4%, var(--bg)) 280px, var(--bg) 500px),
+            var(--bg);
+    }
+
+    .az-home .az-home-hero.az-banner-zone::before {
+        opacity: .68;
     }
 
     .az-home .az-home-hero.az-banner-zone {
         width: calc(100% - 32px) !important;
         aspect-ratio: 16 / 9 !important;
+        min-height: 0 !important;
+        max-height: none !important;
         margin-top: 24px !important;
         border-radius: 16px !important;
     }
 
     .az-home-hero .az-banner-card img {
-        object-fit: cover !important;
+        object-fit: contain !important;
         object-position: var(--az-banner-object-position, 58% center) !important;
     }
 

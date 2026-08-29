@@ -28,11 +28,17 @@
     let autoTimer = null;
     let current = 0;
     let cards = [];
+    let trackSlides = [];
+    let virtualPosition = 0;
+    let dragStartVirtual = 0;
+    let dragVirtualPosition = 0;
     let dots = [];
     let activeBanners = [];
     let dragStartX = 0;
     let dragCurrentX = 0;
     let isDragging = false;
+    let activePointerId = null;
+    let activePointerType = "";
     let didDrag = false;
     let dragLastX = 0;
     let dragLastTime = 0;
@@ -42,16 +48,14 @@
     let userPaused = false;
     let carouselAbort = null;
     let renderFrame = 0;
-    let pendingDragOffset = 0;
-    let carouselMetrics = { desktop: false, step: 0 };
+    let pendingVirtualPosition = 0;
+    let ambientAuthoritySource = "";
+    let carouselMetrics = { desktop: false, step: 0, centerOffset: 0 };
     const colorCache = new Map();
     const desktopMedia = window.matchMedia(DESKTOP_CAROUSEL_QUERY);
     const reducedMotionMedia = window.matchMedia("(prefers-reduced-motion: reduce)");
 
-    const DRAG_LIMIT = 180;
-    const DRAG_THRESHOLD = 56;
     const DRAG_CLICK_THRESHOLD = 8;
-    const FLICK_VELOCITY_THRESHOLD = .45;
 
     function ready(fn) {
         if (document.readyState === "loading") {
@@ -105,7 +109,6 @@
             zone.dataset.bannerCount = String(banners.length);
             renderManagedBanners(managedTrack, managedDotsBox, banners);
             bindManagedImageFallbacks(managedTrack);
-            ensureHeroArrows(zone);
             if (banners.length === 1) {
                 bindStaticBanner(managedTrack, managedDotsBox);
             } else {
@@ -140,7 +143,7 @@
 
     function defaultHeroMarkup() {
         return `
-            <div class="az-banner-card active" data-home-banner-id="${escapeAttr(DEFAULT_HOME_HERO.id)}" data-home-banner-source="default" style="--az-banner-object-position: ${escapeAttr(DEFAULT_HOME_HERO.objectPosition)}">
+            <div class="az-banner-card active" data-home-banner-id="${escapeAttr(DEFAULT_HOME_HERO.id)}" data-home-banner-source="default" style="--az-banner-object-position: ${escapeAttr(DEFAULT_HOME_HERO.objectPosition)}; --az-banner-card-image: ${escapeAttr(cssUrl(resolveBannerBackgroundUrl(DEFAULT_HOME_HERO.desktopImageUrl)))}">
                 <picture>
                     <source media="(min-width: 769px)" srcset="${escapeAttr(DEFAULT_HOME_HERO.desktopImageUrl)}" type="image/webp">
                     <img src="${escapeAttr(DEFAULT_HOME_HERO.mobileImageUrl)}" alt="${escapeAttr(DEFAULT_HOME_HERO.imageAltText)}" width="1280" height="719" loading="eager" decoding="async" fetchpriority="high" style="object-position: var(--az-banner-object-position)">
@@ -156,7 +159,6 @@
         dots = [];
         dotsBox.innerHTML = "";
         dotsBox.hidden = true;
-        setArrowVisibility(track.closest(".az-banner-zone"), false);
         track.removeAttribute("role");
         track.removeAttribute("aria-roledescription");
         track.removeAttribute("aria-label");
@@ -269,6 +271,18 @@
         }));
 
         if (!cards.length) return;
+        const firstClone = cards[0].cloneNode(true);
+        const lastClone = cards[cards.length - 1].cloneNode(true);
+        firstClone.dataset.carouselClone = "first";
+        lastClone.dataset.carouselClone = "last";
+        firstClone.setAttribute("aria-hidden", "true");
+        lastClone.setAttribute("aria-hidden", "true");
+        firstClone.tabIndex = -1;
+        lastClone.tabIndex = -1;
+        track.prepend(lastClone);
+        track.append(firstClone);
+        trackSlides = [...track.querySelectorAll(".az-banner-card")];
+        virtualPosition = 0;
         userPaused = false;
         dotsBox.hidden = false;
         track.setAttribute("role", "region");
@@ -277,14 +291,52 @@
         track.tabIndex = 0;
 
         const goTo = index => {
-            current = (index + cards.length) % cards.length;
+            const normalized = (index + cards.length) % cards.length;
+            let targetVirtual;
+            if (index === current + 1) targetVirtual = virtualPosition + 1;
+            else if (index === current - 1) targetVirtual = virtualPosition - 1;
+            else targetVirtual = nearestEquivalentPosition(normalized, virtualPosition);
+            current = normalized;
+            virtualPosition = targetVirtual;
             commitBannerVisualState(track.closest(".az-banner-zone"));
-            renderCards(0);
+            renderPhysicalPosition(targetVirtual, true);
+            updateSlideState(targetVirtual);
             updateDots();
+            if (reducedMotionMedia.matches) normalizeSettledPosition();
         };
 
-        setArrowVisibility(track.closest(".az-banner-zone"), true);
-        bindHeroArrows(track.closest(".az-banner-zone"), goTo, listen);
+        const finalizeActiveDrag = (event = null, { preserveVelocity = false } = {}) => {
+            if (!isDragging) return false;
+            if (event?.pointerId !== undefined && event.pointerId !== activePointerId) return false;
+
+            const pointerId = activePointerId;
+            isDragging = false;
+            activePointerId = null;
+            activePointerType = "";
+            track.classList.remove("is-dragging");
+            if (!preserveVelocity) dragVelocity = 0;
+
+            try {
+                if (pointerId !== null && track.hasPointerCapture?.(pointerId)) {
+                    track.releasePointerCapture(pointerId);
+                }
+            } catch {
+                // Capture may already have been released by the browser.
+            }
+
+            finishDrag(goTo);
+            dragStartX = 0;
+            dragStartVirtual = virtualPosition;
+            dragVirtualPosition = virtualPosition;
+            dragLastX = 0;
+            dragLastTime = 0;
+            return true;
+        };
+
+        listen(track, "transitionend", event => {
+            if (event.target !== track || event.propertyName !== "transform") return;
+            normalizeSettledPosition();
+        });
 
         dots.forEach((dot, index) => {
             listen(dot, "click", () => {
@@ -294,48 +346,57 @@
         });
 
         listen(track, "pointerdown", event => {
+            if (isDragging) return;
+            if (event.isPrimary === false) return;
             if (event.button !== undefined && event.button !== 0) return;
             measureCarousel(track);
             isDragging = true;
+            activePointerId = event.pointerId;
+            activePointerType = event.pointerType || "mouse";
             didDrag = false;
             dragStartX = event.clientX;
+            dragStartVirtual = virtualPosition;
+            dragVirtualPosition = virtualPosition;
             dragLastX = event.clientX;
             dragLastTime = event.timeStamp;
             dragVelocity = 0;
             dragCurrentX = 0;
             track.classList.add("is-dragging");
             pauseForInteraction(goTo);
-            track.setPointerCapture?.(event.pointerId);
+            try {
+                track.setPointerCapture?.(activePointerId);
+            } catch {
+                // The lifecycle guards still terminate safely if capture is unavailable.
+            }
         });
 
         listen(track, "pointermove", event => {
             if (!isDragging) return;
-            dragCurrentX = clampDrag(event.clientX - dragStartX);
+            if (event.pointerId !== activePointerId) return;
+            if (activePointerType === "mouse" && (event.buttons & 1) === 0) {
+                finalizeActiveDrag(event);
+                return;
+            }
+            dragCurrentX = event.clientX - dragStartX;
+            dragVirtualPosition = dragStartVirtual - (dragCurrentX / carouselMetrics.step);
             const elapsed = Math.max(1, event.timeStamp - dragLastTime);
             dragVelocity = (event.clientX - dragLastX) / elapsed;
             dragLastX = event.clientX;
             dragLastTime = event.timeStamp;
             if (Math.abs(dragCurrentX) > DRAG_CLICK_THRESHOLD) didDrag = true;
-            if (carouselMetrics.desktop) scheduleGestureRender(dragCurrentX);
+            scheduleGestureRender(dragVirtualPosition);
         });
 
         listen(track, "pointerup", event => {
-            if (!isDragging) return;
-            isDragging = false;
-            track.classList.remove("is-dragging");
-            track.releasePointerCapture?.(event.pointerId);
-            finishDrag(goTo);
+            finalizeActiveDrag(event, { preserveVelocity: true });
         });
 
         listen(track, "pointercancel", event => {
-            isDragging = false;
-            track.classList.remove("is-dragging");
-            track.releasePointerCapture?.(event.pointerId);
-            dragCurrentX = 0;
-            dragVelocity = 0;
-            renderCards(0);
-            scheduleAuto(goTo);
+            finalizeActiveDrag(event);
         });
+
+        listen(track, "lostpointercapture", event => finalizeActiveDrag(event));
+        listen(window, "blur", () => finalizeActiveDrag());
 
         listen(track, "click", event => {
             if (!didDrag) return;
@@ -361,7 +422,11 @@
         });
 
         listen(document, "visibilitychange", () => {
-            if (document.hidden) pauseAuto();
+            if (document.hidden) {
+                finalizeActiveDrag();
+                pauseAuto();
+                userPaused = false;
+            }
             else scheduleAuto(goTo);
         });
 
@@ -372,7 +437,12 @@
         });
         listen(window, "resize", () => scheduleCarouselMeasure(track), { passive: true });
         measureCarousel(track);
-        goTo(0);
+        current = 0;
+        virtualPosition = 0;
+        commitBannerVisualState(track.closest(".az-banner-zone"));
+        renderPhysicalPosition(0, false);
+        updateSlideState(0);
+        updateDots();
         startAuto(goTo);
     }
 
@@ -386,14 +456,24 @@
         autoResumeTimer = null;
         autoTimer = null;
         isDragging = false;
+        activePointerId = null;
+        activePointerType = "";
+        trackSlides = [];
+        virtualPosition = 0;
     }
 
     function measureCarousel(track) {
-        const stageWidth = track?.clientWidth || 0;
+        const stageWidth = track?.closest(".az-banner-zone")?.clientWidth || track?.clientWidth || 0;
         const viewportWidth = window.innerWidth;
+        const fraction = viewportWidth >= 1200 ? .72 : viewportWidth >= 1024 ? .76 : viewportWidth > 768 ? .9 : 1;
+        const gap = viewportWidth >= 1024 ? 16 : viewportWidth > 768 ? 12 : 10;
+        const slideWidth = stageWidth * fraction;
+        track.style.setProperty("--az-banner-slide-width", `${slideWidth}px`);
+        track.style.setProperty("--az-banner-slide-gap", `${gap}px`);
         carouselMetrics = {
             desktop: desktopMedia.matches,
-            step: (stageWidth * .397) + Math.max(24, Math.min(32, viewportWidth * .02))
+            step: slideWidth + gap,
+            centerOffset: (stageWidth - slideWidth) / 2
         };
     }
 
@@ -402,16 +482,18 @@
         renderFrame = requestAnimationFrame(() => {
             renderFrame = 0;
             measureCarousel(track);
-            renderCards(0);
+            renderPhysicalPosition(moduloPosition(virtualPosition), false);
         });
     }
 
-    function scheduleGestureRender(offset) {
-        pendingDragOffset = offset;
+    function scheduleGestureRender(position) {
+        pendingVirtualPosition = position;
         if (renderFrame) return;
         renderFrame = requestAnimationFrame(() => {
             renderFrame = 0;
-            renderCards(pendingDragOffset);
+            const renderedPosition = moduloPosition(pendingVirtualPosition);
+            renderPhysicalPosition(renderedPosition, false);
+            updatePhysicalEmphasis(renderedPosition);
         });
     }
 
@@ -444,130 +526,72 @@
         autoResumeTimer = setTimeout(() => startAuto(goTo), AUTO_DELAY);
     }
 
-    function setArrowVisibility(zone, visible) {
-        if (!zone) return;
-        zone.querySelectorAll(".az-banner-arrow").forEach(button => {
-            button.hidden = !visible;
-        });
-    }
-
-    function ensureHeroArrows(zone) {
-        if (!zone) return;
-        // The canonical runtime owns the complete control pair. Remove any
-        // stale/legacy controls before binding so one controller never
-        // inherits duplicate visual buttons.
-        zone.querySelectorAll(".az-banner-arrow").forEach(button => button.remove());
-        const previous = document.createElement("button");
-        previous.type = "button";
-        previous.className = "az-banner-arrow az-banner-arrow--previous";
-        previous.setAttribute("aria-label", t("home.previousBanner", "Show previous banner"));
-        previous.innerHTML = '<i class="fa-solid fa-chevron-left" aria-hidden="true"></i>';
-
-        const next = document.createElement("button");
-        next.type = "button";
-        next.className = "az-banner-arrow az-banner-arrow--next";
-        next.setAttribute("aria-label", t("home.nextBanner", "Show next banner"));
-        next.innerHTML = '<i class="fa-solid fa-chevron-right" aria-hidden="true"></i>';
-
-        zone.append(previous, next);
-    }
-
-    function bindHeroArrows(zone, goTo, listen) {
-        if (!zone || typeof listen !== "function") return;
-        const previous = zone.querySelector(".az-banner-arrow--previous");
-        const next = zone.querySelector(".az-banner-arrow--next");
-        if (previous) listen(previous, "click", event => {
-            event.preventDefault();
-            event.stopPropagation();
-            pauseForInteraction(goTo);
-            goTo(current - 1);
-        });
-        if (next) listen(next, "click", event => {
-            event.preventDefault();
-            event.stopPropagation();
-            pauseForInteraction(goTo);
-            goTo(current + 1);
-        });
-    }
-
-    function clampDrag(value) {
-        return Math.max(-DRAG_LIMIT, Math.min(DRAG_LIMIT, value));
-    }
-
     function finishDrag(goTo) {
         cancelAnimationFrame(renderFrame);
         renderFrame = 0;
-        const diff = dragCurrentX;
         const velocity = dragVelocity;
         dragCurrentX = 0;
         dragVelocity = 0;
 
-        if (diff < -DRAG_THRESHOLD || velocity < -FLICK_VELOCITY_THRESHOLD) {
-            goTo(current + 1);
-        } else if (diff > DRAG_THRESHOLD || velocity > FLICK_VELOCITY_THRESHOLD) {
-            goTo(current - 1);
-        } else {
-            renderCards(0);
-        }
+        const velocitySlides = Math.max(-.35, Math.min(.35, -(velocity * 180) / carouselMetrics.step));
+        const targetVirtual = Math.round(dragVirtualPosition + velocitySlides);
+        const displayedPosition = moduloPosition(dragVirtualPosition);
+        const physicalTarget = displayedPosition + (targetVirtual - dragVirtualPosition);
+        virtualPosition = targetVirtual;
+        current = moduloIndex(targetVirtual);
+        commitBannerVisualState(trackSlides[0]?.closest(".az-banner-zone"));
+        renderPhysicalPosition(physicalTarget, true);
+        updateSlideState(physicalTarget);
+        updateDots();
+        if (reducedMotionMedia.matches) normalizeSettledPosition();
 
         scheduleAuto(goTo);
     }
 
-    function renderCards(dragOffset = 0) {
-        const desktopCarousel = carouselMetrics.desktop;
-        const desktopStep = carouselMetrics.step;
+    function renderPhysicalPosition(position, animate = true) {
+        const track = trackSlides[0]?.parentElement;
+        if (!track) return;
+        const x = carouselMetrics.centerOffset - ((position + 1) * carouselMetrics.step);
+        track.style.transition = animate && !reducedMotionMedia.matches
+            ? "transform var(--az-banner-transition-duration, 560ms) var(--az-banner-transition-ease, ease)"
+            : "none";
+        track.style.transform = `translate3d(${x}px, 0, 0)`;
+    }
 
-        if (isDragging && dragOffset && desktopCarousel && cards.length > 1) {
-            cards.forEach((card, index) => {
-                const offset = getShortestOffset(index);
-                if (Math.abs(offset) > 1) return;
-                const isSide = Math.abs(offset) === 1;
-                const x = (offset * desktopStep) + dragOffset;
-                card.style.transform = `translateX(calc(-50% + ${x}px)) scale(${isSide ? ".96" : "1"})`;
-            });
-            return;
-        }
-
+    function updateSlideState(position) {
+        updatePhysicalEmphasis(position);
         cards.forEach((card, index) => {
             const isActive = index === current;
-            card.classList.toggle("active", isActive);
             card.setAttribute("aria-hidden", isActive ? "false" : "true");
             if (card.matches("a")) card.tabIndex = isActive ? 0 : -1;
-            const offset = getShortestOffset(index);
-
-            if (desktopCarousel && cards.length > 1) {
-                const visibleOffset = Math.max(-1, Math.min(1, offset));
-                const isSide = Math.abs(offset) === 1;
-                const x = (visibleOffset * desktopStep) + dragOffset;
-                card.classList.toggle("is-side", isSide);
-                card.classList.toggle("is-previous", isSide && offset < 0);
-                card.classList.toggle("is-next", isSide && offset > 0);
-                card.style.transform = `translateX(calc(-50% + ${x}px)) scale(${isSide ? ".96" : "1"})`;
-                card.style.opacity = Math.abs(offset) > 1 ? "0" : (isSide ? ".68" : "1");
-                card.style.filter = isSide ? "brightness(.58) saturate(.58)" : "none";
-                card.style.zIndex = isActive ? "3" : "1";
-                card.style.pointerEvents = isActive ? "auto" : "none";
-                card.style.transition = isDragging ? "none" : "transform var(--az-banner-transition-duration, 560ms) var(--az-banner-transition-ease, ease), opacity var(--az-banner-transition-duration, 560ms) var(--az-banner-transition-ease, ease), filter var(--az-banner-transition-duration, 560ms) var(--az-banner-transition-ease, ease)";
-                return;
-            }
-
-            card.classList.remove("is-side", "is-previous", "is-next");
-            card.style.transform = "translateX(-50%)";
-            card.style.opacity = index === current ? "1" : "0";
-            card.style.filter = "none";
-            card.style.zIndex = index === current ? "2" : "1";
-            card.style.pointerEvents = index === current ? "auto" : "none";
-            card.style.transition = "opacity var(--az-banner-transition-duration, 640ms) var(--az-banner-transition-ease, ease)";
         });
     }
 
-    function getShortestOffset(index) {
-        let offset = index - current;
+    function updatePhysicalEmphasis(position) {
+        const activePhysicalIndex = Math.round(position) + 1;
+        trackSlides.forEach((slide, index) => {
+            slide.classList.toggle("active", index === activePhysicalIndex);
+            slide.classList.toggle("is-neighbor", Math.abs(index - activePhysicalIndex) === 1);
+        });
+    }
 
-        if (offset > cards.length / 2) offset -= cards.length;
-        if (offset < -cards.length / 2) offset += cards.length;
+    function normalizeSettledPosition() {
+        virtualPosition = current;
+        renderPhysicalPosition(current, false);
+        updateSlideState(current);
+    }
 
-        return offset;
+    function moduloIndex(position) {
+        return ((Math.round(position) % cards.length) + cards.length) % cards.length;
+    }
+
+    function moduloPosition(position) {
+        return ((position % cards.length) + cards.length) % cards.length;
+    }
+
+    function nearestEquivalentPosition(logicalIndex, reference) {
+        const cycle = Math.round((reference - logicalIndex) / cards.length);
+        return logicalIndex + (cycle * cards.length);
     }
 
     function updateDots() {
@@ -589,9 +613,8 @@
         const home = zone.closest(".az-home");
         zone.style.setProperty("--az-banner-ambient-image", cssUrl(imageUrl));
         zone.style.setProperty("--az-banner-active-position", objectPosition);
-        home?.style.setProperty("--az-banner-ambient-image", cssUrl(imageUrl));
-        home?.style.setProperty("--az-banner-active-position", objectPosition);
-        updateHeroAtmosphere(zone, activeImg, { forceUrl: imageUrl });
+        const ambientSource = activeImg?.currentSrc || activeImg?.src || imageUrl;
+        updateHeroAtmosphere(zone, activeImg, { forceUrl: ambientSource });
         activeImg?.style.setProperty("object-position", objectPosition);
     }
 
@@ -601,16 +624,21 @@
         const source = options.forceUrl || image.currentSrc || image.src || "";
         if (!source) return;
 
+        ambientAuthoritySource = source;
         home.dataset.heroAtmosphereState = "resolving";
         try {
             const colors = await resolveHeroColors(image, source);
+            if (ambientAuthoritySource !== source) return;
             home.style.setProperty("--home-hero-rgb-primary", colors.primary);
             home.style.setProperty("--home-hero-rgb-secondary", colors.secondary);
+            home.style.setProperty("--home-hero-ambient-primary", `rgb(${colors.primary})`);
+            home.style.setProperty("--home-hero-ambient-secondary", `rgb(${colors.secondary})`);
             home.dataset.heroAtmosphereState = colors.fallback ? "fallback" : "sampled";
             window.dispatchEvent(new CustomEvent("aziel:homeHeroAtmosphereChanged", {
                 detail: { source, ...colors }
             }));
         } catch {
+            if (ambientAuthoritySource !== source) return;
             applyFallbackHeroAtmosphere(home, source);
         }
     }
@@ -620,7 +648,7 @@
 
         await ensureImageReady(image);
         const colors = sampleHeroImageColors(image);
-        if (!colors.fallback) colorCache.set(source, colors);
+        colorCache.set(source, colors);
         return colors;
     }
 
@@ -692,18 +720,58 @@
             if (!count) return fallbackHeroColors();
 
             const primary = normalizeRgb(red / count, green / count, blue / count);
-            const secondary = coolCount > warmCount && warmCount > 0
-                ? normalizeRgb(warmRed / warmCount, warmGreen / warmCount, warmBlue / warmCount)
-                : normalizeRgb(coolRed / Math.max(coolCount, 1), coolGreen / Math.max(coolCount, 1), coolBlue / Math.max(coolCount, 1));
-            return { primary, secondary: secondary || primary, fallback: false };
+            const useWarm = coolCount > warmCount && warmCount > 0;
+            const secondaryCount = useWarm ? warmCount : coolCount;
+            const secondary = secondaryCount > 0
+                ? normalizeRgb(
+                    (useWarm ? warmRed : coolRed) / secondaryCount,
+                    (useWarm ? warmGreen : coolGreen) / secondaryCount,
+                    (useWarm ? warmBlue : coolBlue) / secondaryCount
+                )
+                : primary;
+            return { primary, secondary, fallback: false };
         } catch {
             return fallbackHeroColors();
         }
     }
 
     function normalizeRgb(red, green, blue) {
-        const channels = [red, green, blue].map(value => Math.max(18, Math.min(210, Math.round(value || 0))));
-        return channels.join(" ");
+        const [hue, saturation, lightness] = rgbToHsl(red, green, blue);
+        const normalizedSaturation = Math.max(.18, Math.min(.58, saturation));
+        const normalizedLightness = Math.max(.22, Math.min(.44, lightness));
+        return hslToRgb(hue, normalizedSaturation, normalizedLightness).join(" ");
+    }
+
+    function rgbToHsl(red, green, blue) {
+        const [r, g, b] = [red, green, blue].map(value => Math.max(0, Math.min(255, value || 0)) / 255);
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        const delta = max - min;
+        let hue = 0;
+        if (delta) {
+            if (max === r) hue = ((g - b) / delta) % 6;
+            else if (max === g) hue = ((b - r) / delta) + 2;
+            else hue = ((r - g) / delta) + 4;
+            hue = (hue * 60 + 360) % 360;
+        }
+        const lightness = (max + min) / 2;
+        const saturation = delta ? delta / (1 - Math.abs((2 * lightness) - 1)) : 0;
+        return [hue, saturation, lightness];
+    }
+
+    function hslToRgb(hue, saturation, lightness) {
+        const chroma = (1 - Math.abs((2 * lightness) - 1)) * saturation;
+        const segment = hue / 60;
+        const x = chroma * (1 - Math.abs((segment % 2) - 1));
+        let channels = [0, 0, 0];
+        if (segment < 1) channels = [chroma, x, 0];
+        else if (segment < 2) channels = [x, chroma, 0];
+        else if (segment < 3) channels = [0, chroma, x];
+        else if (segment < 4) channels = [0, x, chroma];
+        else if (segment < 5) channels = [x, 0, chroma];
+        else channels = [chroma, 0, x];
+        const match = lightness - (chroma / 2);
+        return channels.map(value => Math.round((value + match) * 255));
     }
 
     function fallbackHeroColors() {
@@ -713,6 +781,8 @@
     function applyFallbackHeroAtmosphere(home, source = "") {
         home.style.setProperty("--home-hero-rgb-primary", FALLBACK_HERO_COLORS.primary);
         home.style.setProperty("--home-hero-rgb-secondary", FALLBACK_HERO_COLORS.secondary);
+        home.style.setProperty("--home-hero-ambient-primary", `rgb(${FALLBACK_HERO_COLORS.primary})`);
+        home.style.setProperty("--home-hero-ambient-secondary", `rgb(${FALLBACK_HERO_COLORS.secondary})`);
         home.style.setProperty("--home-hero-atmosphere-opacity", ".12");
         home.dataset.heroAtmosphereState = "fallback";
         window.dispatchEvent(new CustomEvent("aziel:homeHeroAtmosphereChanged", {
@@ -759,6 +829,12 @@
 
     function cssUrl(url = "") {
         return `url("${String(url).replace(/\\/g, "\\\\").replace(/"/g, "\\\"")}")`;
+    }
+
+    function resolveBannerBackgroundUrl(url = "") {
+        const value = String(url || "").trim();
+        if (!value || /^(?:[a-z]+:|\/)/i.test(value)) return value;
+        return `/${value.replace(/^\.\//, "")}`;
     }
 
     function normalizeTarget(target = "") {

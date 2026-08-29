@@ -22,11 +22,13 @@ function verifyLocales() {
         assert(html.indexOf("locale-loader.js") < html.indexOf("i18n.js"), `${file} must load its active dictionary before i18n.`);
         const versions = [...html.matchAll(/\?v=([^"'\s>]+)/g)].map(match => match[1]);
         const allowedVersions = file === "frontend/home.html"
-            ? new Set(["20260829-p4", "20260829-arrow-controls"])
+            ? new Set(["20260829-p4", "20260829-dynamic-ambient-r2", "20260829-header-hero-seam-r3"])
             : new Set(["20260829-p4"]);
         assert(versions.every(version => allowedVersions.has(version)), `${file} has an unexpected public asset version.`);
         if (file === "frontend/home.html") {
-            assert.strictEqual((html.match(/home-banner-runtime\.js\?v=20260829-arrow-controls/g) || []).length, 1, "Home carousel fix must use one cache-busted canonical runtime.");
+            assert.strictEqual((html.match(/home-banner-runtime\.js\?v=20260829-dynamic-ambient-r2/g) || []).length, 1, "Home carousel composition must use one cache-busted canonical runtime.");
+            assert.strictEqual((html.match(/marketplace-reference\.css\?v=20260829-header-hero-seam-r3/g) || []).length, 1, "Home carousel composition must use one cache-busted canonical stylesheet.");
+            assert.strictEqual((html.match(/aziel-header\.css\?v=20260829-header-hero-seam-r3/g) || []).length, 1, "Home must use the cache-busted header/seam stylesheet.");
         }
     }
 
