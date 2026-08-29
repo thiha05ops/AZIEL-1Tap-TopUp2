@@ -4,6 +4,7 @@
   "description": "AZIEL 1Tap TopUp Shop",
   "main": "backend/server.js",
   "scripts": {
+    "verify:admin-operations-layer": "node backend/scripts/verify-admin-operations-layer.js",
     "verify:refresh-supplier-cost-authority": "node backend/scripts/verify-refresh-existing-supplier-cost-authority.js",
     "verify:wallet-paid-auto-fulfillment": "node backend/scripts/verify-wallet-paid-auto-fulfillment.js",
     "verify:market-decoupled-fulfillment-phase1": "node backend/scripts/verify-market-decoupled-fulfillment-phase1.js",

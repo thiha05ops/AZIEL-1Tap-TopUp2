@@ -146,6 +146,22 @@ const fulfillmentAttemptSchema = new mongoose.Schema(
             maxlength: 500,
             default: ""
         },
+        normalizedFailureCategory: {
+            type: String,
+            enum: [
+                "",
+                "SUPPLIER_OUT_OF_STOCK",
+                "SUPPLIER_BALANCE_INSUFFICIENT",
+                "SUPPLIER_AUTH_ERROR",
+                "SUPPLIER_TIMEOUT",
+                "SUPPLIER_RATE_LIMIT",
+                "SUPPLIER_PACKAGE_INVALID",
+                "SUPPLIER_SERVICE_UNAVAILABLE",
+                "SUPPLIER_REJECTED",
+                "SUPPLIER_UNKNOWN_ERROR"
+            ],
+            default: ""
+        },
         startedAt: {
             type: Date,
             default: null
@@ -192,6 +208,7 @@ fulfillmentAttemptSchema.index({ idempotencyKey: 1 }, { unique: true, name: "uni
 fulfillmentAttemptSchema.index({ status: 1, createdAt: -1, _id: -1 });
 fulfillmentAttemptSchema.index({ supplierId: 1, createdAt: -1, _id: -1 });
 fulfillmentAttemptSchema.index({ supplierCodeSnapshot: 1, createdAt: -1, _id: -1 });
+fulfillmentAttemptSchema.index({ normalizedFailureCategory: 1, failedAt: -1, _id: -1 });
 fulfillmentAttemptSchema.index({ createdAt: -1, _id: -1 });
 
 module.exports = mongoose.model("FulfillmentAttempt", fulfillmentAttemptSchema);

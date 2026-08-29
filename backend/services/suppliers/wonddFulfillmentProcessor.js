@@ -4,6 +4,7 @@ const SupplierProductMapping = require("../../models/SupplierProductMapping");
 const commerceOrderRepository = require("../commerce/orderRepository");
 const wonddAdapter = require("./wonddAdapter");
 const { normalizeSupplierResult } = require("../supplierAdapterRegistry");
+const { classifySupplierFailure } = require("../supplierFailureClassificationService");
 const { CONFIRMED_SERVICE_CODES } = require("./wonddCatalogConfig");
 const { buildWonddGameId, hasWonddGameIdFormatter } = require("./wonddGameIdFormatters");
 const { providerGameCodeForProduct } = require("../commerce/canonicalGameInputContract");
@@ -68,6 +69,7 @@ function createWonddFulfillmentProcessor(deps = {}) {
             attempt.status = "FAILED";
             attempt.failureCode = result.failureCode || result.providerStatus || "WONDD_FULFILLMENT_FAILED";
             attempt.failureReason = result.safeMessage || "WonDD fulfillment failed.";
+            attempt.normalizedFailureCategory = classifySupplierFailure(result).category;
             attempt.failedAt = new Date();
             await attempt.save();
             await transitionOrder(order, "failed", `WonDD failed ${attempt.fulfillmentId}`);

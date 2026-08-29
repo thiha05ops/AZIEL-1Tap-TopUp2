@@ -1,6 +1,7 @@
 const defaultFetch = require("node-fetch");
 
 const DEFAULT_API_URL = "https://www.wondd.com/member/bot-game.php";
+const DEFAULT_PACK_LIST_URL = "https://www.wondd.com/member/bot-game-packlist.php";
 const WONDD_MLBB_SERVICE_CODE = "mlbb";
 const WONDD_FREEFIRE_SERVICE_CODE = "freefire";
 const PLAYER_ID_PATTERN = /^\d+$/;
@@ -36,6 +37,7 @@ function createWonddAdapter(options = {}) {
     const fetchImpl = options.fetchImpl || defaultFetch;
     const env = options.env || process.env;
     const apiUrl = clean(options.apiUrl || env.WONDD_API_URL) || DEFAULT_API_URL;
+    const packListUrl = clean(options.packListUrl || env.WONDD_PACK_LIST_URL) || DEFAULT_PACK_LIST_URL;
     const credentials = () => ({ username: clean(env.WONDD_USERNAME), password: clean(env.WONDD_PASSWORD) });
     const isConfigured = () => Boolean(credentials().username && credentials().password);
     const isMlbbAutoFulfillmentEnabled = () => clean(env.WONDD_MLBB_AUTO_FULFILLMENT_ENABLED).toLowerCase() === "true";
@@ -71,13 +73,43 @@ function createWonddAdapter(options = {}) {
         }
     }
 
-    async function getBalance() {
-        const payload = await postWonDD({ method: "balance" });
+    async function getBalance(options = {}) {
+        const payload = await postWonDD({ method: "balance" }, { signal: options.signal });
         const failure = normalizeWonddError(payload);
         if (failure) return failure;
         const balance = Number(payload.balance);
         if (!Number.isFinite(balance) || balance < 0) throw new WonddAdapterError("WONDD_INVALID_BALANCE", "WonDD returned an invalid balance.");
         return supplierResult("SUCCEEDED", "BALANCE_OK", { balance, currency: "THB" }, "WonDD balance fetched successfully.");
+    }
+
+    async function getPackageAvailability(options = {}) {
+        const auth = credentials();
+        if (!auth.username || !auth.password) throw new WonddAdapterError("WONDD_NOT_CONFIGURED", "WonDD credentials are not configured.", { category: "CONFIGURATION" });
+        let response;
+        try {
+            response = await fetchImpl(packListUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: new URLSearchParams(auth).toString(),
+                signal: options.signal
+            });
+        } catch {
+            throw new WonddAdapterError("WONDD_TRANSPORT_ERROR", "WonDD package availability could not be confirmed.", { category: "OPERATIONAL", retryable: true });
+        }
+        if (!response.ok) throw new WonddAdapterError(`WONDD_HTTP_${response.status}`, "WonDD returned an HTTP error for package availability.", { category: "OPERATIONAL", retryable: response.status >= 500 });
+        let rows;
+        try { rows = JSON.parse(await response.text()); } catch { throw new WonddAdapterError("WONDD_INVALID_JSON", "WonDD returned an unreadable package list.", { category: "OPERATIONAL", retryable: true }); }
+        if (!Array.isArray(rows)) throw new WonddAdapterError("WONDD_INVALID_PACKAGE_LIST", "WonDD returned an invalid package list.", { category: "OPERATIONAL" });
+        return {
+            supported: true,
+            evidence: "PROVIDER_PACKAGE_LIST_RETURNED",
+            packages: rows.map(row => ({
+                supplierProductCode: clean(row.servicecode || row.serviceid),
+                supplierPackageCode: clean(row.packcode),
+                supplierDisplayName: clean(row.name),
+                availability: "AVAILABLE"
+            })).filter(row => row.supplierPackageCode)
+        };
     }
 
     function buildTopupPayload(input = {}) {
@@ -119,7 +151,7 @@ function createWonddAdapter(options = {}) {
         return failure || normalizeWonddStatus(response, orderId);
     }
 
-    return { isConfigured, isMlbbAutoFulfillmentEnabled, isFreefireAutoFulfillmentEnabled, isProductAutoFulfillmentEnabled, autoFulfillmentGateState, isAutoFulfillmentEnabled, hasAnyAutoFulfillmentEnabled, getBalance, buildTopupPayload, dryRunTopup, submitTopup, checkStatus };
+    return { isConfigured, isMlbbAutoFulfillmentEnabled, isFreefireAutoFulfillmentEnabled, isProductAutoFulfillmentEnabled, autoFulfillmentGateState, isAutoFulfillmentEnabled, hasAnyAutoFulfillmentEnabled, getBalance, getPackageAvailability, buildTopupPayload, dryRunTopup, submitTopup, checkStatus };
 }
 
 function buildWonddMlbbGameId(userId, zoneId) {
@@ -167,4 +199,4 @@ function mask(value) { const text = clean(value); return text.length <= 4 ? "***
 function maskGameId(value) { return String(value || "").split(" ").map(mask).join(" "); }
 
 const adapter = createWonddAdapter();
-module.exports = { ...adapter, createWonddAdapter, buildWonddMlbbGameId, normalizeWonddError, normalizeWonddStatus, WonddAdapterError, WONDD_MLBB_SERVICE_CODE, WONDD_FREEFIRE_SERVICE_CODE };
+module.exports = { ...adapter, createWonddAdapter, buildWonddMlbbGameId, normalizeWonddError, normalizeWonddStatus, WonddAdapterError, WONDD_MLBB_SERVICE_CODE, WONDD_FREEFIRE_SERVICE_CODE, DEFAULT_PACK_LIST_URL };

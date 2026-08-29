@@ -23,7 +23,7 @@ function read(relativePath) {
 function verifyManualEvidenceQuery() {
     const query = internals.manualPaymentReviewQuery();
 
-    assert.strictEqual(query.provider, "MANUAL_PROMPTPAY");
+    assert.deepStrictEqual(query.provider, { $in: ["MANUAL_PROMPTPAY", "MANUAL_ADMIN"] });
     assert.strictEqual(query.status, "PENDING");
     assert.strictEqual(query["safeMetadata.receiptAttached"], true);
     assert(query["safeMetadata.receiptEvidence.fileReference"], "Manual review query should require canonical receipt evidence");
@@ -182,7 +182,11 @@ function verifyFrontendContract() {
         "dashboardSalesChart",
         "dashboardStatusChart",
         "dashboardAttentionQueue",
+        "dashboardTopPackages",
         "dashboardTopGames",
+        "dashboardSupplierBalances",
+        "dashboardSupplierPackages",
+        "dashboardStockAffectedOrders",
         "dashboardPaymentMethods",
         "dashboardRecentActivity"
     ].forEach(token => {
@@ -217,7 +221,7 @@ function verifyFrontendContract() {
     assert(css.includes(".dashboard-kpi-grid"), "Dashboard KPI grid CSS must exist");
     assert(css.includes("@media (max-width: 680px)"), "Dashboard mobile breakpoint must exist");
     assert(css.includes("@media (prefers-reduced-motion: reduce)"), "Dashboard must respect reduced motion");
-    assert(html.includes("admin-stats.js?v=20260824-phase2-desktop-repair"), "Admin page must bust cached dashboard runtime after responsive restoration changes");
+    assert(html.includes("admin-stats.js?v=20260829-supplier-operations"), "Admin page must bust cached dashboard runtime after supplier operations changes");
 }
 
 function createElement(id = "") {

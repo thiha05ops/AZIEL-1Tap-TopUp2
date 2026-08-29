@@ -36,7 +36,7 @@
     <link rel="stylesheet" href="/css/admin/admin-wallet.css?v=20260706-2">
     <link rel="stylesheet" href="/css/admin/admin-support.css?v=20260706-2">
     <link rel="stylesheet" href="/css/admin/admin-live-chat.css?v=20260824-mobile-boundary">
-    <link rel="stylesheet" href="/css/admin/admin-design-system.css?v=20260824-mobile-boundary">
+    <link rel="stylesheet" href="/css/admin/admin-design-system.css?v=20260829-supplier-operations">
     <link rel="stylesheet" href="/css/admin/admin-os-brand.css?v=20260827-brand">
     <!-- Global responsive shell owner: phone <768px, tablet 768-1023px, desktop >=1024px. -->
     <link rel="stylesheet" href="/css/admin/admin-mobile-shell.css?v=20260824-phase2-desktop-repair">
@@ -374,6 +374,46 @@
                         <div class="admin-dashboard-skeleton"></div>
                     </div>
 
+                    <section class="dashboard-operations-section" aria-labelledby="dashboardSupplierOperationsTitle">
+                        <div class="dashboard-section-heading">
+                            <div>
+                                <h2 id="dashboardSupplierOperationsTitle">Supplier Operations</h2>
+                                <p>Live supplier balances and package evidence. These snapshots are independent of the reporting period.</p>
+                            </div>
+                            <button id="dashboardSupplierRefresh" class="admin-secondary-btn" type="button">Refresh suppliers</button>
+                        </div>
+                        <div id="dashboardSupplierBalances" class="dashboard-supplier-balance-grid" aria-live="polite"></div>
+                        <div class="dashboard-supplier-detail-grid">
+                            <article class="panel">
+                                <div class="dashboard-panel-head">
+                                    <div><h3>Supplier Packages</h3><span>Availability uses supplier API evidence only.</span></div>
+                                </div>
+                                <div class="dashboard-operations-filters">
+                                    <select id="dashboardProductFilter" aria-label="Filter product"><option value="ALL">All products</option></select>
+                                    <select id="dashboardPackageFilter" aria-label="Filter package"><option value="ALL">All packages</option></select>
+                                    <select id="dashboardSupplierFilter" aria-label="Filter supplier"><option value="ALL">All suppliers</option></select>
+                                    <select id="dashboardAvailabilityFilter" aria-label="Filter availability">
+                                        <option value="ALL">All availability</option><option value="AVAILABLE">Available</option><option value="OUT_OF_STOCK">Out of stock</option><option value="UNAVAILABLE">Unavailable</option><option value="UNKNOWN">Unknown</option>
+                                    </select>
+                                </div>
+                                <div id="dashboardSupplierPackageSummary" class="dashboard-availability-summary"></div>
+                                <div id="dashboardSupplierPackages" class="dashboard-product-coverage"></div>
+                            </article>
+                            <article class="panel">
+                                <div class="dashboard-panel-head">
+                                    <div><h3>Orders affected by supplier stock</h3><span>Only positively classified supplier out-of-stock failures.</span></div>
+                                </div>
+                                <div class="dashboard-operations-filters dashboard-stock-filters">
+                                    <select id="dashboardStockSupplierFilter" aria-label="Filter affected orders by supplier"><option value="ALL">All suppliers</option></select>
+                                    <select id="dashboardStockProductFilter" aria-label="Filter affected orders by product"><option value="ALL">All products</option></select>
+                                    <select id="dashboardStockPackageFilter" aria-label="Filter affected orders by package"><option value="ALL">All packages</option></select>
+                                    <select id="dashboardStockFailureFilter" aria-label="Filter affected orders by failure category"><option value="SUPPLIER_OUT_OF_STOCK">Supplier out of stock</option></select>
+                                </div>
+                                <div id="dashboardStockAffectedOrders" class="dashboard-operations-table" aria-live="polite"></div>
+                            </article>
+                        </div>
+                    </section>
+
                     <details class="dashboard-mobile-analytics">
                         <summary>
                             <span><i class="fa-solid fa-chart-simple" aria-hidden="true"></i> More analytics</span>
@@ -435,12 +475,21 @@
                             <div class="dashboard-panel-head">
                                 <div>
                                     <h3>Top Games</h3>
-                                    <span>Eligible paid/completed order sales.</span>
+                                    <span>Eligible paid order sales.</span>
                                 </div>
-                                <button class="admin-secondary-btn" type="button" data-dashboard-section="catalog">View
-                                    Catalog</button>
+                                <button class="admin-secondary-btn" type="button" data-dashboard-section="catalog">View Catalog</button>
                             </div>
                             <div id="dashboardTopGames" class="dashboard-table-list" aria-live="polite"></div>
+                        </article>
+
+                        <article class="panel">
+                            <div class="dashboard-panel-head">
+                                <div>
+                                    <h3>Top Selling Packages</h3>
+                                    <span>Completed fulfillment, ranked by units sold.</span>
+                                </div>
+                            </div>
+                            <div id="dashboardTopPackages" class="dashboard-table-list" aria-live="polite"></div>
                         </article>
 
                         <article class="panel">
@@ -1691,7 +1740,7 @@ TH</textarea></label>
     <script src="/js/os/configuration/configuration-client.js?v=20260724-config-registry"></script>
     <script src="/js/os/configuration/configuration-runtime-bridge.js?v=20260724-config-registry"></script>
 
-    <script src="/js/admin-stats.js?v=20260824-phase2-desktop-repair"></script>
+    <script src="/js/admin-stats.js?v=20260829-supplier-operations"></script>
     <script src="/js/admin-website-runtime.js?v=20260724-website-runtime"></script>
     <script src="/js/admin-fulfillment.js?v=20260827-owner-routing"></script>
 

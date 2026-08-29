@@ -4,6 +4,7 @@ const SupplierProductMapping = require("../../models/SupplierProductMapping");
 const commerceOrderRepository = require("../commerce/orderRepository");
 const adapterDefault = require("./fazercardsAdapter");
 const { normalizeSupplierResult } = require("../supplierAdapterRegistry");
+const { classifySupplierFailure } = require("../supplierFailureClassificationService");
 const { buildFazerCardsFields, maskFazerCardsFields } = require("./fazercardsInputFormatters");
 
 const POLL_DELAYS_MS = Object.freeze([0, 5000, 10000, 20000, 30000, 60000]);
@@ -55,7 +56,7 @@ function createFazerCardsFulfillmentProcessor(deps = {}) {
             attempt.status = "SUCCEEDED"; attempt.completedAt = new Date(); await attempt.save();
             await transition(order, "completed", `FazerCards completed ${attempt.fulfillmentId}`);
         } else if (result.status === "FAILED") {
-            attempt.status = "FAILED"; attempt.failureCode = result.failureCode || result.providerStatus; attempt.failureReason = result.safeMessage; attempt.failedAt = new Date(); await attempt.save();
+            attempt.status = "FAILED"; attempt.failureCode = result.failureCode || result.providerStatus; attempt.failureReason = result.safeMessage; attempt.normalizedFailureCategory = classifySupplierFailure(result).category; attempt.failedAt = new Date(); await attempt.save();
             await transition(order, "failed", `FazerCards ${result.providerStatus} ${attempt.fulfillmentId}`);
         } else {
             attempt.supplierRequest = { ...(attempt.supplierRequest || {}), manualAttention: result.providerStatus === "UNKNOWN_PROVIDER_STATUS", lastReconciledAt: new Date() };

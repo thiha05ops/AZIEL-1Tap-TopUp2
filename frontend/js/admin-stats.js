@@ -5,6 +5,8 @@ let adminDashboardTimer = null;
 let adminDashboardRefreshTimer = null;
 let adminDashboardLoading = false;
 let lastAdminDashboard = null;
+let lastSupplierOperations = [];
+let lastSupplierPackageProducts = [];
 let dashboardChartMode = "MMK";
 let dashboardActivityMode = "orders";
 const adminDashboardPhoneQuery = typeof window.matchMedia === "function"
@@ -31,6 +33,7 @@ function initAdminDashboard() {
     });
     bindDashboardControls();
     loadAdminDashboard();
+    loadSupplierOperations(false);
 
     if (!adminDashboardTimer) {
         adminDashboardTimer = setInterval(() => {
@@ -82,6 +85,12 @@ function bindDashboardControls() {
     const apply = document.getElementById("dashboardApplyCustomBtn");
     const cancel = document.getElementById("dashboardCancelCustomBtn");
     const mobileFilterClose = document.getElementById("dashboardMobileFilterClose");
+    const supplierRefresh = document.getElementById("dashboardSupplierRefresh");
+    const supplierFilter = document.getElementById("dashboardSupplierFilter");
+    const availabilityFilter = document.getElementById("dashboardAvailabilityFilter");
+    const productFilter = document.getElementById("dashboardProductFilter");
+    const packageFilter = document.getElementById("dashboardPackageFilter");
+    const stockFilters = ["dashboardStockSupplierFilter", "dashboardStockProductFilter", "dashboardStockPackageFilter"];
 
     const filters = getDashboardFilters();
     if (preset) preset.value = filters.preset;
@@ -125,6 +134,12 @@ function bindDashboardControls() {
     mobileFilterClose?.addEventListener("click", () => {
         document.getElementById("dashboardMobileFilters")?.removeAttribute("open");
     });
+    supplierRefresh?.addEventListener("click", () => loadSupplierOperations(true));
+    supplierFilter?.addEventListener("change", renderSupplierPackageAvailability);
+    availabilityFilter?.addEventListener("change", renderSupplierPackageAvailability);
+    productFilter?.addEventListener("change", () => { populateSupplierPackageFilters(); renderSupplierPackageAvailability(); });
+    packageFilter?.addEventListener("change", renderSupplierPackageAvailability);
+    stockFilters.forEach(id => document.getElementById(id)?.addEventListener("change", () => renderStockAffectedOrders(lastAdminDashboard?.supplierStockAffected || {})));
 
     document.querySelectorAll("[data-dashboard-chart]").forEach(button => {
         button.addEventListener("click", () => {
@@ -214,6 +229,8 @@ function renderAdminDashboard(dashboard) {
     renderAttentionQueue(dashboard.attention || []);
     renderRegionPerformance(dashboard.regionPerformance || []);
     renderTopGames(dashboard.topGames || []);
+    renderTopPackages(dashboard.topPackages || []);
+    renderStockAffectedOrders(dashboard.supplierStockAffected || {});
     renderDashboardPaymentMethods(resolvePaymentDistribution(dashboard));
     renderRecentActivity(dashboard.recentActivity || {});
     renderQuickActions(dashboard.quickActions || []);
@@ -243,10 +260,20 @@ function renderKpis(kpis) {
     const cards = [
         {
             title: "Gross Sales",
-            definition: "Paid, processing, and completed order amounts. Wallet top-ups are excluded.",
+            definition: "Final immutable paid order amounts. Wallet top-ups are excluded.",
             type: "money",
             value: kpis.grossSales?.current,
             comparison: kpis.grossSales?.comparison,
+            section: "orders"
+        },
+        {
+            title: "Gross Profit",
+            definition: "Final paid revenue minus persisted immutable direct cost snapshots. Incomplete rows are never recalculated.",
+            type: "profit",
+            value: kpis.grossProfit?.current,
+            margin: kpis.grossProfit?.margin,
+            complete: kpis.grossProfit?.complete,
+            incompleteOrders: kpis.grossProfit?.incompleteOrders,
             section: "orders"
         },
         {
@@ -334,6 +361,23 @@ function renderKpiCard(card) {
                 <strong>${escapeHTML(formatMoney(value.MMK, "MMK"))}</strong>
                 <strong>${escapeHTML(formatMoney(value.THB, "THB"))}</strong>
                 <small>${escapeHTML(changeLabel(comparison.MMK?.change))} MMK · ${escapeHTML(changeLabel(comparison.THB?.change))} THB</small>
+            </button>
+        `;
+    }
+
+    if (card.type === "profit") {
+        const value = card.value || {};
+        const margin = card.margin || {};
+        const incomplete = Number(card.incompleteOrders?.MMK || 0) + Number(card.incompleteOrders?.THB || 0);
+        const marginLabel = card.complete
+            ? `${margin.MMK ?? 0}% MMK · ${margin.THB ?? 0}% THB`
+            : `${incomplete.toLocaleString()} order${incomplete === 1 ? "" : "s"} missing immutable costs`;
+        return `
+            <button class="dashboard-kpi-card" type="button" data-dashboard-open="${escapeHTML(card.section || "orders")}" title="${escapeHTML(card.definition)}">
+                <span>${escapeHTML(card.title)}${card.complete ? "" : " · Partial"}</span>
+                <strong>${escapeHTML(formatMoney(value.MMK, "MMK"))}</strong>
+                <strong>${escapeHTML(formatMoney(value.THB, "THB"))}</strong>
+                <small>${escapeHTML(marginLabel)}</small>
             </button>
         `;
     }
@@ -467,26 +511,165 @@ function renderRegionPerformance(items) {
     `).join("");
 }
 
-function renderTopGames(items) {
-    const box = document.getElementById("dashboardTopGames");
+function renderTopPackages(items) {
+    const box = document.getElementById("dashboardTopPackages");
     if (!box) return;
     if (!items.length) {
-        box.innerHTML = renderEmptyState("No top games yet", "No eligible paid/completed orders in this period.");
+        box.innerHTML = renderEmptyState("No top packages yet", "No successfully fulfilled package sales exist for this period.");
         return;
     }
 
     box.innerHTML = items.map(item => `
-        <button class="dashboard-table-row" type="button" data-section="${escapeHTML(item.target?.section || "orders")}" data-params="${escapeHTML(JSON.stringify(item.target?.params || {}))}">
+        <div class="dashboard-table-row dashboard-package-rank-row">
+            <em>${escapeHTML(item.rank)}</em>
             <span>
-                <strong>${escapeHTML(item.name)}</strong>
-                <small>${Number(item.orders || 0).toLocaleString()} orders · ${Number(item.share || 0)}% share</small>
+                <strong>${escapeHTML(item.productName)} — ${escapeHTML(item.packageName)}</strong>
+                <small>${Number(item.unitsSold || 0).toLocaleString()} sold · ${Number(item.orders || 0).toLocaleString()} completed orders</small>
             </span>
+            <span><b>${escapeHTML(formatMoney(item.revenue?.MMK, "MMK"))}</b><small>Profit ${escapeHTML(formatMoney(item.profit?.MMK, "MMK"))}${item.profitIncompleteOrders?.MMK ? " · partial" : ""}</small></span>
+            <span><b>${escapeHTML(formatMoney(item.revenue?.THB, "THB"))}</b><small>Profit ${escapeHTML(formatMoney(item.profit?.THB, "THB"))}${item.profitIncompleteOrders?.THB ? " · partial" : ""}</small></span>
+        </div>
+    `).join("");
+}
+
+function renderTopGames(items) {
+    const box = document.getElementById("dashboardTopGames");
+    if (!box) return;
+    if (!items.length) {
+        box.innerHTML = renderEmptyState("No top games yet", "No eligible paid orders exist for this period.");
+        return;
+    }
+    box.innerHTML = items.map(item => `
+        <button class="dashboard-table-row" type="button" data-section="${escapeHTML(item.target?.section || "orders")}" data-params="${escapeHTML(JSON.stringify(item.target?.params || {}))}">
+            <span><strong>${escapeHTML(item.name)}</strong><small>${Number(item.orders || 0).toLocaleString()} orders · ${Number(item.share || 0)}% share</small></span>
             <b>${escapeHTML(formatMoney(item.sales?.MMK, "MMK"))}</b>
             <b>${escapeHTML(formatMoney(item.sales?.THB, "THB"))}</b>
         </button>
     `).join("");
-
     bindTargetButtons(box, ".dashboard-table-row");
+}
+
+async function loadSupplierOperations(force = false) {
+    const button = document.getElementById("dashboardSupplierRefresh");
+    if (button) { button.disabled = true; button.textContent = force ? "Refreshing..." : "Loading..."; }
+    try {
+        const data = await adminFetch(`/api/admin/dashboard/supplier-operations${force ? "?refresh=true" : ""}`);
+        lastSupplierOperations = Array.isArray(data?.suppliers) ? data.suppliers : [];
+        lastSupplierPackageProducts = Array.isArray(data?.products) ? data.products : [];
+        renderSupplierOperations();
+    } catch {
+        document.getElementById("dashboardSupplierBalances").innerHTML = renderEmptyState("Supplier monitoring unavailable", "Business analytics and order operations remain available.");
+    } finally {
+        if (button) { button.disabled = false; button.textContent = "Refresh suppliers"; }
+    }
+}
+
+function renderSupplierOperations() {
+    const balances = document.getElementById("dashboardSupplierBalances");
+    const supplierFilter = document.getElementById("dashboardSupplierFilter");
+    if (!balances) return;
+    const visibleSuppliers = lastSupplierOperations.filter(supplier => supplier.liveOperationsVisible !== false);
+    if (!visibleSuppliers.length) {
+        balances.innerHTML = renderEmptyState("No suppliers configured", "Configure a supplier to enable operational monitoring.");
+    } else {
+        balances.innerHTML = visibleSuppliers.map(supplier => {
+            const balance = supplier.balance || {};
+            const amount = balance.supported && balance.amount != null ? formatMoney(balance.amount, balance.currency) : "Balance unavailable";
+            return `<article class="dashboard-supplier-balance-card">
+                <div><strong>${escapeHTML(supplier.supplierName || supplier.supplierCode)}</strong><span class="dashboard-health dashboard-health-${escapeHTML(String(balance.status || "UNKNOWN").toLowerCase())}">${escapeHTML(balance.status || "UNKNOWN")}</span></div>
+                <b>${escapeHTML(amount)}</b>
+                <small>${balance.supported ? `${balance.stale ? "Stale" : "Fresh"} · ${formatDateTime(balance.fetchedAt)}` : escapeHTML(balance.errorMessage || "API balance not supported")}</small>
+                ${balance.errorCode && balance.supported ? `<em>${escapeHTML(balance.errorCode)}</em>` : ""}
+            </article>`;
+        }).join("");
+    }
+    if (supplierFilter) {
+        const selected = supplierFilter.value;
+        supplierFilter.innerHTML = `<option value="ALL">All suppliers</option>${visibleSuppliers.map(item => `<option value="${escapeHTML(item.supplierCode)}">${escapeHTML(item.supplierName || item.supplierCode)}</option>`).join("")}`;
+        supplierFilter.value = [...supplierFilter.options].some(option => option.value === selected) ? selected : "ALL";
+    }
+    populateSupplierPackageFilters();
+    renderSupplierPackageAvailability();
+}
+
+function populateSupplierPackageFilters() {
+    const productSelect = document.getElementById("dashboardProductFilter");
+    const packageSelect = document.getElementById("dashboardPackageFilter");
+    if (!productSelect || !packageSelect) return;
+    const selectedProduct = productSelect.value || "ALL";
+    const selectedPackage = packageSelect.value || "ALL";
+    productSelect.innerHTML = `<option value="ALL">All products</option>${lastSupplierPackageProducts.map(product => `<option value="${escapeHTML(product.productCode)}">${escapeHTML(product.productName || product.productCode)}</option>`).join("")}`;
+    productSelect.value = lastSupplierPackageProducts.some(product => product.productCode === selectedProduct) ? selectedProduct : "ALL";
+    const packages = lastSupplierPackageProducts.filter(product => productSelect.value === "ALL" || product.productCode === productSelect.value).flatMap(product => (product.packages || []).map(pkg => ({ ...pkg, productCode: product.productCode })));
+    packageSelect.innerHTML = `<option value="ALL">All packages</option>${packages.map(pkg => `<option value="${escapeHTML(`${pkg.productCode}:${pkg.packageCode}`)}">${escapeHTML(`${pkg.packageName || pkg.packageCode}${productSelect.value === "ALL" ? ` · ${pkg.productCode}` : ""}`)}</option>`).join("")}`;
+    packageSelect.value = packages.some(pkg => `${pkg.productCode}:${pkg.packageCode}` === selectedPackage) ? selectedPackage : "ALL";
+}
+
+function supplierAvailabilityLabel(value) {
+    return ({ AVAILABLE: "Available", OUT_OF_STOCK: "Out of stock", UNAVAILABLE: "Unavailable", UNKNOWN: "Unknown", NOT_MONITORED: "Not monitored" })[value] || "Unknown";
+}
+
+function renderSupplierPackageAvailability() {
+    const summary = document.getElementById("dashboardSupplierPackageSummary");
+    const box = document.getElementById("dashboardSupplierPackages");
+    if (!summary || !box) return;
+    const productCode = document.getElementById("dashboardProductFilter")?.value || "ALL";
+    const packageIdentity = document.getElementById("dashboardPackageFilter")?.value || "ALL";
+    const supplier = document.getElementById("dashboardSupplierFilter")?.value || "ALL";
+    const availability = document.getElementById("dashboardAvailabilityFilter")?.value || "ALL";
+    const products = lastSupplierPackageProducts.filter(product => productCode === "ALL" || product.productCode === productCode).map(product => ({ ...product, packages: (product.packages || []).filter(pkg => packageIdentity === "ALL" || `${product.productCode}:${pkg.packageCode}` === packageIdentity).map(pkg => ({ ...pkg, suppliers: (pkg.suppliers || []).filter(row => (supplier === "ALL" || row.supplierCode === supplier) && (availability === "ALL" || row.availability === availability)) })).filter(pkg => pkg.suppliers.length) })).filter(product => product.packages.length);
+    const selectedSummary = products.length === 1 ? products[0].supplierSummary || [] : [];
+    summary.innerHTML = selectedSummary.length ? selectedSummary.map(item => item.monitored === false
+        ? `<span><b>${escapeHTML(item.supplierName || item.supplierCode)}</b>Not monitored</span>`
+        : `<span><b>${escapeHTML(item.supplierName || item.supplierCode)}</b>${Number(item.counts?.AVAILABLE || 0)} available · ${Number(item.counts?.UNKNOWN || 0)} unknown</span>`).join("") : `<span><b>${products.reduce((sum, product) => sum + product.packages.length, 0)}</b>packages</span>`;
+    box.innerHTML = products.length ? products.map(product => `<details class="dashboard-product-group">
+        <summary><span><strong>${escapeHTML(product.productName || product.productCode)}</strong><small>${Number(product.packages.length)} packages · ${escapeHTML(product.productCode)}</small></span></summary>
+        <div>${product.packages.map(pkg => `<details class="dashboard-package-coverage-row">
+            <summary>
+                <span class="dashboard-package-identity"><strong>${escapeHTML(pkg.packageName || pkg.packageCode)}</strong><small>${escapeHTML(pkg.packageCode)}</small></span>
+                <span class="dashboard-package-coverage-summary">${Number(pkg.coverage?.confirmedAvailableSuppliers || 0)} supplier${Number(pkg.coverage?.confirmedAvailableSuppliers || 0) === 1 ? "" : "s"} available</span>
+                <span class="dashboard-supplier-badges" aria-label="Supplier availability">${pkg.suppliers.map(item => `<span class="dashboard-supplier-badge dashboard-supplier-badge-${escapeHTML(item.availability.toLowerCase())}" data-supplier-code="${escapeHTML(item.supplierCode)}" data-availability="${escapeHTML(item.availability)}"><strong>${escapeHTML(item.supplierName || item.supplierCode)}</strong><span>${escapeHTML(supplierAvailabilityLabel(item.availability))}</span></span>`).join("")}</span>
+            </summary>
+            <div class="dashboard-package-evidence" aria-label="Supplier evidence details">${pkg.suppliers.map(item => `<div>
+                <span><strong>${escapeHTML(item.supplierName || item.supplierCode)}</strong><small>${escapeHTML(item.supplierPackageCode || "No mapping")}</small></span>
+                <b class="dashboard-health dashboard-health-${escapeHTML(item.availability.toLowerCase())}">${escapeHTML(supplierAvailabilityLabel(item.availability))}</b>
+                <small>${item.stale ? "Stale" : item.fetchedAt ? formatDateTime(item.fetchedAt) : escapeHTML(item.evidence.replaceAll("_", " "))}${item.affectedOrderCount ? ` · ${Number(item.affectedOrderCount)} affected orders` : ""}</small>
+            </div>`).join("")}</div>
+        </details>`).join("")}</div>
+    </details>`).join("") : renderEmptyState("No matching packages", "No supplier package coverage matches these filters.");
+}
+
+function renderStockAffectedOrders(data) {
+    const box = document.getElementById("dashboardStockAffectedOrders");
+    if (!box) return;
+    const allItems = Array.isArray(data.orders) ? data.orders : [];
+    const filterConfigs = [
+        ["dashboardStockSupplierFilter", "supplierCode", "All suppliers"],
+        ["dashboardStockProductFilter", "productCode", "All products"],
+        ["dashboardStockPackageFilter", "packageCode", "All packages"]
+    ];
+    filterConfigs.forEach(([id, field, label]) => {
+        const select = document.getElementById(id);
+        if (!select) return;
+        const selected = select.value || "ALL";
+        const values = [...new Set(allItems.map(item => item[field]).filter(Boolean))].sort();
+        select.innerHTML = `<option value="ALL">${escapeHTML(label)}</option>${values.map(value => `<option value="${escapeHTML(value)}">${escapeHTML(value)}</option>`).join("")}`;
+        select.value = values.includes(selected) ? selected : "ALL";
+    });
+    const items = allItems.filter(item => filterConfigs.every(([id, field]) => {
+        const value = document.getElementById(id)?.value || "ALL";
+        return value === "ALL" || item[field] === value;
+    }));
+    if (!items.length) {
+        box.innerHTML = renderEmptyState(allItems.length ? "No matching affected orders" : "0 stock-affected orders", allItems.length ? "No positively classified supplier stock failures match these filters." : "No fulfillment attempts were positively classified as supplier out of stock in this period.");
+        return;
+    }
+    box.innerHTML = `<strong class="dashboard-operation-count">${Number(data.count || items.length).toLocaleString()} affected orders</strong>${items.map(item => `<div class="dashboard-operation-row">
+        <span><strong>${escapeHTML(item.orderId)}</strong><small>${escapeHTML(item.productName)} · ${escapeHTML(item.packageName)}</small></span>
+        <span><b>${escapeHTML(item.supplierCode)}</b><small>${escapeHTML(item.supplierPackageCode || "-")}</small></span>
+        <span><b>${escapeHTML(formatMoney(item.paidAmount, item.currency))}</b><small>${escapeHTML(item.rawFailureCode || item.normalizedFailureCategory)}</small></span>
+        <small>${escapeHTML(formatDateTime(item.failedAt))}</small>
+    </div>`).join("")}`;
 }
 
 function renderDashboardPaymentMethods(items) {

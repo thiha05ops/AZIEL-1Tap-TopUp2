@@ -14,6 +14,9 @@ const FulfillmentAttempt = require("../models/FulfillmentAttempt");
 const adminMiddleware = require("../middleware/adminMiddleware");
 const { PERMISSIONS, requireAdminPermission, hasPermission } = require("../services/adminAuthorizationService");
 const { formatPaymentDisplayName } = require("../services/paymentDisplayNameService");
+const { getSupplierOperations, getSupplierPackageCoverage } = require("../services/supplierOperationsService");
+const { buildBusinessPerformance } = require("../services/adminBusinessAnalyticsService");
+const { SUPPLIER_FAILURE_CATEGORIES } = require("../services/supplierFailureClassificationService");
 
 const DASHBOARD_TIMEZONE = "Asia/Bangkok";
 const MAX_DASHBOARD_RANGE_DAYS = 93;
@@ -385,10 +388,12 @@ async function buildCommandCenterDashboard(query = {}, now = new Date(), admin =
     const region = normalizeFilterRegion(query.region);
     const orderRegion = orderRegionQuery(region);
     const salesMatch = dateMatch("updatedAt", range, region, {
-        status: { $in: SALES_STATUSES }
+        status: { $in: SALES_STATUSES },
+        paymentStatus: "paid"
     });
     const previousSalesMatch = dateMatch("updatedAt", range.comparison, region, {
-        status: { $in: SALES_STATUSES }
+        status: { $in: SALES_STATUSES },
+        paymentStatus: "paid"
     });
     const orderCreatedMatch = dateMatch("createdAt", range, region);
     const previousOrderCreatedMatch = dateMatch("createdAt", range.comparison, region);
@@ -452,7 +457,7 @@ async function buildCommandCenterDashboard(query = {}, now = new Date(), admin =
             { $match: orderRegion },
             { $group: { _id: "$status", count: { $sum: 1 } } }
         ]),
-        CommerceOrder.find(salesMatch).select("commercial product createdAt updatedAt payment status").lean(),
+        CommerceOrder.find(salesMatch).select("commercial product fulfilment quoteSnapshot createdAt updatedAt payment paymentStatus status").lean(),
         CommerceOrder.find(orderCreatedMatch).select("commercial product createdAt updatedAt payment status").lean(),
         CommerceOrder.aggregate([
             { $match: orderCreatedMatch },
@@ -492,6 +497,43 @@ async function buildCommandCenterDashboard(query = {}, now = new Date(), admin =
         User.find(region === "ALL" ? {} : { region }).sort({ createdAt: -1 }).limit(5).select("username displayName region createdAt").lean(),
         SupportTicket.find({ status: { $nin: ["solved", "closed"] } }).sort({ updatedAt: -1 }).limit(5).select("ticketId username subject status updatedAt unreadByAdmin").lean()
     ]);
+
+    const businessPerformance = buildBusinessPerformance(salesOrders);
+    const stockAttemptMatch = {
+        normalizedFailureCategory: SUPPLIER_FAILURE_CATEGORIES.OUT_OF_STOCK,
+        failedAt: { $gte: range.start, $lt: range.end },
+        ...(region === "ALL" ? {} : { region })
+    };
+    const [stockAffectedCount, stockAttempts] = await Promise.all([
+        FulfillmentAttempt.countDocuments(stockAttemptMatch),
+        FulfillmentAttempt.find(stockAttemptMatch).sort({ failedAt: -1, _id: -1 }).limit(50).lean()
+    ]);
+    const stockOrderIds = [...new Set(stockAttempts.map(attempt => String(attempt.orderId || "")).filter(Boolean))];
+    const stockOrders = stockOrderIds.length
+        ? await CommerceOrder.find({ _id: { $in: stockOrderIds } }).select("_id orderId product commercial fulfilment status paymentStatus").lean()
+        : [];
+    const stockOrderById = new Map(stockOrders.map(order => [String(order._id), order]));
+    const stockAffectedOrders = stockAttempts.map(attempt => {
+        const order = stockOrderById.get(String(attempt.orderId)) || {};
+        return {
+            fulfillmentId: attempt.fulfillmentId,
+            orderId: order.orderId || attempt.orderCode,
+            failedAt: attempt.failedAt || attempt.updatedAt,
+            productCode: attempt.productCode || order.product?.gameCode || "",
+            productName: order.product?.gameName || attempt.productCode || "Unknown product",
+            packageCode: attempt.packageCode || order.product?.packageCode || "",
+            packageName: order.product?.packageName || attempt.packageCode || "Unknown package",
+            supplierCode: attempt.supplierCodeSnapshot,
+            supplierPackageCode: attempt.supplierRequest?.supplierPackageCode || "",
+            paidAmount: Number(order.commercial?.totalAmount || 0),
+            currency: normalizeCurrency(order.commercial?.currency),
+            fulfillmentState: attempt.status,
+            normalizedFailureCategory: attempt.normalizedFailureCategory,
+            rawFailureCode: attempt.failureCode || attempt.supplierResult?.failureCode || "",
+            rawFailureMessage: String(attempt.failureReason || attempt.supplierResult?.safeMessage || "").slice(0, 240),
+            retryState: attempt.supplierRequest?.submissionState || attempt.supplierRequest?.pollingState || "MANUAL_REVIEW"
+        };
+    });
 
     const pendingAttention = {
         manualPaymentReviews: await PaymentAttempt.countDocuments({ ...manualReview, ...(region === "ALL" ? {} : { region }) }),
@@ -615,6 +657,8 @@ async function buildCommandCenterDashboard(query = {}, now = new Date(), admin =
             salesDateField: "updatedAt",
             orderVolumeDateField: "createdAt",
             salesStatuses: SALES_STATUSES,
+            salesPaymentStatus: "paid",
+            grossProfit: "Final paid commercial.totalAmount minus immutable quoteSnapshot.pricingSnapshot.result.totalCost multiplied by quantity. Incomplete immutable cost snapshots are not recomputed.",
             pendingAttentionScope: "Current global operational backlog; not restricted to the selected analytics date range, except failed fulfillment attempts.",
             pendingAttentionStatuses: ["pending manual payment evidence", "paid", "processing older than 24h", "refund_pending"],
             refundMetrics: "unsupported: CommerceOrder has no authoritative refund amount and refund timestamp fields",
@@ -622,6 +666,13 @@ async function buildCommandCenterDashboard(query = {}, now = new Date(), admin =
         },
         kpis: {
             grossSales: { current: grossSales, previous: previousGrossSales, comparison: compareCurrency(grossSales, previousGrossSales) },
+            grossProfit: {
+                current: businessPerformance.grossProfit,
+                margin: businessPerformance.profitMargin,
+                complete: businessPerformance.profitDataComplete,
+                completeOrders: businessPerformance.profitCompleteOrders,
+                incompleteOrders: businessPerformance.profitIncompleteOrders
+            },
             orders: compareNumber(orderCount, previousOrderCount),
             completedOrders: compareNumber(completedCount, previousCompletedCount),
             pendingAttention: compareNumber(sumPendingAttention(pendingAttention), 0),
@@ -642,6 +693,13 @@ async function buildCommandCenterDashboard(query = {}, now = new Date(), admin =
         orderStatus: buildOrderStatusGroups(statusRows),
         orderStatusAll: buildOrderStatusGroups(statusAllRows),
         topGames,
+        topPackages: businessPerformance.topPackages,
+        businessPerformance,
+        supplierStockAffected: {
+            count: stockAffectedCount,
+            failureCategory: SUPPLIER_FAILURE_CATEGORIES.OUT_OF_STOCK,
+            orders: stockAffectedOrders
+        },
         regionPerformance,
         paymentDistribution,
         attention: [
@@ -747,6 +805,31 @@ router.get("/admin/dashboard/command-center", adminMiddleware, requireAdminPermi
     }
 });
 
+router.get("/admin/dashboard/supplier-operations", adminMiddleware, requireAdminPermission(PERMISSIONS.DASHBOARD_READ), async (req, res) => {
+    try {
+        const suppliers = await getSupplierOperations({ force: String(req.query.refresh || "").toLowerCase() === "true" });
+        const products = await getSupplierPackageCoverage({
+            snapshots: suppliers,
+            filters: {
+                productCode: req.query.product,
+                packageCode: req.query.package,
+                supplierCode: req.query.supplier,
+                availability: req.query.availability
+            }
+        });
+        return res.json({
+            success: true,
+            liveSnapshot: true,
+            fetchedAt: new Date(),
+            suppliers,
+            products
+        });
+    } catch (error) {
+        console.log("Admin supplier operations error:", error?.code || error?.message || "SUPPLIER_OPERATIONS_FAILED");
+        return res.json({ success: true, liveSnapshot: true, degraded: true, fetchedAt: new Date(), suppliers: [] });
+    }
+});
+
 router.get("/admin/stats", adminMiddleware, requireAdminPermission(PERMISSIONS.DASHBOARD_READ), async (req, res) => {
     try {
         const dashboard = await buildCommandCenterDashboard({ preset: "today", region: "ALL" }, new Date(), req.admin);
@@ -800,6 +883,8 @@ router._adminDashboardInternals = {
     normalizeCurrency,
     normalizeRegion,
     SALES_STATUSES,
+    buildBusinessPerformance,
+    SUPPLIER_FAILURE_CATEGORIES,
     FAILED_STATUSES,
     ORDER_STATUSES
 };

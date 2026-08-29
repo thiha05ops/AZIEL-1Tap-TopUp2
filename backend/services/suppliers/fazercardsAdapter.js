@@ -4,6 +4,9 @@ const { sanitizeProviderMetadata } = require("../supplierAdapterRegistry");
 const { effectiveAutoFulfillmentGateState } = require("../../config/supplierAutoFulfillmentGate");
 
 const DEFAULT_BASE_URL = "https://api.fzr.cards/api/v2";
+const MAX_CATEGORY_PAGES = 10;
+const MAX_AVAILABILITY_CATEGORIES = 40;
+const AVAILABILITY_CONCURRENCY = 4;
 const clean = value => String(value == null ? "" : value).trim();
 
 class FazerCardsAdapterError extends Error {
@@ -51,7 +54,7 @@ function createFazerCardsAdapter(options = {}) {
         if (!isConfigured()) throw new FazerCardsAdapterError("FAZERCARDS_NOT_CONFIGURED", "FazerCards credentials are not configured.", { statusCode: 409 });
         let response;
         try {
-            response = await fetchImpl(`${baseUrl}${path}`, { method: options.method || "GET", headers: { Accept: "application/json", "X-API-Key": apiKey(), ...(options.body ? { "Content-Type": "application/json" } : {}), ...(options.idempotencyKey ? { "Idempotency-Key": options.idempotencyKey } : {}) }, body: options.body ? JSON.stringify(options.body) : undefined });
+            response = await fetchImpl(`${baseUrl}${path}`, { method: options.method || "GET", headers: { Accept: "application/json", "X-API-Key": apiKey(), ...(options.body ? { "Content-Type": "application/json" } : {}), ...(options.idempotencyKey ? { "Idempotency-Key": options.idempotencyKey } : {}) }, body: options.body ? JSON.stringify(options.body) : undefined, signal: options.signal });
         } catch {
             throw new FazerCardsAdapterError("FAZERCARDS_TRANSPORT_ERROR", "FazerCards request outcome could not be confirmed.", { retryable: true, submissionUncertain: options.submission === true });
         }
@@ -62,15 +65,62 @@ function createFazerCardsAdapter(options = {}) {
     }
 
     const getAccount = () => request("/me");
-    async function getBalance() {
-        const payload = await request("/balance");
+    async function getBalance(options = {}) {
+        const payload = await request("/balance", { signal: options.signal });
         const value = payload.balance ?? payload.data?.balance;
         const balance = Number(value);
         if (!Number.isFinite(balance) || balance < 0) throw new FazerCardsAdapterError("FAZERCARDS_INVALID_BALANCE", "FazerCards returned an invalid balance.");
         return result("SUCCEEDED", "BALANCE_OK", "", { balance, currency: clean(payload.currency || payload.data?.currency || "USD").toUpperCase() }, "FazerCards balance fetched successfully.");
     }
-    const getTopupCategories = (cursor = "") => request(`/topups${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`);
-    const getTopupOffers = categoryId => request(`/topups/offers?category_id=${encodeURIComponent(clean(categoryId))}`);
+    const getTopupCategories = (cursor = "", options = {}) => request(`/topups${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`, { signal: options.signal });
+    const getTopupOffers = (categoryId, options = {}) => request(`/topups/offers?category_id=${encodeURIComponent(clean(categoryId))}`, { signal: options.signal });
+
+    const categoryRows = payload => Array.isArray(payload?.items) ? payload.items : Array.isArray(payload?.categories) ? payload.categories : Array.isArray(payload?.data?.categories) ? payload.data.categories : Array.isArray(payload?.data) ? payload.data : [];
+    const offerRows = payload => Array.isArray(payload?.offers) ? payload.offers : Array.isArray(payload?.data?.offers) ? payload.data.offers : Array.isArray(payload?.data) ? payload.data : [];
+    function normalizeOfferAvailability(offer = {}) {
+        const stock = clean(offer.stock_status || offer.availability || offer.status).toLowerCase();
+        const explicitEnabled = offer.active ?? offer.enabled ?? offer.orderable ?? offer.is_available;
+        const quantity = offer.stock_quantity ?? offer.stock ?? offer.quantity;
+        if (["out_of_stock", "sold_out", "exhausted"].includes(stock) || (Number.isFinite(Number(quantity)) && Number(quantity) <= 0)) return "OUT_OF_STOCK";
+        if (["disabled", "inactive", "unavailable", "not_orderable"].includes(stock) || explicitEnabled === false) return "UNAVAILABLE";
+        if (["available", "active", "in_stock", "orderable"].includes(stock) || explicitEnabled === true) return "AVAILABLE";
+        // The current FazerCards offers endpoint is the orderable catalog authority.
+        // A listed offer with an exact identity is positive evidence, but absence is not negative evidence.
+        return clean(offer.offer_id || offer.id) ? "AVAILABLE" : "UNKNOWN";
+    }
+    async function getPackageAvailability(options = {}) {
+        const requested = new Set((options.categoryIds || []).map(clean).filter(Boolean));
+        if (!requested.size) return { supported: true, evidence: "FAZERCARDS_CURRENT_ORDERABLE_OFFER_CATALOG", packages: [], diagnostics: { categoryPages: 0, requestedCategories: 0, retrievedCategories: 0, categoryLimitReached: false, paginationLimitReached: false } };
+        const discovered = new Set();
+        let cursor = "";
+        let pages = 0;
+        do {
+            const page = await getTopupCategories(cursor, { signal: options.signal });
+            pages += 1;
+            categoryRows(page).forEach(row => discovered.add(clean(row.category_id || row.id)));
+            cursor = clean(page?.meta?.next_cursor);
+        } while (cursor && pages < MAX_CATEGORY_PAGES && [...requested].some(id => !discovered.has(id)));
+
+        const categoryIds = [...requested].filter(id => discovered.has(id)).slice(0, MAX_AVAILABILITY_CATEGORIES);
+        const packages = [];
+        for (let index = 0; index < categoryIds.length; index += AVAILABILITY_CONCURRENCY) {
+            const batch = categoryIds.slice(index, index + AVAILABILITY_CONCURRENCY);
+            const results = await Promise.all(batch.map(async categoryId => ({ categoryId, payload: await getTopupOffers(categoryId, { signal: options.signal }) })));
+            results.forEach(({ categoryId, payload }) => offerRows(payload).forEach(offer => packages.push({
+                supplierProductCode: categoryId,
+                supplierPackageCode: clean(offer.offer_id || offer.id),
+                availability: normalizeOfferAvailability(offer),
+                price: Number.isFinite(Number(offer.price_usd)) ? Number(offer.price_usd) : null,
+                currency: Number.isFinite(Number(offer.price_usd)) ? "USD" : ""
+            })));
+        }
+        return {
+            supported: true,
+            evidence: "FAZERCARDS_CURRENT_ORDERABLE_OFFER_CATALOG",
+            packages,
+            diagnostics: { categoryPages: pages, requestedCategories: requested.size, retrievedCategories: categoryIds.length, categoryLimitReached: requested.size > MAX_AVAILABILITY_CATEGORIES, paginationLimitReached: Boolean(cursor) }
+        };
+    }
     const getOrder = orderId => request(`/orders/${encodeURIComponent(clean(orderId))}`);
     function buildValidationPayload({ validationCategoryId, fields }) {
         const categoryId = clean(validationCategoryId);
@@ -141,8 +191,8 @@ function createFazerCardsAdapter(options = {}) {
         const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
         return crypto.timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(supplied, "hex"));
     }
-    return { isConfigured, isProductAutoFulfillmentEnabled, autoFulfillmentGateState, isAutoFulfillmentEnabled, getAccount, getBalance, getTopupCategories, getTopupOffers, getOrder, buildValidationPayload, normalizeValidation, validatePlayerId, buildTopupPayload, dryRunTopup, submitTopup, checkStatus, verifyWebhookSignature };
+    return { isConfigured, isProductAutoFulfillmentEnabled, autoFulfillmentGateState, isAutoFulfillmentEnabled, getAccount, getBalance, getTopupCategories, getTopupOffers, getPackageAvailability, getOrder, buildValidationPayload, normalizeValidation, validatePlayerId, buildTopupPayload, dryRunTopup, submitTopup, checkStatus, verifyWebhookSignature };
 }
 
 const adapter = createFazerCardsAdapter();
-module.exports = { ...adapter, createFazerCardsAdapter, normalizeStatus, FazerCardsAdapterError, DEFAULT_BASE_URL };
+module.exports = { ...adapter, createFazerCardsAdapter, normalizeStatus, FazerCardsAdapterError, DEFAULT_BASE_URL, MAX_CATEGORY_PAGES, MAX_AVAILABILITY_CATEGORIES, AVAILABILITY_CONCURRENCY };
