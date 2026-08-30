@@ -40,13 +40,17 @@ const wonddThMapping = {
     supplierCode: "WONDD",
     supplierProductCode: "mlbb",
     supplierPackageCode: "MLTEST",
+    productionRole: "PRIMARY",
     executionMode: "API",
-    mappingMetadata: { readiness: { supplierMapped: true, inputReady: true, pricingReady: true, fulfillmentReady: true } }
+    fulfillmentEligibility: { mode: "CUSTOMER_MARKET_ALLOWLIST", allowedCustomerMarkets: ["TH"], evidenceCode: "OPERATOR_CONFIRMED_CAPABILITY", evidenceSource: "verifier", verifiedAt: "2026-08-30T00:00:00.000Z", version: 1 },
+    mappingMetadata: { readiness: { supplierMapped: true, inputReady: true, validationReady: true, pricingReady: true, fulfillmentReady: true, storefrontReady: true } }
 };
+const supplier = { _id: "supplier-1", supplierCode: "WONDD", enabled: true, mode: "API", supportedRegions: ["TH"] };
+const eligibilityContext = { adapterResolver: () => ({ isConfigured: () => true }), mappingSupportResolver: () => true };
 
-function readiness(packages, mappings, overrides = {}) {
+function readiness(packages, mappings, overrides = {}, suppliers = []) {
     const subject = { ...product, ...overrides };
-    const commerce = projectCommerceReadiness(subject, packages, mappings, []);
+    const commerce = projectCommerceReadiness(subject, packages, mappings, [], suppliers, eligibilityContext);
     return resolvePublicProductReadiness(subject, packages, commerce);
 }
 
@@ -61,7 +65,7 @@ assert.strictEqual(mmOnly.state, "AVAILABLE");
 assert.strictEqual(mmOnly.regions.MM.state, "AVAILABLE");
 assert.strictEqual(mmOnly.regions.TH.state, "COMING_SOON");
 
-const bothRegions = readiness([pkg], [mmMapping, wonddThMapping]);
+const bothRegions = readiness([pkg], [mmMapping, wonddThMapping], {}, [supplier]);
 assert.strictEqual(bothRegions.regions.MM.state, "AVAILABLE");
 assert.strictEqual(bothRegions.regions.TH.state, "AVAILABLE");
 
@@ -69,7 +73,7 @@ assert.notStrictEqual(readiness([], []).state, "AVAILABLE");
 assert.strictEqual(readiness([pkg], [mmMapping], { commerceState: "HIDDEN" }).state, "HIDDEN");
 assert.strictEqual(readiness([pkg], [mmMapping], { productCode: "aovid" }).state, "HIDDEN");
 
-const futureMapping = readiness([pkg], [wonddThMapping]);
+const futureMapping = readiness([pkg], [wonddThMapping], {}, [supplier]);
 assert.strictEqual(futureMapping.regions.TH.state, "AVAILABLE", "A legitimate future mapping must enable readiness without product exceptions.");
 
 const root = path.resolve(__dirname, "../..");

@@ -836,16 +836,18 @@ async function updateProduct({ productCode, patch = {}, actor = "admin" }) {
     });
     if (validateReadiness) {
         const SupplierProductMapping = require("../models/SupplierProductMapping");
+        const Supplier = require("../models/Supplier");
         const PackageInventoryState = require("../models/PackageInventoryState");
         const { projectCommerceReadiness } = require("./catalogService");
-        const [packages, mappings, inventoryStates] = await Promise.all([
+        const [packages, mappings, inventoryStates, suppliers] = await Promise.all([
             CatalogPackage.find({ productCode: normalizedProductCode }).lean(),
             SupplierProductMapping.find({ productCode: normalizedProductCode, enabled: true }).lean(),
-            PackageInventoryState.find().lean()
+            PackageInventoryState.find().lean(),
+            Supplier.find({ enabled: true }).lean()
         ]);
         const packageIds = new Set(packages.map(item => String(item._id)));
         const relevantInventory = inventoryStates.filter(item => packageIds.has(String(item.packageRef)) || packages.some(pkg => pkg.packageCode === item.packageCode));
-        const readiness = projectCommerceReadiness(product.toObject(), packages, mappings, relevantInventory);
+        const readiness = projectCommerceReadiness(product.toObject(), packages, mappings, relevantInventory, suppliers);
         if (!readiness.ready) {
             throw new CatalogAdminError(
                 "CATALOG_COMMERCE_CONFIGURATION_INCOMPLETE",

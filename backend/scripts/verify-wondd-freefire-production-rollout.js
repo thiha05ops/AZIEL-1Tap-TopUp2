@@ -87,8 +87,9 @@ const { loadDailyPricingWorkspace } = require("../services/commerce/adminPricing
         assert(live, `Missing live packcode ${mapping.supplierPackageCode}`);
         const pkg = packageMap.get(mapping.packageCode);
         assert(pkg?.enabled && pkg.prices?.TH?.enabled);
-        assert.strictEqual(pkg.prices.TH.supplierCode, "WONDD");
-        assert.strictEqual(Number(pkg.prices.TH.supplierCost), Number(live.netpricedealer));
+        assert(["WONDD", "FAZERCARDS"].includes(pkg.prices.TH.supplierCode), "Published pricing may use any configured supplier-cost authority.");
+        assert(Number.isFinite(Number(pkg.prices.TH.supplierCost)) && Number(pkg.prices.TH.supplierCost) >= 0);
+        if (pkg.prices.TH.supplierCode === "WONDD") assert.strictEqual(Number(pkg.prices.TH.supplierCost), Number(live.netpricedealer));
         assert(Number(pkg.prices.TH.amount) > Number(pkg.prices.TH.supplierCost));
         assert.strictEqual(pkg.prices.TH.publishedPriceMode, "POLICY_DERIVED");
         assert(!/[\u0E00-\u0E7F]/.test(pkg.name), `${pkg.packageCode} exposes Thai supplier text`);

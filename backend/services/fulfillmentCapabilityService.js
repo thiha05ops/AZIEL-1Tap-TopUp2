@@ -1,6 +1,9 @@
 const CatalogProduct = require("../models/CatalogProduct");
 const Supplier = require("../models/Supplier");
 const SupplierProductMapping = require("../models/SupplierProductMapping");
+const { getSupplierAdapter } = require("./supplierAdapterRegistry");
+const { supportsMapping } = require("./suppliers/supplierFulfillmentDispatcher");
+const { validateFulfillmentEligibility, isCustomerMarketEligible } = require("./supplierFulfillmentEligibilityService");
 
 const REGIONS = Object.freeze(["MM", "TH"]);
 
@@ -25,26 +28,46 @@ function classifyMapping(mapping = {}, supplier = {}) {
     return supplierMode === "API" && executionMode === "API" ? "SUPPLIER_API" : "SUPPLIER_MANUAL";
 }
 
-function isWonddAutoTopupThScope({ productCode = "", region = "" } = {}) {
+function isSupplierMappedAutoTopupThScope({ productCode = "", region = "" } = {}) {
     return ["mlbb", "freefire"].includes(String(productCode || "").trim().toLowerCase()) && normalizeRegion(region) === "TH";
 }
 
-function isProductionReadyWonddMapping(mapping = {}, supplier = {}) {
+function assessProductionReadyFulfillmentMapping(mapping = {}, supplier = {}, context = {}) {
+    const productCode = String(context.productCode || mapping.productCode || "").trim().toLowerCase();
+    const packageCode = String(context.packageCode || mapping.packageCode || "").trim().toUpperCase();
+    const region = normalizeRegion(context.region || mapping.region);
     const readiness = mapping.mappingMetadata?.readiness || {};
-    const productCode = String(mapping.productCode || "").trim().toLowerCase();
-    return mapping.enabled === true &&
-        String(mapping.supplierCode || supplier.supplierCode || "").trim().toUpperCase() === "WONDD" &&
-        String(supplier.supplierCode || mapping.supplierCode || "").trim().toUpperCase() === "WONDD" &&
-        String(mapping.region || "").trim().toUpperCase() === "TH" &&
-        ["mlbb", "freefire"].includes(productCode) &&
-        String(mapping.supplierProductCode || "").trim().toLowerCase() === productCode &&
-        Boolean(String(mapping.supplierPackageCode || "").trim()) &&
-        String(mapping.executionMode || "").trim().toUpperCase() === "API" &&
-        String(supplier.mode || "").trim().toUpperCase() === "API" &&
-        readiness.supplierMapped === true &&
-        readiness.inputReady === true &&
-        readiness.pricingReady === true &&
-        readiness.fulfillmentReady === true;
+    const blockers = [];
+    const eligibility = validateFulfillmentEligibility(mapping.fulfillmentEligibility);
+
+    if (mapping.enabled !== true) blockers.push("MAPPING_DISABLED");
+    if (mapping.archivedAt) blockers.push("MAPPING_ARCHIVED");
+    if (String(mapping.productCode || "").trim().toLowerCase() !== productCode ||
+        String(mapping.packageCode || "").trim().toUpperCase() !== packageCode) blockers.push("EXACT_MAPPING_MISMATCH");
+    if (normalizeRegion(mapping.region) !== region) blockers.push("MAPPING_REGION_MISMATCH");
+    if (!String(mapping.supplierProductCode || "").trim() || !String(mapping.supplierPackageCode || "").trim()) blockers.push("EXACT_MAPPING_INCOMPLETE");
+    if (String(mapping.executionMode || "").trim().toUpperCase() !== "API") blockers.push("MAPPING_EXECUTION_NOT_API");
+    if (String(mapping.productionRole || "").trim().toUpperCase() !== "PRIMARY") blockers.push("MAPPING_NOT_PRIMARY");
+    if (!supplier || supplier.enabled !== true || String(supplier.mode || "").trim().toUpperCase() !== "API") blockers.push("SUPPLIER_NOT_API_READY");
+    if (Array.isArray(supplier?.supportedRegions) && supplier.supportedRegions.length && !supplier.supportedRegions.map(normalizeRegion).includes(region)) blockers.push("SUPPLIER_REGION_UNSUPPORTED");
+    if (!eligibility.valid) blockers.push(...eligibility.errors);
+    else if (eligibility.value.mode === "UNKNOWN") blockers.push("FULFILLMENT_ELIGIBILITY_UNKNOWN");
+    else if (!isCustomerMarketEligible(mapping.fulfillmentEligibility, region)) blockers.push("CUSTOMER_MARKET_NOT_ELIGIBLE");
+    ["supplierMapped", "inputReady", "validationReady", "pricingReady", "fulfillmentReady", "storefrontReady"].forEach(flag => {
+        if (readiness[flag] !== true) blockers.push(`${flag.replace(/[A-Z]/g, letter => `_${letter}`).toUpperCase()}_FALSE`);
+    });
+
+    const adapterResolver = context.adapterResolver || getSupplierAdapter;
+    const mappingSupportResolver = context.mappingSupportResolver || supportsMapping;
+    const adapter = supplier ? adapterResolver(supplier) : null;
+    if (!adapter?.isConfigured?.()) blockers.push("SUPPLIER_ADAPTER_NOT_READY");
+    if (!mappingSupportResolver(mapping)) blockers.push("FULFILLMENT_PROCESSOR_NOT_READY");
+
+    return { ready: blockers.length === 0, blockers: [...new Set(blockers)].sort(), eligibility: eligibility.value };
+}
+
+function isProductionReadyFulfillmentMapping(mapping = {}, supplier = {}, context = {}) {
+    return assessProductionReadyFulfillmentMapping(mapping, supplier, context).ready;
 }
 
 function eligibleMappingsForPackage({ mappings = [], suppliers = [], productCode = "", packageCode = "", region = "" } = {}) {
@@ -59,7 +82,11 @@ function eligibleMappingsForPackage({ mappings = [], suppliers = [], productCode
         if (String(mapping.packageCode || "").toUpperCase() !== normalizedPackage) return [];
         if (normalizeRegion(mapping.region) !== normalizedRegion) return [];
         if (Array.isArray(supplier.supportedRegions) && supplier.supportedRegions.length && !supplier.supportedRegions.includes(normalizedRegion)) return [];
-        if (isWonddAutoTopupThScope({ productCode: normalizedProduct, region: normalizedRegion }) && !isProductionReadyWonddMapping(mapping, supplier)) return [];
+        if (isSupplierMappedAutoTopupThScope({ productCode: normalizedProduct, region: normalizedRegion }) && !isProductionReadyFulfillmentMapping(mapping, supplier, {
+            productCode: normalizedProduct,
+            packageCode: normalizedPackage,
+            region: normalizedRegion
+        })) return [];
         return [{ mapping, supplier, routeType: classifyMapping(mapping, supplier) }];
     });
 }
@@ -68,7 +95,7 @@ function resolveFulfillmentCapability({ product = {}, mappings = [], suppliers =
     const eligible = eligibleMappingsForPackage({ mappings, suppliers, productCode, packageCode, region });
     const automatedRoutes = eligible.filter(item => item.routeType === "SUPPLIER_API");
     const supplierManualRoutes = eligible.filter(item => item.routeType === "SUPPLIER_MANUAL");
-    const manualAdminAllowed = isWonddAutoTopupThScope({ productCode, region }) ? false : isManualFulfillmentAllowed(product, region);
+    const manualAdminAllowed = isSupplierMappedAutoTopupThScope({ productCode, region }) ? false : isManualFulfillmentAllowed(product, region);
     return {
         manualAdminAllowed,
         automatedAvailable: automatedRoutes.length > 0,
@@ -105,11 +132,10 @@ async function loadFulfillmentCapability({ productCode = "", packageCode = "", r
 module.exports = {
     REGIONS,
     classifyMapping,
+    assessProductionReadyFulfillmentMapping,
     eligibleMappingsForPackage,
-    isProductionReadyWonddMapping,
-    isProductionReadyWonddMlbbMapping: isProductionReadyWonddMapping,
-    isWonddAutoTopupThScope,
-    isWonddMlbbThScope: isWonddAutoTopupThScope,
+    isProductionReadyFulfillmentMapping,
+    isSupplierMappedAutoTopupThScope,
     isManualFulfillmentAllowed,
     loadFulfillmentCapability,
     manualAllowedRegions,

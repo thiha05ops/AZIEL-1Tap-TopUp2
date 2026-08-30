@@ -1283,7 +1283,7 @@ function renderPackageTable(packages) {
                         <small>${Number(item.sortOrder || index + 1)}</small>
                     </span>
                     <span><b>${escapeHtml(item.packageCode)}</b></span>
-                    <span>${escapeHtml(item.name)}${item.supplierSupport?.TH ? `<small><b class="admin-status-pill ${item.supplierSupport.TH.status === "SUPPORTED_READY" ? "is-ok" : item.supplierSupport.TH.status === "SUPPORTED_NOT_READY" ? "is-warning" : "is-muted"}">${escapeHtml(item.supplierSupport.TH.status === "SUPPORTED_READY" ? "SUPPORTED / READY" : item.supplierSupport.TH.status === "SUPPORTED_NOT_READY" ? "SUPPORTED / NOT READY" : "UNSUPPORTED BY WONDD")}</b></small>` : ""}</span>
+                    <span>${escapeHtml(item.name)}${item.supplierSupport?.TH ? `<small><b class="admin-status-pill ${item.supplierSupport.TH.status === "SUPPORTED" ? "is-ok" : item.supplierSupport.TH.status === "NOT_READY" ? "is-warning" : "is-muted"}">${escapeHtml(item.supplierSupport.TH.status === "SUPPORTED" ? "SUPPORTED" : item.supplierSupport.TH.status === "NOT_READY" ? "NOT READY" : "UNSUPPORTED")}</b></small>` : ""}</span>
                     <span><b>${escapeHtml(item.packageFamily?.name || "Other / Special")}</b><small>${escapeHtml(item.packageFamily?.code || "OTHER_SPECIAL")}</small></span>
                     <span class="catalog-icon-cell">${renderPackageIconControl(item)}</span>
                     <span>${renderPackageBusinessPrice(item.prices?.MM, "MM")}</span>
