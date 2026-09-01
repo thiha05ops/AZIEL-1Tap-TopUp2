@@ -1,9 +1,11 @@
 (function () {
     "use strict";
+    let rememberedDaily={};try{rememberedDaily=JSON.parse(sessionStorage.getItem("aziel.dailyPricing.scope")||"{}")||{}}catch{rememberedDaily={}}
+    const rememberDailyScope=state=>sessionStorage.setItem("aziel.dailyPricing.scope",JSON.stringify({supplierMarket:state.supplierMarket,product:state.selectedProductId,customerMarket:state.region}));
 
     const daily = {
-        loaded: false, loading: false, products: [], policies: [], suppliers: [], region: "ALL",
-        supplierId: "", selectedProductId: "", edits: new Map(), priceEdits: new Map(), selected: new Set(), previews: new Map(), search: "", previewSeq: 0,
+        loaded: false, loading: false, products: [], navigationProducts: [], policies: [], suppliers: [], supplierMarkets: [], region: ["TH","MM"].includes(rememberedDaily.customerMarket)?rememberedDaily.customerMarket:"TH",
+        supplierId: "", supplierMarket: String(rememberedDaily.supplierMarket||"").toUpperCase(), selectedProductId: String(rememberedDaily.product||""), edits: new Map(), priceEdits: new Map(), selected: new Set(), previews: new Map(), search: "", previewSeq: 0,
         previewCompleted: false, previewError: "",
         previewController: null, previewTimer: null, saveTimer: null, publishing: false,
         loadController: null, loadSeq: 0
@@ -27,7 +29,7 @@
             headers: { "Content-Type": "application/json", ...(options.headers || {}), Authorization: `Bearer ${token}` }
         });
         const body = await response.json().catch(() => ({}));
-        if (!response.ok || body.success === false) throw new Error(body.message || body.code || "Pricing request failed.");
+        if (!response.ok || body.success === false) { const error = new Error(body.message || body.code || "Pricing request failed."); error.code = body.code || ""; error.status = response.status; throw error; }
         return body;
     }
 
@@ -89,7 +91,7 @@
     }
 
     function regionProducts() {
-        return daily.products;
+        return daily.navigationProducts;
     }
 
     function renderProductSelect() {
@@ -97,14 +99,13 @@
         if (!select) return;
         const products = regionProducts();
         if (!products.some(product => product.productId === daily.selectedProductId)) daily.selectedProductId = products[0]?.productId || "";
-        select.innerHTML = products.length
-            ? products.map(product => `<option value="${product.productId}">${text(product.productName)}</option>`).join("")
-            : '<option value="">No products available</option>';
+        $("pricingProductOptions").innerHTML = products.map(product => `<option value="${product.productId}">${text(product.productName)} (${product.mappingCount ?? product.packages?.length ?? 0} mappings)</option>`).join("");
         select.value = daily.selectedProductId;
     }
 
     function dailyBlockingReason() {
-        if (!daily.products.length) return "Failed to load products.";
+        if (!daily.navigationProducts.length) return "Add a product to the Store Catalog before setting prices.";
+        if (!daily.products.length) return "This Store Catalog product has no selected packages for this selling region.";
         if (!["TH", "MM"].every(region => daily.policies.some(policy => policy.region === region && (policy.active || policy.draft)))) return "Failed to load active Thailand and Myanmar pricing policies.";
         if (!daily.selectedProductId) return "Select a product.";
         const supplier = activeSupplier();
@@ -117,11 +118,13 @@
         return text(rows.find(row => row.savedDraftSupplierId)?.savedDraftSupplierId);
     }
 
-    function setDailyError(message) {
+    function setDailyError(message, retryable = false) {
         const box = $("pricingDailyBlocking");
         if (!box) return;
         box.hidden = !message;
         box.textContent = message || "";
+        const retry = $("pricingRetryRefresh");
+        if (retry) retry.hidden = !retryable;
     }
 
     function renderSupplierSelect() {
@@ -131,13 +134,19 @@
         if (!suppliers.some(item => String(item.id || item.supplierId || item._id) === daily.supplierId)) {
             daily.supplierId = suppliers.length ? String(suppliers[0].id || suppliers[0].supplierId || suppliers[0]._id) : "";
         }
-        select.innerHTML = suppliers.length
-            ? suppliers.map(supplier => `<option value="${String(supplier.id || supplier.supplierId || supplier._id)}">${text(supplier.name || supplier.supplierName)}</option>`).join("")
-            : '<option value="">No configured suppliers</option>';
-        select.value = daily.supplierId;
+        $("pricingSupplierOptions").innerHTML = suppliers.map(supplier => `<option value="${upper(supplier.supplierCode)}">${text(supplier.name || supplier.supplierName)}</option>`).join("");
+        select.value = upper(activeSupplier()?.supplierCode);
         const supplier = activeSupplier();
         $("pricingSupplierCurrency").textContent = supplier?.supplierCurrency || "-";
         setDailyError(dailyBlockingReason());
+    }
+
+    function renderSupplierMarketSelect() {
+        const select = $("pricingSupplierMarketSelect");
+        if (!select) return;
+        $("pricingSupplierMarketOptions").innerHTML = daily.supplierMarkets.map(item => `<option value="${item.value}">${text(item.label)} (${item.count})</option>`).join("");
+        select.value = daily.supplierMarket;
+        select.disabled = !daily.supplierMarkets.length;
     }
 
     function previewFor(row) {
@@ -210,7 +219,7 @@
         const difference = result?.publishedPriceDifference;
         const percent = publishedPrice > 0 && difference != null ? (difference / publishedPrice) * 100 : null;
         const changeEvidence = result
-            ? `<span>Published ${money(publishedPrice, currency)}</span><span>Calculated ${money(calculatedPrice, currency)}</span><span>Final ${money(sellingPrice, currency)}</span><span>Difference ${difference == null ? "-" : money(difference, currency)}${percent == null ? "" : ` (${percent.toFixed(2)}%)`}</span>`
+            ? `<span>Current ${money(publishedPrice, currency)}</span><span>New ${money(sellingPrice, currency)}</span><b class="pricing-change-value">${difference == null ? "No change" : `${difference >= 0 ? "+" : ""}${money(difference, currency)}${percent == null ? "" : ` (${percent >= 0 ? "+" : ""}${percent.toFixed(2)}%)`}`}</b>`
             : "";
         const reason = result?.blockingErrors?.[0]?.message || result?.warnings?.[0]?.message || "";
         const rawCost = result?.rawSupplierCost ?? result?.supplierCost;
@@ -225,14 +234,14 @@
         const edit = priceInstruction(row, region);
         const manual = edit.mode === "MANUAL_OVERRIDE";
         const adjustment = edit.mode === "ADJUSTMENT";
-        return `<div class="pricing-region-result">
+        return `<div class="pricing-region-result operator-price-result">
             <strong>${money(sellingPrice, currency)}</strong>${changeEvidence}
             <div class="pricing-price-control" data-price-control data-product-code="${text(row.productCode)}" data-package-code="${text(row.packageCode)}" data-region="${region}">
                 <select data-price-mode aria-label="${region} price mode"><option value="CALCULATED" ${edit.mode === "CALCULATED" ? "selected" : ""}>Calculated</option><option value="MANUAL_OVERRIDE" ${manual ? "selected" : ""}>Manual override</option><option value="ADJUSTMENT" ${adjustment ? "selected" : ""}>Adjustment</option></select>
                 <select data-adjustment-type aria-label="${region} adjustment type" ${adjustment ? "" : "hidden disabled"}><option value="FIXED" ${edit.adjustmentType !== "PERCENTAGE" ? "selected" : ""}>Fixed +/-</option><option value="PERCENTAGE" ${edit.adjustmentType === "PERCENTAGE" ? "selected" : ""}>Percent +/-</option></select>
                 <input data-price-value type="number" step="0.01" value="${edit.value ?? ""}" placeholder="${adjustment && edit.adjustmentType === "PERCENTAGE" ? "%" : currency}" aria-label="${region} manual or adjustment value" ${manual || adjustment ? "" : "hidden disabled"}>
             </div>
-            <span>Raw ${money(rawCost, rawCurrency)}</span><span>FX ${text(fx)}</span><span>Landed ${money(landed, result?.landedCurrency || currency)}</span><span>${profitEvidence}</span><span>${guardrails}</span><span>Applied profit ${money(profit, currency)}</span><span>Margin ${margin == null ? "-" : `${Number(margin).toFixed(2)}%`}</span>${reason ? `<small>${reason}</small>` : ""}</div>`;
+            <details class="operator-pricing-details"><summary>Calculation details</summary><span>Approved supplier cost ${money(rawCost, rawCurrency)}</span><span>FX ${text(fx)}</span><span>Landed ${money(landed, result?.landedCurrency || currency)}</span><span>${profitEvidence}</span><span>${guardrails}</span><span>Applied profit ${money(profit, currency)}</span><span>Margin ${margin == null ? "-" : `${Number(margin).toFixed(2)}%`}</span><span>Calculated ${money(calculatedPrice, currency)}</span>${reason ? `<small>${reason}</small>` : ""}</details></div>`;
     }
 
     function renderRows() {
@@ -273,7 +282,7 @@
             return `<tr data-pricing-row="${key}">
                 <td><input type="checkbox" data-row-selection="${key}" aria-label="Select ${text(row.packageName)}" ${daily.selected.has(key) ? "checked" : ""} ${selectionEligible ? "" : "disabled"}></td>
                 <td><strong>${text(row.packageName)}</strong><small>${text(row.productName)} · ${upper(row.packageCode)}</small><details class="pricing-mobile-regions"><summary>Regional prices</summary><div><b>Thailand</b>${regionalResult(row, preview, "TH")}</div><div><b>Myanmar</b>${regionalResult(row, preview, "MM")}</div></details></td>
-                <td><label class="pricing-cost-input"><input type="number" min="0.000001" step="0.000001" value="${value}" data-supplier-cost="${key}" ${blocked ? `disabled title="${blocked}"` : ""}><span>${supplier?.supplierCurrency || "-"}</span></label></td>
+                <td><label class="pricing-cost-input"><input type="number" min="0.000001" step="0.000001" value="${value}" placeholder="${row.observedSupplierCost ?? ""}" data-supplier-cost="${key}" ${(blocked || row.supplierCostStatus === "COST_REVIEW_REQUIRED") ? `disabled title="${row.supplierCostStatus === "COST_REVIEW_REQUIRED" ? "Observed cost requires explicit approval in Supplier Cost Coverage" : blocked}"` : ""}><span>${row.supplierCurrency || supplier?.supplierCurrency || "-"}</span></label><small>${row.supplierCostStatus || "COST_MISSING"}${row.observedSupplierCost != null ? ` · observed ${row.observedSupplierCost} ${row.observedSupplierCurrency}` : ""}</small></td>
                 <td>${profitControls}</td>
                 <td class="pricing-desktop-region">${regionalResult(row, preview, "TH")}</td><td class="pricing-desktop-region">${regionalResult(row, preview, "MM")}</td>
                 <td><span class="pricing-status is-${displayStatus.toLowerCase()}">${displayStatus}</span><small>${view.reason}</small></td>
@@ -297,7 +306,7 @@
         reconcileSelection();
         const button = $("pricingPublishBtn");
         button.disabled = daily.publishing || !activeSupplier() || daily.selected.size === 0;
-        button.innerHTML = `<i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i> Publish Selected (${daily.selected.size})`;
+        button.innerHTML = `<i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i> Publish Changes (${daily.selected.size})`;
     }
 
     function buildWorkspaceRows() {
@@ -410,7 +419,7 @@
         const publishRegion = authoritativePreviewRegion();
         const regions = publishRegion === "ALL" ? ["TH", "MM"] : [publishRegion];
         reconcileSelection();
-        const rows = buildPublishRows();
+        const rows = buildPublishRows(),publicationIntent=rows.map(row=>({productCode:row.productCode,packageCode:row.packageCode,mappingId:row.mappingId}));
         if (!rows.length) return;
         const reviewLines = rows.flatMap(row => {
             const preview = daily.previews.get(rowKey(row));
@@ -426,24 +435,48 @@
         daily.publishing = true;
         updatePublishState();
         $("pricingDailyState").textContent = "Publishing";
+        const publishScope = `${daily.supplierId}|${daily.supplierMarket}|${daily.selectedProductId}|${daily.region}`;
         try {
             const result = await pricingFetch("/api/admin/pricing-engine/workspace/publish", { method: "POST", body: JSON.stringify({ supplierId: daily.supplierId, region: publishRegion, rows }) });
             const successKeys = new Set((result.draftCleanup?.clearedKeys || []).map(upper));
             successKeys.forEach(key => { daily.edits.delete(key); daily.previews.delete(key); });
-            daily.selected.clear();
-            daily.priceEdits.clear();
-            $("pricingDailyState").textContent = `${result.summary?.published || 0} published`;
-            await loadDaily(true);
+            successKeys.forEach(key => { daily.selected.delete(key); daily.priceEdits.delete(key); });
+            const publishedCount = Number(result.summary?.published || 0);
+            const failedCount = Number(result.summary?.failed || 0);
+            if (failedCount > 0) {
+                const reasons = (result.results || []).filter(item => item.failed).map(item => `${item.productCode}/${item.packageCode}/${item.region}: ${item.reason || item.code || "Publish failed"}`);
+                setDailyError(`${publishedCount} published; ${failedCount} failed.${reasons.length ? ` ${reasons.join(" · ")}` : ""}`, false);
+                $("pricingDailyState").textContent = publishedCount > 0 ? "Partially published" : "Publish failed";
+            } else {
+                $("pricingDailyState").textContent = `${publishedCount} published`;
+            }
+            const currentScope = `${daily.supplierId}|${daily.supplierMarket}|${daily.selectedProductId}|${daily.region}`;
+            if (publishedCount > 0 && currentScope === publishScope) {
+                const activation=await pricingFetch(`/api/admin/product-activation?productCode=${encodeURIComponent(daily.selectedProductId)}&supplierMarket=${encodeURIComponent(daily.supplierMarket)}&customerMarket=${encodeURIComponent(publishRegion)}`);
+                const selections=publicationIntent.map(intent=>activation.packages.find(item=>item.mappingId===intent.mappingId&&item.packageCode===intent.packageCode)).filter(Boolean);
+                if(selections.length===publicationIntent.length&&selections.every(item=>item.readiness?.ready)){await pricingFetch(`/api/admin/product-activation/products/${encodeURIComponent(daily.selectedProductId)}/publication`,{method:"POST",body:JSON.stringify({customerMarket:publishRegion,selections:selections.map(item=>({packageCode:item.packageCode,mappingId:item.mappingId,expectedMappingUpdatedAt:item.mappingUpdatedAt,expectedDecisionVersion:item.publication.decisionVersion})),decisionNote:"Daily Pricing explicit Publish Changes decision"})});const store=await pricingFetch(`/api/admin/store-catalog-selections?productCode=${encodeURIComponent(daily.selectedProductId)}&supplierMarket=${encodeURIComponent(daily.supplierMarket)}&sellingRegion=${encodeURIComponent(publishRegion)}`),selection=store.selections?.[0];if(selection&&!selection.visibleRegions?.includes(publishRegion))await pricingFetch(`/api/admin/store-catalog-selections/${encodeURIComponent(selection._id)}/regions/${encodeURIComponent(publishRegion)}/visibility`,{method:"PATCH",body:JSON.stringify({visible:true,expectedDecisionVersion:selection.decisionVersion})})}
+                else setDailyError("Prices were saved, but one or more packages cannot be published yet. View issue for details; unsafe packages remain private.",false);
+                await loadDaily(true, { preserveOnError: true, postPublish: true });
+            }
         } catch (error) {
-            setDailyError(error.message);
-            $("pricingDailyState").textContent = "Publish failed";
+            if (!error.status || error.status >= 500) {
+                $("pricingDailyState").textContent = "Publish result uncertain · reconciling";
+                const reconciled = await loadDaily(true, { preserveOnError: true, postPublish: true, failureMessage: `Publish response was uncertain and authoritative refresh also failed: ${error.message}` });
+                if (reconciled) {
+                    setDailyError("Publish response was uncertain. Authoritative workspace was reloaded; verify the published value before retrying.", false);
+                    $("pricingDailyState").textContent = "Reconciled · verify before retry";
+                }
+            } else {
+                setDailyError(error.message);
+                $("pricingDailyState").textContent = "Publish failed";
+            }
         } finally {
             daily.publishing = false;
             updatePublishState();
         }
     }
 
-    async function loadDaily(force = false) {
+    async function loadDaily(force = false, { preserveOnError = false, postPublish = false, failureMessage = "" } = {}) {
         if ((daily.loading && !force) || (daily.loaded && !force)) return;
         const previousProductId = daily.selectedProductId;
         const seq = ++daily.loadSeq;
@@ -454,36 +487,52 @@
         daily.previewError = "";
         daily.previews.clear();
         setDailyError("");
-        $("pricingDailyState").textContent = "Loading";
+        $("pricingDailyState").textContent = postPublish ? "Published · revalidating" : "Loading";
         try {
             const requestOptions = { signal: daily.loadController.signal };
             const workspaceParams = new URLSearchParams({ region: daily.region });
             if (daily.supplierId) workspaceParams.set("supplierId", daily.supplierId);
+            if (daily.supplierMarket) workspaceParams.set("supplierMarket", daily.supplierMarket);
+            if (daily.selectedProductId) workspaceParams.set("productCode", daily.selectedProductId);
             const [pricing, workspace] = await Promise.all([pricingFetch("/api/admin/pricing-engine", requestOptions), pricingFetch(`/api/admin/pricing-engine/workspace?${workspaceParams}`, requestOptions)]);
             if (seq !== daily.loadSeq) return;
             daily.products = Array.isArray(workspace.products) ? workspace.products : [];
+            daily.navigationProducts = Array.isArray(workspace.navigationProducts) ? workspace.navigationProducts : [];
             daily.policies = Array.isArray(pricing.policies) ? pricing.policies : [];
             daily.suppliers = Array.isArray(workspace.suppliers) ? workspace.suppliers : [];
             daily.supplierId = workspace.selectedSupplierId || daily.supplierId;
-            if (!daily.products.length) throw new Error("Failed to load products: production catalog returned no products.");
+            daily.supplierMarkets = Array.isArray(workspace.supplierMarkets) ? workspace.supplierMarkets : [];
+            daily.supplierMarket = workspace.selectedSupplierMarket || "";
             if (!daily.policies.length) throw new Error("Failed to load pricing policy.");
             const rows = regionRows();
             daily.supplierId = restoredSupplierId(rows) || daily.supplierId;
             daily.edits.clear();
             rows.forEach(row => { if (row.savedDraftSupplierCost != null) daily.edits.set(rowKey(row), { value: row.savedDraftSupplierCost, restored: true }); });
             daily.loaded = true;
-            daily.selectedProductId = daily.products.some(product => product.productId === previousProductId) ? previousProductId : "";
+            daily.selectedProductId = workspace.selectedProductCode || (daily.navigationProducts.some(product => product.productId === previousProductId) ? previousProductId : "");
+            rememberDailyScope(daily);
             $("pricingDailyState").textContent = "Ready";
+            $("pricingRegionSelect").value = daily.region;
             renderProductSelect();
             renderSupplierSelect();
+            renderSupplierMarketSelect();
             renderRows();
             schedulePreview();
+            return true;
         } catch (error) {
             if (error.name === "AbortError" || seq !== daily.loadSeq) return;
-            daily.loaded = false;
-            setDailyError(error.message);
-            $("pricingDailyState").textContent = "Unavailable";
-            $("pricingPackageRows").innerHTML = '<tr><td colspan="7" class="empty">Failed to load production pricing.</td></tr>';
+            if (preserveOnError) {
+                daily.loaded = true;
+                setDailyError(failureMessage || `Publication succeeded, but authoritative workspace refresh failed: ${error.message}`, true);
+                $("pricingDailyState").textContent = "Published · refresh required";
+                renderRows();
+            } else {
+                daily.loaded = false;
+                setDailyError(error.message, true);
+                $("pricingDailyState").textContent = "Unavailable";
+                $("pricingPackageRows").innerHTML = '<tr><td colspan="7" class="empty">Failed to load production pricing.</td></tr>';
+            }
+            return false;
         } finally { if (seq === daily.loadSeq) daily.loading = false; }
     }
 
@@ -629,9 +678,13 @@
     function bind() {
         if (document.documentElement.dataset.pricingV3Bound === "true") return;
         document.documentElement.dataset.pricingV3Bound = "true";
-        $("pricingRegionSelect")?.addEventListener("change", event => { daily.region = event.target.value; daily.edits.clear(); daily.priceEdits.clear(); daily.selected.clear(); daily.previews.clear(); loadDaily(true); });
-        $("pricingProductSelect")?.addEventListener("change", event => { daily.selectedProductId = event.target.value; daily.search = ""; $("pricingPackageSearch").value = ""; daily.selected.clear(); daily.previews.clear(); renderRows(); schedulePreview(); });
-        $("pricingSupplierSelect")?.addEventListener("change", event => { daily.supplierId = event.target.value; daily.edits.clear(); daily.priceEdits.clear(); daily.selected.clear(); daily.previews.clear(); loadDaily(true); });
+        $("pricingSupplierSelect")?.closest("label")?.setAttribute("hidden","");
+        $("pricingSupplierMarketSelect")?.closest("label")?.setAttribute("hidden","");
+        const heading=document.querySelector("#section-pricing-engine h2");if(heading)heading.textContent="Daily Pricing";
+        $("pricingRegionSelect")?.addEventListener("change", event => { daily.region = event.target.value;rememberDailyScope(daily);daily.edits.clear(); daily.priceEdits.clear(); daily.selected.clear(); daily.previews.clear(); loadDaily(true); });
+        $("pricingProductSelect")?.addEventListener("change", event => { const value=event.target.value;daily.selectedProductId=daily.navigationProducts.some(item=>item.productId===value)?value:"";event.target.value=daily.selectedProductId;rememberDailyScope(daily);daily.search = ""; $("pricingPackageSearch").value = ""; daily.selected.clear(); daily.previews.clear();if(daily.selectedProductId)loadDaily(true); });
+        $("pricingSupplierSelect")?.addEventListener("change", event => { const supplier=daily.suppliers.find(item=>upper(item.supplierCode)===upper(event.target.value));daily.supplierId=supplier?String(supplier.id||supplier.supplierId||supplier._id):"";daily.supplierMarket="";daily.selectedProductId="";event.target.value=supplier?upper(supplier.supplierCode):"";daily.edits.clear(); daily.priceEdits.clear(); daily.selected.clear(); daily.previews.clear(); if(daily.supplierId)loadDaily(true); });
+        $("pricingSupplierMarketSelect")?.addEventListener("change", event => { const value=upper(event.target.value);daily.supplierMarket=daily.supplierMarkets.some(item=>item.value===value)?value:"";event.target.value=daily.supplierMarket;daily.selectedProductId="";rememberDailyScope(daily);daily.edits.clear();daily.priceEdits.clear();daily.selected.clear();daily.previews.clear();if(daily.supplierMarket)loadDaily(true); });
         $("pricingPackageSearch")?.addEventListener("input", event => { daily.search = event.target.value; renderRows(); });
         $("pricingPackageRows")?.addEventListener("input", event => { const key = event.target.dataset.supplierCost; if (key) { const value = Number(event.target.value); if (Number.isFinite(value) && value > 0) daily.edits.set(key, { value }); else daily.edits.delete(key); daily.previews.delete(key); $("pricingDraftState").textContent = "Unsaved Changes"; schedulePreview(); updatePublishState(); return; } const control = event.target.closest("[data-price-control]"); if (control && event.target.matches("[data-price-value]")) updatePriceEdit(control); });
         $("pricingPackageRows")?.addEventListener("change", event => {
@@ -644,6 +697,7 @@
         $("pricingSelectChanged")?.addEventListener("click", () => selectVisible("CHANGED"));
         $("pricingClearSelection")?.addEventListener("click", () => selectVisible("CLEAR"));
         $("pricingPublishBtn")?.addEventListener("click", publishRows);
+        $("pricingRetryRefresh")?.addEventListener("click", () => loadDaily(true, { preserveOnError: daily.loaded }));
         $("pricingSettingsRegion")?.addEventListener("change", event => { settings.region = event.target.value; fillSettings(); });
         $("pricingSettingsForm")?.addEventListener("input", updateSettingUnits);
         $("pricingSettingsSave")?.addEventListener("click", saveSettings);

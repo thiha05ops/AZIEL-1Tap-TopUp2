@@ -316,7 +316,12 @@ router.post("/admin/pricing-engine/workspace/preview", adminMiddleware, requireA
 
 router.get("/admin/pricing-engine/workspace", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_READ), async (req, res) => {
     try {
-        return res.json(await loadDailyPricingWorkspace({ supplierId: req.query?.supplierId || "", productCode: req.query?.productCode || "", region: req.query?.region || "ALL" }));
+        return res.json(await loadDailyPricingWorkspace({
+            supplierId: req.query?.supplierId || "",
+            supplierMarket: req.query?.supplierMarket || "",
+            productCode: req.query?.productCode || "",
+            region: req.query?.region || "TH"
+        }));
     } catch (error) {
         return sendPricingError(req, res, error);
     }

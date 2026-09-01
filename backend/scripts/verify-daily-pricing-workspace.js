@@ -24,13 +24,16 @@ function main() {
     includes(html, "pricingProductSelect", "Daily Pricing must expose a canonical product selector.");
     excludes(html, "pricingWorkspaceSupplier\" type=\"text", "Free-text supplier input must be removed.");
     const dailySection = html.slice(html.indexOf('id="section-pricing-engine"'), html.indexOf('id="section-pricing-settings"'));
-    includes(dailySection, "value=\"ALL\"", "Daily Pricing must default to all-region preview and publish scope.");
+    excludes(dailySection, "value=\"ALL\"", "Daily Pricing must not default to a mixed customer-market scope.");
+    includes(dailySection, "Supplier Market", "Daily Pricing must expose supplier market separately.");
+    includes(dailySection, "Customer Market", "Daily Pricing must label customer pricing authority separately.");
     ["Package", "Supplier Cost", "Thailand", "Myanmar", "Status"].forEach(label => includes(html, label, `${label} column is required.`));
     excludes(html, "Calculation Detail", "Legacy calculation detail must be removed.");
     excludes(html, "Business Rules", "Legacy Business Rules drawer must be removed.");
     excludes(html, "Storefront Preview", "Legacy storefront simulation must be removed.");
 
     includes(frontend, "supplierId: daily.supplierId", "Preview and publish must carry canonical supplierId.");
+    includes(frontend, 'workspaceParams.set("supplierMarket", daily.supplierMarket)', "Workspace reads must carry exact supplier-market scope.");
     includes(frontend, "selectedProductId", "Daily Pricing must preserve an explicit product selection.");
     includes(frontend, "published.publishedPriceMode === \"POLICY_DERIVED\"", "Legacy compatibility prices must not render as V3 selling prices.");
     includes(frontend, "dailyBlockingReason", "Disabled inputs must expose their exact blocking contract.");
@@ -41,6 +44,8 @@ function main() {
     includes(frontend, "margin == null", "Calculated zero margin must not render as missing.");
     includes(frontend, "daily.previewSeq", "Stale preview sequencing must exist.");
     includes(frontend, "daily.previewController?.abort()", "Previous preview must be abortable.");
+    includes(frontend, "preserveOnError", "Post-publish reconciliation failure must preserve the last valid workspace.");
+    includes(frontend, "Publish response was uncertain", "Uncertain publication responses must reconcile without resubmission.");
     includes(frontend, "savedDraftSupplierCost", "Saved supplier draft must restore after refresh.");
     includes(frontend, "workspaceRows: rows", "Supplier cost drafts must be persisted.");
     includes(frontend, "window.confirm", "Warning rows require owner confirmation.");
@@ -55,6 +60,7 @@ function main() {
     includes(control, "regionalResults", "Preview API must return the cross-region result contract.");
     includes(control, "selectedRegions", "Publish must support selected-region server recalculation.");
     includes(control, "loadDailyPricingWorkspace", "Workspace rows must be loaded through supplier mapping authority.");
+    includes(control, "region: selectedSupplierMarket", "Workspace mapping query must use exact supplier-market authority.");
     includes(control, "canonicalSupplierCost", "Publish must persist one canonical supplier-cost snapshot.");
     includes(drafts, "resolvePricingSupplier", "Draft save must validate canonical supplier.");
     includes(drafts, "supplierId: group.supplierId", "Draft must snapshot canonical supplier identity.");

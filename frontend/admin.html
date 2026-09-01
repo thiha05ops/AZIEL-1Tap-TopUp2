@@ -41,6 +41,7 @@
     <link rel="stylesheet" href="/css/admin/admin-operator-workflows.css?v=20260901-operator-first">
     <link rel="stylesheet" href="/css/admin/admin-guided-selling.css?v=20260901-guided-selling">
     <link rel="stylesheet" href="/css/admin/admin-business-first.css?v=20260901-business-first">
+    <link rel="stylesheet" href="/css/admin/admin-clear-workflow.css?v=20260901-clear-workflow">
     <link rel="stylesheet" href="/css/admin/admin-os-brand.css?v=20260827-brand">
     <!-- Global responsive shell owner: phone <768px, tablet 768-1023px, desktop >=1024px. -->
     <link rel="stylesheet" href="/css/admin/admin-mobile-shell.css?v=20260824-phase2-desktop-repair">
@@ -264,6 +265,7 @@
                             <span class="admin-eyebrow">AZIEL OS · Version 2.5</span>
                             <h3>Dashboard</h3>
                             <p>Commerce operations overview using live AZIEL data for the selected period.</p>
+                            <button class="admin-primary-btn dashboard-add-product" type="button" data-add-product><i class="fa-solid fa-plus"></i> Add Product</button>
                         </div>
                         <details id="dashboardMobileFilters" class="dashboard-mobile-filter-disclosure">
                             <summary id="dashboardMobileFilterSummary"><i class="fa-solid fa-filter" aria-hidden="true"></i> Filters</summary>
@@ -585,7 +587,7 @@
                 <div class="supplier-catalog-shell operator-products-shell" aria-label="Products workspace">
                     <header class="supplier-catalog-head">
                         <div><span class="admin-status-pill">Commerce</span><h2>Products</h2><p>Prepare what AZIEL sells, understand blockers, and follow the next safe action.</p></div>
-                        <button id="activationPrepare" class="admin-primary-btn" type="button"><i class="fa-solid fa-wand-magic-sparkles"></i> Prepare for Sale</button>
+                        <div class="business-inline-actions"><button class="admin-primary-btn" type="button" data-add-product><i class="fa-solid fa-plus"></i> Add Product</button><button id="activationPrepare" class="admin-secondary-btn" type="button"><i class="fa-solid fa-wand-magic-sparkles"></i> Prepare for Sale</button></div>
                     </header>
                     <nav class="operator-workflow-tabs" aria-label="Product workflow">
                         <button class="active" type="button" aria-current="page">Overview &amp; Packages</button>
@@ -609,6 +611,8 @@
                     </footer>
                 </div>
             </section>
+
+            <div id="addProductWizard" class="business-wizard-modal" hidden role="dialog" aria-modal="true" aria-labelledby="addProductWizardTitle"><div class="business-wizard-card"><header><div><span class="admin-status-pill">Add Product</span><h2 id="addProductWizardTitle">Choose a product</h2><p id="addProductWizardSubtitle">Select the game or service you want to sell.</p></div><button type="button" data-wizard-close aria-label="Close Add Product">×</button></header><ol id="addProductSteps" class="business-stepper" aria-label="Add Product progress"><li class="active">1 <span>Product</span></li><li>2 <span>Market</span></li><li>3 <span>Supplier</span></li><li>4 <span>Packages</span></li><li>5 <span>Review</span></li></ol><div class="business-wizard-market"><label><span>Selling market</span><select id="wizardCustomerMarket"><option value="TH">Thailand</option><option value="MM">Myanmar</option></select></label></div><main id="addProductWizardBody" class="business-wizard-body" aria-live="polite"></main><footer><button id="wizardBack" class="admin-secondary-btn" type="button" hidden>Back</button><span id="wizardState" role="status"></span><button id="wizardNext" class="admin-primary-btn" type="button" disabled>Continue</button></footer></div></div>
 
             <section class="admin-section" id="section-catalog">
                 <div class="catalog-workspace-shell">
@@ -1461,7 +1465,7 @@ TH</textarea></label>
                         <section><h3>Suppliers</h3><p>Provider catalog, cost evidence, ingestion, reconciliation, and mapping diagnostics.</p><button type="button" data-admin-open-section="supplier-catalog">Open Supplier System</button></section>
                         <section><h3>Pricing System</h3><p>Pricing rules, FX configuration, policy thresholds, and publication diagnostics.</p><button type="button" data-admin-open-section="pricing-settings">Open Pricing Rules</button></section>
                         <section><h3>Fulfillment System</h3><p>Supplier setup, package routes, execution modes, adapters, and processors.</p><button type="button" data-admin-open-section="fulfillment" data-admin-context-view="advanced">Open Fulfillment Configuration</button></section>
-                        <section><h3>Commerce System</h3><p>Canonical catalog state, storefront sections, publication readiness, and technical identities.</p><button type="button" data-admin-open-section="catalog">Open Commerce Configuration</button></section>
+                        <section><h3>Commerce System</h3><p>Canonical catalog state, storefront sections, publication readiness, and technical identities.</p><button type="button" data-admin-open-section="catalog" data-admin-context-view="advanced">Open Commerce Configuration</button></section>
                         <section><h3>Content System</h3><p>Banners, placements, broadcasts, live chat, and website runtime diagnostics.</p><div class="business-inline-actions"><button type="button" data-admin-open-section="site-content">Banners</button><button type="button" data-admin-open-section="website">Website</button><button type="button" data-admin-open-section="broadcast">Broadcast</button></div></section>
                         <section><h3>System Health</h3><p>Environment gates, audit references, team access, and technical health.</p><button type="button" data-admin-open-section="settings">Open System Settings</button></section>
                     </div>
@@ -1784,29 +1788,9 @@ TH</textarea></label>
     <script src="/js/admin-stats.js?v=20260829-supplier-operations"></script>
     <script src="/js/admin-website-runtime.js?v=20260724-website-runtime"></script>
     <script src="/js/admin-fulfillment.js?v=20260827-owner-routing"></script>
-    <script src="/js/admin-supplier-catalog.js?v=20260831-phase2i"></script>
-    <script src="/js/admin-guided-selling.js?v=20260901-guided-selling"></script>
-    <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            const market = document.getElementById("activationSupplierMarket");
-            const prepare = document.getElementById("activationPrepare");
-            if (!market || !prepare) return;
-            new MutationObserver(() => {
-                prepare.disabled = !market.value;
-                prepare.textContent = "Prepare for Sale";
-            }).observe(market, { childList: true });
-            const packages = document.getElementById("activationPackages");
-            if (packages) new MutationObserver(() => {
-                const heading = packages.querySelector(".activation-summary h3");
-                if (!heading || heading.classList.contains("guided-market-context")) return;
-                heading.classList.add("guided-market-context");
-                heading.textContent = productActivationState.selectedProduct;
-                const context = document.createElement("small");
-                context.textContent = `Selling to: ${productActivationState.customerMarket} · Supplier market: ${productActivationState.supplierMarket === "GLOBAL" ? "Global" : productActivationState.supplierMarket}`;
-                heading.appendChild(context);
-            }).observe(packages, { childList: true, subtree: true });
-        });
-    </script>
+    <script src="/js/admin-supplier-catalog.js?v=20260901-empty-store-v2"></script>
+    <script src="/js/admin-guided-selling.js?v=20260901-empty-store-v2"></script>
+    <script src="/js/admin-add-product-wizard.js?v=20260901-empty-store-v2"></script>
     <script src="/js/admin-cost-coverage.js?v=20260831-cost-coverage"></script>
 
     <script src="/js/payment-display.js?v=20260718-labels"></script>
@@ -1816,7 +1800,7 @@ TH</textarea></label>
     <script src="/js/admin-media.js?v=20260714-phase8"></script>
 
     <!-- UPDATED -->
-    <script src="/js/admin-catalog.js?v=20260731-discount-v1"></script>
+    <script src="/js/admin-catalog.js?v=20260901-empty-store-v2"></script>
 
     <script src="/js/admin-pricing-selection-state.js?v=20260828-selection-authority"></script>
     <script src="/js/admin-pricing-engine.js?v=20260730-pricing-v3"></script>

@@ -90,9 +90,9 @@ function main() {
     const service = read("backend/services/commerce/adminPricingControlCenterService.js");
     assert(frontend.includes("daily.selected.has(rowKey(row))"), "Publish payload must contain selected rows only.");
     assert(frontend.includes('daily.selected.has(key) ? "checked" : ""'), "Rendered checkbox state must derive from the canonical selection Set.");
-    assert(frontend.includes("Publish Selected (${daily.selected.size})"), "Publish count must derive from the canonical selection Set.");
+    assert(frontend.includes("Publish Changes (${daily.selected.size})"), "Publish count must derive from the canonical selection Set.");
     assert(frontend.includes("daily.selected.size === 0"), "Publish disabled state must derive from the canonical selection Set.");
-    assert(frontend.includes("const rows = buildPublishRows();"), "Confirmation and publication must use the unmodified canonical selected-row payload.");
+    assert(frontend.includes("const rows = buildPublishRows(),publicationIntent="), "Confirmation and publication must use the canonical selected-row payload.");
     assert(frontend.includes("checkbox.checked = daily.selected.has(checkbox.dataset.rowSelection)"), "DOM checkbox properties must be synchronized from canonical selection state.");
     assert(frontend.includes("reconcileSelection(rows)") && frontend.includes("rows.filter(rowSelectionEligible)"), "Selection must be reconciled to visible eligible rows.");
     assert(frontend.includes('code: "PREVIEW_IDENTITY_MISMATCH"') && frontend.includes('code: "PREVIEW_REGION_MISMATCH"'), "Missing preview rows and regions must fail closed with explicit diagnostics.");

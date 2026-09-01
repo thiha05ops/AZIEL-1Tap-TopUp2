@@ -1,0 +1,1045 @@
+{
+  "mode": "DRY_RUN",
+  "schemaVersion": 1,
+  "migrationId": "package-market-publication-th-2026-08-30T06:44:32.463Z",
+  "generatedAt": "2026-08-30T06:44:32.463Z",
+  "source": "current-effective-public-catalog",
+  "customerMarket": "TH",
+  "legacyPublicCount": 57,
+  "proposedPublishedCount": 57,
+  "duplicatePublicationKeys": 0,
+  "added": [],
+  "removed": [],
+  "records": [
+    {
+      "productCode": "freefire-pass-membership",
+      "packageCode": "FF_BP_CARD",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "freefire-pass-membership",
+      "packageCode": "FF_LEVEL_10_UP_PASS",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "freefire-pass-membership",
+      "packageCode": "FF_LEVEL_15_UP_PASS",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "freefire-pass-membership",
+      "packageCode": "FF_LEVEL_20_UP_PASS",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "freefire-pass-membership",
+      "packageCode": "FF_LEVEL_25_UP_PASS",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "freefire-pass-membership",
+      "packageCode": "FF_LEVEL_30_UP_PASS",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "freefire-pass-membership",
+      "packageCode": "FF_LEVEL_6_UP_PASS",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "freefire-pass-membership",
+      "packageCode": "FF_MONTHLY_MEMBERSHIP",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "freefire-pass-membership",
+      "packageCode": "FF_WEEKLY_MEMBERSHIP_LITE",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "freefire-pass-membership",
+      "packageCode": "FF_WEEKLY_MEMBERSHIP",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "freefire",
+      "packageCode": "FF_1052_DIA",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "freefire",
+      "packageCode": "FF_172_DIA",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "freefire",
+      "packageCode": "FF_1801_DIA",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "freefire",
+      "packageCode": "FF_310_DIA",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "freefire",
+      "packageCode": "FF_33_DIA",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "freefire",
+      "packageCode": "FF_3698_DIA",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "freefire",
+      "packageCode": "FF_517_DIA",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "freefire",
+      "packageCode": "FF_68_DIA",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "freefire",
+      "packageCode": "FF_690_DIA",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "hok",
+      "packageCode": "HOK_1200_45_TOKENS",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "hok",
+      "packageCode": "HOK_1245_TOKENS",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "hok",
+      "packageCode": "HOK_16_TOKENS",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "hok",
+      "packageCode": "HOK_240_TOKENS",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "hok",
+      "packageCode": "HOK_2508_TOKENS",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "hok",
+      "packageCode": "HOK_400_TOKENS",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "hok",
+      "packageCode": "HOK_4180_TOKENS",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "hok",
+      "packageCode": "HOK_560_TOKENS",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "hok",
+      "packageCode": "HOK_80_TOKENS",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "hok",
+      "packageCode": "HOK_800_30_TOKENS",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "hok",
+      "packageCode": "HOK_830_TOKENS",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "hok",
+      "packageCode": "HOK_8360_TOKENS",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "mlbb-twilight-weekly-pass",
+      "packageCode": "MLBB_ONE_TIME_WEEKLY_PASS",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "mlbb-twilight-weekly-pass",
+      "packageCode": "MLBB_TWILIGHT_MIYA_PASS",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_1049_DIA",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_165_DIA_FIRST_TOPUP",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_172",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_2195_DIA",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_257_DIA",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_275_DIA_FIRST_TOPUP",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_275_DIA",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_343_DIA",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_3688_DIA",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_55_DIA_FIRST_TOPUP",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_5532_DIA",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_565_DIA_FIRST_TOPUP",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_570",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_600_DIA",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_706_DIA",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_792_DIA",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_86",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_9288_DIA",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "pubg",
+      "packageCode": "PUBG_1800_UC",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "pubg",
+      "packageCode": "PUBG_325_UC",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "pubg",
+      "packageCode": "PUBG_3850_UC",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "pubg",
+      "packageCode": "PUBG_60_UC",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "pubg",
+      "packageCode": "PUBG_660_UC",
+      "customerMarket": "TH",
+      "published": true
+    },
+    {
+      "productCode": "pubg",
+      "packageCode": "PUBG_8100_UC",
+      "customerMarket": "TH",
+      "published": true
+    }
+  ],
+  "publicationBaseline": [
+    {
+      "productCode": "freefire-pass-membership",
+      "packageCode": "FF_BP_CARD",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "freefire-pass-membership",
+      "packageCode": "FF_LEVEL_10_UP_PASS",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "freefire-pass-membership",
+      "packageCode": "FF_LEVEL_15_UP_PASS",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "freefire-pass-membership",
+      "packageCode": "FF_LEVEL_20_UP_PASS",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "freefire-pass-membership",
+      "packageCode": "FF_LEVEL_25_UP_PASS",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "freefire-pass-membership",
+      "packageCode": "FF_LEVEL_30_UP_PASS",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "freefire-pass-membership",
+      "packageCode": "FF_LEVEL_6_UP_PASS",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "freefire-pass-membership",
+      "packageCode": "FF_MONTHLY_MEMBERSHIP",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "freefire-pass-membership",
+      "packageCode": "FF_WEEKLY_MEMBERSHIP_LITE",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "freefire-pass-membership",
+      "packageCode": "FF_WEEKLY_MEMBERSHIP",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "freefire",
+      "packageCode": "FF_1052_DIA",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "freefire",
+      "packageCode": "FF_172_DIA",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "freefire",
+      "packageCode": "FF_1801_DIA",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "freefire",
+      "packageCode": "FF_310_DIA",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "freefire",
+      "packageCode": "FF_33_DIA",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "freefire",
+      "packageCode": "FF_3698_DIA",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "freefire",
+      "packageCode": "FF_517_DIA",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "freefire",
+      "packageCode": "FF_68_DIA",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "freefire",
+      "packageCode": "FF_690_DIA",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "hok",
+      "packageCode": "HOK_1200_45_TOKENS",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "hok",
+      "packageCode": "HOK_1245_TOKENS",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "hok",
+      "packageCode": "HOK_16_TOKENS",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "hok",
+      "packageCode": "HOK_240_TOKENS",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "hok",
+      "packageCode": "HOK_2508_TOKENS",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "hok",
+      "packageCode": "HOK_400_TOKENS",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "hok",
+      "packageCode": "HOK_4180_TOKENS",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "hok",
+      "packageCode": "HOK_560_TOKENS",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "hok",
+      "packageCode": "HOK_80_TOKENS",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "hok",
+      "packageCode": "HOK_800_30_TOKENS",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "hok",
+      "packageCode": "HOK_830_TOKENS",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "hok",
+      "packageCode": "HOK_8360_TOKENS",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "mlbb-twilight-weekly-pass",
+      "packageCode": "MLBB_ONE_TIME_WEEKLY_PASS",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "mlbb-twilight-weekly-pass",
+      "packageCode": "MLBB_TWILIGHT_MIYA_PASS",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_1049_DIA",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_165_DIA_FIRST_TOPUP",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_172",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_2195_DIA",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_257_DIA",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_275_DIA_FIRST_TOPUP",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_275_DIA",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_343_DIA",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_3688_DIA",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_55_DIA_FIRST_TOPUP",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_5532_DIA",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_565_DIA_FIRST_TOPUP",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_570",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_600_DIA",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_706_DIA",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_792_DIA",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_86",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "mlbb",
+      "packageCode": "MLBB_9288_DIA",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "pubg",
+      "packageCode": "PUBG_1800_UC",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "pubg",
+      "packageCode": "PUBG_325_UC",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "pubg",
+      "packageCode": "PUBG_3850_UC",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "pubg",
+      "packageCode": "PUBG_60_UC",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "pubg",
+      "packageCode": "PUBG_660_UC",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    },
+    {
+      "productCode": "pubg",
+      "packageCode": "PUBG_8100_UC",
+      "customerMarket": "TH",
+      "exists": false,
+      "published": false,
+      "decisionVersion": 0,
+      "updatedAt": "",
+      "provenanceSource": "",
+      "migrationId": "",
+      "provenancePlanHash": ""
+    }
+  ],
+  "publicationBaselineHash": "9b8fcce2bec4c21393dff8df766d601ec8654028b08cfeb9ef8c935466846299",
+  "planHash": "10efdbc165dc4b60cb6af055600010d91f197fd242582907d798c7acd1348d7a"
+}

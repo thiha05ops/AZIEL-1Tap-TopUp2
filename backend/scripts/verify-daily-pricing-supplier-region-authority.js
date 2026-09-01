@@ -7,6 +7,7 @@ require("dotenv").config({ path: path.resolve(__dirname, "../../.env"), quiet: t
 const mongoose = require("mongoose");
 const PricingPolicy = require("../models/PricingPolicy");
 const ExchangeRateAuthority = require("../models/ExchangeRateAuthority");
+const SupplierProductMapping = require("../models/SupplierProductMapping");
 const { batchPreviewDailyPricing, loadDailyPricingWorkspace } = require("../services/commerce/adminPricingControlCenterService");
 const { resolveExchangeRate } = require("../services/commerce/exchangeRateService");
 const { SUPPLIER_CURRENCY } = require("../constants/commerce");
@@ -40,7 +41,9 @@ const { SUPPLIER_CURRENCY } = require("../constants/commerce");
     assert.strictEqual(thPreview.rows[0].regions[0].exchangeRateSource, "same_currency");
     assert(Number(thPreview.rows[0].regions[0].recommendedSellingPrice) > 41);
 
-    const fazerMm = await loadDailyPricingWorkspace({ supplierId: fazer.id, productCode: "pubg", region: "MM" });
+    const pubg60Mapping = await SupplierProductMapping.findOne({ supplierId: fazer.id, productCode: "pubg", packageCode: "PUBG_60_UC", "supplierCostAuthority.rawSupplierCost": { $ne: null } }).select("region").lean();
+    assert(pubg60Mapping?.region, "PUBG 60 UC must have an exact FazerCards supplier market.");
+    const fazerMm = await loadDailyPricingWorkspace({ supplierId: fazer.id, supplierMarket: pubg60Mapping.region, productCode: "pubg", region: "MM" });
     const mm60 = fazerMm.rows.find(row => row.packageCode === "PUBG_60_UC");
     assert(mm60, "Canonical MM-enabled PUBG 60 UC must enter the MM pricing workspace.");
     const mmPreview = await batchPreviewDailyPricing({ supplierId: fazer.id, region: "MM", rows: [{ mappingId: mm60.mappingId, productCode: "pubg", packageCode: "PUBG_60_UC", newSupplierCost: mm60.supplierCost }] });

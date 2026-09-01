@@ -390,6 +390,9 @@ async function updateMapping(supplierId, mappingId, payload = {}, context = {}) 
     if (!mapping) throw new FulfillmentError("SUPPLIER_MAPPING_NOT_FOUND", "Supplier mapping not found.", 404);
     const supplier = await Supplier.findById(supplierId);
     if (!supplier) throw new FulfillmentError("SUPPLIER_NOT_FOUND", "Supplier not found.", 404);
+    if (mapping.productionRole !== "DISABLED" && String(context.admin?.role || "").toUpperCase() !== "OWNER") {
+        throw new FulfillmentError("OWNER_ROUTING_AUTHORITY_REQUIRED", "Only the Owner can modify a production-role supplier mapping.", 403);
+    }
     if (payload.productionRole !== undefined && String(context.admin?.role || "").toUpperCase() !== "OWNER") {
         throw new FulfillmentError("OWNER_ROUTING_AUTHORITY_REQUIRED", "Only the Owner can change production supplier routing.", 403);
     }

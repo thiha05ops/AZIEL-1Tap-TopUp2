@@ -1,0 +1,6 @@
+#section-products .activation-route>.activation-line:nth-child(2),
+#section-products .activation-route>.activation-line:nth-child(6),
+#section-products .activation-route>.activation-line:nth-child(7),
+#section-products .activation-route>.activation-line:nth-child(8),
+#section-products .activation-actions{display:none}
+.guided-market-context small{display:block;color:var(--admin-text-muted,#8f93a7);font-weight:400;margin-top:5px}
