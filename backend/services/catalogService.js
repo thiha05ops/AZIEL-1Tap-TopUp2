@@ -5,6 +5,8 @@ const CatalogPackage = require("../models/CatalogPackage");
 const SupplierProductMapping = require("../models/SupplierProductMapping");
 const Supplier = require("../models/Supplier");
 const PackageInventoryState = require("../models/PackageInventoryState");
+const PackageMarketPublication = require("../models/PackageMarketPublication");
+const StoreCatalogSelection = require("../models/StoreCatalogSelection");
 const { getCanonicalProduct, isCanonicalProductCode, resolveCanonicalProductRoute } = require("../catalog/canonicalOperationalCatalog");
 const {
     REGION_CURRENCIES,
@@ -21,6 +23,13 @@ const { resolvePublicProductReadiness } = require("../catalog/publicProductReadi
 const { normalizeProductRegions, productSupportsRegion } = require("../catalog/productRegionAuthority");
 const { assessProductionReadyFulfillmentMapping, isManualFulfillmentAllowed, isProductionReadyFulfillmentMapping, isSupplierMappedAutoTopupThScope } = require("./fulfillmentCapabilityService");
 const { publicCategoryFor } = require("../catalog/catalogTaxonomy");
+const {
+    applyPublicationMetadata,
+    comparePublicationSets,
+    explicitPublishedPackages,
+    publicationMode,
+    stripPublicationMetadata
+} = require("./packageMarketPublicationService");
 
 class CatalogError extends Error {
     constructor(code, message, statusCode = 400) {
@@ -62,6 +71,11 @@ function getCatalogSource(env = process.env) {
         "Catalog source configuration is invalid.",
         500
     );
+}
+
+function storeCatalogSelectionMode(env = process.env) {
+    const mode = String(env.STORE_CATALOG_SELECTION_MODE || "LEGACY").trim().toUpperCase();
+    return mode === "EXPLICIT" ? "EXPLICIT" : "LEGACY";
 }
 
 function getProduct(productCodeOrAlias) {
@@ -340,6 +354,20 @@ async function resolveDatabasePackagePrice(payload = {}) {
     let packages;
 
     try {
+        if (storeCatalogSelectionMode() === "EXPLICIT") {
+            const region = normalizeRegion(payload.region);
+            const publicProducts = await toDatabasePublicCatalog({ includeDisabled: false, includeAssetProjection: false, includeAdminPricing: false, customerMarket: region, publicationProjectionMode: "EXPLICIT" });
+            const refs = [payload.productCode, payload.gameKey, payload.game].filter(Boolean).map(normalizeProductCode);
+            const product = publicProducts.find(item => [item.productCode,item.name,...(item.aliases||[])].some(alias=>refs.includes(normalizeProductCode(alias))));
+            if (!product) throw new CatalogError("PRODUCT_NOT_OFFERED", "This product is not currently offered.");
+            const packageRef = payload.packageCode || payload.selectedPackageCode || payload.packageName || payload.package;
+            const pkg = (product.packages||[]).find(item=>normalizePackageCode(item.packageCode)===normalizePackageCode(packageRef)||normalizePackageName(item.name)===normalizePackageName(packageRef));
+            if (!pkg) throw new CatalogError("PACKAGE_NOT_OFFERED", "This package is not currently available.");
+            const price = pkg.prices?.[region];
+            if (!price||price.enabled===false||!Number.isFinite(Number(price.amount))||Number(price.amount)<=0)throw new CatalogError("PRICE_NOT_AVAILABLE","Pricing is not ready for this selling region.");
+            const canonical={productCode:product.productCode,productName:product.name,packageCode:pkg.packageCode,packageName:pkg.name,region,currency:price.currency,amount:Number(price.amount)};
+            assertClientCompatibility(payload,canonical);return canonical;
+        }
         products = await CatalogProduct.find().sort({ sortOrder: 1, productCode: 1 }).lean();
         const product = getDatabaseProductFromRows(payload, products);
         packages = await CatalogPackage.find({ productCode: product.productCode })
@@ -359,7 +387,7 @@ async function resolveDatabasePackagePrice(payload = {}) {
 }
 
 async function resolvePackagePrice(payload = {}, options = {}) {
-    const source = options.source || getCatalogSource();
+    const source = storeCatalogSelectionMode() === "EXPLICIT" ? "database" : (options.source || getCatalogSource());
 
     if (source === "database") {
         return resolveDatabasePackagePrice(payload);
@@ -798,6 +826,44 @@ function applyAdminSupplierSupport(projection, mappings = [], suppliers = [], el
     return projection;
 }
 
+function applyAdminProductionAttribution(projection, mappings = [], suppliers = [], publications = [], customerMarket = "TH") {
+    if (!projection || !Array.isArray(projection.packages)) return projection;
+    const market = String(customerMarket || "TH").trim().toUpperCase();
+    const supplierById = new Map(suppliers.map(item => [String(item._id), item]));
+    const publicationByPackage = new Map(publications.filter(item => String(item.customerMarket || "").toUpperCase() === market).map(item => [String(item.packageCode || "").toUpperCase(), item]));
+    projection.packages.forEach(pkg => {
+        const packageCode = String(pkg.packageCode || "").toUpperCase();
+        const publication = publicationByPackage.get(packageCode);
+        const candidates = mappings.filter(mapping => !mapping.archivedAt && mapping.enabled === true && supplierById.has(String(mapping.supplierId)) &&
+            String(mapping.productionRole || "").toUpperCase() === "PRIMARY" && String(mapping.executionMode || "").toUpperCase() === "API" &&
+            String(mapping.productCode || "").toLowerCase() === String(projection.productCode || "").toLowerCase() &&
+            String(mapping.packageCode || "").toUpperCase() === packageCode && String(mapping.region || "").toUpperCase() === market
+        ).map(mapping => {
+            const supplier = supplierById.get(String(mapping.supplierId));
+            return { mapping, supplier, assessment: assessProductionReadyFulfillmentMapping(mapping, supplier, { productCode: projection.productCode, packageCode, region: market }) };
+        });
+        const selected = candidates.length === 1 ? candidates[0] : null;
+        const price = pkg.prices?.[market], published = publication?.published === true;
+        const selling = Boolean(published && selected?.assessment.ready && pkg.enabled !== false && price?.enabled === true && Number(price.amount) > 0);
+        pkg.productionAttribution = {
+            customerMarket: market, publication: { published, decisionVersion: Number(publication?.decisionVersion || 0) },
+            status: selling ? "SELLING" : published && !selected ? "PRODUCTION_SUPPLIER_MARKET_UNRESOLVED" : published && selected ? "PUBLISHED_ROUTE_NOT_READY" : "NOT_SELLING",
+            publishedPrice: price?.enabled === true && Number(price.amount) > 0 ? { amount: Number(price.amount), currency: price.currency || "" } : null,
+            supplier: selected ? { id: String(selected.supplier?._id || selected.mapping.supplierId), code: selected.supplier?.supplierCode || selected.mapping.supplierCode, name: selected.supplier?.name || selected.mapping.supplierCode } : null,
+            supplierMarket: selected ? String(selected.mapping.region || "").toUpperCase() : null,
+            supplierProductCode: selected?.mapping.supplierProductCode || null, supplierPackageCode: selected?.mapping.supplierPackageCode || null,
+            productionRole: selected?.mapping.productionRole || null, mappingEnabled: selected?.mapping.enabled === true,
+            fulfillmentReady: selected?.assessment.ready === true, mappingId: selected ? String(selected.mapping._id) : null,
+            blockers: selected ? selected.assessment.blockers : [...new Set(candidates.flatMap(item => item.assessment.blockers))].sort()
+        };
+    });
+    const publishedAttributions = projection.packages.map(pkg => pkg.productionAttribution).filter(item => item?.publication?.published);
+    const attributedPublished = publishedAttributions.filter(item => item.mappingId);
+    const selling = attributedPublished.filter(item => item.status === "SELLING");
+    projection.productionSummary = { customerMarkets: publishedAttributions.length ? [market] : [], publishedPackageCount: publishedAttributions.length, productionSuppliers: [...new Set(attributedPublished.map(item => item.supplier?.code).filter(Boolean))].sort(), productionSupplierMarkets: [...new Set(attributedPublished.map(item => item.supplierMarket).filter(Boolean))].sort(), sellingPackageCount: selling.length, unresolvedPackageCodes: projection.packages.filter(pkg => pkg.productionAttribution?.status === "PRODUCTION_SUPPLIER_MARKET_UNRESOLVED").map(pkg => pkg.packageCode) };
+    return projection;
+}
+
 function applyPublicPackageEligibility(projection) {
     if (!projection || !["mlbb", "freefire"].includes(projection.productCode) || !Array.isArray(projection.packages)) return projection;
     projection.packages = projection.packages.filter(pkg =>
@@ -842,19 +908,23 @@ function toStaticPublicCatalog({ includeDisabled = true } = {}) {
         .filter(Boolean);
 }
 
-async function toDatabasePublicCatalog({ includeDisabled = true, includeAssetProjection = false, includeAdminPricing = false } = {}) {
-    const [products, packages, mappings, inventoryStates, enabledSuppliers] = await Promise.all([
+async function toDatabasePublicCatalog({ includeDisabled = true, includeAssetProjection = false, includeAdminPricing = false, customerMarket = "TH", publicationProjectionMode } = {}) {
+    const mode = publicationProjectionMode || publicationMode();
+    const storeSelectionExplicit = storeCatalogSelectionMode() === "EXPLICIT";
+    const [products, packages, mappings, inventoryStates, enabledSuppliers, publications, storeSelections] = await Promise.all([
         CatalogProduct.find().sort({ sortOrder: 1, productCode: 1 }).lean(),
         CatalogPackage.find().sort({ productCode: 1, sortOrder: 1, packageCode: 1 }).lean(),
         SupplierProductMapping.find({ enabled: true }).lean(),
         PackageInventoryState.find().lean(),
-        Supplier.find({ enabled: true }).lean()
+        Supplier.find({ enabled: true }).lean(),
+        PackageMarketPublication.find({ customerMarket }).lean(),
+        StoreCatalogSelection.find({ status: "ACTIVE", sellingRegions: String(customerMarket).toUpperCase(), visibleRegions:String(customerMarket).toUpperCase() }).lean()
     ]);
     const enabledSupplierIds = new Set(enabledSuppliers.map(item => String(item._id)));
     const activeMappings = mappings.filter(item => enabledSupplierIds.has(String(item.supplierId)));
     const mediaMap = await loadMediaAssetMap(products, packages);
 
-    return products
+    const legacyProducts = products
         .map(product => {
             const productPackages = packages.filter(item => item.productCode === product.productCode);
             const projection = projectCatalogProduct(product, productPackages, {
@@ -873,21 +943,61 @@ async function toDatabasePublicCatalog({ includeDisabled = true, includeAssetPro
             );
             applyPackageFulfillmentReadiness(projection, activeMappings.filter(item => item.productCode === product.productCode), inventoryStates, enabledSuppliers);
             if (!includeAdminPricing) applyPublicPackageEligibility(projection);
+            if (includeAdminPricing) applyPublicationMetadata(projection, publications, customerMarket);
             applyPublicReadiness(projection, product, productPackages, projection.commerceReadiness);
             if (!includeDisabled && !projection.discoverable) return null;
             return projection;
         })
         .filter(Boolean);
+
+    if (includeAdminPricing) return legacyProducts;
+    if (!storeSelectionExplicit && mode === "LEGACY") return legacyProducts;
+    const recordsByProduct = new Map(products.map(product => [product.productCode, publications.filter(item => item.productCode === product.productCode)]));
+    const proposedProducts = products
+        .map(product => {
+            const selectedCodes = new Set(storeSelections.filter(item => item.productCode === product.productCode).flatMap(item => item.packages || []).map(item => String(item.packageCode).toUpperCase()));
+            const sourcePackages = packages.filter(item => item.productCode === product.productCode && (!storeSelectionExplicit || selectedCodes.has(String(item.packageCode).toUpperCase())));
+            if (!sourcePackages.length) return null;
+            const projection = projectCatalogProduct(product, sourcePackages, {
+                includeDisabled,
+                mediaMap,
+                includeAssetProjection,
+                includeAdminPricing: false
+            });
+            if (!projection) return null;
+            const productMappings = activeMappings.filter(item => item.productCode === product.productCode);
+            const productInventory = inventoryStates.filter(item => sourcePackages.some(pkg => String(pkg._id) === String(item.packageRef) || pkg.packageCode === item.packageCode));
+            applyPackageFulfillmentReadiness(projection, productMappings, productInventory, enabledSuppliers);
+            applyPublicationMetadata(projection, recordsByProduct.get(product.productCode) || [], customerMarket);
+            projection.packages = explicitPublishedPackages(projection);
+            projection.packageCount = projection.packages.length;
+            if (!projection.packages.length) return null;
+            const publishedCodes = new Set(projection.packages.map(pkg => String(pkg.packageCode || "").toUpperCase()));
+            const publishedSourcePackages = sourcePackages.filter(pkg => publishedCodes.has(String(pkg.packageCode || "").toUpperCase()));
+            projection.commerceReadiness = projectCommerceReadiness(product, publishedSourcePackages, productMappings, productInventory, enabledSuppliers);
+            applyPublicReadiness(projection, product, publishedSourcePackages, projection.commerceReadiness);
+            if (!includeDisabled && !projection.discoverable) return null;
+            return projection;
+        })
+        .filter(Boolean);
+    if (mode === "SHADOW") {
+        const comparison = comparePublicationSets(legacyProducts, proposedProducts, customerMarket);
+        console.log("Package market publication shadow comparison:", comparison);
+        return legacyProducts;
+    }
+    return proposedProducts.map(stripPublicationMetadata);
 }
 
 async function toPublicCatalog(options = {}) {
-    const source = options.source || getCatalogSource();
+    const source = storeCatalogSelectionMode() === "EXPLICIT" ? "database" : (options.source || getCatalogSource());
 
     if (source === "database") {
         return toDatabasePublicCatalog({
             includeDisabled: options.includeDisabled !== false,
             includeAssetProjection: Boolean(options.includeAssetProjection),
-            includeAdminPricing: Boolean(options.includeAdminPricing)
+            includeAdminPricing: Boolean(options.includeAdminPricing),
+            customerMarket: options.customerMarket || "TH",
+            publicationProjectionMode: options.publicationProjectionMode
         });
     }
 
@@ -930,10 +1040,11 @@ async function getCatalogProductDetail(productCode, options = {}) {
             fallback.temporarilyUnavailable = false;
             return fallback;
         }
-        const [packages, mappings, inventoryStates] = await Promise.all([
+        const [packages, mappings, inventoryStates, publications] = await Promise.all([
             CatalogPackage.find({ productCode: normalizedCode }).sort({ sortOrder: 1, packageCode: 1 }).lean(),
             SupplierProductMapping.find({ productCode: normalizedCode, enabled: true }).lean(),
-            PackageInventoryState.find().lean()
+            PackageInventoryState.find().lean(),
+            PackageMarketPublication.find({ productCode: normalizedCode, customerMarket: options.customerMarket || "TH" }).lean()
         ]);
         const mediaMap = await loadMediaAssetMap([product], packages);
         const enabledSuppliers = await Supplier.find({
@@ -958,6 +1069,7 @@ async function getCatalogProductDetail(productCode, options = {}) {
             enabledSuppliers
         );
         applyPackageFulfillmentReadiness(projection, activeMappings, inventoryStates, enabledSuppliers);
+        applyPublicationMetadata(projection, publications, options.customerMarket || "TH");
         if (!options.includeAdminPricing) applyPublicPackageEligibility(projection);
         applyPublicReadiness(projection, product, packages, projection.commerceReadiness);
         if (options.includeDisabled === false && !projection.discoverable) return null;
@@ -978,11 +1090,15 @@ async function resolveAdminCatalogProduct(productCode, options = {}) {
     const findPackages = options.findPackages || (code => CatalogPackage.find({ productCode: code }).sort({ sortOrder: 1, packageCode: 1 }).lean());
     const findMappings = options.findMappings || (code => SupplierProductMapping.find({ productCode: code }).lean());
     const findInventoryStates = options.findInventoryStates || (() => PackageInventoryState.find().lean());
+    const findPublications = options.findPublications || (options.findMappings
+        ? (() => [])
+        : (code => PackageMarketPublication.find({ productCode: code, customerMarket: options.customerMarket || "TH" }).lean()));
     const product = await findProduct(canonicalCode);
-    const [packages, mappings, inventoryStates] = await Promise.all([
+    const [packages, mappings, inventoryStates, publications] = await Promise.all([
         findPackages(canonicalCode),
         findMappings(canonicalCode),
-        findInventoryStates()
+        findInventoryStates(),
+        findPublications(canonicalCode)
     ]);
     const foundation = product ? {
         ...canonical,
@@ -1025,6 +1141,7 @@ async function resolveAdminCatalogProduct(productCode, options = {}) {
         includeAdminPricing: options.includeAdminPricing !== false,
         publicProjection: false
     });
+    projection.canonicalMarket = canonical.market || foundation.market || "";
     const packageIds = new Set(packages.map(item => String(item._id)));
     projection.commerceReadiness = projectCommerceReadiness(
         foundation,
@@ -1034,7 +1151,9 @@ async function resolveAdminCatalogProduct(productCode, options = {}) {
         enabledSuppliers
     );
     applyPackageFulfillmentReadiness(projection, activeMappings, inventoryStates, enabledSuppliers);
+    applyPublicationMetadata(projection, publications, options.customerMarket || "TH");
     applyAdminSupplierSupport(projection, mappings, enabledSuppliers);
+    applyAdminProductionAttribution(projection, mappings, enabledSuppliers, publications, options.customerMarket || "TH");
     applyPublicReadiness(projection, foundation, packages, projection.commerceReadiness);
     projection.metadataRecordMissing = !product;
     return projection;
@@ -1042,9 +1161,11 @@ async function resolveAdminCatalogProduct(productCode, options = {}) {
 
 module.exports = {
     applyPackageFulfillmentReadiness,
+    applyAdminProductionAttribution,
     applyAdminSupplierSupport,
     applyPublicPackageEligibility,
     CatalogError,
+    storeCatalogSelectionMode,
     getCatalogProductDetail,
     resolveAdminCatalogProduct,
     getCatalogSource,

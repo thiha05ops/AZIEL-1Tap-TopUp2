@@ -105,7 +105,8 @@ function verifyRoutesAndRbac() {
     includes("backend/routes/supplier.js", "MOCK_SUPPLIER_DISABLED", "Legacy mock supplier route must be disabled.");
     includes("backend/routes/order.js", "router.get(\"/admin/orders/:id\"", "Admin must expose a single-order detail refresh endpoint.");
     includes("backend/routes/order.js", "projectAdminOrder(order, attempts)", "Single-order detail refresh must use canonical fulfillment projection.");
-    includes("backend/server.js", "supplierRoutes", "Supplier routes must be mounted.");
+    includes("backend/server.js", '["supplier", "wallet", "support", "settings", "paymentMethods"]', "Supplier routes must be included in the mounted API route set.");
+    includes("backend/server.js", 'app.use("/api", require(`./routes/${route}`))', "The supplier route set must be mounted under /api.");
 }
 
 function verifyOrderIntegration() {

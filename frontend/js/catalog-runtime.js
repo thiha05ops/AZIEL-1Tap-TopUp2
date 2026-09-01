@@ -101,7 +101,8 @@
     }
 
     async function fetchCatalog(attempt = 0) {
-        const response = await fetch("/api/catalog", {
+        const region=window.AZIEL?.getRegion?.()||localStorage.getItem("region")||localStorage.getItem("selectedRegion")||"TH";
+        const response = await fetch(`/api/catalog?region=${encodeURIComponent(region)}`, {
             cache: "no-store",
             headers: { Accept: "application/json" }
         });

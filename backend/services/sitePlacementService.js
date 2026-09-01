@@ -409,7 +409,7 @@ async function resolveHomePlacements(options = {}) {
         definition.itemType === "product" && byCode.get(placementCode)?.managed === true
     ));
     const publicCatalog = needsProductCatalog
-        ? await toPublicCatalog({ source: "database", includeDisabled: false })
+        ? await toPublicCatalog({ source: "database", includeDisabled: false, customerMarket: region })
         : [];
 
     for (const placementCode of Object.keys(SUPPORTED_PLACEMENTS)) {

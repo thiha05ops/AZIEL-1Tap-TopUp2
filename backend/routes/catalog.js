@@ -63,9 +63,13 @@ const {
     projectMediaAsset
 } = require("../services/mediaService");
 const { StorageError } = require("../services/storageService");
+const {
+    PackageMarketPublicationError,
+    setPackageMarketPublication
+} = require("../services/packageMarketPublicationService");
 
 function sendAdminCatalogError(res, error) {
-    if (error instanceof CatalogAdminError || error instanceof MediaError || error instanceof StorageError || error instanceof GameBannerError || error instanceof StorefrontSectionError || error instanceof AdminPricingControlCenterError) {
+    if (error instanceof CatalogAdminError || error instanceof PackageMarketPublicationError || error instanceof MediaError || error instanceof StorageError || error instanceof GameBannerError || error instanceof StorefrontSectionError || error instanceof AdminPricingControlCenterError) {
         return res.status(error.statusCode || 400).json({
             success: false,
             code: error.code,
@@ -155,7 +159,8 @@ function projectAdminCatalogListProduct(product = {}) {
 
 router.get("/catalog", async (req, res) => {
     try {
-        const products = await toPublicCatalog({ includeDisabled: false });
+        const customerMarket = String(req.query.region || req.headers["x-customer-region"] || "TH").trim().toUpperCase();
+        const products = await toPublicCatalog({ includeDisabled: false, customerMarket });
 
         res.set("Cache-Control", "no-store");
         return res.json({
@@ -177,6 +182,9 @@ router.get("/catalog", async (req, res) => {
 
 router.get("/catalog/:productCode/banners", async (req, res) => {
     try {
+        const customerMarket = String(req.query.region || req.headers["x-customer-region"] || "TH").trim().toUpperCase();
+        const visible = (await toPublicCatalog({ includeDisabled: false, customerMarket })).some(product=>product.productCode===String(req.params.productCode||"").trim().toLowerCase());
+        if(!visible)return res.status(404).json({success:false,code:"PRODUCT_NOT_OFFERED",message:"This product is not currently offered."});
         const result = await listPublicBanners(req.params.productCode);
 
         res.set("Cache-Control", "no-store");
@@ -244,16 +252,17 @@ router.get("/public/storefront-sections/:key", async (req, res) => {
 
 router.get("/catalog/:productCode", async (req, res) => {
     try {
-        const product = await getCatalogProductDetail(req.params.productCode, { includeDisabled: true });
+        const customerMarket = String(req.query.region || req.headers["x-customer-region"] || "TH").trim().toUpperCase();
+        const product = (await toPublicCatalog({includeDisabled:false,customerMarket})).find(item=>item.productCode===String(req.params.productCode||"").trim().toLowerCase())||null;
 
         res.set("Cache-Control", "no-store");
         if (!product) {
             return res.status(404).json({
                 success: false,
-                code: "PRODUCT_HIDDEN",
-                availabilityCode: "PRODUCT_HIDDEN",
+                code: "PRODUCT_NOT_OFFERED",
+                availabilityCode: "PRODUCT_NOT_OFFERED",
                 productCode: String(req.params.productCode || ""),
-                message: availabilityReason("PRODUCT_HIDDEN")
+                message: "This product is not currently offered."
             });
         }
 
@@ -384,7 +393,8 @@ router.get("/admin/catalog/products/:productCode", adminMiddleware, requireAdmin
     try {
         const product = await resolveAdminCatalogProduct(req.params.productCode, {
             includeAssetProjection: true,
-            includeAdminPricing: true
+            includeAdminPricing: true,
+            customerMarket: ["TH", "MM"].includes(String(req.query?.customerMarket || "").toUpperCase()) ? String(req.query.customerMarket).toUpperCase() : "TH"
         });
 
         if (!product) {
@@ -609,6 +619,46 @@ router.patch("/admin/catalog/products/:productCode/packages/:packageCode", admin
             ...projectAdminSource(),
             product,
             package: product?.packages?.find(item => item.packageCode === result.package.packageCode) || null
+        });
+    } catch (error) {
+        return sendAdminCatalogError(res, error);
+    }
+});
+
+router.patch("/admin/catalog/products/:productCode/packages/:packageCode/publication", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_MANAGE), async (req, res) => {
+    try {
+        const customerMarket = String(req.body?.customerMarket || "TH").toUpperCase();
+        const result = await setPackageMarketPublication({
+            productCode: req.params.productCode,
+            packageCode: req.params.packageCode,
+            customerMarket,
+            published: req.body?.published,
+            decisionNote: req.body?.decisionNote || "",
+            actor: req.admin?.username || "admin"
+        });
+        await writeAdminAudit({
+            actor: req.admin,
+            req,
+            action: result.publication.published ? ADMIN_AUDIT_ACTIONS.PACKAGE_MARKET_PUBLISHED : ADMIN_AUDIT_ACTIONS.PACKAGE_MARKET_UNPUBLISHED,
+            resourceType: "PackageMarketPublication",
+            resourceId: `${result.publication.productCode}:${result.publication.packageCode}:${customerMarket}`,
+            metadata: { published: result.publication.published, decisionVersion: result.publication.decisionVersion }
+        }).catch(error => console.log("Admin audit failed:", error.message));
+        const product = await getCatalogProductDetail(result.publication.productCode, {
+            source: "database",
+            includeDisabled: true,
+            includeAssetProjection: true,
+            includeAdminPricing: true,
+            customerMarket
+        });
+        return res.json({
+            success: true,
+            changed: result.changed,
+            unchanged: !result.changed,
+            ...projectAdminSource(),
+            publication: result.publication,
+            product,
+            package: product?.packages?.find(item => item.packageCode === result.publication.packageCode) || null
         });
     } catch (error) {
         return sendAdminCatalogError(res, error);

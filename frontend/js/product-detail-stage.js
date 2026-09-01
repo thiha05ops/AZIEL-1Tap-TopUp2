@@ -357,7 +357,8 @@
     let directAvailabilityRequest = null;
     function resolveDirectAvailability(productCode) {
         if (!productCode || directAvailabilityRequest) return directAvailabilityRequest;
-        directAvailabilityRequest = fetch(`/api/catalog/${encodeURIComponent(productCode)}`, {
+        const region=window.AZIEL?.getRegion?.()||localStorage.getItem("region")||localStorage.getItem("selectedRegion")||"TH";
+        directAvailabilityRequest = fetch(`/api/catalog/${encodeURIComponent(productCode)}?region=${encodeURIComponent(region)}`, {
             cache: "no-store",
             headers: { Accept: "application/json" }
         }).then(async response => {

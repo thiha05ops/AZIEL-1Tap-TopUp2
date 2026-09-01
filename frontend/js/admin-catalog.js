@@ -15,6 +15,8 @@ let activeCatalogTab = "general";
 let storefrontSections = [];
 let catalogPackageSearch = "";
 let catalogPackageStatusFilter = "all";
+let catalogCustomerMarket = sessionStorage.getItem("aziel.catalog.customerMarket") === "MM" ? "MM" : "TH";
+let catalogSupplierMarketFilter = "";
 let catalogHighlightedPackageCode = "";
 let catalogPricingPreviewTimer = null;
 let catalogPricingPreviewRequestId = 0;
@@ -24,6 +26,7 @@ let catalogProductSavePending = false;
 let catalogProductRequestController = null;
 let catalogKnowledgeLocale = "en";
 let catalogKnowledgeDrafts = { en: {}, my: {}, th: {} };
+let catalogStoreSelectionScope = null;
 
 document.addEventListener("DOMContentLoaded", () => {
     initAdminCatalogController();
@@ -52,8 +55,11 @@ function initAdminCatalogController() {
 
     window.addEventListener("aziel:admin-section-opened", event => {
         if (event.detail?.section === "catalog") {
-            loadAdminCatalog();
-            loadStorefrontSections();
+            if (event.detail?.context?.view === "advanced") {
+                setAdminCatalogStoreSelectionScope(null);
+                loadAdminCatalog(true);
+                loadStorefrontSections(true);
+            }
         }
     });
 
@@ -112,7 +118,8 @@ async function loadAdminCatalog(force = false) {
 
     catalogSource = data.source || "";
     catalogActiveSource = data.activeSource || data.source || "";
-    catalogProducts = Array.isArray(data.products) ? data.products : [];
+    catalogProducts = (Array.isArray(data.products) ? data.products : [])
+        .filter(product => catalogStoreSelectionScope === null || catalogStoreSelectionScope.has(product.productCode));
     const selectionStillExists = catalogProducts.some(product => product.productCode === selectedCatalogProductCode);
     selectedCatalogProductCode = selectionStillExists ? selectedCatalogProductCode : (catalogProducts[0]?.productCode || "");
 
@@ -124,6 +131,15 @@ async function loadAdminCatalog(force = false) {
         renderCatalogEmpty(adminT("no_products_found", "No products found"));
     }
 }
+
+function setAdminCatalogStoreSelectionScope(productCodes) {
+    catalogStoreSelectionScope = productCodes === null
+        ? null
+        : new Set((productCodes || []).map(code => String(code || "").trim().toLowerCase()).filter(Boolean));
+}
+
+window.setAdminCatalogStoreSelectionScope = setAdminCatalogStoreSelectionScope;
+window.loadScopedAdminCatalog = () => loadAdminCatalog(true);
 
 function renderCatalogLoading() {
     const list = document.getElementById("adminCatalogProducts");
@@ -193,7 +209,7 @@ function renderCatalogProductRow(product) {
     const publicState = String(product.publicState || "HIDDEN").toUpperCase();
     const statusKey = deleted ? "deleted" : (!product.enabled ? "inactive" : publicState === "AVAILABLE" ? "purchasable" : publicState === "COMING_SOON" ? "needs_setup" : "hidden");
     const statusText = deleted ? "Deleted" : (!product.enabled ? "Disabled" : publicState === "AVAILABLE" ? "Purchasable" : publicState === "COMING_SOON" ? "Needs Setup" : "Hidden");
-    const market = marketLabel(product.market, product.displayMarketLabel);
+    const market = marketLabel(product.canonicalMarket || product.market, product.displayMarketLabel);
 
     return `
         <button class="catalog-product-row ${active} ${deleted ? "is-deleted" : ""}" type="button"
@@ -202,7 +218,7 @@ function renderCatalogProductRow(product) {
             data-category="${escapeHtml(product.adminCategory || "")}">
             <span class="catalog-product-row-title">
                 <strong>${escapeHtml(product.name)}</strong>
-                <small>${escapeHtml(market)}</small>
+                <small>Canonical Market: ${escapeHtml(market)}</small>
             </span>
             <span class="catalog-row-meta">
                 <b>${adminT(statusKey, statusText)}</b>
@@ -270,7 +286,7 @@ async function selectCatalogProduct(productCode, rerenderList = true) {
 
     let data;
     try {
-        data = await adminFetch(`/api/admin/catalog/products/${encodeURIComponent(selectedCatalogProductCode)}`, {
+        data = await adminFetch(`/api/admin/catalog/products/${encodeURIComponent(selectedCatalogProductCode)}?customerMarket=${encodeURIComponent(catalogCustomerMarket)}`, {
             signal: requestController.signal
         });
     } catch (error) {
@@ -407,6 +423,9 @@ function renderCatalogTabPanel(product, packages) {
     const publicReadiness = product.publicReadiness || { state: "HIDDEN", blockers: ["readiness unavailable"], warnings: [] };
 
     if (activeCatalogTab === "packages") {
+        const productionMarkets = [...new Set(packages.map(item => item.productionAttribution?.supplierMarket).filter(Boolean))].sort();
+        if (catalogSupplierMarketFilter && !productionMarkets.includes(catalogSupplierMarketFilter)) catalogSupplierMarketFilter = "";
+        const scopedPackages = filterPackages(packages).filter(item => !catalogSupplierMarketFilter || item.productionAttribution?.supplierMarket === catalogSupplierMarketFilter);
         return `
             <div class="catalog-package-table-wrap">
                 <div class="panel-head catalog-package-head">
@@ -418,6 +437,8 @@ function renderCatalogTabPanel(product, packages) {
                 </div>
                 <div class="catalog-package-toolbar">
                     <input type="search" data-package-search value="${escapeHtml(catalogPackageSearch)}" placeholder="Search packages">
+                    <select data-customer-market-filter><option value="TH" ${catalogCustomerMarket === "TH" ? "selected" : ""}>Customer market: Thailand</option><option value="MM" ${catalogCustomerMarket === "MM" ? "selected" : ""}>Customer market: Myanmar</option></select>
+                    <select data-supplier-market-filter><option value="">All active supplier markets</option>${productionMarkets.map(market => `<option value="${escapeHtml(market)}" ${catalogSupplierMarketFilter === market ? "selected" : ""}>Supplier market: ${escapeHtml(market)}</option>`).join("")}</select>
                     <select data-package-status-filter>
                         <option value="all" ${catalogPackageStatusFilter === "all" ? "selected" : ""}>All</option>
                         <option value="enabled" ${catalogPackageStatusFilter === "enabled" ? "selected" : ""}>Enabled</option>
@@ -425,7 +446,7 @@ function renderCatalogTabPanel(product, packages) {
                         <option value="deleted" ${catalogPackageStatusFilter === "deleted" ? "selected" : ""}>Deleted</option>
                     </select>
                 </div>
-                ${renderPackageTable(filterPackages(packages))}
+                ${renderPackageTable(scopedPackages)}
             </div>
         `;
     }
@@ -470,7 +491,7 @@ function renderCatalogTabPanel(product, packages) {
                     <dl>
                         ${detailDefinition("status", productDeleted ? "Deleted" : (product.enabled ? "Enabled" : "Disabled"))}
                         ${detailDefinition("commerce_state", product.commerceState || "HIDDEN")}
-                        ${detailDefinition("market", marketLabel(product.market, product.displayMarketLabel))}
+                        ${detailDefinition("canonical_market", marketLabel(product.canonicalMarket || product.market, product.displayMarketLabel))}
                         ${detailDefinition("platform", product.platform || "-")}
                         ${detailDefinition("supported_regions", formatRegions(product.supportedRegions))}
                         ${detailDefinition("package_count", Number(product.packageCount || packages.length))}
@@ -542,7 +563,7 @@ function renderCatalogTabPanel(product, packages) {
                     ${detailDefinition("category", product.adminCategory || product.operationalCategory || "-")}
                     ${detailDefinition("family", product.family || "-")}
                     ${detailDefinition("platform", product.platform || "-")}
-                    ${detailDefinition("market", marketLabel(product.market, product.displayMarketLabel))}
+                    ${detailDefinition("canonical_market", marketLabel(product.canonicalMarket || product.market, product.displayMarketLabel))}
                     ${detailDefinition("status", productDeleted ? "Deleted" : (product.enabled ? "Enabled" : "Disabled"))}
                 </dl>
             </article>
@@ -567,6 +588,11 @@ function renderCatalogTabPanel(product, packages) {
                 <p>Canonical route is read-only for canonical products.</p>
                 <dl>
                     ${detailDefinition("active_runtime_source", catalogActiveSource || "-")}
+                    ${detailDefinition("customer_markets_currently_attributed", (product.productionSummary?.customerMarkets || []).join(", ") || "None")}
+                    ${detailDefinition("production_suppliers", (product.productionSummary?.productionSuppliers || []).join(", ") || "Unresolved")}
+                    ${detailDefinition("production_supplier_markets", (product.productionSummary?.productionSupplierMarkets || []).join(", ") || "Unresolved")}
+                    ${detailDefinition("selling_packages", Number(product.productionSummary?.sellingPackageCount || 0))}
+                    ${detailDefinition("unresolved_public_routes", (product.productionSummary?.unresolvedPackageCodes || []).join(", ") || "None")}
                 </dl>
             </article>
         </section>
@@ -1017,6 +1043,16 @@ function bindActiveCatalogTab(detail, product, packages) {
             catalogPackageStatusFilter = event.target.value || "all";
             renderCatalogDetail(product);
         });
+        detail.querySelector("[data-customer-market-filter]")?.addEventListener("change", event => {
+            catalogCustomerMarket = ["TH", "MM"].includes(event.target.value) ? event.target.value : "TH";
+            catalogSupplierMarketFilter = "";
+            sessionStorage.setItem("aziel.catalog.customerMarket", catalogCustomerMarket);
+            selectCatalogProduct(product.productCode, false);
+        });
+        detail.querySelector("[data-supplier-market-filter]")?.addEventListener("change", event => {
+            catalogSupplierMarketFilter = String(event.target.value || "").toUpperCase();
+            renderCatalogDetail(product);
+        });
         detail.querySelector("[data-bulk-supplier-cost]")?.addEventListener("click", () => {
             openBulkSupplierCostPanel(product, packages);
         });
@@ -1266,7 +1302,7 @@ function renderPackageTable(packages) {
                 <span>Order</span>
                 <span data-admin-i18n="package_code">${adminT("package_code", "Package Code")}</span>
                 <span data-admin-i18n="package_name">${adminT("package_name", "Package Name")}</span>
-                <span>Family / Group</span>
+                <span>Production Attribution</span>
                 <span data-admin-i18n="package_icon">${adminT("package_icon", "Package Icon")}</span>
                 <span data-admin-i18n="mmk_price">${adminT("mmk_price", "MMK Price")}</span>
                 <span data-admin-i18n="thb_price">${adminT("thb_price", "THB Price")}</span>
@@ -1284,7 +1320,7 @@ function renderPackageTable(packages) {
                     </span>
                     <span><b>${escapeHtml(item.packageCode)}</b></span>
                     <span>${escapeHtml(item.name)}${item.supplierSupport?.TH ? `<small><b class="admin-status-pill ${item.supplierSupport.TH.status === "SUPPORTED" ? "is-ok" : item.supplierSupport.TH.status === "NOT_READY" ? "is-warning" : "is-muted"}">${escapeHtml(item.supplierSupport.TH.status === "SUPPORTED" ? "SUPPORTED" : item.supplierSupport.TH.status === "NOT_READY" ? "NOT READY" : "UNSUPPORTED")}</b></small>` : ""}</span>
-                    <span><b>${escapeHtml(item.packageFamily?.name || "Other / Special")}</b><small>${escapeHtml(item.packageFamily?.code || "OTHER_SPECIAL")}</small></span>
+                    <span>${renderProductionAttribution(item.productionAttribution)}</span>
                     <span class="catalog-icon-cell">${renderPackageIconControl(item)}</span>
                     <span>${renderPackageBusinessPrice(item.prices?.MM, "MM")}</span>
                     <span>${renderPackageBusinessPrice(item.prices?.TH, "TH")}</span>
@@ -1321,6 +1357,15 @@ function renderPackageTable(packages) {
     }).join("")}
         </div>
     `;
+}
+
+function renderProductionAttribution(attribution) {
+    if (!attribution) return '<b class="admin-status-pill is-muted">MASTER CATALOG</b><small>No selling attribution projected</small>';
+    const statusClass = attribution.status === "SELLING" ? "is-ok" : attribution.status === "PRODUCTION_SUPPLIER_MARKET_UNRESOLVED" ? "is-danger" : attribution.publication?.published ? "is-warning" : "is-muted";
+    const supplier = attribution.supplier?.name || attribution.supplier?.code || "Unresolved";
+    const sku = attribution.supplierPackageCode || "-";
+    const price = attribution.publishedPrice ? `${attribution.publishedPrice.amount} ${attribution.publishedPrice.currency}` : "No published price";
+    return `<b class="admin-status-pill ${statusClass}">${escapeHtml(attribution.status)}</b><small>Customer: ${escapeHtml(attribution.customerMarket)} · Published: ${attribution.publication?.published ? "Yes" : "No"}</small><small>Supplier: ${escapeHtml(supplier)} · Market: ${escapeHtml(attribution.supplierMarket || "UNRESOLVED")}</small><small>SKU: ${escapeHtml(sku)} · Route: ${escapeHtml(attribution.productionRole || "-")} · ${escapeHtml(price)}</small>`;
 }
 
 function regionalControlId(region, suffix) {
@@ -2362,6 +2407,14 @@ function openPackageEditPanel(product, pkg) {
     modal.dataset.iconCleared = draft?.iconCleared ? "true" : "";
     modal.querySelector("#catalogEditIconLabel").textContent = draft?.iconLabel || pkg.iconAsset?.name || pkg.iconUrl || adminT("fallback_static_asset", "Static fallback asset");
     modal.querySelector("#catalogEditSupplierMapping").value = formatSupplierMapping(pkg);
+    const publication = pkg.publication || { published: false, state: "PRIVATE", suppressionReasons: [], missing: true };
+    const publicationToggle = modal.querySelector("#catalogEditTHPublication");
+    publicationToggle.checked = publication.published === true;
+    modal.querySelector("#catalogEditTHPublicationState").textContent = publication.state === "SUPPRESSED"
+        ? `Published but Suppressed · ${(publication.suppressionReasons || []).join(", ") || "Operational safety gate"}`
+        : publication.published ? "Published" : "Private";
+    modal.querySelector("#catalogEditTHPublicationNote").value = publication.decisionNote || "";
+    publicationToggle.onchange = () => updatePackagePublication(product, pkg, publicationToggle.checked);
     mmEnabled.checked = draft?.regionEnabled?.MM ?? Boolean(pkg.prices?.MM);
     thEnabled.checked = draft?.regionEnabled?.TH ?? Boolean(pkg.prices?.TH);
     mmInput.value = draft?.values?.MM ?? pkg.prices?.MM?.amount ?? "";
@@ -2401,6 +2454,35 @@ function openPackageEditPanel(product, pkg) {
     };
     modal.querySelector("#catalogEditCancel").onclick = () => abandonPackageEditDraft();
     modal.querySelector("#catalogEditSave").onclick = () => handlePackageEditSave(product, pkg);
+}
+
+async function updatePackagePublication(product, pkg, published) {
+    const modal = document.getElementById("catalogPackageEditModal");
+    const toggle = modal?.querySelector("#catalogEditTHPublication");
+    const previous = pkg.publication?.published === true;
+    const confirmed = await confirmCatalogAction({
+        title: published ? "Publish package for Thailand?" : "Unpublish package for Thailand?",
+        message: `${pkg.packageCode} · ${pkg.name}\nThis changes publication intent only. Pricing, supplier mappings, eligibility and fulfillment roles will not change.`,
+        confirmText: published ? "Publish" : "Unpublish"
+    });
+    if (!confirmed) {
+        if (toggle) toggle.checked = previous;
+        return;
+    }
+    const result = await mutateCatalog(`/api/admin/catalog/products/${encodeURIComponent(product.productCode)}/packages/${encodeURIComponent(pkg.packageCode)}/publication`, {
+        customerMarket: "TH",
+        published,
+        decisionNote: modal?.querySelector("#catalogEditTHPublicationNote")?.value || ""
+    });
+    if (!result?.success) {
+        if (toggle) toggle.checked = previous;
+        return;
+    }
+    selectedCatalogProduct = result.product || selectedCatalogProduct;
+    const updated = result.package || pkg;
+    if (modal?.classList.contains("show")) openPackageEditPanel(result.product || product, updated);
+    renderCatalogDetail(selectedCatalogProduct);
+    showAdminToast?.(published ? "Package published for Thailand" : "Package unpublished for Thailand", "success");
 }
 
 async function handlePackageEditSave(product, pkg) {
@@ -2822,6 +2904,21 @@ function ensurePackageEditModal() {
             </header>
 
             <div class="catalog-package-editor-scroll">
+                <section class="catalog-editor-section">
+                    <div class="catalog-editor-section-head">
+                        <div>
+                            <span>Publication</span>
+                            <h4>Public Storefront</h4>
+                            <p>Explicit package publication for the Thailand customer market. Operational failures suppress purchasing without changing this decision.</p>
+                        </div>
+                    </div>
+                    <label class="catalog-toggle-row">
+                        <span><b>Thailand · Public Storefront</b><small id="catalogEditTHPublicationState">Private</small></span>
+                        <input id="catalogEditTHPublication" type="checkbox" role="switch">
+                    </label>
+                    <label>Decision note <input id="catalogEditTHPublicationNote" type="text" maxlength="500" placeholder="Optional Admin note"></label>
+                </section>
+
                 <section class="catalog-editor-section">
                     <div class="catalog-editor-section-head">
                         <div>

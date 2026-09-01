@@ -36,6 +36,7 @@
     function renderHomeSections(products, catalogReady) {
         const selection = { groups: [] };
         SECTION_CONFIG.forEach(config => renderSection(config, products, selection, catalogReady));
+        if(catalogReady&&!products.length){const config=SECTION_CONFIG[0],section=document.getElementById(config.id),target=document.getElementById(config.target);if(section&&target){target.innerHTML='<div class="home-catalog-empty"><strong>Products are not available right now.</strong></div>';target.removeAttribute("aria-busy");section.hidden=false;section.dataset.homeSelectionSource="empty-catalog"}}
         lastSelection = selection;
         window.AZIEL_HOME_SELECTION = Object.freeze({ getSnapshot: () => JSON.parse(JSON.stringify(lastSelection)), refresh: scheduleHomeRefresh });
         document.dispatchEvent(new CustomEvent("aziel:home-groups-updated", { detail: JSON.parse(JSON.stringify(selection)) }));

@@ -1,7 +1,7 @@
 const CACHE_PREFIX = "aziel-runtime";
 const CORE_CACHE = `${CACHE_PREFIX}-core-v4`;
 const PAGE_CACHE = `${CACHE_PREFIX}-pages-v1`;
-const CODE_CACHE = `${CACHE_PREFIX}-code-v3-phase4`;
+const CODE_CACHE = `${CACHE_PREFIX}-code-v4-empty-store`;
 const MEDIA_CACHE = `${CACHE_PREFIX}-media-v2-phase4`;
 
 const CORE_ASSETS = [
