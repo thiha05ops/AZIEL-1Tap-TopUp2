@@ -725,7 +725,6 @@ function projectCommerceReadiness(product = {}, packages = [], mappings = [], in
     const supplierById = new Map(suppliers.map(item => [String(item._id), item]));
     const mappingMatches = (item, region) => mappings.some(mapping =>
         mapping.enabled !== false &&
-        mapping.region === region &&
         String(mapping.productCode || "").toLowerCase() === String(product.productCode || "").toLowerCase() &&
         String(mapping.packageCode || "").toUpperCase() === String(item.packageCode || "").toUpperCase() &&
         (!isSupplierMappedAutoTopupThScope({ productCode: product.productCode, region }) || isProductionReadyFulfillmentMapping(mapping, supplierById.get(String(mapping.supplierId)), {
@@ -780,7 +779,7 @@ function applyPackageFulfillmentReadiness(projection, mappings = [], inventorySt
             !unavailablePackageIds.has(String(pkg.packageCode || "").toUpperCase());
         pkg.fulfillmentRegions = Object.fromEntries(["MM", "TH"].map(region => {
             const supplierMappedScope = isSupplierMappedAutoTopupThScope({ productCode: projection.productCode, region });
-            const mapped = mappings.some(mapping => mapping.enabled !== false && mapping.region === region &&
+            const mapped = mappings.some(mapping => mapping.enabled !== false &&
                 String(mapping.productCode || "").toLowerCase() === String(projection.productCode || "").toLowerCase() &&
                 String(mapping.packageCode || "").toUpperCase() === String(pkg.packageCode || "").toUpperCase() &&
                 (!supplierMappedScope || isProductionReadyFulfillmentMapping(mapping, supplierById.get(String(mapping.supplierId)), {
@@ -799,7 +798,6 @@ function applyAdminSupplierSupport(projection, mappings = [], suppliers = [], el
     const supplierById = new Map(suppliers.map(item => [String(item._id), item]));
     projection.packages.forEach(pkg => {
         const exact = mappings.filter(mapping =>
-            String(mapping.region || "").toUpperCase() === "TH" &&
             String(mapping.productCode || "").toLowerCase() === productCode &&
             String(mapping.packageCode || "").toUpperCase() === String(pkg.packageCode || "").toUpperCase() &&
             Boolean(String(mapping.supplierPackageCode || "").trim()) &&
@@ -837,7 +835,7 @@ function applyAdminProductionAttribution(projection, mappings = [], suppliers = 
         const candidates = mappings.filter(mapping => !mapping.archivedAt && mapping.enabled === true && supplierById.has(String(mapping.supplierId)) &&
             String(mapping.productionRole || "").toUpperCase() === "PRIMARY" && String(mapping.executionMode || "").toUpperCase() === "API" &&
             String(mapping.productCode || "").toLowerCase() === String(projection.productCode || "").toLowerCase() &&
-            String(mapping.packageCode || "").toUpperCase() === packageCode && String(mapping.region || "").toUpperCase() === market
+            String(mapping.packageCode || "").toUpperCase() === packageCode
         ).map(mapping => {
             const supplier = supplierById.get(String(mapping.supplierId));
             return { mapping, supplier, assessment: assessProductionReadyFulfillmentMapping(mapping, supplier, { productCode: projection.productCode, packageCode, region: market }) };

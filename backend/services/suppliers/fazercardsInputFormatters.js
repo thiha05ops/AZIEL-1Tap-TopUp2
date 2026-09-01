@@ -55,6 +55,10 @@ function buildFazerCardsValidationFields(productCode, input = {}) {
     return buildFazerCardsOrderFields(product, input);
 }
 
+function hasFazerCardsInputContract(productCode) {
+    return ["mlbb", "freefire", "hok", "valorant", "pubg"].includes(gameFamilyForProduct(productCode).toLowerCase());
+}
+
 const buildFazerCardsFields = buildFazerCardsOrderFields;
 
 function maskFazerCardsFields(fields = {}) {
@@ -62,4 +66,4 @@ function maskFazerCardsFields(fields = {}) {
     return Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, mask(value)]));
 }
 
-module.exports = { buildFazerCardsFields, buildFazerCardsOrderFields, buildFazerCardsValidationFields, maskFazerCardsFields, FazerCardsInputError };
+module.exports = { buildFazerCardsFields, buildFazerCardsOrderFields, buildFazerCardsValidationFields, hasFazerCardsInputContract, maskFazerCardsFields, FazerCardsInputError };

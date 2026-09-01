@@ -790,7 +790,7 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
     }
     if (supplier.supplierCode === "FAZERCARDS") {
         const { validateFazerCardsMapping } = require("./suppliers/fazercardsFulfillmentProcessor");
-        try { validateFazerCardsMapping(mapping); } catch (error) { throw new FulfillmentError(error.code || "FAZERCARDS_PACKAGE_NOT_PRODUCTION_READY", error.message, 409); }
+        try { validateFazerCardsMapping(mapping, { customerMarket }); } catch (error) { throw new FulfillmentError(error.code || "FAZERCARDS_PACKAGE_NOT_PRODUCTION_READY", error.message, 409); }
         if (!adapter.isAutoFulfillmentEnabled(mapping.productCode)) {
             const gate = adapter.autoFulfillmentGateState?.(mapping.productCode);
             throw new FulfillmentError(gate?.blockerCode === "SUPPLIER_AUTO_FULFILLMENT_DISABLED" ? gate.blockerCode : "FAZERCARDS_AUTO_FULFILLMENT_DISABLED", "Live FazerCards fulfillment is disabled.", 409);

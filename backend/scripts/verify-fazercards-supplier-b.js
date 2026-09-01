@@ -43,7 +43,7 @@ async function main() {
     assert.strictEqual(invalidValidation.providerStatus, "INVALID");
     await assert.rejects(() => adapter.submitTopup({ categoryId: "pubg_mobile_auto", offerId: "60_uc", fields: { player_id: "123456789" }, idempotencyKey: "FUL-1", productCode: "pubg" }), error => error.code === "FAZERCARDS_AUTO_FULFILLMENT_DISABLED");
     assert.strictEqual(requests.length, 1, "gate-off submission must make zero transport calls");
-    const mapping = { enabled: true, supplierCode: "FAZERCARDS", productCode: "pubg", region: "TH", executionMode: "API", supplierProductCode: "pubg_mobile_auto", supplierPackageCode: "60_uc", mappingMetadata: { readiness: { supplierMapped: true, inputReady: true, pricingReady: true, fulfillmentReady: true } } };
+    const mapping = { enabled: true, supplierCode: "FAZERCARDS", productCode: "pubg", region: "TH", executionMode: "API", supplierProductCode: "pubg_mobile_auto", supplierPackageCode: "60_uc", fulfillmentEligibility: { mode: "CUSTOMER_MARKET_ALLOWLIST", allowedCustomerMarkets: ["TH"], evidenceCode: "OPERATOR_CONFIRMED_CAPABILITY", evidenceSource: "isolated verifier", verifiedAt: new Date(), version: 1 }, mappingMetadata: { readiness: { supplierMapped: true, inputReady: true, pricingReady: true, fulfillmentReady: true } } };
     assert.strictEqual(validateFazerCardsMapping(mapping), mapping);
     [
         ["mlbb", "mobile_legends_global"], ["freefire", "free_fire_th"], ["hok", "honor_of_kings"], ["valorant", "valorant_th"]

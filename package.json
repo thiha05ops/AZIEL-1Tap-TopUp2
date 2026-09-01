@@ -42,6 +42,7 @@
     "verify:supplier-catalog-zero-side-effects": "node backend/scripts/verify-supplier-catalog-zero-side-effects.js",
     "verify:admin-supplier-catalog-read-model": "node backend/scripts/verify-admin-supplier-catalog-read-model.js",
     "verify:admin-product-activation": "node backend/scripts/verify-admin-product-activation.js",
+    "verify:first-sellable-store-package": "node backend/scripts/verify-first-sellable-store-package.js",
     "verify:admin-product-activation-performance": "node backend/scripts/verify-admin-product-activation-performance.js",
     "verify:supplier-cost-coverage": "node backend/scripts/verify-supplier-cost-coverage.js",
     "verify:admin-region-first-scoping": "node backend/scripts/verify-admin-region-first-scoping.js",

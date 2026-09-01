@@ -77,6 +77,7 @@ const ADMIN_AUDIT_ACTIONS = Object.freeze({
     STORE_CATALOG_SELECTION_SAVED: "STORE_CATALOG_SELECTION_SAVED",
     STORE_CATALOG_PACKAGE_REMOVED: "STORE_CATALOG_PACKAGE_REMOVED",
     STORE_CATALOG_REGION_VISIBILITY_CHANGED: "STORE_CATALOG_REGION_VISIBILITY_CHANGED",
+    STORE_PACKAGE_ACTIVATED: "STORE_PACKAGE_ACTIVATED",
     FULFILLMENT_STARTED: "FULFILLMENT_STARTED",
     FULFILLMENT_SUCCEEDED: "FULFILLMENT_SUCCEEDED",
     FULFILLMENT_FAILED: "FULFILLMENT_FAILED",
@@ -122,11 +123,12 @@ async function writeAdminAudit({
     resourceType = "",
     resourceId = "",
     targetAdminId = null,
-    metadata = {}
+    metadata = {},
+    session = null
 } = {}) {
     if (!action) return null;
 
-    return AdminAuditLog.create({
+    const document = {
         ...actorSnapshot(actor || req?.admin || {}),
         action,
         resourceType,
@@ -136,7 +138,9 @@ async function writeAdminAudit({
         route: req?.originalUrl || "",
         method: req?.method || "",
         metadata: sanitizeAuditMetadata(metadata)
-    });
+    };
+    if (session) return (await AdminAuditLog.create([document], { session }))[0];
+    return AdminAuditLog.create(document);
 }
 
 async function listAdminAuditLogs(query = {}) {

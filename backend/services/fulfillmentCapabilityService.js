@@ -44,7 +44,6 @@ function assessProductionReadyFulfillmentMapping(mapping = {}, supplier = {}, co
     if (mapping.archivedAt) blockers.push("MAPPING_ARCHIVED");
     if (String(mapping.productCode || "").trim().toLowerCase() !== productCode ||
         String(mapping.packageCode || "").trim().toUpperCase() !== packageCode) blockers.push("EXACT_MAPPING_MISMATCH");
-    if (normalizeRegion(mapping.region) !== region) blockers.push("MAPPING_REGION_MISMATCH");
     if (!String(mapping.supplierProductCode || "").trim() || !String(mapping.supplierPackageCode || "").trim()) blockers.push("EXACT_MAPPING_INCOMPLETE");
     if (String(mapping.executionMode || "").trim().toUpperCase() !== "API") blockers.push("MAPPING_EXECUTION_NOT_API");
     if (String(mapping.productionRole || "").trim().toUpperCase() !== "PRIMARY") blockers.push("MAPPING_NOT_PRIMARY");
@@ -80,7 +79,7 @@ function eligibleMappingsForPackage({ mappings = [], suppliers = [], productCode
         if (!supplier || mapping.enabled === false) return [];
         if (String(mapping.productCode || "").toLowerCase() !== normalizedProduct) return [];
         if (String(mapping.packageCode || "").toUpperCase() !== normalizedPackage) return [];
-        if (normalizeRegion(mapping.region) !== normalizedRegion) return [];
+        if (!isCustomerMarketEligible(mapping.fulfillmentEligibility, normalizedRegion)) return [];
         if (Array.isArray(supplier.supportedRegions) && supplier.supportedRegions.length && !supplier.supportedRegions.includes(normalizedRegion)) return [];
         if (isSupplierMappedAutoTopupThScope({ productCode: normalizedProduct, region: normalizedRegion }) && !isProductionReadyFulfillmentMapping(mapping, supplier, {
             productCode: normalizedProduct,

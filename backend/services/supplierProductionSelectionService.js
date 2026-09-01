@@ -156,8 +156,16 @@ function createRoutingAuthority({ legacyResolver = resolveLegacyCheckoutRouteSna
     return async function route({ productCode, packageCode, region, includeDiagnostics = false }) {
         const routingMode = modeResolver();
         const legacy = await legacyResolver({ productCode, packageCode, region });
-        if (routingMode === FULFILLMENT_ROUTING_MODES.LEGACY_REGION) return legacy;
+        if (routingMode === FULFILLMENT_ROUTING_MODES.LEGACY_REGION && legacy.ready) return legacy;
         const shadow = await eligibilityResolver({ productCode, packageCode, customerMarket: region });
+        // Compatibility convergence: a supplier-account market (for example GLOBAL)
+        // is not a customer market. When the legacy region route has no route, an
+        // explicitly eligible, enabled PRIMARY is authoritative and remains fail-closed.
+        if (routingMode === FULFILLMENT_ROUTING_MODES.LEGACY_REGION) {
+            if (shadow.outcome !== ELIGIBILITY_OUTCOMES.ELIGIBLE) return legacy;
+            const result = { ready: true, blockers: [], routeSnapshot: pilotV2Snapshot(shadow, region) };
+            return includeDiagnostics ? { ...result, diagnostics: Object.freeze({ scopedEligibilityFallback: true }) } : result;
+        }
         const comparison = compareRoutingDecisions({ legacy, shadow });
         const diagnostics = Object.freeze({
             productCode: clean(productCode).toLowerCase(),
