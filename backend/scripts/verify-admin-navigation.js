@@ -22,19 +22,15 @@ const packageJson = read("package.json");
 
 const expectedModules = [
     ["dashboard", "DASHBOARD_READ"],
-    ["website", "SITE_CONTENT_READ"],
+    ["products", "CATALOG_READ"],
     ["orders", "ORDERS_READ"],
     ["wallet", "WALLET_READ"],
     ["fulfillment", "SUPPLIERS_READ,FULFILLMENT_READ"],
     ["support", "SUPPORT_READ"],
-    ["chat", "LIVE_CHAT_READ"],
     ["catalog", "CATALOG_READ"],
-    ["promos", "PROMOS_READ"],
     ["media", "MEDIA_READ"],
-    ["site-content", "SITE_CONTENT_READ"],
     ["campaigns", "CAMPAIGNS_READ"],
     ["users", "USERS_READ"],
-    ["broadcast", "SETTINGS_MANAGE"],
     ["payments", "PAYMENT_METHODS_READ,PAYMENT_METHODS_MANAGE"],
     ["settings", "SETTINGS_MANAGE"]
 ];
@@ -46,9 +42,11 @@ expectedModules.forEach(([section, permission]) => {
 });
 
 assertIncludes(html, `data-section="admin-security"`, "Admin Team nav item must exist.");
+assertIncludes(html, `data-section="advanced-settings"`, "Advanced Settings nav item must exist.");
+["chat", "promos", "site-content", "broadcast", "supplier-catalog", "pricing-settings"].forEach(section => assertIncludes(html, `id="section-${section}"`, `Advanced deep link ${section} must remain resolvable.`));
+assertIncludes(html, `id="section-website"`, "Legacy Website deep link must remain resolvable.");
 assertIncludes(html, `data-admin-permission="ADMIN_ACCOUNTS_READ,ADMIN_SESSIONS_READ,AUDIT_LOG_READ"`, "Admin Security RBAC group marker must remain.");
-assertIncludes(html, `href="/admin-design-studio.html"`, "Design Studio must remain a direct route.");
-assertIncludes(html, `data-admin-permission="DESIGN_STUDIO_READ"`, "Design Studio RBAC marker must remain.");
+assertIncludes(app, "products:", "Products must be a first-class operator destination.");
 
 [
     "Home",
@@ -56,7 +54,6 @@ assertIncludes(html, `data-admin-permission="DESIGN_STUDIO_READ"`, "Design Studi
     "Commerce",
     "Operations",
     "Customers",
-    "Administration",
     "System"
 ].forEach(group => assertIncludes(html, group, `Navigation group ${group} must exist.`));
 

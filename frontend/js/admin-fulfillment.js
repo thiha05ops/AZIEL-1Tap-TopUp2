@@ -5,13 +5,13 @@ let fulfillmentSuppliers = [];
 let fulfillmentMappings = [];
 let fulfillmentProducts = [];
 let fulfillmentAttempts = [];
-let selectedFulfillmentView = "suppliers";
+let selectedFulfillmentView = "attempts";
 let fulfillmentInitialized = false;
 let fulfillmentLastFocused = null;
 const FULFILLMENT_REGIONS = Object.freeze(["MM", "TH"]);
 const SUPPLIER_CODE_PATTERN = /^[A-Z0-9_-]{2,40}$/;
 const fulfillmentState = {
-    activeView: "suppliers",
+    activeView: "attempts",
     loading: {
         suppliers: false,
         mappings: false,
@@ -84,7 +84,11 @@ function initAdminFulfillmentController() {
     syncFulfillmentViewVisibility();
 
     window.addEventListener("aziel:admin-section-opened", event => {
-        if (event.detail?.section === "fulfillment") loadFulfillmentData({ view: fulfillmentState.activeView });
+        if (event.detail?.section === "fulfillment") {
+            const view = event.detail?.context?.view === "advanced" ? "suppliers" : "attempts";
+            if (view !== fulfillmentState.activeView) openFulfillmentView(view);
+            else loadFulfillmentData({ view });
+        }
     });
     window.addEventListener("aziel:admin-locale-changed", () => {
         renderSuppliers();

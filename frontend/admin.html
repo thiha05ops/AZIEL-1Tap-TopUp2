@@ -37,6 +37,10 @@
     <link rel="stylesheet" href="/css/admin/admin-support.css?v=20260706-2">
     <link rel="stylesheet" href="/css/admin/admin-live-chat.css?v=20260824-mobile-boundary">
     <link rel="stylesheet" href="/css/admin/admin-design-system.css?v=20260829-supplier-operations">
+    <link rel="stylesheet" href="/css/admin/admin-supplier-catalog.css?v=20260830-phase2f">
+    <link rel="stylesheet" href="/css/admin/admin-operator-workflows.css?v=20260901-operator-first">
+    <link rel="stylesheet" href="/css/admin/admin-guided-selling.css?v=20260901-guided-selling">
+    <link rel="stylesheet" href="/css/admin/admin-business-first.css?v=20260901-business-first">
     <link rel="stylesheet" href="/css/admin/admin-os-brand.css?v=20260827-brand">
     <!-- Global responsive shell owner: phone <768px, tablet 768-1023px, desktop >=1024px. -->
     <link rel="stylesheet" href="/css/admin/admin-mobile-shell.css?v=20260824-phase2-desktop-repair">
@@ -99,68 +103,19 @@
                     </div>
 
                     <div class="admin-nav-group">
-                        <span class="admin-nav-label">Growth</span>
-
-                        <button class="admin-nav" data-section="campaigns" type="button"
-                            data-admin-permission="CAMPAIGNS_READ">
-                            <i class="fa-solid fa-bullseye"></i>
-                            <span data-admin-i18n="campaigns">Campaigns</span>
-                        </button>
-                        <button class="admin-nav" data-section="promos" type="button"
-                            data-admin-permission="PROMOS_READ">
-                            <i class="fa-solid fa-ticket"></i>
-                            <span data-admin-i18n="promo_codes">Promo Codes</span>
-                        </button>
-                        <button class="admin-nav" data-section="site-content" type="button"
-                            data-admin-permission="SITE_CONTENT_READ">
-                            <i class="fa-solid fa-images"></i>
-                            <span data-admin-i18n="home_banners">Home Banners</span>
-                        </button>
-                        <button class="admin-nav" data-section="website" type="button"
-                            data-admin-permission="SITE_CONTENT_READ">
-                            <i class="fa-solid fa-globe"></i>
-                            <span>Game Banners</span>
-                        </button>
-                        <button class="admin-nav" data-section="media" type="button" data-admin-permission="MEDIA_READ">
-                            <i class="fa-solid fa-photo-film"></i>
-                            <span data-admin-i18n="media_library">Media Library</span>
-                        </button>
-                        <a class="admin-nav admin-design-studio-link" href="/admin-design-studio.html"
-                            data-admin-permission="DESIGN_STUDIO_READ">
-                            <i class="fa-solid fa-palette"></i>
-                            <span data-admin-i18n="design_studio">Design Studio</span>
-                        </a>
-                    </div>
-
-                    <div class="admin-nav-group">
                         <span class="admin-nav-label" data-admin-i18n="commerce">Commerce</span>
-
-                        <button class="admin-nav" data-section="orders" type="button"
-                            data-admin-permission="ORDERS_READ">
-                            <i class="fa-solid fa-box"></i>
-                            <span data-admin-i18n="orders">Orders</span>
-                        </button>
-
-                        <button class="admin-nav" data-section="catalog" type="button"
+                        <button class="admin-nav" data-section="products" type="button"
                             data-admin-permission="CATALOG_READ">
                             <i class="fa-solid fa-layer-group"></i>
-                            <span data-admin-i18n="catalog">Catalog</span>
+                            <span>Products</span>
                         </button>
-
+                        <button class="admin-nav" data-section="orders" type="button" data-admin-permission="ORDERS_READ">
+                            <i class="fa-solid fa-box"></i><span data-admin-i18n="orders">Orders</span>
+                        </button>
                         <button class="admin-nav" data-section="pricing-engine" type="button"
                             data-admin-permission="CATALOG_READ">
                             <i class="fa-solid fa-scale-balanced"></i>
-                            <span>Daily Pricing</span>
-                        </button>
-                        <button class="admin-nav" data-section="pricing-settings" type="button"
-                            data-admin-permission="CATALOG_MANAGE">
-                            <i class="fa-solid fa-sliders"></i>
-                            <span>Pricing Settings</span>
-                        </button>
-                        <button class="admin-nav" data-section="wallet" type="button"
-                            data-admin-permission="WALLET_READ">
-                            <i class="fa-solid fa-wallet"></i>
-                            <span data-admin-i18n="wallet">Wallet</span>
+                            <span>Pricing</span>
                         </button>
                     </div>
 
@@ -174,8 +129,18 @@
                         <button class="admin-nav" data-section="payments" type="button"
                             data-admin-permission="PAYMENT_METHODS_READ,PAYMENT_METHODS_MANAGE">
                             <i class="fa-solid fa-credit-card"></i>
-                            <span data-admin-i18n="payment_methods">Payment Methods</span>
+                            <span>Payments</span>
                         </button>
+                        <button class="admin-nav" data-section="wallet" type="button" data-admin-permission="WALLET_READ">
+                            <i class="fa-solid fa-wallet"></i><span data-admin-i18n="wallet">Wallet</span>
+                        </button>
+                    </div>
+
+                    <div class="admin-nav-group">
+                        <span class="admin-nav-label">Growth</span>
+                        <button class="admin-nav" data-section="campaigns" type="button" data-admin-permission="CAMPAIGNS_READ"><i class="fa-solid fa-bullseye"></i><span>Promotions</span></button>
+                        <button class="admin-nav" data-section="catalog" type="button" data-admin-permission="CATALOG_READ"><i class="fa-solid fa-store"></i><span>Storefront</span></button>
+                        <button class="admin-nav" data-section="media" type="button" data-admin-permission="MEDIA_READ"><i class="fa-solid fa-photo-film"></i><span>Media</span></button>
                     </div>
 
                     <div class="admin-nav-group">
@@ -183,44 +148,25 @@
 
                         <button class="admin-nav" data-section="users" type="button" data-admin-permission="USERS_READ">
                             <i class="fa-solid fa-users"></i>
-                            <span data-admin-i18n="users">Users</span>
+                            <span>Customers</span>
                         </button>
 
-                        <button class="admin-nav" data-section="broadcast" type="button"
-                            data-admin-permission="SETTINGS_MANAGE">
-                            <i class="fa-solid fa-bullhorn"></i>
-                            <span data-admin-i18n="broadcast">Broadcast</span>
-                        </button>
                         <button class="admin-nav" data-section="support" type="button"
                             data-admin-permission="SUPPORT_READ">
                             <i class="fa-solid fa-headset"></i>
                             <span data-admin-i18n="support">Support</span>
                         </button>
-                        <button class="admin-nav" data-section="chat" type="button"
-                            data-admin-permission="LIVE_CHAT_READ">
-                            <i class="fa-solid fa-comments"></i>
-                            <span data-admin-i18n="live_chat">Live Chat</span>
-                        </button>
-                    </div>
-
-                    <div class="admin-nav-group"
-                        data-admin-permission="ADMIN_ACCOUNTS_READ,ADMIN_SESSIONS_READ,AUDIT_LOG_READ">
-                        <span class="admin-nav-label">Administration</span>
-
-                        <button class="admin-nav" data-section="admin-security" type="button">
-                            <i class="fa-solid fa-user-shield"></i>
-                            <span data-admin-i18n="admin_team">Admin Team</span>
-                        </button>
                     </div>
 
                     <div class="admin-nav-group">
                         <span class="admin-nav-label">System</span>
-
+                        <button class="admin-nav" data-section="admin-security" type="button" data-admin-permission="ADMIN_ACCOUNTS_READ,ADMIN_SESSIONS_READ,AUDIT_LOG_READ"><i class="fa-solid fa-user-shield"></i><span>Team</span></button>
                         <button class="admin-nav" data-section="settings" type="button"
                             data-admin-permission="SETTINGS_MANAGE">
                             <i class="fa-solid fa-gear"></i>
-                            <span data-admin-i18n="site_settings">Site Settings</span>
+                            <span>Settings</span>
                         </button>
+                        <button class="admin-nav" data-section="advanced-settings" type="button" data-admin-permission="SETTINGS_MANAGE,SUPPLIERS_READ,CATALOG_MANAGE"><i class="fa-solid fa-screwdriver-wrench"></i><span>Advanced Settings</span></button>
                     </div>
 
                 </nav>
@@ -377,10 +323,10 @@
                     <section class="dashboard-operations-section" aria-labelledby="dashboardSupplierOperationsTitle">
                         <div class="dashboard-section-heading">
                             <div>
-                                <h2 id="dashboardSupplierOperationsTitle">Supplier Operations</h2>
-                                <p>Live supplier balances and package evidence. These snapshots are independent of the reporting period.</p>
+                                <h2 id="dashboardSupplierOperationsTitle">Supplier Health</h2>
+                                <p>Balances and provider health that may affect selling today.</p>
                             </div>
-                            <button id="dashboardSupplierRefresh" class="admin-secondary-btn" type="button">Refresh suppliers</button>
+                            <div class="business-inline-actions"><button type="button" class="admin-secondary-btn" data-admin-open-section="advanced-settings">Advanced supplier details</button><button id="dashboardSupplierRefresh" class="admin-secondary-btn" type="button">Refresh</button></div>
                         </div>
                         <div id="dashboardSupplierBalances" class="dashboard-supplier-balance-grid" aria-live="polite"></div>
                         <div class="dashboard-supplier-detail-grid">
@@ -635,13 +581,42 @@
                 </div>
             </section>
 
+            <section class="admin-section" id="section-products">
+                <div class="supplier-catalog-shell operator-products-shell" aria-label="Products workspace">
+                    <header class="supplier-catalog-head">
+                        <div><span class="admin-status-pill">Commerce</span><h2>Products</h2><p>Prepare what AZIEL sells, understand blockers, and follow the next safe action.</p></div>
+                        <button id="activationPrepare" class="admin-primary-btn" type="button"><i class="fa-solid fa-wand-magic-sparkles"></i> Prepare for Sale</button>
+                    </header>
+                    <nav class="operator-workflow-tabs" aria-label="Product workflow">
+                        <button class="active" type="button" aria-current="page">Overview &amp; Packages</button>
+                        <button type="button" data-admin-open-section="pricing-engine">Pricing</button>
+                        <button type="button" data-admin-open-section="fulfillment">Fulfillment</button>
+                        <button type="button" data-admin-open-section="catalog" data-admin-context-view="storefront">Presentation</button>
+                    </nav>
+                    <div class="activation-filters panel operator-filter-bar">
+                        <label><span>Find product</span><input id="activationProductSearch" type="search" placeholder="Search products" autocomplete="off"></label>
+                        <label><span>Customer market</span><select id="activationCustomerMarket"><option value="TH">Thailand (TH)</option><option value="MM">Myanmar (MM)</option></select></label>
+                        <label><span>Supplier market</span><select id="activationSupplierMarket"><option value="">Select a product first</option></select></label>
+                    </div>
+                    <div class="activation-workspace">
+                        <div id="activationProducts" class="panel activation-products" aria-label="Products" aria-live="polite"></div>
+                        <div id="activationPackages" class="panel activation-packages" aria-live="polite"><div class="supplier-catalog-empty">Select a product to see selling readiness, routes, packages, and the next action.</div></div>
+                    </div>
+                    <footer id="guidedSellingActions" class="guided-selling-actions" hidden>
+                        <div><strong id="guidedSellingSelection">0 packages selected</strong><small>Select only the packages you want customers to see.</small></div>
+                        <button id="guidedPauseSelected" class="admin-secondary-btn" type="button" disabled>Pause Selected</button>
+                        <button id="guidedPublishSelected" class="admin-primary-btn" type="button" disabled>Review &amp; Publish Selected</button>
+                    </footer>
+                </div>
+            </section>
+
             <section class="admin-section" id="section-catalog">
                 <div class="catalog-workspace-shell">
                     <div class="catalog-top-tabs" role="tablist" aria-label="Catalog workspace views">
                         <button class="catalog-top-tab active" type="button" role="tab" aria-selected="true"
                             data-catalog-view="products">
                             <i class="fa-solid fa-layer-group"></i>
-                            <span>Products</span>
+                            <span>Product Presentation</span>
                         </button>
                         <button class="catalog-top-tab" type="button" role="tab" aria-selected="false"
                             data-catalog-view="storefront">
@@ -654,9 +629,8 @@
                         <div class="panel catalog-products-panel">
                             <div class="panel-head">
                                 <div>
-                                    <h3 data-admin-i18n="catalog">Catalog</h3>
-                                    <span data-admin-i18n="catalog_readonly_sub">Database-authoritative product
-                                        workspace.</span>
+                                    <h3>Product Presentation</h3>
+                                    <span>Manage merchandising, content, media, and storefront presentation.</span>
                                 </div>
                                 <button id="refreshCatalogBtn" class="admin-secondary-btn" type="button"
                                     data-admin-i18n="refresh">Refresh</button>
@@ -709,12 +683,67 @@
                 </div>
             </section>
 
+            <section class="admin-section" id="section-supplier-catalog">
+                <div class="supplier-catalog-shell" aria-label="Supplier catalog and product activation workspace">
+                    <header class="supplier-catalog-head">
+                        <div><span class="admin-status-pill">Operations</span><h2>Suppliers</h2><p>Review supplier health, cost changes, catalog evidence, and ingestion.</p></div>
+                        <button id="supplierCatalogRefresh" class="admin-secondary-btn" type="button"><i class="fa-solid fa-rotate"></i> Refresh stored data</button>
+                    </header>
+                    <div id="supplierCatalogMetrics" class="supplier-catalog-metrics" aria-live="polite"></div>
+                    <div class="supplier-catalog-tabs" role="tablist">
+                        <button class="active" data-supplier-catalog-tab="overview" type="button">Overview</button>
+                        <button data-supplier-catalog-tab="costs" type="button">Cost Changes</button>
+                        <button data-supplier-catalog-tab="offers" type="button">Catalog</button>
+                        <button data-supplier-catalog-tab="runs" type="button">Ingestion runs</button>
+                        <button data-supplier-catalog-tab="automation" type="button">Automation</button>
+                    </div>
+                    <div data-supplier-catalog-panel="overview">
+                        <div class="supplier-overview-grid">
+                            <button type="button" data-supplier-catalog-open="costs"><i class="fa-solid fa-coins"></i><span><strong>Review cost changes</strong><small>Approve observed supplier-cost changes before pricing uses them.</small></span></button>
+                            <button type="button" data-supplier-catalog-open="offers"><i class="fa-solid fa-boxes-stacked"></i><span><strong>Inspect supplier catalog</strong><small>Open the raw diagnostic offer catalog only when needed.</small></span></button>
+                            <button type="button" data-supplier-catalog-open="runs"><i class="fa-solid fa-clock-rotate-left"></i><span><strong>Check ingestion</strong><small>Review recent sync results and provider evidence.</small></span></button>
+                        </div>
+                    </div>
+                    <div data-supplier-catalog-panel="offers" hidden>
+                        <div class="supplier-catalog-filters">
+                            <label><span>Search</span><input id="supplierCatalogSearch" type="search" placeholder="Provider or canonical identity"></label>
+                            <label><span>Supplier</span><select id="supplierCatalogSupplier"><option value="">All suppliers</option></select></label>
+                            <label><span>Availability</span><select id="supplierCatalogAvailability"><option value="">All</option><option>AVAILABLE</option><option>UNKNOWN</option><option>UNAVAILABLE</option></select></label>
+                            <label><span>Coverage</span><select id="supplierCatalogCoverage"><option value="">All</option><option value="COMPLETE">Complete evidence</option><option value="PARTIAL">Partial / unproven</option></select></label>
+                            <label><span>Target market</span><select id="supplierCatalogMarketCoverage"><option value="">All states</option><option>ELIGIBLE_GLOBAL</option><option>ELIGIBLE_ASIA</option><option>ELIGIBLE_ASIA_COUNTRY</option><option>NON_TARGET_MARKET</option><option>UNKNOWN_MARKET</option><option>UNSUPPORTED</option></select></label>
+                            <label><span>Disposition</span><select id="supplierCatalogDisposition"><option value="">All dispositions</option><option>MAPPED</option><option>REVIEW_REQUIRED</option><option>UNSUPPORTED</option><option>NON_TARGET_MARKET</option></select></label>
+                            <label><span>Reconciliation</span><select id="supplierCatalogReconciliation"><option value="">All states</option><option>EXACT_CANONICAL_MATCH</option><option>SEMANTIC_REVIEW_REQUIRED</option><option>SPECIAL_VARIANT</option><option>NO_CANONICAL_PACKAGE</option></select></label>
+                            <label><span>Mapping</span><select id="supplierCatalogMapped"><option value="">All</option><option value="LINKED">Linked</option><option value="UNLINKED">Unmapped</option></select></label>
+                            <label><span>Publication</span><select id="supplierCatalogPublication"><option value="">All</option><option value="PUBLISHED">Published</option><option value="PRIVATE">Private</option><option value="NOT_APPLICABLE">Not applicable</option></select></label>
+                        </div>
+                        <div class="supplier-catalog-workspace">
+                            <div class="panel"><div id="supplierCatalogList" class="supplier-catalog-list" aria-live="polite"><div class="admin-dashboard-skeleton"></div></div><div id="supplierCatalogPager" class="supplier-catalog-pager"></div></div>
+                            <aside id="supplierCatalogDetail" class="panel supplier-catalog-detail"><div class="supplier-catalog-empty">Select an offer to inspect independent supplier, mapping, readiness, availability, and publication state.</div></aside>
+                        </div>
+                    </div>
+                    <div data-supplier-catalog-panel="costs" hidden>
+                        <div class="activation-filters panel"><label><span>Supplier</span><input id="costCoverageSupplier" list="costCoverageSupplierOptions" placeholder="Search supplier" autocomplete="off"><datalist id="costCoverageSupplierOptions"></datalist></label><label><span>Canonical product</span><input id="costCoverageProduct" list="costCoverageProductOptions" placeholder="Select supplier first" autocomplete="off" disabled><datalist id="costCoverageProductOptions"></datalist></label><label><span>Supplier market</span><input id="costCoverageMarket" list="costCoverageMarketOptions" placeholder="Select product first" autocomplete="off" disabled><datalist id="costCoverageMarketOptions"></datalist></label><label><span>Cost state</span><select id="costCoverageState"><option value="">All cost states</option><option>COST_AUTHORITY_MISSING</option><option>COST_REVIEW_REQUIRED</option><option>COST_AUTHORITY_STALE</option><option>COST_CURRENT</option><option>OBSERVED_COST_MISSING</option></select></label><button id="costCoverageRefresh" class="admin-secondary-btn" disabled>Load exact scope</button></div>
+                        <div id="costCoverageSummary" class="supplier-catalog-metrics"></div><div id="costCoverageRows" class="panel supplier-catalog-list"></div><div class="activation-actions"><button id="costCoverageSelectVisible" class="admin-secondary-btn">Select all visible</button><button id="costCoverageApprove" class="admin-primary-btn" disabled>Review and approve selected</button></div>
+                    </div>
+                    <div data-supplier-catalog-panel="runs" hidden><div id="supplierCatalogRuns" class="supplier-catalog-runs" aria-live="polite"></div></div>
+                    <div data-supplier-catalog-panel="automation" hidden><div id="supplierCatalogAutomation" class="supplier-catalog-runs" aria-live="polite"></div></div>
+                </div>
+            </section>
+
+            <div id="supplierReconciliationModal" class="supplier-reconciliation-modal" hidden role="dialog" aria-modal="true" aria-labelledby="supplierReconciliationTitle">
+                <div class="supplier-reconciliation-card">
+                    <header><div><span class="admin-status-pill">Explicit review</span><h3 id="supplierReconciliationTitle">Supplier reconciliation</h3></div><button type="button" data-reconciliation-close aria-label="Close">×</button></header>
+                    <div id="supplierReconciliationBody"></div>
+                </div>
+            </div>
+            <div id="supplierCostAuthorityModal" class="supplier-reconciliation-modal" hidden role="dialog" aria-modal="true" aria-labelledby="supplierCostAuthorityTitle"><div class="supplier-reconciliation-card"><header><div><span class="admin-status-pill">Source-locked review</span><h3 id="supplierCostAuthorityTitle">Supplier cost authority</h3></div><button type="button" data-cost-authority-close aria-label="Close">×</button></header><div id="supplierCostAuthorityBody"></div></div></div>
+
             <section class="admin-section" id="section-pricing-engine">
                 <div class="pricing-v3-shell" data-pricing-view="daily">
                     <header class="pricing-v3-header">
                         <div><span class="admin-status-pill is-purple">Commerce</span>
-                            <h2>Daily Pricing</h2>
-                            <p>Preview calculated prices, fine-tune selected packages, and publish explicitly.</p>
+                            <h2>Pricing</h2>
+                            <p>Review supplier costs, compare new customer prices, and publish selected changes.</p>
                         </div>
                         <div class="pricing-v3-header-actions"><span id="pricingDailyState"
                                 class="admin-status-pill">Loading</span><button id="pricingPublishBtn"
@@ -722,18 +751,15 @@
                                     aria-hidden="true"></i> Publish Selected (0)</button></div>
                     </header>
                     <div id="pricingDailyBlocking" class="pricing-v3-blocking" role="alert" hidden></div>
+                    <button id="pricingRetryRefresh" class="admin-secondary-btn" type="button" hidden>Retry authoritative refresh</button>
                     <div class="pricing-v3-toolbar">
-                        <label><span>Supplier</span><select id="pricingSupplierSelect">
-                                <option value="">Loading suppliers...</option>
-                            </select></label>
-                        <label><span>Region</span><select id="pricingRegionSelect">
-                                <option value="ALL">All Regions</option>
+                        <label><span>Supplier</span><input id="pricingSupplierSelect" list="pricingSupplierOptions" placeholder="Search supplier" autocomplete="off"><datalist id="pricingSupplierOptions"></datalist></label>
+                        <label><span>Supplier Market</span><input id="pricingSupplierMarketSelect" list="pricingSupplierMarketOptions" placeholder="Search exact market" autocomplete="off"><datalist id="pricingSupplierMarketOptions"></datalist></label>
+                        <label><span>Customer Market</span><select id="pricingRegionSelect">
                                 <option value="TH">Thailand</option>
                                 <option value="MM">Myanmar</option>
                             </select></label>
-                        <label><span>Product</span><select id="pricingProductSelect">
-                                <option value="">Loading products...</option>
-                            </select></label>
+                        <label><span>Product</span><input id="pricingProductSelect" list="pricingProductOptions" placeholder="Search canonical product" autocomplete="off"><datalist id="pricingProductOptions"></datalist></label>
                         <div class="pricing-v3-readonly"><span>Supplier Currency</span><strong
                                 id="pricingSupplierCurrency">-</strong></div>
                         <label class="pricing-v3-search"><span>Packages</span><input id="pricingPackageSearch"
@@ -751,9 +777,9 @@
                                     <th class="pricing-selection-column">Select</th>
                                     <th>Package</th>
                                     <th>Supplier Cost</th>
-                                    <th>Profit</th>
-                                    <th>Thailand</th>
-                                    <th>Myanmar</th>
+                                    <th>Price rule</th>
+                                    <th>Thailand price</th>
+                                    <th>Myanmar price</th>
                                     <th>Status</th>
                                 </tr>
                             </thead>
@@ -934,6 +960,7 @@
 
             <section class="admin-section" id="section-campaigns">
                 <div class="media-library-center">
+                    <nav class="operator-workflow-tabs" aria-label="Promotion tools"><button class="active" type="button">Campaigns</button><button type="button" data-admin-open-section="promos">Promo Codes</button></nav>
                     <div class="panel campaign-manager-panel">
                         <div class="panel-head">
                             <div>
@@ -1316,24 +1343,23 @@
                         <div class="panel-head">
                             <div>
                                 <h3 data-admin-i18n="fulfillment">Fulfillment</h3>
-                                <span data-admin-i18n="fulfillment_sub">Supplier mappings and manual fulfillment
-                                    operations.</span>
+                                <span>Handle fulfillment work first; configuration remains available when needed.</span>
                             </div>
                             <button id="refreshFulfillmentBtn" class="admin-secondary-btn" type="button"
                                 data-admin-i18n="refresh">Refresh</button>
                         </div>
 
                         <div class="admin-security-tabs fulfillment-tabs" role="tablist">
-                            <button class="admin-security-tab active" type="button" data-fulfillment-view="suppliers"
-                                data-admin-permission="SUPPLIERS_READ" data-admin-i18n="suppliers">Suppliers</button>
+                            <button class="admin-security-tab" type="button" data-fulfillment-view="suppliers"
+                                data-admin-permission="SUPPLIERS_READ">Supplier setup</button>
                             <button class="admin-security-tab" type="button" data-fulfillment-view="mappings"
-                                data-admin-permission="SUPPLIERS_READ" data-admin-i18n="mappings">Mappings</button>
-                            <button class="admin-security-tab" type="button" data-fulfillment-view="attempts"
+                                data-admin-permission="SUPPLIERS_READ">Package routes</button>
+                            <button class="admin-security-tab active" type="button" data-fulfillment-view="attempts"
                                 data-admin-permission="FULFILLMENT_READ"
-                                data-admin-i18n="fulfillment_attempts">Fulfillment Attempts</button>
+                                >Needs Action &amp; Processing</button>
                         </div>
 
-                        <div id="fulfillmentSuppliersView" class="fulfillment-view-panel active"
+                        <div id="fulfillmentSuppliersView" class="fulfillment-view-panel"
                             data-fulfillment-panel="suppliers">
                             <div class="fulfillment-form-grid">
                                 <label><span data-admin-i18n="supplier_name">Supplier Name</span><input
@@ -1406,7 +1432,7 @@ TH</textarea></label>
                             <div id="mappingsList" class="fulfillment-list"></div>
                         </div>
 
-                        <div id="fulfillmentAttemptsView" class="fulfillment-view-panel"
+                        <div id="fulfillmentAttemptsView" class="fulfillment-view-panel active"
                             data-fulfillment-panel="attempts">
                             <div class="fulfillment-view-head">
                                 <h4 data-admin-i18n="fulfillment_attempts">Fulfillment Attempts</h4>
@@ -1423,6 +1449,21 @@ TH</textarea></label>
                             </div>
                             <div id="fulfillmentAttemptsList" class="fulfillment-list"></div>
                         </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="admin-section" id="section-advanced-settings">
+                <div class="business-advanced-shell">
+                    <header class="business-page-header"><div><span class="admin-status-pill">System</span><h2>Advanced Settings</h2><p>Technical configuration, diagnostics, and provider operations.</p></div></header>
+                    <div class="business-warning" role="alert"><i class="fa-solid fa-triangle-exclamation"></i><div><strong>Technical settings can affect production behavior.</strong><span>Use normal Products, Pricing, Orders, and Fulfillment workspaces for everyday operations.</span></div></div>
+                    <div class="business-advanced-grid">
+                        <section><h3>Suppliers</h3><p>Provider catalog, cost evidence, ingestion, reconciliation, and mapping diagnostics.</p><button type="button" data-admin-open-section="supplier-catalog">Open Supplier System</button></section>
+                        <section><h3>Pricing System</h3><p>Pricing rules, FX configuration, policy thresholds, and publication diagnostics.</p><button type="button" data-admin-open-section="pricing-settings">Open Pricing Rules</button></section>
+                        <section><h3>Fulfillment System</h3><p>Supplier setup, package routes, execution modes, adapters, and processors.</p><button type="button" data-admin-open-section="fulfillment" data-admin-context-view="advanced">Open Fulfillment Configuration</button></section>
+                        <section><h3>Commerce System</h3><p>Canonical catalog state, storefront sections, publication readiness, and technical identities.</p><button type="button" data-admin-open-section="catalog">Open Commerce Configuration</button></section>
+                        <section><h3>Content System</h3><p>Banners, placements, broadcasts, live chat, and website runtime diagnostics.</p><div class="business-inline-actions"><button type="button" data-admin-open-section="site-content">Banners</button><button type="button" data-admin-open-section="website">Website</button><button type="button" data-admin-open-section="broadcast">Broadcast</button></div></section>
+                        <section><h3>System Health</h3><p>Environment gates, audit references, team access, and technical health.</p><button type="button" data-admin-open-section="settings">Open System Settings</button></section>
                     </div>
                 </div>
             </section>
@@ -1743,6 +1784,30 @@ TH</textarea></label>
     <script src="/js/admin-stats.js?v=20260829-supplier-operations"></script>
     <script src="/js/admin-website-runtime.js?v=20260724-website-runtime"></script>
     <script src="/js/admin-fulfillment.js?v=20260827-owner-routing"></script>
+    <script src="/js/admin-supplier-catalog.js?v=20260831-phase2i"></script>
+    <script src="/js/admin-guided-selling.js?v=20260901-guided-selling"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const market = document.getElementById("activationSupplierMarket");
+            const prepare = document.getElementById("activationPrepare");
+            if (!market || !prepare) return;
+            new MutationObserver(() => {
+                prepare.disabled = !market.value;
+                prepare.textContent = "Prepare for Sale";
+            }).observe(market, { childList: true });
+            const packages = document.getElementById("activationPackages");
+            if (packages) new MutationObserver(() => {
+                const heading = packages.querySelector(".activation-summary h3");
+                if (!heading || heading.classList.contains("guided-market-context")) return;
+                heading.classList.add("guided-market-context");
+                heading.textContent = productActivationState.selectedProduct;
+                const context = document.createElement("small");
+                context.textContent = `Selling to: ${productActivationState.customerMarket} · Supplier market: ${productActivationState.supplierMarket === "GLOBAL" ? "Global" : productActivationState.supplierMarket}`;
+                heading.appendChild(context);
+            }).observe(packages, { childList: true, subtree: true });
+        });
+    </script>
+    <script src="/js/admin-cost-coverage.js?v=20260831-cost-coverage"></script>
 
     <script src="/js/payment-display.js?v=20260718-labels"></script>
     <script src="/js/admin-orders.js?v=20260824-phase2"></script>

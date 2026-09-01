@@ -553,7 +553,9 @@ async function loadSupplierOperations(force = false) {
     const button = document.getElementById("dashboardSupplierRefresh");
     if (button) { button.disabled = true; button.textContent = force ? "Refreshing..." : "Loading..."; }
     try {
-        const data = await adminFetch(`/api/admin/dashboard/supplier-operations${force ? "?refresh=true" : ""}`);
+        const params = new URLSearchParams({ view: "summary" });
+        if (force) params.set("refresh", "true");
+        const data = await adminFetch(`/api/admin/dashboard/supplier-operations?${params}`);
         lastSupplierOperations = Array.isArray(data?.suppliers) ? data.suppliers : [];
         lastSupplierPackageProducts = Array.isArray(data?.products) ? data.products : [];
         renderSupplierOperations();

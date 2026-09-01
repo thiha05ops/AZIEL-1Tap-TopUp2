@@ -29,6 +29,10 @@ const adminSectionTitles = {
         titleKey: "orders",
         subKey: "orders_sub"
     },
+    products: {
+        title: "Products",
+        subtitle: "Manage what AZIEL sells and follow the next safe action."
+    },
     payments: {
         titleKey: "payment_methods",
         subKey: "payment_methods_sub"
@@ -42,8 +46,12 @@ const adminSectionTitles = {
         subKey: "fulfillment_sub"
     },
     catalog: {
-        titleKey: "catalog",
-        subKey: "catalog_sub"
+        title: "Storefront",
+        subtitle: "Manage product presentation, sections, banners, and merchandising."
+    },
+    "supplier-catalog": {
+        title: "Suppliers",
+        subtitle: "Review supplier health, cost changes, catalog evidence, and ingestion."
     },
     "pricing-engine": {
         titleKey: "pricing",
@@ -70,8 +78,8 @@ const adminSectionTitles = {
         subKey: "campaigns_sub"
     },
     users: {
-        titleKey: "users",
-        subKey: "users_sub"
+        title: "Customers",
+        subtitle: "View customer profiles, orders, wallets, activity, and support history."
     },
     support: {
         titleKey: "support",
@@ -88,6 +96,10 @@ const adminSectionTitles = {
     "admin-security": {
         titleKey: "admin_team",
         subKey: "admin_team_sub"
+    },
+    "advanced-settings": {
+        title: "Advanced Settings",
+        subtitle: "Technical configuration and diagnostics for experienced operators."
     },
     settings: {
         titleKey: "site_settings",
@@ -113,6 +125,12 @@ function initAdminNavigation() {
                 window.AZIEL_ADMIN_LAYOUT?.closeDrawer?.();
             }
         });
+    });
+    document.addEventListener("click", event => {
+        const target = event.target.closest("[data-admin-open-section]");
+        if (!target) return;
+        const context = target.dataset.adminContextView ? { view: target.dataset.adminContextView } : {};
+        openAdminSection(target.dataset.adminOpenSection, true, context);
     });
 
     function setDefaultSection() {
@@ -197,6 +215,7 @@ function openAdminSection(sectionName, updateHash = true, context = {}) {
     syncAdminMobileNavigation(sectionName);
 
     document.body.dataset.adminSection = sectionName;
+    document.body.dataset.adminEntry = context.view || "normal";
     document.body.classList.toggle("admin-orders-active", sectionName === "orders");
 
     sections.forEach(section => {
@@ -240,6 +259,7 @@ function openAdminSection(sectionName, updateHash = true, context = {}) {
     window.AZIEL_ADMIN_LAYOUT?.showList?.("orders");
     window.AZIEL_ADMIN_LAYOUT?.showList?.("wallet");
     window.AZIEL_ADMIN_LAYOUT?.showList?.("catalog");
+    window.AZIEL_ADMIN_LAYOUT?.showList?.("supplier-catalog");
     window.AZIEL_ADMIN_LAYOUT?.showList?.("fulfillment");
     window.AZIEL_ADMIN_LAYOUT?.showList?.("users");
 

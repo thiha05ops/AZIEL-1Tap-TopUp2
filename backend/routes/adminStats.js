@@ -808,7 +808,8 @@ router.get("/admin/dashboard/command-center", adminMiddleware, requireAdminPermi
 router.get("/admin/dashboard/supplier-operations", adminMiddleware, requireAdminPermission(PERMISSIONS.DASHBOARD_READ), async (req, res) => {
     try {
         const suppliers = await getSupplierOperations({ force: String(req.query.refresh || "").toLowerCase() === "true" });
-        const products = await getSupplierPackageCoverage({
+        const summaryOnly = String(req.query.view || "").toLowerCase() === "summary";
+        const products = summaryOnly ? [] : await getSupplierPackageCoverage({
             snapshots: suppliers,
             filters: {
                 productCode: req.query.product,
@@ -822,7 +823,8 @@ router.get("/admin/dashboard/supplier-operations", adminMiddleware, requireAdmin
             liveSnapshot: true,
             fetchedAt: new Date(),
             suppliers,
-            products
+            products,
+            projection: summaryOnly ? "BUSINESS_SUMMARY" : "TECHNICAL_PACKAGE_COVERAGE"
         });
     } catch (error) {
         console.log("Admin supplier operations error:", error?.code || error?.message || "SUPPLIER_OPERATIONS_FAILED");
