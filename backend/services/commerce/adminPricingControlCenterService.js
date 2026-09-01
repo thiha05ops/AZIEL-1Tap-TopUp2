@@ -409,6 +409,23 @@ function storePublicationReadinessReasons({ mapping = {}, pkg = {}, selections =
     return reasons;
 }
 
+function pricingPersistenceReadinessReasons({ mapping = {}, selections = [], regions = [] } = {}) {
+    const selected = selections.some(selection =>
+        selection.status === "ACTIVE" &&
+        String(selection.supplierId) === String(mapping.supplierId) &&
+        selection.productCode === mapping.productCode &&
+        upper(selection.supplierMarket) === upper(mapping.region) &&
+        regions.every(region => (selection.sellingRegions || []).map(upper).includes(region)) &&
+        (selection.packages || []).some(item =>
+            String(item.supplierProductMappingId) === String(mapping._id) &&
+            upper(item.packageCode) === upper(mapping.packageCode)
+        )
+    );
+    return selected
+        ? []
+        : [readinessReason("STORE_CATALOG_SELECTION_REQUIRED", "Exact Store Catalog selection required")];
+}
+
 function regionalAvailability(product = {}, pkg = {}) {
     return Object.fromEntries(WORKSPACE_REGIONS.map(regionCode => {
         let reason = "";
@@ -1231,18 +1248,10 @@ async function publishDailyPricing({
             );
         }
         if (String(process.env.STORE_CATALOG_SELECTION_MODE || "LEGACY").trim().toUpperCase() === "EXPLICIT") {
-            const [publicationPackages, publicationSelections] = await Promise.all([
-                CatalogPackage.find({
-                    $or: publicationMappings.map(mapping => ({ productCode: mapping.productCode, packageCode: mapping.packageCode })),
-                    deletedAt: null
-                }).lean(),
-                StoreCatalogSelection.find({ status: "ACTIVE", supplierId }).lean()
-            ]);
-            const packageByKey = new Map(publicationPackages.map(pkg => [`${pkg.productCode}:${pkg.packageCode}`, pkg]));
+            const publicationSelections = await StoreCatalogSelection.find({ status: "ACTIVE", supplierId }).lean();
             const readinessFailures = publicationMappings.flatMap(mapping =>
-                storePublicationReadinessReasons({
+                pricingPersistenceReadinessReasons({
                     mapping,
-                    pkg: packageByKey.get(`${mapping.productCode}:${mapping.packageCode}`),
                     selections: publicationSelections,
                     regions: selectedRegions
                 }).map(reason => ({ mappingId: String(mapping._id), ...reason }))
@@ -1705,6 +1714,7 @@ module.exports = Object.freeze({
     canonicalPricingRegions,
     workspaceSupplierCostState,
     storePublicationReadinessReasons,
+    pricingPersistenceReadinessReasons,
     batchPreviewDailyPricing,
     loadDailyPricingWorkspace,
     bulkBackfillSupplierCosts,

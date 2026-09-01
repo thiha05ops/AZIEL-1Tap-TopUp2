@@ -16,6 +16,7 @@ const {
     withBootstrapDeadline
 } = require("../services/commerce/adminPricingEngineService");
 const {
+    AdminPricingControlCenterError,
     batchPreviewDailyPricing,
     loadDailyPricingWorkspace,
     publishDailyPricing
@@ -125,7 +126,7 @@ function sendPricingError(req, res, error) {
         ...(error?.stage ? { stage: error.stage } : {})
     });
     if (res.headersSent || req?.aborted) return;
-    if (error instanceof AdminPricingEngineError) {
+    if (error instanceof AdminPricingEngineError || error instanceof AdminPricingControlCenterError) {
         trace?.markCompleted();
         return res.status(error.statusCode || 400).json({
             success: false,

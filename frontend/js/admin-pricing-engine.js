@@ -19,6 +19,7 @@
     const rowKey = (row) => `${upper(row.productCode)}:${upper(row.packageCode)}`;
     const priceEditKey = (row, region) => `${rowKey(row)}:${region}`;
     const money = (value, currency) => value == null ? "-" : `${Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })} ${currency}`;
+    const publishOutcome = window.AZIEL_PRICING_PUBLISH_OUTCOME;
 
     async function pricingFetch(url, options = {}) {
         const token = localStorage.getItem("adminToken") || "";
@@ -468,7 +469,7 @@
                 await loadDaily(true, { preserveOnError: true, postPublish: true });
             }
         } catch (error) {
-            if (!error.status || error.status >= 500) {
+            if (publishOutcome.classify(error) === "UNCERTAIN") {
                 $("pricingDailyState").textContent = "Publish result uncertain · reconciling";
                 const reconciled = await loadDaily(true, { preserveOnError: true, postPublish: true, failureMessage: `Publish response was uncertain and authoritative refresh also failed: ${error.message}` });
                 if (reconciled) {
