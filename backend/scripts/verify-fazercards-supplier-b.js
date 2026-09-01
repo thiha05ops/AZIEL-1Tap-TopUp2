@@ -7,7 +7,7 @@ const { validateFazerCardsMapping, supportsFazerCardsMapping, createFazerCardsFu
 
 async function main() {
     const requests = [];
-    const env = { FAZERCARDS_API_KEY: "test-only", FAZERCARDS_PUBG_AUTO_FULFILLMENT_ENABLED: "false", FAZERCARDS_WEBHOOK_SECRET: "webhook-test" };
+    const env = { FAZERCARDS_API_KEY: "test-only", FAZERCARDS_AUTO_FULFILLMENT_ENABLED: "false", FAZERCARDS_WEBHOOK_SECRET: "webhook-test" };
     const adapter = createFazerCardsAdapter({ env, fetchImpl: async (url, options) => { requests.push({ url, method: options.method, headers: options.headers }); return { ok: true, json: async () => ({ balance: "10.0000", currency: "USD" }) }; } });
     assert.deepStrictEqual(buildFazerCardsFields("pubg", { playerId: "123456789" }), { player_id: "123456789" });
     assert.deepStrictEqual(buildFazerCardsOrderFields("mlbb", { userId: " 123456789 ", zoneId: " 1234 " }), { player_id: "123456789", server_id: "1234" });
@@ -41,7 +41,7 @@ async function main() {
     const invalidValidation = await validationAdapter.validatePlayerId({ validationCategoryId: "pubg_mobile", fields: { player_id: "123456789" } });
     assert.deepStrictEqual(validationRequests[0], { url: "https://api.fzr.cards/api/v2/topups/validate-id", method: "POST", body: { category_id: "pubg_mobile", fields: { player_id: "123456789" } } });
     assert.strictEqual(invalidValidation.providerStatus, "INVALID");
-    await assert.rejects(() => adapter.submitTopup({ categoryId: "pubg_mobile_auto", offerId: "60_uc", fields: { player_id: "123456789" }, idempotencyKey: "FUL-1", productCode: "pubg" }), error => error.code === "FAZERCARDS_AUTO_FULFILLMENT_DISABLED");
+    await assert.rejects(() => adapter.submitTopup({ categoryId: "pubg_mobile_auto", offerId: "60_uc", fields: { player_id: "123456789" }, idempotencyKey: "FUL-1", productCode: "pubg" }), error => error.code === "SUPPLIER_AUTO_FULFILLMENT_DISABLED");
     assert.strictEqual(requests.length, 1, "gate-off submission must make zero transport calls");
     const mapping = { enabled: true, supplierCode: "FAZERCARDS", productCode: "pubg", region: "TH", executionMode: "API", supplierProductCode: "pubg_mobile_auto", supplierPackageCode: "60_uc", fulfillmentEligibility: { mode: "CUSTOMER_MARKET_ALLOWLIST", allowedCustomerMarkets: ["TH"], evidenceCode: "OPERATOR_CONFIRMED_CAPABILITY", evidenceSource: "isolated verifier", verifiedAt: new Date(), version: 1 }, mappingMetadata: { readiness: { supplierMapped: true, inputReady: true, pricingReady: true, fulfillmentReady: true } } };
     assert.strictEqual(validateFazerCardsMapping(mapping), mapping);
@@ -55,7 +55,7 @@ async function main() {
     assert(!supportsFazerCardsMapping({ productCode: "freefire", supplierProductCode: "free_fire_global" }));
     for (const productCode of ["mlbb", "freefire", "hok", "valorant"]) {
         assert.strictEqual(adapter.isAutoFulfillmentEnabled(productCode), false);
-        await assert.rejects(() => adapter.submitTopup({ categoryId: "blocked", offerId: "blocked", fields: { player_id: "123456789" }, idempotencyKey: `BLOCKED-${productCode}`, productCode }), error => error.code === "FAZERCARDS_AUTO_FULFILLMENT_DISABLED");
+        await assert.rejects(() => adapter.submitTopup({ categoryId: "blocked", offerId: "blocked", fields: { player_id: "123456789" }, idempotencyKey: `BLOCKED-${productCode}`, productCode }), error => error.code === "SUPPLIER_AUTO_FULFILLMENT_DISABLED");
     }
     assert.strictEqual(requests.length, 1, "all product gates OFF must make zero order transport calls");
     assert.strictEqual(normalizeStatus({ status: "processing" }, "F-1").status, "PENDING");

@@ -63,7 +63,8 @@ function verifyProductionBoundaries() {
     assert(!paid.includes("resolveCheckoutRouteSnapshot"));
     assert(paid.includes("supplierMappingId"));
     const adapters = `${read("backend/services/suppliers/wonddAdapter.js")}\n${read("backend/services/suppliers/fazercardsAdapter.js")}`;
-    for (const gate of ["WONDD_MLBB_AUTO_FULFILLMENT_ENABLED", "WONDD_FREEFIRE_AUTO_FULFILLMENT_ENABLED", "FAZERCARDS_PUBG_AUTO_FULFILLMENT_ENABLED", "FAZERCARDS_MLBB_AUTO_FULFILLMENT_ENABLED"]) assert(adapters.includes(gate));
+    for (const gate of ["WONDD_MLBB_AUTO_FULFILLMENT_ENABLED", "WONDD_FREEFIRE_AUTO_FULFILLMENT_ENABLED"]) assert(adapters.includes(gate));
+    assert(adapters.includes("productGateKey") && adapters.includes("FAZERCARDS_${"), "FazerCards must retain an explicit derived per-product fulfillment gate.");
 }
 
 verifyPureSimulator();

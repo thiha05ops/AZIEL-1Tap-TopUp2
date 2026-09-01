@@ -50,6 +50,7 @@ const {
 const { ADMIN_AUDIT_ACTIONS, writeAdminAudit } = require("../services/adminAuditService");
 const { StoreCatalogSelectionError, listStoreCatalogSelections, saveStoreCatalogSelection, removeStoreCatalogPackage, setStoreCatalogRegionVisibility } = require("../services/storeCatalogSelectionService");
 const { StorePackageActivationError, inspectStorePackageActivation, activateStorePackage } = require("../services/storePackageActivationService");
+const { SupplierInputContractReviewError, context: getInputContractReview, approve: approveInputContract } = require("../services/supplierCatalog/supplierInputContractReviewService");
 
 function sendFulfillmentError(res, error) {
     if (error instanceof FulfillmentError || error?.name === "FinancialIntegrityError") {
@@ -75,6 +76,7 @@ function sendSupplierCatalogReadError(res, error) {
     console.log("Admin supplier catalog read error:", error?.code || error?.name || "SUPPLIER_CATALOG_READ_FAILED");
     return res.status(500).json({ success: false, code: "SUPPLIER_CATALOG_READ_FAILED", message: "Supplier catalog data unavailable" });
 }
+function sendInputContractError(res,error){if(error instanceof SupplierInputContractReviewError)return res.status(error.statusCode||400).json({success:false,code:error.code,message:error.message});console.log("Supplier input contract error:",error?.code||error?.name||"INPUT_CONTRACT_REVIEW_FAILED");return res.status(500).json({success:false,code:"INPUT_CONTRACT_REVIEW_FAILED",message:"Supplier input contract review failed."})}
 
 function sendReconciliationError(res, error) {
     if (error instanceof ReconciliationError) return res.status(error.statusCode || 400).json({ success: false, code: error.code, message: error.message, details: error.details || {} });
@@ -160,6 +162,8 @@ router.get("/admin/supplier-catalog/products/:id", adminMiddleware, requireAdmin
     try { res.set("Cache-Control", "no-store"); return res.json({ success: true, ...(await getAdminSupplierCatalogProduct(req.params.id)) }); }
     catch (error) { return sendSupplierCatalogReadError(res, error); }
 });
+router.get("/admin/supplier-catalog/products/:id/input-contract",adminMiddleware,requireAdminPermission(PERMISSIONS.SUPPLIERS_READ),async(req,res)=>{try{res.set("Cache-Control","no-store");return res.json({success:true,review:await getInputContractReview(req.params.id)})}catch(error){return sendInputContractError(res,error)}});
+router.post("/admin/supplier-catalog/products/:id/input-contract/approve",adminMiddleware,requireAdminPermission(PERMISSIONS.OWNER_ROUTING_MANAGE),async(req,res)=>{try{return res.status(201).json({success:true,...await approveInputContract(req.params.id,req.body,{actor:req.admin,req})})}catch(error){return sendInputContractError(res,error)}});
 
 router.get("/admin/supplier-catalog/offers/:id", adminMiddleware, requireAdminPermission(PERMISSIONS.SUPPLIERS_READ), async (req, res) => {
     try { res.set("Cache-Control", "no-store"); return res.json({ success: true, ...(await getAdminSupplierCatalogOffer(req.params.id)) }); }

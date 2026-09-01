@@ -1,7 +1,7 @@
 const defaultFetch = require("node-fetch");
 const crypto = require("crypto");
 const { sanitizeProviderMetadata } = require("../supplierAdapterRegistry");
-const { effectiveAutoFulfillmentGateState } = require("../../config/supplierAutoFulfillmentGate");
+const { supplierAutoFulfillmentGateState } = require("../../config/supplierAutoFulfillmentGate");
 
 const DEFAULT_BASE_URL = "https://api.fzr.cards/api/v2";
 const MAX_CATEGORY_PAGES = 10;
@@ -42,12 +42,10 @@ function createFazerCardsAdapter(options = {}) {
     const baseUrl = clean(options.baseUrl || env.FAZERCARDS_API_URL) || DEFAULT_BASE_URL;
     const apiKey = () => clean(env.FAZERCARDS_API_KEY);
     const isConfigured = () => Boolean(apiKey());
-    const PRODUCT_GATE_KEYS = Object.freeze({ pubg: "FAZERCARDS_PUBG_AUTO_FULFILLMENT_ENABLED", mlbb: "FAZERCARDS_MLBB_AUTO_FULFILLMENT_ENABLED", freefire: "FAZERCARDS_FREEFIRE_AUTO_FULFILLMENT_ENABLED", hok: "FAZERCARDS_HOK_AUTO_FULFILLMENT_ENABLED", valorant: "FAZERCARDS_VALORANT_AUTO_FULFILLMENT_ENABLED" });
-    const isProductAutoFulfillmentEnabled = product => {
-        const key = PRODUCT_GATE_KEYS[clean(product).toLowerCase()];
-        return Boolean(key) && clean(env[key]).toLowerCase() === "true";
-    };
-    const autoFulfillmentGateState = product => effectiveAutoFulfillmentGateState({ supplierCode: "FAZERCARDS", productGateEnabled: isProductAutoFulfillmentEnabled(product), env });
+    const productGateKey = () => "FAZERCARDS_AUTO_FULFILLMENT_ENABLED";
+    const isProductAutoFulfillmentEnabled = () => supplierAutoFulfillmentGateState("FAZERCARDS", env).supplierGateEnabled;
+    const isAnyAutoFulfillmentEnabled = () => isProductAutoFulfillmentEnabled();
+    const autoFulfillmentGateState = () => { const state=supplierAutoFulfillmentGateState("FAZERCARDS",env); return {...state,productGateEnabled:true,effectiveGateEnabled:state.supplierGateEnabled,blockerCode:state.supplierGateEnabled?"":"SUPPLIER_AUTO_FULFILLMENT_DISABLED"}; };
     const isAutoFulfillmentEnabled = product => autoFulfillmentGateState(product).effectiveGateEnabled;
 
     async function request(path, options = {}) {
@@ -154,13 +152,9 @@ function createFazerCardsAdapter(options = {}) {
 
     function buildTopupPayload({ categoryId, offerId, fields }) {
         const normalizedCategory = clean(categoryId);
-        const orderFields = normalizedCategory === "mobile_legends_global"
-            ? { player_id: clean(fields?.player_id), server_id: clean(fields?.server_id) }
-            : normalizedCategory === "valorant_th"
-                ? { riot_id: clean(fields?.riot_id) }
-                : { player_id: clean(fields?.player_id) };
+        const orderFields = Object.fromEntries(Object.entries(fields || {}).filter(([key, value]) => /^[a-z][a-z0-9_]{0,63}$/.test(key) && clean(value)).map(([key, value]) => [key, clean(value)]));
         const payload = { category_id: normalizedCategory, offer_id: clean(offerId), fields: orderFields };
-        if (!payload.category_id || !payload.offer_id || !Object.values(payload.fields).every(Boolean)) throw new FazerCardsAdapterError("FAZERCARDS_ORDER_CONTRACT_INVALID", "FazerCards order authority and required customer fields are required.", { statusCode: 409 });
+        if (!payload.category_id || !payload.offer_id || !Object.keys(payload.fields).length || !Object.values(payload.fields).every(Boolean)) throw new FazerCardsAdapterError("FAZERCARDS_ORDER_CONTRACT_INVALID", "FazerCards order authority and required customer fields are required.", { statusCode: 409 });
         if (normalizedCategory === "mobile_legends_global" && !payload.fields.server_id) throw new FazerCardsAdapterError("FAZERCARDS_ORDER_CONTRACT_INVALID", "FazerCards MLBB order requires User ID and Zone ID.", { statusCode: 409 });
         return payload;
     }
@@ -191,7 +185,7 @@ function createFazerCardsAdapter(options = {}) {
         const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
         return crypto.timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(supplied, "hex"));
     }
-    return { isConfigured, isProductAutoFulfillmentEnabled, autoFulfillmentGateState, isAutoFulfillmentEnabled, getAccount, getBalance, getTopupCategories, getTopupOffers, getPackageAvailability, getOrder, buildValidationPayload, normalizeValidation, validatePlayerId, buildTopupPayload, dryRunTopup, submitTopup, checkStatus, verifyWebhookSignature };
+    return { isConfigured, productGateKey, isProductAutoFulfillmentEnabled, isAnyAutoFulfillmentEnabled, autoFulfillmentGateState, isAutoFulfillmentEnabled, getAccount, getBalance, getTopupCategories, getTopupOffers, getPackageAvailability, getOrder, buildValidationPayload, normalizeValidation, validatePlayerId, buildTopupPayload, dryRunTopup, submitTopup, checkStatus, verifyWebhookSignature };
 }
 
 const adapter = createFazerCardsAdapter();

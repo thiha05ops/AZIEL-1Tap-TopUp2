@@ -1,18 +1,21 @@
 const FulfillmentAttempt = require("../../models/FulfillmentAttempt");
 const CommerceOrder = require("../../models/CommerceOrder");
 const SupplierProductMapping = require("../../models/SupplierProductMapping");
+const SupplierCatalogOffer = require("../../models/SupplierCatalogOffer");
+const SupplierCatalogProduct = require("../../models/SupplierCatalogProduct");
 const commerceOrderRepository = require("../commerce/orderRepository");
 const adapterDefault = require("./fazercardsAdapter");
 const { normalizeSupplierResult } = require("../supplierAdapterRegistry");
 const { classifySupplierFailure } = require("../supplierFailureClassificationService");
 const { buildFazerCardsFields, maskFazerCardsFields } = require("./fazercardsInputFormatters");
+const { buildFieldsFromContract, verifiedMappingContract, mappingContractMatchesSupplierCatalog } = require("./fazercardsFulfillmentContractService");
 const { isCustomerMarketEligible } = require("../supplierFulfillmentEligibilityService");
 
 const POLL_DELAYS_MS = Object.freeze([0, 5000, 10000, 20000, 30000, 60000]);
 const SUPPORTED_PRODUCT_CATEGORIES = Object.freeze({ pubg: "pubg_mobile_auto", mlbb: "mobile_legends_global", freefire: "free_fire_th", hok: "honor_of_kings", valorant: "valorant_th" });
 
 function supportsFazerCardsMapping(mapping = {}) {
-    return SUPPORTED_PRODUCT_CATEGORIES[String(mapping.productCode || "").trim().toLowerCase()] === String(mapping.supplierProductCode || "").trim();
+    return Boolean(verifiedMappingContract(mapping)) || SUPPORTED_PRODUCT_CATEGORIES[String(mapping.productCode || "").trim().toLowerCase()] === String(mapping.supplierProductCode || "").trim();
 }
 
 function validateFazerCardsMapping(mapping = {}, { customerMarket = "" } = {}) {
@@ -49,6 +52,8 @@ function createFazerCardsFulfillmentProcessor(deps = {}) {
     const Attempt = deps.Attempt || FulfillmentAttempt;
     const Order = deps.Order || CommerceOrder;
     const Mapping = deps.Mapping || SupplierProductMapping;
+    const CatalogOffer = deps.CatalogOffer || SupplierCatalogOffer;
+    const CatalogProduct = deps.CatalogProduct || SupplierCatalogProduct;
     const adapter = deps.adapter || adapterDefault;
     const transition = deps.transitionOrder || transitionOrder;
     const schedule = deps.schedule || ((fn, delay) => setTimeout(fn, delay));
@@ -91,7 +96,15 @@ function createFazerCardsFulfillmentProcessor(deps = {}) {
         if (!order) throw Object.assign(new Error("CommerceOrder not found."), { code: "ORDER_NOT_FOUND" });
         const customerMarket = String(order.commercial?.region || order.product?.region || order.region || "").trim().toUpperCase();
         validateFazerCardsMapping(mapping, { customerMarket });
-        const fields = buildFazerCardsFields(mapping.productCode, order.fulfilment?.input || {});
+        const contract = verifiedMappingContract(mapping);
+        if (contract) {
+            const offer = await CatalogOffer.findById(mapping.supplierCatalogOfferId).lean();
+            const supplierProduct = offer ? await CatalogProduct.findById(offer.supplierCatalogProductId).lean() : null;
+            if (!offer || !supplierProduct || String(offer.catalogLifecycleState || "").toUpperCase() !== "ACTIVE" || !mappingContractMatchesSupplierCatalog(mapping, supplierProduct)) throw Object.assign(new Error("FazerCards supplier input contract changed and requires Owner re-review."), { code: "FAZERCARDS_INPUT_CONTRACT_STALE" });
+        }
+        const fields = contract
+            ? buildFieldsFromContract(contract, order.fulfilment?.input || {})
+            : buildFazerCardsFields(mapping.productCode, order.fulfilment?.input || {});
         attempt.supplierRequest = { ...(attempt.supplierRequest || {}), submissionState: "SUBMISSION_IN_FLIGHT", submissionStartedAt: new Date(), categoryId: mapping.supplierProductCode, offerId: mapping.supplierPackageCode, fields: maskFazerCardsFields(fields), providerIdempotencyKey: attempt.idempotencyKey };
         await attempt.save();
         let result;
@@ -115,7 +128,7 @@ function createFazerCardsFulfillmentProcessor(deps = {}) {
     }
 
     async function recoverDue() {
-        if (!Object.keys(SUPPORTED_PRODUCT_CATEGORIES).some(product => adapter.isAutoFulfillmentEnabled(product))) return { recovered: 0, disabled: true };
+        if (!adapter.isAnyAutoFulfillmentEnabled?.() && !Object.keys(SUPPORTED_PRODUCT_CATEGORIES).some(product => adapter.isAutoFulfillmentEnabled(product))) return { recovered: 0, disabled: true };
         const attempts = await Attempt.find({ supplierCodeSnapshot: "FAZERCARDS", status: "IN_PROGRESS", supplierReference: { $ne: "" }, $or: [{ "supplierRequest.nextRecoveryAt": null }, { "supplierRequest.nextRecoveryAt": { $lte: new Date() } }] }).limit(50);
         attempts.forEach(item => schedule(() => poll(item._id, 0).catch(() => null), 0));
         return { recovered: attempts.length, disabled: false };

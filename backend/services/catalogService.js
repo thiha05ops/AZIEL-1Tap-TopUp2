@@ -20,6 +20,7 @@ const {
 const { projectMediaAsset, projectPublicMediaAsset } = require("./mediaService");
 const { normalizeProductKnowledge, normalizeCustomerNote, normalizeCustomerNoteLocales } = require("../catalog/productKnowledge");
 const { resolvePublicProductReadiness } = require("../catalog/publicProductReadiness");
+const { publicCustomerInputContract, verifiedMappingContract } = require("./suppliers/fazercardsFulfillmentContractService");
 const { normalizeProductRegions, productSupportsRegion } = require("../catalog/productRegionAuthority");
 const { assessProductionReadyFulfillmentMapping, isManualFulfillmentAllowed, isProductionReadyFulfillmentMapping, isSupplierMappedAutoTopupThScope } = require("./fulfillmentCapabilityService");
 const { publicCategoryFor } = require("../catalog/catalogTaxonomy");
@@ -887,6 +888,16 @@ function applyPublicReadiness(projection, product, packages, commerceReadiness) 
     return projection;
 }
 
+function applyCustomerInputContract(projection, mappings = []) {
+    const contracts = mappings
+        .filter(mapping => mapping.enabled === true && String(mapping.productionRole || "").toUpperCase() === "PRIMARY")
+        .map(verifiedMappingContract)
+        .filter(Boolean);
+    const fingerprints = new Set(contracts.map(contract => contract.fingerprint));
+    projection.customerInputContract = fingerprints.size === 1 ? publicCustomerInputContract(contracts[0]) : null;
+    return projection;
+}
+
 function toStaticPublicCatalog({ includeDisabled = true } = {}) {
     const snapshot = getStaticCatalogSnapshot();
 
@@ -940,6 +951,7 @@ async function toDatabasePublicCatalog({ includeDisabled = true, includeAssetPro
                 enabledSuppliers
             );
             applyPackageFulfillmentReadiness(projection, activeMappings.filter(item => item.productCode === product.productCode), inventoryStates, enabledSuppliers);
+            applyCustomerInputContract(projection, activeMappings.filter(item => item.productCode === product.productCode));
             if (!includeAdminPricing) applyPublicPackageEligibility(projection);
             if (includeAdminPricing) applyPublicationMetadata(projection, publications, customerMarket);
             applyPublicReadiness(projection, product, productPackages, projection.commerceReadiness);
@@ -966,6 +978,7 @@ async function toDatabasePublicCatalog({ includeDisabled = true, includeAssetPro
             const productMappings = activeMappings.filter(item => item.productCode === product.productCode);
             const productInventory = inventoryStates.filter(item => sourcePackages.some(pkg => String(pkg._id) === String(item.packageRef) || pkg.packageCode === item.packageCode));
             applyPackageFulfillmentReadiness(projection, productMappings, productInventory, enabledSuppliers);
+            applyCustomerInputContract(projection, productMappings);
             applyPublicationMetadata(projection, recordsByProduct.get(product.productCode) || [], customerMarket);
             projection.packages = explicitPublishedPackages(projection);
             projection.packageCount = projection.packages.length;
@@ -1160,6 +1173,7 @@ async function resolveAdminCatalogProduct(productCode, options = {}) {
 
 module.exports = {
     applyPackageFulfillmentReadiness,
+    applyCustomerInputContract,
     applyAdminProductionAttribution,
     applyAdminSupplierSupport,
     applyPublicPackageEligibility,

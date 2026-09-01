@@ -91,6 +91,7 @@ function summarizeEligibilityResolution({ mappings = [], assessments = new Map()
             region: market,
             supplierProductCode: mapping.supplierProductCode,
             supplierPackageCode: mapping.supplierPackageCode,
+            fulfillmentContract: mapping.mappingMetadata?.fulfillmentContract || null,
             executionMode: "API",
             selectedRole: "PRIMARY",
             selectedAt: new Date().toISOString()

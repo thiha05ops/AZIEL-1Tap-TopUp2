@@ -110,7 +110,7 @@ async function resolvePrimaryRouteSnapshot({ productCode, packageCode, region })
     const mapping = await Mapping.findOne({ productCode: clean(productCode).toLowerCase(), packageCode: clean(packageCode).toUpperCase(), region: clean(region).toUpperCase(), productionRole: ROLES.PRIMARY, archivedAt: null }).lean();
     const assessment = await assessProductionMapping(mapping);
     if (!assessment.ready) return { ready: false, blockers: assessment.blockers, routeSnapshot: null };
-    return { ready: true, blockers: [], routeSnapshot: Object.freeze({ routeType: "SUPPLIER_API", supplierMappingId: String(mapping._id), supplierId: String(mapping.supplierId), supplierCode: mapping.supplierCode, productCode: mapping.productCode, packageCode: mapping.packageCode, region: mapping.region, supplierProductCode: mapping.supplierProductCode, supplierPackageCode: mapping.supplierPackageCode, executionMode: mapping.executionMode, selectedRole: ROLES.PRIMARY, selectedAt: new Date().toISOString() }) };
+    return { ready: true, blockers: [], routeSnapshot: Object.freeze({ routeType: "SUPPLIER_API", supplierMappingId: String(mapping._id), supplierId: String(mapping.supplierId), supplierCode: mapping.supplierCode, productCode: mapping.productCode, packageCode: mapping.packageCode, region: mapping.region, supplierProductCode: mapping.supplierProductCode, supplierPackageCode: mapping.supplierPackageCode, fulfillmentContract: mapping.mappingMetadata?.fulfillmentContract || null, executionMode: mapping.executionMode, selectedRole: ROLES.PRIMARY, selectedAt: new Date().toISOString() }) };
 }
 
 async function resolveLegacyCheckoutRouteSnapshot({ productCode, packageCode, region }) {

@@ -18,6 +18,7 @@ const {
     createOrderSnapshot: createRuntimeOrderSnapshot
 } = require("./orderSnapshotRuntime");
 const { inputContractForProduct, gameFamilyForProduct } = require("./canonicalGameInputContract");
+const { buildFieldsFromContract } = require("../suppliers/fazercardsFulfillmentContractService");
 
 const CHECKOUT_APPLICATION_SERVICE_VERSION = "2.5.4";
 const MAX_ID_LENGTH = 200;
@@ -542,6 +543,14 @@ async function validateFulfilment(quote, context, deps) {
             throw new CheckoutApplicationError(ERROR_CODES.INVALID_FULFILMENT_INPUT, "PUBG Player ID must be numeric.", { stage: "fulfilment", metadata: { productCode } });
         }
     }
+    const routeContract = context.packageValidation?.supplierRouteSnapshot?.fulfillmentContract;
+    if (routeContract) {
+        try {
+            buildFieldsFromContract(routeContract, gameAccount);
+        } catch (error) {
+            throw new CheckoutApplicationError(ERROR_CODES.INVALID_FULFILMENT_INPUT, "Required supplier account information is missing.", { stage: "fulfilment", causeCode: error.code, metadata: { productCode } });
+        }
+    }
     return normalized;
 }
 
@@ -816,6 +825,7 @@ async function executeCheckoutTransaction(context, deps) {
 
     validateQuoteForCheckout(quote, context.checkoutTime);
     const packageValidation = await validatePackage(quote, preflightContext, deps);
+    preflightContext.packageValidation = packageValidation;
     const fulfilmentInput = await validateFulfilment(quote, preflightContext, deps);
     const paymentValidation = await validatePayment(quote, preflightContext, deps);
     const promotionValidation = await validatePromotion(quote, preflightContext, deps);

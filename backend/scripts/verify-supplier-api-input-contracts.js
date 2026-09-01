@@ -29,7 +29,7 @@ assert(!hasWonddGameIdFormatter("pubg"));
 for (const page of ["product.html", "mlbb.html", "freefire.html", "pubg.html", "hok.html"]) assert(read(`frontend/${page}`).includes("canonical-game-input-contracts.js"), `${page} must load canonical input contracts.`);
 const generic = read("frontend/js/product-detail.js");
 assert(generic.includes("AZIEL_GAME_INPUT_CONTRACTS"));
-assert(generic.includes('input.id = "serverId"'));
+assert(generic.includes("contract.accountFields.slice(1)") && generic.includes("field.selector"));
 const checkout = read("backend/services/commerce/checkoutApplicationService.js");
 assert(checkout.includes("inputContractForProduct"));
 assert(checkout.includes("INVALID_FULFILMENT_INPUT"));

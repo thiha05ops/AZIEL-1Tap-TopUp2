@@ -63,7 +63,10 @@
         applyText("[data-product-summary-name]", name);
         applyText("#selectedPackageTitle", "Select Package");
 
-        const contract = window.AZIEL_GAME_INPUT_CONTRACTS?.forProduct?.(productCode);
+        const canonicalContract = window.AZIEL_GAME_INPUT_CONTRACTS?.forProduct?.(productCode);
+        const contract = product.customerInputContract?.verified === true
+            ? { accountFields: product.customerInputContract.fields }
+            : canonicalContract;
         const accountCard = document.getElementById("userId")?.closest(".form-card");
         const firstField = contract?.accountFields?.[0];
         if (!firstField) {
@@ -72,18 +75,22 @@
         }
         applyText('label[for="userId"]', firstField.label);
         document.getElementById("userId")?.setAttribute("placeholder", firstField.key === "riotId" ? "Name#TAG" : `Enter ${firstField.label}`);
-        if (contract?.accountFields?.some(field => field.key === "zoneId") && !document.getElementById("serverId")) {
-            const label = document.createElement("label"); label.htmlFor = "serverId"; label.textContent = "Zone ID";
-            const input = document.createElement("input"); input.type = "text"; input.id = "serverId"; input.inputMode = "numeric"; input.placeholder = "Enter Zone ID";
+        const applyConstraints=(input,field)=>{if(!input)return;input.type=field.type==="number"?"text":field.type||"text";if(field.type==="number")input.inputMode="numeric";if(field.constraints?.pattern)input.pattern=field.constraints.pattern;if(field.constraints?.minLength!=null)input.minLength=field.constraints.minLength;if(field.constraints?.maxLength!=null)input.maxLength=field.constraints.maxLength;input.required=field.required!==false};
+        applyConstraints(document.getElementById("userId"),firstField);
+        contract.accountFields.slice(1).forEach((field, index) => {
+            const inputId = String(field.selector || `#supplierInput${index + 2}`).replace(/^#/, "");
+            if (document.getElementById(inputId)) return;
+            const label = document.createElement("label"); label.htmlFor = inputId; label.textContent = field.label;
+            const input = document.createElement("input"); input.id = inputId; input.placeholder = `Enter ${field.label}`; applyConstraints(input,field);
             accountCard?.append(label, input);
-        }
+        });
 
         window.AZIEL_GAME_FLOW?.init({
             game: name,
             gameKey: productCode,
             userIdSelector: "#userId",
-            zoneIdSelector: contract?.accountFields?.some(field => field.key === "zoneId") ? "#serverId" : "",
-            zoneRequired: contract?.accountFields?.some(field => field.key === "zoneId") || false,
+            zoneIdSelector: contract.accountFields.find(field => field.key === "zoneId")?.selector || "",
+            zoneRequired: contract.accountFields.some(field => field.key === "zoneId" && field.required),
             userIdRequiredMessage: firstField.requiredMessage,
             accountFields: contract.accountFields,
             pendingReturnUrl: `product.html?product=${encodeURIComponent(productCode)}`
