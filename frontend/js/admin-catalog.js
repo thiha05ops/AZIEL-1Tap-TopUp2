@@ -73,7 +73,8 @@ function initAdminCatalogController() {
         }
     });
 
-    if (document.getElementById("section-catalog")?.classList.contains("active")) {
+    if (document.getElementById("section-catalog")?.classList.contains("active") && document.body.dataset.adminEntry === "advanced") {
+        setAdminCatalogStoreSelectionScope(null);
         loadAdminCatalog();
         loadStorefrontSections();
     }
@@ -100,6 +101,13 @@ function setCatalogView(view = "products") {
 }
 
 async function loadAdminCatalog(force = false) {
+    if (catalogStoreSelectionScope !== null && catalogStoreSelectionScope.size === 0) {
+        clearAdminCatalogSelection();
+        renderCatalogProducts();
+        renderCatalogEmpty(adminT("no_products_found", "No products found"));
+        return;
+    }
+
     if (catalogProducts.length && !force) {
         renderCatalogProducts();
         return;
@@ -107,9 +115,40 @@ async function loadAdminCatalog(force = false) {
 
     renderCatalogLoading();
 
-    const data = await adminFetch("/api/admin/catalog/products");
+    let data;
+    try {
+        if (catalogStoreSelectionScope === null) {
+            data = await adminFetch("/api/admin/catalog/products");
+        } else {
+            const selectedCodes = [...catalogStoreSelectionScope];
+            const responses = await Promise.all(selectedCodes.map(productCode => (
+                adminFetch(`/api/admin/catalog/products/${encodeURIComponent(productCode)}?customerMarket=${encodeURIComponent(catalogCustomerMarket)}`)
+            )));
+            if (responses.some(response => response == null)) {
+                renderCatalogError(adminT("catalog_data_unavailable", "Catalog data unavailable"));
+                return;
+            }
+            const failed = responses.find(response => response.success !== true || !response.product);
+            if (failed) {
+                renderCatalogError(failed.message || adminT("catalog_data_unavailable", "Catalog data unavailable"));
+                return;
+            }
+            data = {
+                success: true,
+                source: responses[0]?.source || "database",
+                activeSource: responses[0]?.activeSource || responses[0]?.source || "database",
+                products: responses.map(response => response.product)
+            };
+        }
+    } catch (error) {
+        renderCatalogError(error?.message || adminT("catalog_data_unavailable", "Catalog data unavailable"));
+        return;
+    }
 
-    if (!data) return;
+    if (!data) {
+        renderCatalogError(adminT("catalog_data_unavailable", "Catalog data unavailable"));
+        return;
+    }
 
     if (!data.success) {
         renderCatalogError(data.message || adminT("catalog_data_unavailable", "Catalog data unavailable"));
@@ -136,6 +175,15 @@ function setAdminCatalogStoreSelectionScope(productCodes) {
     catalogStoreSelectionScope = productCodes === null
         ? null
         : new Set((productCodes || []).map(code => String(code || "").trim().toLowerCase()).filter(Boolean));
+}
+
+function clearAdminCatalogSelection() {
+    catalogProductRequestController?.abort();
+    catalogProductRequestController = null;
+    catalogProducts = [];
+    selectedCatalogProductCode = "";
+    selectedCatalogProduct = null;
+    selectedCatalogBanners = [];
 }
 
 window.setAdminCatalogStoreSelectionScope = setAdminCatalogStoreSelectionScope;
