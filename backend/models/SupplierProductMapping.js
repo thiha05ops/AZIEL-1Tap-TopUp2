@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const { SUPPLIER_CURRENCY } = require("../constants/commerce");
+const { SUPPLIER_MARKETS } = require("../constants/supplierMarkets");
 
 const SUPPLIER_EXECUTION_MODES = Object.freeze({
     MANUAL: "MANUAL",
@@ -72,6 +73,11 @@ const supplierProductMappingSchema = new mongoose.Schema(
             trim: true,
             maxlength: 120
         },
+        supplierCatalogOfferId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "SupplierCatalogOffer",
+            default: null
+        },
         supplierDisplayName: {
             type: String,
             trim: true,
@@ -80,8 +86,16 @@ const supplierProductMappingSchema = new mongoose.Schema(
         },
         region: {
             type: String,
-            enum: ["MM", "TH"],
+            enum: SUPPLIER_MARKETS,
             required: true
+        },
+        supplierMarketEvidence: {
+            normalizedMarket: { type: String, enum: SUPPLIER_MARKETS, required: true },
+            supplierMarketCode: { type: String, trim: true, maxlength: 120, required: true },
+            marketClassification: { type: String, trim: true, maxlength: 80, required: true },
+            restrictions: { type: [mongoose.Schema.Types.Mixed], default: [] },
+            evidenceCode: { type: String, trim: true, maxlength: 160, default: "" },
+            sourceProductHash: { type: String, trim: true, lowercase: true, match: /^[a-f0-9]{64}$/, default: undefined }
         },
         enabled: {
             type: Boolean,
@@ -126,11 +140,13 @@ const supplierProductMappingSchema = new mongoose.Schema(
 );
 
 supplierProductMappingSchema.index(
-    { supplierId: 1, productCode: 1, packageCode: 1, region: 1 },
-    { unique: true }
+    { supplierId: 1, supplierProductCode: 1, supplierPackageCode: 1, region: 1 },
+    { unique: true, name: "one_supplier_offer_mapping_per_market" }
 );
+supplierProductMappingSchema.index({ supplierId: 1, productCode: 1, packageCode: 1, region: 1 }, { name: "canonical_package_market_lookup" });
 supplierProductMappingSchema.index({ productCode: 1, packageCode: 1, region: 1, enabled: 1 });
 supplierProductMappingSchema.index({ supplierCode: 1 });
+supplierProductMappingSchema.index({ supplierCatalogOfferId: 1 }, { sparse: true, name: "supplier_catalog_offer_reference" });
 supplierProductMappingSchema.index({ archivedAt: 1, supplierCode: 1 });
 supplierProductMappingSchema.index({ productCode: 1, packageCode: 1, region: 1, productionRole: 1 });
 supplierProductMappingSchema.index(

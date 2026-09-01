@@ -1,0 +1,42 @@
+# Supplier Catalog Architecture Invariants
+
+- **SC-001:** Ingestion writes only supplier catalog products/offers, availability, runs, locks, and cost observations.
+- **SC-002:** Ingestion cannot create or mutate canonical products/packages.
+- **SC-003:** Ingestion cannot create or mutate supplier mappings, roles, eligibility, or execution mode.
+- **SC-004:** Ingestion cannot approve mapping cost authority.
+- **SC-005:** Ingestion and availability cannot publish or unpublish packages or prices.
+- **SC-006:** Provider identities are exact supplier/namespace/product/offer identities; names and numeric totals cannot substitute.
+- **SC-007:** `78+8` and flat `86`, weekly and one-time weekly, and distinct markets remain semantically distinct.
+- **SC-008:** FazerCards missing transitions require complete successful coverage and produce UNKNOWN/stale, not immediate UNAVAILABLE.
+- **SC-009:** WonDD partial absence produces no destructive transition.
+- **SC-010:** Failed or suspicious ingestion cannot erase durable catalog state.
+- **SC-011:** Automated ingestion requires execution, automation, and supplier gates; manual ingestion requires execution gate.
+- **SC-012:** A supplier lease is unique by `lockKey`; active ownership is revalidated before every persistence mutation.
+- **SC-013:** Manual and scheduled ingestion for one supplier cannot execute concurrently.
+- **SC-014:** Different suppliers use independent lease scopes.
+- **SC-015:** Reconciliation requires Admin authentication, `SUPPLIER_CATALOG_RECONCILE`, exact source lock, explicit action, idempotency, transaction, and enabled gate.
+- **SC-016:** Reconciliation cannot automatically create canonical identity or production-ready mapping authority.
+- **SC-017:** A reconciliation-created mapping starts disabled, role DISABLED, MANUAL, UNKNOWN eligibility, and without approved cost.
+- **SC-018:** Cost promotion requires Admin authentication, `SUPPLIER_COST_MANAGE`, explicit confirmation, exact source/mapping locks, idempotency, transaction, and enabled gate.
+- **SC-019:** Observed cost cannot directly become customer payable price.
+- **SC-020:** Cost comparison requires identical currencies and performs no implicit FX.
+- **SC-021:** Negative, NaN, Infinity, missing-currency, and malformed costs cannot become authority.
+- **SC-022:** Supplier cost promotion cannot mutate retail pricing or publication.
+- **SC-023:** Publication intent and production readiness are independent and mutually suppressive.
+- **SC-024:** An unmapped offer remains an Admin-visible supplier fact and cannot fulfill or become public.
+- **SC-025:** Routing selects an explicit eligible PRIMARY only.
+- **SC-026:** BACKUP is never automatically selected; there is no cheapest or availability-driven failover.
+- **SC-027:** Ambiguous post-submit outcomes cannot automatically retry or switch suppliers.
+- **SC-028:** Later supplier observations cannot rewrite PricingQuote, CommerceOrder, or FulfillmentAttempt history.
+- **SC-029:** Observation and cost-change histories expose no generic update/delete API.
+- **SC-030:** Reconciliation history is versioned with at most one current decision.
+- **SC-031:** Admin and public reads cannot call supplier APIs or renew leases.
+- **SC-032:** Raw snapshots are sanitized and bounded before persistence or Admin display.
+- **SC-033:** UNKNOWN market/readiness/availability evidence fails closed and does not mutate business authority.
+- **SC-034:** Exact replay cannot duplicate observations, promotions, reconciliation decisions, runs, or index metadata.
+- **SC-035:** Production deployment scripts default to dry-run, require explicit guards, create narrowly, and never drop/sync indexes.
+- **SC-036:** Startup remains non-blocking; the disabled scheduler performs no supplier call; shutdown clears local timers.
+- **SC-037:** Multiple supplier offers for one canonical package do not blend cost, duplicate canonical identity, or duplicate publication intent.
+- **SC-038:** Supplier market, customer market, pricing currency, mapping region, eligibility market, and publication market remain distinct fields.
+- **SC-039:** `observedAt`, `lastObservedAt`, `lastChangedAt`, `staleAt`, `capturedAt`, run timestamps, and lease expiry retain distinct meanings.
+- **SC-040:** No supplier observation silently becomes AZIEL business authority.

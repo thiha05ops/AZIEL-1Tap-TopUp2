@@ -1,0 +1,5 @@
+"use strict";
+const SUPPLIER_MARKETS = Object.freeze(["MM","TH","GLOBAL","ASIA","SEA","BD","KH","CN","ID","IN","KZ","MY","MY_SG","PK","PH","SA","SG","TW","TW_HK_MO","VN"]);
+const ALIASES = Object.freeze({MYANMAR:"MM",THAILAND:"TH",BANGLADESH:"BD",CAMBODIA:"KH",CHINA:"CN",INDONESIA:"ID",INDIA:"IN",KAZAKHSTAN:"KZ",MALAYSIA:"MY","MALAYSIA/SINGAPORE":"MY_SG","MALAYSIA / SINGAPORE":"MY_SG","SINGAPORE / MALAYSIA":"MY_SG",PAKISTAN:"PK",PHILIPPINES:"PH","SAUDI ARABIA":"SA",SINGAPORE:"SG",TAIWAN:"TW","TAIWAN / HONG KONG / MACAU":"TW_HK_MO",VIETNAM:"VN","SOUTHEAST ASIA":"SEA","SOUTH EAST ASIA":"SEA"});
+function normalizeSupplierMarket(value){const market=String(value==null?"":value).trim().toUpperCase().replace(/\s+/g," "),normalized=ALIASES[market]||market;return SUPPLIER_MARKETS.includes(normalized)?normalized:""}
+module.exports=Object.freeze({SUPPLIER_MARKETS,normalizeSupplierMarket});

@@ -44,6 +44,7 @@ let shuttingDown = false;
 let mongoRetryTimer = null;
 let mongoConnectInFlight = null;
 let backgroundWorkersStarted = false;
+let supplierCatalogSchedulerStarted = false;
 const backgroundTimers = new Set();
 
 function recordStartupMilestone(milestone, startedAt = processStartedAt, extra = {}) {
@@ -237,6 +238,10 @@ function configureDatabaseApplication(mongoConnection) {
 }
 
 function stopBackgroundWorkers() {
+    if (supplierCatalogSchedulerStarted) {
+        require("./services/supplierCatalog/supplierCatalogIngestionScheduler").scheduler.stop();
+        supplierCatalogSchedulerStarted = false;
+    }
     backgroundTimers.forEach(timer => clearInterval(timer));
     backgroundTimers.clear();
     backgroundWorkersStarted = false;
@@ -246,6 +251,8 @@ function startBackgroundWorkers() {
     if (backgroundWorkersStarted || !startup.databaseReady || shuttingDown) return;
     const workersStartedAt = performance.now();
     backgroundWorkersStarted = true;
+    require("./services/supplierCatalog/supplierCatalogIngestionScheduler").scheduler.start();
+    supplierCatalogSchedulerStarted = true;
     if (require("./services/suppliers/wonddAdapter").hasAnyAutoFulfillmentEnabled()) {
         const processor = require("./services/suppliers/wonddFulfillmentProcessor").processor;
         processor.recoverDue().catch(() => null);

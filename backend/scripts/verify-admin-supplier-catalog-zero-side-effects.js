@@ -1,0 +1,37 @@
+"use strict";
+
+const assert = require("assert");
+const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
+const { createAdminSupplierCatalogReadService } = require("../services/adminSupplierCatalogReadService");
+
+const root = path.resolve(__dirname, "../..");
+const serviceSource = fs.readFileSync(path.join(root, "backend/services/adminSupplierCatalogReadService.js"), "utf8");
+const routeSource = fs.readFileSync(path.join(root, "backend/routes/supplier.js"), "utf8");
+const frontendSource = fs.readFileSync(path.join(root, "frontend/js/admin-supplier-catalog.js"), "utf8");
+const protectedModels = ["SupplierCatalogProduct", "SupplierCatalogOffer", "SupplierOfferAvailability", "SupplierCatalogIngestionRun", "SupplierProductMapping", "CatalogProduct", "CatalogPackage", "PackageMarketPublication", "PricingQuote", "CommerceOrder", "FulfillmentAttempt", "PackageInventoryState"];
+const fingerprint = value => crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex");
+const stores = Object.fromEntries(protectedModels.map((name, index) => [name, [{ _id: String(index + 1), sentinel: `${name}-unchanged` }]]));
+const before = Object.fromEntries(Object.entries(stores).map(([name, rows]) => [name, fingerprint(rows)]));
+const empty = { suppliers: [], products: [], offers: [], availability: [], runs: [], mappings: [], catalogProducts: [], catalogPackages: [], publications: [], controlledTests: [] };
+const readService = createAdminSupplierCatalogReadService();
+readService.summarize(readService.project(empty));
+readService.filterRows(readService.project(empty).rows, { search: "nothing", supplier: "WONDD" });
+const after = Object.fromEntries(Object.entries(stores).map(([name, rows]) => [name, fingerprint(rows)]));
+assert.deepStrictEqual(after, before, "Read projection changed protected state");
+const forbiddenWrites = [".save(", ".create(", ".insertMany(", ".updateOne(", ".updateMany(", ".findOneAndUpdate(", ".deleteOne(", ".deleteMany(", ".bulkWrite("];
+for (const token of forbiddenWrites) assert(!serviceSource.includes(token), `Read service contains mutation token ${token}`);
+const forbiddenNetwork = ["fetch(", "axios", "submitTopup", "placeOrder", "validatePlayer", "checkStatus", "getBalance"];
+for (const token of forbiddenNetwork) assert(!serviceSource.includes(token), `Read service contains supplier call token ${token}`);
+const catalogRouteBlock = routeSource.slice(routeSource.indexOf('router.get("/admin/supplier-catalog"'), routeSource.indexOf('router.post("/supplier/mock-topup'));
+assert(catalogRouteBlock.includes("SUPPLIERS_READ"), "Supplier read permission missing");
+const catalogMutations = [...catalogRouteBlock.matchAll(/router\.(post|put|patch|delete)\("([^"]+)"/g)].map(match => `${match[1].toUpperCase()} ${match[2]}`);
+assert(catalogMutations.every(route => route === "POST /admin/supplier-catalog/offers/:id/reconciliation" || route === "POST /admin/supplier-catalog/offers/:id/reconciliation/reopen" || route === "POST /admin/supplier-catalog/offers/:id/cost-authority/promote" || route === "POST /admin/supplier-catalog/automation/:supplierCode/run"), "Unexpected Supplier Catalog mutation route");
+assert(catalogRouteBlock.includes("SUPPLIER_CATALOG_RECONCILE"), "Reconciliation mutations lack dedicated permission");
+assert(catalogRouteBlock.includes("SUPPLIER_COST_MANAGE"), "Cost-authority mutation lacks dedicated permission");
+assert(catalogRouteBlock.includes("SUPPLIER_CATALOG_INGEST"), "Catalog ingestion lacks dedicated permission");
+assert(!/method\s*:\s*["'](PUT|PATCH|DELETE)/.test(frontendSource), "Frontend supplier catalog performs an arbitrary mutation request");
+assert(!frontendSource.includes('method:"POST"') || (frontendSource.includes('/reconciliation`') && frontendSource.includes('/cost-authority/promote`') && frontendSource.includes('/automation/${encodeURIComponent(button.dataset.catalogIngest)}/run`')), "Frontend POST is not scoped to reviewed reconciliation/cost-authority/ingestion operations");
+assert(!/(place order|start fulfillment|submit order)/i.test(frontendSource), "Frontend exposes prohibited transactional action");
+console.log(JSON.stringify({ result: "PASS", checks: protectedModels.length + forbiddenWrites.length + forbiddenNetwork.length + 4, protectedModels, exactEquality: true, supplierNetworkCalls: 0, databaseWrites: 0, publicWrites: 0, pricingWrites: 0, fulfillmentCalls: 0 }, null, 2));

@@ -19,6 +19,36 @@ const {
     updateMapping,
     updateSupplier
 } = require("../services/fulfillmentService");
+const {
+    AdminSupplierCatalogReadError,
+    getOffer: getAdminSupplierCatalogOffer,
+    getProduct: getAdminSupplierCatalogProduct,
+    listOffers: listAdminSupplierCatalogOffers,
+    listRuns: listAdminSupplierCatalogRuns
+} = require("../services/adminSupplierCatalogReadService");
+const {
+    ReconciliationError,
+    reviewContext: getSupplierCatalogReconciliation,
+    decide: decideSupplierCatalogReconciliation,
+    reopen: reopenSupplierCatalogReconciliation
+} = require("../services/supplierCatalog/supplierCatalogReconciliationService");
+const { SupplierCostAuthorityError, getCostAuthorityReview, promoteObservedCost } = require("../services/supplierCatalog/supplierCostAuthorityService");
+const { SupplierCatalogIngestionError, runSupplierCatalogIngestion } = require("../services/supplierCatalog/supplierCatalogIngestionOrchestrator");
+const { getSupplierCatalogIngestionHealth } = require("../services/supplierCatalog/supplierCatalogIngestionHealthService");
+const { listCostCoverage, listCostCoverageOptions, approveSelectedCosts } = require("../services/supplierCatalog/supplierCostCoverageService");
+const {
+    AdminProductActivationError,
+    getWorkspace: getProductActivationWorkspace,
+    publishSelectedPackage,
+    publishSelectedPackages
+} = require("../services/adminProductActivationService");
+const {
+    ProductSourcePreparationError,
+    generatePlan: generateProductSourcePreparationPlan,
+    applyPlan: applyProductSourcePreparationPlan
+} = require("../services/productSourcePreparationService");
+const { ADMIN_AUDIT_ACTIONS, writeAdminAudit } = require("../services/adminAuditService");
+const { StoreCatalogSelectionError, listStoreCatalogSelections, saveStoreCatalogSelection, removeStoreCatalogPackage, setStoreCatalogRegionVisibility } = require("../services/storeCatalogSelectionService");
 
 function sendFulfillmentError(res, error) {
     if (error instanceof FulfillmentError || error?.name === "FinancialIntegrityError") {
@@ -36,6 +66,109 @@ function sendFulfillmentError(res, error) {
         message: "Fulfillment operation failed"
     });
 }
+
+function sendSupplierCatalogReadError(res, error) {
+    if (error instanceof AdminSupplierCatalogReadError) {
+        return res.status(error.statusCode || 400).json({ success: false, code: error.code, message: error.message });
+    }
+    console.log("Admin supplier catalog read error:", error?.code || error?.name || "SUPPLIER_CATALOG_READ_FAILED");
+    return res.status(500).json({ success: false, code: "SUPPLIER_CATALOG_READ_FAILED", message: "Supplier catalog data unavailable" });
+}
+
+function sendReconciliationError(res, error) {
+    if (error instanceof ReconciliationError) return res.status(error.statusCode || 400).json({ success: false, code: error.code, message: error.message, details: error.details || {} });
+    if (error?.code === 11000) return res.status(409).json({ success: false, code: "RECONCILIATION_CONFLICT", message: "A concurrent reconciliation decision already exists." });
+    console.log("Supplier reconciliation error:", error?.code || error?.name || "RECONCILIATION_FAILED");
+    return res.status(500).json({ success: false, code: "RECONCILIATION_FAILED", message: "Supplier reconciliation failed." });
+}
+function sendCostAuthorityError(res,error){if(error instanceof SupplierCostAuthorityError||error?.statusCode)return res.status(error.statusCode||400).json({success:false,code:error.code,message:error.message,details:error.details||{}});if(error?.code===11000)return res.status(409).json({success:false,code:"COST_AUTHORITY_CONFLICT",message:"A concurrent cost-authority operation already completed."});console.log("Supplier cost authority error:",error?.code||error?.name||"SUPPLIER_COST_AUTHORITY_FAILED");return res.status(500).json({success:false,code:"SUPPLIER_COST_AUTHORITY_FAILED",message:"Supplier cost-authority operation failed."})}
+function sendIngestionError(res,error){if(error instanceof SupplierCatalogIngestionError||String(error?.code||"").startsWith("SUPPLIER_CATALOG_"))return res.status(error.statusCode||409).json({success:false,code:error.code,message:error.message,details:error.details||{}});console.log("Supplier catalog ingestion error:",error?.code||error?.name||"SUPPLIER_CATALOG_INGESTION_FAILED");return res.status(500).json({success:false,code:"SUPPLIER_CATALOG_INGESTION_FAILED",message:"Supplier catalog ingestion failed."})}
+function sendActivationError(res,error){if(error instanceof AdminProductActivationError)return res.status(error.statusCode||400).json({success:false,code:error.code,message:error.message,details:error.details||{}});console.log("Product activation error:",error?.code||error?.name||"PRODUCT_ACTIVATION_FAILED");return res.status(500).json({success:false,code:"PRODUCT_ACTIVATION_FAILED",message:"Product activation operation failed."})}
+function sendSourcePreparationError(res,error){if(error instanceof ProductSourcePreparationError)return res.status(error.statusCode||400).json({success:false,code:error.code,message:error.message,details:error.details||{}});console.log("Product source preparation error:",error?.code||error?.name||"PRODUCT_SOURCE_PREPARATION_FAILED");return res.status(500).json({success:false,code:"PRODUCT_SOURCE_PREPARATION_FAILED",message:"Product source preparation failed."})}
+function sendStoreSelectionError(res,error){if(error instanceof StoreCatalogSelectionError)return res.status(error.statusCode||400).json({success:false,code:error.code,message:error.message,details:error.details||{}});console.log("Store Catalog selection error:",error?.code||error?.name||"STORE_SELECTION_FAILED");return res.status(500).json({success:false,code:"STORE_SELECTION_FAILED",message:"Store Catalog operation failed."})}
+
+router.get("/admin/product-activation", adminMiddleware, requireAdminPermission(PERMISSIONS.SUPPLIERS_READ), async (req,res)=>{
+    try { res.set("Cache-Control","no-store"); return res.json({success:true,...await getProductActivationWorkspace(req.query)}); }
+    catch(error){ return sendActivationError(res,error); }
+});
+router.get("/admin/store-catalog-selections",adminMiddleware,requireAdminPermission(PERMISSIONS.CATALOG_READ),async(req,res)=>{try{res.set("Cache-Control","no-store");return res.json({success:true,selections:await listStoreCatalogSelections(req.query)})}catch(error){return sendStoreSelectionError(res,error)}});
+router.post("/admin/store-catalog-selections",adminMiddleware,requireAdminPermission(PERMISSIONS.CATALOG_MANAGE),async(req,res)=>{try{const result=await saveStoreCatalogSelection(req.body,{actor:req.admin});await writeAdminAudit({actor:req.admin,req,action:ADMIN_AUDIT_ACTIONS.STORE_CATALOG_SELECTION_SAVED,resourceType:"StoreCatalogSelection",resourceId:String(result.selection._id),metadata:{productCode:result.selection.productCode,supplierMarket:result.selection.supplierMarket,sellingRegions:result.selection.sellingRegions,packageCount:result.selection.packages.length}});return res.json({success:true,...result})}catch(error){return sendStoreSelectionError(res,error)}});
+router.delete("/admin/store-catalog-selections/:selectionId/packages/:packageCode",adminMiddleware,requireAdminPermission(PERMISSIONS.CATALOG_MANAGE),async(req,res)=>{try{const result=await removeStoreCatalogPackage({selectionId:req.params.selectionId,packageCode:req.params.packageCode,expectedDecisionVersion:req.body?.expectedDecisionVersion,confirmed:req.body?.confirmed===true},{actor:req.admin});await writeAdminAudit({actor:req.admin,req,action:ADMIN_AUDIT_ACTIONS.STORE_CATALOG_PACKAGE_REMOVED,resourceType:"StoreCatalogSelection",resourceId:req.params.selectionId,metadata:{packageCode:req.params.packageCode,wasLive:result.wasLive}});return res.json({success:true,...result})}catch(error){return sendStoreSelectionError(res,error)}});
+router.patch("/admin/store-catalog-selections/:selectionId/regions/:region/visibility",adminMiddleware,requireAdminPermission(PERMISSIONS.CATALOG_MANAGE),async(req,res)=>{try{const result=await setStoreCatalogRegionVisibility({selectionId:req.params.selectionId,region:req.params.region,visible:req.body?.visible,expectedDecisionVersion:req.body?.expectedDecisionVersion},{actor:req.admin});await writeAdminAudit({actor:req.admin,req,action:ADMIN_AUDIT_ACTIONS.STORE_CATALOG_REGION_VISIBILITY_CHANGED,resourceType:"StoreCatalogSelection",resourceId:req.params.selectionId,metadata:{region:req.params.region,visible:req.body?.visible}});return res.json({success:true,...result})}catch(error){return sendStoreSelectionError(res,error)}});
+
+router.post("/admin/product-activation/source-preparation/plan", adminMiddleware, requireAdminPermission(PERMISSIONS.OWNER_ROUTING_MANAGE), async(req,res)=>{
+    try {
+        const plan=await generateProductSourcePreparationPlan(req.body);
+        await writeAdminAudit({actor:req.admin,req,action:ADMIN_AUDIT_ACTIONS.PRODUCT_SOURCE_PREPARATION_PLANNED,resourceType:"ProductSourcePreparation",resourceId:plan.planHash,metadata:{productCode:plan.selection.productCode,supplierId:plan.selection.supplierId,supplierCode:plan.selection.supplierCode,supplierMarket:plan.selection.supplierMarket,customerMarket:plan.selection.customerMarket,mappingIds:plan.selection.selectedMappingIds,planHash:plan.planHash,summary:plan.summary}});
+        return res.json({success:true,plan});
+    } catch(error){return sendSourcePreparationError(res,error)}
+});
+
+router.post("/admin/product-activation/source-preparation/apply", adminMiddleware, requireAdminPermission(PERMISSIONS.OWNER_ROUTING_MANAGE), async(req,res)=>{
+    try{return res.json({success:true,...await applyProductSourcePreparationPlan(req.body?.plan,{actor:req.admin})})}
+    catch(error){return sendSourcePreparationError(res,error)}
+});
+
+router.get("/admin/supplier-cost-coverage",adminMiddleware,requireAdminPermission(PERMISSIONS.SUPPLIERS_READ),async(req,res)=>{try{res.set("Cache-Control","no-store");return res.json({success:true,...await listCostCoverage(req.query)})}catch(error){return sendCostAuthorityError(res,error)}});
+router.get("/admin/supplier-cost-coverage/options",adminMiddleware,requireAdminPermission(PERMISSIONS.SUPPLIERS_READ),async(req,res)=>{try{res.set("Cache-Control","private, max-age=60");return res.json({success:true,...await listCostCoverageOptions(req.query)})}catch(error){return sendCostAuthorityError(res,error)}});
+router.post("/admin/supplier-cost-coverage/approve",adminMiddleware,requireAdminPermission(PERMISSIONS.SUPPLIER_COST_MANAGE),async(req,res)=>{try{return res.json({success:true,...await approveSelectedCosts(req.body,{actor:req.admin,requestId:req.id||req.headers["x-request-id"]||""})})}catch(error){return sendCostAuthorityError(res,error)}});
+
+router.post("/admin/product-activation/products/:productCode/packages/:packageCode/publication", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_MANAGE), async(req,res)=>{
+    try { return res.json({success:true,...await publishSelectedPackage({...req.body,productCode:req.params.productCode,packageCode:req.params.packageCode,actor:req.admin?.username||"admin"})}); }
+    catch(error){ return sendActivationError(res,error); }
+});
+router.post("/admin/product-activation/products/:productCode/publication", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_MANAGE), async(req,res)=>{
+    try { return res.json({success:true,...await publishSelectedPackages({...req.body,productCode:req.params.productCode,actor:req.admin?.username||"admin"})}); }
+    catch(error){ return sendActivationError(res,error); }
+});
+
+router.get("/admin/supplier-catalog", adminMiddleware, requireAdminPermission(PERMISSIONS.SUPPLIERS_READ), async (req, res) => {
+    try { res.set("Cache-Control", "no-store"); return res.json({ success: true, ...(await listAdminSupplierCatalogOffers(req.query)) }); }
+    catch (error) { return sendSupplierCatalogReadError(res, error); }
+});
+
+router.get("/admin/supplier-catalog/products/:id", adminMiddleware, requireAdminPermission(PERMISSIONS.SUPPLIERS_READ), async (req, res) => {
+    try { res.set("Cache-Control", "no-store"); return res.json({ success: true, ...(await getAdminSupplierCatalogProduct(req.params.id)) }); }
+    catch (error) { return sendSupplierCatalogReadError(res, error); }
+});
+
+router.get("/admin/supplier-catalog/offers/:id", adminMiddleware, requireAdminPermission(PERMISSIONS.SUPPLIERS_READ), async (req, res) => {
+    try { res.set("Cache-Control", "no-store"); return res.json({ success: true, ...(await getAdminSupplierCatalogOffer(req.params.id)) }); }
+    catch (error) { return sendSupplierCatalogReadError(res, error); }
+});
+
+router.get("/admin/supplier-catalog/runs", adminMiddleware, requireAdminPermission(PERMISSIONS.SUPPLIERS_READ), async (req, res) => {
+    try { res.set("Cache-Control", "no-store"); return res.json({ success: true, ...(await listAdminSupplierCatalogRuns(req.query)) }); }
+    catch (error) { return sendSupplierCatalogReadError(res, error); }
+});
+
+router.get("/admin/supplier-catalog/automation/health", adminMiddleware, requireAdminPermission(PERMISSIONS.SUPPLIERS_READ), async (req,res)=>{
+    try { res.set("Cache-Control","no-store"); return res.json({success:true, ...(await getSupplierCatalogIngestionHealth())}); }
+    catch(error){ return sendIngestionError(res,error); }
+});
+
+router.post("/admin/supplier-catalog/automation/:supplierCode/run", adminMiddleware, requireAdminPermission(PERMISSIONS.SUPPLIER_CATALOG_INGEST), async(req,res)=>{
+    try { const result=await runSupplierCatalogIngestion({supplierCode:req.params.supplierCode,trigger:"ADMIN_MANUAL",actor:{adminId:req.admin?._id||req.admin?.id,username:req.admin?.username||"",role:req.admin?.role||""},reason:req.body?.reason||"Admin requested catalog refresh"}); return res.status(202).json({success:true,result}); }
+    catch(error){ return sendIngestionError(res,error); }
+});
+
+router.get("/admin/supplier-catalog/offers/:id/reconciliation", adminMiddleware, requireAdminPermission(PERMISSIONS.SUPPLIERS_READ), async (req, res) => {
+    try { res.set("Cache-Control", "no-store"); return res.json({ success: true, reconciliation: await getSupplierCatalogReconciliation(req.params.id) }); }
+    catch (error) { return sendReconciliationError(res, error); }
+});
+
+router.get("/admin/supplier-catalog/offers/:id/cost-authority",adminMiddleware,requireAdminPermission(PERMISSIONS.SUPPLIERS_READ),async(req,res)=>{try{res.set("Cache-Control","no-store");return res.json({success:true,costAuthority:await getCostAuthorityReview(req.params.id,{mappingId:req.query.mappingId})})}catch(error){return sendCostAuthorityError(res,error)}});
+router.post("/admin/supplier-catalog/offers/:id/cost-authority/promote",adminMiddleware,requireAdminPermission(PERMISSIONS.SUPPLIER_COST_MANAGE),async(req,res)=>{try{return res.status(201).json({success:true,...await promoteObservedCost({...req.body,supplierCatalogOfferId:req.params.id},{actor:req.admin,requestId:req.id||req.headers["x-request-id"]||""})})}catch(error){return sendCostAuthorityError(res,error)}});
+
+router.post("/admin/supplier-catalog/offers/:id/reconciliation", adminMiddleware, requireAdminPermission(PERMISSIONS.SUPPLIER_CATALOG_RECONCILE), async (req, res) => {
+    try { return res.status(201).json({ success: true, ...(await decideSupplierCatalogReconciliation({ ...req.body, supplierCatalogOfferId: req.params.id }, { actor: req.admin, requestId: req.id || req.headers["x-request-id"] || "" })) }); }
+    catch (error) { return sendReconciliationError(res, error); }
+});
+
+router.post("/admin/supplier-catalog/offers/:id/reconciliation/reopen", adminMiddleware, requireAdminPermission(PERMISSIONS.SUPPLIER_CATALOG_RECONCILE), async (req, res) => {
+    try { return res.status(201).json({ success: true, ...(await reopenSupplierCatalogReconciliation({ ...req.body, supplierCatalogOfferId: req.params.id }, { actor: req.admin, requestId: req.id || req.headers["x-request-id"] || "" })) }); }
+    catch (error) { return sendReconciliationError(res, error); }
+});
 
 router.post("/supplier/mock-topup/:id", adminMiddleware, requireAdminPermission(PERMISSIONS.FULFILLMENT_EXECUTE), (req, res) => {
     return res.status(410).json({

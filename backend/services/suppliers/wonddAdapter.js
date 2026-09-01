@@ -82,7 +82,7 @@ function createWonddAdapter(options = {}) {
         return supplierResult("SUCCEEDED", "BALANCE_OK", { balance, currency: "THB" }, "WonDD balance fetched successfully.");
     }
 
-    async function getPackageAvailability(options = {}) {
+    async function getPackageCatalog(options = {}) {
         const auth = credentials();
         if (!auth.username || !auth.password) throw new WonddAdapterError("WONDD_NOT_CONFIGURED", "WonDD credentials are not configured.", { category: "CONFIGURATION" });
         let response;
@@ -103,8 +103,27 @@ function createWonddAdapter(options = {}) {
         return {
             supported: true,
             evidence: "PROVIDER_PACKAGE_LIST_RETURNED",
-            packages: rows.map(row => ({
-                supplierProductCode: clean(row.servicecode || row.serviceid),
+            completenessEvidence: "SINGLE_RESPONSE_COMPLETENESS_UNPROVEN",
+            rows: rows.map(row => ({
+                serviceid: clean(row.serviceid),
+                packcode: clean(row.packcode),
+                name: clean(row.name),
+                point: row.point == null ? null : Number(row.point),
+                amount: Number(row.amount),
+                discount: Number(row.discount),
+                netpricedealer: Number(row.netpricedealer)
+            })),
+            packageCount: rows.length
+        };
+    }
+
+    async function getPackageAvailability(options = {}) {
+        const catalog = await getPackageCatalog(options);
+        return {
+            supported: catalog.supported,
+            evidence: catalog.evidence,
+            packages: catalog.rows.map(row => ({
+                supplierProductCode: clean(row.serviceid),
                 supplierPackageCode: clean(row.packcode),
                 supplierDisplayName: clean(row.name),
                 availability: "AVAILABLE"
@@ -151,7 +170,7 @@ function createWonddAdapter(options = {}) {
         return failure || normalizeWonddStatus(response, orderId);
     }
 
-    return { isConfigured, isMlbbAutoFulfillmentEnabled, isFreefireAutoFulfillmentEnabled, isProductAutoFulfillmentEnabled, autoFulfillmentGateState, isAutoFulfillmentEnabled, hasAnyAutoFulfillmentEnabled, getBalance, getPackageAvailability, buildTopupPayload, dryRunTopup, submitTopup, checkStatus };
+    return { isConfigured, isMlbbAutoFulfillmentEnabled, isFreefireAutoFulfillmentEnabled, isProductAutoFulfillmentEnabled, autoFulfillmentGateState, isAutoFulfillmentEnabled, hasAnyAutoFulfillmentEnabled, getBalance, getPackageCatalog, getPackageAvailability, buildTopupPayload, dryRunTopup, submitTopup, checkStatus };
 }
 
 function buildWonddMlbbGameId(userId, zoneId) {

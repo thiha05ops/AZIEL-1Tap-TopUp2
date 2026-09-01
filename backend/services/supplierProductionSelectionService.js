@@ -36,9 +36,15 @@ async function assessProductionMapping(mappingOrId) {
         CatalogPackage.findOne({ productCode: mapping.productCode, packageCode: mapping.packageCode, deletedAt: null }).lean(),
         FulfillmentAttempt.findOne({ supplierMappingId: mapping._id, status: "SUCCEEDED", supplierReference: { $ne: "" } }).select("_id").lean()
     ]);
+    return assessProductionMappingFromContext(mapping, { supplier, pkg, controlledTest });
+}
+
+function assessProductionMappingFromContext(mapping, { supplier = null, pkg = null, controlledTest = null } = {}) {
     const blockers = [];
     if (mapping.archivedAt) blockers.push("MAPPING_ARCHIVED");
-    if (!CORE_PRODUCTS.has(mapping.productCode)) blockers.push("PRODUCT_OUT_OF_CORE_SCOPE");
+    // Product support is established by the exact mapping, adapter/processor,
+    // feature gate and readiness evidence below. A hard-coded product allowlist
+    // would make prepared Master Catalog products require another code change.
     if (!pkg) blockers.push("CANONICAL_PACKAGE_MISSING");
     if (mapping.enabled !== true) blockers.push("MAPPING_DISABLED");
     if (!supplier?.enabled) blockers.push("SUPPLIER_DISABLED");
@@ -67,7 +73,7 @@ async function assessProductionMapping(mappingOrId) {
     return { ready: blockers.length === 0, blockers, mapping, supplier, package: pkg, featureGateEnabled: gateEnabled(mapping, adapter), controlledTestEvidence: Boolean(controlledTest) };
 }
 
-async function setProductionRole(mappingId, role, { session = null } = {}) {
+async function setProductionRole(mappingId, role, { session = null, replaceExistingPrimaryId = "", displacedRole = "" } = {}) {
     const normalizedRole = clean(role).toUpperCase();
     if (!Object.values(ROLES).includes(normalizedRole)) throw Object.assign(new Error("Invalid production role."), { code: "INVALID_PRODUCTION_ROLE" });
     const mapping = await Mapping.findById(mappingId).session(session);
@@ -75,7 +81,14 @@ async function setProductionRole(mappingId, role, { session = null } = {}) {
     if (normalizedRole === ROLES.PRIMARY) {
         const assessment = await assessProductionMapping(mapping.toObject());
         if (!assessment.ready) throw Object.assign(new Error(`Mapping cannot become PRIMARY: ${assessment.blockers.join(", ")}`), { code: "MAPPING_NOT_PRODUCTION_READY", blockers: assessment.blockers });
-        await Mapping.updateMany({ _id: { $ne: mapping._id }, productCode: mapping.productCode, packageCode: mapping.packageCode, region: mapping.region, productionRole: ROLES.PRIMARY }, { $set: { productionRole: ROLES.BACKUP } }, { session });
+        const existingPrimary = await Mapping.findOne({ _id: { $ne: mapping._id }, productCode: mapping.productCode, packageCode: mapping.packageCode, region: mapping.region, productionRole: ROLES.PRIMARY, archivedAt: null }).session(session);
+        if (existingPrimary) {
+            if (clean(replaceExistingPrimaryId) !== String(existingPrimary._id)) throw Object.assign(new Error("A different PRIMARY already exists; explicit Owner replacement is required."), { code: "PRIMARY_ROUTE_CONFLICT", currentPrimaryMappingId: String(existingPrimary._id) });
+            const normalizedDisplacedRole = clean(displacedRole).toUpperCase();
+            if (![ROLES.DISABLED, ROLES.BACKUP].includes(normalizedDisplacedRole)) throw Object.assign(new Error("Explicit replacement must state whether the displaced PRIMARY becomes DISABLED or BACKUP."), { code: "PRIMARY_REPLACEMENT_ROLE_REQUIRED" });
+            existingPrimary.productionRole = normalizedDisplacedRole;
+            await existingPrimary.save({ session });
+        }
     } else if (mapping.productionRole === ROLES.PRIMARY) {
         const [otherPrimary, product, pkg] = await Promise.all([
             Mapping.findOne({ _id: { $ne: mapping._id }, productCode: mapping.productCode, packageCode: mapping.packageCode, region: mapping.region, productionRole: ROLES.PRIMARY, archivedAt: null }).session(session).lean(),
@@ -184,4 +197,4 @@ function createRoutingAuthority({ legacyResolver = resolveLegacyCheckoutRouteSna
 
 const resolveCheckoutRouteSnapshot = createRoutingAuthority();
 
-module.exports = { ROLES, CORE_PRODUCTS, assessProductionMapping, setProductionRole, resolvePrimaryRouteSnapshot, resolveLegacyCheckoutRouteSnapshot, resolveCheckoutRouteSnapshot, compareRoutingDecisions, pilotV2Snapshot, createRoutingAuthority };
+module.exports = { ROLES, CORE_PRODUCTS, assessProductionMapping, assessProductionMappingFromContext, setProductionRole, resolvePrimaryRouteSnapshot, resolveLegacyCheckoutRouteSnapshot, resolveCheckoutRouteSnapshot, compareRoutingDecisions, pilotV2Snapshot, createRoutingAuthority };
