@@ -239,7 +239,7 @@ function getDatabaseProductFromRows(payload = {}, products = []) {
         );
     }
 
-    if (!isCanonicalProductCode(product.productCode)) {
+    if (!/^[a-z0-9][a-z0-9-]{0,79}$/.test(String(product.productCode || "").trim().toLowerCase())) {
         throw new CatalogError(
             "PRODUCT_NOT_FOUND",
             "Product is not available."
@@ -711,7 +711,7 @@ function projectCatalogProduct(product = {}, packages = [], {
 }
 
 function isAdminCanonicalCatalogProduct(product = {}) {
-    return isCanonicalProductCode(product.productCode) && product.deleted !== true;
+    return /^[a-z0-9][a-z0-9-]{0,79}$/.test(String(product.productCode || "").trim().toLowerCase()) && product.deleted !== true;
 }
 
 function projectCommerceReadiness(product = {}, packages = [], mappings = [], inventoryStates = [], suppliers = [], eligibilityContext = {}) {
@@ -1005,7 +1005,8 @@ async function toPublicCatalog(options = {}) {
 async function getCatalogProductDetail(productCode, options = {}) {
     const source = options.source || getCatalogSource();
     const requestedCode = String(productCode || "").trim().toLowerCase();
-    const normalizedCode = getCanonicalProduct(requestedCode)?.productCode || normalizeProductCode(requestedCode);
+    const normalizedCode = getCanonicalProduct(requestedCode)?.productCode || requestedCode;
+    if (!/^[a-z0-9][a-z0-9-]{0,79}$/.test(normalizedCode)) return null;
 
     if (source === "database") {
         const product = await CatalogProduct.findOne({ productCode: normalizedCode }).lean();
@@ -1081,9 +1082,8 @@ async function getCatalogProductDetail(productCode, options = {}) {
 
 async function resolveAdminCatalogProduct(productCode, options = {}) {
     const canonical = getCanonicalProduct(productCode);
-    if (!canonical) return null;
-
-    const canonicalCode = canonical.productCode;
+    const canonicalCode = canonical?.productCode || String(productCode || "").trim().toLowerCase();
+    if (!/^[a-z0-9][a-z0-9-]{0,79}$/.test(canonicalCode)) return null;
     const findProduct = options.findProduct || (code => CatalogProduct.findOne({ productCode: code }).lean());
     const findPackages = options.findPackages || (code => CatalogPackage.find({ productCode: code }).sort({ sortOrder: 1, packageCode: 1 }).lean());
     const findMappings = options.findMappings || (code => SupplierProductMapping.find({ productCode: code }).lean());
@@ -1092,6 +1092,7 @@ async function resolveAdminCatalogProduct(productCode, options = {}) {
         ? (() => [])
         : (code => PackageMarketPublication.find({ productCode: code, customerMarket: options.customerMarket || "TH" }).lean()));
     const product = await findProduct(canonicalCode);
+    if (!product && !canonical) return null;
     const [packages, mappings, inventoryStates, publications] = await Promise.all([
         findPackages(canonicalCode),
         findMappings(canonicalCode),
@@ -1099,11 +1100,11 @@ async function resolveAdminCatalogProduct(productCode, options = {}) {
         findPublications(canonicalCode)
     ]);
     const foundation = product ? {
-        ...canonical,
+        ...(canonical || {}),
         ...product,
         productCode: canonicalCode,
-        name: product.name || canonical.name,
-        supportedRegions: Array.isArray(product.supportedRegions) ? product.supportedRegions : canonical.supportedRegions
+        name: product.name || canonical?.name || canonicalCode,
+        supportedRegions: Array.isArray(product.supportedRegions) ? product.supportedRegions : (canonical?.supportedRegions || [])
     } : {
         ...canonical,
         enabled: true,
@@ -1139,7 +1140,7 @@ async function resolveAdminCatalogProduct(productCode, options = {}) {
         includeAdminPricing: options.includeAdminPricing !== false,
         publicProjection: false
     });
-    projection.canonicalMarket = canonical.market || foundation.market || "";
+    projection.canonicalMarket = canonical?.market || foundation.market || "";
     const packageIds = new Set(packages.map(item => String(item._id)));
     projection.commerceReadiness = projectCommerceReadiness(
         foundation,

@@ -1,4 +1,4 @@
-const { isCanonicalProductCode, resolveCanonicalProductRoute } = require("./canonicalOperationalCatalog");
+const { resolveCanonicalProductRoute } = require("./canonicalOperationalCatalog");
 
 const REGIONS = Object.freeze(["MM", "TH"]);
 
@@ -70,7 +70,10 @@ function regionReadiness(product = {}, packages = [], region, commerceReadiness 
 }
 
 function resolvePublicProductReadiness(product = {}, packages = [], commerceReadiness = {}) {
-    const canonical = isCanonicalProductCode(product.productCode);
+    // A persisted CatalogProduct owns canonical identity. The historical
+    // operational list only selects dedicated legacy pages; it is not the
+    // authority for Master Catalog membership.
+    const canonical = /^[a-z0-9][a-z0-9-]{0,79}$/.test(String(product.productCode || "").trim().toLowerCase()) && !product.deletedAt;
     const route = resolveCanonicalProductRoute(product.productCode);
     const regions = Object.fromEntries(REGIONS.map(region => [region, regionReadiness(product, packages, region, commerceReadiness)]));
     const blockers = [];

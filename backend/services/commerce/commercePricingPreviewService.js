@@ -4,7 +4,6 @@ const crypto = require("crypto");
 const CatalogProduct = require("../../models/CatalogProduct");
 const CatalogPackage = require("../../models/CatalogPackage");
 const { findCatalogPackageByIdentity } = require("./catalogPackageIdentityService");
-const { isCanonicalProductCode } = require("../../catalog/canonicalOperationalCatalog");
 const { isProductPubliclyEligible, productSupportsRegion } = require("../../catalog/productRegionAuthority");
 const { createPricingQuote } = require("./pricingQuoteRuntime");
 const { buildProductionPricingContext } = require("./productionPricingContextService");
@@ -42,7 +41,7 @@ async function loadCatalogPackage(input = {}) {
     const currency = normalizeCurrency(input.currency, region);
     if (!productCode || !packageCode) throw new CommercePricingPreviewError("INVALID_PRICING_PREVIEW", "Package selection is required.");
     const product = await CatalogProduct.findOne({ productCode }).lean();
-    if (!isCanonicalProductCode(productCode) || !product || !isProductPubliclyEligible(product)) {
+    if (!/^[a-z0-9][a-z0-9-]{0,79}$/.test(productCode) || !product || !isProductPubliclyEligible(product)) {
         throw new CommercePricingPreviewError("PRODUCT_UNAVAILABLE", "Selected product is no longer available.", 409, "PRODUCT_DISABLED");
     }
     if (!productSupportsRegion(product, region)) {

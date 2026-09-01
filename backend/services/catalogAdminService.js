@@ -13,11 +13,12 @@ const { normalizeProductKnowledge, normalizeCustomerNote, normalizeCustomerNoteL
 const { SUPPLIER_CURRENCY } = require("../constants/commerce");
 
 function normalizeAdminProductCode(value) {
-    const canonical = getCanonicalProduct(value);
-    if (!canonical) {
+    const requested = String(value || "").trim().toLowerCase();
+    const normalized = getCanonicalProduct(requested)?.productCode || requested;
+    if (!/^[a-z0-9][a-z0-9-]{0,79}$/.test(normalized)) {
         throw new CatalogAdminError("CATALOG_PRODUCT_UNSUPPORTED", "Product is not supported by the canonical catalog.", 409);
     }
-    return canonical.productCode;
+    return normalized;
 }
 
 class CatalogAdminError extends Error {
