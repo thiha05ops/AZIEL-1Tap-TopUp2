@@ -85,14 +85,39 @@ function sendCostAuthorityError(res,error){if(error instanceof SupplierCostAutho
 function sendIngestionError(res,error){if(error instanceof SupplierCatalogIngestionError||String(error?.code||"").startsWith("SUPPLIER_CATALOG_"))return res.status(error.statusCode||409).json({success:false,code:error.code,message:error.message,details:error.details||{}});console.log("Supplier catalog ingestion error:",error?.code||error?.name||"SUPPLIER_CATALOG_INGESTION_FAILED");return res.status(500).json({success:false,code:"SUPPLIER_CATALOG_INGESTION_FAILED",message:"Supplier catalog ingestion failed."})}
 function sendActivationError(res,error){if(error instanceof AdminProductActivationError)return res.status(error.statusCode||400).json({success:false,code:error.code,message:error.message,details:error.details||{}});console.log("Product activation error:",error?.code||error?.name||"PRODUCT_ACTIVATION_FAILED");return res.status(500).json({success:false,code:"PRODUCT_ACTIVATION_FAILED",message:"Product activation operation failed."})}
 function sendSourcePreparationError(res,error){if(error instanceof ProductSourcePreparationError)return res.status(error.statusCode||400).json({success:false,code:error.code,message:error.message,details:error.details||{}});console.log("Product source preparation error:",error?.code||error?.name||"PRODUCT_SOURCE_PREPARATION_FAILED");return res.status(500).json({success:false,code:"PRODUCT_SOURCE_PREPARATION_FAILED",message:"Product source preparation failed."})}
-function sendStoreSelectionError(res,error){if(error instanceof StoreCatalogSelectionError)return res.status(error.statusCode||400).json({success:false,code:error.code,message:error.message,details:error.details||{}});console.log("Store Catalog selection error:",error?.code||error?.name||"STORE_SELECTION_FAILED");return res.status(500).json({success:false,code:"STORE_SELECTION_FAILED",message:"Store Catalog operation failed."})}
+function sanitizeStoreSelectionErrorMessage(message) {
+    return String(message || "")
+        .replace(/(mongodb(?:\+srv)?:\/\/)[^@\s]+@/gi, "$1[REDACTED]@")
+        .replace(/\b(password|passwd|secret|token|authorization|api[_-]?key)\s*[=:]\s*[^\s,;]+/gi, "$1=[REDACTED]")
+        .slice(0, 500);
+}
+function storeSelectionErrorDiagnostics(error) {
+    return {
+        name: String(error?.name || "Error").slice(0, 100),
+        code: error?.code == null ? "" : String(error.code).slice(0, 100),
+        codeName: String(error?.codeName || "").slice(0, 100),
+        message: sanitizeStoreSelectionErrorMessage(error?.message)
+    };
+}
+function sendStoreSelectionError(res,error){if(error instanceof StoreCatalogSelectionError)return res.status(error.statusCode||400).json({success:false,code:error.code,message:error.message,details:error.details||{}});console.log("Store Catalog selection error:",storeSelectionErrorDiagnostics(error));return res.status(500).json({success:false,code:"STORE_SELECTION_FAILED",message:"Store Catalog operation failed."})}
+async function recordStoreSelectionAudit({ result, actor, req }, dependencies = {}) {
+    const auditWriter = dependencies.auditWriter || writeAdminAudit;
+    const logger = dependencies.logger || console.log;
+    try {
+        await auditWriter({actor,req,action:ADMIN_AUDIT_ACTIONS.STORE_CATALOG_SELECTION_SAVED,resourceType:"StoreCatalogSelection",resourceId:String(result.selection._id),metadata:{productCode:result.selection.productCode,supplierMarket:result.selection.supplierMarket,sellingRegions:result.selection.sellingRegions,packageCount:result.selection.packages.length}});
+        return { auditRecorded: true, auditWarning: "" };
+    } catch (error) {
+        logger("Store Catalog selection audit error:", storeSelectionErrorDiagnostics(error));
+        return { auditRecorded: false, auditWarning: "STORE_SELECTION_AUDIT_LOG_FAILED" };
+    }
+}
 
 router.get("/admin/product-activation", adminMiddleware, requireAdminPermission(PERMISSIONS.SUPPLIERS_READ), async (req,res)=>{
     try { res.set("Cache-Control","no-store"); return res.json({success:true,...await getProductActivationWorkspace(req.query)}); }
     catch(error){ return sendActivationError(res,error); }
 });
 router.get("/admin/store-catalog-selections",adminMiddleware,requireAdminPermission(PERMISSIONS.CATALOG_READ),async(req,res)=>{try{res.set("Cache-Control","no-store");return res.json({success:true,selections:await listStoreCatalogSelections(req.query)})}catch(error){return sendStoreSelectionError(res,error)}});
-router.post("/admin/store-catalog-selections",adminMiddleware,requireAdminPermission(PERMISSIONS.CATALOG_MANAGE),async(req,res)=>{try{const result=await saveStoreCatalogSelection(req.body,{actor:req.admin});await writeAdminAudit({actor:req.admin,req,action:ADMIN_AUDIT_ACTIONS.STORE_CATALOG_SELECTION_SAVED,resourceType:"StoreCatalogSelection",resourceId:String(result.selection._id),metadata:{productCode:result.selection.productCode,supplierMarket:result.selection.supplierMarket,sellingRegions:result.selection.sellingRegions,packageCount:result.selection.packages.length}});return res.json({success:true,...result})}catch(error){return sendStoreSelectionError(res,error)}});
+router.post("/admin/store-catalog-selections",adminMiddleware,requireAdminPermission(PERMISSIONS.CATALOG_MANAGE),async(req,res)=>{try{const result=await saveStoreCatalogSelection(req.body,{actor:req.admin});const audit=await recordStoreSelectionAudit({result,actor:req.admin,req});return res.json({success:true,...result,...audit})}catch(error){return sendStoreSelectionError(res,error)}});
 router.delete("/admin/store-catalog-selections/:selectionId/packages/:packageCode",adminMiddleware,requireAdminPermission(PERMISSIONS.CATALOG_MANAGE),async(req,res)=>{try{const result=await removeStoreCatalogPackage({selectionId:req.params.selectionId,packageCode:req.params.packageCode,expectedDecisionVersion:req.body?.expectedDecisionVersion,confirmed:req.body?.confirmed===true},{actor:req.admin});await writeAdminAudit({actor:req.admin,req,action:ADMIN_AUDIT_ACTIONS.STORE_CATALOG_PACKAGE_REMOVED,resourceType:"StoreCatalogSelection",resourceId:req.params.selectionId,metadata:{packageCode:req.params.packageCode,wasLive:result.wasLive}});return res.json({success:true,...result})}catch(error){return sendStoreSelectionError(res,error)}});
 router.patch("/admin/store-catalog-selections/:selectionId/regions/:region/visibility",adminMiddleware,requireAdminPermission(PERMISSIONS.CATALOG_MANAGE),async(req,res)=>{try{const result=await setStoreCatalogRegionVisibility({selectionId:req.params.selectionId,region:req.params.region,visible:req.body?.visible,expectedDecisionVersion:req.body?.expectedDecisionVersion},{actor:req.admin});await writeAdminAudit({actor:req.admin,req,action:ADMIN_AUDIT_ACTIONS.STORE_CATALOG_REGION_VISIBILITY_CHANGED,resourceType:"StoreCatalogSelection",resourceId:req.params.selectionId,metadata:{region:req.params.region,visible:req.body?.visible}});return res.json({success:true,...result})}catch(error){return sendStoreSelectionError(res,error)}});
 
@@ -323,3 +348,4 @@ router.post("/admin/fulfillments/:fulfillmentId/cancel", adminMiddleware, requir
 });
 
 module.exports = router;
+module.exports._test = { sanitizeStoreSelectionErrorMessage, storeSelectionErrorDiagnostics, recordStoreSelectionAudit };

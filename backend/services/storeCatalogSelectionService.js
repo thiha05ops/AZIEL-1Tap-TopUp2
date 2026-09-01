@@ -37,19 +37,15 @@ function createStoreCatalogSelectionService(models = {}) {
         if (!productCode || !supplierMarket || !supplierId || !sellingRegions.length || !mappingIds.length) throw new StoreCatalogSelectionError("STORE_SELECTION_INCOMPLETE", "Choose selling regions, product, supplier, and at least one package.");
         const transaction = context.transaction || (async fn => { const session = await mongoose.startSession(); try { let result; await session.withTransaction(async () => { result = await fn(session); }); return result; } finally { await session.endSession(); } });
         return transaction(async session => {
-            const [supplier, mappings, current] = await Promise.all([
-                lean(M.Supplier.findOne({ _id: supplierId }), session),
-                lean(M.Mapping.find({ _id: { $in: mappingIds }, productCode, supplierId, region: supplierMarket, archivedAt: null }), session),
-                lean(M.Selection.findOne({ productCode, supplierMarket }), session)
-            ]);
+            const supplier = await lean(M.Supplier.findOne({ _id: supplierId }), session);
+            const mappings = await lean(M.Mapping.find({ _id: { $in: mappingIds }, productCode, supplierId, region: supplierMarket, archivedAt: null }), session);
+            const current = await lean(M.Selection.findOne({ productCode, supplierMarket }), session);
             if (!supplier) throw new StoreCatalogSelectionError("STORE_SELECTION_SUPPLIER_MISSING", "The selected supplier is unavailable.", 404);
             if (current && Number(input.expectedDecisionVersion || 0) !== Number(current.decisionVersion || 0)) throw new StoreCatalogSelectionError("STORE_SELECTION_STALE", "This Store Catalog product changed. Refresh and review it again.", 409);
             if (mappings.length !== mappingIds.length) throw new StoreCatalogSelectionError("STORE_SELECTION_SCOPE_MISMATCH", "One or more packages do not belong to this exact product and supplier market.", 409);
             const offerIds = mappings.map(item => item.supplierCatalogOfferId).filter(Boolean), packageCodes = mappings.map(item => upper(item.packageCode));
-            const [offers, packages] = await Promise.all([
-                offerIds.length ? lean(M.Offer.find({ _id: { $in: offerIds } }), session) : [],
-                lean(M.Package.find({ productCode, packageCode: { $in: packageCodes }, deletedAt: null }), session)
-            ]);
+            const offers = offerIds.length ? await lean(M.Offer.find({ _id: { $in: offerIds } }), session) : [];
+            const packages = await lean(M.Package.find({ productCode, packageCode: { $in: packageCodes }, deletedAt: null }), session);
             const offerById = new Map(offers.map(item => [id(item), item])), packageSet = new Set(packages.map(item => upper(item.packageCode)));
             const invalid = mappings.filter(mapping => { const offer = offerById.get(id(mapping.supplierCatalogOfferId)); return !offer || id(offer.supplierId) !== supplierId || clean(offer.supplierOfferCode) !== clean(mapping.supplierPackageCode) || !packageSet.has(upper(mapping.packageCode)); });
             if (invalid.length) throw new StoreCatalogSelectionError("STORE_SELECTION_TECHNICAL_DATA_ISSUE", "Some selected packages have a technical data issue.", 409, { mappingIds: invalid.map(item => id(item)) });

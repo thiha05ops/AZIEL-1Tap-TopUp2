@@ -56,6 +56,7 @@
     "verify:safe-empty-storefront-cutover": "node backend/scripts/verify-safe-empty-storefront-cutover.js",
     "verify:safe-empty-storefront-production-readonly": "node backend/scripts/verify-safe-empty-storefront-production-readonly.js",
     "verify:admin-store-catalog-rendering": "node backend/scripts/verify-admin-store-catalog-rendering.js",
+    "verify:store-catalog-first-write": "node backend/scripts/verify-store-catalog-first-write.js",
     "plan:store-catalog-selection-backfill": "node backend/scripts/plan-store-catalog-selection-backfill.js",
     "verify:product-source-preparation": "node backend/scripts/verify-product-source-preparation.js",
     "verify:admin-supplier-catalog-zero-side-effects": "node backend/scripts/verify-admin-supplier-catalog-zero-side-effects.js",
