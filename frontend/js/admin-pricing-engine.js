@@ -278,6 +278,10 @@
                             : "UNCHANGED";
             const blocked = dailyBlockingReason();
             const selectionEligible = rowSelectionEligible(row);
+            const canReviewCost = window.AZIEL_ADMIN_AUTH?.hasPermission?.("SUPPLIER_COST_MANAGE") === true;
+            const costReviewAction = row.supplierCostStatus === "COST_REVIEW_REQUIRED" && row.mappingId && row.supplierCatalogOfferId && canReviewCost
+                ? `<button class="admin-secondary-btn pricing-review-cost" type="button" data-pricing-review-cost data-mapping-id="${text(row.mappingId)}" data-offer-id="${text(row.supplierCatalogOfferId)}" data-supplier-code="${text(row.supplierCode)}" data-product-code="${text(row.productCode)}" data-package-code="${text(row.packageCode)}" data-supplier-market="${text(row.mappingRegion)}">Review cost</button>`
+                : "";
             const overrideRegions = daily.region === "ALL" ? ["TH", "MM"] : [daily.region];
             const profitControls = overrideRegions.map(region => {
                 const override = row.regionalRows[region]?.profitOverride || { mode: "INHERIT", value: null };
@@ -287,7 +291,7 @@
             return `<tr data-pricing-row="${key}">
                 <td><input type="checkbox" data-row-selection="${key}" aria-label="Select ${text(row.packageName)}" ${daily.selected.has(key) ? "checked" : ""} ${selectionEligible ? "" : "disabled"}></td>
                 <td><strong>${text(row.packageName)}</strong><small>${text(row.productName)} · ${upper(row.packageCode)}</small><details class="pricing-mobile-regions"><summary>Regional prices</summary><div><b>Thailand</b>${regionalResult(row, preview, "TH")}</div><div><b>Myanmar</b>${regionalResult(row, preview, "MM")}</div></details></td>
-                <td><label class="pricing-cost-input"><input type="number" min="0.000001" step="0.000001" value="${value}" placeholder="${row.observedSupplierCost ?? ""}" data-supplier-cost="${key}" ${(blocked || row.supplierCostStatus === "COST_REVIEW_REQUIRED") ? `disabled title="${row.supplierCostStatus === "COST_REVIEW_REQUIRED" ? "Observed cost requires explicit approval in Supplier Cost Coverage" : blocked}"` : ""}><span>${row.supplierCurrency || supplier?.supplierCurrency || "-"}</span></label><small>${row.approvedSupplierCost != null ? `Approved: ${row.approvedSupplierCost} ${row.supplierCurrency}` : "Approved: —"}</small><small>${row.observedSupplierCost != null ? `Observed: ${row.observedSupplierCost} ${row.observedSupplierCurrency}` : "Observed: —"}</small>${row.supplierCostStatus === "COST_REVIEW_REQUIRED" ? '<small class="pricing-readiness-note">Cost approval required · provisional preview only</small>' : ""}</td>
+                <td><label class="pricing-cost-input"><input type="number" min="0.000001" step="0.000001" value="${value}" placeholder="${row.observedSupplierCost ?? ""}" data-supplier-cost="${key}" ${(blocked || row.supplierCostStatus === "COST_REVIEW_REQUIRED") ? `disabled title="${row.supplierCostStatus === "COST_REVIEW_REQUIRED" ? "Observed cost requires explicit approval in Supplier Cost Coverage" : blocked}"` : ""}><span>${row.supplierCurrency || supplier?.supplierCurrency || "-"}</span></label><small>${row.approvedSupplierCost != null ? `Approved: ${row.approvedSupplierCost} ${row.supplierCurrency}` : "Approved: —"}</small><small>${row.observedSupplierCost != null ? `Observed: ${row.observedSupplierCost} ${row.observedSupplierCurrency}` : "Observed: —"}</small>${row.supplierCostStatus === "COST_REVIEW_REQUIRED" ? '<small class="pricing-readiness-note">Cost approval required · provisional preview only</small>' : ""}${costReviewAction}</td>
                 <td>${profitControls}</td>
                 <td class="pricing-desktop-region">${regionalResult(row, preview, "TH")}</td><td class="pricing-desktop-region">${regionalResult(row, preview, "MM")}</td>
                 <td><span class="pricing-status is-${displayStatus.toLowerCase()}">${displayStatus}</span><small>${view.reason}</small></td>
@@ -691,6 +695,23 @@
         $("pricingSupplierSelect")?.addEventListener("change", event => { const supplier=daily.suppliers.find(item=>upper(item.supplierCode)===upper(event.target.value));daily.supplierId=supplier?String(supplier.id||supplier.supplierId||supplier._id):"";daily.supplierMarket="";daily.selectedProductId="";event.target.value=supplier?upper(supplier.supplierCode):"";daily.edits.clear(); daily.priceEdits.clear(); daily.selected.clear(); daily.previews.clear(); if(daily.supplierId)loadDaily(true); });
         $("pricingSupplierMarketSelect")?.addEventListener("change", event => { const value=upper(event.target.value);daily.supplierMarket=daily.supplierMarkets.some(item=>item.value===value)?value:"";event.target.value=daily.supplierMarket;daily.selectedProductId="";rememberDailyScope(daily);daily.edits.clear();daily.priceEdits.clear();daily.selected.clear();daily.previews.clear();if(daily.supplierMarket)loadDaily(true); });
         $("pricingPackageSearch")?.addEventListener("input", event => { daily.search = event.target.value; renderRows(); });
+        $("pricingPackageRows")?.addEventListener("click", async event => {
+            const trigger = event.target.closest("[data-pricing-review-cost]");
+            if (!trigger || window.AZIEL_ADMIN_AUTH?.hasPermission?.("SUPPLIER_COST_MANAGE") !== true) return;
+            const row = regionRows().find(item => String(item.mappingId) === trigger.dataset.mappingId && String(item.supplierCatalogOfferId) === trigger.dataset.offerId);
+            if (!row || row.supplierCostStatus !== "COST_REVIEW_REQUIRED") return;
+            const review = window.AZIEL_SUPPLIER_COST_AUTHORITY_REVIEW;
+            if (!review?.open) return setDailyError("Supplier cost review is unavailable.");
+            $("pricingDailyState").textContent = "Reviewing supplier cost";
+            const opened = await review.open(row.supplierCatalogOfferId, {
+                mappingId: row.mappingId,
+                onApproved: async () => {
+                    $("pricingDailyState").textContent = "Cost approved · refreshing";
+                    await loadDaily(true);
+                }
+            });
+            if (opened) $("pricingDailyState").textContent = "Ready";
+        });
         $("pricingPackageRows")?.addEventListener("input", event => { const key = event.target.dataset.supplierCost; if (key) { const value = Number(event.target.value); if (Number.isFinite(value) && value > 0) daily.edits.set(key, { value }); else daily.edits.delete(key); daily.previews.delete(key); $("pricingDraftState").textContent = "Unsaved Changes"; schedulePreview(); updatePublishState(); return; } const control = event.target.closest("[data-price-control]"); if (control && event.target.matches("[data-price-value]")) updatePriceEdit(control); });
         $("pricingPackageRows")?.addEventListener("change", event => {
             if (event.target.matches("[data-row-selection]")) { if (event.target.disabled) return; event.target.checked ? daily.selected.add(event.target.dataset.rowSelection) : daily.selected.delete(event.target.dataset.rowSelection); updatePublishState(); $("pricingDailySummary").textContent = `${visibleRows().length} visible · ${daily.selected.size} selected`; return; }

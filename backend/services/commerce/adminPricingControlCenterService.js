@@ -111,15 +111,18 @@ async function loadDailyPricingWorkspace({ supplierId = "", supplierMarket = "",
             Boolean(text(mapping.supplierProductCode)) &&
             Boolean(text(mapping.supplierPackageCode));
         const previewEligible = exactMappingReady && Number.isFinite(costState.previewSupplierCost);
-        const readinessReasons = [];
-        if (!exactMappingReady) readinessReasons.push(readinessReason("EXACT_MAPPING_REQUIRED", "Exact supplier mapping required"));
-        if (!costState.authoritative) readinessReasons.push(readinessReason("EXACT_MAPPING_COST_APPROVAL_REQUIRED", "Cost approval required"));
-        if (pkg.enabled === false) readinessReasons.push(readinessReason("CANONICAL_PACKAGE_DISABLED", "Package activation required"));
+        const preparationReasons = [];
+        if (!exactMappingReady) preparationReasons.push(readinessReason("EXACT_MAPPING_REQUIRED", "Exact supplier mapping required"));
+        if (!costState.authoritative) preparationReasons.push(readinessReason("EXACT_MAPPING_COST_APPROVAL_REQUIRED", "Cost approval required"));
+        if (pkg.enabled === false) preparationReasons.push(readinessReason("CANONICAL_PACKAGE_DISABLED", "Package activation required"));
         const pricingRegions = canonicalPricingRegions(product, pkg, normalizedRegion, { allowDisabledPackage: storeSelectionExplicit });
         return pricingRegions.map(pricingRegion => {
             const price = pkg.prices?.[pricingRegion] || null;
+            const readinessReasons = [...preparationReasons, ...(storeSelectionExplicit ? storePublicationReadinessReasons({ mapping, pkg, selections: storeSelections, regions: [pricingRegion] }) : [])]
+                .filter((item, index, list) => list.findIndex(candidate => candidate.code === item.code) === index);
             return {
             rowId: String(mapping._id), mappingId: String(mapping._id), supplierId: selected.id, supplierCode: selected.supplierCode,
+            supplierCatalogOfferId: mapping.supplierCatalogOfferId ? String(mapping.supplierCatalogOfferId) : "",
             productCode: mapping.productCode, productName: product?.name || mapping.productCode,
             packageId: String(pkg._id), packageCode: pkg.packageCode, packageName: pkg.name,
             supplierProductCode: mapping.supplierProductCode, supplierPackageCode: mapping.supplierPackageCode,
