@@ -3,6 +3,7 @@
 const crypto = require("crypto");
 const { isCanonicalProductCode } = require("../../catalog/canonicalOperationalCatalog");
 const CatalogPackage = require("../../models/CatalogPackage");
+const { CatalogError, resolvePackagePrice } = require("../catalogService");
 const { findCatalogPackageByIdentity } = require("./catalogPackageIdentityService");
 const PaymentMethod = require("../../models/PaymentMethod");
 const { paymentMethodCapabilityState } = require("../paymentProviderRegistry");
@@ -80,12 +81,39 @@ async function loadCatalogPackage(input = {}) {
         throw new CustomerManualPromptPayCheckoutError(ERROR_CODES.PACKAGE_UNAVAILABLE, "Selected package is no longer available.", 409);
     }
 
+    let publicPackage;
+    try {
+        publicPackage = await resolvePackagePrice({
+            productCode,
+            packageCode,
+            region,
+            currency
+        });
+    } catch (error) {
+        if (!(error instanceof CatalogError) || error.code === "CATALOG_UNAVAILABLE") throw error;
+        throw new CustomerManualPromptPayCheckoutError(
+            ERROR_CODES.PACKAGE_UNAVAILABLE,
+            "Selected package is no longer available.",
+            409
+        );
+    }
+
     const pkg = await findCatalogPackageByIdentity(productCode, packageCode, {
         enabled: true,
         deletedAt: null
     }).lean();
     const price = pkg?.prices?.[region];
-    if (!pkg || !price || price.enabled === false || normalizeCurrency(price.currency, region) !== currency) {
+    if (
+        !pkg ||
+        !price ||
+        price.enabled === false ||
+        normalizeCurrency(price.currency, region) !== currency ||
+        publicPackage.productCode !== productCode ||
+        publicPackage.packageCode !== pkg.packageCode ||
+        publicPackage.region !== region ||
+        publicPackage.currency !== currency ||
+        Number(publicPackage.amount) !== Number(price.amount)
+    ) {
         throw new CustomerManualPromptPayCheckoutError(ERROR_CODES.PACKAGE_UNAVAILABLE, "Selected package is no longer available.", 409);
     }
 

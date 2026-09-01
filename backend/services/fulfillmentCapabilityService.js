@@ -69,7 +69,7 @@ function isProductionReadyFulfillmentMapping(mapping = {}, supplier = {}, contex
     return assessProductionReadyFulfillmentMapping(mapping, supplier, context).ready;
 }
 
-function eligibleMappingsForPackage({ mappings = [], suppliers = [], productCode = "", packageCode = "", region = "" } = {}) {
+function eligibleMappingsForPackage({ mappings = [], suppliers = [], productCode = "", packageCode = "", region = "", context = {} } = {}) {
     const normalizedProduct = String(productCode || "").trim().toLowerCase();
     const normalizedPackage = String(packageCode || "").trim().toUpperCase();
     const normalizedRegion = normalizeRegion(region);
@@ -82,6 +82,7 @@ function eligibleMappingsForPackage({ mappings = [], suppliers = [], productCode
         if (!isCustomerMarketEligible(mapping.fulfillmentEligibility, normalizedRegion)) return [];
         if (Array.isArray(supplier.supportedRegions) && supplier.supportedRegions.length && !supplier.supportedRegions.includes(normalizedRegion)) return [];
         if (isSupplierMappedAutoTopupThScope({ productCode: normalizedProduct, region: normalizedRegion }) && !isProductionReadyFulfillmentMapping(mapping, supplier, {
+            ...context,
             productCode: normalizedProduct,
             packageCode: normalizedPackage,
             region: normalizedRegion
@@ -90,8 +91,8 @@ function eligibleMappingsForPackage({ mappings = [], suppliers = [], productCode
     });
 }
 
-function resolveFulfillmentCapability({ product = {}, mappings = [], suppliers = [], productCode = "", packageCode = "", region = "" } = {}) {
-    const eligible = eligibleMappingsForPackage({ mappings, suppliers, productCode, packageCode, region });
+function resolveFulfillmentCapability({ product = {}, mappings = [], suppliers = [], productCode = "", packageCode = "", region = "", context = {} } = {}) {
+    const eligible = eligibleMappingsForPackage({ mappings, suppliers, productCode, packageCode, region, context });
     const automatedRoutes = eligible.filter(item => item.routeType === "SUPPLIER_API");
     const supplierManualRoutes = eligible.filter(item => item.routeType === "SUPPLIER_MANUAL");
     const manualAdminAllowed = isSupplierMappedAutoTopupThScope({ productCode, region }) ? false : isManualFulfillmentAllowed(product, region);
@@ -114,7 +115,6 @@ async function loadFulfillmentCapability({ productCode = "", packageCode = "", r
     const mappingQuery = SupplierProductMapping.find({
         productCode: normalizedProduct,
         packageCode: normalizedPackage,
-        region: normalizedRegion,
         enabled: true
     });
     if (session) {

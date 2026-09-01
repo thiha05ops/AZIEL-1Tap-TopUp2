@@ -32,7 +32,6 @@ function loadCheckoutContract() {
 function sourceContracts() {
     const detail = read("frontend/js/game-flow.js");
     const review = read("frontend/js/product-checkout.js");
-    const methods = read("frontend/js/payment-method-page.js");
     const payment = read("frontend/js/payment/payment-engine.js");
     const receipt = read("frontend/js/payment/payment-manual.js");
     const recovery = read("frontend/js/payment/pending-payment-recovery.js");
@@ -40,10 +39,11 @@ function sourceContracts() {
 
     assert(detail.includes('sessionStorage.setItem("azielProductCheckoutDraft"'), "Game Detail must stage the review draft.");
     assert(review.includes('"/api/commerce/checkout/review"'), "Review must obtain a persisted authoritative quote.");
-    assert(review.includes('window.location.href = "payment-method.html"'), "Valid review must navigate to payment methods.");
+    assert(review.includes("window.AZIEL_PAYMENT.start"), "Valid inline review must hand the authoritative quote to the selected payment method.");
+    assert(review.includes('document.addEventListener("paymentChanged", updatePaymentReady)'), "Inline payment selection must refresh checkout readiness.");
     assert(!review.includes("validateCatalog(draft.order)"), "Review must not compare its quote against a raw catalog amount.");
-    assert(methods.includes("if (submitting || !payment?.key) return"), "Payment-method submit must reject double click.");
-    assert(methods.includes("reviewQuoteId: draft.review.quoteId"), "Payment creation must retain the authoritative quote identifier.");
+    assert(review.includes("if (paymentSubmitting || paymentCommitted"), "Inline payment submit must reject double click and committed replay.");
+    assert(review.includes("reviewQuoteId: authoritativeReview.quoteId"), "Payment creation must retain the authoritative quote identifier.");
     assert(payment.includes('"/api/commerce/checkout/manual-promptpay"'), "Manual PromptPay must use Commerce checkout.");
     assert(receipt.includes("/api/commerce/orders/"), "Receipt must bind through the Commerce endpoint.");
     assert(recovery.includes('"/api/commerce/payments/recoverable"'), "Refresh recovery must be server-backed.");

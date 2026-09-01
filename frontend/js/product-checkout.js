@@ -1,6 +1,7 @@
 (function () {
     const t = (key, fallback, params) => window.AZIEL_LOCALE?.t?.(key, fallback, params) || fallback.replace(/\{(\w+)\}/g, (_, name) => params?.[name] ?? `{${name}}`);
     const STORAGE_KEY = "azielProductCheckoutDraft";
+    const REVIEW_TIMEOUT_MS = 15000;
     let draft = null;
     let authoritativeReview = null;
     let reviewLoading = false;
@@ -103,6 +104,13 @@
         }
     }
 
+    function renderReviewFailure() {
+        const unavailable = t("checkout.reviewUnavailable", "Unavailable");
+        for (const id of ["checkoutBasePrice", "checkoutDiscount", "checkoutPromo", "checkoutTotal", "checkoutSummaryTotal"]) {
+            setReviewValue(id, unavailable);
+        }
+    }
+
     function showRecoveryActions(show) {
         const actions = document.getElementById("checkoutRecoveryActions");
         if (actions) actions.hidden = !show;
@@ -152,9 +160,12 @@
         showRecoveryActions(false);
         updatePaymentReady();
         feedback(t("checkout.verifyingReview", "Verifying package, promotion, and total with AZIEL..."));
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), REVIEW_TIMEOUT_MS);
         try {
             const res = await fetch("/api/commerce/checkout/review", {
                 method: "POST",
+                signal: controller.signal,
                 headers: {
                     "Content-Type": "application/json",
                     ...(window.AZIEL?.authHeaders?.() || window.PaymentUtils?.authHeaders?.() || {})
@@ -177,16 +188,23 @@
                 error.code = data.code || `HTTP_${res.status}`;
                 throw error;
             }
-            authoritativeReview = data.review;
+            authoritativeReview = validateReviewForHandoff(data.review);
             renderAuthoritativeReview(authoritativeReview);
             reconcileDraft(authoritativeReview);
             showRecoveryActions(false);
         } catch (error) {
-            draft = { ...draft, authoritativeStatus: "failed", reviewErrorCode: error?.code || "REVIEW_FAILED" };
+            const timedOut = error?.name === "AbortError";
+            const errorCode = timedOut ? "REVIEW_TIMEOUT" : (error?.code || "REVIEW_FAILED");
+            const errorMessage = timedOut
+                ? t("checkout.reviewTimeout", "Checkout review timed out.")
+                : (error?.message || t("checkout.reviewFailed", "Checkout review could not be verified."));
+            renderReviewFailure();
+            draft = { ...draft, authoritativeStatus: "failed", reviewErrorCode: errorCode };
             sessionStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
-            feedback(`${error?.message || t("checkout.reviewFailed", "Checkout review could not be verified.")} ${t("checkout.chooseRecovery", "Retry, or return to change the package.")}`, true);
+            feedback(`${errorMessage} ${t("checkout.chooseRecovery", "Retry, or return to change the package.")}`, true);
             showRecoveryActions(true);
         } finally {
+            window.clearTimeout(timeoutId);
             reviewLoading = false;
             updatePaymentReady();
         }

@@ -132,6 +132,7 @@
     "verify:public-checkout-price-refresh": "node backend/scripts/verify-public-checkout-price-refresh.js",
     "verify:public-order-flow-continuity": "node backend/scripts/verify-public-order-flow-continuity.js",
     "verify:commerce-customer-order-consistency": "node backend/scripts/verify-commerce-customer-order-consistency.js",
+    "verify:checkout-review-boundary": "node backend/scripts/verify-checkout-review-boundary.js",
     "verify:admin-game-presentation": "node backend/scripts/verify-admin-game-presentation.js",
     "verify:admin-catalog": "node backend/scripts/verify-admin-catalog-control.js",
     "verify:admin-catalog:isolated": "node backend/scripts/verify-admin-catalog-control.js --isolated",
