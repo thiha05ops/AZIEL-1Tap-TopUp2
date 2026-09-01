@@ -155,13 +155,18 @@
 
     function statusView(row, preview, regionFilter = ["TH", "MM"]) {
         if (row.previewEligible === false) return { status: "BLOCKED", reason: row.previewabilityReason || "Supplier cost is unavailable for preview", regions: [] };
-        if (!daily.edits.has(rowKey(row)) && row.supplierCost == null && row.savedDraftSupplierCost == null && row.publishedSupplierPrice == null) return { status: "MISSING", reason: "Supplier cost required", regions: [] };
+        if (!daily.edits.has(rowKey(row)) && row.previewSupplierCost == null && row.supplierCost == null && row.savedDraftSupplierCost == null && row.publishedSupplierPrice == null) return { status: "MISSING", reason: "Supplier cost required", regions: [] };
         if (preview == null) {
             if (daily.previewError) return { status: "BLOCKED", reason: `Pricing preview unavailable: ${daily.previewError}`, regions: [], code: "PREVIEW_FAILED" };
             if (daily.previewCompleted) return { status: "BLOCKED", reason: `Preview identity mismatch for ${rowKey(row)}`, regions: [], code: "PREVIEW_IDENTITY_MISMATCH" };
             return { status: "WARNING", reason: "Preview pending", regions: [], code: "PREVIEW_PENDING" };
         }
         const regions = (preview?.regions || []).filter(item => row.regionalRows?.[item.region] && regionFilter.includes(item.region));
+        const readinessReasons = [...(row.readinessReasons || []), ...(preview?.readinessReasons || [])]
+            .filter((item, index, list) => list.findIndex(candidate => candidate.code === item.code) === index);
+        if (preview?.publishEligible === false && readinessReasons.length) {
+            return { status: "BLOCKED", reason: readinessReasons.map(item => item.message).join(" · "), regions, code: readinessReasons[0].code };
+        }
         const expectedRegions = regionFilter.filter(region => row.regionalRows?.[region]);
         const returnedRegions = new Set(regions.map(item => item.region));
         const missingRegions = expectedRegions.filter(region => !returnedRegions.has(region));
@@ -282,7 +287,7 @@
             return `<tr data-pricing-row="${key}">
                 <td><input type="checkbox" data-row-selection="${key}" aria-label="Select ${text(row.packageName)}" ${daily.selected.has(key) ? "checked" : ""} ${selectionEligible ? "" : "disabled"}></td>
                 <td><strong>${text(row.packageName)}</strong><small>${text(row.productName)} · ${upper(row.packageCode)}</small><details class="pricing-mobile-regions"><summary>Regional prices</summary><div><b>Thailand</b>${regionalResult(row, preview, "TH")}</div><div><b>Myanmar</b>${regionalResult(row, preview, "MM")}</div></details></td>
-                <td><label class="pricing-cost-input"><input type="number" min="0.000001" step="0.000001" value="${value}" placeholder="${row.observedSupplierCost ?? ""}" data-supplier-cost="${key}" ${(blocked || row.supplierCostStatus === "COST_REVIEW_REQUIRED") ? `disabled title="${row.supplierCostStatus === "COST_REVIEW_REQUIRED" ? "Observed cost requires explicit approval in Supplier Cost Coverage" : blocked}"` : ""}><span>${row.supplierCurrency || supplier?.supplierCurrency || "-"}</span></label><small>${row.supplierCostStatus || "COST_MISSING"}${row.observedSupplierCost != null ? ` · observed ${row.observedSupplierCost} ${row.observedSupplierCurrency}` : ""}</small></td>
+                <td><label class="pricing-cost-input"><input type="number" min="0.000001" step="0.000001" value="${value}" placeholder="${row.observedSupplierCost ?? ""}" data-supplier-cost="${key}" ${(blocked || row.supplierCostStatus === "COST_REVIEW_REQUIRED") ? `disabled title="${row.supplierCostStatus === "COST_REVIEW_REQUIRED" ? "Observed cost requires explicit approval in Supplier Cost Coverage" : blocked}"` : ""}><span>${row.supplierCurrency || supplier?.supplierCurrency || "-"}</span></label><small>${row.approvedSupplierCost != null ? `Approved: ${row.approvedSupplierCost} ${row.supplierCurrency}` : "Approved: —"}</small><small>${row.observedSupplierCost != null ? `Observed: ${row.observedSupplierCost} ${row.observedSupplierCurrency}` : "Observed: —"}</small>${row.supplierCostStatus === "COST_REVIEW_REQUIRED" ? '<small class="pricing-readiness-note">Cost approval required · provisional preview only</small>' : ""}</td>
                 <td>${profitControls}</td>
                 <td class="pricing-desktop-region">${regionalResult(row, preview, "TH")}</td><td class="pricing-desktop-region">${regionalResult(row, preview, "MM")}</td>
                 <td><span class="pricing-status is-${displayStatus.toLowerCase()}">${displayStatus}</span><small>${view.reason}</small></td>
@@ -334,10 +339,10 @@
 
     function buildPreviewRows() {
         const supplier = activeSupplier();
-        return regionRows().filter(row => row.previewEligible !== false && (daily.edits.has(rowKey(row)) || row.supplierCost != null || row.savedDraftSupplierCost != null || row.publishedSupplierPrice != null)).map(row => ({
+        return regionRows().filter(row => row.previewEligible !== false && (daily.edits.has(rowKey(row)) || row.previewSupplierCost != null || row.supplierCost != null || row.savedDraftSupplierCost != null || row.publishedSupplierPrice != null)).map(row => ({
             rowId: rowKey(row), productCode: row.productCode, packageCode: row.packageCode,
             mappingId: row.mappingId,
-            newSupplierCost: daily.edits.has(rowKey(row)) ? daily.edits.get(rowKey(row)).value : (row.supplierCost ?? row.savedDraftSupplierCost ?? row.publishedSupplierPrice),
+            newSupplierCost: daily.edits.has(rowKey(row)) ? daily.edits.get(rowKey(row)).value : (row.previewSupplierCost ?? row.supplierCost ?? row.savedDraftSupplierCost ?? row.publishedSupplierPrice),
             supplierCurrency: supplier.supplierCurrency, supplierName: supplier.name,
             expectedUpdatedAt: row.updatedAt, priceInstructions: priceInstructions(row),
             supplierCostEdited: daily.edits.has(rowKey(row)), selected: daily.selected.has(rowKey(row))

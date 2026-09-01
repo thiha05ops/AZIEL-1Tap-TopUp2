@@ -47,6 +47,7 @@
     "verify:admin-region-first-scoping": "node backend/scripts/verify-admin-region-first-scoping.js",
     "verify:production-supplier-market-attribution": "node backend/scripts/verify-production-supplier-market-attribution.js",
     "verify:daily-pricing-navigation-clarity": "node backend/scripts/verify-daily-pricing-navigation-clarity.js",
+    "verify:store-catalog-daily-pricing-preparation": "node backend/scripts/verify-store-catalog-daily-pricing-preparation.js",
     "verify:daily-pricing-post-publish": "node backend/scripts/verify-daily-pricing-post-publish-reconciliation.js",
     "verify:admin-operator-first": "node backend/scripts/verify-admin-operator-first-workflows.js",
     "verify:admin-guided-selling": "node backend/scripts/verify-admin-guided-selling-workflow.js",
