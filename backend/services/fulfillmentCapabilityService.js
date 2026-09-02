@@ -1,6 +1,8 @@
 const CatalogProduct = require("../models/CatalogProduct");
 const Supplier = require("../models/Supplier");
 const SupplierProductMapping = require("../models/SupplierProductMapping");
+const SupplierCatalogOffer = require("../models/SupplierCatalogOffer");
+const SupplierOfferAvailability = require("../models/SupplierOfferAvailability");
 const { getSupplierAdapter } = require("./supplierAdapterRegistry");
 const { supportsMapping } = require("./suppliers/supplierFulfillmentDispatcher");
 const { validateFulfillmentEligibility, isCustomerMarketEligible } = require("./supplierFulfillmentEligibilityService");
@@ -60,7 +62,23 @@ function assessProductionReadyFulfillmentMapping(mapping = {}, supplier = {}, co
     const mappingSupportResolver = context.mappingSupportResolver || supportsMapping;
     const adapter = supplier ? adapterResolver(supplier) : null;
     if (!adapter?.isConfigured?.()) blockers.push("SUPPLIER_ADAPTER_NOT_READY");
+    if (adapter?.isAutoFulfillmentEnabled?.(mapping.productCode) !== true) {
+        let blocker = "PROVIDER_FEATURE_GATE_OFF";
+        try { if (adapter?.autoFulfillmentGateState?.(mapping.productCode)?.blockerCode === "SUPPLIER_AUTO_FULFILLMENT_DISABLED") blocker = "SUPPLIER_AUTO_FULFILLMENT_DISABLED"; } catch { /* Fail closed. */ }
+        blockers.push(blocker);
+    }
     if (!mappingSupportResolver(mapping)) blockers.push("FULFILLMENT_PROCESSOR_NOT_READY");
+    if (context.requireCatalogEvidence) {
+        const offer = context.offer;
+        const availability = context.availability;
+        const offerMatches = offer && String(offer._id) === String(mapping.supplierCatalogOfferId) &&
+            String(offer.supplierId) === String(mapping.supplierId) &&
+            String(offer.supplierProductCode || "").trim() === String(mapping.supplierProductCode || "").trim() &&
+            String(offer.supplierOfferCode || "").trim() === String(mapping.supplierPackageCode || "").trim() &&
+            String(offer.catalogLifecycleState || "").toUpperCase() === "ACTIVE";
+        if (!offerMatches) blockers.push("SUPPLIER_OFFER_NOT_ACTIVE");
+        if (!availability || String(availability.supplierCatalogOfferId) !== String(mapping.supplierCatalogOfferId) || String(availability.state || "").toUpperCase() !== "AVAILABLE" || availability.coverageComplete !== true) blockers.push("SUPPLIER_AVAILABILITY_NOT_CONFIRMED");
+    }
 
     return { ready: blockers.length === 0, blockers: [...new Set(blockers)].sort(), eligibility: eligibility.value };
 }
@@ -81,8 +99,10 @@ function eligibleMappingsForPackage({ mappings = [], suppliers = [], productCode
         if (String(mapping.packageCode || "").toUpperCase() !== normalizedPackage) return [];
         if (!isCustomerMarketEligible(mapping.fulfillmentEligibility, normalizedRegion)) return [];
         if (Array.isArray(supplier.supportedRegions) && supplier.supportedRegions.length && !supplier.supportedRegions.includes(normalizedRegion)) return [];
-        if (isSupplierMappedAutoTopupThScope({ productCode: normalizedProduct, region: normalizedRegion }) && !isProductionReadyFulfillmentMapping(mapping, supplier, {
+        if (!isProductionReadyFulfillmentMapping(mapping, supplier, {
             ...context,
+            offer: context.offerByMappingId?.get(String(mapping._id)) || context.offer,
+            availability: context.availabilityByMappingId?.get(String(mapping._id)) || context.availability,
             productCode: normalizedProduct,
             packageCode: normalizedPackage,
             region: normalizedRegion
@@ -95,7 +115,10 @@ function resolveFulfillmentCapability({ product = {}, mappings = [], suppliers =
     const eligible = eligibleMappingsForPackage({ mappings, suppliers, productCode, packageCode, region, context });
     const automatedRoutes = eligible.filter(item => item.routeType === "SUPPLIER_API");
     const supplierManualRoutes = eligible.filter(item => item.routeType === "SUPPLIER_MANUAL");
-    const manualAdminAllowed = isSupplierMappedAutoTopupThScope({ productCode, region }) ? false : isManualFulfillmentAllowed(product, region);
+    const identifiedPrimary = mappings.some(mapping => !mapping.archivedAt && String(mapping.productionRole || "").toUpperCase() === "PRIMARY" &&
+        String(mapping.productCode || "").toLowerCase() === String(productCode || "").toLowerCase() &&
+        String(mapping.packageCode || "").toUpperCase() === String(packageCode || "").toUpperCase());
+    const manualAdminAllowed = !identifiedPrimary && isManualFulfillmentAllowed(product, region);
     return {
         manualAdminAllowed,
         automatedAvailable: automatedRoutes.length > 0,
@@ -115,7 +138,7 @@ async function loadFulfillmentCapability({ productCode = "", packageCode = "", r
     const mappingQuery = SupplierProductMapping.find({
         productCode: normalizedProduct,
         packageCode: normalizedPackage,
-        enabled: true
+        archivedAt: null
     });
     if (session) {
         productQuery.session(session);
@@ -124,8 +147,15 @@ async function loadFulfillmentCapability({ productCode = "", packageCode = "", r
     const [product, mappings] = await Promise.all([productQuery.lean(), mappingQuery.lean()]);
     const supplierQuery = Supplier.find({ _id: { $in: mappings.map(item => item.supplierId) }, enabled: true });
     if (session) supplierQuery.session(session);
-    const suppliers = await supplierQuery.lean();
-    return resolveFulfillmentCapability({ product: product || {}, mappings, suppliers, productCode: normalizedProduct, packageCode: normalizedPackage, region: normalizedRegion });
+    const offerQuery = SupplierCatalogOffer.find({ _id: { $in: mappings.map(item => item.supplierCatalogOfferId).filter(Boolean) } });
+    const availabilityQuery = SupplierOfferAvailability.find({ supplierCatalogOfferId: { $in: mappings.map(item => item.supplierCatalogOfferId).filter(Boolean) } });
+    if (session) { supplierQuery.session(session); offerQuery.session(session); availabilityQuery.session(session); }
+    const [suppliers, offers, availabilityRows] = await Promise.all([supplierQuery.lean(), offerQuery.lean(), availabilityQuery.lean()]);
+    const offerById = new Map(offers.map(offer => [String(offer._id), offer]));
+    const availabilityByOfferId = new Map(availabilityRows.map(row => [String(row.supplierCatalogOfferId), row]));
+    const offerByMappingId = new Map(mappings.map(mapping => [String(mapping._id), offerById.get(String(mapping.supplierCatalogOfferId))]));
+    const availabilityByMappingId = new Map(mappings.map(mapping => [String(mapping._id), availabilityByOfferId.get(String(mapping.supplierCatalogOfferId))]));
+    return resolveFulfillmentCapability({ product: product || {}, mappings, suppliers, productCode: normalizedProduct, packageCode: normalizedPackage, region: normalizedRegion, context: { requireCatalogEvidence: true, offerByMappingId, availabilityByMappingId } });
 }
 
 module.exports = {

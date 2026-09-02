@@ -129,7 +129,7 @@ async function verifyBackend() {
     const supplier = { _id: "supplier", enabled: true, mode: "API", supportedRegions: ["TH"] };
     const capability = resolveFulfillmentCapability({
         product: {}, mappings: [mapping], suppliers: [supplier], productCode: "mlbb", packageCode, region: "TH",
-        context: { adapterResolver: () => ({ isConfigured: () => true }), mappingSupportResolver: () => true }
+        context: { adapterResolver: () => ({ isConfigured: () => true, isAutoFulfillmentEnabled: () => true }), mappingSupportResolver: () => true }
     });
     assert.strictEqual(capability.fulfillmentAvailable, true, "GLOBAL supplier market must be eligible for its explicitly allowed TH customer market.");
 

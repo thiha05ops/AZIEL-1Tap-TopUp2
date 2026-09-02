@@ -4,6 +4,8 @@ const CatalogPackage = require("../models/CatalogPackage");
 const Supplier = require("../models/Supplier");
 const Mapping = require("../models/SupplierProductMapping");
 const FulfillmentAttempt = require("../models/FulfillmentAttempt");
+const SupplierCatalogOffer = require("../models/SupplierCatalogOffer");
+const SupplierOfferAvailability = require("../models/SupplierOfferAvailability");
 const { getSupplierAdapter } = require("./supplierAdapterRegistry");
 const {
     validateFulfillmentEligibility,
@@ -23,7 +25,7 @@ function gateEnabled(mapping, adapter) {
     try { return adapter?.isAutoFulfillmentEnabled?.(mapping.productCode) === true; } catch { return false; }
 }
 
-function basicCandidateBlockers({ mapping = {}, supplier = {}, pkg = {}, customerMarket = "", now = new Date(), adapter = null, controlledTestEvidence = false } = {}) {
+function basicCandidateBlockers({ mapping = {}, supplier = {}, pkg = {}, customerMarket = "", adapter = null, controlledTestEvidence = false, offer = null, availability = null, requireCatalogEvidence = false } = {}) {
     const blockers = [];
     const market = upper(customerMarket);
     const eligibility = validateFulfillmentEligibility(mapping.fulfillmentEligibility);
@@ -41,12 +43,15 @@ function basicCandidateBlockers({ mapping = {}, supplier = {}, pkg = {}, custome
     if (readiness.pricingReady !== true) blockers.push("PRICING_NOT_READY");
     if (readiness.inputReady !== true) blockers.push("INPUT_NOT_READY");
     if (readiness.fulfillmentReady !== true) blockers.push("FULFILLMENT_NOT_READY");
-    const cost = Number(mapping.supplierCostAuthority?.rawSupplierCost ?? mapping.mappingMetadata?.supplierCost?.amount);
-    const capturedValue = mapping.supplierCostAuthority?.capturedAt;
-    const capturedAt = new Date(capturedValue || 0);
-    const maximumAge = Number(mapping.mappingMetadata?.costAuthorityMaximumAgeSeconds || 86400);
-    if (!Number.isFinite(cost) || cost < 0 || !capturedValue || !Number.isFinite(capturedAt.getTime())) blockers.push("CURRENT_SUPPLIER_COST_MISSING");
-    else if (new Date(now).getTime() - capturedAt.getTime() > maximumAge * 1000) blockers.push("SUPPLIER_COST_AUTHORITY_STALE");
+    if (requireCatalogEvidence) {
+        const offerMatches = offer && String(offer._id) === String(mapping.supplierCatalogOfferId) &&
+            String(offer.supplierId) === String(mapping.supplierId) &&
+            clean(offer.supplierProductCode) === clean(mapping.supplierProductCode) &&
+            clean(offer.supplierOfferCode) === clean(mapping.supplierPackageCode) &&
+            upper(offer.catalogLifecycleState) === "ACTIVE";
+        if (!offerMatches) blockers.push("SUPPLIER_OFFER_NOT_ACTIVE");
+        if (!availability || String(availability.supplierCatalogOfferId) !== String(mapping.supplierCatalogOfferId) || upper(availability.state) !== "AVAILABLE" || availability.coverageComplete !== true) blockers.push("SUPPLIER_AVAILABILITY_NOT_CONFIRMED");
+    }
     const price = pkg?.prices?.[market];
     if (!pkg?.enabled || pkg?.deletedAt || price?.enabled !== true || !Number.isFinite(Number(price?.amount)) || Number(price.amount) <= 0) blockers.push("CUSTOMER_MARKET_PRICE_NOT_PUBLISHED");
     if (!adapter?.isConfigured?.()) blockers.push("SUPPLIER_ADAPTER_NOT_READY");
@@ -91,6 +96,7 @@ function summarizeEligibilityResolution({ mappings = [], assessments = new Map()
             region: market,
             supplierProductCode: mapping.supplierProductCode,
             supplierPackageCode: mapping.supplierPackageCode,
+            supplierMarket: upper(mapping.region),
             fulfillmentContract: mapping.mappingMetadata?.fulfillmentContract || null,
             executionMode: "API",
             selectedRole: "PRIMARY",
@@ -104,11 +110,17 @@ async function resolveEligibilityPrimaryRoute({ productCode, packageCode, custom
     const normalizedPackage = upper(packageCode);
     const market = upper(customerMarket);
     const [mappings, pkg] = await Promise.all([
-        Mapping.find({ productCode: normalizedProduct, packageCode: normalizedPackage, productionRole: "PRIMARY", enabled: true, archivedAt: null }).lean(),
+        Mapping.find({ productCode: normalizedProduct, packageCode: normalizedPackage, productionRole: "PRIMARY", archivedAt: null }).lean(),
         CatalogPackage.findOne({ productCode: normalizedProduct, packageCode: normalizedPackage, deletedAt: null }).lean()
     ]);
     const suppliers = await Supplier.find({ _id: { $in: mappings.map(mapping => mapping.supplierId) } }).lean();
+    const [offers, availabilityRows] = await Promise.all([
+        SupplierCatalogOffer.find({ _id: { $in: mappings.map(mapping => mapping.supplierCatalogOfferId).filter(Boolean) } }).lean(),
+        SupplierOfferAvailability.find({ supplierCatalogOfferId: { $in: mappings.map(mapping => mapping.supplierCatalogOfferId).filter(Boolean) } }).lean()
+    ]);
     const supplierById = new Map(suppliers.map(supplier => [String(supplier._id), supplier]));
+    const offerById = new Map(offers.map(offer => [String(offer._id), offer]));
+    const availabilityByOfferId = new Map(availabilityRows.map(row => [String(row.supplierCatalogOfferId), row]));
     const assessments = new Map();
     await Promise.all(mappings.map(async mapping => {
         const supplier = supplierById.get(String(mapping.supplierId));
@@ -116,7 +128,8 @@ async function resolveEligibilityPrimaryRoute({ productCode, packageCode, custom
             FulfillmentAttempt.findOne({ supplierMappingId: mapping._id, status: "SUCCEEDED", supplierReference: { $ne: "" } }).select("_id").lean()
         ]);
         const adapter = supplier ? getSupplierAdapter(supplier) : null;
-        assessments.set(String(mapping._id), basicCandidateBlockers({ mapping, supplier, pkg, customerMarket: market, adapter, controlledTestEvidence: Boolean(controlledTest) }));
+        const offer = offerById.get(String(mapping.supplierCatalogOfferId));
+        assessments.set(String(mapping._id), basicCandidateBlockers({ mapping, supplier, pkg, customerMarket: market, adapter, controlledTestEvidence: Boolean(controlledTest), offer, availability: availabilityByOfferId.get(String(mapping.supplierCatalogOfferId)), requireCatalogEvidence: true }));
     }));
     return summarizeEligibilityResolution({ mappings, assessments, productCode: normalizedProduct, packageCode: normalizedPackage, customerMarket: market });
 }

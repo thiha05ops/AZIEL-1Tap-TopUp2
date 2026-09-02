@@ -427,6 +427,7 @@ function normalizeSupplierRouteSnapshot(route, quote) {
             ? { region: boundedString(route.region, "supplierRouteSnapshot.region", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 2, true).toUpperCase() }
             : {
                 snapshotVersion: 2,
+                supplierMarket: boundedString(route.supplierMarket, "supplierRouteSnapshot.supplierMarket", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 40).toUpperCase(),
                 customerMarket: boundedString(route.customerMarket, "supplierRouteSnapshot.customerMarket", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 2, true).toUpperCase()
             }),
         supplierProductCode: boundedString(route.supplierProductCode, "supplierRouteSnapshot.supplierProductCode", ORDER_SNAPSHOT_ERROR_CODES.INVALID_FULFILMENT_INPUT, 120),

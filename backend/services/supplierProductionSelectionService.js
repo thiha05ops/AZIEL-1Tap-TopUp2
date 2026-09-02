@@ -8,7 +8,6 @@ const FulfillmentAttempt = require("../models/FulfillmentAttempt");
 const { getSupplierAdapter } = require("./supplierAdapterRegistry");
 const { resolveFulfillmentRoutingMode, FULFILLMENT_ROUTING_MODES } = require("../config/fulfillmentRoutingMode");
 const { resolveEligibilityPrimaryRoute, OUTCOMES: ELIGIBILITY_OUTCOMES } = require("./supplierEligibilityRouteResolver");
-const { isPilotEnabled, matchesPilotRoute } = require("../config/mmWonddMlbbPilot");
 
 const ROLES = Object.freeze({ PRIMARY: "PRIMARY", BACKUP: "BACKUP", DISABLED: "DISABLED" });
 const CORE_PRODUCTS = new Set(["mlbb", "pubg", "freefire", "hok"]);
@@ -147,6 +146,7 @@ function pilotV2Snapshot(shadow, customerMarket) {
     return Object.freeze({
         ...route,
         snapshotVersion: 2,
+        supplierMarket: clean(route.supplierMarket).toUpperCase(),
         customerMarket: clean(customerMarket).toUpperCase(),
         eligibility: shadow.eligibility
     });
@@ -167,7 +167,7 @@ function isGenuineManualOnlyResolution(shadow) {
         shadow.blockerCodes[0] === "NO_PRIMARY_MAPPING";
 }
 
-function createRoutingAuthority({ legacyResolver = resolveLegacyCheckoutRouteSnapshot, eligibilityResolver = resolveEligibilityPrimaryRoute, modeResolver = resolveFulfillmentRoutingMode, pilotEnabledResolver = isPilotEnabled, diagnosticsObserver = null } = {}) {
+function createRoutingAuthority({ legacyResolver = resolveLegacyCheckoutRouteSnapshot, eligibilityResolver = resolveEligibilityPrimaryRoute, modeResolver = resolveFulfillmentRoutingMode, diagnosticsObserver = null } = {}) {
     return async function route({ productCode, packageCode, region, includeDiagnostics = false }) {
         const routingMode = modeResolver();
         const legacy = await legacyResolver({ productCode, packageCode, region });
@@ -202,18 +202,25 @@ function createRoutingAuthority({ legacyResolver = resolveLegacyCheckoutRouteSna
         if (typeof diagnosticsObserver === "function") {
             try { diagnosticsObserver(diagnostics); } catch { /* Observability must never alter route selection. */ }
         }
-        const pilotSelected = routingMode === FULFILLMENT_ROUTING_MODES.DUAL_READ &&
-            pilotEnabledResolver() === true &&
-            shadow.outcome === ELIGIBILITY_OUTCOMES.ELIGIBLE &&
-            matchesPilotRoute({ mapping: shadow.routeSnapshot, productCode, packageCode, customerMarket: region });
-        if (pilotSelected) {
-            const result = { ready: true, blockers: [], routeSnapshot: pilotV2Snapshot(shadow, region) };
-            return includeDiagnostics ? { ...result, diagnostics: Object.freeze({ ...diagnostics, scopedPilotOverride: true }) } : result;
+        if (routingMode === FULFILLMENT_ROUTING_MODES.DUAL_READ && isSupplierApiRoute(legacy)) {
+            return includeDiagnostics ? { ...legacy, diagnostics } : legacy;
         }
-        if (routingMode === FULFILLMENT_ROUTING_MODES.DUAL_READ) return includeDiagnostics ? { ...legacy, diagnostics } : legacy;
+        if (routingMode === FULFILLMENT_ROUTING_MODES.DUAL_READ && shadow.outcome === ELIGIBILITY_OUTCOMES.ELIGIBLE) {
+            const result = { ready: true, blockers: [], routeSnapshot: pilotV2Snapshot(shadow, region) };
+            return includeDiagnostics ? { ...result, diagnostics: Object.freeze({ ...diagnostics, marketDecoupledAuthority: true }) } : result;
+        }
+        if (routingMode === FULFILLMENT_ROUTING_MODES.DUAL_READ && isManualAdminRoute(legacy) && isGenuineManualOnlyResolution(shadow)) {
+            return includeDiagnostics ? { ...legacy, diagnostics } : legacy;
+        }
+        if (routingMode === FULFILLMENT_ROUTING_MODES.DUAL_READ) {
+            const result = legacy.ready
+                ? { ready: false, blockers: shadow.blockerCodes?.length ? shadow.blockerCodes : ["SUPPLIER_ROUTE_NOT_EXECUTABLE"], routeSnapshot: null }
+                : legacy;
+            return includeDiagnostics ? { ...result, diagnostics: Object.freeze({ ...diagnostics, manualFallbackSuppressed: legacy.ready }) } : result;
+        }
         if (routingMode === FULFILLMENT_ROUTING_MODES.ELIGIBILITY_PRIMARY) {
             if (shadow.outcome === ELIGIBILITY_OUTCOMES.ELIGIBLE) {
-                const result = { ready: true, blockers: [], routeSnapshot: shadow.routeSnapshot };
+                const result = { ready: true, blockers: [], routeSnapshot: pilotV2Snapshot(shadow, region) };
                 return includeDiagnostics ? { ...result, diagnostics } : result;
             }
             const result = { ready: false, blockers: shadow.blockerCodes, routeSnapshot: null };

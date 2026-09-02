@@ -16,7 +16,6 @@ const { getSupplierAdapter, normalizeSupplierResult } = require("./supplierAdapt
 const { assessProductionMapping, setProductionRole } = require("./supplierProductionSelectionService");
 const { basicCandidateBlockers } = require("./supplierEligibilityRouteResolver");
 const { isCustomerMarketEligible } = require("./supplierFulfillmentEligibilityService");
-const { matchesPilotRoute } = require("../config/mmWonddMlbbPilot");
 const commerceOrderRepository = require("./commerce/orderRepository");
 const {
     FINANCIAL_OUTCOMES,
@@ -41,6 +40,24 @@ class FulfillmentError extends Error {
         this.code = code;
         this.statusCode = statusCode;
     }
+}
+
+function isMarketDecoupledV2RouteSnapshot({ routeSnapshot = null, mapping = null, customerMarket = "" } = {}) {
+    if (!routeSnapshot || !mapping || Number(routeSnapshot.snapshotVersion) !== 2 || String(routeSnapshot.routeType || "").toUpperCase() !== "SUPPLIER_API") return false;
+    const market = String(customerMarket || "").trim().toUpperCase();
+    const persistedSupplierMarket = String(routeSnapshot.supplierMarket || "").trim().toUpperCase();
+    return String(routeSnapshot.customerMarket || "").trim().toUpperCase() === market &&
+        String(routeSnapshot.supplierMappingId || "") === String(mapping._id || "") &&
+        String(routeSnapshot.supplierId || "") === String(mapping.supplierId || "") &&
+        String(routeSnapshot.supplierCode || "").trim().toUpperCase() === String(mapping.supplierCode || "").trim().toUpperCase() &&
+        String(routeSnapshot.productCode || "").trim().toLowerCase() === String(mapping.productCode || "").trim().toLowerCase() &&
+        String(routeSnapshot.packageCode || "").trim().toUpperCase() === String(mapping.packageCode || "").trim().toUpperCase() &&
+        String(routeSnapshot.supplierProductCode || "").trim() === String(mapping.supplierProductCode || "").trim() &&
+        String(routeSnapshot.supplierPackageCode || "").trim() === String(mapping.supplierPackageCode || "").trim() &&
+        String(routeSnapshot.executionMode || "").trim().toUpperCase() === "API" &&
+        String(routeSnapshot.selectedRole || "").trim().toUpperCase() === "PRIMARY" &&
+        (!persistedSupplierMarket || persistedSupplierMarket === String(mapping.region || "").trim().toUpperCase()) &&
+        isCustomerMarketEligible(routeSnapshot.eligibility, market);
 }
 
 function cleanText(value = "", max = 160) {
@@ -722,19 +739,11 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
 
     const routeSnapshot = order.fulfilment?.routeSnapshot || order.quoteSnapshot?.supplierRouteSnapshot || null;
     const customerMarket = normalizeRegion(order.commercial?.region || order.product?.region || order.region || "MM");
-    const scopedPilotV2 = isCommerceOrder && Number(routeSnapshot?.snapshotVersion) === 2 &&
-        String(routeSnapshot?.customerMarket || "").toUpperCase() === customerMarket &&
-        matchesPilotRoute({ mapping, customerMarket }) &&
-        String(routeSnapshot?.supplierCode || "").toUpperCase() === String(mapping.supplierCode || "").toUpperCase() &&
-        String(routeSnapshot?.productCode || "").toLowerCase() === String(mapping.productCode || "").toLowerCase() &&
-        String(routeSnapshot?.packageCode || "").toUpperCase() === String(mapping.packageCode || "").toUpperCase() &&
-        String(routeSnapshot?.supplierProductCode || "").toLowerCase() === String(mapping.supplierProductCode || "").toLowerCase() &&
-        String(routeSnapshot?.supplierPackageCode || "").toUpperCase() === String(mapping.supplierPackageCode || "").toUpperCase() &&
-        isCustomerMarketEligible(routeSnapshot?.eligibility, customerMarket);
+    const marketDecoupledV2 = isCommerceOrder && isMarketDecoupledV2RouteSnapshot({ routeSnapshot, mapping, customerMarket });
     if (
         mapping.productCode !== normalizeProductCode(order.product?.gameCode || order.productCode) ||
         mapping.packageCode !== normalizePackageCode(order.product?.packageCode || order.packageCode) ||
-        (!scopedPilotV2 && mapping.region !== customerMarket)
+        (!marketDecoupledV2 && mapping.region !== customerMarket)
     ) {
         throw new FulfillmentError("SUPPLIER_MAPPING_MISMATCH", "Supplier mapping does not match this order.");
     }
@@ -762,15 +771,15 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
             packageCode: mapping.packageCode,
             deletedAt: null
         }).lean();
-        const regionalPrice = catalogPackage?.prices?.[scopedPilotV2 ? customerMarket : mapping.region];
+        const regionalPrice = catalogPackage?.prices?.[marketDecoupledV2 ? customerMarket : mapping.region];
         const supplierCost = Number(regionalPrice?.supplierCost);
         const sellingPrice = Number(regionalPrice?.amount);
         const mappingForAssessment = mapping.toObject ? mapping.toObject() : mapping;
-        const pilotAssessment = scopedPilotV2 ? basicCandidateBlockers({ mapping: { ...mappingForAssessment, fulfillmentEligibility: routeSnapshot.eligibility }, supplier: supplier.toObject ? supplier.toObject() : supplier, pkg: catalogPackage, customerMarket, adapter }) : null;
-        if (scopedPilotV2 && pilotAssessment.blockers.length) {
-            throw new FulfillmentError("WONDD_PILOT_NOT_PRODUCTION_READY", `WonDD pilot readiness is incomplete: ${pilotAssessment.blockers.join(",")}`, 409);
+        const marketDecoupledAssessment = marketDecoupledV2 ? basicCandidateBlockers({ mapping: { ...mappingForAssessment, fulfillmentEligibility: routeSnapshot.eligibility }, supplier: supplier.toObject ? supplier.toObject() : supplier, pkg: catalogPackage, customerMarket, adapter }) : null;
+        if (marketDecoupledV2 && marketDecoupledAssessment.blockers.length) {
+            throw new FulfillmentError("SUPPLIER_MARKET_DECOUPLED_ROUTE_NOT_PRODUCTION_READY", `Supplier market-decoupled readiness is incomplete: ${marketDecoupledAssessment.blockers.join(",")}`, 409);
         }
-        if (!scopedPilotV2 && (
+        if (!marketDecoupledV2 && (
             readiness.supplierMapped !== true ||
             readiness.inputReady !== true ||
             readiness.pricingReady !== true ||
@@ -819,7 +828,7 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
         productCode: mapping.productCode,
         packageCode: mapping.packageCode,
         region: mapping.region,
-        ...(scopedPilotV2 ? { customerMarket } : {}),
+        ...(marketDecoupledV2 ? { customerMarket } : {}),
         mode: supplier.mode,
         routeType: supplier.mode === SUPPLIER_MODES.API
             ? FULFILLMENT_ROUTE_TYPES.SUPPLIER_API
@@ -1033,6 +1042,7 @@ module.exports = {
     createSupplier,
     getAttempt,
     getOrderFulfillmentSummary,
+    isMarketDecoupledV2RouteSnapshot,
     listAttempts,
     listEligibleMappingsForOrder,
     listMappings,
