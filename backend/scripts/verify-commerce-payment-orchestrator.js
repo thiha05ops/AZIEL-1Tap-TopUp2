@@ -243,7 +243,9 @@ function createDeps(store, overrides = {}) {
                 return clone(attempt);
             },
             async appendProviderEvent({ attemptId, providerEvent, transactionContext }) {
-                assert(transactionContext, "provider event append receives transaction context.");
+                if (!store.options.allowNonTransactionalEventAppend) {
+                    assert(transactionContext, "provider event append receives transaction context.");
+                }
                 store.calls.appendProviderEvent += 1;
                 const attempt = store.attempts.find(item => item.attemptId === attemptId);
                 attempt.webhookEvents = [...(attempt.webhookEvents || []), clone(providerEvent)];
@@ -598,6 +600,117 @@ async function testPostCommitFulfillmentFailureDoesNotRollbackPayment() {
     assert.strictEqual(failures[0].errorCode, "MOCK_START_FAILED");
 }
 
+async function testIdempotentPaidEventConvergesFulfillment() {
+    const routeSnapshot = {
+        routeType: "SUPPLIER_API",
+        supplierCode: "FAZERCARDS",
+        supplierMappingId: "mapping-global-th",
+        supplierProductCode: "mobile_legends_global",
+        supplierPackageCode: "20_2_diamonds",
+        executionMode: "API",
+        selectedRole: "PRIMARY",
+        supplierMarket: "GLOBAL",
+        customerMarket: "TH",
+        snapshotVersion: 2
+    };
+    const paidAttempt = {
+        attemptId: "ATT-PAID-REPLAY",
+        orderId: "AZL-ORDER-0001",
+        owner: owner(),
+        status: PAYMENT_STATES.PAID,
+        provider: "manual_promptpay",
+        providerReference: "PREF-PAID-REPLAY",
+        amount: 1490,
+        currency: "THB",
+        webhookEvents: []
+    };
+    const store = createStore({
+        allowNonTransactionalEventAppend: true,
+        order: {
+            status: "paid",
+            paymentStatus: "paid",
+            payment: { ...order().payment, status: "paid" },
+            fulfilment: { status: "not_started", routeSnapshot }
+        },
+        attempts: [paidAttempt]
+    });
+    const fulfillmentAttempts = new Map();
+    let paidHookCalls = 0;
+    let supplierStarts = 0;
+    const orchestrator = createOrchestrator(store, {
+        paidFulfillmentHandler: async committedOrder => {
+            paidHookCalls += 1;
+            assert.strictEqual(store.inTransaction, false, "idempotent paid convergence runs outside a payment transaction.");
+            const key = `fulfillment:start:${committedOrder.orderId}:${routeSnapshot.supplierMappingId}`;
+            if (fulfillmentAttempts.has(key)) return { created: false, reason: "SUPPLIER_FULFILLMENT_ALREADY_BOUND", attempt: fulfillmentAttempts.get(key) };
+            supplierStarts += 1;
+            const fulfillmentAttempt = { fulfillmentId: "FUL-PAID-REPLAY", idempotencyKey: key };
+            fulfillmentAttempts.set(key, fulfillmentAttempt);
+            return { created: true, reason: "SUPPLIER_FULFILLMENT_STARTED", attempt: fulfillmentAttempt };
+        }
+    });
+    const result = await orchestrator.handleProviderEvent({
+        providerEvent: {
+            provider: "manual_promptpay",
+            providerReference: "PREF-PAID-REPLAY",
+            providerEventId: "evt-paid-replay-new",
+            eventType: "MANUAL_PAYMENT_APPROVED",
+            status: PAYMENT_STATES.PAID,
+            amount: 1490,
+            currency: "THB",
+            orderId: "AZL-ORDER-0001"
+        }
+    });
+    assert.strictEqual(result.idempotent, true, "payment result remains idempotent.");
+    assert.strictEqual(result.metadata.outcome, "event_no_change", "public payment outcome remains event_no_change.");
+    assert.strictEqual(store.calls.transactions, 0, "idempotent paid convergence does not reapply the payment transaction.");
+    assert.strictEqual(store.calls.updateAttemptStatus, 0, "idempotent paid convergence does not rewrite payment status.");
+    assert.strictEqual(store.calls.updatePaymentStatus, 0, "idempotent paid convergence does not rewrite order payment status.");
+    assert.strictEqual(paidHookCalls, 1, "idempotent PAID event invokes fulfillment convergence once.");
+    assert.strictEqual(fulfillmentAttempts.size, 1, "fulfillment authority creates one idempotent attempt identity.");
+    await orchestrator.handleProviderEvent({
+        providerEvent: {
+            provider: "manual_promptpay",
+            providerReference: "PREF-PAID-REPLAY",
+            providerEventId: "evt-paid-replay-second",
+            eventType: "MANUAL_PAYMENT_APPROVED",
+            status: PAYMENT_STATES.PAID,
+            amount: 1490,
+            currency: "THB",
+            orderId: "AZL-ORDER-0001"
+        }
+    });
+    assert.strictEqual(paidHookCalls, 2, "each fresh idempotent PAID event may converge fulfillment.");
+    assert.strictEqual(supplierStarts, 1, "fulfillment idempotency prevents a duplicate supplier start.");
+    assert.strictEqual(fulfillmentAttempts.size, 1, "repeated convergence retains one fulfillment attempt identity.");
+
+    const nonPaidStore = createStore({
+        allowNonTransactionalEventAppend: true,
+        order: { paymentStatus: "pending", payment: { ...order().payment, status: "pending" } },
+        attempts: [{ ...paidAttempt, attemptId: "ATT-PENDING-REPLAY", providerReference: "PREF-PENDING-REPLAY", status: PAYMENT_STATES.PENDING }]
+    });
+    let nonPaidHookCalls = 0;
+    const nonPaidResult = await createOrchestrator(nonPaidStore, {
+        paidFulfillmentHandler: async () => {
+            nonPaidHookCalls += 1;
+            return { created: false };
+        }
+    }).handleProviderEvent({
+        providerEvent: {
+            provider: "manual_promptpay",
+            providerReference: "PREF-PENDING-REPLAY",
+            providerEventId: "evt-pending-replay-new",
+            status: PAYMENT_STATES.PENDING,
+            amount: 1490,
+            currency: "THB",
+            orderId: "AZL-ORDER-0001"
+        }
+    });
+    assert.strictEqual(nonPaidResult.idempotent, true);
+    assert.strictEqual(nonPaidResult.metadata.outcome, "event_no_change");
+    assert.strictEqual(nonPaidHookCalls, 0, "non-PAID idempotent events do not start fulfillment.");
+}
+
 async function testProviderEventAtomicRollback() {
     const attempt = {
         attemptId: "ATT-ROLLBACK",
@@ -738,6 +851,7 @@ async function run() {
     await testProviderEvents();
     await testPaidFulfillmentRunsPostCommit();
     await testPostCommitFulfillmentFailureDoesNotRollbackPayment();
+    await testIdempotentPaidEventConvergesFulfillment();
     await testProviderEventAtomicRollback();
     await testProviderEventSafetyFailures();
     await testPublicRedactionAndDetach();

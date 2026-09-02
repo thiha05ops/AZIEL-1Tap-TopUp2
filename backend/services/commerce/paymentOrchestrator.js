@@ -826,6 +826,9 @@ function createPaymentOrchestrator(dependencies = {}) {
                     }
                 });
             }
+            if (result.status === PAYMENT_STATES.PAID) {
+                await runPostCommitPaidFulfillment({ attempt, order });
+            }
             return buildPublicResult({ attempt, order, idempotent: true, outcome: "event_no_change" });
         }
         assertTransition(current, result.status, { allowLatePaymentReconciliation: deps.allowLatePaymentReconciliation });
