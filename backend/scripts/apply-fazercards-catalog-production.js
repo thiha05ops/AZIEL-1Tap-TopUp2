@@ -175,4 +175,4 @@ async function main() {
 
 if (require.main === module) main().catch(error => { console.error(JSON.stringify({ result: "ABORTED", code: error.code || error.name, message: error.message }, null, 2)); process.exitCode = 1; }).finally(async () => { await mongoose.disconnect().catch(() => {}); });
 
-module.exports = Object.freeze({ assertGenericStage });
+module.exports = Object.freeze({ assertGenericStage, protectedState, mappingSafety, storefrontState });

@@ -30,6 +30,8 @@
     "verify:fazercards-catalog-zero-side-effects": "node backend/scripts/verify-fazercards-catalog-zero-side-effects.js",
     "dry-run:fazercards-catalog": "node backend/scripts/dry-run-fazercards-catalog.js",
     "apply:fazercards-catalog-production": "node backend/scripts/apply-fazercards-catalog-production.js --apply",
+    "recover:fazercards-catalog-production": "node backend/scripts/recover-fazercards-catalog-production.js",
+    "verify:fazercards-catalog-recovery": "node backend/scripts/verify-fazercards-catalog-recovery.js",
     "verify:wondd-catalog-ingestion": "node backend/scripts/verify-wondd-catalog-ingestion.js",
     "verify:wondd-catalog-zero-side-effects": "node backend/scripts/verify-wondd-catalog-zero-side-effects.js",
     "dry-run:wondd-catalog": "node backend/scripts/dry-run-wondd-catalog.js",
