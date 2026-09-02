@@ -144,6 +144,7 @@ async function main() {
     ];
     productionSources.forEach(file => assert(!read(file).includes('productCode === "afk-journey"'), `${file} must remain product-generic.`));
     const genericFrontend = read("frontend/js/product-detail.js");
+    const i18nFrontend = read("frontend/js/i18n.js");
     assert(genericFrontend.includes("AZIEL_CATALOG?.ensureFresh?."));
     assert(genericFrontend.includes("window.AZIEL_GENERIC_PRODUCT_DETAIL"));
     const identityBinding = genericFrontend.indexOf('setAttribute("data-game", productCode)');
@@ -151,6 +152,14 @@ async function main() {
     const catalogAwait = genericFrontend.indexOf("await window.AZIEL_CATALOG?.ensureFresh?.");
     assert(identityBinding >= 0, "Generic Product Detail must bind its URL-derived product identity.");
     assert(identityBinding < asynchronousBootstrap && identityBinding < catalogAwait, "Product identity must be bound before asynchronous catalog hydration.");
+    assert(genericFrontend.includes('node.removeAttribute("data-i18n")'), "Runtime-owned text must release legacy translation ownership.");
+    assert(genericFrontend.includes('node.removeAttribute("data-i18n-placeholder")'), "Runtime-owned placeholders must release legacy translation ownership.");
+    assert(genericFrontend.includes('node.setAttribute("data-i18n-skip", "true")'), "Runtime-owned Product Detail elements must use the existing i18n skip convention.");
+    assert(genericFrontend.includes('applyText("[data-product-summary-name]", name)'), "The generic Order Summary must use the resolved public product name.");
+    assert(genericFrontend.includes('applyText(\'label[for="userId"]\', firstField.label)'), "The account label must use the verified public input contract.");
+    assert(genericFrontend.includes('applyPlaceholder("#userId", firstField.key === "riotId" ? "Name#TAG" : `Enter ${firstField.label}`)'), "The account placeholder must use the verified public input contract.");
+    assert(i18nFrontend.includes('querySelectorAll("[data-i18n]")'), "The verifier must track the translation selector used by later i18n passes.");
+    assert(i18nFrontend.includes('querySelectorAll("[data-i18n-placeholder]")'), "The verifier must track the placeholder selector used by later i18n passes.");
     assert(!genericFrontend.includes("heaven-burns-red"), "Generic Product Detail must not special-case Heaven Burns Red.");
 
     console.log(JSON.stringify({

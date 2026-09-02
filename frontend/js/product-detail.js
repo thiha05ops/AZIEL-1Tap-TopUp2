@@ -21,7 +21,18 @@
 
     function applyText(selector, value) {
         const node = document.querySelector(selector);
-        if (node) node.textContent = value;
+        if (!node) return;
+        node.removeAttribute("data-i18n");
+        node.setAttribute("data-i18n-skip", "true");
+        node.textContent = value;
+    }
+
+    function applyPlaceholder(selector, value) {
+        const node = document.querySelector(selector);
+        if (!node) return;
+        node.removeAttribute("data-i18n-placeholder");
+        node.setAttribute("data-i18n-skip", "true");
+        node.setAttribute("placeholder", value);
     }
 
     const productCode = productCodeFromUrl();
@@ -75,7 +86,7 @@
             return product;
         }
         applyText('label[for="userId"]', firstField.label);
-        document.getElementById("userId")?.setAttribute("placeholder", firstField.key === "riotId" ? "Name#TAG" : `Enter ${firstField.label}`);
+        applyPlaceholder("#userId", firstField.key === "riotId" ? "Name#TAG" : `Enter ${firstField.label}`);
         const applyConstraints=(input,field)=>{if(!input)return;input.type=field.type==="number"?"text":field.type||"text";if(field.type==="number")input.inputMode="numeric";if(field.constraints?.pattern)input.pattern=field.constraints.pattern;if(field.constraints?.minLength!=null)input.minLength=field.constraints.minLength;if(field.constraints?.maxLength!=null)input.maxLength=field.constraints.maxLength;input.required=field.required!==false};
         applyConstraints(document.getElementById("userId"),firstField);
         contract.accountFields.slice(1).forEach((field, index) => {
