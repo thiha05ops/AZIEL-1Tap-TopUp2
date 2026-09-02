@@ -5,6 +5,7 @@ const mongoose = require("mongoose");
 const orderRepository = require("./orderRepository");
 const paymentAttemptRepository = require("./paymentAttemptRepository");
 const { createPaymentOrchestrator, PaymentOrchestratorError } = require("./paymentOrchestrator");
+const { ensurePaidOrderFulfillmentWork } = require("../paidFulfillmentRoutingService");
 const { createProviderRegistry } = require("./providerRegistry");
 const { createManualPromptPayProvider } = require("./manualPromptPayProviderFactory");
 const { createManualAdminAdapter, MANUAL_ADMIN_PROVIDER_ID } = require("./providers/manualAdminAdapter");
@@ -333,7 +334,20 @@ function createManualPaymentApplicationService(dependencies = {}) {
         transactionRunner: deps.transactionRunner,
         clock: deps.clock,
         idGenerator: deps.idGenerator,
-        logger: deps.logger
+        logger: deps.logger,
+        paidFulfillmentHandler: dependencies.paidFulfillmentHandler || ensurePaidOrderFulfillmentWork,
+        paidFulfillmentFailureRecorder: dependencies.paidFulfillmentFailureRecorder || (async failure => {
+            if (typeof deps.commerceOrderRepository.appendOperationalReference !== "function") return null;
+            return deps.commerceOrderRepository.appendOperationalReference({
+                orderId: failure.orderId,
+                changedAt: failure.changedAt,
+                reference: {
+                    type: "paid_fulfillment_start_failed",
+                    reason: failure.reason,
+                    errorCode: failure.errorCode
+                }
+            });
+        })
     });
 
     async function loadOwnedManualOrder(orderId, owner) {

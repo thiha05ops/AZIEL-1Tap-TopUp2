@@ -317,6 +317,8 @@ function createPaymentOrchestrator(dependencies = {}) {
         clock: dependencies.clock || (() => new Date()),
         idGenerator: dependencies.idGenerator || (() => `PAY_${Date.now()}_${Math.random().toString(16).slice(2)}`),
         logger: dependencies.logger || console,
+        paidFulfillmentHandler: dependencies.paidFulfillmentHandler || null,
+        paidFulfillmentFailureRecorder: dependencies.paidFulfillmentFailureRecorder || null,
         allowLatePaymentReconciliation: dependencies.allowLatePaymentReconciliation === true
     };
     assertProviderFunction(deps.providerResolver, "providerResolver");
@@ -363,6 +365,52 @@ function createPaymentOrchestrator(dependencies = {}) {
             });
         }
         return clonePlain(order);
+    }
+
+    async function runPostCommitPaidFulfillment(applied = {}) {
+        if (typeof deps.paidFulfillmentHandler !== "function") return null;
+        if (normalizeState(applied.attempt?.status) !== PAYMENT_STATES.PAID) return null;
+        const orderId = normalizeString(applied.order?.orderId || applied.attempt?.orderId);
+        if (!orderId) return null;
+
+        let committedOrder;
+        let result;
+        try {
+            committedOrder = await loadOperationalOrder({ orderId });
+            if (normalizeString(committedOrder.status).toLowerCase() !== "paid" || paymentStateOfOrder(committedOrder) !== PAYMENT_STATES.PAID) {
+                result = { created: false, reason: "POST_COMMIT_ORDER_NOT_PAID", errorCode: "POST_COMMIT_ORDER_NOT_PAID" };
+            } else {
+                result = await deps.paidFulfillmentHandler(committedOrder);
+            }
+        } catch (error) {
+            result = {
+                created: false,
+                reason: "PAID_FULFILLMENT_POST_COMMIT_FAILED",
+                errorCode: normalizeString(error?.code || error?.name || "PAID_FULFILLMENT_POST_COMMIT_FAILED")
+            };
+        }
+
+        const failed = result?.reason === "SUPPLIER_FULFILLMENT_START_FAILED" || result?.reason === "PAID_FULFILLMENT_POST_COMMIT_FAILED" || result?.reason === "POST_COMMIT_ORDER_NOT_PAID";
+        if (failed) {
+            deps.logger.error?.("Paid fulfillment post-commit start failed.", {
+                orderId,
+                reason: result.reason,
+                errorCode: normalizeString(result.errorCode)
+            });
+            if (typeof deps.paidFulfillmentFailureRecorder === "function") {
+                await Promise.resolve(deps.paidFulfillmentFailureRecorder({
+                    order: committedOrder || applied.order,
+                    orderId,
+                    reason: result.reason,
+                    errorCode: normalizeString(result.errorCode),
+                    changedAt: deps.clock()
+                })).catch(error => deps.logger.error?.("Paid fulfillment failure recording failed.", {
+                    orderId,
+                    errorCode: normalizeString(error?.code || error?.name)
+                }));
+            }
+        }
+        return result;
     }
 
     function buildIntent(order, input = {}) {
@@ -547,7 +595,7 @@ function createPaymentOrchestrator(dependencies = {}) {
         }
 
         try {
-            return await runTransaction(async transactionContext => {
+            const applied = await runTransaction(async transactionContext => {
                 let currentAttempt = initiatingAttempt;
                 if (providerResult.providerReference && typeof deps.paymentAttemptPort.setProviderReference === "function") {
                     currentAttempt = await deps.paymentAttemptPort.setProviderReference({
@@ -579,12 +627,13 @@ function createPaymentOrchestrator(dependencies = {}) {
                     reason: "Payment initiated",
                     transactionContext
                 });
-                return buildPublicResult({
+                return {
                     attempt: { ...applied.attempt, ...currentAttempt, status: providerResult.status },
-                    order: applied.order,
-                    outcome: "created"
-                });
+                    order: applied.order
+                };
             });
+            await runPostCommitPaidFulfillment(applied);
+            return buildPublicResult({ attempt: applied.attempt, order: applied.order, outcome: "created" });
         } catch (error) {
             if (typeof deps.paymentAttemptPort.recordFailure === "function") {
                 await deps.paymentAttemptPort.recordFailure({
@@ -658,6 +707,7 @@ function createPaymentOrchestrator(dependencies = {}) {
             reason: "Payment refreshed",
             transactionContext
         }));
+        await runPostCommitPaidFulfillment(applied);
         return buildPublicResult({ attempt: applied.attempt, order: applied.order, outcome: "refreshed" });
     }
 
@@ -807,6 +857,7 @@ function createPaymentOrchestrator(dependencies = {}) {
                 transactionContext
             });
         });
+        await runPostCommitPaidFulfillment(applied);
         return buildPublicResult({ attempt: applied.attempt, order: applied.order, outcome: "provider_event_applied" });
     }
 

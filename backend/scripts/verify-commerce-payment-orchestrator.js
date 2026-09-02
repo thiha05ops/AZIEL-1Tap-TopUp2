@@ -1,6 +1,8 @@
 "use strict";
 
 const assert = require("assert");
+const fs = require("fs");
+const path = require("path");
 const {
     createPaymentOrchestrator,
     PaymentOrchestratorError,
@@ -86,6 +88,7 @@ function createStore(options = {}) {
             transactions: 0
         },
         txContexts: [],
+        inTransaction: false,
         providerInputs: [],
         options
     };
@@ -136,11 +139,14 @@ function createDeps(store, overrides = {}) {
             const ordersBefore = clone(store.orders);
             const attemptsBefore = clone(store.attempts);
             try {
+                store.inTransaction = true;
                 return await callback(transactionContext);
             } catch (error) {
                 store.orders.splice(0, store.orders.length, ...ordersBefore);
                 store.attempts.splice(0, store.attempts.length, ...attemptsBefore);
                 throw error;
+            } finally {
+                store.inTransaction = false;
             }
         },
         providerResolver({ intent }) {
@@ -490,6 +496,108 @@ async function testProviderEvents() {
     assert.strictEqual(store.calls.updateOrderStatus, 1, "duplicate approval does not repeat the top-level transition.");
 }
 
+async function testPaidFulfillmentRunsPostCommit() {
+    const baseAttempt = {
+        attemptId: "ATT-POST-COMMIT",
+        orderId: "AZL-ORDER-0001",
+        owner: owner(),
+        status: PAYMENT_STATES.PENDING,
+        provider: "manual_promptpay",
+        providerReference: "PREF-POST-COMMIT",
+        amount: 1490,
+        currency: "THB",
+        webhookEvents: []
+    };
+    const routeSnapshot = {
+        routeType: "SUPPLIER_API",
+        supplierCode: "FAZERCARDS",
+        supplierMappingId: "mapping-global-th",
+        supplierProductCode: "mobile_legends_global",
+        supplierPackageCode: "20_2_diamonds",
+        executionMode: "API",
+        selectedRole: "PRIMARY",
+        supplierMarket: "GLOBAL",
+        customerMarket: "TH",
+        snapshotVersion: 2
+    };
+    const store = createStore({
+        order: {
+            paymentStatus: "pending",
+            payment: { ...order().payment, status: "pending" },
+            fulfilment: { status: "not_started", routeSnapshot }
+        },
+        attempts: [baseAttempt]
+    });
+    const fulfillmentAttempts = new Map();
+    let paidHookCalls = 0;
+    let routeResolutions = 0;
+    const orchestrator = createOrchestrator(store, {
+        paidFulfillmentHandler: async committedOrder => {
+            paidHookCalls += 1;
+            assert.strictEqual(store.inTransaction, false, "paid fulfillment runs only after transaction commit.");
+            assert.strictEqual(committedOrder.status, "paid");
+            assert.strictEqual(committedOrder.paymentStatus, "paid");
+            assert.deepStrictEqual(committedOrder.fulfilment.routeSnapshot, routeSnapshot, "immutable v2 route is retained.");
+            assert.strictEqual(routeResolutions, 0, "paid fulfillment does not re-resolve routing.");
+            const key = `fulfillment:start:${committedOrder.orderId}:${routeSnapshot.supplierMappingId}`;
+            if (fulfillmentAttempts.has(key)) return { created: false, reason: "SUPPLIER_FULFILLMENT_ALREADY_BOUND", attempt: fulfillmentAttempts.get(key) };
+            const attempt = { fulfillmentId: "FUL-POST-COMMIT", idempotencyKey: key };
+            fulfillmentAttempts.set(key, attempt);
+            return { created: true, reason: "SUPPLIER_FULFILLMENT_STARTED", attempt };
+        }
+    });
+    const event = {
+        provider: "manual_promptpay",
+        providerReference: "PREF-POST-COMMIT",
+        providerEventId: "evt-post-commit",
+        eventType: "MANUAL_PAYMENT_APPROVED",
+        status: PAYMENT_STATES.PAID,
+        amount: 1490,
+        currency: "THB",
+        orderId: "AZL-ORDER-0001"
+    };
+    await orchestrator.handleProviderEvent({ providerEvent: event });
+    await orchestrator.handleProviderEvent({ providerEvent: event });
+    assert.strictEqual(paidHookCalls, 1, "replayed approval does not create another fulfillment start.");
+    assert.strictEqual(fulfillmentAttempts.size, 1, "exactly one fulfillment attempt identity is created.");
+    assert(fulfillmentAttempts.has("fulfillment:start:AZL-ORDER-0001:mapping-global-th"), "existing fulfillment idempotency key is retained.");
+}
+
+async function testPostCommitFulfillmentFailureDoesNotRollbackPayment() {
+    const baseAttempt = {
+        attemptId: "ATT-POST-COMMIT-FAIL",
+        orderId: "AZL-ORDER-0001",
+        owner: owner(),
+        status: PAYMENT_STATES.PENDING,
+        provider: "manual_promptpay",
+        providerReference: "PREF-POST-COMMIT-FAIL",
+        amount: 1490,
+        currency: "THB",
+        webhookEvents: []
+    };
+    const store = createStore({ order: { paymentStatus: "pending", payment: { ...order().payment, status: "pending" } }, attempts: [baseAttempt] });
+    const failures = [];
+    await createOrchestrator(store, {
+        paidFulfillmentHandler: async () => ({ created: false, reason: "SUPPLIER_FULFILLMENT_START_FAILED", errorCode: "MOCK_START_FAILED" }),
+        paidFulfillmentFailureRecorder: async failure => failures.push(clone(failure))
+    }).handleProviderEvent({
+        providerEvent: {
+            provider: "manual_promptpay",
+            providerReference: "PREF-POST-COMMIT-FAIL",
+            providerEventId: "evt-post-commit-fail",
+            eventType: "MANUAL_PAYMENT_APPROVED",
+            status: PAYMENT_STATES.PAID,
+            amount: 1490,
+            currency: "THB",
+            orderId: "AZL-ORDER-0001"
+        }
+    });
+    assert.strictEqual(store.orders[0].paymentStatus, "paid", "fulfillment failure cannot roll back committed payment.");
+    assert.strictEqual(store.orders[0].status, "paid", "fulfillment failure cannot roll back committed lifecycle.");
+    assert.strictEqual(failures.length, 1, "post-commit failure is surfaced to durable failure recorder.");
+    assert.strictEqual(failures[0].errorCode, "MOCK_START_FAILED");
+}
+
 async function testProviderEventAtomicRollback() {
     const attempt = {
         attemptId: "ATT-ROLLBACK",
@@ -612,6 +720,10 @@ async function testMalformedProviderResult() {
 }
 
 async function run() {
+    const orderRepositorySource = fs.readFileSync(path.resolve(__dirname, "../services/commerce/orderRepository.js"), "utf8");
+    const orchestratorSource = fs.readFileSync(path.resolve(__dirname, "../services/commerce/paymentOrchestrator.js"), "utf8");
+    assert(!orderRepositorySource.includes("ensurePaidOrderFulfillmentWork"), "repository persistence methods cannot start paid fulfillment.");
+    assert(orchestratorSource.indexOf("await runTransaction(async transactionContext") < orchestratorSource.indexOf("await runPostCommitPaidFulfillment(applied)"), "paid fulfillment is sequenced after transaction completion.");
     await testSuccessfulPendingInitiation();
     await testImmediatePayment();
     await testProviderFailureResult();
@@ -624,6 +736,8 @@ async function run() {
     await testCancelAndExpireIdempotency();
     await testInvalidTransitions();
     await testProviderEvents();
+    await testPaidFulfillmentRunsPostCommit();
+    await testPostCommitFulfillmentFailureDoesNotRollbackPayment();
     await testProviderEventAtomicRollback();
     await testProviderEventSafetyFailures();
     await testPublicRedactionAndDetach();
