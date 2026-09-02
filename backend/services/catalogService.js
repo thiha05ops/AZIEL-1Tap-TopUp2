@@ -794,7 +794,7 @@ function applyPackageFulfillmentReadiness(projection, mappings = [], inventorySt
 }
 
 function applyAdminSupplierSupport(projection, mappings = [], suppliers = [], eligibilityContext = {}) {
-    if (!projection || !["mlbb", "freefire"].includes(projection.productCode) || !Array.isArray(projection.packages)) return projection;
+    if (!projection || !Array.isArray(projection.packages)) return projection;
     const productCode = projection.productCode;
     const supplierById = new Map(suppliers.map(item => [String(item._id), item]));
     projection.packages.forEach(pkg => {
@@ -802,7 +802,8 @@ function applyAdminSupplierSupport(projection, mappings = [], suppliers = [], el
             String(mapping.productCode || "").toLowerCase() === productCode &&
             String(mapping.packageCode || "").toUpperCase() === String(pkg.packageCode || "").toUpperCase() &&
             Boolean(String(mapping.supplierPackageCode || "").trim()) &&
-            String(mapping.executionMode || "").toUpperCase() === "API"
+            !mapping.archivedAt &&
+            supplierById.has(String(mapping.supplierId || ""))
         );
         const details = exact.map(mapping => {
             const assessment = assessProductionReadyFulfillmentMapping(mapping, supplierById.get(String(mapping.supplierId)), {

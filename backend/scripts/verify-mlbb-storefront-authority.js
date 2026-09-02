@@ -57,6 +57,16 @@ const adminProjection = { ...product("mlbb"), packages: [pkg("FAZER_ADMIN")] };
 applyAdminSupplierSupport(adminProjection, [mapping("FAZERCARDS", "FAZER_ADMIN")], suppliers, eligibilityContext);
 assert.strictEqual(adminProjection.packages[0].supplierSupport.TH.status, "SUPPORTED");
 assert.strictEqual(adminProjection.packages[0].supplierSupport.TH.suppliers[0].supplierCode, "FAZERCARDS");
+const activationRequiredProjection = { ...product("future-product"), packages: [pkg("PENDING", { productCode: "future-product" })] };
+const activationRequiredMapping = mapping("FAZERCARDS", "PENDING", { productCode: "future-product", enabled: false, productionRole: "DISABLED", executionMode: "MANUAL", fulfillmentEligibility: unknown, mappingMetadata: { readiness: { supplierMapped: true, pricingReady: false, inputReady: false, fulfillmentReady: false, storefrontReady: false } } });
+applyAdminSupplierSupport(activationRequiredProjection, [activationRequiredMapping], suppliers, eligibilityContext);
+assert.strictEqual(activationRequiredProjection.packages[0].supplierSupport.TH.status, "NOT_READY", "An exact mapping awaiting activation must not be reported as unsupported.");
+assert.strictEqual(activationRequiredProjection.packages[0].supplierSupport.TH.mappingCount, 1);
+assert.strictEqual(activationRequiredProjection.packages[0].supplierSupport.TH.blocker, "NO_ELIGIBLE_SUPPLIER_MAPPING");
+const unsupportedProjection = { ...product("future-product"), packages: [pkg("UNSUPPORTED", { productCode: "future-product" })] };
+applyAdminSupplierSupport(unsupportedProjection, [], suppliers, eligibilityContext);
+assert.strictEqual(unsupportedProjection.packages[0].supplierSupport.TH.status, "UNSUPPORTED", "Inventory without an exact mapping must remain fail-closed.");
+assert.strictEqual(unsupportedProjection.packages[0].supplierSupport.TH.blocker, "NO_SUPPLIER_MAPPING");
 
 const root = path.resolve(__dirname, "../..");
 const catalogSource = fs.readFileSync(path.join(root, "backend/services/catalogService.js"), "utf8");
