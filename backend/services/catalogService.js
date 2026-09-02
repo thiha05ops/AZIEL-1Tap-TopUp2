@@ -1104,14 +1104,25 @@ async function resolveAdminCatalogProduct(productCode, options = {}) {
     const findPublications = options.findPublications || (options.findMappings
         ? (() => [])
         : (code => PackageMarketPublication.find({ productCode: code, customerMarket: options.customerMarket || "TH" }).lean()));
+    const findStoreSelections = options.findStoreSelections || (code => StoreCatalogSelection.find({
+        productCode: code,
+        status: "ACTIVE"
+    }).select("packages.packageCode").lean());
     const product = await findProduct(canonicalCode);
     if (!product && !canonical) return null;
-    const [packages, mappings, inventoryStates, publications] = await Promise.all([
+    const [canonicalPackages, mappings, inventoryStates, publications, storeSelections] = await Promise.all([
         findPackages(canonicalCode),
         findMappings(canonicalCode),
         findInventoryStates(),
-        findPublications(canonicalCode)
+        findPublications(canonicalCode),
+        options.storeCatalogPackageScope === true ? findStoreSelections(canonicalCode) : Promise.resolve([])
     ]);
+    const selectedPackageCodes = new Set(storeSelections.flatMap(selection => selection.packages || [])
+        .map(item => String(item.packageCode || "").trim().toUpperCase())
+        .filter(Boolean));
+    const packages = options.storeCatalogPackageScope === true
+        ? canonicalPackages.filter(item => selectedPackageCodes.has(String(item.packageCode || "").trim().toUpperCase()))
+        : canonicalPackages;
     const foundation = product ? {
         ...(canonical || {}),
         ...product,

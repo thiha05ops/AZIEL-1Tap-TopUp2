@@ -391,10 +391,12 @@ router.patch("/admin/catalog/products/:productCode/restore", adminMiddleware, re
 
 router.get("/admin/catalog/products/:productCode", adminMiddleware, requireAdminPermission(PERMISSIONS.CATALOG_READ), async (req, res) => {
     try {
+        const storeCatalogPackageScope = String(req.query?.packageScope || "").trim().toLowerCase() === "store-catalog";
         const product = await resolveAdminCatalogProduct(req.params.productCode, {
             includeAssetProjection: true,
             includeAdminPricing: true,
-            customerMarket: ["TH", "MM"].includes(String(req.query?.customerMarket || "").toUpperCase()) ? String(req.query.customerMarket).toUpperCase() : "TH"
+            customerMarket: ["TH", "MM"].includes(String(req.query?.customerMarket || "").toUpperCase()) ? String(req.query.customerMarket).toUpperCase() : "TH",
+            storeCatalogPackageScope
         });
 
         if (!product) {

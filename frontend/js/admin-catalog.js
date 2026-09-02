@@ -122,7 +122,7 @@ async function loadAdminCatalog(force = false) {
         } else {
             const selectedCodes = [...catalogStoreSelectionScope];
             const responses = await Promise.all(selectedCodes.map(productCode => (
-                adminFetch(`/api/admin/catalog/products/${encodeURIComponent(productCode)}?customerMarket=${encodeURIComponent(catalogCustomerMarket)}`)
+                adminFetch(`/api/admin/catalog/products/${encodeURIComponent(productCode)}?customerMarket=${encodeURIComponent(catalogCustomerMarket)}&packageScope=store-catalog`)
             )));
             if (responses.some(response => response == null)) {
                 renderCatalogError(adminT("catalog_data_unavailable", "Catalog data unavailable"));
@@ -334,7 +334,8 @@ async function selectCatalogProduct(productCode, rerenderList = true) {
 
     let data;
     try {
-        data = await adminFetch(`/api/admin/catalog/products/${encodeURIComponent(selectedCatalogProductCode)}?customerMarket=${encodeURIComponent(catalogCustomerMarket)}`, {
+        const packageScope = catalogStoreSelectionScope === null ? "" : "&packageScope=store-catalog";
+        data = await adminFetch(`/api/admin/catalog/products/${encodeURIComponent(selectedCatalogProductCode)}?customerMarket=${encodeURIComponent(catalogCustomerMarket)}${packageScope}`, {
             signal: requestController.signal
         });
     } catch (error) {
