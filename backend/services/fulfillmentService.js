@@ -84,6 +84,10 @@ function normalizeRegion(value = "") {
     return region;
 }
 
+function fulfillmentAttemptRegion(mapping = {}, customerMarket = "", marketDecoupledV2 = false) {
+    return marketDecoupledV2 ? normalizeRegion(customerMarket) : String(mapping.region || "").trim().toUpperCase();
+}
+
 function normalizeSupplierMode(value = "") {
     const mode = cleanText(value, 20).toUpperCase() || SUPPLIER_MODES.MANUAL;
     if (!Object.values(SUPPLIER_MODES).includes(mode)) {
@@ -827,7 +831,7 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
         supplierMappingId: mapping._id,
         productCode: mapping.productCode,
         packageCode: mapping.packageCode,
-        region: mapping.region,
+        region: fulfillmentAttemptRegion(mapping, customerMarket, marketDecoupledV2),
         ...(marketDecoupledV2 ? { customerMarket } : {}),
         mode: supplier.mode,
         routeType: supplier.mode === SUPPLIER_MODES.API
@@ -1042,6 +1046,7 @@ module.exports = {
     createSupplier,
     getAttempt,
     getOrderFulfillmentSummary,
+    fulfillmentAttemptRegion,
     isMarketDecoupledV2RouteSnapshot,
     listAttempts,
     listEligibleMappingsForOrder,
