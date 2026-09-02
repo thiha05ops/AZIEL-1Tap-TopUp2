@@ -8,6 +8,7 @@ const vm = require("vm");
 const { resolveFulfillmentCapability } = require("../services/fulfillmentCapabilityService");
 const { reviewCustomerCheckout } = require("../services/commerce/customerManualPromptPayCheckoutService");
 const { createAndPersistPricingQuote } = require("../services/commerce/pricingQuoteApplicationService");
+const { checkoutFromQuote } = require("../services/commerce/checkoutApplicationService");
 
 const ROOT = path.resolve(__dirname, "../..");
 const checkoutSource = fs.readFileSync(path.join(ROOT, "frontend/js/product-checkout.js"), "utf8");
@@ -111,6 +112,7 @@ function publicQuote() {
 }
 
 async function verifyBackend() {
+    let persistedQuote = null;
     const mapping = {
         _id: "6a94fec6591c7120027da868",
         supplierId: "supplier",
@@ -146,7 +148,10 @@ async function verifyBackend() {
             }),
             createAndPersistPricingQuote: (input, dependencies) => createAndPersistPricingQuote(input, {
                 ...dependencies,
-                createQuoteRecord: async ({ quote }) => ({ ...quote, createdAt: new Date(), __pricingQuotePersistenceOutcome: "isolated_no_write" })
+                createQuoteRecord: async ({ quote }) => {
+                    persistedQuote = { ...quote, createdAt: new Date(), __pricingQuotePersistenceOutcome: "isolated_no_write" };
+                    return persistedQuote;
+                }
             })
         }
     );
@@ -155,6 +160,39 @@ async function verifyBackend() {
     assert.strictEqual(result.review.pricing.discountAmount, 0);
     assert.strictEqual(result.review.pricing.quotedTotalAmount, 651.08);
     assert.strictEqual(result.review.pricing.currency, "THB");
+
+    const supplierRouteSnapshot = {
+        routeType: "SUPPLIER_API", supplierMappingId: mapping._id, supplierId: mapping.supplierId, supplierCode: "FAZERCARDS",
+        productCode: "mlbb", packageCode, supplierProductCode: mapping.supplierProductCode, supplierPackageCode: mapping.supplierPackageCode,
+        executionMode: "API", selectedRole: "PRIMARY", selectedAt: new Date().toISOString(), snapshotVersion: 2,
+        supplierMarket: "GLOBAL", customerMarket: "TH", eligibility: mapping.fulfillmentEligibility,
+        fulfillmentContract: { version: 1, supplierCode: "FAZERCARDS", protocol: "FAZERCARDS_TOPUPS_ORDER_V2", supplierProductCode: mapping.supplierProductCode, fields: [
+            { customerField: "playerId", providerField: "player_id", required: true, label: "Player ID", type: "text", constraints: {} },
+            { customerField: "serverId", providerField: "server_id", required: true, label: "Server ID", type: "text", constraints: {} }
+        ] }
+    };
+    let persistedOrder = null;
+    let supplierCalls = 0;
+    const checkout = await checkoutFromQuote({
+        quoteId: persistedQuote.quoteId, owner: { userId: "customer" }, idempotencyKey: "checkout:checkout-boundary-test",
+        paymentSelection: { paymentMethodId: "promptpay", paymentChannel: "MANUAL_PROMPTPAY" },
+        customerInput: { gameAccount: { userId: "439488505", zoneId: "2409", accountFields: [
+            { key: "userId", label: "MLBB User ID", value: "439488505" }, { key: "zoneId", label: "Zone ID", value: "2409" }
+        ] }, customFields: { gameKey: "mlbb" } }, requestMetadata: { source: "isolated-verifier" }
+    }, {
+        findOwnedQuote: async () => persistedQuote, findOrderByQuoteId: async () => null, findOrderByCheckoutIdempotency: async () => null,
+        validateOperationalPackageState: async () => ({ allowed: true, supplierRouteSnapshot }),
+        validateFulfilmentInput: async ({ customerInput }) => ({ allowed: true, normalisedFulfilmentInput: customerInput }),
+        validatePaymentMethod: async () => ({ allowed: true, paymentSnapshot: { paymentMethodId: "promptpay", paymentChannel: "MANUAL_PROMPTPAY", provider: "MANUAL_PROMPTPAY", nextAction: "OPEN_MANUAL_PAYMENT", paymentMethodBound: true }, nextAction: "OPEN_MANUAL_PAYMENT" }),
+        validatePromotionRedemption: async () => ({ allowed: true, promotionRedemptionSnapshot: null }),
+        getCheckoutTime: () => new Date(), generateOrderId: () => "AZL-CHECKOUT-BOUNDARY", generateCheckoutId: () => "CHK-CHECKOUT-BOUNDARY",
+        transactionRunner: async callback => callback({}),
+        createOrderRecord: async ({ orderSnapshot }) => { persistedOrder = orderSnapshot; return orderSnapshot; }, markQuoteUsed: async () => persistedQuote
+    });
+    assert.strictEqual(checkout.checkout.orderId, "AZL-CHECKOUT-BOUNDARY");
+    assert(persistedOrder, "Valid userId/zoneId aliases must reach mocked CommerceOrder persistence.");
+    assert.deepStrictEqual({ routeType: persistedOrder.fulfilment.routeSnapshot.routeType, supplierCode: persistedOrder.fulfilment.routeSnapshot.supplierCode, supplierMappingId: persistedOrder.fulfilment.routeSnapshot.supplierMappingId, supplierMarket: persistedOrder.fulfilment.routeSnapshot.supplierMarket, customerMarket: persistedOrder.fulfilment.routeSnapshot.customerMarket, snapshotVersion: persistedOrder.fulfilment.routeSnapshot.snapshotVersion }, { routeType: "SUPPLIER_API", supplierCode: "FAZERCARDS", supplierMappingId: mapping._id, supplierMarket: "GLOBAL", customerMarket: "TH", snapshotVersion: 2 });
+    assert.strictEqual(supplierCalls, 0, "Checkout verification must not call the supplier.");
 }
 
 async function verifyFrontend() {

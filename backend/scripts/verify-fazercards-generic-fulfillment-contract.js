@@ -42,6 +42,21 @@ assert.deepStrictEqual(buildFieldsFromContract(contract, { accountFields: [{ key
 assert.throws(() => buildFieldsFromContract(contract, {}), error => error.code === "FAZERCARDS_REQUIRED_INPUT_MISSING");
 assert.deepStrictEqual(publicCustomerInputContract(contract).fields.map(field => [field.key, field.label]), [["userId", "Account ID"]]);
 
+const mlbbSemanticContract = { ...contract, fields: [
+    { customerField: "playerId", providerField: "player_id", required: true, label: "Player ID", type: "text", constraints: {} },
+    { customerField: "serverId", providerField: "server_id", required: true, label: "Server ID", type: "text", constraints: {} }
+] };
+assert.deepStrictEqual(buildFieldsFromContract(mlbbSemanticContract, { userId: "439488505", zoneId: "2409" }), { player_id: "439488505", server_id: "2409" });
+assert.deepStrictEqual(buildFieldsFromContract(mlbbSemanticContract, { playerId: "439488505", serverId: "2409" }), { player_id: "439488505", server_id: "2409" });
+const reverseSemanticContract = { ...contract, fields: [
+    { customerField: "userId", providerField: "player_id", required: true, label: "User ID", type: "text", constraints: {} },
+    { customerField: "zoneId", providerField: "server_id", required: true, label: "Zone ID", type: "text", constraints: {} }
+] };
+assert.deepStrictEqual(buildFieldsFromContract(reverseSemanticContract, { playerId: "439488505", serverId: "2409" }), { player_id: "439488505", server_id: "2409" });
+assert.throws(() => buildFieldsFromContract(mlbbSemanticContract, { zoneId: "2409" }), error => error.code === "FAZERCARDS_REQUIRED_INPUT_MISSING");
+assert.throws(() => buildFieldsFromContract(mlbbSemanticContract, { userId: "439488505" }), error => error.code === "FAZERCARDS_REQUIRED_INPUT_MISSING");
+assert.throws(() => buildFieldsFromContract(mlbbSemanticContract, { userId: "439488505", zoneId: "", accountFields: [{ key: "serverId", value: "" }] }), error => error.code === "FAZERCARDS_REQUIRED_INPUT_MISSING");
+
 const snapshotted = { ...mapping, mappingMetadata: { ...mapping.mappingMetadata, fulfillmentContract: contract } };
 assert(verifiedMappingContract(snapshotted));
 assert(mappingContractMatchesSupplierCatalog(snapshotted, supplierProduct));

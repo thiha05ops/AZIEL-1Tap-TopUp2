@@ -87,11 +87,17 @@ function verifiedMappingContract(mapping = {}) {
     return clean(value.fingerprint) === contractFingerprint(normalized) ? normalized : null;
 }
 
+const CUSTOMER_INPUT_ALIASES = Object.freeze({
+    playerId: Object.freeze(["playerId", "userId"]),
+    userId: Object.freeze(["userId", "playerId"]),
+    serverId: Object.freeze(["serverId", "zoneId"]),
+    zoneId: Object.freeze(["zoneId", "serverId"])
+});
+
 function inputValue(input = {}, key = "") {
     const accountFields = Array.isArray(input.accountFields) ? input.accountFields : [];
-    const direct = input[key];
-    const aliases = key === "playerId" ? ["playerId", "userId"] : key === "userId" ? ["userId", "playerId"] : [key];
-    return clean(direct || aliases.map(alias => input[alias]).find(Boolean) || accountFields.find(field => aliases.includes(clean(field?.key)))?.value);
+    const aliases = CUSTOMER_INPUT_ALIASES[key] || [key];
+    return clean(aliases.map(alias => input[alias]).find(value => clean(value)) || accountFields.find(field => aliases.includes(clean(field?.key)) && clean(field?.value))?.value);
 }
 
 function buildFieldsFromContract(contract, input = {}) {
