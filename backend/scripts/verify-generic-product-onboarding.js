@@ -146,6 +146,12 @@ async function main() {
     const genericFrontend = read("frontend/js/product-detail.js");
     assert(genericFrontend.includes("AZIEL_CATALOG?.ensureFresh?."));
     assert(genericFrontend.includes("window.AZIEL_GENERIC_PRODUCT_DETAIL"));
+    const identityBinding = genericFrontend.indexOf('setAttribute("data-game", productCode)');
+    const asynchronousBootstrap = genericFrontend.indexOf("async function bootstrap");
+    const catalogAwait = genericFrontend.indexOf("await window.AZIEL_CATALOG?.ensureFresh?.");
+    assert(identityBinding >= 0, "Generic Product Detail must bind its URL-derived product identity.");
+    assert(identityBinding < asynchronousBootstrap && identityBinding < catalogAwait, "Product identity must be bound before asynchronous catalog hydration.");
+    assert(!genericFrontend.includes("heaven-burns-red"), "Generic Product Detail must not special-case Heaven Burns Red.");
 
     console.log(JSON.stringify({
         result: "PASS", noDedicatedHtml: true, genericRoute: readiness.route,

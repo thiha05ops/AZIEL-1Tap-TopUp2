@@ -40,6 +40,8 @@
         return;
     }
 
+    document.getElementById("packages")?.setAttribute("data-game", productCode);
+
     async function bootstrap() {
         try {
             await window.AZIEL_CATALOG?.ensureFresh?.();
@@ -56,7 +58,6 @@
         const name = product.name || fallback[0] || productCode;
         const tag = product.displayMarketLabel || fallback[1] || String(product.catalogCategory || "Product").replaceAll("_", " ");
         const packagePrompt = product.productKnowledge?.shortDescription || product.description || fallback[2] || "Select an available package.";
-        document.getElementById("packages")?.setAttribute("data-game", productCode);
         applyText("[data-product-title]", name);
         applyText("[data-product-tag]", tag);
         applyText("[data-package-prompt]", packagePrompt);
