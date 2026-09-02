@@ -22,6 +22,7 @@ const packageRows = [
 function initialState() {
     return {
         selections: [],
+        product: { _id: "product-mlbb", productCode: "mlbb", enabled: false, deletedAt: new Date().toISOString(), lifecycleStatus: "RETIRED" },
         supplier: { _id: ids.supplier, supplierCode: "FAZERCARDS", name: "FazerCards", enabled: true },
         mappings: packageRows.map(([packageCode, _name, supplierPackageCode], index) => ({
             _id: ids.mappings[index], productCode: "mlbb", packageCode, supplierId: ids.supplier,
@@ -48,6 +49,7 @@ function query(sessionOperation, execute) {
     return {
         activeSession: null,
         session(session) { this.activeSession = session; return this; },
+        then(resolve, reject) { return this.lean().then(resolve, reject); },
         async lean() {
             const session = this.activeSession;
             if (session) {
@@ -70,8 +72,14 @@ function fixture(state, options = {}) {
         Supplier: { findOne: filter => query("Supplier.findOne", () => matches(state.supplier, filter) ? clone(state.supplier) : null) },
         Mapping: { find: filter => query("Mapping.find", () => clone(state.mappings.filter(row => matches(row, filter)))) },
         Offer: { find: filter => query("Offer.find", () => clone(state.offers.filter(row => matches(row, filter)))) },
-        Package: { find: filter => query("Package.find", () => clone(state.packages.filter(row => matches(row, filter)))) },
-        Product: {}, Publication: {},
+        Package: {
+            find: filter => query("Package.find", () => clone(state.packages.filter(row => matches(row, filter)))),
+            updateMany: (_filter, update, options = {}) => query("Package.updateMany", () => { state.packages.forEach(row => Object.assign(row, clone(update.$set))); return { modifiedCount: state.packages.length }; }).session(options.session)
+        },
+        Product: {
+            findOne: filter => query("Product.findOne", () => matches(state.product, filter) ? clone(state.product) : null),
+            updateOne: (_filter, update, options = {}) => query("Product.updateOne", () => { Object.assign(state.product, clone(update.$set)); return { modifiedCount: 1 }; }).session(options.session)
+        }, Publication: {},
         Selection: {
             findOne: filter => query("Selection.findOne", () => clone(state.selections.find(row => matches(row, filter)) || null)),
             findOneAndUpdate: (filter, update, options = {}) => {
@@ -134,7 +142,7 @@ async function main() {
     assert.deepStrictEqual(state.prices, beforePrices);
     assert.deepStrictEqual(state.publications, beforePublications);
     assert.equal(state.supplierCalls, 0);
-    assert.deepStrictEqual(state.lastOperations, ["Supplier.findOne", "Mapping.find", "Selection.findOne", "Offer.find", "Package.find", "Selection.findOneAndUpdate"]);
+    assert.deepStrictEqual(state.lastOperations, ["Supplier.findOne", "Mapping.find", "Selection.findOne", "Offer.find", "Product.findOne", "Package.find", "Product.updateOne", "Package.updateMany", "Selection.findOneAndUpdate"]);
 
     await assert.rejects(
         () => service.save(input, { actor: { username: "owner" }, transaction }),

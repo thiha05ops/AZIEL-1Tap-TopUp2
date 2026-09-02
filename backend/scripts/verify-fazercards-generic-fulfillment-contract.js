@@ -13,7 +13,7 @@ const {
 } = require("../services/suppliers/fazercardsFulfillmentContractService");
 const { supportsFazerCardsMapping, validateFazerCardsMapping } = require("../services/suppliers/fazercardsFulfillmentProcessor");
 const { createFazerCardsAdapter } = require("../services/suppliers/fazercardsAdapter");
-const { isCustomerMarketEligible } = require("../services/supplierFulfillmentEligibilityService");
+const { isCustomerMarketEligible, isCustomerMarketCompatible } = require("../services/supplierFulfillmentEligibilityService");
 const { reviewedContract } = require("../services/supplierCatalog/supplierInputContractReviewService");
 const { planMutations } = require("../services/supplierCatalog/providers/fazerCardsCatalogIngestionService");
 
@@ -49,9 +49,10 @@ assert.strictEqual(mappingContractMatchesSupplierCatalog(snapshotted, { ...suppl
 assert(supportsFazerCardsMapping(snapshotted), "A verified mapping snapshot must replace game-name allowlisting.");
 assert.strictEqual(supportsFazerCardsMapping(mapping), false, "An unknown generic mapping must remain unsupported.");
 validateFazerCardsMapping(snapshotted, { customerMarket: "TH" });
-assert.throws(() => validateFazerCardsMapping(snapshotted, { customerMarket: "MM" }), error => error.code === "FAZERCARDS_CUSTOMER_MARKET_NOT_ELIGIBLE");
+validateFazerCardsMapping(snapshotted, { customerMarket: "MM" });
 assert.strictEqual(isCustomerMarketEligible(snapshotted.fulfillmentEligibility, "TH"), true);
 assert.strictEqual(isCustomerMarketEligible(snapshotted.fulfillmentEligibility, "MM"), false);
+assert.strictEqual(isCustomerMarketCompatible(snapshotted, "MM"), true, "GLOBAL supplier inventory is deterministically compatible with MM commerce.");
 
 const noContract = contractFromSupplierCatalog({
     mapping: { ...mapping, productCode: "afk-journey", supplierProductCode: "afk_journey" },
@@ -103,10 +104,10 @@ console.log(JSON.stringify({
     noDedicatedHtml: true,
     gameNameAllowlistRequired: false,
     unknownContractFailClosed: true,
-    globalMarketAutomaticallyEligible: false,
+    globalMarketAutomaticallyEligible: true,
     afkContractVerified: false,
     afkReady: false,
-    ownerReviewWorkflow: true,
+    normalOwnerInputApprovalRequired: false,
     sourceChangeInvalidatesExecution: true,
     perProductEnvironmentVariableRequired: false,
     liveSupplierCalls: 0,

@@ -72,6 +72,21 @@ function isCustomerMarketEligible(value, customerMarket) {
     return false;
 }
 
+function supplierMarketCompatibility(supplierMarket, customerMarket) {
+    const supplier = upper(supplierMarket);
+    const customer = upper(customerMarket);
+    if (!CUSTOMER_MARKETS.includes(customer)) return Object.freeze({ compatible: false, deterministic: true, code: "CUSTOMER_MARKET_UNSUPPORTED" });
+    if (supplier === "GLOBAL") return Object.freeze({ compatible: true, deterministic: true, code: "GLOBAL_COMMERCE_COMPATIBILITY" });
+    if (["TH", "THAILAND"].includes(supplier)) return Object.freeze({ compatible: customer === "TH", deterministic: true, code: customer === "TH" ? "TH_COMMERCE_COMPATIBILITY" : "SUPPLIER_MARKET_MISMATCH" });
+    if (["MM", "MYANMAR"].includes(supplier)) return Object.freeze({ compatible: customer === "MM", deterministic: true, code: customer === "MM" ? "MM_COMMERCE_COMPATIBILITY" : "SUPPLIER_MARKET_MISMATCH" });
+    return Object.freeze({ compatible: false, deterministic: false, code: supplier === "UNSPECIFIED" || !supplier ? "SUPPLIER_MARKET_UNSPECIFIED" : "SUPPLIER_MARKET_COMPATIBILITY_UNPROVEN" });
+}
+
+function isCustomerMarketCompatible(mapping, customerMarket) {
+    if (isCustomerMarketEligible(mapping?.fulfillmentEligibility, customerMarket)) return true;
+    return supplierMarketCompatibility(mapping?.region, customerMarket).compatible;
+}
+
 module.exports = Object.freeze({
     CUSTOMER_MARKETS,
     FULFILLMENT_ELIGIBILITY_MODES,
@@ -79,4 +94,6 @@ module.exports = Object.freeze({
     normalizeFulfillmentEligibility,
     validateFulfillmentEligibility,
     isCustomerMarketEligible
+    ,supplierMarketCompatibility,
+    isCustomerMarketCompatible
 });

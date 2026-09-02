@@ -51,7 +51,7 @@ ok(adminRead.includes("marketCoverageState") && adminRead.includes("durableDispo
 ok(adminUi.includes("PACKAGE_MARKET_PUBLICATION") || adminUi.includes("PackageMarketPublication"), "Admin UI must name the publication authority.");
 ok(adminUi.includes("OFF preserves canonical identity, supplier mapping, cost evidence and availability history"), "Admin OFF preservation must be explicit.");
 ok(publicCatalog.includes("explicitPublishedPackages"), "Public catalog must retain explicit publication filtering.");
-ok(routing.includes('productionRole: ROLES.PRIMARY') && routing.includes('productionRole: ROLES.BACKUP'), "Routing roles must remain explicit.");
+ok(routing.includes('PRIMARY: "PRIMARY"') && routing.includes('BACKUP: "BACKUP"') && routing.includes("normalizedRole === ROLES.PRIMARY") && routing.includes("ROLES.DISABLED, ROLES.BACKUP"), "Routing roles must remain explicit.");
 ok(routing.includes("automaticFailover: false") || read("backend/scripts/verify-owner-routing-publication-boundary.js").includes("backupAutomaticSelection: false"), "Automatic failover must remain absent.");
 ok(pricing.includes("SUPPLIER_COST_AUTHORITY_MUTATIONS_ENABLED"), "Observed-cost promotion must remain gated.");
 

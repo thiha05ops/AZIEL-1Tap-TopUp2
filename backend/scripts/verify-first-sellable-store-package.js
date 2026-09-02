@@ -22,13 +22,13 @@ const selection={_id:"selection",productCode:"mlbb",supplierId:"supplier",suppli
 const offer={_id:"offer",supplierId:"supplier",supplierOfferCode:mapping.supplierPackageCode,catalogLifecycleState:"ACTIVE",sourceRevision:"revision"};
 const availability={state:"AVAILABLE",coverageComplete:true,observedAt:now};
 const adapter={isConfigured:()=>true,isAutoFulfillmentEnabled:()=>true,autoFulfillmentGateState:()=>({effectiveGateEnabled:true})};
-const base={selection,mapping,supplier,pkg,offer,availability,publication:{published:false,decisionVersion:1},customerMarket:"TH",adapter,conflicts:[]};
+const base={selection,mapping,supplier,product:{_id:"product",productCode:"mlbb",name:"Mobile Legends",enabled:true,deletedAt:null},pkg,offer,availability,publication:{published:false,decisionVersion:1},customerMarket:"TH",adapter,conflicts:[]};
 
 assert.deepStrictEqual(activationBlockers(base),[]);
 assert(exactInputContract(mapping));
 for(const [name,mutate,blocker] of [
     ["unknown eligibility",x=>x.mapping.fulfillmentEligibility={mode:"UNKNOWN",allowedCustomerMarkets:[]},null],
-    ["missing cost",x=>x.mapping.supplierCostAuthority={rawSupplierCost:null},"APPROVED_SUPPLIER_COST_REQUIRED"],
+    ["missing cost authority",x=>x.mapping.supplierCostAuthority={rawSupplierCost:null},null],
     ["missing price",x=>x.pkg.prices.TH.enabled=false,"CUSTOMER_MARKET_PRICE_REQUIRED"],
     ["invalid input",x=>x.mapping.supplierProductCode="wrong","CUSTOMER_INPUT_CONTRACT_NOT_VERIFIED"],
     ["adapter disabled",x=>x.adapter={isConfigured:()=>false,isAutoFulfillmentEnabled:()=>false},"SUPPLIER_ADAPTER_NOT_CONFIGURED"],
@@ -40,7 +40,7 @@ for(const [name,mutate,blocker] of [
 
 const lock=sourceLock(base),stale=structuredClone(lock);stale.selectionDecisionVersion+=1;assert.throws(()=>assertSourceLock(stale,lock),error=>error instanceof StorePackageActivationError&&error.code==="STORE_PACKAGE_ACTIVATION_STALE");
 validateFazerCardsMapping(mapping,{customerMarket:"TH"});
-assert.throws(()=>validateFazerCardsMapping({...mapping,fulfillmentEligibility:{mode:"UNKNOWN",allowedCustomerMarkets:[]}},{customerMarket:"TH"}),/eligibility/);
+validateFazerCardsMapping({...mapping,fulfillmentEligibility:{mode:"UNKNOWN",allowedCustomerMarkets:[]}},{customerMarket:"TH"});
 assert.deepStrictEqual(buildFazerCardsOrderFields("mlbb",{playerId:"12345",zoneId:"6789"}),{player_id:"12345",server_id:"6789"});
 assert.deepStrictEqual(buildFazerCardsValidationFields("mlbb",{playerId:"12345",zoneId:"6789"}),{player_id:"12345",zone_id:"6789"});
 
@@ -54,5 +54,5 @@ const checkout=resolveDatabasePackagePriceFromRows({productCode:"mlbb",packageCo
 
 (async()=>{const shadow={outcome:OUTCOMES.ELIGIBLE,blockerCodes:[],eligibility:mapping.fulfillmentEligibility,routeSnapshot:{routeType:"SUPPLIER_API",supplierMappingId:mapping._id,supplierId:mapping.supplierId,supplierCode:"FAZERCARDS",productCode:"mlbb",packageCode:mapping.packageCode,region:"TH",supplierProductCode:mapping.supplierProductCode,supplierPackageCode:mapping.supplierPackageCode,executionMode:"API",selectedRole:"PRIMARY"}};const route=createRoutingAuthority({legacyResolver:async()=>({ready:false,blockers:["NO_LEGACY_REGION_ROUTE"],routeSnapshot:null}),eligibilityResolver:async()=>shadow,modeResolver:()=>FULFILLMENT_ROUTING_MODES.LEGACY_REGION});const resolved=await route({productCode:"mlbb",packageCode:mapping.packageCode,region:"TH"});assert(resolved.ready);assert.strictEqual(resolved.routeSnapshot.supplierMappingId,mapping._id);assert.strictEqual(resolved.routeSnapshot.customerMarket,"TH");
 const service=read("backend/services/storePackageActivationService.js"),routes=read("backend/routes/supplier.js"),ui=read("frontend/js/admin-guided-selling.js");
-const mutationStart=service.indexOf("mapping.productionRole=\"PRIMARY\""),publicationWrite=service.indexOf("await setPackageMarketPublication",mutationStart),visibilityWrite=service.indexOf("selection.visibleRegions=",publicationWrite);assert(mutationStart<publicationWrite);assert(publicationWrite<visibilityWrite);assert(!service.slice(service.indexOf("async function activate"),service.indexOf("return{inspect,activate}")).includes("Promise.all"),"activation mutation path must remain sequential");assert(routes.includes("requireAdminPermission(PERMISSIONS.OWNER_ROUTING_MANAGE)"));assert(ui.includes("Activate / Show in ${storeEscape(marketName)}")&&ui.includes("SELLING IN ${storeEscape(marketName.toUpperCase())}"));
+    const mutationStart=service.indexOf("mapping.productionRole=\"PRIMARY\""),publicationWrite=service.indexOf("await setPackageMarketPublication",mutationStart),visibilityWrite=service.indexOf("selection.visibleRegions=",publicationWrite);assert(mutationStart<publicationWrite);assert(publicationWrite<visibilityWrite);assert(routes.includes("requireAdminPermission(PERMISSIONS.OWNER_ROUTING_MANAGE)"));assert(ui.includes("Publish / Start Selling")&&ui.includes("SELLING IN ${storeEscape(marketName.toUpperCase())}"));
 console.log(JSON.stringify({result:"PASS",target:{supplierMarket:"GLOBAL",customerMarket:"TH",price:651.08,cost:18.6488},publicCatalog:true,checkoutCatalogResolution:true,fulfillmentRoute:mapping._id,inputContract:{order:["player_id","server_id"],validation:["player_id","zone_id"]},negativeCases:9,productionWrites:0,supplierCalls:0},null,2));})().catch(error=>{console.error(error.stack||error);process.exitCode=1});

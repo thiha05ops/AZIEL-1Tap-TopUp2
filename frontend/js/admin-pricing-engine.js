@@ -279,10 +279,6 @@
                             : "UNCHANGED";
             const blocked = dailyBlockingReason();
             const selectionEligible = rowSelectionEligible(row);
-            const canReviewCost = window.AZIEL_ADMIN_AUTH?.hasPermission?.("SUPPLIER_COST_MANAGE") === true;
-            const costReviewAction = row.supplierCostStatus === "COST_REVIEW_REQUIRED" && row.mappingId && row.supplierCatalogOfferId && canReviewCost
-                ? `<button class="admin-secondary-btn pricing-review-cost" type="button" data-pricing-review-cost data-mapping-id="${text(row.mappingId)}" data-offer-id="${text(row.supplierCatalogOfferId)}" data-supplier-code="${text(row.supplierCode)}" data-product-code="${text(row.productCode)}" data-package-code="${text(row.packageCode)}" data-supplier-market="${text(row.mappingRegion)}">Review cost</button>`
-                : "";
             const overrideRegions = daily.region === "ALL" ? ["TH", "MM"] : [daily.region];
             const profitControls = overrideRegions.map(region => {
                 const override = row.regionalRows[region]?.profitOverride || { mode: "INHERIT", value: null };
@@ -292,7 +288,7 @@
             return `<tr data-pricing-row="${key}">
                 <td><input type="checkbox" data-row-selection="${key}" aria-label="Select ${text(row.packageName)}" ${daily.selected.has(key) ? "checked" : ""} ${selectionEligible ? "" : "disabled"}></td>
                 <td><strong>${text(row.packageName)}</strong><small>${text(row.productName)} · ${upper(row.packageCode)}</small><details class="pricing-mobile-regions"><summary>Regional prices</summary><div><b>Thailand</b>${regionalResult(row, preview, "TH")}</div><div><b>Myanmar</b>${regionalResult(row, preview, "MM")}</div></details></td>
-                <td><label class="pricing-cost-input"><input type="number" min="0.000001" step="0.000001" value="${value}" placeholder="${row.observedSupplierCost ?? ""}" data-supplier-cost="${key}" ${(blocked || row.supplierCostStatus === "COST_REVIEW_REQUIRED") ? `disabled title="${row.supplierCostStatus === "COST_REVIEW_REQUIRED" ? "Observed cost requires explicit approval in Supplier Cost Coverage" : blocked}"` : ""}><span>${row.supplierCurrency || supplier?.supplierCurrency || "-"}</span></label><small>${row.approvedSupplierCost != null ? `Approved: ${row.approvedSupplierCost} ${row.supplierCurrency}` : "Approved: —"}</small><small>${row.observedSupplierCost != null ? `Observed: ${row.observedSupplierCost} ${row.observedSupplierCurrency}` : "Observed: —"}</small>${row.supplierCostStatus === "COST_REVIEW_REQUIRED" ? '<small class="pricing-readiness-note">Cost approval required · provisional preview only</small>' : ""}${costReviewAction}</td>
+                <td><label class="pricing-cost-input"><input type="number" min="0.000001" step="0.000001" value="${value}" placeholder="${row.observedSupplierCost ?? ""}" data-supplier-cost="${key}" ${blocked ? `disabled title="${blocked}"` : ""}><span>${row.supplierCurrency || supplier?.supplierCurrency || "-"}</span></label><small>${row.observedSupplierCost != null ? `Supplier catalog: ${row.observedSupplierCost} ${row.observedSupplierCurrency}` : "Supplier catalog cost unavailable"}</small></td>
                 <td>${profitControls}</td>
                 <td class="pricing-desktop-region">${regionalResult(row, preview, "TH")}</td><td class="pricing-desktop-region">${regionalResult(row, preview, "MM")}</td>
                 <td><span class="pricing-status is-${displayStatus.toLowerCase()}">${displayStatus}</span><small>${view.reason}</small></td>

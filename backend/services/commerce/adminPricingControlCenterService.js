@@ -113,7 +113,7 @@ async function loadDailyPricingWorkspace({ supplierId = "", supplierMarket = "",
         const previewEligible = exactMappingReady && Number.isFinite(costState.previewSupplierCost);
         const preparationReasons = [];
         if (!exactMappingReady) preparationReasons.push(readinessReason("EXACT_MAPPING_REQUIRED", "Exact supplier mapping required"));
-        if (!costState.authoritative) preparationReasons.push(readinessReason("EXACT_MAPPING_COST_APPROVAL_REQUIRED", "Cost approval required"));
+        if (!Number.isFinite(costState.previewSupplierCost)) preparationReasons.push(readinessReason("SUPPLIER_CATALOG_COST_REQUIRED", "Current supplier catalog cost required"));
         if (pkg.enabled === false) preparationReasons.push(readinessReason("CANONICAL_PACKAGE_DISABLED", "Package activation required"));
         const pricingRegions = canonicalPricingRegions(product, pkg, normalizedRegion, {
             allowDisabledPackage: Boolean(activeSelection),
@@ -372,7 +372,8 @@ function workspaceSupplierCostState(mapping = {}, observedSupplierCost = null) {
     const approved = Number(authoritativeEvidence.rawSupplierCost ?? authoritativeEvidence.priceUsd ?? authoritativeEvidence.netDealerPrice);
     const observed = Number(observedSupplierCost?.amount);
     const authoritative = Number.isFinite(approved);
-    const provisional = !authoritative && Number.isFinite(observed);
+    const observedFact = Number.isFinite(observed);
+    const provisional = false;
     const stale = authoritative && mapping.supplierCostAuthority?.capturedAt &&
         Date.now() - new Date(mapping.supplierCostAuthority.capturedAt).getTime() > Number(mapping.mappingMetadata?.costAuthorityMaximumAgeSeconds || 86400) * 1000;
     return {
@@ -380,8 +381,8 @@ function workspaceSupplierCostState(mapping = {}, observedSupplierCost = null) {
         authoritative,
         provisional,
         approvedSupplierCost: authoritative ? approved : null,
-        previewSupplierCost: authoritative ? approved : provisional ? observed : null,
-        status: !authoritative && !provisional ? "COST_MISSING" : provisional ? "COST_REVIEW_REQUIRED" : stale ? "COST_STALE" : "COST_READY"
+        previewSupplierCost: observedFact ? observed : authoritative ? approved : null,
+        status: observedFact ? "COST_READY" : authoritative ? (stale ? "COST_STALE" : "COST_READY") : "COST_MISSING"
     };
 }
 
@@ -1249,11 +1250,12 @@ async function publishDailyPricing({
             _id: { $in: selectedMappingIds },
             supplierId
         }).lean();
+        const pricingOffers = await SupplierCatalogOffer.find({ _id: { $in: publicationMappings.map(mapping => mapping.supplierCatalogOfferId).filter(Boolean) } }).lean();
+        const mappingOffersById = new Map(pricingOffers.map(offer => [String(offer._id), offer]));
         const authoritativeMappings = publicationMappings.filter(mapping => {
-            const evidence = mapping.supplierCostAuthority?.rawSupplierCost != null
-                ? mapping.supplierCostAuthority
-                : mapping.mappingMetadata?.supplierCost || {};
-            const cost = Number(evidence.rawSupplierCost ?? evidence.priceUsd ?? evidence.netDealerPrice);
+            const offer = mappingOffersById.get(String(mapping.supplierCatalogOfferId));
+            const evidence = mapping.supplierCostAuthority?.rawSupplierCost != null ? mapping.supplierCostAuthority : mapping.mappingMetadata?.supplierCost || {};
+            const cost = Number(offer?.supplierCost?.amount ?? evidence.rawSupplierCost ?? evidence.priceUsd ?? evidence.netDealerPrice);
             return Boolean(text(mapping.supplierProductCode)) && Boolean(text(mapping.supplierPackageCode)) && Number.isFinite(cost);
         });
         if (authoritativeMappings.length !== new Set(selectedMappingIds).size) {

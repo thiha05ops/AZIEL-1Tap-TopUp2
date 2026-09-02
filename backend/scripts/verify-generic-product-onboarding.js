@@ -63,8 +63,8 @@ async function main() {
     }), ["TH"], "An exact Store Catalog selection must prepare disabled Master Catalog packages for pricing.");
     const observed = workspaceSupplierCostState(mapping, { amount: 4.25, currency: "USD" });
     assert.strictEqual(observed.previewSupplierCost, 4.25);
-    assert.strictEqual(observed.provisional, true);
-    assert.strictEqual(observed.status, "COST_REVIEW_REQUIRED");
+    assert.strictEqual(observed.provisional, false);
+    assert.strictEqual(observed.status, "COST_READY");
     assert.strictEqual(mapping.supplierCostAuthority.rawSupplierCost, null, "Pricing preparation must not approve cost.");
 
     const adminProduct = await resolveAdminCatalogProduct(productCode, {
@@ -100,8 +100,8 @@ async function main() {
         mappingSupportResolver: () => true
     });
     const activationInspection = await activation.inspect({ selectionId: selection._id, mappingId, customerMarket: "TH" });
-    assert(activationInspection.blockers.includes("CANONICAL_PACKAGE_NOT_ENABLED"));
-    assert(activationInspection.blockers.includes("APPROVED_SUPPLIER_COST_REQUIRED"));
+    assert(!activationInspection.blockers.includes("CANONICAL_PACKAGE_NOT_ENABLED"), "Selected canonical records are prepared by the system, not an Owner approval blocker.");
+    assert(!activationInspection.blockers.includes("APPROVED_SUPPLIER_COST_REQUIRED"));
     assert(activationInspection.blockers.includes("CUSTOMER_MARKET_PRICE_REQUIRED"));
     assert(!activationInspection.blockers.includes("CUSTOMER_INPUT_CONTRACT_NOT_VERIFIED"));
     assert(!activationInspection.blockers.includes("EXACT_SUPPLIER_OFFER_UNSUPPORTED"));
@@ -149,7 +149,7 @@ async function main() {
 
     console.log(JSON.stringify({
         result: "PASS", noDedicatedHtml: true, genericRoute: readiness.route,
-        selectedPricingRows: 1, presentationResolved: true, provisionalPricing: true,
+        selectedPricingRows: 1, presentationResolved: true, supplierCatalogCostUsable: true,
         activationCommandReusable: true, publicProjectionAfterExplicitActivation: true,
         checkoutPriceResolved: true, afkFulfillmentReady: false,
         afkBlockers: ["CUSTOMER_INPUT_CONTRACT_NOT_VERIFIED", "EXACT_SUPPLIER_OFFER_UNSUPPORTED"],

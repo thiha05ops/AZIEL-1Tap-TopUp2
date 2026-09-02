@@ -9,7 +9,7 @@ const { normalizeSupplierResult } = require("../supplierAdapterRegistry");
 const { classifySupplierFailure } = require("../supplierFailureClassificationService");
 const { buildFazerCardsFields, maskFazerCardsFields } = require("./fazercardsInputFormatters");
 const { buildFieldsFromContract, verifiedMappingContract, mappingContractMatchesSupplierCatalog } = require("./fazercardsFulfillmentContractService");
-const { isCustomerMarketEligible } = require("../supplierFulfillmentEligibilityService");
+const { isCustomerMarketCompatible } = require("../supplierFulfillmentEligibilityService");
 
 const POLL_DELAYS_MS = Object.freeze([0, 5000, 10000, 20000, 30000, 60000]);
 const SUPPORTED_PRODUCT_CATEGORIES = Object.freeze({ pubg: "pubg_mobile_auto", mlbb: "mobile_legends_global", freefire: "free_fire_th", hok: "honor_of_kings", valorant: "valorant_th" });
@@ -23,7 +23,7 @@ function validateFazerCardsMapping(mapping = {}, { customerMarket = "" } = {}) {
     const legacyMarket = ["TH", "MM"].includes(String(mapping.region || "").trim().toUpperCase()) ? mapping.region : "";
     const market = String(customerMarket || legacyMarket).trim().toUpperCase();
     if (!mapping.enabled || mapping.supplierCode !== "FAZERCARDS" || mapping.executionMode !== "API" || !supportsFazerCardsMapping(mapping) || !String(mapping.supplierPackageCode || "").trim()) throw Object.assign(new Error("An exact supported FazerCards mapping is required."), { code: "FAZERCARDS_PACKAGE_MAPPING_MISSING" });
-    if (!market || !isCustomerMarketEligible(mapping.fulfillmentEligibility, market)) throw Object.assign(new Error("FazerCards customer-market eligibility is not explicitly approved."), { code: "FAZERCARDS_CUSTOMER_MARKET_NOT_ELIGIBLE" });
+    if (!market || !isCustomerMarketCompatible(mapping, market)) throw Object.assign(new Error("FazerCards supplier market is not compatible with the customer market."), { code: "FAZERCARDS_CUSTOMER_MARKET_NOT_ELIGIBLE" });
     if (readiness.supplierMapped !== true || readiness.inputReady !== true || readiness.pricingReady !== true || readiness.fulfillmentReady !== true) throw Object.assign(new Error("FazerCards package production readiness is incomplete."), { code: "FAZERCARDS_PACKAGE_NOT_PRODUCTION_READY" });
     return mapping;
 }

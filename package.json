@@ -51,6 +51,7 @@
     "verify:store-catalog-daily-pricing-preparation": "node backend/scripts/verify-store-catalog-daily-pricing-preparation.js",
     "verify:generic-product-onboarding": "node backend/scripts/verify-generic-product-onboarding.js",
     "verify:fazercards-generic-fulfillment-contract": "node backend/scripts/verify-fazercards-generic-fulfillment-contract.js",
+    "verify:supplier-sellability-contract-coverage": "node backend/scripts/verify-supplier-sellability-contract-coverage.js",
     "verify:daily-pricing-cost-authority-handoff": "node backend/scripts/verify-daily-pricing-cost-authority-handoff.js",
     "verify:daily-pricing-post-publish": "node backend/scripts/verify-daily-pricing-post-publish-reconciliation.js",
     "verify:admin-operator-first": "node backend/scripts/verify-admin-operator-first-workflows.js",

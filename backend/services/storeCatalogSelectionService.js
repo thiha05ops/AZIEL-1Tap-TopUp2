@@ -45,13 +45,16 @@ function createStoreCatalogSelectionService(models = {}) {
             if (mappings.length !== mappingIds.length) throw new StoreCatalogSelectionError("STORE_SELECTION_SCOPE_MISMATCH", "One or more packages do not belong to this exact product and supplier market.", 409);
             const offerIds = mappings.map(item => item.supplierCatalogOfferId).filter(Boolean), packageCodes = mappings.map(item => upper(item.packageCode));
             const offers = offerIds.length ? await lean(M.Offer.find({ _id: { $in: offerIds } }), session) : [];
-            const packages = await lean(M.Package.find({ productCode, packageCode: { $in: packageCodes }, deletedAt: null }), session);
+            const product = await lean(M.Product.findOne({ productCode }), session);
+            const packages = await lean(M.Package.find({ productCode, packageCode: { $in: packageCodes } }), session);
             const offerById = new Map(offers.map(item => [id(item), item])), packageSet = new Set(packages.map(item => upper(item.packageCode)));
             const invalid = mappings.filter(mapping => { const offer = offerById.get(id(mapping.supplierCatalogOfferId)); return !offer || id(offer.supplierId) !== supplierId || clean(offer.supplierOfferCode) !== clean(mapping.supplierPackageCode) || !packageSet.has(upper(mapping.packageCode)); });
-            if (invalid.length) throw new StoreCatalogSelectionError("STORE_SELECTION_TECHNICAL_DATA_ISSUE", "Some selected packages have a technical data issue.", 409, { mappingIds: invalid.map(item => id(item)) });
+            if (!product || invalid.length) throw new StoreCatalogSelectionError("STORE_SELECTION_TECHNICAL_DATA_ISSUE", "Some selected packages have a technical data issue.", 409, { mappingIds: invalid.map(item => id(item)) });
+            await M.Product.updateOne({ _id: product._id }, { $set: { deletedAt: null, enabled: true, lifecycleStatus: "ACTIVE" } }, { session });
+            await M.Package.updateMany({ _id: { $in: packages.map(item => item._id) } }, { $set: { deletedAt: null, enabled: true } }, { session });
             const now = new Date(), update = { productCode, supplierId, supplierCode: upper(supplier.supplierCode), supplierMarket, sellingRegions, visibleRegions:(current?.visibleRegions||[]).filter(region=>sellingRegions.includes(region)), packages: mappings.map(mapping => ({ packageCode: upper(mapping.packageCode), supplierProductMappingId: mapping._id })).sort((a, b) => a.packageCode.localeCompare(b.packageCode)), status: "ACTIVE", decisionVersion: Number(current?.decisionVersion || 0) + 1, selectedBy: clean(context.actor?.username || context.actor || "admin"), selectedAt: now, removedBy: "", removedAt: null };
             const selection = await M.Selection.findOneAndUpdate({ productCode, supplierMarket }, { $set: update }, { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true, session }).lean();
-            return { selection, created: !current, publicPackagesChanged: 0, pricesChanged: 0, mappingsChanged: 0, supplierCalls: 0 };
+            return { selection, created: !current, canonicalCommercialRecordsPrepared: 1 + packages.length, publicPackagesChanged: 0, pricesChanged: 0, mappingsChanged: 0, supplierCalls: 0 };
         });
     }
     async function removePackage(input = {}, context = {}) {

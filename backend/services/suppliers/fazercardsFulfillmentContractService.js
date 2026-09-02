@@ -5,6 +5,7 @@ const crypto = require("crypto");
 const clean = value => String(value == null ? "" : value).trim();
 const CUSTOMER_FIELD_PATTERN = /^[a-z][A-Za-z0-9]{0,39}$/;
 const PROVIDER_FIELD_PATTERN = /^[a-z][a-z0-9_]{0,63}$/;
+const customerFieldForProviderField = value => clean(value).replace(/_([a-z0-9])/g, (_, character) => character.toUpperCase());
 
 class FazerCardsFulfillmentContractError extends Error {
     constructor(code, message) {
@@ -19,7 +20,7 @@ function normalizedFields(source = {}) {
         ? source.normalizedInputContract.fields
         : Array.isArray(source.requiredFields) ? source.requiredFields : [];
     const fields = rows.map(item => ({
-        customerField: clean(item.azielField || item.customerField || item.name),
+        customerField: clean(item.azielField || item.customerField || item.name || customerFieldForProviderField(item.providerField)),
         providerField: clean(item.providerField),
         required: item.required !== false,
         label: clean(item.label),
@@ -130,6 +131,7 @@ module.exports = Object.freeze({
     contractFingerprint,
     normalizedFields,
     mappingContractMatchesSupplierCatalog,
+    customerFieldForProviderField,
     publicCustomerInputContract,
     verifiedMappingContract
 });
