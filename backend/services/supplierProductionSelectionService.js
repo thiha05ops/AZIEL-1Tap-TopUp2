@@ -152,19 +152,39 @@ function pilotV2Snapshot(shadow, customerMarket) {
     });
 }
 
+function isSupplierApiRoute(result) {
+    return result?.ready === true && result?.routeSnapshot?.routeType === "SUPPLIER_API";
+}
+
+function isManualAdminRoute(result) {
+    return result?.ready === true && result?.routeSnapshot?.routeType === "MANUAL_ADMIN";
+}
+
+function isGenuineManualOnlyResolution(shadow) {
+    return shadow?.outcome === ELIGIBILITY_OUTCOMES.NO_ELIGIBLE_ROUTE &&
+        Array.isArray(shadow.blockerCodes) &&
+        shadow.blockerCodes.length === 1 &&
+        shadow.blockerCodes[0] === "NO_PRIMARY_MAPPING";
+}
+
 function createRoutingAuthority({ legacyResolver = resolveLegacyCheckoutRouteSnapshot, eligibilityResolver = resolveEligibilityPrimaryRoute, modeResolver = resolveFulfillmentRoutingMode, pilotEnabledResolver = isPilotEnabled, diagnosticsObserver = null } = {}) {
     return async function route({ productCode, packageCode, region, includeDiagnostics = false }) {
         const routingMode = modeResolver();
         const legacy = await legacyResolver({ productCode, packageCode, region });
-        if (routingMode === FULFILLMENT_ROUTING_MODES.LEGACY_REGION && legacy.ready) return legacy;
+        if (routingMode === FULFILLMENT_ROUTING_MODES.LEGACY_REGION && isSupplierApiRoute(legacy)) return legacy;
         const shadow = await eligibilityResolver({ productCode, packageCode, customerMarket: region });
-        // Compatibility convergence: a supplier-account market (for example GLOBAL)
-        // is not a customer market. When the legacy region route has no route, an
-        // explicitly eligible, enabled PRIMARY is authoritative and remains fail-closed.
+        // A supplier-account market (for example GLOBAL) is not a customer market.
+        // An exact legacy supplier route remains authoritative, but a manual fallback
+        // must not hide an eligible market-decoupled PRIMARY/API route.
         if (routingMode === FULFILLMENT_ROUTING_MODES.LEGACY_REGION) {
-            if (shadow.outcome !== ELIGIBILITY_OUTCOMES.ELIGIBLE) return legacy;
-            const result = { ready: true, blockers: [], routeSnapshot: pilotV2Snapshot(shadow, region) };
-            return includeDiagnostics ? { ...result, diagnostics: Object.freeze({ scopedEligibilityFallback: true }) } : result;
+            if (shadow.outcome === ELIGIBILITY_OUTCOMES.ELIGIBLE) {
+                const result = { ready: true, blockers: [], routeSnapshot: pilotV2Snapshot(shadow, region) };
+                return includeDiagnostics ? { ...result, diagnostics: Object.freeze({ scopedEligibilityFallback: true }) } : result;
+            }
+            if (isManualAdminRoute(legacy) && isGenuineManualOnlyResolution(shadow)) return legacy;
+            if (!legacy.ready) return legacy;
+            const result = { ready: false, blockers: shadow.blockerCodes?.length ? shadow.blockerCodes : ["SUPPLIER_ROUTE_NOT_EXECUTABLE"], routeSnapshot: null };
+            return includeDiagnostics ? { ...result, diagnostics: Object.freeze({ manualFallbackSuppressed: true }) } : result;
         }
         const comparison = compareRoutingDecisions({ legacy, shadow });
         const diagnostics = Object.freeze({
