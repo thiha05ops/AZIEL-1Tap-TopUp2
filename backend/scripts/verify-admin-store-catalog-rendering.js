@@ -5,7 +5,7 @@ const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
-const { resolveAdminCatalogProduct } = require("../services/catalogService");
+const { applyAdminProductionAttribution, resolveAdminCatalogProduct } = require("../services/catalogService");
 
 const root = path.resolve(__dirname, "../..");
 const read = file => fs.readFileSync(path.join(root, file), "utf8");
@@ -143,6 +143,79 @@ async function verifyPackageProjectionContract() {
     return { fullPackages: 2, selectedPackages: 1, historicalPackagesPreserved: 1, publicCatalogChanged: false };
 }
 
+function verifyProductionAttributionSelection() {
+    const supplier = { _id: "supplier-fazer", supplierCode: "FAZERCARDS", name: "FazerCards", enabled: true, mode: "API" };
+    const publication = packageCode => ({ productCode: "pubg", packageCode, customerMarket: "TH", published: true, decisionVersion: 1 });
+    const packageProjection = packageCode => ({ packageCode, name: packageCode, enabled: true, prices: { TH: { amount: 35, currency: "THB", enabled: true } } });
+    const mapping = ({ id, packageCode, region, eligibility, ready = true }) => ({
+        _id: id,
+        supplierId: supplier._id,
+        supplierCode: supplier.supplierCode,
+        productCode: "pubg",
+        packageCode,
+        supplierProductCode: `pubg_${region.toLowerCase()}`,
+        supplierPackageCode: "60_uc",
+        region,
+        enabled: true,
+        productionRole: "PRIMARY",
+        executionMode: "API",
+        fulfillmentEligibility: eligibility,
+        mappingMetadata: { readiness: {
+            supplierMapped: ready,
+            inputReady: ready,
+            validationReady: ready,
+            pricingReady: ready,
+            fulfillmentReady: ready,
+            storefrontReady: ready
+        } }
+    });
+    const explicitTh = { mode: "CUSTOMER_MARKET_ALLOWLIST", allowedCustomerMarkets: ["TH"], evidenceCode: "PROVIDER_CONFIRMED", evidenceSource: "fixture", verifiedAt: new Date(), version: 2 };
+    const unknown = { mode: "UNKNOWN", allowedCustomerMarkets: [], evidenceCode: "", evidenceSource: "", verifiedAt: null, version: 1 };
+    const eligibilityContext = {
+        adapterResolver: () => ({ isConfigured: () => true, isAutoFulfillmentEnabled: () => true }),
+        mappingSupportResolver: () => true
+    };
+    const project = (packageCode, mappings) => {
+        const projection = { productCode: "pubg", packages: [packageProjection(packageCode)] };
+        applyAdminProductionAttribution(projection, mappings, [supplier], [publication(packageCode)], "TH", eligibilityContext);
+        return projection.packages[0].productionAttribution;
+    };
+
+    const current = mapping({ id: "current-global", packageCode: "PUBG_60_UC", region: "GLOBAL", eligibility: explicitTh });
+    const legacy = mapping({ id: "legacy-th", packageCode: "PUBG_60_UC", region: "TH", eligibility: unknown });
+    const resolved = project("PUBG_60_UC", [legacy, current]);
+    assert.strictEqual(resolved.status, "SELLING", "One eligible ready mapping must defeat an UNKNOWN legacy candidate");
+    assert.strictEqual(resolved.mappingId, "current-global");
+    assert.strictEqual(resolved.supplier.code, "FAZERCARDS");
+    assert.strictEqual(resolved.supplierMarket, "GLOBAL");
+
+    const ambiguous = project("AMBIGUOUS", [
+        mapping({ id: "ready-a", packageCode: "AMBIGUOUS", region: "GLOBAL", eligibility: explicitTh }),
+        mapping({ id: "ready-b", packageCode: "AMBIGUOUS", region: "GLOBAL", eligibility: explicitTh })
+    ]);
+    assert.strictEqual(ambiguous.status, "PRODUCTION_SUPPLIER_MARKET_UNRESOLVED", "Two eligible ready mappings must fail closed");
+    assert.strictEqual(ambiguous.mappingId, null);
+    assert.strictEqual(ambiguous.supplier, null);
+
+    const notReady = project("ONE_NOT_READY", [mapping({ id: "one-not-ready", packageCode: "ONE_NOT_READY", region: "GLOBAL", eligibility: explicitTh, ready: false })]);
+    assert.strictEqual(notReady.status, "PUBLISHED_ROUTE_NOT_READY", "One meaningful non-ready candidate must retain route diagnostics");
+    assert.strictEqual(notReady.mappingId, "one-not-ready");
+    assert(notReady.blockers.length > 0);
+
+    const noneEligible = project("NONE_ELIGIBLE", [
+        mapping({ id: "unknown-a", packageCode: "NONE_ELIGIBLE", region: "TH", eligibility: unknown }),
+        mapping({ id: "unknown-b", packageCode: "NONE_ELIGIBLE", region: "GLOBAL", eligibility: unknown })
+    ]);
+    assert.strictEqual(noneEligible.status, "PRODUCTION_SUPPLIER_MARKET_UNRESOLVED", "Multiple non-eligible candidates must fail closed");
+    assert.strictEqual(noneEligible.mappingId, null);
+
+    const ordinary = project("ORDINARY", [mapping({ id: "ordinary-ready", packageCode: "ORDINARY", region: "GLOBAL", eligibility: explicitTh })]);
+    assert.strictEqual(ordinary.status, "SELLING");
+    assert.strictEqual(ordinary.mappingId, "ordinary-ready", "Ordinary unique ready attribution must remain unchanged");
+    assert(!read("backend/services/catalogService.js").includes('packageCode === "PUBG_60_UC"'), "Production attribution must remain product/package generic");
+    return { unknownDefeatedByExplicitReady: true, trueAmbiguityFailClosed: true, uniqueNotReadyDiagnosed: true, zeroEligibleFailClosed: true, ordinaryUniqueUnchanged: true };
+}
+
 Promise.all([verifyCatalogLoadingContract(), verifyPackageProjectionContract()]).then(([loadingContract, packageProjection]) => console.log(JSON.stringify({
     result: "PASS",
     normalProductsAuthority: "StoreCatalogSelection",
@@ -154,6 +227,7 @@ Promise.all([verifyCatalogLoadingContract(), verifyPackageProjectionContract()])
     addProductMasterCatalogPreserved: true,
     loadingContract,
     packageProjection,
+    productionAttributionSelection: verifyProductionAttributionSelection(),
     writes: 0,
     supplierCalls: 0
 }, null, 2))).catch(error => {

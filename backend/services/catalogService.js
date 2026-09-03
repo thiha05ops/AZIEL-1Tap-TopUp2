@@ -826,7 +826,7 @@ function applyAdminSupplierSupport(projection, mappings = [], suppliers = [], el
     return projection;
 }
 
-function applyAdminProductionAttribution(projection, mappings = [], suppliers = [], publications = [], customerMarket = "TH") {
+function applyAdminProductionAttribution(projection, mappings = [], suppliers = [], publications = [], customerMarket = "TH", eligibilityContext = {}) {
     if (!projection || !Array.isArray(projection.packages)) return projection;
     const market = String(customerMarket || "TH").trim().toUpperCase();
     const supplierById = new Map(suppliers.map(item => [String(item._id), item]));
@@ -840,9 +840,14 @@ function applyAdminProductionAttribution(projection, mappings = [], suppliers = 
             String(mapping.packageCode || "").toUpperCase() === packageCode
         ).map(mapping => {
             const supplier = supplierById.get(String(mapping.supplierId));
-            return { mapping, supplier, assessment: assessProductionReadyFulfillmentMapping(mapping, supplier, { productCode: projection.productCode, packageCode, region: market }) };
+            return { mapping, supplier, assessment: assessProductionReadyFulfillmentMapping(mapping, supplier, { ...eligibilityContext, productCode: projection.productCode, packageCode, region: market }) };
         });
-        const selected = candidates.length === 1 ? candidates[0] : null;
+        const eligibleReady = candidates.filter(candidate => candidate.assessment.ready);
+        const selected = eligibleReady.length === 1
+            ? eligibleReady[0]
+            : eligibleReady.length === 0 && candidates.length === 1
+                ? candidates[0]
+                : null;
         const price = pkg.prices?.[market], published = publication?.published === true;
         const selling = Boolean(published && selected?.assessment.ready && pkg.enabled !== false && price?.enabled === true && Number(price.amount) > 0);
         pkg.productionAttribution = {
