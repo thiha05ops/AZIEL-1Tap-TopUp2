@@ -1,6 +1,7 @@
 const express = require("express");
 const ProviderWebhookEvent = require("../models/ProviderWebhookEvent");
 const adapter = require("../services/suppliers/fazercardsAdapter");
+const { normalizeProviderOrder, normalizeStatus } = adapter;
 const { processor } = require("../services/suppliers/fazercardsFulfillmentProcessor");
 const { sanitizeProviderMetadata } = require("../services/supplierAdapterRegistry");
 
@@ -14,13 +15,13 @@ router.post("/webhooks/fazercards", express.raw({ type: "application/json", limi
     const eventId = String(event.event_id || event.id || "").trim();
     const eventType = String(event.type || event.event || "").trim();
     const orderPayload = event.data?.order || event.data || event.order || {};
-    const providerOrderId = String(orderPayload.id || orderPayload.order_id || event.order_id || "").trim();
+    const providerOrderId = normalizeProviderOrder(orderPayload, event.order_id).supplierReference;
     if (!eventId || !["order.created", "order.status_changed"].includes(eventType)) return res.status(202).json({ success: true, ignored: true });
     let receipt;
     try { receipt = await ProviderWebhookEvent.create({ provider: "FAZERCARDS", eventId, eventType, providerOrderId, safeMetadata: sanitizeProviderMetadata({ status: orderPayload.status }) }); }
     catch (error) { if (error?.code === 11000) return res.status(200).json({ success: true, duplicate: true }); throw error; }
     try {
-        if (providerOrderId) await processor.reconcileProviderStatus(providerOrderId, require("../services/suppliers/fazercardsAdapter").normalizeStatus(orderPayload, providerOrderId));
+        if (providerOrderId) await processor.reconcileProviderStatus(providerOrderId, normalizeStatus(orderPayload, providerOrderId));
         receipt.processingStatus = providerOrderId ? "PROCESSED" : "IGNORED"; receipt.processedAt = new Date(); await receipt.save();
         return res.status(200).json({ success: true });
     } catch {

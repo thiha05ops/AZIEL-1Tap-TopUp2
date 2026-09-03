@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 const assert = require("assert");
 const crypto = require("crypto");
-const { createFazerCardsAdapter, normalizeStatus } = require("../services/suppliers/fazercardsAdapter");
+const fs = require("fs");
+const path = require("path");
+const { createFazerCardsAdapter, normalizeProviderOrder, normalizeStatus } = require("../services/suppliers/fazercardsAdapter");
 const { buildFazerCardsFields, buildFazerCardsOrderFields, buildFazerCardsValidationFields } = require("../services/suppliers/fazercardsInputFormatters");
 const { validateFazerCardsMapping, supportsFazerCardsMapping, createFazerCardsFulfillmentProcessor } = require("../services/suppliers/fazercardsFulfillmentProcessor");
 
@@ -61,8 +63,22 @@ async function main() {
     assert.strictEqual(normalizeStatus({ status: "processing" }, "F-1").status, "PENDING");
     assert.strictEqual(normalizeStatus({ status: "completed" }, "F-1").status, "SUCCEEDED");
     assert.strictEqual(normalizeStatus({ status: "failed" }, "F-1").status, "FAILED");
+    assert.strictEqual(normalizeStatus({ order: { id: "ord-9002", kind: "topup", status: "processing" } }).supplierReference, "ord-9002");
+    assert.strictEqual(normalizeStatus({ order: { id: "ord-9002", kind: "topup", status: "processing" } }).providerStatus, "PROCESSING");
+    assert.strictEqual(normalizeStatus({ order: { id: "ord-9002", status: "completed" } }).status, "SUCCEEDED");
+    assert.strictEqual(normalizeStatus({ order: { id: "ord-9002", status: "failed" } }).status, "FAILED");
+    assert.strictEqual(normalizeStatus({ order: { id: "ord-9002", status: "refund" } }).providerStatus, "REFUNDED");
     assert.strictEqual(normalizeStatus({ status: "refunded" }, "F-1").providerStatus, "REFUNDED");
     assert.strictEqual(normalizeStatus({ status: "mystery" }, "F-1").providerStatus, "UNKNOWN_PROVIDER_STATUS");
+    [
+        [{ id: "legacy-id", status: "created" }, "legacy-id"],
+        [{ order_id: "legacy-order-id", order_status: "processing" }, "legacy-order-id"],
+        [{ data: { id: "legacy-data-id", status: "completed" } }, "legacy-data-id"],
+        [{ data: { order_id: "legacy-data-order-id", status: "failed" } }, "legacy-data-order-id"]
+    ].forEach(([payload, expected]) => assert.strictEqual(normalizeProviderOrder(payload).supplierReference, expected));
+    const webhookSource = fs.readFileSync(path.resolve(__dirname, "../routes/fazercardsWebhook.js"), "utf8");
+    assert(webhookSource.includes("normalizeProviderOrder(orderPayload, event.order_id)"), "Webhook identity must use the shared FazerCards normalizer.");
+    assert(webhookSource.includes("normalizeStatus(orderPayload, providerOrderId)"), "Webhook status must use the shared FazerCards normalizer.");
     const raw = Buffer.from('{"event_id":"evt-1"}'); const signature = `sha256=${crypto.createHmac("sha256", env.FAZERCARDS_WEBHOOK_SECRET).update(raw).digest("hex")}`;
     assert(adapter.verifyWebhookSignature(raw, signature)); assert(!adapter.verifyWebhookSignature(Buffer.from("changed"), signature));
     const attempt = { _id: "a1", fulfillmentId: "FUL-1", orderId: "o1", supplierMappingId: "m1", supplierCodeSnapshot: "FAZERCARDS", status: "IN_PROGRESS", idempotencyKey: "stable-intent-key", supplierReference: "", supplierRequest: {}, async save() { return this; } };
@@ -80,6 +96,70 @@ async function main() {
     await processor.submit("a1"); assert.strictEqual(submitted.length, 1, "same accepted FulfillmentAttempt cannot intentionally submit twice");
     await processor.poll("a1", 0); assert.strictEqual(attempt.status, "SUCCEEDED", "polling converges to success");
     assert.strictEqual(await processor.reconcileProviderStatus("FC-1", normalizeStatus({ status: "completed" }, "FC-1")), null, "terminal webhook replay is idempotently ignored");
-    console.log("FazerCards Supplier B verification passed: gate OFF, order POST calls 0, status/signature/input contracts PASS.");
+
+    function freshAttempt(id) {
+        return { _id: id, fulfillmentId: `FUL-${id}`, orderId: "o1", supplierMappingId: "m1", supplierCodeSnapshot: "FAZERCARDS", status: "IN_PROGRESS", idempotencyKey: `intent-${id}`, supplierReference: "", supplierRequest: {}, supplierResult: {}, async save() { return this; } };
+    }
+    const documentedResponse = { ok: true, order: { id: "ord-9002", kind: "topup", status: "processing" } };
+    const acceptedAttempt = freshAttempt("documented-pending");
+    const scheduled = [];
+    const acceptedAdapter = createFazerCardsAdapter({
+        env: { FAZERCARDS_API_KEY: "fixture", FAZERCARDS_AUTO_FULFILLMENT_ENABLED: "true" },
+        fetchImpl: async () => ({ ok: true, status: 200, async json() { return documentedResponse; } })
+    });
+    const acceptedProcessor = createFazerCardsFulfillmentProcessor({
+        Attempt: { async findById() { return acceptedAttempt; } }, Order: { async findById() { return order; } }, Mapping: { async findById() { return mapping; } },
+        adapter: acceptedAdapter, transitionOrder: async () => {}, schedule: (fn, delay) => {
+            assert.strictEqual(acceptedAttempt.supplierReference, "ord-9002", "Reference must be durable before polling is scheduled.");
+            assert.strictEqual(acceptedAttempt.supplierRequest.submissionState, "ACCEPTED", "Accepted state must be durable before polling is scheduled.");
+            scheduled.push({ fn, delay });
+        }
+    });
+    await acceptedProcessor.submit(acceptedAttempt._id);
+    assert.strictEqual(acceptedAttempt.supplierReference, "ord-9002", "Documented order.id persists as supplierReference.");
+    assert.strictEqual(acceptedAttempt.supplierResult.providerStatus, "PROCESSING");
+    assert.strictEqual(acceptedAttempt.supplierRequest.submissionState, "ACCEPTED");
+    assert.strictEqual(scheduled.length, 1, "Accepted non-terminal submission becomes eligible for existing polling.");
+
+    const statusAdapter = createFazerCardsAdapter({
+        env: { FAZERCARDS_API_KEY: "fixture" },
+        fetchImpl: async () => ({ ok: true, status: 200, async json() { return { ok: true, order: { id: "ord-9002", kind: "topup", status: "completed" } }; } })
+    });
+    const polledStatus = await statusAdapter.checkStatus({ orderId: "ord-9002" });
+    assert.strictEqual(polledStatus.supplierReference, "ord-9002", "Status lookup uses the same documented identity normalization.");
+    assert.strictEqual(polledStatus.status, "SUCCEEDED");
+
+    const completedAttempt = freshAttempt("documented-completed");
+    const transitions = [];
+    const completedAdapter = createFazerCardsAdapter({
+        env: { FAZERCARDS_API_KEY: "fixture", FAZERCARDS_AUTO_FULFILLMENT_ENABLED: "true" },
+        fetchImpl: async () => ({ ok: true, status: 200, async json() { return { ok: true, order: { id: "ord-terminal", kind: "topup", status: "completed" } }; } })
+    });
+    const completedProcessor = createFazerCardsFulfillmentProcessor({
+        Attempt: { async findById() { return completedAttempt; } }, Order: { async findById() { return order; } }, Mapping: { async findById() { return mapping; } },
+        adapter: completedAdapter, transitionOrder: async (_order, target) => transitions.push(target), schedule: () => { throw new Error("terminal result must not poll"); }
+    });
+    await completedProcessor.submit(completedAttempt._id);
+    assert.strictEqual(completedAttempt.supplierReference, "ord-terminal");
+    assert.strictEqual(completedAttempt.status, "SUCCEEDED");
+    assert(completedAttempt.completedAt instanceof Date);
+    assert.deepStrictEqual(transitions, ["completed"]);
+
+    let missingIdentityCalls = 0;
+    const uncertainAttempt = freshAttempt("missing-identity");
+    const uncertainAdapter = createFazerCardsAdapter({
+        env: { FAZERCARDS_API_KEY: "fixture", FAZERCARDS_AUTO_FULFILLMENT_ENABLED: "true" },
+        fetchImpl: async () => { missingIdentityCalls += 1; return { ok: true, status: 200, async json() { return { ok: true, order: { kind: "topup", status: "processing" } }; } }; }
+    });
+    const uncertainProcessor = createFazerCardsFulfillmentProcessor({
+        Attempt: { async findById() { return uncertainAttempt; } }, Order: { async findById() { return order; } }, Mapping: { async findById() { return mapping; } },
+        adapter: uncertainAdapter, transitionOrder: async () => {}, schedule: () => { throw new Error("uncertain submission must not poll"); }
+    });
+    await uncertainProcessor.submit(uncertainAttempt._id);
+    assert.strictEqual(uncertainAttempt.supplierRequest.submissionState, "SUBMISSION_UNCERTAIN");
+    assert.strictEqual(uncertainAttempt.supplierResult.failureCode, "FAZERCARDS_ORDER_REFERENCE_MISSING");
+    await uncertainProcessor.submit(uncertainAttempt._id);
+    assert.strictEqual(missingIdentityCalls, 1, "Missing identity remains fail-closed and is never automatically resubmitted.");
+    console.log("FazerCards Supplier B verification passed: live order calls 0, documented response identity/status, polling, uncertainty, signature, and input contracts PASS.");
 }
 main().catch(error => { console.error("FazerCards Supplier B verification failed:", error.message); process.exitCode = 1; });

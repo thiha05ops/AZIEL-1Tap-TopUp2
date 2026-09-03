@@ -21,13 +21,19 @@ class FazerCardsAdapterError extends Error {
     }
 }
 
+function normalizeProviderOrder(payload = {}, reference = "") {
+    return {
+        supplierReference: clean(reference || payload.id || payload.order_id || payload.data?.id || payload.data?.order_id || payload.order?.id),
+        status: clean(payload.status || payload.order_status || payload.data?.status || payload.order?.status).toLowerCase()
+    };
+}
+
 function normalizeStatus(payload = {}, reference = "") {
-    const raw = clean(payload.status || payload.order_status || payload.data?.status).toLowerCase();
-    const supplierReference = clean(reference || payload.id || payload.order_id || payload.data?.id || payload.data?.order_id);
-    const metadata = sanitizeProviderMetadata({ status: raw || "missing", refunded: raw === "refunded", provider: payload.data || payload });
+    const { status: raw, supplierReference } = normalizeProviderOrder(payload, reference);
+    const metadata = sanitizeProviderMetadata({ status: raw || "missing", refunded: ["refund", "refunded"].includes(raw), provider: payload.data || payload.order || payload });
     if (["completed", "complete", "succeeded", "success"].includes(raw)) return result("SUCCEEDED", "COMPLETED", supplierReference, metadata, "FazerCards confirmed completion.");
     if (["failed", "failure", "cancelled", "canceled"].includes(raw)) return result("FAILED", "FAILED", supplierReference, metadata, "FazerCards reported fulfillment failure.");
-    if (raw === "refunded") return result("FAILED", "REFUNDED", supplierReference, metadata, "FazerCards reported a refunded order; manual financial review is required.");
+    if (["refund", "refunded"].includes(raw)) return result("FAILED", "REFUNDED", supplierReference, metadata, "FazerCards reported a refunded order; manual financial review is required.");
     if (["pending", "processing", "created", "queued", "in_progress"].includes(raw)) return result("PENDING", raw.toUpperCase(), supplierReference, metadata, "FazerCards is processing the order.");
     return result("PENDING", "UNKNOWN_PROVIDER_STATUS", supplierReference, metadata, "FazerCards returned an unknown non-terminal status; manual attention is required.");
 }
@@ -172,7 +178,7 @@ function createFazerCardsAdapter(options = {}) {
         const orderPayload = buildTopupPayload({ categoryId, offerId, fields });
         if (!clean(idempotencyKey)) throw new FazerCardsAdapterError("FAZERCARDS_IDEMPOTENCY_KEY_REQUIRED", "FazerCards Idempotency-Key is required.", { statusCode: 409 });
         const payload = await request("/topups/order", { method: "POST", body: orderPayload, idempotencyKey: clean(idempotencyKey), submission: true });
-        const reference = clean(payload.id || payload.order_id || payload.data?.id || payload.data?.order_id);
+        const reference = normalizeProviderOrder(payload).supplierReference;
         if (!reference) throw new FazerCardsAdapterError("FAZERCARDS_ORDER_REFERENCE_MISSING", "FazerCards accepted an order without a provider order ID.", { submissionUncertain: true });
         return normalizeStatus(payload, reference);
     }
@@ -189,4 +195,4 @@ function createFazerCardsAdapter(options = {}) {
 }
 
 const adapter = createFazerCardsAdapter();
-module.exports = { ...adapter, createFazerCardsAdapter, normalizeStatus, FazerCardsAdapterError, DEFAULT_BASE_URL, MAX_CATEGORY_PAGES, MAX_AVAILABILITY_CATEGORIES, AVAILABILITY_CONCURRENCY };
+module.exports = { ...adapter, createFazerCardsAdapter, normalizeProviderOrder, normalizeStatus, FazerCardsAdapterError, DEFAULT_BASE_URL, MAX_CATEGORY_PAGES, MAX_AVAILABILITY_CATEGORIES, AVAILABILITY_CONCURRENCY };
