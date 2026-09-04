@@ -7,7 +7,7 @@ const Mapping = require("../models/SupplierProductMapping");
 const FulfillmentAttempt = require("../models/FulfillmentAttempt");
 const { getSupplierAdapter } = require("./supplierAdapterRegistry");
 const { resolveFulfillmentRoutingMode, FULFILLMENT_ROUTING_MODES } = require("../config/fulfillmentRoutingMode");
-const { resolveEligibilityPrimaryRoute, OUTCOMES: ELIGIBILITY_OUTCOMES } = require("./supplierEligibilityRouteResolver");
+const { resolveEligibilityPrimaryRoute, eligiblePrimaryRouteConflicts, OUTCOMES: ELIGIBILITY_OUTCOMES } = require("./supplierEligibilityRouteResolver");
 
 const ROLES = Object.freeze({ PRIMARY: "PRIMARY", BACKUP: "BACKUP", DISABLED: "DISABLED" });
 const CORE_PRODUCTS = new Set(["mlbb", "pubg", "freefire", "hok"]);
@@ -80,6 +80,14 @@ async function setProductionRole(mappingId, role, { session = null, replaceExist
     if (normalizedRole === ROLES.PRIMARY) {
         const assessment = await assessProductionMapping(mapping.toObject());
         if (!assessment.ready) throw Object.assign(new Error(`Mapping cannot become PRIMARY: ${assessment.blockers.join(", ")}`), { code: "MAPPING_NOT_PRODUCTION_READY", blockers: assessment.blockers });
+        const primaryCandidates = await Mapping.find({ _id: { $ne: mapping._id }, productCode: mapping.productCode, packageCode: mapping.packageCode, productionRole: ROLES.PRIMARY, archivedAt: null }).session(session).lean();
+        const replacementId = clean(replaceExistingPrimaryId);
+        const customerMarketConflicts = eligiblePrimaryRouteConflicts({ candidate: { ...mapping.toObject(), productionRole: ROLES.PRIMARY }, existingMappings: primaryCandidates })
+            .filter(item => replacementId !== String(item._id) || clean(item.region).toUpperCase() !== clean(mapping.region).toUpperCase());
+        if (customerMarketConflicts.length) throw Object.assign(new Error("Multiple operational PRIMARY routes would be eligible for the same customer market."), {
+            code: "AMBIGUOUS_PRIMARY_ROUTE",
+            conflictingMappingIds: customerMarketConflicts.map(item => String(item._id))
+        });
         const existingPrimary = await Mapping.findOne({ _id: { $ne: mapping._id }, productCode: mapping.productCode, packageCode: mapping.packageCode, region: mapping.region, productionRole: ROLES.PRIMARY, archivedAt: null }).session(session);
         if (existingPrimary) {
             if (clean(replaceExistingPrimaryId) !== String(existingPrimary._id)) throw Object.assign(new Error("A different PRIMARY already exists; explicit Owner replacement is required."), { code: "PRIMARY_ROUTE_CONFLICT", currentPrimaryMappingId: String(existingPrimary._id) });

@@ -87,6 +87,75 @@ function isProductionReadyFulfillmentMapping(mapping = {}, supplier = {}, contex
     return assessProductionReadyFulfillmentMapping(mapping, supplier, context).ready;
 }
 
+function assessPreCommercialFulfillmentReadiness({
+    mapping = null,
+    supplier = null,
+    supplierProduct = null,
+    offer = null,
+    availability = null,
+    canonicalProduct = null,
+    canonicalPackages = [],
+    customerMarkets = [],
+    fulfillmentContract = null,
+    adapterConfigured = false,
+    autoFulfillmentEnabled = false,
+    processorSupported = false
+} = {}) {
+    const blockers = [];
+    const markets = [...new Set((customerMarkets || []).map(normalizeRegion).filter(Boolean))].sort();
+    const packages = Array.isArray(canonicalPackages) ? canonicalPackages.filter(Boolean) : [];
+    if (!mapping) blockers.push("MISSING_MAPPING");
+    if (mapping?.archivedAt) blockers.push("MAPPING_ARCHIVED");
+    if (!supplier || supplier.enabled !== true || String(supplier.mode || "").toUpperCase() !== "API") blockers.push("SUPPLIER_UNSUPPORTED");
+    if (!supplierProduct || String(supplierProduct.supportState || "").toUpperCase() !== "SUPPORTED") blockers.push("SUPPLIER_PRODUCT_UNSUPPORTED");
+    if (!offer || String(offer.catalogLifecycleState || "").toUpperCase() !== "ACTIVE") blockers.push("OFFER_NOT_ACTIVE");
+    if (!availability || String(availability.state || "").toUpperCase() !== "AVAILABLE" || availability.coverageComplete !== true || (availability.staleAt && new Date(availability.staleAt).getTime() <= Date.now())) blockers.push("AVAILABILITY_UNPROVEN");
+    if (!canonicalProduct || packages.length === 0) blockers.push("MISSING_CANONICAL_LINK");
+    if (packages.length > 1) blockers.push("AMBIGUOUS_CANONICAL_IDENTITY");
+    if (mapping && offer) {
+        if (String(mapping.supplierCatalogOfferId || "") !== String(offer._id || "") ||
+            String(mapping.supplierId || "") !== String(offer.supplierId || "") ||
+            String(mapping.supplierProductCode || "").trim() !== String(offer.supplierProductCode || "").trim() ||
+            String(mapping.supplierPackageCode || "").trim() !== String(offer.supplierOfferCode || "").trim()) blockers.push("STALE_OR_WRONG_OFFER_LINKAGE");
+    }
+    if (mapping && supplierProduct) {
+        if (String(mapping.supplierId || "") !== String(supplierProduct.supplierId || "") ||
+            String(mapping.supplierProductCode || "").trim() !== String(supplierProduct.supplierProductCode || "").trim()) blockers.push("SUPPLIER_IDENTITY_MISMATCH");
+        const supplierMarket = String(supplierProduct.supplierMarketCode || "").trim().toUpperCase();
+        if (!supplierMarket || ["UNKNOWN", "UNSPECIFIED"].includes(supplierMarket) || supplierMarket !== String(mapping.region || "").trim().toUpperCase()) blockers.push("MARKET_UNRESOLVED");
+    }
+    if (!markets.length) blockers.push("CUSTOMER_MARKET_REQUIRED");
+    const eligibility = validateFulfillmentEligibility(mapping?.fulfillmentEligibility);
+    if (!eligibility.valid || eligibility.value.mode === "UNKNOWN" || markets.some(market => !isCustomerMarketEligible(mapping.fulfillmentEligibility, market))) blockers.push("CUSTOMER_MARKET_ELIGIBILITY_UNPROVEN");
+    if (!fulfillmentContract?.fields?.length) blockers.push("INPUT_CONTRACT_UNRESOLVED");
+    if (String(mapping?.executionMode || "").toUpperCase() !== "API" || processorSupported !== true) blockers.push("PROTOCOL_UNSUPPORTED");
+    if (adapterConfigured !== true) blockers.push("SUPPLIER_ADAPTER_NOT_READY");
+    if (autoFulfillmentEnabled !== true) blockers.push("SUPPLIER_AUTO_FULFILLMENT_DISABLED");
+    const readiness = mapping?.mappingMetadata?.readiness || {};
+    if (readiness.supplierMapped !== true) blockers.push("SUPPLIER_MAPPING_NOT_READY");
+    if (readiness.inputReady !== true) blockers.push("INPUT_NOT_READY");
+    if (readiness.validationReady !== true) blockers.push("VALIDATION_NOT_READY");
+    if (readiness.fulfillmentReady !== true) blockers.push("FULFILLMENT_NOT_READY");
+    return {
+        ready: blockers.length === 0,
+        blockers: [...new Set(blockers)].sort(),
+        customerMarkets: markets,
+        evidence: {
+            mappingId: String(mapping?._id || ""),
+            supplierId: String(mapping?.supplierId || ""),
+            supplierCatalogProductId: String(supplierProduct?._id || ""),
+            supplierCatalogOfferId: String(offer?._id || ""),
+            canonicalProductId: String(canonicalProduct?._id || ""),
+            canonicalPackageIds: packages.map(item => String(item._id || "")).sort(),
+            supplierMarket: String(mapping?.region || "").trim().toUpperCase(),
+            protocol: String(fulfillmentContract?.protocol || "").trim(),
+            availabilityObservedAt: availability?.observedAt || null,
+            availabilityComplete: availability?.coverageComplete === true
+        },
+        ignoredCommercialState: ["enabled", "productionRole", "pricingReady", "storefrontReady", "retailPrice", "publication"]
+    };
+}
+
 function eligibleMappingsForPackage({ mappings = [], suppliers = [], productCode = "", packageCode = "", region = "", context = {} } = {}) {
     const normalizedProduct = String(productCode || "").trim().toLowerCase();
     const normalizedPackage = String(packageCode || "").trim().toUpperCase();
@@ -162,6 +231,7 @@ module.exports = {
     REGIONS,
     classifyMapping,
     assessProductionReadyFulfillmentMapping,
+    assessPreCommercialFulfillmentReadiness,
     eligibleMappingsForPackage,
     isProductionReadyFulfillmentMapping,
     isSupplierMappedAutoTopupThScope,

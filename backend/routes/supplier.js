@@ -51,6 +51,7 @@ const { ADMIN_AUDIT_ACTIONS, writeAdminAudit } = require("../services/adminAudit
 const { StoreCatalogSelectionError, listStoreCatalogSelections, saveStoreCatalogSelection, removeStoreCatalogPackage, setStoreCatalogRegionVisibility } = require("../services/storeCatalogSelectionService");
 const { StorePackageActivationError, inspectStorePackageActivation, activateStorePackage } = require("../services/storePackageActivationService");
 const { SupplierInputContractReviewError, context: getInputContractReview, approve: approveInputContract } = require("../services/supplierCatalog/supplierInputContractReviewService");
+const { SupplierRoutePreparationError, generateSupplierRoutePreparationPlan, applySupplierRoutePreparationPlan } = require("../services/supplierCatalog/supplierRoutePreparationService");
 
 function sendFulfillmentError(res, error) {
     if (error instanceof FulfillmentError || error?.name === "FinancialIntegrityError") {
@@ -89,6 +90,7 @@ function sendIngestionError(res,error){if(error instanceof SupplierCatalogIngest
 function sendActivationError(res,error){if(error instanceof AdminProductActivationError)return res.status(error.statusCode||400).json({success:false,code:error.code,message:error.message,details:error.details||{}});console.log("Product activation error:",error?.code||error?.name||"PRODUCT_ACTIVATION_FAILED");return res.status(500).json({success:false,code:"PRODUCT_ACTIVATION_FAILED",message:"Product activation operation failed."})}
 function sendStorePackageActivationError(res,error){if(error instanceof StorePackageActivationError)return res.status(error.statusCode||400).json({success:false,code:error.code,message:error.message,details:error.details||{}});console.log("Store package activation error:",error?.code||error?.name||"STORE_PACKAGE_ACTIVATION_FAILED");return res.status(500).json({success:false,code:"STORE_PACKAGE_ACTIVATION_FAILED",message:"Store package activation failed."})}
 function sendSourcePreparationError(res,error){if(error instanceof ProductSourcePreparationError)return res.status(error.statusCode||400).json({success:false,code:error.code,message:error.message,details:error.details||{}});console.log("Product source preparation error:",error?.code||error?.name||"PRODUCT_SOURCE_PREPARATION_FAILED");return res.status(500).json({success:false,code:"PRODUCT_SOURCE_PREPARATION_FAILED",message:"Product source preparation failed."})}
+function sendSupplierRoutePreparationError(res,error){if(error instanceof SupplierRoutePreparationError)return res.status(error.statusCode||409).json({success:false,code:error.code,message:error.message,details:error.details||{}});console.log("Supplier route preparation error:",error?.code||error?.name||"SUPPLIER_ROUTE_PREPARATION_FAILED");return res.status(500).json({success:false,code:"SUPPLIER_ROUTE_PREPARATION_FAILED",message:"Supplier route preparation failed."})}
 function sanitizeStoreSelectionErrorMessage(message) {
     return String(message || "")
         .replace(/(mongodb(?:\+srv)?:\/\/)[^@\s]+@/gi, "$1[REDACTED]@")
@@ -139,6 +141,15 @@ router.post("/admin/product-activation/source-preparation/plan", adminMiddleware
 router.post("/admin/product-activation/source-preparation/apply", adminMiddleware, requireAdminPermission(PERMISSIONS.OWNER_ROUTING_MANAGE), async(req,res)=>{
     try{return res.json({success:true,...await applyProductSourcePreparationPlan(req.body?.plan,{actor:req.admin})})}
     catch(error){return sendSourcePreparationError(res,error)}
+});
+
+router.post("/admin/supplier-catalog/route-preparation/plan", adminMiddleware, requireAdminPermission(PERMISSIONS.OWNER_ROUTING_MANAGE), async(req,res)=>{
+    try { return res.json({success:true,plan:await generateSupplierRoutePreparationPlan(req.body)}); }
+    catch(error){ return sendSupplierRoutePreparationError(res,error); }
+});
+router.post("/admin/supplier-catalog/route-preparation/apply", adminMiddleware, requireAdminPermission(PERMISSIONS.OWNER_ROUTING_MANAGE), async(req,res)=>{
+    try { return res.json({success:true,...await applySupplierRoutePreparationPlan(req.body?.plan,{actor:req.admin,confirmed:req.body?.confirmed===true})}); }
+    catch(error){ return sendSupplierRoutePreparationError(res,error); }
 });
 
 router.get("/admin/supplier-cost-coverage",adminMiddleware,requireAdminPermission(PERMISSIONS.SUPPLIERS_READ),async(req,res)=>{try{res.set("Cache-Control","no-store");return res.json({success:true,...await listCostCoverage(req.query)})}catch(error){return sendCostAuthorityError(res,error)}});

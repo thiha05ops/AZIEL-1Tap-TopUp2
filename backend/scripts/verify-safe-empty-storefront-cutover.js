@@ -12,7 +12,7 @@ assert(routes.includes('toPublicCatalog({includeDisabled:false,customerMarket}')
 assert(routes.includes('/catalog/:productCode/banners')&&routes.includes('PRODUCT_NOT_OFFERED'),"Public banners must not reveal an unoffered legacy product");
 assert(runtime.includes('/api/catalog?region=')&&detail.includes('?region='),"Public catalog/detail reads must carry customer market");
 assert(home.includes("Products are not available right now.")&&!home.includes("StoreCatalogSelection"),"Home zero-state must be customer-facing");
-assert(wizard.includes("/api/admin/product-activation?customerMarket=TH")&&wizard.includes("masterCatalog?.valid===true"),"Admin Add Product must retain independent Master Catalog discovery");
+assert(wizard.includes("/api/admin/product-activation?")&&wizard.includes("row.prepared?.selectable===true"),"Admin Add Product must use fulfillment-ready Master Catalog discovery");
 const legacy={products:[{code:"mlbb",packages:[{code:"42",price:{TH:29},published:{TH:true}},{code:"86",price:{TH:55},published:{TH:true}},{code:"172",price:{TH:105},published:{TH:true}}]}]},selection=[];
 const publicProjection=(market,selections=selection,publications={TH:new Set(),MM:new Set()},visible=new Set())=>selections.filter(item=>item.sellingRegions.includes(market)&&visible.has(market)).map(item=>({code:item.code,packages:item.packages.filter(code=>publications[market].has(code))})).filter(item=>item.packages.length);
 assert.deepStrictEqual(publicProjection("TH"),[],"Phase 1: historical prices/publications cannot bypass zero selection");

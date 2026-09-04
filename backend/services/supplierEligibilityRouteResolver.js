@@ -17,12 +17,41 @@ const OUTCOMES = Object.freeze({
     NO_ELIGIBLE_ROUTE: "NO_ELIGIBLE_ROUTE",
     AMBIGUOUS_PRIMARY_ROUTE: "AMBIGUOUS_PRIMARY_ROUTE"
 });
+const CATALOG_AUTHORITY_BOUNDARIES = Object.freeze({
+    supplierInventory: "SupplierCatalogProduct/SupplierCatalogOffer",
+    commercialIdentity: "CatalogProduct/CatalogPackage",
+    routeCandidate: "SupplierProductMapping",
+    commercialSelection: "StoreCatalogSelection",
+    publication: "PackageMarketPublication",
+    retailPrice: "CatalogPackage.prices"
+});
+const CUSTOMER_MARKETS = Object.freeze(["TH", "MM"]);
 const clean = value => String(value == null ? "" : value).trim();
 const upper = value => clean(value).toUpperCase();
 const lower = value => clean(value).toLowerCase();
 
 function gateEnabled(mapping, adapter) {
     try { return adapter?.isAutoFulfillmentEnabled?.(mapping.productCode) === true; } catch { return false; }
+}
+
+function operationalPrimaryCustomerMarkets(mapping = {}) {
+    const readiness = mapping.mappingMetadata?.readiness || {};
+    if (mapping.archivedAt || mapping.enabled !== true || upper(mapping.productionRole) !== "PRIMARY" || upper(mapping.executionMode) !== "API") return [];
+    if (readiness.supplierMapped !== true || readiness.pricingReady !== true || readiness.inputReady !== true || readiness.fulfillmentReady !== true) return [];
+    const eligibility = validateFulfillmentEligibility(mapping.fulfillmentEligibility);
+    if (!eligibility.valid || eligibility.value.mode === "UNKNOWN") return [];
+    return CUSTOMER_MARKETS.filter(market => isCustomerMarketEligible(eligibility.value, market));
+}
+
+function eligiblePrimaryRouteConflicts({ candidate = {}, existingMappings = [] } = {}) {
+    const candidateMarkets = new Set(operationalPrimaryCustomerMarkets(candidate));
+    if (!candidateMarkets.size) return [];
+    return existingMappings.filter(mapping =>
+        String(mapping._id) !== String(candidate._id) &&
+        lower(mapping.productCode) === lower(candidate.productCode) &&
+        upper(mapping.packageCode) === upper(candidate.packageCode) &&
+        operationalPrimaryCustomerMarkets(mapping).some(market => candidateMarkets.has(market))
+    );
 }
 
 function basicCandidateBlockers({ mapping = {}, supplier = {}, pkg = {}, customerMarket = "", adapter = null, controlledTestEvidence = false, offer = null, availability = null, requireCatalogEvidence = false } = {}) {
@@ -134,4 +163,12 @@ async function resolveEligibilityPrimaryRoute({ productCode, packageCode, custom
     return summarizeEligibilityResolution({ mappings, assessments, productCode: normalizedProduct, packageCode: normalizedPackage, customerMarket: market });
 }
 
-module.exports = Object.freeze({ OUTCOMES, basicCandidateBlockers, summarizeEligibilityResolution, resolveEligibilityPrimaryRoute });
+module.exports = Object.freeze({
+    OUTCOMES,
+    CATALOG_AUTHORITY_BOUNDARIES,
+    operationalPrimaryCustomerMarkets,
+    eligiblePrimaryRouteConflicts,
+    basicCandidateBlockers,
+    summarizeEligibilityResolution,
+    resolveEligibilityPrimaryRoute
+});

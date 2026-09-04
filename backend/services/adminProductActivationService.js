@@ -9,9 +9,11 @@ const SupplierCatalogOffer = require("../models/SupplierCatalogOffer");
 const SupplierCatalogProduct = require("../models/SupplierCatalogProduct");
 const SupplierOfferAvailability = require("../models/SupplierOfferAvailability");
 const PackageMarketPublication = require("../models/PackageMarketPublication");
+const StoreCatalogSelection = require("../models/StoreCatalogSelection");
 const { getSupplierAdapter } = require("./supplierAdapterRegistry");
 const { basicCandidateBlockers } = require("./supplierEligibilityRouteResolver");
 const { setPackageMarketPublication } = require("./packageMarketPublicationService");
+const { assessExistingPreparedRoute } = require("./supplierCatalog/supplierRoutePreparationService");
 
 const COMMERCE_MARKETS = Object.freeze(["TH", "MM"]);
 const clean = value => String(value == null ? "" : value).trim();
@@ -101,7 +103,7 @@ function blockerActions(blockers = []) {
     return [...new Map(blockers.map(code => [definitions[code]?.[0] || "INSPECT_BLOCKER", { code, action: definitions[code]?.[0] || "INSPECT_BLOCKER", label: definitions[code]?.[1] || "Inspect the server-authoritative blocker." }])).values()];
 }
 
-function projectActivation(data, { search = "", productCode = "", supplierMarket = "", customerMarket = "TH", now = new Date() } = {}) {
+function projectActivation(data, { search = "", productCode = "", supplierMarket = "", customerMarket = "TH", customerMarkets = "", now = new Date() } = {}, dependencies = {}) {
     const productByCode = new Map(data.products.map(item => [lower(item.productCode), item]));
     const packageByKey = new Map(data.packages.map(item => [key(lower(item.productCode), upper(item.packageCode)), item]));
     const supplierById = new Map(data.suppliers.map(item => [id(item), item]));
@@ -112,7 +114,8 @@ function projectActivation(data, { search = "", productCode = "", supplierMarket
     const normalizedSearch = lower(search);
     const normalizedProduct = lower(productCode);
     const normalizedSupplierMarket = upper(supplierMarket);
-    const market = upper(customerMarket || "TH");
+    const requestedMarkets = [...new Set(String(customerMarkets || customerMarket || "TH").split(",").map(upper).filter(Boolean))].sort();
+    const market = requestedMarkets[0] || "TH";
 
     if (!normalizedProduct) {
         const publishedKeys = new Set(data.publications.filter(item => item.published === true).map(item => key(lower(item.productCode), upper(item.packageCode))));
@@ -148,7 +151,7 @@ function projectActivation(data, { search = "", productCode = "", supplierMarket
         const publication = publicationByKey.get(key(lower(mapping.productCode), upper(mapping.packageCode), market));
         const readiness = mappingReadiness({ mapping, supplier, pkg, offer, availability, customerMarket: market, now });
         const setup = mappingAvailability({ mapping, supplier, pkg, offer });
-        const masterCatalogBlockers = setup.blockers.filter(code => code !== "MAPPING_DISABLED");
+        const prepared = assessExistingPreparedRoute({ mapping, supplier, supplierProduct, offer, availability, canonicalProduct: product, canonicalPackages: pkg ? [pkg] : [] }, requestedMarkets, dependencies);
         const cost = mapping.supplierCostAuthority || {};
         const approvedCostPresent = cost.rawSupplierCost != null && Number.isFinite(Number(cost.rawSupplierCost));
         const pricingPrepared = approvedCostPresent && Boolean(cost.supplierCurrency) && mapping.mappingMetadata?.readiness?.pricingReady === true;
@@ -164,7 +167,7 @@ function projectActivation(data, { search = "", productCode = "", supplierMarket
             productionRole: mapping.productionRole, executionMode: mapping.executionMode,
             supplierId: id(mapping.supplierId), supplierCode: supplier?.supplierCode || mapping.supplierCode,
             supplierName: supplier?.name || supplier?.supplierCode || mapping.supplierCode,
-            supplierProductCode: mapping.supplierProductCode, supplierPackageCode: mapping.supplierPackageCode,
+            supplierProductCode: mapping.supplierProductCode, supplierProductName: supplierProduct?.displayName || supplierProduct?.rawName || mapping.supplierProductCode, supplierPackageCode: mapping.supplierPackageCode,
             supplierOfferName: offer?.supplierOfferName || offer?.rawName || mapping.supplierDisplayName || "",
             supplierCatalogOfferId: id(offer),
             supplierMarket: upper(mapping.region), supplierMarketEvidence: mapping.supplierMarketEvidence || null,
@@ -174,7 +177,8 @@ function projectActivation(data, { search = "", productCode = "", supplierMarket
             observedSupplierCost: offer?.supplierCost || null,
             availability: availability ? { state: availability.state, evidenceCode: availability.evidenceCode, coverageComplete: availability.coverageComplete, observedAt: availability.observedAt } : { state: "UNKNOWN", evidenceCode: "MISSING", coverageComplete: false, observedAt: null },
             publishedPrice: publicPrice(pkg, market), publication: publication ? { published: publication.published === true, decisionVersion: publication.decisionVersion, decisionNote: publication.decisionNote || "" } : { published: false, decisionVersion: 0, decisionNote: "" },
-            masterCatalog: { mapped: true, valid: masterCatalogBlockers.length === 0, blockers: masterCatalogBlockers },
+            masterCatalog: { mapped: true, valid: prepared.ready, blockers: prepared.blockers },
+            prepared: { selectable: prepared.ready, outcome: prepared.outcome, customerMarkets: requestedMarkets },
             setup: { ...setup, productionMappingEnabled: mapping.enabled === true, pricingPrepared, fulfillmentPrepared, readyToPublish: readiness.ready, published: publication?.published === true },
             dailyPricing: { workspacePath: `/api/admin/pricing-engine/workspace?supplierId=${encodeURIComponent(id(mapping.supplierId))}&supplierMarket=${encodeURIComponent(upper(mapping.region))}&productCode=${encodeURIComponent(lower(mapping.productCode))}&region=${encodeURIComponent(market)}`, previewEligible: approvedCostPresent && mapping.mappingMetadata?.readiness?.supplierMapped === true },
             readiness: { ...readiness, actions: blockerActions(readiness.blockers) }
@@ -204,7 +208,7 @@ function projectActivation(data, { search = "", productCode = "", supplierMarket
 
     return {
         authority: { catalog: "CatalogProduct/CatalogPackage", route: "SupplierProductMapping.productionRole", cost: "SupplierProductMapping.supplierCostAuthority", pricing: "Daily Pricing/Pricing Engine", input: "SupplierCatalogProduct + mapping readiness", fulfillment: "supplier eligibility route resolver", publication: "PackageMarketPublication" },
-        projectionMode: "READINESS", customerMarket: market, commerceMarketSupported: COMMERCE_MARKETS.includes(market), products,
+        projectionMode: "READINESS", customerMarket: market, customerMarkets: requestedMarkets, commerceMarketSupported: requestedMarkets.every(value => COMMERCE_MARKETS.includes(value)), products,
         markets: normalizedProduct ? [...new Set(mappingRows.filter(row => row.productCode === normalizedProduct).map(row => row.supplierMarket))].sort() : [],
         packages: filtered, automaticFailover: false, automaticPublicRepricing: false
     };
@@ -215,7 +219,8 @@ function createAdminProductActivationService(models = {}) {
         CatalogProduct: models.CatalogProduct || CatalogProduct, CatalogPackage: models.CatalogPackage || CatalogPackage,
         Supplier: models.Supplier || Supplier, Mapping: models.Mapping || SupplierProductMapping,
         Offer: models.Offer || SupplierCatalogOffer, SupplierProduct: models.SupplierProduct || SupplierCatalogProduct,
-        Availability: models.Availability || SupplierOfferAvailability, Publication: models.Publication || PackageMarketPublication
+        Availability: models.Availability || SupplierOfferAvailability, Publication: models.Publication || PackageMarketPublication,
+        Selection: models.Selection || StoreCatalogSelection
     };
     const lean = (query, session) => (session ? query.session(session) : query).lean();
     async function load(query = {}, session = null) {
@@ -258,9 +263,11 @@ async function publishSelectedPackage({ productCode, packageCode, customerMarket
     const workspace = await defaultService.getWorkspace({ productCode, customerMarket: market });
     const row = workspace.packages.find(item => item.mappingId === clean(mappingId) && item.packageCode === upper(packageCode));
     if (!row) throw new AdminProductActivationError("ACTIVATION_MAPPING_NOT_FOUND", "The selected exact supplier mapping is unavailable.", 404);
+    const selected = await StoreCatalogSelection.exists({ status: "ACTIVE", productCode: lower(productCode), supplierId: row.supplierId, supplierMarket: row.supplierMarket, sellingRegions: market, packages: { $elemMatch: { packageCode: upper(packageCode), supplierProductMappingId: mappingId } } });
+    if (!selected) throw new AdminProductActivationError("PACKAGE_NOT_COMMERCIALLY_SELECTED", "This package is not in the active Store Catalog selection for this market.", 409);
     if (expectedMappingUpdatedAt && new Date(expectedMappingUpdatedAt).getTime() !== new Date(row.mappingUpdatedAt).getTime()) throw new AdminProductActivationError("ACTIVATION_STALE_STATE", "The supplier mapping changed after this activation view was loaded.", 409);
     if (Number(expectedDecisionVersion || 0) !== Number(row.publication.decisionVersion || 0)) throw new AdminProductActivationError("ACTIVATION_STALE_PUBLICATION", "The publication decision changed after this activation view was loaded.", 409);
-    if (!row.readiness.ready) throw new AdminProductActivationError("ACTIVATION_NOT_READY", "Package activation is blocked by production readiness.", 409, { blockers: row.readiness.blockers });
+    if (!row.prepared?.selectable || !row.readiness.ready) throw new AdminProductActivationError("ACTIVATION_NOT_READY", "Package publication is blocked by route or pricing readiness.", 409, { blockers: [...new Set([...(row.masterCatalog?.blockers || []), ...(row.readiness.blockers || [])])] });
     return setPackageMarketPublication({ productCode, packageCode, customerMarket: market, published: true, decisionNote, actor });
 }
 
@@ -275,14 +282,17 @@ async function publishSelectedPackages({ productCode, customerMarket, selections
         let publications = [];
         await session.withTransaction(async () => {
             const workspace = await defaultService.getWorkspace({ productCode: normalizedProduct, customerMarket: market }, session);
-            const rows = selections.map(selection => {
+            const rows = [];
+            for (const selection of selections) {
                 const row = workspace.packages.find(item => item.mappingId === clean(selection.mappingId) && item.packageCode === upper(selection.packageCode));
                 if (!row) throw new AdminProductActivationError("ACTIVATION_MAPPING_NOT_FOUND", "A selected exact supplier mapping is unavailable.", 404);
                 if (selection.expectedMappingUpdatedAt && new Date(selection.expectedMappingUpdatedAt).getTime() !== new Date(row.mappingUpdatedAt).getTime()) throw new AdminProductActivationError("ACTIVATION_STALE_STATE", "A supplier mapping changed after this activation view was loaded.", 409);
                 if (Number(selection.expectedDecisionVersion || 0) !== Number(row.publication.decisionVersion || 0)) throw new AdminProductActivationError("ACTIVATION_STALE_PUBLICATION", "A publication decision changed after this activation view was loaded.", 409);
-                if (!row.readiness.ready) throw new AdminProductActivationError("ACTIVATION_NOT_READY", "Package activation is blocked by production readiness.", 409, { packageCode: row.packageCode, blockers: row.readiness.blockers });
-                return row;
-            });
+                const commerciallySelected = await StoreCatalogSelection.exists({ status: "ACTIVE", productCode: normalizedProduct, supplierId: row.supplierId, supplierMarket: row.supplierMarket, sellingRegions: market, packages: { $elemMatch: { packageCode: row.packageCode, supplierProductMappingId: row.mappingId } } }).session(session);
+                if (!commerciallySelected) throw new AdminProductActivationError("PACKAGE_NOT_COMMERCIALLY_SELECTED", "A package is not in the active Store Catalog selection for this market.", 409, { packageCode: row.packageCode });
+                if (!row.prepared?.selectable || !row.readiness.ready) throw new AdminProductActivationError("ACTIVATION_NOT_READY", "Package publication is blocked by route or pricing readiness.", 409, { packageCode: row.packageCode, blockers: [...new Set([...(row.masterCatalog?.blockers || []), ...(row.readiness.blockers || [])])] });
+                rows.push(row);
+            }
             publications = [];
             for (const row of rows) publications.push(await setPackageMarketPublication({ productCode: normalizedProduct, packageCode: row.packageCode, customerMarket: market, published: true, decisionNote, actor, session }));
         });

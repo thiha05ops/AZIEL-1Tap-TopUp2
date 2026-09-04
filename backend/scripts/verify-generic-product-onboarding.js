@@ -97,12 +97,13 @@ async function main() {
     const activation = createStorePackageActivationService(fakeActivationModels(), {
         adapterResolver: () => ({ isConfigured: () => true, isAutoFulfillmentEnabled: () => true }),
         inputContractResolver: () => true,
-        mappingSupportResolver: () => true
+        mappingSupportResolver: () => true,
+        preCommercialReadinessResolver: () => ({ ready: true, blockers: [] })
     });
     const activationInspection = await activation.inspect({ selectionId: selection._id, mappingId, customerMarket: "TH" });
     assert(!activationInspection.blockers.includes("CANONICAL_PACKAGE_NOT_ENABLED"), "Selected canonical records are prepared by the system, not an Owner approval blocker.");
     assert(!activationInspection.blockers.includes("APPROVED_SUPPLIER_COST_REQUIRED"));
-    assert(activationInspection.blockers.includes("CUSTOMER_MARKET_PRICE_REQUIRED"));
+    assert(!activationInspection.blockers.includes("CUSTOMER_MARKET_PRICE_REQUIRED"), "Start Selling must not depend on retail pricing.");
     assert(!activationInspection.blockers.includes("CUSTOMER_INPUT_CONTRACT_NOT_VERIFIED"));
     assert(!activationInspection.blockers.includes("EXACT_SUPPLIER_OFFER_UNSUPPORTED"));
     const activationReadyMapping = {
@@ -114,7 +115,8 @@ async function main() {
     }), {
         adapterResolver: () => ({ isConfigured: () => true, isAutoFulfillmentEnabled: () => true }),
         inputContractResolver: () => true,
-        mappingSupportResolver: () => true
+        mappingSupportResolver: () => true,
+        preCommercialReadinessResolver: () => ({ ready: true, blockers: [] })
     });
     const readyInspection = await readyActivation.inspect({ selectionId: selection._id, mappingId, customerMarket: "TH" });
     assert.strictEqual(readyInspection.ready, true, `The existing activation command must accept a genuinely ready generic product: ${readyInspection.blockers.join(", ")}`);
@@ -128,10 +130,10 @@ async function main() {
         pkg: preparedPackage, offer: { _id: "offer-1", supplierId, supplierOfferCode: "100_credits", catalogLifecycleState: "ACTIVE" },
         availability: { state: "AVAILABLE", coverageComplete: true }, customerMarket: "TH", conflicts: [],
         adapter: { isConfigured: () => true, isAutoFulfillmentEnabled: () => false, autoFulfillmentGateState: () => ({ blockerCode: "SUPPLIER_PRODUCT_AUTO_FULFILLMENT_DISABLED" }) },
-        inputContractReady: false, offerSupported: false
+        preCommercial: { ready: false, blockers: ["INPUT_CONTRACT_UNRESOLVED", "PROCESSOR_UNSUPPORTED"] }
     });
-    assert(afkBlockers.includes("CUSTOMER_INPUT_CONTRACT_NOT_VERIFIED"));
-    assert(afkBlockers.includes("EXACT_SUPPLIER_OFFER_UNSUPPORTED"));
+    assert(afkBlockers.includes("INPUT_CONTRACT_UNRESOLVED"));
+    assert(afkBlockers.includes("PROCESSOR_UNSUPPORTED"));
 
     const productionSources = [
         "backend/services/catalogAdminService.js",
@@ -167,7 +169,7 @@ async function main() {
         selectedPricingRows: 1, presentationResolved: true, supplierCatalogCostUsable: true,
         activationCommandReusable: true, publicProjectionAfterExplicitActivation: true,
         checkoutPriceResolved: true, afkFulfillmentReady: false,
-        afkBlockers: ["CUSTOMER_INPUT_CONTRACT_NOT_VERIFIED", "EXACT_SUPPLIER_OFFER_UNSUPPORTED"],
+        afkBlockers,
         productionWrites: 0, supplierCalls: 0, environmentChanges: 0
     }, null, 2));
 }

@@ -882,8 +882,8 @@ function applyPublicPackageEligibility(projection) {
     return projection;
 }
 
-function applyPublicReadiness(projection, product, packages, commerceReadiness) {
-    projection.publicReadiness = resolvePublicProductReadiness(product, packages, commerceReadiness);
+function applyPublicReadiness(projection, product, packages, commerceReadiness, options = {}) {
+    projection.publicReadiness = resolvePublicProductReadiness(product, packages, commerceReadiness, options);
     projection.publicState = projection.publicReadiness.state;
     projection.purchasable = projection.publicState === "AVAILABLE";
     projection.comingSoon = projection.publicState === "COMING_SOON";
@@ -992,7 +992,7 @@ async function toDatabasePublicCatalog({ includeDisabled = true, includeAssetPro
             const publishedCodes = new Set(projection.packages.map(pkg => String(pkg.packageCode || "").toUpperCase()));
             const publishedSourcePackages = sourcePackages.filter(pkg => publishedCodes.has(String(pkg.packageCode || "").toUpperCase()));
             projection.commerceReadiness = projectCommerceReadiness(product, publishedSourcePackages, productMappings, productInventory, enabledSuppliers);
-            applyPublicReadiness(projection, product, publishedSourcePackages, projection.commerceReadiness);
+            applyPublicReadiness(projection, product, publishedSourcePackages, projection.commerceReadiness, { explicitCommercialAuthority: true });
             if (!includeDisabled && !projection.discoverable) return null;
             return projection;
         })

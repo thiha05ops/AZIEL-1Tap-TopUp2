@@ -23,15 +23,19 @@ function initialState() {
     return {
         selections: [],
         product: { _id: "product-mlbb", productCode: "mlbb", enabled: false, deletedAt: new Date().toISOString(), lifecycleStatus: "RETIRED" },
-        supplier: { _id: ids.supplier, supplierCode: "FAZERCARDS", name: "FazerCards", enabled: true },
+        supplier: { _id: ids.supplier, supplierCode: "FAZERCARDS", name: "FazerCards", enabled: true, mode: "API" },
         mappings: packageRows.map(([packageCode, _name, supplierPackageCode], index) => ({
             _id: ids.mappings[index], productCode: "mlbb", packageCode, supplierId: ids.supplier,
-            supplierCode: "FAZERCARDS", region: "GLOBAL", supplierPackageCode,
-            supplierCatalogOfferId: ids.offers[index], enabled: false, executionMode: "MANUAL", archivedAt: null
+            supplierCode: "FAZERCARDS", region: "GLOBAL", supplierProductCode: "mobile_legends_global", supplierPackageCode,
+            supplierCatalogOfferId: ids.offers[index], enabled: false, productionRole: "DISABLED", executionMode: "API", archivedAt: null,
+            fulfillmentEligibility: { mode: "CUSTOMER_MARKET_ALLOWLIST", allowedCustomerMarkets: ["TH", "MM"], evidenceCode: "OPERATOR_CONFIRMED_CAPABILITY", evidenceSource: "fixture", verifiedAt: new Date().toISOString(), version: 1 },
+            mappingMetadata: { readiness: { supplierMapped: true, pricingReady: false, inputReady: true, validationReady: true, fulfillmentReady: true, storefrontReady: false } }
         })),
         offers: packageRows.map(([_packageCode, _name, supplierOfferCode], index) => ({
-            _id: ids.offers[index], supplierId: ids.supplier, supplierOfferCode
+            _id: ids.offers[index], supplierId: ids.supplier, supplierCatalogProductId: "supplier-product-mlbb", supplierProductCode: "mobile_legends_global", supplierOfferCode, catalogLifecycleState: "ACTIVE", reconciliationState: "EXACT_CANONICAL_MATCH"
         })),
+        supplierProducts: [{ _id: "supplier-product-mlbb", supplierId: ids.supplier, supplierProductCode: "mobile_legends_global", supplierMarketCode: "GLOBAL", supportState: "SUPPORTED", rawSnapshotHash: "a".repeat(64), normalizedInputContract: { fields: [{ customerField: "playerId", providerField: "player_id", required: true }] } }],
+        availability: ids.offers.map((supplierCatalogOfferId, index) => ({ _id: `availability-${index}`, supplierCatalogOfferId, state: "AVAILABLE", coverageComplete: true, observedAt: new Date().toISOString(), staleAt: null })),
         packages: packageRows.map(([packageCode, name]) => ({ productCode: "mlbb", packageCode, name, deletedAt: null })),
         prices: [], publications: [], supplierCalls: 0, nextSelectionId: 1
     };
@@ -72,6 +76,8 @@ function fixture(state, options = {}) {
         Supplier: { findOne: filter => query("Supplier.findOne", () => matches(state.supplier, filter) ? clone(state.supplier) : null) },
         Mapping: { find: filter => query("Mapping.find", () => clone(state.mappings.filter(row => matches(row, filter)))) },
         Offer: { find: filter => query("Offer.find", () => clone(state.offers.filter(row => matches(row, filter)))) },
+        SupplierProduct: { find: filter => query("SupplierProduct.find", () => clone(state.supplierProducts.filter(row => matches(row, filter)))) },
+        Availability: { find: filter => query("Availability.find", () => clone(state.availability.filter(row => matches(row, filter)))) },
         Package: {
             find: filter => query("Package.find", () => clone(state.packages.filter(row => matches(row, filter)))),
             updateMany: (_filter, update, options = {}) => query("Package.updateMany", () => { state.packages.forEach(row => Object.assign(row, clone(update.$set))); return { modifiedCount: state.packages.length }; }).session(options.session)
@@ -111,7 +117,7 @@ function fixture(state, options = {}) {
             throw error;
         }
     };
-    return { service: createStoreCatalogSelectionService(models), transaction };
+    return { service: createStoreCatalogSelectionService(models, { adapterResolver: () => ({ isConfigured: () => true, isAutoFulfillmentEnabled: () => true }), processorSupportResolver: () => true }), transaction };
 }
 
 const input = {
@@ -142,7 +148,7 @@ async function main() {
     assert.deepStrictEqual(state.prices, beforePrices);
     assert.deepStrictEqual(state.publications, beforePublications);
     assert.equal(state.supplierCalls, 0);
-    assert.deepStrictEqual(state.lastOperations, ["Supplier.findOne", "Mapping.find", "Selection.findOne", "Offer.find", "Product.findOne", "Package.find", "Product.updateOne", "Package.updateMany", "Selection.findOneAndUpdate"]);
+    assert.deepStrictEqual(state.lastOperations, ["Supplier.findOne", "Mapping.find", "Selection.findOne", "Offer.find", "Product.findOne", "Package.find", "SupplierProduct.find", "Availability.find", "Product.updateOne", "Package.updateMany", "Selection.findOneAndUpdate"]);
 
     await assert.rejects(
         () => service.save(input, { actor: { username: "owner" }, transaction }),

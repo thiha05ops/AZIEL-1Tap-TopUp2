@@ -4,10 +4,13 @@ const mongoose = require("mongoose");
 const StoreCatalogSelection = require("../models/StoreCatalogSelection");
 const SupplierProductMapping = require("../models/SupplierProductMapping");
 const SupplierCatalogOffer = require("../models/SupplierCatalogOffer");
+const SupplierCatalogProduct = require("../models/SupplierCatalogProduct");
+const SupplierOfferAvailability = require("../models/SupplierOfferAvailability");
 const CatalogPackage = require("../models/CatalogPackage");
 const CatalogProduct = require("../models/CatalogProduct");
 const Supplier = require("../models/Supplier");
 const PackageMarketPublication = require("../models/PackageMarketPublication");
+const { assessExistingPreparedRoute } = require("./supplierCatalog/supplierRoutePreparationService");
 
 class StoreCatalogSelectionError extends Error {
     constructor(code, message, statusCode = 400, details = {}) { super(message); this.name = "StoreCatalogSelectionError"; this.code = code; this.statusCode = statusCode; this.details = details; }
@@ -17,8 +20,8 @@ const upper = value => clean(value).toUpperCase();
 const lower = value => clean(value).toLowerCase();
 const id = value => clean(value?._id || value);
 
-function createStoreCatalogSelectionService(models = {}) {
-    const M = { Selection: models.Selection || StoreCatalogSelection, Mapping: models.Mapping || SupplierProductMapping, Offer: models.Offer || SupplierCatalogOffer, Package: models.Package || CatalogPackage, Product: models.Product || CatalogProduct, Supplier: models.Supplier || Supplier, Publication:models.Publication||PackageMarketPublication };
+function createStoreCatalogSelectionService(models = {}, dependencies = {}) {
+    const M = { Selection: models.Selection || StoreCatalogSelection, Mapping: models.Mapping || SupplierProductMapping, Offer: models.Offer || SupplierCatalogOffer, SupplierProduct: models.SupplierProduct || SupplierCatalogProduct, Availability: models.Availability || SupplierOfferAvailability, Package: models.Package || CatalogPackage, Product: models.Product || CatalogProduct, Supplier: models.Supplier || Supplier, Publication:models.Publication||PackageMarketPublication };
     const lean = (query, session) => (session && query.session ? query.session(session) : query).lean();
     async function list(query = {}, session = null) {
         const filter = { status: "ACTIVE" };
@@ -47,9 +50,20 @@ function createStoreCatalogSelectionService(models = {}) {
             const offers = offerIds.length ? await lean(M.Offer.find({ _id: { $in: offerIds } }), session) : [];
             const product = await lean(M.Product.findOne({ productCode }), session);
             const packages = await lean(M.Package.find({ productCode, packageCode: { $in: packageCodes } }), session);
-            const offerById = new Map(offers.map(item => [id(item), item])), packageSet = new Set(packages.map(item => upper(item.packageCode)));
-            const invalid = mappings.filter(mapping => { const offer = offerById.get(id(mapping.supplierCatalogOfferId)); return !offer || id(offer.supplierId) !== supplierId || clean(offer.supplierOfferCode) !== clean(mapping.supplierPackageCode) || !packageSet.has(upper(mapping.packageCode)); });
-            if (!product || invalid.length) throw new StoreCatalogSelectionError("STORE_SELECTION_TECHNICAL_DATA_ISSUE", "Some selected packages have a technical data issue.", 409, { mappingIds: invalid.map(item => id(item)) });
+            const supplierProductIds = [...new Set(offers.map(item => id(item.supplierCatalogProductId)).filter(Boolean))];
+            const supplierProducts = supplierProductIds.length ? await lean(M.SupplierProduct.find({ _id: { $in: supplierProductIds } }), session) : [];
+            const availabilityRows = offerIds.length ? await lean(M.Availability.find({ supplierCatalogOfferId: { $in: offerIds } }), session) : [];
+            const offerById = new Map(offers.map(item => [id(item), item]));
+            const supplierProductById = new Map(supplierProducts.map(item => [id(item), item]));
+            const availabilityByOfferId = new Map(availabilityRows.map(item => [id(item.supplierCatalogOfferId), item]));
+            const packagesByCode = new Map();
+            for (const pkg of packages) { const code = upper(pkg.packageCode); packagesByCode.set(code, [...(packagesByCode.get(code) || []), pkg]); }
+            const assessments = mappings.map(mapping => {
+                const offer = offerById.get(id(mapping.supplierCatalogOfferId));
+                return { mapping, assessment: assessExistingPreparedRoute({ mapping, supplier, offer, supplierProduct: supplierProductById.get(id(offer?.supplierCatalogProductId)), availability: availabilityByOfferId.get(id(offer)), canonicalProduct: product, canonicalPackages: packagesByCode.get(upper(mapping.packageCode)) || [] }, sellingRegions, dependencies) };
+            });
+            const invalid = assessments.filter(item => !item.assessment.ready);
+            if (!product || invalid.length) throw new StoreCatalogSelectionError("STORE_SELECTION_MAPPING_NOT_PREPARED", "One or more selected packages are not fulfillment-ready inventory.", 409, { mappingIds: invalid.map(item => id(item.mapping)), outcomes: invalid.map(item => item.assessment.outcome) });
             await M.Product.updateOne({ _id: product._id }, { $set: { deletedAt: null, enabled: true, lifecycleStatus: "ACTIVE" } }, { session });
             await M.Package.updateMany({ _id: { $in: packages.map(item => item._id) } }, { $set: { deletedAt: null, enabled: true } }, { session });
             const now = new Date(), update = { productCode, supplierId, supplierCode: upper(supplier.supplierCode), supplierMarket, sellingRegions, visibleRegions:(current?.visibleRegions||[]).filter(region=>sellingRegions.includes(region)), packages: mappings.map(mapping => ({ packageCode: upper(mapping.packageCode), supplierProductMappingId: mapping._id })).sort((a, b) => a.packageCode.localeCompare(b.packageCode)), status: "ACTIVE", decisionVersion: Number(current?.decisionVersion || 0) + 1, selectedBy: clean(context.actor?.username || context.actor || "admin"), selectedAt: now, removedBy: "", removedAt: null };
