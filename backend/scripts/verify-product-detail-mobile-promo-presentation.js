@@ -54,6 +54,8 @@ assert(prices.includes("closeMobilePackagePicker"), "picker must close without c
 assert(!/productCode\s*===\s*\"(?:mlbb|pubg|heaven-burns-red|afk)/.test(prices), "mobile picker must not introduce product-specific package behavior");
 assert(css.includes(".product-package-card > #packages") && css.includes("display: none !important"), "mobile Product Detail must not render the full package catalog inline");
 assert(css.includes("#mobilePackageList #packages") && css.includes("display: block !important"), "mobile picker must render the shared package grid inside the sheet");
+assert(css.includes(".mobile-selected-package:not([hidden])") && css.includes("display: grid !important"), "mobile compact package selector must override desktop hidden state");
+assert(css.includes(".mobile-selected-package b") && css.includes("font-size: 24px"), "mobile compact package selector must retain a clear tap affordance");
 
 [
     "product.subtotal", "product.promoDiscount", "product.youSaved", "product.enterPromo",

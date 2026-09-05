@@ -1382,6 +1382,28 @@
     overflow: hidden;
   }
 
+  .az-product-detail .mobile-selected-package:not([hidden]) {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    min-height: 58px !important;
+    padding: 12px 14px !important;
+    cursor: pointer !important;
+  }
+
+  .az-product-detail .mobile-selected-package .mobile-pack-icon {
+    display: none !important;
+  }
+
+  .az-product-detail .mobile-selected-package .mobile-pack-content {
+    min-width: 0;
+  }
+
+  .az-product-detail .mobile-selected-package b {
+    color: var(--text-muted) !important;
+    font-size: 24px !important;
+    line-height: 1 !important;
+  }
+
   .az-product-detail .game-page {
     padding-right: max(16px, env(safe-area-inset-right)) !important;
     padding-left: max(16px, env(safe-area-inset-left)) !important;
