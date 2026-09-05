@@ -20,6 +20,67 @@
   overflow-wrap: anywhere;
 }
 
+.az-product-detail:not([data-product-detail-hydration="hydrated"]) .product-detail-skeleton-block,
+.az-product-detail:not([data-product-detail-hydration="hydrated"]) .product-detail-skeleton-line,
+.az-product-detail:not([data-product-detail-hydration="hydrated"]) .product-account-card label,
+.az-product-detail:not([data-product-detail-hydration="hydrated"]) .product-account-card input,
+.az-product-detail:not([data-product-detail-hydration="hydrated"]) .product-package-card .mobile-selected-package,
+.az-product-detail:not([data-product-detail-hydration="hydrated"]) .order-summary .summary-line,
+.az-product-detail:not([data-product-detail-hydration="hydrated"]) .order-summary .summary-total,
+.az-product-detail:not([data-product-detail-hydration="hydrated"]) .order-summary #buyBtn {
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  color: transparent !important;
+}
+
+.az-product-detail:not([data-product-detail-hydration="hydrated"]) .product-detail-skeleton-block,
+.az-product-detail:not([data-product-detail-hydration="hydrated"]) .product-detail-skeleton-line,
+.az-product-detail:not([data-product-detail-hydration="hydrated"]) .product-account-card label,
+.az-product-detail:not([data-product-detail-hydration="hydrated"]) .product-account-card input,
+.az-product-detail:not([data-product-detail-hydration="hydrated"]) .product-package-card .mobile-selected-package,
+.az-product-detail:not([data-product-detail-hydration="hydrated"]) .order-summary .summary-line,
+.az-product-detail:not([data-product-detail-hydration="hydrated"]) .order-summary .summary-total,
+.az-product-detail:not([data-product-detail-hydration="hydrated"]) .order-summary #buyBtn {
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, .12), rgba(255, 255, 255, .05)),
+    rgba(255, 255, 255, .045) !important;
+  background-size: 220% 100% !important;
+  animation: gameManagedSkeleton 1.2s ease-in-out infinite;
+}
+
+.az-product-detail:not([data-product-detail-hydration="hydrated"]) .product-detail-skeleton-line {
+  display: block;
+  height: 14px;
+}
+
+.az-product-detail:not([data-product-detail-hydration="hydrated"]) .product-account-card label {
+  width: 44%;
+  height: 14px;
+}
+
+.az-product-detail:not([data-product-detail-hydration="hydrated"]) .product-account-card input {
+  border-color: transparent !important;
+}
+
+.az-product-detail:not([data-product-detail-hydration="hydrated"]) .product-package-card .mobile-selected-package > * {
+  opacity: 0;
+}
+
+.az-product-detail:not([data-product-detail-hydration="hydrated"]) .order-summary .summary-line,
+.az-product-detail:not([data-product-detail-hydration="hydrated"]) .order-summary .summary-total {
+  min-height: 26px;
+}
+
+.az-product-detail:not([data-product-detail-hydration="hydrated"]) .order-summary #buyBtn {
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.az-product-detail:not([data-product-detail-hydration="hydrated"]) .mobile-selected-package img {
+  opacity: 0;
+}
+
 @media (min-width: 901px) {
   .game-page {
     padding-top: 24px;

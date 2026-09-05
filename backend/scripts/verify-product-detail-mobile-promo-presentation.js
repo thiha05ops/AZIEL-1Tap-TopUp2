@@ -14,6 +14,7 @@ const css = read("frontend/css/game/product-detail-desktop.css");
 const locales = ["en", "my", "th"].map(locale => read(`frontend/lang/${locale}.js`));
 
 const updateSummary = flow.slice(flow.indexOf("function updateSummary"), flow.indexOf("function buildOrderData"));
+const identityRenderer = stage.slice(stage.indexOf("function renderProductIdentity"), stage.indexOf("function setMeta"));
 
 assert(stage.includes('priceLabel.textContent = tr("product.subtotal"'), "summary must label the current Commerce price as Subtotal");
 assert(stage.includes('promoLine.id = "summaryDiscountRow"'), "summary must own a conditional Promo row");
@@ -86,5 +87,12 @@ assert(!read("frontend/js/product-detail.js").includes('applyText("#selectedPack
 
 assert(stage.includes('document.createElement("details")'), "FAQ must preserve native keyboard-operable disclosures");
 assert(css.includes("color: var(--text-secondary)"), "Product Knowledge body text must preserve theme-safe hierarchy");
+assert(stage.includes('document.documentElement.dataset.productDetailHydration = "loading"'), "Product Detail must begin in skeleton-first loading state");
+assert(stage.includes("function renderProductIdentitySkeleton"), "Product Detail must render a neutral identity skeleton before runtime media hydration");
+assert(stage.includes('document.documentElement.dataset.productDetailHydration = "hydrated"'), "Product Detail must explicitly reveal content after runtime hydration");
+assert(!stage.includes("renderProductIdentity({\n        productCode"), "Product Detail must not pre-render static product identity before catalog hydration");
+assert(!identityRenderer.includes("AZIEL_CATALOG_PRESENTATION?.getProductImage"), "Product Detail identity renderer must not fall back to bundled static product images");
+assert(css.includes('[data-product-detail-hydration="hydrated"]'), "Product Detail CSS must key skeleton visibility off hydration state");
+assert(css.includes(".product-package-card .mobile-selected-package > *") && css.includes("opacity: 0"), "Product Detail skeleton must hide package selector static copy/artwork before hydration");
 
 console.log("Product Detail mobile + Promo presentation verification passed.");

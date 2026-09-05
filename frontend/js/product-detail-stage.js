@@ -2,6 +2,7 @@
 (function () {
     const tr = (key, fallback, params) => window.AZIEL_LOCALE?.t?.(key, fallback, params) || fallback;
     document.documentElement.classList.add("az-product-detail");
+    document.documentElement.dataset.productDetailHydration = "loading";
     document.body?.classList.add("az-purchase-surface");
 
     if (!document.querySelector('link[data-aziel-purchase-shell="true"]')) {
@@ -45,12 +46,11 @@
     const hero = document.querySelector(".game-hero");
     const identity = hero?.querySelector(".game-banner");
     const info = hero?.querySelector(".game-info");
-    const initialProductName = identity?.querySelector("h1")?.textContent?.trim() || document.title.split("|")[0].trim();
-    const initialProductDescription = identity?.querySelector(".banner-overlay p")?.textContent?.trim() || "";
     if (orderLeft && identity && packageCard) {
         identity.classList.add("product-identity");
         orderLeft.insertBefore(identity, packageCard);
     }
+    renderProductIdentitySkeleton();
 
     const orderLayout = document.querySelector(".order-layout");
     if (info && orderLayout) {
@@ -146,7 +146,7 @@
         identity.removeAttribute("data-managed-content-state");
         identity.replaceChildren();
 
-        const artworkUrl = String(product.imageUrl || product.artworkPath || window.AZIEL_CATALOG_PRESENTATION?.getProductImage?.(product.productCode) || "").trim();
+        const artworkUrl = String(product.imageUrl || product.artworkPath || "").trim();
         if (artworkUrl) {
             const media = document.createElement("div");
             media.className = "product-identity-media";
@@ -192,6 +192,30 @@
             content.appendChild(note);
         }
         identity.appendChild(content);
+    }
+
+    function renderProductIdentitySkeleton() {
+        if (!identity) return;
+        identity.dataset.identitySignature = "skeleton";
+        identity.setAttribute("data-managed-content-state", "resolving");
+        identity.replaceChildren();
+        const media = document.createElement("div");
+        media.className = "product-identity-media product-detail-skeleton-block";
+        media.setAttribute("aria-hidden", "true");
+        const content = document.createElement("div");
+        content.className = "product-identity-content product-detail-skeleton-content";
+        [34, 78, 54, 92].forEach(width => {
+            const line = document.createElement("span");
+            line.className = "product-detail-skeleton-line";
+            line.style.width = `${width}%`;
+            content.appendChild(line);
+        });
+        identity.append(media, content);
+    }
+
+    function markProductDetailHydrated() {
+        if (document.documentElement.dataset.productDetailHydration === "hydrated") return;
+        document.documentElement.dataset.productDetailHydration = "hydrated";
     }
 
     function setMeta(selector, attribute, value) {
@@ -246,6 +270,7 @@
             document.title = "Product unavailable | AZIEL";
             setMeta('meta[name="robots"]', "content", "noindex, nofollow");
         }
+        markProductDetailHydrated();
     }
 
     function resolveAndRenderPublicState(product) {
@@ -352,6 +377,7 @@
         }
 
         if (container.children.length) (document.querySelector(".product-lower-info") || orderLayout).insertAdjacentElement("afterend", container);
+        markProductDetailHydrated();
     }
 
     let directAvailabilityRequest = null;
@@ -408,11 +434,4 @@
     window.addEventListener("aziel:shopRegionChanged", renderLowerProductContent);
     window.addEventListener("aziel:locale-changed", renderLowerProductContent);
     document.addEventListener("DOMContentLoaded", renderLowerProductContent);
-    renderProductIdentity({
-        productCode: document.getElementById("packages")?.dataset.game || "",
-        name: initialProductName,
-        description: initialProductDescription,
-        imageUrl: window.AZIEL_CATALOG_PRESENTATION?.getProductImage?.(document.getElementById("packages")?.dataset.game || "") || "",
-        supportedRegions: []
-    });
 })();
