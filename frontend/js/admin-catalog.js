@@ -27,6 +27,17 @@ let catalogProductRequestController = null;
 let catalogKnowledgeLocale = "en";
 let catalogKnowledgeDrafts = { en: {}, my: {}, th: {} };
 let catalogStoreSelectionScope = null;
+const PRODUCT_COMPATIBILITY_MARKETS = Object.freeze([
+    ["GLOBAL", "Global"],
+    ["TH", "Thailand"],
+    ["MM", "Myanmar"],
+    ["ID", "Indonesia"],
+    ["MY", "Malaysia"],
+    ["SG", "Singapore"],
+    ["PH", "Philippines"],
+    ["SEA", "SEA"],
+    ["ASIA", "Asia"]
+]);
 
 document.addEventListener("DOMContentLoaded", () => {
     initAdminCatalogController();
@@ -662,8 +673,9 @@ function openProductEditor(product) {
     modal.querySelector("#catalogProductCanonicalMarket").textContent = marketLabel(product.market, product.displayMarketLabel);
     modal.querySelector("#catalogProductCanonicalStatus").textContent = product.deleted || product.deletedAt ? "Deleted" : (product.enabled ? "Enabled" : "Disabled");
     modal.querySelector("#catalogProductDescription").value = product.description || "";
-    modal.querySelector("#catalogProductRegionMM").checked = (product.supportedRegions || []).includes("MM");
-    modal.querySelector("#catalogProductRegionTH").checked = (product.supportedRegions || []).includes("TH");
+    modal.querySelectorAll("[data-product-compatibility-market]").forEach(input => {
+        input.checked = (product.supportedRegions || []).includes(input.value);
+    });
     modal.querySelector("#catalogProductManualMM").checked = (product.fulfillment?.manualAllowedRegions || []).includes("MM");
     modal.querySelector("#catalogProductManualTH").checked = (product.fulfillment?.manualAllowedRegions || []).includes("TH");
     modal.querySelector("#catalogProductEnabled").checked = product.enabled !== false;
@@ -794,9 +806,11 @@ function ensureProductEditorModal() {
                 </section>
                 <section data-product-drawer-panel="availability" hidden>
                     <fieldset class="catalog-edit-fieldset catalog-chip-fieldset">
-                        <legend>${adminT("supported_regions", "Supported Regions")}</legend>
-                        <label class="catalog-choice-chip"><input id="catalogProductRegionMM" type="checkbox"> Myanmar</label>
-                        <label class="catalog-choice-chip"><input id="catalogProductRegionTH" type="checkbox"> Thailand</label>
+                        <legend>Product / account compatibility</legend>
+                        ${PRODUCT_COMPATIBILITY_MARKETS.map(([market, label]) => (
+        `<label class="catalog-choice-chip"><input data-product-compatibility-market type="checkbox" value="${market}"> ${label}</label>`
+    )).join("")}
+                        <small>Customer-facing game/account market. This does not restrict AZIEL TH/MM commerce visibility.</small>
                     </fieldset>
                     <fieldset class="catalog-edit-fieldset catalog-chip-fieldset">
                         <legend>Manual Fulfillment Regions</legend>
@@ -809,7 +823,7 @@ function ensureProductEditorModal() {
                     <label>Commerce state <select id="catalogProductCommerceState"><option value="PURCHASABLE">Purchasable</option><option value="COMING_SOON">Coming Soon</option><option value="TEMPORARILY_UNAVAILABLE">Temporarily Unavailable</option><option value="HIDDEN">Hidden</option></select></label>
                     <label class="catalog-toggle-row"><span>Public discovery enabled</span><input id="catalogProductDiscoveryEnabled" type="checkbox"></label>
                     <label>Market presentation <select id="catalogProductMarketScope"><option value="GLOBAL">Global</option><option value="REGION">Specific region</option><option value="MULTI_REGION">Multiple regions</option></select></label>
-                    <p><b>Authoritative availability</b><br><span id="catalogProductAuthoritativeRegions"></span><br><small>Read-only commerce authority</small></p>
+                    <p><b>Product compatibility label</b><br><span id="catalogProductAuthoritativeRegions"></span><br><small>Customer-facing account market guidance, not AZIEL commerce visibility.</small></p>
                     <label>Display market label <input id="catalogProductDisplayMarketLabel" type="text" maxlength="60" placeholder="Use fallback when empty"><small>Presentation only. Does not change selling availability.</small></label>
                     <div id="catalogProductReadiness" class="catalog-pricing-preview-state" aria-live="polite"></div>
                 </section>
@@ -972,9 +986,9 @@ function setProductDrawerTab(tab = "general") {
 
 function readProductEditorPayload(product) {
     const modal = document.getElementById("catalogProductEditModal");
-    const supportedRegions = [];
-    if (modal.querySelector("#catalogProductRegionMM")?.checked) supportedRegions.push("MM");
-    if (modal.querySelector("#catalogProductRegionTH")?.checked) supportedRegions.push("TH");
+    const supportedRegions = Array.from(modal.querySelectorAll("[data-product-compatibility-market]:checked"))
+        .map(input => input.value)
+        .filter(Boolean);
     const manualAllowedRegions = [];
     if (modal.querySelector("#catalogProductManualMM")?.checked) manualAllowedRegions.push("MM");
     if (modal.querySelector("#catalogProductManualTH")?.checked) manualAllowedRegions.push("TH");

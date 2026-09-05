@@ -86,8 +86,8 @@ function assertAdminFrontend() {
     [
         "catalogProductName",
         "catalogProductDescription",
-        "catalogProductRegionMM",
-        "catalogProductRegionTH",
+        "data-product-compatibility-market",
+        "Product / account compatibility",
         "catalogProductFeatured",
         "catalogProductSeoTitle",
         "catalogProductSeoDescription",

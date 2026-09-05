@@ -305,6 +305,35 @@ async function verifyIsolatedDatabase() {
         product = await getFixtureProduct();
         await updateProduct({
             productCode: TEST_PRODUCT,
+            patch: { supportedRegions: ["ID"], expectedUpdatedAt: product.updatedAt },
+            actor: "verify"
+        });
+        product = await getFixtureProduct();
+        assert.deepStrictEqual(product.supportedRegions, ["ID"], "Admin product compatibility metadata must support non-AZIEL commerce markets.");
+        item = await getFixturePackage();
+        result = await updatePackage({
+            productCode: TEST_PRODUCT,
+            packageCode: TEST_PACKAGE,
+            patch: { prices: { TH: { amount: 61.5, enabled: true } }, expectedUpdatedAt: item.updatedAt },
+            actor: "verify"
+        });
+        assert.strictEqual(result.changed, true, "TH commerce price edits must not be blocked by ID product compatibility metadata.");
+        product = await getFixtureProduct();
+        await expectAdminError(updateProduct({
+            productCode: TEST_PRODUCT,
+            patch: { manualAllowedRegions: ["ID"], expectedUpdatedAt: product.updatedAt },
+            actor: "verify"
+        }), "CATALOG_FULFILLMENT_REGION_INVALID");
+        product = await getFixtureProduct();
+        await updateProduct({
+            productCode: TEST_PRODUCT,
+            patch: { supportedRegions: ["MM", "TH"], expectedUpdatedAt: product.updatedAt },
+            actor: "verify"
+        });
+
+        product = await getFixtureProduct();
+        await updateProduct({
+            productCode: TEST_PRODUCT,
             patch: { enabled: false, expectedUpdatedAt: product.updatedAt },
             actor: "verify"
         });

@@ -136,6 +136,21 @@ function normalizeSupportedRegions(value = []) {
     return regions;
 }
 
+function normalizeManualAllowedRegions(value = []) {
+    if (!Array.isArray(value)) {
+        throw new CatalogAdminError("CATALOG_PATCH_INVALID", "manualAllowedRegions must be an array.");
+    }
+
+    const commerceRegions = new Set(Object.keys(REGION_CURRENCIES));
+    const requested = value.map(item => normalizeRegion(item)).filter(Boolean);
+    const invalidRegion = requested.find(region => !commerceRegions.has(region));
+    if (invalidRegion) {
+        throw new CatalogAdminError("CATALOG_FULFILLMENT_REGION_INVALID", "Manual fulfillment regions must be AZIEL commerce markets.");
+    }
+
+    return Array.from(new Set(requested));
+}
+
 function parsePrice(value) {
     if (value === "" || value === null || value === undefined) {
         throw new CatalogAdminError(
@@ -316,16 +331,6 @@ async function buildCreatePackagePayload(product, patch = {}) {
         );
     }
 
-    const supportedRegions = product.supportedRegions || [];
-    Object.keys(prices).forEach(region => {
-        if (prices[region] && supportedRegions.length && !supportedRegions.includes(region)) {
-            throw new CatalogAdminError(
-                "CATALOG_REGION_PRICE_UNAVAILABLE",
-                "This product does not support the selected region."
-            );
-        }
-    });
-
     const iconAssetId = String(patch.iconAssetId || "").trim();
     if (iconAssetId) {
         await assertAssetCategory(iconAssetId, "package_icon");
@@ -405,7 +410,7 @@ function buildProductPatch(patch = {}) {
     if (Object.prototype.hasOwnProperty.call(patch, "homepageOrder")) updates.homepageOrder = parseSortOrder(patch.homepageOrder);
     if (Object.prototype.hasOwnProperty.call(patch, "homepageFlags")) updates.homepageFlags = normalizeHomepageFlags(patch.homepageFlags);
     if (Object.prototype.hasOwnProperty.call(patch, "homepageSections")) updates.homepageSections = normalizeHomepageSections(patch.homepageSections);
-    if (Object.prototype.hasOwnProperty.call(patch, "manualAllowedRegions")) updates["fulfillment.manualAllowedRegions"] = normalizeSupportedRegions(patch.manualAllowedRegions);
+    if (Object.prototype.hasOwnProperty.call(patch, "manualAllowedRegions")) updates["fulfillment.manualAllowedRegions"] = normalizeManualAllowedRegions(patch.manualAllowedRegions);
     if (Object.prototype.hasOwnProperty.call(patch, "previewPrice")) updates["presentation.previewPrice"] = normalizePreviewPrice(patch.previewPrice);
     if (Object.prototype.hasOwnProperty.call(patch, "marketScope")) updates["presentation.marketScope"] = parseEnum(patch.marketScope, ["GLOBAL", "REGION", "MULTI_REGION"], "marketScope");
     if (Object.prototype.hasOwnProperty.call(patch, "displayMarketLabel")) updates["presentation.displayMarketLabel"] = cleanEditableText(patch.displayMarketLabel, 60);
@@ -825,10 +830,11 @@ async function updateProduct({ productCode, patch = {}, actor = "admin" }) {
     Object.entries(updates).forEach(([path, value]) => {
         product.set(path, value);
     });
+    const commerceRegions = new Set(Object.keys(REGION_CURRENCIES));
     const unsupportedManualRegion = (product.fulfillment?.manualAllowedRegions || [])
-        .find(region => !(product.supportedRegions || []).includes(region));
+        .find(region => !commerceRegions.has(normalizeRegion(region)));
     if (unsupportedManualRegion) {
-        throw new CatalogAdminError("CATALOG_FULFILLMENT_REGION_INVALID", "Manual fulfillment regions must be supported by the product.");
+        throw new CatalogAdminError("CATALOG_FULFILLMENT_REGION_INVALID", "Manual fulfillment regions must be AZIEL commerce markets.");
     }
     const transition = classifyProductEnabledTransition(previousEnabled, product.enabled !== false);
     const validateReadiness = shouldValidateProductReadiness({
@@ -952,16 +958,10 @@ async function updatePackage({ productCode, packageCode, patch = {}, actor = "ad
         await assertAssetCategory(updates.iconAssetId, "package_icon");
     }
 
-    const supportedRegions = product.supportedRegions || [];
     Object.entries(patch.prices || {}).forEach(([regionKey, pricePatch]) => {
         const region = normalizeRegion(regionKey);
-        const willBeAvailable = pricePatch?.enabled === true ||
-            (Object.prototype.hasOwnProperty.call(pricePatch || {}, "amount") && pricePatch?.enabled !== false);
-        if (willBeAvailable && supportedRegions.length && !supportedRegions.includes(region)) {
-            throw new CatalogAdminError(
-                "CATALOG_REGION_PRICE_UNAVAILABLE",
-                "This product does not support the selected region."
-            );
+        if (!Object.prototype.hasOwnProperty.call(REGION_CURRENCIES, region)) {
+            throw new CatalogAdminError("CATALOG_REGION_PRICE_UNAVAILABLE", "Unsupported AZIEL commerce market.");
         }
     });
 

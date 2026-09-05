@@ -147,6 +147,27 @@ async function verifyIsolatedPropagation() {
 }
 
 async function main() {
+    const valorantThailand = {
+        ...baseProduct,
+        productCode: "valorant-th",
+        name: "Valorant (Thailand)",
+        supportedRegions: ["TH"],
+        presentation: { displayMarketLabel: "Thailand" }
+    };
+    const codmIndonesia = {
+        ...baseProduct,
+        productCode: "codm-id",
+        name: "Call of Duty Mobile (Indonesia)",
+        supportedRegions: ["ID"],
+        presentation: { displayMarketLabel: "Indonesia" }
+    };
+    [valorantThailand, codmIndonesia].forEach(product => {
+        const projected = publicProjection(product, { ...basePackage, productCode: product.productCode });
+        assert(projected.packages[0].prices.TH, `${product.name} must remain visible in TH commerce when TH price/publication exists.`);
+        assert(projected.packages[0].prices.MM, `${product.name} must remain visible in MM commerce when MM price/publication exists.`);
+        assert.deepStrictEqual(projected.supportedRegions, product.supportedRegions, "Product/account compatibility label must remain unchanged by commerce projection.");
+    });
+
     const mmOnlyProduct = { ...baseProduct, supportedRegions: ["MM"] };
     const mmOnly = publicProjection(mmOnlyProduct);
     assert(mmOnly.packages[0].prices.TH, "TH commerce price must be publicly projected independently of product compatibility.");
@@ -206,6 +227,10 @@ async function main() {
 
     const frontend = fs.readFileSync(path.join(ROOT, "frontend/js/catalog-runtime.js"), "utf8");
     assert(!frontend.includes("product.supportedRegions?.includes(normalizedRegion) === false"), "Frontend must not hide packages because product compatibility metadata differs from commerce market.");
+
+    const adminService = fs.readFileSync(path.join(ROOT, "backend/services/catalogAdminService.js"), "utf8");
+    assert(!adminService.includes("This product does not support the selected region."), "Admin pricing must not use product compatibility metadata as a TH/MM commerce gate.");
+    assert(adminService.includes("normalizeManualAllowedRegions"), "Manual fulfillment regions must have a separate TH/MM commerce normalizer.");
 
     if (process.argv.includes("--isolated")) await verifyIsolatedPropagation();
 
