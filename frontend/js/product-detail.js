@@ -73,7 +73,7 @@
         applyText("[data-product-tag]", tag);
         applyText("[data-package-prompt]", packagePrompt);
         applyText("[data-product-summary-name]", name);
-        applyText("#selectedPackageTitle", "Select Package");
+        applyText("#selectedPackageTitle", "Choose a package");
 
         const canonicalContract = window.AZIEL_GAME_INPUT_CONTRACTS?.forProduct?.(productCode);
         const contract = product.customerInputContract?.verified === true

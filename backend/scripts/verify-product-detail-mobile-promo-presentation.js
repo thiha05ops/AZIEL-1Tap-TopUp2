@@ -45,6 +45,15 @@ assert(css.includes("@media (prefers-reduced-motion: reduce)"), "FAQ affordance 
 
 assert(prices.includes('Number(item.discountPercent || 0).toLocaleString()}% ${escapeHtml(t("product.offerOff", "OFF"))}'), "compare badge must be compact and server-derived");
 assert(prices.includes("Promise.allSettled"), "one preview failure must not reject the complete package grid");
+assert(prices.includes("MOBILE_PACKAGE_PICKER_QUERY"), "mobile package picker breakpoint must be owned by prices.js");
+assert(prices.includes("setupMobilePackagePicker()"), "mobile package picker must be initialized with the shared price renderer");
+assert(prices.includes("list.appendChild(packageContainer)"), "mobile picker must reuse the authoritative #packages DOM instead of duplicating package rendering");
+assert(prices.includes("inlineParent.insertBefore(packageContainer"), "desktop must restore the existing inline package grid");
+assert(prices.includes("openMobilePackagePicker"), "summary control must open the mobile package picker");
+assert(prices.includes("closeMobilePackagePicker"), "picker must close without clearing selectedPackage");
+assert(!/productCode\s*===\s*\"(?:mlbb|pubg|heaven-burns-red|afk)/.test(prices), "mobile picker must not introduce product-specific package behavior");
+assert(css.includes(".product-package-card > #packages") && css.includes("display: none !important"), "mobile Product Detail must not render the full package catalog inline");
+assert(css.includes("#mobilePackageList #packages") && css.includes("display: block !important"), "mobile picker must render the shared package grid inside the sheet");
 
 [
     "product.subtotal", "product.promoDiscount", "product.youSaved", "product.enterPromo",

@@ -4,9 +4,12 @@
 let selectedPackage = null;
 let pricingRenderRequestId = 0;
 let catalogLoadInFlight = false;
+const MOBILE_PACKAGE_PICKER_QUERY = "(max-width: 768px)";
+let mobilePackagePickerState = null;
 
 document.addEventListener("DOMContentLoaded", () => {
   document.addEventListener("pricesRendered", bindPackageSelection);
+  setupMobilePackagePicker();
 
   renderGamePrices();
 
@@ -172,10 +175,12 @@ function showPackageSkeletons(packageContainer) {
       <span class="pack-skeleton-price"></span>
     </div>
   `).join("") + '<span class="az-visually-hidden" role="status">Loading available packages</span>';
+  syncMobilePackagePickerLayout();
 }
 
 function finishPackageLoading(packageContainer) {
   packageContainer?.setAttribute("aria-busy", "false");
+  syncMobilePackagePickerLayout();
 }
 
 function t(key, fallback) {
@@ -415,6 +420,7 @@ function bindPackageSelection() {
       selectPackage(pack);
     };
   });
+  syncMobilePackagePickerLayout();
 }
 
 function selectPackage(packEl) {
@@ -461,6 +467,118 @@ function selectPackage(packEl) {
   );
 
   emitPackageEvent("package:selected", selectedPackage);
+  syncMobilePackagePickerLayout();
+}
+
+function setupMobilePackagePicker() {
+  if (mobilePackagePickerState) {
+    syncMobilePackagePickerLayout();
+    return mobilePackagePickerState;
+  }
+
+  const packageContainer = document.getElementById("packages");
+  const summary = document.getElementById("selectedPackagePreview") || document.getElementById("openPackagePanel");
+  const panel = document.getElementById("mobilePackagePanel");
+  const list = document.getElementById("mobilePackageList");
+  const closeButton = document.getElementById("closePackagePanel");
+  const confirmButton = document.getElementById("confirmPackagePanel");
+
+  if (!packageContainer || !summary || !panel || !list) return null;
+
+  const placeholder = document.createComment("aziel-packages-inline-anchor");
+  packageContainer.parentNode?.insertBefore(placeholder, packageContainer);
+
+  const media = window.matchMedia?.(MOBILE_PACKAGE_PICKER_QUERY);
+  const isMobile = () => Boolean(media?.matches || window.innerWidth <= 768);
+
+  mobilePackagePickerState = {
+    packageContainer,
+    summary,
+    panel,
+    list,
+    closeButton,
+    confirmButton,
+    placeholder,
+    inlineParent: placeholder.parentNode,
+    isMobile
+  };
+
+  summary.setAttribute("aria-haspopup", "dialog");
+  summary.setAttribute("aria-controls", panel.id || "mobilePackagePanel");
+  summary.setAttribute("aria-expanded", "false");
+  panel.setAttribute("role", "dialog");
+  panel.setAttribute("aria-modal", "true");
+  panel.setAttribute("aria-labelledby", "mobilePackagePanelTitle");
+  panel.querySelector(".mobile-panel-head h3")?.setAttribute("id", "mobilePackagePanelTitle");
+
+  summary.addEventListener("click", openMobilePackagePicker);
+  closeButton?.addEventListener("click", closeMobilePackagePicker);
+  confirmButton?.addEventListener("click", closeMobilePackagePicker);
+  panel.addEventListener("click", event => {
+    if (event.target === panel) closeMobilePackagePicker();
+  });
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape" && panel.classList.contains("show")) {
+      closeMobilePackagePicker();
+    }
+  });
+
+  media?.addEventListener?.("change", syncMobilePackagePickerLayout);
+  window.addEventListener("resize", syncMobilePackagePickerLayout);
+
+  syncMobilePackagePickerLayout();
+  return mobilePackagePickerState;
+}
+
+function syncMobilePackagePickerLayout() {
+  const state = mobilePackagePickerState;
+  if (!state) return;
+
+  const { packageContainer, summary, panel, list, placeholder, inlineParent, isMobile } = state;
+
+  if (isMobile()) {
+    if (packageContainer.parentNode !== list) {
+      list.appendChild(packageContainer);
+    }
+    summary.hidden = false;
+    packageContainer.dataset.mobilePickerSource = "true";
+    return;
+  }
+
+  if (packageContainer.parentNode !== inlineParent) {
+    inlineParent.insertBefore(packageContainer, placeholder.nextSibling);
+  }
+  packageContainer.dataset.mobilePickerSource = "false";
+  summary.hidden = true;
+  panel.classList.remove("show");
+  panel.setAttribute("hidden", "");
+  summary.setAttribute("aria-expanded", "false");
+  document.body.classList.remove("mobile-package-picker-open");
+}
+
+function openMobilePackagePicker() {
+  const state = mobilePackagePickerState || setupMobilePackagePicker();
+  if (!state || !state.isMobile()) return;
+
+  syncMobilePackagePickerLayout();
+  state.panel.classList.add("show");
+  state.panel.removeAttribute("hidden");
+  state.summary.setAttribute("aria-expanded", "true");
+  document.body.classList.add("mobile-package-picker-open");
+  const active = state.packageContainer.querySelector(".pack.active");
+  window.requestAnimationFrame?.(() => {
+    active?.scrollIntoView?.({ block: "center", inline: "nearest" });
+  });
+}
+
+function closeMobilePackagePicker() {
+  const state = mobilePackagePickerState;
+  if (!state) return;
+
+  state.panel.classList.remove("show");
+  state.panel.setAttribute("hidden", "");
+  state.summary.setAttribute("aria-expanded", "false");
+  document.body.classList.remove("mobile-package-picker-open");
 }
 
 function updateSelectedPackagePreview(pkg) {
@@ -542,8 +660,8 @@ function resetSelectedPackagePreview() {
 
   if (preview) preview.classList.remove("selected", "has-package");
   if (icon) setPackagePreviewIcon(icon, defaultIcon, staticFallbackIcon || defaultIcon);
-  if (title) title.textContent = "Select Top-Up Amount";
-  if (subtitle) subtitle.textContent = "Choose your package";
+  if (title) title.textContent = t("product.choosePackage", "Choose a package");
+  if (subtitle) subtitle.textContent = t("product.tapToSelectPackage", "Tap to select");
 }
 
 function getSelectedPackage() {

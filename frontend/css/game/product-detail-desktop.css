@@ -1378,6 +1378,9 @@
 }
 
 @media (max-width: 768px) {
+  body.mobile-package-picker-open {
+    overflow: hidden;
+  }
 
   .az-product-detail .game-page {
     padding-right: max(16px, env(safe-area-inset-right)) !important;
@@ -1400,8 +1403,13 @@
     min-width: 0;
   }
 
-  .az-product-detail #packages {
+  .az-product-detail .product-package-card > #packages {
+    display: none !important;
+  }
+
+  .az-product-detail #mobilePackageList #packages {
     display: block !important;
+    width: 100% !important;
   }
 
   .az-product-detail .package-family-grid {
