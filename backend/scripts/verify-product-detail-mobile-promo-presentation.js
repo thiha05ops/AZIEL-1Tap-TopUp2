@@ -62,8 +62,11 @@ assert(!/productCode\s*===\s*\"(?:mlbb|pubg|heaven-burns-red|afk)/.test(prices),
 assert(css.includes(".product-package-card > #packages") && css.includes("display: none !important"), "mobile Product Detail must not render the full package catalog inline");
 assert(css.includes("#mobilePackageList #packages") && css.includes("display: block !important"), "mobile picker must render the shared package grid inside the sheet");
 assert(css.includes(".mobile-selected-package:not([hidden])") && css.includes("display: grid !important"), "mobile compact package selector must override desktop hidden state");
-assert(css.includes("grid-template-columns: 54px minmax(0, 1fr) 18px"), "mobile compact package selector must preserve preview image, text, and chevron columns");
-assert(css.includes("min-height: 72px"), "mobile compact package selector must keep a compact commerce-row height");
+assert(css.includes("grid-template-columns: 60px minmax(0, 1fr) 18px"), "mobile compact package selector must preserve larger preview image, text, and chevron columns");
+assert(css.includes("min-height: 76px"), "mobile compact package selector must keep a compact commerce-row height");
+assert(css.includes("border: 0 !important") && css.includes("background: transparent !important"), "mobile compact package selector must not render as a nested card");
+assert(css.includes("box-shadow: none !important"), "mobile compact package selector must remove nested-card shadow");
+assert(css.includes("width: 58px !important") && css.includes("height: 58px !important"), "mobile compact package selector preview image must have breathing room");
 assert(css.includes("text-align: left !important"), "mobile compact package selector content must remain left aligned");
 assert(css.includes("font-weight: 750"), "mobile compact package selector title must use a cleaner semibold hierarchy");
 assert(css.includes(".mobile-selected-package.has-package span") && css.includes("color: var(--warning)"), "selected mobile package price must use AZIEL accent color");

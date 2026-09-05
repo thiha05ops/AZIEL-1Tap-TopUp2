@@ -1384,24 +1384,30 @@
 
   .az-product-detail .mobile-selected-package:not([hidden]) {
     display: grid !important;
-    grid-template-columns: 54px minmax(0, 1fr) 18px !important;
-    min-height: 72px !important;
-    padding: 9px 12px !important;
+    grid-template-columns: 60px minmax(0, 1fr) 18px !important;
+    min-height: 76px !important;
+    padding: 8px 0 !important;
     align-items: center !important;
-    gap: 11px !important;
+    gap: 13px !important;
     text-align: left !important;
     cursor: pointer !important;
-    border-radius: 18px !important;
-    background: var(--surface) !important;
-    border-color: var(--border) !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
   }
 
   .az-product-detail .mobile-selected-package .mobile-pack-icon {
     display: grid !important;
-    width: 52px !important;
-    height: 52px !important;
-    border-radius: 14px !important;
-    flex: 0 0 52px !important;
+    width: 58px !important;
+    height: 58px !important;
+    border-radius: 16px !important;
+    flex: 0 0 58px !important;
+  }
+
+  .az-product-detail .mobile-selected-package .mobile-pack-icon img {
+    width: 46px !important;
+    height: 46px !important;
   }
 
   .az-product-detail .mobile-selected-package .mobile-pack-content {
