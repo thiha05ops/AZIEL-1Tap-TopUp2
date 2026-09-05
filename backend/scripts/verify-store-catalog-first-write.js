@@ -22,7 +22,7 @@ const packageRows = [
 function initialState() {
     return {
         selections: [],
-        product: { _id: "product-mlbb", productCode: "mlbb", enabled: false, deletedAt: new Date().toISOString(), lifecycleStatus: "RETIRED" },
+        product: { _id: "product-mlbb", productCode: "mlbb", enabled: false, deletedAt: new Date().toISOString(), lifecycleStatus: "RETIRED", supportedRegions: ["GLOBAL"] },
         supplier: { _id: ids.supplier, supplierCode: "FAZERCARDS", name: "FazerCards", enabled: true, mode: "API" },
         mappings: packageRows.map(([packageCode, _name, supplierPackageCode], index) => ({
             _id: ids.mappings[index], productCode: "mlbb", packageCode, supplierId: ids.supplier,
@@ -127,8 +127,11 @@ const input = {
 
 async function main() {
     const source = fs.readFileSync(path.resolve(__dirname, "../services/storeCatalogSelectionService.js"), "utf8");
+    const routeSource = fs.readFileSync(path.resolve(__dirname, "../routes/supplier.js"), "utf8");
     const callback = source.slice(source.indexOf("return transaction(async session"), source.indexOf("async function removePackage"));
     assert(!/Promise\.(all|allSettled|race|any)\s*\(/.test(callback), "Parallel execution reintroduced into Store Catalog transaction callback");
+    assert(routeSource.includes("/admin/store-catalog-selections/:selectionId/selling-regions"), "Existing Store Catalog selections must expose a selling-market mutation endpoint.");
+    assert(routeSource.includes("STORE_CATALOG_SELLING_MARKETS_CHANGED"), "Selling-market changes must be audited.");
 
     const state = initialState();
     const beforeMappings = clone(state.mappings), beforePrices = clone(state.prices), beforePublications = clone(state.publications);
@@ -144,11 +147,59 @@ async function main() {
     assert.deepStrictEqual(selection.sellingRegions, ["MM", "TH"]);
     assert.deepStrictEqual(selection.visibleRegions, []);
     assert.deepStrictEqual(selection.packages.map(row => String(row.supplierProductMappingId)).sort(), [...ids.mappings].sort());
+    const firstWriteSummary = { created: true, count: 1, productCode: selection.productCode, supplierCode: selection.supplierCode, supplierMarket: selection.supplierMarket, sellingRegions: [...selection.sellingRegions], selectedMappings: selection.packages.length, visibleRegions: [...selection.visibleRegions] };
     assert.deepStrictEqual(state.mappings, beforeMappings);
     assert.deepStrictEqual(state.prices, beforePrices);
     assert.deepStrictEqual(state.publications, beforePublications);
     assert.equal(state.supplierCalls, 0);
     assert.deepStrictEqual(state.lastOperations, ["Supplier.findOne", "Mapping.find", "Selection.findOne", "Offer.find", "Product.findOne", "Package.find", "SupplierProduct.find", "Availability.find", "Product.updateOne", "Package.updateMany", "Selection.findOneAndUpdate"]);
+
+    const existingPackages = clone(selection.packages);
+    const existingMappings = clone(state.mappings);
+    const existingPrices = clone(state.prices);
+    const existingPublications = clone(state.publications);
+    let marketResult = await service.setSellingRegions({
+        selectionId: selection._id,
+        sellingRegions: ["TH"],
+        expectedDecisionVersion: selection.decisionVersion
+    }, { actor: { username: "owner" } });
+    assert.deepStrictEqual(marketResult.selection.sellingRegions, ["TH"]);
+    assert.deepStrictEqual(marketResult.selection.visibleRegions, []);
+    assert.deepStrictEqual(marketResult.selection.packages, existingPackages);
+    assert.deepStrictEqual(state.mappings, existingMappings);
+    assert.deepStrictEqual(state.prices, existingPrices);
+    assert.deepStrictEqual(state.publications, existingPublications);
+
+    marketResult = await service.setSellingRegions({
+        selectionId: selection._id,
+        sellingRegions: ["TH", "MM"],
+        expectedDecisionVersion: marketResult.selection.decisionVersion
+    }, { actor: { username: "owner" } });
+    assert.deepStrictEqual(marketResult.selection.sellingRegions, ["MM", "TH"]);
+    assert.deepStrictEqual(marketResult.selection.visibleRegions, []);
+    const visibleResult = await service.setRegionVisibility({
+        selectionId: selection._id,
+        region: "MM",
+        visible: true,
+        expectedDecisionVersion: marketResult.selection.decisionVersion
+    }, { actor: { username: "owner" } });
+    assert.deepStrictEqual(visibleResult.selection.visibleRegions, ["MM"]);
+    marketResult = await service.setSellingRegions({
+        selectionId: selection._id,
+        sellingRegions: ["TH"],
+        expectedDecisionVersion: visibleResult.selection.decisionVersion
+    }, { actor: { username: "owner" } });
+    assert.deepStrictEqual(marketResult.selection.sellingRegions, ["TH"]);
+    assert.deepStrictEqual(marketResult.selection.visibleRegions, [], "Removing a selling market must preserve visibleRegions subset invariant.");
+    assert.deepStrictEqual(marketResult.selection.packages, existingPackages);
+    assert.deepStrictEqual(state.mappings, existingMappings);
+    assert.deepStrictEqual(state.prices, existingPrices);
+    assert.deepStrictEqual(state.publications, existingPublications);
+
+    await assert.rejects(
+        () => service.setSellingRegions({ selectionId: selection._id, sellingRegions: ["ID"], expectedDecisionVersion: marketResult.selection.decisionVersion }),
+        error => error instanceof StoreCatalogSelectionError && error.code === "STORE_SELECTION_SELLING_MARKETS_INVALID"
+    );
 
     await assert.rejects(
         () => service.save(input, { actor: { username: "owner" }, transaction }),
@@ -181,7 +232,8 @@ async function main() {
 
     console.log(JSON.stringify({
         result: "PASS",
-        firstWrite: { created: true, count: 1, productCode: selection.productCode, supplierCode: selection.supplierCode, supplierMarket: selection.supplierMarket, sellingRegions: selection.sellingRegions, selectedMappings: selection.packages.length, visibleRegions: selection.visibleRegions },
+        firstWrite: firstWriteSummary,
+        sellingMarkets: { expandable: true, removable: true, visibilitySubsetPreserved: true, mappingsChanged: 0, pricesChanged: 0, publicationsChanged: 0 },
         transaction: { operations: state.lastOperations, parallelSameSessionOperations: 0, retained: true },
         staleDecisionRejected: true,
         validationFailureSelectionCount: invalidState.selections.length,
