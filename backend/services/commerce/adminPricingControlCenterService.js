@@ -908,11 +908,37 @@ function rowStatusFromRegional(regional = []) {
 }
 
 function selectedPublicationDecision(row = {}) {
-    if (row.changed !== true) return { action: "NO_OP", reason: "No changes" };
+    const pricingReadinessPublish = row.preparationSelected === true &&
+        row.mappingId &&
+        row.mappingReadiness?.pricingReady !== true;
+    if (row.changed !== true && !pricingReadinessPublish) return { action: "NO_OP", reason: "No changes" };
     if (row.publishEligible !== true || (row.blockingErrors || []).length) {
         return { action: "BLOCKED", reason: "Blocked by pricing preview" };
     }
     return { action: "PUBLISH", reason: "" };
+}
+
+async function markMappingPricingReady(row = {}, actor = "admin") {
+    if (!row.mappingId || row.mappingReadiness?.pricingReady === true) return { changed: false };
+    const result = await SupplierProductMapping.updateOne(
+        { _id: row.mappingId, archivedAt: null, "mappingMetadata.readiness.pricingReady": { $ne: true } },
+        {
+            $set: {
+                "mappingMetadata.readiness.pricingReady": true,
+                "mappingMetadata.pricingPreparation": {
+                    authority: "DAILY_PRICING_EXPLICIT_PUBLISH",
+                    productCode: row.productCode,
+                    packageCode: row.packageCode,
+                    supplierProductCode: row.supplierProductCode,
+                    supplierPackageCode: row.supplierPackageCode,
+                    preparedAt: new Date(),
+                    preparedBy: actor
+                }
+            }
+        },
+        { runValidators: true }
+    );
+    return { changed: result.modifiedCount === 1 };
 }
 
 function operatorRegionStatus(item = {}) {
@@ -1386,7 +1412,11 @@ async function publishDailyPricing({
             const calculatedPrice = Number(regionalPreview?.finalPreviewPrice ?? regionalPreview?.recommendedSellingPrice);
             const regionalBlockingErrors = regionalPreview?.blockingErrors || [];
 
-            if (regionalPreview && regionalPreview.changed !== true) {
+            const pricingReadinessPublish = row.preparationSelected === true &&
+                row.mappingId &&
+                row.mappingReadiness?.pricingReady !== true;
+
+            if (regionalPreview && regionalPreview.changed !== true && !pricingReadinessPublish) {
                 results.push({
                     region: selectedRegion,
                     productCode: row.productCode,
@@ -1502,18 +1532,19 @@ async function publishDailyPricing({
                 patch,
                 actor
             });
+            const pricingReadiness = await markMappingPricingReady(row, actor);
 
             publishableRegions.forEach(selectedRegion => {
                 results.push({
                     region: selectedRegion,
                     productCode: row.productCode,
                     packageCode: row.packageCode,
-                    published: update.changed === true,
+                    published: update.changed === true || pricingReadiness.changed === true,
                     supplierCost: normalized.newSupplierCost,
                     sellingPrice: pricePatches[selectedRegion].amount,
-                    skipped: update.changed !== true,
-                    reason: update.changed ? "" : "No changes",
-                    changedFields: update.changedFields || []
+                    skipped: update.changed !== true && pricingReadiness.changed !== true,
+                    reason: update.changed || pricingReadiness.changed ? "" : "No changes",
+                    changedFields: [...(update.changedFields || []), ...(pricingReadiness.changed ? ["mappingMetadata.readiness.pricingReady"] : [])]
                 });
             });
         } catch (error) {

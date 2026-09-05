@@ -8,6 +8,7 @@ const {
     AdminPricingControlCenterError,
     buildWorkspacePricePatch,
     pricingPersistenceReadinessReasons,
+    selectedPublicationDecision,
     storePublicationReadinessReasons
 } = require("../services/commerce/adminPricingControlCenterService");
 const publishOutcome = require("../../frontend/js/admin-pricing-publish-outcome");
@@ -71,6 +72,21 @@ assert.strictEqual(patch.amount, 651.08);
 assert.strictEqual(patch.publishedPriceMode, "POLICY_DERIVED");
 assert(!Object.prototype.hasOwnProperty.call(patch, "supplierCost"));
 assert.strictEqual(JSON.stringify({ mapping, selection, neighbors }), protectedBefore, "Price preparation must not mutate protected authorities.");
+assert.deepStrictEqual(
+    selectedPublicationDecision({ changed: false, publishEligible: true, preparationSelected: true, mappingId: mapping._id, mappingReadiness: { pricingReady: false } }),
+    { action: "PUBLISH", reason: "" },
+    "Explicit Daily Pricing publish must converge pricing readiness for unchanged prepared rows."
+);
+assert.deepStrictEqual(
+    selectedPublicationDecision({ changed: false, publishEligible: true, preparationSelected: true, mappingId: mapping._id, mappingReadiness: { pricingReady: true } }),
+    { action: "NO_OP", reason: "No changes" },
+    "Already pricing-ready unchanged rows must remain idempotent no-ops."
+);
+assert.deepStrictEqual(
+    selectedPublicationDecision({ changed: false, publishEligible: true, preparationSelected: false, mappingId: mapping._id, mappingReadiness: { pricingReady: false } }),
+    { action: "NO_OP", reason: "No changes" },
+    "Unchanged rows outside Store Catalog preparation must not gain a new pricing-ready side effect."
+);
 
 assert.strictEqual(publishOutcome.classify({ status: 409 }), "REJECTED");
 assert.strictEqual(publishOutcome.classify({ status: 400 }), "REJECTED");
@@ -88,6 +104,8 @@ assert(route.includes("error instanceof AdminPricingEngineError || error instanc
 assert(publishBody.includes("pricingPersistenceReadinessReasons"));
 assert(!publishBody.includes("storePublicationReadinessReasons"), "Full sellability must remain outside price persistence.");
 assert(!publishBody.includes("withTransaction") && !publishBody.includes("session:"), "Publish path has no Mongo transaction-session concurrency defect.");
+assert(service.includes("markMappingPricingReady"), "Daily Pricing publish must own mapping pricing-readiness convergence.");
+assert(service.includes("DAILY_PRICING_EXPLICIT_PUBLISH"), "Pricing readiness provenance must be explicit.");
 assert(frontend.includes('publishOutcome.classify(error) === "UNCERTAIN"'));
 assert(frontend.includes("await loadDaily(true, { preserveOnError: true, postPublish: true"), "Success and uncertainty paths must reload authoritative workspace.");
 assert(frontend.includes("selections.every(item=>item.readiness?.ready)"), "Explicit publication follow-up must remain readiness-gated.");
@@ -103,6 +121,7 @@ console.log(JSON.stringify({
     deterministicRejectionUncertain: false,
     transportFailureUncertain: true,
     successfulCommitRefreshesWorkspace: true,
+    unchangedPreparedRowsCanConvergePricingReadiness: true,
     unrelatedPackagesChanged: 0,
     mappingActivationWrites: 0,
     roleWrites: 0,

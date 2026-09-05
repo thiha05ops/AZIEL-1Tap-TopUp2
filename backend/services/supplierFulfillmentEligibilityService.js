@@ -16,6 +16,22 @@ const FULFILLMENT_ELIGIBILITY_EVIDENCE_CODES = Object.freeze([
 
 const text = value => String(value == null ? "" : value).trim();
 const upper = value => text(value).toUpperCase();
+const marketToken = value => upper(value).replace(/_/g, " ").replace(/\s+/g, " ").trim();
+const ASIA_MULTI_MARKETS = new Set([
+    "ASIA", "SEA", "SOUTHEAST ASIA", "SOUTH EAST ASIA",
+    "MALAYSIA/SINGAPORE", "MALAYSIA / SINGAPORE", "SINGAPORE / MALAYSIA",
+    "MALAYSIA SINGAPORE", "SINGAPORE MALAYSIA",
+    "TAIWAN / HONG KONG / MACAU", "TAIWAN HONG KONG MACAU"
+]);
+const ASIA_COUNTRY_MARKETS = new Set([
+    "BD", "BANGLADESH", "BN", "BRUNEI", "KH", "CAMBODIA", "CN", "CHINA",
+    "HK", "HONG KONG", "IN", "INDIA", "ID", "INDONESIA", "JP", "JAPAN",
+    "KZ", "KAZAKHSTAN", "LA", "LAOS", "MY", "MALAYSIA", "MM", "MYANMAR",
+    "NP", "NEPAL", "PK", "PAKISTAN", "PH", "PHILIPPINES", "SG", "SINGAPORE",
+    "KR", "SOUTH KOREA", "LK", "SRI LANKA", "SA", "SAUDI ARABIA", "AE", "UNITED ARAB EMIRATES",
+    "BH", "BAHRAIN", "QA", "QATAR", "KW", "KUWAIT", "OM", "OMAN",
+    "TW", "TAIWAN", "TH", "THAILAND", "VN", "VIETNAM"
+]);
 
 function normalizeAllowedCustomerMarkets(value) {
     if (!Array.isArray(value)) return [];
@@ -73,12 +89,14 @@ function isCustomerMarketEligible(value, customerMarket) {
 }
 
 function supplierMarketCompatibility(supplierMarket, customerMarket) {
-    const supplier = upper(supplierMarket);
+    const supplier = marketToken(supplierMarket);
     const customer = upper(customerMarket);
     if (!CUSTOMER_MARKETS.includes(customer)) return Object.freeze({ compatible: false, deterministic: true, code: "CUSTOMER_MARKET_UNSUPPORTED" });
     if (supplier === "GLOBAL") return Object.freeze({ compatible: true, deterministic: true, code: "GLOBAL_COMMERCE_COMPATIBILITY" });
+    if (ASIA_MULTI_MARKETS.has(supplier)) return Object.freeze({ compatible: true, deterministic: true, code: "ASIA_COMMERCE_COMPATIBILITY" });
     if (["TH", "THAILAND"].includes(supplier)) return Object.freeze({ compatible: customer === "TH", deterministic: true, code: customer === "TH" ? "TH_COMMERCE_COMPATIBILITY" : "SUPPLIER_MARKET_MISMATCH" });
     if (["MM", "MYANMAR"].includes(supplier)) return Object.freeze({ compatible: customer === "MM", deterministic: true, code: customer === "MM" ? "MM_COMMERCE_COMPATIBILITY" : "SUPPLIER_MARKET_MISMATCH" });
+    if (ASIA_COUNTRY_MARKETS.has(supplier)) return Object.freeze({ compatible: false, deterministic: true, code: "SUPPLIER_MARKET_UNSUPPORTED_FOR_AZIEL_COMMERCE" });
     return Object.freeze({ compatible: false, deterministic: false, code: supplier === "UNSPECIFIED" || !supplier ? "SUPPLIER_MARKET_UNSPECIFIED" : "SUPPLIER_MARKET_COMPATIBILITY_UNPROVEN" });
 }
 

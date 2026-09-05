@@ -6,8 +6,12 @@ const {
     ADOPTION_STATES,
     OUTCOMES,
     adoptionStateFor,
+    assessExistingPreparedRoute,
+    proposedMapping,
     createSupplierRoutePreparationService
 } = require("../services/supplierCatalog/supplierRoutePreparationService");
+const { linkedOfferLaunchTarget } = require("../services/adminSupplierCatalogReadService");
+const { supportsMapping } = require("../services/suppliers/supplierFulfillmentDispatcher");
 
 const hash = character => character.repeat(64);
 const now = new Date("2026-09-04T00:00:00.000Z");
@@ -152,8 +156,12 @@ function fixtures(overrides = {}) {
 
     const unresolvedMarket = fixtures({ supplierProduct: { supplierMarketCode: "UNSPECIFIED" } });
     const unresolvedMarketPlan = await unresolvedMarket.service.generatePlan({ mappingId: "m1", customerMarkets: ["TH"] });
-    assert.strictEqual(unresolvedMarketPlan.outcome, OUTCOMES.MARKET_UNRESOLVED);
-    assert.strictEqual(unresolvedMarketPlan.proposedChanges, null);
+    assert.strictEqual(unresolvedMarketPlan.outcome, OUTCOMES.FULFILLMENT_READY);
+    assert.strictEqual(unresolvedMarketPlan.proposedChanges.region, "TH");
+    const genuinelyUnresolvedMarket = fixtures({ mapping: { region: "UNKNOWN" }, supplierProduct: { supplierMarketCode: "UNSPECIFIED" } });
+    const genuinelyUnresolvedMarketPlan = await genuinelyUnresolvedMarket.service.generatePlan({ mappingId: "m1", customerMarkets: ["TH"] });
+    assert.strictEqual(genuinelyUnresolvedMarketPlan.outcome, OUTCOMES.MARKET_UNRESOLVED);
+    assert.strictEqual(genuinelyUnresolvedMarketPlan.proposedChanges, null);
 
     const missingContract = fixtures({ supplierProduct: { normalizedInputContract: { fields: [] } } });
     const missingContractPlan = await missingContract.service.generatePlan({ mappingId: "m1", customerMarkets: ["TH"] });
@@ -163,9 +171,84 @@ function fixtures(overrides = {}) {
     const ambiguousPackagePlan = await ambiguousPackage.service.generatePlan({ mappingId: "m1", customerMarkets: ["TH"] });
     assert.strictEqual(ambiguousPackagePlan.outcome, OUTCOMES.REVIEW_REQUIRED);
 
-    const wondd = fixtures({ mapping: { supplierCode: "WONDD", supplierProductCode: "9621" }, supplier: { supplierCode: "WONDD" }, supplierProduct: { supplierProductCode: "9621", supplierMarketCode: "UNSPECIFIED" } });
-    const wonddPlan = await wondd.service.generatePlan({ mappingId: "m1", customerMarkets: ["TH"] });
-    assert.notStrictEqual(wonddPlan.outcome, OUTCOMES.FULFILLMENT_READY);
+    const projected = {
+        rows: [
+            { supplierCode: "FAZERCARDS", supplierProductId: "fp1", mappingStatus: "LINKED", offerId: "fo1" },
+            { supplierCode: "FAZERCARDS", supplierProductId: "fp1", mappingStatus: "UNLINKED", offerId: "fo2" },
+            { supplierCode: "WONDD", supplierProductId: "wp1", mappingStatus: "LINKED", offerId: "wo1" },
+            { supplierCode: "WONDD", supplierProductId: "wp2", mappingStatus: "UNLINKED", offerId: "wo2" }
+        ],
+        productRows: [
+            { supplierCode: "FAZERCARDS", productId: "fp1" },
+            { supplierCode: "WONDD", productId: "wp1" },
+            { supplierCode: "WONDD", productId: "wp2" }
+        ]
+    };
+    const target = linkedOfferLaunchTarget(projected);
+    assert.strictEqual(target.authority, "ADMIN_SUPPLIER_CATALOG_LINKED_OFFER_PROJECTION");
+    assert.strictEqual(target.linkedOfferCount, 2);
+    assert.strictEqual(target.supplierProductCount, 2);
+    assert.deepStrictEqual(target.offers.map(row => row.offerId).sort(), ["fo1", "wo1"]);
+    assert.deepStrictEqual(target.products.map(row => row.productId).sort(), ["fp1", "wp1"]);
+
+    const wonddMapping = {
+        ...mapping,
+        _id: "wm1",
+        supplierCode: "WONDD",
+        productCode: "mlbb",
+        packageCode: "MLBB_42",
+        supplierProductCode: "mlbb",
+        supplierPackageCode: "M00042",
+        region: "TH"
+    };
+    const wonddSupplier = { ...supplier, supplierCode: "WONDD" };
+    const wonddProduct = {
+        ...supplierProduct,
+        supplierProductCode: "mlbb",
+        supplierMarketCode: "UNSPECIFIED",
+        metadata: { transactionalServiceCode: "mlbb" },
+        normalizedInputContract: { contractId: "MLBB_USER_ZONE", fields: [{ name: "userId", required: true }, { name: "zoneId", required: true }] }
+    };
+    const wonddOffer = {
+        ...offer,
+        supplierProductCode: "mlbb",
+        supplierOfferCode: "M00042"
+    };
+    assert.strictEqual(supportsMapping(wonddMapping), true);
+    assert.strictEqual(supportsMapping({ ...wonddMapping, supplierProductCode: "9622" }), false);
+    const wonddInitial = assessExistingPreparedRoute({
+        mapping: wonddMapping,
+        supplier: wonddSupplier,
+        supplierProduct: wonddProduct,
+        offer: wonddOffer,
+        availability,
+        canonicalProduct: { ...canonicalProduct, productCode: "mlbb" },
+        canonicalPackages: [{ ...canonicalPackage, productCode: "mlbb", packageCode: "MLBB_42" }]
+    }, ["TH"], { adapterResolver: () => ({ isConfigured: () => true, isAutoFulfillmentEnabled: () => true }), processorSupportResolver: supportsMapping });
+    assert(!wonddInitial.blockers.includes("MARKET_UNRESOLVED"));
+    const wonddProposal = proposedMapping(wonddMapping, {
+        mapping: wonddMapping,
+        supplier: wonddSupplier,
+        supplierProduct: wonddProduct,
+        offer: wonddOffer,
+        availability,
+        canonicalProduct: { ...canonicalProduct, productCode: "mlbb" },
+        canonicalPackages: [{ ...canonicalPackage, productCode: "mlbb", packageCode: "MLBB_42" }]
+    }, { customerMarkets: ["TH"] }, wonddInitial);
+    assert.strictEqual(wonddProposal.region, "TH");
+    assert.strictEqual(wonddProposal.executionMode, "API");
+    assert.strictEqual(wonddProposal.fulfillmentEligibility.mode, "CUSTOMER_MARKET_ALLOWLIST");
+    const wonddPrepared = assessExistingPreparedRoute({
+        mapping: wonddProposal,
+        supplier: wonddSupplier,
+        supplierProduct: wonddProduct,
+        offer: wonddOffer,
+        availability,
+        canonicalProduct: { ...canonicalProduct, productCode: "mlbb" },
+        canonicalPackages: [{ ...canonicalPackage, productCode: "mlbb", packageCode: "MLBB_42" }]
+    }, ["TH"], { adapterResolver: () => ({ isConfigured: () => true, isAutoFulfillmentEnabled: () => true }), processorSupportResolver: supportsMapping });
+    assert.deepStrictEqual(wonddPrepared.blockers, []);
+    assert(!wonddPrepared.blockers.includes("PROTOCOL_UNSUPPORTED"));
 
     const stale = fixtures();
     const stalePlan = await stale.service.generatePlan({ mappingId: "m1", customerMarkets: ["TH"] });
@@ -185,7 +268,9 @@ function fixtures(overrides = {}) {
         deterministicGlobalFazerPreparation: true,
         unresolvedMarketBlocked: true,
         ambiguousEvidenceBlocked: true,
-        wonddSupplierSemanticsIsolated: true,
+        linkedOfferLaunchTargetLocked: true,
+        wonddServiceCodeSupported: true,
+        wonddConcreteMarketPreparedWithoutFakeGlobal: true,
         preparedMappingRemainsDisabled: true,
         primaryAssignments: 0,
         pricingWrites: 0,

@@ -39,7 +39,7 @@ for (const [change, blocker] of [
     [{ mapping: { ...mapping, fulfillmentEligibility: { mode: "UNKNOWN", allowedCustomerMarkets: [], evidenceCode: "", evidenceSource: "", verifiedAt: null, version: 1 } } }, "CUSTOMER_MARKET_ELIGIBILITY_UNPROVEN"],
     [{ fulfillmentContract: null }, "INPUT_CONTRACT_UNRESOLVED"],
     [{ processorSupported: false }, "PROTOCOL_UNSUPPORTED"],
-    [{ availability: { ...availability, coverageComplete: false } }, "AVAILABILITY_UNPROVEN"],
+    [{ availability: { ...availability, state: "UNKNOWN" } }, "AVAILABILITY_UNPROVEN"],
     [{ offer: { ...offer, catalogLifecycleState: "RETIRED" } }, "OFFER_NOT_ACTIVE"],
     [{ canonicalPackages: [canonicalPackage, { ...canonicalPackage, _id: "ck2" }] }, "AMBIGUOUS_CANONICAL_IDENTITY"]
 ]) assert(assessPreCommercialFulfillmentReadiness({ ...readyInput, ...change }).blockers.includes(blocker), blocker);

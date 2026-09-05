@@ -78,9 +78,15 @@ async function verifySubmissionAndRecoveryBoundaries() {
 
 async function verifyRoutingAndPayloadCompatibility() {
     const legacy = { ready: true, blockers: [], routeSnapshot: { routeType: "MANUAL_ADMIN", region: "MM" } };
-    const shadow = { outcome: "ELIGIBLE", blockerCodes: [], routeSnapshot: { routeType: "SUPPLIER_API" } };
+    const shadow = { outcome: "ELIGIBLE", blockerCodes: [], eligibility: { mode: "CUSTOMER_MARKET_ALLOWLIST", allowedCustomerMarkets: ["MM"], evidenceCode: "TEST", version: 1 }, routeSnapshot: { routeType: "SUPPLIER_API", supplierMappingId: "mapping-1", supplierId: "supplier-1", supplierCode: "WONDD", productCode: "mlbb", packageCode: "MLBB_55_DIA_FIRST_TOPUP", region: "MM", supplierMarket: "MM", supplierProductCode: "mlbb", supplierPackageCode: "MLFT055", executionMode: "API", selectedRole: "PRIMARY" } };
     const authority = createRoutingAuthority({ legacyResolver: async () => legacy, eligibilityResolver: async () => shadow, modeResolver: () => FULFILLMENT_ROUTING_MODES.DUAL_READ, pilotEnabledResolver: () => false });
-    assert.strictEqual(await authority({ productCode: "mlbb", packageCode: "MLBB_55_DIA_FIRST_TOPUP", region: "MM" }), legacy, "DUAL_READ authority must remain unchanged.");
+    const resolved = await authority({ productCode: "mlbb", packageCode: "MLBB_55_DIA_FIRST_TOPUP", region: "MM" });
+    assert.strictEqual(resolved.routeSnapshot.routeType, "SUPPLIER_API", "DUAL_READ must not let MANUAL_ADMIN shadow an executable eligible PRIMARY/API supplier route.");
+    assert.strictEqual(resolved.routeSnapshot.supplierCode, "WONDD");
+    assert.strictEqual(resolved.routeSnapshot.snapshotVersion, 2);
+    assert.strictEqual(resolved.routeSnapshot.customerMarket, "MM");
+    const genuineManual = createRoutingAuthority({ legacyResolver: async () => legacy, eligibilityResolver: async () => ({ outcome: OUTCOMES.NO_ELIGIBLE_ROUTE, blockerCodes: ["NO_PRIMARY_MAPPING"], routeSnapshot: null }), modeResolver: () => FULFILLMENT_ROUTING_MODES.DUAL_READ });
+    assert.strictEqual((await genuineManual({ productCode: "manual-product", packageCode: "MANUAL_1", region: "MM" })).routeSnapshot.routeType, "MANUAL_ADMIN", "Genuine manual-only products must retain manual-admin routing.");
     const wondd = createWonddAdapter({ env: {} }).buildTopupPayload({ productCode: "mlbb", serviceCode: "mlbb", packCode: "MLFT055", gameId: "123 456" });
     assert.deepStrictEqual(Object.keys(wondd).sort(), ["gameid", "method", "packcode", "servicecode"]);
     for (const forbidden of ["region", "country", "customerMarket"]) assert.strictEqual(Object.hasOwn(wondd, forbidden), false);

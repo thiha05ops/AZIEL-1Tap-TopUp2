@@ -14,6 +14,18 @@ function normalizeRegion(value = "") {
     return REGIONS.includes(region) ? region : "";
 }
 
+function resolvedSupplierMarketForReadiness(mapping = {}, supplierProduct = {}) {
+    const catalogMarket = String(supplierProduct?.supplierMarketCode || "").trim().toUpperCase();
+    if (catalogMarket && !["UNKNOWN", "UNSPECIFIED"].includes(catalogMarket)) return catalogMarket;
+    return normalizeRegion(mapping?.region);
+}
+
+function supplierProductCodeForReadiness(mapping = {}, supplier = {}, supplierProduct = {}) {
+    const supplierCode = String(supplier?.supplierCode || mapping?.supplierCode || "").trim().toUpperCase();
+    if (supplierCode === "WONDD") return String(supplierProduct?.metadata?.transactionalServiceCode || mapping?.supplierProductCode || "").trim();
+    return String(supplierProduct?.supplierProductCode || "").trim();
+}
+
 function manualAllowedRegions(product = {}) {
     return Array.isArray(product.fulfillment?.manualAllowedRegions)
         ? product.fulfillment.manualAllowedRegions.map(normalizeRegion).filter(Boolean)
@@ -77,7 +89,7 @@ function assessProductionReadyFulfillmentMapping(mapping = {}, supplier = {}, co
             String(offer.supplierOfferCode || "").trim() === String(mapping.supplierPackageCode || "").trim() &&
             String(offer.catalogLifecycleState || "").toUpperCase() === "ACTIVE";
         if (!offerMatches) blockers.push("SUPPLIER_OFFER_NOT_ACTIVE");
-        if (!availability || String(availability.supplierCatalogOfferId) !== String(mapping.supplierCatalogOfferId) || String(availability.state || "").toUpperCase() !== "AVAILABLE" || availability.coverageComplete !== true) blockers.push("SUPPLIER_AVAILABILITY_NOT_CONFIRMED");
+        if (!availability || String(availability.supplierCatalogOfferId) !== String(mapping.supplierCatalogOfferId) || String(availability.state || "").toUpperCase() !== "AVAILABLE") blockers.push("SUPPLIER_AVAILABILITY_NOT_CONFIRMED");
     }
 
     return { ready: blockers.length === 0, blockers: [...new Set(blockers)].sort(), eligibility: eligibility.value };
@@ -109,19 +121,22 @@ function assessPreCommercialFulfillmentReadiness({
     if (!supplier || supplier.enabled !== true || String(supplier.mode || "").toUpperCase() !== "API") blockers.push("SUPPLIER_UNSUPPORTED");
     if (!supplierProduct || String(supplierProduct.supportState || "").toUpperCase() !== "SUPPORTED") blockers.push("SUPPLIER_PRODUCT_UNSUPPORTED");
     if (!offer || String(offer.catalogLifecycleState || "").toUpperCase() !== "ACTIVE") blockers.push("OFFER_NOT_ACTIVE");
-    if (!availability || String(availability.state || "").toUpperCase() !== "AVAILABLE" || availability.coverageComplete !== true || (availability.staleAt && new Date(availability.staleAt).getTime() <= Date.now())) blockers.push("AVAILABILITY_UNPROVEN");
+    if (!availability || String(availability.state || "").toUpperCase() !== "AVAILABLE" || (availability.staleAt && new Date(availability.staleAt).getTime() <= Date.now())) blockers.push("AVAILABILITY_UNPROVEN");
     if (!canonicalProduct || packages.length === 0) blockers.push("MISSING_CANONICAL_LINK");
     if (packages.length > 1) blockers.push("AMBIGUOUS_CANONICAL_IDENTITY");
     if (mapping && offer) {
+        const offerProductCode = String(mapping?.supplierCode || "").trim().toUpperCase() === "WONDD"
+            ? String(mapping.supplierProductCode || "").trim()
+            : String(offer.supplierProductCode || "").trim();
         if (String(mapping.supplierCatalogOfferId || "") !== String(offer._id || "") ||
             String(mapping.supplierId || "") !== String(offer.supplierId || "") ||
-            String(mapping.supplierProductCode || "").trim() !== String(offer.supplierProductCode || "").trim() ||
+            String(mapping.supplierProductCode || "").trim() !== offerProductCode ||
             String(mapping.supplierPackageCode || "").trim() !== String(offer.supplierOfferCode || "").trim()) blockers.push("STALE_OR_WRONG_OFFER_LINKAGE");
     }
     if (mapping && supplierProduct) {
         if (String(mapping.supplierId || "") !== String(supplierProduct.supplierId || "") ||
-            String(mapping.supplierProductCode || "").trim() !== String(supplierProduct.supplierProductCode || "").trim()) blockers.push("SUPPLIER_IDENTITY_MISMATCH");
-        const supplierMarket = String(supplierProduct.supplierMarketCode || "").trim().toUpperCase();
+            String(mapping.supplierProductCode || "").trim() !== supplierProductCodeForReadiness(mapping, supplier, supplierProduct)) blockers.push("SUPPLIER_IDENTITY_MISMATCH");
+        const supplierMarket = resolvedSupplierMarketForReadiness(mapping, supplierProduct);
         if (!supplierMarket || ["UNKNOWN", "UNSPECIFIED"].includes(supplierMarket) || supplierMarket !== String(mapping.region || "").trim().toUpperCase()) blockers.push("MARKET_UNRESOLVED");
     }
     if (!markets.length) blockers.push("CUSTOMER_MARKET_REQUIRED");
