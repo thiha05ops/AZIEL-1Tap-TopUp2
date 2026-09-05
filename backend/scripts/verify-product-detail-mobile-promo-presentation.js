@@ -62,8 +62,12 @@ assert(!/productCode\s*===\s*\"(?:mlbb|pubg|heaven-burns-red|afk)/.test(prices),
 assert(css.includes(".product-package-card > #packages") && css.includes("display: none !important"), "mobile Product Detail must not render the full package catalog inline");
 assert(css.includes("#mobilePackageList #packages") && css.includes("display: block !important"), "mobile picker must render the shared package grid inside the sheet");
 assert(css.includes(".mobile-selected-package:not([hidden])") && css.includes("display: grid !important"), "mobile compact package selector must override desktop hidden state");
-assert(css.includes("grid-template-columns: 52px minmax(0, 1fr) auto"), "mobile compact package selector must preserve preview image, text, and chevron columns");
-assert(css.includes(".mobile-selected-package b") && css.includes("font-size: 24px"), "mobile compact package selector must retain a clear tap affordance");
+assert(css.includes("grid-template-columns: 54px minmax(0, 1fr) 18px"), "mobile compact package selector must preserve preview image, text, and chevron columns");
+assert(css.includes("min-height: 72px"), "mobile compact package selector must keep a compact commerce-row height");
+assert(css.includes("text-align: left !important"), "mobile compact package selector content must remain left aligned");
+assert(css.includes("font-weight: 750"), "mobile compact package selector title must use a cleaner semibold hierarchy");
+assert(css.includes(".mobile-selected-package.has-package span") && css.includes("color: var(--warning)"), "selected mobile package price must use AZIEL accent color");
+assert(css.includes(".mobile-selected-package b") && css.includes("font-size: 22px"), "mobile compact package selector must retain a clear tap affordance");
 assert(prices.includes('t("product.choosePackage", "Choose a package")'), "mobile selector title must have English fallback copy");
 assert(prices.includes('t("product.tapToSelectPackage", "Tap to select")'), "mobile selector subtitle must have English fallback copy");
 assert(!read("frontend/js/product-detail.js").includes('applyText("#selectedPackageTitle"'), "generic product bootstrap must not compete with the selector-state renderer");
