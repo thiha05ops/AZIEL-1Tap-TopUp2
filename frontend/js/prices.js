@@ -184,7 +184,8 @@ function finishPackageLoading(packageContainer) {
 }
 
 function t(key, fallback) {
-  return window.AZIEL_I18N?.t?.(key) || window.i18n?.t?.(key) || fallback;
+  const resolved = window.AZIEL_I18N?.t?.(key) || window.i18n?.t?.(key);
+  return resolved && resolved !== key ? resolved : fallback;
 }
 
 async function loadAuthoritativePrice(item) {
