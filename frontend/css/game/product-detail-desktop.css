@@ -1384,11 +1384,11 @@
 
   .az-product-detail .mobile-selected-package:not([hidden]) {
     display: grid !important;
-    grid-template-columns: 60px minmax(0, 1fr) 18px !important;
-    min-height: 76px !important;
-    padding: 8px 0 !important;
+    grid-template-columns: 66px minmax(0, 1fr) 18px !important;
+    min-height: 86px !important;
+    padding: 10px 0 !important;
     align-items: center !important;
-    gap: 13px !important;
+    gap: 14px !important;
     text-align: left !important;
     cursor: pointer !important;
     border: 0 !important;
@@ -1399,15 +1399,20 @@
 
   .az-product-detail .mobile-selected-package .mobile-pack-icon {
     display: grid !important;
-    width: 58px !important;
-    height: 58px !important;
-    border-radius: 16px !important;
-    flex: 0 0 58px !important;
+    width: 64px !important;
+    height: 64px !important;
+    border-radius: 12px !important;
+    flex: 0 0 64px !important;
+    overflow: hidden !important;
+    background: rgba(255, 255, 255, .04) !important;
+    border: 1px solid rgba(255, 255, 255, .08) !important;
   }
 
   .az-product-detail .mobile-selected-package .mobile-pack-icon img {
-    width: 46px !important;
-    height: 46px !important;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    object-position: center !important;
   }
 
   .az-product-detail .mobile-selected-package .mobile-pack-content {
