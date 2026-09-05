@@ -35,28 +35,25 @@ function meaningfulDescription(product = {}) {
 }
 
 function regionReadiness(product = {}, packages = [], region, commerceReadiness = {}) {
-    const supported = Array.isArray(product.supportedRegions) && product.supportedRegions.includes(region);
     const enabled = packages.filter(item => item.enabled !== false && !item.deletedAt);
     const purchasablePackages = enabled.filter(item => {
         const price = item.prices?.[region];
-        return supported && price?.enabled !== false && Number.isFinite(Number(price?.amount)) && Number(price.amount) > 0;
+        return price?.enabled !== false && Number.isFinite(Number(price?.amount)) && Number(price.amount) > 0;
     });
     const commerceRegion = commerceReadiness.regions?.[region] || {};
     const fulfillmentReady = commerceRegion.fulfillment === true || (!commerceReadiness.regions && commerceReadiness.checks?.fulfillment === true);
     const availabilityReady = commerceRegion.availability !== false && commerceReadiness.checks?.availability !== false;
     const blockers = [];
-    if (!supported) blockers.push("region");
     if (!purchasablePackages.length) blockers.push("packagesAndPricing");
     if (!fulfillmentReady) blockers.push("fulfillment");
     if (!availabilityReady) blockers.push("availability");
     let availabilityCode = PUBLIC_AVAILABILITY.AVAILABLE;
-    if (!supported) availabilityCode = PUBLIC_AVAILABILITY.REGION_UNAVAILABLE;
-    else if (!purchasablePackages.length) availabilityCode = PUBLIC_AVAILABILITY.SETUP_INCOMPLETE;
+    if (!purchasablePackages.length) availabilityCode = PUBLIC_AVAILABILITY.SETUP_INCOMPLETE;
     else if (!availabilityReady) availabilityCode = PUBLIC_AVAILABILITY.PACKAGE_UNAVAILABLE;
     else if (!fulfillmentReady) availabilityCode = PUBLIC_AVAILABILITY.SETUP_INCOMPLETE;
     return {
         region,
-        supported,
+        supported: true,
         packageCount: purchasablePackages.length,
         pricingReady: purchasablePackages.length > 0,
         fulfillmentReady,

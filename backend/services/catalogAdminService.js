@@ -10,6 +10,7 @@ const { assertAssetCategory } = require("./mediaService");
 const { CATALOG_CATEGORIES, HOMEPAGE_FLAGS, HOMEPAGE_SECTIONS, CATALOG_LIFECYCLE, COMMERCE_STATES } = require("../catalog/catalogTaxonomy");
 const { getCanonicalProduct, resolveCanonicalProductRoute } = require("../catalog/canonicalOperationalCatalog");
 const { normalizeProductKnowledge, normalizeCustomerNote, normalizeCustomerNoteLocales, ProductKnowledgeError } = require("../catalog/productKnowledge");
+const { SUPPORTED_REGIONS: PRODUCT_COMPATIBILITY_MARKETS } = require("../catalog/productRegionAuthority");
 const { SUPPLIER_CURRENCY } = require("../constants/commerce");
 
 function normalizeAdminProductCode(value) {
@@ -125,10 +126,11 @@ function normalizeSupportedRegions(value = []) {
         throw new CatalogAdminError("CATALOG_PATCH_INVALID", "supportedRegions must be an array.");
     }
 
-    const regions = Array.from(new Set(value.map(normalizeRegion).filter(region => REGION_CURRENCIES[region])));
+    const supported = new Set(PRODUCT_COMPATIBILITY_MARKETS);
+    const regions = Array.from(new Set(value.map(item => String(item || "").trim().toUpperCase()).filter(region => supported.has(region))));
 
     if (!regions.length) {
-        throw new CatalogAdminError("CATALOG_REGION_PRICE_UNAVAILABLE", "At least one supported region is required.");
+        throw new CatalogAdminError("CATALOG_REGION_PRICE_UNAVAILABLE", "At least one product compatibility market is required.");
     }
 
     return regions;

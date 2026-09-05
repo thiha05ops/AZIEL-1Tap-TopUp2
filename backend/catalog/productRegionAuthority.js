@@ -1,6 +1,6 @@
 "use strict";
 
-const SUPPORTED_REGIONS = Object.freeze(["MM", "TH"]);
+const SUPPORTED_REGIONS = Object.freeze(["GLOBAL", "MM", "TH", "ID", "MY", "SG", "PH", "SEA", "ASIA"]);
 
 const normalizeRegion = value => String(value || "").trim().toUpperCase();
 

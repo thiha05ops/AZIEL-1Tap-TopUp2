@@ -5,7 +5,7 @@ const SupplierCatalogOffer = require("../models/SupplierCatalogOffer");
 const SupplierOfferAvailability = require("../models/SupplierOfferAvailability");
 const { getSupplierAdapter } = require("./supplierAdapterRegistry");
 const { supportsMapping } = require("./suppliers/supplierFulfillmentDispatcher");
-const { validateFulfillmentEligibility, isCustomerMarketEligible } = require("./supplierFulfillmentEligibilityService");
+const { validateFulfillmentEligibility, isCustomerMarketEligible, supplierRouteProductMarketCompatibility } = require("./supplierFulfillmentEligibilityService");
 
 const REGIONS = Object.freeze(["MM", "TH"]);
 
@@ -138,6 +138,7 @@ function assessPreCommercialFulfillmentReadiness({
             String(mapping.supplierProductCode || "").trim() !== supplierProductCodeForReadiness(mapping, supplier, supplierProduct)) blockers.push("SUPPLIER_IDENTITY_MISMATCH");
         const supplierMarket = resolvedSupplierMarketForReadiness(mapping, supplierProduct);
         if (!supplierMarket || ["UNKNOWN", "UNSPECIFIED"].includes(supplierMarket) || supplierMarket !== String(mapping.region || "").trim().toUpperCase()) blockers.push("MARKET_UNRESOLVED");
+        if (!supplierRouteProductMarketCompatibility(supplierMarket, canonicalProduct?.supportedRegions || []).compatible) blockers.push("PRODUCT_ACCOUNT_MARKET_INCOMPATIBLE");
     }
     if (!markets.length) blockers.push("CUSTOMER_MARKET_REQUIRED");
     const eligibility = validateFulfillmentEligibility(mapping?.fulfillmentEligibility);

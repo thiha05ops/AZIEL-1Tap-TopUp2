@@ -120,7 +120,7 @@ const catalogProductSchema = new mongoose.Schema(
         },
         supportedRegions: {
             type: [String],
-            enum: ["MM", "TH"],
+            enum: ["GLOBAL", "MM", "TH", "ID", "MY", "SG", "PH", "SEA", "ASIA"],
             default: []
         },
         aliases: {

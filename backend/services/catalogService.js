@@ -21,7 +21,7 @@ const { projectMediaAsset, projectPublicMediaAsset } = require("./mediaService")
 const { normalizeProductKnowledge, normalizeCustomerNote, normalizeCustomerNoteLocales } = require("../catalog/productKnowledge");
 const { resolvePublicProductReadiness } = require("../catalog/publicProductReadiness");
 const { publicCustomerInputContract, verifiedMappingContract } = require("./suppliers/fazercardsFulfillmentContractService");
-const { normalizeProductRegions, productSupportsRegion } = require("../catalog/productRegionAuthority");
+const { normalizeProductRegions } = require("../catalog/productRegionAuthority");
 const { assessProductionReadyFulfillmentMapping, isManualFulfillmentAllowed, isProductionReadyFulfillmentMapping, isSupplierMappedAutoTopupThScope } = require("./fulfillmentCapabilityService");
 const { publicCategoryFor } = require("../catalog/catalogTaxonomy");
 const {
@@ -314,11 +314,7 @@ function resolveDatabasePackagePriceFromRows(payload = {}, rows = {}) {
     const region = normalizeRegion(payload.region);
     const price = priceForRegion(item, region);
 
-    if (
-        !productSupportsRegion(product, region) ||
-        !price ||
-        price.enabled === false
-    ) {
+    if (!price || price.enabled === false) {
         throw new CatalogError(
             "REGION_NOT_SUPPORTED",
             "This package is not available in the selected region."
@@ -616,16 +612,9 @@ function projectCatalogProduct(product = {}, packages = [], {
     if (!includeDisabled && product.deletedAt) return null;
     if (!includeDisabled && product.enabled === false) return null;
 
-    const supportedRegions = normalizeProductRegions(product);
     const publicPackages = packages
         .map(item => projectCatalogPackage(item, { includeDisabled, mediaMap, includeAssetProjection, includeAdminPricing }))
-        .filter(Boolean)
-        .map(pkg => {
-            if (!publicProjection) return pkg;
-            pkg.prices = Object.fromEntries(Object.entries(pkg.prices || {})
-                .filter(([region]) => supportedRegions.includes(region)));
-            return pkg;
-        });
+        .filter(Boolean);
     const imageAsset = product.presentation?.imageAssetId
         ? mediaMap.get(product.presentation.imageAssetId)
         : null;
@@ -672,7 +661,7 @@ function projectCatalogProduct(product = {}, packages = [], {
         },
         deleted: Boolean(product.deletedAt),
         deletedAt: product.deletedAt || null,
-        supportedRegions,
+        supportedRegions: normalizeProductRegions(product),
         packageCount: packages.length,
         packages: publicPackages,
         sortOrder: Number(product.sortOrder || 0),
@@ -717,7 +706,6 @@ function isAdminCanonicalCatalogProduct(product = {}) {
 
 function projectCommerceReadiness(product = {}, packages = [], mappings = [], inventoryStates = [], suppliers = [], eligibilityContext = {}) {
     const enabledPackages = packages.filter(item => item.enabled !== false && !item.deletedAt);
-    const regions = Array.isArray(product.supportedRegions) ? product.supportedRegions : [];
     const unavailablePackageIds = new Set(inventoryStates
         .filter(item => item.availabilityState && item.availabilityState !== "AVAILABLE")
         .flatMap(item => [String(item.packageRef || ""), String(item.packageId || item.packageCode || "").toUpperCase()]));
@@ -733,16 +721,15 @@ function projectCommerceReadiness(product = {}, packages = [], mappings = [], in
         }))
     );
     const regional = Object.fromEntries(["MM", "TH"].map(region => {
-        const supported = regions.includes(region);
         const pricedPackages = enabledPackages.filter(item => {
             const price = item.prices?.[region];
-            return supported && price?.enabled !== false && Number.isFinite(Number(price?.amount)) && Number(price.amount) > 0;
+            return price?.enabled !== false && Number.isFinite(Number(price?.amount)) && Number(price.amount) > 0;
         });
         const manualFulfillmentAllowed = isSupplierMappedAutoTopupThScope({ productCode: product.productCode, region }) ? false : isManualFulfillmentAllowed(product, region);
         const fulfillmentPackages = pricedPackages.filter(item => manualFulfillmentAllowed || mappingMatches(item, region));
         const availablePackages = pricedPackages.filter(packageAvailable);
         return [region, {
-            supported,
+            supported: true,
             pricing: pricedPackages.length > 0,
             fulfillment: fulfillmentPackages.length > 0,
             availability: availablePackages.length > 0,
@@ -758,7 +745,7 @@ function projectCommerceReadiness(product = {}, packages = [], mappings = [], in
     const checks = {
         catalog: product.enabled !== false && !product.deletedAt,
         packages: enabledPackages.length > 0,
-        region: regions.length > 0,
+        productCompatibility: Array.isArray(product.supportedRegions) && product.supportedRegions.length > 0,
         pricing,
         fulfillment,
         availability,
@@ -787,7 +774,7 @@ function applyPackageFulfillmentReadiness(projection, mappings = [], inventorySt
                     ...eligibilityContext, productCode: projection.productCode, packageCode: pkg.packageCode, region
                 })));
             const manual = !supplierMappedScope && isManualFulfillmentAllowed(projection, region);
-            return [region, productSupportsRegion(projection, region) && available && (manual || mapped)];
+            return [region, available && (manual || mapped)];
         }));
     });
     return projection;

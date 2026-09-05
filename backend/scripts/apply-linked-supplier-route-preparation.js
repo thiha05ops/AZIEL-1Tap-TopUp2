@@ -8,7 +8,6 @@ require("dotenv").config({ path: path.resolve(__dirname, "../../.env"), quiet: t
 const mongoose = require("mongoose");
 const readService = require("../services/adminSupplierCatalogReadService");
 const { createSupplierRoutePreparationService, generateSupplierRoutePreparationPlan, ACTION, isActiveCanonicalRecord } = require("../services/supplierCatalog/supplierRoutePreparationService");
-const { supplierMarketCompatibility } = require("../services/supplierFulfillmentEligibilityService");
 const { normalizeSupplierMarket } = require("../constants/supplierMarkets");
 const { canonicalJson } = require("../services/supplierCatalog/supplierCatalogNormalization");
 const SupplierProductMapping = require("../models/SupplierProductMapping");
@@ -76,8 +75,10 @@ async function mappingCommercialFingerprint() {
 }
 
 function customerMarketsFor(row) {
-    const compatible = CUSTOMER_MARKETS.filter(market => supplierMarketCompatibility(row.supplierMarketCode, market).compatible);
-    if (compatible.length) return compatible.sort();
+    const supplierMarket = upper(row.supplierMarketCode);
+    if (supplierMarket === "GLOBAL" || ["ASIA", "SEA", "SOUTHEAST ASIA", "SOUTH EAST ASIA"].includes(supplierMarket)) return [...CUSTOMER_MARKETS].sort();
+    if (supplierMarket === "TH" || supplierMarket === "THAILAND") return ["TH"];
+    if (supplierMarket === "MM" || supplierMarket === "MYANMAR") return ["MM"];
     const mappingMarket = upper(row.customerMarket);
     if (CUSTOMER_MARKETS.includes(mappingMarket)) return [mappingMarket];
     const allowed = row.fulfillmentEligibility?.allowedCustomerMarkets || [];

@@ -119,21 +119,23 @@ async function verifyIsolatedPropagation() {
 
         products = await toPublicCatalog({ source: "database", includeDisabled: false });
         projected = products.find(item => item.productCode === productCode);
-        assert(projected, "Product must remain publicly projected for its supported region.");
-        assert.strictEqual(projected.packages[0].prices.TH, undefined);
-        assert.strictEqual(projected.packages[0].fulfillmentRegions.TH, false);
-        await expectError(loadCatalogPackage({ productCode, packageCode, region: "TH", currency: "THB" }), CommercePricingPreviewError, "PRODUCT_REGION_UNAVAILABLE");
+        assert(projected, "Product must remain publicly projected because commerce market is independent from product compatibility.");
+        assert(projected.packages[0].prices.TH, "TH commerce price must remain projected even when product compatibility metadata is MM.");
+        assert.strictEqual(projected.packages[0].fulfillmentRegions.TH, true);
+        const thPreview = await loadCatalogPackage({ productCode, packageCode, region: "TH", currency: "THB" });
+        assert.strictEqual(thPreview.price.amount, 30);
         const storedPackage = await CatalogPackage.findOne({ productCode, packageCode }).lean();
-        await expectError(Promise.resolve().then(() => resolveDatabasePackagePriceFromRows({ productCode, packageCode, region: "TH" }, {
+        const thOrderCatalog = resolveDatabasePackagePriceFromRows({ productCode, packageCode, region: "TH" }, {
             products: [persisted],
             packages: [storedPackage]
-        })), CatalogError, "REGION_NOT_SUPPORTED");
+        });
+        assert.strictEqual(thOrderCatalog.amount, 30);
 
         assert(storedPackage.prices.TH, "Removing product TH support must not delete stored TH package configuration.");
         await CatalogProduct.updateOne({ productCode }, { $set: { supportedRegions: ["MM", "TH"] } });
         products = await toPublicCatalog({ source: "database", includeDisabled: false });
         projected = products.find(item => item.productCode === productCode);
-        assert(projected?.packages[0]?.prices?.TH, "Restoring TH product support must re-expose the stored TH package configuration.");
+        assert(projected?.packages[0]?.prices?.TH, "Product compatibility metadata changes must not delete existing TH commerce configuration.");
         const restoredPreview = await loadCatalogPackage({ productCode, packageCode, region: "TH", currency: "THB" });
         assert.strictEqual(restoredPreview.price.amount, 30);
         console.log("Isolated Admin-to-Public region propagation verification passed.");
@@ -147,14 +149,15 @@ async function verifyIsolatedPropagation() {
 async function main() {
     const mmOnlyProduct = { ...baseProduct, supportedRegions: ["MM"] };
     const mmOnly = publicProjection(mmOnlyProduct);
-    assert.strictEqual(mmOnly.packages[0].prices.TH, undefined, "Unsupported TH price must not be publicly projected.");
-    assert.strictEqual(mmOnly.packages[0].fulfillmentRegions.TH, false, "Unsupported TH fulfillment must be false.");
+    assert(mmOnly.packages[0].prices.TH, "TH commerce price must be publicly projected independently of product compatibility.");
+    assert.strictEqual(mmOnly.packages[0].fulfillmentRegions.TH, true, "TH fulfillment readiness must follow commerce route readiness, not product compatibility labels.");
     assert(mmOnly.packages[0].prices.MM, "Supported MM price must remain projected.");
 
     await withCatalogRows(mmOnlyProduct, basePackage, async () => {
-        await expectError(loadCatalogPackage({
+        const catalog = await loadCatalogPackage({
             productCode: "pubg", packageCode: basePackage.packageCode, region: "TH", currency: "THB"
-        }), CommercePricingPreviewError, "PRODUCT_REGION_UNAVAILABLE");
+        });
+        assert.strictEqual(catalog.price.amount, 30);
     });
     await withCatalogRows({ ...baseProduct, publicDiscoveryEnabled: false }, basePackage, async () => {
         await expectError(loadCatalogPackage({
@@ -184,14 +187,15 @@ async function main() {
         }), CommercePricingPreviewError, "PACKAGE_UNAVAILABLE");
     });
 
-    await expectError(Promise.resolve().then(() => resolveDatabasePackagePriceFromRows({
+    const mmOnlyOrderCatalog = resolveDatabasePackagePriceFromRows({
         productCode: "pubg", packageCode: basePackage.packageCode, region: "TH"
-    }, { products: [mmOnlyProduct], packages: [basePackage] })), CatalogError, "REGION_NOT_SUPPORTED");
+    }, { products: [mmOnlyProduct], packages: [basePackage] });
+    assert.strictEqual(mmOnlyOrderCatalog.amount, 30);
 
     const underlyingBefore = JSON.stringify(basePackage.prices.TH);
     publicProjection(mmOnlyProduct);
     assert.strictEqual(JSON.stringify(basePackage.prices.TH), underlyingBefore, "Projection must not mutate stored package region configuration.");
-    assert(publicProjection(baseProduct).packages[0].prices.TH, "Restoring product TH support must re-expose the existing TH configuration.");
+    assert(publicProjection(baseProduct).packages[0].prices.TH, "Product compatibility metadata changes must not delete existing TH commerce configuration.");
 
     const adminProjection = projectCatalogProduct(mmOnlyProduct, [basePackage], {
         includeDisabled: true,
@@ -201,7 +205,7 @@ async function main() {
     assert(adminProjection.packages[0].prices.TH, "Admin projection must retain unsupported-region configuration for later restoration.");
 
     const frontend = fs.readFileSync(path.join(ROOT, "frontend/js/catalog-runtime.js"), "utf8");
-    assert(frontend.includes("product.supportedRegions?.includes(normalizedRegion) === false"), "Frontend must defensively reject a region excluded by the server product projection.");
+    assert(!frontend.includes("product.supportedRegions?.includes(normalizedRegion) === false"), "Frontend must not hide packages because product compatibility metadata differs from commerce market.");
 
     if (process.argv.includes("--isolated")) await verifyIsolatedPropagation();
 

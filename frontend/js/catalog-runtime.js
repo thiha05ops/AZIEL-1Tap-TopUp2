@@ -186,7 +186,7 @@
         const product = getProduct(productCode);
         const presentation = window.AZIEL_CATALOG_PRESENTATION;
 
-        if (!product || product.enabled === false || product.supportedRegions?.includes(normalizedRegion) === false) return [];
+        if (!product || product.enabled === false) return [];
 
         return (product.packages || [])
             .map(item => projectPackage(product, item, normalizedRegion, presentation))

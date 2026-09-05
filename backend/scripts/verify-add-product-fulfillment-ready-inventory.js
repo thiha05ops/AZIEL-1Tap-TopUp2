@@ -10,7 +10,7 @@ const { createStoreCatalogSelectionService, StoreCatalogSelectionError } = requi
 const now = new Date("2026-09-03T00:00:00.000Z");
 const hash = value => value.repeat(64);
 const supplier = { _id: "s1", supplierCode: "FAZERCARDS", name: "FazerCards", enabled: true, mode: "API" };
-const product = { _id: "cp1", productCode: "pubg", name: "PUBG Mobile UC", deletedAt: null };
+const product = { _id: "cp1", productCode: "pubg", name: "PUBG Mobile UC", supportedRegions: ["GLOBAL"], deletedAt: null };
 const pkg = { _id: "pk1", productCode: "pubg", packageCode: "PUBG_325_UC", name: "325 UC", enabled: false, deletedAt: null, prices: {} };
 const supplierProduct = { _id: "sp1", supplierId: "s1", supplierProductCode: "pubg_mobile_auto", supplierMarketCode: "GLOBAL", displayName: "PUBG Mobile Auto", supportState: "SUPPORTED", rawSnapshotHash: hash("a"), normalizedInputContract: { fields: [{ customerField: "playerId", providerField: "player_id", required: true }] } };
 const offer = { _id: "o1", supplierId: "s1", supplierCatalogProductId: "sp1", supplierProductCode: "pubg_mobile_auto", supplierOfferCode: "325_uc", supplierOfferName: "325 UC", catalogLifecycleState: "ACTIVE", reconciliationState: "EXACT_CANONICAL_MATCH", rawSnapshotHash: hash("b") };
@@ -78,6 +78,31 @@ const sameSupplierNativeRoutes = projectActivation({
 assert.strictEqual(new Set(sameSupplierNativeRoutes.packages.map(row => row.supplierId)).size, 1, "Supplier-native route families must remain one Owner-facing supplier.");
 assert.strictEqual(new Set(sameSupplierNativeRoutes.packages.map(row => row.supplierProductCode)).size, 3, "Exact supplier-native route identities must be preserved internally.");
 assert.strictEqual(sameSupplierNativeRoutes.packages.filter(row => row.prepared.selectable).length, 3, "Package discovery must span all prepared supplier-native routes for the chosen supplier.");
+
+const idProduct = { ...product, productCode: "codm-id", name: "Call of Duty Mobile (ID)", supportedRegions: ["ID"] };
+const idPackage = { ...pkg, productCode: "codm-id", packageCode: "CODM_ID_80_CP", name: "80 CP" };
+const idSupplierProduct = { ...supplierProduct, _id: "sp-id", supplierProductCode: "codm_id", supplierMarketCode: "ID", displayName: "CODM ID" };
+const idOffer = { ...offer, _id: "o-id", supplierCatalogProductId: "sp-id", supplierProductCode: "codm_id", supplierOfferCode: "80_cp" };
+const idAvailability = { ...availability, _id: "av-id", supplierCatalogOfferId: "o-id" };
+const idMapping = { ...mapping, _id: "m-id", productCode: "codm-id", packageCode: "CODM_ID_80_CP", supplierProductCode: "codm_id", supplierPackageCode: "80_cp", supplierCatalogOfferId: "o-id", region: "ID", fulfillmentEligibility: { ...mapping.fulfillmentEligibility, allowedCustomerMarkets: ["MM", "TH"] } };
+const idCommerceProjection = projectActivation({
+    products: [idProduct], packages: [idPackage], suppliers: [supplier],
+    mappings: [idMapping], offers: [idOffer], supplierProducts: [idSupplierProduct],
+    availability: [idAvailability], publications: []
+}, { productCode: "codm-id", supplierMarket: "ID", customerMarkets: "MM,TH" }, dependencies);
+assert.strictEqual(idCommerceProjection.packages[0].prepared.selectable, true, "TH/MM commerce must allow an ID product when the supplier route is ID-compatible.");
+assert.deepStrictEqual(idCommerceProjection.packages[0].prepared.customerMarkets, ["MM", "TH"]);
+const mismatchedSupplierProduct = { ...idSupplierProduct, _id: "sp-india", supplierMarketCode: "INDIA" };
+const mismatchedOffer = { ...idOffer, _id: "o-india", supplierCatalogProductId: "sp-india" };
+const mismatchedAvailability = { ...idAvailability, supplierCatalogOfferId: "o-india" };
+const mismatchedMapping = { ...idMapping, _id: "m-india", supplierCatalogOfferId: "o-india", region: "INDIA" };
+const mismatchedProjection = projectActivation({
+    products: [idProduct], packages: [idPackage], suppliers: [supplier],
+    mappings: [mismatchedMapping], offers: [mismatchedOffer], supplierProducts: [mismatchedSupplierProduct],
+    availability: [mismatchedAvailability], publications: []
+}, { productCode: "codm-id", supplierMarket: "INDIA", customerMarkets: "TH" }, dependencies);
+assert.strictEqual(mismatchedProjection.packages[0].prepared.selectable, false, "TH commerce preference alone must not make an incompatible supplier account market valid.");
+assert(mismatchedProjection.packages[0].masterCatalog.blockers.includes("PRODUCT_ACCOUNT_MARKET_INCOMPATIBLE"));
 
 const clone = value => structuredClone(value);
 function query(value) { return { session() { return this; }, lean: async () => clone(value) }; }

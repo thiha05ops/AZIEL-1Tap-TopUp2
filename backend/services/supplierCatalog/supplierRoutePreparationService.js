@@ -14,7 +14,7 @@ const { canonicalJson } = require("./supplierCatalogNormalization");
 const { getSupplierAdapter } = require("../supplierAdapterRegistry");
 const { supportsMapping } = require("../suppliers/supplierFulfillmentDispatcher");
 const { contractFromSupplierCatalog, verifiedMappingContract } = require("../suppliers/fazercardsFulfillmentContractService");
-const { supplierMarketCompatibility } = require("../supplierFulfillmentEligibilityService");
+const { supplierRouteProductMarketCompatibility } = require("../supplierFulfillmentEligibilityService");
 const { assessPreCommercialFulfillmentReadiness } = require("../fulfillmentCapabilityService");
 const { normalizeSupplierMarket } = require("../../constants/supplierMarkets");
 
@@ -230,7 +230,7 @@ function createSupplierRoutePreparationService({ repos = defaultRepos(), adapter
             return { ...body, sourceLockHash: sha(body.sourceLock), planHash: sha(body) };
         }
         const proposedSupplierMarket = deterministicSupplierMarket(state) || upper(state.mapping.region);
-        const marketCompatible = request.customerMarkets.every(market => supplierMarketCompatibility(proposedSupplierMarket, market).compatible);
+        const marketCompatible = supplierRouteProductMarketCompatibility(proposedSupplierMarket, state.canonicalProduct?.supportedRegions || []).compatible;
         const initialRuntime = runtimeFor(state, state.mapping);
         const proposal = proposedMapping(state.mapping, state, request, initialRuntime);
         const runtime = runtimeFor(state, proposal);

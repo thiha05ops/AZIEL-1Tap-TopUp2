@@ -32,6 +32,37 @@ const ASIA_COUNTRY_MARKETS = new Set([
     "BH", "BAHRAIN", "QA", "QATAR", "KW", "KUWAIT", "OM", "OMAN",
     "TW", "TAIWAN", "TH", "THAILAND", "VN", "VIETNAM"
 ]);
+const MARKET_ALIASES = Object.freeze({
+    BANGLADESH: "BD",
+    BRUNEI: "BN",
+    CAMBODIA: "KH",
+    CHINA: "CN",
+    "HONG KONG": "HK",
+    INDIA: "IN",
+    INDONESIA: "ID",
+    JAPAN: "JP",
+    KAZAKHSTAN: "KZ",
+    LAOS: "LA",
+    MALAYSIA: "MY",
+    MYANMAR: "MM",
+    NEPAL: "NP",
+    PAKISTAN: "PK",
+    PHILIPPINES: "PH",
+    SINGAPORE: "SG",
+    "SOUTH KOREA": "KR",
+    "SRI LANKA": "LK",
+    "SAUDI ARABIA": "SA",
+    "UNITED ARAB EMIRATES": "AE",
+    BAHRAIN: "BH",
+    QATAR: "QA",
+    KUWAIT: "KW",
+    OMAN: "OM",
+    TAIWAN: "TW",
+    THAILAND: "TH",
+    VIETNAM: "VN"
+});
+const SEA_MEMBER_MARKETS = new Set(["BN", "KH", "ID", "LA", "MY", "MM", "PH", "SG", "TH", "VN"]);
+const canonicalMarketToken = value => MARKET_ALIASES[marketToken(value)] || marketToken(value);
 
 function normalizeAllowedCustomerMarkets(value) {
     if (!Array.isArray(value)) return [];
@@ -96,8 +127,29 @@ function supplierMarketCompatibility(supplierMarket, customerMarket) {
     if (ASIA_MULTI_MARKETS.has(supplier)) return Object.freeze({ compatible: true, deterministic: true, code: "ASIA_COMMERCE_COMPATIBILITY" });
     if (["TH", "THAILAND"].includes(supplier)) return Object.freeze({ compatible: customer === "TH", deterministic: true, code: customer === "TH" ? "TH_COMMERCE_COMPATIBILITY" : "SUPPLIER_MARKET_MISMATCH" });
     if (["MM", "MYANMAR"].includes(supplier)) return Object.freeze({ compatible: customer === "MM", deterministic: true, code: customer === "MM" ? "MM_COMMERCE_COMPATIBILITY" : "SUPPLIER_MARKET_MISMATCH" });
-    if (ASIA_COUNTRY_MARKETS.has(supplier)) return Object.freeze({ compatible: false, deterministic: true, code: "SUPPLIER_MARKET_UNSUPPORTED_FOR_AZIEL_COMMERCE" });
+    if (ASIA_COUNTRY_MARKETS.has(supplier)) return Object.freeze({ compatible: false, deterministic: true, code: "SUPPLIER_ACCOUNT_MARKET_REQUIRES_PRODUCT_COMPATIBILITY" });
     return Object.freeze({ compatible: false, deterministic: false, code: supplier === "UNSPECIFIED" || !supplier ? "SUPPLIER_MARKET_UNSPECIFIED" : "SUPPLIER_MARKET_COMPATIBILITY_UNPROVEN" });
+}
+
+function supplierRouteProductMarketCompatibility(supplierMarket, productCompatibilityMarkets = []) {
+    const supplier = canonicalMarketToken(supplierMarket);
+    const productMarkets = [...new Set((Array.isArray(productCompatibilityMarkets) ? productCompatibilityMarkets : [])
+        .map(canonicalMarketToken)
+        .filter(Boolean))];
+    if (!supplier || supplier === "UNSPECIFIED" || supplier === "UNKNOWN") return Object.freeze({ compatible: false, deterministic: false, code: "SUPPLIER_MARKET_UNSPECIFIED" });
+    if (!productMarkets.length) return Object.freeze({ compatible: false, deterministic: false, code: "PRODUCT_ACCOUNT_MARKET_UNPROVEN" });
+    if (supplier === "GLOBAL") return Object.freeze({ compatible: productMarkets.includes("GLOBAL"), deterministic: true, code: productMarkets.includes("GLOBAL") ? "GLOBAL_PRODUCT_COMPATIBILITY" : "SUPPLIER_PRODUCT_ACCOUNT_MARKET_MISMATCH" });
+    if (["SEA", "SOUTHEAST ASIA", "SOUTH EAST ASIA"].includes(supplier)) {
+        const compatible = productMarkets.includes("SEA") || productMarkets.some(market => SEA_MEMBER_MARKETS.has(market));
+        return Object.freeze({ compatible, deterministic: true, code: compatible ? "SEA_PRODUCT_COMPATIBILITY" : "SUPPLIER_PRODUCT_ACCOUNT_MARKET_MISMATCH" });
+    }
+    if (supplier === "ASIA") {
+        const compatible = productMarkets.includes("ASIA") || productMarkets.includes("SEA") || productMarkets.some(market => ASIA_COUNTRY_MARKETS.has(market));
+        return Object.freeze({ compatible, deterministic: true, code: compatible ? "ASIA_PRODUCT_COMPATIBILITY" : "SUPPLIER_PRODUCT_ACCOUNT_MARKET_MISMATCH" });
+    }
+    if (ASIA_MULTI_MARKETS.has(supplier)) return Object.freeze({ compatible: productMarkets.includes(supplier), deterministic: true, code: productMarkets.includes(supplier) ? "MULTI_MARKET_PRODUCT_COMPATIBILITY" : "SUPPLIER_PRODUCT_ACCOUNT_MARKET_MISMATCH" });
+    if (productMarkets.some(market => market === supplier)) return Object.freeze({ compatible: true, deterministic: true, code: "EXACT_PRODUCT_ACCOUNT_MARKET" });
+    return Object.freeze({ compatible: false, deterministic: true, code: "SUPPLIER_PRODUCT_ACCOUNT_MARKET_MISMATCH" });
 }
 
 function isCustomerMarketCompatible(mapping, customerMarket) {
@@ -113,5 +165,6 @@ module.exports = Object.freeze({
     validateFulfillmentEligibility,
     isCustomerMarketEligible
     ,supplierMarketCompatibility,
+    supplierRouteProductMarketCompatibility,
     isCustomerMarketCompatible
 });

@@ -15,7 +15,7 @@ const { basicCandidateBlockers } = require("./supplierEligibilityRouteResolver")
 const { setPackageMarketPublication } = require("./packageMarketPublicationService");
 const { assessExistingPreparedRoute } = require("./supplierCatalog/supplierRoutePreparationService");
 const { contractFromSupplierCatalog } = require("./suppliers/fazercardsFulfillmentContractService");
-const { supplierMarketCompatibility } = require("./supplierFulfillmentEligibilityService");
+const { supplierRouteProductMarketCompatibility } = require("./supplierFulfillmentEligibilityService");
 
 const COMMERCE_MARKETS = Object.freeze(["TH", "MM"]);
 const clean = value => String(value == null ? "" : value).trim();
@@ -166,7 +166,8 @@ function discoveryAssessment({ mapping, supplier, supplierProduct, offer, availa
     if (!supplierMarket || ["UNKNOWN", "UNSPECIFIED"].includes(supplierMarket)) blockers.push("MARKET_UNRESOLVED");
     const markets = [...new Set((customerMarkets || []).map(upper).filter(Boolean))].sort();
     if (!markets.length) blockers.push("CUSTOMER_MARKET_REQUIRED");
-    if (markets.some(market => !COMMERCE_MARKETS.includes(market) || !supplierMarketCompatibility(supplierMarket, market).compatible)) blockers.push("CUSTOMER_MARKET_ELIGIBILITY_UNPROVEN");
+    if (markets.some(market => !COMMERCE_MARKETS.includes(market))) blockers.push("CUSTOMER_MARKET_ELIGIBILITY_UNPROVEN");
+    if (!supplierRouteProductMarketCompatibility(supplierMarket, product?.supportedRegions || []).compatible) blockers.push("PRODUCT_ACCOUNT_MARKET_INCOMPATIBLE");
     const { proposed, fulfillmentContract } = discoveryMappingCandidate({ mapping, supplier, supplierProduct, offer, customerMarkets: markets });
     if (!fulfillmentContract?.fields?.length) blockers.push("INPUT_CONTRACT_UNRESOLVED");
     let adapter = null, adapterConfigured = false, autoFulfillmentEnabled = false, processorSupported = false;

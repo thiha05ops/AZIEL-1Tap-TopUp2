@@ -25,20 +25,24 @@ const product = {
 const pkg = {
     packageCode: "P1",
     enabled: true,
-    prices: { MM: { amount: 1000, currency: "MMK", enabled: true } }
+    prices: {
+        MM: { amount: 1000, currency: "MMK", enabled: true },
+        TH: { amount: 30, currency: "THB", enabled: true }
+    }
 };
 const commerce = {
     checks: { availability: true },
     regions: {
         MM: { fulfillment: true, availability: true },
-        TH: { fulfillment: false, availability: true }
+        TH: { fulfillment: true, availability: true }
     }
 };
 
 const available = resolvePublicProductReadiness(product, [pkg], commerce);
 assert.equal(available.availabilityCode, PUBLIC_AVAILABILITY.AVAILABLE);
 assert.equal(available.regions.MM.availabilityCode, PUBLIC_AVAILABILITY.AVAILABLE);
-assert.equal(available.regions.TH.availabilityCode, PUBLIC_AVAILABILITY.REGION_UNAVAILABLE);
+assert.equal(available.regions.TH.availabilityCode, PUBLIC_AVAILABILITY.AVAILABLE);
+assert.equal(available.regions.TH.supported, true);
 
 const comingSoon = resolvePublicProductReadiness({ ...product, lifecycleStatus: "COMING_SOON" }, [pkg], commerce);
 assert.equal(comingSoon.availabilityCode, PUBLIC_AVAILABILITY.COMING_SOON);
@@ -68,8 +72,8 @@ assert(catalogRoute.includes("includeDisabled: true"));
 assert(catalogRoute.includes("if (!product.discoverable)"));
 
 const preview = source("backend/services/commerce/commercePricingPreviewService.js");
-assert(preview.includes('"REGION_UNAVAILABLE"'));
 assert(preview.includes('"PACKAGE_UNAVAILABLE"'));
+assert(!preview.includes("PRODUCT_REGION_UNAVAILABLE"), "Pricing preview must not treat product compatibility metadata as commerce-market availability.");
 
 const runtime = source("frontend/js/catalog-runtime.js");
 assert(runtime.includes("function getAvailability"));

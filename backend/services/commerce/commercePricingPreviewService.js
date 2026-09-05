@@ -4,7 +4,7 @@ const crypto = require("crypto");
 const CatalogProduct = require("../../models/CatalogProduct");
 const CatalogPackage = require("../../models/CatalogPackage");
 const { findCatalogPackageByIdentity } = require("./catalogPackageIdentityService");
-const { isProductPubliclyEligible, productSupportsRegion } = require("../../catalog/productRegionAuthority");
+const { isProductPubliclyEligible } = require("../../catalog/productRegionAuthority");
 const { createPricingQuote } = require("./pricingQuoteRuntime");
 const { buildProductionPricingContext } = require("./productionPricingContextService");
 const { loadCommercePromotionContext } = require("./commercePromotionBridgeService");
@@ -43,9 +43,6 @@ async function loadCatalogPackage(input = {}) {
     const product = await CatalogProduct.findOne({ productCode }).lean();
     if (!/^[a-z0-9][a-z0-9-]{0,79}$/.test(productCode) || !product || !isProductPubliclyEligible(product)) {
         throw new CommercePricingPreviewError("PRODUCT_UNAVAILABLE", "Selected product is no longer available.", 409, "PRODUCT_DISABLED");
-    }
-    if (!productSupportsRegion(product, region)) {
-        throw new CommercePricingPreviewError("PRODUCT_REGION_UNAVAILABLE", "Selected product is not available in this region.", 409, "REGION_UNAVAILABLE");
     }
     const pkg = await findCatalogPackageByIdentity(productCode, packageCode, { enabled: true, deletedAt: null }).lean();
     const price = pkg?.prices?.[region];

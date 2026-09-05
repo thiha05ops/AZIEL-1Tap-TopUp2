@@ -15,7 +15,10 @@ const {
     sourceLockDiff,
     validatePlanPersistenceContracts
 } = require("./apply-linked-supplier-route-preparation");
-const { supplierMarketCompatibility } = require("../services/supplierFulfillmentEligibilityService");
+const {
+    supplierMarketCompatibility,
+    supplierRouteProductMarketCompatibility
+} = require("../services/supplierFulfillmentEligibilityService");
 const { normalizeSupplierMarket } = require("../constants/supplierMarkets");
 
 const sha = value => crypto.createHash("sha256").update(canonicalJson(value)).digest("hex");
@@ -203,7 +206,7 @@ function canonicalParityFixture({ productDeleted = false, packageDeleted = false
             updatedAt: now
         }],
         catalogProducts: [
-            ...(includeActiveProduct ? [{ _id: "canonical-product-active", productCode, updatedAt: now, deletedAt: productDeleted ? deletedAt : null }] : []),
+            ...(includeActiveProduct ? [{ _id: "canonical-product-active", productCode, supportedRegions: ["GLOBAL"], updatedAt: now, deletedAt: productDeleted ? deletedAt : null }] : []),
             { _id: "canonical-product-deleted", productCode, updatedAt: now, deletedAt }
         ],
         catalogPackages: [
@@ -249,9 +252,16 @@ async function generateSnapshotPlan(fixture) {
     const packageRemoved = await generateSnapshotPlan(canonicalParityFixture({ includeActivePackage: false }));
     assert.strictEqual(productRemoved.sourceLock.canonical.productId, "", "Missing canonical product is represented identically to authoritative replay.");
     assert.deepStrictEqual(packageRemoved.sourceLock.canonical.packageIds, [], "Missing canonical package is represented identically to authoritative replay.");
-    assert.strictEqual(supplierMarketCompatibility("INDIA", "TH").compatible, false, "Unsupported supplier country markets must not imply AZIEL customer-market eligibility.");
-    assert.strictEqual(supplierMarketCompatibility("IN", "MM").compatible, false, "Normalized unsupported supplier country markets must fail closed.");
-    assert.deepStrictEqual(customerMarketsFor({ supplierMarketCode: "INDIA", customerMarket: "", fulfillmentEligibility: { allowedCustomerMarkets: [] } }), [], "Unsupported supplier markets cannot become preparation targets.");
+    assert.strictEqual(supplierMarketCompatibility("INDIA", "TH").compatible, false, "Customer commerce market alone must not prove supplier/product account-market compatibility.");
+    assert.strictEqual(supplierMarketCompatibility("IN", "MM").compatible, false, "Recognized supplier country markets must not become AZIEL commerce markets.");
+    assert.strictEqual(supplierRouteProductMarketCompatibility("ID", ["ID"]).compatible, true, "Exact supplier/product account-market match must pass.");
+    assert.strictEqual(supplierRouteProductMarketCompatibility("INDIA", ["ID"]).compatible, false, "Mismatched supplier/product account markets must fail closed.");
+    assert.strictEqual(supplierRouteProductMarketCompatibility("GLOBAL", ["GLOBAL"]).compatible, true, "GLOBAL supplier routes require GLOBAL product/account compatibility.");
+    assert.strictEqual(supplierRouteProductMarketCompatibility("GLOBAL", ["ID"]).compatible, false, "GLOBAL supplier routes must not automatically prove country-specific product/account coverage.");
+    assert.strictEqual(supplierRouteProductMarketCompatibility("SEA", ["ID"]).compatible, true, "SEA supplier routes deterministically include Indonesia product/account compatibility.");
+    assert.strictEqual(supplierRouteProductMarketCompatibility("SEA", ["SA"]).compatible, false, "SEA supplier routes must not pass for incompatible country-specific product/account markets.");
+    assert.strictEqual(supplierRouteProductMarketCompatibility("UNKNOWN", ["ID"]).compatible, false, "Unknown supplier markets must fail closed.");
+    assert.deepStrictEqual(customerMarketsFor({ supplierMarketCode: "INDIA", customerMarket: "", fulfillmentEligibility: { allowedCustomerMarkets: [] } }), [], "Country supplier markets must not become TH/MM preparation targets without explicit commercial evidence.");
     assert.strictEqual(normalizeSupplierMarket("SINGAPORE_MALAYSIA"), "MY_SG");
     assert.strictEqual(normalizeSupplierMarket("MALAYSIA_SINGAPORE"), "MY_SG");
     assert.strictEqual(normalizeSupplierMarket("TAIWAN_HONG_KONG_MACAU"), "TW_HK_MO");
@@ -340,7 +350,7 @@ async function generateSnapshotPlan(fixture) {
         missingCanonicalPackageBlocksPreparation: true,
         deletedCanonicalEvidenceBlocksPreparation: true,
         validCanonicalEvidenceRemainsPreparable: true,
-        unsupportedSupplierCountryMarketsBlocked: true,
+        supplierAccountMarketsDecoupledFromCommerceMarkets: true,
         compositeSupplierMarketsNormalizeToSchemaEnums: true,
         mongoosePersistenceDryRun: true,
         stalePlanItem53ZeroWrites: true,
