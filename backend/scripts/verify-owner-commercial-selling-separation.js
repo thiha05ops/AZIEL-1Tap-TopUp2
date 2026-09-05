@@ -36,9 +36,11 @@ const publication = read("backend/services/adminProductActivationService.js");
 
 assert(activation.includes("assessExistingPreparedRoute"));
 assert(activation.includes('mapping.enabled=true;mapping.productionRole="PRIMARY"'));
+assert(activation.includes("markRouteStorefrontReady(mapping)"));
 assert(!activation.includes("setPackageMarketPublication"));
 assert(!activation.includes("mapping.fulfillmentEligibility="));
-assert(!activation.includes("mapping.mappingMetadata="));
+assert(!activation.includes("mapping.mappingMetadata.fulfillmentContract="));
+assert(!activation.includes("mapping.mappingMetadata.technicalPreparation="));
 assert(!activation.includes('mapping.executionMode="API"'));
 assert(!activation.includes('product.commerceState="PURCHASABLE"'));
 assert(!activation.includes("selection.visibleRegions="));
@@ -62,4 +64,4 @@ assert(publicReadiness.includes("options.explicitCommercialAuthority === true"))
 assert(checkout.includes("assertAuthoritativeFulfillmentReady"));
 assert(orderSnapshot.includes("supplierMappingId"));
 
-console.log(JSON.stringify({ result: "PASS", startSelling: { consumesPreparedEvidence: true, writes: ["mapping.enabled", "mapping.productionRole"], technicalEvidenceWrites: 0, pricingWrites: 0, publicationWrites: 0, storefrontVisibilityWrites: 0 }, publish: { explicit: true, commerciallySelectedRequired: true, preparedRouteRequired: true, productionReadinessRequired: true }, purchasable: { selectionRequired: true, priceRequired: true, publicationRequired: true, storefrontVisibilityRequired: true, fulfillmentRequired: true }, checkoutRevalidation: true, automaticFailovers: 0, supplierCalls: 0, productionWrites: 0 }, null, 2));
+console.log(JSON.stringify({ result: "PASS", startSelling: { consumesPreparedEvidence: true, writes: ["mapping.enabled", "mapping.productionRole", "mapping.mappingMetadata.readiness.storefrontReady"], technicalEvidenceWrites: 1, pricingWrites: 0, publicationWrites: 0, storefrontVisibilityWrites: 0 }, publish: { explicit: true, commerciallySelectedRequired: true, preparedRouteRequired: true, productionReadinessRequired: true }, purchasable: { selectionRequired: true, priceRequired: true, publicationRequired: true, storefrontVisibilityRequired: true, fulfillmentRequired: true }, checkoutRevalidation: true, automaticFailovers: 0, supplierCalls: 0, productionWrites: 0 }, null, 2));
