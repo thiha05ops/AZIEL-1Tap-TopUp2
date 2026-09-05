@@ -50,6 +50,26 @@ const secondMapping = { ...mapping, _id: "m2", supplierId: "s2", supplierCode: "
 const multi = projectActivation({ products: [product], packages: [pkg], suppliers: [supplier, secondSupplier], mappings: [mapping, secondMapping], offers: [offer, secondOffer], supplierProducts: [supplierProduct, secondProduct], availability: [availability, secondAvailability], publications: [] }, { productCode: "pubg", supplierMarket: "GLOBAL", customerMarkets: "TH" }, dependencies);
 assert.strictEqual(multi.packages.length, 2, "Exact supplier candidates must not collapse by canonical packageCode.");
 
+const fastProduct = { ...supplierProduct, _id: "sp-fast", supplierProductCode: "pubg_mobile_fast", displayName: "PUBG Mobile Fast" };
+const reserveProduct = { ...supplierProduct, _id: "sp-reserve", supplierProductCode: "pubg_mobile_reserve", displayName: "PUBG Mobile Reserve" };
+const fastOffer = { ...offer, _id: "o-fast", supplierCatalogProductId: "sp-fast", supplierProductCode: "pubg_mobile_fast", supplierOfferCode: "325_uc_fast" };
+const reserveOffer = { ...offer, _id: "o-reserve", supplierCatalogProductId: "sp-reserve", supplierProductCode: "pubg_mobile_reserve", supplierOfferCode: "325_uc_reserve" };
+const fastAvailability = { ...availability, _id: "av-fast", supplierCatalogOfferId: "o-fast" };
+const reserveAvailability = { ...availability, _id: "av-reserve", supplierCatalogOfferId: "o-reserve" };
+const fastMapping = { ...mapping, _id: "m-fast", supplierProductCode: "pubg_mobile_fast", supplierPackageCode: "325_uc_fast", supplierCatalogOfferId: "o-fast" };
+const reserveMapping = { ...mapping, _id: "m-reserve", supplierProductCode: "pubg_mobile_reserve", supplierPackageCode: "325_uc_reserve", supplierCatalogOfferId: "o-reserve" };
+const sameSupplierNativeRoutes = projectActivation({
+    products: [product], packages: [pkg], suppliers: [supplier],
+    mappings: [mapping, fastMapping, reserveMapping],
+    offers: [offer, fastOffer, reserveOffer],
+    supplierProducts: [supplierProduct, fastProduct, reserveProduct],
+    availability: [availability, fastAvailability, reserveAvailability],
+    publications: []
+}, { productCode: "pubg", supplierMarket: "GLOBAL", customerMarkets: "TH" }, dependencies);
+assert.strictEqual(new Set(sameSupplierNativeRoutes.packages.map(row => row.supplierId)).size, 1, "Supplier-native route families must remain one Owner-facing supplier.");
+assert.strictEqual(new Set(sameSupplierNativeRoutes.packages.map(row => row.supplierProductCode)).size, 3, "Exact supplier-native route identities must be preserved internally.");
+assert.strictEqual(sameSupplierNativeRoutes.packages.filter(row => row.prepared.selectable).length, 3, "Package discovery must span all prepared supplier-native routes for the chosen supplier.");
+
 const clone = value => structuredClone(value);
 function query(value) { return { session() { return this; }, lean: async () => clone(value) }; }
 function fixture(selectedMapping = mapping) {
@@ -84,5 +104,11 @@ function fixture(selectedMapping = mapping) {
     assert(wizard.includes("No fulfillment-ready packages available."));
     assert(wizard.includes("data-wizard-package=\"${apwEsc(row.mappingId)}\""));
     assert(!wizard.includes("new Map(apwValidRows().map(row=>[row.packageCode,row]))"));
-    console.log(JSON.stringify({ result: "PASS", preparedDisabledNonPrimarySelectable: true, rejectedAdvancedOnlyCases: 4, distinctSupplierCandidates: multi.packages.length, supplierNativeGrouping: true, storeSelectionGuard: true, mappingWrites: 0, automaticPrimaryAssignments: 0, pricingWrites: 0, publicationWrites: 0, supplierCalls: 0, productionWrites: 0 }, null, 2));
+    assert(wizard.includes("valid.map(row=>[row.supplierId,row])"), "Add Product supplier step must aggregate by real supplier, not supplier-native product.");
+    assert(!wizard.includes("&&(!addProductWizard.supplierProductCode||row.supplierProductCode===addProductWizard.supplierProductCode)"), "Package step must not narrow the chosen supplier to one supplier-native route family.");
+    assert(!wizard.includes("!!addProductWizard.supplierProductCode&&apwValidRows().length>0"), "Continuing from Supplier step must not require a supplier-native product.");
+    assert(wizard.includes("function apwRouteRank"), "Owner-facing duplicate package candidates must prefer an existing PRIMARY/API route when available.");
+    assert(wizard.includes("routeAlternatives:rows.map"), "Collapsed package candidates must preserve exact supplier route identities internally.");
+    assert(wizard.includes("row.routeAlternatives?.length>1"), "The package step must disclose reviewed alternate route evidence without presenting duplicate commercial packages.");
+    console.log(JSON.stringify({ result: "PASS", preparedDisabledNonPrimarySelectable: true, rejectedAdvancedOnlyCases: 4, distinctSupplierCandidates: multi.packages.length, sameSupplierNativeRoutes: sameSupplierNativeRoutes.packages.length, supplierNativeGrouping: true, duplicateCommercialPackagesCollapsed: true, exactRouteIdentityPreserved: true, storeSelectionGuard: true, mappingWrites: 0, automaticPrimaryAssignments: 0, pricingWrites: 0, publicationWrites: 0, supplierCalls: 0, productionWrites: 0 }, null, 2));
 })().catch(error => { console.error("VERIFY_ADD_PRODUCT_FULFILLMENT_READY_INVENTORY_FAILED:", error); process.exitCode = 1; });
