@@ -597,9 +597,7 @@ function closeMobilePackagePicker() {
   document.body.classList.remove("mobile-package-picker-open");
 }
 
-function updateSelectedPackagePreview(pkg) {
-  if (!pkg) return;
-
+function getSelectedPackagePreviewElements() {
   const preview =
     document.getElementById("selectedPackagePreview") ||
     document.getElementById("openPackagePanel") ||
@@ -627,10 +625,35 @@ function updateSelectedPackagePreview(pkg) {
     document.getElementById("selectedPackageCode") ||
     document.querySelector("[data-selected-package-code]");
 
+  return { preview, icon, title, subtitle, code };
+}
+
+function claimRuntimeSelectorText(node) {
+  if (!node) return;
+  node.removeAttribute("data-i18n");
+  node.removeAttribute("data-i18n-placeholder");
+  node.setAttribute("data-i18n-skip", "true");
+}
+
+function renderSelectedPackagePreview(pkg = selectedPackage) {
+  const { preview, icon, title, subtitle, code } = getSelectedPackagePreviewElements();
   const defaultIcon = rememberDefaultPackageIcon(icon, preview);
 
+  [title, subtitle, code].forEach(claimRuntimeSelectorText);
+
+  if (!pkg) {
+    const staticFallbackIcon = getStaticPreviewFallbackIcon(icon);
+
+    if (preview) preview.classList.remove("selected", "has-package");
+    if (icon) setPackagePreviewIcon(icon, defaultIcon, staticFallbackIcon || defaultIcon);
+    if (title) title.textContent = t("product.choosePackage", "Choose a package");
+    if (subtitle) subtitle.textContent = t("product.tapToSelectPackage", "Tap to select");
+    if (code) code.textContent = "";
+    return;
+  }
+
   if (preview) preview.classList.add("selected", "has-package");
-  setPackagePreviewIcon(icon, pkg.icon, pkg.fallbackIcon || defaultIcon);
+  setPackagePreviewIcon(icon, pkg.icon || defaultIcon, pkg.fallbackIcon || defaultIcon);
   if (title) {
     window.AZIEL_MOTION?.swapText(title, pkg.name) ||
       (title.textContent = pkg.name);
@@ -647,37 +670,12 @@ function updateSelectedPackagePreview(pkg) {
   window.AZIEL_MOTION?.emphasize(preview, "updated");
 }
 
+function updateSelectedPackagePreview(pkg) {
+  renderSelectedPackagePreview(pkg);
+}
+
 function resetSelectedPackagePreview() {
-  const preview =
-    document.getElementById("selectedPackagePreview") ||
-    document.getElementById("openPackagePanel") ||
-    document.querySelector("[data-selected-package-preview]") ||
-    document.querySelector(".selected-package-preview");
-
-  const icon =
-    document.getElementById("selectedPackageIcon") ||
-    document.getElementById("mobilePackageIcon") ||
-    document.querySelector("[data-selected-package-icon]");
-
-  const title =
-    document.getElementById("selectedPackageTitle") ||
-    document.getElementById("selectedPackageName") ||
-    document.getElementById("mobileSelectedPackageName") ||
-    document.querySelector("[data-selected-package-title]");
-
-  const subtitle =
-    document.getElementById("selectedPackageSubtitle") ||
-    document.getElementById("selectedPackagePrice") ||
-    document.getElementById("mobileSelectedPackagePrice") ||
-    document.querySelector("[data-selected-package-subtitle]");
-
-  const defaultIcon = rememberDefaultPackageIcon(icon, preview);
-  const staticFallbackIcon = getStaticPreviewFallbackIcon(icon);
-
-  if (preview) preview.classList.remove("selected", "has-package");
-  if (icon) setPackagePreviewIcon(icon, defaultIcon, staticFallbackIcon || defaultIcon);
-  if (title) title.textContent = t("product.choosePackage", "Choose a package");
-  if (subtitle) subtitle.textContent = t("product.tapToSelectPackage", "Tap to select");
+  renderSelectedPackagePreview(null);
 }
 
 function getSelectedPackage() {
@@ -720,3 +718,4 @@ window.renderGamePrices = renderGamePrices;
 window.getSelectedPackage = getSelectedPackage;
 window.selectPackage = selectPackage;
 window.clearSelectedPackage = clearSelectedPackage;
+window.renderPackageSelectorState = renderSelectedPackagePreview;

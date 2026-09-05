@@ -48,6 +48,10 @@ assert(prices.includes("Promise.allSettled"), "one preview failure must not reje
 assert(prices.includes("MOBILE_PACKAGE_PICKER_QUERY"), "mobile package picker breakpoint must be owned by prices.js");
 assert(prices.includes("setupMobilePackagePicker()"), "mobile package picker must be initialized with the shared price renderer");
 assert(prices.includes("resolved !== key ? resolved : fallback"), "missing selector translations must fall back instead of rendering literal i18n keys");
+assert(prices.includes("function renderSelectedPackagePreview"), "compact package selector state must have one authoritative renderer");
+assert(prices.includes("window.renderPackageSelectorState = renderSelectedPackagePreview"), "generic product bootstrap must be able to request selector-state refresh");
+assert(prices.includes("[title, subtitle, code].forEach(claimRuntimeSelectorText)"), "selector renderer must claim runtime text ownership from static i18n");
+assert(prices.includes("pkg.icon || defaultIcon"), "selected package preview must prefer package icon and fall back to mobile package preview");
 assert(prices.includes("list.appendChild(packageContainer)"), "mobile picker must reuse the authoritative #packages DOM instead of duplicating package rendering");
 assert(prices.includes("inlineParent.insertBefore(packageContainer"), "desktop must restore the existing inline package grid");
 assert(prices.includes("openMobilePackagePicker"), "summary control must open the mobile package picker");
@@ -58,9 +62,11 @@ assert(!/productCode\s*===\s*\"(?:mlbb|pubg|heaven-burns-red|afk)/.test(prices),
 assert(css.includes(".product-package-card > #packages") && css.includes("display: none !important"), "mobile Product Detail must not render the full package catalog inline");
 assert(css.includes("#mobilePackageList #packages") && css.includes("display: block !important"), "mobile picker must render the shared package grid inside the sheet");
 assert(css.includes(".mobile-selected-package:not([hidden])") && css.includes("display: grid !important"), "mobile compact package selector must override desktop hidden state");
+assert(css.includes("grid-template-columns: 52px minmax(0, 1fr) auto"), "mobile compact package selector must preserve preview image, text, and chevron columns");
 assert(css.includes(".mobile-selected-package b") && css.includes("font-size: 24px"), "mobile compact package selector must retain a clear tap affordance");
 assert(prices.includes('t("product.choosePackage", "Choose a package")'), "mobile selector title must have English fallback copy");
 assert(prices.includes('t("product.tapToSelectPackage", "Tap to select")'), "mobile selector subtitle must have English fallback copy");
+assert(!read("frontend/js/product-detail.js").includes('applyText("#selectedPackageTitle"'), "generic product bootstrap must not compete with the selector-state renderer");
 
 [
     "product.subtotal", "product.promoDiscount", "product.youSaved", "product.enterPromo",

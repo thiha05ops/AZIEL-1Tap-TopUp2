@@ -1384,14 +1384,14 @@
 
   .az-product-detail .mobile-selected-package:not([hidden]) {
     display: grid !important;
-    grid-template-columns: minmax(0, 1fr) auto !important;
-    min-height: 58px !important;
-    padding: 12px 14px !important;
+    grid-template-columns: 52px minmax(0, 1fr) auto !important;
+    min-height: 78px !important;
+    padding: 12px !important;
     cursor: pointer !important;
   }
 
   .az-product-detail .mobile-selected-package .mobile-pack-icon {
-    display: none !important;
+    display: grid !important;
   }
 
   .az-product-detail .mobile-selected-package .mobile-pack-content {
