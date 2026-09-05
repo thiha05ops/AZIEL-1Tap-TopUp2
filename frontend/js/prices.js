@@ -530,11 +530,24 @@ function setupMobilePackagePicker() {
   return mobilePackagePickerState;
 }
 
+function refreshMobilePackagePickerContainer(state) {
+  const current = document.getElementById("packages");
+  if (!current || current === state.packageContainer) return state.packageContainer;
+
+  state.packageContainer = current;
+  if (!state.placeholder.parentNode && current.parentNode) {
+    current.parentNode.insertBefore(state.placeholder, current);
+    state.inlineParent = state.placeholder.parentNode;
+  }
+  return current;
+}
+
 function syncMobilePackagePickerLayout() {
   const state = mobilePackagePickerState;
   if (!state) return;
 
-  const { packageContainer, summary, panel, list, placeholder, inlineParent, isMobile } = state;
+  const packageContainer = refreshMobilePackagePickerContainer(state);
+  const { summary, panel, list, placeholder, inlineParent, isMobile } = state;
 
   if (isMobile()) {
     if (packageContainer.parentNode !== list) {
@@ -556,10 +569,12 @@ function syncMobilePackagePickerLayout() {
   document.body.classList.remove("mobile-package-picker-open");
 }
 
-function openMobilePackagePicker() {
+function openMobilePackagePicker(event) {
   const state = mobilePackagePickerState || setupMobilePackagePicker();
   if (!state || !state.isMobile()) return;
 
+  event?.preventDefault?.();
+  event?.stopImmediatePropagation?.();
   syncMobilePackagePickerLayout();
   state.panel.classList.add("show");
   state.panel.removeAttribute("hidden");
