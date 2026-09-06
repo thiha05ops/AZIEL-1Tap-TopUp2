@@ -23,6 +23,10 @@ const {
     CommercePricingPreviewError,
     loadCatalogPackage
 } = require("../services/commerce/commercePricingPreviewService");
+const {
+    assessProductionReadyFulfillmentMapping,
+    resolveFulfillmentCapability
+} = require("../services/fulfillmentCapabilityService");
 
 const ROOT = path.resolve(__dirname, "../..");
 const baseProduct = {
@@ -52,6 +56,116 @@ function publicProjection(product, pkg = basePackage) {
     const projection = projectCatalogProduct(product, [pkg], { includeDisabled: false });
     applyPackageFulfillmentReadiness(projection, [], []);
     return projection;
+}
+
+function productionReadyMapping(overrides = {}) {
+    return {
+        _id: overrides._id || "region-route",
+        supplierId: "supplier-route",
+        supplierCode: "FAZERCARDS",
+        productCode: overrides.productCode || "region-route-product",
+        packageCode: overrides.packageCode || "REGION_ROUTE_PACKAGE",
+        supplierProductCode: overrides.supplierProductCode || "region_route_product",
+        supplierPackageCode: overrides.supplierPackageCode || "region_route_package",
+        region: overrides.region || "GLOBAL",
+        enabled: overrides.enabled !== false,
+        archivedAt: null,
+        executionMode: overrides.executionMode || "API",
+        productionRole: overrides.productionRole || "PRIMARY",
+        fulfillmentEligibility: overrides.fulfillmentEligibility || {
+            mode: "GLOBAL",
+            allowedCustomerMarkets: [],
+            evidenceCode: "OPERATOR_CONFIRMED_CAPABILITY",
+            evidenceSource: "region authority verifier",
+            verifiedAt: "2026-09-07T00:00:00.000Z",
+            version: 1
+        },
+        mappingMetadata: {
+            readiness: {
+                supplierMapped: true,
+                inputReady: true,
+                validationReady: true,
+                pricingReady: true,
+                fulfillmentReady: true,
+                storefrontReady: true
+            }
+        },
+        ...overrides
+    };
+}
+
+function apiSupplier(overrides = {}) {
+    return {
+        _id: "supplier-route",
+        supplierCode: "FAZERCARDS",
+        enabled: true,
+        mode: "API",
+        supportedRegions: ["TH"],
+        ...overrides
+    };
+}
+
+function readyContext(productCompatibilityMarkets, region) {
+    return {
+        productCode: "region-route-product",
+        packageCode: "REGION_ROUTE_PACKAGE",
+        region,
+        productCompatibilityMarkets,
+        adapterResolver: () => ({ isConfigured: () => true, isAutoFulfillmentEnabled: () => true }),
+        mappingSupportResolver: () => true
+    };
+}
+
+function verifySupplierRouteCommerceMarketSeparation() {
+    const supplier = apiSupplier({ supportedRegions: ["TH"] });
+    const globalRoute = productionReadyMapping({ region: "GLOBAL" });
+    const thRoute = productionReadyMapping({ region: "TH" });
+    const idRoute = productionReadyMapping({ region: "ID" });
+
+    const globalTh = assessProductionReadyFulfillmentMapping(globalRoute, supplier, readyContext(["GLOBAL"], "TH"));
+    assert.strictEqual(globalTh.ready, true, "CASE A: GLOBAL product + GLOBAL supplier route must be ready in TH commerce.");
+
+    const globalMm = assessProductionReadyFulfillmentMapping(globalRoute, supplier, readyContext(["GLOBAL"], "MM"));
+    assert.strictEqual(globalMm.ready, true, "CASE B: Same GLOBAL route must remain ready in MM commerce.");
+    assert(!globalMm.blockers.includes("SUPPLIER_REGION_UNSUPPORTED"), "CASE B: Supplier.supportedRegions must not reject MM commerce.");
+
+    const thProductMmCommerce = assessProductionReadyFulfillmentMapping(thRoute, supplier, readyContext(["TH"], "MM"));
+    assert.strictEqual(thProductMmCommerce.ready, true, "CASE C: TH product/account route must remain technically valid in MM commerce.");
+
+    const incompatible = assessProductionReadyFulfillmentMapping(idRoute, supplier, readyContext(["TH"], "MM"));
+    assert.strictEqual(incompatible.ready, false, "CASE D: ID-only supplier route must fail for a TH product/account market.");
+    assert(incompatible.blockers.includes("PRODUCT_ACCOUNT_MARKET_INCOMPATIBLE"));
+
+    const mmCapability = resolveFulfillmentCapability({
+        product: { supportedRegions: ["TH"], fulfillment: { manualAllowedRegions: [] } },
+        mappings: [thRoute],
+        suppliers: [supplier],
+        productCode: thRoute.productCode,
+        packageCode: thRoute.packageCode,
+        region: "MM",
+        context: readyContext(["TH"], "MM")
+    });
+    assert.strictEqual(mmCapability.fulfillmentAvailable, true, "CASE E: MM commerce must reuse the exact valid route without requiring an MM supplier route.");
+    assert.strictEqual(mmCapability.eligibleRoutes[0].mapping.region, "TH");
+
+    const thCapability = resolveFulfillmentCapability({
+        product: { supportedRegions: ["GLOBAL"], fulfillment: { manualAllowedRegions: [] } },
+        mappings: [globalRoute],
+        suppliers: [supplier],
+        productCode: globalRoute.productCode,
+        packageCode: globalRoute.packageCode,
+        region: "TH",
+        context: readyContext(["GLOBAL"], "TH")
+    });
+    assert.strictEqual(thCapability.fulfillmentAvailable, true, "CASE F: Existing TH production readiness behavior must remain unchanged.");
+    return {
+        globalThReady: true,
+        globalMmReady: true,
+        thRouteMmCommerceReady: true,
+        incompatibleIdRouteRejected: true,
+        noMmSupplierRouteRequired: true,
+        thBehaviorUnchanged: true
+    };
 }
 
 async function withCatalogRows(product, pkg, callback) {
@@ -364,10 +478,11 @@ async function main() {
     assert(adminService.includes("normalizeManualAllowedRegions"), "Manual fulfillment regions must have a separate TH/MM commerce normalizer.");
 
     const explicitStorefrontVisibility = await verifyExplicitStorefrontVisibilitySeparatesPublishedPackages();
+    const routeCommerceMarketSeparation = verifySupplierRouteCommerceMarketSeparation();
 
     if (process.argv.includes("--isolated")) await verifyIsolatedPropagation();
 
-    console.log("Product region authority verification passed.", JSON.stringify({ explicitStorefrontVisibility }));
+    console.log("Product region authority verification passed.", JSON.stringify({ explicitStorefrontVisibility, routeCommerceMarketSeparation }));
 }
 
 main().catch(error => {

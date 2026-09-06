@@ -46,7 +46,7 @@ const wonddThMapping = {
     mappingMetadata: { readiness: { supplierMapped: true, inputReady: true, validationReady: true, pricingReady: true, fulfillmentReady: true, storefrontReady: true } }
 };
 const supplier = { _id: "supplier-1", supplierCode: "WONDD", enabled: true, mode: "API", supportedRegions: ["TH"] };
-const eligibilityContext = { adapterResolver: () => ({ isConfigured: () => true }), mappingSupportResolver: () => true };
+const eligibilityContext = { adapterResolver: () => ({ isConfigured: () => true, isAutoFulfillmentEnabled: () => true }), mappingSupportResolver: () => true };
 
 function readiness(packages, mappings, overrides = {}, suppliers = []) {
     const subject = { ...product, ...overrides };
@@ -71,7 +71,7 @@ assert.strictEqual(bothRegions.regions.TH.state, "AVAILABLE");
 
 assert.notStrictEqual(readiness([], []).state, "AVAILABLE");
 assert.strictEqual(readiness([pkg], [mmMapping], { commerceState: "HIDDEN" }).state, "HIDDEN");
-assert.strictEqual(readiness([pkg], [mmMapping], { productCode: "aovid" }).state, "HIDDEN");
+assert.strictEqual(readiness([pkg], [mmMapping], { productCode: "aovid" }).state, "COMING_SOON");
 
 const futureMapping = readiness([pkg], [wonddThMapping], {}, [supplier]);
 assert.strictEqual(futureMapping.regions.TH.state, "AVAILABLE", "A legitimate future mapping must enable readiness without product exceptions.");

@@ -50,6 +50,10 @@ function assessProductionReadyFulfillmentMapping(mapping = {}, supplier = {}, co
     const productCode = String(context.productCode || mapping.productCode || "").trim().toLowerCase();
     const packageCode = String(context.packageCode || mapping.packageCode || "").trim().toUpperCase();
     const region = normalizeRegion(context.region || mapping.region);
+    const routeMarket = String(context.supplierRouteMarket || mapping.region || "").trim().toUpperCase();
+    const productCompatibilityMarkets = Array.isArray(context.productCompatibilityMarkets)
+        ? context.productCompatibilityMarkets
+        : [];
     const readiness = mapping.mappingMetadata?.readiness || {};
     const blockers = [];
     const eligibility = validateFulfillmentEligibility(mapping.fulfillmentEligibility);
@@ -62,7 +66,7 @@ function assessProductionReadyFulfillmentMapping(mapping = {}, supplier = {}, co
     if (String(mapping.executionMode || "").trim().toUpperCase() !== "API") blockers.push("MAPPING_EXECUTION_NOT_API");
     if (String(mapping.productionRole || "").trim().toUpperCase() !== "PRIMARY") blockers.push("MAPPING_NOT_PRIMARY");
     if (!supplier || supplier.enabled !== true || String(supplier.mode || "").trim().toUpperCase() !== "API") blockers.push("SUPPLIER_NOT_API_READY");
-    if (Array.isArray(supplier?.supportedRegions) && supplier.supportedRegions.length && !supplier.supportedRegions.map(normalizeRegion).includes(region)) blockers.push("SUPPLIER_REGION_UNSUPPORTED");
+    if (productCompatibilityMarkets.length && !supplierRouteProductMarketCompatibility(routeMarket, productCompatibilityMarkets).compatible) blockers.push("PRODUCT_ACCOUNT_MARKET_INCOMPATIBLE");
     if (!eligibility.valid) blockers.push(...eligibility.errors);
     else if (eligibility.value.mode === "UNKNOWN") blockers.push("FULFILLMENT_ELIGIBILITY_UNKNOWN");
     else if (!isCustomerMarketEligible(mapping.fulfillmentEligibility, region)) blockers.push("CUSTOMER_MARKET_NOT_ELIGIBLE");
@@ -183,9 +187,10 @@ function eligibleMappingsForPackage({ mappings = [], suppliers = [], productCode
         if (String(mapping.productCode || "").toLowerCase() !== normalizedProduct) return [];
         if (String(mapping.packageCode || "").toUpperCase() !== normalizedPackage) return [];
         if (!isCustomerMarketEligible(mapping.fulfillmentEligibility, normalizedRegion)) return [];
-        if (Array.isArray(supplier.supportedRegions) && supplier.supportedRegions.length && !supplier.supportedRegions.includes(normalizedRegion)) return [];
         if (!isProductionReadyFulfillmentMapping(mapping, supplier, {
             ...context,
+            productCompatibilityMarkets: context.productCompatibilityMarkets,
+            supplierRouteMarket: mapping.region,
             offer: context.offerByMappingId?.get(String(mapping._id)) || context.offer,
             availability: context.availabilityByMappingId?.get(String(mapping._id)) || context.availability,
             productCode: normalizedProduct,
@@ -197,7 +202,17 @@ function eligibleMappingsForPackage({ mappings = [], suppliers = [], productCode
 }
 
 function resolveFulfillmentCapability({ product = {}, mappings = [], suppliers = [], productCode = "", packageCode = "", region = "", context = {} } = {}) {
-    const eligible = eligibleMappingsForPackage({ mappings, suppliers, productCode, packageCode, region, context });
+    const eligible = eligibleMappingsForPackage({
+        mappings,
+        suppliers,
+        productCode,
+        packageCode,
+        region,
+        context: {
+            productCompatibilityMarkets: product.supportedRegions || [],
+            ...context
+        }
+    });
     const automatedRoutes = eligible.filter(item => item.routeType === "SUPPLIER_API");
     const supplierManualRoutes = eligible.filter(item => item.routeType === "SUPPLIER_MANUAL");
     const identifiedPrimary = mappings.some(mapping => !mapping.archivedAt && String(mapping.productionRole || "").toUpperCase() === "PRIMARY" &&
