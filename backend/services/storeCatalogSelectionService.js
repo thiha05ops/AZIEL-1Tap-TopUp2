@@ -11,7 +11,7 @@ const CatalogProduct = require("../models/CatalogProduct");
 const Supplier = require("../models/Supplier");
 const PackageMarketPublication = require("../models/PackageMarketPublication");
 const { assessExistingPreparedRoute } = require("./supplierCatalog/supplierRoutePreparationService");
-const { discoveryAssessment, canonicalEvidenceForOffer, syntheticMappingFromOffer } = require("./adminProductActivationService");
+const { discoveryAssessment, canonicalEvidenceForOffer, syntheticMappingFromOffer, routeReadinessMarketsForMapping } = require("./adminProductActivationService");
 
 class StoreCatalogSelectionError extends Error {
     constructor(code, message, statusCode = 400, details = {}) { super(message); this.name = "StoreCatalogSelectionError"; this.code = code; this.statusCode = statusCode; this.details = details; }
@@ -65,7 +65,7 @@ function createStoreCatalogSelectionService(models = {}, dependencies = {}) {
                 const supplierProduct = supplierProductById.get(id(offer?.supplierCatalogProductId));
                 const canonical = canonicalEvidenceForOffer(offer);
                 if (!offer || !supplierProduct || !canonical || canonical.productCode !== productCode) throw new StoreCatalogSelectionError("STORE_SELECTION_SCOPE_MISMATCH", "One or more supplier offers cannot be deterministically adopted.", 409);
-                const synthetic = syntheticMappingFromOffer({ offer, supplier, supplierProduct, customerMarkets: sellingRegions });
+                const synthetic = syntheticMappingFromOffer({ offer, supplier, supplierProduct });
                 if (!synthetic || upper(synthetic.region) !== supplierMarket) throw new StoreCatalogSelectionError("STORE_SELECTION_SCOPE_MISMATCH", "One or more supplier offers do not belong to this exact supplier market.", 409);
                 const existing = await lean(M.Mapping.findOne({ supplierId, supplierProductCode: synthetic.supplierProductCode, supplierPackageCode: synthetic.supplierPackageCode, region: supplierMarket, archivedAt: null }), session);
                 if (existing) { mappings.push(existing); continue; }
@@ -86,7 +86,7 @@ function createStoreCatalogSelectionService(models = {}, dependencies = {}) {
                 const offer = offerById.get(id(mapping.supplierCatalogOfferId));
                 const supplierProduct = supplierProductById.get(id(offer?.supplierCatalogProductId));
                 const existingPackage = packageByCode.get(upper(mapping.packageCode));
-                const existingPrepared = assessExistingPreparedRoute({ mapping, supplier, offer, supplierProduct, availability: availabilityByOfferId.get(id(offer)), canonicalProduct: product, canonicalPackages: existingPackage ? [existingPackage] : [] }, sellingRegions, dependencies);
+                const existingPrepared = assessExistingPreparedRoute({ mapping, supplier, offer, supplierProduct, availability: availabilityByOfferId.get(id(offer)), canonicalProduct: product, canonicalPackages: existingPackage ? [existingPackage] : [] }, routeReadinessMarketsForMapping(mapping, sellingRegions), dependencies);
                 if (existingPrepared.ready) { adoptedMappings.push(mapping); continue; }
                 const discovery = discoveryAssessment({ mapping, supplier, supplierProduct, offer, availability: availabilityByOfferId.get(id(offer)), product, pkg: existingPackage, customerMarkets: sellingRegions, dependencies });
                 if (!discovery.ready) { adoptedMappings.push(mapping); continue; }
@@ -101,7 +101,7 @@ function createStoreCatalogSelectionService(models = {}, dependencies = {}) {
                 }
                 const proposal = discovery.proposal || {};
                 const readiness = proposal.mappingMetadata?.readiness || {};
-                const metadata = { ...(mapping.mappingMetadata || {}), fulfillmentContract: proposal.mappingMetadata?.fulfillmentContract, readiness: { ...(mapping.mappingMetadata?.readiness || {}), supplierMapped: true, inputReady: readiness.inputReady === true, validationReady: readiness.validationReady === true, fulfillmentReady: readiness.fulfillmentReady === true }, adoptionPreparation: { authority: "STORE_CATALOG_SELECTION_SUPPLIER_OFFER_ADOPTION", supplierCatalogOfferId: id(offer), supplierProductCode: clean(offer?.supplierProductCode), supplierOfferCode: clean(offer?.supplierOfferCode), customerMarkets: sellingRegions, preparedAt: adoptionNow, preparedBy: clean(context.actor?.username || context.actor || "admin") } };
+                const metadata = { ...(mapping.mappingMetadata || {}), fulfillmentContract: proposal.mappingMetadata?.fulfillmentContract, readiness: { ...(mapping.mappingMetadata?.readiness || {}), supplierMapped: true, inputReady: readiness.inputReady === true, validationReady: readiness.validationReady === true, fulfillmentReady: readiness.fulfillmentReady === true }, adoptionPreparation: { authority: "STORE_CATALOG_SELECTION_SUPPLIER_OFFER_ADOPTION", supplierCatalogOfferId: id(offer), supplierProductCode: clean(offer?.supplierProductCode), supplierOfferCode: clean(offer?.supplierOfferCode), sellingRegions, preparedAt: adoptionNow, preparedBy: clean(context.actor?.username || context.actor || "admin") } };
                 await M.Mapping.updateOne({ _id: mapping._id }, { $set: { region: proposal.region, supplierCatalogOfferId: proposal.supplierCatalogOfferId, supplierProductCode: proposal.supplierProductCode, supplierPackageCode: proposal.supplierPackageCode, executionMode: "API", supplierMarketEvidence: proposal.supplierMarketEvidence, fulfillmentEligibility: { ...proposal.fulfillmentEligibility, verifiedAt: adoptionNow }, mappingMetadata: metadata } }, { session, runValidators: true });
                 adoptedMappings.push({ ...mapping, region: proposal.region, supplierCatalogOfferId: proposal.supplierCatalogOfferId, supplierProductCode: proposal.supplierProductCode, supplierPackageCode: proposal.supplierPackageCode, executionMode: "API", supplierMarketEvidence: proposal.supplierMarketEvidence, fulfillmentEligibility: { ...proposal.fulfillmentEligibility, verifiedAt: adoptionNow }, mappingMetadata: metadata });
             }
@@ -109,7 +109,11 @@ function createStoreCatalogSelectionService(models = {}, dependencies = {}) {
             for (const pkg of packages) { const code = upper(pkg.packageCode); packagesByCode.set(code, [...(packagesByCode.get(code) || []), pkg]); }
             const assessments = adoptedMappings.map(mapping => {
                 const offer = offerById.get(id(mapping.supplierCatalogOfferId));
-                return { mapping, assessment: assessExistingPreparedRoute({ mapping, supplier, offer, supplierProduct: supplierProductById.get(id(offer?.supplierCatalogProductId)), availability: availabilityByOfferId.get(id(offer)), canonicalProduct: product, canonicalPackages: packagesByCode.get(upper(mapping.packageCode)) || [] }, sellingRegions, dependencies) };
+                const supplierProduct = supplierProductById.get(id(offer?.supplierCatalogProductId));
+                const canonicalPackages = packagesByCode.get(upper(mapping.packageCode)) || [];
+                const discovery = discoveryAssessment({ mapping, supplier, supplierProduct, offer, availability: availabilityByOfferId.get(id(offer)), product, pkg: canonicalPackages[0] || null, customerMarkets: sellingRegions, dependencies });
+                const assessment = discovery.ready ? { ready: true, outcome: "FULFILLMENT_READY", blockers: [] } : assessExistingPreparedRoute({ mapping, supplier, offer, supplierProduct, availability: availabilityByOfferId.get(id(offer)), canonicalProduct: product, canonicalPackages }, routeReadinessMarketsForMapping(mapping, sellingRegions), dependencies);
+                return { mapping, assessment };
             });
             const invalid = assessments.filter(item => !item.assessment.ready);
             if (!product || invalid.length) throw new StoreCatalogSelectionError("STORE_SELECTION_MAPPING_NOT_PREPARED", "One or more selected packages are not fulfillment-ready inventory.", 409, { mappingIds: invalid.map(item => id(item.mapping)), outcomes: invalid.map(item => item.assessment.outcome) });

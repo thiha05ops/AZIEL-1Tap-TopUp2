@@ -15,7 +15,7 @@ const supplier = { _id: "s1", supplierCode: "FAZERCARDS", enabled: true, mode: "
 const supplierProduct = { _id: "sp1", supplierId: "s1", supplierProductCode: "pubg_mobile_auto", supplierMarketCode: "GLOBAL", supportState: "SUPPORTED", rawSnapshotHash: hash("a"), sourceRevision: "p1", normalizedInputContract: { fields: contract.fields }, restrictions: [], updatedAt: now };
 const offer = { _id: "o1", supplierId: "s1", supplierCatalogProductId: "sp1", supplierProductCode: "pubg_mobile_auto", supplierOfferCode: "325_uc", catalogLifecycleState: "ACTIVE", reconciliationState: "EXACT_CANONICAL_MATCH", rawSnapshotHash: hash("b"), sourceRevision: "o1", updatedAt: now };
 const availability = { supplierCatalogOfferId: "o1", state: "AVAILABLE", coverageComplete: true, observedAt: now, staleAt: null, updatedAt: now };
-const canonicalProduct = { _id: "cp1", productCode: "pubg", updatedAt: now };
+const canonicalProduct = { _id: "cp1", productCode: "pubg", supportedRegions: ["GLOBAL"], updatedAt: now };
 const canonicalPackage = { _id: "ck1", productCode: "pubg", packageCode: "PUBG_325_UC", enabled: false, prices: {}, updatedAt: now };
 const readyInput = { mapping, supplier, supplierProduct, offer, availability, canonicalProduct, canonicalPackages: [canonicalPackage], customerMarkets: ["TH"], fulfillmentContract: contract, adapterConfigured: true, autoFulfillmentEnabled: true, processorSupported: true };
 

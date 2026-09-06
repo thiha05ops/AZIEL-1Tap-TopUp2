@@ -30,6 +30,21 @@ assert.strictEqual(readyProjection.packages[0].mappingEnabled, false);
 assert.strictEqual(readyProjection.packages[0].productionRole, "DISABLED");
 assert.strictEqual(readyProjection.packages[0].publishedPrice, null);
 
+const thProduct = { ...product, _id: "cp-th", productCode: "valorant-th", name: "Valorant (Thailand)", supportedRegions: ["TH"] };
+const thPackage = { ...pkg, productCode: "valorant-th", packageCode: "VALORANT_TH_100", name: "100 Points" };
+const thSupplierProduct = { ...supplierProduct, _id: "sp-th", supplierProductCode: "valorant_th", supplierMarketCode: "TH", displayName: "Valorant TH" };
+const thOffer = { ...offer, _id: "o-th", supplierCatalogProductId: "sp-th", supplierProductCode: "valorant_th", supplierOfferCode: "100_points" };
+const thAvailability = { ...availability, _id: "av-th", supplierCatalogOfferId: "o-th" };
+const thMapping = { ...mapping, _id: "m-th", productCode: "valorant-th", packageCode: "VALORANT_TH_100", supplierProductCode: "valorant_th", supplierPackageCode: "100_points", supplierCatalogOfferId: "o-th", region: "TH", fulfillmentEligibility: { ...mapping.fulfillmentEligibility, allowedCustomerMarkets: ["TH"] } };
+const thCommerceProjection = projectActivation({
+    products: [thProduct], packages: [thPackage], suppliers: [supplier],
+    mappings: [thMapping], offers: [thOffer], supplierProducts: [thSupplierProduct],
+    availability: [thAvailability], publications: []
+}, { productCode: "valorant-th", supplierMarket: "TH", sellingRegions: "MM,TH" }, dependencies);
+assert.strictEqual(thCommerceProjection.packages[0].prepared.selectable, true, "TH product / TH supplier route must remain selectable for TH+MM AZIEL commerce selling markets.");
+assert.deepStrictEqual(thCommerceProjection.packages[0].prepared.sellingRegions, ["MM", "TH"]);
+assert.deepStrictEqual(thCommerceProjection.packages[0].fulfillmentEligibility.allowedCustomerMarkets, ["TH"], "Add Product projection must not manufacture MM supplier eligibility for a TH route.");
+
 for (const changed of [
     { executionMode: "MANUAL" },
     { mappingMetadata: { readiness: { ...mapping.mappingMetadata.readiness, inputReady: false } } },
@@ -84,14 +99,15 @@ const idPackage = { ...pkg, productCode: "codm-id", packageCode: "CODM_ID_80_CP"
 const idSupplierProduct = { ...supplierProduct, _id: "sp-id", supplierProductCode: "codm_id", supplierMarketCode: "ID", displayName: "CODM ID" };
 const idOffer = { ...offer, _id: "o-id", supplierCatalogProductId: "sp-id", supplierProductCode: "codm_id", supplierOfferCode: "80_cp" };
 const idAvailability = { ...availability, _id: "av-id", supplierCatalogOfferId: "o-id" };
-const idMapping = { ...mapping, _id: "m-id", productCode: "codm-id", packageCode: "CODM_ID_80_CP", supplierProductCode: "codm_id", supplierPackageCode: "80_cp", supplierCatalogOfferId: "o-id", region: "ID", fulfillmentEligibility: { ...mapping.fulfillmentEligibility, allowedCustomerMarkets: ["MM", "TH"] } };
+const idMapping = { ...mapping, _id: "m-id", productCode: "codm-id", packageCode: "CODM_ID_80_CP", supplierProductCode: "codm_id", supplierPackageCode: "80_cp", supplierCatalogOfferId: "o-id", region: "ID", fulfillmentEligibility: { mode: "UNKNOWN", allowedCustomerMarkets: [], evidenceCode: "OPERATOR_CONFIRMED_CAPABILITY", evidenceSource: "fixture", verifiedAt: now, version: 1 } };
 const idCommerceProjection = projectActivation({
     products: [idProduct], packages: [idPackage], suppliers: [supplier],
     mappings: [idMapping], offers: [idOffer], supplierProducts: [idSupplierProduct],
     availability: [idAvailability], publications: []
-}, { productCode: "codm-id", supplierMarket: "ID", customerMarkets: "MM,TH" }, dependencies);
+}, { productCode: "codm-id", supplierMarket: "ID", sellingRegions: "MM,TH" }, dependencies);
 assert.strictEqual(idCommerceProjection.packages[0].prepared.selectable, true, "TH/MM commerce must allow an ID product when the supplier route is ID-compatible.");
-assert.deepStrictEqual(idCommerceProjection.packages[0].prepared.customerMarkets, ["MM", "TH"]);
+assert.deepStrictEqual(idCommerceProjection.packages[0].prepared.sellingRegions, ["MM", "TH"]);
+assert.strictEqual(idCommerceProjection.packages[0].fulfillmentEligibility.mode, "UNKNOWN", "Commerce selling regions must not be rewritten into supplier eligibility during projection.");
 const mismatchedSupplierProduct = { ...idSupplierProduct, _id: "sp-india", supplierMarketCode: "INDIA" };
 const mismatchedOffer = { ...idOffer, _id: "o-india", supplierCatalogProductId: "sp-india" };
 const mismatchedAvailability = { ...idAvailability, supplierCatalogOfferId: "o-india" };
@@ -100,7 +116,7 @@ const mismatchedProjection = projectActivation({
     products: [idProduct], packages: [idPackage], suppliers: [supplier],
     mappings: [mismatchedMapping], offers: [mismatchedOffer], supplierProducts: [mismatchedSupplierProduct],
     availability: [mismatchedAvailability], publications: []
-}, { productCode: "codm-id", supplierMarket: "INDIA", customerMarkets: "TH" }, dependencies);
+}, { productCode: "codm-id", supplierMarket: "INDIA", sellingRegions: "TH" }, dependencies);
 assert.strictEqual(mismatchedProjection.packages[0].prepared.selectable, false, "TH commerce preference alone must not make an incompatible supplier account market valid.");
 assert(mismatchedProjection.packages[0].masterCatalog.blockers.includes("PRODUCT_ACCOUNT_MARKET_INCOMPATIBLE"));
 
@@ -108,10 +124,13 @@ const clone = value => structuredClone(value);
 function query(value) { return { session() { return this; }, lean: async () => clone(value) }; }
 function fixture(selectedMapping = mapping) {
     const state = { selection: null, mapping: clone(selectedMapping), product: clone(product), pkg: clone(pkg), createdPackages: [], mappingUpdates: [] };
+    const fixtureOffer = selectedMapping?.supplierCatalogOfferId === "o-th" ? thOffer : offer;
+    const fixtureSupplierProduct = selectedMapping?.supplierCatalogOfferId === "o-th" ? thSupplierProduct : supplierProduct;
+    const fixtureAvailability = selectedMapping?.supplierCatalogOfferId === "o-th" ? thAvailability : availability;
     const models = {
         Supplier: { findOne: () => query(supplier) }, Mapping: { find: filter => query(state.mapping && (!filter?._id?.$in || filter._id.$in.includes(state.mapping._id)) ? [state.mapping] : []), findOne: () => query(null), create: async docs => { state.createdMappings = docs.map((doc, index) => ({ _id: `created-mapping-${index + 1}`, ...clone(doc) })); state.mapping = state.createdMappings[0]; return state.createdMappings; }, updateOne: async (_filter, update) => { state.mappingUpdates.push({ update: clone(update) }); Object.assign(state.mapping, clone(update.$set)); return { matchedCount: 1, modifiedCount: 1 }; } },
         Selection: { findOne: () => query(state.selection), findOneAndUpdate: (_f, update) => ({ session() { return this; }, lean: async () => { state.selection = { _id: "sel1", ...clone(update.$set) }; return clone(state.selection); } }) },
-        Offer: { find: filter => query(filter?._id?.$in?.includes("o-source") ? [offerWithCanonicalEvidence] : [offer]) }, SupplierProduct: { find: () => query([supplierProduct]) }, Availability: { find: filter => query(filter?.supplierCatalogOfferId?.$in?.includes("o-source") ? [{ ...availability, supplierCatalogOfferId: "o-source" }] : [availability]) },
+        Offer: { find: filter => query(filter?._id?.$in?.includes("o-source") ? [offerWithCanonicalEvidence] : [fixtureOffer]) }, SupplierProduct: { find: () => query([fixtureSupplierProduct]) }, Availability: { find: filter => query(filter?.supplierCatalogOfferId?.$in?.includes("o-source") ? [{ ...availability, supplierCatalogOfferId: "o-source" }] : [fixtureAvailability]) },
         Product: { findOne: () => query(state.product), updateOne: async () => ({ modifiedCount: 1 }) },
         Package: { find: () => query(state.pkg ? [state.pkg] : []), findOneAndUpdate: (_filter, update) => ({ session() { return this; }, lean: async () => { const created = { _id: `created-${state.createdPackages.length + 1}`, ...clone(update.$setOnInsert), ...clone(update.$set) }; state.createdPackages.push(created); state.pkg = created; return clone(created); } }), updateMany: async () => ({ modifiedCount: 1 }) }, Publication: {}
     };
@@ -128,6 +147,14 @@ function fixture(selectedMapping = mapping) {
     assert.deepStrictEqual(accepted.state.mapping, beforeMapping);
     assert.strictEqual(result.pricesChanged, 0);
     assert.strictEqual(result.publicPackagesChanged, 0);
+
+    const thAccepted = fixture(thMapping);
+    thAccepted.state.product = clone(thProduct);
+    thAccepted.state.pkg = clone(thPackage);
+    const thBeforeMapping = clone(thAccepted.state.mapping);
+    const thSelection = await thAccepted.service.save({ productCode: "valorant-th", supplierMarket: "TH", supplierId: "s1", sellingRegions: ["TH", "MM"], mappingIds: ["m-th"], expectedDecisionVersion: 0 }, { actor: { username: "owner" }, transaction: thAccepted.transaction });
+    assert.deepStrictEqual(thSelection.selection.sellingRegions, ["MM", "TH"], "Store Catalog save must accept TH+MM commerce scope for a valid TH product/account supplier route.");
+    assert.deepStrictEqual(thAccepted.state.mapping, thBeforeMapping, "Store Catalog save must not mutate supplier route identity or manufacture MM technical eligibility.");
 
     const missingCanonical = fixture();
     missingCanonical.state.pkg = null;

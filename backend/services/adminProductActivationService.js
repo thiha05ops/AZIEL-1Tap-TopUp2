@@ -41,6 +41,31 @@ function eligibilityAllows(mapping, customerMarket) {
         (mapping.fulfillmentEligibility?.allowedCustomerMarkets || []).map(upper).includes(upper(customerMarket));
 }
 
+function commerceSellingRegionsFrom(value, fallback = "TH") {
+    return [...new Set(String(value || fallback || "TH").split(",").map(upper).filter(Boolean))].sort();
+}
+
+function routeReadinessMarketsForMapping(mapping = {}, fallbackMarkets = []) {
+    const mode = upper(mapping?.fulfillmentEligibility?.mode);
+    if (mode === "CUSTOMER_MARKET_ALLOWLIST") {
+        const allowed = [...new Set((mapping.fulfillmentEligibility?.allowedCustomerMarkets || []).map(upper).filter(market => COMMERCE_MARKETS.includes(market)))].sort();
+        if (allowed.length) return allowed;
+    }
+    if (mode === "GLOBAL") return ["TH"];
+    const fallback = (fallbackMarkets || []).map(upper).find(market => COMMERCE_MARKETS.includes(market));
+    return [fallback || "TH"];
+}
+
+function proposedFulfillmentEligibility(mapping = {}, evidenceSource = "Reviewed Supplier Master Catalog offer for Add Product adoption") {
+    const mode = upper(mapping?.fulfillmentEligibility?.mode);
+    if (mode === "GLOBAL") return { ...mapping.fulfillmentEligibility, mode: "GLOBAL", allowedCustomerMarkets: [], evidenceCode: upper(mapping.fulfillmentEligibility?.evidenceCode) || "OPERATOR_CONFIRMED_CAPABILITY", evidenceSource: mapping.fulfillmentEligibility?.evidenceSource || evidenceSource, verifiedAt: null, version: Number(mapping.fulfillmentEligibility?.version || 0) + 1 };
+    if (mode === "CUSTOMER_MARKET_ALLOWLIST") {
+        const allowed = [...new Set((mapping.fulfillmentEligibility?.allowedCustomerMarkets || []).map(upper).filter(market => COMMERCE_MARKETS.includes(market)))].sort();
+        if (allowed.length) return { ...mapping.fulfillmentEligibility, mode, allowedCustomerMarkets: allowed, evidenceCode: upper(mapping.fulfillmentEligibility?.evidenceCode) || "OPERATOR_CONFIRMED_CAPABILITY", evidenceSource: mapping.fulfillmentEligibility?.evidenceSource || evidenceSource, verifiedAt: null, version: Number(mapping.fulfillmentEligibility?.version || 0) + 1 };
+    }
+    return { mode: "GLOBAL", allowedCustomerMarkets: [], evidenceCode: "OPERATOR_CONFIRMED_CAPABILITY", evidenceSource, verifiedAt: null, version: Number(mapping.fulfillmentEligibility?.version || 0) + 1 };
+}
+
 function publicPrice(pkg, customerMarket) {
     const price = pkg?.prices?.[upper(customerMarket)];
     return price?.enabled === true && Number(price.amount) > 0 ? {
@@ -101,9 +126,8 @@ function discoveryPackage(mapping = {}, pkg = null, offer = {}) {
     };
 }
 
-function discoveryMappingCandidate({ mapping, supplier, supplierProduct, offer, customerMarkets = [] } = {}) {
+function discoveryMappingCandidate({ mapping, supplier, supplierProduct, offer } = {}) {
     const supplierMarket = upper(supplierProduct?.supplierMarketCode);
-    const markets = [...new Set((customerMarkets || []).map(upper).filter(market => COMMERCE_MARKETS.includes(market)))].sort();
     const productCode = supplierExecutionProductCode(mapping, supplier, supplierProduct, offer);
     const proposed = {
         ...mapping,
@@ -113,7 +137,7 @@ function discoveryMappingCandidate({ mapping, supplier, supplierProduct, offer, 
         supplierCatalogOfferId: offer?._id || mapping.supplierCatalogOfferId,
         executionMode: "API",
         supplierMarketEvidence: { normalizedMarket: supplierMarket, supplierMarketCode: upper(supplierProduct?.supplierMarketCode), marketClassification: "REVIEWED_SUPPLIER_MARKET", restrictions: supplierProduct?.restrictions || [], evidenceCode: "SOURCE_LOCKED_SUPPLIER_CATALOG", sourceProductHash: supplierProduct?.rawSnapshotHash },
-        fulfillmentEligibility: { mode: "CUSTOMER_MARKET_ALLOWLIST", allowedCustomerMarkets: markets, evidenceCode: "OPERATOR_CONFIRMED_CAPABILITY", evidenceSource: "Reviewed Supplier Master Catalog offer for Add Product adoption", verifiedAt: null, version: Number(mapping.fulfillmentEligibility?.version || 0) + 1 },
+        fulfillmentEligibility: proposedFulfillmentEligibility(mapping),
         mappingMetadata: { ...(mapping.mappingMetadata || {}), readiness: { ...(mapping.mappingMetadata?.readiness || {}), supplierMapped: true, inputReady: true, validationReady: true, fulfillmentReady: true } }
     };
     const fulfillmentContract = contractFromSupplierCatalog({ mapping: proposed, supplier, offer, supplierProduct });
@@ -128,7 +152,7 @@ function canonicalEvidenceForOffer(offer = {}) {
     return productCode && packageCode ? { productCode, packageCode } : null;
 }
 
-function syntheticMappingFromOffer({ offer, supplier, supplierProduct, customerMarkets = [] } = {}) {
+function syntheticMappingFromOffer({ offer, supplier, supplierProduct } = {}) {
     const canonical = canonicalEvidenceForOffer(offer);
     if (!canonical) return null;
     const supplierMarket = upper(supplierProduct?.supplierMarketCode);
@@ -147,7 +171,7 @@ function syntheticMappingFromOffer({ offer, supplier, supplierProduct, customerM
         productionRole: "DISABLED",
         executionMode: "API",
         archivedAt: null,
-        fulfillmentEligibility: { mode: "CUSTOMER_MARKET_ALLOWLIST", allowedCustomerMarkets: [...new Set((customerMarkets || []).map(upper).filter(market => COMMERCE_MARKETS.includes(market)))].sort(), evidenceCode: "OPERATOR_CONFIRMED_CAPABILITY", evidenceSource: "Reviewed Supplier Master Catalog offer for Add Product adoption", verifiedAt: null, version: 1 },
+        fulfillmentEligibility: proposedFulfillmentEligibility({}, "Reviewed Supplier Master Catalog offer for Add Product adoption"),
         mappingMetadata: { readiness: { supplierMapped: true, inputReady: true, validationReady: true, fulfillmentReady: true, pricingReady: false, storefrontReady: false } },
         supplierCostAuthority: { rawSupplierCost: null }
     };
@@ -168,7 +192,7 @@ function discoveryAssessment({ mapping, supplier, supplierProduct, offer, availa
     if (!markets.length) blockers.push("CUSTOMER_MARKET_REQUIRED");
     if (markets.some(market => !COMMERCE_MARKETS.includes(market))) blockers.push("CUSTOMER_MARKET_ELIGIBILITY_UNPROVEN");
     if (!supplierRouteProductMarketCompatibility(supplierMarket, product?.supportedRegions || []).compatible) blockers.push("PRODUCT_ACCOUNT_MARKET_INCOMPATIBLE");
-    const { proposed, fulfillmentContract } = discoveryMappingCandidate({ mapping, supplier, supplierProduct, offer, customerMarkets: markets });
+    const { proposed, fulfillmentContract } = discoveryMappingCandidate({ mapping, supplier, supplierProduct, offer });
     if (!fulfillmentContract?.fields?.length) blockers.push("INPUT_CONTRACT_UNRESOLVED");
     let adapter = null, adapterConfigured = false, autoFulfillmentEnabled = false, processorSupported = false;
     const adapterResolver = dependencies.adapterResolver || getSupplierAdapter;
@@ -214,7 +238,7 @@ function blockerActions(blockers = []) {
     return [...new Map(blockers.map(code => [definitions[code]?.[0] || "INSPECT_BLOCKER", { code, action: definitions[code]?.[0] || "INSPECT_BLOCKER", label: definitions[code]?.[1] || "Inspect the server-authoritative blocker." }])).values()];
 }
 
-function projectActivation(data, { search = "", productCode = "", supplierMarket = "", customerMarket = "TH", customerMarkets = "", now = new Date() } = {}, dependencies = {}) {
+function projectActivation(data, { search = "", productCode = "", supplierMarket = "", customerMarket = "TH", customerMarkets = "", sellingRegions = "", now = new Date() } = {}, dependencies = {}) {
     const productByCode = new Map(data.products.map(item => [lower(item.productCode), item]));
     const packageByKey = new Map(data.packages.map(item => [key(lower(item.productCode), upper(item.packageCode)), item]));
     const supplierById = new Map(data.suppliers.map(item => [id(item), item]));
@@ -225,8 +249,8 @@ function projectActivation(data, { search = "", productCode = "", supplierMarket
     const normalizedSearch = lower(search);
     const normalizedProduct = lower(productCode);
     const normalizedSupplierMarket = upper(supplierMarket);
-    const requestedMarkets = [...new Set(String(customerMarkets || customerMarket || "TH").split(",").map(upper).filter(Boolean))].sort();
-    const market = requestedMarkets[0] || "TH";
+    const requestedSellingRegions = commerceSellingRegionsFrom(sellingRegions || customerMarkets || customerMarket, "TH");
+    const market = requestedSellingRegions[0] || "TH";
 
     if (!normalizedProduct) {
         const publishedKeys = new Set(data.publications.filter(item => item.published === true).map(item => key(lower(item.productCode), upper(item.packageCode))));
@@ -257,7 +281,7 @@ function projectActivation(data, { search = "", productCode = "", supplierMarket
     const offerSourceRows = data.offers.filter(offer => !mappedOfferIds.has(id(offer))).map(offer => {
         const supplier = supplierById.get(id(offer.supplierId));
         const supplierProduct = supplierProductById.get(id(offer.supplierCatalogProductId));
-        const mapping = syntheticMappingFromOffer({ offer, supplier, supplierProduct, customerMarkets: requestedMarkets });
+        const mapping = syntheticMappingFromOffer({ offer, supplier, supplierProduct });
         return mapping ? { mapping, synthetic: true } : null;
     }).filter(Boolean);
     const mappingRows = [...mappingSourceRows, ...offerSourceRows].map(({ mapping, synthetic }) => {
@@ -270,8 +294,8 @@ function projectActivation(data, { search = "", productCode = "", supplierMarket
         const publication = publicationByKey.get(key(lower(mapping.productCode), upper(mapping.packageCode), market));
         const readiness = mappingReadiness({ mapping, supplier, pkg, offer, availability, customerMarket: market, now });
         const setup = mappingAvailability({ mapping, supplier, pkg, offer });
-        const discovery = discoveryAssessment({ mapping, supplier, supplierProduct, offer, availability, product, pkg, customerMarkets: requestedMarkets, dependencies });
-        const prepared = discovery.ready ? { ready: true, outcome: "FULFILLMENT_READY", blockers: [], fulfillmentContract: discovery.fulfillmentContract } : assessExistingPreparedRoute({ mapping, supplier, supplierProduct, offer, availability, canonicalProduct: product, canonicalPackages: pkg ? [pkg] : [] }, requestedMarkets, dependencies);
+        const discovery = discoveryAssessment({ mapping, supplier, supplierProduct, offer, availability, product, pkg, customerMarkets: requestedSellingRegions, dependencies });
+        const prepared = discovery.ready ? { ready: true, outcome: "FULFILLMENT_READY", blockers: [], fulfillmentContract: discovery.fulfillmentContract } : assessExistingPreparedRoute({ mapping, supplier, supplierProduct, offer, availability, canonicalProduct: product, canonicalPackages: pkg ? [pkg] : [] }, routeReadinessMarketsForMapping(mapping, requestedSellingRegions), dependencies);
         const displayPackage = discoveryPackage(mapping, pkg, offer);
         const cost = mapping.supplierCostAuthority || {};
         const approvedCostPresent = cost.rawSupplierCost != null && Number.isFinite(Number(cost.rawSupplierCost));
@@ -299,7 +323,7 @@ function projectActivation(data, { search = "", productCode = "", supplierMarket
             availability: availability ? { state: availability.state, evidenceCode: availability.evidenceCode, coverageComplete: availability.coverageComplete, observedAt: availability.observedAt } : { state: "UNKNOWN", evidenceCode: "MISSING", coverageComplete: false, observedAt: null },
             publishedPrice: publicPrice(pkg, market), publication: publication ? { published: publication.published === true, decisionVersion: publication.decisionVersion, decisionNote: publication.decisionNote || "" } : { published: false, decisionVersion: 0, decisionNote: "" },
             masterCatalog: { mapped: !synthetic, valid: prepared.ready, blockers: prepared.blockers, canonicalPackageMissing: discovery.canonicalPackageMissing === true },
-            prepared: { selectable: prepared.ready, outcome: prepared.outcome, customerMarkets: requestedMarkets, adoptionCreatesCanonicalPackage: discovery.canonicalPackageMissing === true, adoptionCreatesMapping: synthetic === true },
+            prepared: { selectable: prepared.ready, outcome: prepared.outcome, sellingRegions: requestedSellingRegions, customerMarkets: requestedSellingRegions, adoptionCreatesCanonicalPackage: discovery.canonicalPackageMissing === true, adoptionCreatesMapping: synthetic === true },
             setup: { ...setup, productionMappingEnabled: mapping.enabled === true, pricingPrepared, fulfillmentPrepared, readyToPublish: readiness.ready, published: publication?.published === true },
             dailyPricing: { workspacePath: `/api/admin/pricing-engine/workspace?supplierId=${encodeURIComponent(id(mapping.supplierId))}&supplierMarket=${encodeURIComponent(upper(mapping.region))}&productCode=${encodeURIComponent(lower(mapping.productCode))}&region=${encodeURIComponent(market)}`, previewEligible: approvedCostPresent && mapping.mappingMetadata?.readiness?.supplierMapped === true },
             readiness: { ...readiness, actions: blockerActions(readiness.blockers) }
@@ -329,7 +353,7 @@ function projectActivation(data, { search = "", productCode = "", supplierMarket
 
     return {
         authority: { catalog: "CatalogProduct/CatalogPackage", route: "SupplierProductMapping.productionRole", cost: "SupplierProductMapping.supplierCostAuthority", pricing: "Daily Pricing/Pricing Engine", input: "SupplierCatalogProduct + mapping readiness", fulfillment: "supplier eligibility route resolver", publication: "PackageMarketPublication" },
-        projectionMode: "READINESS", customerMarket: market, customerMarkets: requestedMarkets, commerceMarketSupported: requestedMarkets.every(value => COMMERCE_MARKETS.includes(value)), products,
+        projectionMode: "READINESS", customerMarket: market, customerMarkets: requestedSellingRegions, sellingRegions: requestedSellingRegions, commerceMarketSupported: requestedSellingRegions.every(value => COMMERCE_MARKETS.includes(value)), products,
         markets: normalizedProduct ? [...new Set(mappingRows.filter(row => row.productCode === normalizedProduct).map(row => row.supplierMarket))].sort() : [],
         packages: filtered, automaticFailover: false, automaticPublicRepricing: false
     };
@@ -431,4 +455,4 @@ async function publishSelectedPackages({ productCode, customerMarket, selections
 }
 
 const defaultService = createAdminProductActivationService();
-module.exports = Object.freeze({ COMMERCE_MARKETS, AdminProductActivationError, eligibilityAllows, mappingAvailability, mappingReadiness, blockerActions, canonicalEvidenceForOffer, syntheticMappingFromOffer, discoveryAssessment, discoveryMappingCandidate, discoveryPackage, projectActivation, createAdminProductActivationService, getWorkspace: defaultService.getWorkspace, publishSelectedPackage, publishSelectedPackages });
+module.exports = Object.freeze({ COMMERCE_MARKETS, AdminProductActivationError, eligibilityAllows, mappingAvailability, mappingReadiness, blockerActions, canonicalEvidenceForOffer, syntheticMappingFromOffer, discoveryAssessment, discoveryMappingCandidate, discoveryPackage, routeReadinessMarketsForMapping, projectActivation, createAdminProductActivationService, getWorkspace: defaultService.getWorkspace, publishSelectedPackage, publishSelectedPackages });

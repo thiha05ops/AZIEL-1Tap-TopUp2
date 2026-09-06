@@ -28,7 +28,7 @@ function initialState() {
             _id: ids.mappings[index], productCode: "mlbb", packageCode, supplierId: ids.supplier,
             supplierCode: "FAZERCARDS", region: "GLOBAL", supplierProductCode: "mobile_legends_global", supplierPackageCode,
             supplierCatalogOfferId: ids.offers[index], enabled: false, productionRole: "DISABLED", executionMode: "API", archivedAt: null,
-            fulfillmentEligibility: { mode: "CUSTOMER_MARKET_ALLOWLIST", allowedCustomerMarkets: ["TH", "MM"], evidenceCode: "OPERATOR_CONFIRMED_CAPABILITY", evidenceSource: "fixture", verifiedAt: new Date().toISOString(), version: 1 },
+            fulfillmentEligibility: { mode: "CUSTOMER_MARKET_ALLOWLIST", allowedCustomerMarkets: ["TH"], evidenceCode: "OPERATOR_CONFIRMED_CAPABILITY", evidenceSource: "fixture", verifiedAt: new Date().toISOString(), version: 1 },
             mappingMetadata: { readiness: { supplierMapped: true, pricingReady: false, inputReady: true, validationReady: true, fulfillmentReady: true, storefrontReady: false } }
         })),
         offers: packageRows.map(([_packageCode, _name, supplierOfferCode], index) => ({
@@ -147,6 +147,7 @@ async function main() {
     assert.deepStrictEqual(selection.sellingRegions, ["MM", "TH"]);
     assert.deepStrictEqual(selection.visibleRegions, []);
     assert.deepStrictEqual(selection.packages.map(row => String(row.supplierProductMappingId)).sort(), [...ids.mappings].sort());
+    assert.deepStrictEqual(state.mappings.map(row => row.fulfillmentEligibility.allowedCustomerMarkets), [["TH"], ["TH"], ["TH"]], "TH+MM Store Catalog commerce scope must not manufacture MM supplier eligibility.");
     const firstWriteSummary = { created: true, count: 1, productCode: selection.productCode, supplierCode: selection.supplierCode, supplierMarket: selection.supplierMarket, sellingRegions: [...selection.sellingRegions], selectedMappings: selection.packages.length, visibleRegions: [...selection.visibleRegions] };
     assert.deepStrictEqual(state.mappings, beforeMappings);
     assert.deepStrictEqual(state.prices, beforePrices);
