@@ -22,7 +22,7 @@ const { normalizeProductKnowledge, normalizeCustomerNote, normalizeCustomerNoteL
 const { resolvePublicProductReadiness } = require("../catalog/publicProductReadiness");
 const { publicCustomerInputContract, verifiedMappingContract } = require("./suppliers/fazercardsFulfillmentContractService");
 const { normalizeProductRegions } = require("../catalog/productRegionAuthority");
-const { assessProductionReadyFulfillmentMapping, isManualFulfillmentAllowed, isProductionReadyFulfillmentMapping, isSupplierMappedAutoTopupThScope } = require("./fulfillmentCapabilityService");
+const { assessProductionReadyFulfillmentMapping, isManualFulfillmentAllowed, isProductionReadyFulfillmentMapping, isSupplierMappedAutoTopupThScope, productCompatibilityMarketsFromAuthority } = require("./fulfillmentCapabilityService");
 const { publicCategoryFor } = require("../catalog/catalogTaxonomy");
 const {
     applyPublicationMetadata,
@@ -712,6 +712,7 @@ function projectCommerceReadiness(product = {}, packages = [], mappings = [], in
     const packageAvailable = item => !unavailablePackageIds.has(String(item._id || "")) &&
         !unavailablePackageIds.has(String(item.packageCode || "").toUpperCase());
     const supplierById = new Map(suppliers.map(item => [String(item._id), item]));
+    const productCompatibilityMarkets = productCompatibilityMarketsFromAuthority(product);
     const mappingMatches = (item, region) => mappings.some(mapping =>
         mapping.enabled !== false &&
         String(mapping.productCode || "").toLowerCase() === String(product.productCode || "").toLowerCase() &&
@@ -721,7 +722,7 @@ function projectCommerceReadiness(product = {}, packages = [], mappings = [], in
             productCode: product.productCode,
             packageCode: item.packageCode,
             region,
-            productCompatibilityMarkets: product.supportedRegions || [],
+            productCompatibilityMarkets,
             supplierRouteMarket: mapping.region
         }))
     );
@@ -767,6 +768,7 @@ function applyPackageFulfillmentReadiness(projection, mappings = [], inventorySt
         .filter(item => item.availabilityState && item.availabilityState !== "AVAILABLE")
         .flatMap(item => [String(item.packageRef || ""), String(item.packageId || item.packageCode || "").toUpperCase()]));
     const supplierById = new Map(suppliers.map(item => [String(item._id), item]));
+    const productCompatibilityMarkets = productCompatibilityMarketsFromAuthority(projection);
     projection.packages.forEach(pkg => {
         const available = !unavailablePackageIds.has(String(pkg._id || "")) &&
             !unavailablePackageIds.has(String(pkg.packageCode || "").toUpperCase());
@@ -780,7 +782,7 @@ function applyPackageFulfillmentReadiness(projection, mappings = [], inventorySt
                     productCode: projection.productCode,
                     packageCode: pkg.packageCode,
                     region,
-                    productCompatibilityMarkets: projection.supportedRegions || [],
+                    productCompatibilityMarkets,
                     supplierRouteMarket: mapping.region
                 })));
             const manual = !supplierMappedScope && isManualFulfillmentAllowed(projection, region);
@@ -794,6 +796,7 @@ function applyAdminSupplierSupport(projection, mappings = [], suppliers = [], el
     if (!projection || !Array.isArray(projection.packages)) return projection;
     const productCode = projection.productCode;
     const supplierById = new Map(suppliers.map(item => [String(item._id), item]));
+    const productCompatibilityMarkets = productCompatibilityMarketsFromAuthority(projection);
     projection.packages.forEach(pkg => {
         const exact = mappings.filter(mapping =>
             String(mapping.productCode || "").toLowerCase() === productCode &&
@@ -804,7 +807,7 @@ function applyAdminSupplierSupport(projection, mappings = [], suppliers = [], el
         );
         const details = exact.map(mapping => {
             const assessment = assessProductionReadyFulfillmentMapping(mapping, supplierById.get(String(mapping.supplierId)), {
-                ...eligibilityContext, productCode, packageCode: pkg.packageCode, region: "TH", productCompatibilityMarkets: projection.supportedRegions || []
+                ...eligibilityContext, productCode, packageCode: pkg.packageCode, region: "TH", productCompatibilityMarkets
             });
             return { supplierCode: String(mapping.supplierCode || "").toUpperCase(), ready: assessment.ready, blockers: assessment.blockers };
         });
@@ -827,6 +830,7 @@ function applyAdminProductionAttribution(projection, mappings = [], suppliers = 
     if (!projection || !Array.isArray(projection.packages)) return projection;
     const market = String(customerMarket || "TH").trim().toUpperCase();
     const supplierById = new Map(suppliers.map(item => [String(item._id), item]));
+    const productCompatibilityMarkets = productCompatibilityMarketsFromAuthority(projection);
     const publicationByPackage = new Map(publications.filter(item => String(item.customerMarket || "").toUpperCase() === market).map(item => [String(item.packageCode || "").toUpperCase(), item]));
     projection.packages.forEach(pkg => {
         const packageCode = String(pkg.packageCode || "").toUpperCase();
@@ -837,7 +841,7 @@ function applyAdminProductionAttribution(projection, mappings = [], suppliers = 
             String(mapping.packageCode || "").toUpperCase() === packageCode
         ).map(mapping => {
             const supplier = supplierById.get(String(mapping.supplierId));
-            return { mapping, supplier, assessment: assessProductionReadyFulfillmentMapping(mapping, supplier, { ...eligibilityContext, productCode: projection.productCode, packageCode, region: market, productCompatibilityMarkets: projection.supportedRegions || [] }) };
+            return { mapping, supplier, assessment: assessProductionReadyFulfillmentMapping(mapping, supplier, { ...eligibilityContext, productCode: projection.productCode, packageCode, region: market, productCompatibilityMarkets }) };
         });
         const eligibleReady = candidates.filter(candidate => candidate.assessment.ready);
         const selected = eligibleReady.length === 1

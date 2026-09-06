@@ -8,6 +8,20 @@ const { supportsMapping } = require("./suppliers/supplierFulfillmentDispatcher")
 const { validateFulfillmentEligibility, isCustomerMarketEligible, supplierRouteProductMarketCompatibility } = require("./supplierFulfillmentEligibilityService");
 
 const REGIONS = Object.freeze(["MM", "TH"]);
+const PRODUCT_COMPATIBILITY_MARKETS = Object.freeze(["GLOBAL", "MM", "TH", "ID", "MY", "SG", "PH", "SEA", "ASIA"]);
+const MARKET_LABELS = Object.freeze({
+    GLOBAL: "GLOBAL",
+    WORLDWIDE: "GLOBAL",
+    THAILAND: "TH",
+    MYANMAR: "MM",
+    INDONESIA: "ID",
+    MALAYSIA: "MY",
+    SINGAPORE: "SG",
+    PHILIPPINES: "PH",
+    "SOUTHEAST ASIA": "SEA",
+    "SOUTH EAST ASIA": "SEA",
+    ASIA: "ASIA"
+});
 
 function normalizeRegion(value = "") {
     const region = String(value || "").trim().toUpperCase();
@@ -36,6 +50,31 @@ function isManualFulfillmentAllowed(product = {}, region = "") {
     return manualAllowedRegions(product).includes(normalizeRegion(region));
 }
 
+function normalizeProductCompatibilityMarkets(markets = []) {
+    return [...new Set((Array.isArray(markets) ? markets : [])
+        .map(value => String(value || "").trim().toUpperCase())
+        .map(value => MARKET_LABELS[value] || value)
+        .filter(value => PRODUCT_COMPATIBILITY_MARKETS.includes(value)))].sort();
+}
+
+function productCompatibilityMarketsFromAuthority(product = {}) {
+    const metadataMarkets = normalizeProductCompatibilityMarkets(
+        product.metadata?.productAccountCompatibilityMarkets ||
+        product.metadata?.accountCompatibilityMarkets ||
+        product.metadata?.compatibilityMarkets
+    );
+    if (metadataMarkets.length) return metadataMarkets;
+
+    const marketScope = String(product.presentation?.marketScope || product.marketScope || "").trim().toUpperCase();
+    if (marketScope === "GLOBAL") return ["GLOBAL"];
+
+    const displayMarket = String(product.presentation?.displayMarketLabel || product.displayMarketLabel || "").trim().toUpperCase();
+    const displayMarketValue = MARKET_LABELS[displayMarket] || displayMarket;
+    if (PRODUCT_COMPATIBILITY_MARKETS.includes(displayMarketValue)) return [displayMarketValue];
+
+    return normalizeProductCompatibilityMarkets(product.supportedRegions);
+}
+
 function classifyMapping(mapping = {}, supplier = {}) {
     const supplierMode = String(supplier.mode || "").toUpperCase();
     const executionMode = String(mapping.executionMode || "").toUpperCase();
@@ -51,9 +90,7 @@ function assessProductionReadyFulfillmentMapping(mapping = {}, supplier = {}, co
     const packageCode = String(context.packageCode || mapping.packageCode || "").trim().toUpperCase();
     const region = normalizeRegion(context.region || mapping.region);
     const routeMarket = String(context.supplierRouteMarket || mapping.region || "").trim().toUpperCase();
-    const productCompatibilityMarkets = Array.isArray(context.productCompatibilityMarkets)
-        ? context.productCompatibilityMarkets
-        : [];
+    const productCompatibilityMarkets = normalizeProductCompatibilityMarkets(context.productCompatibilityMarkets);
     const readiness = mapping.mappingMetadata?.readiness || {};
     const blockers = [];
     const eligibility = validateFulfillmentEligibility(mapping.fulfillmentEligibility);
@@ -142,7 +179,8 @@ function assessPreCommercialFulfillmentReadiness({
             String(mapping.supplierProductCode || "").trim() !== supplierProductCodeForReadiness(mapping, supplier, supplierProduct)) blockers.push("SUPPLIER_IDENTITY_MISMATCH");
         const supplierMarket = resolvedSupplierMarketForReadiness(mapping, supplierProduct);
         if (!supplierMarket || ["UNKNOWN", "UNSPECIFIED"].includes(supplierMarket) || supplierMarket !== String(mapping.region || "").trim().toUpperCase()) blockers.push("MARKET_UNRESOLVED");
-        if (!supplierRouteProductMarketCompatibility(supplierMarket, canonicalProduct?.supportedRegions || []).compatible) blockers.push("PRODUCT_ACCOUNT_MARKET_INCOMPATIBLE");
+        const productMarkets = productCompatibilityMarketsFromAuthority(canonicalProduct);
+        if (productMarkets.length && !supplierRouteProductMarketCompatibility(supplierMarket, productMarkets).compatible) blockers.push("PRODUCT_ACCOUNT_MARKET_INCOMPATIBLE");
     }
     if (!markets.length) blockers.push("CUSTOMER_MARKET_REQUIRED");
     const eligibility = validateFulfillmentEligibility(mapping?.fulfillmentEligibility);
@@ -209,7 +247,7 @@ function resolveFulfillmentCapability({ product = {}, mappings = [], suppliers =
         packageCode,
         region,
         context: {
-            productCompatibilityMarkets: product.supportedRegions || [],
+            productCompatibilityMarkets: productCompatibilityMarketsFromAuthority(product),
             ...context
         }
     });
@@ -264,6 +302,8 @@ module.exports = {
     assessProductionReadyFulfillmentMapping,
     assessPreCommercialFulfillmentReadiness,
     eligibleMappingsForPackage,
+    normalizeProductCompatibilityMarkets,
+    productCompatibilityMarketsFromAuthority,
     isProductionReadyFulfillmentMapping,
     isSupplierMappedAutoTopupThScope,
     isManualFulfillmentAllowed,

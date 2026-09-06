@@ -25,6 +25,8 @@ const {
 } = require("../services/commerce/commercePricingPreviewService");
 const {
     assessProductionReadyFulfillmentMapping,
+    normalizeProductCompatibilityMarkets,
+    productCompatibilityMarketsFromAuthority,
     resolveFulfillmentCapability
 } = require("../services/fulfillmentCapabilityService");
 
@@ -121,6 +123,7 @@ function verifySupplierRouteCommerceMarketSeparation() {
     const globalRoute = productionReadyMapping({ region: "GLOBAL" });
     const thRoute = productionReadyMapping({ region: "TH" });
     const idRoute = productionReadyMapping({ region: "ID" });
+    const idProductRoute = productionReadyMapping({ region: "ID" });
 
     const globalTh = assessProductionReadyFulfillmentMapping(globalRoute, supplier, readyContext(["GLOBAL"], "TH"));
     assert.strictEqual(globalTh.ready, true, "CASE A: GLOBAL product + GLOBAL supplier route must be ready in TH commerce.");
@@ -135,6 +138,22 @@ function verifySupplierRouteCommerceMarketSeparation() {
     const incompatible = assessProductionReadyFulfillmentMapping(idRoute, supplier, readyContext(["TH"], "MM"));
     assert.strictEqual(incompatible.ready, false, "CASE D: ID-only supplier route must fail for a TH product/account market.");
     assert(incompatible.blockers.includes("PRODUCT_ACCOUNT_MARKET_INCOMPATIBLE"));
+
+    const idProductThCommerce = assessProductionReadyFulfillmentMapping(idProductRoute, supplier, readyContext(["ID"], "TH"));
+    assert.strictEqual(idProductThCommerce.ready, true, "CASE G: ID product + ID supplier route must be valid in TH commerce.");
+
+    const idProductMmCommerce = assessProductionReadyFulfillmentMapping(idProductRoute, supplier, readyContext(["ID"], "MM"));
+    assert.strictEqual(idProductMmCommerce.ready, true, "CASE H: ID product + ID supplier route must be valid in MM commerce.");
+
+    const genuineThMmProduct = assessProductionReadyFulfillmentMapping(thRoute, supplier, readyContext(productCompatibilityMarketsFromAuthority({ supportedRegions: ["TH", "MM"] }), "MM"));
+    assert.strictEqual(genuineThMmProduct.ready, true, "A genuine TH+MM product/account compatibility declaration must not be discarded.");
+
+    const explicitGlobalProduct = assessProductionReadyFulfillmentMapping(globalRoute, supplier, readyContext(productCompatibilityMarketsFromAuthority({ supportedRegions: ["TH", "MM"], presentation: { marketScope: "GLOBAL", displayMarketLabel: "Global" } }), "MM"));
+    assert.strictEqual(explicitGlobalProduct.ready, true, "Explicit product presentation authority can identify GLOBAL compatibility despite legacy TH/MM stored regions.");
+    assert.deepStrictEqual(normalizeProductCompatibilityMarkets(["TH", "MM"]), ["MM", "TH"], "A genuine TH+MM product/account compatibility declaration remains authoritative.");
+    assert.deepStrictEqual(productCompatibilityMarketsFromAuthority({ supportedRegions: ["TH", "MM"] }), ["MM", "TH"], "The value shape alone must not make TH+MM legacy.");
+    assert.deepStrictEqual(productCompatibilityMarketsFromAuthority({ supportedRegions: ["TH", "MM"], presentation: { marketScope: "GLOBAL", displayMarketLabel: "Global" } }), ["GLOBAL"], "Explicit presentation authority can override legacy commerce-region compatibility data.");
+    assert.deepStrictEqual(normalizeProductCompatibilityMarkets(["TH"]), ["TH"], "A single TH account-market label remains authoritative.");
 
     const mmCapability = resolveFulfillmentCapability({
         product: { supportedRegions: ["TH"], fulfillment: { manualAllowedRegions: [] } },
@@ -163,6 +182,9 @@ function verifySupplierRouteCommerceMarketSeparation() {
         globalMmReady: true,
         thRouteMmCommerceReady: true,
         incompatibleIdRouteRejected: true,
+        idProductThCommerceReady: true,
+        idProductMmCommerceReady: true,
+        genuineThMmCompatibilityPreserved: true,
         noMmSupplierRouteRequired: true,
         thBehaviorUnchanged: true
     };
