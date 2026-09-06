@@ -7,6 +7,11 @@ const mongoose = require("mongoose");
 
 const CatalogProduct = require("../models/CatalogProduct");
 const CatalogPackage = require("../models/CatalogPackage");
+const SupplierProductMapping = require("../models/SupplierProductMapping");
+const Supplier = require("../models/Supplier");
+const PackageInventoryState = require("../models/PackageInventoryState");
+const PackageMarketPublication = require("../models/PackageMarketPublication");
+const StoreCatalogSelection = require("../models/StoreCatalogSelection");
 const {
     CatalogError,
     applyPackageFulfillmentReadiness,
@@ -71,6 +76,132 @@ async function expectError(promise, ErrorType, code) {
     }
     assert(caught instanceof ErrorType, `Expected ${ErrorType.name}, received ${caught?.constructor?.name || "no error"}`);
     assert.strictEqual(caught.code, code);
+}
+
+function queryResult(value) {
+    return {
+        sort() { return this; },
+        select() { return this; },
+        lean: () => Promise.resolve(value)
+    };
+}
+
+async function withExplicitStoreCatalogProjection({ products, packages, mappings = [], suppliers = [], publications = [], selections = [] }, callback) {
+    const originals = {
+        CatalogProductFind: CatalogProduct.find,
+        CatalogPackageFind: CatalogPackage.find,
+        SupplierProductMappingFind: SupplierProductMapping.find,
+        SupplierFind: Supplier.find,
+        PackageInventoryStateFind: PackageInventoryState.find,
+        PackageMarketPublicationFind: PackageMarketPublication.find,
+        StoreCatalogSelectionFind: StoreCatalogSelection.find,
+        STORE_CATALOG_SELECTION_MODE: process.env.STORE_CATALOG_SELECTION_MODE,
+        PACKAGE_MARKET_PUBLICATION_MODE: process.env.PACKAGE_MARKET_PUBLICATION_MODE
+    };
+    CatalogProduct.find = () => queryResult(products);
+    CatalogPackage.find = () => queryResult(packages);
+    SupplierProductMapping.find = () => queryResult(mappings);
+    Supplier.find = () => queryResult(suppliers);
+    PackageInventoryState.find = () => queryResult([]);
+    PackageMarketPublication.find = query => queryResult(publications.filter(item => String(item.customerMarket || "").toUpperCase() === String(query?.customerMarket || "").toUpperCase()));
+    StoreCatalogSelection.find = query => queryResult(selections.filter(item => (
+        item.status === query?.status &&
+        (item.sellingRegions || []).includes(String(query?.sellingRegions || "").toUpperCase()) &&
+        (item.visibleRegions || []).includes(String(query?.visibleRegions || "").toUpperCase())
+    )));
+    process.env.STORE_CATALOG_SELECTION_MODE = "EXPLICIT";
+    process.env.PACKAGE_MARKET_PUBLICATION_MODE = "EXPLICIT";
+    try {
+        return await callback();
+    } finally {
+        CatalogProduct.find = originals.CatalogProductFind;
+        CatalogPackage.find = originals.CatalogPackageFind;
+        SupplierProductMapping.find = originals.SupplierProductMappingFind;
+        Supplier.find = originals.SupplierFind;
+        PackageInventoryState.find = originals.PackageInventoryStateFind;
+        PackageMarketPublication.find = originals.PackageMarketPublicationFind;
+        StoreCatalogSelection.find = originals.StoreCatalogSelectionFind;
+        if (originals.STORE_CATALOG_SELECTION_MODE == null) delete process.env.STORE_CATALOG_SELECTION_MODE;
+        else process.env.STORE_CATALOG_SELECTION_MODE = originals.STORE_CATALOG_SELECTION_MODE;
+        if (originals.PACKAGE_MARKET_PUBLICATION_MODE == null) delete process.env.PACKAGE_MARKET_PUBLICATION_MODE;
+        else process.env.PACKAGE_MARKET_PUBLICATION_MODE = originals.PACKAGE_MARKET_PUBLICATION_MODE;
+    }
+}
+
+async function verifyExplicitStorefrontVisibilitySeparatesPublishedPackages() {
+    const productCode = "visible-unpublished-product";
+    const product = {
+        ...baseProduct,
+        productCode,
+        name: "Visible Unpublished Product",
+        homepageEnabled: true,
+        commerceState: "PURCHASABLE",
+        presentation: {}
+    };
+    const publishedPackage = {
+        ...basePackage,
+        _id: "published-package",
+        productCode,
+        packageCode: "PUBLISHED_PACKAGE",
+        name: "Published Package"
+    };
+    const unpublishedPackage = {
+        ...basePackage,
+        _id: "unpublished-package",
+        productCode,
+        packageCode: "UNPUBLISHED_PACKAGE",
+        name: "Unpublished Package"
+    };
+    const selection = regions => ({
+        productCode,
+        status: "ACTIVE",
+        sellingRegions: regions,
+        visibleRegions: regions,
+        packages: [
+            { packageCode: "PUBLISHED_PACKAGE" },
+            { packageCode: "UNPUBLISHED_PACKAGE" }
+        ]
+    });
+    const readPublicMm = async ({ visibleRegions = ["MM"], published = [] } = {}) => withExplicitStoreCatalogProjection({
+        products: [product],
+        packages: [publishedPackage, unpublishedPackage],
+        selections: [selection(visibleRegions)],
+        publications: published.map(packageCode => ({
+            productCode,
+            packageCode,
+            customerMarket: "MM",
+            published: true,
+            decisionVersion: 1
+        }))
+    }, () => toPublicCatalog({
+        source: "database",
+        includeDisabled: false,
+        includeAssetProjection: false,
+        includeAdminPricing: false,
+        customerMarket: "MM",
+        publicationProjectionMode: "EXPLICIT"
+    }));
+
+    let catalog = await readPublicMm({ published: [] });
+    let projected = catalog.find(item => item.productCode === productCode);
+    assert(projected, "CASE A: Store Catalog visible product must appear even when zero MM packages are published.");
+    assert.strictEqual(projected.packageCount, 0, "CASE A: zero published packages must expose zero purchasable package options.");
+    assert.deepStrictEqual(projected.packages, [], "CASE A: unpublished packages must not leak into the public package list.");
+    assert.strictEqual(projected.purchasable, false, "CASE A: visible product with no published packages must not be purchasable.");
+    assert.strictEqual(projected.publicState, "COMING_SOON", "CASE A: visible product with no purchasable packages must use unavailable/coming-soon semantics.");
+
+    catalog = await readPublicMm({ published: ["PUBLISHED_PACKAGE"] });
+    projected = catalog.find(item => item.productCode === productCode);
+    assert(projected, "CASE B: product with one published package must appear.");
+    assert.deepStrictEqual(projected.packages.map(item => item.packageCode), ["PUBLISHED_PACKAGE"], "CASE B/E: only published package options may be exposed.");
+    assert.strictEqual(projected.packages[0].prices.MM.amount, 1000, "CASE B: published package pricing must remain available.");
+
+    catalog = await readPublicMm({ visibleRegions: ["TH"], published: ["PUBLISHED_PACKAGE"] });
+    assert(!catalog.some(item => item.productCode === productCode), "CASE C/D: product not visible in MM must remain hidden from MM.");
+
+    const source = fs.readFileSync(path.join(ROOT, "backend/services/catalogService.js"), "utf8");
+    assert(!source.includes("if (!projection.packages.length) return null;"), "Public Store Catalog product inclusion must not be gated by published package count.");
+    return { zeroPublishedVisible: true, unpublishedPackagesHidden: true, publishedPackageVisible: true, hiddenRegionHidden: true };
 }
 
 function isolatedMongoUri() {
@@ -232,9 +363,11 @@ async function main() {
     assert(!adminService.includes("This product does not support the selected region."), "Admin pricing must not use product compatibility metadata as a TH/MM commerce gate.");
     assert(adminService.includes("normalizeManualAllowedRegions"), "Manual fulfillment regions must have a separate TH/MM commerce normalizer.");
 
+    const explicitStorefrontVisibility = await verifyExplicitStorefrontVisibilitySeparatesPublishedPackages();
+
     if (process.argv.includes("--isolated")) await verifyIsolatedPropagation();
 
-    console.log("Product region authority verification passed.");
+    console.log("Product region authority verification passed.", JSON.stringify({ explicitStorefrontVisibility }));
 }
 
 main().catch(error => {

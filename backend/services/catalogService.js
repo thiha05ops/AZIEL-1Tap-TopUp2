@@ -975,7 +975,6 @@ async function toDatabasePublicCatalog({ includeDisabled = true, includeAssetPro
             applyPublicationMetadata(projection, recordsByProduct.get(product.productCode) || [], customerMarket);
             projection.packages = explicitPublishedPackages(projection);
             projection.packageCount = projection.packages.length;
-            if (!projection.packages.length) return null;
             const publishedCodes = new Set(projection.packages.map(pkg => String(pkg.packageCode || "").toUpperCase()));
             const publishedSourcePackages = sourcePackages.filter(pkg => publishedCodes.has(String(pkg.packageCode || "").toUpperCase()));
             projection.commerceReadiness = projectCommerceReadiness(product, publishedSourcePackages, productMappings, productInventory, enabledSuppliers);
