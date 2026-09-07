@@ -89,8 +89,13 @@
         applyPlaceholder("#userId", firstField.key === "riotId" ? "Name#TAG" : `Enter ${firstField.label}`);
         const applyConstraints=(input,field)=>{if(!input)return;input.type=field.type==="number"?"text":field.type||"text";if(field.type==="number")input.inputMode="numeric";if(field.constraints?.pattern)input.pattern=field.constraints.pattern;if(field.constraints?.minLength!=null)input.minLength=field.constraints.minLength;if(field.constraints?.maxLength!=null)input.maxLength=field.constraints.maxLength;input.required=field.required!==false};
         applyConstraints(document.getElementById("userId"),firstField);
-        contract.accountFields.slice(1).forEach((field, index) => {
-            const inputId = String(field.selector || `#supplierInput${index + 2}`).replace(/^#/, "");
+        const resolvedAccountFields = contract.accountFields.map((field, index) => ({
+            ...field,
+            selector: field.selector || (index === 0 ? "#userId" : `#supplierInput${index + 1}`)
+        }));
+
+        resolvedAccountFields.slice(1).forEach((field, index) => {
+            const inputId = String(field.selector).replace(/^#/, "");
             if (document.getElementById(inputId)) return;
             const label = document.createElement("label"); label.htmlFor = inputId; label.textContent = field.label;
             let input;
@@ -126,7 +131,7 @@
             zoneIdSelector: contract.accountFields.find(field => field.key === "zoneId")?.selector || "",
             zoneRequired: contract.accountFields.some(field => field.key === "zoneId" && field.required),
             userIdRequiredMessage: firstField.requiredMessage,
-            accountFields: contract.accountFields,
+            accountFields: resolvedAccountFields,
             pendingReturnUrl: `product.html?product=${encodeURIComponent(productCode)}`
         });
         return product;

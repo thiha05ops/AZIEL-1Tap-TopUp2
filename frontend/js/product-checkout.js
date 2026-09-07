@@ -62,7 +62,14 @@
     function render(order) {
         document.getElementById("checkoutProduct").textContent = order.game;
         document.getElementById("checkoutPackage").textContent = order.packageName;
-        document.getElementById("checkoutAccount").textContent = [order.userId, order.zoneId !== "-" ? order.zoneId : ""].filter(Boolean).join(" / ");
+        const accountFields = Array.isArray(order.accountFields)
+            ? order.accountFields.filter(field => String(field?.value || "").trim())
+            : [];
+        document.getElementById("checkoutAccount").textContent = accountFields.length
+            ? accountFields
+                .map(field => `${String(field.label || field.key || "Account").trim()}: ${String(field.displayValue || field.value || "").trim()}`)
+                .join(" · ")
+            : [order.userId, order.zoneId !== "-" ? order.zoneId : ""].filter(Boolean).join(" / ");
         document.getElementById("checkoutRegion").textContent = order.region;
         document.getElementById("checkoutSummaryProduct").textContent = order.game;
         document.getElementById("checkoutSummaryPackage").textContent = order.packageName;

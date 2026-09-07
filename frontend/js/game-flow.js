@@ -413,11 +413,20 @@
             sessionStorage.getItem("username") ||
             "guest";
 
-        const accountFields = getAccountFieldDefinitions(flow).map(field => ({
-            key: String(field.key || "").trim(),
-            label: String(field.label || field.key || "Account field").trim(),
-            value: getFieldValue(field.selector)
-        })).filter(field => field.key && field.value);
+        const accountFields = getAccountFieldDefinitions(flow).map(field => {
+            const value = getFieldValue(field.selector);
+            const input = field.selector ? getEl(field.selector) : null;
+            const displayValue = input?.tagName === "SELECT"
+                ? String(input.selectedOptions?.[0]?.textContent || value || "").trim()
+                : String(value || "").trim();
+
+            return {
+                key: String(field.key || "").trim(),
+                label: String(field.label || field.key || "Account field").trim(),
+                value,
+                displayValue
+            };
+        }).filter(field => field.key && field.value);
 
         return {
             orderId: "AZL-" + Date.now(),
