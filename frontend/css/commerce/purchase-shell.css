@@ -1109,8 +1109,8 @@ body.az-purchase-surface .tracking-page {
 
     .checkout-review dl {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 3px 12px;
+        grid-template-columns: 1fr;
+        gap: 4px;
     }
 
     .checkout-review dl div {
@@ -1127,14 +1127,20 @@ body.az-purchase-surface .tracking-page {
 
     .checkout-review dl div:nth-child(3),
     .checkout-review dl div:nth-child(4) {
-        display: flex;
-        justify-content: flex-start;
-        gap: 5px;
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        align-items: start;
+        gap: 8px;
         color: var(--text-muted);
     }
 
-    .checkout-review dl div:nth-child(4) {
-        justify-content: flex-end;
+    .checkout-review dl div:nth-child(3) dd,
+    .checkout-review dl div:nth-child(4) dd {
+        text-align: right;
+        color: var(--text);
+        overflow-wrap: normal;
+        word-break: normal;
     }
 
     .checkout-review dl div:nth-child(1) dt,
@@ -1166,17 +1172,6 @@ body.az-purchase-surface .tracking-page {
 
     .checkout-review dl div:nth-child(3) dt,
     .checkout-review dl div:nth-child(4) dt {
-        flex: 0 0 auto;
-        white-space: nowrap;
-        overflow-wrap: normal;
-    }
-
-    .checkout-review dl div:nth-child(3) dd {
-        flex: 1 1 auto;
-    }
-
-    .checkout-review dl div:nth-child(4) dd {
-        flex: 0 0 auto;
         white-space: nowrap;
         overflow-wrap: normal;
     }
