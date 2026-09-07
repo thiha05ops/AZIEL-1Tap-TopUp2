@@ -8,8 +8,7 @@ const SupplierCatalogOffer = require("../models/SupplierCatalogOffer");
 const SupplierOfferAvailability = require("../models/SupplierOfferAvailability");
 const { getSupplierAdapter } = require("./supplierAdapterRegistry");
 const {
-    validateFulfillmentEligibility,
-    isCustomerMarketEligible
+    validateFulfillmentEligibility
 } = require("./supplierFulfillmentEligibilityService");
 
 const OUTCOMES = Object.freeze({
@@ -45,7 +44,7 @@ function operationalPrimaryCustomerMarkets(mapping = {}) {
     if (readiness.supplierMapped !== true || readiness.pricingReady !== true || readiness.inputReady !== true || readiness.fulfillmentReady !== true) return [];
     const eligibility = validateFulfillmentEligibility(mapping.fulfillmentEligibility);
     if (!eligibility.valid || eligibility.value.mode === "UNKNOWN") return [];
-    return CUSTOMER_MARKETS.filter(market => isCustomerMarketEligible(eligibility.value, market));
+    return [...CUSTOMER_MARKETS];
 }
 
 function eligiblePrimaryRouteConflicts({ candidate = {}, existingMappings = [] } = {}) {
@@ -65,7 +64,6 @@ function basicCandidateBlockers({ mapping = {}, supplier = {}, pkg = {}, custome
     const eligibility = validateFulfillmentEligibility(mapping.fulfillmentEligibility);
     if (!eligibility.valid) blockers.push(...eligibility.errors);
     else if (eligibility.value.mode === "UNKNOWN") blockers.push("FULFILLMENT_ELIGIBILITY_UNKNOWN");
-    else if (!isCustomerMarketEligible(mapping.fulfillmentEligibility, market)) blockers.push("CUSTOMER_MARKET_NOT_ELIGIBLE");
     if (mapping.archivedAt) blockers.push("MAPPING_ARCHIVED");
     if (mapping.productionRole !== "PRIMARY") blockers.push("MAPPING_NOT_PRIMARY");
     if (mapping.enabled !== true) blockers.push("MAPPING_DISABLED");

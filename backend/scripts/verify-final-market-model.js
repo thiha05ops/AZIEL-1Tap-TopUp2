@@ -127,7 +127,7 @@ const adapter = enabled => ({
 });
 
 function assertReadyForCommerceMarket(customerMarket) {
-    const m = mapping({ supplierCode: "GENERICAPI" });
+    const m = mapping({ supplierCode: "GENERICAPI", eligibilityMarkets: ["TH"] });
     const blockers = basicCandidateBlockers({
         mapping: m,
         supplier: supplier("GENERICAPI"),
@@ -300,6 +300,48 @@ assertReadyForCommerceMarket("MM");
         assessments: new Map([["a", { blockers: [] }], ["b", { blockers: [] }]])
     });
     assert.strictEqual(conflictResult.outcome, "AMBIGUOUS_PRIMARY_ROUTE", "No automatic supplier failover may be introduced.");
+}
+
+{
+    const hokMapping = mapping({
+        id: "hok-route",
+        productCode: "hok",
+        packageCode: "HOK_16_TOKENS",
+        supplierProductCode: "honor_of_kings",
+        supplierPackageCode: "16_tokens",
+        region: "TH",
+        eligibilityMarkets: ["TH"]
+    });
+    const route = ({ customerMarket, packageOverride = {}, adapterEnabled = true, availabilityOverride = {} }) => basicCandidateBlockers({
+        mapping: hokMapping,
+        supplier: supplier(),
+        pkg: { ...pkg("hok", "HOK_16_TOKENS"), ...packageOverride },
+        customerMarket,
+        adapter: adapter(adapterEnabled),
+        offer: offer({ id: hokMapping.supplierCatalogOfferId, supplierProductCode: hokMapping.supplierProductCode, offerCode: hokMapping.supplierPackageCode }),
+        availability: availability(hokMapping.supplierCatalogOfferId, availabilityOverride),
+        requireCatalogEvidence: true
+    }).blockers;
+    assert.deepStrictEqual(route({ customerMarket: "TH" }), [], "HOK TH commerce must use the THB price and the same TH supplier route.");
+    assert.deepStrictEqual(route({ customerMarket: "MM" }), [], "HOK MM commerce must use the MMK price and the same TH supplier route.");
+    assert.deepStrictEqual(route({
+        customerMarket: "MM",
+        packageOverride: { prices: { TH: { enabled: true, amount: 100, supplierCost: 50 } } }
+    }), ["CUSTOMER_MARKET_PRICE_NOT_PUBLISHED"], "Missing MMK price must be the only MM blocker when the route is otherwise ready.");
+    assert(route({ customerMarket: "TH", availabilityOverride: { state: "UNKNOWN" } }).includes("SUPPLIER_AVAILABILITY_NOT_CONFIRMED"), "Unavailable supplier offer must block TH.");
+    assert(route({ customerMarket: "MM", availabilityOverride: { state: "UNKNOWN" } }).includes("SUPPLIER_AVAILABILITY_NOT_CONFIRMED"), "Unavailable supplier offer must block MM.");
+    assert(route({ customerMarket: "TH", adapterEnabled: false }).includes("SUPPLIER_AUTO_FULFILLMENT_DISABLED"), "Supplier gate disabled must block TH.");
+    assert(route({ customerMarket: "MM", adapterEnabled: false }).includes("SUPPLIER_AUTO_FULFILLMENT_DISABLED"), "Supplier gate disabled must block MM.");
+    assert(basicCandidateBlockers({
+        mapping: { ...hokMapping, enabled: false },
+        supplier: supplier(),
+        pkg: pkg("hok", "HOK_16_TOKENS"),
+        customerMarket: "MM",
+        adapter: adapter(true),
+        offer: offer({ id: hokMapping.supplierCatalogOfferId, supplierProductCode: hokMapping.supplierProductCode, offerCode: hokMapping.supplierPackageCode }),
+        availability: availability(hokMapping.supplierCatalogOfferId),
+        requireCatalogEvidence: true
+    }).blockers.includes("MAPPING_DISABLED"), "Disabled mapping must block both commerce markets.");
 }
 
 {

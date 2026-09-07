@@ -35,10 +35,9 @@ class AdminProductActivationError extends Error {
 }
 
 function eligibilityAllows(mapping, customerMarket) {
+    if (!COMMERCE_MARKETS.includes(upper(customerMarket))) return false;
     const mode = upper(mapping?.fulfillmentEligibility?.mode);
-    if (mode === "GLOBAL") return COMMERCE_MARKETS.includes(upper(customerMarket));
-    return mode === "CUSTOMER_MARKET_ALLOWLIST" &&
-        (mapping.fulfillmentEligibility?.allowedCustomerMarkets || []).map(upper).includes(upper(customerMarket));
+    return mode === "GLOBAL" || mode === "CUSTOMER_MARKET_ALLOWLIST";
 }
 
 function commerceSellingRegionsFrom(value, fallback = "TH") {
@@ -96,9 +95,7 @@ function mappingReadiness({ mapping, supplier, pkg, offer, availability, custome
     const assessment = basicCandidateBlockers({ mapping, supplier, pkg, customerMarket, now, adapter });
     const blockers = [...assessment.blockers];
     if (!COMMERCE_MARKETS.includes(upper(customerMarket))) blockers.push("CUSTOMER_COMMERCE_MARKET_UNSUPPORTED");
-    if (!eligibilityAllows(mapping, customerMarket)) blockers.push(
-        upper(mapping?.fulfillmentEligibility?.mode) === "UNKNOWN" ? "FULFILLMENT_ELIGIBILITY_UNKNOWN" : "CUSTOMER_MARKET_NOT_ELIGIBLE"
-    );
+    if (!eligibilityAllows(mapping, customerMarket)) blockers.push("FULFILLMENT_ELIGIBILITY_UNKNOWN");
     if (!offer) blockers.push("SUPPLIER_CATALOG_OFFER_MISSING");
     if (offer && offer.catalogLifecycleState !== "ACTIVE") blockers.push("SUPPLIER_OFFER_NOT_ACTIVE");
     if (!availability || availability.state !== "AVAILABLE") blockers.push("SUPPLIER_AVAILABILITY_NOT_CONFIRMED");

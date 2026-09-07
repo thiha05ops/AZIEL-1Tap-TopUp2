@@ -15,7 +15,6 @@ const { ORDER_STATES, getAllowedNextStatuses, transitionOrder } = require("./ord
 const { getSupplierAdapter, normalizeSupplierResult } = require("./supplierAdapterRegistry");
 const { assessProductionMapping, setProductionRole } = require("./supplierProductionSelectionService");
 const { basicCandidateBlockers } = require("./supplierEligibilityRouteResolver");
-const { isCustomerMarketEligible } = require("./supplierFulfillmentEligibilityService");
 const { supplierCapabilityProductCode } = require("./fulfillmentCapabilityService");
 const commerceOrderRepository = require("./commerce/orderRepository");
 const {
@@ -57,8 +56,7 @@ function isMarketDecoupledV2RouteSnapshot({ routeSnapshot = null, mapping = null
         String(routeSnapshot.supplierPackageCode || "").trim() === String(mapping.supplierPackageCode || "").trim() &&
         String(routeSnapshot.executionMode || "").trim().toUpperCase() === "API" &&
         String(routeSnapshot.selectedRole || "").trim().toUpperCase() === "PRIMARY" &&
-        (!persistedSupplierMarket || persistedSupplierMarket === String(mapping.region || "").trim().toUpperCase()) &&
-        isCustomerMarketEligible(routeSnapshot.eligibility, market);
+        (!persistedSupplierMarket || persistedSupplierMarket === String(mapping.region || "").trim().toUpperCase());
 }
 
 function cleanText(value = "", max = 160) {

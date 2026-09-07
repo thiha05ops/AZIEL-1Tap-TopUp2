@@ -115,7 +115,6 @@ function assessProductionReadyFulfillmentMapping(mapping = {}, supplier = {}, co
         : { compatible: true, deterministic: false, code: "PRODUCT_ACCOUNT_MARKET_NOT_ENFORCED_FOR_SELLING" };
     if (!eligibility.valid) blockers.push(...eligibility.errors);
     else if (eligibility.value.mode === "UNKNOWN") blockers.push("FULFILLMENT_ELIGIBILITY_UNKNOWN");
-    else if (!isCustomerMarketEligible(mapping.fulfillmentEligibility, region)) blockers.push("CUSTOMER_MARKET_NOT_ELIGIBLE");
     ["supplierMapped", "inputReady", "validationReady", "pricingReady", "fulfillmentReady", "storefrontReady"].forEach(flag => {
         if (readiness[flag] !== true) blockers.push(`${flag.replace(/[A-Z]/g, letter => `_${letter}`).toUpperCase()}_FALSE`);
     });
@@ -194,7 +193,7 @@ function assessPreCommercialFulfillmentReadiness({
     }
     if (!markets.length) blockers.push("CUSTOMER_MARKET_REQUIRED");
     const eligibility = validateFulfillmentEligibility(mapping?.fulfillmentEligibility);
-    if (!eligibility.valid || eligibility.value.mode === "UNKNOWN" || markets.some(market => !isCustomerMarketEligible(mapping.fulfillmentEligibility, market))) blockers.push("CUSTOMER_MARKET_ELIGIBILITY_UNPROVEN");
+    if (!eligibility.valid || eligibility.value.mode === "UNKNOWN") blockers.push("CUSTOMER_MARKET_ELIGIBILITY_UNPROVEN");
     if (!fulfillmentContract?.fields?.length) blockers.push("INPUT_CONTRACT_UNRESOLVED");
     if (String(mapping?.executionMode || "").toUpperCase() !== "API" || processorSupported !== true) blockers.push("PROTOCOL_UNSUPPORTED");
     if (adapterConfigured !== true) blockers.push("SUPPLIER_ADAPTER_NOT_READY");
@@ -234,7 +233,6 @@ function eligibleMappingsForPackage({ mappings = [], suppliers = [], productCode
         if (!supplier || mapping.enabled === false) return [];
         if (String(mapping.productCode || "").toLowerCase() !== normalizedProduct) return [];
         if (String(mapping.packageCode || "").toUpperCase() !== normalizedPackage) return [];
-        if (!isCustomerMarketEligible(mapping.fulfillmentEligibility, normalizedRegion)) return [];
         if (!isProductionReadyFulfillmentMapping(mapping, supplier, {
             ...context,
             productCompatibilityMarkets: context.productCompatibilityMarkets,
