@@ -1164,6 +1164,23 @@ body.az-purchase-surface .tracking-page {
         overflow-wrap: anywhere;
     }
 
+    .checkout-review dl div:nth-child(3) dt,
+    .checkout-review dl div:nth-child(4) dt {
+        flex: 0 0 auto;
+        white-space: nowrap;
+        overflow-wrap: normal;
+    }
+
+    .checkout-review dl div:nth-child(3) dd {
+        flex: 1 1 auto;
+    }
+
+    .checkout-review dl div:nth-child(4) dd {
+        flex: 0 0 auto;
+        white-space: nowrap;
+        overflow-wrap: normal;
+    }
+
 
     .checkout-sidebar {
         order: 2;
