@@ -681,7 +681,7 @@ function openProductEditor(product) {
     modal.querySelector("#catalogProductEnabled").checked = product.enabled !== false;
     modal.querySelector("#catalogProductFeatured").checked = product.featured === true;
     modal.querySelector("#catalogProductCategory").value = product.catalogCategory || "";
-    modal.querySelector("#catalogProductCommerceState").value = product.commerceState || "HIDDEN";
+    modal.querySelector("#catalogProductCommerceState").value = product.requestedCommerceState || product.commerceState || "HIDDEN";
     modal.querySelector("#catalogProductDiscoveryEnabled").checked = product.publicDiscoveryEnabled === true;
     modal.querySelector("#catalogProductHomeEnabled").checked = product.homepageEnabled === true;
     modal.querySelector("#catalogProductHomeOrder").value = Number(product.homepageOrder || 0);
