@@ -42,10 +42,20 @@ function normalizedFields(source = {}) {
 }
 
 function contractFingerprint(value = {}) {
+    const fields = Array.isArray(value.fields)
+        ? value.fields.map(field => {
+            if (clean(field?.type || "text").toLowerCase() === "select") {
+                return field;
+            }
+            const { options, ...rest } = field || {};
+            return rest;
+        })
+        : value.fields;
+
     return crypto.createHash("sha256").update(JSON.stringify({
         supplierProductCode: value.supplierProductCode,
         sourceHash: value.sourceHash,
-        fields: value.fields
+        fields
     })).digest("hex");
 }
 
