@@ -40,6 +40,14 @@ function supplierProductCodeForReadiness(mapping = {}, supplier = {}, supplierPr
     return String(supplierProduct?.supplierProductCode || "").trim();
 }
 
+function supplierCapabilityProductCode(mapping = {}, supplier = {}, supplierProduct = {}) {
+    const supplierCode = String(supplier?.supplierCode || mapping?.supplierCode || "").trim().toUpperCase();
+    if (supplierCode === "WONDD") {
+        return String(supplierProduct?.metadata?.transactionalServiceCode || mapping?.supplierProductCode || mapping?.productCode || "").trim();
+    }
+    return String(mapping?.productCode || "").trim();
+}
+
 function manualAllowedRegions(product = {}) {
     return Array.isArray(product.fulfillment?.manualAllowedRegions)
         ? product.fulfillment.manualAllowedRegions.map(normalizeRegion).filter(Boolean)
@@ -89,7 +97,6 @@ function assessProductionReadyFulfillmentMapping(mapping = {}, supplier = {}, co
     const productCode = String(context.productCode || mapping.productCode || "").trim().toLowerCase();
     const packageCode = String(context.packageCode || mapping.packageCode || "").trim().toUpperCase();
     const region = normalizeRegion(context.region || mapping.region);
-    const routeMarket = String(context.supplierRouteMarket || mapping.region || "").trim().toUpperCase();
     const productCompatibilityMarkets = normalizeProductCompatibilityMarkets(context.productCompatibilityMarkets);
     const readiness = mapping.mappingMetadata?.readiness || {};
     const blockers = [];
@@ -103,7 +110,9 @@ function assessProductionReadyFulfillmentMapping(mapping = {}, supplier = {}, co
     if (String(mapping.executionMode || "").trim().toUpperCase() !== "API") blockers.push("MAPPING_EXECUTION_NOT_API");
     if (String(mapping.productionRole || "").trim().toUpperCase() !== "PRIMARY") blockers.push("MAPPING_NOT_PRIMARY");
     if (!supplier || supplier.enabled !== true || String(supplier.mode || "").trim().toUpperCase() !== "API") blockers.push("SUPPLIER_NOT_API_READY");
-    if (productCompatibilityMarkets.length && !supplierRouteProductMarketCompatibility(routeMarket, productCompatibilityMarkets).compatible) blockers.push("PRODUCT_ACCOUNT_MARKET_INCOMPATIBLE");
+    const routeProductMarketCompatibility = productCompatibilityMarkets.length
+        ? supplierRouteProductMarketCompatibility(String(context.supplierRouteMarket || mapping.region || "").trim().toUpperCase(), productCompatibilityMarkets)
+        : { compatible: true, deterministic: false, code: "PRODUCT_ACCOUNT_MARKET_NOT_ENFORCED_FOR_SELLING" };
     if (!eligibility.valid) blockers.push(...eligibility.errors);
     else if (eligibility.value.mode === "UNKNOWN") blockers.push("FULFILLMENT_ELIGIBILITY_UNKNOWN");
     else if (!isCustomerMarketEligible(mapping.fulfillmentEligibility, region)) blockers.push("CUSTOMER_MARKET_NOT_ELIGIBLE");
@@ -115,9 +124,10 @@ function assessProductionReadyFulfillmentMapping(mapping = {}, supplier = {}, co
     const mappingSupportResolver = context.mappingSupportResolver || supportsMapping;
     const adapter = supplier ? adapterResolver(supplier) : null;
     if (!adapter?.isConfigured?.()) blockers.push("SUPPLIER_ADAPTER_NOT_READY");
-    if (adapter?.isAutoFulfillmentEnabled?.(mapping.productCode) !== true) {
+    const gateProductCode = supplierCapabilityProductCode(mapping, supplier, context.supplierProduct);
+    if (adapter?.isAutoFulfillmentEnabled?.(gateProductCode) !== true) {
         let blocker = "PROVIDER_FEATURE_GATE_OFF";
-        try { if (adapter?.autoFulfillmentGateState?.(mapping.productCode)?.blockerCode === "SUPPLIER_AUTO_FULFILLMENT_DISABLED") blocker = "SUPPLIER_AUTO_FULFILLMENT_DISABLED"; } catch { /* Fail closed. */ }
+        try { if (adapter?.autoFulfillmentGateState?.(gateProductCode)?.blockerCode === "SUPPLIER_AUTO_FULFILLMENT_DISABLED") blocker = "SUPPLIER_AUTO_FULFILLMENT_DISABLED"; } catch { /* Fail closed. */ }
         blockers.push(blocker);
     }
     if (!mappingSupportResolver(mapping)) blockers.push("FULFILLMENT_PROCESSOR_NOT_READY");
@@ -133,7 +143,7 @@ function assessProductionReadyFulfillmentMapping(mapping = {}, supplier = {}, co
         if (!availability || String(availability.supplierCatalogOfferId) !== String(mapping.supplierCatalogOfferId) || String(availability.state || "").toUpperCase() !== "AVAILABLE") blockers.push("SUPPLIER_AVAILABILITY_NOT_CONFIRMED");
     }
 
-    return { ready: blockers.length === 0, blockers: [...new Set(blockers)].sort(), eligibility: eligibility.value };
+    return { ready: blockers.length === 0, blockers: [...new Set(blockers)].sort(), eligibility: eligibility.value, routeProductMarketCompatibility };
 }
 
 function isProductionReadyFulfillmentMapping(mapping = {}, supplier = {}, context = {}) {
@@ -178,9 +188,9 @@ function assessPreCommercialFulfillmentReadiness({
         if (String(mapping.supplierId || "") !== String(supplierProduct.supplierId || "") ||
             String(mapping.supplierProductCode || "").trim() !== supplierProductCodeForReadiness(mapping, supplier, supplierProduct)) blockers.push("SUPPLIER_IDENTITY_MISMATCH");
         const supplierMarket = resolvedSupplierMarketForReadiness(mapping, supplierProduct);
-        if (!supplierMarket || ["UNKNOWN", "UNSPECIFIED"].includes(supplierMarket) || supplierMarket !== String(mapping.region || "").trim().toUpperCase()) blockers.push("MARKET_UNRESOLVED");
         const productMarkets = productCompatibilityMarketsFromAuthority(canonicalProduct);
-        if (productMarkets.length && !supplierRouteProductMarketCompatibility(supplierMarket, productMarkets).compatible) blockers.push("PRODUCT_ACCOUNT_MARKET_INCOMPATIBLE");
+        const routeProductMarketCompatibility = supplierRouteProductMarketCompatibility(supplierMarket, productMarkets);
+        void routeProductMarketCompatibility;
     }
     if (!markets.length) blockers.push("CUSTOMER_MARKET_REQUIRED");
     const eligibility = validateFulfillmentEligibility(mapping?.fulfillmentEligibility);
@@ -304,6 +314,7 @@ module.exports = {
     eligibleMappingsForPackage,
     normalizeProductCompatibilityMarkets,
     productCompatibilityMarketsFromAuthority,
+    supplierCapabilityProductCode,
     isProductionReadyFulfillmentMapping,
     isSupplierMappedAutoTopupThScope,
     isManualFulfillmentAllowed,

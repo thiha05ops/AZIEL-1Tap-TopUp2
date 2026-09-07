@@ -6,6 +6,7 @@ const Supplier = require("../models/Supplier");
 const Mapping = require("../models/SupplierProductMapping");
 const FulfillmentAttempt = require("../models/FulfillmentAttempt");
 const { getSupplierAdapter } = require("./supplierAdapterRegistry");
+const { supplierCapabilityProductCode } = require("./fulfillmentCapabilityService");
 const { resolveFulfillmentRoutingMode, FULFILLMENT_ROUTING_MODES } = require("../config/fulfillmentRoutingMode");
 const { resolveEligibilityPrimaryRoute, eligiblePrimaryRouteConflicts, OUTCOMES: ELIGIBILITY_OUTCOMES } = require("./supplierEligibilityRouteResolver");
 
@@ -14,12 +15,12 @@ const CORE_PRODUCTS = new Set(["mlbb", "pubg", "freefire", "hok"]);
 const clean = value => String(value == null ? "" : value).trim();
 
 function gateEnabled(mapping, adapter) {
-    try { return adapter?.isAutoFulfillmentEnabled?.(mapping.productCode) === true; } catch { return false; }
+    try { return adapter?.isAutoFulfillmentEnabled?.(supplierCapabilityProductCode(mapping, { supplierCode: mapping.supplierCode })) === true; } catch { return false; }
 }
 
 function gateBlocker(mapping, adapter) {
     try {
-        return adapter?.autoFulfillmentGateState?.(mapping.productCode)?.blockerCode === "SUPPLIER_AUTO_FULFILLMENT_DISABLED"
+        return adapter?.autoFulfillmentGateState?.(supplierCapabilityProductCode(mapping, { supplierCode: mapping.supplierCode }))?.blockerCode === "SUPPLIER_AUTO_FULFILLMENT_DISABLED"
             ? "SUPPLIER_AUTO_FULFILLMENT_DISABLED"
             : "PROVIDER_FEATURE_GATE_OFF";
     } catch { return "PROVIDER_FEATURE_GATE_OFF"; }
@@ -47,7 +48,6 @@ function assessProductionMappingFromContext(mapping, { supplier = null, pkg = nu
     if (!pkg) blockers.push("CANONICAL_PACKAGE_MISSING");
     if (mapping.enabled !== true) blockers.push("MAPPING_DISABLED");
     if (!supplier?.enabled) blockers.push("SUPPLIER_DISABLED");
-    if (!supplier?.supportedRegions?.includes(mapping.region)) blockers.push("REGION_INCOMPATIBLE");
     if (!clean(mapping.supplierProductCode) || !clean(mapping.supplierPackageCode)) blockers.push("EXACT_MAPPING_INCOMPLETE");
     const readiness = mapping.mappingMetadata?.readiness || {};
     if (readiness.supplierMapped !== true) blockers.push("SUPPLIER_MAPPING_NOT_READY");

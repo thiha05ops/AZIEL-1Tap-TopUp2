@@ -31,7 +31,12 @@ const upper = value => clean(value).toUpperCase();
 const lower = value => clean(value).toLowerCase();
 
 function gateEnabled(mapping, adapter) {
-    try { return adapter?.isAutoFulfillmentEnabled?.(mapping.productCode) === true; } catch { return false; }
+    try { return adapter?.isAutoFulfillmentEnabled?.(supplierCapabilityProductCode(mapping)) === true; } catch { return false; }
+}
+
+function supplierCapabilityProductCode(mapping = {}) {
+    if (upper(mapping.supplierCode) === "WONDD") return clean(mapping.supplierProductCode) || clean(mapping.productCode);
+    return clean(mapping.productCode);
 }
 
 function operationalPrimaryCustomerMarkets(mapping = {}) {
@@ -79,14 +84,14 @@ function basicCandidateBlockers({ mapping = {}, supplier = {}, pkg = {}, custome
             clean(offer.supplierOfferCode) === clean(mapping.supplierPackageCode) &&
             upper(offer.catalogLifecycleState) === "ACTIVE";
         if (!offerMatches) blockers.push("SUPPLIER_OFFER_NOT_ACTIVE");
-        if (!availability || String(availability.supplierCatalogOfferId) !== String(mapping.supplierCatalogOfferId) || upper(availability.state) !== "AVAILABLE" || availability.coverageComplete !== true) blockers.push("SUPPLIER_AVAILABILITY_NOT_CONFIRMED");
+        if (!availability || String(availability.supplierCatalogOfferId) !== String(mapping.supplierCatalogOfferId) || upper(availability.state) !== "AVAILABLE" || (availability.staleAt && new Date(availability.staleAt).getTime() <= Date.now())) blockers.push("SUPPLIER_AVAILABILITY_NOT_CONFIRMED");
     }
     const price = pkg?.prices?.[market];
     if (!pkg?.enabled || pkg?.deletedAt || price?.enabled !== true || !Number.isFinite(Number(price?.amount)) || Number(price.amount) <= 0) blockers.push("CUSTOMER_MARKET_PRICE_NOT_PUBLISHED");
     if (!adapter?.isConfigured?.()) blockers.push("SUPPLIER_ADAPTER_NOT_READY");
     if (!gateEnabled(mapping, adapter)) {
         let blocker = "PROVIDER_FEATURE_GATE_OFF";
-        try { if (adapter?.autoFulfillmentGateState?.(mapping.productCode)?.blockerCode === "SUPPLIER_AUTO_FULFILLMENT_DISABLED") blocker = "SUPPLIER_AUTO_FULFILLMENT_DISABLED"; } catch { /* fail closed */ }
+        try { if (adapter?.autoFulfillmentGateState?.(supplierCapabilityProductCode(mapping))?.blockerCode === "SUPPLIER_AUTO_FULFILLMENT_DISABLED") blocker = "SUPPLIER_AUTO_FULFILLMENT_DISABLED"; } catch { /* fail closed */ }
         blockers.push(blocker);
     }
     if (upper(supplier?.supplierCode || mapping.supplierCode) === "FAZERCARDS") {

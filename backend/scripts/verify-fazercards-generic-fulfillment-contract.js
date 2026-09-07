@@ -23,7 +23,7 @@ const mapping = {
     _id: "mapping-1", supplierCatalogOfferId: "offer-1", supplierCode: "FAZERCARDS",
     productCode: "future-generic-game", packageCode: "PACKAGE_100", supplierProductCode: "future_generic_game",
     supplierPackageCode: "100_credits", region: "GLOBAL", enabled: true, executionMode: "API", productionRole: "PRIMARY",
-    fulfillmentEligibility: { mode: "CUSTOMER_MARKET_ALLOWLIST", allowedCustomerMarkets: ["TH"], evidenceCode: "PROVIDER_CONFIRMED", evidenceSource: "isolated fixture", verifiedAt: new Date("2026-09-01T00:00:00.000Z"), version: 1 },
+    fulfillmentEligibility: { mode: "CUSTOMER_MARKET_ALLOWLIST", allowedCustomerMarkets: ["TH", "MM"], evidenceCode: "PROVIDER_CONFIRMED", evidenceSource: "isolated fixture", verifiedAt: new Date("2026-09-01T00:00:00.000Z"), version: 1 },
     mappingMetadata: { readiness: { supplierMapped: true, inputReady: true, pricingReady: true, fulfillmentReady: true } }
 };
 const offer = {
@@ -66,8 +66,8 @@ assert.strictEqual(supportsFazerCardsMapping(mapping), false, "An unknown generi
 validateFazerCardsMapping(snapshotted, { customerMarket: "TH" });
 validateFazerCardsMapping(snapshotted, { customerMarket: "MM" });
 assert.strictEqual(isCustomerMarketEligible(snapshotted.fulfillmentEligibility, "TH"), true);
-assert.strictEqual(isCustomerMarketEligible(snapshotted.fulfillmentEligibility, "MM"), false);
-assert.strictEqual(isCustomerMarketCompatible(snapshotted, "MM"), true, "GLOBAL supplier inventory is deterministically compatible with MM commerce.");
+assert.strictEqual(isCustomerMarketEligible(snapshotted.fulfillmentEligibility, "MM"), true);
+assert.strictEqual(isCustomerMarketCompatible(snapshotted, "MM"), true, "Explicit fulfillment eligibility, not supplier market, authorizes MM commerce.");
 
 const noContract = contractFromSupplierCatalog({
     mapping: { ...mapping, productCode: "afk-journey", supplierProductCode: "afk_journey" },

@@ -135,9 +135,9 @@ function verifySupplierRouteCommerceMarketSeparation() {
     const thProductMmCommerce = assessProductionReadyFulfillmentMapping(thRoute, supplier, readyContext(["TH"], "MM"));
     assert.strictEqual(thProductMmCommerce.ready, true, "CASE C: TH product/account route must remain technically valid in MM commerce.");
 
-    const incompatible = assessProductionReadyFulfillmentMapping(idRoute, supplier, readyContext(["TH"], "MM"));
-    assert.strictEqual(incompatible.ready, false, "CASE D: ID-only supplier route must fail for a TH product/account market.");
-    assert(incompatible.blockers.includes("PRODUCT_ACCOUNT_MARKET_INCOMPATIBLE"));
+    const marketMismatch = assessProductionReadyFulfillmentMapping(idRoute, supplier, readyContext(["TH"], "MM"));
+    assert.strictEqual(marketMismatch.ready, true, "CASE D: Supplier/player market mismatch is not a generic AZIEL commerce selling blocker.");
+    assert(!marketMismatch.blockers.includes("PRODUCT_ACCOUNT_MARKET_INCOMPATIBLE"));
 
     const idProductThCommerce = assessProductionReadyFulfillmentMapping(idProductRoute, supplier, readyContext(["ID"], "TH"));
     assert.strictEqual(idProductThCommerce.ready, true, "CASE G: ID product + ID supplier route must be valid in TH commerce.");
@@ -181,7 +181,7 @@ function verifySupplierRouteCommerceMarketSeparation() {
         globalThReady: true,
         globalMmReady: true,
         thRouteMmCommerceReady: true,
-        incompatibleIdRouteRejected: true,
+        supplierPlayerMarketMismatchNotGenericBlocker: true,
         idProductThCommerceReady: true,
         idProductMmCommerceReady: true,
         genuineThMmCompatibilityPreserved: true,

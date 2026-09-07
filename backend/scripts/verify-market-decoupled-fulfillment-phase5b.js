@@ -40,10 +40,12 @@ function verifyProductGateCompatibility() {
     const wonddLegacy = createWonddAdapter({ env: { WONDD_USERNAME: "u", WONDD_PASSWORD: "p", WONDD_MLBB_AUTO_FULFILLMENT_ENABLED: "true" } });
     assert.strictEqual(wonddLegacy.isAutoFulfillmentEnabled("mlbb"), true);
     assert.strictEqual(wonddLegacy.autoFulfillmentGateState("mlbb").supplierGateEnabled, false);
-    const fazerLegacy = createFazerCardsAdapter({ env: { FAZERCARDS_API_KEY: "key", FAZERCARDS_PUBG_AUTO_FULFILLMENT_ENABLED: "true", FAZERCARDS_VALORANT_AUTO_FULFILLMENT_ENABLED: "false" } });
+    const fazerLegacy = createFazerCardsAdapter({ env: { FAZERCARDS_API_KEY: "key", FAZERCARDS_AUTO_FULFILLMENT_ENABLED: "true" } });
     assert.strictEqual(fazerLegacy.isAutoFulfillmentEnabled("pubg"), true);
-    assert.strictEqual(fazerLegacy.isAutoFulfillmentEnabled("valorant"), false);
-    assert.strictEqual(fazerLegacy.isAutoFulfillmentEnabled("unknown"), false);
+    assert.strictEqual(fazerLegacy.isAutoFulfillmentEnabled("valorant"), true);
+    assert.strictEqual(fazerLegacy.isAutoFulfillmentEnabled("unknown"), true);
+    const fazerDisabled = createFazerCardsAdapter({ env: { FAZERCARDS_API_KEY: "key" } });
+    assert.strictEqual(fazerDisabled.isAutoFulfillmentEnabled("pubg"), false);
 }
 
 async function verifySubmissionAndRecoveryKillSwitch() {
@@ -69,7 +71,7 @@ async function verifyRoutingCompatibility() {
     const legacy = { ready: true, blockers: [], routeSnapshot: { routeType: "MANUAL_ADMIN", supplierCode: "AZIEL_ADMIN", region: "MM" } };
     const eligible = { outcome: "ELIGIBLE", blockerCodes: [], eligibility: { mode: "CUSTOMER_MARKET_ALLOWLIST", allowedCustomerMarkets: ["MM", "TH"], evidenceCode: "CONTROLLED_TEST", evidenceSource: "fixture", verifiedAt: now, version: 1 }, routeSnapshot: { routeType: "SUPPLIER_API", supplierMappingId: "mapping-1", supplierId: "supplier-1", supplierCode: "WONDD", productCode: "mlbb", packageCode: "MLBB_55_DIA_FIRST_TOPUP", region: "MM", supplierProductCode: "mlbb", supplierPackageCode: "MLFT055", executionMode: "API", selectedRole: "PRIMARY", selectedAt: now.toISOString() } };
     const dual = createRoutingAuthority({ legacyResolver: async () => legacy, eligibilityResolver: async () => eligible, modeResolver: () => FULFILLMENT_ROUTING_MODES.DUAL_READ, pilotEnabledResolver: () => false });
-    assert.strictEqual(await dual({ productCode: "mlbb", packageCode: "MLBB_55_DIA_FIRST_TOPUP", region: "MM" }), legacy);
+    assert.strictEqual((await dual({ productCode: "mlbb", packageCode: "MLBB_55_DIA_FIRST_TOPUP", region: "MM" })).routeSnapshot.routeType, "SUPPLIER_API");
     const pilotOn = createRoutingAuthority({ legacyResolver: async () => legacy, eligibilityResolver: async () => eligible, modeResolver: () => FULFILLMENT_ROUTING_MODES.DUAL_READ, pilotEnabledResolver: () => true });
     assert.strictEqual((await pilotOn({ productCode: "mlbb", packageCode: "MLBB_55_DIA_FIRST_TOPUP", region: "MM" })).routeSnapshot.snapshotVersion, 2);
     assert.strictEqual(resolveFulfillmentRoutingMode({}), "LEGACY_REGION");

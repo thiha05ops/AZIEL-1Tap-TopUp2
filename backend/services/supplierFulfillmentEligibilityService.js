@@ -153,8 +153,7 @@ function supplierRouteProductMarketCompatibility(supplierMarket, productCompatib
 }
 
 function isCustomerMarketCompatible(mapping, customerMarket) {
-    if (isCustomerMarketEligible(mapping?.fulfillmentEligibility, customerMarket)) return true;
-    return supplierMarketCompatibility(mapping?.region, customerMarket).compatible;
+    return isCustomerMarketEligible(mapping?.fulfillmentEligibility, customerMarket);
 }
 
 module.exports = Object.freeze({

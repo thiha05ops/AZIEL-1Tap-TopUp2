@@ -16,6 +16,7 @@ const { getSupplierAdapter, normalizeSupplierResult } = require("./supplierAdapt
 const { assessProductionMapping, setProductionRole } = require("./supplierProductionSelectionService");
 const { basicCandidateBlockers } = require("./supplierEligibilityRouteResolver");
 const { isCustomerMarketEligible } = require("./supplierFulfillmentEligibilityService");
+const { supplierCapabilityProductCode } = require("./fulfillmentCapabilityService");
 const commerceOrderRepository = require("./commerce/orderRepository");
 const {
     FINANCIAL_OUTCOMES,
@@ -762,8 +763,9 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
     if (supplier.supplierCode === "WONDD") {
         const { CONFIRMED_SERVICE_CODES } = require("./suppliers/wonddCatalogConfig");
         const { hasWonddGameIdFormatter } = require("./suppliers/wonddGameIdFormatters");
-        const expectedServiceCode = CONFIRMED_SERVICE_CODES[mapping.productCode];
-        if (mapping.executionMode !== SUPPLIER_EXECUTION_MODES.API || !expectedServiceCode || String(mapping.supplierProductCode || "").trim().toLowerCase() !== expectedServiceCode.toLowerCase() || !String(mapping.supplierPackageCode || "").trim()) {
+        const capabilityProductCode = supplierCapabilityProductCode(mapping, supplier);
+        const expectedServiceCode = CONFIRMED_SERVICE_CODES[capabilityProductCode] || capabilityProductCode;
+        if (mapping.executionMode !== SUPPLIER_EXECUTION_MODES.API || !expectedServiceCode || String(mapping.supplierProductCode || "").trim().toLowerCase() !== String(expectedServiceCode).toLowerCase() || !String(mapping.supplierPackageCode || "").trim()) {
             throw new FulfillmentError("WONDD_PACKAGE_MAPPING_MISSING", "A verified WonDD servicecode and packcode mapping is required.", 409);
         }
         if (!hasWonddGameIdFormatter(mapping.productCode)) {
@@ -796,8 +798,8 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
         )) {
             throw new FulfillmentError("WONDD_PACKAGE_NOT_PRODUCTION_READY", "WonDD package production readiness is incomplete.", 409);
         }
-        if (!adapter.isAutoFulfillmentEnabled(mapping.productCode)) {
-            const gate = adapter.autoFulfillmentGateState?.(mapping.productCode);
+        if (!adapter.isAutoFulfillmentEnabled(capabilityProductCode)) {
+            const gate = adapter.autoFulfillmentGateState?.(capabilityProductCode);
             throw new FulfillmentError(gate?.blockerCode === "SUPPLIER_AUTO_FULFILLMENT_DISABLED" ? gate.blockerCode : "WONDD_AUTO_FULFILLMENT_DISABLED", "Live WonDD fulfillment is disabled.", 409);
         }
     }

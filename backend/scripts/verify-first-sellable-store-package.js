@@ -44,7 +44,7 @@ assert.deepStrictEqual(activationBlockers({...base,pkg:{...pkg,prices:{TH:{enabl
 
 const lock=sourceLock(base),stale=structuredClone(lock);stale.selectionDecisionVersion+=1;assert.throws(()=>assertSourceLock(stale,lock),error=>error instanceof StorePackageActivationError&&error.code==="STORE_PACKAGE_ACTIVATION_STALE");
 validateFazerCardsMapping(mapping,{customerMarket:"TH"});
-validateFazerCardsMapping({...mapping,fulfillmentEligibility:{mode:"UNKNOWN",allowedCustomerMarkets:[]}},{customerMarket:"TH"});
+assert.throws(()=>validateFazerCardsMapping({...mapping,fulfillmentEligibility:{mode:"UNKNOWN",allowedCustomerMarkets:[]}},{customerMarket:"TH"}),error=>error.code==="FAZERCARDS_CUSTOMER_MARKET_NOT_ELIGIBLE");
 assert.deepStrictEqual(buildFazerCardsOrderFields("mlbb",{playerId:"12345",zoneId:"6789"}),{player_id:"12345",server_id:"6789"});
 assert.deepStrictEqual(buildFazerCardsValidationFields("mlbb",{playerId:"12345",zoneId:"6789"}),{player_id:"12345",zone_id:"6789"});
 

@@ -117,8 +117,8 @@ const mismatchedProjection = projectActivation({
     mappings: [mismatchedMapping], offers: [mismatchedOffer], supplierProducts: [mismatchedSupplierProduct],
     availability: [mismatchedAvailability], publications: []
 }, { productCode: "codm-id", supplierMarket: "INDIA", sellingRegions: "TH" }, dependencies);
-assert.strictEqual(mismatchedProjection.packages[0].prepared.selectable, false, "TH commerce preference alone must not make an incompatible supplier account market valid.");
-assert(mismatchedProjection.packages[0].masterCatalog.blockers.includes("PRODUCT_ACCOUNT_MARKET_INCOMPATIBLE"));
+assert.strictEqual(mismatchedProjection.packages[0].prepared.selectable, true, "Supplier/player market mismatch must not be a generic Add Product selling blocker.");
+assert(!mismatchedProjection.packages[0].masterCatalog.blockers.includes("PRODUCT_ACCOUNT_MARKET_INCOMPATIBLE"));
 
 const clone = value => structuredClone(value);
 function query(value) { return { session() { return this; }, lean: async () => clone(value) }; }

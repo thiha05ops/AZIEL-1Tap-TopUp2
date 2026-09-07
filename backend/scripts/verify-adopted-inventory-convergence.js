@@ -160,8 +160,8 @@ function fixtures(overrides = {}) {
     assert.strictEqual(unresolvedMarketPlan.proposedChanges.region, "TH");
     const genuinelyUnresolvedMarket = fixtures({ mapping: { region: "UNKNOWN" }, supplierProduct: { supplierMarketCode: "UNSPECIFIED" } });
     const genuinelyUnresolvedMarketPlan = await genuinelyUnresolvedMarket.service.generatePlan({ mappingId: "m1", customerMarkets: ["TH"] });
-    assert.strictEqual(genuinelyUnresolvedMarketPlan.outcome, OUTCOMES.MARKET_UNRESOLVED);
-    assert.strictEqual(genuinelyUnresolvedMarketPlan.proposedChanges, null);
+    assert.strictEqual(genuinelyUnresolvedMarketPlan.outcome, OUTCOMES.FULFILLMENT_READY);
+    assert.strictEqual(genuinelyUnresolvedMarketPlan.proposedChanges.region, "UNKNOWN");
 
     const missingContract = fixtures({ supplierProduct: { normalizedInputContract: { fields: [] } } });
     const missingContractPlan = await missingContract.service.generatePlan({ mappingId: "m1", customerMarkets: ["TH"] });
@@ -266,7 +266,7 @@ function fixtures(overrides = {}) {
         result: "PASS",
         adoptionStates: Object.keys(ADOPTION_STATES).length,
         deterministicGlobalFazerPreparation: true,
-        unresolvedMarketBlocked: true,
+        unresolvedSupplierMarketAllowedWithExactEvidence: true,
         ambiguousEvidenceBlocked: true,
         linkedOfferLaunchTargetLocked: true,
         wonddServiceCodeSupported: true,

@@ -15,7 +15,7 @@ const { basicCandidateBlockers } = require("./supplierEligibilityRouteResolver")
 const { setPackageMarketPublication } = require("./packageMarketPublicationService");
 const { assessExistingPreparedRoute } = require("./supplierCatalog/supplierRoutePreparationService");
 const { contractFromSupplierCatalog } = require("./suppliers/fazercardsFulfillmentContractService");
-const { supplierRouteProductMarketCompatibility } = require("./supplierFulfillmentEligibilityService");
+const { supplierCapabilityProductCode } = require("./fulfillmentCapabilityService");
 
 const COMMERCE_MARKETS = Object.freeze(["TH", "MM"]);
 const clean = value => String(value == null ? "" : value).trim();
@@ -185,20 +185,19 @@ function discoveryAssessment({ mapping, supplier, supplierProduct, offer, availa
     if (!supplierProduct || upper(supplierProduct.supportState) !== "SUPPORTED") blockers.push("SUPPLIER_PRODUCT_UNSUPPORTED");
     if (!offer || upper(offer.catalogLifecycleState) !== "ACTIVE") blockers.push("OFFER_NOT_ACTIVE");
     if (offer && upper(offer.reconciliationState) !== "EXACT_CANONICAL_MATCH") blockers.push("CANONICAL_EQUIVALENCE_REVIEW_REQUIRED");
-    if (!availability || upper(availability.state) !== "AVAILABLE" || availability.coverageComplete !== true) blockers.push("AVAILABILITY_UNPROVEN");
+    if (!availability || upper(availability.state) !== "AVAILABLE" || (availability.staleAt && new Date(availability.staleAt).getTime() <= Date.now())) blockers.push("AVAILABILITY_UNPROVEN");
     const supplierMarket = upper(supplierProduct?.supplierMarketCode);
-    if (!supplierMarket || ["UNKNOWN", "UNSPECIFIED"].includes(supplierMarket)) blockers.push("MARKET_UNRESOLVED");
+    void supplierMarket;
     const markets = [...new Set((customerMarkets || []).map(upper).filter(Boolean))].sort();
     if (!markets.length) blockers.push("CUSTOMER_MARKET_REQUIRED");
     if (markets.some(market => !COMMERCE_MARKETS.includes(market))) blockers.push("CUSTOMER_MARKET_ELIGIBILITY_UNPROVEN");
-    if (!supplierRouteProductMarketCompatibility(supplierMarket, product?.supportedRegions || []).compatible) blockers.push("PRODUCT_ACCOUNT_MARKET_INCOMPATIBLE");
     const { proposed, fulfillmentContract } = discoveryMappingCandidate({ mapping, supplier, supplierProduct, offer });
     if (!fulfillmentContract?.fields?.length) blockers.push("INPUT_CONTRACT_UNRESOLVED");
     let adapter = null, adapterConfigured = false, autoFulfillmentEnabled = false, processorSupported = false;
     const adapterResolver = dependencies.adapterResolver || getSupplierAdapter;
     try { adapter = supplier ? adapterResolver(supplier) : null; } catch { adapter = null; }
     try { adapterConfigured = adapter?.isConfigured?.() === true; } catch { adapterConfigured = false; }
-    try { autoFulfillmentEnabled = adapter?.isAutoFulfillmentEnabled?.(mapping?.productCode) === true; } catch { autoFulfillmentEnabled = false; }
+    try { autoFulfillmentEnabled = adapter?.isAutoFulfillmentEnabled?.(supplierCapabilityProductCode(proposed, supplier, supplierProduct)) === true; } catch { autoFulfillmentEnabled = false; }
     try { processorSupported = (dependencies.processorSupportResolver || require("./suppliers/supplierFulfillmentDispatcher").supportsMapping)(proposed) === true; } catch { processorSupported = false; }
     if (!adapterConfigured) blockers.push("SUPPLIER_ADAPTER_NOT_READY");
     if (!autoFulfillmentEnabled) blockers.push("SUPPLIER_AUTO_FULFILLMENT_DISABLED");

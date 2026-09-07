@@ -14,8 +14,7 @@ const { canonicalJson } = require("./supplierCatalogNormalization");
 const { getSupplierAdapter } = require("../supplierAdapterRegistry");
 const { supportsMapping } = require("../suppliers/supplierFulfillmentDispatcher");
 const { contractFromSupplierCatalog, verifiedMappingContract } = require("../suppliers/fazercardsFulfillmentContractService");
-const { supplierRouteProductMarketCompatibility } = require("../supplierFulfillmentEligibilityService");
-const { assessPreCommercialFulfillmentReadiness } = require("../fulfillmentCapabilityService");
+const { assessPreCommercialFulfillmentReadiness, supplierCapabilityProductCode } = require("../fulfillmentCapabilityService");
 const { normalizeSupplierMarket } = require("../../constants/supplierMarkets");
 
 const ACTION = "SUPPLIER_ROUTE_TECHNICALLY_PREPARED";
@@ -172,7 +171,7 @@ function assessExistingPreparedRoute(state = {}, customerMarkets = [], dependenc
     const fulfillmentContract = contractFromCurrentSupplierCatalog({ mapping, supplier: state.supplier, offer: state.offer, supplierProduct: state.supplierProduct }) || verifiedMappingContract(mapping || {});
     let adapterConfigured = false, autoFulfillmentEnabled = false, processorSupported = false;
     try { adapterConfigured = adapter?.isConfigured?.() === true; } catch { adapterConfigured = false; }
-    try { autoFulfillmentEnabled = adapter?.isAutoFulfillmentEnabled?.(mapping?.productCode) === true; } catch { autoFulfillmentEnabled = false; }
+    try { autoFulfillmentEnabled = adapter?.isAutoFulfillmentEnabled?.(supplierCapabilityProductCode(mapping, state.supplier, state.supplierProduct)) === true; } catch { autoFulfillmentEnabled = false; }
     try { processorSupported = processorSupportResolver(mapping || {}) === true; } catch { processorSupported = false; }
     const assessment = assessPreCommercialFulfillmentReadiness({ ...state, mapping, customerMarkets, fulfillmentContract, adapterConfigured, autoFulfillmentEnabled, processorSupported });
     if (state.offer && upper(state.offer.reconciliationState) !== "EXACT_CANONICAL_MATCH") assessment.blockers.push("CANONICAL_EQUIVALENCE_REVIEW_REQUIRED");
@@ -212,7 +211,7 @@ function createSupplierRoutePreparationService({ repos = defaultRepos(), adapter
         const fulfillmentContract = contractFromCurrentSupplierCatalog({ mapping, supplier: state.supplier, offer: state.offer, supplierProduct: state.supplierProduct }) || verifiedMappingContract(mapping);
         let adapterConfigured = false, autoFulfillmentEnabled = false, processorSupported = false;
         try { adapterConfigured = adapter?.isConfigured?.() === true; } catch { adapterConfigured = false; }
-        try { autoFulfillmentEnabled = adapter?.isAutoFulfillmentEnabled?.(mapping?.productCode) === true; } catch { autoFulfillmentEnabled = false; }
+        try { autoFulfillmentEnabled = adapter?.isAutoFulfillmentEnabled?.(supplierCapabilityProductCode(mapping, state.supplier, state.supplierProduct)) === true; } catch { autoFulfillmentEnabled = false; }
         try { processorSupported = processorSupportResolver(mapping) === true; } catch { processorSupported = false; }
         return { fulfillmentContract, adapterConfigured, autoFulfillmentEnabled, processorSupported };
     }
@@ -230,14 +229,12 @@ function createSupplierRoutePreparationService({ repos = defaultRepos(), adapter
             return { ...body, sourceLockHash: sha(body.sourceLock), planHash: sha(body) };
         }
         const proposedSupplierMarket = deterministicSupplierMarket(state) || upper(state.mapping.region);
-        const marketCompatible = supplierRouteProductMarketCompatibility(proposedSupplierMarket, state.canonicalProduct?.supportedRegions || []).compatible;
+        const marketCompatible = true;
         const initialRuntime = runtimeFor(state, state.mapping);
         const proposal = proposedMapping(state.mapping, state, request, initialRuntime);
         const runtime = runtimeFor(state, proposal);
-        if (!marketCompatible) proposal.fulfillmentEligibility = { ...proposal.fulfillmentEligibility, mode: "UNKNOWN", allowedCustomerMarkets: [] };
         const assessment = assessPreCommercialFulfillmentReadiness({ ...state, mapping: proposal, customerMarkets: request.customerMarkets, ...runtime });
         if (upper(state.offer?.reconciliationState) !== "EXACT_CANONICAL_MATCH") assessment.blockers.push("CANONICAL_EQUIVALENCE_REVIEW_REQUIRED");
-        if (!marketCompatible) assessment.blockers.push("MARKET_UNRESOLVED");
         if (["PRIMARY", "BACKUP"].includes(upper(state.mapping.productionRole)) && upper(state.mapping.region) !== upper(proposal.region)) assessment.blockers.push("COMMERCIAL_ROUTE_REGION_CHANGE_REQUIRES_OWNER_REVIEW");
         assessment.blockers = [...new Set(assessment.blockers)].sort(); assessment.ready = assessment.blockers.length === 0;
         const lock = sourceLock(state, runtime);

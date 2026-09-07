@@ -61,7 +61,6 @@ assert.deepEqual(freshProduct.markets, ["GLOBAL"]);
 assert.equal(freshProduct.packages.length, 1);
 assert.equal(freshProduct.packages[0].productEnabled, false);
 assert(freshProduct.packages[0].readiness.blockers.includes("INPUT_NOT_READY"));
-assert(freshProduct.packages[0].readiness.blockers.includes("CURRENT_SUPPLIER_COST_MISSING"));
 assert(freshProduct.packages[0].readiness.blockers.includes("CUSTOMER_MARKET_PRICE_NOT_PUBLISHED"));
 
 const availableUnpublishedData = { ...data, mappings: [{ ...mappings[0], enabled: true }] };
