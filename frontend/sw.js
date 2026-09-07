@@ -111,9 +111,7 @@ self.addEventListener("fetch", event => {
     }
 
     if (isCodeAsset(url.pathname)) {
-        event.respondWith(isVersionedCodeAsset(url)
-            ? cacheFirstVersionedCodeAsset(request)
-            : networkFirstCodeAsset(request));
+        event.respondWith(networkFirstCodeAsset(request));
         return;
     }
 
@@ -265,18 +263,6 @@ async function networkFirstCodeAsset(request) {
             statusText: "Asset unavailable"
         });
     }
-}
-
-async function cacheFirstVersionedCodeAsset(request) {
-    const cache = await caches.open(CODE_CACHE);
-    const cached = await cache.match(request);
-    if (cached) return cached;
-
-    const response = await fetch(request, { cache: "no-store" });
-    if (response.ok && response.type === "basic") {
-        await cache.put(request, response.clone());
-    }
-    return response;
 }
 
 /**
