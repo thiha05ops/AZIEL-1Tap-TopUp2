@@ -499,23 +499,45 @@ body.dark .az-home {
     min-width: 0;
     padding: 9px 58px 10px 16px;
     background: var(--home-popular-body);
+    overflow: hidden;
 }
 
 .az-home #popularGames .popular-game-card h3 {
+    display: -webkit-box !important;
+    overflow: hidden !important;
     margin: 0 0 5px !important;
     color: var(--home-popular-title) !important;
     font-size: 14px !important;
     font-weight: 700 !important;
     line-height: 1.28 !important;
     letter-spacing: 0 !important;
+    overflow-wrap: anywhere !important;
+    -webkit-box-orient: vertical !important;
+    -webkit-line-clamp: 2 !important;
 }
 
 .az-home #popularGames .popular-game-card p {
+    display: -webkit-box !important;
+    overflow: hidden !important;
     margin: 0 !important;
     color: var(--home-popular-subtitle) !important;
     font-size: 12px !important;
     font-weight: 500 !important;
     line-height: 1.32 !important;
+    -webkit-box-orient: vertical !important;
+    -webkit-line-clamp: 1 !important;
+}
+
+.az-home #popularGames .popular-game-card .product-market-label {
+    display: block;
+    overflow: hidden;
+    margin-top: 2px;
+    color: color-mix(in srgb, var(--home-popular-subtitle) 78%, transparent);
+    font-size: 10.5px;
+    font-weight: 400;
+    line-height: 1.2;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 
 .az-home .home-card-arrow {
@@ -672,8 +694,54 @@ body.dark .az-home {
     transform: none;
 }
 
+.az-home #availableCoupons,
 .az-home #newsPromotions {
     margin-top: 56px !important;
+}
+
+.az-home .home-coupon-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--home-gap);
+}
+
+.az-home .home-coupon-card {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    min-height: 82px;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--surface-liquid, var(--card)) 62%, transparent);
+    color: var(--heading);
+}
+
+.az-home .home-coupon-icon {
+    display: inline-flex;
+    width: 42px;
+    height: 42px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--primary) 12%, transparent);
+    color: var(--primary);
+}
+
+.az-home .home-coupon-card strong {
+    display: block;
+    color: var(--heading);
+    font-size: 14px;
+    font-weight: 850;
+    line-height: 1.25;
+}
+
+.az-home .home-coupon-card p {
+    margin: 4px 0 0;
+    color: var(--text-secondary);
+    font-size: 12.5px;
+    line-height: 1.35;
 }
 
 .az-home .home-promotion-grid {
@@ -703,6 +771,12 @@ body.dark .az-home {
     box-shadow: var(--home-popular-shadow);
 }
 
+.az-home .home-promotion-copy {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+}
+
 .az-home .home-promotion-card strong {
     color: var(--home-promo-title);
     font-size: 14px;
@@ -720,6 +794,17 @@ body.dark .az-home {
 .az-home .home-promotion-card small {
     color: var(--home-promo-meta);
     font-size: 12px;
+    line-height: 1.2;
+}
+
+.az-home .home-promotion-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    width: fit-content;
+    color: var(--primary);
+    font-size: 12px;
+    font-weight: 800;
     line-height: 1.2;
 }
 
@@ -779,6 +864,10 @@ body.theme-light .az-home + .site-footer {
     }
 
     .az-home .home-promotion-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .az-home .home-coupon-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
@@ -843,6 +932,7 @@ body.theme-light .az-home + .site-footer {
 
     html body main.az-home #popularGames,
     html body main.az-home #allMobileGames,
+    html body main.az-home #availableCoupons,
     html body main.az-home #newsPromotions {
         width: calc(100% - 32px) !important;
         max-width: calc(100% - 32px) !important;
@@ -928,6 +1018,10 @@ body.theme-light .az-home + .site-footer {
         line-height: 1.28 !important;
     }
 
+    .az-home #popularGames .popular-game-card .product-market-label {
+        font-size: 9.5px !important;
+    }
+
     .az-home .home-card-arrow {
         right: 10px;
         bottom: 8px;
@@ -976,8 +1070,33 @@ body.theme-light .az-home + .site-footer {
     }
 
     .az-home .home-promotion-grid {
-        grid-template-columns: 1fr;
+        display: grid;
+        grid-auto-flow: column;
+        grid-auto-columns: minmax(238px, 84%);
+        grid-template-columns: none;
         gap: 14px;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        padding-bottom: 4px;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .az-home .home-promotion-card {
+        scroll-snap-align: start;
+    }
+
+    .az-home .home-coupon-grid {
+        display: flex;
+        overflow-x: auto;
+        gap: 12px;
+        padding-bottom: 4px;
+        scroll-snap-type: x mandatory;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .az-home .home-coupon-card {
+        flex: 0 0 min(86%, 320px);
+        scroll-snap-align: start;
     }
 }
 

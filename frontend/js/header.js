@@ -1,6 +1,7 @@
 // frontend/js/header.js - AZIEL V2.5 Global Header + i18n
 
 document.addEventListener("DOMContentLoaded", () => {
+    let mobileDrawerScrollY = 0;
     document.addEventListener("click", event => {
         const menuButton = event.target.closest(".az-mobile-menu-btn");
         const drawerDismiss = event.target.closest(".az-mobile-drawer-close, .az-mobile-drawer-backdrop");
@@ -18,6 +19,13 @@ document.addEventListener("DOMContentLoaded", () => {
         const header = menuButton.closest(".az-header");
         const open = header?.classList.toggle("mobile-menu-open") === true;
         document.body.classList.toggle("az-mobile-drawer-open", open);
+        if (open) {
+            mobileDrawerScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+            document.body.style.setProperty("--az-mobile-drawer-scroll-y", `${mobileDrawerScrollY}px`);
+            document.body.style.top = `-${mobileDrawerScrollY}px`;
+        } else {
+            restoreMobileDrawerScroll(mobileDrawerScrollY);
+        }
         header?.querySelectorAll(".az-nav-dropdown.show").forEach(dropdown => {
             dropdown.classList.remove("show");
             dropdown.querySelector(".az-nav-drop-btn")?.setAttribute("aria-expanded", "false");
@@ -62,11 +70,20 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 });
 
+function restoreMobileDrawerScroll(scrollY = 0) {
+    if (document.body.classList.contains("az-mobile-drawer-open")) return;
+    document.body.style.removeProperty("--az-mobile-drawer-scroll-y");
+    document.body.style.top = "";
+    requestAnimationFrame(() => window.scrollTo({ top: scrollY, left: 0, behavior: "auto" }));
+}
+
 function closeMobileMenu(header, { restoreFocus = false } = {}) {
     if (!header) return;
     const wasOpen = header.classList.contains("mobile-menu-open");
     header.classList.remove("mobile-menu-open");
     document.body.classList.remove("az-mobile-drawer-open");
+    const lockedTop = Math.abs(parseInt(document.body.style.top || "0", 10)) || Math.abs(parseInt(getComputedStyle(document.body).getPropertyValue("--az-mobile-drawer-scroll-y") || "0", 10)) || window.scrollY || 0;
+    restoreMobileDrawerScroll(lockedTop);
     const menuButton = header.querySelector(".az-mobile-menu-btn");
     menuButton?.setAttribute("aria-expanded", "false");
     menuButton?.setAttribute("aria-label", window.AZIEL_LOCALE?.t?.("header.openMenu", "Open menu") || "Open menu");

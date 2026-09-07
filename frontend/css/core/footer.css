@@ -1,11 +1,11 @@
 .site-footer {
     width: min(var(--public-storefront-max, 1500px), calc(100% - (var(--public-storefront-gutter, 24px) * 2)));
-    margin: 72px auto 0;
-    padding: 42px 0 max(34px, calc(34px + env(safe-area-inset-bottom)));
+    margin: 56px auto 0;
+    padding: 32px 0 max(28px, calc(28px + env(safe-area-inset-bottom)));
 
     display: grid;
-    grid-template-columns: minmax(220px, 1.35fr) repeat(5, minmax(120px, 1fr));
-    gap: 28px;
+    grid-template-columns: minmax(240px, 1.2fr) repeat(auto-fit, minmax(116px, max-content));
+    gap: 20px 28px;
     align-items: start;
 
     border-top: 1px solid var(--border);
@@ -13,10 +13,10 @@
 
 .site-footer h3,
 .site-footer h4 {
-    margin: 0 0 12px;
+    margin: 0 0 9px;
     color: var(--heading);
     font-size: 13px;
-    font-weight: 900;
+    font-weight: 650;
     letter-spacing: 0;
 }
 
@@ -24,13 +24,14 @@
 .site-footer a {
     color: var(--text-secondary);
     font-size: 13px;
-    line-height: 1.65;
+    font-weight: 400;
+    line-height: 1.5;
     text-decoration: none;
 }
 
 .site-footer a {
     display: inline-block;
-    margin-bottom: 7px;
+    margin-bottom: 5px;
     transition:
         color var(--motion-fast, .18s) ease,
         transform var(--motion-fast, .18s) var(--motion-ease-premium, ease);
@@ -64,7 +65,7 @@
 .site-footer .payment-logos {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     flex-wrap: wrap;
 }
 
@@ -78,16 +79,63 @@
     border: 1px solid var(--border);
 }
 
+.footer-social-icons {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.site-footer .footer-social-icons a {
+    display: inline-flex;
+    width: 36px;
+    height: 36px;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--surface) 42%, transparent);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    line-height: 1;
+}
+
+.site-footer .footer-social-icons a:hover,
+.site-footer .footer-social-icons a:focus-visible {
+    color: var(--primary);
+    transform: translateY(-1px);
+}
+
 .footer-copy {
     grid-column: 1 / -1;
-    margin-top: 10px;
-    padding-top: 22px;
+    margin-top: 2px;
+    padding-top: 18px;
     border-top: 1px solid var(--border);
 
     text-align: left;
     color: var(--text-muted);
     font-size: 13px;
     line-height: 1.55;
+}
+
+.footer-brand-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 100%;
+    color: var(--text-muted);
+}
+
+.footer-brand-row img {
+    width: 58px;
+    height: auto;
+    flex: 0 0 auto;
+    opacity: .72;
+}
+
+.footer-brand-row p {
+    margin: 0;
+    color: inherit;
 }
 
 /* Light */
@@ -108,8 +156,8 @@ body.theme-light .site-footer .payment-logos img {
         width: calc(100% - 28px);
         grid-template-columns: 1fr;
         gap: 0;
-        margin-top: 36px;
-        padding: 24px 0 max(28px, calc(28px + env(safe-area-inset-bottom)));
+        margin-top: 32px;
+        padding: 22px 0 max(28px, calc(28px + env(safe-area-inset-bottom)));
     }
 
     .site-footer p,
@@ -119,7 +167,7 @@ body.theme-light .site-footer .payment-logos img {
     }
 
     .site-footer > div:first-child {
-        margin-bottom: 14px;
+        margin-bottom: 10px;
     }
 
     .site-footer > div:first-child p {
@@ -149,7 +197,7 @@ body.theme-light .site-footer .payment-logos img {
         background: transparent;
         font: inherit;
         font-size: 13px;
-        font-weight: 700;
+        font-weight: 600;
         text-align: left;
         cursor: pointer;
     }
@@ -205,6 +253,16 @@ body.theme-light .site-footer .payment-logos img {
         padding-top: 16px;
         line-height: 1.45;
     }
+
+    .footer-social-icons {
+        gap: 8px;
+        padding-bottom: 4px;
+    }
+
+    .site-footer .footer-social-icons a {
+        width: 34px;
+        height: 34px;
+    }
 }
 
 @media (max-width: 520px) {
@@ -216,6 +274,16 @@ body.theme-light .site-footer .payment-logos img {
     .footer-copy {
         text-align: left;
         margin-top: 0;
+    }
+
+    .footer-brand-row {
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .footer-brand-row img {
+        width: 48px;
     }
 }
 

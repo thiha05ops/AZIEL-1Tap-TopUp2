@@ -44,6 +44,14 @@
         return String(region || "MM").trim().toUpperCase() === "TH" ? "TH" : "MM";
     }
 
+    function localStorageValue(key) {
+        try {
+            return typeof localStorage !== "undefined" ? localStorage.getItem(key) : "";
+        } catch {
+            return "";
+        }
+    }
+
     function clone(value) {
         return value ? JSON.parse(JSON.stringify(value)) : value;
     }
@@ -101,7 +109,7 @@
     }
 
     async function fetchCatalog(attempt = 0) {
-        const region=window.AZIEL?.getRegion?.()||localStorage.getItem("region")||localStorage.getItem("selectedRegion")||"TH";
+        const region = window.AZIEL?.getRegion?.() || localStorageValue("region") || localStorageValue("selectedRegion") || "TH";
         const response = await fetch(`/api/catalog?region=${encodeURIComponent(region)}`, {
             cache: "no-store",
             headers: { Accept: "application/json" }

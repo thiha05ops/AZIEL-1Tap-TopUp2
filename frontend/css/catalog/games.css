@@ -28,34 +28,34 @@ body {
 }
 
 .az-catalog-shell {
-    width: min(1180px, calc(100% - 32px));
+    width: min(1240px, calc(100% - 32px));
     margin: 0 auto;
 }
 
 .az-catalog-breadcrumb {
-    margin: 0 0 24px;
+    margin: 0 0 18px;
     color: rgba(17, 24, 39, .58);
-    font-size: 13px;
-    font-weight: 900;
+    font-size: 12px;
+    font-weight: 500;
 }
 
 /* FEATURED */
 
 .az-featured-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 22px;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 18px;
     margin-bottom: 34px;
 }
 
 .az-featured-card {
-    min-height: 150px;
+    min-height: 128px;
     display: grid;
-    grid-template-columns: 130px 1fr;
+    grid-template-columns: 112px 1fr;
     align-items: center;
 
     overflow: hidden;
-    border-radius: 22px;
+    border-radius: 20px;
     text-decoration: none;
 
     background: rgba(255, 255, 255, .48);
@@ -68,19 +68,19 @@ body {
     backdrop-filter: blur(18px) saturate(160%);
     -webkit-backdrop-filter: blur(18px) saturate(160%);
 
-    transition: .22s ease;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
 }
 
 .az-featured-card:hover {
-    transform: translateY(-3px);
+    transform: translateY(-2px);
     box-shadow:
         0 24px 60px rgba(31, 41, 55, .12),
         inset 0 1px 0 rgba(255, 255, 255, .8);
 }
 
 .az-featured-card img {
-    width: 130px;
-    height: 150px;
+    width: 112px;
+    height: 128px;
     object-fit: cover;
 }
 
@@ -91,59 +91,86 @@ body {
 .az-featured-card h3 {
     margin: 0 0 8px;
     color: #111827;
-    font-size: 18px;
-    font-weight: 950;
-    line-height: 1.1;
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 1.18;
 }
 
 .az-featured-card p {
     margin: 0;
     color: rgba(17, 24, 39, .62);
     font-size: 13px;
-    font-weight: 700;
+    font-weight: 400;
 }
 
 /* POSTERS */
 
 .az-poster-grid {
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    gap: 32px 22px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 26px 18px;
+    align-items: stretch;
 }
 
 .az-poster-card {
+    display: block;
+    flex: 0 1 158px;
+    width: 158px;
     color: #111827;
     text-decoration: none;
-    transition: .22s ease;
+    transition: transform .18s ease, filter .18s ease;
 }
 
 .az-poster-card:hover {
-    transform: translateY(-3px);
+    transform: translateY(-2px);
 }
 
 .az-poster-card img {
     width: 100%;
-    aspect-ratio: 1 / 1.25;
+    aspect-ratio: 1 / 1.12;
     object-fit: cover;
     display: block;
-    border-radius: 20px;
+    border-radius: 18px;
     box-shadow: 0 18px 45px rgba(31, 41, 55, .10);
 }
 
 .az-poster-card h3 {
-    margin: 14px 0 5px;
+    display: -webkit-box;
+    overflow: hidden;
+    margin: 11px 0 4px;
     color: #111827;
-    font-size: 20px;
-    line-height: 1.08;
-    font-weight: 950;
-    letter-spacing: -.4px;
+    font-size: 15px;
+    line-height: 1.22;
+    font-weight: 600;
+    letter-spacing: -.01em;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
 }
 
 .az-poster-card p {
+    display: -webkit-box;
+    overflow: hidden;
     margin: 0;
     color: rgba(17, 24, 39, .62);
-    font-size: 14px;
-    font-weight: 650;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.28;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+}
+
+.az-poster-card .product-market-label {
+    display: block;
+    overflow: hidden;
+    margin-top: 2px;
+    color: rgba(17, 24, 39, .48);
+    font-size: 10.5px;
+    font-weight: 400;
+    line-height: 1.22;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 
 /* FOOTER FIX */
@@ -162,7 +189,7 @@ footer {
     color: #ffffff;
 
     font-size: 14px;
-    font-weight: 800;
+    font-weight: 500;
 }
 
 /* DARK MODE */
@@ -213,7 +240,7 @@ body.theme-dark .az-poster-card {
 
 @media (max-width: 1100px) {
     .az-poster-grid {
-        grid-template-columns: repeat(4, 1fr);
+        justify-content: center;
     }
 
     .az-featured-grid {
@@ -269,8 +296,13 @@ body.theme-dark .az-poster-card {
     }
 
     .az-poster-grid {
-        grid-template-columns: repeat(3, 1fr);
-        gap: 32px 12px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 22px 12px;
+    }
+
+    .az-poster-card {
+        width: auto;
     }
 
     .az-poster-card img {
@@ -279,13 +311,17 @@ body.theme-dark .az-poster-card {
 
     .az-poster-card h3 {
         margin-top: 12px;
-        font-size: 18px;
-        line-height: 1.05;
+        font-size: 14px;
+        line-height: 1.22;
     }
 
     .az-poster-card p {
-        font-size: 12px;
+        font-size: 11.5px;
         line-height: 1.35;
+    }
+
+    .az-poster-card .product-market-label {
+        font-size: 10px;
     }
 
     footer {
@@ -307,7 +343,7 @@ body.theme-dark .az-poster-card {
     }
 
     .az-poster-card h3 {
-        font-size: 17px;
+        font-size: 13.5px;
     }
 }
 

@@ -493,11 +493,33 @@ body.dark .payment-logos img {
 
 .footer-copy {
   width: 100%;
-  text-align: center;
+  grid-column: 1 / -1;
+  text-align: left;
   font-size: 11px;
   opacity: .7;
-  margin-top: 20px;
+  margin-top: 4px;
   color: var(--text-secondary);
+}
+
+.game-mini-footer .footer-brand-row,
+.site-footer .footer-brand-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+}
+
+.game-mini-footer .footer-brand-row img,
+.site-footer .footer-brand-row img {
+  width: 58px;
+  height: auto;
+  flex: 0 0 auto;
+  opacity: .72;
+}
+
+.game-mini-footer .footer-brand-row p,
+.site-footer .footer-brand-row p {
+  margin: 0;
 }
 
 @media (max-width:768px) {

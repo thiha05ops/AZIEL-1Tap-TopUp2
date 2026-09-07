@@ -64,11 +64,14 @@
 
     function renderPopularCard(product) {
         const fallback = product.fallbackImage || window.AZIEL_CATALOG_PRESENTATION?.getProductImage?.(product.productCode) || "";
+        const description = shortDescription(product);
+        const market = marketLabel(product);
         return `
             <a href="${escapeHtml(product.route)}" class="popular-game-card" data-product-code="${escapeHtml(product.productCode)}" data-name="${escapeHtml(product.name)}">
                 <img src="${escapeHtml(product.image)}" alt="${escapeHtml(product.name)}" loading="lazy" decoding="async"${window.AZIEL_CATALOG_PRESENTATION?.imageFallbackAttributes?.(fallback) || ""}>
                 <h3>${escapeHtml(product.name)}</h3>
-                <p>${escapeHtml(product.description || "Top Up")}</p>
+                <p>${escapeHtml(description || market || "Top Up")}</p>
+                ${market ? `<small class="product-market-label">${escapeHtml(market)}</small>` : ""}
             </a>
         `;
     }
@@ -85,12 +88,15 @@
 
     function renderFeaturedCard(product) {
         const fallback = product.fallbackImage || window.AZIEL_CATALOG_PRESENTATION?.getProductImage?.(product.productCode) || "";
+        const description = shortDescription(product);
+        const market = marketLabel(product);
         return `
             <a href="${escapeHtml(product.route)}" class="az-featured-card ${escapeHtml(product.theme || "")}" data-product-code="${escapeHtml(product.productCode)}">
                 <img src="${escapeHtml(normalizeImageSrc(product.image))}" alt="${escapeHtml(product.name)}" loading="lazy" decoding="async"${window.AZIEL_CATALOG_PRESENTATION?.imageFallbackAttributes?.(normalizeImageSrc(fallback)) || ""}>
                 <div>
                     <h3>${escapeHtml(product.name)}</h3>
-                    <p>${escapeHtml(product.description || "Top Up")}</p>
+                    ${description ? `<p>${escapeHtml(description)}</p>` : ""}
+                    ${market ? `<small class="product-market-label">${escapeHtml(market)}</small>` : ""}
                 </div>
             </a>
         `;
@@ -98,26 +104,43 @@
 
     function renderPosterCard(product) {
         const fallback = product.fallbackImage || window.AZIEL_CATALOG_PRESENTATION?.getProductImage?.(product.productCode) || "";
+        const description = shortDescription(product);
+        const market = marketLabel(product);
         return `
             <a href="${escapeHtml(product.route)}" class="az-poster-card" data-product-code="${escapeHtml(product.productCode)}">
                 <img src="${escapeHtml(normalizeImageSrc(product.image))}" alt="${escapeHtml(product.name)}" loading="lazy" decoding="async"${window.AZIEL_CATALOG_PRESENTATION?.imageFallbackAttributes?.(normalizeImageSrc(fallback)) || ""}>
                 <h3>${escapeHtml(product.name)}</h3>
-                <p>${escapeHtml(product.description || "Top Up")}</p>
+                ${description ? `<p>${escapeHtml(description)}</p>` : ""}
+                ${market ? `<small class="product-market-label">${escapeHtml(market)}</small>` : ""}
             </a>
         `;
     }
 
     function renderHomeGameCard(product) {
         const fallback = product.fallbackImage || window.AZIEL_CATALOG_PRESENTATION?.getProductImage?.(product.productCode) || "";
+        const description = shortDescription(product);
+        const market = marketLabel(product);
         return `
             <a href="${escapeHtml(product.route)}" class="home-game-card" data-product-code="${escapeHtml(product.productCode)}">
                 <img src="${escapeHtml(normalizeImageSrc(product.image))}" alt="${escapeHtml(product.name)}" loading="lazy" decoding="async"${window.AZIEL_CATALOG_PRESENTATION?.imageFallbackAttributes?.(normalizeImageSrc(fallback)) || ""}>
                 <div>
                     <h3>${escapeHtml(product.name)}</h3>
-                    <p>${escapeHtml(product.description || "Top Up")}</p>
+                    ${description ? `<p>${escapeHtml(description)}</p>` : ""}
+                    ${market ? `<small class="product-market-label">${escapeHtml(market)}</small>` : ""}
                 </div>
             </a>
         `;
+    }
+
+    function shortDescription(product = {}) {
+        const value = String(product.shortDescription || product.productKnowledge?.shortDescription || product.searchDescription || product.description || "").trim();
+        const market = marketLabel(product);
+        if (!value || value === market) return "";
+        return value.split(/[•·]/)[0].trim();
+    }
+
+    function marketLabel(product = {}) {
+        return String(window.AZIEL_CATALOG_PRESENTATION?.displayMarketLabel?.(product) || product.displayMarketLabel || product.marketLabel || "").trim();
     }
 
     function normalizeImageSrc(src = "") {

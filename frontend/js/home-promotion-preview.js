@@ -36,6 +36,7 @@
         if (!section || !panel || !list) return;
 
         section.hidden = true;
+        section.dataset.exclusiveOffers = "true";
         panel.dataset.promotionPreviewState = "loading";
         list.innerHTML = "";
         if (viewAll) viewAll.href = "/notifications.html?filter=promotions";
@@ -63,6 +64,7 @@
 
             list.innerHTML = promotions.map(renderPromotionCard).join("");
             panel.dataset.promotionPreviewState = "active";
+            section.querySelector(".az-section-head h2")?.replaceChildren(document.createTextNode("Exclusive Offers"));
             section.hidden = false;
             window.AZIEL_MOTION?.enter?.(list, "fast");
         } catch {
@@ -74,15 +76,32 @@
 
     function renderPromotionCard(promotion = {}) {
         const action = safeAction(promotion.action || { label: promotion.ctaLabel, url: promotion.ctaUrl });
+        const meta = promotionMeta(promotion);
+        const label = action?.label || promotion.ctaLabel || "View More";
         const body = `
             <img src="${escapeAttr(promotion.imageUrl)}" alt="${escapeAttr(promotion.imageAltText || promotion.title || "AZIEL promotion")}" loading="lazy" decoding="async">
-            <strong>${escapeHtml(promotion.title || "AZIEL promotion")}</strong>
-            ${promotion.summary ? `<p>${escapeHtml(promotion.summary)}</p>` : ""}
-            <small>${escapeHtml(formatRange(promotion.startsAt, promotion.endsAt) || "Limited time")}</small>
+            <span class="home-promotion-copy">
+                <small>${escapeHtml(meta)}</small>
+                <strong>${escapeHtml(promotion.title || "AZIEL promotion")}</strong>
+                ${promotion.summary ? `<p>${escapeHtml(promotion.summary)}</p>` : ""}
+                ${action ? `<span class="home-promotion-action">${escapeHtml(label)} <i class="fa-solid fa-angle-right" aria-hidden="true"></i></span>` : ""}
+            </span>
         `;
         return action
             ? `<a class="home-promotion-card" href="${escapeAttr(action.url)}"${action.external ? ' target="_blank" rel="noopener noreferrer"' : ""}>${body}</a>`
             : `<article class="home-promotion-card">${body}</article>`;
+    }
+
+    function promotionMeta(promotion = {}) {
+        const parts = [];
+        const product = String(promotion.productName || promotion.targetProductName || promotion.game || "").trim();
+        const regions = Array.isArray(promotion.regions) ? promotion.regions.filter(Boolean).join(" / ") : "";
+        const range = formatRange(promotion.startsAt, promotion.endsAt);
+        if (product) parts.push(product);
+        if (regions) parts.push(regions);
+        if (promotion.promoCode) parts.push("Promo code");
+        if (range) parts.push(range);
+        return parts.join(" · ") || "Exclusive AZIEL offer";
     }
 
     function safeAction(action = null) {

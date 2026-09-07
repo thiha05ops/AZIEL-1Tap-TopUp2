@@ -233,6 +233,31 @@
         );
     }
 
+    function displayMarketLabel(product = {}) {
+        const direct = String(
+            product.displayMarketLabel ||
+            product.presentation?.displayMarketLabel ||
+            product.marketLabel ||
+            ""
+        ).trim();
+        if (direct) return direct;
+        const scope = String(product.marketScope || product.presentation?.marketScope || "").trim().toUpperCase();
+        if (scope === "GLOBAL") return "Global";
+        const regions = Array.isArray(product.supportedRegions) ? product.supportedRegions : [];
+        const labels = {
+            GLOBAL: "Global",
+            TH: "Thailand",
+            MM: "Myanmar",
+            ID: "Indonesia",
+            MY: "Malaysia",
+            SG: "Singapore",
+            PH: "Philippines",
+            SEA: "SEA",
+            ASIA: "Asia"
+        };
+        return regions.map(region => labels[String(region || "").trim().toUpperCase()]).filter(Boolean)[0] || "";
+    }
+
     function getPackageIcon(productCode, packageCode) {
         const code = String(productCode || "").trim().toLowerCase();
         const packageId = String(packageCode || "").trim().toUpperCase();
@@ -298,6 +323,8 @@
             trending: (product.homepageFlags || []).includes("TRENDING"),
             description: product.description || "",
             searchDescription: product.description || "",
+            displayMarketLabel: displayMarketLabel(product),
+            marketLabel: displayMarketLabel(product),
             theme: presentation?.theme || ""
         };
     }
@@ -311,6 +338,7 @@
         resolveProductImage,
         resolveProductBanner,
         resolveMobilePackagePreview,
+        displayMarketLabel,
         getPackageIcon,
         resolvePackageIcon,
         imageFallbackAttributes,

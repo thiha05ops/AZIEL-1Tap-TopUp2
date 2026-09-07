@@ -779,7 +779,7 @@ body.theme-dark .dropdown-btn:hover {
     visibility: hidden;
     pointer-events: none;
 
-    transform: translateX(-50%) translateY(8px) scale(.98);
+    transform: translateX(-50%) translateY(12px) scale(.96);
     transition: .2s ease;
 
     z-index: var(--az-z-header-dropdown, 100000);
@@ -2236,7 +2236,11 @@ body.dark .az-profile-dropdown .dropdown-divider {
 /* Final mobile drawer presentation; navigation content remains runtime-owned. */
 @media (max-width: 900px) {
     body.az-mobile-drawer-open {
+        position: fixed !important;
+        inset: var(--az-mobile-drawer-scroll-y, 0) 0 auto 0 !important;
+        width: 100% !important;
         overflow: hidden !important;
+        touch-action: none;
     }
 
     html body .az-header > .az-mobile-drawer-backdrop {
@@ -2269,6 +2273,7 @@ body.dark .az-profile-dropdown .dropdown-divider {
         width: min(76vw, 320px) !important;
         max-width: 320px !important;
         height: 100dvh !important;
+        min-height: 100svh !important;
         max-height: none !important;
         padding: 0 14px 24px !important;
         border: 0 !important;
@@ -2280,6 +2285,8 @@ body.dark .az-profile-dropdown .dropdown-divider {
         visibility: hidden !important;
         overflow-x: hidden !important;
         overflow-y: auto !important;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
         pointer-events: none !important;
         transform: translateX(-100%) !important;
         transition: transform .24s var(--motion-ease-premium, ease), visibility .24s ease !important;
@@ -2348,6 +2355,7 @@ body.dark .az-profile-dropdown .dropdown-divider {
         margin: 0 !important;
         border-radius: 8px !important;
         background: transparent;
+        font-weight: 600 !important;
     }
 }
 

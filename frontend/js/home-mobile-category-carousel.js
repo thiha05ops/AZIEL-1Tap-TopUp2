@@ -2,7 +2,7 @@
 
 (function () {
     const MOBILE_QUERY = window.matchMedia("(max-width: 768px)");
-    const MAX_ITEMS = 6;
+    const MAX_ITEMS = 5;
     let renderSequence = 0;
     let resizeFrame = 0;
     let mutationTimer = 0;
@@ -35,7 +35,7 @@
             image: row.querySelector("img")?.getAttribute("src") || "",
             imageAltText: row.querySelector("img")?.getAttribute("alt") || "",
             fallbackImage: row.querySelector("img")?.dataset.fallbackSrc || "",
-            subtitle: row.querySelector("p")?.dataset.mobileMeta || row.querySelector("p")?.textContent?.trim() || "",
+            subtitle: row.querySelector("p")?.dataset.mobileMeta || row.dataset.marketLabel || row.querySelector("p")?.textContent?.trim() || "",
             productType: row.querySelector("p")?.dataset.mobileType || row.querySelector("p")?.textContent?.trim() || "",
             priceText: row.querySelector(".home-product-price")?.textContent?.trim() || "",
             commerceState: row.dataset.commerceState || "PURCHASABLE",
@@ -152,6 +152,8 @@
         const target = window.AZIEL_CATALOG_PRESENTATION?.resolveProductRoute?.(product.productRoute || product.route, product.productCode) || "";
         const state = String(product.commerceState || "HIDDEN").toLowerCase().replaceAll("_", "-");
         const priceText = product.priceText || productPriceText(product);
+        const description = shortDescription(product);
+        const market = marketLabel(product);
         return `
             <a class="mobile-home-product-row is-${escapeAttr(state)}" href="${escapeAttr(target)}" data-purchasable="${product.purchasable === true}">
                 <span class="mobile-home-product-art">
@@ -159,11 +161,23 @@
                 </span>
                 <span class="mobile-home-product-copy">
                     <strong>${escapeHtml(product.name)}</strong>
-                    <small class="mobile-home-product-type">${escapeHtml(product.productType || String(product.description || "Digital product").split(/[•·]/)[0].trim())}</small>
+                    ${description ? `<small class="mobile-home-product-type">${escapeHtml(description)}</small>` : ""}
+                    <small class="mobile-home-product-market">${escapeHtml(market)}</small>
                     ${priceText ? `<span class="mobile-home-product-price${product.purchasable === true ? "" : " is-preview"}">${escapeHtml(priceText)}</span>` : ""}
                 </span>
             </a>
         `;
+    }
+
+    function shortDescription(product = {}) {
+        const value = String(product.shortDescription || product.productKnowledge?.shortDescription || product.searchDescription || product.description || product.productType || "").trim();
+        const market = marketLabel(product);
+        if (!value || value === market) return "";
+        return value.split(/[•·]/)[0].trim();
+    }
+
+    function marketLabel(product = {}) {
+        return String(product.displayMarketLabel || product.marketLabel || "Digital product").trim();
     }
 
     function productPriceText(product = {}) {

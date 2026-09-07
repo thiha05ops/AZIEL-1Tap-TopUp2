@@ -47,7 +47,7 @@
     <link rel="stylesheet" href="css/theme/desktop.css">
     <link rel="stylesheet" href="css/theme/mobile.css?v=20260901-empty-store-v2">
     <!-- marketplace-reference.css is the canonical Home hero geometry owner. -->
-    <link rel="stylesheet" href="/css/home/marketplace-reference.css?v=20260829-header-hero-seam-r3">
+    <link rel="stylesheet" href="/css/home/marketplace-reference.css?v=20260907-storefront-polish">
     <link rel="stylesheet" href="/css/home/home-product-system.css?v=20260901-empty-store-v2">
     <link rel="stylesheet" href="/css/theme/aziel-header.css?v=20260829-header-hero-seam-r3">
 <meta name="theme-color" content="#070716">
@@ -167,13 +167,24 @@
             <div class="home-product-panels" id="socialTopUpList"></div>
         </section>
 
+        <section id="availableCoupons" class="az-section home-merch-section home-coupon-section" hidden
+            data-coupon-authority="public-list-unavailable">
+            <div class="az-section-head">
+                <div>
+                    <h2>Available Coupons</h2>
+                </div>
+            </div>
+            <div class="home-coupon-grid" id="availableCouponsList">
+            </div>
+        </section>
+
         <section id="newsPromotions" class="az-section home-merch-section" hidden>
             <div class="az-section-head">
                 <div>
-                    <h2 data-i18n="home.newsPROMOTIONS">NEWS &amp; PROMOTIONS</h2>
+                    <h2>Exclusive Offers</h2>
                 </div>
                 <a id="latestPromotionsViewAll" href="/notifications.html?filter=promotions">
-                    <span data-i18n="home.viewAllNews">View all news</span>
+                    <span>View More</span>
                     <i class="fa-solid fa-angle-right" aria-hidden="true"></i></a>
             </div>
             <div id="latestPromotionsPanel" data-promotion-preview-state="idle">
@@ -185,7 +196,6 @@
 
     <footer class="site-footer" aria-label="AZIEL footer" data-i18n-aria-label="common.footer">
         <div>
-            <h3>AZIEL</h3>
             <p data-i18n="footerDescription">
                 Game top-ups, order tracking, wallet services, and customer support in one place.
             </p>
@@ -223,11 +233,20 @@
 
         <div>
             <h4 data-i18n="followUs">Follow Us</h4>
-            <a href="https://www.facebook.com/share/1DhL7dQ16a/?mibextid=wwXIfr" target="_blank"
-                rel="noopener noreferrer">Facebook</a><br>
-            <a href="https://t.me/aziel1tap" target="_blank" rel="noopener noreferrer">Telegram</a><br>
-            <a href="https://youtube.com/@aziel1tapshop" target="_blank" rel="noopener noreferrer">YouTube</a><br>
-            <a href="https://discord.gg/txTGuTK76" target="_blank" rel="noopener noreferrer">Discord</a>
+            <div class="footer-social-icons" aria-label="AZIEL social links">
+                <a href="https://www.facebook.com/share/1DhL7dQ16a/?mibextid=wwXIfr" target="_blank"
+                    rel="noopener noreferrer" aria-label="AZIEL on Facebook" title="Facebook"><i
+                        class="fa-brands fa-facebook-f" aria-hidden="true"></i></a>
+                <a href="https://t.me/aziel1tap" target="_blank" rel="noopener noreferrer"
+                    aria-label="AZIEL on Telegram" title="Telegram"><i class="fa-brands fa-telegram"
+                        aria-hidden="true"></i></a>
+                <a href="https://youtube.com/@aziel1tapshop" target="_blank" rel="noopener noreferrer"
+                    aria-label="AZIEL on YouTube" title="YouTube"><i class="fa-brands fa-youtube"
+                        aria-hidden="true"></i></a>
+                <a href="https://discord.gg/txTGuTK76" target="_blank" rel="noopener noreferrer"
+                    aria-label="AZIEL on Discord" title="Discord"><i class="fa-brands fa-discord"
+                        aria-hidden="true"></i></a>
+            </div>
         </div>
 
         <div>
@@ -237,8 +256,10 @@
         </div>
 
         <div class="footer-copy">
-            <span data-i18n="footerCopyright">© 2026 AZIEL 1Tap Shop.</span><br>
-            <span data-i18n="tagline">1 TAP. TOP UP. DONE.</span>
+            <div class="footer-brand-row">
+                <img src="/assets/brand/aziel-logo-primary.svg" alt="AZIEL" loading="lazy" decoding="async">
+                <p>© 2026 AZIEL 1Tap Shop · <span data-i18n="tagline">1 TAP. TOP UP. DONE.</span></p>
+            </div>
         </div>
     </footer>
 

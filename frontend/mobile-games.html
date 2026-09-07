@@ -119,7 +119,6 @@
 
     <footer class="site-footer" aria-label="AZIEL footer" data-i18n-aria-label="common.footer">
         <div>
-            <h3>AZIEL</h3>
             <p data-i18n="footerDescription">
                 Game top-ups, order tracking, wallet services, and customer support in one place.
             </p>
@@ -157,11 +156,20 @@
 
         <div>
             <h4 data-i18n="followUs">Follow Us</h4>
-            <a href="https://www.facebook.com/share/1DhL7dQ16a/?mibextid=wwXIfr" target="_blank"
-                rel="noopener noreferrer">Facebook</a><br>
-            <a href="https://t.me/aziel1tap" target="_blank" rel="noopener noreferrer">Telegram</a><br>
-            <a href="https://youtube.com/@aziel1tapshop" target="_blank" rel="noopener noreferrer">YouTube</a><br>
-            <a href="https://discord.gg/txTGuTK76" target="_blank" rel="noopener noreferrer">Discord</a>
+            <div class="footer-social-icons" aria-label="AZIEL social links">
+                <a href="https://www.facebook.com/share/1DhL7dQ16a/?mibextid=wwXIfr" target="_blank"
+                    rel="noopener noreferrer" aria-label="AZIEL on Facebook" title="Facebook"><i
+                        class="fa-brands fa-facebook-f" aria-hidden="true"></i></a>
+                <a href="https://t.me/aziel1tap" target="_blank" rel="noopener noreferrer"
+                    aria-label="AZIEL on Telegram" title="Telegram"><i class="fa-brands fa-telegram"
+                        aria-hidden="true"></i></a>
+                <a href="https://youtube.com/@aziel1tapshop" target="_blank" rel="noopener noreferrer"
+                    aria-label="AZIEL on YouTube" title="YouTube"><i class="fa-brands fa-youtube"
+                        aria-hidden="true"></i></a>
+                <a href="https://discord.gg/txTGuTK76" target="_blank" rel="noopener noreferrer"
+                    aria-label="AZIEL on Discord" title="Discord"><i class="fa-brands fa-discord"
+                        aria-hidden="true"></i></a>
+            </div>
         </div>
 
         <!--div>
@@ -175,8 +183,10 @@
         </div-->
 
         <div class="footer-copy">
-            <span data-i18n="footerCopyright">© 2026 AZIEL 1Tap Shop.</span><br>
-            <span data-i18n="tagline">1 TAP. TOP UP. DONE.</span>
+            <div class="footer-brand-row">
+                <img src="/assets/brand/aziel-logo-primary.svg" alt="AZIEL" loading="lazy" decoding="async">
+                <p>© 2026 AZIEL 1Tap Shop · <span data-i18n="tagline">1 TAP. TOP UP. DONE.</span></p>
+            </div>
         </div>
     </footer>
 

@@ -36,9 +36,10 @@
 }
 
 .home-product-panels {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 190px));
-    justify-content: start;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: stretch;
     gap: 20px;
     width: 100%;
     padding: 0;
@@ -54,8 +55,11 @@
     position: relative;
     display: block;
     justify-self: center;
-    width: 100%;
+    flex: 0 1 190px;
+    width: 190px;
     max-width: 190px;
+    min-height: 230px;
+    height: 100%;
     min-width: 0;
     padding: 8px;
     border: 1px solid var(--home-product-border);
@@ -94,7 +98,14 @@
     object-fit: contain;
     object-position: center;
 }
-.home-product-copy { display: block; min-width: 0; margin-top: 9px; }
+.home-product-copy {
+    display: grid;
+    grid-template-rows: auto auto auto;
+    align-content: start;
+    min-width: 0;
+    min-height: 64px;
+    margin-top: 9px;
+}
 .home-product-copy strong,
 .home-product-copy small { display: block; overflow: hidden; }
 .home-product-copy strong {
@@ -109,11 +120,22 @@
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
 }
-.home-product-copy small {
+.home-product-copy .home-product-description {
+    display: -webkit-box;
     margin-top: 3px;
     color: var(--home-product-muted);
     font-size: 12px;
     line-height: 1.35;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+}
+.home-product-copy .home-product-market {
+    margin-top: 2px;
+    color: color-mix(in srgb, var(--home-product-muted) 78%, transparent);
+    font-size: 10.5px;
+    font-weight: 400;
+    line-height: 1.25;
     white-space: nowrap;
     text-overflow: ellipsis;
 }
@@ -131,10 +153,10 @@
 .home-product-item.is-temporarily-unavailable { opacity: .68; }
 .home-product-item:focus-visible { outline: 2px solid #8b5cf6; outline-offset: 3px; }
 
-#popularGames .home-product-panels { grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 210px)); gap: 20px; }
-#popularGames .home-product-item { max-width: 210px; padding: 10px; }
+#popularGames .home-product-panels { gap: 20px; }
+#popularGames .home-product-item { flex-basis: 210px; width: 210px; max-width: 210px; padding: 10px; }
 #popularGames .home-product-copy strong { font-size: 15px; }
-#popularGames .home-product-copy small { font-size: 12.5px; }
+#popularGames .home-product-copy .home-product-description { font-size: 12.5px; }
 
 @media (hover: hover) and (pointer: fine) {
     .home-product-item:hover {
@@ -146,8 +168,8 @@
 }
 
 @media (max-width: 1023px) and (min-width: 721px) {
-    .home-product-panels { grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); }
-    #popularGames .home-product-panels { grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); }
+    .home-product-item { flex-basis: 150px; width: 150px; max-width: 170px; }
+    #popularGames .home-product-item { flex-basis: 170px; width: 170px; max-width: 190px; }
 }
 
 @media (min-width: 721px) {
@@ -182,8 +204,8 @@
     }
     .home-mobile-group-rail::-webkit-scrollbar { display: none; }
     html body main.az-home .home-mobile-group-rail > section.home-merch-section {
-        flex: 0 0 clamp(238px, calc(100vw - 89px), 341px);
-        width: clamp(238px, calc(100vw - 89px), 341px);
+        flex: 0 0 clamp(276px, calc(100vw - 48px), 360px);
+        width: clamp(276px, calc(100vw - 48px), 360px);
         margin: 0 !important;
         padding: 12px;
         border: 1px solid var(--home-product-border);
@@ -215,7 +237,7 @@
         min-width: 0;
         overflow: hidden;
         font-size: clamp(11px, 3vw, 14px) !important;
-        font-weight: 700 !important;
+        font-weight: 600 !important;
         line-height: 1.2 !important;
         white-space: nowrap;
         text-overflow: clip;
@@ -260,8 +282,8 @@
         justify-self: stretch;
         width: auto;
         max-width: none;
+        min-height: 60px;
         min-width: 0;
-        min-height: 62px;
         gap: 8px;
         padding: 6px;
         border: 0;
@@ -275,9 +297,12 @@
         aspect-ratio: auto;
         padding: 2px;
         border-radius: 8px;
-        object-fit: contain;
+        object-fit: cover;
     }
-    .home-product-copy { margin-top: 0; }
+    .home-product-copy {
+        min-height: 0;
+        margin-top: 0;
+    }
     .home-product-copy strong,
     #popularGames .home-product-copy strong {
         display: -webkit-box;
@@ -292,14 +317,21 @@
         -webkit-box-orient: vertical;
         -webkit-line-clamp: 2;
     }
-    .home-product-copy small,
-    #popularGames .home-product-copy small {
-        min-height: 1.35em;
+    .home-product-copy .home-product-description,
+    #popularGames .home-product-copy .home-product-description {
         margin-top: 3px;
         color: var(--home-product-muted);
         font-size: 11.5px;
-        line-height: 1.35;
+        font-weight: 400;
+        line-height: 1.25;
         white-space: normal;
+        -webkit-line-clamp: 1;
+    }
+    .home-product-copy .home-product-market,
+    #popularGames .home-product-copy .home-product-market {
+        margin-top: 1px;
+        font-size: 10px;
+        line-height: 1.2;
     }
     .home-mobile-group-rail .home-product-item:hover {
         border-color: transparent;

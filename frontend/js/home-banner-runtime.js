@@ -553,7 +553,7 @@
         if (!track) return;
         const x = carouselMetrics.centerOffset - ((position + 1) * carouselMetrics.step);
         track.style.transition = animate && !reducedMotionMedia.matches
-            ? "transform var(--az-banner-transition-duration, 560ms) var(--az-banner-transition-ease, ease)"
+            ? "transform var(--az-banner-transition-duration, 560ms) var(--az-banner-transition-ease, ease), opacity var(--az-banner-transition-duration, 560ms) var(--az-banner-transition-ease, ease)"
             : "none";
         track.style.transform = `translate3d(${x}px, 0, 0)`;
     }

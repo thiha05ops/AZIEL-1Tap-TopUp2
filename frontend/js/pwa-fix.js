@@ -67,10 +67,20 @@ function initAzielFooterPolish() {
         });
 
         const copy = footer.querySelector(".footer-copy span:first-child");
-        if (copy) {
-            copy.textContent = copy.textContent.replace(/©\s*\d{4}/, `© ${year}`);
-        }
+        if (copy) updateFooterCopyrightYear(copy, year);
     });
+}
+
+function updateFooterCopyrightYear(node, year) {
+    const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+    let textNode = walker.nextNode();
+    while (textNode) {
+        if (/©\s*\d{4}/.test(textNode.textContent || "")) {
+            textNode.textContent = textNode.textContent.replace(/©\s*\d{4}/, `© ${year}`);
+            return;
+        }
+        textNode = walker.nextNode();
+    }
 }
 
 function scheduleAzielTrustLogoRender() {
