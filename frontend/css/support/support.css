@@ -141,13 +141,57 @@
 }
 
 .support-hero h1 {
-    margin-bottom: 18px;
+    margin-bottom: 14px;
 
     color: var(--text);
-    font-size: 54px;
+    font-size: clamp(38px, 4vw, 50px);
     line-height: 1.05;
-    letter-spacing: -2px;
-    font-weight: 900;
+    letter-spacing: -1.6px;
+    font-weight: 800;
+}
+
+.support-hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 22px;
+}
+
+.support-hero-actions a {
+    display: inline-flex;
+    min-height: 46px;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    padding: 0 18px;
+    border-radius: 16px;
+    font-size: 14px;
+    font-weight: 750;
+    text-decoration: none;
+    transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+
+.support-action-primary {
+    border: 1px solid transparent;
+    background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+    color: #fff;
+    box-shadow: 0 16px 34px rgba(124, 58, 237, .26);
+}
+
+.support-action-secondary {
+    border: 1px solid var(--border);
+    background: color-mix(in srgb, var(--surface) 72%, transparent);
+    color: var(--text);
+}
+
+.support-hero-actions a:hover,
+.support-hero-actions a:focus-visible {
+    transform: translateY(-1px);
+}
+
+.support-hero-actions a:focus-visible {
+    outline: 3px solid rgba(139, 92, 246, .72);
+    outline-offset: 3px;
 }
 
 .hero-icon {
@@ -757,23 +801,25 @@
 
 .support-footer-grid {
     display: grid;
-    grid-template-columns: 1.4fr repeat(4, minmax(0, 1fr));
-    gap: 28px;
+    grid-template-columns: minmax(220px, 1.25fr) repeat(4, minmax(116px, max-content));
+    gap: 20px 28px;
     text-align: left;
 }
 
 .support-footer h3,
 .support-footer h4 {
-    margin-bottom: 12px;
+    margin-bottom: 9px;
     color: var(--heading);
-    font-weight: 900;
+    font-size: 13px;
+    font-weight: 650;
 }
 
 .support-footer p,
 .support-footer a {
     color: var(--text-secondary);
-    font-size: 14px;
-    line-height: 1.8;
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.55;
 }
 
 .support-footer a {
@@ -788,10 +834,47 @@
 }
 
 .support-footer-copy {
-    margin-top: 26px;
-    padding-top: 22px;
+    margin-top: 18px;
+    padding-top: 18px;
     border-top: 1px solid var(--border);
-    text-align: center;
+    text-align: left;
+}
+
+.support-footer .footer-social-icons {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.support-footer .footer-social-icons a {
+    display: inline-flex;
+    width: 36px;
+    height: 36px;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: color-mix(in srgb, var(--surface) 42%, transparent);
+    line-height: 1;
+}
+
+.support-footer .footer-brand-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.support-footer .footer-brand-row img {
+    width: 58px;
+    height: auto;
+    flex: 0 0 auto;
+    opacity: .72;
+}
+
+.support-footer .footer-brand-row p {
+    margin: 0;
 }
 
 /* ==========================================
@@ -941,8 +1024,15 @@ body.theme-light .support-msg.error {
     }
 
     .support-hero h1 {
-        font-size: 36px;
+        font-size: 34px;
         letter-spacing: -1.2px;
+    }
+
+    .support-hero-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+        margin-top: 18px;
     }
 
     .support-subtitle {

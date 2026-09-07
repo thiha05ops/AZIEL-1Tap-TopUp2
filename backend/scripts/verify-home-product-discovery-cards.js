@@ -91,7 +91,7 @@ async function run() {
     assertNotIncludes(css, "body.theme-light .az-home + .site-footer {\n    background: var(--surface)", "Light Home footer must not become an isolated white surface.");
     assertIncludes(css, ".az-home + .site-footer .payment-logos img", "Home payment chips must have a scoped theme-safe surface.");
     assertIncludes(css, "background: var(--surface-strong) !important;", "Home payment chips must use a semantic theme surface.");
-    assertIncludes(home, "marketplace-reference.css?v=20260811-rgb-cleanup", "Home must load the current shared Home stylesheet version.");
+    assertIncludes(home, "marketplace-reference.css?v=20260907-storefront-polish", "Home must load the current shared Home stylesheet version.");
 
     return {
         popularMobileGames: "Admin SitePlacement membership and order",

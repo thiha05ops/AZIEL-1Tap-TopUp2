@@ -295,7 +295,7 @@
   .pack {
     min-height: 78px !important;
     padding: 12px !important;
-    grid-template-columns: 44px minmax(0, 1fr) !important;
+    grid-template-columns: 52px minmax(0, 1fr) !important;
     grid-template-rows: auto auto !important;
     align-content: center !important;
     gap: 7px 11px !important;
@@ -311,8 +311,8 @@
 
   .pack-icon {
     grid-row: 1 / span 2;
-    width: 44px !important;
-    height: 44px !important;
+    width: 52px !important;
+    height: 52px !important;
     border-radius: 10px !important;
     overflow: hidden;
   }
@@ -898,8 +898,8 @@
 
 .az-product-detail .pack-icon {
   align-self: center;
-  width: 40px !important;
-  height: 40px !important;
+  width: 48px !important;
+  height: 48px !important;
   border: 1px solid var(--pd-border);
   background: var(--pd-panel);
 }

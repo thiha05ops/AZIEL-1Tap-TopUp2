@@ -664,7 +664,7 @@ window.AZIEL_LANG.th = {
     "Orders, payments, wallet, and account support.": "คำสั่งซื้อ, การชำระเงินs, กระเป๋าเงิน, and บัญชี ซัพพอร์ต.",
     "Open Support": "เปิด ซัพพอร์ต",
     "General and business inquiries.": "General and business inquiries.",
-    "aziel1tapshop@gmail.com": "aziel1tapshop@gmail.com",
+    "aziel1tapshop@gmail.com": "support@azielplay.com",
     "Official AZIEL public Telegram channel.": "Official AZIEL public Telegram channel.",
     "Open Telegram": "เปิด Telegram",
     "Official community and updates. Do not submit passwords, OTPs, payment PINs, or private evidence here.": "Official community and updates. Do not submit รหัสผ่านs, OTPs, การชำระเงิน PINs, or private evidence here.",

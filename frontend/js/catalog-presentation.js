@@ -182,8 +182,7 @@
         freefire: [[/.*/, "diamond.webp"]],
         hok: [
             [/WEEKLY_CARD_PLUS/i, "weekly-plus.webp"],
-            [/WEEKLY/i, "weekly.webp"],
-            [/.*/, "token.webp"]
+            [/WEEKLY/i, "weekly.webp"]
         ],
         aovid: [[/.*/, "voucher.webp"]],
         pubgrp: [[/.*/, "rp.webp"]],

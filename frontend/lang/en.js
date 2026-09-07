@@ -665,7 +665,7 @@ window.AZIEL_LANG.en = {
     "Orders, payments, wallet, and account support.": "Orders, payments, wallet, and account support.",
     "Open Support": "Open Support",
     "General and business inquiries.": "General and business inquiries.",
-    "aziel1tapshop@gmail.com": "aziel1tapshop@gmail.com",
+    "aziel1tapshop@gmail.com": "support@azielplay.com",
     "Official AZIEL public Telegram channel.": "Official AZIEL public Telegram channel.",
     "Open Telegram": "Open Telegram",
     "Official community and updates. Do not submit passwords, OTPs, payment PINs, or private evidence here.": "Official community and updates. Do not submit passwords, OTPs, payment PINs, or private evidence here.",

@@ -663,7 +663,7 @@ window.AZIEL_LANG.my = {
     "Orders, payments, wallet, and account support.": "အော်ဒါများ, ငွေပေးချေမှုs, ပိုက်ဆံအိတ်, and အကောင့် အကူအညီ.",
     "Open Support": "ဖွင့်မည် အကူအညီ",
     "General and business inquiries.": "General and business inquiries.",
-    "aziel1tapshop@gmail.com": "aziel1tapshop@gmail.com",
+    "aziel1tapshop@gmail.com": "support@azielplay.com",
     "Official AZIEL public Telegram channel.": "Official AZIEL public Telegram channel.",
     "Open Telegram": "ဖွင့်မည် Telegram",
     "Official community and updates. Do not submit passwords, OTPs, payment PINs, or private evidence here.": "Official community and updates. Do not submit စကားဝှက်s, OTPs, ငွေပေးချေမှု PINs, or private evidence here.",
