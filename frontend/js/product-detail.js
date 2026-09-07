@@ -93,7 +93,29 @@
             const inputId = String(field.selector || `#supplierInput${index + 2}`).replace(/^#/, "");
             if (document.getElementById(inputId)) return;
             const label = document.createElement("label"); label.htmlFor = inputId; label.textContent = field.label;
-            const input = document.createElement("input"); input.id = inputId; input.placeholder = `Enter ${field.label}`; applyConstraints(input,field);
+            let input;
+            if (field.type === "select" && Array.isArray(field.options) && field.options.length) {
+                input = document.createElement("select");
+                input.id = inputId;
+                const placeholder = document.createElement("option");
+                placeholder.value = "";
+                placeholder.textContent = `Select ${field.label}`;
+                placeholder.disabled = true;
+                placeholder.selected = true;
+                input.appendChild(placeholder);
+                field.options.forEach(option => {
+                    const node = document.createElement("option");
+                    node.value = String(option.value || "");
+                    node.textContent = String(option.label || option.value || "");
+                    input.appendChild(node);
+                });
+                input.required = field.required !== false;
+            } else {
+                input = document.createElement("input");
+                input.id = inputId;
+                input.placeholder = `Enter ${field.label}`;
+                applyConstraints(input, field);
+            }
             accountCard?.append(label, input);
         });
 

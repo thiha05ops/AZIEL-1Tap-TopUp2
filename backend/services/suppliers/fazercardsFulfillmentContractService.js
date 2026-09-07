@@ -25,6 +25,12 @@ function normalizedFields(source = {}) {
         required: item.required !== false,
         label: clean(item.label),
         type: clean(item.type || "text").toLowerCase(),
+        options: Array.isArray(item.options)
+            ? item.options.map(option => ({
+                label: clean(option?.label || option?.value),
+                value: clean(option?.value)
+            })).filter(option => option.value)
+            : [],
         constraints: (() => { const value=item.constraints&&typeof item.constraints==="object"?item.constraints:{}; const out={}; if(clean(value.pattern)&&clean(value.pattern).length<=160)out.pattern=clean(value.pattern); if(Number.isInteger(Number(value.minLength))&&Number(value.minLength)>=0)out.minLength=Number(value.minLength); if(Number.isInteger(Number(value.maxLength))&&Number(value.maxLength)>0)out.maxLength=Number(value.maxLength); return out; })(),
         evidenceReference: clean(item.evidenceReference),
         transformationId: clean(item.transformationId)
@@ -109,6 +115,25 @@ function buildFieldsFromContract(contract, input = {}) {
         if (value && field.constraints?.minLength != null && value.length < field.constraints.minLength) throw new FazerCardsFulfillmentContractError("FAZERCARDS_INPUT_CONSTRAINT_FAILED", `${field.customerField} is shorter than the verified minimum.`);
         if (value && field.constraints?.maxLength != null && value.length > field.constraints.maxLength) throw new FazerCardsFulfillmentContractError("FAZERCARDS_INPUT_CONSTRAINT_FAILED", `${field.customerField} exceeds the verified maximum.`);
         if (value && field.constraints?.pattern) { let pattern; try { pattern=new RegExp(field.constraints.pattern); } catch { throw new FazerCardsFulfillmentContractError("FAZERCARDS_INPUT_CONTRACT_NOT_VERIFIED", "The verified input pattern is invalid."); } if(!pattern.test(value))throw new FazerCardsFulfillmentContractError("FAZERCARDS_INPUT_CONSTRAINT_FAILED", `${field.customerField} does not match the verified format.`); }
+        if (value && field.type === "select") {
+            const allowedValues = new Set(
+                (Array.isArray(field.options) ? field.options : [])
+                    .map(option => clean(option?.value))
+                    .filter(Boolean)
+            );
+            if (!allowedValues.size) {
+                throw new FazerCardsFulfillmentContractError(
+                    "FAZERCARDS_INPUT_CONTRACT_NOT_VERIFIED",
+                    `${field.customerField} has no verified select options.`
+                );
+            }
+            if (!allowedValues.has(value)) {
+                throw new FazerCardsFulfillmentContractError(
+                    "FAZERCARDS_INPUT_CONSTRAINT_FAILED",
+                    `${field.customerField} is not an allowed verified option.`
+                );
+            }
+        }
         if (value) output[field.providerField] = value;
     }
     return output;
@@ -124,6 +149,9 @@ function publicCustomerInputContract(contract) {
             selector: index === 0 ? "#userId" : `#supplierInput${index + 1}`,
             required: field.required,
             type: field.type || "text",
+            options: Array.isArray(field.options)
+                ? field.options.map(option => ({ label: option.label, value: option.value }))
+                : [],
             constraints: field.constraints || {},
             requiredMessage: `${field.label || field.customerField} is required.`
         }))

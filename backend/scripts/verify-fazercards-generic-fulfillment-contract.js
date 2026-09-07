@@ -42,6 +42,67 @@ assert.deepStrictEqual(buildFieldsFromContract(contract, { accountFields: [{ key
 assert.throws(() => buildFieldsFromContract(contract, {}), error => error.code === "FAZERCARDS_REQUIRED_INPUT_MISSING");
 assert.deepStrictEqual(publicCustomerInputContract(contract).fields.map(field => [field.key, field.label]), [["userId", "Account ID"]]);
 
+const selectSupplierProduct = {
+    ...supplierProduct,
+    normalizedInputContract: {
+        fields: [
+            {
+                customerField: "playerId",
+                providerField: "player_id",
+                required: true,
+                label: "Player ID",
+                type: "text"
+            },
+            {
+                customerField: "server",
+                providerField: "server",
+                required: true,
+                label: "Server",
+                type: "select",
+                options: [
+                    { label: "America", value: "america" },
+                    { label: "Asia", value: "asia" },
+                    { label: "Europe", value: "europe" },
+                    { label: "TW HK MO", value: "tw_hk_mo" }
+                ]
+            }
+        ]
+    }
+};
+const selectContract = contractFromSupplierCatalog({
+    mapping,
+    offer,
+    supplierProduct: selectSupplierProduct
+});
+assert(selectContract, "A supplier select field with authoritative options must produce a verified contract.");
+assert.deepStrictEqual(
+    publicCustomerInputContract(selectContract).fields[1].options,
+    [
+        { label: "America", value: "america" },
+        { label: "Asia", value: "asia" },
+        { label: "Europe", value: "europe" },
+        { label: "TW HK MO", value: "tw_hk_mo" }
+    ]
+);
+assert.deepStrictEqual(
+    buildFieldsFromContract(selectContract, {
+        accountFields: [
+            { key: "playerId", value: "123456789" },
+            { key: "server", value: "asia" }
+        ]
+    }),
+    { player_id: "123456789", server: "asia" }
+);
+assert.throws(
+    () => buildFieldsFromContract(selectContract, {
+        accountFields: [
+            { key: "playerId", value: "123456789" },
+            { key: "server", value: "forged_server" }
+        ]
+    }),
+    error => error.code === "FAZERCARDS_INPUT_CONSTRAINT_FAILED"
+);
+
 const mlbbSemanticContract = { ...contract, fields: [
     { customerField: "playerId", providerField: "player_id", required: true, label: "Player ID", type: "text", constraints: {} },
     { customerField: "serverId", providerField: "server_id", required: true, label: "Server ID", type: "text", constraints: {} }
