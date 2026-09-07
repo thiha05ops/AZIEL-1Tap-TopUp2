@@ -33,6 +33,20 @@ function publicationMap(records = []) {
     return new Map(records.map(record => [publicationKey(record.productCode, record.packageCode, record.customerMarket), record]));
 }
 
+function publicationPackageKey(productCode, packageCode) {
+    return `${String(productCode || "").trim().toLowerCase()}:${String(packageCode || "").trim().toUpperCase()}`;
+}
+
+function publicationPackageMap(records = []) {
+    const grouped = new Map();
+    for (const record of records || []) {
+        const key = publicationPackageKey(record.productCode, record.packageCode);
+        if (!grouped.has(key)) grouped.set(key, []);
+        grouped.get(key).push(record);
+    }
+    return grouped;
+}
+
 function suppressionReasons(pkg = {}, customerMarket = "TH") {
     const market = normalizeCustomerMarket(customerMarket);
     const reasons = [];
@@ -44,8 +58,12 @@ function suppressionReasons(pkg = {}, customerMarket = "TH") {
     return reasons;
 }
 
-function projectPackagePublication(pkg, record, customerMarket = "TH") {
-    const published = record?.published === true;
+function projectPackagePublication(pkg, recordOrRecords, customerMarket = "TH") {
+    const records = Array.isArray(recordOrRecords) ? recordOrRecords : (recordOrRecords ? [recordOrRecords] : []);
+    const publishedRecords = records.filter(record => record?.published === true);
+    const marketRecord = records.find(record => String(record?.customerMarket || "").trim().toUpperCase() === normalizeCustomerMarket(customerMarket));
+    const record = marketRecord || publishedRecords[0] || records[0] || null;
+    const published = publishedRecords.length > 0;
     const reasons = published ? suppressionReasons(pkg, customerMarket) : [];
     return {
         customerMarket: normalizeCustomerMarket(customerMarket),
@@ -64,10 +82,10 @@ function projectPackagePublication(pkg, record, customerMarket = "TH") {
 }
 
 function applyPublicationMetadata(projection, records = [], customerMarket = "TH") {
-    const recordsByKey = publicationMap(records);
+    const recordsByPackage = publicationPackageMap(records);
     for (const pkg of projection?.packages || []) {
-        const record = recordsByKey.get(publicationKey(projection.productCode, pkg.packageCode, customerMarket));
-        pkg.publication = projectPackagePublication(pkg, record, customerMarket);
+        const packageRecords = recordsByPackage.get(publicationPackageKey(projection.productCode, pkg.packageCode)) || [];
+        pkg.publication = projectPackagePublication(pkg, packageRecords, customerMarket);
     }
     return projection;
 }
@@ -141,6 +159,8 @@ module.exports = {
     explicitPublishedPackages,
     normalizeCustomerMarket,
     publicationKey,
+    publicationPackageKey,
+    publicationPackageMap,
     publicationMap,
     publicationMode,
     projectPackagePublication,

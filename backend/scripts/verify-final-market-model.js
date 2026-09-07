@@ -8,6 +8,7 @@ const {
 } = require("../services/fulfillmentCapabilityService");
 const { assessExistingPreparedRoute } = require("../services/supplierCatalog/supplierRoutePreparationService");
 const { basicCandidateBlockers, summarizeEligibilityResolution } = require("../services/supplierEligibilityRouteResolver");
+const { applyPublicationMetadata, explicitPublishedPackages } = require("../services/packageMarketPublicationService");
 
 const now = new Date().toISOString();
 
@@ -301,14 +302,46 @@ assertReadyForCommerceMarket("MM");
     assert.strictEqual(conflictResult.outcome, "AMBIGUOUS_PRIMARY_ROUTE", "No automatic supplier failover may be introduced.");
 }
 
+{
+    const projection = {
+        productCode: "hok",
+        packages: [
+            { ...pkg("hok", "HOK_16_TOKENS"), fulfillmentRegions: { TH: true, MM: true } },
+            { ...pkg("hok", "HOK_80_TOKENS"), prices: { TH: { enabled: true, amount: 55, supplierCost: 20 } }, fulfillmentRegions: { TH: true, MM: true } },
+            { ...pkg("hok", "HOK_PRIVATE"), prices: { TH: { enabled: true, amount: 22, supplierCost: 10 }, MM: { enabled: true, amount: 2116, supplierCost: 1000 } }, fulfillmentRegions: { TH: true, MM: true } },
+            { ...pkg("hok", "HOK_DISABLED"), enabled: false, fulfillmentRegions: { TH: true, MM: true } }
+        ]
+    };
+    applyPublicationMetadata(projection, [
+        { productCode: "hok", packageCode: "HOK_16_TOKENS", customerMarket: "TH", published: true, decisionVersion: 1 },
+        { productCode: "hok", packageCode: "HOK_80_TOKENS", customerMarket: "TH", published: true, decisionVersion: 1 },
+        { productCode: "hok", packageCode: "HOK_DISABLED", customerMarket: "TH", published: true, decisionVersion: 1 }
+    ], "MM");
+    assert.deepStrictEqual(
+        explicitPublishedPackages(projection).map(item => item.packageCode),
+        ["HOK_16_TOKENS", "HOK_80_TOKENS", "HOK_DISABLED"],
+        "Package-level publication must not require a separate MM publication row."
+    );
+    assert.strictEqual(projection.packages[0].publication.currentlyPurchasable, true, "Published package with MMK price is purchasable in MM.");
+    assert.deepStrictEqual(projection.packages[0].publication.suppressionReasons, [], "MM must not be suppressed by missing MM publication.");
+    assert.strictEqual(projection.packages[1].publication.currentlyPurchasable, false, "Published package with only THB price must fail in MM for price only.");
+    assert.deepStrictEqual(projection.packages[1].publication.suppressionReasons, ["NO_VALID_PRICE"]);
+    assert.strictEqual(projection.packages[2].publication.published, false, "Unpublished package remains unpublished for both commerce markets.");
+    assert.strictEqual(projection.packages[3].publication.currentlyPurchasable, false, "Disabled published package remains blocked.");
+    assert(projection.packages[3].publication.suppressionReasons.includes("PACKAGE_DISABLED"));
+}
+
 console.log(JSON.stringify({
     result: "PASS",
-    checks: 18,
+    checks: 27,
     coverage: [
         "TH commerce with TH player product",
         "MM commerce with TH player product",
         "TH commerce with ID player product",
         "MM commerce with GLOBAL player product via UNSPECIFIED supplier route",
+        "package-level publication across TH/MM commerce",
+        "MM missing price blocks by price only",
+        "unpublished/disabled packages remain blocked",
         "exact unavailable/stale offer fail-closed",
         "input/protocol/gate fail-closed",
         "WonDD supplier service identity gate",

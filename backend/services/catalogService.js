@@ -831,7 +831,18 @@ function applyAdminProductionAttribution(projection, mappings = [], suppliers = 
     const market = String(customerMarket || "TH").trim().toUpperCase();
     const supplierById = new Map(suppliers.map(item => [String(item._id), item]));
     const productCompatibilityMarkets = productCompatibilityMarketsFromAuthority(projection);
-    const publicationByPackage = new Map(publications.filter(item => String(item.customerMarket || "").toUpperCase() === market).map(item => [String(item.packageCode || "").toUpperCase(), item]));
+    const publicationByPackage = new Map();
+    for (const item of publications || []) {
+        if (String(item.productCode || "").toLowerCase() !== String(projection.productCode || "").toLowerCase()) continue;
+        const packageCode = String(item.packageCode || "").toUpperCase();
+        const current = publicationByPackage.get(packageCode) || { published: false, decisionVersion: 0 };
+        publicationByPackage.set(packageCode, {
+            ...current,
+            ...(String(item.customerMarket || "").toUpperCase() === market ? item : {}),
+            published: current.published === true || item.published === true,
+            decisionVersion: Math.max(Number(current.decisionVersion || 0), Number(item.decisionVersion || 0))
+        });
+    }
     projection.packages.forEach(pkg => {
         const packageCode = String(pkg.packageCode || "").toUpperCase();
         const publication = publicationByPackage.get(packageCode);
@@ -870,14 +881,15 @@ function applyAdminProductionAttribution(projection, mappings = [], suppliers = 
     return projection;
 }
 
-function applyPublicPackageEligibility(projection) {
+function applyPublicPackageEligibility(projection, customerMarket = "TH") {
     if (!projection || !["mlbb", "freefire"].includes(projection.productCode) || !Array.isArray(projection.packages)) return projection;
+    const market = String(customerMarket || "TH").trim().toUpperCase();
     projection.packages = projection.packages.filter(pkg =>
         pkg.enabled !== false &&
-        pkg.fulfillmentRegions?.TH === true &&
-        pkg.prices?.TH?.enabled !== false &&
-        Number.isFinite(Number(pkg.prices?.TH?.amount)) &&
-        Number(pkg.prices.TH.amount) > 0
+        pkg.fulfillmentRegions?.[market] === true &&
+        pkg.prices?.[market]?.enabled !== false &&
+        Number.isFinite(Number(pkg.prices?.[market]?.amount)) &&
+        Number(pkg.prices[market].amount) > 0
     );
     projection.packageCount = projection.packages.length;
     return projection;
@@ -933,7 +945,7 @@ async function toDatabasePublicCatalog({ includeDisabled = true, includeAssetPro
         SupplierProductMapping.find({ enabled: true }).lean(),
         PackageInventoryState.find().lean(),
         Supplier.find({ enabled: true }).lean(),
-        PackageMarketPublication.find({ customerMarket }).lean(),
+        PackageMarketPublication.find({}).lean(),
         StoreCatalogSelection.find({ status: "ACTIVE", sellingRegions: String(customerMarket).toUpperCase(), visibleRegions:String(customerMarket).toUpperCase() }).lean()
     ]);
     const enabledSupplierIds = new Set(enabledSuppliers.map(item => String(item._id)));
@@ -959,7 +971,7 @@ async function toDatabasePublicCatalog({ includeDisabled = true, includeAssetPro
             );
             applyPackageFulfillmentReadiness(projection, activeMappings.filter(item => item.productCode === product.productCode), inventoryStates, enabledSuppliers);
             applyCustomerInputContract(projection, activeMappings.filter(item => item.productCode === product.productCode));
-            if (!includeAdminPricing) applyPublicPackageEligibility(projection);
+            if (!includeAdminPricing) applyPublicPackageEligibility(projection, customerMarket);
             if (includeAdminPricing) applyPublicationMetadata(projection, publications, customerMarket);
             applyPublicReadiness(projection, product, productPackages, projection.commerceReadiness);
             if (!includeDisabled && !projection.discoverable) return null;
@@ -1062,7 +1074,7 @@ async function getCatalogProductDetail(productCode, options = {}) {
             CatalogPackage.find({ productCode: normalizedCode }).sort({ sortOrder: 1, packageCode: 1 }).lean(),
             SupplierProductMapping.find({ productCode: normalizedCode, enabled: true }).lean(),
             PackageInventoryState.find().lean(),
-            PackageMarketPublication.find({ productCode: normalizedCode, customerMarket: options.customerMarket || "TH" }).lean()
+            PackageMarketPublication.find({ productCode: normalizedCode }).lean()
         ]);
         const mediaMap = await loadMediaAssetMap([product], packages);
         const enabledSuppliers = await Supplier.find({
@@ -1088,7 +1100,7 @@ async function getCatalogProductDetail(productCode, options = {}) {
         );
         applyPackageFulfillmentReadiness(projection, activeMappings, inventoryStates, enabledSuppliers);
         applyPublicationMetadata(projection, publications, options.customerMarket || "TH");
-        if (!options.includeAdminPricing) applyPublicPackageEligibility(projection);
+        if (!options.includeAdminPricing) applyPublicPackageEligibility(projection, options.customerMarket || "TH");
         applyPublicReadiness(projection, product, packages, projection.commerceReadiness);
         if (options.includeDisabled === false && !projection.discoverable) return null;
         return projection;
@@ -1109,7 +1121,7 @@ async function resolveAdminCatalogProduct(productCode, options = {}) {
     const findInventoryStates = options.findInventoryStates || (() => PackageInventoryState.find().lean());
     const findPublications = options.findPublications || (options.findMappings
         ? (() => [])
-        : (code => PackageMarketPublication.find({ productCode: code, customerMarket: options.customerMarket || "TH" }).lean()));
+        : (code => PackageMarketPublication.find({ productCode: code }).lean()));
     const findStoreSelections = options.findStoreSelections || (code => StoreCatalogSelection.find({
         productCode: code,
         status: "ACTIVE"

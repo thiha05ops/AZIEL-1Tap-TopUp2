@@ -12,7 +12,7 @@ const PackageMarketPublication = require("../models/PackageMarketPublication");
 const StoreCatalogSelection = require("../models/StoreCatalogSelection");
 const { getSupplierAdapter } = require("./supplierAdapterRegistry");
 const { basicCandidateBlockers } = require("./supplierEligibilityRouteResolver");
-const { setPackageMarketPublication } = require("./packageMarketPublicationService");
+const { publicationPackageKey, publicationPackageMap, setPackageMarketPublication } = require("./packageMarketPublicationService");
 const { assessExistingPreparedRoute } = require("./supplierCatalog/supplierRoutePreparationService");
 const { contractFromSupplierCatalog } = require("./suppliers/fazercardsFulfillmentContractService");
 const { supplierCapabilityProductCode } = require("./fulfillmentCapabilityService");
@@ -244,7 +244,7 @@ function projectActivation(data, { search = "", productCode = "", supplierMarket
     const offerById = new Map(data.offers.map(item => [id(item), item]));
     const supplierProductById = new Map(data.supplierProducts.map(item => [id(item), item]));
     const availabilityByOffer = new Map(data.availability.map(item => [id(item.supplierCatalogOfferId), item]));
-    const publicationByKey = new Map(data.publications.map(item => [key(lower(item.productCode), upper(item.packageCode), upper(item.customerMarket)), item]));
+    const publicationByPackage = publicationPackageMap(data.publications);
     const normalizedSearch = lower(search);
     const normalizedProduct = lower(productCode);
     const normalizedSupplierMarket = upper(supplierMarket);
@@ -290,7 +290,10 @@ function projectActivation(data, { search = "", productCode = "", supplierMarket
         const offer = offerById.get(id(mapping.supplierCatalogOfferId));
         const supplierProduct = offer ? supplierProductById.get(id(offer.supplierCatalogProductId)) : null;
         const availability = offer ? availabilityByOffer.get(id(offer)) : null;
-        const publication = publicationByKey.get(key(lower(mapping.productCode), upper(mapping.packageCode), market));
+        const publicationRecords = publicationByPackage.get(publicationPackageKey(mapping.productCode, mapping.packageCode)) || [];
+        const marketPublication = publicationRecords.find(item => upper(item.customerMarket) === market);
+        const publication = marketPublication || publicationRecords.find(item => item.published === true) || publicationRecords[0] || null;
+        const packagePublished = publicationRecords.some(item => item.published === true);
         const readiness = mappingReadiness({ mapping, supplier, pkg, offer, availability, customerMarket: market, now });
         const setup = mappingAvailability({ mapping, supplier, pkg, offer });
         const discovery = discoveryAssessment({ mapping, supplier, supplierProduct, offer, availability, product, pkg, customerMarkets: requestedSellingRegions, dependencies });
@@ -320,10 +323,10 @@ function projectActivation(data, { search = "", productCode = "", supplierMarket
             supplierCost: cost.rawSupplierCost ?? null, supplierCurrency: cost.supplierCurrency || "", supplierCostCapturedAt: cost.capturedAt || null,
             observedSupplierCost: offer?.supplierCost || null,
             availability: availability ? { state: availability.state, evidenceCode: availability.evidenceCode, coverageComplete: availability.coverageComplete, observedAt: availability.observedAt } : { state: "UNKNOWN", evidenceCode: "MISSING", coverageComplete: false, observedAt: null },
-            publishedPrice: publicPrice(pkg, market), publication: publication ? { published: publication.published === true, decisionVersion: publication.decisionVersion, decisionNote: publication.decisionNote || "" } : { published: false, decisionVersion: 0, decisionNote: "" },
+            publishedPrice: publicPrice(pkg, market), publication: publication ? { published: packagePublished, decisionVersion: publication.decisionVersion, decisionNote: publication.decisionNote || "" } : { published: false, decisionVersion: 0, decisionNote: "" },
             masterCatalog: { mapped: !synthetic, valid: prepared.ready, blockers: prepared.blockers, canonicalPackageMissing: discovery.canonicalPackageMissing === true },
             prepared: { selectable: prepared.ready, outcome: prepared.outcome, sellingRegions: requestedSellingRegions, customerMarkets: requestedSellingRegions, adoptionCreatesCanonicalPackage: discovery.canonicalPackageMissing === true, adoptionCreatesMapping: synthetic === true },
-            setup: { ...setup, productionMappingEnabled: mapping.enabled === true, pricingPrepared, fulfillmentPrepared, readyToPublish: readiness.ready, published: publication?.published === true },
+            setup: { ...setup, productionMappingEnabled: mapping.enabled === true, pricingPrepared, fulfillmentPrepared, readyToPublish: readiness.ready, published: packagePublished },
             dailyPricing: { workspacePath: `/api/admin/pricing-engine/workspace?supplierId=${encodeURIComponent(id(mapping.supplierId))}&supplierMarket=${encodeURIComponent(upper(mapping.region))}&productCode=${encodeURIComponent(lower(mapping.productCode))}&region=${encodeURIComponent(market)}`, previewEligible: approvedCostPresent && mapping.mappingMetadata?.readiness?.supplierMapped === true },
             readiness: { ...readiness, actions: blockerActions(readiness.blockers) }
         };
@@ -374,7 +377,7 @@ function createAdminProductActivationService(models = {}) {
             const [products, mappings, publications] = await Promise.all([
                 lean(M.CatalogProduct.find({ deletedAt: null }).select("productCode name enabled commerceState publicDiscoveryEnabled catalogCategory metadata"), session),
                 lean(M.Mapping.find({ archivedAt: null }).select("productCode packageCode supplierCode region"), session),
-                lean(M.Publication.find({ customerMarket: upper(query.customerMarket || "TH"), published: true }).select("productCode packageCode customerMarket published decisionVersion decisionNote"), session)
+                lean(M.Publication.find({ published: true }).select("productCode packageCode customerMarket published decisionVersion decisionNote"), session)
             ]);
             return { products, packages: [], suppliers: [], mappings, offers: [], supplierProducts: [], availability: [], publications };
         }
@@ -396,7 +399,7 @@ function createAdminProductActivationService(models = {}) {
             supplierIds.length ? lean(M.Supplier.find({ _id: { $in: supplierIds } }), session) : [],
             offerIds.length || routeSupplierProductIds.length ? lean(M.Offer.find({ $or: [...(offerIds.length ? [{ _id: { $in: offerIds } }] : []), ...(routeSupplierProductIds.length ? [{ supplierCatalogProductId: { $in: routeSupplierProductIds } }] : [])] }), session) : [],
             offerIds.length || routeSupplierProductIds.length ? lean(M.Availability.find({ supplierCatalogOfferId: { $in: offerIds } }), session) : [],
-            packageKeys.length ? lean(M.Publication.find({ productCode, packageCode: { $in: packageKeys.map(item => item.packageCode) }, customerMarket: upper(query.customerMarket || "TH") }), session) : []
+            packageKeys.length ? lean(M.Publication.find({ productCode, packageCode: { $in: packageKeys.map(item => item.packageCode) } }), session) : []
         ]);
         const supplierProductIds = [...new Set([...supplierProductsFromRoutes.map(id), ...offers.map(item => id(item.supplierCatalogProductId)).filter(Boolean)])];
         const loadedSupplierProducts = supplierProductIds.length ? await lean(M.SupplierProduct.find({ _id: { $in: supplierProductIds } }), session) : [];

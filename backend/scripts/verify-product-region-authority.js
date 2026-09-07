@@ -239,7 +239,11 @@ async function withExplicitStoreCatalogProjection({ products, packages, mappings
     SupplierProductMapping.find = () => queryResult(mappings);
     Supplier.find = () => queryResult(suppliers);
     PackageInventoryState.find = () => queryResult([]);
-    PackageMarketPublication.find = query => queryResult(publications.filter(item => String(item.customerMarket || "").toUpperCase() === String(query?.customerMarket || "").toUpperCase()));
+    PackageMarketPublication.find = query => queryResult(publications.filter(item => {
+        if (query?.productCode && item.productCode !== query.productCode) return false;
+        if (query?.customerMarket && String(item.customerMarket || "").toUpperCase() !== String(query.customerMarket || "").toUpperCase()) return false;
+        return true;
+    }));
     StoreCatalogSelection.find = query => queryResult(selections.filter(item => (
         item.status === query?.status &&
         (item.sellingRegions || []).includes(String(query?.sellingRegions || "").toUpperCase()) &&
@@ -302,10 +306,10 @@ async function verifyExplicitStorefrontVisibilitySeparatesPublishedPackages() {
         products: [product],
         packages: [publishedPackage, unpublishedPackage],
         selections: [selection(visibleRegions)],
-        publications: published.map(packageCode => ({
+        publications: published.map(item => ({
             productCode,
-            packageCode,
-            customerMarket: "MM",
+            packageCode: typeof item === "string" ? item : item.packageCode,
+            customerMarket: typeof item === "string" ? "MM" : item.customerMarket,
             published: true,
             decisionVersion: 1
         }))
@@ -331,6 +335,12 @@ async function verifyExplicitStorefrontVisibilitySeparatesPublishedPackages() {
     assert(projected, "CASE B: product with one published package must appear.");
     assert.deepStrictEqual(projected.packages.map(item => item.packageCode), ["PUBLISHED_PACKAGE"], "CASE B/E: only published package options may be exposed.");
     assert.strictEqual(projected.packages[0].prices.MM.amount, 1000, "CASE B: published package pricing must remain available.");
+
+    catalog = await readPublicMm({ published: [{ packageCode: "PUBLISHED_PACKAGE", customerMarket: "TH" }] });
+    projected = catalog.find(item => item.productCode === productCode);
+    assert(projected, "CASE B2: product with package-level publication must appear in MM even when the publication record was created from TH.");
+    assert.deepStrictEqual(projected.packages.map(item => item.packageCode), ["PUBLISHED_PACKAGE"], "CASE B2: package-level publication must expose the same package option in MM.");
+    assert.strictEqual(projected.packages[0].prices.MM.amount, 1000, "CASE B2: MM still uses MMK pricing.");
 
     catalog = await readPublicMm({ visibleRegions: ["TH"], published: ["PUBLISHED_PACKAGE"] });
     assert(!catalog.some(item => item.productCode === productCode), "CASE C/D: product not visible in MM must remain hidden from MM.");
