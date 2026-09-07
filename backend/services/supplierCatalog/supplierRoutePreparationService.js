@@ -284,4 +284,4 @@ function createSupplierRoutePreparationService({ repos = defaultRepos(), adapter
 }
 
 const service = createSupplierRoutePreparationService();
-module.exports = Object.freeze({ ACTION, ACTIVE_CANONICAL_QUERY, isActiveCanonicalRecord, OUTCOMES, ADOPTION_STATES, SupplierRoutePreparationError, normalizeRequest, outcomeFor, adoptionStateFor, sourceLock, proposedMapping, assessExistingPreparedRoute, createSupplierRoutePreparationService, generateSupplierRoutePreparationPlan: service.generatePlan, applySupplierRoutePreparationPlan: service.applyPlan });
+module.exports = Object.freeze({ ACTION, ACTIVE_CANONICAL_QUERY, isActiveCanonicalRecord, OUTCOMES, ADOPTION_STATES, SupplierRoutePreparationError, normalizeRequest, outcomeFor, adoptionStateFor, sourceLock, contractFromCurrentSupplierCatalog, proposedMapping, assessExistingPreparedRoute, createSupplierRoutePreparationService, generateSupplierRoutePreparationPlan: service.generatePlan, applySupplierRoutePreparationPlan: service.applyPlan });
