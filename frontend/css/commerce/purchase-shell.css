@@ -1164,9 +1164,6 @@ body.az-purchase-surface .tracking-page {
         overflow-wrap: anywhere;
     }
 
-    .checkout-review dl div:nth-child(3) dt::after {
-        content: ":";
-    }
 
     .checkout-sidebar {
         order: 2;
