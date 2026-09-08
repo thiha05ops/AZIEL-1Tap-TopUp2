@@ -181,7 +181,7 @@ AZIEL.loadUser = async function () {
             localStorage.setItem("username", data.user.username || "");
             localStorage.setItem("displayName", AZIEL.getDisplayName(data.user));
             localStorage.setItem("email", data.user.email || "");
-            localStorage.setItem("region", data.user.region || "MM");
+            localStorage.setItem("accountRegion", data.user.region || "MM");
             localStorage.setItem("role", data.user.role || "user");
 
             localStorage.setItem("user", JSON.stringify(data.user));

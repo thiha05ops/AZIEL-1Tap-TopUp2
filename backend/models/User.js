@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const crypto = require("crypto");
 
 const userSchema = new mongoose.Schema(
     {
@@ -7,6 +8,14 @@ const userSchema = new mongoose.Schema(
             required: true,
             unique: true,
             trim: true
+        },
+
+        customerId: {
+            type: String,
+            trim: true,
+            uppercase: true,
+            immutable: true,
+            default: undefined
         },
 
         email: {
@@ -284,6 +293,39 @@ const userSchema = new mongoose.Schema(
     },
     {
         timestamps: true
+    }
+);
+
+function generateCustomerId() {
+    const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    const bytes = crypto.randomBytes(10);
+
+    let value = "";
+
+    for (let index = 0; index < 10; index += 1) {
+        value += alphabet[bytes[index] % alphabet.length];
+    }
+
+    return `AZU-${value}`;
+}
+
+userSchema.pre("validate", function assignCustomerId(next) {
+    if (this.isNew && !String(this.customerId || "").trim()) {
+        this.customerId = generateCustomerId();
+    }
+
+    next();
+});
+
+userSchema.index(
+    { customerId: 1 },
+    {
+        unique: true,
+        partialFilterExpression: {
+            customerId: {
+                $type: "string"
+            }
+        }
     }
 );
 

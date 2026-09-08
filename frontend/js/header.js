@@ -109,7 +109,9 @@ function initHeader() {
 function renderHeader() {
     const walletText = document.getElementById("headerWalletText");
     const avatarText = document.getElementById("avatarText");
-    const localeFlag = document.getElementById("localeFlag");
+    const preferenceFlags = document.querySelectorAll("[data-preference-flag]");
+    const preferenceSummaries = document.querySelectorAll("[data-preference-summary]");
+    const mobilePreferenceSummaries = document.querySelectorAll("[data-mobile-preference-summary]");
 
     const region = window.AZIEL?.getShopRegion?.() || "MM";
     const symbol =
@@ -119,9 +121,21 @@ function renderHeader() {
     const user = window.AZIEL?.user || null;
     const wallet = window.AZIEL?.wallet || null;
 
-    if (localeFlag) {
-        localeFlag.innerText = region === "TH" ? "🇹🇭" : "🇲🇲";
-    }
+    const isThailand = region === "TH";
+
+    preferenceFlags.forEach(node => {
+        node.textContent = isThailand ? "🇹🇭" : "🇲🇲";
+    });
+
+    preferenceSummaries.forEach(node => {
+        node.textContent = isThailand ? "TH · EN · ฿" : "MM · EN · Ks";
+    });
+
+    mobilePreferenceSummaries.forEach(node => {
+        node.textContent = isThailand
+            ? "🇹🇭 Thailand · English · THB"
+            : "🇲🇲 Myanmar · English · MMK";
+    });
 
     if (!user) {
         if (walletText) walletText.innerText = `0 ${symbol}`;
@@ -148,6 +162,7 @@ function renderHeader() {
 
     translateHeader();
 }
+
 
 function initHeaderSearchTrigger() {
     const btn = document.getElementById("azHeaderSearchBtn");

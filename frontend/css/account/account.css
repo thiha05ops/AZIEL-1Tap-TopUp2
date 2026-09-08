@@ -1613,3 +1613,76 @@ body.theme-dark.account-page #profile .form-card input[readonly] {
         font-size: 12px;
     }
 }
+
+
+/* =========================================================
+   AZIEL ACCOUNT — CUSTOMER IDENTITY
+   Public customerId presentation only.
+   Internal Mongo ownership remains unchanged.
+   ========================================================= */
+
+.account-page .profile-info {
+    min-width: 0;
+}
+
+.account-page .profile-customer-id {
+    margin: 0 !important;
+    color: var(--text-muted);
+    font-size: 11px !important;
+    line-height: 1.35;
+    font-weight: 700 !important;
+    letter-spacing: .035em;
+    white-space: nowrap;
+}
+
+.account-page .profile-badges {
+    margin-top: 7px;
+    align-items: center;
+}
+
+.account-page .profile-region,
+.account-page .verified-badge,
+.account-page .gmail-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--text-muted);
+    font-size: 11px;
+    line-height: 1.3;
+    font-weight: 700;
+}
+
+.account-page .profile-region::after {
+    content: "·";
+    margin-left: 3px;
+    color: var(--text-muted);
+    opacity: .6;
+}
+
+.account-page .verified-badge {
+    gap: 4px;
+}
+
+.account-page .verified-badge i {
+    font-size: 10px;
+}
+
+#profile #profileCustomerIdReadOnly {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: .035em;
+}
+
+body.theme-dark.account-page .profile-customer-id,
+body.theme-dark.account-page .profile-region {
+    color: var(--account-muted) !important;
+}
+
+@media (max-width: 900px) {
+    .account-page .profile-card {
+        align-items: flex-start;
+    }
+
+    .account-page .profile-info {
+        flex: 1;
+    }
+}

@@ -38,11 +38,16 @@
                 <div class="avatar-big" id="accountAvatar" aria-label="Account"></div>
 
                 <div class="profile-info">
-                    <h3 id="profileName">Username</h3>
-                    <p id="profileRegion">Region: MM</p>
+                    <h3 id="profileName">Account</h3>
+                    <p id="profileCustomerId" class="profile-customer-id"></p>
 
                     <div class="profile-badges">
-                        <span data-i18n="verified">Verified</span>
+                        <span id="profileRegion" class="profile-region"></span>
+
+                        <span class="verified-badge">
+                            <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                            <span data-i18n="verified">Verified</span>
+                        </span>
 
                         <span class="gmail-badge">
                             <i class="fa-regular fa-envelope"></i>
@@ -163,6 +168,9 @@
                 <div class="content-card form-card">
                     <label data-i18n="displayName">Display Name</label>
                     <input type="text" id="displayName" placeholder="Your display name">
+
+                    <label>AZIEL User ID</label>
+                    <input type="text" id="profileCustomerIdReadOnly" readonly>
 
                     <label data-i18n="username">Username</label>
                     <input type="text" id="profileUsername" readonly>
@@ -380,6 +388,7 @@
     <script src="js/i18n.js?v=20260829-p4"></script>
 
     <script src="/core/settings/theme.js?v=20260829-p4"></script>
+    <script src="/js/locale-switcher.js?v=20260908-account-header-preferences"></script>
 
     <script src="js/user-state.js"></script>
     <script src="js/header-loader.js"></script>
@@ -389,7 +398,7 @@
 
     <script src="js/motion.js?v=20260829-p4"></script>
     <script src="js/ui-feedback.js?v=20260829-p4"></script>
-    <script src="js/account.js?v=20260829-p4"></script>
+    <script src="js/account.js?v=20260908-customer-id"></script>
 
     <script src="js/logout.js"></script>
     <script src="js/api.js"></script>

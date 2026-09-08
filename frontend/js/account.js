@@ -61,7 +61,12 @@ async function initAccount() {
     }
 
     renderAccount();
-    await refreshAccountData();
+
+    await Promise.all([
+        loadHistory(),
+        refreshAccountData()
+    ]);
+
     await loadSecurityData();
 
     window.addEventListener("aziel:ready", async () => {
@@ -223,16 +228,24 @@ function renderProfile() {
     const verified = isVerified(user);
 
     setText("profileName", name);
+    setText("profileCustomerId", user.customerId || "");
+
     const accountAvatar = document.getElementById("accountAvatar");
     if (accountAvatar) {
         accountAvatar.innerHTML = '<i class="fa-solid fa-user" aria-hidden="true"></i>';
         accountAvatar.setAttribute("aria-label", "Account");
     }
-    setText("profileRegion", `${t("region", "Region")}: ${region}`);
+    setText(
+        "profileRegion",
+        region === "TH"
+            ? t("thailand", "Thailand")
+            : t("myanmar", "Myanmar")
+    );
 
     setValue("displayName", name);
     setProfileBaseline(name);
 
+    setValue("profileCustomerIdReadOnly", user.customerId || "");
     setValue("profileUsername", user.username || "");
     setValue("profileEmail", user.email || "");
 
