@@ -26,10 +26,11 @@ const gestureWrite = banners.slice(banners.indexOf("function renderPhysicalPosit
 assert(gestureWrite.includes("track.style.transform") && !gestureWrite.includes("clientWidth") && !gestureWrite.includes("getBoundingClientRect"), "Gesture rendering must be transform-only and must not force layout reads.");
 assert(banners.includes("reducedMotionMedia.matches") && banners.includes('listen(reducedMotionMedia, "change"'), "Autoplay must honor reduced-motion changes.");
 
-assert(placement.includes("mobileLayoutActive === mobile"), "Section relocation must be idempotent.");
+assert(!placement.includes("selected.slice(0"), "Mobile Home rails must not artificially truncate renderable products.");
 assert(placement.includes("renderHomeSections(lastProducts, lastCatalogReady)"), "Breakpoint changes must reuse catalog data.");
-assert(railCss.includes("overflow-x: auto") && railCss.includes("scroll-snap-type: x mandatory"), "Mobile group rail must retain native horizontal scrolling.");
-assert(railCss.includes("grid-template-columns: 1fr"), "Mobile grouped panel rows must remain one-column/five-row compatible.");
+assert(railCss.includes("overflow-x: auto") && railCss.includes("scroll-snap-type: x proximity"), "Mobile Home must use native horizontal individual-card rails.");
+assert(railCss.includes("display: contents;"), "Mobile Home must avoid giant clipped section panels.");
+assert(railCss.includes("flex: 0 0 clamp(138px, 42vw, 156px)"), "Mobile Home rail cards must expose a partial next-card peek.");
 
 assert(!productStage.includes("new MutationObserver"), "Product Detail must not retain a body-wide observer.");
 assert(productStage.includes('aziel:promo-controls-ready') && gameFlow.includes('aziel:promo-controls-ready'), "Promo relocation must use a deterministic lifecycle event.");

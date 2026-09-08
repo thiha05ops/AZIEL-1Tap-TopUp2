@@ -179,6 +179,18 @@ const catalogPackageSchema = new mongoose.Schema(
             trim: true,
             lowercase: true
         },
+        merchandising: {
+            exclusiveOfferEligible: {
+                type: Boolean,
+                default: false
+            },
+            exclusiveOfferPriority: {
+                type: Number,
+                min: 0,
+                default: 0
+            }
+        },
+
         packageCode: {
             type: String,
             required: true,

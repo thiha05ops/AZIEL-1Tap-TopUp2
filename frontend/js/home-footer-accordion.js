@@ -2,10 +2,11 @@
     const MOBILE_FOOTER_QUERY = "(max-width: 900px)";
 
     function setupFooterAccordion() {
-        const footer = document.querySelector(".site-footer");
+        const footer = document.querySelector(".site-footer, .support-footer");
         if (!footer) return;
 
-        const candidates = [...footer.children].filter(group => (
+        const candidateRoots = [footer, ...footer.querySelectorAll(":scope > .support-footer-grid")];
+        const candidates = candidateRoots.flatMap(root => [...root.children]).filter(group => (
             group.querySelector?.("h4") && !group.querySelector(".payment-logos")
         ));
         const groups = candidates.map(prepareGroup).filter(Boolean);

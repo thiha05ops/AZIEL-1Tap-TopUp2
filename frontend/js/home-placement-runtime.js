@@ -11,7 +11,6 @@
         { key: "SOCIAL_TOPUP", id: "socialTopUp", target: "socialTopUpList", report: "social-topup" }
     ]);
     const DESKTOP_PANEL_SIZE = 6;
-    const MOBILE_PANEL_SIZE = 5;
     const MOBILE_QUERY = "(max-width: 720px)";
     const MOBILE_GROUP_RAIL_ID = "homeMobileGroupRail";
     let refreshSequence = 0;
@@ -80,7 +79,7 @@
             selection.groups.push(groupReport(config.report, [], section.dataset.homeHiddenReason));
             return;
         }
-        target.innerHTML = renderPanels(selected, config.report, isMobileViewport() ? MOBILE_PANEL_SIZE : DESKTOP_PANEL_SIZE);
+        target.innerHTML = renderPanels(selected, config.report, isMobileViewport() ? selected.length : DESKTOP_PANEL_SIZE);
         target.removeAttribute("aria-busy");
         section.hidden = false;
         section.dataset.homeSelectionSource = "catalog-homepage-sections";
@@ -98,31 +97,46 @@
         const panels = [];
         chunkProducts(products, panelSize).forEach(chunk => {
             const items = chunk.map(product => renderProduct(product, groupId)).join("");
-            panels.push(`<div class="home-product-panel" role="list">${items}</div>`);
+            const mobileTwoRowClass =
+                isMobileViewport() && groupId === "all-mobile-games"
+                    ? " home-product-panel--mobile-two-row"
+                    : "";
+            panels.push(`<div class="home-product-panel${mobileTwoRowClass}" role="list" data-panel-size="${chunk.length}">${items}</div>`);
         });
         return panels.join("");
     }
     function isMobileViewport() { return window.matchMedia?.(MOBILE_QUERY).matches === true; }
     function syncMobileGroupRail() {
         const main = document.querySelector?.("main.az-home");
-        const sections = SECTION_CONFIG.map(config => document.getElementById(config.id)).filter(Boolean);
+        const sections = SECTION_CONFIG
+            .map(config => document.getElementById(config.id))
+            .filter(Boolean);
+
         if (!main || !sections.length) return;
-        let rail = document.getElementById(MOBILE_GROUP_RAIL_ID);
-        const mobile = isMobileViewport();
-        if (mobileLayoutActive === mobile && (mobile ? Boolean(rail) : !rail)) return;
-        mobileLayoutActive = mobile;
-        if (mobile) {
-            if (!rail) {
-                rail = document.createElement("div");
-                rail.id = MOBILE_GROUP_RAIL_ID;
-                rail.className = "home-mobile-group-rail";
-                sections[0].before(rail);
+
+        const rail = document.getElementById(MOBILE_GROUP_RAIL_ID);
+        mobileLayoutActive = false;
+
+        /*
+         * Merchandising sections own the top-of-home position:
+         * Hero -> Exclusive Offers -> Available Coupons -> product discovery.
+         *
+         * Keep product groups together after coupons instead of moving them
+         * ahead of Exclusive Offers at runtime.
+         */
+        const couponSection = document.getElementById("availableCoupons");
+        let anchor = couponSection;
+
+        sections.forEach(section => {
+            if (anchor) {
+                anchor.insertAdjacentElement("afterend", section);
+            } else {
+                main.appendChild(section);
             }
-            sections.forEach(section => rail.append(section));
-            return;
-        }
-        const anchor = document.getElementById("newsPromotions");
-        sections.forEach(section => main.insertBefore(section, anchor || null));
+
+            anchor = section;
+        });
+
         rail?.remove();
     }
     function renderProduct(product, groupId) {
@@ -139,7 +153,7 @@
     function renderPopularGame(product) { return renderProduct(product, "popular-mobile-games"); }
     function renderAllMobileGame(product) { return renderProduct(product, "all-mobile-games"); }
     function renderSocialTopUpProduct(product) { return renderProduct(product, "social-topup"); }
-    function renderSocialTopUp(products = []) { return renderPanels(products, "social-topup", isMobileViewport() ? MOBILE_PANEL_SIZE : DESKTOP_PANEL_SIZE); }
+    function renderSocialTopUp(products = []) { return renderPanels(products, "social-topup", isMobileViewport() ? products.length : DESKTOP_PANEL_SIZE); }
     function displayProduct(product = {}) {
         const canonical = window.AZIEL_CATALOG?.getProduct?.(codeOf(product)) || product;
         return window.AZIEL_CATALOG_PRESENTATION?.buildDisplayProduct?.(canonical) || null;

@@ -43,27 +43,24 @@ body {
 
 .az-featured-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(158px, 176px));
+    justify-content: start;
     gap: 18px;
-    margin-bottom: 34px;
+    margin-bottom: 22px;
 }
 
 .az-featured-card {
-    min-height: 128px;
-    display: grid;
-    grid-template-columns: 112px 1fr;
-    align-items: center;
+    min-height: 0;
+    display: block;
 
     overflow: hidden;
-    border-radius: 20px;
+    border-radius: 18px;
     text-decoration: none;
 
     background: rgba(255, 255, 255, .48);
     border: 1px solid rgba(255, 255, 255, .65);
 
-    box-shadow:
-        0 18px 45px rgba(31, 41, 55, .08),
-        inset 0 1px 0 rgba(255, 255, 255, .72);
+    box-shadow: 0 16px 38px rgba(31, 41, 55, .08);
 
     backdrop-filter: blur(18px) saturate(160%);
     -webkit-backdrop-filter: blur(18px) saturate(160%);
@@ -79,44 +76,54 @@ body {
 }
 
 .az-featured-card img {
-    width: 112px;
-    height: 128px;
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1 / 1.08;
     object-fit: cover;
 }
 
 .az-featured-card div {
-    padding: 0 20px;
+    padding: 10px 11px 12px;
 }
 
 .az-featured-card h3 {
-    margin: 0 0 8px;
+    display: -webkit-box;
+    overflow: hidden;
+    margin: 0 0 4px;
     color: #111827;
-    font-size: 17px;
+    font-size: 15px;
     font-weight: 600;
-    line-height: 1.18;
+    line-height: 1.22;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
 }
 
 .az-featured-card p {
+    display: -webkit-box;
+    overflow: hidden;
     margin: 0;
     color: rgba(17, 24, 39, .62);
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 400;
+    line-height: 1.28;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
 }
 
 /* POSTERS */
 
 .az-poster-grid {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 26px 18px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(158px, 176px));
+    justify-content: start;
+    gap: 22px 18px;
     align-items: stretch;
 }
 
 .az-poster-card {
     display: block;
-    flex: 0 1 158px;
-    width: 158px;
+    width: 100%;
     color: #111827;
     text-decoration: none;
     transition: transform .18s ease, filter .18s ease;
@@ -173,25 +180,6 @@ body {
     text-overflow: ellipsis;
 }
 
-/* FOOTER FIX */
-
-footer {
-    position: static !important;
-    width: 100%;
-    min-height: 92px;
-
-    display: flex;
-    align-items: center;
-
-    padding: 0 max(20px, calc((100vw - 1180px) / 2));
-
-    background: #070b1a;
-    color: #ffffff;
-
-    font-size: 14px;
-    font-weight: 500;
-}
-
 /* DARK MODE */
 
 body.dark,
@@ -239,12 +227,9 @@ body.theme-dark .az-poster-card {
 /* TABLET */
 
 @media (max-width: 1100px) {
+    .az-featured-grid,
     .az-poster-grid {
-        justify-content: center;
-    }
-
-    .az-featured-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     }
 }
 
@@ -253,7 +238,7 @@ body.theme-dark .az-poster-card {
 /* Mobile */
 @media (max-width: 900px) {
     .az-catalog-page {
-        padding-top: calc(24px + env(safe-area-inset-top));
+        padding: calc(20px + env(safe-area-inset-top)) 16px 76px;
     }
 
     .az-catalog-shell {
@@ -266,80 +251,112 @@ body.theme-dark .az-poster-card {
     }
 
     .az-featured-grid {
-        grid-template-columns: 1fr;
-        gap: 14px;
-        margin-bottom: 30px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px 12px;
+        margin-bottom: 20px;
     }
 
     .az-featured-card {
-        grid-template-columns: 96px 1fr;
-        min-height: 96px;
-        border-radius: 18px;
+        display: block;
+        min-height: 0;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
     }
 
     .az-featured-card img {
-        width: 96px;
-        height: 96px;
+        width: 100%;
+        height: auto;
+        aspect-ratio: 1 / 1.05;
+        border-radius: 14px;
+        box-shadow: 0 10px 24px rgba(31, 41, 55, .08);
     }
 
     .az-featured-card div {
-        padding: 0 14px;
+        padding: 8px 1px 0;
     }
 
     .az-featured-card h3 {
-        font-size: 17px;
-        margin-bottom: 7px;
+        display: -webkit-box;
+        overflow: hidden;
+        margin-bottom: 3px;
+        font-size: 13.5px;
+        font-weight: 600;
+        line-height: 1.22;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
     }
 
     .az-featured-card p {
-        font-size: 12px;
+        font-size: 10.8px;
+        line-height: 1.25;
     }
 
     .az-poster-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 22px 12px;
+        gap: 16px 12px;
     }
 
     .az-poster-card {
+        display: block;
         width: auto;
+        min-height: 0;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
     }
 
     .az-poster-card img {
-        border-radius: 16px;
+        width: 100%;
+        height: auto;
+        aspect-ratio: 1 / 1.05;
+        border-radius: 14px;
+        box-shadow: 0 10px 24px rgba(31, 41, 55, .08);
     }
 
     .az-poster-card h3 {
-        margin-top: 12px;
-        font-size: 14px;
-        line-height: 1.22;
+        margin: 8px 1px 3px;
+        font-size: 13.5px;
+        line-height: 1.24;
+        font-weight: 600;
     }
 
     .az-poster-card p {
-        font-size: 11.5px;
-        line-height: 1.35;
+        display: none;
     }
 
     .az-poster-card .product-market-label {
-        font-size: 10px;
+        margin: 0 1px;
+        font-size: 10.5px;
     }
 
-    footer {
-        min-height: 80px;
-        padding: 0 26px;
+    body.dark .az-featured-card,
+    body.dark .az-poster-card,
+    body.theme-dark .az-featured-card,
+    body.theme-dark .az-poster-card {
+        background: transparent;
+        box-shadow: none;
     }
+
 }
 
 /* SMALL MOBILE */
 
 @media (max-width: 420px) {
     .az-catalog-page {
-        padding-left: 26px;
-        padding-right: 18px;
+        padding-left: 16px;
+        padding-right: 16px;
     }
 
     .az-poster-grid {
-        gap: 30px 11px;
+        gap: 8px;
     }
 
     .az-poster-card h3 {

@@ -30,9 +30,14 @@ assert(!/discountAmount\s*=\s*[^;]*(baseAmount|referencePrice)\s*[-+*/]/.test(up
 assert(flow.includes('t("product.promoInvalid"'), "invalid Promo feedback must use locale authority");
 assert(flow.includes('t("product.promoExpired"'), "expired Promo feedback must use locale authority");
 assert(flow.includes('t("product.promoNotEligible"'), "ineligible Promo feedback must use locale authority");
-assert(flow.includes('data-i18n-placeholder="product.enterPromo"'), "Promo input must update when locale changes");
-assert(flow.includes('data-i18n="product.applyPromo"'), "Promo actions must update when locale changes");
-assert(flow.includes('removeBtn.hidden = !promo'), "Promo removal state must track the active server quote");
+assert(flow.includes('id="userCouponSelect"'), "Product Detail must use an owned coupon selector instead of a typed promo input");
+assert(flow.includes('data-i18n="product.useCoupon"'), "Coupon actions must update when locale changes");
+assert(
+    flow.includes("if (promo)") &&
+    flow.includes("removeBtn.hidden = false") &&
+    flow.includes("removeBtn.hidden = true"),
+    "Promo removal state must track the active server quote"
+);
 assert(flow.includes('promoSaved.hidden = !promo'), "removing Promo must hide saving feedback immediately");
 
 assert(css.includes("information is typography-first"), "Step 3 presentation layer must be present");
@@ -41,7 +46,7 @@ assert(css.includes("border-radius: 0 !important"), "informational sections must
 assert(css.includes(".product-faq-item summary"), "FAQ must use simple disclosure-row styling");
 assert(css.includes(".product-lower-info .step-row"), "How to Top Up must have compact mobile flow styling");
 assert(css.includes("border-radius: 14px"), "functional mobile surfaces must retain card affordance");
-assert(css.includes("grid-template-columns: minmax(0, 1fr) auto"), "Promo input and Apply action must remain compact on mobile");
+assert(css.includes("grid-template-columns: minmax(0, 1fr) auto"), "Coupon selector and action must remain compact on mobile");
 assert(css.includes("@media (prefers-reduced-motion: reduce)"), "FAQ affordance must honor reduced motion");
 
 assert(prices.includes('Number(item.discountPercent || 0).toLocaleString()}% ${escapeHtml(t("product.offerOff", "OFF"))}'), "compare badge must be compact and server-derived");
@@ -78,8 +83,8 @@ assert(prices.includes('t("product.tapToSelectPackage", "Tap to select")'), "mob
 assert(!read("frontend/js/product-detail.js").includes('applyText("#selectedPackageTitle"'), "generic product bootstrap must not compete with the selector-state renderer");
 
 [
-    "product.subtotal", "product.promoDiscount", "product.youSaved", "product.enterPromo",
-    "product.applyPromo", "product.removePromo", "product.promoApplied", "product.promoInvalid",
+    "product.subtotal", "product.promoDiscount", "product.youSaved", "product.availableCoupons",
+    "product.useCoupon", "product.removePromo", "product.couponApplied", "product.promoInvalid",
     "product.promoExpired", "product.promoNotEligible", "product.offerOff"
 ].forEach(key => locales.forEach((source, index) => {
     assert(source.includes(`"${key}"`), `${key} must exist in ${["EN", "MY", "TH"][index]}`);

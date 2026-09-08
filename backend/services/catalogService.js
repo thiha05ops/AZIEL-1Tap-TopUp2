@@ -353,7 +353,7 @@ async function resolveDatabasePackagePrice(payload = {}) {
     try {
         if (storeCatalogSelectionMode() === "EXPLICIT") {
             const region = normalizeRegion(payload.region);
-            const publicProducts = await toDatabasePublicCatalog({ includeDisabled: false, includeAssetProjection: false, includeAdminPricing: false, customerMarket: region, publicationProjectionMode: "EXPLICIT" });
+            const publicProducts = await toPublicCatalog({ includeDisabled: false, includeAssetProjection: false, includeAdminPricing: false, customerMarket: region, publicationProjectionMode: "EXPLICIT" });
             const refs = [payload.productCode, payload.gameKey, payload.game].filter(Boolean).map(normalizeProductCode);
             const product = publicProducts.find(item => [item.productCode,item.name,...(item.aliases||[])].some(alias=>refs.includes(normalizeProductCode(alias))));
             if (!product) throw new CatalogError("PRODUCT_NOT_OFFERED", "This product is not currently offered.");
@@ -553,6 +553,14 @@ function projectCatalogPackage(
         deleted: Boolean(item.deletedAt),
         deletedAt: item.deletedAt || null,
         prices,
+        merchandising: {
+            exclusiveOfferEligible:
+                item.merchandising?.exclusiveOfferEligible === true,
+            exclusiveOfferPriority:
+                Number.isFinite(Number(item.merchandising?.exclusiveOfferPriority))
+                    ? Number(item.merchandising.exclusiveOfferPriority)
+                    : 0
+        },
         sortOrder: Number(item.sortOrder || 0),
         iconUrl: mediaUrl(iconAsset),
         iconAltText: iconAsset?.altText || "",
@@ -1017,98 +1025,394 @@ async function toDatabasePublicCatalog({ includeDisabled = true, includeAssetPro
     return proposedProducts.map(stripPublicationMetadata);
 }
 
+const PUBLIC_CATALOG_CACHE_TTL_MS = 15_000;
+const publicCatalogCache = new Map();
+
+function publicCatalogCacheKey(options = {}) {
+    return [
+        String(options.customerMarket || "TH").trim().toUpperCase(),
+        options.includeDisabled !== false ? "ALL" : "PUBLIC_ONLY",
+        Boolean(options.includeAssetProjection) ? "ASSETS" : "NO_ASSETS",
+        Boolean(options.includeAdminPricing) ? "ADMIN_PRICING" : "PUBLIC_PRICING",
+        String(options.publicationProjectionMode || publicationMode()).trim().toUpperCase()
+    ].join(":");
+}
+
+function readPublicCatalogCache(key) {
+    const entry = publicCatalogCache.get(key);
+
+    if (!entry) return null;
+
+    if (Date.now() >= entry.expiresAt) {
+        publicCatalogCache.delete(key);
+        return null;
+    }
+
+    return entry.value;
+}
+
+function writePublicCatalogCache(key, value) {
+    publicCatalogCache.set(key, {
+        value,
+        expiresAt: Date.now() + PUBLIC_CATALOG_CACHE_TTL_MS
+    });
+
+    if (publicCatalogCache.size > 20) {
+        const oldestKey = publicCatalogCache.keys().next().value;
+        if (oldestKey) publicCatalogCache.delete(oldestKey);
+    }
+
+    return value;
+}
+
 async function toPublicCatalog(options = {}) {
-    const source = storeCatalogSelectionMode() === "EXPLICIT" ? "database" : (options.source || getCatalogSource());
+    const source =
+        storeCatalogSelectionMode() === "EXPLICIT"
+            ? "database"
+            : (options.source || getCatalogSource());
+
+    const cacheEligible =
+        source === "database" &&
+        options.includeAdminPricing !== true &&
+        options.includeAssetProjection !== true &&
+        storeCatalogSelectionMode() === "EXPLICIT" &&
+        (options.publicationProjectionMode || publicationMode()) === "EXPLICIT";
+
+    const cacheKey = cacheEligible
+        ? publicCatalogCacheKey(options)
+        : "";
+
+    if (cacheEligible) {
+        const cached = readPublicCatalogCache(cacheKey);
+        if (cached) return cached;
+    }
 
     if (source === "database") {
-        return toDatabasePublicCatalog({
+        const products = await toDatabasePublicCatalog({
             includeDisabled: options.includeDisabled !== false,
             includeAssetProjection: Boolean(options.includeAssetProjection),
             includeAdminPricing: Boolean(options.includeAdminPricing),
             customerMarket: options.customerMarket || "TH",
             publicationProjectionMode: options.publicationProjectionMode
         });
+
+        return cacheEligible
+            ? writePublicCatalogCache(cacheKey, products)
+            : products;
     }
 
-    return toStaticPublicCatalog({ includeDisabled: options.includeDisabled !== false });
+    return toStaticPublicCatalog({
+        includeDisabled: options.includeDisabled !== false
+    });
+}
+
+
+const PUBLIC_PRODUCT_DETAIL_CACHE_TTL_MS = 15_000;
+const publicProductDetailCache = new Map();
+
+function publicProductDetailCacheKey(productCode, options = {}) {
+    return [
+        normalizeProductCode(productCode),
+        String(options.customerMarket || "TH").trim().toUpperCase(),
+        String(options.publicationProjectionMode || publicationMode()).trim().toUpperCase(),
+        options.includeDisabled !== false ? "ALL" : "PUBLIC_ONLY"
+    ].join(":");
+}
+
+function readPublicProductDetailCache(key) {
+    const entry = publicProductDetailCache.get(key);
+
+    if (!entry) return null;
+
+    if (Date.now() >= entry.expiresAt) {
+        publicProductDetailCache.delete(key);
+        return null;
+    }
+
+    return entry.value;
+}
+
+function writePublicProductDetailCache(key, value) {
+    publicProductDetailCache.set(key, {
+        value,
+        expiresAt: Date.now() + PUBLIC_PRODUCT_DETAIL_CACHE_TTL_MS
+    });
+
+    /*
+     * Keep this tiny process-local cache bounded even if product/market
+     * combinations grow substantially.
+     */
+    if (publicProductDetailCache.size > 100) {
+        const oldestKey = publicProductDetailCache.keys().next().value;
+        if (oldestKey) publicProductDetailCache.delete(oldestKey);
+    }
+
+    return value;
 }
 
 async function getCatalogProductDetail(productCode, options = {}) {
-    const source = options.source || getCatalogSource();
     const requestedCode = String(productCode || "").trim().toLowerCase();
-    const normalizedCode = getCanonicalProduct(requestedCode)?.productCode || requestedCode;
+    const normalizedCode =
+        getCanonicalProduct(requestedCode)?.productCode || requestedCode;
+
     if (!/^[a-z0-9][a-z0-9-]{0,79}$/.test(normalizedCode)) return null;
 
-    if (source === "database") {
-        const product = await CatalogProduct.findOne({ productCode: normalizedCode }).lean();
-        if (!product) {
-            if (!options.allowCanonicalFallback) return null;
-            const canonical = getCanonicalProduct(normalizedCode);
-            if (!canonical) return null;
-            const fallback = {
-                ...canonical,
-                enabled: true,
-                featured: false,
-                lifecycleStatus: "ACTIVE",
-                commerceState: "HIDDEN",
-                publicDiscoveryEnabled: false,
-                homepageEnabled: false,
-                homepageOrder: 0,
-                homepageFlags: [],
-                homepageSections: [],
-                packages: [],
-                packageCount: 0,
-                description: "",
-                productKnowledge: normalizeProductKnowledge(),
-                seo: { title: "", description: "" },
-                metadataRecordMissing: true
-            };
-            fallback.commerceReadiness = projectCommerceReadiness(fallback, [], [], []);
-            fallback.purchasable = false;
-            fallback.discoverable = false;
-            fallback.comingSoon = false;
-            fallback.temporarilyUnavailable = false;
-            return fallback;
-        }
-        const [packages, mappings, inventoryStates, publications] = await Promise.all([
-            CatalogPackage.find({ productCode: normalizedCode }).sort({ sortOrder: 1, packageCode: 1 }).lean(),
-            SupplierProductMapping.find({ productCode: normalizedCode, enabled: true }).lean(),
-            PackageInventoryState.find().lean(),
-            PackageMarketPublication.find({ productCode: normalizedCode }).lean()
-        ]);
-        const mediaMap = await loadMediaAssetMap([product], packages);
-        const enabledSuppliers = await Supplier.find({
-            _id: { $in: mappings.map(item => item.supplierId) },
-            enabled: true
-        }).lean();
-        const enabledSupplierIds = new Set(enabledSuppliers.map(item => String(item._id)));
-        const activeMappings = mappings.filter(item => enabledSupplierIds.has(String(item.supplierId)));
-        const projection = projectCatalogProduct(product, packages, {
-            includeDisabled: options.includeDisabled !== false,
-            mediaMap,
-            includeAssetProjection: Boolean(options.includeAssetProjection),
-            includeAdminPricing: Boolean(options.includeAdminPricing)
-        });
-        if (!projection) return null;
-        const packageIds = new Set(packages.map(item => String(item._id)));
-        projection.commerceReadiness = projectCommerceReadiness(
-            product,
-            packages,
-            activeMappings,
-            inventoryStates.filter(item => packageIds.has(String(item.packageRef)) || packages.some(pkg => pkg.packageCode === item.packageCode)),
-            enabledSuppliers
-        );
-        applyPackageFulfillmentReadiness(projection, activeMappings, inventoryStates, enabledSuppliers);
-        applyPublicationMetadata(projection, publications, options.customerMarket || "TH");
-        if (!options.includeAdminPricing) applyPublicPackageEligibility(projection, options.customerMarket || "TH");
-        applyPublicReadiness(projection, product, packages, projection.commerceReadiness);
-        if (options.includeDisabled === false && !projection.discoverable) return null;
-        return projection;
+    const cacheEligible =
+        (options.source || getCatalogSource()) === "database" &&
+        options.includeAdminPricing !== true &&
+        options.includeAssetProjection !== true &&
+        storeCatalogSelectionMode() === "EXPLICIT" &&
+        (options.publicationProjectionMode || publicationMode()) === "EXPLICIT";
+
+    const cacheKey = cacheEligible
+        ? publicProductDetailCacheKey(normalizedCode, options)
+        : "";
+
+    if (cacheEligible) {
+        const cached = readPublicProductDetailCache(cacheKey);
+        if (cached) return cached;
     }
 
-    const product = toStaticPublicCatalog({ includeDisabled: options.includeDisabled !== false })
-        .find(item => item.productCode === normalizedCode);
-    return product || null;
+    /*
+     * Admin callers require the existing broad/admin projection semantics.
+     * Keep that path unchanged.
+     */
+    if (
+        options.includeAdminPricing === true ||
+        options.includeAssetProjection === true
+    ) {
+        const catalog = await toPublicCatalog({
+            source: options.source || getCatalogSource(),
+            includeDisabled: options.includeDisabled !== false,
+            includeAssetProjection: Boolean(options.includeAssetProjection),
+            includeAdminPricing: Boolean(options.includeAdminPricing),
+            customerMarket: options.customerMarket || "TH",
+            publicationProjectionMode: options.publicationProjectionMode
+        });
+
+        return (
+            catalog.find(
+                item =>
+                    normalizeProductCode(item.productCode) ===
+                    normalizeProductCode(normalizedCode)
+            ) || null
+        );
+    }
+
+    /*
+     * Public Product Detail fast path.
+     *
+     * Preserve the exact explicit storefront authority:
+     * active Store Catalog selection -> selected packages ->
+     * package publication -> published packages -> public readiness.
+     *
+     * The only change here is query scope: one product instead of
+     * materializing the complete public catalog.
+     */
+    if ((options.source || getCatalogSource()) !== "database") {
+        const catalog = await toPublicCatalog({
+            source: options.source || getCatalogSource(),
+            includeDisabled: options.includeDisabled !== false,
+            includeAssetProjection: false,
+            includeAdminPricing: false,
+            customerMarket: options.customerMarket || "TH",
+            publicationProjectionMode: options.publicationProjectionMode
+        });
+
+        return (
+            catalog.find(
+                item =>
+                    normalizeProductCode(item.productCode) ===
+                    normalizeProductCode(normalizedCode)
+            ) || null
+        );
+    }
+
+    const customerMarket = String(options.customerMarket || "TH")
+        .trim()
+        .toUpperCase();
+
+    const mode =
+        options.publicationProjectionMode || publicationMode();
+    const storeSelectionExplicit =
+        storeCatalogSelectionMode() === "EXPLICIT";
+
+    /*
+     * Legacy / shadow modes retain the existing full-catalog behavior.
+     * The optimized path is deliberately limited to explicit production
+     * authority so semantics cannot drift.
+     */
+    if (!storeSelectionExplicit || mode !== "EXPLICIT") {
+        const catalog = await toPublicCatalog({
+            source: "database",
+            includeDisabled: options.includeDisabled !== false,
+            includeAssetProjection: false,
+            includeAdminPricing: false,
+            customerMarket,
+            publicationProjectionMode: mode
+        });
+
+        return (
+            catalog.find(
+                item =>
+                    normalizeProductCode(item.productCode) ===
+                    normalizeProductCode(normalizedCode)
+            ) || null
+        );
+    }
+
+    const product = await CatalogProduct.findOne({
+        productCode: normalizedCode
+    }).lean();
+
+    if (!product) return null;
+
+    const storeSelections = await StoreCatalogSelection.find({
+        productCode: normalizedCode,
+        status: "ACTIVE",
+        sellingRegions: customerMarket,
+        visibleRegions: customerMarket
+    })
+        .select("packages.packageCode")
+        .lean();
+
+    const selectedCodes = new Set(
+        storeSelections
+            .flatMap(item => item.packages || [])
+            .map(item => String(item.packageCode || "").trim().toUpperCase())
+            .filter(Boolean)
+    );
+
+    if (!selectedCodes.size) return null;
+
+    const packages = await CatalogPackage.find({
+        productCode: normalizedCode,
+        packageCode: { $in: Array.from(selectedCodes) }
+    })
+        .sort({ sortOrder: 1, packageCode: 1 })
+        .lean();
+
+    if (!packages.length) return null;
+
+    const packageIds = packages.map(item => item._id);
+    const packageCodes = packages.map(item => item.packageCode);
+
+    const [
+        mappings,
+        inventoryStates,
+        enabledSuppliers,
+        publications
+    ] = await Promise.all([
+        SupplierProductMapping.find({
+            productCode: normalizedCode,
+            enabled: true
+        }).lean(),
+
+        PackageInventoryState.find({
+            $or: [
+                { packageRef: { $in: packageIds } },
+                {
+                    productCode: normalizedCode,
+                    packageCode: { $in: packageCodes }
+                }
+            ]
+        }).lean(),
+
+        Supplier.find({ enabled: true }).lean(),
+
+        PackageMarketPublication.find({
+            productCode: normalizedCode
+        }).lean()
+    ]);
+
+    const enabledSupplierIds = new Set(
+        enabledSuppliers.map(item => String(item._id))
+    );
+
+    const activeMappings = mappings.filter(item =>
+        enabledSupplierIds.has(String(item.supplierId || ""))
+    );
+
+    const mediaMap = await loadMediaAssetMap([product], packages);
+
+    const projection = projectCatalogProduct(product, packages, {
+        includeDisabled: options.includeDisabled !== false,
+        mediaMap,
+        includeAssetProjection: false,
+        includeAdminPricing: false
+    });
+
+    if (!projection) return null;
+
+    applyPackageFulfillmentReadiness(
+        projection,
+        activeMappings,
+        inventoryStates,
+        enabledSuppliers
+    );
+
+    applyCustomerInputContract(projection, activeMappings);
+
+    applyPublicationMetadata(
+        projection,
+        publications,
+        customerMarket
+    );
+
+    projection.packages = explicitPublishedPackages(projection);
+    projection.packageCount = projection.packages.length;
+
+    const publishedCodes = new Set(
+        projection.packages.map(item =>
+            String(item.packageCode || "").trim().toUpperCase()
+        )
+    );
+
+    const publishedSourcePackages = packages.filter(item =>
+        publishedCodes.has(
+            String(item.packageCode || "").trim().toUpperCase()
+        )
+    );
+
+    const publishedIds = new Set(
+        publishedSourcePackages.map(item => String(item._id))
+    );
+
+    const publishedInventory = inventoryStates.filter(item =>
+        publishedIds.has(String(item.packageRef || "")) ||
+        publishedCodes.has(
+            String(item.packageCode || "").trim().toUpperCase()
+        )
+    );
+
+    projection.commerceReadiness = projectCommerceReadiness(
+        product,
+        publishedSourcePackages,
+        activeMappings,
+        publishedInventory,
+        enabledSuppliers
+    );
+
+    applyPublicReadiness(
+        projection,
+        product,
+        publishedSourcePackages,
+        projection.commerceReadiness,
+        { explicitCommercialAuthority: true }
+    );
+
+    if (
+        options.includeDisabled === false &&
+        !projection.discoverable
+    ) {
+        return null;
+    }
+
+    const publicProjection = stripPublicationMetadata(projection);
+
+    return cacheEligible
+        ? writePublicProductDetailCache(cacheKey, publicProjection)
+        : publicProjection;
 }
 
 async function resolveAdminCatalogProduct(productCode, options = {}) {
@@ -1200,7 +1504,315 @@ async function resolveAdminCatalogProduct(productCode, options = {}) {
     return projection;
 }
 
+
+async function listPublicExclusiveOffers(options = {}) {
+    const customerMarket = normalizeRegion(options.customerMarket || "TH");
+    const limit = Math.max(1, Math.min(24, Number(options.limit || 8)));
+
+    /*
+     * Candidate-first merchandising projection.
+     *
+     * Exclusive eligibility narrows the query scope only. It never grants
+     * sellability. Every candidate must still pass the same explicit
+     * Store Catalog selection, package publication, fulfillment readiness,
+     * pricing and public product readiness authorities used by storefront.
+     */
+    const candidatePackages = await CatalogPackage.find({
+        deletedAt: null,
+        enabled: { $ne: false },
+        "merchandising.exclusiveOfferEligible": true
+    })
+        .sort({
+            "merchandising.exclusiveOfferPriority": -1,
+            productCode: 1,
+            sortOrder: 1,
+            packageCode: 1
+        })
+        .lean();
+
+    if (!candidatePackages.length) return [];
+
+    const candidateProductCodes = [
+        ...new Set(
+            candidatePackages
+                .map(pkg => normalizeProductCode(pkg.productCode))
+                .filter(Boolean)
+        )
+    ];
+
+    const candidatePackageCodes = [
+        ...new Set(
+            candidatePackages
+                .map(pkg => String(pkg.packageCode || "").trim().toUpperCase())
+                .filter(Boolean)
+        )
+    ];
+
+    const [
+        products,
+        mappings,
+        inventoryStates,
+        enabledSuppliers,
+        publications,
+        storeSelections
+    ] = await Promise.all([
+        CatalogProduct.find({
+            productCode: { $in: candidateProductCodes },
+            deletedAt: null,
+            enabled: { $ne: false }
+        }).lean(),
+
+        SupplierProductMapping.find({
+            productCode: { $in: candidateProductCodes },
+            packageCode: { $in: candidatePackageCodes },
+            enabled: true
+        }).lean(),
+
+        PackageInventoryState.find({
+            $or: [
+                {
+                    productCode: { $in: candidateProductCodes },
+                    packageCode: { $in: candidatePackageCodes }
+                },
+                {
+                    packageRef: {
+                        $in: candidatePackages.map(pkg => pkg._id)
+                    }
+                }
+            ]
+        }).lean(),
+
+        Supplier.find({ enabled: true }).lean(),
+
+        PackageMarketPublication.find({
+            productCode: { $in: candidateProductCodes }
+        }).lean(),
+
+        StoreCatalogSelection.find({
+            status: "ACTIVE",
+            sellingRegions: customerMarket,
+            visibleRegions: customerMarket,
+            productCode: { $in: candidateProductCodes }
+        }).lean()
+    ]);
+
+    const enabledSupplierIds = new Set(
+        enabledSuppliers.map(item => String(item._id))
+    );
+
+    const activeMappings = mappings.filter(mapping =>
+        enabledSupplierIds.has(String(mapping.supplierId || ""))
+    );
+
+    const mediaMap = await loadMediaAssetMap(products, candidatePackages);
+    const winners = [];
+
+    for (const product of products) {
+        const productCode = normalizeProductCode(product.productCode);
+
+        const selectedCodes = new Set(
+            storeSelections
+                .filter(selection =>
+                    normalizeProductCode(selection.productCode) === productCode
+                )
+                .flatMap(selection => selection.packages || [])
+                .map(item =>
+                    String(item.packageCode || "").trim().toUpperCase()
+                )
+                .filter(Boolean)
+        );
+
+        if (!selectedCodes.size) continue;
+
+        const sourcePackages = candidatePackages.filter(pkg =>
+            normalizeProductCode(pkg.productCode) === productCode &&
+            selectedCodes.has(
+                String(pkg.packageCode || "").trim().toUpperCase()
+            )
+        );
+
+        if (!sourcePackages.length) continue;
+
+        const productMappings = activeMappings.filter(mapping =>
+            normalizeProductCode(mapping.productCode) === productCode
+        );
+
+        const sourceIds = new Set(
+            sourcePackages.map(pkg => String(pkg._id))
+        );
+
+        const sourceCodes = new Set(
+            sourcePackages.map(pkg =>
+                String(pkg.packageCode || "").trim().toUpperCase()
+            )
+        );
+
+        const productInventory = inventoryStates.filter(item =>
+            sourceIds.has(String(item.packageRef || "")) ||
+            sourceCodes.has(
+                String(item.packageCode || "").trim().toUpperCase()
+            )
+        );
+
+        const projection = projectCatalogProduct(product, sourcePackages, {
+            includeDisabled: false,
+            mediaMap,
+            includeAssetProjection: false,
+            includeAdminPricing: false
+        });
+
+        if (!projection) continue;
+
+        applyPackageFulfillmentReadiness(
+            projection,
+            productMappings,
+            productInventory,
+            enabledSuppliers
+        );
+
+        applyCustomerInputContract(projection, productMappings);
+
+        applyPublicationMetadata(
+            projection,
+            publications.filter(record =>
+                normalizeProductCode(record.productCode) === productCode
+            ),
+            customerMarket
+        );
+
+        projection.packages = explicitPublishedPackages(projection);
+        projection.packageCount = projection.packages.length;
+
+        if (!projection.packages.length) continue;
+
+        const publishedCodes = new Set(
+            projection.packages.map(pkg =>
+                String(pkg.packageCode || "").trim().toUpperCase()
+            )
+        );
+
+        const publishedSourcePackages = sourcePackages.filter(pkg =>
+            publishedCodes.has(
+                String(pkg.packageCode || "").trim().toUpperCase()
+            )
+        );
+
+        const publishedIds = new Set(
+            publishedSourcePackages.map(pkg => String(pkg._id))
+        );
+
+        const publishedInventory = productInventory.filter(item =>
+            publishedIds.has(String(item.packageRef || "")) ||
+            publishedCodes.has(
+                String(item.packageCode || "").trim().toUpperCase()
+            )
+        );
+
+        projection.commerceReadiness = projectCommerceReadiness(
+            product,
+            publishedSourcePackages,
+            productMappings,
+            publishedInventory,
+            enabledSuppliers
+        );
+
+        applyPublicReadiness(
+            projection,
+            product,
+            publishedSourcePackages,
+            projection.commerceReadiness,
+            { explicitCommercialAuthority: true }
+        );
+
+        if (
+            projection.publicState !== "AVAILABLE" ||
+            projection.purchasable !== true
+        ) {
+            continue;
+        }
+
+        const candidates = projection.packages
+            .filter(pkg => {
+                const price = pkg.prices?.[customerMarket];
+
+                return (
+                    pkg.merchandising?.exclusiveOfferEligible === true &&
+                    price &&
+                    price.enabled !== false &&
+                    Number(price.amount || 0) > 0 &&
+                    Number(price.referencePrice || 0) >
+                        Number(price.amount || 0)
+                );
+            })
+            .map(pkg => {
+                const price = pkg.prices[customerMarket];
+                const amount = Number(price.amount);
+                const referencePrice = Number(price.referencePrice);
+                const saveAmount = referencePrice - amount;
+                const discountPercent =
+                    referencePrice > 0
+                        ? Math.round(
+                            (saveAmount / referencePrice) * 10000
+                        ) / 100
+                        : 0;
+
+                return {
+                    productCode: projection.productCode,
+                    productName: projection.name,
+                    productRoute: projection.productRoute || "",
+                    productImage:
+                        projection.imageUrl ||
+                        projection.image ||
+                        projection.artwork ||
+                        "",
+                    packageCode: pkg.packageCode,
+                    packageName: pkg.name,
+                    packageIcon:
+                        pkg.iconUrl ||
+                        pkg.icon ||
+                        pkg.artwork ||
+                        "",
+                    priority: Number(
+                        pkg.merchandising?.exclusiveOfferPriority || 0
+                    ),
+                    amount,
+                    referencePrice,
+                    saveAmount,
+                    discountPercent,
+                    currency:
+                        price.currency ||
+                        (customerMarket === "MM" ? "MMK" : "THB"),
+                    showOriginalPrice:
+                        price.showOriginalPrice !== false
+                };
+            });
+
+        if (!candidates.length) continue;
+
+        candidates.sort(
+            (a, b) =>
+                b.priority - a.priority ||
+                b.discountPercent - a.discountPercent ||
+                b.saveAmount - a.saveAmount ||
+                String(a.packageCode).localeCompare(String(b.packageCode))
+        );
+
+        winners.push(candidates[0]);
+    }
+
+    winners.sort(
+        (a, b) =>
+            b.priority - a.priority ||
+            b.discountPercent - a.discountPercent ||
+            b.saveAmount - a.saveAmount ||
+            String(a.productCode).localeCompare(String(b.productCode))
+    );
+
+    return winners.slice(0, limit);
+}
+
 module.exports = {
+    listPublicExclusiveOffers,
     applyPackageFulfillmentReadiness,
     applyCustomerInputContract,
     applyAdminProductionAttribution,

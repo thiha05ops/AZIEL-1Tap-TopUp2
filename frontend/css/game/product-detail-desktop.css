@@ -1600,3 +1600,304 @@
     overflow-wrap: anywhere;
   }
 }
+
+/* AZIEL integrated order-summary coupon UI */
+.az-product-detail .order-summary .aziel-coupon-box {
+  margin: 12px 0 4px;
+  padding: 13px 0 2px;
+  border-top: 1px solid var(--pd-border);
+}
+
+.az-product-detail .aziel-coupon-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 9px;
+}
+
+.az-product-detail .aziel-coupon-heading .aziel-promo-label {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .025em;
+}
+
+.az-product-detail .aziel-coupon-count {
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.az-product-detail .aziel-coupon-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.az-product-detail .aziel-coupon-picker[hidden],
+.az-product-detail .aziel-coupon-applied[hidden] {
+  display: none !important;
+}
+
+.az-product-detail #userCouponSelect {
+  width: 100%;
+  min-width: 0;
+  height: 42px;
+  padding: 0 34px 0 11px;
+  border: 1px solid var(--pd-border);
+  border-radius: 10px;
+  background: var(--pd-panel-secondary);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+}
+
+.az-product-detail #userCouponSelect:focus {
+  border-color: var(--pd-border-strong);
+  box-shadow: 0 0 0 3px var(--pd-accent-soft);
+}
+
+.az-product-detail #promoApplyBtn {
+  min-width: 64px;
+  height: 42px;
+  padding: 0 14px;
+  border: 1px solid var(--pd-border-strong);
+  border-radius: 10px;
+  background: var(--pd-accent-soft);
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.az-product-detail #promoApplyBtn:disabled {
+  opacity: .55;
+  cursor: default;
+}
+
+.az-product-detail .aziel-coupon-applied {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 54px;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--pd-border));
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--primary) 5%, var(--pd-panel-secondary));
+}
+
+.az-product-detail .aziel-coupon-applied-main {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.az-product-detail .aziel-coupon-check {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--success) 13%, transparent);
+  color: var(--success);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.az-product-detail .aziel-coupon-applied-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.az-product-detail .aziel-coupon-applied-copy strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.az-product-detail .aziel-coupon-applied-copy small {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.az-product-detail .aziel-coupon-remove {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.az-product-detail .aziel-coupon-remove:hover {
+  background: var(--pd-accent-soft);
+  color: var(--primary);
+}
+
+.az-product-detail .aziel-promo-feedback {
+  min-height: 0;
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+.az-product-detail .aziel-promo-feedback:empty {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .az-product-detail .order-summary .aziel-coupon-box {
+    margin-top: 10px;
+    padding-top: 11px;
+  }
+
+  .az-product-detail .aziel-coupon-picker {
+    grid-template-columns: minmax(0, 1fr) 62px;
+  }
+
+  .az-product-detail #userCouponSelect,
+  .az-product-detail #promoApplyBtn {
+    height: 40px;
+  }
+
+  .az-product-detail .aziel-coupon-applied {
+    min-height: 52px;
+  }
+}
+
+
+/* AZIEL coupon preview parity polish */
+.az-product-detail .order-summary .aziel-coupon-box {
+  margin: 10px 0 0;
+  padding: 12px 0 10px;
+  border-top: 1px solid var(--pd-border);
+  border-bottom: 1px solid var(--pd-border);
+}
+
+.az-product-detail .aziel-coupon-heading {
+  margin-bottom: 8px;
+}
+
+.az-product-detail .aziel-coupon-heading .aziel-promo-label {
+  color: var(--text);
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.az-product-detail .aziel-coupon-count {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.az-product-detail .aziel-coupon-applied {
+  min-height: 52px;
+  padding: 8px 9px;
+  border: 1px solid color-mix(in srgb, var(--primary) 25%, var(--pd-border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--primary) 4%, var(--pd-panel-secondary));
+}
+
+.az-product-detail .aziel-coupon-check {
+  width: 22px;
+  height: 22px;
+  font-size: 12px;
+}
+
+.az-product-detail .aziel-coupon-applied-copy strong {
+  color: var(--text);
+  font-size: 11.5px;
+  font-weight: 750;
+}
+
+.az-product-detail .aziel-coupon-applied-copy small {
+  color: var(--text-muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+}
+
+.az-product-detail .aziel-coupon-remove {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  font-size: 17px;
+}
+
+.az-product-detail .aziel-coupon-change {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 30px;
+  margin-top: 5px;
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.az-product-detail .aziel-coupon-change[hidden] {
+  display: none !important;
+}
+
+.az-product-detail .aziel-coupon-change:hover {
+  text-decoration: underline;
+}
+
+.az-product-detail .summary-promo-line {
+  padding-top: 10px;
+  padding-bottom: 9px;
+}
+
+.az-product-detail .summary-promo-line span {
+  color: var(--text) !important;
+  font-weight: 600;
+}
+
+.az-product-detail #summaryDiscount {
+  color: var(--success) !important;
+  font-weight: 750;
+}
+
+.az-product-detail .summary-promo-saved {
+  margin: 6px 0 2px;
+  padding: 5px 7px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--success) 8%, transparent);
+  color: var(--success);
+  font-size: 10.5px;
+  font-weight: 700;
+}

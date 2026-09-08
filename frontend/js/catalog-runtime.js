@@ -108,18 +108,67 @@
         return new Promise(resolve => setTimeout(resolve, delayMs));
     }
 
+    function productDetailCode() {
+        const packageContainer = document.getElementById("packages");
+        const explicitCode = normalizeProductCode(
+            packageContainer?.dataset?.game || ""
+        );
+
+        if (explicitCode) return explicitCode;
+
+        /*
+         * Generic product.html resolves its product code later in the
+         * product-detail runtime, so do not guess from the URL here.
+         * It keeps the existing full-catalog fallback until an explicit
+         * product code is available.
+         */
+        return "";
+    }
+
     async function fetchCatalog(attempt = 0) {
-        const region = window.AZIEL?.getRegion?.() || localStorageValue("region") || localStorageValue("selectedRegion") || "TH";
-        const response = await fetch(`/api/catalog?region=${encodeURIComponent(region)}`, {
+        const region =
+            window.AZIEL?.getRegion?.() ||
+            localStorageValue("region") ||
+            localStorageValue("selectedRegion") ||
+            "TH";
+
+        const detailCode = productDetailCode();
+        const endpoint = detailCode
+            ? `/api/catalog/${encodeURIComponent(detailCode)}?region=${encodeURIComponent(region)}`
+            : `/api/catalog?region=${encodeURIComponent(region)}`;
+
+        const response = await fetch(endpoint, {
             cache: "no-store",
             headers: { Accept: "application/json" }
         });
-        const data = await response.json().catch(() => ({}));
-        const startupUnavailable = response.status === 503 && data?.code === "SERVICE_TEMPORARILY_UNAVAILABLE";
-        if (startupUnavailable && attempt < STARTUP_RETRY_DELAYS_MS.length) {
+
+        const rawData = await response.json().catch(() => ({}));
+        const startupUnavailable =
+            response.status === 503 &&
+            rawData?.code === "SERVICE_TEMPORARILY_UNAVAILABLE";
+
+        if (
+            startupUnavailable &&
+            attempt < STARTUP_RETRY_DELAYS_MS.length
+        ) {
             await wait(STARTUP_RETRY_DELAYS_MS[attempt]);
             return fetchCatalog(attempt + 1);
         }
+
+        /*
+         * Keep one internal catalog shape for every consumer.
+         * Product Detail API returns { product }, while the full catalog
+         * returns { products }. Existing indexes/getProduct/getPackages
+         * therefore remain unchanged.
+         */
+        const data =
+            detailCode && rawData?.product
+                ? {
+                    ...rawData,
+                    products: [rawData.product]
+                }
+                : rawData;
+
         return { response, data };
     }
 
@@ -203,7 +252,6 @@
 
     function projectPackage(product, item, region, presentation) {
         if (!item || item.enabled === false) return null;
-        if (item.fulfillmentRegions && item.fulfillmentRegions[region] !== true) return null;
 
         const price = item.prices?.[region] || null;
         if (!price || price.enabled === false) return null;

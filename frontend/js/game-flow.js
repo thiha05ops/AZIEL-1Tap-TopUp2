@@ -104,6 +104,10 @@
             clearPromoQuote(flow, false);
             updateSummary(flow);
         });
+
+        window.addEventListener("aziel:locale-changed", () => {
+            updateSummary(flow);
+        });
     }
 
     function bindBuyButton(flow) {
@@ -771,7 +775,7 @@
                 <select id="userCouponSelect" aria-label="${couponUiText("product.selectCoupon", "Select coupon")}">
                     <option value="">${couponUiText("product.noCoupon", "Select a coupon")}</option>
                 </select>
-                <button id="promoApplyBtn" type="button">${couponUiText("product.applyCoupon", "Apply")}</button>
+                <button id="promoApplyBtn" type="button" data-i18n="product.useCoupon">${couponUiText("product.useCoupon", "Use Coupon")}</button>
             </div>
 
             <div id="promoAppliedCard" class="aziel-coupon-applied" hidden>
@@ -1026,7 +1030,7 @@
         applyBtn.disabled = loading;
         applyBtn.textContent = loading
             ? couponUiText("product.applyingPromo", "Applying…")
-            : couponUiText("product.applyCoupon", "Apply");
+            : couponUiText("product.useCoupon", "Use Coupon");
 
         input.disabled = loading;
 

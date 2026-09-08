@@ -31,6 +31,11 @@ async function run() {
     const home = read("frontend/home.html");
     const homeRuntime = read("frontend/js/home-placement-runtime.js");
     const css = read("frontend/css/home/marketplace-reference.css");
+    const homeProductCss = read("frontend/css/home/home-product-system.css");
+    const gamesCss = read("frontend/css/catalog/games.css");
+    const supportHtml = read("frontend/support.html");
+    const mobileGamesHtml = read("frontend/mobile-games.html");
+    const footerRuntime = read("frontend/js/home-footer-accordion.js");
 
     assertNotIncludes(presentation, "CANONICAL_HOME_PRODUCT_GROUPS", "Presentation metadata must not own Home membership.");
     assertNotIncludes(presentation, "getCanonicalHomeProductCodes", "Presentation must not expose code-based Home membership.");
@@ -48,6 +53,13 @@ async function run() {
     assertNotIncludes(homeRuntime, "ALL_MOBILE_GAME_ORDER", "Home runtime must not own duplicate All Mobile product list.");
     assertIncludes(homeRuntime, "resolveProductRoute", "Home cards must consume the backend-projected route with a generic defensive fallback.");
     assertIncludes(homeRuntime, "renderSocialTopUp", "Social Top Up renderer missing.");
+    assertIncludes(homeRuntime, "data-panel-size=\"${chunk.length}\"", "Home runtime must expose chunk sizes for panel verification.");
+    assertNotIncludes(homeRuntime, "selected.slice(0", "Mobile Home rails must not artificially truncate renderable products.");
+    assertIncludes(homeProductCss, "overflow-x: auto;", "Mobile Home product discovery must use native horizontal rails.");
+    assertIncludes(homeProductCss, "scroll-snap-type: x proximity;", "Mobile Home rails may use restrained individual-card snapping.");
+    assertIncludes(homeProductCss, "flex: 0 0 clamp(138px, 42vw, 156px);", "Mobile Home rail cards must show roughly two cards plus a partial peek.");
+    assertIncludes(homeProductCss, "display: none;", "Mobile Home compact rail cards must remove description text.");
+    assertIncludes(homeProductCss, "display: contents;", "Mobile Home must avoid a large enclosing product-panel card.");
     const popularSelection = functionSnippet(homeRuntime, "selectPopularProducts");
     assertIncludes(popularSelection, "product?.enabled !== false", "Popular placement must reject disabled products.");
     assertIncludes(popularSelection, "product.discoverable === true", "Popular placement must require computed discoverability.");
@@ -69,22 +81,26 @@ async function run() {
     assertIncludes(css, "object-fit: cover !important;", "Artwork must use full-card cover treatment.");
     assertIncludes(css, ".az-home #popularGames .popular-game-card", "Popular card rules must remain present.");
     assertIncludes(css, "height: 204px !important;", "Popular cards must remain the larger featured surface on desktop.");
-    assertIncludes(css, "grid-template-columns: repeat(7, minmax(0, 1fr))", "Desktop compact catalog grid must be denser than Popular.");
+    assertIncludes(homeProductCss, "grid-template-columns: repeat(auto-fill, minmax(170px, 180px));", "Desktop Home grid must use stable card columns instead of product-count-specific rows.");
+    assertIncludes(css, "grid-template-columns: repeat(auto-fill, minmax(170px, 180px)) !important;", "Legacy Home grid path must not force a 7+2 desktop composition.");
+    assertNotIncludes(css, "repeat(7, minmax(0, 1fr))", "Home grid must not force seven columns.");
     assertIncludes(css, "height: 150px !important;", "Desktop All Mobile/Social cards must be compact.");
     assertIncludes(css, "grid-template-rows: minmax(0, 1fr) 42px", "Compact card must reserve dominant artwork area with smaller text body.");
     assertIncludes(css, "grid-template-columns: repeat(4, minmax(0, 1fr))", "Tablet compact catalog grid must increase density.");
     assertIncludes(css, "grid-template-columns: repeat(2, minmax(0, 1fr))", "Mobile grid must remain two-column.");
-    assertIncludes(css, "height: 136px !important;", "Mobile compact cards must be shorter than Popular cards.");
+    assertIncludes(css, "height: 148px !important;", "Mobile compact cards must remain comfortable without becoming oversized image tiles.");
     assertIncludes(css, "@media (max-width: 480px)", "Narrow mobile compact polish must be scoped to <=480px.");
     const narrowMobileCssStart = css.indexOf("@media (max-width: 480px)");
     const narrowMobileCssEnd = css.indexOf("@media (prefers-reduced-motion", narrowMobileCssStart);
     const narrowMobileCss = css.slice(narrowMobileCssStart, narrowMobileCssEnd);
     assertNotIncludes(narrowMobileCss, "repeat(3", "375px compact catalog must never switch to three columns.");
-    assertIncludes(css, "width: calc(100% - 24px) !important;", "Narrow mobile catalog sections must use 12px side gutters.");
-    assertIncludes(css, "gap: 8px !important;", "Narrow mobile compact catalog grid must use the approved 8px gap.");
-    assertIncludes(css, "height: 132px !important;", "Narrow mobile compact cards must reduce total height.");
-    assertIncludes(css, "grid-template-rows: 88px 44px", "Narrow mobile compact cards must use 88px media and 44px body rows.");
-    assertIncludes(css, "height: 88px !important;", "Narrow mobile compact artwork must target the approved media height.");
+    assertIncludes(css, "width: calc(100% - 32px) !important;", "Narrow mobile catalog sections must use 16px side gutters.");
+    assertIncludes(css, "gap: 10px !important;", "Narrow mobile compact catalog grid must use balanced compact gutters.");
+    assertIncludes(css, "height: 148px !important;", "Narrow mobile compact cards must keep consistent geometry.");
+    assertIncludes(css, "grid-template-rows: 96px 52px", "Narrow mobile compact cards must use 96px media and 52px body rows.");
+    assertIncludes(css, "height: 96px !important;", "Narrow mobile compact artwork must target a readable media height.");
+    assertIncludes(css, ".az-home #availableCoupons[hidden]", "Empty Available Coupons section must stay fully hidden.");
+    assertIncludes(css, ".az-home #newsPromotions[hidden]", "Empty Exclusive Offers section must stay fully hidden.");
     assertIncludes(css, "#socialTopUpList", "Social Top Up grid must share the same narrow mobile alignment rules.");
     assertIncludes(css, "#socialTopUp", "Social Top Up must share product discovery card treatment.");
     assertIncludes(css, "background: var(--page-bg, var(--bg)) !important;", "Home footer must use the storefront page-background authority.");
@@ -92,13 +108,20 @@ async function run() {
     assertIncludes(css, ".az-home + .site-footer .payment-logos img", "Home payment chips must have a scoped theme-safe surface.");
     assertIncludes(css, "background: var(--surface-strong) !important;", "Home payment chips must use a semantic theme surface.");
     assertIncludes(home, "marketplace-reference.css?v=20260907-storefront-polish", "Home must load the current shared Home stylesheet version.");
+    assertIncludes(gamesCss, "grid-template-columns: repeat(auto-fill, minmax(158px, 176px));", "Mobile Games desktop catalog must use one coherent product-grid rhythm.");
+    assertIncludes(gamesCss, "grid-template-columns: repeat(2, minmax(0, 1fr));", "Mobile Games mobile catalog must use compact two-column visual grids.");
+    assertIncludes(gamesCss, ".az-poster-card p {\n        display: none;", "Mobile Games mobile cards must remove long descriptions.");
+    assertIncludes(mobileGamesHtml, "/js/home-footer-accordion.js", "Mobile Games must use the shared mobile footer accordion runtime.");
+    assertIncludes(supportHtml, "/js/home-footer-accordion.js", "Support must use the shared mobile footer accordion runtime.");
+    assertIncludes(footerRuntime, 'document.querySelector(".site-footer, .support-footer")', "Shared footer accordion must support the Support footer variant.");
+    assertIncludes(footerRuntime, "candidateRoots", "Shared footer accordion must support nested footer grids.");
 
     return {
         popularMobileGames: "Admin SitePlacement membership and order",
         allMobileGames: "eligible homepage-enabled publicCategory=mobile products",
         socialTopUp: "eligible homepage-enabled publicCategory=social products",
         visualTreatment: "artwork-first product discovery cards",
-        mobile375Treatment: "2-column compact grid, 12px gutters, 8px gap, 132px cards, 88px media row",
+        mobile375Treatment: "individual-card horizontal rails, 16px gutters, partial next-card peek, no giant panels or truncation",
         canonicalRouting: true,
         packageLevelContent: false
     };

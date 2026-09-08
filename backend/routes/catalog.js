@@ -45,6 +45,7 @@ const {
     isAdminCanonicalCatalogProduct,
     normalizeProductCode,
     resolveAdminCatalogProduct,
+    listPublicExclusiveOffers,
     toPublicCatalog
 } = require("../services/catalogService");
 const { CANONICAL_OPERATIONAL_PRODUCTS, getCanonicalProduct, resolveCanonicalProductRoute } = require("../catalog/canonicalOperationalCatalog");
@@ -157,6 +158,40 @@ function projectAdminCatalogListProduct(product = {}) {
     };
 }
 
+router.get("/public/exclusive-offers", async (req, res) => {
+    try {
+        const customerMarket = String(
+            req.query.region ||
+            req.headers["x-customer-region"] ||
+            "TH"
+        ).trim().toUpperCase();
+
+        const offers = await listPublicExclusiveOffers({
+            customerMarket,
+            limit: 8
+        });
+
+        res.set("Cache-Control", "no-store");
+
+        return res.json({
+            success: true,
+            region: customerMarket,
+            offers
+        });
+    } catch (error) {
+        console.log(
+            "Public exclusive offers error:",
+            error?.code || error?.name || "EXCLUSIVE_OFFERS_ERROR"
+        );
+
+        return res.status(500).json({
+            success: false,
+            code: "EXCLUSIVE_OFFERS_UNAVAILABLE",
+            message: "Exclusive offers are temporarily unavailable."
+        });
+    }
+});
+
 router.get("/catalog", async (req, res) => {
     try {
         const customerMarket = String(req.query.region || req.headers["x-customer-region"] || "TH").trim().toUpperCase();
@@ -253,7 +288,11 @@ router.get("/public/storefront-sections/:key", async (req, res) => {
 router.get("/catalog/:productCode", async (req, res) => {
     try {
         const customerMarket = String(req.query.region || req.headers["x-customer-region"] || "TH").trim().toUpperCase();
-        const product = (await toPublicCatalog({includeDisabled:false,customerMarket})).find(item=>item.productCode===String(req.params.productCode||"").trim().toLowerCase())||null;
+        const product = await getCatalogProductDetail(req.params.productCode, {
+            source: "database",
+            includeDisabled: false,
+            customerMarket
+        });
 
         res.set("Cache-Control", "no-store");
         if (!product) {

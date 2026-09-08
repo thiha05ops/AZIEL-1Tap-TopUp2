@@ -2466,6 +2466,22 @@ function openPackageEditPanel(product, pkg) {
     modal.querySelector("#catalogEditCustomerNoteMy").value = draft?.customerNoteLocales?.my ?? pkg.customerNoteLocales?.my ?? "";
     modal.querySelector("#catalogEditCustomerNoteTh").value = draft?.customerNoteLocales?.th ?? pkg.customerNoteLocales?.th ?? "";
     modal.querySelector("#catalogEditEnabled").checked = draft?.enabled ?? pkg.enabled !== false;
+
+    const exclusiveEligible =
+        draft?.merchandising?.exclusiveOfferEligible ??
+        pkg.merchandising?.exclusiveOfferEligible ??
+        false;
+
+    const exclusivePriority =
+        draft?.merchandising?.exclusiveOfferPriority ??
+        pkg.merchandising?.exclusiveOfferPriority ??
+        0;
+
+    modal.querySelector("#catalogEditExclusiveOfferEligible").checked =
+        Boolean(exclusiveEligible);
+
+    modal.querySelector("#catalogEditExclusiveOfferPriority").value =
+        String(exclusivePriority);
     modal.dataset.iconAssetId = draft?.iconAssetId ?? (pkg.iconAsset?.assetId || "");
     modal.dataset.iconCleared = draft?.iconCleared ? "true" : "";
     modal.querySelector("#catalogEditIconLabel").textContent = draft?.iconLabel || pkg.iconAsset?.name || pkg.iconUrl || adminT("fallback_static_asset", "Static fallback asset");
@@ -2589,6 +2605,7 @@ async function handlePackageEditSave(product, pkg) {
             enabled: changeSet.enabled,
             iconAssetId: changeSet.iconAssetId,
             prices: changeSet.prices,
+            merchandising: changeSet.merchandising,
             expectedUpdatedAt: pkg.updatedAt
         });
 
@@ -2621,6 +2638,18 @@ function validatePackageEditDraft(pkg, draft) {
 
     if (!draft.name.trim()) {
         showAdminToast?.(adminT("catalog_update_failed", "Catalog update failed"), "error");
+        return false;
+    }
+
+    const exclusivePriority = Number(
+        draft.merchandising?.exclusiveOfferPriority || 0
+    );
+
+    if (!Number.isFinite(exclusivePriority) || exclusivePriority < 0) {
+        showAdminToast?.(
+            "Exclusive Offer Priority must be 0 or greater.",
+            "error"
+        );
         return false;
     }
 
@@ -2708,7 +2737,15 @@ function readPackageEditDraft(product, pkg) {
             MM: readRegionalPricingDraft(modal, "MM"),
             TH: readRegionalPricingDraft(modal, "TH")
         },
-        couponCode: String(modal?.querySelector("#catalogEditCouponPreview")?.value || "").trim()
+        couponCode: String(modal?.querySelector("#catalogEditCouponPreview")?.value || "").trim(),
+        merchandising: {
+            exclusiveOfferEligible: Boolean(
+                modal?.querySelector("#catalogEditExclusiveOfferEligible")?.checked
+            ),
+            exclusiveOfferPriority: String(
+                modal?.querySelector("#catalogEditExclusiveOfferPriority")?.value || "0"
+            ).trim()
+        }
     };
 }
 
@@ -2771,7 +2808,52 @@ function buildPackageEditChanges(pkg, draft) {
     });
 
     if (JSON.stringify(draft.customerNoteLocales) !== JSON.stringify(pkg.customerNoteLocales || { en: pkg.customerNote || "", my: "", th: "" })) changes.push("Customer-facing note locales");
-    return { name: nextName, packageFamily: draft.packageFamily, customerNote: draft.customerNote, customerNoteLocales: draft.customerNoteLocales, enabled, iconAssetId, prices, changes };
+
+    const currentExclusiveEligible =
+        pkg.merchandising?.exclusiveOfferEligible === true;
+    const nextExclusiveEligible =
+        draft.merchandising?.exclusiveOfferEligible === true;
+
+    const currentExclusivePriority =
+        Number(pkg.merchandising?.exclusiveOfferPriority || 0);
+    const nextExclusivePriority =
+        Number(draft.merchandising?.exclusiveOfferPriority || 0);
+
+    let merchandising;
+
+    if (
+        currentExclusiveEligible !== nextExclusiveEligible ||
+        currentExclusivePriority !== nextExclusivePriority
+    ) {
+        merchandising = {
+            exclusiveOfferEligible: nextExclusiveEligible,
+            exclusiveOfferPriority: nextExclusivePriority
+        };
+
+        if (currentExclusiveEligible !== nextExclusiveEligible) {
+            changes.push(
+                `Exclusive Offers: ${nextExclusiveEligible ? "Eligible" : "Not eligible"}`
+            );
+        }
+
+        if (currentExclusivePriority !== nextExclusivePriority) {
+            changes.push(
+                `Exclusive Offer Priority: ${currentExclusivePriority} → ${nextExclusivePriority}`
+            );
+        }
+    }
+
+    return {
+        name: nextName,
+        packageFamily: draft.packageFamily,
+        customerNote: draft.customerNote,
+        customerNoteLocales: draft.customerNoteLocales,
+        enabled,
+        iconAssetId,
+        prices,
+        merchandising,
+        changes
+    };
 }
 
 function reopenPackageEditPanel(product, pkg, draft) {
@@ -3065,6 +3147,51 @@ function ensurePackageEditModal() {
                             </label>
                         </div>
                     </fieldset>
+                </section>
+
+                <section class="catalog-editor-section">
+                    <div class="catalog-editor-section-head">
+                        <div>
+                            <span>Merchandising</span>
+                            <h4>Exclusive Offers</h4>
+                            <p>
+                                Controls whether this package may compete for this
+                                product's Exclusive Offer slot. Only one package
+                                per product is displayed on the storefront.
+                            </p>
+                        </div>
+                    </div>
+
+                    <label class="catalog-toggle-row">
+                        <span>
+                            <b>Feature in Exclusive Offers</b>
+                            <small>
+                                This is separate from Original Price and
+                                Discount Display.
+                            </small>
+                        </span>
+                        <input
+                            id="catalogEditExclusiveOfferEligible"
+                            type="checkbox"
+                            role="switch"
+                        >
+                    </label>
+
+                    <label>
+                        Exclusive Offer Priority
+                        <input
+                            id="catalogEditExclusiveOfferPriority"
+                            type="number"
+                            min="0"
+                            step="1"
+                            value="0"
+                        >
+                        <small>
+                            Higher priority wins when multiple eligible packages
+                            belong to the same product. This is not a discount
+                            percentage.
+                        </small>
+                    </label>
                 </section>
 
                 <section class="catalog-editor-section">

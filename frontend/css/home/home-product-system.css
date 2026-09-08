@@ -36,9 +36,9 @@
 }
 
 .home-product-panels {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 180px));
+    justify-content: start;
     align-items: stretch;
     gap: 20px;
     width: 100%;
@@ -54,11 +54,10 @@
 .home-product-item {
     position: relative;
     display: block;
-    justify-self: center;
-    flex: 0 1 190px;
-    width: 190px;
-    max-width: 190px;
-    min-height: 230px;
+    justify-self: stretch;
+    width: 100%;
+    max-width: none;
+    min-height: 232px;
     height: 100%;
     min-width: 0;
     padding: 8px;
@@ -153,8 +152,11 @@
 .home-product-item.is-temporarily-unavailable { opacity: .68; }
 .home-product-item:focus-visible { outline: 2px solid #8b5cf6; outline-offset: 3px; }
 
-#popularGames .home-product-panels { gap: 20px; }
-#popularGames .home-product-item { flex-basis: 210px; width: 210px; max-width: 210px; padding: 10px; }
+#popularGames .home-product-panels {
+    grid-template-columns: repeat(auto-fill, minmax(178px, 190px));
+    gap: 20px;
+}
+#popularGames .home-product-item { width: 100%; max-width: none; padding: 10px; }
 #popularGames .home-product-copy strong { font-size: 15px; }
 #popularGames .home-product-copy .home-product-description { font-size: 12.5px; }
 
@@ -168,8 +170,8 @@
 }
 
 @media (max-width: 1023px) and (min-width: 721px) {
-    .home-product-item { flex-basis: 150px; width: 150px; max-width: 170px; }
-    #popularGames .home-product-item { flex-basis: 170px; width: 170px; max-width: 190px; }
+    .home-product-panels { grid-template-columns: repeat(auto-fill, minmax(150px, 170px)); }
+    #popularGames .home-product-panels { grid-template-columns: repeat(auto-fill, minmax(160px, 180px)); }
 }
 
 @media (min-width: 721px) {
@@ -182,133 +184,133 @@
 }
 
 @media (max-width: 720px) {
+    .az-home .home-merch-section,
+    html body main.az-home .home-merch-section,
+    html body main.az-home #popularGames.home-merch-section,
+    html body main.az-home #allMobileGames.home-merch-section,
+    html body main.az-home #socialTopUp.home-merch-section {
+        width: calc(100% - 32px);
+        max-width: calc(100% - 32px);
+        margin: 28px auto 0 !important;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        overflow: visible;
+    }
     .home-mobile-group-rail {
-        display: flex;
-        align-items: flex-start;
-        width: calc(100% - 24px);
-        margin: 30px auto 0;
-        gap: 10px;
-        padding: 0 0 8px;
-        overflow-x: auto;
-        overflow-y: hidden;
-        overscroll-behavior-inline: contain;
-        scroll-snap-type: x mandatory;
-        scroll-padding-inline: 0;
-        scrollbar-width: none;
+        display: contents;
     }
     .home-mobile-group-rail::after {
-        content: "";
-        flex: 0 0 calc(100% - clamp(238px, calc(100vw - 89px), 341px) - 10px);
-        width: calc(100% - clamp(238px, calc(100vw - 89px), 341px) - 10px);
-        pointer-events: none;
+        display: none;
     }
-    .home-mobile-group-rail::-webkit-scrollbar { display: none; }
-    html body main.az-home .home-mobile-group-rail > section.home-merch-section {
-        flex: 0 0 clamp(276px, calc(100vw - 48px), 360px);
-        width: clamp(276px, calc(100vw - 48px), 360px);
-        margin: 0 !important;
-        padding: 12px;
-        border: 1px solid var(--home-product-border);
-        border-radius: 12px;
-        background: var(--home-product-surface);
-        overflow: visible;
-        scroll-snap-align: start;
+    .az-home .home-mobile-group-rail > .home-merch-section[hidden],
+    .az-home .home-merch-section[hidden] {
+        display: none !important;
     }
-    html body main.az-home .home-mobile-group-rail > #popularGames.home-merch-section,
-    html body main.az-home .home-mobile-group-rail > #allMobileGames.home-merch-section,
-    html body main.az-home .home-mobile-group-rail > #socialTopUp.home-merch-section {
-        margin: 0 !important;
-    }
-    .az-home .home-mobile-group-rail > .home-merch-section[hidden] { display: none; }
-    .az-home .home-mobile-group-rail .az-section-head {
+    .az-home .home-merch-section .az-section-head {
         display: grid !important;
         grid-template-columns: minmax(0, 1fr) auto !important;
-        align-items: start !important;
+        align-items: center !important;
         width: 100%;
-        min-height: 30px;
+        min-height: 40px;
         gap: 8px !important;
-        margin-bottom: 9px !important;
+        margin-bottom: 10px !important;
     }
-    .az-home .home-mobile-group-rail .az-section-head > div {
+    .az-home .home-merch-section .az-section-head > div {
         min-width: 0;
     }
-    .az-home .home-mobile-group-rail .az-section-head h2 {
+    .az-home .home-merch-section .az-section-head h2 {
         display: block;
         min-width: 0;
         overflow: hidden;
-        font-size: clamp(11px, 3vw, 14px) !important;
-        font-weight: 600 !important;
-        line-height: 1.2 !important;
+        font-size: clamp(15px, 4.2vw, 16px) !important;
+        font-weight: 700 !important;
+        line-height: 1.25 !important;
         white-space: nowrap;
         text-overflow: clip;
     }
-    .az-home .home-mobile-group-rail .az-section-head a {
-        flex: 0 0 auto;
-        min-height: 28px;
-        font-size: 11px;
+    .az-home .home-merch-section .az-section-head a {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        width: auto;
+        min-height: 40px;
+        padding: 0;
+        font-size: 12px;
+        font-weight: 600;
         white-space: nowrap;
+    }
+    .az-home .home-merch-section .az-section-head a i {
+        font-size: 12px;
+        line-height: 1;
     }
     .home-product-panels,
     #popularGames .home-product-panels,
     #allMobileGames .home-product-panels,
     #socialTopUp .home-product-panels {
-        display: block !important;
+        display: flex !important;
+        align-items: stretch;
         width: 100%;
         margin-inline: 0;
-        padding: 0;
+        padding: 0 12px 6px 0;
         border: 0;
         border-radius: 0;
         background: transparent;
-        overflow: visible;
+        gap: 12px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        overscroll-behavior-inline: contain;
+        scroll-snap-type: x proximity;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+    }
+    .home-product-panels::-webkit-scrollbar {
+        display: none;
     }
     .home-product-panel,
     .home-product-panel:has(.home-product-item:only-child),
     .home-product-panel:has(.home-product-item:first-child:nth-last-child(2)) {
-        display: grid;
-        grid-template-columns: 1fr;
-        width: 100%;
-        max-width: none;
-        gap: 6px;
-        padding: 0;
-        border: 0;
-        border-radius: 0;
-        background: transparent;
+        display: contents;
     }
     .home-product-item,
     #popularGames .home-product-item {
-        display: grid;
-        grid-template-columns: 50px minmax(0, 1fr);
-        align-items: center;
-        justify-self: stretch;
-        width: auto;
+        display: block;
+        flex: 0 0 clamp(138px, 42vw, 156px);
+        width: clamp(138px, 42vw, 156px);
         max-width: none;
-        min-height: 60px;
+        min-height: 188px;
+        height: 188px;
         min-width: 0;
-        gap: 8px;
-        padding: 6px;
-        border: 0;
-        border-radius: 8px;
-        background: transparent;
-        box-shadow: none;
+        padding: 8px;
+        border: 1px solid color-mix(in srgb, var(--home-product-border) 84%, transparent);
+        border-radius: 14px;
+        background: color-mix(in srgb, var(--home-product-card) 74%, transparent);
+        box-shadow: 0 8px 22px rgba(0, 0, 0, .08);
+        scroll-snap-align: start;
+    }
+    .home-product-panel .home-product-item + .home-product-item {
+        border-top: 1px solid color-mix(in srgb, var(--home-product-border) 84%, transparent);
     }
     .home-product-item img {
-        width: 50px;
-        height: 50px;
+        width: 100%;
+        height: 116px;
         aspect-ratio: auto;
-        padding: 2px;
-        border-radius: 8px;
+        padding: 0;
+        border-radius: 11px;
         object-fit: cover;
     }
     .home-product-copy {
         min-height: 0;
-        margin-top: 0;
+        margin-top: 8px;
     }
     .home-product-copy strong,
     #popularGames .home-product-copy strong {
         display: -webkit-box;
         overflow: hidden;
         color: var(--home-product-text);
-        font-size: 13.5px;
+        font-size: 14px;
         font-weight: 600;
         line-height: 1.25;
         white-space: normal;
@@ -319,21 +321,15 @@
     }
     .home-product-copy .home-product-description,
     #popularGames .home-product-copy .home-product-description {
-        margin-top: 3px;
-        color: var(--home-product-muted);
-        font-size: 11.5px;
-        font-weight: 400;
-        line-height: 1.25;
-        white-space: normal;
-        -webkit-line-clamp: 1;
+        display: none;
     }
     .home-product-copy .home-product-market,
     #popularGames .home-product-copy .home-product-market {
-        margin-top: 1px;
-        font-size: 10px;
+        margin-top: 3px;
+        font-size: 10.5px;
         line-height: 1.2;
     }
-    .home-mobile-group-rail .home-product-item:hover {
+    .home-product-item:hover {
         border-color: transparent;
         background: color-mix(in srgb, var(--primary) 5%, transparent);
         box-shadow: none;
@@ -342,3 +338,42 @@
 }
 
 @media (prefers-reduced-motion: reduce) { .home-product-item { transition: none; } }
+
+
+/* AZIEL HOME MOBILE TWO-ROW PRODUCT RAIL */
+@media (max-width: 768px) {
+    .az-home #allMobileGames .home-product-panels {
+        display: block !important;
+        width: 100% !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        scroll-snap-type: x proximity !important;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        overscroll-behavior-x: contain;
+        touch-action: pan-x pan-y;
+    }
+
+    .az-home #allMobileGames .home-product-panels::-webkit-scrollbar {
+        display: none;
+    }
+
+    .az-home #allMobileGames .home-product-panel--mobile-two-row {
+        display: grid !important;
+        grid-auto-flow: column !important;
+        grid-template-rows: repeat(2, auto) !important;
+        grid-auto-columns: 132px !important;
+        grid-template-columns: none !important;
+        width: max-content !important;
+        min-width: max-content !important;
+        gap: 10px !important;
+        padding-right: 28px !important;
+    }
+
+    .az-home #allMobileGames .home-product-panel--mobile-two-row .home-product-item {
+        width: 132px !important;
+        min-width: 132px !important;
+        max-width: 132px !important;
+        scroll-snap-align: start;
+    }
+}

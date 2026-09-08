@@ -343,6 +343,14 @@ async function buildCreatePackagePayload(product, patch = {}) {
         enabled: Object.prototype.hasOwnProperty.call(patch, "enabled")
             ? parseBoolean(patch.enabled, "enabled")
             : true,
+        merchandising: {
+            exclusiveOfferEligible:
+                patch.merchandising?.exclusiveOfferEligible === true,
+            exclusiveOfferPriority:
+                Number.isFinite(Number(patch.merchandising?.exclusiveOfferPriority))
+                    ? Math.max(0, Number(patch.merchandising.exclusiveOfferPriority))
+                    : 0
+        },
         prices,
         sortOrder: parseSortOrder(patch.sortOrder),
         iconAssetId,
@@ -443,7 +451,8 @@ function buildPackagePatch(document, patch = {}) {
     assertNoImmutableFields(patch, ["_id", "id", "productCode", "packageCode", "source", "createdAt", "updatedAt", "__v"]);
 
     const updates = {};
-    const allowed = new Set(["name", "enabled", "prices", "canonicalSupplierCost", "iconAssetId", "customerNote", "customerNoteLocales", "packageFamily", "expectedUpdatedAt", "pricingPublicationEvidence"]);
+    const allowed = new Set(["name", "enabled", "prices",
+        "merchandising", "canonicalSupplierCost", "iconAssetId", "customerNote", "customerNoteLocales", "packageFamily", "expectedUpdatedAt", "pricingPublicationEvidence"]);
 
     Object.keys(patch).forEach(key => {
         if (!allowed.has(key)) {
@@ -519,6 +528,66 @@ function buildPackagePatch(document, patch = {}) {
         ["fxRateCapturedAt", "fxRateEffectiveAt", "fxRateExpiresAt"].forEach(key => {
             if (Object.prototype.hasOwnProperty.call(snapshot, key)) updates[`canonicalSupplierCost.${key}`] = parseNullableDate(snapshot[key], `canonicalSupplierCost.${key}`);
         });
+    }
+
+    if (patch.merchandising !== undefined) {
+        if (
+            !patch.merchandising ||
+            typeof patch.merchandising !== "object" ||
+            Array.isArray(patch.merchandising)
+        ) {
+            throw new CatalogAdminError(
+                "CATALOG_PATCH_INVALID",
+                "merchandising must be an object."
+            );
+        }
+
+        const merchandisingAllowed = new Set([
+            "exclusiveOfferEligible",
+            "exclusiveOfferPriority"
+        ]);
+
+        Object.keys(patch.merchandising).forEach(key => {
+            if (!merchandisingAllowed.has(key)) {
+                throw new CatalogAdminError(
+                    "CATALOG_PATCH_INVALID",
+                    `merchandising.${key} is not editable.`
+                );
+            }
+        });
+
+        if (
+            Object.prototype.hasOwnProperty.call(
+                patch.merchandising,
+                "exclusiveOfferEligible"
+            )
+        ) {
+            updates["merchandising.exclusiveOfferEligible"] =
+                parseBoolean(
+                    patch.merchandising.exclusiveOfferEligible,
+                    "merchandising.exclusiveOfferEligible"
+                );
+        }
+
+        if (
+            Object.prototype.hasOwnProperty.call(
+                patch.merchandising,
+                "exclusiveOfferPriority"
+            )
+        ) {
+            const priority = Number(
+                patch.merchandising.exclusiveOfferPriority
+            );
+
+            if (!Number.isFinite(priority) || priority < 0) {
+                throw new CatalogAdminError(
+                    "CATALOG_PATCH_INVALID",
+                    "Exclusive offer priority must be a non-negative number."
+                );
+            }
+
+            updates["merchandising.exclusiveOfferPriority"] = priority;
+        }
     }
 
     if (patch.prices !== undefined) {

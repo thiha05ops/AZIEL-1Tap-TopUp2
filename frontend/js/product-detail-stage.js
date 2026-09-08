@@ -274,16 +274,25 @@
     }
 
     function resolveAndRenderPublicState(product) {
-        const region = window.AZIEL?.getShopRegion?.() || "MM";
-        const configuredState = product.publicState || product.publicReadiness?.state || (product.purchasable ? "AVAILABLE" : "COMING_SOON");
-        const regionalState = product.publicReadiness?.regions?.[region]?.state;
-        const hasAccountConfig = document.querySelectorAll(".product-account-card input, .product-account-card select").length > 0;
-        const regionalCode = product.publicReadiness?.regions?.[region]?.availabilityCode;
-        if (configuredState === "AVAILABLE" && regionalState === "COMING_SOON") {
-            product.availabilityCode = regionalCode || "REGION_UNAVAILABLE";
-            product.availabilityReason = product.publicReadiness?.regions?.[region]?.availabilityReason || product.availabilityReason;
-        }
-        const state = configuredState === "AVAILABLE" && regionalState !== "COMING_SOON" && hasAccountConfig ? "AVAILABLE" : (product.availabilityCode === "COMING_SOON" ? "COMING_SOON" : "HIDDEN");
+        const configuredState =
+            product.publicState ||
+            product.publicReadiness?.state ||
+            (product.purchasable ? "AVAILABLE" : "COMING_SOON");
+        const hasAccountConfig =
+            document.querySelectorAll(".product-account-card input, .product-account-card select").length > 0;
+
+        /*
+         * Public catalog authority already resolves commercial availability
+         * for the active customer market. Do not re-gate an AVAILABLE product
+         * with legacy regional fulfillment readiness.
+         */
+        const state =
+            configuredState === "AVAILABLE" && hasAccountConfig
+                ? "AVAILABLE"
+                : configuredState === "COMING_SOON" ||
+                    product.availabilityCode === "COMING_SOON"
+                  ? "COMING_SOON"
+                  : "HIDDEN";
         document.documentElement.dataset.publicProductState = state;
         if (state !== "AVAILABLE") renderUnavailableState(product, state);
         else {

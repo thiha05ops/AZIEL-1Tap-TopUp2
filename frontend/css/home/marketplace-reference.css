@@ -315,7 +315,7 @@ body.dark .az-home {
     margin: 0 !important;
     color: var(--home-section-title) !important;
     font-size: clamp(17px, 1.25vw, 20px) !important;
-    font-weight: 900 !important;
+    font-weight: 700 !important;
     line-height: 1.15 !important;
     letter-spacing: 0 !important;
 }
@@ -575,7 +575,8 @@ body.dark .az-home {
 
 .az-home #allMobileGames .home-merch-row,
 .az-home #socialTopUp .home-merch-row {
-    grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 180px)) !important;
+    justify-content: start !important;
 }
 
 .az-home #allMobileGames .home-mobile-game-tile,
@@ -699,49 +700,125 @@ body.dark .az-home {
     margin-top: 56px !important;
 }
 
+.az-home #availableCoupons[hidden],
+.az-home #newsPromotions[hidden],
+.az-home .home-merch-section[hidden] {
+    display: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.az-home #availableCoupons .az-section-head {
+    display: block;
+    min-height: 0;
+    margin-bottom: 16px;
+}
+
+.az-home #availableCoupons .az-section-head > div {
+    display: block;
+    min-width: 0;
+}
+
+.az-home #availableCoupons .az-section-head h2 {
+    margin: 0;
+}
+
+.az-home .home-coupon-subtitle {
+    margin: 5px 0 0;
+    color: var(--text-secondary);
+    font-size: 12.5px;
+    font-weight: 400;
+    line-height: 1.4;
+}
+
 .az-home .home-coupon-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--home-gap);
+    gap: 14px;
 }
 
 .az-home .home-coupon-card {
-    display: grid;
-    grid-template-columns: 42px minmax(0, 1fr);
-    align-items: center;
-    gap: 12px;
-    min-height: 82px;
-    padding: 14px;
-    border: 1px solid var(--border);
-    border-radius: 18px;
-    background: color-mix(in srgb, var(--surface-liquid, var(--card)) 62%, transparent);
-    color: var(--heading);
-}
-
-.az-home .home-coupon-icon {
-    display: inline-flex;
-    width: 42px;
-    height: 42px;
-    align-items: center;
-    justify-content: center;
-    border-radius: 14px;
-    background: color-mix(in srgb, var(--primary) 12%, transparent);
-    color: var(--primary);
-}
-
-.az-home .home-coupon-card strong {
     display: block;
+    min-width: 0;
+    min-height: 88px;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--card);
     color: var(--heading);
-    font-size: 14px;
-    font-weight: 850;
-    line-height: 1.25;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
 }
 
-.az-home .home-coupon-card p {
-    margin: 4px 0 0;
+.az-home .home-coupon-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.az-home .home-coupon-discount {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
+    white-space: nowrap;
+}
+
+.az-home .home-coupon-discount strong {
+    display: inline;
+    color: var(--heading);
+    font-size: 20px;
+    font-weight: 750;
+    line-height: 1;
+    letter-spacing: -0.02em;
+}
+
+.az-home .home-coupon-discount span {
     color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.az-home .home-coupon-claim {
+    flex: 0 0 auto;
+    min-width: 70px;
+    height: 32px;
+    padding: 0 14px;
+    border: 0;
+    border-radius: 6px;
+    background: #404040;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+        transform 140ms ease,
+        opacity 140ms ease;
+}
+
+.az-home .home-coupon-claim:hover {
+    opacity: 0.9;
+}
+
+.az-home .home-coupon-claim:active {
+    transform: scale(0.97);
+}
+
+.az-home .home-coupon-claim:disabled {
+    cursor: default;
+    opacity: 0.7;
+}
+
+.az-home .home-coupon-name {
+    display: block;
+    margin: 14px 0 0;
+    overflow: hidden;
+    color: var(--heading);
     font-size: 12.5px;
+    font-weight: 400;
     line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .az-home .home-promotion-grid {
@@ -860,7 +937,7 @@ body.theme-light .az-home + .site-footer {
 
     .az-home #allMobileGames .home-merch-row,
     .az-home #socialTopUp .home-merch-row {
-        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 170px)) !important;
     }
 
     .az-home .home-promotion-grid {
@@ -884,18 +961,19 @@ body.theme-light .az-home + .site-footer {
     body.dark .az-home {
         padding-bottom: 40px !important;
         --home-page-background:
-            radial-gradient(ellipse 86% 280px at 50% 150px, color-mix(in srgb, var(--home-hero-ambient-primary) 12%, transparent), transparent 74%),
-            linear-gradient(180deg, color-mix(in srgb, var(--home-hero-ambient-primary) 8%, var(--bg)) 0, color-mix(in srgb, var(--home-hero-ambient-secondary) 4%, var(--bg)) 280px, var(--bg) 500px),
+            radial-gradient(ellipse 92% 340px at 50% 170px, color-mix(in srgb, var(--home-hero-ambient-primary) 18%, transparent), transparent 74%),
+            linear-gradient(180deg, color-mix(in srgb, var(--home-hero-ambient-primary) 12%, var(--bg)) 0, color-mix(in srgb, var(--home-hero-ambient-secondary) 7%, var(--bg)) 340px, var(--bg) 580px),
             var(--bg);
     }
 
     .az-home .az-home-hero.az-banner-zone::before {
-        opacity: .68;
+        inset: -34px -18px -30px;
+        opacity: .82;
     }
 
     .az-home .az-home-hero.az-banner-zone {
         width: calc(100% - 32px) !important;
-        aspect-ratio: 16 / 9 !important;
+        aspect-ratio: 16 / 10 !important;
         min-height: 0 !important;
         max-height: none !important;
         margin-top: 24px !important;
@@ -942,6 +1020,14 @@ body.theme-light .az-home + .site-footer {
         transform: none !important;
     }
 
+    html body main.az-home #availableCoupons[hidden],
+    html body main.az-home #newsPromotions[hidden],
+    html body main.az-home .home-merch-section[hidden] {
+        display: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
     html body main.az-home #popularGames {
         margin-top: 24px !important;
     }
@@ -958,11 +1044,25 @@ body.theme-light .az-home + .site-footer {
 
     .az-home .az-section-head h2 {
         font-size: 16px !important;
+        font-weight: 700 !important;
     }
 
     .az-home .az-section-head a {
-        min-height: 34px !important;
-        font-size: 12px !important;
+        justify-content: center !important;
+        width: 40px !important;
+        min-width: 40px !important;
+        min-height: 40px !important;
+        padding: 0 !important;
+        font-size: 0 !important;
+    }
+
+    .az-home .az-section-head a span {
+        display: none !important;
+    }
+
+    .az-home .az-section-head a i {
+        font-size: 14px !important;
+        line-height: 1 !important;
     }
 
     .az-home .home-merch-row,
@@ -981,9 +1081,9 @@ body.theme-light .az-home + .site-footer {
     .az-home #popularGames .popular-game-card {
         flex: initial !important;
         min-width: 0 !important;
-        grid-template-rows: 121px 47px !important;
-        height: 168px !important;
-        min-height: 168px !important;
+        grid-template-rows: 124px 52px !important;
+        height: 176px !important;
+        min-height: 176px !important;
         padding: 0 !important;
         scroll-snap-align: none !important;
     }
@@ -994,9 +1094,9 @@ body.theme-light .az-home + .site-footer {
     .az-home #popularGames .home-product-wordmark {
         width: calc(100% + 2px) !important;
         min-width: calc(100% + 2px) !important;
-        height: 121px !important;
-        min-height: 121px !important;
-        max-height: 121px !important;
+        height: 124px !important;
+        min-height: 124px !important;
+        max-height: 124px !important;
         object-fit: cover !important;
     }
 
@@ -1005,21 +1105,21 @@ body.theme-light .az-home + .site-footer {
     }
 
     .az-home #popularGames .home-card-copy {
-        padding: 7px 48px 8px 12px;
+        padding: 8px 48px 9px 12px;
     }
 
     .az-home #popularGames .popular-game-card h3 {
-        font-size: 12px !important;
+        font-size: 13px !important;
         line-height: 1.24 !important;
     }
 
     .az-home #popularGames .popular-game-card p {
-        font-size: 10.5px !important;
+        font-size: 11.5px !important;
         line-height: 1.28 !important;
     }
 
     .az-home #popularGames .popular-game-card .product-market-label {
-        font-size: 9.5px !important;
+        font-size: 10.5px !important;
     }
 
     .az-home .home-card-arrow {
@@ -1031,10 +1131,10 @@ body.theme-light .az-home + .site-footer {
 
     .az-home #allMobileGames .home-mobile-game-tile,
     .az-home #socialTopUp .home-mobile-game-tile {
-        height: 136px !important;
+        height: 148px !important;
         padding: 0 !important;
-        grid-template-columns: minmax(0, 1fr) 28px !important;
-        grid-template-rows: minmax(0, 1fr) 42px !important;
+        grid-template-columns: minmax(0, 1fr) 30px !important;
+        grid-template-rows: minmax(0, 1fr) 50px !important;
     }
 
     .az-home #allMobileGames .home-mobile-game-tile img,
@@ -1054,18 +1154,20 @@ body.theme-light .az-home + .site-footer {
 
     .az-home #allMobileGames .home-mobile-game-tile > span:not(.home-card-arrow):not(.home-product-wordmark),
     .az-home #socialTopUp .home-mobile-game-tile > span:not(.home-card-arrow):not(.home-product-wordmark) {
-        padding: 6px 0 6px 9px;
+        padding: 7px 0 7px 10px;
     }
 
     .az-home #allMobileGames .home-mobile-game-tile strong,
     .az-home #socialTopUp .home-mobile-game-tile strong {
-        font-size: 10.5px !important;
-        line-height: 1.22 !important;
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        line-height: 1.24 !important;
     }
 
     .az-home #allMobileGames .home-mobile-game-tile small,
     .az-home #socialTopUp .home-mobile-game-tile small {
-        font-size: 9.5px !important;
+        font-size: 10.5px !important;
+        font-weight: 400 !important;
         line-height: 1.22 !important;
     }
 
@@ -1085,26 +1187,60 @@ body.theme-light .az-home + .site-footer {
         scroll-snap-align: start;
     }
 
+    .az-home #availableCoupons .az-section-head {
+        display: block;
+        margin-bottom: 12px;
+    }
+
+    .az-home .home-coupon-subtitle {
+        margin-top: 4px;
+        font-size: 11px;
+        line-height: 1.35;
+    }
+
     .az-home .home-coupon-grid {
         display: flex;
+        gap: 10px;
         overflow-x: auto;
-        gap: 12px;
-        padding-bottom: 4px;
+        padding: 0 36px 4px 0;
         scroll-snap-type: x mandatory;
+        scrollbar-width: none;
         -webkit-overflow-scrolling: touch;
     }
 
+    .az-home .home-coupon-grid::-webkit-scrollbar {
+        display: none;
+    }
+
     .az-home .home-coupon-card {
-        flex: 0 0 min(86%, 320px);
+        flex: 0 0 min(84%, 300px);
+        min-height: 82px;
+        padding: 13px 14px;
         scroll-snap-align: start;
+    }
+
+    .az-home .home-coupon-discount strong {
+        font-size: 18px;
+    }
+
+    .az-home .home-coupon-claim {
+        min-width: 66px;
+        height: 30px;
+        padding: 0 12px;
+        font-size: 11px;
+    }
+
+    .az-home .home-coupon-name {
+        margin-top: 12px;
+        font-size: 12px;
     }
 }
 
 @media (max-width: 480px) {
     html body main.az-home #allMobileGames,
     html body main.az-home #socialTopUp {
-        width: calc(100% - 24px) !important;
-        max-width: calc(100% - 24px) !important;
+        width: calc(100% - 32px) !important;
+        max-width: calc(100% - 32px) !important;
         margin-left: auto !important;
         margin-right: auto !important;
         overflow: visible !important;
@@ -1116,7 +1252,7 @@ body.theme-light .az-home + .site-footer {
     .az-home #socialTopUpList {
         display: grid !important;
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-        gap: 8px !important;
+        gap: 10px !important;
         width: 100% !important;
         max-width: 100% !important;
         margin: 0 !important;
@@ -1132,10 +1268,10 @@ body.theme-light .az-home + .site-footer {
         width: 100% !important;
         max-width: none !important;
         min-width: 0 !important;
-        height: 132px !important;
-        min-height: 132px !important;
-        grid-template-columns: minmax(0, 1fr) 28px !important;
-        grid-template-rows: 88px 44px !important;
+        height: 148px !important;
+        min-height: 148px !important;
+        grid-template-columns: minmax(0, 1fr) 30px !important;
+        grid-template-rows: 96px 52px !important;
         scroll-snap-align: none !important;
     }
 
@@ -1143,26 +1279,26 @@ body.theme-light .az-home + .site-footer {
     .az-home #allMobileGames .home-mobile-game-tile .home-product-wordmark,
     .az-home #socialTopUp .home-mobile-game-tile img,
     .az-home #socialTopUp .home-mobile-game-tile .home-product-wordmark {
-        height: 88px !important;
-        min-height: 88px !important;
-        max-height: 88px !important;
+        height: 96px !important;
+        min-height: 96px !important;
+        max-height: 96px !important;
     }
 
     .az-home #allMobileGames .home-mobile-game-tile > span:not(.home-card-arrow):not(.home-product-wordmark),
     .az-home #socialTopUp .home-mobile-game-tile > span:not(.home-card-arrow):not(.home-product-wordmark) {
-        padding: 5px 0 5px 9px !important;
+        padding: 7px 0 7px 10px !important;
     }
 
     .az-home #allMobileGames .home-mobile-game-tile strong,
     .az-home #socialTopUp .home-mobile-game-tile strong {
-        font-size: 11px !important;
-        line-height: 1.18 !important;
+        font-size: 12px !important;
+        line-height: 1.22 !important;
         -webkit-line-clamp: 2;
     }
 
     .az-home #allMobileGames .home-mobile-game-tile small,
     .az-home #socialTopUp .home-mobile-game-tile small {
-        font-size: 9.5px !important;
+        font-size: 10.5px !important;
         line-height: 1.2 !important;
     }
 }
@@ -1175,5 +1311,586 @@ body.theme-light .az-home + .site-footer {
     .az-home #allMobileGames .home-mobile-game-tile,
     .az-home .az-section-head a {
         transition: none !important;
+    }
+}
+
+/* Coupon heading copy owns its visibility over generic section-head rules. */
+html body main.az-home #availableCoupons .az-section-head .home-coupon-subtitle {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    width: auto !important;
+    height: auto !important;
+    max-width: none !important;
+    margin: 5px 0 0 !important;
+    overflow: visible !important;
+    color: var(--text-secondary) !important;
+    font-size: 12.5px !important;
+    font-weight: 400 !important;
+    line-height: 1.4 !important;
+    white-space: normal !important;
+}
+
+@media (max-width: 768px) {
+    html body main.az-home #availableCoupons .az-section-head .home-coupon-subtitle {
+        margin-top: 4px !important;
+        font-size: 11px !important;
+        line-height: 1.35 !important;
+    }
+}
+
+/* AZIEL merchandising cards: Exclusive Offers + Available Coupons */
+
+.az-home #newsPromotions,
+.az-home #availableCoupons {
+    padding-block: 18px;
+}
+
+.az-home #newsPromotions .az-section-head,
+.az-home #availableCoupons .az-section-head {
+    margin-bottom: 12px;
+}
+
+.az-home .home-exclusive-subtitle {
+    display: block !important;
+    margin: 4px 0 0 !important;
+    color: var(--text-secondary) !important;
+    font-size: 12px !important;
+    font-weight: 400 !important;
+    line-height: 1.4 !important;
+    white-space: normal !important;
+}
+
+
+/* ---------------- Exclusive Offers ---------------- */
+
+.az-home #latestPromotionsPanel {
+    width: 100%;
+    min-height: 0;
+    padding: 0;
+    background: transparent;
+}
+
+.az-home .home-promotion-grid {
+    display: grid;
+    grid-template-columns: repeat(
+        auto-fill,
+        minmax(min(100%, 310px), 340px)
+    );
+    gap: 14px;
+    align-items: stretch;
+    justify-content: start;
+    width: 100%;
+}
+
+.az-home .home-commerce-offer {
+    --offer-rgb: 111 45 189;
+
+    position: relative;
+    display: grid;
+    grid-template-rows: 126px 40px;
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid rgb(var(--offer-rgb) / .30);
+    border-radius: 13px;
+    background: var(--card);
+    color: var(--heading);
+    text-decoration: none;
+    isolation: isolate;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.035),
+        0 8px 22px rgba(0,0,0,.10);
+    transition:
+        transform 160ms ease,
+        border-color 160ms ease,
+        box-shadow 160ms ease;
+}
+
+.az-home .home-commerce-offer:hover {
+    transform: translateY(-2px);
+    border-color: rgb(var(--offer-rgb) / .58);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.04),
+        0 12px 28px rgba(0,0,0,.15);
+}
+
+.az-home .home-exclusive-visual {
+    position: relative;
+    display: grid;
+    grid-template-columns: 92px minmax(0, 1fr);
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+    padding: 16px;
+    overflow: hidden;
+    background:
+        linear-gradient(
+            100deg,
+            rgb(var(--offer-rgb) / .20) 0%,
+            rgb(var(--offer-rgb) / .08) 42%,
+            transparent 76%
+        );
+}
+
+.az-home .home-exclusive-visual::before {
+    content: "";
+    position: absolute;
+    left: -50px;
+    top: -65px;
+    width: 210px;
+    height: 210px;
+    border-radius: 50%;
+    background: rgb(var(--offer-rgb) / .20);
+    filter: blur(34px);
+    pointer-events: none;
+}
+
+.az-home .home-exclusive-visual::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(
+            118deg,
+            transparent 0 55%,
+            rgb(var(--offer-rgb) / .055) 55% 72%,
+            transparent 72%
+        );
+    pointer-events: none;
+}
+
+.az-home .home-exclusive-artwork,
+.az-home .home-exclusive-artwork-fallback {
+    position: relative;
+    z-index: 1;
+    display: block;
+    width: 92px !important;
+    height: 92px !important;
+    aspect-ratio: 1 !important;
+    overflow: hidden;
+    border: 1px solid rgb(var(--offer-rgb) / .42) !important;
+    border-radius: 12px !important;
+    background: rgb(var(--offer-rgb) / .14) !important;
+    object-fit: cover !important;
+    box-shadow: 0 7px 20px rgba(0,0,0,.20) !important;
+}
+
+.az-home .home-exclusive-content {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    align-content: center;
+    gap: 5px;
+    min-width: 0;
+}
+
+.az-home .home-exclusive-product {
+    overflow: hidden;
+    color: var(--text-secondary) !important;
+    font-size: 10.5px !important;
+    font-weight: 500 !important;
+    line-height: 1.2 !important;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.az-home .home-exclusive-package {
+    display: -webkit-box;
+    overflow: hidden;
+    color: var(--heading) !important;
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    line-height: 1.25 !important;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+.az-home .home-exclusive-prices {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 5px;
+}
+
+.az-home .home-exclusive-prices del {
+    color: var(--text-secondary);
+    font-size: 10.5px;
+    font-weight: 500;
+}
+
+.az-home .home-exclusive-prices b {
+    color: var(--heading);
+    font-size: 15px;
+    font-weight: 750;
+}
+
+.az-home .home-exclusive-footer {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+    padding: 0 12px;
+    border-top: 1px solid rgb(var(--offer-rgb) / .16);
+    background:
+        linear-gradient(
+            90deg,
+            rgb(var(--offer-rgb) / .13),
+            color-mix(in srgb, var(--card) 94%, transparent) 52%
+        );
+}
+
+.az-home .home-exclusive-promo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 22px;
+    padding: 0 8px;
+    border: 1px solid rgb(var(--offer-rgb) / .52);
+    border-radius: 6px;
+    background: rgb(var(--offer-rgb) / .17);
+    color: var(--heading);
+    font-size: 9px;
+    font-weight: 750;
+    letter-spacing: .045em;
+}
+
+.az-home .home-exclusive-discount {
+    color: rgb(var(--offer-rgb) / 1);
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    white-space: nowrap;
+}
+
+.az-home .home-exclusive-view {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 5px;
+    min-width: 0;
+    color: var(--text-secondary);
+    font-size: 10.5px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+
+/* ---------------- Available Coupons ---------------- */
+
+.az-home .home-coupon-grid {
+    display: grid;
+    grid-template-columns: repeat(
+        auto-fill,
+        minmax(min(100%, 300px), 340px)
+    );
+    gap: 14px;
+    justify-content: start;
+    width: 100%;
+}
+
+.az-home .home-coupon-card {
+    position: relative;
+    display: grid;
+    align-content: center;
+    min-height: 108px;
+    padding: 16px 18px;
+    overflow: hidden;
+    border: 1px solid
+        color-mix(in srgb, var(--primary) 30%, var(--border));
+    border-radius: 13px;
+    background:
+        linear-gradient(
+            135deg,
+            color-mix(in srgb, var(--primary) 9%, var(--card)),
+            var(--card) 58%
+        );
+    box-shadow: 0 7px 20px rgba(0,0,0,.07);
+}
+
+.az-home .home-coupon-card::before,
+.az-home .home-coupon-card::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    width: 18px;
+    height: 18px;
+    border: 1px solid
+        color-mix(in srgb, var(--primary) 22%, var(--border));
+    border-radius: 50%;
+    background: var(--bg);
+    transform: translateY(-50%);
+}
+
+.az-home .home-coupon-card::before {
+    left: -10px;
+}
+
+.az-home .home-coupon-card::after {
+    right: -10px;
+}
+
+.az-home .home-coupon-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.az-home .home-coupon-discount {
+    min-width: 0;
+}
+
+.az-home .home-coupon-discount strong {
+    color: var(--heading);
+    font-size: 21px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.az-home .home-coupon-claim {
+    flex: 0 0 auto;
+    min-width: 68px;
+    min-height: 32px;
+    padding: 0 13px;
+    border: 1px solid
+        color-mix(in srgb, var(--primary) 48%, transparent);
+    border-radius: 7px;
+    background:
+        color-mix(in srgb, var(--primary) 20%, var(--card));
+    color: var(--heading);
+    font-size: 10px;
+    font-weight: 750;
+    cursor: pointer;
+    transition:
+        transform 150ms ease,
+        background 150ms ease,
+        border-color 150ms ease;
+}
+
+.az-home .home-coupon-claim:hover {
+    transform: translateY(-1px);
+    border-color:
+        color-mix(in srgb, var(--primary) 68%, transparent);
+    background:
+        color-mix(in srgb, var(--primary) 27%, var(--card));
+}
+
+.az-home .home-coupon-name {
+    display: -webkit-box;
+    overflow: hidden;
+    margin: 14px 0 0;
+    color: var(--text-primary);
+    font-size: 12.5px;
+    font-weight: 550;
+    line-height: 1.35;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+
+/* ---------------- Responsive ---------------- */
+
+@media (max-width: 768px) {
+    .az-home #newsPromotions,
+    .az-home #availableCoupons {
+        padding-block: 14px;
+    }
+
+    .az-home .home-exclusive-subtitle {
+        margin-top: 3px !important;
+        font-size: 11px !important;
+    }
+
+    .az-home .home-promotion-grid,
+    .az-home .home-coupon-grid {
+        display: flex !important;
+        gap: 10px !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        width: 100%;
+        padding: 0 36px 5px 0 !important;
+        scroll-snap-type: x mandatory;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .az-home .home-promotion-grid::-webkit-scrollbar,
+    .az-home .home-coupon-grid::-webkit-scrollbar {
+        display: none;
+    }
+
+    .az-home .home-commerce-offer {
+        flex: 0 0 min(86%, 310px);
+        grid-template-rows: 120px 38px;
+        scroll-snap-align: start;
+    }
+
+    .az-home .home-exclusive-visual {
+        grid-template-columns: 84px minmax(0, 1fr);
+        gap: 12px;
+        padding: 14px;
+    }
+
+    .az-home .home-exclusive-artwork,
+    .az-home .home-exclusive-artwork-fallback {
+        width: 84px !important;
+        height: 84px !important;
+    }
+
+    .az-home .home-exclusive-package {
+        font-size: 14px !important;
+    }
+
+    .az-home .home-exclusive-prices b {
+        font-size: 14px;
+    }
+
+    .az-home .home-coupon-card {
+        flex: 0 0 min(86%, 310px);
+        min-height: 102px;
+        scroll-snap-align: start;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .az-home .home-commerce-offer,
+    .az-home .home-coupon-claim {
+        transition: none;
+    }
+}
+
+/* Home merchandising density pass */
+
+.az-home #newsPromotions,
+.az-home #availableCoupons {
+    margin-top: 22px !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+.az-home #newsPromotions .az-section-head,
+.az-home #availableCoupons .az-section-head {
+    margin-bottom: 8px !important;
+    min-height: 0 !important;
+}
+
+.az-home #latestPromotionsPanel {
+    display: block;
+    width: auto;
+    min-height: 0;
+    background: transparent !important;
+}
+
+.az-home .home-promotion-grid {
+    width: fit-content !important;
+    max-width: 100%;
+    min-height: 0 !important;
+    background: transparent !important;
+}
+
+.az-home .home-coupon-grid {
+    width: fit-content !important;
+    max-width: 100%;
+}
+
+.az-home #availableCoupons + #popularGames {
+    margin-top: 24px !important;
+}
+
+.az-home #newsPromotions + #availableCoupons {
+    margin-top: 20px !important;
+}
+
+@media (min-width: 769px) {
+    .az-home .home-promotion-grid:has(.home-commerce-offer:only-child) {
+        grid-template-columns: 340px !important;
+    }
+
+    .az-home .home-coupon-grid:has(.home-coupon-card:only-child) {
+        grid-template-columns: 340px !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .az-home #newsPromotions,
+    .az-home #availableCoupons {
+        margin-top: 18px !important;
+    }
+
+    .az-home #newsPromotions + #availableCoupons {
+        margin-top: 16px !important;
+    }
+
+    .az-home #availableCoupons + #popularGames {
+        margin-top: 20px !important;
+    }
+
+    .az-home .home-promotion-grid,
+    .az-home .home-coupon-grid {
+        width: 100% !important;
+    }
+}
+
+/* Mobile section heading alignment */
+
+@media (max-width: 768px) {
+    html body main.az-home #newsPromotions,
+    html body main.az-home #availableCoupons,
+    html body main.az-home #popularGames,
+    html body main.az-home #allMobileGames,
+    html body main.az-home #socialTopUp {
+        width: calc(100% - 32px) !important;
+        max-width: calc(100% - 32px) !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    html body main.az-home #newsPromotions .az-section-head,
+    html body main.az-home #availableCoupons .az-section-head,
+    html body main.az-home #popularGames .az-section-head,
+    html body main.az-home #allMobileGames .az-section-head,
+    html body main.az-home #socialTopUp .az-section-head {
+        width: 100% !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    html body main.az-home #newsPromotions .az-section-head > div,
+    html body main.az-home #availableCoupons .az-section-head > div,
+    html body main.az-home #popularGames .az-section-head > div,
+    html body main.az-home #allMobileGames .az-section-head > div,
+    html body main.az-home #socialTopUp .az-section-head > div {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    html body main.az-home #newsPromotions .az-section-head h2,
+    html body main.az-home #availableCoupons .az-section-head h2,
+    html body main.az-home #popularGames .az-section-head h2,
+    html body main.az-home #allMobileGames .az-section-head h2,
+    html body main.az-home #socialTopUp .az-section-head h2 {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    html body main.az-home #newsPromotions .az-section-head h2::before,
+    html body main.az-home #availableCoupons .az-section-head h2::before,
+    html body main.az-home #popularGames .az-section-head h2::before,
+    html body main.az-home #allMobileGames .az-section-head h2::before,
+    html body main.az-home #socialTopUp .az-section-head h2::before {
+        margin-left: 0 !important;
+        margin-right: 8px !important;
+    }
+
+    html body main.az-home #newsPromotions .home-exclusive-subtitle,
+    html body main.az-home #availableCoupons .home-coupon-subtitle {
+        margin-left: 0 !important;
+        padding-left: 0 !important;
     }
 }

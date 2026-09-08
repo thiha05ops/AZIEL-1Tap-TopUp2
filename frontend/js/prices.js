@@ -390,8 +390,13 @@ async function renderGamePrices(options = {}) {
     ready: true
   });
 
-  if (options.reselectCode) {
-    const escapedCode = cssEscape(options.reselectCode);
+  const requestedPackageCode =
+    options.reselectCode ||
+    new URLSearchParams(window.location.search).get("package") ||
+    "";
+
+  if (requestedPackageCode) {
+    const escapedCode = cssEscape(requestedPackageCode);
     const packToSelect = document.querySelector(
       `.pack[data-code="${escapedCode}"]`
     );

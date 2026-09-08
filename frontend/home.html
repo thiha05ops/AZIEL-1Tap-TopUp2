@@ -122,6 +122,33 @@
                 data-i18n-aria-label="home.bannerNavigation"></div>
         </section>
 
+        <section id="newsPromotions" class="az-section home-merch-section" hidden>
+            <div class="az-section-head">
+                <div>
+                    <h2>Exclusive Offers</h2>
+                    <p class="home-exclusive-subtitle">Limited-time package deals available now.</p>
+                </div>
+                <a id="latestPromotionsViewAll" href="/notifications.html?filter=promotions">
+                    <span>View More</span>
+                    <i class="fa-solid fa-angle-right" aria-hidden="true"></i></a>
+            </div>
+            <div id="latestPromotionsPanel" data-promotion-preview-state="idle">
+                <div class="home-promotion-grid" id="latestPromotionsList"></div>
+            </div>
+        </section>
+
+        <section id="availableCoupons" class="az-section home-merch-section home-coupon-section" hidden
+            data-coupon-authority="public-list-unavailable">
+            <div class="az-section-head">
+                <div>
+                    <h2>Available Coupons</h2>
+                    <p class="home-coupon-subtitle">Claim your coupon now for extra savings! Do not miss out!</p>
+                </div>
+            </div>
+            <div class="home-coupon-grid" id="availableCouponsList">
+            </div>
+        </section>
+
         <section id="popularGames" class="az-section home-merch-section">
             <div class="az-section-head">
                 <div>
@@ -146,7 +173,7 @@
         <section id="allMobileGames" class="az-section home-merch-section" hidden>
             <div class="az-section-head">
                 <div>
-                    <h2 data-i18n="home.allMOBILEGAMES">ALL MOBILE GAMES</h2>
+                    <h2 data-i18n="home.allMOBILEGAMES">MOBILE GAMES TOP-UP</h2>
                 </div>
                 <a href="mobile-games.html"><span data-i18n="viewAll">View All</span> <i class="fa-solid fa-angle-right"
                         aria-hidden="true"></i></a>
@@ -167,30 +194,7 @@
             <div class="home-product-panels" id="socialTopUpList"></div>
         </section>
 
-        <section id="availableCoupons" class="az-section home-merch-section home-coupon-section" hidden
-            data-coupon-authority="public-list-unavailable">
-            <div class="az-section-head">
-                <div>
-                    <h2>Available Coupons</h2>
-                </div>
-            </div>
-            <div class="home-coupon-grid" id="availableCouponsList">
-            </div>
-        </section>
 
-        <section id="newsPromotions" class="az-section home-merch-section" hidden>
-            <div class="az-section-head">
-                <div>
-                    <h2>Exclusive Offers</h2>
-                </div>
-                <a id="latestPromotionsViewAll" href="/notifications.html?filter=promotions">
-                    <span>View More</span>
-                    <i class="fa-solid fa-angle-right" aria-hidden="true"></i></a>
-            </div>
-            <div id="latestPromotionsPanel" data-promotion-preview-state="idle">
-                <div class="home-promotion-grid" id="latestPromotionsList"></div>
-            </div>
-        </section>
 
     </main>
 
@@ -304,7 +308,7 @@
     <script src="/js/home.js?v=20260901-empty-store-v2"></script>
     <script src="/js/home-banner-runtime.js?v=20260829-dynamic-ambient-r2"></script>
     <script src="/js/home-placement-runtime.js?v=20260901-empty-store-v2"></script>
-    <script src="/js/home-promotion-preview.js?v=20260901-empty-store-v2"></script>
+    <script src="/js/home-promotion-preview.js?v=20260908-exclusive-authority-v1"></script>
     <script src="/js/home-product-accent.js?v=20260901-empty-store-v2"></script>
     <script src="/js/home-footer-accordion.js?v=20260901-empty-store-v2"></script>
     <script src="/js/search.js?v=20260901-empty-store-v2"></script>
@@ -317,6 +321,7 @@
     <script src="/js/pwa-fix.js?v=20260901-empty-store-v2"></script>
 
 
+    <script src="/js/home-coupon-preview.js?v=20260908-coupon-placement-v1"></script>
 </body>
 
 </html>
