@@ -194,6 +194,8 @@ function assertReviewQuoteMatchesCheckout(review, catalog, input = {}) {
     const expiresAt = review?.expiresAt ? new Date(review.expiresAt) : null;
     const suppliedCouponCode = text(input.promoCode).toUpperCase();
     const reviewedCouponCode = text(review?.promotion?.code).toUpperCase();
+    const suppliedUserCouponId = text(input.userCouponId);
+    const reviewedUserCouponId = text(review?.coupon?.userCouponId);
     if (
         !review?.quoteId ||
         text(review.status).toUpperCase() !== "ISSUED" ||
@@ -202,7 +204,8 @@ function assertReviewQuoteMatchesCheckout(review, catalog, input = {}) {
         expiresAt <= new Date() ||
         text(review.package?.packageCode).toUpperCase() !== catalog.packageCode ||
         text(review.pricing?.currency).toUpperCase() !== catalog.currency ||
-        reviewedCouponCode !== suppliedCouponCode
+        reviewedCouponCode !== suppliedCouponCode ||
+        reviewedUserCouponId !== suppliedUserCouponId
     ) {
         throw new CustomerManualPromptPayCheckoutError(
             ERROR_CODES.INVALID_CHECKOUT_INPUT,
@@ -216,7 +219,6 @@ function assertReviewQuoteMatchesCheckout(review, catalog, input = {}) {
 async function reviewCustomerCheckout(input = {}, context = {}, dependencies = {}) {
     const owner = ownerFromUser(context.user, context.sessionId);
     const catalog = await (dependencies.loadCatalogPackage || loadCatalogPackage)(input);
-    await (dependencies.assertFulfillmentReady || assertAuthoritativeFulfillmentReady)(catalog);
     const issuedAt = new Date();
     const pricingContext = await (
         dependencies.buildPricingContext ||
@@ -237,8 +239,9 @@ async function reviewCustomerCheckout(input = {}, context = {}, dependencies = {
         );
     }
     const suppliedCouponCode = text(input.promoCode);
+    const suppliedUserCouponId = text(input.userCouponId);
     const quoteDependencies = defaultQuoteDependencies({
-        ...(suppliedCouponCode
+        ...(suppliedCouponCode || suppliedUserCouponId
             ? {
                 loadPromotionContext: args =>
                     (dependencies.loadPromotionContext || loadCommercePromotionContext)({
@@ -265,6 +268,7 @@ async function reviewCustomerCheckout(input = {}, context = {}, dependencies = {
                 },
                 paymentMethodId: "",
                 couponCode: suppliedCouponCode,
+                userCouponId: suppliedUserCouponId,
                 quantity: 1
             },
             idempotencyKey: `review-quote:${idempotencySeed}`,
@@ -348,6 +352,17 @@ async function startCustomerManualPromptPayCheckout(
     context = {},
     dependencies = {}
 ) {
+    const checkoutStartedAt = Date.now();
+    let checkoutLastStepAt = checkoutStartedAt;
+    const timingStep = label => {
+        const now = Date.now();
+        console.log("[CHECKOUT TIMING]", {
+            step: label,
+            stepMs: now - checkoutLastStepAt,
+            totalMs: now - checkoutStartedAt
+        });
+        checkoutLastStepAt = now;
+    };
     runtimeDebug("[CHECKOUT STEP 0] Request entered", {
         productCode: input.productCode || input.gameKey || "",
         packageCode: input.packageCode || "",
@@ -368,8 +383,8 @@ async function startCustomerManualPromptPayCheckout(
     runtimeDebug("[CHECKOUT STEP 2] Loading catalog package");
 
     const catalog = await (dependencies.loadCatalogPackage || loadCatalogPackage)(input);
-    await (dependencies.assertFulfillmentReady || assertAuthoritativeFulfillmentReady)(catalog);
 
+    timingStep("catalog-loaded");
     runtimeDebug("[CHECKOUT STEP 3] Catalog package loaded", {
         productCode: catalog.productCode,
         packageCode: catalog.packageCode,
@@ -383,6 +398,7 @@ async function startCustomerManualPromptPayCheckout(
 
     const method = await loadPromptPayMethod(input, catalog.region);
 
+    timingStep("promptpay-method-loaded");
     runtimeDebug("[CHECKOUT STEP 5] PromptPay method loaded", {
         key: method.key,
         region: method.region,
@@ -408,6 +424,7 @@ async function startCustomerManualPromptPayCheckout(
         now: issuedAt
     });
 
+    timingStep("pricing-context-ready");
     runtimeDebug("[CHECKOUT STEP 7] Pricing context ready", {
         supplierCost:
             pricingContext?.pricing?.pricingInput?.supplierCost ?? null,
@@ -431,9 +448,10 @@ async function startCustomerManualPromptPayCheckout(
         publicId("checkout");
 
     const suppliedCouponCode = text(input.promoCode);
+    const suppliedUserCouponId = text(input.userCouponId);
 
     const quoteDependencies = defaultQuoteDependencies({
-        ...(suppliedCouponCode
+        ...(suppliedCouponCode || suppliedUserCouponId
             ? {
                 loadPromotionContext: args =>
                     loadCommercePromotionContext({
@@ -485,6 +503,7 @@ async function startCustomerManualPromptPayCheckout(
                 },
                 paymentMethodId: method.key,
                 couponCode: suppliedCouponCode,
+                userCouponId: suppliedUserCouponId,
                 quantity: 1
             },
             idempotencyKey: `quote:${idempotencySeed}`,
@@ -529,6 +548,7 @@ async function startCustomerManualPromptPayCheckout(
         quoteDependencies
         );
 
+    timingStep("pricing-quote-created");
     runtimeDebug("[CHECKOUT STEP 9] Pricing quote created", {
         quoteId: quoteResult?.publicQuote?.quoteId || "",
         status: quoteResult?.publicQuote?.status || "",
@@ -574,10 +594,10 @@ async function startCustomerManualPromptPayCheckout(
                 }
             },
             {
-                validateOperationalPackageState: async ({ quote }) => {
-                    const route = await resolveCheckoutRouteSnapshot({ productCode: quote.packageSnapshot?.gameCode, packageCode: quote.packageSnapshot?.packageCode, region: quote.commercialSnapshot?.region });
-                    return route.ready ? { allowed: true, supplierRouteSnapshot: route.routeSnapshot } : { allowed: false, reasonCode: route.blockers[0] || "PRIMARY_SUPPLIER_NOT_READY" };
-                },
+                validateOperationalPackageState: async () => ({
+                    allowed: true,
+                    supplierRouteSnapshot: null
+                }),
 
                 validateFulfilmentInput: async ({
                     customerInput
@@ -646,7 +666,11 @@ async function startCustomerManualPromptPayCheckout(
                                             ?.quotedTotalAmount
                                 },
                                 promotionSnapshot:
-                                    quote.promotionSnapshot
+                                    quote.promotionSnapshot,
+                                couponSnapshot:
+                                    quote.couponSnapshot,
+                                quoteSnapshot:
+                                    quote
                             },
                             user: context.user,
                             expiresAt:
@@ -681,6 +705,7 @@ async function startCustomerManualPromptPayCheckout(
             }
         );
 
+        timingStep("commerce-order-created");
         runtimeDebug("[CHECKOUT STEP 11] CommerceOrder created", {
             orderId:
                 checkoutResult?.checkout?.orderId || "",
@@ -738,6 +763,7 @@ async function startCustomerManualPromptPayCheckout(
             });
         }
 
+        timingStep("manual-payment-created");
         runtimeDebug(
             "[CHECKOUT STEP 13] Manual payment created",
             {
@@ -762,6 +788,7 @@ async function startCustomerManualPromptPayCheckout(
             catalog
         });
 
+        timingStep("checkout-session-ready");
         runtimeDebug(
             "[CHECKOUT STEP 14] Checkout session ready",
             {

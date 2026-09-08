@@ -76,7 +76,9 @@ function publicPreview(quote, catalog) {
         discountPercent: hasReferencePrice ? Math.round((saveAmount / referencePrice) * 100) : 0,
         supplierCostConfigured: businessRuntime.supplierCostConfigured === true,
         pricingSource: businessRuntime.supplierCostSource || "",
-        promoCode: promotion?.code || "",
+        promoCode: quote.couponSnapshot ? "" : promotion?.code || "",
+        userCouponId: quote.couponSnapshot?.userCouponId || "",
+        coupon: quote.couponSnapshot || null,
         promoType: promotion?.promotionType || "",
         issuedAt: quote.lifecycle.issuedAt,
         expiresAt: quote.lifecycle.expiresAt
@@ -90,8 +92,10 @@ async function resolveCommercePricingPreviewDetailed(input = {}, context = {}, d
         pkg: catalog.pkg, price: catalog.price, catalog, region: catalog.region, currency: catalog.currency, now: issuedAt
     });
     const promoCode = upper(input.promoCode);
-    const promotionContext = promoCode ? await (dependencies.loadPromotionContext || loadCommercePromotionContext)({
+    const userCouponId = text(input.userCouponId);
+    const promotionContext = (promoCode || userCouponId) ? await (dependencies.loadPromotionContext || loadCommercePromotionContext)({
         couponCode: promoCode,
+        userCouponId,
         catalog,
         user: context.user || null,
         owner: { userId: text(context.user?.id || context.user?._id), sessionId: text(context.sessionId) },
@@ -108,10 +112,12 @@ async function resolveCommercePricingPreviewDetailed(input = {}, context = {}, d
             currency: catalog.currency,
             package: { ...pricingContext.packageContext, quantity: 1 },
             paymentMethodId: "",
-            couponCode: promoCode
+            couponCode: promoCode,
+            userCouponId
         },
         pricingInput: pricingContext.pricing.pricingInput,
         promotionInput: promotionContext || undefined,
+        couponSnapshot: promotionContext?.userCouponSnapshot || null,
         versionContext: pricingContext.pricing.versionContext,
         trace: { issueSource: "product-detail-preview" }
     });

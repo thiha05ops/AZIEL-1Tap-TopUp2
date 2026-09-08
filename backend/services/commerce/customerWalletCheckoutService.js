@@ -207,8 +207,9 @@ async function startCustomerWalletCheckout(input = {}, context = {}, dependencie
     });
     const idempotencySeed = text(input.orderId) || publicId("checkout");
     const suppliedCouponCode = text(input.promoCode);
+    const suppliedUserCouponId = text(input.userCouponId);
     const quoteDependencies = defaultQuoteDependencies({
-        ...(suppliedCouponCode ? {
+        ...(suppliedCouponCode || suppliedUserCouponId ? {
             loadPromotionContext: args => loadCommercePromotionContext({
                 ...args,
                 catalog,
@@ -228,6 +229,7 @@ async function startCustomerWalletCheckout(input = {}, context = {}, dependencie
             },
             paymentMethodId: method.key || "wallet",
             couponCode: suppliedCouponCode,
+            userCouponId: suppliedUserCouponId,
             quantity: 1
         },
         idempotencyKey: `quote:${idempotencySeed}`,
@@ -306,7 +308,9 @@ async function startCustomerWalletCheckout(input = {}, context = {}, dependencie
                             discountAmount: quote.commercialSnapshot?.discountAmount,
                             totalAmount: quote.commercialSnapshot?.quotedTotalAmount
                         },
-                        promotionSnapshot: quote.promotionSnapshot
+                        promotionSnapshot: quote.promotionSnapshot,
+                        couponSnapshot: quote.couponSnapshot,
+                        quoteSnapshot: quote
                     },
                     user: context.user,
                     expiresAt: quote.lifecycle?.expiresAt || quoteResult.publicQuote.expiresAt || null
