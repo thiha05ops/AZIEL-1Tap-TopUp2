@@ -211,7 +211,7 @@ function configureDatabaseApplication(mongoConnection) {
         app.use("/api", require(`./routes/${route}`))
     );
     app.use("/api/live-chat", require("./routes/liveChat"));
-    ["catalog", "homeBanners", "campaigns", "promos", "sitePlacements", "configurationRegistry", "websiteRuntime"].forEach(route =>
+    ["catalog", "homeBanners", "campaigns", "promos", "coupons", "sitePlacements", "configurationRegistry", "websiteRuntime"].forEach(route =>
         app.use("/api", require(`./routes/${route}`))
     );
     app.use("/api", require("./routes/commerceManualPaymentRoutes")());

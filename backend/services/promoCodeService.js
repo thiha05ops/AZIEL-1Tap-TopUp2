@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const PromoCode = require("../models/PromoCode");
 const PromoUsageState = require("../models/PromoUsageState");
 const PromoRedemption = require("../models/PromoRedemption");
@@ -37,6 +38,20 @@ function normalizeCode(value) {
 function normalizeOptionalCode(value) {
     const raw = String(value || "").trim();
     return raw ? normalizeCode(raw) : "";
+}
+
+function generatedCouponCode() {
+    return `AZC-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
+}
+
+async function generateUniquePromoCode() {
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+        const code = generatedCouponCode();
+        // eslint-disable-next-line no-await-in-loop
+        const exists = await PromoCode.exists({ code });
+        if (!exists) return code;
+    }
+    throw new PromoError("PROMO_CODE_GENERATION_FAILED", "Could not generate a coupon identifier.");
 }
 
 function positiveNumber(value, fallback = 0) {
@@ -212,17 +227,27 @@ async function listAdminPromos() {
 }
 
 async function createPromo(payload = {}, actor = "admin") {
-    const code = normalizeCode(payload.code);
     const clean = sanitizePromoPayload(payload, null, actor);
     if (!clean.name) {
         throw new PromoError("PROMO_NAME_REQUIRED", "Promo name is required.");
     }
-
-    const promo = await PromoCode.create({
-        ...clean,
-        code,
-        createdBy: actor
-    });
+    let promo = null;
+    let code = "";
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+        code = payload.code ? normalizeCode(payload.code) : await generateUniquePromoCode();
+        try {
+            // eslint-disable-next-line no-await-in-loop
+            promo = await PromoCode.create({
+                ...clean,
+                code,
+                createdBy: actor
+            });
+            break;
+        } catch (error) {
+            if (error?.code !== 11000 || payload.code) throw error;
+        }
+    }
+    if (!promo) throw new PromoError("PROMO_CODE_GENERATION_FAILED", "Could not generate a coupon identifier.");
 
     await PromoUsageState.updateOne(
         { code },

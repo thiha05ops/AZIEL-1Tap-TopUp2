@@ -143,6 +143,7 @@ function buildRecordPayload({ quote, idempotencyKey = "" }) {
         commercialSnapshot: { ...quote.commercialSnapshot },
         pricingSnapshot: quote.pricingSnapshot,
         promotionSnapshot: quote.promotionSnapshot,
+        couponSnapshot: quote.couponSnapshot || null,
         lifecycle: {
             ...quote.lifecycle,
             issuedAt: new Date(quote.lifecycle.issuedAt),

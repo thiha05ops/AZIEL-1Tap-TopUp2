@@ -204,6 +204,7 @@ function normalizeApplicationInput(input) {
             packageIdentity,
             paymentMethodId: normalizePaymentMethodId(request.paymentMethodId),
             couponCode: normalizeUpper(request.couponCode),
+            userCouponId: normalizeString(request.userCouponId),
             quantity
         },
         idempotencyKey: normalizeIdempotencyKey(input.idempotencyKey),
@@ -337,6 +338,7 @@ function toPublicQuote(record, options = {}) {
         ? record.toObject({ depopulate: true, flattenMaps: true, versionKey: false })
         : record;
     const selectedPromotion = quote.promotionSnapshot?.selectedPromotion || null;
+    const couponSnapshot = quote.couponSnapshot || null;
     return deepFreeze({
         applicationServiceVersion: APPLICATION_SERVICE_VERSION,
         quoteId: quote.quoteId,
@@ -357,10 +359,11 @@ function toPublicQuote(record, options = {}) {
             currency: quote.commercialSnapshot?.currency || ""
         },
         promotion: selectedPromotion ? {
-            code: selectedPromotion.code || "",
+            code: couponSnapshot ? "" : selectedPromotion.code || "",
             name: selectedPromotion.name || "",
             promotionType: selectedPromotion.promotionType || ""
         } : null,
+        coupon: couponSnapshot,
         issuedAt: quote.lifecycle?.issuedAt instanceof Date ? quote.lifecycle.issuedAt.toISOString() : quote.lifecycle?.issuedAt,
         expiresAt: quote.lifecycle?.expiresAt instanceof Date ? quote.lifecycle.expiresAt.toISOString() : quote.lifecycle?.expiresAt,
         warnings: mapWarnings(quote, options.persistenceOutcome)
@@ -423,6 +426,7 @@ async function createAndPersistPricingQuote(input, dependencies = {}) {
                 region: normalized.request.region,
                 currency: normalized.request.currency,
                 couponCode: normalized.request.couponCode,
+                userCouponId: normalized.request.userCouponId,
                 issuedAt
             })
             : null;
@@ -438,10 +442,12 @@ async function createAndPersistPricingQuote(input, dependencies = {}) {
                 currency: normalized.request.currency,
                 package: packageSnapshot,
                 paymentMethodId: normalized.request.paymentMethodId,
-                couponCode: normalized.request.couponCode
+                couponCode: normalized.request.couponCode,
+                userCouponId: normalized.request.userCouponId
             },
             pricingInput: pricingContext.pricingInput || pricingContext,
             promotionInput: buildPromotionInput(normalized, promotionContext),
+            couponSnapshot: promotionContext?.userCouponSnapshot || null,
             versionContext: pricingContext.versionContext || normalized.trustedContext.versionContext || {},
             trace
         };

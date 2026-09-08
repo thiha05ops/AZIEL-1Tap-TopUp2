@@ -112,6 +112,7 @@ const pricingQuoteSchema = new mongoose.Schema(
         commercialSnapshot: { type: commercialSnapshotSchema, required: true, immutable: true },
         pricingSnapshot: { type: mongoose.Schema.Types.Mixed, required: true, immutable: true },
         promotionSnapshot: { type: mongoose.Schema.Types.Mixed, default: null, immutable: true },
+        couponSnapshot: { type: mongoose.Schema.Types.Mixed, default: null, immutable: true },
         lifecycle: {
             type: lifecycleSchema,
             required: true,

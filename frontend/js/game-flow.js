@@ -324,6 +324,8 @@
     }
 
     function updateSummary(flow) {
+        ensurePromoControlsMounted(flow);
+
         const pkg = getSelectedPackage();
         const payment = getSelectedPayment();
         const readiness = getReadiness(flow);
@@ -353,14 +355,18 @@
         const discountAmount = Number(promo?.discountAmount || 0);
         if (subtotal) subtotal.textContent = pkg ? `${baseAmount.toLocaleString()} ${symbol}` : `0 ${symbol}`;
         if (promoRow) promoRow.hidden = !promo;
-        if (promoLabel) promoLabel.textContent = promo
-            ? `${t("product.promoDiscount", "Promo")} ${promo.promoCode || ""}`.trim()
-            : t("product.promoDiscount", "Promo discount");
+        if (promoLabel) {
+            promoLabel.textContent = couponUiText(
+                "product.couponDiscount",
+                "Coupon Discount"
+            );
+        }
         if (promoDiscount) promoDiscount.textContent = promo ? `−${discountAmount.toLocaleString()} ${symbol}` : `0 ${symbol}`;
         if (promoSaved) {
             promoSaved.hidden = !promo;
             promoSaved.textContent = promo
-                ? t("product.youSaved", "You saved {amount}").replace("{amount}", `${discountAmount.toLocaleString()} ${symbol}`)
+                ? `✓ ${couponUiText("product.youSaved", "You saved {amount}")
+                    .replace("{amount}", `${discountAmount.toLocaleString()} ${symbol}`)}`
                 : "";
         }
 
@@ -439,6 +445,8 @@
             currency: pkg.currency || currency,
             region: pkg.region || region,
             promoCode: getActivePromoQuote(flow, pkg)?.promoCode || "",
+            ...(getActivePromoQuote(flow, pkg)?.userCouponId ? { promoCode: "" } : {}),
+            userCouponId: getActivePromoQuote(flow, pkg)?.userCouponId || "",
             paymentMethod: payment?.key || "",
             username,
             userId: getFieldValue(flow.config.userIdSelector),
@@ -548,7 +556,7 @@
                 return;
             }
 
-            if (orderData.promoCode) {
+            if (orderData.userCouponId || orderData.promoCode) {
                 const promoFresh = await refreshPromoBeforeSubmit(flow, orderData);
                 if (!promoFresh) return;
             }
@@ -684,49 +692,162 @@
         }
     }
 
+    function couponUiText(key, fallback) {
+        const value = String(t(key, fallback) || "").trim();
+        return !value || value === key ? fallback : value;
+    }
+
+    function placePromoInsideOrderSummary(flow) {
+        const box = document.getElementById("azielPromoBox");
+        const orderSummary = document.querySelector(".order-summary");
+
+        if (!box || !orderSummary) return;
+
+        const discountRow = document.getElementById("summaryDiscountRow");
+        const totalRow = orderSummary.querySelector(".summary-total");
+        const note = getEl(flow.config.noteSelector);
+        const buyBtn = getEl(flow.config.buyButtonSelector);
+
+        const anchor =
+            (discountRow && orderSummary.contains(discountRow) && discountRow) ||
+            (totalRow && orderSummary.contains(totalRow) && totalRow) ||
+            (note && orderSummary.contains(note) && note) ||
+            (buyBtn && orderSummary.contains(buyBtn) && buyBtn);
+
+        if (anchor) {
+            if (box.parentElement !== orderSummary || box.nextElementSibling !== anchor) {
+                orderSummary.insertBefore(box, anchor);
+            }
+        } else if (box.parentElement !== orderSummary) {
+            orderSummary.appendChild(box);
+        }
+
+        const oldWrapper = document.querySelector(".product-promo-card");
+        if (
+            oldWrapper &&
+            oldWrapper !== box &&
+            oldWrapper.children.length === 0
+        ) {
+            oldWrapper.hidden = true;
+        }
+    }
+
+    function ensurePromoControlsMounted(flow) {
+        if (!document.getElementById("azielPromoBox")) {
+            const orderSummary = document.querySelector(".order-summary");
+            if (!orderSummary) return;
+            initPromoControls(flow);
+        }
+
+        placePromoInsideOrderSummary(flow);
+    }
+
     function initPromoControls(flow) {
         const summaryAmount = getEl(flow.config.amountSummarySelector);
-        const summaryContainer =
-            summaryAmount?.closest(".summary-row, .summary-item, li, p, div")?.parentElement ||
-            summaryAmount?.parentElement;
-        if (!summaryContainer || document.getElementById("azielPromoBox")) return;
+        const orderSummary =
+            summaryAmount?.closest(".order-summary") ||
+            document.querySelector(".order-summary");
+
+        if (!orderSummary || document.getElementById("azielPromoBox")) return;
 
         flow.promo = {
             code: "",
             quote: null,
+            coupons: [],
+            selectedUserCouponId: "",
             loading: false
         };
 
         const box = document.createElement("div");
         box.id = "azielPromoBox";
-        box.className = "aziel-promo-box";
+        box.className = "aziel-promo-box aziel-coupon-box";
         box.innerHTML = `
-            <label class="aziel-promo-label" for="promoCodeInput" data-i18n="product.promoCode">${t("product.promoCode", "Promo Code")}</label>
-            <div class="aziel-promo-row">
-                <input id="promoCodeInput" type="text" autocomplete="off" maxlength="32" placeholder="${t("product.enterPromo", "Enter promo code")}" data-i18n-placeholder="product.enterPromo">
-                <button id="promoApplyBtn" type="button" data-i18n="product.applyPromo">${t("product.applyPromo", "Apply")}</button>
-                <button id="promoRemoveBtn" type="button" data-i18n="product.removePromo" hidden>${t("product.removePromo", "Remove")}</button>
+            <div class="aziel-coupon-heading">
+                <span class="aziel-promo-label">${couponUiText("product.coupon", "Coupon")}</span>
+                <span id="userCouponCount" class="aziel-coupon-count"></span>
             </div>
+
+            <div id="promoPicker" class="aziel-coupon-picker">
+                <select id="userCouponSelect" aria-label="${couponUiText("product.selectCoupon", "Select coupon")}">
+                    <option value="">${couponUiText("product.noCoupon", "Select a coupon")}</option>
+                </select>
+                <button id="promoApplyBtn" type="button">${couponUiText("product.applyCoupon", "Apply")}</button>
+            </div>
+
+            <div id="promoAppliedCard" class="aziel-coupon-applied" hidden>
+                <div class="aziel-coupon-applied-main">
+                    <span class="aziel-coupon-check" aria-hidden="true">✓</span>
+                    <div class="aziel-coupon-applied-copy">
+                        <strong id="promoAppliedName">${couponUiText("product.coupon", "Coupon")}</strong>
+                        <small id="promoAppliedBenefit"></small>
+                    </div>
+                </div>
+                <button
+                    id="promoRemoveBtn"
+                    class="aziel-coupon-remove"
+                    type="button"
+                    aria-label="${couponUiText("product.removeCoupon", "Remove coupon")}"
+                    title="${couponUiText("product.removeCoupon", "Remove coupon")}"
+                    hidden
+                >×</button>
+            </div>
+
+            <button id="promoChangeBtn" class="aziel-coupon-change" type="button" hidden>
+                <span>${couponUiText("product.selectAnotherCoupon", "Select another coupon")}</span>
+                <span aria-hidden="true">⌄</span>
+            </button>
+
             <p id="promoFeedback" class="aziel-promo-feedback" aria-live="polite"></p>
         `;
 
-        summaryContainer.appendChild(box);
+        const discountRow = document.getElementById("summaryDiscountRow");
+        const totalRow = orderSummary.querySelector(".summary-total");
+        const note = getEl(flow.config.noteSelector);
+        const buyBtn = getEl(flow.config.buyButtonSelector);
+
+        const anchor =
+            (discountRow && orderSummary.contains(discountRow) && discountRow) ||
+            (totalRow && orderSummary.contains(totalRow) && totalRow) ||
+            (note && orderSummary.contains(note) && note) ||
+            (buyBtn && orderSummary.contains(buyBtn) && buyBtn);
+
+        if (anchor) {
+            orderSummary.insertBefore(box, anchor);
+        } else {
+            orderSummary.appendChild(box);
+        }
+
+        placePromoInsideOrderSummary(flow);
         document.dispatchEvent(new CustomEvent("aziel:promo-controls-ready", { detail: { box } }));
 
         box.querySelector("#promoApplyBtn")?.addEventListener("click", () => applyPromoCode(flow));
+
         box.querySelector("#promoRemoveBtn")?.addEventListener("click", () => {
             clearPromoQuote(flow, true);
             updateSummary(flow);
         });
-        box.querySelector("#promoCodeInput")?.addEventListener("input", () => {
+
+        box.querySelector("#promoChangeBtn")?.addEventListener("click", () => {
+            const picker = document.getElementById("promoPicker");
+            const changeBtn = document.getElementById("promoChangeBtn");
+
+            if (picker) picker.hidden = false;
+            if (changeBtn) changeBtn.hidden = true;
+
+            document.getElementById("userCouponSelect")?.focus();
+        });
+
+        box.querySelector("#userCouponSelect")?.addEventListener("change", () => {
             if (flow.promo?.quote) clearPromoQuote(flow, false);
             updateSummary(flow);
         });
+
+        loadOwnedCoupons(flow);
     }
 
     async function applyPromoCode(flow) {
-        const input = document.getElementById("promoCodeInput");
-        const code = String(input?.value || "").trim().toUpperCase();
+        const input = document.getElementById("userCouponSelect");
+        const userCouponId = String(input?.value || "").trim();
         const pkg = getSelectedPackage();
 
         if (!pkg) {
@@ -734,8 +855,8 @@
             return;
         }
 
-        if (!code) {
-            setPromoFeedback(t("product.promoEnterCode", "Enter a promo code."), "error");
+        if (!userCouponId) {
+            setPromoFeedback(t("product.selectCouponFirst", "Select an available coupon."), "error");
             return;
         }
 
@@ -753,7 +874,7 @@
                     ...getAuthHeader()
                 },
                 body: JSON.stringify({
-                    promoCode: code,
+                    userCouponId,
                     productCode: flow.config.productCode || flow.config.gameKey || pkg.productCode,
                     gameKey: flow.config.gameKey,
                     game: flow.config.game,
@@ -773,18 +894,21 @@
             }
 
             flow.promo = {
-                code,
+                code: "",
                 loading: false,
+                selectedUserCouponId: userCouponId,
                 quote: {
                     ...data.quote,
                     productCode: data.quote.productCode || flow.config.productCode || flow.config.gameKey,
                     packageCode: data.quote.packageCode || pkg.packageCode || pkg.code || "",
                     region: data.quote.region || pkg.region || getRegion(),
-                    promoCode: data.quote.promoCode || code
+                    promoCode: data.quote.promoCode || "",
+                    userCouponId: data.quote.userCouponId || userCouponId,
+                    coupon: data.quote.coupon || null
                 }
             };
-            setPromoFeedback(t("product.promoApplied", "Promo applied."), "success");
-            window.AZIEL_UI?.toast?.success(t("product.promoApplied", "Promo applied."));
+            setPromoFeedback(t("product.couponApplied", "Coupon applied."), "success");
+            window.AZIEL_UI?.toast?.success(t("product.couponApplied", "Coupon applied."));
         } catch (error) {
             console.log("Promo quote error:", error);
             clearPromoQuote(flow, false);
@@ -808,6 +932,7 @@
                 },
                 body: JSON.stringify({
                     promoCode: orderData.promoCode,
+                    userCouponId: orderData.userCouponId,
                     productCode: orderData.productCode,
                     gameKey: orderData.gameKey,
                     game: orderData.game,
@@ -829,7 +954,9 @@
 
             const quote = {
                 ...data.quote,
-                promoCode: data.quote.promoCode || orderData.promoCode
+                promoCode: data.quote.promoCode || orderData.promoCode,
+                userCouponId: data.quote.userCouponId || orderData.userCouponId,
+                coupon: data.quote.coupon || null
             };
 
             if (
@@ -865,17 +992,18 @@
     }
 
     function invalidatePromoIfSelectionChanged(flow) {
-        if (!flow.promo?.quote) return;
-        if (!getActivePromoQuote(flow)) clearPromoQuote(flow, false);
+        if (flow.promo?.quote && !getActivePromoQuote(flow)) clearPromoQuote(flow, false);
+        loadOwnedCoupons(flow);
     }
 
     function clearPromoQuote(flow, clearInput) {
         if (!flow.promo) return;
         flow.promo.quote = null;
         flow.promo.code = "";
+        flow.promo.selectedUserCouponId = "";
         flow.promo.loading = false;
         if (clearInput) {
-            const input = document.getElementById("promoCodeInput");
+            const input = document.getElementById("userCouponSelect");
             if (input) input.value = "";
             setPromoFeedback("", "");
         }
@@ -884,22 +1012,127 @@
     function renderPromoState(flow, promo) {
         const applyBtn = document.getElementById("promoApplyBtn");
         const removeBtn = document.getElementById("promoRemoveBtn");
-        const input = document.getElementById("promoCodeInput");
+        const input = document.getElementById("userCouponSelect");
+        const picker = document.getElementById("promoPicker");
+        const appliedCard = document.getElementById("promoAppliedCard");
+        const appliedName = document.getElementById("promoAppliedName");
+        const appliedBenefit = document.getElementById("promoAppliedBenefit");
+        const changeBtn = document.getElementById("promoChangeBtn");
+
         if (!applyBtn || !removeBtn || !input) return;
 
         const loading = Boolean(flow.promo?.loading);
+
         applyBtn.disabled = loading;
-        applyBtn.textContent = loading ? t("product.applyingPromo", "Applying…") : t("product.applyPromo", "Apply");
-        removeBtn.hidden = !promo;
+        applyBtn.textContent = loading
+            ? couponUiText("product.applyingPromo", "Applying…")
+            : couponUiText("product.applyCoupon", "Apply");
+
         input.disabled = loading;
 
         if (promo) {
-            const symbol = promo.currency === "THB" ? "฿" : "Ks";
-            setPromoFeedback(
-                `✓ ${promo.promoCode || ""} ${t("product.promoAppliedInline", "applied")} · ${t("product.youSaved", "You saved {amount}").replace("{amount}", `${Number(promo.discountAmount || 0).toLocaleString()} ${symbol}`)}`,
-                "success"
-            );
+            if (picker) picker.hidden = true;
+            if (appliedCard) appliedCard.hidden = false;
+            if (changeBtn) changeBtn.hidden = false;
+
+            removeBtn.hidden = false;
+
+            if (appliedName) {
+                appliedName.textContent =
+                    promo.coupon?.name ||
+                    couponUiText("product.coupon", "Coupon");
+            }
+
+            if (appliedBenefit) {
+                appliedBenefit.textContent =
+                    promo.coupon?.benefitLabel ||
+                    couponUiText("product.couponApplied", "Applied to this order");
+            }
+
+            setPromoFeedback("", "success");
+            return;
         }
+
+        if (picker) picker.hidden = false;
+        if (appliedCard) appliedCard.hidden = true;
+        if (changeBtn) changeBtn.hidden = true;
+
+        removeBtn.hidden = true;
+
+        if (!flow.promo?.coupons?.length) {
+            setPromoFeedback(
+                couponUiText(
+                    "product.noEligibleCoupons",
+                    "No eligible coupons for this package."
+                ),
+                ""
+            );
+        } else {
+            setPromoFeedback("", "");
+        }
+    }
+
+    async function loadOwnedCoupons(flow) {
+        const select = document.getElementById("userCouponSelect");
+        const pkg = getSelectedPackage();
+        if (!select || !hasToken() || !pkg) return;
+        try {
+            const params = new URLSearchParams({
+                region: pkg.region || getRegion(),
+                productCode: flow.config.productCode || flow.config.gameKey || pkg.productCode || "",
+                packageCode: pkg.packageCode || pkg.code || "",
+                amount: String(pkg.price || 0)
+            });
+            const res = await fetch(`/api/coupons/mine?${params.toString()}`, {
+                headers: {
+                    Accept: "application/json",
+                    ...getAuthHeader()
+                },
+                cache: "no-store"
+            });
+            const data = await res.json().catch(() => ({}));
+            const coupons = Array.isArray(data.coupons)
+                ? data.coupons.filter(coupon => coupon.eligible)
+                : [];
+
+            flow.promo.coupons = coupons;
+
+            const count = document.getElementById("userCouponCount");
+            if (count) {
+                count.textContent = coupons.length
+                    ? `${coupons.length} ${coupons.length === 1 ? "available" : "available"}`
+                    : "";
+            }
+
+            select.innerHTML =
+                `<option value="">${couponUiText("product.selectCoupon", "Select a coupon")}</option>` +
+                coupons.map(coupon => (
+                    `<option value="${escapeHtml(coupon.userCouponId)}">${escapeHtml(coupon.name || coupon.benefitLabel || "Coupon")}</option>`
+                )).join("");
+
+            if (!coupons.length) {
+                setPromoFeedback(
+                    couponUiText(
+                        "product.noEligibleCoupons",
+                        "No eligible coupons for this package."
+                    ),
+                    ""
+                );
+            } else {
+                setPromoFeedback("", "");
+            }
+        } catch (error) {
+            console.log("Owned coupons unavailable:", error);
+        }
+    }
+
+    function escapeHtml(value = "") {
+        return String(value ?? "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#039;");
     }
 
     function promoErrorMessage(data = {}) {

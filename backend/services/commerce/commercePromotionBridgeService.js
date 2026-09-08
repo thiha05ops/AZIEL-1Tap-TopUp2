@@ -13,6 +13,12 @@ const {
     resolvePromoDefinition,
     consumePromoRedemption
 } = require("../promoCodeService");
+const {
+    consumeUserCoupon,
+    loadPromotionContextForUserCoupon,
+    releaseUserCoupon,
+    reserveUserCoupon
+} = require("../userCouponService");
 
 function text(value) {
     return String(value || "").trim();
@@ -138,7 +144,17 @@ function buildResolverCandidate(promo, region, currency) {
     };
 }
 
-async function loadCommercePromotionContext({ couponCode, catalog, user, owner, packageContext, readOnly = false } = {}) {
+async function loadCommercePromotionContext({ couponCode, userCouponId, catalog, user, owner, packageContext, readOnly = false } = {}) {
+    if (text(userCouponId)) {
+        return loadPromotionContextForUserCoupon({
+            userCouponId,
+            catalog,
+            user,
+            owner,
+            packageContext,
+            issuedAt: new Date()
+        });
+    }
     const code = normalizeOptionalCode(couponCode);
     if (!code) {
         return {
@@ -187,6 +203,14 @@ function selectedPromotionCode(source = {}) {
     );
 }
 
+function selectedUserCouponId(source = {}) {
+    return text(
+        source.couponSnapshot?.userCouponId ||
+        source.quoteSnapshot?.couponSnapshot?.userCouponId ||
+        source.promotionRedemptionSnapshot?.userCouponId
+    );
+}
+
 function redemptionSnapshot(redemption) {
     if (!redemption) return null;
     return {
@@ -208,6 +232,26 @@ function redemptionSnapshot(redemption) {
     };
 }
 
+function userCouponRedemptionSnapshot(result = {}, order = {}) {
+    const coupon = result.coupon || result;
+    if (!coupon?.userCouponId) return null;
+    return {
+        type: "USER_COUPON",
+        userCouponId: coupon.userCouponId,
+        campaignId: coupon.campaignId || order.couponSnapshot?.campaignId || order.quoteSnapshot?.couponSnapshot?.campaignId || "",
+        code: "",
+        status: coupon.status || "",
+        orderId: order.orderId || coupon.reservedOrderId || "",
+        reservationToken: order.orderId || "",
+        originalAmount: Number(order.commercial?.originalUnitPrice || order.commercialSnapshot?.originalPrice || 0) * Number(order.commercial?.quantity || order.commercialSnapshot?.quantity || 1),
+        discountAmount: Number(order.commercial?.discountAmount || order.commercialSnapshot?.discountAmount || 0),
+        finalAmount: Number(order.commercial?.totalAmount || order.commercialSnapshot?.quotedTotalAmount || 0),
+        currency: order.commercial?.currency || order.commercialSnapshot?.currency || "",
+        region: order.commercial?.region || order.commercialSnapshot?.region || "",
+        snapshot: order.couponSnapshot || order.quoteSnapshot?.couponSnapshot || null
+    };
+}
+
 async function findExistingRedemption(orderId, code) {
     if (!orderId || !code) return null;
     return PromoRedemption.findOne({
@@ -218,6 +262,18 @@ async function findExistingRedemption(orderId, code) {
 }
 
 async function reserveCommercePromotion({ order, user, expiresAt = null } = {}) {
+    const userCouponId = selectedUserCouponId(order);
+    if (userCouponId) {
+        const reservation = await reserveUserCoupon({
+            userCouponId,
+            user,
+            quote: order.quoteSnapshot || order,
+            orderId: order.orderId,
+            reservationToken: order.orderId,
+            expiresAt
+        });
+        return userCouponRedemptionSnapshot(reservation, order);
+    }
     const code = selectedPromotionCode(order);
     if (!code) return null;
     const existing = await findExistingRedemption(order.orderId, code);
@@ -245,6 +301,15 @@ async function reserveCommercePromotion({ order, user, expiresAt = null } = {}) 
 }
 
 async function consumeCommercePromotion(order) {
+    const userCouponId = selectedUserCouponId(order);
+    if (userCouponId) {
+        const consumed = await consumeUserCoupon({
+            userCouponId,
+            orderId: order.orderId || order.promotionRedemptionSnapshot?.orderId || "",
+            reservationToken: order.promotionRedemptionSnapshot?.reservationToken || order.orderId || ""
+        });
+        return userCouponRedemptionSnapshot(consumed, order) || order.promotionRedemptionSnapshot || null;
+    }
     const redemptionId = text(order?.promotionRedemptionSnapshot?.redemptionId);
     if (!redemptionId) return null;
     const redemption = await consumePromoRedemption(redemptionId, order.orderId || "");
@@ -252,6 +317,15 @@ async function consumeCommercePromotion(order) {
 }
 
 async function releaseCommercePromotion(order) {
+    const userCouponId = selectedUserCouponId(order);
+    if (userCouponId) {
+        const released = await releaseUserCoupon({
+            userCouponId,
+            orderId: order.orderId || order.promotionRedemptionSnapshot?.orderId || "",
+            reservationToken: order.promotionRedemptionSnapshot?.reservationToken || order.orderId || ""
+        });
+        return userCouponRedemptionSnapshot(released, order) || order.promotionRedemptionSnapshot || null;
+    }
     const redemptionId = text(order?.promotionRedemptionSnapshot?.redemptionId);
     if (!redemptionId) return null;
     const redemption = await releasePromoRedemption(redemptionId);

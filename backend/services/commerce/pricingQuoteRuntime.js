@@ -475,7 +475,7 @@ function addWarning(warnings, code, details = {}) {
     warnings.push({ code, details });
 }
 
-function buildIntegrityPayload({ quoteId, owner, packageSnapshot, commercialSnapshot, pricingSnapshot, promotionSnapshot, lifecycle, payloadVersion }) {
+function buildIntegrityPayload({ quoteId, owner, packageSnapshot, commercialSnapshot, pricingSnapshot, promotionSnapshot, couponSnapshot, lifecycle, payloadVersion }) {
     const canonicalCommercialData = {
         quoteId,
         owner,
@@ -502,6 +502,10 @@ function buildIntegrityPayload({ quoteId, owner, packageSnapshot, commercialSnap
             selectedPromotionId: promotionSnapshot.selectedPromotion?.id || null,
             selectedPromotionCode: promotionSnapshot.selectedPromotion?.code || null,
             campaignId: promotionSnapshot.campaignId || null
+        } : null,
+        coupon: couponSnapshot ? {
+            userCouponId: couponSnapshot.userCouponId || null,
+            campaignId: couponSnapshot.campaignId || null
         } : null,
         issuedAt: lifecycle.issuedAt,
         expiresAt: lifecycle.expiresAt,
@@ -587,6 +591,7 @@ function createPricingQuote(input) {
     };
     const pricingSnapshot = buildPricingSnapshot(pricingInput, pricingResult, versionContext);
     const promotionSnapshot = buildPromotionSnapshot(promotionResult);
+    const couponSnapshot = input.couponSnapshot ? clonePlain(input.couponSnapshot, "couponSnapshot") : null;
     const lifecycle = {
         issuedAt: times.issuedAt,
         expiresAt: times.expiresAt,
@@ -599,6 +604,7 @@ function createPricingQuote(input) {
         commercialSnapshot,
         pricingSnapshot,
         promotionSnapshot,
+        couponSnapshot,
         lifecycle,
         payloadVersion: integrityContext.payloadVersion
     });
@@ -614,6 +620,7 @@ function createPricingQuote(input) {
         commercialSnapshot,
         pricingSnapshot,
         promotionSnapshot,
+        couponSnapshot,
         lifecycle,
         integrityPayload,
         integrityMetadata: {

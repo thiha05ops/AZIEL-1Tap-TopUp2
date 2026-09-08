@@ -1,21 +1,15 @@
 // frontend/js/home-promotion-preview.js
-// Artwork-first Home promotions sourced from Admin-published notifications.
+// Commerce-driven Exclusive Offers projected from currently sellable discounted packages.
 
 (function () {
-    const ENDPOINT = "/api/notifications/promotions/active";
     const LIMIT = 8;
 
     function ready(fn) {
-        if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", fn);
-        else fn();
-    }
-
-    function apiUrl(path) {
-        return window.AZIEL?.apiUrl ? window.AZIEL.apiUrl(path) : path;
-    }
-
-    function authHeaders(extra = {}) {
-        return window.AZIEL?.authHeaders?.(extra) || extra;
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", fn);
+        } else {
+            fn();
+        }
     }
 
     function currentRegion() {
@@ -28,107 +22,245 @@
         );
     }
 
-    async function loadPromotionPreview() {
+    function money(amount, currency) {
+        const value = Number(amount || 0);
+        if (!Number.isFinite(value)) return "";
+
+        if (currency === "THB") {
+            return `฿${value.toLocaleString(undefined, {
+                minimumFractionDigits: value % 1 ? 2 : 0,
+                maximumFractionDigits: 2
+            })}`;
+        }
+
+        if (currency === "MMK") {
+            return `${value.toLocaleString(undefined, {
+                maximumFractionDigits: 0
+            })} Ks`;
+        }
+
+        return `${value.toLocaleString()} ${currency || ""}`.trim();
+    }
+
+    function productRoute(product = {}, packageCode = "") {
+        const base =
+            window.AZIEL_CATALOG_PRESENTATION?.resolveProductRoute?.(
+                product.productRoute || product.route,
+                product.productCode
+            ) ||
+            `product.html?product=${encodeURIComponent(product.productCode || "")}`;
+
+        if (!packageCode) return base;
+
+        const separator = base.includes("?") ? "&" : "?";
+        return `${base}${separator}package=${encodeURIComponent(packageCode)}`;
+    }
+
+    async function fetchExclusiveOffers() {
+        const region = currentRegion();
+
+        const response = await fetch(
+            `/api/public/exclusive-offers?region=${encodeURIComponent(region)}`,
+            {
+                credentials: "same-origin",
+                headers: {
+                    Accept: "application/json"
+                }
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error(`Exclusive offers request failed: ${response.status}`);
+        }
+
+        const payload = await response.json();
+
+        if (!payload?.success || !Array.isArray(payload.offers)) {
+            return [];
+        }
+
+        return payload.offers.slice(0, LIMIT);
+    }
+
+    function artworkFor(offer = {}) {
+        return String(
+            offer.packageIcon ||
+            offer.productImage ||
+            ""
+        ).trim();
+    }
+
+    function renderOffer(offer = {}) {
+        const artwork = artworkFor(offer);
+
+        const product = {
+            productCode: offer.productCode,
+            productRoute: offer.productRoute
+        };
+
+        const href = productRoute(product, offer.packageCode);
+        const original = money(offer.referencePrice, offer.currency);
+        const current = money(offer.amount, offer.currency);
+        const discount = Number(offer.discountPercent || 0);
+
+        return `
+            <a class="home-promotion-card home-commerce-offer"
+               href="${escapeAttr(href)}"
+               data-product-code="${escapeAttr(offer.productCode)}"
+               data-package-code="${escapeAttr(offer.packageCode)}">
+                <span class="home-exclusive-visual">
+                    ${artwork
+                        ? `<img class="home-exclusive-artwork"
+                                src="${escapeAttr(artwork)}"
+                                alt="${escapeAttr(`${offer.productName || offer.productCode} ${offer.packageName || ""}`)}"
+                                loading="lazy"
+                                decoding="async"
+                                crossorigin="anonymous">`
+                        : `<span class="home-exclusive-artwork-fallback" aria-hidden="true"></span>`}
+
+                    <span class="home-exclusive-content">
+                        <small class="home-exclusive-product">
+                            ${escapeHtml(offer.productName || offer.productCode || "")}
+                        </small>
+
+                        <strong class="home-exclusive-package">
+                            ${escapeHtml(offer.packageName || offer.packageCode || "")}
+                        </strong>
+
+                        <span class="home-exclusive-prices">
+                            ${offer.showOriginalPrice !== false
+                                ? `<del>${escapeHtml(original)}</del>`
+                                : ""}
+                            <b>${escapeHtml(current)}</b>
+                        </span>
+                    </span>
+                </span>
+
+                <span class="home-exclusive-footer">
+                    <span class="home-exclusive-promo">PROMO</span>
+
+                    ${discount > 0
+                        ? `<strong class="home-exclusive-discount">-${escapeHtml(discount.toLocaleString())}%</strong>`
+                        : ""}
+
+                    <span class="home-exclusive-view">
+                        View Package
+                        <i class="fa-solid fa-angle-right" aria-hidden="true"></i>
+                    </span>
+                </span>
+            </a>
+        `;
+    }
+
+    function applyArtworkAccent(card) {
+        const image = card?.querySelector(".home-exclusive-artwork");
+        if (!image) return;
+
+        const update = () => {
+            try {
+                const canvas = document.createElement("canvas");
+                const context = canvas.getContext("2d", {
+                    willReadFrequently: true
+                });
+
+                if (!context) return;
+
+                canvas.width = 24;
+                canvas.height = 24;
+                context.drawImage(image, 0, 0, 24, 24);
+
+                const data = context.getImageData(0, 0, 24, 24).data;
+                let red = 0;
+                let green = 0;
+                let blue = 0;
+                let weight = 0;
+
+                for (let i = 0; i < data.length; i += 16) {
+                    const alpha = data[i + 3] / 255;
+                    if (alpha < 0.35) continue;
+
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+                    const max = Math.max(r, g, b);
+                    const min = Math.min(r, g, b);
+                    const saturation = max - min;
+                    const brightness = (r + g + b) / 3;
+
+                    if (brightness < 28 || brightness > 238) continue;
+
+                    const sampleWeight = 1 + saturation / 80;
+
+                    red += r * sampleWeight;
+                    green += g * sampleWeight;
+                    blue += b * sampleWeight;
+                    weight += sampleWeight;
+                }
+
+                if (!weight) return;
+
+                const r = Math.round(red / weight);
+                const g = Math.round(green / weight);
+                const b = Math.round(blue / weight);
+
+                card.style.setProperty("--offer-rgb", `${r} ${g} ${b}`);
+            } catch (_) {
+                // Cross-origin or unreadable artwork keeps AZIEL fallback accent.
+            }
+        };
+
+        if (image.complete && image.naturalWidth) {
+            update();
+        } else {
+            image.addEventListener("load", update, { once: true });
+        }
+    }
+
+    function applyOfferAccents(list) {
+        list.querySelectorAll(".home-commerce-offer")
+            .forEach(applyArtworkAccent);
+    }
+
+    async function loadExclusiveOffers() {
         const section = document.getElementById("newsPromotions");
         const panel = document.getElementById("latestPromotionsPanel");
         const list = document.getElementById("latestPromotionsList");
         const viewAll = document.getElementById("latestPromotionsViewAll");
+
         if (!section || !panel || !list) return;
 
         section.hidden = true;
         section.dataset.exclusiveOffers = "true";
         panel.dataset.promotionPreviewState = "loading";
         list.innerHTML = "";
-        if (viewAll) viewAll.href = "/notifications.html?filter=promotions";
 
         try {
-            const params = new URLSearchParams({
-                region: currentRegion(),
-                limit: String(LIMIT)
-            });
-            const response = await fetch(apiUrl(`${ENDPOINT}?${params.toString()}`), {
-                headers: authHeaders({ Accept: "application/json" }),
-                cache: "no-store"
-            });
-            const data = await response.json().catch(() => ({}));
-            if (!response.ok || data?.success !== true) throw new Error(data?.message || "Could not load promotions");
+            const offers = await fetchExclusiveOffers();
 
-            const promotions = (Array.isArray(data.promotions) ? data.promotions : [])
-                .filter(promotion => String(promotion.imageUrl || "").trim())
-                .slice(0, LIMIT);
-
-            if (!promotions.length) {
+            if (!offers.length) {
                 panel.dataset.promotionPreviewState = "empty";
                 return;
             }
 
-            list.innerHTML = promotions.map(renderPromotionCard).join("");
+            list.innerHTML = offers.map(renderOffer).join("");
+            applyOfferAccents(list);
             panel.dataset.promotionPreviewState = "active";
-            section.querySelector(".az-section-head h2")?.replaceChildren(document.createTextNode("Exclusive Offers"));
+
+            section.querySelector(".az-section-head h2")
+                ?.replaceChildren(document.createTextNode("Exclusive Offers"));
+
+            if (viewAll) {
+                viewAll.href = "/mobile-games.html";
+                viewAll.hidden = false;
+            }
+
             section.hidden = false;
             window.AZIEL_MOTION?.enter?.(list, "fast");
-        } catch {
+        } catch (_) {
             panel.dataset.promotionPreviewState = "error";
             list.innerHTML = "";
             section.hidden = true;
         }
-    }
-
-    function renderPromotionCard(promotion = {}) {
-        const action = safeAction(promotion.action || { label: promotion.ctaLabel, url: promotion.ctaUrl });
-        const meta = promotionMeta(promotion);
-        const label = action?.label || promotion.ctaLabel || "View More";
-        const body = `
-            <img src="${escapeAttr(promotion.imageUrl)}" alt="${escapeAttr(promotion.imageAltText || promotion.title || "AZIEL promotion")}" loading="lazy" decoding="async">
-            <span class="home-promotion-copy">
-                <small>${escapeHtml(meta)}</small>
-                <strong>${escapeHtml(promotion.title || "AZIEL promotion")}</strong>
-                ${promotion.summary ? `<p>${escapeHtml(promotion.summary)}</p>` : ""}
-                ${action ? `<span class="home-promotion-action">${escapeHtml(label)} <i class="fa-solid fa-angle-right" aria-hidden="true"></i></span>` : ""}
-            </span>
-        `;
-        return action
-            ? `<a class="home-promotion-card" href="${escapeAttr(action.url)}"${action.external ? ' target="_blank" rel="noopener noreferrer"' : ""}>${body}</a>`
-            : `<article class="home-promotion-card">${body}</article>`;
-    }
-
-    function promotionMeta(promotion = {}) {
-        const parts = [];
-        const product = String(promotion.productName || promotion.targetProductName || promotion.game || "").trim();
-        const regions = Array.isArray(promotion.regions) ? promotion.regions.filter(Boolean).join(" / ") : "";
-        const range = formatRange(promotion.startsAt, promotion.endsAt);
-        if (product) parts.push(product);
-        if (regions) parts.push(regions);
-        if (promotion.promoCode) parts.push("Promo code");
-        if (range) parts.push(range);
-        return parts.join(" · ") || "Exclusive AZIEL offer";
-    }
-
-    function safeAction(action = null) {
-        if (!action?.url) return null;
-        const url = String(action.url || "").trim();
-        if (/^\s*(javascript|data|vbscript):/i.test(url)) return null;
-        if (!url.startsWith("/") && !/^[a-z0-9_-]+\.html/i.test(url) && !/^https?:\/\//i.test(url)) return null;
-        return {
-            url,
-            external: /^https?:\/\//i.test(url)
-        };
-    }
-
-    function formatRange(startsAt, endsAt) {
-        const start = formatDate(startsAt);
-        const end = formatDate(endsAt);
-        if (start && end) return `${start} - ${end}`;
-        if (end) return `Ends ${end}`;
-        if (start) return `Starts ${start}`;
-        return "";
-    }
-
-    function formatDate(value) {
-        if (!value) return "";
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return "";
-        return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
     }
 
     function escapeHtml(value = "") {
@@ -145,8 +277,17 @@
     }
 
     ready(() => {
-        loadPromotionPreview();
-        window.addEventListener("aziel:shopRegionChanged", loadPromotionPreview);
-        window.addEventListener("aziel:userChanged", loadPromotionPreview);
+        loadExclusiveOffers();
+
+        window.addEventListener(
+            "aziel:shopRegionChanged",
+            loadExclusiveOffers
+        );
+
+        document.addEventListener("aziel:catalog-updated", event => {
+            if (event.detail?.status === "ready") {
+                loadExclusiveOffers();
+            }
+        });
     });
 })();

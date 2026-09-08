@@ -193,6 +193,7 @@ const commerceOrderSchema = new mongoose.Schema(
         commercialSnapshot: { type: mongoose.Schema.Types.Mixed, default: {}, immutable: true },
         promotionSnapshot: { type: mongoose.Schema.Types.Mixed, default: null, immutable: true },
         promotionRedemptionSnapshot: { type: mongoose.Schema.Types.Mixed, default: null },
+        couponSnapshot: { type: mongoose.Schema.Types.Mixed, default: null, immutable: true },
         createdAt: { type: Date, required: true, immutable: true },
         updatedAt: { type: Date, required: true },
         operationalReferences: { type: [mongoose.Schema.Types.Mixed], default: [] },

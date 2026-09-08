@@ -29,7 +29,8 @@ includes("backend/services/promoCodeService.js", "releasePromoRedemption", "Prom
 
 includes("backend/routes/promos.js", '"/promos/quote"', "Customer quote API must exist.");
 includes("backend/routes/promos.js", '"/admin/promos"', "Admin promo API must exist.");
-includes("backend/server.js", "promoRoutes", "Promo routes must be mounted.");
+includes("backend/server.js", "\"promos\"", "Promo routes must be mounted.");
+includes("backend/server.js", "\"coupons\"", "Claim-based coupon routes must be mounted.");
 
 includes("backend/models/Order.js", "promoSnapshot", "Order must store immutable promo snapshot.");
 includes("backend/models/Order.js", "originalAmount", "Order must store original amount.");
@@ -42,11 +43,13 @@ includes("backend/routes/payment.js", "consumePromoRedemption", "Payment routes 
 includes("backend/routes/wallet.js", "resolvePurchasePricing", "Wallet pay must use promo pricing.");
 includes("backend/services/commerce/customerWalletCheckoutService.js", "walletService", "Wallet debit must remain centralized through walletService.");
 
-includes("frontend/js/game-flow.js", "/api/promos/quote", "Shared game flow must quote promos server-side.");
-includes("frontend/js/game-flow.js", "promoCode:", "Shared game flow must send promo code intent only.");
+includes("frontend/js/game-flow.js", "/api/promos/quote", "Shared game flow must quote coupon discounts server-side.");
+includes("frontend/js/game-flow.js", "userCouponId:", "Shared game flow must send owned coupon entitlement intent only.");
+includes("frontend/js/game-flow.js", "/api/coupons/mine", "Shared game flow must load owned coupons from server authority.");
 includes("frontend/css/game/game.css", ".aziel-promo-box", "Shared game CSS must style promo apply UI.");
 
-includes("frontend/admin.html", 'data-section="promos"', "Admin nav must expose Promo Codes.");
+includes("frontend/admin.html", 'id="section-promos"', "Admin section must expose Coupon Campaigns.");
+includes("frontend/admin.html", 'data-admin-open-section="promos"', "Admin nav must expose Coupon Campaigns.");
 includes("frontend/admin.html", "admin-promos.js", "Admin page must load promo controller.");
 includes("frontend/js/admin-app.js", "promos:", "Admin shell must register promo section.");
 includes("frontend/js/admin-promos.js", "/api/admin/promos", "Admin promo controller must call promo API.");

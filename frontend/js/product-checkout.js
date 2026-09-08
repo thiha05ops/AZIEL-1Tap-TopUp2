@@ -129,13 +129,15 @@
         const localAmount = Number(draft.order.amount || 0);
         const canonicalBase = Number(pricing.originalPrice || 0);
         const localPromo = String(draft.order.promoCode || "").trim().toUpperCase();
+        const localUserCouponId = String(draft.order.userCouponId || "").trim();
         const canonicalPromo = String(review?.promotion?.code || "").trim().toUpperCase();
+        const canonicalUserCouponId = String(review?.coupon?.userCouponId || "").trim();
         const changes = [];
 
         if (localAmount > 0 && canonicalBase > 0 && Math.abs(localAmount - canonicalBase) > 0.000001) {
             changes.push(t("checkout.priceUpdated", "The price changed. The authoritative total is shown below."));
         }
-        if (localPromo !== canonicalPromo) {
+        if (localPromo !== canonicalPromo || localUserCouponId !== canonicalUserCouponId) {
             changes.push(canonicalPromo
                 ? t("checkout.promotionUpdated", "The promotion was updated during review.")
                 : t("checkout.promotionRemoved", "The previous promotion is no longer valid."));
@@ -152,7 +154,7 @@
             reconciliation: {
                 packageCode: canonicalPackage.packageCode || draft.order.packageCode,
                 priceChanged: localAmount > 0 && canonicalBase > 0 && Math.abs(localAmount - canonicalBase) > 0.000001,
-                promotionChanged: localPromo !== canonicalPromo
+                promotionChanged: localPromo !== canonicalPromo || localUserCouponId !== canonicalUserCouponId
             }
         };
         sessionStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
@@ -186,7 +188,8 @@
                     packageCode: draft.order.packageCode,
                     region: draft.order.region,
                     currency: draft.order.currency,
-                    promoCode: draft.order.promoCode || ""
+                    promoCode: draft.order.promoCode || "",
+                    userCouponId: draft.order.userCouponId || ""
                 })
             });
             const data = await res.json().catch(() => ({}));

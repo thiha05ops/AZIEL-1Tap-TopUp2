@@ -258,6 +258,7 @@ function validateQuote(quote) {
         commercialSnapshot,
         pricingSnapshot,
         promotionSnapshot,
+        couponSnapshot: clonePlain(quote.couponSnapshot || null),
         lifecycle: { issuedAt, expiresAt },
         quoteRuntimeVersion: normalizeString(quote.quoteRuntimeVersion),
         quoteSpecificationVersion: normalizeString(quote.quoteSpecificationVersion),
@@ -705,6 +706,7 @@ function createOrderSnapshot(input) {
                 commercialSnapshot: clonePlain(input.quote.commercialSnapshot),
                 pricingSnapshot: clonePlain(input.quote.pricingSnapshot || {}),
                 promotionSnapshot: clonePlain(input.quote.promotionSnapshot || null),
+                couponSnapshot: clonePlain(input.quote.couponSnapshot || null),
                 lifecycle: clonePlain(input.quote.lifecycle || {}),
                 integrityMetadata: clonePlain(input.quote.integrityMetadata || {})
             },
@@ -718,7 +720,8 @@ function createOrderSnapshot(input) {
             promotionRedemptionSnapshot: normalized.promotionRedemptionSnapshot,
             packageSnapshot: clonePlain(input.quote.packageSnapshot),
             commercialSnapshot: clonePlain(input.quote.commercialSnapshot),
-            promotionSnapshot: clonePlain(input.quote.promotionSnapshot || null)
+            promotionSnapshot: clonePlain(input.quote.promotionSnapshot || null),
+            couponSnapshot: clonePlain(input.quote.couponSnapshot || null)
         };
         return deepFreeze(snapshot);
     } catch (error) {

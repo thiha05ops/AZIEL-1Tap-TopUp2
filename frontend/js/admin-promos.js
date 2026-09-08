@@ -1,5 +1,5 @@
 // frontend/js/admin-promos.js
-// AZIEL Admin Promo Code Manager.
+// AZIEL Admin Coupon Campaign Manager.
 
 let adminPromosInitialized = false;
 let adminPromos = [];
@@ -41,7 +41,7 @@ async function loadAdminPromos(force = false) {
 
     const data = await adminFetch("/api/admin/promos");
     if (!data?.success) {
-        list.innerHTML = `<p class="admin-empty-state">${escapePromoHtml(data?.message || adminT("promo_load_failed", "Promo codes could not be loaded"))}</p>`;
+        list.innerHTML = `<p class="admin-empty-state">${escapePromoHtml(data?.message || adminT("promo_load_failed", "Coupon campaigns could not be loaded"))}</p>`;
         return;
     }
 
@@ -68,7 +68,7 @@ function renderAdminPromos() {
     if (!list) return;
 
     if (!adminPromos.length) {
-        list.innerHTML = `<p class="admin-empty-state">${adminT("no_promos_found", "No promo codes found")}</p>`;
+        list.innerHTML = `<p class="admin-empty-state">${adminT("no_promos_found", "No coupon campaigns found")}</p>`;
         return;
     }
 
@@ -105,16 +105,30 @@ function renderAdminPromos() {
 }
 
 async function openPromoEditor(promo = null) {
-    await loadPromoCatalog();
     ensurePromoEditorModal();
 
     const modal = document.getElementById("promoEditorModal");
+    modal.classList.add("show");
+
+    try {
+        await loadPromoCatalog();
+    } catch (error) {
+        console.error("Coupon campaign catalog load failed:", error);
+        const errorEl = modal.querySelector("#promoEditorError");
+        if (errorEl) {
+            errorEl.textContent = adminT(
+                "promo_catalog_load_failed",
+                "Product/package eligibility data could not be loaded. Please try again."
+            );
+        }
+        return;
+    }
     modal.dataset.promoId = promo?.id || "";
-    modal.querySelector("#promoEditorTitle").textContent = promo ? adminT("update_promo_code", "Update Promo Code") : adminT("create_promo_code", "Create Promo Code");
+    modal.querySelector("#promoEditorTitle").textContent = promo ? adminT("update_promo_code", "Update Coupon Campaign") : adminT("create_promo_code", "Create Coupon Campaign");
     modal.querySelector("#promoName").value = promo?.name || "";
-    modal.querySelector("#promoCode").value = promo?.code || "";
-    modal.querySelector("#promoCode").readOnly = Boolean(promo);
-    modal.querySelector("#promoImmutableNote").hidden = !promo;
+    modal.querySelector("#promoCode").value = promo?.code || adminT("generated_on_save", "Generated on save");
+    modal.querySelector("#promoCode").readOnly = true;
+    modal.querySelector("#promoImmutableNote").hidden = false;
     modal.querySelector("#promoDiscountType").value = promo?.discountType || "PERCENTAGE";
     modal.querySelector("#promoPercentageValue").value = promo?.percentageValue || "";
     modal.querySelector("#promoFixedMM").value = promo?.fixedAmounts?.MM || "";
@@ -143,7 +157,7 @@ async function openPromoEditor(promo = null) {
     modal.querySelector("#promoPackageSearch").oninput = () => filterPromoPackages(modal);
     modal.querySelector("#promoCancel").onclick = () => modal.classList.remove("show");
     modal.querySelector("#promoSave").onclick = () => savePromo(promo);
-    modal.querySelector("#promoSave").textContent = promo ? adminT("save_changes", "Save Changes") : adminT("create_promo_code", "Create Promo Code");
+    modal.querySelector("#promoSave").textContent = promo ? adminT("save_changes", "Save Changes") : adminT("create_promo_code", "Create Coupon Campaign");
     modal.classList.add("show");
 }
 
@@ -157,7 +171,7 @@ function ensurePromoEditorModal() {
         <div class="admin-action-modal-box promo-editor-box">
             <header class="promo-editor-head">
                 <div>
-                    <h3 id="promoEditorTitle">${adminT("create_promo_code", "Create Promo Code")}</h3>
+                    <h3 id="promoEditorTitle">${adminT("create_promo_code", "Create Coupon Campaign")}</h3>
                     <p>${adminT("promo_editor_sub", "Configure one server-authoritative promo rule.")}</p>
                 </div>
                 <button id="promoEditorClose" class="admin-icon-btn" type="button" aria-label="${adminT("close", "Close")}">&times;</button>
@@ -169,10 +183,10 @@ function ensurePromoEditorModal() {
                         <h4>${adminT("basic_information", "Basic Information")}</h4>
                         <div class="promo-field-grid">
                             <label>${adminT("name", "Name")}<input id="promoName" type="text"></label>
-                            <label class="promo-code-field">${adminT("code", "Code")}
+                            <label class="promo-code-field">${adminT("campaign_identifier", "Generated identifier")}
                                 <span class="promo-input-with-note">
                                     <input id="promoCode" type="text" maxlength="32">
-                                    <small id="promoImmutableNote">${adminT("immutable", "Immutable")}</small>
+                                    <small id="promoImmutableNote">${adminT("immutable", "Auto-generated")}</small>
                                 </span>
                             </label>
                             <label>${adminT("discount_type", "Discount Type")}
@@ -239,7 +253,7 @@ function ensurePromoEditorModal() {
                 <p id="promoEditorError" class="admin-action-modal-error"></p>
                 <div class="admin-action-modal-actions">
                     <button id="promoCancel" type="button">${adminT("cancel", "Cancel")}</button>
-                    <button id="promoSave" type="button">${adminT("create_promo_code", "Create Promo Code")}</button>
+                    <button id="promoSave" type="button">${adminT("create_promo_code", "Create Coupon Campaign")}</button>
                 </div>
             </footer>
         </div>
@@ -356,10 +370,10 @@ async function savePromo(existing = null) {
 
     modal?.classList.remove("show");
     const result = await window.AZIEL_ADMIN_ACTION_MODAL?.open?.({
-        title: existing ? adminT("update_promo_code", "Update Promo Code") : adminT("create_promo_code", "Create Promo Code"),
-        message: existing ? adminT("update_promo_message", "Save changes to this promo code?") : adminT("create_promo_message", "Create this promo code?"),
+        title: existing ? adminT("update_promo_code", "Update Coupon Campaign") : adminT("create_promo_code", "Create Coupon Campaign"),
+        message: existing ? adminT("update_promo_message", "Save changes to this coupon campaign?") : adminT("create_promo_message", "Create this coupon campaign?"),
         input: false,
-        confirmText: existing ? adminT("save_changes", "Save Changes") : adminT("create_promo_code", "Create Promo Code"),
+        confirmText: existing ? adminT("save_changes", "Save Changes") : adminT("create_promo_code", "Create Coupon Campaign"),
         cancelText: adminT("cancel", "Cancel")
     });
 
@@ -381,14 +395,14 @@ async function savePromo(existing = null) {
         });
 
         if (!data?.success) {
-            if (errorEl) errorEl.textContent = data?.message || adminT("promo_save_failed", "Promo code could not be saved");
+            if (errorEl) errorEl.textContent = data?.message || adminT("promo_save_failed", "Coupon campaign could not be saved");
             modal?.classList.add("show");
             return;
         }
 
         adminPromos = [];
         await loadAdminPromos(true);
-        showAdminToast(adminT("promo_saved", "Promo code saved"), "success");
+        showAdminToast(adminT("promo_saved", "Coupon campaign saved"), "success");
     } finally {
         promoSavePending = false;
         if (saveBtn) saveBtn.disabled = false;
@@ -399,7 +413,7 @@ function readPromoPayload(modal, existing = null) {
     const mode = modal.querySelector("#promoEligibilityMode")?.value || "ALL";
     return {
         name: modal.querySelector("#promoName")?.value || "",
-        code: existing?.code || modal.querySelector("#promoCode")?.value || "",
+        ...(existing ? { code: existing.code || "" } : {}),
         discountType: modal.querySelector("#promoDiscountType")?.value || "PERCENTAGE",
         percentageValue: numberValue("#promoPercentageValue"),
         fixedAmounts: { MM: numberValue("#promoFixedMM"), TH: numberValue("#promoFixedTH") },
@@ -451,18 +465,18 @@ async function togglePromo(promo) {
 
 async function removePromo(id) {
     if (!id) return;
-    const confirmed = window.confirm(adminT("remove_promo_confirm", "Remove this promo code? Existing orders keep their snapshots."));
+    const confirmed = window.confirm(adminT("remove_promo_confirm", "Remove this coupon campaign? Existing orders keep their snapshots."));
     if (!confirmed) return;
 
     const data = await adminFetch(`/api/admin/promos/${encodeURIComponent(id)}`, { method: "DELETE" });
     if (!data?.success) {
-        showAdminToast(data?.message || adminT("promo_remove_failed", "Promo code could not be removed"), "error");
+        showAdminToast(data?.message || adminT("promo_remove_failed", "Coupon campaign could not be removed"), "error");
         return;
     }
 
     adminPromos = adminPromos.filter(promo => promo.id !== id);
     renderAdminPromos();
-    showAdminToast(adminT("promo_removed", "Promo code removed"), "success");
+    showAdminToast(adminT("promo_removed", "Coupon campaign removed"), "success");
 }
 
 function findPromo(id) {

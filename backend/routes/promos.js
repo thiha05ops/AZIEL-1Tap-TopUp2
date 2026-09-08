@@ -44,7 +44,7 @@ router.get("/admin/promos", adminMiddleware, requireAdminPermission(PERMISSIONS.
 
 router.post("/admin/promos", adminMiddleware, requireAdminPermission(PERMISSIONS.PROMOS_MANAGE), async (req, res) => {
     try {
-        const promo = await createPromo(req.body, req.admin?.username || req.user?.username || "admin");
+        const promo = await createPromo({ ...req.body, code: "" }, req.admin?.username || req.user?.username || "admin");
         await writeAdminAudit({
             actor: req.admin,
             req,

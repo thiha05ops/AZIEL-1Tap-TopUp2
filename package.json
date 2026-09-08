@@ -154,6 +154,7 @@
     "verify:campaign-placements": "node backend/scripts/verify-campaign-placement-expansion.js",
     "verify:campaign-admin-load": "node backend/scripts/verify-campaign-admin-load-state.js",
     "verify:admin-promos": "node backend/scripts/verify-admin-promos.js",
+    "verify:claim-based-coupons": "node backend/scripts/verify-claim-based-coupons.js",
     "verify:admin-promo-editor-layout": "node backend/scripts/verify-admin-promo-editor-layout.js",
     "verify:campaign-popup-visual": "node backend/scripts/verify-campaign-popup-visual.js",
     "verify:admin-navigation": "node backend/scripts/verify-admin-navigation.js",
