@@ -309,12 +309,10 @@ function generateCustomerId() {
     return `AZU-${value}`;
 }
 
-userSchema.pre("validate", function assignCustomerId(next) {
+userSchema.pre("validate", function assignCustomerId() {
     if (this.isNew && !String(this.customerId || "").trim()) {
         this.customerId = generateCustomerId();
     }
-
-    next();
 });
 
 userSchema.index(
