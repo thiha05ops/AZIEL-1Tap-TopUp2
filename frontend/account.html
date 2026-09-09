@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="css/theme/aziel-design-system.css?v=20260829-p4">
     <link rel="stylesheet" href="css/core/main.css">
     <link rel="stylesheet" href="css/theme/aziel-header.css?v=20260829-p4">
-    <link rel="stylesheet" href="css/account/account.css">
+    <link rel="stylesheet" href="css/account/account.css?v=20260909-my-coupons-final2">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="icon" type="image/png" sizes="16x16" href="/assets/brand/favicon-16.png">
@@ -79,6 +79,11 @@
                     <i class="fa-solid fa-box"></i>
                     <span data-i18n="orders">Orders</span>
 
+                </button>
+
+                <button class="side-link" data-tab="coupons" type="button">
+                    <i class="fa-solid fa-ticket"></i>
+                    <span>My Coupons</span>
                 </button>
 
                 <a href="wallet.html" class="side-link">
@@ -148,6 +153,42 @@
                     </div>
                 </div>
 
+                <section class="account-quick-access" aria-labelledby="quickAccessTitle">
+                    <div class="card-head quick-access-head">
+                        <h2 id="quickAccessTitle">Quick Access</h2>
+                    </div>
+
+                    <div class="quick-access-grid">
+                        <button class="quick-access-item" type="button" data-account-target="history">
+                            <span class="quick-access-icon">
+                                <i class="fa-solid fa-box" aria-hidden="true"></i>
+                            </span>
+                            <span>Orders</span>
+                        </button>
+
+                        <button class="quick-access-item" type="button" data-account-target="coupons">
+                            <span class="quick-access-icon">
+                                <i class="fa-solid fa-ticket" aria-hidden="true"></i>
+                            </span>
+                            <span>Coupons</span>
+                        </button>
+
+                        <a class="quick-access-item" href="wallet.html">
+                            <span class="quick-access-icon">
+                                <i class="fa-solid fa-wallet" aria-hidden="true"></i>
+                            </span>
+                            <span>Wallet</span>
+                        </a>
+
+                        <a class="quick-access-item" href="support.html">
+                            <span class="quick-access-icon">
+                                <i class="fa-solid fa-headset" aria-hidden="true"></i>
+                            </span>
+                            <span>Support</span>
+                        </a>
+                    </div>
+                </section>
+
                 <div class="content-card">
                     <div class="card-head">
                         <h2 data-i18n="recentOrders">Recent Orders</h2>
@@ -199,6 +240,29 @@
 
                 <div id="historyList"><span data-i18n="loading">Loading...</span></div>
             </div>
+            <!-- MY COUPONS TAB -->
+            <div class="tab-panel" id="coupons">
+                <div class="page-title coupon-page-title">
+                    <h1>My Coupons</h1>
+                    <p>Your claimed AZIEL offers.</p>
+                </div>
+
+                <div class="coupon-toolbar" aria-label="Coupon filters">
+                    <button class="coupon-filter active" type="button" data-coupon-filter="ALL">All</button>
+                    <button class="coupon-filter" type="button" data-coupon-filter="AVAILABLE">Available</button>
+                    <button class="coupon-filter" type="button" data-coupon-filter="RESERVED">Reserved</button>
+                    <button class="coupon-filter" type="button" data-coupon-filter="USED">Used</button>
+                    <button class="coupon-filter" type="button" data-coupon-filter="EXPIRED">Expired</button>
+                </div>
+
+                <div id="myCouponsList" class="my-coupons-list">
+                    <div class="coupon-loading">
+                        <i class="fa-solid fa-ticket" aria-hidden="true"></i>
+                        <span>Loading coupons...</span>
+                    </div>
+                </div>
+            </div>
+
             <!-- SECURITY TAB -->
             <div class="tab-panel" id="security">
                 <div class="page-title">
@@ -398,7 +462,7 @@
 
     <script src="js/motion.js?v=20260829-p4"></script>
     <script src="js/ui-feedback.js?v=20260829-p4"></script>
-    <script src="js/account.js?v=20260908-customer-id"></script>
+    <script src="js/account.js?v=20260909-my-coupons-final"></script>
 
     <script src="js/logout.js"></script>
     <script src="js/api.js"></script>

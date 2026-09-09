@@ -1275,6 +1275,10 @@ function showAccountTab(tabName) {
         loadSecurityData();
     }
 
+    if (tabName === "coupons") {
+        loadMyCoupons();
+    }
+
     window.AZIEL_I18N?.translatePage?.(document);
 }
 
@@ -1412,3 +1416,330 @@ function escapeHTML(value) {
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#039;");
 }
+
+
+// =========================================================
+// MY COUPONS
+// Customer-facing claimed coupon presentation only.
+// Internal campaign identifiers/codes are intentionally hidden.
+// =========================================================
+
+let myCouponsState = {
+    coupons: [],
+    filter: "ALL",
+    loading: false,
+    loaded: false,
+    error: ""
+};
+
+function escapeAccountHtml(value) {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function normalizeCouponStatus(value) {
+    const status = String(value || "").trim().toUpperCase();
+
+    if (
+        status === "AVAILABLE" ||
+        status === "RESERVED" ||
+        status === "USED" ||
+        status === "EXPIRED"
+    ) {
+        return status;
+    }
+
+    return "AVAILABLE";
+}
+
+function couponStatusPresentation(status) {
+    switch (normalizeCouponStatus(status)) {
+        case "RESERVED":
+            return {
+                label: "Reserved",
+                description: "Reserved for an active order"
+            };
+
+        case "USED":
+            return {
+                label: "Used",
+                description: "Used on a completed order"
+            };
+
+        case "EXPIRED":
+            return {
+                label: "Expired",
+                description: "This offer has expired"
+            };
+
+        case "AVAILABLE":
+        default:
+            return {
+                label: "Ready to use",
+                description: "Use on eligible orders"
+            };
+    }
+}
+
+function formatCouponExpiry(value) {
+    if (!value) return "No expiry";
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+        return "Expiry unavailable";
+    }
+
+    return new Intl.DateTimeFormat(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric"
+    }).format(date);
+}
+
+function couponOrderReference(coupon = {}) {
+    const status = normalizeCouponStatus(coupon.status);
+
+    if (status === "RESERVED") {
+        return String(coupon.reservedOrderId || "").trim();
+    }
+
+    if (status === "USED") {
+        return String(coupon.usedOrderId || "").trim();
+    }
+
+    return "";
+}
+
+function renderMyCoupons() {
+    const list = document.getElementById("myCouponsList");
+    if (!list) return;
+
+    if (myCouponsState.loading) {
+        list.innerHTML = `
+            <div class="coupon-loading">
+                <i class="fa-solid fa-ticket" aria-hidden="true"></i>
+                <span>Loading coupons...</span>
+            </div>
+        `;
+        return;
+    }
+
+    if (myCouponsState.error) {
+        list.innerHTML = `
+            <div class="coupon-empty coupon-error-state">
+                <span class="coupon-empty-icon">
+                    <i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+                </span>
+                <strong>Could not load coupons</strong>
+                <p>${escapeAccountHtml(myCouponsState.error)}</p>
+                <button id="retryMyCouponsBtn" class="coupon-retry-btn" type="button">
+                    Try again
+                </button>
+            </div>
+        `;
+
+        document
+            .getElementById("retryMyCouponsBtn")
+            ?.addEventListener("click", () => loadMyCoupons({ force: true }));
+
+        return;
+    }
+
+    const filter = myCouponsState.filter;
+
+    const coupons = myCouponsState.coupons.filter(coupon => {
+        if (filter === "ALL") return true;
+        return normalizeCouponStatus(coupon.status) === filter;
+    });
+
+    if (!coupons.length) {
+        const filtered = filter !== "ALL";
+
+        list.innerHTML = `
+            <div class="coupon-empty">
+                <span class="coupon-empty-icon">
+                    <i class="fa-solid fa-ticket" aria-hidden="true"></i>
+                </span>
+                <strong>${filtered ? `No ${escapeAccountHtml(filter.toLowerCase())} coupons` : "No coupons yet"}</strong>
+                <p>${
+                    filtered
+                        ? "There are no coupons in this status."
+                        : "Claim an AZIEL offer and it will appear here."
+                }</p>
+            </div>
+        `;
+        return;
+    }
+
+    list.innerHTML = coupons.map(coupon => {
+        const status = normalizeCouponStatus(coupon.status);
+        const presentation = couponStatusPresentation(status);
+        const name =
+            String(coupon.name || "").trim() ||
+            "AZIEL Coupon";
+
+        const benefit =
+            String(coupon.benefitLabel || "").trim() ||
+            "Coupon benefit";
+
+        const campaign = coupon.campaign || {};
+        const minimumOrderAmount = Number(campaign.minimumOrderAmount || 0);
+        const maximumDiscountAmount = Number(campaign.maximumDiscountAmount || 0);
+
+        const shopRegion =
+            String(
+                window.AZIEL?.shopRegion ||
+                localStorage.getItem("shopRegion") ||
+                "TH"
+            ).toUpperCase();
+
+        const currencySymbol = shopRegion === "TH" ? "฿" : "Ks ";
+
+        const conditions = [];
+
+        if (minimumOrderAmount > 0) {
+            conditions.push(
+                `Min. spend ${currencySymbol}${minimumOrderAmount.toLocaleString()}`
+            );
+        }
+
+        if (maximumDiscountAmount > 0) {
+            conditions.push(
+                `Save up to ${currencySymbol}${maximumDiscountAmount.toLocaleString()}`
+            );
+        }
+
+        const conditionMarkup = conditions.length
+            ? `<p class="coupon-condition">${escapeAccountHtml(conditions.join(" • "))}</p>`
+            : "";
+
+        return `
+            <article class="account-coupon-card" data-coupon-status="${escapeAccountHtml(status)}">
+                <div class="coupon-benefit-block">
+                    <span class="coupon-benefit-label">
+                        ${escapeAccountHtml(benefit)}
+                    </span>
+                </div>
+
+                <div class="coupon-card-body">
+                    <div class="coupon-card-top">
+                        <div class="coupon-card-copy">
+                            <h3>${escapeAccountHtml(name)}</h3>
+                            <p>${escapeAccountHtml(presentation.description)}</p>
+                            ${conditionMarkup}
+                        </div>
+
+                        <span class="coupon-status coupon-status-${status.toLowerCase()}">
+                            ${escapeAccountHtml(presentation.label)}
+                        </span>
+                    </div>
+
+                    <div class="coupon-card-meta">
+                        <div>
+                            <span>Expires</span>
+                            <strong>${escapeAccountHtml(formatCouponExpiry(coupon.expiresAt))}</strong>
+                        </div>
+                    </div>
+                </div>
+            </article>
+        `;
+    }).join("");
+}
+
+async function loadMyCoupons({ force = false } = {}) {
+    if (myCouponsState.loading) return;
+
+    if (myCouponsState.loaded && !force) {
+        renderMyCoupons();
+        return;
+    }
+
+    const token = window.AZIEL?.getToken?.();
+    if (!token) return;
+
+    myCouponsState.loading = true;
+    myCouponsState.error = "";
+    renderMyCoupons();
+
+    try {
+        const region =
+            window.AZIEL?.shopRegion ||
+            localStorage.getItem("shopRegion") ||
+            "TH";
+
+        const params = new URLSearchParams({
+            region: String(region || "TH").toUpperCase()
+        });
+
+        const response = await fetch(
+            accountApiUrl(`/api/coupons/mine?${params.toString()}`),
+            {
+                method: "GET",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    Accept: "application/json"
+                }
+            }
+        );
+
+        const payload = await response.json().catch(() => ({}));
+
+        if (!response.ok || payload?.success === false) {
+            throw new Error(
+                payload?.message ||
+                "Please try again."
+            );
+        }
+
+        myCouponsState.coupons = Array.isArray(payload?.coupons)
+            ? payload.coupons
+            : [];
+
+        myCouponsState.loaded = true;
+    } catch (error) {
+        console.error("My Coupons load failed:", error);
+        myCouponsState.error =
+            error?.message ||
+            "Please try again.";
+    } finally {
+        myCouponsState.loading = false;
+        renderMyCoupons();
+    }
+}
+
+function initMyCouponsUI() {
+    document.querySelectorAll(".coupon-filter").forEach(button => {
+        button.addEventListener("click", () => {
+            const filter =
+                String(button.dataset.couponFilter || "ALL").toUpperCase();
+
+            myCouponsState.filter = filter;
+
+            document.querySelectorAll(".coupon-filter").forEach(item => {
+                item.classList.toggle(
+                    "active",
+                    item.dataset.couponFilter === filter
+                );
+            });
+
+            renderMyCoupons();
+        });
+    });
+
+    document.querySelectorAll("[data-account-target]").forEach(item => {
+        item.addEventListener("click", () => {
+            const target = item.dataset.accountTarget;
+            if (!target) return;
+
+            history.replaceState(null, "", `#${target}`);
+            showAccountTab(target);
+        });
+    });
+}
+
+document.addEventListener("DOMContentLoaded", initMyCouponsUI);
