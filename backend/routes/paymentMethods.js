@@ -544,6 +544,15 @@ function canonicalProviderForMethod(method = {}, fallback = "") {
     return normalized || defaultProviderFor(method.region, method.paymentType) || "";
 }
 
+function normalizePaymentMethodKey(value = "") {
+    const compact = safeText(value, 60)
+        .toLowerCase()
+        .replace(/\s+/g, "")
+        .replace(/[-_]/g, "")
+        .replace(/[^a-z0-9]/g, "");
+    return compact === "tmwpromptpay" ? "tmw_promptpay" : compact;
+}
+
 function safeOpenAppMode(value = "", fallback = "disabled") {
     const mode = String(value || "").trim().toLowerCase();
     return OPEN_APP_MODES.has(mode) ? mode : fallback;
@@ -554,7 +563,21 @@ function applyCompatibilityModes(method) {
     const provider = canonicalProviderForMethod(method);
     method.provider = provider;
 
-    if (key === "promptpay" && method.qrMode !== "aziel_promptpay_dynamic") {
+    if (key === "tmw_promptpay") {
+        method.region = "TH";
+        method.paymentType = "auto";
+        method.provider = "tmw";
+        method.qrMode = "provider_generated";
+        method.slipRequired = false;
+        method.receiptUploadEnabled = false;
+        method.autoVerificationSupported = true;
+        method.webhookSupported = true;
+        method.confirmationMode = "provider_webhook";
+        method.enableSaveQr = false;
+        method.enableOpenApp = false;
+        method.enableChecklist = false;
+        method.openAppMode = "disabled";
+    } else if (key === "promptpay" && method.qrMode !== "aziel_promptpay_dynamic") {
         method.paymentType = "auto";
         method.qrMode = "provider_generated";
         method.slipRequired = false;
@@ -1649,11 +1672,7 @@ async function validatePaymentMethodConfiguration(method) {
 router.post("/admin/payment-methods", adminMiddleware, requireAdminPermission(PERMISSIONS.PAYMENT_METHODS_MANAGE), async (req, res) => {
     try {
         const methodName = safeText(req.body.method || req.body.displayName, 80);
-        const key = safeText(req.body.key, 60)
-            .toLowerCase()
-            .replace(/\s+/g, "")
-            .replace(/[-_]/g, "")
-            .replace(/[^a-z0-9]/g, "");
+        const key = normalizePaymentMethodKey(req.body.key);
         const region = String(req.body.region || "").toUpperCase();
 
         if (!methodName || !key || !["MM", "TH"].includes(region)) {
@@ -1876,6 +1895,7 @@ module.exports._test = {
     formatMethod,
     isLegacyThailandBankMethod,
     mergePromptPayLaunchers,
+    normalizePaymentMethodKey,
     publicBankLaunchersProjection,
     publicTrustDisplayForMethod,
     sanitizeBankLaunchers,

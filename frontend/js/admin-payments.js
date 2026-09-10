@@ -9,6 +9,7 @@ let adminPaymentsInitialized = false;
 let paymentInfrastructureActionsBound = false;
 
 const ADMIN_PAYMENT_PROVIDERS = Object.freeze({
+    tmw: { key: "tmw", label: "TMW PromptPay", region: "TH" },
     promptpay: { key: "promptpay", label: "PromptPay", region: "TH" },
     scb: { key: "scb", label: "SCB", region: "TH" },
     bangkok_bank: { key: "bangkok_bank", label: "Bangkok Bank", region: "TH" },
@@ -25,7 +26,7 @@ const ADMIN_PAYMENT_PROVIDERS = Object.freeze({
 
 const ADMIN_PROVIDER_BY_REGION_TYPE = Object.freeze({
     TH: {
-        auto: ["promptpay"],
+        auto: ["tmw", "promptpay"],
         deeplink: ["scb", "bangkok_bank", "kplus", "krungsri", "krungthai"],
         manual: ["promptpay", "scb", "bangkok_bank", "kplus", "krungsri", "krungthai"],
         wallet: ["wallet"]
@@ -2280,7 +2281,7 @@ async function addAdminPaymentMethod() {
             : "manual";
     }
 
-    const method = selected.label;
+    const method = selected.method || selected.label;
     const key = selected.key;
     if (!key) return;
 
@@ -2294,10 +2295,13 @@ async function addAdminPaymentMethod() {
                 region,
                 enabled: false,
                 paymentType,
-                slipRequired: ["manual", "deeplink"].includes(paymentType),
-                receiptUploadEnabled: ["manual", "deeplink"].includes(paymentType),
-                qrMode: paymentType === "auto" ? "provider_generated" : paymentType === "wallet" ? "none" : "uploaded_static",
-            confirmationMode: paymentType === "auto" ? "provider_webhook" : paymentType === "wallet" ? "wallet_internal" : "manual_admin"
+                provider: selected.provider || "",
+                slipRequired: selected.slipRequired ?? ["manual", "deeplink"].includes(paymentType),
+                receiptUploadEnabled: selected.receiptUploadEnabled ?? ["manual", "deeplink"].includes(paymentType),
+                autoVerificationSupported: selected.autoVerificationSupported === true,
+                webhookSupported: selected.webhookSupported === true,
+                qrMode: selected.qrMode || (paymentType === "auto" ? "provider_generated" : paymentType === "wallet" ? "none" : "uploaded_static"),
+                confirmationMode: selected.confirmationMode || (paymentType === "auto" ? "provider_webhook" : paymentType === "wallet" ? "wallet_internal" : "manual_admin")
             })
         });
 
@@ -2318,6 +2322,7 @@ function getMethodChoices(region) {
     const choices = {
         TH: [
             { key: "promptpay", label: "PromptPay QR", paymentType: "manual" },
+            { key: "tmw_promptpay", label: "TMW PromptPay (Automatic)", method: "TMW PromptPay", paymentType: "auto", provider: "tmw", qrMode: "provider_generated", confirmationMode: "provider_webhook", slipRequired: false, receiptUploadEnabled: false, autoVerificationSupported: true, webhookSupported: true },
             { key: "scb", label: "SCB", paymentType: "deeplink" },
             { key: "bangkok_bank", label: "Bangkok Bank", paymentType: "deeplink" },
             { key: "kplus", label: "K PLUS", paymentType: "deeplink" },
