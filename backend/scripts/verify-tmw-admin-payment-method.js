@@ -14,7 +14,7 @@ const { applyPaymentMethodPatch, formatAdminMethod, formatMethod, normalizePayme
 
 function main() {
     assert(adminSource.includes('key: "tmw_promptpay", label: "TMW PromptPay (Automatic)"'), "Thailand wizard must expose a separate TMW automatic PromptPay choice");
-    assert(adminHtml.includes("admin-payments.js?v=20260910-tmw-admin-method"), "Admin must load the updated payment wizard asset");
+    assert(adminHtml.includes("admin-payments.js?v=20260910-tmw-admin-presentation"), "Admin must load the updated payment wizard asset");
     assert(adminSource.includes('provider: "tmw", qrMode: "provider_generated", confirmationMode: "provider_webhook"'), "TMW wizard preset must select the canonical provider flow");
 
     const tmw = {
@@ -34,7 +34,9 @@ function main() {
         slipRequired: false,
         receiptUploadEnabled: false,
         autoVerificationSupported: true,
-        webhookSupported: true
+        webhookSupported: true,
+        shortDescription: "Pay using the K PLUS mobile app",
+        badgeText: "Bank App"
     });
     assert.deepStrictEqual({
         key: tmw.key,
@@ -47,7 +49,9 @@ function main() {
         slipRequired: tmw.slipRequired,
         receiptUploadEnabled: tmw.receiptUploadEnabled,
         autoVerificationSupported: tmw.autoVerificationSupported,
-        webhookSupported: tmw.webhookSupported
+        webhookSupported: tmw.webhookSupported,
+        shortDescription: tmw.shortDescription,
+        badgeText: tmw.badgeText
     }, {
         key: "tmw_promptpay",
         region: "TH",
@@ -59,7 +63,9 @@ function main() {
         slipRequired: false,
         receiptUploadEnabled: false,
         autoVerificationSupported: true,
-        webhookSupported: true
+        webhookSupported: true,
+        shortDescription: "PromptPay with automatic confirmation",
+        badgeText: "Automatic"
     });
 
     const manual = applyPaymentMethodPatch({
@@ -88,10 +94,12 @@ function main() {
     const previous = Object.fromEntries(controlledNames.map(name => [name, process.env[name]]));
     controlledNames.forEach(name => delete process.env[name]);
     try {
-        const customer = formatMethod({ ...tmw, enabled: true });
-        const admin = formatAdminMethod(tmw);
+        const customer = formatMethod({ ...tmw, enabled: true, shortDescription: "", badgeText: "" });
+        const admin = formatAdminMethod({ ...tmw, shortDescription: "", badgeText: "" });
         assert.strictEqual(customer.publicReady, false);
         assert.strictEqual(customer.customerVisible, false, "TMW must remain customer-hidden when provider readiness is false");
+        assert.strictEqual(admin.shortDescription, "PromptPay with automatic confirmation");
+        assert.strictEqual(admin.badgeText, "Automatic");
         const serialized = JSON.stringify(admin);
         controlledNames.forEach(name => assert(!serialized.includes(name), `Admin projection must not expose ${name}`));
     } finally {

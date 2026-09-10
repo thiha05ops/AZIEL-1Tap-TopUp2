@@ -564,6 +564,7 @@ function applyCompatibilityModes(method) {
     method.provider = provider;
 
     if (key === "tmw_promptpay") {
+        method.method = "TMW PromptPay";
         method.region = "TH";
         method.paymentType = "auto";
         method.provider = "tmw";
@@ -577,6 +578,8 @@ function applyCompatibilityModes(method) {
         method.enableOpenApp = false;
         method.enableChecklist = false;
         method.openAppMode = "disabled";
+        method.shortDescription = "PromptPay with automatic confirmation";
+        method.badgeText = "Automatic";
     } else if (key === "promptpay" && method.qrMode !== "aziel_promptpay_dynamic") {
         method.paymentType = "auto";
         method.qrMode = "provider_generated";
@@ -975,6 +978,12 @@ function canonicalDisplayValue(method = {}, value = "") {
 function formatMethod(method) {
     const obj = toPaymentMethodObject(method);
     const provider = normalizeProviderKey(obj.provider || obj.key || "");
+    const isTmwPromptPay = provider === "tmw" && String(obj.key || "").toLowerCase() === "tmw_promptpay";
+    if (isTmwPromptPay) {
+        obj.method = "TMW PromptPay";
+        obj.shortDescription = "PromptPay with automatic confirmation";
+        obj.badgeText = "Automatic";
+    }
     const configurationKind = paymentConfigurationKind(obj);
     const isDynamicPromptPayQr = obj.qrMode === "aziel_promptpay_dynamic";
     const configuredQrImage = safePublicAssetUrl(
@@ -1012,10 +1021,10 @@ function formatMethod(method) {
         qrImageUrl: qrImage,
         uploadedQrImage: qrImage,
         maintenanceMessage: obj.maintenanceMessage || "",
-        shortDescription: canonicalDisplayValue(obj, obj.shortDescription),
+        shortDescription: isTmwPromptPay ? obj.shortDescription : canonicalDisplayValue(obj, obj.shortDescription),
         badgeText: configurationKind === PAYMENT_CONFIGURATION_KINDS.MANUAL_QR && String(obj.badgeText || "").trim().toLowerCase() === "bank app"
             ? ""
-            : canonicalDisplayValue(obj, obj.badgeText),
+            : isTmwPromptPay ? obj.badgeText : canonicalDisplayValue(obj, obj.badgeText),
         recipientLabel: obj.recipientLabel || "",
         referenceInstructions: obj.referenceInstructions || "",
         qrMode: obj.qrMode || "uploaded_static",
