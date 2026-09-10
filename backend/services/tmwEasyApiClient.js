@@ -14,6 +14,7 @@ class TmwEasyApiError extends Error {
         this.statusCode = options.statusCode || 502;
         this.retryable = options.retryable === true;
         this.submissionUncertain = options.submissionUncertain === true;
+        this.metadata = Object.freeze({ ...(options.metadata || {}) });
     }
 }
 
@@ -23,6 +24,37 @@ function text(value) {
 
 function isProduction(env = {}) {
     return text(env.NODE_ENV).toLowerCase() === "production";
+}
+
+const REDIRECT_STATUSES = new Set([301, 302, 307, 308]);
+
+function sanitizedRedirectMetadata({ status, location, baseUrl, stage } = {}) {
+    const httpStatus = Number(status);
+    if (!REDIRECT_STATUSES.has(httpStatus)) return null;
+    let source;
+    let destination;
+    try {
+        source = new URL(baseUrl);
+        destination = new URL(text(location), source);
+    } catch {
+        return Object.freeze({ stage: text(stage).slice(0, 40), httpStatus, locationPresent: Boolean(text(location)), destinationValid: false });
+    }
+    if (!["http:", "https:"].includes(destination.protocol)) {
+        return Object.freeze({ stage: text(stage).slice(0, 40), httpStatus, locationPresent: true, destinationValid: false });
+    }
+    return Object.freeze({
+        stage: text(stage).slice(0, 40),
+        httpStatus,
+        locationPresent: true,
+        destinationValid: true,
+        destinationOrigin: destination.origin.slice(0, 300),
+        destinationHost: destination.host.slice(0, 255),
+        destinationPath: destination.pathname.slice(0, 500),
+        protocolChanged: source.protocol !== destination.protocol,
+        httpToHttps: source.protocol === "http:" && destination.protocol === "https:",
+        hostChanged: source.host !== destination.host,
+        pathChanged: source.pathname !== destination.pathname
+    });
 }
 
 function configurationFromEnvironment(env = process.env) {
@@ -71,6 +103,7 @@ function createTmwEasyApiClient(options = {}) {
     const env = options.env || process.env;
     const config = options.configuration || configurationFromEnvironment(env);
     const fetchImpl = options.fetchImpl || defaultFetch;
+    const logger = options.logger || console;
 
     function assertReady() {
         if (!config.ready) {
@@ -105,6 +138,23 @@ function createTmwEasyApiClient(options = {}) {
         } finally {
             clearTimeout(timer);
         }
+        if (REDIRECT_STATUSES.has(Number(response.status))) {
+            const redirect = sanitizedRedirectMetadata({ status: response.status, location: response.headers?.get?.("location"), baseUrl: config.baseUrl, stage: parameters.method });
+            logger.warn?.("TMW request redirect blocked.", { provider: "TMW", ...redirect });
+            throw new TmwEasyApiError(`TMW_HTTP_${response.status}`, "TMW returned an HTTP redirect.", {
+                statusCode: response.status,
+                retryable: false,
+                submissionUncertain: false,
+                metadata: { redirect }
+            });
+        }
+        if (!response.ok) {
+            throw new TmwEasyApiError(`TMW_HTTP_${response.status}`, "TMW returned an HTTP error.", {
+                statusCode: response.status,
+                retryable: response.status >= 500,
+                submissionUncertain: requestOptions.submission === true && response.status >= 500
+            });
+        }
         let body;
         try {
             const declaredLength = Number(response.headers?.get?.("content-length") || 0);
@@ -113,13 +163,6 @@ function createTmwEasyApiClient(options = {}) {
             if (Buffer.byteLength(body, "utf8") > MAX_RESPONSE_BYTES) throw new Error("response too large");
         } catch {
             throw new TmwEasyApiError("TMW_INVALID_RESPONSE", "TMW returned an invalid response.");
-        }
-        if (!response.ok) {
-            throw new TmwEasyApiError(`TMW_HTTP_${response.status}`, "TMW returned an HTTP error.", {
-                statusCode: response.status,
-                retryable: response.status >= 500,
-                submissionUncertain: requestOptions.submission === true && response.status >= 500
-            });
         }
         let payload;
         try { payload = JSON.parse(body); }
@@ -138,5 +181,6 @@ module.exports = Object.freeze({
     createTmwEasyApiClient,
     configurationFromEnvironment,
     TmwEasyApiError,
-    DEFAULT_BASE_URL
+    DEFAULT_BASE_URL,
+    sanitizedRedirectMetadata
 });

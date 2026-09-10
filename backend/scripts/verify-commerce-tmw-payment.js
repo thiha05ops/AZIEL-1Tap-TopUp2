@@ -27,6 +27,23 @@ async function main() {
     await httpClient.createPay({ amount: 53, ref1: "PAY-HTTP", ip: "203.0.113.10" });
     assert.strictEqual(requestedAmount, "53", "create_pay must send whole THB, not satang");
     assert.strictEqual(redirectMode, "manual", "credential-bearing GET requests must not follow redirects");
+    const redirectLogs = [];
+    let redirectRequests = 0;
+    const redirectClient = createTmwEasyApiClient({
+        configuration: { ready: true, baseUrl: "http://www.tmweasyapi.com/api_pph.php", username: "user-secret", password: "password-secret", conId: "con-secret", promptPayId: "promptpay-secret", promptPayType: "01", timeoutMs: 1000 },
+        logger: { warn(message, metadata) { redirectLogs.push({ message, metadata }); } },
+        fetchImpl: async (_url, options) => {
+            redirectRequests += 1;
+            assert.strictEqual(options.redirect, "manual");
+            return { ok: false, status: 301, headers: { get: name => name === "location" ? "https://secure.tmweasyapi.com/v2/api_pph.php?username=leak&token=secret-token#fragment" : null } };
+        }
+    });
+    let redirectError;
+    await assert.rejects(() => redirectClient.createPay({ amount: 53, ref1: "PAY-REDIRECT", ip: "203.0.113.10" }), error => { redirectError = error; return error.code === "TMW_HTTP_301" && error.retryable === false && error.submissionUncertain === false; });
+    assert.strictEqual(redirectRequests, 1, "redirect response must never trigger a second request");
+    assert.deepStrictEqual(redirectError.metadata.redirect, { stage: "create_pay", httpStatus: 301, locationPresent: true, destinationValid: true, destinationOrigin: "https://secure.tmweasyapi.com", destinationHost: "secure.tmweasyapi.com", destinationPath: "/v2/api_pph.php", protocolChanged: true, httpToHttps: true, hostChanged: true, pathChanged: true });
+    const safeRedirectTelemetry = JSON.stringify(redirectLogs);
+    for (const forbidden of ["leak", "secret-token", "fragment", "user-secret", "password-secret", "con-secret", "promptpay-secret", "username=", "token="]) assert(!safeRedirectTelemetry.includes(forbidden), `redirect telemetry leaked ${forbidden}`);
     let creates = 0, details = 0, cancels = 0;
     const client = {
         async createPay(input) { creates += 1; assert.deepStrictEqual(input, { amount: 19, ref1: "PAY-1", ip: "203.0.113.10" }); return { status: 1, id_pay: "754349" }; },
