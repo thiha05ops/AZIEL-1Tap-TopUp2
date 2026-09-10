@@ -147,7 +147,7 @@ async function main() {
     await assert.rejects(() => adapter.handleProviderEvent({ ...webhookContext, trusted: true, providerEvent: { provider: "TMW", providerReference: "754349", providerEventId: "evt", ref1: "OTHER", amountCheck: "1900" } }), /ref1/);
     assert.strictEqual(parseTmwSatang("1901"), 1901);
     assert.strictEqual(parseTmwAmountToSatang("19.01"), 1901);
-    const data = JSON.stringify({ id_pay: "754349", ref1: "PAY-1", amount_check: "5310", amount: "53.10", date_pay: "2026-09-10 07:00" });
+    const data = JSON.stringify({ id_pay: "754349", ref1: "PAY-1", amount_check: "5310", amount: "53.00", date_pay: "2026-09-10 07:00" });
     const key = "test-key";
     const signature = crypto.createHash("md5").update(`${data}:${key}`).digest("hex");
     assert(verifyTmwWebhookSignature(data, signature, key));
@@ -158,6 +158,7 @@ async function main() {
     let webhookReceipt = null;
     let appliedEvents = 0;
     let appliedProviderEvent = null;
+    const webhookLogs = [];
     const webhookEventModel = {
         async findOne(query) { return webhookReceipt?.eventId === query.eventId ? webhookReceipt : null; },
         async create(value) {
@@ -167,8 +168,9 @@ async function main() {
     };
     const webhookService = createTmwPaymentWebhookService({
         configuration: { apiKey: key },
+        logger: { info(message, metadata) { webhookLogs.push({ level: "info", message, metadata }); }, warn(message, metadata) { webhookLogs.push({ level: "warn", message, metadata }); } },
         webhookEventModel,
-        paymentAttemptRepository: { async findAttemptByProviderReference() { return { attemptId: "PAY-1", orderId: "AZL-1", provider: "TMW", providerReference: "754349", amount: 53, providerPayableAmountSatang: 5310, providerPayableAmount: 53.10, currency: "THB" }; } },
+        paymentAttemptRepository: { async findAttemptByProviderReference({ providerReference }) { return providerReference === "754349" ? { attemptId: "PAY-1", orderId: "AZL-1", provider: "TMW", providerReference: "754349", amount: 53, providerPayableAmountSatang: 5310, providerPayableAmount: 53.10, currency: "THB" } : null; } },
         orderRepository: { async findOrderById() { return { orderId: "AZL-1", commercial: { totalAmount: 53, currency: "THB" }, payment: { provider: "TMW" } }; } },
         application: { orchestrator: { async handleProviderEvent(value) { appliedEvents += 1; appliedProviderEvent = value.providerEvent; return { metadata: { duplicate: false }, status: "PAID" }; } } }
     });
@@ -179,6 +181,43 @@ async function main() {
     assert.strictEqual(appliedEvents, 1, "duplicate webhooks must not reapply paid side effects");
     assert.strictEqual(appliedProviderEvent.amount, 53, "webhook keeps the commerce amount bound to the order");
     assert.strictEqual(appliedProviderEvent.providerPayableAmountSatang, 5310, "webhook reconciles the persisted provider payable amount");
+    for (const stage of ["webhook_received", "signature_validated", "payload_validated", "payment_attempt_lookup", "commerce_amount_validated", "provider_payable_validated", "order_binding_validated", "webhook_applied", "webhook_duplicate"]) {
+        assert(webhookLogs.some(entry => entry.metadata?.event === stage), `webhook telemetry must include ${stage}`);
+    }
+
+    const signed = payload => {
+        const serialized = JSON.stringify(payload);
+        return { data: serialized, signature: crypto.createHash("md5").update(`${serialized}:${key}`).digest("hex") };
+    };
+    async function rejected(payload, code, signatureOverride) {
+        await assert.rejects(
+            () => webhookService.processWebhook({ ...signed(payload), ...(signatureOverride ? { signature: signatureOverride } : {}) }),
+            error => error.code === code
+        );
+    }
+    await rejected({ id_pay: "754349", ref1: "PAY-1", amount_check: "5310", amount: "52.00", date_pay: "2026-09-10 07:01" }, "TMW_COMMERCE_AMOUNT_MISMATCH");
+    await rejected({ id_pay: "754349", ref1: "PAY-1", amount_check: "5300", amount: "53.00", date_pay: "2026-09-10 07:02" }, "TMW_AMOUNT_MISMATCH");
+    await rejected({ id_pay: "754349", ref1: "PAY-1", amount_check: "5311", amount: "53.00", date_pay: "2026-09-10 07:03" }, "TMW_AMOUNT_MISMATCH");
+    await rejected({ id_pay: "UNKNOWN", ref1: "PAY-1", amount_check: "5310", amount: "53.00", date_pay: "2026-09-10 07:04" }, "TMW_PAYMENT_NOT_FOUND");
+    await rejected({ id_pay: "754349", ref1: "WRONG", amount_check: "5310", amount: "53.00", date_pay: "2026-09-10 07:05" }, "TMW_REFERENCE_MISMATCH");
+    await rejected({ id_pay: "754349", ref1: "PAY-1", amount_check: "5310", amount: "53.00", date_pay: "2026-09-10 07:06" }, "TMW_WEBHOOK_SIGNATURE_INVALID", "0".repeat(32));
+
+    let adjustedApplied = 0;
+    const adjustedPayload = { id_pay: "754320", ref1: "PAY-20", amount_check: "2001", amount: "20.00", date_pay: "2026-09-10 07:07" };
+    const adjustedService = createTmwPaymentWebhookService({
+        configuration: { apiKey: key }, logger: { info() {}, warn() {} },
+        webhookEventModel: { async findOne() { return null; }, async create(value) { return { ...value, processingStatus: "RECEIVED", async save() { return this; } }; } },
+        paymentAttemptRepository: { async findAttemptByProviderReference() { return { attemptId: "PAY-20", orderId: "AZL-20", provider: "TMW", amount: 20, providerPayableAmountSatang: 2001, providerPayableAmount: 20.01, currency: "THB" }; } },
+        orderRepository: { async findOrderById() { return { orderId: "AZL-20", commercial: { totalAmount: 20, currency: "THB" }, payment: { provider: "TMW" } }; } },
+        application: { orchestrator: { async handleProviderEvent(value) { adjustedApplied += 1; assert.strictEqual(value.providerEvent.amount, 20); assert.strictEqual(value.providerEvent.providerPayableAmountSatang, 2001); return { metadata: { duplicate: false }, status: "PAID" }; } } }
+    });
+    assert.strictEqual((await adjustedService.processWebhook(signed(adjustedPayload))).accepted, true, "20.00 commerce amount with 2001 provider payable satang must be accepted");
+    assert.strictEqual(adjustedApplied, 1);
+    assert.strictEqual((await adjustedService.processWebhook(signed({ id_pay: "754320", ref1: "PAY-20", amount_check: "2001", date_pay: "2026-09-10 07:08" }))).accepted, true, "an omitted optional commerce amount must not be invented or compared to provider payable satang");
+    assert.strictEqual(adjustedApplied, 2);
+    const serializedWebhookLogs = JSON.stringify(webhookLogs);
+    assert(webhookLogs.some(entry => entry.metadata?.event === "webhook_rejected" && entry.metadata?.errorCode === "TMW_COMMERCE_AMOUNT_MISMATCH"), "sanitized telemetry must identify webhook rejection stage and code");
+    for (const forbidden of [key, signature, data, "53.00", "5310", "754349", "PAY-1"]) assert(!serializedWebhookLogs.includes(forbidden), `webhook telemetry leaked ${forbidden}`);
     let publicErrorBody = null;
     const publicFailure = new TmwPaymentApplicationError("TMW_PAYMENT_FAILED", "TMW payment operation failed.", 502);
     publicFailure.metadata = { attemptId: "PAY-INTERNAL", expectedAmountCheckSatang: 5300, returnedAmountCheck: 53, providerMessage: "internal response", password: "secret" };
@@ -187,6 +226,10 @@ async function main() {
     const serializedPublicError = JSON.stringify(publicErrorBody);
     assert.deepStrictEqual(publicErrorBody, { success: false, code: "TMW_PAYMENT_FAILED", message: "TMW payment operation failed." });
     for (const forbidden of ["PAY-INTERNAL", "expectedAmountCheckSatang", "returnedAmountCheck", "internal response", "secret"]) assert(!serializedPublicError.includes(forbidden), `public TMW error leaked ${forbidden}`);
+    let publicWebhookBody = null;
+    const webhookController = createTmwPaymentController({ application: {}, webhookService: { async processWebhook() { const error = new TmwWebhookError("TMW_COMMERCE_AMOUNT_MISMATCH", "internal binding detail", 409); error.metadata = { apiKey: "secret", amountCheck: 5310 }; throw error; } } });
+    await webhookController.webhook({ body: {}, headers: {}, socket: {} }, { status() { return this; }, json(value) { publicWebhookBody = value; return value; } });
+    assert.deepStrictEqual(publicWebhookBody, { status: 0 }, "public webhook rejection must remain provider-safe and generic");
     const method = { key: "tmw_promptpay", method: "TMW PromptPay", region: "TH", enabled: true, paymentType: "auto", provider: "tmw", qrMode: "provider_generated", confirmationMode: "provider_webhook" };
     function checkoutQuote({ gameCode = "mlbb-twilight-weekly-pass", packageCode = "MLBB_ONE_TIME_WEEKLY_PASS", packageName = "One-Time Weekly Pass", amount = 53, region = "TH", currency = "THB" } = {}) {
         const issuedAt = new Date();

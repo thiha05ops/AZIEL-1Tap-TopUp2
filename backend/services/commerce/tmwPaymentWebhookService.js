@@ -65,56 +65,98 @@ function createTmwPaymentWebhookService(dependencies = {}) {
     const orders = dependencies.orderRepository || orderRepository;
     const webhookModel = dependencies.webhookEventModel || ProviderWebhookEvent;
     const application = dependencies.application || createTmwPaymentApplicationService(dependencies.applicationOptions || {});
+    const logger = dependencies.logger || console;
+
+    function log(stage, metadata = {}) {
+        logger.info?.("[tmw-webhook]", { event: stage, provider: "TMW", ...metadata });
+    }
 
     async function processWebhook(input = {}) {
-        const data = input.data;
-        if (typeof data !== "string" || typeof input.signature !== "string") throw new TmwWebhookError("TMW_WEBHOOK_ENVELOPE_INVALID", "TMW webhook envelope is invalid.");
-        if (!configuration.apiKey) throw new TmwWebhookError("TMW_WEBHOOK_NOT_CONFIGURED", "TMW webhook is not configured.", 503);
-        if (!verifySignature(data, input.signature, configuration.apiKey)) throw new TmwWebhookError("TMW_WEBHOOK_SIGNATURE_INVALID", "TMW webhook signature is invalid.", 401);
-        const payload = parsePayload(data);
-        const idPay = text(payload.id_pay);
-        if (idPay.length > 200 || !/^[A-Za-z0-9._:-]+$/.test(idPay)) throw new TmwWebhookError("TMW_WEBHOOK_ID_PAY_INVALID", "TMW webhook id_pay is invalid.");
-        const amountCheck = parseAmountCheck(payload.amount_check);
-        if (payload.amount != null && text(payload.amount) && parseAmountStringToSatang(payload.amount) !== amountCheck) throw new TmwWebhookError("TMW_WEBHOOK_AMOUNTS_DISAGREE", "TMW webhook amounts do not agree.");
-
-        const attempt = await attempts.findAttemptByProviderReference({ providerReference: idPay });
-        if (!attempt) throw new TmwWebhookError("TMW_PAYMENT_NOT_FOUND", "TMW payment was not found.", 404);
-        if (text(attempt.provider) !== "TMW") throw new TmwWebhookError("TMW_PROVIDER_MISMATCH", "TMW payment provider does not match.", 409);
-        if (text(payload.ref1) !== text(attempt.attemptId)) throw new TmwWebhookError("TMW_REFERENCE_MISMATCH", "TMW payment reference does not match.", 409);
-        if (text(attempt.currency).toUpperCase() !== "THB") throw new TmwWebhookError("TMW_CURRENCY_MISMATCH", "TMW payment currency does not match.", 409);
-        const expectedSatang = Number(attempt.providerPayableAmountSatang);
-        if (!Number.isSafeInteger(expectedSatang) || expectedSatang <= 0) throw new TmwWebhookError("TMW_PROVIDER_PAYABLE_AMOUNT_MISSING", "TMW provider payable amount is unavailable for reconciliation.", 409);
-        if (expectedSatang !== amountCheck) throw new TmwWebhookError("TMW_AMOUNT_MISMATCH", "TMW payment amount does not match the provider payable amount.", 409);
-        const order = await orders.findOrderById(attempt.orderId);
-        if (!order || text(order.orderId) !== text(attempt.orderId) || text(order.payment?.provider) !== "TMW" || Number(order.commercial?.totalAmount) !== Number(attempt.amount) || text(order.commercial?.currency).toUpperCase() !== "THB") {
-            throw new TmwWebhookError("TMW_ORDER_BINDING_MISMATCH", "TMW payment order binding does not match.", 409);
-        }
-
-        const eventId = eventIdFor(payload);
-        let receipt = await webhookModel.findOne({ provider: "TMW", eventId });
-        if (receipt?.processingStatus === "PROCESSED") return { accepted: true, duplicate: true, eventId };
-        if (!receipt) {
-            try {
-                receipt = await webhookModel.create({ provider: "TMW", eventId, eventType: "TMW_PAYMENT_CONFIRMED", providerOrderId: idPay, safeMetadata: { attemptId: attempt.attemptId, orderId: attempt.orderId, amountSatang: amountCheck } });
-            } catch (error) {
-                if (error?.code !== 11000) throw error;
-                receipt = await webhookModel.findOne({ provider: "TMW", eventId });
-                if (receipt?.processingStatus === "PROCESSED") return { accepted: true, duplicate: true, eventId };
-            }
-        }
+        const diagnostic = { stage: "webhook_received", idPayPresent: false, ref1Present: false, attemptFound: false, amountPresent: false, amountCheckPresent: false };
+        log("webhook_received");
         try {
-            const result = await application.orchestrator.handleProviderEvent({
-                trusted: true,
-                providerEvent: { provider: "TMW", providerReference: idPay, providerTransactionId: idPay, providerEventId: eventId, eventType: "TMW_PAYMENT_CONFIRMED", status: "PAID", amount: Number(attempt.amount), providerPayableAmountSatang: expectedSatang, providerPayableAmount: expectedSatang / 100, currency: "THB", orderId: attempt.orderId, ref1: text(payload.ref1), amountCheck }
-            });
-            if (receipt) { receipt.processingStatus = "PROCESSED"; receipt.processedAt = new Date(); await receipt.save(); }
-            return { accepted: true, duplicate: result.metadata?.duplicate === true, eventId, payment: result };
-        } catch (error) {
-            if (["PAYMENT_EVENT_DUPLICATE", "PAYMENT_DUPLICATE_EVENT"].includes(error?.code)) {
-                if (receipt) { receipt.processingStatus = "PROCESSED"; receipt.processedAt = new Date(); await receipt.save().catch(() => null); }
+            const data = input.data;
+            if (typeof data !== "string" || typeof input.signature !== "string") throw new TmwWebhookError("TMW_WEBHOOK_ENVELOPE_INVALID", "TMW webhook envelope is invalid.");
+            if (!configuration.apiKey) throw new TmwWebhookError("TMW_WEBHOOK_NOT_CONFIGURED", "TMW webhook is not configured.", 503);
+            if (!verifySignature(data, input.signature, configuration.apiKey)) throw new TmwWebhookError("TMW_WEBHOOK_SIGNATURE_INVALID", "TMW webhook signature is invalid.", 401);
+            diagnostic.stage = "signature_validated";
+            log("signature_validated");
+            const payload = parsePayload(data);
+            diagnostic.idPayPresent = Boolean(text(payload.id_pay));
+            diagnostic.ref1Present = Boolean(text(payload.ref1));
+            diagnostic.amountPresent = Boolean(text(payload.amount));
+            diagnostic.amountCheckPresent = Boolean(text(payload.amount_check));
+            const idPay = text(payload.id_pay);
+            if (idPay.length > 200 || !/^[A-Za-z0-9._:-]+$/.test(idPay)) throw new TmwWebhookError("TMW_WEBHOOK_ID_PAY_INVALID", "TMW webhook id_pay is invalid.");
+            const amountCheck = parseAmountCheck(payload.amount_check);
+            const webhookCommerceSatang = diagnostic.amountPresent ? parseAmountStringToSatang(payload.amount) : null;
+            diagnostic.stage = "payload_validated";
+            log("payload_validated", { idPayPresent: true, ref1Present: true, amountPresent: diagnostic.amountPresent, amountCheckPresent: true });
+
+            const attempt = await attempts.findAttemptByProviderReference({ providerReference: idPay });
+            diagnostic.attemptFound = Boolean(attempt);
+            diagnostic.stage = "payment_attempt_lookup";
+            log("payment_attempt_lookup", { attemptFound: diagnostic.attemptFound });
+            if (!attempt) throw new TmwWebhookError("TMW_PAYMENT_NOT_FOUND", "TMW payment was not found.", 404);
+            if (text(attempt.provider).toUpperCase() !== "TMW") throw new TmwWebhookError("TMW_PROVIDER_MISMATCH", "TMW payment provider does not match.", 409);
+            if (text(payload.ref1) !== text(attempt.attemptId)) throw new TmwWebhookError("TMW_REFERENCE_MISMATCH", "TMW payment reference does not match.", 409);
+            if (text(attempt.currency).toUpperCase() !== "THB") throw new TmwWebhookError("TMW_CURRENCY_MISMATCH", "TMW payment currency does not match.", 409);
+            const attemptCommerceSatang = parseAmountStringToSatang(String(attempt.amount));
+            if (webhookCommerceSatang != null && webhookCommerceSatang !== attemptCommerceSatang) throw new TmwWebhookError("TMW_COMMERCE_AMOUNT_MISMATCH", "TMW webhook commerce amount does not match.", 409);
+            diagnostic.stage = "commerce_amount_validated";
+            log("commerce_amount_validated", { amountPresent: diagnostic.amountPresent });
+
+            const expectedSatang = Number(attempt.providerPayableAmountSatang);
+            if (!Number.isSafeInteger(expectedSatang) || expectedSatang <= 0) throw new TmwWebhookError("TMW_PROVIDER_PAYABLE_AMOUNT_MISSING", "TMW provider payable amount is unavailable for reconciliation.", 409);
+            if (expectedSatang !== amountCheck) throw new TmwWebhookError("TMW_AMOUNT_MISMATCH", "TMW payment amount does not match the provider payable amount.", 409);
+            diagnostic.stage = "provider_payable_validated";
+            log("provider_payable_validated");
+            const order = await orders.findOrderById(attempt.orderId);
+            const orderCommerceSatang = order?.commercial?.totalAmount == null ? null : parseAmountStringToSatang(String(order.commercial.totalAmount));
+            if (!order || text(order.orderId) !== text(attempt.orderId) || text(order.payment?.provider).toUpperCase() !== "TMW" || orderCommerceSatang !== attemptCommerceSatang || text(order.commercial?.currency).toUpperCase() !== "THB") {
+                throw new TmwWebhookError("TMW_ORDER_BINDING_MISMATCH", "TMW payment order binding does not match.", 409);
+            }
+            diagnostic.stage = "order_binding_validated";
+            log("order_binding_validated");
+
+            const eventId = eventIdFor(payload);
+            let receipt = await webhookModel.findOne({ provider: "TMW", eventId });
+            if (receipt?.processingStatus === "PROCESSED") {
+                log("webhook_duplicate");
                 return { accepted: true, duplicate: true, eventId };
             }
-            if (receipt) { receipt.processingStatus = "FAILED"; receipt.processedAt = new Date(); await receipt.save().catch(() => null); }
+            if (!receipt) {
+                try {
+                    receipt = await webhookModel.create({ provider: "TMW", eventId, eventType: "TMW_PAYMENT_CONFIRMED", providerOrderId: idPay, safeMetadata: { attemptId: attempt.attemptId, orderId: attempt.orderId, amountSatang: amountCheck } });
+                } catch (error) {
+                    if (error?.code !== 11000) throw error;
+                    receipt = await webhookModel.findOne({ provider: "TMW", eventId });
+                    if (receipt?.processingStatus === "PROCESSED") {
+                        log("webhook_duplicate");
+                        return { accepted: true, duplicate: true, eventId };
+                    }
+                }
+            }
+            try {
+                const result = await application.orchestrator.handleProviderEvent({
+                    trusted: true,
+                    providerEvent: { provider: "TMW", providerReference: idPay, providerTransactionId: idPay, providerEventId: eventId, eventType: "TMW_PAYMENT_CONFIRMED", status: "PAID", amount: Number(attempt.amount), providerPayableAmountSatang: expectedSatang, providerPayableAmount: expectedSatang / 100, currency: "THB", orderId: attempt.orderId, ref1: text(payload.ref1), amountCheck }
+                });
+                if (receipt) { receipt.processingStatus = "PROCESSED"; receipt.processedAt = new Date(); await receipt.save(); }
+                if (result.metadata?.duplicate === true) log("webhook_duplicate");
+                else log("webhook_applied");
+                return { accepted: true, duplicate: result.metadata?.duplicate === true, eventId, payment: result };
+            } catch (error) {
+                if (["PAYMENT_EVENT_DUPLICATE", "PAYMENT_DUPLICATE_EVENT"].includes(error?.code)) {
+                    if (receipt) { receipt.processingStatus = "PROCESSED"; receipt.processedAt = new Date(); await receipt.save().catch(() => null); }
+                    log("webhook_duplicate");
+                    return { accepted: true, duplicate: true, eventId };
+                }
+                if (receipt) { receipt.processingStatus = "FAILED"; receipt.processedAt = new Date(); await receipt.save().catch(() => null); }
+                throw error;
+            }
+        } catch (error) {
+            logger.warn?.("[tmw-webhook]", { event: "webhook_rejected", provider: "TMW", errorCode: text(error?.code || "TMW_WEBHOOK_INTERNAL_ERROR"), httpStatus: Number(error?.statusCode || 500), ...diagnostic });
             throw error;
         }
     }
