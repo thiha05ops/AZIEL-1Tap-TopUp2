@@ -47,8 +47,8 @@ async function transactionRunner(callback) {
 function createTmwPaymentApplicationService(dependencies = {}) {
     const env = dependencies.env || process.env;
     const configuration = dependencies.configuration || configurationFromEnvironment(env);
-    const adapter = dependencies.adapter || createTmwPromptPayAdapter({ ...(dependencies.adapterOptions || {}), environment: env.NODE_ENV });
     const logger = dependencies.logger || console;
+    const adapter = dependencies.adapter || createTmwPromptPayAdapter({ ...(dependencies.adapterOptions || {}), environment: env.NODE_ENV, logger });
     const orders = dependencies.orderRepository || orderRepository;
     const attempts = dependencies.paymentAttemptRepository || paymentAttemptRepository;
     const runTransaction = dependencies.transactionRunner || transactionRunner;

@@ -598,15 +598,42 @@ function createPaymentOrchestrator(dependencies = {}) {
         }));
 
         let providerResult;
+        let checkpointedAttempt = initiatingAttempt;
         try {
-            providerResult = normalizeProviderResult(await adapter.createPayment({
+            const providerContext = {
                 intent,
                 attempt: detachAttempt(initiatingAttempt)
-            }), intent);
+            };
+            if (normalizeString(intent.provider).toUpperCase() === "TMW") {
+                providerContext.persistProviderReference = async checkpoint => {
+                    const reference = normalizeId(checkpoint?.providerReference || checkpoint?.providerTransactionId, "providerReference");
+                    const persist = assertPortFunction(deps.paymentAttemptPort, "setProviderReference");
+                    checkpointedAttempt = await runTransaction(transactionContext => persist({
+                            attemptId,
+                            providerReference: reference,
+                            providerTransactionId: checkpoint?.providerTransactionId || reference,
+                            rawProviderStatus: checkpoint?.rawProviderStatus,
+                            safeMetadata: checkpoint?.safeMetadata,
+                            changedAt: deps.clock(),
+                            transactionContext
+                        })) || { ...checkpointedAttempt, providerReference: reference, providerTransactionId: reference };
+                    return detachAttempt(checkpointedAttempt);
+                };
+            }
+            providerResult = normalizeProviderResult(await adapter.createPayment(providerContext), intent);
         } catch (error) {
             if (error instanceof PaymentOrchestratorError) throw error;
 
-            console.error("[payment-provider-error]", JSON.stringify({
+            if (normalizeString(intent.provider).toUpperCase() === "TMW" && error?.submissionUncertain === true && !checkpointedAttempt?.providerReference && typeof deps.paymentAttemptPort.recordFailure === "function") {
+                await deps.paymentAttemptPort.recordFailure({
+                    attemptId,
+                    status: PAYMENT_STATES.INITIATING,
+                    error: { category: "OPERATIONAL_RECONCILIATION", code: "TMW_SUBMISSION_OUTCOME_UNKNOWN", safeMessage: "Provider submission outcome requires reconciliation before retry." },
+                    changedAt: deps.clock()
+                }).catch(() => null);
+            }
+
+            deps.logger.error?.("Payment provider operation failed.", {
                 provider: intent.provider || "",
                 orderId,
                 attemptId,
@@ -614,21 +641,22 @@ function createPaymentOrchestrator(dependencies = {}) {
                 errorCode: error?.code || "",
                 errorStage: error?.stage || "",
                 diagnostic: error?.metadata?.diagnostic || "",
+                httpStatus: Number.isInteger(error?.statusCode) ? error.statusCode : null,
                 retryable: error?.retryable === true,
                 submissionUncertain: error?.submissionUncertain === true
-            }));
+            });
 
             throw new PaymentOrchestratorError(ERROR_CODES.PAYMENT_PROVIDER_ERROR, "Payment provider failed.", {
                 stage: "provider",
                 causeCode: error?.code || "",
                 retryable: error?.retryable === true,
-                metadata: { message: error?.message || "" }
+                metadata: { message: error?.message || "", attemptId, providerReferencePresent: Boolean(checkpointedAttempt?.providerReference), diagnostic: error?.metadata?.diagnostic || "", expectedAmountCheckSatang: error?.metadata?.expectedAmountCheckSatang, returnedAmountCheck: error?.metadata?.returnedAmountCheck }
             });
         }
 
         try {
             const applied = await runTransaction(async transactionContext => {
-                let currentAttempt = initiatingAttempt;
+                let currentAttempt = checkpointedAttempt;
                 if (providerResult.providerReference && typeof deps.paymentAttemptPort.setProviderReference === "function") {
                     currentAttempt = await deps.paymentAttemptPort.setProviderReference({
                         attemptId,

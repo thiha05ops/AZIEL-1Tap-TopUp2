@@ -696,7 +696,11 @@ async function setProviderReference(input = {}, options = {}) {
             });
         }
         const request = opts.model.findOneAndUpdate(
-            { attemptId },
+            {
+                attemptId,
+                providerReference: { $in: ["", providerReference] },
+                providerTransactionId: { $in: ["", normalizeString(input.providerTransactionId || providerReference)] }
+            },
             {
                 $set: {
                     providerReference,
@@ -713,7 +717,13 @@ async function setProviderReference(input = {}, options = {}) {
             { returnDocument: "after", runValidators: true, session: opts.mongoSession || undefined }
         );
         const updated = request.exec ? await request.exec() : await request;
-        if (!updated) throw new PaymentAttemptRepositoryError(ERROR_CODES.PAYMENT_ATTEMPT_NOT_FOUND, "Payment attempt was not found.", { stage: "reference" });
+        if (!updated) {
+            const existingAttempt = await findAttemptById({ attemptId }, { ...opts, lean: true });
+            if (existingAttempt) {
+                throw new PaymentAttemptRepositoryError(ERROR_CODES.PAYMENT_PROVIDER_REFERENCE_EXISTS, "Payment attempt is already bound to a different provider reference.", { stage: "reference", metadata: { attemptId } });
+            }
+            throw new PaymentAttemptRepositoryError(ERROR_CODES.PAYMENT_ATTEMPT_NOT_FOUND, "Payment attempt was not found.", { stage: "reference" });
+        }
         return plainRecord(updated);
     } catch (error) {
         if (error instanceof PaymentAttemptRepositoryError) throw error;

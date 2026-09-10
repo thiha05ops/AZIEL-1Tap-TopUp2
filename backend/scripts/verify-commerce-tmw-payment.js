@@ -3,9 +3,10 @@
 const assert = require("assert");
 const crypto = require("crypto");
 const { createTmwPromptPayAdapter, parseTmwSatang } = require("../services/commerce/providers/tmwPromptPayAdapter");
-const { configurationFromEnvironment, TmwEasyApiError } = require("../services/tmwEasyApiClient");
+const { createTmwEasyApiClient, configurationFromEnvironment, TmwEasyApiError } = require("../services/tmwEasyApiClient");
 const { createTmwPaymentWebhookService, verifyTmwWebhookSignature, parseTmwWebhookPayload, tmwWebhookEventId, parseTmwAmountToSatang } = require("../services/commerce/tmwPaymentWebhookService");
-const { createTmwPaymentApplicationService } = require("../services/commerce/tmwPaymentApplicationService");
+const { createTmwPaymentApplicationService, TmwPaymentApplicationError } = require("../services/commerce/tmwPaymentApplicationService");
+const { createTmwPaymentController } = require("../controllers/tmwPaymentController");
 const { validatePaymentCatalogEligibility } = require("../services/commerce/paymentCatalogEligibilityService");
 const { canonicalSerialize } = require("../services/commerce/pricingQuoteRuntime");
 
@@ -15,6 +16,17 @@ function context(overrides = {}) {
 const qr = Buffer.from("fake png").toString("base64");
 
 async function main() {
+    let requestedAmount = "";
+    let redirectMode = "";
+    const httpClient = createTmwEasyApiClient({ configuration: { ready: true, baseUrl: "http://www.tmweasyapi.com/api_pph.php", username: "hidden", password: "hidden", conId: "hidden", promptPayId: "hidden", promptPayType: "01", timeoutMs: 1000 }, fetchImpl: async (url, options) => {
+        const parsed = new URL(url);
+        requestedAmount = parsed.searchParams.get("amount");
+        redirectMode = options.redirect;
+        return { ok: true, status: 200, headers: { get: () => "32" }, text: async () => JSON.stringify({ status: 1, id_pay: "754300" }) };
+    } });
+    await httpClient.createPay({ amount: 53, ref1: "PAY-HTTP", ip: "203.0.113.10" });
+    assert.strictEqual(requestedAmount, "53", "create_pay must send whole THB, not satang");
+    assert.strictEqual(redirectMode, "manual", "credential-bearing GET requests must not follow redirects");
     let creates = 0, details = 0, cancels = 0;
     const client = {
         async createPay(input) { creates += 1; assert.deepStrictEqual(input, { amount: 19, ref1: "PAY-1", ip: "203.0.113.10" }); return { status: 1, id_pay: "754349" }; },
@@ -47,19 +59,49 @@ async function main() {
     assert.strictEqual(delayedDetail.status, "PENDING");
     assert.strictEqual(delayedDetail.safeMetadata.detailPending, true);
     const invalidDetailAdapter = detail => createTmwPromptPayAdapter({ client: { async createPay() { return { status: 1, id_pay: "754351" }; }, async detailPay() { return detail; } } });
+    const telemetry = [];
+    const telemetryAdapter = createTmwPromptPayAdapter({ logger: { info(_message, fields) { telemetry.push(fields); } }, client: { async createPay() { return { status: 1, id_pay: "754352" }; }, async detailPay() { return { status: 1, ref1: "PAY-1", amount_check: "1900", amount: "", qr_image_base64: qr, time_out: "60" }; } } });
+    await telemetryAdapter.createPayment(context());
+    assert.strictEqual(telemetry.find(item => item.event === "detail_pay_validation").returnedAmount, null, "blank optional provider amount must remain null in telemetry");
     await assert.rejects(
         () => invalidDetailAdapter({ status: 1, ref1: "OTHER", amount_check: "1900", qr_image_base64: qr, time_out: "60" }).createPayment(context()),
         /reference does not match/
     );
     await assert.rejects(
         () => invalidDetailAdapter({ status: 1, ref1: "PAY-1", amount_check: "1901", qr_image_base64: qr, time_out: "60" }).createPayment(context()),
-        /amount does not match/
+        error => error.code === "TMW_DETAIL_AMOUNT_MISMATCH" && /amount does not match/.test(error.message)
+    );
+    await assert.rejects(
+        () => invalidDetailAdapter({ status: 1, ref1: "PAY-1", amount_check: "19", qr_image_base64: qr, time_out: "60" }).createPayment(context()),
+        error => error.code === "TMW_DETAIL_AMOUNT_MISMATCH"
     );
     await assert.rejects(
         () => invalidDetailAdapter({ status: 1, ref1: "PAY-1", amount_check: "not-satang", qr_image_base64: qr, time_out: "invalid" }).createPayment(context()),
         /amount_check is invalid/
     );
     await assert.rejects(() => adapter.cancelPayment(context({ providerReference: "754349", status: "PENDING" })), /only be cancelled after/);
+    await assert.rejects(() => adapter.refreshPayment(context()), /automatic recreation is unsafe/);
+    await assert.rejects(() => createTmwPromptPayAdapter({ client: { async createPay() { return { status: 0, msg: "rejected" }; } } }).createPayment(context()), error => error.code === "TMW_CREATE_PAY_REJECTED");
+    await assert.rejects(() => createTmwPromptPayAdapter({ client: { async createPay() { return { status: 1, id_pay: "bad id" }; } } }).createPayment(context()), /invalid id_pay/);
+    let checkpointed = "";
+    let checkpointCreates = 0;
+    let checkpointDetails = 0;
+    const checkpointAdapter = createTmwPromptPayAdapter({ logger: { info() {} }, client: {
+        async createPay() { checkpointCreates += 1; return { status: 1, id_pay: "754399" }; },
+        async detailPay() { checkpointDetails += 1; return { status: 1, ref1: "PAY-1", amount_check: "19", qr_image_base64: qr, time_out: "60" }; }
+    } });
+    await assert.rejects(() => checkpointAdapter.createPayment({ ...context(), persistProviderReference: async value => { checkpointed = value.providerReference; } }), error => error.code === "TMW_DETAIL_AMOUNT_MISMATCH");
+    assert.strictEqual(checkpointed, "754399", "id_pay must be checkpointed before detail integrity validation can fail");
+    await assert.rejects(() => checkpointAdapter.createPayment(context({ providerReference: checkpointed, providerTransactionId: checkpointed })), error => error.code === "TMW_DETAIL_AMOUNT_MISMATCH");
+    assert.strictEqual(checkpointCreates, 1, "recovery with checkpointed id_pay must never call create_pay again");
+    assert.strictEqual(checkpointDetails, 2, "recovery must reuse detail_pay");
+    let detailAfterFailedCheckpoint = 0;
+    const failedCheckpointAdapter = createTmwPromptPayAdapter({ logger: { info() {} }, client: { async createPay() { return { status: 1, id_pay: "754400" }; }, async detailPay() { detailAfterFailedCheckpoint += 1; return {}; } } });
+    await assert.rejects(
+        () => failedCheckpointAdapter.createPayment({ ...context(), persistProviderReference: async () => { throw new Error("database unavailable"); } }),
+        error => error.code === "TMW_PROVIDER_REFERENCE_PERSIST_FAILED" && error.submissionUncertain === true && !JSON.stringify(error).includes("754400")
+    );
+    assert.strictEqual(detailAfterFailedCheckpoint, 0, "detail_pay must not run when id_pay was not durably checkpointed");
     assert.strictEqual(cancels, 0);
     const expiredClient = { ...client, async detailPay() { return { status: 1, ref1: "PAY-1", amount_check: "1900", qr_image_base64: qr, time_out: "-1" }; } };
     const expiredAdapter = createTmwPromptPayAdapter({ client: expiredClient, clock: () => new Date("2026-09-10T00:00:00.000Z") });
@@ -101,6 +143,14 @@ async function main() {
     assert.strictEqual(firstWebhook.accepted, true);
     assert.strictEqual(duplicateWebhook.duplicate, true);
     assert.strictEqual(appliedEvents, 1, "duplicate webhooks must not reapply paid side effects");
+    let publicErrorBody = null;
+    const publicFailure = new TmwPaymentApplicationError("TMW_PAYMENT_FAILED", "TMW payment operation failed.", 502);
+    publicFailure.metadata = { attemptId: "PAY-INTERNAL", expectedAmountCheckSatang: 5300, returnedAmountCheck: 53, providerMessage: "internal response", password: "secret" };
+    const controller = createTmwPaymentController({ application: { async startCheckout() { throw publicFailure; } }, webhookService: {} });
+    await controller.checkout({ body: {}, user: { id: "U-1" }, headers: {}, socket: {} }, { status() { return this; }, json(value) { publicErrorBody = value; return value; } });
+    const serializedPublicError = JSON.stringify(publicErrorBody);
+    assert.deepStrictEqual(publicErrorBody, { success: false, code: "TMW_PAYMENT_FAILED", message: "TMW payment operation failed." });
+    for (const forbidden of ["PAY-INTERNAL", "expectedAmountCheckSatang", "returnedAmountCheck", "internal response", "secret"]) assert(!serializedPublicError.includes(forbidden), `public TMW error leaked ${forbidden}`);
     const method = { key: "tmw_promptpay", method: "TMW PromptPay", region: "TH", enabled: true, paymentType: "auto", provider: "tmw", qrMode: "provider_generated", confirmationMode: "provider_webhook" };
     function checkoutQuote({ gameCode = "mlbb-twilight-weekly-pass", packageCode = "MLBB_ONE_TIME_WEEKLY_PASS", packageName = "One-Time Weekly Pass", amount = 53, region = "TH", currency = "THB" } = {}) {
         const issuedAt = new Date();

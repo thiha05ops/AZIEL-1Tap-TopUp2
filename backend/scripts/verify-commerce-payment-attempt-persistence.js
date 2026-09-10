@@ -282,6 +282,13 @@ async function verifyProviderReference() {
     assert.strictEqual(updated.providerMetadata.authorization, undefined, "provider metadata redacted.");
     assert.strictEqual(updated.safeMetadata.rawPayload, undefined, "safe metadata strips raw payload.");
     assert(await findAttemptByProviderReference({ providerReference: "PREF-0001" }, { model }), "provider reference lookup works.");
+    const idempotent = await setProviderReference({ attemptId: "ATT-0001", providerReference: "PREF-0001", providerTransactionId: "PTX-0001", rawProviderStatus: "pending" }, { model });
+    assert.strictEqual(idempotent.providerReference, "PREF-0001", "same provider reference checkpoint is idempotent.");
+    await assertRepoError(
+        () => setProviderReference({ attemptId: "ATT-0001", providerReference: "PREF-DIFFERENT", providerTransactionId: "PTX-DIFFERENT" }, { model }),
+        ERROR_CODES.PAYMENT_PROVIDER_REFERENCE_EXISTS,
+        "a different provider reference cannot overwrite an existing checkpoint"
+    );
     await createAttempt(attempt({ attemptId: "ATT-0002", orderId: "AZL-ORDER-0002", idempotencyKey: "idem-2", requestFingerprint: "fp-2" }), { model });
     await assertRepoError(
         () => setProviderReference({ attemptId: "ATT-0002", providerReference: "PREF-0001" }, { model }),

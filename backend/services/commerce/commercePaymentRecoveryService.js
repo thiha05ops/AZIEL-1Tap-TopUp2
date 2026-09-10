@@ -8,7 +8,7 @@ const MANUAL_PROMPTPAY_PROVIDER = "MANUAL_PROMPTPAY";
 const MANUAL_ADMIN_PROVIDER = "MANUAL_ADMIN";
 const TMW_PROVIDER = "TMW";
 const MANUAL_PROMPTPAY_PROVIDER_ALIASES = Object.freeze(["promptpay", MANUAL_PROMPTPAY_PROVIDER, MANUAL_ADMIN_PROVIDER, TMW_PROVIDER]);
-const RECOVERABLE_STATUSES = Object.freeze(["PENDING"]);
+const RECOVERABLE_STATUSES = Object.freeze(["INITIATING", "PENDING"]);
 const RECOVERABLE_ORDER_STATUSES = Object.freeze(new Set(["pending_payment"]));
 const RECOVERABLE_ORDER_PAYMENT_STATUSES = Object.freeze(new Set(["pending", "unpaid"]));
 
@@ -76,10 +76,13 @@ function attemptRecoverable(attempt = {}, order = {}, owner = {}, now = new Date
     const provider = text(attempt.provider).toUpperCase();
     if (!normalizeManualPromptPayProvider(provider) && provider !== MANUAL_ADMIN_PROVIDER && provider !== TMW_PROVIDER) return false;
     if (!RECOVERABLE_STATUSES.includes(text(attempt.status).toUpperCase())) return false;
-    if (!notExpired(attempt, now)) return false;
     if (!orderRecoverable(order)) return false;
+    if (provider === TMW_PROVIDER) {
+        if (!text(attempt.providerReference)) return false;
+        return attempt.qr?.image ? notExpired(attempt, now) : true;
+    }
+    if (!notExpired(attempt, now)) return false;
     if (provider === MANUAL_ADMIN_PROVIDER) return true;
-    if (provider === TMW_PROVIDER) return Boolean(attempt.providerReference && attempt.qr?.image && attempt.qr?.mode === "provider_generated");
     if (hasReceiptEvidence(attempt)) return false;
     const qr = attempt.qr || {};
     return Boolean(qr.image && (qr.mode || "aziel_promptpay_dynamic") === "aziel_promptpay_dynamic");
@@ -213,15 +216,16 @@ function createCommercePaymentRecoveryService(dependencies = {}) {
         const now = deps.clock();
 
         const attemptGroups = await Promise.all(
-            MANUAL_PROMPTPAY_PROVIDER_ALIASES.map(provider =>
-                deps.paymentAttemptRepository.findAttemptsForOwner({
+            MANUAL_PROMPTPAY_PROVIDER_ALIASES.map(provider => {
+                const query = {
                     owner,
                     provider,
                     statuses: RECOVERABLE_STATUSES,
-                    expiresAfter: now,
                     limit: input.limit || 25
-                })
-            )
+                };
+                if (provider !== TMW_PROVIDER) query.expiresAfter = now;
+                return deps.paymentAttemptRepository.findAttemptsForOwner(query);
+            })
         );
 
         const attempts = attemptGroups.flat();

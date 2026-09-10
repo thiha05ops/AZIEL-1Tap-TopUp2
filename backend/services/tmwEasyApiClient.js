@@ -4,6 +4,7 @@ const defaultFetch = require("node-fetch");
 
 const DEFAULT_BASE_URL = "http://www.tmweasyapi.com/api_pph.php";
 const DEFAULT_TIMEOUT_MS = 10000;
+const MAX_RESPONSE_BYTES = 1024 * 1024;
 
 class TmwEasyApiError extends Error {
     constructor(code, message, options = {}) {
@@ -93,7 +94,8 @@ function createTmwEasyApiClient(options = {}) {
             response = await fetchImpl(url.toString(), {
                 method: "GET",
                 headers: { Accept: "application/json" },
-                signal: controller.signal
+                signal: controller.signal,
+                redirect: "manual"
             });
         } catch (error) {
             throw new TmwEasyApiError("TMW_TRANSPORT_ERROR", "TMW request outcome could not be confirmed.", {
@@ -103,10 +105,12 @@ function createTmwEasyApiClient(options = {}) {
         } finally {
             clearTimeout(timer);
         }
-        let payload;
+        let body;
         try {
-            const body = await response.text();
-            payload = JSON.parse(body);
+            const declaredLength = Number(response.headers?.get?.("content-length") || 0);
+            if (Number.isFinite(declaredLength) && declaredLength > MAX_RESPONSE_BYTES) throw new Error("response too large");
+            body = await response.text();
+            if (Buffer.byteLength(body, "utf8") > MAX_RESPONSE_BYTES) throw new Error("response too large");
         } catch {
             throw new TmwEasyApiError("TMW_INVALID_RESPONSE", "TMW returned an invalid response.");
         }
@@ -117,6 +121,9 @@ function createTmwEasyApiClient(options = {}) {
                 submissionUncertain: requestOptions.submission === true && response.status >= 500
             });
         }
+        let payload;
+        try { payload = JSON.parse(body); }
+        catch { throw new TmwEasyApiError("TMW_INVALID_RESPONSE", "TMW returned an invalid response."); }
         return payload;
     }
 

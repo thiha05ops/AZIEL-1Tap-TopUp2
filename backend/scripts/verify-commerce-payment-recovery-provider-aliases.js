@@ -35,15 +35,19 @@ function createAttempt(provider, attemptId) {
     const promptpayAttempt = createAttempt("promptpay", "PAY-1");
     const legacyAttempt = createAttempt("MANUAL_PROMPTPAY", "PAY-2");
     const unrelatedAttempt = createAttempt("stripe", "PAY-3");
+    const tmwCheckpointedAttempt = { ...createAttempt("TMW", "PAY-TMW-1"), status: "INITIATING", expiresAt: null, providerReference: "754399", qr: null };
     const queriedProviders = [];
+    const recoveryQueries = [];
 
     const service = createCommercePaymentRecoveryService({
         clock: () => now,
         paymentAttemptRepository: {
             findAttemptsForOwner: async input => {
                 queriedProviders.push(input.provider);
+                recoveryQueries.push(input);
                 if (input.provider === "promptpay") return [promptpayAttempt];
                 if (input.provider === "MANUAL_PROMPTPAY") return [legacyAttempt];
+                if (input.provider === "TMW") return [tmwCheckpointedAttempt];
                 return [];
             }
         },
@@ -61,9 +65,10 @@ function createAttempt(provider, attemptId) {
     );
     assert.deepStrictEqual(
         recovered.map(item => item.attemptId).sort(),
-        [promptpayAttempt.attemptId, legacyAttempt.attemptId].sort(),
-        "both Manual PromptPay provider aliases must be recovered"
+        [promptpayAttempt.attemptId, legacyAttempt.attemptId, tmwCheckpointedAttempt.attemptId].sort(),
+        "Manual PromptPay aliases and a checkpointed INITIATING TMW attempt must be recovered"
     );
+    assert.strictEqual(Object.hasOwn(recoveryQueries.find(item => item.provider === "TMW"), "expiresAfter"), false, "checkpointed TMW attempts without a QR expiry must remain discoverable");
     assert.strictEqual(
         attemptRecoverable(unrelatedAttempt, order, owner, now),
         false,

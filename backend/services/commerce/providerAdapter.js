@@ -41,6 +41,7 @@ class ProviderAdapterError extends Error {
         this.code = code;
         this.stage = normalizeString(options.stage);
         this.retryable = options.retryable === true;
+        this.submissionUncertain = options.submissionUncertain === true;
         this.metadata = deepFreeze(clonePlain(options.metadata || {}));
     }
 }

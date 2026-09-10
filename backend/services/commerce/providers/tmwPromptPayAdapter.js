@@ -15,13 +15,18 @@ const MAX_QR_BASE64_LENGTH = 2 * 1024 * 1024;
 function text(value) { return String(value == null ? "" : value).trim(); }
 function upper(value) { return text(value).replace(/-/g, "_").toUpperCase(); }
 function providerError(code, message, stage, options = {}) {
-    return new ProviderAdapterError(code, message, { stage, retryable: options.retryable === true, metadata: options.metadata || {} });
+    return new ProviderAdapterError(code, message, { stage, retryable: options.retryable === true, submissionUncertain: options.submissionUncertain === true, metadata: options.metadata || {} });
+}
+function optionalFiniteNumber(value) {
+    if (value === undefined || value === null || text(value) === "") return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
 }
 function assertSuccessful(payload, operation) {
     const status = text(payload?.status).toLowerCase();
     if (!["1", "success", "successful", "ok"].includes(status)) {
-        throw providerError(ERROR_CODES.PAYMENT_PROVIDER_RESPONSE_INVALID, `TMW ${operation} was not successful.`, operation, {
-            metadata: { providerStatus: text(payload?.status), providerMessage: text(payload?.msg).slice(0, 200) }
+        throw providerError(`TMW_${upper(operation)}_REJECTED`, `TMW ${operation} was not successful.`, operation, {
+            metadata: { providerStatus: text(payload?.status).slice(0, 40), diagnostic: "PROVIDER_STATUS_REJECTED" }
         });
     }
 }
@@ -62,6 +67,27 @@ function referenceFor(attempt = {}) {
 function createTmwPromptPayAdapter(options = {}) {
     const client = options.client || createTmwEasyApiClient(options.clientOptions || options);
     const clock = options.clock || (() => new Date());
+    const logger = options.logger || console;
+
+    function observe(event, fields = {}) {
+        logger.info?.("[tmw-provider-contract]", {
+            event,
+            provider: PROVIDER_ID,
+            stage: fields.stage || "",
+            attemptId: text(fields.attemptId),
+            orderId: text(fields.orderId),
+            requestedThb: Number.isFinite(fields.requestedThb) ? fields.requestedThb : null,
+            expectedAmountCheckSatang: Number.isSafeInteger(fields.expectedAmountCheckSatang) ? fields.expectedAmountCheckSatang : null,
+            returnedAmountCheck: Number.isSafeInteger(fields.returnedAmountCheck) ? fields.returnedAmountCheck : null,
+            returnedAmount: Number.isFinite(fields.returnedAmount) ? fields.returnedAmount : null,
+            tmwStatus: text(fields.tmwStatus).slice(0, 40),
+            idPayPresent: fields.idPayPresent === true,
+            refMatch: typeof fields.refMatch === "boolean" ? fields.refMatch : null,
+            timeoutSeconds: Number.isSafeInteger(fields.timeoutSeconds) ? fields.timeoutSeconds : null,
+            qrPresent: fields.qrPresent === true,
+            diagnostic: text(fields.diagnostic).slice(0, 80)
+        });
+    }
 
     function normalizeDetail(payload, context) {
         assertSuccessful(payload, "detail_pay");
@@ -69,13 +95,19 @@ function createTmwPromptPayAdapter(options = {}) {
         const idPay = text(attempt.providerReference || attempt.providerTransactionId || context.idPay);
         const expectedRef = referenceFor(attempt);
         if (!idPay) throw providerError(ERROR_CODES.PAYMENT_PROVIDER_RESPONSE_INVALID, "TMW id_pay is missing.", "detail_pay");
-        if (text(payload.ref1) !== expectedRef) throw providerError(ERROR_CODES.PAYMENT_PROVIDER_EVENT_INVALID, "TMW payment reference does not match the payment attempt.", "detail_pay", {
+        const refMatch = text(payload.ref1) === expectedRef;
+        const expectedSatang = integerThb(intent.amount ?? attempt.amount) * 100;
+        let actualSatang = null;
+        try { actualSatang = satang(payload.amount_check); } catch (error) {
+            observe("detail_pay_validation", { stage: "detail_pay", attemptId: attempt.attemptId, orderId: attempt.orderId || intent.orderId, requestedThb: expectedSatang / 100, expectedAmountCheckSatang: expectedSatang, tmwStatus: payload.status, idPayPresent: true, refMatch, returnedAmount: optionalFiniteNumber(payload.amount), timeoutSeconds: /^-?\d+$/.test(text(payload.time_out)) ? Number(payload.time_out) : null, qrPresent: Boolean(text(payload.qr_image_base64)), diagnostic: "MALFORMED_AMOUNT_CHECK" });
+            throw error;
+        }
+        observe("detail_pay_validation", { stage: "detail_pay", attemptId: attempt.attemptId, orderId: attempt.orderId || intent.orderId, requestedThb: expectedSatang / 100, expectedAmountCheckSatang: expectedSatang, returnedAmountCheck: actualSatang, returnedAmount: optionalFiniteNumber(payload.amount), tmwStatus: payload.status, idPayPresent: true, refMatch, timeoutSeconds: /^-?\d+$/.test(text(payload.time_out)) ? Number(payload.time_out) : null, qrPresent: Boolean(text(payload.qr_image_base64)), diagnostic: !refMatch ? "REF_MISMATCH" : actualSatang !== expectedSatang ? "AMOUNT_MISMATCH" : "MATCH" });
+        if (!refMatch) throw providerError(ERROR_CODES.PAYMENT_PROVIDER_EVENT_INVALID, "TMW payment reference does not match the payment attempt.", "detail_pay", {
             metadata: { diagnostic: "REF_MISMATCH" }
         });
-        const expectedSatang = integerThb(intent.amount ?? attempt.amount) * 100;
-        const actualSatang = satang(payload.amount_check);
-        if (actualSatang !== expectedSatang) throw providerError(ERROR_CODES.PAYMENT_PROVIDER_EVENT_INVALID, "TMW payment amount does not match the payment attempt.", "detail_pay", {
-            metadata: { diagnostic: "AMOUNT_MISMATCH" }
+        if (actualSatang !== expectedSatang) throw providerError("TMW_DETAIL_AMOUNT_MISMATCH", "TMW payment amount does not match the payment attempt.", "detail_pay", {
+            metadata: { diagnostic: "AMOUNT_MISMATCH", expectedAmountCheckSatang: expectedSatang, returnedAmountCheck: actualSatang }
         });
         const remaining = timeoutSeconds(payload.time_out);
         const expired = remaining < 0;
@@ -117,6 +149,14 @@ function createTmwPromptPayAdapter(options = {}) {
         assertSuccessful(created, "create_pay");
         const idPay = text(created.id_pay);
         if (!idPay || idPay.length > 200 || !/^[A-Za-z0-9._:-]+$/.test(idPay)) throw providerError(ERROR_CODES.PAYMENT_PROVIDER_RESPONSE_INVALID, "TMW returned an invalid id_pay.", "create_pay");
+        observe("create_pay_accepted", { stage: "create_pay", attemptId: attempt.attemptId, orderId: attempt.orderId || intent.orderId, requestedThb: amount, tmwStatus: created.status, idPayPresent: true, diagnostic: "ID_PAY_RECEIVED" });
+        if (typeof context.persistProviderReference === "function") {
+            try {
+                await context.persistProviderReference({ providerReference: idPay, providerTransactionId: idPay, rawProviderStatus: text(created.status), safeMetadata: { providerId: PROVIDER_ID, attemptId: attempt.attemptId, orderId: attempt.orderId || intent.orderId, detailPending: true, referenceCheckpointed: true } });
+            } catch {
+                throw providerError("TMW_PROVIDER_REFERENCE_PERSIST_FAILED", "TMW payment submission requires operational reconciliation.", "create_pay", { submissionUncertain: true, metadata: { diagnostic: "ID_PAY_PERSISTENCE_FAILED" } });
+            }
+        }
         try {
             const detail = await client.detailPay({ idPay });
             return normalizeDetail(detail, { ...context, idPay, attempt: { ...attempt, providerReference: idPay, providerTransactionId: idPay } });

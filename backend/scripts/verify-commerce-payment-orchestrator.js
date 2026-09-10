@@ -251,12 +251,12 @@ function createDeps(store, overrides = {}) {
                 attempt.webhookEvents = [...(attempt.webhookEvents || []), clone(providerEvent)];
                 return clone(attempt);
             },
-            async recordFailure({ attemptId, error }) {
+            async recordFailure({ attemptId, error, status = PAYMENT_STATES.FAILED }) {
                 store.calls.recordFailure += 1;
                 const attempt = store.attempts.find(item => item.attemptId === attemptId);
                 if (attempt) {
                     attempt.failure = clone(error);
-                    attempt.status = PAYMENT_STATES.FAILED;
+                    attempt.status = status;
                 }
             },
             async listAttemptsForOrder({ orderId }) {
@@ -833,6 +833,36 @@ async function testMalformedProviderResult() {
     );
 }
 
+async function testTmwReferenceCheckpointSurvivesDetailFailure() {
+    const tmwOrder = order({ payment: { paymentMethodId: "tmw_promptpay", paymentChannel: "TMW_PROMPTPAY", provider: "TMW", providerType: "automatic_provider", confirmationMode: "provider_webhook", status: "unpaid" } });
+    const store = createStore({ order: tmwOrder });
+    let createCalls = 0;
+    const adapter = {
+        async createPayment(input) {
+            createCalls += 1;
+            await input.persistProviderReference({ providerReference: "TMW-ID-1", providerTransactionId: "TMW-ID-1", rawProviderStatus: "1", safeMetadata: { referenceCheckpointed: true } });
+            throw Object.assign(new Error("TMW payment amount does not match the payment attempt."), { code: "TMW_DETAIL_AMOUNT_MISMATCH", stage: "detail_pay", metadata: { diagnostic: "AMOUNT_MISMATCH" } });
+        }
+    };
+    await assertPaymentError(() => createOrchestrator(store, { adapter }).initiatePayment(initiateInput()), ERROR_CODES.PAYMENT_PROVIDER_ERROR, "detail mismatch remains a hard provider failure");
+    assert.strictEqual(store.attempts[0].status, PAYMENT_STATES.INITIATING);
+    assert.strictEqual(store.attempts[0].providerReference, "TMW-ID-1", "id_pay checkpoint survives detail validation failure");
+    await createOrchestrator(store, { adapter }).initiatePayment(initiateInput());
+    assert.strictEqual(createCalls, 1, "active checkpointed TMW attempt prevents a second create_pay");
+}
+
+async function testTmwUncertainSubmissionCannotRecreate() {
+    const tmwOrder = order({ payment: { paymentMethodId: "tmw_promptpay", paymentChannel: "TMW_PROMPTPAY", provider: "TMW", providerType: "automatic_provider", confirmationMode: "provider_webhook", status: "unpaid" } });
+    const store = createStore({ order: tmwOrder });
+    let createCalls = 0;
+    const adapter = { async createPayment() { createCalls += 1; throw Object.assign(new Error("reconciliation required"), { code: "TMW_PROVIDER_REFERENCE_PERSIST_FAILED", submissionUncertain: true }); } };
+    await assertPaymentError(() => createOrchestrator(store, { adapter }).initiatePayment(initiateInput()), ERROR_CODES.PAYMENT_PROVIDER_ERROR, "uncertain TMW create remains operationally ambiguous");
+    assert.strictEqual(store.attempts[0].status, PAYMENT_STATES.INITIATING);
+    assert.strictEqual(store.attempts[0].failure.code, "TMW_SUBMISSION_OUTCOME_UNKNOWN");
+    await createOrchestrator(store, { adapter }).initiatePayment(initiateInput());
+    assert.strictEqual(createCalls, 1, "uncertain create retry must reuse the active attempt without another provider submission");
+}
+
 async function run() {
     const orderRepositorySource = fs.readFileSync(path.resolve(__dirname, "../services/commerce/orderRepository.js"), "utf8");
     const orchestratorSource = fs.readFileSync(path.resolve(__dirname, "../services/commerce/paymentOrchestrator.js"), "utf8");
@@ -858,6 +888,8 @@ async function run() {
     await testPublicRedactionAndDetach();
     await testTransactionAndUnknownOutcome();
     await testMalformedProviderResult();
+    await testTmwReferenceCheckpointSurvivesDetailFailure();
+    await testTmwUncertainSubmissionCannotRecreate();
 
     console.log("Commerce payment orchestrator runtime verification passed.");
 }
