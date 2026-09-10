@@ -12,6 +12,7 @@ const { getCanonicalProduct, resolveCanonicalProductRoute } = require("../catalo
 const { normalizeProductKnowledge, normalizeCustomerNote, normalizeCustomerNoteLocales, ProductKnowledgeError } = require("../catalog/productKnowledge");
 const { SUPPORTED_REGIONS: PRODUCT_COMPATIBILITY_MARKETS } = require("../catalog/productRegionAuthority");
 const { SUPPLIER_CURRENCY } = require("../constants/commerce");
+const { finalizePublishedCustomerAmount } = require("./commerce/customerPayableAmountService");
 
 function normalizeAdminProductCode(value) {
     const requested = String(value || "").trim().toLowerCase();
@@ -171,6 +172,17 @@ function parsePrice(value) {
     return amount;
 }
 
+function parsePublishedPrice(value, currency) {
+    const amount = finalizePublishedCustomerAmount(parsePrice(value), currency);
+    if (amount > MAX_PRICE) throw new CatalogAdminError("CATALOG_PRICE_INVALID", "Price amount exceeds the supported maximum.");
+    return amount;
+}
+
+function parseNullablePublishedPrice(value, field, currency) {
+    const amount = parseNullablePrice(value, field);
+    return amount == null ? null : finalizePublishedCustomerAmount(amount, currency);
+}
+
 function parseNullablePrice(value, field = "supplierCost") {
     if (value === "" || value === null || value === undefined) return null;
 
@@ -273,8 +285,8 @@ function buildCreateRegionalPrice(region, patch = {}) {
 
     if (!enabled) return undefined;
 
-    const amount = parsePrice(patch.amount);
-    const referencePrice = parseNullablePrice(patch.referencePrice, `${region}.referencePrice`);
+    const amount = parsePublishedPrice(patch.amount, currency);
+    const referencePrice = parseNullablePublishedPrice(patch.referencePrice, `${region}.referencePrice`, currency);
     const showDiscount = Object.prototype.hasOwnProperty.call(patch, "showDiscount")
         ? parseBoolean(patch.showDiscount, `${region}.showDiscount`)
         : false;
@@ -657,7 +669,7 @@ function buildPackagePatch(document, patch = {}) {
             }
 
             if (Object.prototype.hasOwnProperty.call(pricePatch, "amount")) {
-                updates[`prices.${region}.amount`] = parsePrice(pricePatch.amount);
+                updates[`prices.${region}.amount`] = parsePublishedPrice(pricePatch.amount, currency);
                 updates[`prices.${region}.currency`] = currency;
                 if (!Object.prototype.hasOwnProperty.call(pricePatch, "enabled") && !document.prices?.[region]) {
                     updates[`prices.${region}.enabled`] = true;
@@ -670,9 +682,10 @@ function buildPackagePatch(document, patch = {}) {
             }
 
             if (Object.prototype.hasOwnProperty.call(pricePatch, "referencePrice")) {
-                updates[`prices.${region}.referencePrice`] = parseNullablePrice(
+                updates[`prices.${region}.referencePrice`] = parseNullablePublishedPrice(
                     pricePatch.referencePrice,
-                    `${region}.referencePrice`
+                    `${region}.referencePrice`,
+                    currency
                 );
             }
             if (Object.prototype.hasOwnProperty.call(pricePatch, "showDiscount")) {

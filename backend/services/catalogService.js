@@ -31,6 +31,7 @@ const {
     publicationMode,
     stripPublicationMetadata
 } = require("./packageMarketPublicationService");
+const { finalizePublishedCustomerAmount } = require("./commerce/customerPayableAmountService");
 
 class CatalogError extends Error {
     constructor(code, message, statusCode = 400) {
@@ -208,7 +209,7 @@ function resolveStaticPackagePrice(payload = {}) {
         packageName: item.name,
         region,
         currency: price.currency,
-        amount: Number(price.amount)
+        amount: finalizePublishedCustomerAmount(Number(price.amount), price.currency)
     };
 
     assertClientCompatibility(payload, canonical);
@@ -338,7 +339,7 @@ function resolveDatabasePackagePriceFromRows(payload = {}, rows = {}) {
         packageName: item.name,
         region,
         currency: price.currency,
-        amount: Number(price.amount)
+        amount: finalizePublishedCustomerAmount(Number(price.amount), price.currency)
     };
 
     assertClientCompatibility(payload, canonical);
@@ -362,7 +363,7 @@ async function resolveDatabasePackagePrice(payload = {}) {
             if (!pkg) throw new CatalogError("PACKAGE_NOT_OFFERED", "This package is not currently available.");
             const price = pkg.prices?.[region];
             if (!price||price.enabled===false||!Number.isFinite(Number(price.amount))||Number(price.amount)<=0)throw new CatalogError("PRICE_NOT_AVAILABLE","Pricing is not ready for this selling region.");
-            const canonical={productCode:product.productCode,productName:product.name,packageCode:pkg.packageCode,packageName:pkg.name,region,currency:price.currency,amount:Number(price.amount)};
+            const canonical={productCode:product.productCode,productName:product.name,packageCode:pkg.packageCode,packageName:pkg.name,region,currency:price.currency,amount:finalizePublishedCustomerAmount(Number(price.amount),price.currency)};
             assertClientCompatibility(payload,canonical);return canonical;
         }
         products = await CatalogProduct.find().sort({ sortOrder: 1, productCode: 1 }).lean();

@@ -72,11 +72,11 @@ async function preview(region, promo = false) {
 
 async function main() {
     const th = await preview("TH");
-    assert.strictEqual(th.baseAmount, 14.1);
-    assert.strictEqual(th.finalAmount, 14.1);
+    assert.strictEqual(th.baseAmount, 15);
+    assert.strictEqual(th.finalAmount, 15);
     const thPromo = await preview("TH", true);
-    assert.strictEqual(thPromo.discountAmount, 1.41);
-    assert.strictEqual(thPromo.finalAmount, 12.69);
+    assert.strictEqual(thPromo.discountAmount, 2, "display discount must reconcile whole-baht original and final prices");
+    assert.strictEqual(thPromo.finalAmount, 13, "10% promotion must run against precise 14.1 before whole-baht settlement");
 
     const mm = await preview("MM");
     assert.strictEqual(mm.baseAmount, 1703);
@@ -94,7 +94,7 @@ async function main() {
         now: "2026-08-09T00:00:00.000Z",
         quoteId: "AZP-FIXTURE-TAMPER"
     });
-    assert.strictEqual(tampered.finalAmount, 14.1, "browser financial fields and presentation metadata must be ignored");
+    assert.strictEqual(tampered.finalAmount, 15, "browser financial fields and presentation metadata must be ignored");
 
     const compatibilityPreview = await resolveCommercePricingPreview(
         { productCode: "mlbb", packageCode: "MLBB_22", region: "TH", currency: "THB" }, {}, {
@@ -109,7 +109,7 @@ async function main() {
             }
         }
     );
-    assert.strictEqual(compatibilityPreview.finalAmount, 15.1, "legacy packages must still be calculated by the server Commerce runtime");
+    assert.strictEqual(compatibilityPreview.finalAmount, 16, "legacy packages must still be calculated by the server Commerce runtime");
     assert.strictEqual(compatibilityPreview.supplierCostConfigured, false);
     assert.strictEqual(compatibilityPreview.pricingSource, "catalog_price_compatibility");
 

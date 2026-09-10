@@ -4,7 +4,7 @@
 const assert = require("assert");
 const { calculateBasePrice } = require("../services/commerce/pricingCalculationEngine");
 const { publishedCustomerPriceRule } = require("../services/commerce/productionPricingContextService");
-const { finalizeCustomerPayableAmount } = require("../services/commerce/customerPayableAmountService");
+const { finalizeCustomerPayableAmount, finalizePublishedCustomerAmount } = require("../services/commerce/customerPayableAmountService");
 
 const base = supplierCost => ({
     supplierCost,
@@ -34,7 +34,7 @@ assert.strictEqual(customerPrice(300, 315), 315); // unchanged
 assert.strictEqual(calculateBasePrice(base(290)).regularPrice, 304.5); // operational preview changes
 assert.strictEqual(customerPrice(290, 315), 315); // supplier change is unpublished
 assert.strictEqual(customerPrice(280, 315), 315); // policy/input change remains unpublished
-assert.strictEqual(customerPrice(290, 304.5), 304.5); // explicit publication changes authority
+assert.strictEqual(customerPrice(290, 304.5), 305); // explicit THB publication changes authority at whole-baht boundary
 
 const oldQuote = Object.freeze({ amount: customerPrice(300, 315) });
 const oldOrder = Object.freeze({ amount: oldQuote.amount });
@@ -49,6 +49,8 @@ assert.throws(() => publishedCustomerPriceRule({ price: {}, packageContext: { pa
 
 assert.strictEqual(finalizeCustomerPayableAmount(315.004, "THB"), 315);
 assert.strictEqual(finalizeCustomerPayableAmount(315.005, "THB"), 315.01);
+assert.strictEqual(finalizePublishedCustomerAmount(315.004, "THB"), 316);
+assert.strictEqual(finalizePublishedCustomerAmount(315.005, "THB"), 316);
 assert.strictEqual(finalizeCustomerPayableAmount(1532.7, "MMK"), 1533);
 
 console.log(JSON.stringify({

@@ -3,7 +3,8 @@
 const assert = require("assert");
 const { createPricingQuote } = require("../services/commerce/pricingQuoteRuntime");
 const {
-    finalizeCustomerPayableAmount
+    finalizeCustomerPayableAmount,
+    finalizePublishedCustomerAmount
 } = require("../services/commerce/customerPayableAmountService");
 const {
     createManualPromptPayAdapter
@@ -59,17 +60,21 @@ function quote(amount, currency, quantity = 1) {
 }
 
 async function main() {
-    assert.strictEqual(finalizeCustomerPayableAmount(33.9255, "THB"), 33.93);
-    assert.strictEqual(finalizeCustomerPayableAmount(327.6, "THB"), 327.6);
+    for (const [input, expected] of [[52.01, 53], [52.37, 53], [52.5, 53], [52.99, 53], [53, 53], [53.25, 54]]) {
+        assert.strictEqual(finalizePublishedCustomerAmount(input, "THB"), expected, `${input} THB must publish as ${expected}`);
+    }
+    assert.strictEqual(finalizeCustomerPayableAmount(52.37, "THB"), 52.37, "ordinary THB normalization must retain decimal precision");
+    assert.strictEqual(finalizeCustomerPayableAmount(14.1, "THB"), 14.1, "internal pricing values must not be ceiled");
     assert.strictEqual(finalizeCustomerPayableAmount(4319.5, "MMK"), 4320);
 
     const pubg = quote(33.9255, "THB");
-    assert.strictEqual(pubg.commercialSnapshot.originalPrice, 33.9255, "internal pricing precision must be retained");
-    assert.strictEqual(pubg.commercialSnapshot.quotedUnitPrice, 33.9255, "unit economics must retain internal precision");
-    assert.strictEqual(pubg.commercialSnapshot.quotedTotalAmount, 33.93, "THB payable must finalize once at quote issuance");
+    assert.strictEqual(pubg.pricingSnapshot.result.regularPrice, 33.9255, "pricing snapshot retains internal precision");
+    assert.strictEqual(pubg.commercialSnapshot.originalPrice, 34, "customer-facing original price is whole THB");
+    assert.strictEqual(pubg.commercialSnapshot.quotedUnitPrice, 34, "customer-facing unit price is whole THB");
+    assert.strictEqual(pubg.commercialSnapshot.quotedTotalAmount, 34, "THB payable finalizes upward at quote issuance");
 
     const mlbb = quote(327.6, "THB");
-    assert.strictEqual(mlbb.commercialSnapshot.quotedTotalAmount, 327.6, "existing valid THB payable must remain unchanged");
+    assert.strictEqual(mlbb.commercialSnapshot.quotedTotalAmount, 328, "decimal THB payable rounds upward");
 
     const mmk = quote(4319.5, "MMK");
     assert.strictEqual(mmk.commercialSnapshot.quotedTotalAmount, 4320, "MMK payable must follow its zero-decimal settlement policy");
@@ -105,13 +110,13 @@ async function main() {
         },
         attempt: { attemptId: "PAY-PUBG-60" }
     });
-    assert.strictEqual(qrRequest.amount, 33.93, "PromptPay QR must receive the quote-finalized amount");
-    assert.strictEqual(payment.amount, 33.93, "PaymentAttempt/provider result must retain the identical payable amount");
-    assert.strictEqual(payment.qr.encodedAmount, "33.93", "PromptPay payload must encode the identical payable amount");
+    assert.strictEqual(qrRequest.amount, 34, "PromptPay QR must receive the quote-finalized amount");
+    assert.strictEqual(payment.amount, 34, "PaymentAttempt/provider result must retain the identical payable amount");
+    assert.strictEqual(payment.qr.encodedAmount, "34.00", "PromptPay payload must encode the identical payable amount");
 
     console.log("Customer payable precision verification passed.");
-    console.log("PUBG_60_UC: 33.9255 internal -> 33.93 THB quote/order/attempt/QR/display");
-    console.log("MLBB control: 327.6 -> 327.6 THB");
+    console.log("PUBG_60_UC: 33.9255 internal -> 34 THB quote/order/attempt/QR/display");
+    console.log("MLBB control: 327.6 -> 328 THB");
     console.log("MMK control: 4319.5 -> 4320 MMK");
     console.log("Persistent writes: 0; real payments: 0; provider calls: 0");
 }

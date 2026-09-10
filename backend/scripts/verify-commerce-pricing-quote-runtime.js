@@ -174,8 +174,10 @@ function verifyPromotionOrchestration() {
     assert.strictEqual(percentage.promotionSnapshot.selectedPromotion.code, "SAVE10", "percentage promotion must be selected.");
     assert.strictEqual(percentage.promotionSnapshot.resolverVersion, "2.3.1", "resolver version must be snapshotted.");
     assert.strictEqual(percentage.promotionSnapshot.specificationVersion, "2.3.0", "promotion spec version must be snapshotted.");
-    assert.strictEqual(percentage.promotionSnapshot.candidateFinalPrice, percentage.commercialSnapshot.quotedUnitPrice, "final price must come from resolver result.");
-    assert.strictEqual(percentage.promotionSnapshot.discountAmount, percentage.commercialSnapshot.discountAmount, "discount must come from resolver result.");
+    assert.strictEqual(percentage.promotionSnapshot.candidateFinalPrice, 1152.9, "promotion math must retain internal precision.");
+    assert.strictEqual(percentage.commercialSnapshot.quotedUnitPrice, 1153, "THB quote settlement must ceil the resolver result to whole baht.");
+    assert.strictEqual(percentage.promotionSnapshot.discountAmount, 128.1, "promotion discount math must retain internal precision.");
+    assert.strictEqual(percentage.commercialSnapshot.discountAmount, 128, "commercial THB discount must match the whole-baht original and unit prices.");
     assert.strictEqual(percentage.promotionSnapshot.traceSummary[0].status, "ELIGIBLE", "resolution trace must be snapshotted.");
 
     const fixed = createPricingQuote(baseQuoteInput({
@@ -204,6 +206,34 @@ function verifyPromotionOrchestration() {
     assert.strictEqual(none.promotionSnapshot.selectedPromotion, null, "rejected promotions should not select a winner.");
     assert.strictEqual(none.commercialSnapshot.discountAmount, 0, "no selected promotion means zero discount.");
     assert(hasWarning(none, WARNING_CODES.PROMOTION_WARNINGS_PRESENT), "resolver warnings must be aggregated.");
+}
+
+function verifyPromotionRunsBeforeWholeBahtSettlement() {
+    const precise = createPricingQuote(baseQuoteInput({
+        pricingInput: basePricingInput({
+            supplierCost: 52.37,
+            policy: {
+                supplierFee: { enabled: false, type: "FIXED", value: 0 },
+                businessCost: { enabled: false, type: "FIXED", value: 0 },
+                profitRule: { enabled: true, type: "FIXED", value: 0 },
+                gatewayFee: { enabled: false, type: "FIXED", value: 0 },
+                platformCost: { enabled: false, type: "FIXED", value: 0 },
+                tax: { enabled: false, type: "FIXED", value: 0 },
+                roundingRule: { enabled: false, mode: "NONE" }
+            }
+        }),
+        promotionInput: {
+            promotions: [promotion({ code: "MINIMUM_52_50", minimumOrderAmount: 52.5 })],
+            context: {}
+        }
+    }));
+
+    assert.strictEqual(precise.pricingSnapshot.result.originalPrice, 52.37, "pricing result must retain decimal precision.");
+    assert.strictEqual(precise.promotionSnapshot.selectedPromotion, null, "52.37 must not satisfy a 52.50 minimum spend.");
+    assert.strictEqual(precise.promotionSnapshot.traceSummary[0].reasonCode, "MINIMUM_SPEND_NOT_MET", "eligibility must be evaluated before THB ceiling.");
+    assert.strictEqual(precise.promotionSnapshot.candidateFinalPrice, 52.37, "rejected promotion must preserve the precise candidate.");
+    assert.strictEqual(precise.commercialSnapshot.originalPrice, 53, "customer-facing original price must be whole baht.");
+    assert.strictEqual(precise.commercialSnapshot.quotedUnitPrice, 53, "whole-baht settlement must occur after promotion resolution.");
 }
 
 function verifyTimeAndIdentity() {
@@ -351,6 +381,7 @@ function verifyOutputShapeAndWarnings() {
 function run() {
     verifyBasicQuoteNoPromotion();
     verifyPromotionOrchestration();
+    verifyPromotionRunsBeforeWholeBahtSettlement();
     verifyTimeAndIdentity();
     verifyQuantityAndTotals();
     verifyPricingOrchestration();

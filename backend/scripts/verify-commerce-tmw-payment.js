@@ -89,6 +89,16 @@ async function main() {
     assert.strictEqual(providerAdjusted.providerPayableAmountSatang, 1901);
     assert.strictEqual(providerAdjusted.providerPayableAmount, 19.01);
     assert.strictEqual(providerAdjusted.qr.encodedAmount, 19.01);
+    let wholeBahtCreateAmount = null;
+    const wholeBahtAdapter = createTmwPromptPayAdapter({ client: {
+        async createPay(input) { wholeBahtCreateAmount = input.amount; return { status: 1, id_pay: "754353" }; },
+        async detailPay() { return { status: 1, ref1: "PAY-53", amount_check: "5310", qr_image_base64: qr, time_out: "900" }; }
+    } });
+    const wholeBahtPayment = await wholeBahtAdapter.createPayment({ intent: { orderId: "AZL-53", amount: 53, currency: "THB", clientIp: "203.0.113.10" }, attempt: { attemptId: "PAY-53", orderId: "AZL-53", amount: 53, currency: "THB" } });
+    assert.strictEqual(wholeBahtCreateAmount, 53, "TMW create_pay must receive the integer commerce amount");
+    assert.strictEqual(wholeBahtPayment.amount, 53, "TMW commerce amount must remain whole baht");
+    assert.strictEqual(wholeBahtPayment.providerPayableAmountSatang, 5310, "TMW detail_pay satang must remain exact");
+    assert.strictEqual(wholeBahtPayment.providerPayableAmount, 53.10, "TMW provider payable decimal must remain exact");
     await assert.rejects(
         () => invalidDetailAdapter({ status: 1, ref1: "PAY-1", amount_check: "not-satang", qr_image_base64: qr, time_out: "invalid" }).createPayment(context()),
         /amount_check is invalid/
@@ -127,17 +137,17 @@ async function main() {
     const webhookContext = context({ providerReference: "754349", providerPayableAmountSatang: 1900, providerPayableAmount: 19 });
     const webhookResult = await adapter.handleProviderEvent({ ...webhookContext, trusted: true, providerEvent: { provider: "TMW", providerReference: "754349", providerEventId: "evt", ref1: "PAY-1", amountCheck: "1900" } });
     assert.strictEqual(webhookResult.status, "PAID");
-    const liveShapeContext = { intent: { orderId: "AZL-53", amount: 53, currency: "THB" }, attempt: { attemptId: "PAY-53", orderId: "AZL-53", amount: 53, currency: "THB", providerReference: "754353", providerPayableAmountSatang: 5306, providerPayableAmount: 53.06 } };
-    const liveShapeEvent = await adapter.handleProviderEvent({ ...liveShapeContext, trusted: true, providerEvent: { provider: "TMW", providerReference: "754353", providerEventId: "evt-53", ref1: "PAY-53", amountCheck: "5306" } });
+    const liveShapeContext = { intent: { orderId: "AZL-53", amount: 53, currency: "THB" }, attempt: { attemptId: "PAY-53", orderId: "AZL-53", amount: 53, currency: "THB", providerReference: "754353", providerPayableAmountSatang: 5310, providerPayableAmount: 53.10 } };
+    const liveShapeEvent = await adapter.handleProviderEvent({ ...liveShapeContext, trusted: true, providerEvent: { provider: "TMW", providerReference: "754353", providerEventId: "evt-53", ref1: "PAY-53", amountCheck: "5310" } });
     assert.strictEqual(liveShapeEvent.amount, 53);
-    assert.strictEqual(liveShapeEvent.providerPayableAmount, 53.06);
+    assert.strictEqual(liveShapeEvent.providerPayableAmount, 53.10);
     await assert.rejects(() => adapter.handleProviderEvent({ ...liveShapeContext, trusted: true, providerEvent: { provider: "TMW", providerReference: "754353", providerEventId: "evt-53-low", ref1: "PAY-53", amountCheck: "5300" } }), /provider payable amount/);
-    await assert.rejects(() => adapter.handleProviderEvent({ ...liveShapeContext, trusted: true, providerEvent: { provider: "TMW", providerReference: "754353", providerEventId: "evt-53-bad", ref1: "PAY-53", amountCheck: "5307" } }), /provider payable amount/);
-    await assert.rejects(() => adapter.handleProviderEvent({ ...liveShapeContext, trusted: true, providerEvent: { provider: "TMW", providerReference: "OTHER", providerEventId: "evt-53-id", ref1: "PAY-53", amountCheck: "5306" } }), /id_pay/);
+    await assert.rejects(() => adapter.handleProviderEvent({ ...liveShapeContext, trusted: true, providerEvent: { provider: "TMW", providerReference: "754353", providerEventId: "evt-53-bad", ref1: "PAY-53", amountCheck: "5311" } }), /provider payable amount/);
+    await assert.rejects(() => adapter.handleProviderEvent({ ...liveShapeContext, trusted: true, providerEvent: { provider: "TMW", providerReference: "OTHER", providerEventId: "evt-53-id", ref1: "PAY-53", amountCheck: "5310" } }), /id_pay/);
     await assert.rejects(() => adapter.handleProviderEvent({ ...webhookContext, trusted: true, providerEvent: { provider: "TMW", providerReference: "754349", providerEventId: "evt", ref1: "OTHER", amountCheck: "1900" } }), /ref1/);
     assert.strictEqual(parseTmwSatang("1901"), 1901);
     assert.strictEqual(parseTmwAmountToSatang("19.01"), 1901);
-    const data = JSON.stringify({ id_pay: "754349", ref1: "PAY-1", amount_check: "5306", amount: "53.06", date_pay: "2026-09-10 07:00" });
+    const data = JSON.stringify({ id_pay: "754349", ref1: "PAY-1", amount_check: "5310", amount: "53.10", date_pay: "2026-09-10 07:00" });
     const key = "test-key";
     const signature = crypto.createHash("md5").update(`${data}:${key}`).digest("hex");
     assert(verifyTmwWebhookSignature(data, signature, key));
@@ -158,7 +168,7 @@ async function main() {
     const webhookService = createTmwPaymentWebhookService({
         configuration: { apiKey: key },
         webhookEventModel,
-        paymentAttemptRepository: { async findAttemptByProviderReference() { return { attemptId: "PAY-1", orderId: "AZL-1", provider: "TMW", providerReference: "754349", amount: 53, providerPayableAmountSatang: 5306, providerPayableAmount: 53.06, currency: "THB" }; } },
+        paymentAttemptRepository: { async findAttemptByProviderReference() { return { attemptId: "PAY-1", orderId: "AZL-1", provider: "TMW", providerReference: "754349", amount: 53, providerPayableAmountSatang: 5310, providerPayableAmount: 53.10, currency: "THB" }; } },
         orderRepository: { async findOrderById() { return { orderId: "AZL-1", commercial: { totalAmount: 53, currency: "THB" }, payment: { provider: "TMW" } }; } },
         application: { orchestrator: { async handleProviderEvent(value) { appliedEvents += 1; appliedProviderEvent = value.providerEvent; return { metadata: { duplicate: false }, status: "PAID" }; } } }
     });
@@ -168,7 +178,7 @@ async function main() {
     assert.strictEqual(duplicateWebhook.duplicate, true);
     assert.strictEqual(appliedEvents, 1, "duplicate webhooks must not reapply paid side effects");
     assert.strictEqual(appliedProviderEvent.amount, 53, "webhook keeps the commerce amount bound to the order");
-    assert.strictEqual(appliedProviderEvent.providerPayableAmountSatang, 5306, "webhook reconciles the persisted provider payable amount");
+    assert.strictEqual(appliedProviderEvent.providerPayableAmountSatang, 5310, "webhook reconciles the persisted provider payable amount");
     let publicErrorBody = null;
     const publicFailure = new TmwPaymentApplicationError("TMW_PAYMENT_FAILED", "TMW payment operation failed.", 502);
     publicFailure.metadata = { attemptId: "PAY-INTERNAL", expectedAmountCheckSatang: 5300, returnedAmountCheck: 53, providerMessage: "internal response", password: "secret" };

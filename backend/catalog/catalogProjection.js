@@ -1,4 +1,5 @@
 const staticCatalog = require("./catalog");
+const { finalizePublishedCustomerAmount } = require("../services/commerce/customerPayableAmountService");
 
 const REGION_CURRENCIES = Object.freeze({
     MM: "MMK",
@@ -96,11 +97,14 @@ function normalizePrice(region, price = {}) {
     const currency = normalizeCurrency(
         price.currency || REGION_CURRENCIES[normalizedRegion]
     );
-    const amount = Number(price.amount);
+    const amount = finalizePublishedCustomerAmount(Number(price.amount), currency);
+    const referencePrice = price.referencePrice == null
+        ? null
+        : finalizePublishedCustomerAmount(Number(price.referencePrice), currency);
 
     const discount = deriveDiscountPricing({
         amount,
-        referencePrice: price.referencePrice,
+        referencePrice,
         showDiscount: price.showDiscount,
         showOriginalPrice: price.showOriginalPrice,
         showSaveAmount: price.showSaveAmount,

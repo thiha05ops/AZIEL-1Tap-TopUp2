@@ -18,7 +18,7 @@ const { updatePackage } = require("../catalogAdminService");
 const { clearPublishedSupplierCostDraftRows } = require("./pricingWorkspaceDraftService");
 const { resolvePricingSupplier } = require("./pricingSupplierService");
 const { SUPPLIER_CURRENCY } = require("../../constants/commerce");
-const { finalizeCustomerPayableAmount } = require("./customerPayableAmountService");
+const { finalizeCustomerPayableAmount, finalizePublishedCustomerAmount } = require("./customerPayableAmountService");
 
 const PROFITABILITY_STATUS = Object.freeze({
     HEALTHY: "HEALTHY",
@@ -254,13 +254,17 @@ function resolveWorkspacePriceInstruction({ instruction = {}, calculatedPrice, c
     const normalized = normalizePriceInstruction(instruction, region);
     const calculated = finalizeCustomerPayableAmount(calculatedPrice, currency);
     let finalPrice = calculated;
-    if (normalized.mode === "MANUAL_OVERRIDE") finalPrice = finalizeCustomerPayableAmount(normalized.value, currency);
+    if (normalized.mode === "MANUAL_OVERRIDE") finalPrice = normalized.value;
     if (normalized.mode === "ADJUSTMENT") {
         const delta = normalized.adjustmentType === "PERCENTAGE"
             ? calculated * (normalized.value / 100)
             : normalized.value;
-        finalPrice = finalizeCustomerPayableAmount(calculated + delta, currency);
+        finalPrice = calculated + delta;
     }
+    finalPrice = finalizePublishedCustomerAmount(
+        finalizeCustomerPayableAmount(finalPrice, currency),
+        currency
+    );
     if (!Number.isFinite(finalPrice) || finalPrice <= 0) {
         throw new AdminPricingControlCenterError("WORKSPACE_FINAL_PRICE_INVALID", `${region} final preview price must be positive.`);
     }
@@ -604,8 +608,8 @@ function previewFromQuote({ quote, context, price, couponCode }) {
     const saveAmount = referencePrice && publishedPrice ? round(referencePrice - publishedPrice) : 0;
     const displayDiscountPercent = referencePrice && saveAmount > 0 ? round((saveAmount / referencePrice) * 100) : 0;
     const recommendedSellingPrice = round(pricing.result?.preOverridePrice ?? pricing.result?.regularPrice ?? commercial.originalPrice);
-    const publishedCustomerPrice = finalizeCustomerPayableAmount(price.amount, quote.commercialSnapshot.currency);
-    const previewCustomerPrice = finalizeCustomerPayableAmount(recommendedSellingPrice, quote.commercialSnapshot.currency);
+    const publishedCustomerPrice = finalizePublishedCustomerAmount(price.amount, quote.commercialSnapshot.currency);
+    const previewCustomerPrice = finalizePublishedCustomerAmount(recommendedSellingPrice, quote.commercialSnapshot.currency);
     const publishedPriceDifference = Number((previewCustomerPrice - publishedCustomerPrice).toFixed(quote.commercialSnapshot.currency === "MMK" ? 0 : 2));
 
     return {

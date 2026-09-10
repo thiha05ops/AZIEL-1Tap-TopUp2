@@ -23,6 +23,14 @@ function main() {
     assert.strictEqual(manual.calculatedPrice, 105);
     assert.strictEqual(manual.finalPrice, 99);
     assert.strictEqual(manual.mode, "MANUAL_OVERRIDE");
+    const decimalManual = resolveWorkspacePriceInstruction({
+        instruction: { mode: "MANUAL_OVERRIDE", value: 53.25 },
+        calculatedPrice: 52.37,
+        currency: "THB",
+        region: "TH"
+    });
+    assert.strictEqual(decimalManual.calculatedPrice, 52.37, "internal calculated THB price must retain decimal precision");
+    assert.strictEqual(decimalManual.finalPrice, 54, "decimal THB manual override must publish at the next whole baht");
 
     const fixed = resolveWorkspacePriceInstruction({
         instruction: { mode: "ADJUSTMENT", adjustmentType: "FIXED", value: -5 },

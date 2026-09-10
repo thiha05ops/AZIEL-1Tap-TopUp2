@@ -22,6 +22,7 @@ const {
     releaseCommercePromotion
 } = require("./commercePromotionBridgeService");
 const { runtimeDebug } = require("../../utils/runtimeDebug");
+const { finalizePublishedCustomerAmount } = require("./customerPayableAmountService");
 
 const ERROR_CODES = Object.freeze({
     INVALID_CHECKOUT_INPUT: "INVALID_CHECKOUT_INPUT",
@@ -107,7 +108,7 @@ async function loadCatalogPackage(input = {}) {
         publicPackage.packageCode !== pkg.packageCode ||
         publicPackage.region !== region ||
         publicPackage.currency !== currency ||
-        Number(publicPackage.amount) !== Number(price.amount)
+        Number(publicPackage.amount) !== finalizePublishedCustomerAmount(price.amount, currency)
     ) {
         throw new CustomerManualPromptPayCheckoutError(ERROR_CODES.PACKAGE_UNAVAILABLE, "Selected package is no longer available.", 409);
     }

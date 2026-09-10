@@ -270,7 +270,7 @@ async function verifyIsolatedDatabase() {
         item = await getFixturePackage();
         assert.strictEqual(item.prices.MM.amount, 7000);
         assert.strictEqual(item.prices.MM.currency, "MMK");
-        assert.strictEqual(item.prices.TH.amount, 60.5);
+        assert.strictEqual(item.prices.TH.amount, 61);
         assert.strictEqual(item.prices.TH.currency, "THB");
 
         result = await updatePackage({

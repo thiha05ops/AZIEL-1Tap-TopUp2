@@ -43,9 +43,19 @@ function finalizeCustomerPayableAmount(amount, currency) {
     return Object.is(finalized, -0) ? 0 : finalized;
 }
 
+function finalizePublishedCustomerAmount(amount, currency) {
+    const normalizedCurrency = String(currency || "").trim().toUpperCase();
+    const normalizedAmount = finalizeCustomerPayableAmount(amount, normalizedCurrency);
+    const numeric = Number(amount);
+    return normalizedCurrency === "THB" && numeric > 0
+        ? Math.ceil(numeric)
+        : normalizedAmount;
+}
+
 module.exports = Object.freeze({
     CUSTOMER_PAYABLE_DECIMALS,
     CustomerPayableAmountError,
     finalizeCustomerPayableAmount,
+    finalizePublishedCustomerAmount,
     payableDecimals
 });

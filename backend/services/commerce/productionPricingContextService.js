@@ -7,6 +7,7 @@ const PriceVersion = require("../../models/PriceVersion");
 const { loadActiveExchangeRateAuthority, resolveExchangeRate, snapshotFromAuthority } = require("./exchangeRateService");
 const { resolveSupplierCostSnapshot } = require("./supplierCostService");
 const { STOREFRONT_CURRENCY } = require("../../constants/commerce");
+const { finalizePublishedCustomerAmount } = require("./customerPayableAmountService");
 
 const DEFAULT_BRANCH = "storefront";
 
@@ -85,10 +86,11 @@ function ruleSnapshot(rule) {
 
 function publishedCustomerPriceRule({ price = {}, packageContext = {}, region, currency } = {}) {
     const mode = upper(price.publishedPriceMode || "LEGACY_COMPATIBILITY_PRICE");
-    const publishedAmount = Number(price.amount);
-    if (!Number.isFinite(publishedAmount) || publishedAmount <= 0) {
+    const rawPublishedAmount = Number(price.amount);
+    if (!Number.isFinite(rawPublishedAmount) || rawPublishedAmount <= 0) {
         throw new Error(`Published customer price is unavailable for ${packageContext.packageCode} in ${upper(region)}.`);
     }
+    const publishedAmount = finalizePublishedCustomerAmount(rawPublishedAmount, currency);
     const reason = text(price.manualOverrideReason) || (mode === "MANUAL_OVERRIDE"
         ? "Manual published-price override."
         : "Owner-published customer price.");
