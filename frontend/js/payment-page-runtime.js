@@ -67,7 +67,7 @@
         const card = document.createElement("section"); card.className = "checkout-card tmw-payment-card";
         const header = document.createElement("header"); header.className = "tmw-payment-card__header";
         const identity = document.createElement("div"); identity.className = "tmw-payment-card__identity";
-        const mark = document.createElement("span"); mark.className = "tmw-payment-card__mark"; mark.setAttribute("aria-hidden", "true"); mark.textContent = "P";
+        const mark = document.createElement("span"); mark.className = "tmw-payment-card__mark"; mark.setAttribute("aria-hidden", "true"); mark.innerHTML = '<i class="fa-solid fa-qrcode"></i>';
         const headingGroup = document.createElement("div");
         const heading = document.createElement("h2"); heading.textContent = "PromptPay";
         const subtitle = document.createElement("p"); subtitle.textContent = "Scan the QR with your banking app";
@@ -91,8 +91,8 @@
             document.body.append(link); link.click(); link.remove();
         });
         const guidance = document.createElement("div"); guidance.className = "tmw-payment-card__guidance";
-        [["Using the same phone?", "Tap “Save QR” and open your banking app to scan."], ["Pay the exact amount", `Make sure the amount is ${formattedAmount}`], ["Confirmation is automatic", "No need to upload a slip."]].forEach(([title, body]) => {
-            const item = document.createElement("section"); const titleNode = document.createElement("h3"); const bodyNode = document.createElement("p"); titleNode.textContent = title; bodyNode.textContent = body; item.append(titleNode, bodyNode); guidance.append(item);
+        [["fa-mobile-screen-button", "Using the same phone?", "Tap “Save QR” and open your banking app to scan."], ["fa-baht-sign", "Pay the exact amount", `Make sure the amount is ${formattedAmount}`], ["fa-circle-check", "Confirmation is automatic", "No need to upload a slip."]].forEach(([icon, title, body]) => {
+            const item = document.createElement("section"); const iconNode = document.createElement("i"); const copy = document.createElement("div"); const titleNode = document.createElement("h3"); const bodyNode = document.createElement("p"); iconNode.className = `fa-solid ${icon}`; iconNode.setAttribute("aria-hidden", "true"); titleNode.textContent = title; bodyNode.textContent = body; copy.append(titleNode, bodyNode); item.append(iconNode, copy); guidance.append(item);
         });
         const secure = document.createElement("div"); secure.className = "tmw-payment-card__secure"; secure.innerHTML = '<i class="fa-solid fa-shield-halved" aria-hidden="true"></i><div><strong>Secure Payment</strong><p>Your payment is protected and verified automatically.</p></div>';
         card.append(header, paymentArea, save, openQr, guidance, secure);

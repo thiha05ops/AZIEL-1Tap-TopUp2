@@ -14,6 +14,7 @@ assert(runtime.includes("function showTmwPayment"), "payment page has a dedicate
 assert(/function showCompletion\([^]*?document\.body\.classList\.remove\("tmw-payment-page-active"\);/.test(runtime), "completion removes the active TMW page state");
 assert(runtime.includes("session.qrImage || session.qrUrl || session.qr?.image || session.dynamicQr?.qrImage"), "TMW QR survives both staged and recovered contracts");
 assert(runtime.includes("image.id = \"tmwProviderQrImage\"; image.src = qr"), "provider QR is assigned to the payment-page DOM");
+assert(runtime.includes('mark.innerHTML = \'<i class="fa-solid fa-qrcode"></i>\''), "TMW header uses the existing neutral QR icon facility");
 assert(runtime.includes("const payableAmount = Number(session.providerPayableAmount ?? session.amount)"), "TMW page renders the exact provider payable amount");
 assert(runtime.includes("session.providerPayableAmount ?? session.amount"), "provider payable amount takes precedence for presentation");
 assert(runtime.includes("commerceAmount: payment.commerceAmount ?? payment.amount"), "recovery retains the separate commerce amount");
@@ -37,6 +38,7 @@ for (const selector of [".tmw-payment-card__header", ".tmw-payment-card__payment
 }
 assert(styles.includes("@media (max-width: 768px)"), "mobile payment layout breakpoint exists");
 assert(styles.includes("grid-template-columns: minmax(0, 1fr)"), "mobile payment layout collapses to one column");
+assert(/@media \(max-width: 768px\)[^]*?\.tmw-payment-card__status \{[^}]*white-space: nowrap;/.test(styles), "375px waiting status remains on one line");
 assert(runtime.includes("figure.hidden = true; save.hidden = true; openQr.hidden = true"), "expired state stops presenting payment controls");
 assert(!/console\.(log|warn|error)\([^\n]*(qr|providerPayable)/i.test(runtime), "TMW QR and payable data are not logged");
 

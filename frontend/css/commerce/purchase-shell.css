@@ -381,7 +381,7 @@ body.tmw-payment-page-active .payment-page-heading > p {
 }
 
 body.tmw-payment-page-active .payment-page-layout {
-    grid-template-columns: minmax(0, 1.72fr) minmax(290px, .78fr);
+    grid-template-columns: minmax(0, 1.88fr) minmax(310px, .76fr);
     align-items: start;
     gap: clamp(20px, 2.4vw, 34px);
 }
@@ -393,11 +393,12 @@ body.tmw-payment-page-active .payment-page-layout {
 body.tmw-payment-page-active .payment-page-rail {
     min-width: 0;
     display: grid;
-    gap: 16px;
+    gap: 18px;
 }
 
 body.tmw-payment-page-active .payment-page-rail .checkout-sidebar {
     width: 100%;
+    padding: 26px;
 }
 
 body.tmw-payment-page-active .payment-page-rail .checkout-sidebar dd {
@@ -406,6 +407,10 @@ body.tmw-payment-page-active .payment-page-rail .checkout-sidebar dd {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+body.tmw-payment-page-active .payment-page-rail .checkout-sidebar dl div {
+    padding-block: 12px;
 }
 
 body.tmw-payment-page-active .payment-page-rail .checkout-total {
@@ -418,7 +423,7 @@ body.tmw-payment-page-active .payment-page-rail .checkout-total {
 
 .payment-help-card {
     display: none;
-    padding: 22px;
+    padding: 24px 26px;
 }
 
 body.tmw-payment-page-active .payment-help-card {
@@ -456,9 +461,9 @@ body.tmw-payment-page-active .payment-provider-note {
 
 .tmw-payment-card {
     min-width: 0;
-    padding: clamp(22px, 3vw, 38px);
+    padding: clamp(28px, 3.2vw, 46px);
     display: grid;
-    gap: 26px;
+    gap: 30px;
     overflow: hidden;
 }
 
@@ -473,7 +478,7 @@ body.tmw-payment-page-active .payment-provider-note {
 
 .tmw-payment-card__header {
     justify-content: space-between;
-    gap: 18px;
+    gap: 20px;
 }
 
 .tmw-payment-card__identity {
@@ -487,7 +492,7 @@ body.tmw-payment-page-active .payment-provider-note {
 }
 
 .tmw-payment-card__identity h2 {
-    font-size: clamp(21px, 2vw, 27px);
+    font-size: clamp(21px, 1.8vw, 25px);
 }
 
 .tmw-payment-card__identity p {
@@ -497,15 +502,15 @@ body.tmw-payment-page-active .payment-provider-note {
 }
 
 .tmw-payment-card__mark {
-    width: 48px;
-    height: 48px;
-    flex: 0 0 48px;
+    width: 50px;
+    height: 50px;
+    flex: 0 0 50px;
     display: grid;
     place-items: center;
     border-radius: 15px;
-    background: color-mix(in srgb, var(--primary) 12%, var(--purchase-panel));
-    color: var(--primary);
-    font-size: 22px;
+    background: #e8f4ff;
+    color: #1769aa;
+    font-size: 21px;
     font-weight: 900;
 }
 
@@ -526,10 +531,10 @@ body.tmw-payment-page-active .payment-provider-note {
 
 .tmw-payment-card__payment {
     display: grid;
-    grid-template-columns: minmax(230px, .9fr) minmax(220px, 1.1fr);
+    grid-template-columns: minmax(270px, .95fr) minmax(240px, 1.05fr);
     align-items: center;
-    gap: clamp(24px, 4vw, 54px);
-    padding: 6px clamp(6px, 2vw, 24px);
+    gap: clamp(34px, 4.4vw, 66px);
+    padding: 12px clamp(8px, 2.2vw, 30px);
 }
 
 .tmw-payment-card__qr {
@@ -542,10 +547,10 @@ body.tmw-payment-page-active .payment-provider-note {
 
 .tmw-payment-card__qr img {
     display: block;
-    width: min(280px, 100%);
+    width: min(310px, 100%);
     aspect-ratio: 1;
     object-fit: contain;
-    padding: 12px;
+    padding: 14px;
     border: 1px solid var(--purchase-border);
     border-radius: 18px;
     background: #fff;
@@ -575,7 +580,7 @@ body.tmw-payment-page-active .payment-provider-note {
 .tmw-payment-card__amount {
     margin: 0 0 5px;
     color: var(--primary);
-    font-size: clamp(38px, 5vw, 58px);
+    font-size: clamp(44px, 5.4vw, 66px);
     font-weight: 900;
     letter-spacing: -.045em;
     line-height: 1;
@@ -587,6 +592,8 @@ body.tmw-payment-page-active .payment-provider-note {
     align-items: center;
     justify-content: center;
     gap: 10px;
+    min-height: 54px;
+    border-radius: 14px;
     cursor: pointer;
 }
 
@@ -607,14 +614,24 @@ body.tmw-payment-page-active .payment-provider-note {
 .tmw-payment-card__guidance {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 12px;
+    gap: 14px;
 }
 
 .tmw-payment-card__guidance section {
-    padding: 16px;
+    padding: 18px;
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr);
+    align-items: start;
+    gap: 11px;
     border: 1px solid var(--purchase-border);
     border-radius: 14px;
     background: var(--purchase-panel-soft);
+}
+
+.tmw-payment-card__guidance section > i {
+    margin-top: 1px;
+    color: var(--primary);
+    font-size: 16px;
 }
 
 .tmw-payment-card__guidance h3,
@@ -637,7 +654,7 @@ body.tmw-payment-page-active .payment-provider-note {
 
 .tmw-payment-card__secure {
     gap: 12px;
-    padding: 15px 17px;
+    padding: 13px 17px;
     border-radius: 14px;
     background: color-mix(in srgb, var(--primary) 7%, var(--purchase-panel-soft));
 }
@@ -1680,22 +1697,27 @@ body.az-purchase-surface .tracking-page {
 
     .tmw-payment-card {
         padding: 20px 16px;
-        gap: 21px;
+        gap: 17px;
     }
 
     .tmw-payment-card__header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
         align-items: flex-start;
+        gap: 10px;
     }
 
     .tmw-payment-card__status {
-        padding-inline: 10px;
-        font-size: 11px;
+        padding: 6px 9px;
+        gap: 5px;
+        font-size: 10.5px;
+        white-space: nowrap;
     }
 
     .tmw-payment-card__payment {
         grid-template-columns: minmax(0, 1fr);
         justify-items: center;
-        gap: 20px;
+        gap: 13px;
         padding: 0;
     }
 
@@ -1714,6 +1736,11 @@ body.az-purchase-surface .tracking-page {
 
     .tmw-payment-card__guidance {
         grid-template-columns: minmax(0, 1fr);
+        gap: 9px;
+    }
+
+    .tmw-payment-card__guidance section {
+        padding: 14px;
     }
 
     .az-payment-sheet.az-payment-sheet--page,
@@ -1772,21 +1799,24 @@ body.az-purchase-surface .tracking-page {
     }
 
     .tmw-payment-card__mark {
-        width: 42px;
-        height: 42px;
-        flex-basis: 42px;
+        width: 40px;
+        height: 40px;
+        flex-basis: 40px;
         border-radius: 13px;
+    }
+
+    .tmw-payment-card__identity {
+        gap: 10px;
+    }
+
+    .tmw-payment-card__identity h2 {
+        font-size: 20px;
     }
 
     .tmw-payment-card__identity p {
         font-size: 12px;
     }
 
-    .tmw-payment-card__status span {
-        max-width: 72px;
-        white-space: normal;
-        line-height: 1.2;
-    }
 }
 
 
