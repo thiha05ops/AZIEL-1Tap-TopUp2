@@ -59,43 +59,65 @@
         const expiresAt = session.expiresAt || session.recoverableExpiresAt || session.dynamicQr?.expiresAt || "";
         const mount = document.getElementById("paymentSessionMount");
         if (!mount || !qr) return false;
+        document.body.classList.add("tmw-payment-page-active");
         stopTmwRuntime();
 
+        const payableAmount = Number(session.providerPayableAmount ?? session.amount);
+        const formattedAmount = `฿${payableAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         const card = document.createElement("section"); card.className = "checkout-card tmw-payment-card";
-        const eyebrow = document.createElement("p"); eyebrow.className = "checkout-eyebrow"; eyebrow.textContent = t("payment.pendingPayment", "Pending payment");
-        const heading = document.createElement("h2"); heading.textContent = "Scan the provider QR";
-        const status = document.createElement("p"); status.className = "checkout-feedback"; status.textContent = "Waiting for TMW payment confirmation";
-        const figure = document.createElement("figure"); figure.className = "az-payment-sheet__qr";
-        const image = document.createElement("img"); image.id = "tmwProviderQrImage"; image.src = qr; image.alt = "TMW PromptPay provider QR";
-        const caption = document.createElement("figcaption"); caption.textContent = "Scan this provider-generated QR with a PromptPay-compatible banking app.";
+        const header = document.createElement("header"); header.className = "tmw-payment-card__header";
+        const identity = document.createElement("div"); identity.className = "tmw-payment-card__identity";
+        const mark = document.createElement("span"); mark.className = "tmw-payment-card__mark"; mark.setAttribute("aria-hidden", "true"); mark.textContent = "P";
+        const headingGroup = document.createElement("div");
+        const heading = document.createElement("h2"); heading.textContent = "PromptPay";
+        const subtitle = document.createElement("p"); subtitle.textContent = "Scan the QR with your banking app";
+        headingGroup.append(heading, subtitle); identity.append(mark, headingGroup);
+        const status = document.createElement("p"); status.className = "tmw-payment-card__status"; status.setAttribute("role", "status"); status.innerHTML = '<i class="fa-regular fa-clock" aria-hidden="true"></i><span>Waiting for payment</span>';
+        header.append(identity, status);
+        const paymentArea = document.createElement("div"); paymentArea.className = "tmw-payment-card__payment";
+        const figure = document.createElement("figure"); figure.className = "tmw-payment-card__qr";
+        const image = document.createElement("img"); image.id = "tmwProviderQrImage"; image.src = qr; image.alt = "PromptPay QR code for this payment";
+        const caption = document.createElement("figcaption"); caption.textContent = "Pay with any PromptPay-supported banking app.";
         figure.append(image, caption);
-        const amount = document.createElement("p"); amount.className = "tmw-payment-card__amount"; amount.textContent = `Amount to pay: ฿${Number(session.providerPayableAmount ?? session.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-        const expiry = document.createElement("p"); expiry.id = "tmwPaymentCountdown"; expiry.className = "az-payment-sheet__qr-expiry";
-        const instructions = document.createElement("ol"); instructions.className = "tmw-payment-card__instructions";
-        const steps = Array.isArray(session.paymentInstructions?.steps) && session.paymentInstructions.steps.length
-            ? session.paymentInstructions.steps
-            : ["Scan the QR and pay the exact amount shown", "Keep this page open", "Wait for automatic confirmation"];
-        steps.forEach(value => { const item = document.createElement("li"); item.textContent = String(value); instructions.append(item); });
-        card.append(eyebrow, heading, status, figure, amount, expiry, instructions);
+        const amountPanel = document.createElement("div"); amountPanel.className = "tmw-payment-card__amount-panel";
+        const amountLabel = document.createElement("span"); amountLabel.textContent = "Amount to pay";
+        const amount = document.createElement("strong"); amount.className = "tmw-payment-card__amount"; amount.textContent = formattedAmount;
+        const expiry = document.createElement("p"); expiry.id = "tmwPaymentCountdown"; expiry.className = "tmw-payment-card__expiry";
+        amountPanel.append(amountLabel, amount, expiry); paymentArea.append(figure, amountPanel);
+        const save = document.createElement("button"); save.type = "button"; save.id = "tmwSaveQrButton"; save.className = "primary-commerce-action tmw-payment-card__save"; save.innerHTML = '<i class="fa-solid fa-download" aria-hidden="true"></i><span>Save QR</span>';
+        const openQr = document.createElement("a"); openQr.className = "tmw-payment-card__open-qr"; openQr.href = qr; openQr.target = "_blank"; openQr.rel = "noopener noreferrer"; openQr.textContent = "Open QR image";
+        save.addEventListener("click", () => {
+            const link = document.createElement("a"); link.href = image.currentSrc || image.src || qr; link.download = "aziel-promptpay-qr.png"; link.rel = "noopener";
+            document.body.append(link); link.click(); link.remove();
+        });
+        const guidance = document.createElement("div"); guidance.className = "tmw-payment-card__guidance";
+        [["Using the same phone?", "Tap “Save QR” and open your banking app to scan."], ["Pay the exact amount", `Make sure the amount is ${formattedAmount}`], ["Confirmation is automatic", "No need to upload a slip."]].forEach(([title, body]) => {
+            const item = document.createElement("section"); const titleNode = document.createElement("h3"); const bodyNode = document.createElement("p"); titleNode.textContent = title; bodyNode.textContent = body; item.append(titleNode, bodyNode); guidance.append(item);
+        });
+        const secure = document.createElement("div"); secure.className = "tmw-payment-card__secure"; secure.innerHTML = '<i class="fa-solid fa-shield-halved" aria-hidden="true"></i><div><strong>Secure Payment</strong><p>Your payment is protected and verified automatically.</p></div>';
+        card.append(header, paymentArea, save, openQr, guidance, secure);
         mount.replaceChildren(card);
 
+        let expired = false;
         const tick = () => {
             const remaining = Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000));
-            expiry.textContent = Number.isFinite(remaining) ? `QR expires in ${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, "0")}` : "";
-            if (remaining <= 0) { clearInterval(tmwCountdownTimer); status.textContent = "Payment QR expired"; }
+            expiry.innerHTML = Number.isFinite(remaining) ? `<i class="fa-regular fa-clock" aria-hidden="true"></i><span>Expires in ${String(Math.floor(remaining / 60)).padStart(2, "0")}:${String(remaining % 60).padStart(2, "0")}</span>` : "";
+            if (remaining <= 0) {
+                expired = true; stopTmwRuntime(); status.textContent = "Payment QR expired"; figure.hidden = true; save.hidden = true; openQr.hidden = true; expiry.textContent = "Expired";
+            }
         };
-        if (expiresAt) { tick(); tmwCountdownTimer = window.setInterval(tick, 1000); }
+        if (expiresAt) { tick(); if (!expired) tmwCountdownTimer = window.setInterval(tick, 1000); }
 
         const attemptId = String(session.attemptId || "").trim();
         const orderId = String(session.commerceOrderId || session.orderId || order.commerceOrderId || order.orderId || "").trim();
-        if (attemptId) tmwPollingTimer = window.setInterval(async () => {
+        if (attemptId && !expired) tmwPollingTimer = window.setInterval(async () => {
             try {
                 const response = await fetch(`/api/commerce/payments/tmw/${encodeURIComponent(attemptId)}`, { headers: window.PaymentUtils?.authHeaders?.() || {} });
                 const data = await response.json();
                 if (!response.ok || !data.success) return;
                 if (String(data.payment?.paymentStatus || "").toLowerCase() === "paid") {
                     stopTmwRuntime();
-                    showCompletion({ orderId, paid: true, amount: session.providerPayableAmount ?? session.amount, currency: session.currency, methodName: session.paymentName || "TMW PromptPay", reference: attemptId });
+                    showCompletion({ orderId, paid: true, paymentReceived: true, amount: session.providerPayableAmount ?? session.amount, currency: session.currency, methodName: "PromptPay", reference: attemptId });
                 }
             } catch (_) { /* polling is best-effort; webhook remains authoritative */ }
         }, 3000);
@@ -110,6 +132,7 @@
         document.getElementById("paymentSessionMount").innerHTML = "";
         renderSummary(order, session, payment);
         if (String(session.provider || payment.provider || "").toLowerCase() === "tmw" && showTmwPayment(order, session)) return;
+        document.body.classList.remove("tmw-payment-page-active");
         if (window.AZIEL_MM_PAYMENT_SHELL?.supports?.(staged)) {
             document.getElementById("paymentPageTitle").textContent = t("payment", "Payment");
             window.AZIEL_MM_PAYMENT_SHELL.show(staged, { onSubmitted: ({ orderId, amount, currency, methodName, reference }) => {
@@ -123,7 +146,8 @@
         else window.PaymentManual.show(order, session);
     }
 
-    function showCompletion({ orderId, paid = false, amount = null, currency = "", methodName = "", reference = "", manualSubmission = false } = {}) {
+    function showCompletion({ orderId, paid = false, paymentReceived = false, amount = null, currency = "", methodName = "", reference = "", manualSubmission = false } = {}) {
+        document.body.classList.remove("tmw-payment-page-active");
         if (!orderId) return;
         let remaining = 5;
         completionState = { orderId, paid, manualSubmission };
@@ -134,8 +158,8 @@
         section.setAttribute("role", "status");
         const icon = document.createElement("div"); icon.className = "payment-completion__icon"; icon.textContent = "✓";
         const eyebrow = document.createElement("p"); eyebrow.className = "checkout-eyebrow"; eyebrow.textContent = t("order.statusLabel", "Order status");
-        const title = document.createElement("h2"); title.textContent = paid ? t("payment.success.title", "Payment Successful") : t("payment.submitted.title", "Payment Submitted");
-        const body = document.createElement("p"); body.textContent = paid ? t("payment.success.receivedProcessing", "Your payment has been received. Your order is being processed.") : t("payment.submitted.awaiting", "Your receipt has been received. Your payment is waiting for verification.");
+        const title = document.createElement("h2"); title.textContent = paymentReceived ? "Payment received" : paid ? t("payment.success.title", "Payment Successful") : t("payment.submitted.title", "Payment Submitted");
+        const body = document.createElement("p"); body.textContent = paymentReceived ? "Your payment has been confirmed. Processing your order..." : paid ? t("payment.success.receivedProcessing", "Your payment has been received. Your order is being processed.") : t("payment.submitted.awaiting", "Your receipt has been received. Your payment is waiting for verification.");
         const details = document.createElement("dl"); details.className = "payment-completion__details";
         [[t("payment.amount", "Amount"), amount != null ? money(amount, currency) : ""], [t("payment.method", "Payment Method"), methodName], [t("payment.reference", "Reference"), reference]].forEach(([label, value]) => { if (!value) return; const row = document.createElement("div"); const dt = document.createElement("dt"); dt.textContent = label; const dd = document.createElement("dd"); dd.textContent = value; row.append(dt, dd); details.append(row); });
         const countdown = document.createElement("p"); countdown.id = "paymentRedirectCountdown"; countdown.textContent = t("payment.redirectCountdown", "Redirecting to order tracking in {seconds} seconds", { seconds: remaining });
@@ -170,6 +194,7 @@
             window.selectedPaymentData = recovery;
             return showTmwPayment(recovery, { ...recovery, qrUrl: recovery.qrImage || recovery.qrImageUrl || recovery.dynamicQr?.qrImage || "" });
         }
+        document.body.classList.remove("tmw-payment-page-active");
         if (String(recovery.provider || "").toUpperCase() === "MANUAL_ADMIN" || String(recovery.region || "").toUpperCase() === "MM") {
             if (recovery.receiptSubmitted === true || recovery.receiptEvidence?.attached === true) {
                 showCompletion({ orderId: recovery.orderId || recovery.commerceOrderId, paid: false, amount: recovery.amount, currency: recovery.currency, methodName: recovery.paymentName || recovery.paymentMethod, reference: recovery.reference, manualSubmission: true });
@@ -293,6 +318,7 @@
         document.getElementById("paymentBackHome").textContent = t("payment.backHome", "Back to Home");
         text("paymentStatusSummary", paid ? t("payment.state.paid", "Paid") : t("payment.state.pendingVerification", "Pending verification"));
     });
+    window.addEventListener("pagehide", stopTmwRuntime);
 
     window.AZIEL_PAYMENT_PAGE = { showCompletion, showTmwPayment, tmwQr };
 })();

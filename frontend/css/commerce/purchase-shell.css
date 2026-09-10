@@ -364,26 +364,293 @@ body.az-purchase-surface,
     border-radius: 14px;
 }
 
-.tmw-payment-card {
+.payment-page-heading {
     display: grid;
-    gap: 1rem;
+    gap: 5px;
 }
 
-.tmw-payment-card .az-payment-sheet__qr {
+.payment-page-heading > p {
+    display: none;
     margin: 0;
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+body.tmw-payment-page-active .payment-page-heading > p {
+    display: block;
+}
+
+body.tmw-payment-page-active .payment-page-layout {
+    grid-template-columns: minmax(0, 1.72fr) minmax(290px, .78fr);
+    align-items: start;
+    gap: clamp(20px, 2.4vw, 34px);
+}
+
+.payment-page-rail {
+    display: contents;
+}
+
+body.tmw-payment-page-active .payment-page-rail {
+    min-width: 0;
+    display: grid;
+    gap: 16px;
+}
+
+body.tmw-payment-page-active .payment-page-rail .checkout-sidebar {
+    width: 100%;
+}
+
+body.tmw-payment-page-active .payment-page-rail .checkout-sidebar dd {
+    min-width: 0;
+    max-width: 62%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+body.tmw-payment-page-active .payment-page-rail .checkout-total {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    border-top: 1px solid var(--purchase-border);
+}
+
+.payment-help-card {
+    display: none;
+    padding: 22px;
+}
+
+body.tmw-payment-page-active .payment-help-card {
+    display: block;
+}
+
+.payment-help-card h2,
+.payment-help-card p {
+    margin: 0 0 9px;
+}
+
+.payment-help-card p,
+.payment-provider-note {
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.55;
+}
+
+body.tmw-payment-page-active .payment-provider-note {
+    display: flex;
+}
+
+.payment-help-card a {
+    color: var(--primary);
+    font-weight: 800;
+    text-decoration: none;
+}
+
+.payment-provider-note {
+    margin: 0;
+    display: none;
+    justify-content: center;
+    gap: 8px;
+}
+
+.tmw-payment-card {
+    min-width: 0;
+    padding: clamp(22px, 3vw, 38px);
+    display: grid;
+    gap: 26px;
+    overflow: hidden;
+}
+
+.tmw-payment-card__header,
+.tmw-payment-card__identity,
+.tmw-payment-card__status,
+.tmw-payment-card__expiry,
+.tmw-payment-card__secure {
+    display: flex;
+    align-items: center;
+}
+
+.tmw-payment-card__header {
+    justify-content: space-between;
+    gap: 18px;
+}
+
+.tmw-payment-card__identity {
+    min-width: 0;
+    gap: 13px;
+}
+
+.tmw-payment-card__identity h2,
+.tmw-payment-card__identity p {
+    margin: 0;
+}
+
+.tmw-payment-card__identity h2 {
+    font-size: clamp(21px, 2vw, 27px);
+}
+
+.tmw-payment-card__identity p {
+    margin-top: 3px;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.tmw-payment-card__mark {
+    width: 48px;
+    height: 48px;
+    flex: 0 0 48px;
+    display: grid;
+    place-items: center;
+    border-radius: 15px;
+    background: color-mix(in srgb, var(--primary) 12%, var(--purchase-panel));
+    color: var(--primary);
+    font-size: 22px;
+    font-weight: 900;
+}
+
+.tmw-payment-card__status,
+.tmw-payment-card__expiry {
+    width: fit-content;
+    min-height: 34px;
+    padding: 7px 12px;
+    gap: 7px;
+    border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--purchase-border));
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--primary) 8%, var(--purchase-panel));
+    color: var(--primary);
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.tmw-payment-card__payment {
+    display: grid;
+    grid-template-columns: minmax(230px, .9fr) minmax(220px, 1.1fr);
+    align-items: center;
+    gap: clamp(24px, 4vw, 54px);
+    padding: 6px clamp(6px, 2vw, 24px);
+}
+
+.tmw-payment-card__qr {
+    min-width: 0;
+    margin: 0;
+    display: grid;
+    justify-items: center;
+    gap: 12px;
+}
+
+.tmw-payment-card__qr img {
+    display: block;
+    width: min(280px, 100%);
+    aspect-ratio: 1;
+    object-fit: contain;
+    padding: 12px;
+    border: 1px solid var(--purchase-border);
+    border-radius: 18px;
+    background: #fff;
+    image-rendering: auto;
+}
+
+.tmw-payment-card__qr figcaption {
+    max-width: 290px;
+    color: var(--text-muted);
+    text-align: center;
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.tmw-payment-card__amount-panel {
+    display: grid;
+    justify-items: start;
+    gap: 8px;
+}
+
+.tmw-payment-card__amount-panel > span {
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 700;
 }
 
 .tmw-payment-card__amount {
-    margin: 0;
-    font-size: 1.25rem;
-    font-weight: 800;
+    margin: 0 0 5px;
+    color: var(--primary);
+    font-size: clamp(38px, 5vw, 58px);
+    font-weight: 900;
+    letter-spacing: -.045em;
+    line-height: 1;
 }
 
-.tmw-payment-card__instructions {
-    margin: 0;
-    padding-left: 1.25rem;
+.tmw-payment-card__save {
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    cursor: pointer;
+}
+
+.tmw-payment-card__save:focus-visible,
+.tmw-payment-card__open-qr:focus-visible,
+.payment-help-card a:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--primary) 35%, transparent);
+    outline-offset: 3px;
+}
+
+.tmw-payment-card__open-qr {
+    width: fit-content;
+    margin: -16px auto -5px;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.tmw-payment-card__guidance {
     display: grid;
-    gap: 0.5rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.tmw-payment-card__guidance section {
+    padding: 16px;
+    border: 1px solid var(--purchase-border);
+    border-radius: 14px;
+    background: var(--purchase-panel-soft);
+}
+
+.tmw-payment-card__guidance h3,
+.tmw-payment-card__guidance p,
+.tmw-payment-card__secure p {
+    margin: 0;
+}
+
+.tmw-payment-card__guidance h3 {
+    margin-bottom: 6px;
+    font-size: 13px;
+}
+
+.tmw-payment-card__guidance p,
+.tmw-payment-card__secure p {
+    color: var(--text-muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.tmw-payment-card__secure {
+    gap: 12px;
+    padding: 15px 17px;
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--primary) 7%, var(--purchase-panel-soft));
+}
+
+.tmw-payment-card__secure > i {
+    color: var(--primary);
+    font-size: 19px;
+}
+
+.tmw-payment-card__secure strong {
+    display: block;
+    margin-bottom: 2px;
+    font-size: 13px;
 }
 
 .az-payment-sheet__action,
@@ -1402,6 +1669,53 @@ body.az-purchase-surface .tracking-page {
 /* Mobile page-mode containment must win after generic bottom-sheet rules. */
 @media (max-width: 768px) {
 
+    body.tmw-payment-page-active .payment-page-layout {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 18px;
+    }
+
+    body.tmw-payment-page-active .payment-page-rail {
+        order: 2;
+    }
+
+    .tmw-payment-card {
+        padding: 20px 16px;
+        gap: 21px;
+    }
+
+    .tmw-payment-card__header {
+        align-items: flex-start;
+    }
+
+    .tmw-payment-card__status {
+        padding-inline: 10px;
+        font-size: 11px;
+    }
+
+    .tmw-payment-card__payment {
+        grid-template-columns: minmax(0, 1fr);
+        justify-items: center;
+        gap: 20px;
+        padding: 0;
+    }
+
+    .tmw-payment-card__qr img {
+        width: min(278px, calc(100vw - 72px));
+    }
+
+    .tmw-payment-card__amount-panel {
+        justify-items: center;
+        text-align: center;
+    }
+
+    .tmw-payment-card__amount {
+        font-size: clamp(40px, 13vw, 52px);
+    }
+
+    .tmw-payment-card__guidance {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
     .az-payment-sheet.az-payment-sheet--page,
     .az-payment-sheet.az-payment-sheet--page.is-mobile-promptpay {
         position: static;
@@ -1449,6 +1763,29 @@ body.az-purchase-surface .tracking-page {
 
         margin: 12px 0 0;
         padding-bottom: 0;
+    }
+}
+
+@media (max-width: 430px) {
+    .payment-page-heading h1 {
+        font-size: 30px;
+    }
+
+    .tmw-payment-card__mark {
+        width: 42px;
+        height: 42px;
+        flex-basis: 42px;
+        border-radius: 13px;
+    }
+
+    .tmw-payment-card__identity p {
+        font-size: 12px;
+    }
+
+    .tmw-payment-card__status span {
+        max-width: 72px;
+        white-space: normal;
+        line-height: 1.2;
     }
 }
 
