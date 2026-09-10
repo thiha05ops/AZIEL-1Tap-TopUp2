@@ -192,6 +192,8 @@ function configureDatabaseApplication(mongoConnection) {
     app.use("/api/password", authLimiter);
     // Must precede JSON parsing so FazerCards HMAC verifies the exact raw bytes.
     app.use("/api", require("./routes/fazercardsWebhook"));
+    // TMW posts signed form fields and must not depend on global content-type parsing.
+    app.use("/api", require("./routes/tmwPaymentRoutes").createTmwWebhookRoutes());
     app.use(express.json({ limit: jsonBodyLimit }));
     app.use(express.urlencoded({ extended: true, limit: formBodyLimit }));
     app.use(createSessionMiddleware({ mongoClient: mongoConnection.getClient(), isProduction }));
