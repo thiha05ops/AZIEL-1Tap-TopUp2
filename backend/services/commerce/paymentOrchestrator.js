@@ -613,6 +613,7 @@ function createPaymentOrchestrator(dependencies = {}) {
                 errorName: error?.name || "",
                 errorCode: error?.code || "",
                 errorStage: error?.stage || "",
+                diagnostic: error?.metadata?.diagnostic || "",
                 retryable: error?.retryable === true,
                 submissionUncertain: error?.submissionUncertain === true
             }));

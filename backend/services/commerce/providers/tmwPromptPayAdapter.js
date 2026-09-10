@@ -69,10 +69,14 @@ function createTmwPromptPayAdapter(options = {}) {
         const idPay = text(attempt.providerReference || attempt.providerTransactionId || context.idPay);
         const expectedRef = referenceFor(attempt);
         if (!idPay) throw providerError(ERROR_CODES.PAYMENT_PROVIDER_RESPONSE_INVALID, "TMW id_pay is missing.", "detail_pay");
-        if (text(payload.ref1) !== expectedRef) throw providerError(ERROR_CODES.PAYMENT_PROVIDER_EVENT_INVALID, "TMW payment reference does not match the payment attempt.", "detail_pay");
+        if (text(payload.ref1) !== expectedRef) throw providerError(ERROR_CODES.PAYMENT_PROVIDER_EVENT_INVALID, "TMW payment reference does not match the payment attempt.", "detail_pay", {
+            metadata: { diagnostic: "REF_MISMATCH" }
+        });
         const expectedSatang = integerThb(intent.amount ?? attempt.amount) * 100;
         const actualSatang = satang(payload.amount_check);
-        if (actualSatang !== expectedSatang) throw providerError(ERROR_CODES.PAYMENT_PROVIDER_EVENT_INVALID, "TMW payment amount does not match the payment attempt.", "detail_pay");
+        if (actualSatang !== expectedSatang) throw providerError(ERROR_CODES.PAYMENT_PROVIDER_EVENT_INVALID, "TMW payment amount does not match the payment attempt.", "detail_pay", {
+            metadata: { diagnostic: "AMOUNT_MISMATCH" }
+        });
         const remaining = timeoutSeconds(payload.time_out);
         const expired = remaining < 0;
         return {
