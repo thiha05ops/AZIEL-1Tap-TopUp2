@@ -102,21 +102,21 @@ function createTmwPromptPayAdapter(options = {}) {
             observe("detail_pay_validation", { stage: "detail_pay", attemptId: attempt.attemptId, orderId: attempt.orderId || intent.orderId, requestedThb: expectedSatang / 100, expectedAmountCheckSatang: expectedSatang, tmwStatus: payload.status, idPayPresent: true, refMatch, returnedAmount: optionalFiniteNumber(payload.amount), timeoutSeconds: /^-?\d+$/.test(text(payload.time_out)) ? Number(payload.time_out) : null, qrPresent: Boolean(text(payload.qr_image_base64)), diagnostic: "MALFORMED_AMOUNT_CHECK" });
             throw error;
         }
-        observe("detail_pay_validation", { stage: "detail_pay", attemptId: attempt.attemptId, orderId: attempt.orderId || intent.orderId, requestedThb: expectedSatang / 100, expectedAmountCheckSatang: expectedSatang, returnedAmountCheck: actualSatang, returnedAmount: optionalFiniteNumber(payload.amount), tmwStatus: payload.status, idPayPresent: true, refMatch, timeoutSeconds: /^-?\d+$/.test(text(payload.time_out)) ? Number(payload.time_out) : null, qrPresent: Boolean(text(payload.qr_image_base64)), diagnostic: !refMatch ? "REF_MISMATCH" : actualSatang !== expectedSatang ? "AMOUNT_MISMATCH" : "MATCH" });
+        observe("detail_pay_validation", { stage: "detail_pay", attemptId: attempt.attemptId, orderId: attempt.orderId || intent.orderId, requestedThb: expectedSatang / 100, expectedAmountCheckSatang: expectedSatang, returnedAmountCheck: actualSatang, returnedAmount: optionalFiniteNumber(payload.amount), tmwStatus: payload.status, idPayPresent: true, refMatch, timeoutSeconds: /^-?\d+$/.test(text(payload.time_out)) ? Number(payload.time_out) : null, qrPresent: Boolean(text(payload.qr_image_base64)), diagnostic: !refMatch ? "REF_MISMATCH" : actualSatang !== expectedSatang ? "PROVIDER_PAYABLE_CAPTURED" : "MATCH" });
         if (!refMatch) throw providerError(ERROR_CODES.PAYMENT_PROVIDER_EVENT_INVALID, "TMW payment reference does not match the payment attempt.", "detail_pay", {
             metadata: { diagnostic: "REF_MISMATCH" }
         });
-        if (actualSatang !== expectedSatang) throw providerError("TMW_DETAIL_AMOUNT_MISMATCH", "TMW payment amount does not match the payment attempt.", "detail_pay", {
-            metadata: { diagnostic: "AMOUNT_MISMATCH", expectedAmountCheckSatang: expectedSatang, returnedAmountCheck: actualSatang }
-        });
         const remaining = timeoutSeconds(payload.time_out);
         const expired = remaining < 0;
+        const providerPayableAmount = actualSatang / 100;
         return {
             provider: PROVIDER_ID,
             providerReference: idPay,
             providerTransactionId: idPay,
             status: expired ? "EXPIRED" : "PENDING",
             amount: expectedSatang / 100,
+            providerPayableAmountSatang: actualSatang,
+            providerPayableAmount,
             currency: "THB",
             expiresAt: expired ? clock().toISOString() : new Date(clock().getTime() + remaining * 1000).toISOString(),
             qr: expired ? (attempt.qr || null) : {
@@ -124,7 +124,7 @@ function createTmwPromptPayAdapter(options = {}) {
                 mode: "provider_generated",
                 sourceType: "provider_response",
                 image: qrImage(payload.qr_image_base64),
-                encodedAmount: expectedSatang / 100
+                encodedAmount: providerPayableAmount
             },
             paymentInstructions: {
                 type: "TMW_PROMPTPAY",
@@ -133,7 +133,7 @@ function createTmwPromptPayAdapter(options = {}) {
                 requiresReceiptUpload: false,
                 confirmationMode: "provider_webhook"
             },
-            safeMetadata: { providerId: PROVIDER_ID, attemptId: attempt.attemptId, orderId: attempt.orderId || intent.orderId, remainingSeconds: Math.max(0, remaining) },
+            safeMetadata: { providerId: PROVIDER_ID, attemptId: attempt.attemptId, orderId: attempt.orderId || intent.orderId, remainingSeconds: Math.max(0, remaining), commerceAmount: expectedSatang / 100, providerPayableAmountSatang: actualSatang, providerPayableAmount },
             rawProviderStatus: text(payload.status)
         };
     }
@@ -213,8 +213,9 @@ function createTmwPromptPayAdapter(options = {}) {
         const idPay = text(event.providerReference || event.providerTransactionId);
         if (!idPay || idPay !== text(attempt.providerReference)) throw providerError(ERROR_CODES.PAYMENT_PROVIDER_EVENT_INVALID, "TMW webhook id_pay does not match the payment attempt.", "webhook");
         if (text(event.ref1) !== referenceFor(attempt)) throw providerError(ERROR_CODES.PAYMENT_PROVIDER_EVENT_INVALID, "TMW webhook ref1 does not match the payment attempt.", "webhook");
-        const expectedSatang = integerThb(attempt.amount) * 100;
-        if (satang(event.amountCheck) !== expectedSatang) throw providerError(ERROR_CODES.PAYMENT_PROVIDER_EVENT_INVALID, "TMW webhook amount does not match the payment attempt.", "webhook");
+        const expectedSatang = Number(attempt.providerPayableAmountSatang);
+        if (!Number.isSafeInteger(expectedSatang) || expectedSatang <= 0) throw providerError(ERROR_CODES.PAYMENT_PROVIDER_EVENT_INVALID, "TMW provider payable amount is missing.", "webhook");
+        if (satang(event.amountCheck) !== expectedSatang) throw providerError(ERROR_CODES.PAYMENT_PROVIDER_EVENT_INVALID, "TMW webhook amount does not match the provider payable amount.", "webhook");
         return {
             provider: PROVIDER_ID,
             providerReference: idPay,
@@ -222,10 +223,12 @@ function createTmwPromptPayAdapter(options = {}) {
             providerEventId: text(event.providerEventId),
             eventType: "TMW_PAYMENT_CONFIRMED",
             status: "PAID",
-            amount: expectedSatang / 100,
+            amount: integerThb(attempt.amount),
+            providerPayableAmountSatang: expectedSatang,
+            providerPayableAmount: expectedSatang / 100,
             currency: "THB",
             orderId: attempt.orderId,
-            safeMetadata: { providerId: PROVIDER_ID, verificationMethod: "tmw_md5_signature" },
+            safeMetadata: { providerId: PROVIDER_ID, verificationMethod: "tmw_md5_signature", providerPayableAmountSatang: expectedSatang },
             rawProviderStatus: "paid"
         };
     }

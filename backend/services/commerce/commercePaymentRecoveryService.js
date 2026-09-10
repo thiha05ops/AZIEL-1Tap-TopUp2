@@ -79,7 +79,9 @@ function attemptRecoverable(attempt = {}, order = {}, owner = {}, now = new Date
     if (!orderRecoverable(order)) return false;
     if (provider === TMW_PROVIDER) {
         if (!text(attempt.providerReference)) return false;
-        return attempt.qr?.image ? notExpired(attempt, now) : true;
+        if (!attempt.qr?.image) return true;
+        if (!Number.isSafeInteger(Number(attempt.providerPayableAmountSatang)) || Number(attempt.providerPayableAmountSatang) <= 0) return false;
+        return notExpired(attempt, now);
     }
     if (!notExpired(attempt, now)) return false;
     if (provider === MANUAL_ADMIN_PROVIDER) return true;
@@ -141,10 +143,13 @@ function projectRecoverableCommerceAttempt({ attempt = {}, order = {}, now = new
             userId: order.fulfilment?.input?.userId || order.fulfilment?.input?.playerId || "",
             zoneId: order.fulfilment?.input?.zoneId || order.fulfilment?.input?.serverId || ""
         },
-        amount: Number(attempt.amount ?? commercial.totalAmount ?? 0),
+        amount: Number(automaticTmw ? attempt.providerPayableAmount : (attempt.amount ?? commercial.totalAmount ?? 0)),
+        commerceAmount: Number(attempt.amount ?? commercial.totalAmount ?? 0),
+        providerPayableAmountSatang: automaticTmw ? Number(attempt.providerPayableAmountSatang) : null,
+        providerPayableAmount: automaticTmw ? Number(attempt.providerPayableAmount) : null,
         originalAmount: Number(commercial.originalUnitPrice ?? commercial.totalAmount ?? attempt.amount ?? 0),
         discountAmount: Number(commercial.discountAmount || 0),
-        finalAmount: Number(attempt.amount ?? commercial.totalAmount ?? 0),
+        finalAmount: Number(automaticTmw ? attempt.providerPayableAmount : (attempt.amount ?? commercial.totalAmount ?? 0)),
         promoCode: order.promotion?.code || order.promotionSnapshot?.code || "",
         promoSnapshot: order.promotion || order.promotionSnapshot || null,
         currency: attempt.currency || commercial.currency || "",

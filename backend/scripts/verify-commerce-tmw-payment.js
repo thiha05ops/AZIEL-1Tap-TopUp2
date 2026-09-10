@@ -84,14 +84,11 @@ async function main() {
         () => invalidDetailAdapter({ status: 1, ref1: "OTHER", amount_check: "1900", qr_image_base64: qr, time_out: "60" }).createPayment(context()),
         /reference does not match/
     );
-    await assert.rejects(
-        () => invalidDetailAdapter({ status: 1, ref1: "PAY-1", amount_check: "1901", qr_image_base64: qr, time_out: "60" }).createPayment(context()),
-        error => error.code === "TMW_DETAIL_AMOUNT_MISMATCH" && /amount does not match/.test(error.message)
-    );
-    await assert.rejects(
-        () => invalidDetailAdapter({ status: 1, ref1: "PAY-1", amount_check: "19", qr_image_base64: qr, time_out: "60" }).createPayment(context()),
-        error => error.code === "TMW_DETAIL_AMOUNT_MISMATCH"
-    );
+    const providerAdjusted = await invalidDetailAdapter({ status: 1, ref1: "PAY-1", amount_check: "1901", qr_image_base64: qr, time_out: "60" }).createPayment(context());
+    assert.strictEqual(providerAdjusted.amount, 19, "commerce amount remains authoritative");
+    assert.strictEqual(providerAdjusted.providerPayableAmountSatang, 1901);
+    assert.strictEqual(providerAdjusted.providerPayableAmount, 19.01);
+    assert.strictEqual(providerAdjusted.qr.encodedAmount, 19.01);
     await assert.rejects(
         () => invalidDetailAdapter({ status: 1, ref1: "PAY-1", amount_check: "not-satang", qr_image_base64: qr, time_out: "invalid" }).createPayment(context()),
         /amount_check is invalid/
@@ -107,9 +104,10 @@ async function main() {
         async createPay() { checkpointCreates += 1; return { status: 1, id_pay: "754399" }; },
         async detailPay() { checkpointDetails += 1; return { status: 1, ref1: "PAY-1", amount_check: "19", qr_image_base64: qr, time_out: "60" }; }
     } });
-    await assert.rejects(() => checkpointAdapter.createPayment({ ...context(), persistProviderReference: async value => { checkpointed = value.providerReference; } }), error => error.code === "TMW_DETAIL_AMOUNT_MISMATCH");
+    const checkpointResult = await checkpointAdapter.createPayment({ ...context(), persistProviderReference: async value => { checkpointed = value.providerReference; } });
+    assert.strictEqual(checkpointResult.providerPayableAmountSatang, 19);
     assert.strictEqual(checkpointed, "754399", "id_pay must be checkpointed before detail integrity validation can fail");
-    await assert.rejects(() => checkpointAdapter.createPayment(context({ providerReference: checkpointed, providerTransactionId: checkpointed })), error => error.code === "TMW_DETAIL_AMOUNT_MISMATCH");
+    assert.strictEqual((await checkpointAdapter.createPayment(context({ providerReference: checkpointed, providerTransactionId: checkpointed }))).providerPayableAmountSatang, 19);
     assert.strictEqual(checkpointCreates, 1, "recovery with checkpointed id_pay must never call create_pay again");
     assert.strictEqual(checkpointDetails, 2, "recovery must reuse detail_pay");
     let detailAfterFailedCheckpoint = 0;
@@ -126,12 +124,20 @@ async function main() {
     assert.strictEqual((await expiredAdapter.cancelPayment(context({ providerReference: "754349" }))).status, "CANCELLED");
     assert.strictEqual(cancels, 1);
     await assert.rejects(() => adapter.handleProviderEvent({ ...context({ providerReference: "754349" }), trusted: false, providerEvent: {} }), /not trusted/);
-    const webhookResult = await adapter.handleProviderEvent({ ...context({ providerReference: "754349" }), trusted: true, providerEvent: { provider: "TMW", providerReference: "754349", providerEventId: "evt", ref1: "PAY-1", amountCheck: "1900" } });
+    const webhookContext = context({ providerReference: "754349", providerPayableAmountSatang: 1900, providerPayableAmount: 19 });
+    const webhookResult = await adapter.handleProviderEvent({ ...webhookContext, trusted: true, providerEvent: { provider: "TMW", providerReference: "754349", providerEventId: "evt", ref1: "PAY-1", amountCheck: "1900" } });
     assert.strictEqual(webhookResult.status, "PAID");
-    await assert.rejects(() => adapter.handleProviderEvent({ ...context({ providerReference: "754349" }), trusted: true, providerEvent: { provider: "TMW", providerReference: "754349", providerEventId: "evt", ref1: "OTHER", amountCheck: "1900" } }), /ref1/);
+    const liveShapeContext = { intent: { orderId: "AZL-53", amount: 53, currency: "THB" }, attempt: { attemptId: "PAY-53", orderId: "AZL-53", amount: 53, currency: "THB", providerReference: "754353", providerPayableAmountSatang: 5306, providerPayableAmount: 53.06 } };
+    const liveShapeEvent = await adapter.handleProviderEvent({ ...liveShapeContext, trusted: true, providerEvent: { provider: "TMW", providerReference: "754353", providerEventId: "evt-53", ref1: "PAY-53", amountCheck: "5306" } });
+    assert.strictEqual(liveShapeEvent.amount, 53);
+    assert.strictEqual(liveShapeEvent.providerPayableAmount, 53.06);
+    await assert.rejects(() => adapter.handleProviderEvent({ ...liveShapeContext, trusted: true, providerEvent: { provider: "TMW", providerReference: "754353", providerEventId: "evt-53-low", ref1: "PAY-53", amountCheck: "5300" } }), /provider payable amount/);
+    await assert.rejects(() => adapter.handleProviderEvent({ ...liveShapeContext, trusted: true, providerEvent: { provider: "TMW", providerReference: "754353", providerEventId: "evt-53-bad", ref1: "PAY-53", amountCheck: "5307" } }), /provider payable amount/);
+    await assert.rejects(() => adapter.handleProviderEvent({ ...liveShapeContext, trusted: true, providerEvent: { provider: "TMW", providerReference: "OTHER", providerEventId: "evt-53-id", ref1: "PAY-53", amountCheck: "5306" } }), /id_pay/);
+    await assert.rejects(() => adapter.handleProviderEvent({ ...webhookContext, trusted: true, providerEvent: { provider: "TMW", providerReference: "754349", providerEventId: "evt", ref1: "OTHER", amountCheck: "1900" } }), /ref1/);
     assert.strictEqual(parseTmwSatang("1901"), 1901);
     assert.strictEqual(parseTmwAmountToSatang("19.01"), 1901);
-    const data = JSON.stringify({ id_pay: "754349", ref1: "PAY-1", amount_check: "1900", amount: "19.00", date_pay: "2026-09-10 07:00" });
+    const data = JSON.stringify({ id_pay: "754349", ref1: "PAY-1", amount_check: "5306", amount: "53.06", date_pay: "2026-09-10 07:00" });
     const key = "test-key";
     const signature = crypto.createHash("md5").update(`${data}:${key}`).digest("hex");
     assert(verifyTmwWebhookSignature(data, signature, key));
@@ -141,6 +147,7 @@ async function main() {
     assert.strictEqual(tmwWebhookEventId(JSON.parse(data)), tmwWebhookEventId(JSON.parse(data)));
     let webhookReceipt = null;
     let appliedEvents = 0;
+    let appliedProviderEvent = null;
     const webhookEventModel = {
         async findOne(query) { return webhookReceipt?.eventId === query.eventId ? webhookReceipt : null; },
         async create(value) {
@@ -151,15 +158,17 @@ async function main() {
     const webhookService = createTmwPaymentWebhookService({
         configuration: { apiKey: key },
         webhookEventModel,
-        paymentAttemptRepository: { async findAttemptByProviderReference() { return { attemptId: "PAY-1", orderId: "AZL-1", provider: "TMW", providerReference: "754349", amount: 19, currency: "THB" }; } },
-        orderRepository: { async findOrderById() { return { orderId: "AZL-1", commercial: { totalAmount: 19, currency: "THB" }, payment: { provider: "TMW" } }; } },
-        application: { orchestrator: { async handleProviderEvent() { appliedEvents += 1; return { metadata: { duplicate: false }, status: "PAID" }; } } }
+        paymentAttemptRepository: { async findAttemptByProviderReference() { return { attemptId: "PAY-1", orderId: "AZL-1", provider: "TMW", providerReference: "754349", amount: 53, providerPayableAmountSatang: 5306, providerPayableAmount: 53.06, currency: "THB" }; } },
+        orderRepository: { async findOrderById() { return { orderId: "AZL-1", commercial: { totalAmount: 53, currency: "THB" }, payment: { provider: "TMW" } }; } },
+        application: { orchestrator: { async handleProviderEvent(value) { appliedEvents += 1; appliedProviderEvent = value.providerEvent; return { metadata: { duplicate: false }, status: "PAID" }; } } }
     });
     const firstWebhook = await webhookService.processWebhook({ data, signature });
     const duplicateWebhook = await webhookService.processWebhook({ data, signature });
     assert.strictEqual(firstWebhook.accepted, true);
     assert.strictEqual(duplicateWebhook.duplicate, true);
     assert.strictEqual(appliedEvents, 1, "duplicate webhooks must not reapply paid side effects");
+    assert.strictEqual(appliedProviderEvent.amount, 53, "webhook keeps the commerce amount bound to the order");
+    assert.strictEqual(appliedProviderEvent.providerPayableAmountSatang, 5306, "webhook reconciles the persisted provider payable amount");
     let publicErrorBody = null;
     const publicFailure = new TmwPaymentApplicationError("TMW_PAYMENT_FAILED", "TMW payment operation failed.", 502);
     publicFailure.metadata = { attemptId: "PAY-INTERNAL", expectedAmountCheckSatang: 5300, returnedAmountCheck: 53, providerMessage: "internal response", password: "secret" };
@@ -212,13 +221,17 @@ async function main() {
             },
             reserveCommercePromotion: async () => null,
             orchestrator: {
-                async initiatePayment() { outboundTmwCreates += 1; return { attemptId: `PAY-${quote.packageSnapshot.packageCode}`, amount: quote.commercialSnapshot.quotedTotalAmount, currency: "THB", status: "PENDING", qr: { image: "data:image/png;base64,ZmFrZQ==" } }; },
+                async initiatePayment() { outboundTmwCreates += 1; return { attemptId: `PAY-${quote.packageSnapshot.packageCode}`, amount: quote.commercialSnapshot.quotedTotalAmount, providerPayableAmountSatang: quote.commercialSnapshot.quotedTotalAmount === 53 ? 5306 : quote.commercialSnapshot.quotedTotalAmount * 100, providerPayableAmount: quote.commercialSnapshot.quotedTotalAmount === 53 ? 53.06 : quote.commercialSnapshot.quotedTotalAmount, currency: "THB", status: "PENDING", qr: { image: "data:image/png;base64,ZmFrZQ==" } }; },
                 async refreshPayment() {}, async getPaymentResult() {}
             }
         });
         const result = await app.startCheckout({ reviewQuoteId: quote.quoteId, checkoutKey: `KEY-${quote.packageSnapshot.packageCode}`, userId: "123", zoneId: "456", productCode: quote.packageSnapshot.gameCode }, { user: { id: "U-1" }, clientIp: "203.0.113.10" });
         assert.strictEqual(result.checkout.packageName, quote.packageSnapshot.packageName);
         assert.strictEqual(result.payment.amount, quote.commercialSnapshot.quotedTotalAmount);
+        if (quote.commercialSnapshot.quotedTotalAmount === 53) {
+            assert.strictEqual(result.session.amount, 53.06, "customer must see the exact provider payable amount");
+            assert.strictEqual(result.session.commerceAmount, 53);
+        }
         assert.strictEqual(outboundTmwCreates, 1);
     }
     const passQuote = checkoutQuote();

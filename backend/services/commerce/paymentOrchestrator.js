@@ -219,6 +219,8 @@ function normalizeProviderResult(result = {}, context = {}) {
         });
     }
     const amount = result.amount == null ? null : Number(result.amount);
+    const providerPayableAmountSatang = result.providerPayableAmountSatang == null ? null : Number(result.providerPayableAmountSatang);
+    const providerPayableAmount = result.providerPayableAmount == null ? null : Number(result.providerPayableAmount);
     const currency = result.currency == null ? "" : normalizeString(result.currency).toUpperCase();
     const orderId = normalizeString(result.orderId || result.orderBinding?.orderId || result.safeMetadata?.orderId);
     if (amount != null && Number.isFinite(context.amount) && amount !== Number(context.amount)) {
@@ -230,12 +232,18 @@ function normalizeProviderResult(result = {}, context = {}) {
     if (orderId && context.orderId && orderId !== context.orderId) {
         throw new PaymentOrchestratorError(ERROR_CODES.PAYMENT_ORDER_BINDING_MISMATCH, "Provider order binding does not match order.", { stage: "provider" });
     }
+    if ((providerPayableAmountSatang == null) !== (providerPayableAmount == null) ||
+        (providerPayableAmountSatang != null && (!Number.isSafeInteger(providerPayableAmountSatang) || providerPayableAmountSatang <= 0 || !Number.isFinite(providerPayableAmount) || providerPayableAmount !== providerPayableAmountSatang / 100))) {
+        throw new PaymentOrchestratorError(ERROR_CODES.PAYMENT_PROVIDER_RESULT_INVALID, "Provider returned an invalid payable amount.", { stage: "provider" });
+    }
     return deepFreeze({
         provider: normalizeString(result.provider || context.provider),
         providerReference: normalizeString(result.providerReference || result.providerTransactionId || ""),
         providerTransactionId: normalizeString(result.providerTransactionId || result.providerReference || ""),
         status,
         amount,
+        providerPayableAmountSatang,
+        providerPayableAmount,
         currency,
         expiresAt: result.expiresAt || null,
         paymentInstructions: clonePlain(result.paymentInstructions || result.customerInstructions || null),
@@ -280,6 +288,9 @@ function buildPublicResult(value = {}) {
         paymentStatus: publicStatus(attempt.status || attempt.paymentStatus || order.paymentStatus),
         provider: normalizeString(attempt.providerDisplay || attempt.provider || order.payment?.provider || ""),
         amount,
+        commerceAmount: amount,
+        providerPayableAmountSatang: attempt.providerPayableAmountSatang ?? null,
+        providerPayableAmount: attempt.providerPayableAmount ?? null,
         currency,
         expiresAt: attempt.expiresAt || null,
         paymentInstructions: clonePlain(attempt.paymentInstructions || attempt.customerInstructions || null),
@@ -667,6 +678,8 @@ function createPaymentOrchestrator(dependencies = {}) {
                         expiresAt: providerResult.expiresAt,
                         paymentInstructions: providerResult.paymentInstructions,
                         safeMetadata: providerResult.safeMetadata,
+                        providerPayableAmountSatang: providerResult.providerPayableAmountSatang,
+                        providerPayableAmount: providerResult.providerPayableAmount,
                         transactionContext
                     }) || currentAttempt;
                 }
@@ -678,7 +691,9 @@ function createPaymentOrchestrator(dependencies = {}) {
                     paymentInstructions: providerResult.paymentInstructions,
                     qr: providerResult.qr,
                     redirect: providerResult.redirect,
-                    expiresAt: providerResult.expiresAt
+                    expiresAt: providerResult.expiresAt,
+                    providerPayableAmountSatang: providerResult.providerPayableAmountSatang,
+                    providerPayableAmount: providerResult.providerPayableAmount
                 };
                 const applied = await applyPaymentStatus({
                     order,
@@ -764,7 +779,10 @@ function createPaymentOrchestrator(dependencies = {}) {
                     attemptId: attempt.attemptId, providerReference: result.providerReference,
                     providerTransactionId: result.providerTransactionId, rawProviderStatus: result.rawProviderStatus,
                     qr: result.qr, expiresAt: result.expiresAt, paymentInstructions: result.paymentInstructions,
-                    safeMetadata: result.safeMetadata, transactionContext
+                    safeMetadata: result.safeMetadata,
+                    providerPayableAmountSatang: result.providerPayableAmountSatang,
+                    providerPayableAmount: result.providerPayableAmount,
+                    transactionContext
                 }) || attempt;
             });
             return buildPublicResult({ attempt: refreshedAttempt, order, idempotent: true, outcome: "no_change" });
@@ -777,7 +795,10 @@ function createPaymentOrchestrator(dependencies = {}) {
                     attemptId: attempt.attemptId, providerReference: result.providerReference,
                     providerTransactionId: result.providerTransactionId, rawProviderStatus: result.rawProviderStatus,
                     qr: result.qr, expiresAt: result.expiresAt, paymentInstructions: result.paymentInstructions,
-                    safeMetadata: result.safeMetadata, transactionContext
+                    safeMetadata: result.safeMetadata,
+                    providerPayableAmountSatang: result.providerPayableAmountSatang,
+                    providerPayableAmount: result.providerPayableAmount,
+                    transactionContext
                 }) || attempt;
             }
             return applyPaymentStatus({ order, attempt: refreshedAttempt, toStatus: result.status, reason: "Payment refreshed", transactionContext });

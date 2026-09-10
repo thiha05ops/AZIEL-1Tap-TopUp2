@@ -25,6 +25,7 @@ const ERROR_CODES = Object.freeze({
     PAYMENT_ATTEMPT_NOT_FOUND: "PAYMENT_ATTEMPT_NOT_FOUND",
     PAYMENT_ATTEMPT_FORBIDDEN: "PAYMENT_ATTEMPT_FORBIDDEN",
     PAYMENT_PROVIDER_REFERENCE_EXISTS: "PAYMENT_PROVIDER_REFERENCE_EXISTS",
+    PAYMENT_PROVIDER_PAYABLE_AMOUNT_CONFLICT: "PAYMENT_PROVIDER_PAYABLE_AMOUNT_CONFLICT",
     PAYMENT_INVALID_TRANSITION: "PAYMENT_INVALID_TRANSITION",
     PAYMENT_DUPLICATE_EVENT: "PAYMENT_DUPLICATE_EVENT",
     PAYMENT_IDEMPOTENCY_CONFLICT: "PAYMENT_IDEMPOTENCY_CONFLICT",
@@ -677,6 +678,12 @@ async function setProviderReference(input = {}, options = {}) {
     );
     const opts = normalizeOptions({ ...options, transactionContext: input.transactionContext || options.transactionContext });
     const expiresAt = input.expiresAt ? new Date(input.expiresAt) : null;
+    const hasPayable = input.providerPayableAmountSatang != null || input.providerPayableAmount != null;
+    const providerPayableAmountSatang = hasPayable ? Number(input.providerPayableAmountSatang) : null;
+    const providerPayableAmount = hasPayable ? Number(input.providerPayableAmount) : null;
+    if (hasPayable && (!Number.isSafeInteger(providerPayableAmountSatang) || providerPayableAmountSatang <= 0 || !Number.isFinite(providerPayableAmount) || providerPayableAmount !== providerPayableAmountSatang / 100)) {
+        throw new PaymentAttemptRepositoryError(ERROR_CODES.INVALID_PAYMENT_ATTEMPT_RECORD, "Provider payable amount is invalid.", { stage: "reference", metadata: { field: "providerPayableAmount" } });
+    }
     if (expiresAt && !Number.isFinite(expiresAt.getTime())) {
         throw new PaymentAttemptRepositoryError(ERROR_CODES.INVALID_PAYMENT_ATTEMPT_RECORD, "expiresAt must be valid.", {
             stage: "reference",
@@ -695,24 +702,31 @@ async function setProviderReference(input = {}, options = {}) {
                 metadata: { providerReference }
             });
         }
-        const request = opts.model.findOneAndUpdate(
-            {
+        const query = {
                 attemptId,
                 providerReference: { $in: ["", providerReference] },
                 providerTransactionId: { $in: ["", normalizeString(input.providerTransactionId || providerReference)] }
-            },
+        };
+        if (hasPayable) {
+            query.providerPayableAmountSatang = { $in: [null, providerPayableAmountSatang] };
+            query.providerPayableAmount = { $in: [null, providerPayableAmount] };
+        }
+        const fields = {
+            providerReference,
+            providerTransactionId: normalizeString(input.providerTransactionId || providerReference),
+            rawProviderStatus: normalizeString(input.rawProviderStatus),
+            providerMetadata: safeMetadata(input.providerMetadata),
+            safeMetadata: safeMetadata(input.safeMetadata),
+            paymentInstructions: clonePlain(input.paymentInstructions || null),
+            qr: clonePlain(input.qr || null),
+            expiresAt,
+            updatedAt: input.changedAt ? new Date(input.changedAt) : new Date()
+        };
+        if (hasPayable) Object.assign(fields, { providerPayableAmountSatang, providerPayableAmount });
+        const request = opts.model.findOneAndUpdate(
+            query,
             {
-                $set: {
-                    providerReference,
-                    providerTransactionId: normalizeString(input.providerTransactionId || providerReference),
-                    rawProviderStatus: normalizeString(input.rawProviderStatus),
-                    providerMetadata: safeMetadata(input.providerMetadata),
-                    safeMetadata: safeMetadata(input.safeMetadata),
-                    paymentInstructions: clonePlain(input.paymentInstructions || null),
-                    qr: clonePlain(input.qr || null),
-                    expiresAt,
-                    updatedAt: input.changedAt ? new Date(input.changedAt) : new Date()
-                }
+                $set: fields
             },
             { returnDocument: "after", runValidators: true, session: opts.mongoSession || undefined }
         );
@@ -720,6 +734,10 @@ async function setProviderReference(input = {}, options = {}) {
         if (!updated) {
             const existingAttempt = await findAttemptById({ attemptId }, { ...opts, lean: true });
             if (existingAttempt) {
+                if (hasPayable && existingAttempt.providerReference === providerReference &&
+                    (existingAttempt.providerPayableAmountSatang != null || existingAttempt.providerPayableAmount != null)) {
+                    throw new PaymentAttemptRepositoryError(ERROR_CODES.PAYMENT_PROVIDER_PAYABLE_AMOUNT_CONFLICT, "Payment attempt is already bound to a different provider payable amount.", { stage: "reference", metadata: { attemptId } });
+                }
                 throw new PaymentAttemptRepositoryError(ERROR_CODES.PAYMENT_PROVIDER_REFERENCE_EXISTS, "Payment attempt is already bound to a different provider reference.", { stage: "reference", metadata: { attemptId } });
             }
             throw new PaymentAttemptRepositoryError(ERROR_CODES.PAYMENT_ATTEMPT_NOT_FOUND, "Payment attempt was not found.", { stage: "reference" });

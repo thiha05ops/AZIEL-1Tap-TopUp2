@@ -82,10 +82,11 @@ function createTmwPaymentWebhookService(dependencies = {}) {
         if (text(attempt.provider) !== "TMW") throw new TmwWebhookError("TMW_PROVIDER_MISMATCH", "TMW payment provider does not match.", 409);
         if (text(payload.ref1) !== text(attempt.attemptId)) throw new TmwWebhookError("TMW_REFERENCE_MISMATCH", "TMW payment reference does not match.", 409);
         if (text(attempt.currency).toUpperCase() !== "THB") throw new TmwWebhookError("TMW_CURRENCY_MISMATCH", "TMW payment currency does not match.", 409);
-        const expectedSatang = Number(attempt.amount) * 100;
-        if (!Number.isSafeInteger(expectedSatang) || expectedSatang !== amountCheck) throw new TmwWebhookError("TMW_AMOUNT_MISMATCH", "TMW payment amount does not match.", 409);
+        const expectedSatang = Number(attempt.providerPayableAmountSatang);
+        if (!Number.isSafeInteger(expectedSatang) || expectedSatang <= 0) throw new TmwWebhookError("TMW_PROVIDER_PAYABLE_AMOUNT_MISSING", "TMW provider payable amount is unavailable for reconciliation.", 409);
+        if (expectedSatang !== amountCheck) throw new TmwWebhookError("TMW_AMOUNT_MISMATCH", "TMW payment amount does not match the provider payable amount.", 409);
         const order = await orders.findOrderById(attempt.orderId);
-        if (!order || text(order.orderId) !== text(attempt.orderId) || text(order.payment?.provider) !== "TMW" || Number(order.commercial?.totalAmount) * 100 !== amountCheck || text(order.commercial?.currency).toUpperCase() !== "THB") {
+        if (!order || text(order.orderId) !== text(attempt.orderId) || text(order.payment?.provider) !== "TMW" || Number(order.commercial?.totalAmount) !== Number(attempt.amount) || text(order.commercial?.currency).toUpperCase() !== "THB") {
             throw new TmwWebhookError("TMW_ORDER_BINDING_MISMATCH", "TMW payment order binding does not match.", 409);
         }
 
@@ -104,7 +105,7 @@ function createTmwPaymentWebhookService(dependencies = {}) {
         try {
             const result = await application.orchestrator.handleProviderEvent({
                 trusted: true,
-                providerEvent: { provider: "TMW", providerReference: idPay, providerTransactionId: idPay, providerEventId: eventId, eventType: "TMW_PAYMENT_CONFIRMED", status: "PAID", amount: amountCheck / 100, currency: "THB", orderId: attempt.orderId, ref1: text(payload.ref1), amountCheck }
+                providerEvent: { provider: "TMW", providerReference: idPay, providerTransactionId: idPay, providerEventId: eventId, eventType: "TMW_PAYMENT_CONFIRMED", status: "PAID", amount: Number(attempt.amount), providerPayableAmountSatang: expectedSatang, providerPayableAmount: expectedSatang / 100, currency: "THB", orderId: attempt.orderId, ref1: text(payload.ref1), amountCheck }
             });
             if (receipt) { receipt.processingStatus = "PROCESSED"; receipt.processedAt = new Date(); await receipt.save(); }
             return { accepted: true, duplicate: result.metadata?.duplicate === true, eventId, payment: result };

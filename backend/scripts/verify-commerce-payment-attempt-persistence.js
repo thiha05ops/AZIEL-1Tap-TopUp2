@@ -274,16 +274,25 @@ async function verifyProviderReference() {
         providerReference: "PREF-0001",
         providerTransactionId: "PTX-0001",
         rawProviderStatus: "pending",
+        providerPayableAmountSatang: 5306,
+        providerPayableAmount: 53.06,
         providerMetadata: { authorization: "secret", providerMode: "test" },
         safeMetadata: { rawPayload: "nope", source: "verifier" },
         transactionContext: { mongoSession: "session-ref" }
     }, { model });
     assert.strictEqual(updated.providerReference, "PREF-0001", "provider reference set.");
+    assert.strictEqual(updated.providerPayableAmountSatang, 5306, "provider payable satang persisted.");
+    assert.strictEqual(updated.providerPayableAmount, 53.06, "provider payable amount persisted.");
     assert.strictEqual(updated.providerMetadata.authorization, undefined, "provider metadata redacted.");
     assert.strictEqual(updated.safeMetadata.rawPayload, undefined, "safe metadata strips raw payload.");
     assert(await findAttemptByProviderReference({ providerReference: "PREF-0001" }, { model }), "provider reference lookup works.");
-    const idempotent = await setProviderReference({ attemptId: "ATT-0001", providerReference: "PREF-0001", providerTransactionId: "PTX-0001", rawProviderStatus: "pending" }, { model });
+    const idempotent = await setProviderReference({ attemptId: "ATT-0001", providerReference: "PREF-0001", providerTransactionId: "PTX-0001", rawProviderStatus: "pending", providerPayableAmountSatang: 5306, providerPayableAmount: 53.06 }, { model });
     assert.strictEqual(idempotent.providerReference, "PREF-0001", "same provider reference checkpoint is idempotent.");
+    await assertRepoError(
+        () => setProviderReference({ attemptId: "ATT-0001", providerReference: "PREF-0001", providerTransactionId: "PTX-0001", providerPayableAmountSatang: 5307, providerPayableAmount: 53.07 }, { model }),
+        ERROR_CODES.PAYMENT_PROVIDER_PAYABLE_AMOUNT_CONFLICT,
+        "a persisted provider payable amount is immutable"
+    );
     await assertRepoError(
         () => setProviderReference({ attemptId: "ATT-0001", providerReference: "PREF-DIFFERENT", providerTransactionId: "PTX-DIFFERENT" }, { model }),
         ERROR_CODES.PAYMENT_PROVIDER_REFERENCE_EXISTS,

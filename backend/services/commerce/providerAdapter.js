@@ -204,6 +204,8 @@ function normalizeProviderResponse(response = {}, context = {}) {
         providerTransactionId: normalizeString(response.providerTransactionId || providerReference),
         status: normalizeProviderStatus(response.status || response.paymentStatus),
         amount: normalizeAmount(response.amount),
+        providerPayableAmountSatang: response.providerPayableAmountSatang == null ? null : Number(response.providerPayableAmountSatang),
+        providerPayableAmount: normalizeAmount(response.providerPayableAmount),
         currency,
         expiresAt: normalizeDateValue(response.expiresAt, ERROR_CODES.PAYMENT_PROVIDER_RESPONSE_INVALID, "expiresAt"),
         redirect: clonePlain(response.redirect || null),

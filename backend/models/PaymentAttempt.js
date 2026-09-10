@@ -81,6 +81,8 @@ const paymentAttemptSchema = new mongoose.Schema(
         paymentChannel: { type: String, trim: true, default: "", immutable: true },
         confirmationMode: { type: String, trim: true, default: "", immutable: true },
         amount: { type: Number, required: true, validate: finiteNonNegative, immutable: true },
+        providerPayableAmountSatang: { type: Number, min: 1, default: null },
+        providerPayableAmount: { type: Number, min: 0.01, default: null },
         currency: { type: String, trim: true, uppercase: true, required: true, immutable: true },
         region: { type: String, trim: true, uppercase: true, default: "", immutable: true },
         status: { type: String, enum: PAYMENT_ATTEMPT_STATUSES, default: "UNPAID", required: true },
