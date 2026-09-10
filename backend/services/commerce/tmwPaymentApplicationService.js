@@ -5,7 +5,7 @@ const mongoose = require("mongoose");
 const PaymentMethod = require("../../models/PaymentMethod");
 const { findOwnedQuote } = require("./pricingQuoteRepository");
 const { checkoutFromQuote } = require("./checkoutApplicationService");
-const { resolveCheckoutRouteSnapshot } = require("../supplierProductionSelectionService");
+const { validatePaymentCatalogEligibility } = require("./paymentCatalogEligibilityService");
 const { reserveCommercePromotion, releaseCommercePromotion, consumeCommercePromotion } = require("./commercePromotionBridgeService");
 const orderRepository = require("./orderRepository");
 const paymentAttemptRepository = require("./paymentAttemptRepository");
@@ -72,6 +72,14 @@ function createTmwPaymentApplicationService(dependencies = {}) {
         },
         transactionRunner: runTransaction,
         paidFulfillmentHandler: dependencies.paidFulfillmentHandler || ensurePaidOrderFulfillmentWork,
+        paidFulfillmentFailureRecorder: dependencies.paidFulfillmentFailureRecorder || (async failure => {
+            if (typeof orders.appendOperationalReference !== "function") return null;
+            return orders.appendOperationalReference({
+                orderId: failure.orderId,
+                changedAt: failure.changedAt,
+                reference: { type: "paid_fulfillment_start_failed", reason: failure.reason, errorCode: failure.errorCode }
+            });
+        }),
         paidSettlementHandler: settlePromotion,
         // Late EXPIRED -> PAID reconciliation remains disabled until the canonical
         // order repository supports the same terminal-state transition atomically.
@@ -112,10 +120,7 @@ function createTmwPaymentApplicationService(dependencies = {}) {
                 customerInput: { gameAccount: { userId: input.userId || "", zoneId: input.zoneId || "", accountFields: Array.isArray(input.accountFields) ? input.accountFields : [] }, customFields: { username: input.username || "", gameKey: input.gameKey || input.productCode || "" } },
                 requestMetadata: { source: "customer-storefront", traceId: text(input.traceId) }
             }, {
-                validateOperationalPackageState: async ({ quote: lockedQuote }) => {
-                    const route = await (dependencies.resolveCheckoutRouteSnapshot || resolveCheckoutRouteSnapshot)({ productCode: lockedQuote.packageSnapshot?.gameCode, packageCode: lockedQuote.packageSnapshot?.packageCode, region: lockedQuote.commercialSnapshot?.region });
-                    return route.ready ? { allowed: true, supplierRouteSnapshot: route.routeSnapshot } : { allowed: false, reasonCode: route.blockers?.[0] || "PRIMARY_SUPPLIER_NOT_READY" };
-                },
+                validateOperationalPackageState: args => (dependencies.validatePaymentCatalogEligibility || validatePaymentCatalogEligibility)(args, dependencies.catalogEligibilityDependencies || {}),
                 validateFulfilmentInput: async ({ customerInput }) => ({ allowed: true, normalisedFulfilmentInput: customerInput }),
                 validatePaymentMethod: async () => ({ allowed: true, paymentSnapshot: { paymentMethodId: method.key, paymentChannel: "TMW_PROMPTPAY", provider: TMW_PROVIDER_ID, providerType: "automatic", flowType: "automatic_provider", confirmationMode: "provider_webhook", nextAction: "OPEN_PROVIDER_QR", paymentMethodBound: true, metadata: { methodName: method.method, region, confirmationMode: "provider_webhook", qrMode: "provider_generated" } }, nextAction: "OPEN_PROVIDER_QR" }),
                 validatePromotionRedemption: async ({ quote: lockedQuote, orderId }) => {

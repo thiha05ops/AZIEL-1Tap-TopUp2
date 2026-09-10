@@ -22,7 +22,7 @@ const product = {
 };
 const pkg = { _id: "pkg1", productCode: "mlbb", packageCode: "MLBB_1", enabled: true, deletedAt: null, customerNote: "note", prices: { MM: { amount: 1000, enabled: true }, TH: { amount: 30, enabled: true } } };
 const supplier = { _id: "supplier1", enabled: true, mode: "API", supportedRegions: ["MM", "TH"] };
-const apiMapping = { supplierId: "supplier1", productCode: "mlbb", packageCode: "MLBB_1", region: "MM", enabled: true, productionRole: "PRIMARY", executionMode: "API" };
+const apiMapping = { supplierId: "supplier1", supplierCode: "WONDD", productCode: "mlbb", packageCode: "MLBB_1", supplierProductCode: "mlbb", supplierPackageCode: "MLBB_1", region: "MM", enabled: true, archivedAt: null, productionRole: "PRIMARY", executionMode: "API", fulfillmentEligibility: { mode: "CUSTOMER_MARKET_ALLOWLIST", allowedCustomerMarkets: ["MM"], evidenceCode: "CONTROLLED_TEST", evidenceSource: "TEST", verifiedAt: new Date(), version: 1 }, mappingMetadata: { readiness: { supplierMapped: true, inputReady: true, validationReady: true, pricingReady: true, fulfillmentReady: true, storefrontReady: true } } };
 
 function publicStateFor(testProduct, packages, mappings) {
     const commerce = projectCommerceReadiness(testProduct, packages, mappings, []);
@@ -43,7 +43,7 @@ function publicStateFor(testProduct, packages, mappings) {
     assert.equal(publicStateFor(noManual, [pkg], []).projection.publicReadiness.regions.MM.state, "COMING_SOON");
 
     const manualCapability = resolveFulfillmentCapability({ product, mappings: [], suppliers: [], productCode: "mlbb", packageCode: "MLBB_1", region: "MM" });
-    const automatedCapability = resolveFulfillmentCapability({ product: noManual, mappings: [apiMapping], suppliers: [supplier], productCode: "mlbb", packageCode: "MLBB_1", region: "MM" });
+    const automatedCapability = resolveFulfillmentCapability({ product: noManual, mappings: [apiMapping], suppliers: [supplier], productCode: "mlbb", packageCode: "MLBB_1", region: "MM", context: { adapterResolver: () => ({ isConfigured: () => true, isAutoFulfillmentEnabled: () => true }), mappingSupportResolver: () => true } });
     assert(manualCapability.fulfillmentAvailable && manualCapability.manualAdminAllowed);
     assert(automatedCapability.fulfillmentAvailable && automatedCapability.automatedAvailable);
 
@@ -66,7 +66,8 @@ function publicStateFor(testProduct, packages, mappings) {
     } };
     const commerceOrderModel = { updateOne: async () => ({ acknowledged: true }) };
     const paidOrder = { _id: "orderObjectId", orderId: "AZL-1", schemaVersion: "1", commerce: { source: "QUOTE_CHECKOUT" }, product: { gameCode: "mlbb", packageCode: "MLBB_1", region: "MM" }, commercial: { region: "MM" }, paymentStatus: "paid" };
-    const routingOptions = { attemptModel, commerceOrderModel, loadCapability: async () => manualCapability };
+    const unavailableRoute = async () => ({ ready: false, blockers: ["PROVIDER_FEATURE_GATE_OFF"], routeSnapshot: null });
+    const routingOptions = { attemptModel, commerceOrderModel, resolveCurrentRoute: unavailableRoute, loadProduct: async () => product };
     const first = await ensurePaidOrderFulfillmentWork(paidOrder, routingOptions);
     const retry = await ensurePaidOrderFulfillmentWork(paidOrder, routingOptions);
     assert.equal(first.attempt.routeType, "MANUAL_ADMIN");
@@ -74,6 +75,35 @@ function publicStateFor(testProduct, packages, mappings) {
     assert.equal(first.attempt.supplierMappingId, null);
     assert.equal(retry.attempt.fulfillmentId, first.attempt.fulfillmentId);
     assert.equal(insertCount, 1);
+
+    // An unavailable PRIMARY does not revoke explicit regional manual authority.
+    const primaryUnavailable = await ensurePaidOrderFulfillmentWork({ ...paidOrder, orderId: "AZL-PRIMARY-OFF" }, routingOptions);
+    assert.equal(primaryUnavailable.reason, "MANUAL_ADMIN_QUEUED");
+
+    // No automatic route and no explicit manual authority remains a paid operational failure.
+    const noRoute = await ensurePaidOrderFulfillmentWork({ ...paidOrder, orderId: "AZL-NO-ROUTE" }, { ...routingOptions, loadProduct: async () => noManual });
+    assert.equal(noRoute.reason, "NO_AUTHORIZED_FULFILLMENT_ROUTE");
+    assert.equal(noRoute.errorCode, "PROVIDER_FEATURE_GATE_OFF");
+    assert.equal(noRoute.attempt, null);
+
+    // Current automatic routing is selected after PAID and remains idempotent.
+    let currentSupplierStarts = 0;
+    const autoAttempts = new Map();
+    const readyRoute = { routeType: "SUPPLIER_API", supplierMappingId: "mapping-current", supplierCode: "WONDD", productCode: "mlbb", packageCode: "MLBB_1", region: "MM" };
+    const autoOptions = {
+        ...routingOptions,
+        resolveCurrentRoute: async () => ({ ready: true, blockers: [], routeSnapshot: readyRoute }),
+        findAttemptByIdempotency: async key => autoAttempts.get(key) || null,
+        startSupplierFulfillment: async (_orderCode, payload) => {
+            currentSupplierStarts += 1;
+            const attempt = { fulfillmentId: "FUL-CURRENT", supplierMappingId: payload.mappingId };
+            autoAttempts.set(payload.idempotencyKey, attempt);
+            return attempt;
+        }
+    };
+    assert.equal((await ensurePaidOrderFulfillmentWork({ ...paidOrder, status: "paid", orderId: "AZL-CURRENT" }, autoOptions)).reason, "SUPPLIER_FULFILLMENT_STARTED");
+    assert.equal((await ensurePaidOrderFulfillmentWork({ ...paidOrder, status: "paid", orderId: "AZL-CURRENT" }, autoOptions)).reason, "SUPPLIER_FULFILLMENT_ALREADY_BOUND");
+    assert.equal(currentSupplierStarts, 1);
 
     // Snapshot authority wins over later capability changes.
     const snapshottedManualOrder = { ...paidOrder, orderId: "AZL-2", fulfilment: { routeSnapshot: { routeType: "MANUAL_ADMIN", supplierCode: "AZIEL_ADMIN", productCode: "mlbb", packageCode: "MLBB_1", region: "MM" } } };

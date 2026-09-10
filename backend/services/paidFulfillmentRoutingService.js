@@ -1,8 +1,10 @@
 const crypto = require("crypto");
 const CommerceOrder = require("../models/CommerceOrder");
 const FulfillmentAttempt = require("../models/FulfillmentAttempt");
+const CatalogProduct = require("../models/CatalogProduct");
 const { FULFILLMENT_ROUTE_TYPES, FULFILLMENT_STATUSES } = require("../models/FulfillmentAttempt");
-const { loadFulfillmentCapability } = require("./fulfillmentCapabilityService");
+const { isManualFulfillmentAllowed } = require("./fulfillmentCapabilityService");
+const { resolveCheckoutRouteSnapshot } = require("./supplierProductionSelectionService");
 
 function fulfillmentIdentity(order = {}) {
     return {
@@ -36,7 +38,7 @@ async function ensurePaidOrderFulfillmentWork(order = {}, options = {}) {
     if (paymentStatus !== "paid") return { created: false, reason: "ORDER_NOT_PAID", attempt: null };
 
     const routeSnapshot = order.fulfilment?.routeSnapshot || null;
-    let capability = null;
+    let routing = null;
     if (routeSnapshot) {
         const routeCustomerMarket = Number(routeSnapshot.snapshotVersion) === 2
             ? String(routeSnapshot.customerMarket || "").trim().toUpperCase()
@@ -66,14 +68,23 @@ async function ensurePaidOrderFulfillmentWork(order = {}, options = {}) {
         }
         if (routeSnapshot.routeType !== FULFILLMENT_ROUTE_TYPES.MANUAL_ADMIN) return { created: false, reason: "SUPPLIER_ROUTE_SNAPSHOT_BOUND", attempt: null, routeSnapshot };
     } else {
-        capability = await (options.loadCapability || loadFulfillmentCapability)({
+        routing = await (options.resolveCurrentRoute || resolveCheckoutRouteSnapshot)({
             productCode: identity.productCode,
             packageCode: identity.packageCode,
-            region: identity.region,
-            session: options.session || null
+            region: identity.region
         });
-        if (capability.automatedAvailable) return { created: false, reason: "AUTOMATED_ROUTE_AVAILABLE", attempt: null, capability };
-        if (!capability.manualAdminAllowed) return { created: false, reason: "MANUAL_ADMIN_NOT_ALLOWED", attempt: null, capability };
+        if (routing?.ready && routing.routeSnapshot?.routeType === FULFILLMENT_ROUTE_TYPES.SUPPLIER_API) {
+            return ensurePaidOrderFulfillmentWork({ ...order, fulfilment: { ...(order.fulfilment || {}), routeSnapshot: routing.routeSnapshot } }, options);
+        }
+        const loadProduct = options.loadProduct || (async productCode => {
+            const request = CatalogProduct.findOne({ productCode, enabled: true, deletedAt: null });
+            if (options.session) request.session(options.session);
+            return request.lean();
+        });
+        const product = await loadProduct(identity.productCode);
+        if (!product || !isManualFulfillmentAllowed(product, identity.region)) {
+            return { created: false, reason: "NO_AUTHORIZED_FULFILLMENT_ROUTE", errorCode: routing?.blockers?.[0] || "MANUAL_ADMIN_NOT_ALLOWED", attempt: null, routing };
+        }
     }
 
     const idempotencyKey = manualAdminIdempotencyKey(identity.orderCode);
@@ -120,7 +131,7 @@ async function ensurePaidOrderFulfillmentWork(order = {}, options = {}) {
             updateOptions
         );
     }
-    return { created: true, reason: "MANUAL_ADMIN_QUEUED", attempt, capability, routeSnapshot };
+    return { created: true, reason: "MANUAL_ADMIN_QUEUED", attempt, routing, routeSnapshot };
 }
 
 module.exports = {

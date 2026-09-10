@@ -580,7 +580,7 @@ async function testPostCommitFulfillmentFailureDoesNotRollbackPayment() {
     const store = createStore({ order: { paymentStatus: "pending", payment: { ...order().payment, status: "pending" } }, attempts: [baseAttempt] });
     const failures = [];
     await createOrchestrator(store, {
-        paidFulfillmentHandler: async () => ({ created: false, reason: "SUPPLIER_FULFILLMENT_START_FAILED", errorCode: "MOCK_START_FAILED" }),
+        paidFulfillmentHandler: async () => ({ created: false, reason: "NO_AUTHORIZED_FULFILLMENT_ROUTE", errorCode: "MANUAL_ADMIN_NOT_ALLOWED" }),
         paidFulfillmentFailureRecorder: async failure => failures.push(clone(failure))
     }).handleProviderEvent({
         providerEvent: {
@@ -597,7 +597,8 @@ async function testPostCommitFulfillmentFailureDoesNotRollbackPayment() {
     assert.strictEqual(store.orders[0].paymentStatus, "paid", "fulfillment failure cannot roll back committed payment.");
     assert.strictEqual(store.orders[0].status, "paid", "fulfillment failure cannot roll back committed lifecycle.");
     assert.strictEqual(failures.length, 1, "post-commit failure is surfaced to durable failure recorder.");
-    assert.strictEqual(failures[0].errorCode, "MOCK_START_FAILED");
+    assert.strictEqual(failures[0].reason, "NO_AUTHORIZED_FULFILLMENT_ROUTE");
+    assert.strictEqual(failures[0].errorCode, "MANUAL_ADMIN_NOT_ALLOWED");
 }
 
 async function testIdempotentPaidEventConvergesFulfillment() {

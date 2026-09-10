@@ -391,7 +391,7 @@ function createPaymentOrchestrator(dependencies = {}) {
             };
         }
 
-        const failed = result?.reason === "SUPPLIER_FULFILLMENT_START_FAILED" || result?.reason === "PAID_FULFILLMENT_POST_COMMIT_FAILED" || result?.reason === "POST_COMMIT_ORDER_NOT_PAID";
+        const failed = result?.reason === "SUPPLIER_FULFILLMENT_START_FAILED" || result?.reason === "NO_AUTHORIZED_FULFILLMENT_ROUTE" || result?.reason === "PAID_FULFILLMENT_POST_COMMIT_FAILED" || result?.reason === "POST_COMMIT_ORDER_NOT_PAID";
         if (failed) {
             deps.logger.error?.("Paid fulfillment post-commit start failed.", {
                 orderId,
