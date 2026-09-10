@@ -605,6 +605,18 @@ function createPaymentOrchestrator(dependencies = {}) {
             }), intent);
         } catch (error) {
             if (error instanceof PaymentOrchestratorError) throw error;
+
+            console.error("[payment-provider-error]", JSON.stringify({
+                provider: intent.provider || "",
+                orderId,
+                attemptId,
+                errorName: error?.name || "",
+                errorCode: error?.code || "",
+                errorStage: error?.stage || "",
+                retryable: error?.retryable === true,
+                submissionUncertain: error?.submissionUncertain === true
+            }));
+
             throw new PaymentOrchestratorError(ERROR_CODES.PAYMENT_PROVIDER_ERROR, "Payment provider failed.", {
                 stage: "provider",
                 causeCode: error?.code || "",
