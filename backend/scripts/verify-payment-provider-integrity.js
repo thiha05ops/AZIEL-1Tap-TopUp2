@@ -29,6 +29,7 @@ function verifyProviderRegistry() {
     const registry = read("backend/services/paymentProviderRegistry.js");
     [
         "promptpay",
+        "tmw",
         "scb",
         "bangkok_bank",
         "kplus",
@@ -44,7 +45,7 @@ function verifyProviderRegistry() {
 
     includes("backend/services/paymentProviderRegistry.js", "TH: {", "registry must define Thailand provider rules");
     includes("backend/services/paymentProviderRegistry.js", "MM: {", "registry must define Myanmar provider rules");
-    assert.deepStrictEqual(validProvidersFor("TH", "auto").map(item => item.key), ["promptpay"], "Thailand auto must only allow PromptPay");
+    assert.deepStrictEqual(validProvidersFor("TH", "auto").map(item => item.key), ["tmw", "promptpay"], "Thailand auto must allow the TMW and legacy PromptPay providers");
     assert.deepStrictEqual(validProvidersFor("TH", "deeplink").map(item => item.key), ["scb", "bangkok_bank", "kplus", "krungsri", "krungthai"], "Thailand deeplink must exclude Myanmar providers");
     assert.deepStrictEqual(validProvidersFor("MM", "manual").map(item => item.key), ["kbzpay", "wavepay", "ayapay", "mmqr", "manual_bank"], "Myanmar manual must exclude Thai banks");
     includes("backend/services/paymentProviderRegistry.js", "omise: \"promptpay\"", "legacy Omise provider must normalize to PromptPay");

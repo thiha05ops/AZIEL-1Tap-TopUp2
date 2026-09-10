@@ -215,6 +215,7 @@ function configureDatabaseApplication(mongoConnection) {
         app.use("/api", require(`./routes/${route}`))
     );
     app.use("/api", require("./routes/commerceManualPaymentRoutes")());
+    app.use("/api", require("./routes/tmwPaymentRoutes")());
 
     app.use("/api", (err, req, res, next) => {
         if (!err) return next();

@@ -56,8 +56,8 @@ function createAttempt(provider, attemptId) {
 
     assert.deepStrictEqual(
         queriedProviders.sort(),
-        ["MANUAL_PROMPTPAY", "promptpay"].sort(),
-        "recovery must query both Manual PromptPay provider aliases"
+        ["MANUAL_ADMIN", "MANUAL_PROMPTPAY", "TMW", "promptpay"].sort(),
+        "recovery must query Manual PromptPay aliases and TMW"
     );
     assert.deepStrictEqual(
         recovered.map(item => item.attemptId).sort(),

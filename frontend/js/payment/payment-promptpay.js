@@ -29,26 +29,27 @@
             confirmBtn.innerText = "Waiting for Payment";
         }
 
-        PaymentUtils.startCountdown(600);
+        const seconds = paymentSession.expiresAt ? Math.max(0, Math.floor((new Date(paymentSession.expiresAt).getTime() - Date.now()) / 1000)) : 600;
+        PaymentUtils.startCountdown(seconds);
 
         modal.classList.add("show");
-        startPolling(orderData.orderId);
+        startPolling(orderData.orderId, paymentSession);
     }
 
-    function startPolling(orderId) {
+    function startPolling(orderId, paymentSession = {}) {
         stopPolling();
 
         pollingTimer = setInterval(async () => {
             try {
-                const res = await fetch(
-                    PaymentUtils.apiUrl(`/api/payment/status/${orderId}`)
-                );
+                const isTmw = String(paymentSession.provider || "").toLowerCase() === "tmw" && paymentSession.attemptId;
+                const res = await fetch(PaymentUtils.apiUrl(isTmw ? `/api/commerce/payments/tmw/${encodeURIComponent(paymentSession.attemptId)}` : `/api/payment/status/${orderId}`), { headers: PaymentUtils.authHeaders?.() || {} });
 
                 const data = await res.json();
 
                 if (!data.success) return;
 
-                if (data.status === "paid") {
+                const paymentStatus = data.payment?.paymentStatus || data.paymentStatus || data.status;
+                if (paymentStatus === "paid") {
                     completeGuideStep("wait_for_confirmation");
                     stopPolling();
                     PaymentUtils.stopCountdown();
@@ -56,7 +57,7 @@
                     PaymentUtils.showSuccess(
                         orderId,
                         "Payment Success",
-                        "Payment detected. Admin will process your top-up soon."
+                        "Payment detected. Your top-up is being processed."
                     );
                 }
             } catch (error) {

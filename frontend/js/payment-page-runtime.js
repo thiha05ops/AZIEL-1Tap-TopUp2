@@ -57,7 +57,8 @@
             } });
             return;
         }
-        window.PaymentManual.show(order, session);
+        if (String(staged.paymentType || session.paymentType || payment.paymentType || "").toLowerCase() === "auto") window.PaymentPromptPay.show(order, session);
+        else window.PaymentManual.show(order, session);
     }
 
     function showCompletion({ orderId, paid = false, amount = null, currency = "", methodName = "", reference = "", manualSubmission = false } = {}) {
@@ -103,6 +104,11 @@
         document.getElementById("paymentPageTitle").textContent = t("payment.resume", "Resume payment");
         document.getElementById("paymentSessionMount").innerHTML = "";
         renderSummary(recovery, recovery, { method: recovery.paymentName || "PromptPay QR" });
+        if (String(recovery.provider || "").toLowerCase() === "tmw") {
+            window.selectedPaymentData = recovery;
+            window.PaymentPromptPay.show(recovery, { ...recovery, qrUrl: recovery.qrImage || recovery.qrImageUrl || recovery.dynamicQr?.qrImage || "" });
+            return true;
+        }
         if (String(recovery.provider || "").toUpperCase() === "MANUAL_ADMIN" || String(recovery.region || "").toUpperCase() === "MM") {
             if (recovery.receiptSubmitted === true || recovery.receiptEvidence?.attached === true) {
                 showCompletion({ orderId: recovery.orderId || recovery.commerceOrderId, paid: false, amount: recovery.amount, currency: recovery.currency, methodName: recovery.paymentName || recovery.paymentMethod, reference: recovery.reference, manualSubmission: true });
@@ -117,6 +123,19 @@
 
     async function recover(marker) {
         if (!marker?.orderId || !marker?.attemptId) return false;
+        if (String(marker.provider || "").toLowerCase() === "tmw") {
+            const res = await fetch(`/api/commerce/payments/tmw/${encodeURIComponent(marker.attemptId)}/refresh`, { method: "POST", headers: window.PaymentUtils?.authHeaders?.() || {} });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) return false;
+            const payment = data.payment || {};
+            if (payment.paymentStatus === "paid") {
+                showCompletion({ orderId: marker.orderId, paid: true, amount: payment.amount, currency: payment.currency, methodName: "TMW PromptPay", reference: payment.attemptId });
+                return true;
+            }
+            const session = { ...payment, commerce: true, commerceOrderId: marker.orderId, orderId: marker.orderId, paymentType: "auto", provider: "tmw", paymentMethod: "tmw_promptpay", paymentName: "TMW PromptPay", qrImage: payment.qr?.image || "", qrUrl: payment.qr?.image || "", receiptUploadEnabled: false, slipRequired: false };
+            showStaged({ session, orderData: marker, selectedPayment: session, paymentType: "auto" });
+            return true;
+        }
         const res = await fetch(`/api/commerce/orders/${encodeURIComponent(marker.orderId)}/payments/manual-promptpay?attemptId=${encodeURIComponent(marker.attemptId)}`, { headers: window.PaymentUtils?.authHeaders?.() || {} });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.success) return false;

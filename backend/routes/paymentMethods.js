@@ -41,8 +41,10 @@ const {
     projectRecoverableAttempt
 } = require("../services/pendingPaymentRecoveryService");
 const notificationService = require("../services/notificationService");
+const { configurationFromEnvironment: tmwConfigurationFromEnvironment } = require("../services/tmwEasyApiClient");
 
 const CANONICAL_PROVIDER_BY_KEY = Object.freeze({
+    tmw_promptpay: "tmw",
     promptpay: "promptpay",
     scb: "scb",
     bangkok_bank: "bangkok_bank",
@@ -131,6 +133,27 @@ const defaultPromptPayBankLaunchers = Object.freeze([
 ]);
 
 const defaultMethods = [
+    {
+        method: "TMW PromptPay",
+        key: "tmw_promptpay",
+        region: "TH",
+        enabled: false,
+        paymentType: "auto",
+        provider: "tmw",
+        railType: "AUTO_PROMPTPAY",
+        availabilityMode: "AUTO_WITH_MANUAL_FALLBACK",
+        qrMode: "provider_generated",
+        receiptUploadEnabled: false,
+        slipRequired: false,
+        confirmationMode: "provider_webhook",
+        dynamicQrSupported: true,
+        amountPrefillSupported: true,
+        autoVerificationSupported: true,
+        webhookSupported: true,
+        badgeText: "Automatic",
+        shortDescription: "PromptPay with automatic confirmation",
+        sortOrder: 5
+    },
     {
         method: "KBZPay",
         key: "kbzpay",
@@ -816,8 +839,8 @@ function capabilityProjection(obj = {}) {
         enableSaveQr: qrApplicable && obj.enableSaveQr === true,
         enableOpenApp: (bankAppApplicable || promptPayApplicable) && obj.enableOpenApp === true,
         enableChecklist: checklistApplicable && obj.enableChecklist === true,
-        dynamicQrSupported: promptPayApplicable && obj.dynamicQrSupported === true,
-        amountPrefillSupported: promptPayApplicable && obj.amountPrefillSupported === true,
+        dynamicQrSupported: (promptPayApplicable || kind === PAYMENT_CONFIGURATION_KINDS.AUTOMATIC_PROVIDER) && obj.dynamicQrSupported === true,
+        amountPrefillSupported: (promptPayApplicable || kind === PAYMENT_CONFIGURATION_KINDS.AUTOMATIC_PROVIDER) && obj.amountPrefillSupported === true,
         referenceSupported: qrApplicable && obj.referenceSupported === true,
         galleryScanSupported: (bankAppApplicable || promptPayApplicable) && obj.galleryScanSupported === true,
         slipRequired: checklistApplicable ? isSlipRequired(obj) : false,
@@ -940,7 +963,14 @@ function formatMethod(method) {
     const qrImage = configurationKind === PAYMENT_CONFIGURATION_KINDS.MANUAL_QR && !isDynamicPromptPayQr ? configuredQrImage : null;
     const displaySource = Object.assign({}, obj, { provider });
     const capabilityState = paymentMethodCapabilityState(displaySource);
-    const readiness = { ready: capabilityState.publicReady, missing: capabilityState.missingConfiguration };
+    const tmwConfiguration = provider === "tmw" ? tmwConfigurationFromEnvironment(process.env) : null;
+    const providerReady = !tmwConfiguration || tmwConfiguration.ready;
+    const readiness = {
+        ready: capabilityState.publicReady && providerReady,
+        missing: providerReady
+            ? capabilityState.missingConfiguration
+            : [...new Set([...(capabilityState.missingConfiguration || []), ...(tmwConfiguration.missing || []).map(item => `tmw:${item}`)])]
+    };
 
     const publicMethodName = obj.region === "TH" && obj.key === "promptpay" && isDynamicPromptPayQr
         ? "PromptPay QR"
@@ -974,8 +1004,8 @@ function formatMethod(method) {
         logoUrl: safePublicAssetUrl(obj.logoUrl) || getPaymentLogo(displaySource),
         trustDisplay,
         publicReady: readiness.ready,
-        customerVisible: capabilityState.customerVisible,
-        unavailableReason: capabilityState.unavailableReason,
+        customerVisible: capabilityState.customerVisible && providerReady,
+        unavailableReason: providerReady ? capabilityState.unavailableReason : "Automatic PromptPay is not configured",
         applicableSections: capabilityState.applicableSections,
         missingConfiguration: readiness.missing,
         ...capabilityProjection(obj)

@@ -319,6 +319,7 @@ function createPaymentOrchestrator(dependencies = {}) {
         logger: dependencies.logger || console,
         paidFulfillmentHandler: dependencies.paidFulfillmentHandler || null,
         paidFulfillmentFailureRecorder: dependencies.paidFulfillmentFailureRecorder || null,
+        paidSettlementHandler: dependencies.paidSettlementHandler || null,
         allowLatePaymentReconciliation: dependencies.allowLatePaymentReconciliation === true
     };
     assertProviderFunction(deps.providerResolver, "providerResolver");
@@ -413,6 +414,23 @@ function createPaymentOrchestrator(dependencies = {}) {
         return result;
     }
 
+    async function runPostCommitPaidSettlement(applied = {}) {
+        if (typeof deps.paidSettlementHandler !== "function") return null;
+        if (normalizeState(applied.attempt?.status) !== PAYMENT_STATES.PAID) return null;
+        const orderId = normalizeString(applied.order?.orderId || applied.attempt?.orderId);
+        if (!orderId) return null;
+        try {
+            const committedOrder = await loadOperationalOrder({ orderId });
+            return await deps.paidSettlementHandler(committedOrder);
+        } catch (error) {
+            deps.logger.error?.("Paid payment settlement post-commit failed.", {
+                orderId,
+                errorCode: normalizeString(error?.code || error?.name || "PAID_SETTLEMENT_FAILED")
+            });
+            return { settled: false, reason: "PAID_SETTLEMENT_FAILED" };
+        }
+    }
+
     function buildIntent(order, input = {}) {
         const amount = amountFromOrder(order);
         const currency = currencyFromOrder(order);
@@ -442,7 +460,8 @@ function createPaymentOrchestrator(dependencies = {}) {
             paymentSnapshot: payment,
             commercialSnapshot: clonePlain(order.commercial || order.commercialSnapshot || {}),
             idempotencyKey: normalizeString(input.idempotencyKey),
-            traceId: normalizeString(input.traceId || input.requestMetadata?.traceId)
+            traceId: normalizeString(input.traceId || input.requestMetadata?.traceId),
+            clientIp: normalizeString(input.clientIp || input.requestMetadata?.clientIp)
         });
     }
 
@@ -633,6 +652,7 @@ function createPaymentOrchestrator(dependencies = {}) {
                 };
             });
             await runPostCommitPaidFulfillment(applied);
+            await runPostCommitPaidSettlement(applied);
             return buildPublicResult({ attempt: applied.attempt, order: applied.order, outcome: "created" });
         } catch (error) {
             if (typeof deps.paymentAttemptPort.recordFailure === "function") {
@@ -697,17 +717,32 @@ function createPaymentOrchestrator(dependencies = {}) {
         const result = normalizeProviderResult(await query.call(adapter, { attempt: detachAttempt(attempt), intent }), intent);
         const currentState = normalizeState(attempt.status);
         if (currentState === result.status) {
-            return buildPublicResult({ attempt, order, idempotent: true, outcome: "no_change" });
+            const refreshedAttempt = await runTransaction(async transactionContext => {
+                if (!result.providerReference || typeof deps.paymentAttemptPort.setProviderReference !== "function") return attempt;
+                return await deps.paymentAttemptPort.setProviderReference({
+                    attemptId: attempt.attemptId, providerReference: result.providerReference,
+                    providerTransactionId: result.providerTransactionId, rawProviderStatus: result.rawProviderStatus,
+                    qr: result.qr, expiresAt: result.expiresAt, paymentInstructions: result.paymentInstructions,
+                    safeMetadata: result.safeMetadata, transactionContext
+                }) || attempt;
+            });
+            return buildPublicResult({ attempt: refreshedAttempt, order, idempotent: true, outcome: "no_change" });
         }
         assertTransition(currentState, result.status, { allowLatePaymentReconciliation: deps.allowLatePaymentReconciliation });
-        const applied = await runTransaction(transactionContext => applyPaymentStatus({
-            order,
-            attempt,
-            toStatus: result.status,
-            reason: "Payment refreshed",
-            transactionContext
-        }));
+        const applied = await runTransaction(async transactionContext => {
+            let refreshedAttempt = attempt;
+            if (result.providerReference && typeof deps.paymentAttemptPort.setProviderReference === "function") {
+                refreshedAttempt = await deps.paymentAttemptPort.setProviderReference({
+                    attemptId: attempt.attemptId, providerReference: result.providerReference,
+                    providerTransactionId: result.providerTransactionId, rawProviderStatus: result.rawProviderStatus,
+                    qr: result.qr, expiresAt: result.expiresAt, paymentInstructions: result.paymentInstructions,
+                    safeMetadata: result.safeMetadata, transactionContext
+                }) || attempt;
+            }
+            return applyPaymentStatus({ order, attempt: refreshedAttempt, toStatus: result.status, reason: "Payment refreshed", transactionContext });
+        });
         await runPostCommitPaidFulfillment(applied);
+        await runPostCommitPaidSettlement(applied);
         return buildPublicResult({ attempt: applied.attempt, order: applied.order, outcome: "refreshed" });
     }
 
@@ -777,7 +812,7 @@ function createPaymentOrchestrator(dependencies = {}) {
             adapter &&
             typeof adapter.handleProviderEvent === "function" &&
             typeof adapter.supportsCapability === "function" &&
-            adapter.supportsCapability("MANUAL_APPROVAL")
+            (adapter.supportsCapability("MANUAL_APPROVAL") || adapter.supportsCapability("WEBHOOK"))
         ) {
             try {
                 providerEventResult = await adapter.handleProviderEvent({
@@ -828,6 +863,7 @@ function createPaymentOrchestrator(dependencies = {}) {
             }
             if (result.status === PAYMENT_STATES.PAID) {
                 await runPostCommitPaidFulfillment({ attempt, order });
+                await runPostCommitPaidSettlement({ attempt, order });
             }
             return buildPublicResult({ attempt, order, idempotent: true, outcome: "event_no_change" });
         }
@@ -861,6 +897,7 @@ function createPaymentOrchestrator(dependencies = {}) {
             });
         });
         await runPostCommitPaidFulfillment(applied);
+        await runPostCommitPaidSettlement(applied);
         return buildPublicResult({ attempt: applied.attempt, order: applied.order, outcome: "provider_event_applied" });
     }
 

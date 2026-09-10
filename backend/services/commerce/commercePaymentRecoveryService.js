@@ -6,7 +6,8 @@ const paymentAttemptRepository = require("./paymentAttemptRepository");
 const SERVICE_VERSION = "commerce.payment-recovery.v1";
 const MANUAL_PROMPTPAY_PROVIDER = "MANUAL_PROMPTPAY";
 const MANUAL_ADMIN_PROVIDER = "MANUAL_ADMIN";
-const MANUAL_PROMPTPAY_PROVIDER_ALIASES = Object.freeze(["promptpay", MANUAL_PROMPTPAY_PROVIDER, MANUAL_ADMIN_PROVIDER]);
+const TMW_PROVIDER = "TMW";
+const MANUAL_PROMPTPAY_PROVIDER_ALIASES = Object.freeze(["promptpay", MANUAL_PROMPTPAY_PROVIDER, MANUAL_ADMIN_PROVIDER, TMW_PROVIDER]);
 const RECOVERABLE_STATUSES = Object.freeze(["PENDING"]);
 const RECOVERABLE_ORDER_STATUSES = Object.freeze(new Set(["pending_payment"]));
 const RECOVERABLE_ORDER_PAYMENT_STATUSES = Object.freeze(new Set(["pending", "unpaid"]));
@@ -73,11 +74,12 @@ function attemptRecoverable(attempt = {}, order = {}, owner = {}, now = new Date
     if (!attempt?.attemptId || !order?.orderId) return false;
     if (!sameOwner(owner, attempt.owner) || !sameOwner(owner, order.owner)) return false;
     const provider = text(attempt.provider).toUpperCase();
-    if (!normalizeManualPromptPayProvider(provider) && provider !== MANUAL_ADMIN_PROVIDER) return false;
+    if (!normalizeManualPromptPayProvider(provider) && provider !== MANUAL_ADMIN_PROVIDER && provider !== TMW_PROVIDER) return false;
     if (!RECOVERABLE_STATUSES.includes(text(attempt.status).toUpperCase())) return false;
     if (!notExpired(attempt, now)) return false;
     if (!orderRecoverable(order)) return false;
     if (provider === MANUAL_ADMIN_PROVIDER) return true;
+    if (provider === TMW_PROVIDER) return Boolean(attempt.providerReference && attempt.qr?.image && attempt.qr?.mode === "provider_generated");
     if (hasReceiptEvidence(attempt)) return false;
     const qr = attempt.qr || {};
     return Boolean(qr.image && (qr.mode || "aziel_promptpay_dynamic") === "aziel_promptpay_dynamic");
@@ -115,6 +117,7 @@ function projectRecoverableCommerceAttempt({ attempt = {}, order = {}, now = new
     const qr = attempt.qr || {};
     const instructions = attempt.paymentInstructions || {};
     const orderReference = qr.encodedReference || attempt.providerReference || attempt.attemptId;
+    const automaticTmw = text(attempt.provider).toUpperCase() === TMW_PROVIDER;
     return {
         architecture: "commerce",
         commerce: true,
@@ -144,19 +147,19 @@ function projectRecoverableCommerceAttempt({ attempt = {}, order = {}, now = new
         currency: attempt.currency || commercial.currency || "",
         region: attempt.region || commercial.region || product.region || "",
         paymentMethod: attempt.paymentMethod || order.payment?.paymentMethodId || "promptpay",
-        paymentType: "manual",
-        provider: "promptpay",
+        paymentType: automaticTmw ? "auto" : "manual",
+        provider: automaticTmw ? "tmw" : "promptpay",
         paymentName: instructions.title || "PromptPay QR",
-        qrMode: qr.mode || "aziel_promptpay_dynamic",
-        confirmationMode: attempt.confirmationMode || instructions.confirmationMode || "manual_admin",
-        receiptUploadEnabled: true,
-        slipRequired: true,
+        qrMode: qr.mode || (automaticTmw ? "provider_generated" : "aziel_promptpay_dynamic"),
+        confirmationMode: attempt.confirmationMode || instructions.confirmationMode || (automaticTmw ? "provider_webhook" : "manual_admin"),
+        receiptUploadEnabled: !automaticTmw,
+        slipRequired: !automaticTmw,
         checklistSteps: Array.isArray(instructions.steps) ? instructions.steps : [],
         instructions: {
             method: instructions.title || "PromptPay QR",
             key: attempt.paymentMethod || "promptpay",
-            qrMode: qr.mode || "aziel_promptpay_dynamic",
-            confirmationMode: attempt.confirmationMode || instructions.confirmationMode || "manual_admin",
+            qrMode: qr.mode || (automaticTmw ? "provider_generated" : "aziel_promptpay_dynamic"),
+            confirmationMode: attempt.confirmationMode || instructions.confirmationMode || (automaticTmw ? "provider_webhook" : "manual_admin"),
             enableSaveQr: true,
             enableOpenApp: true,
             enableChecklist: true,
@@ -164,8 +167,8 @@ function projectRecoverableCommerceAttempt({ attempt = {}, order = {}, now = new
             amountPrefillSupported: true,
             referenceSupported: true,
             galleryScanSupported: true,
-            receiptUploadEnabled: true,
-            slipRequired: true,
+            receiptUploadEnabled: !automaticTmw,
+            slipRequired: !automaticTmw,
             openAppMode: "bank_chooser",
             appLaunchMode: "APP_ONLY",
             appDisplayName: "PromptPay",

@@ -1,6 +1,7 @@
 const PaymentProviderConfig = require("../models/PaymentProviderConfig");
 const { getProviderAdapter, listProviderAdapters } = require("./paymentProviderAdapterRegistry");
 const { formatPaymentMethod } = require("./paymentDisplayNameService");
+const { configurationFromEnvironment: tmwConfigurationFromEnvironment } = require("./tmwEasyApiClient");
 
 const RAIL_TYPES = Object.freeze({
     MANUAL_QR: "MANUAL_QR",
@@ -77,6 +78,19 @@ function safeProviderEnvironmentStatus(env = {}) {
 function envStatusFromProcess(providerCode = "", environment = "TEST") {
     const code = String(providerCode || "").toUpperCase();
     const prefix = environment === "LIVE" ? "LIVE" : "TEST";
+    if (code === "TMW") {
+        const config = tmwConfigurationFromEnvironment(process.env);
+        return {
+            environment,
+            enabled: config.ready,
+            publicKeyConfigured: true,
+            secretKeyConfigured: Boolean(config.username && config.password),
+            webhookSecretConfigured: Boolean(config.apiKey),
+            merchantIdentifierConfigured: Boolean(config.conId && config.promptPayId && ["01", "02"].includes(config.promptPayType)),
+            healthState: config.ready ? STATUS.READY : STATUS.NOT_CONFIGURED,
+            missingConfiguration: config.missing
+        };
+    }
     if (code !== "OMISE") {
         return {
             environment,
@@ -103,14 +117,18 @@ function providerReadiness(provider = {}) {
     const adapter = getProviderAdapter(provider.adapterName);
     const missing = [];
     if (!adapter) missing.push("adapter");
+    const providerCode = String(provider.providerCode || "").toUpperCase();
     const environments = Array.isArray(provider.environments) && provider.environments.length
         ? provider.environments
-        : [envStatusFromProcess(provider.providerCode, "TEST"), envStatusFromProcess(provider.providerCode, "LIVE")];
+        : providerCode === "TMW"
+            ? [envStatusFromProcess(provider.providerCode, "LIVE")]
+            : [envStatusFromProcess(provider.providerCode, "TEST"), envStatusFromProcess(provider.providerCode, "LIVE")];
     const readyEnvironment = environments.find(env =>
         env.enabled === true &&
-        env.publicKeyConfigured &&
+        (String(provider.providerCode || "").toUpperCase() === "TMW" || env.publicKeyConfigured) &&
         env.secretKeyConfigured &&
-        env.webhookSecretConfigured
+        env.webhookSecretConfigured &&
+        (String(provider.providerCode || "").toUpperCase() !== "TMW" || env.merchantIdentifierConfigured)
     );
     if (!readyEnvironment) missing.push("verified environment credentials");
     return {
@@ -125,7 +143,9 @@ function projectProvider(provider = {}) {
     const adapter = getProviderAdapter(provider.adapterName);
     const environments = Array.isArray(provider.environments) && provider.environments.length
         ? provider.environments
-        : [envStatusFromProcess(provider.providerCode, "TEST"), envStatusFromProcess(provider.providerCode, "LIVE")];
+        : String(provider.providerCode || "").toUpperCase() === "TMW"
+            ? [envStatusFromProcess(provider.providerCode, "LIVE")]
+            : [envStatusFromProcess(provider.providerCode, "TEST"), envStatusFromProcess(provider.providerCode, "LIVE")];
     return {
         providerCode: provider.providerCode,
         displayName: provider.displayName,
@@ -277,7 +297,8 @@ function railsByRegion(methods = []) {
         else region.manualRails.push(rail);
     });
 
-    regions.TH.automaticRails.push(disabledAutoRail("TH", RAIL_TYPES.AUTO_PROMPTPAY), disabledAutoRail("TH", RAIL_TYPES.AUTO_CARD));
+    if (!regions.TH.automaticRails.some(rail => rail.railType === RAIL_TYPES.AUTO_PROMPTPAY)) regions.TH.automaticRails.push(disabledAutoRail("TH", RAIL_TYPES.AUTO_PROMPTPAY));
+    if (!regions.TH.automaticRails.some(rail => rail.railType === RAIL_TYPES.AUTO_CARD)) regions.TH.automaticRails.push(disabledAutoRail("TH", RAIL_TYPES.AUTO_CARD));
     regions.MM.automaticRails.push(disabledAutoRail("MM", RAIL_TYPES.AUTO_PROMPTPAY));
     return Object.values(regions);
 }
@@ -295,6 +316,15 @@ async function getPaymentInfrastructureSnapshot(methods = []) {
             adapterName: "omise",
             enabled: false,
             environments: [envStatusFromProcess("OMISE", "TEST"), envStatusFromProcess("OMISE", "LIVE")]
+        }, {
+            providerCode: "tmw",
+            displayName: "TMW Easy API PromptPay",
+            legalRegions: ["TH"],
+            supportedCurrencies: ["THB"],
+            supportedRails: ["AUTO_PROMPTPAY"],
+            adapterName: "tmw",
+            enabled: tmwConfigurationFromEnvironment(process.env).ready,
+            environments: [envStatusFromProcess("TMW", "LIVE")]
         }].map(projectProvider);
     const regions = railsByRegion(methods);
     regions.forEach(region => {
@@ -314,7 +344,9 @@ async function getPaymentInfrastructureSnapshot(methods = []) {
         adapters: listProviderAdapters(),
         routing: {
             MM: { mode: AVAILABILITY_MODES.MANUAL_ONLY, primaryRail: "MANUAL_QR", fallbackRail: "", customerVisibilityUnchanged: true },
-            TH: { mode: AVAILABILITY_MODES.MANUAL_ONLY, primaryRail: "MANUAL_QR", fallbackRail: "", futureMode: AVAILABILITY_MODES.AUTO_WITH_MANUAL_FALLBACK, customerVisibilityUnchanged: true }
+            TH: regions.find(region => region.region === "TH")?.automaticRails.some(rail => rail.enabled && rail.status === STATUS.READY)
+                ? { mode: AVAILABILITY_MODES.AUTO_WITH_MANUAL_FALLBACK, primaryRail: "AUTO_PROMPTPAY", fallbackRail: "MANUAL_QR", customerVisibilityUnchanged: false }
+                : { mode: AVAILABILITY_MODES.MANUAL_ONLY, primaryRail: "MANUAL_QR", fallbackRail: "", futureMode: AVAILABILITY_MODES.AUTO_WITH_MANUAL_FALLBACK, customerVisibilityUnchanged: true }
         },
         security: {
             rawSecretsReturned: false,
