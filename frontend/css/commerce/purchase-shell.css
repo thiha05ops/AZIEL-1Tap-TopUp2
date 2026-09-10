@@ -364,6 +364,28 @@ body.az-purchase-surface,
     border-radius: 14px;
 }
 
+.tmw-payment-card {
+    display: grid;
+    gap: 1rem;
+}
+
+.tmw-payment-card .az-payment-sheet__qr {
+    margin: 0;
+}
+
+.tmw-payment-card__amount {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 800;
+}
+
+.tmw-payment-card__instructions {
+    margin: 0;
+    padding-left: 1.25rem;
+    display: grid;
+    gap: 0.5rem;
+}
+
 .az-payment-sheet__action,
 .az-payment-sheet__secondary,
 .az-payment-sheet__bank-list button,

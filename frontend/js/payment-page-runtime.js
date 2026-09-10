@@ -4,6 +4,8 @@
     const authority = window.AZIEL_PAYMENT_SESSION_AUTHORITY;
     let redirectTimer = null;
     let countdownTimer = null;
+    let tmwCountdownTimer = null;
+    let tmwPollingTimer = null;
     let completionState = null;
     let completionRemaining = 5;
 
@@ -41,6 +43,65 @@
         text("paymentAmount", money(session.amount || order.amount, session.currency || order.currency));
     }
 
+    function stopTmwRuntime() {
+        clearInterval(tmwCountdownTimer);
+        clearInterval(tmwPollingTimer);
+        tmwCountdownTimer = null;
+        tmwPollingTimer = null;
+    }
+
+    function tmwQr(session = {}) {
+        return String(session.qrImage || session.qrUrl || session.qr?.image || session.dynamicQr?.qrImage || "").trim();
+    }
+
+    function showTmwPayment(order = {}, session = {}) {
+        const qr = tmwQr(session);
+        const expiresAt = session.expiresAt || session.recoverableExpiresAt || session.dynamicQr?.expiresAt || "";
+        const mount = document.getElementById("paymentSessionMount");
+        if (!mount || !qr) return false;
+        stopTmwRuntime();
+
+        const card = document.createElement("section"); card.className = "checkout-card tmw-payment-card";
+        const eyebrow = document.createElement("p"); eyebrow.className = "checkout-eyebrow"; eyebrow.textContent = t("payment.pendingPayment", "Pending payment");
+        const heading = document.createElement("h2"); heading.textContent = "Scan the provider QR";
+        const status = document.createElement("p"); status.className = "checkout-feedback"; status.textContent = "Waiting for TMW payment confirmation";
+        const figure = document.createElement("figure"); figure.className = "az-payment-sheet__qr";
+        const image = document.createElement("img"); image.id = "tmwProviderQrImage"; image.src = qr; image.alt = "TMW PromptPay provider QR";
+        const caption = document.createElement("figcaption"); caption.textContent = "Scan this provider-generated QR with a PromptPay-compatible banking app.";
+        figure.append(image, caption);
+        const amount = document.createElement("p"); amount.className = "tmw-payment-card__amount"; amount.textContent = `Amount to pay: ฿${Number(session.providerPayableAmount ?? session.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        const expiry = document.createElement("p"); expiry.id = "tmwPaymentCountdown"; expiry.className = "az-payment-sheet__qr-expiry";
+        const instructions = document.createElement("ol"); instructions.className = "tmw-payment-card__instructions";
+        const steps = Array.isArray(session.paymentInstructions?.steps) && session.paymentInstructions.steps.length
+            ? session.paymentInstructions.steps
+            : ["Scan the QR and pay the exact amount shown", "Keep this page open", "Wait for automatic confirmation"];
+        steps.forEach(value => { const item = document.createElement("li"); item.textContent = String(value); instructions.append(item); });
+        card.append(eyebrow, heading, status, figure, amount, expiry, instructions);
+        mount.replaceChildren(card);
+
+        const tick = () => {
+            const remaining = Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000));
+            expiry.textContent = Number.isFinite(remaining) ? `QR expires in ${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, "0")}` : "";
+            if (remaining <= 0) { clearInterval(tmwCountdownTimer); status.textContent = "Payment QR expired"; }
+        };
+        if (expiresAt) { tick(); tmwCountdownTimer = window.setInterval(tick, 1000); }
+
+        const attemptId = String(session.attemptId || "").trim();
+        const orderId = String(session.commerceOrderId || session.orderId || order.commerceOrderId || order.orderId || "").trim();
+        if (attemptId) tmwPollingTimer = window.setInterval(async () => {
+            try {
+                const response = await fetch(`/api/commerce/payments/tmw/${encodeURIComponent(attemptId)}`, { headers: window.PaymentUtils?.authHeaders?.() || {} });
+                const data = await response.json();
+                if (!response.ok || !data.success) return;
+                if (String(data.payment?.paymentStatus || "").toLowerCase() === "paid") {
+                    stopTmwRuntime();
+                    showCompletion({ orderId, paid: true, amount: session.providerPayableAmount ?? session.amount, currency: session.currency, methodName: session.paymentName || "TMW PromptPay", reference: attemptId });
+                }
+            } catch (_) { /* polling is best-effort; webhook remains authoritative */ }
+        }, 3000);
+        return true;
+    }
+
     function showStaged(staged) {
         const order = staged.orderData || staged.session?.order || {};
         const session = staged.session || {};
@@ -48,6 +109,7 @@
         window.selectedPaymentData = payment;
         document.getElementById("paymentSessionMount").innerHTML = "";
         renderSummary(order, session, payment);
+        if (String(session.provider || payment.provider || "").toLowerCase() === "tmw" && showTmwPayment(order, session)) return;
         if (window.AZIEL_MM_PAYMENT_SHELL?.supports?.(staged)) {
             document.getElementById("paymentPageTitle").textContent = t("payment", "Payment");
             window.AZIEL_MM_PAYMENT_SHELL.show(staged, { onSubmitted: ({ orderId, amount, currency, methodName, reference }) => {
@@ -106,8 +168,7 @@
         renderSummary(recovery, recovery, { method: recovery.paymentName || "PromptPay QR" });
         if (String(recovery.provider || "").toLowerCase() === "tmw") {
             window.selectedPaymentData = recovery;
-            window.PaymentPromptPay.show(recovery, { ...recovery, qrUrl: recovery.qrImage || recovery.qrImageUrl || recovery.dynamicQr?.qrImage || "" });
-            return true;
+            return showTmwPayment(recovery, { ...recovery, qrUrl: recovery.qrImage || recovery.qrImageUrl || recovery.dynamicQr?.qrImage || "" });
         }
         if (String(recovery.provider || "").toUpperCase() === "MANUAL_ADMIN" || String(recovery.region || "").toUpperCase() === "MM") {
             if (recovery.receiptSubmitted === true || recovery.receiptEvidence?.attached === true) {
@@ -132,7 +193,7 @@
                 showCompletion({ orderId: marker.orderId, paid: true, amount: payment.amount, currency: payment.currency, methodName: "TMW PromptPay", reference: payment.attemptId });
                 return true;
             }
-            const session = { ...payment, commerce: true, commerceOrderId: marker.orderId, orderId: marker.orderId, paymentType: "auto", provider: "tmw", paymentMethod: "tmw_promptpay", paymentName: "TMW PromptPay", qrImage: payment.qr?.image || "", qrUrl: payment.qr?.image || "", receiptUploadEnabled: false, slipRequired: false };
+            const session = { ...payment, commerce: true, commerceOrderId: marker.orderId, orderId: marker.orderId, paymentType: "auto", provider: "tmw", paymentMethod: "tmw_promptpay", paymentName: "TMW PromptPay", amount: payment.providerPayableAmount ?? payment.amount, commerceAmount: payment.commerceAmount ?? payment.amount, qrImage: payment.qr?.image || "", qrUrl: payment.qr?.image || "", dynamicQr: payment.qr?.image ? { qrImage: payment.qr.image, expiresAt: payment.expiresAt || "" } : null, receiptUploadEnabled: false, slipRequired: false };
             showStaged({ session, orderData: marker, selectedPayment: session, paymentType: "auto" });
             return true;
         }
@@ -233,5 +294,5 @@
         text("paymentStatusSummary", paid ? t("payment.state.paid", "Paid") : t("payment.state.pendingVerification", "Pending verification"));
     });
 
-    window.AZIEL_PAYMENT_PAGE = { showCompletion };
+    window.AZIEL_PAYMENT_PAGE = { showCompletion, showTmwPayment, tmwQr };
 })();

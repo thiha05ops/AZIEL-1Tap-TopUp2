@@ -221,7 +221,7 @@ async function main() {
             },
             reserveCommercePromotion: async () => null,
             orchestrator: {
-                async initiatePayment() { outboundTmwCreates += 1; return { attemptId: `PAY-${quote.packageSnapshot.packageCode}`, amount: quote.commercialSnapshot.quotedTotalAmount, providerPayableAmountSatang: quote.commercialSnapshot.quotedTotalAmount === 53 ? 5306 : quote.commercialSnapshot.quotedTotalAmount * 100, providerPayableAmount: quote.commercialSnapshot.quotedTotalAmount === 53 ? 53.06 : quote.commercialSnapshot.quotedTotalAmount, currency: "THB", status: "PENDING", qr: { image: "data:image/png;base64,ZmFrZQ==" } }; },
+                async initiatePayment() { outboundTmwCreates += 1; return { attemptId: `PAY-${quote.packageSnapshot.packageCode}`, amount: quote.commercialSnapshot.quotedTotalAmount, providerPayableAmountSatang: quote.commercialSnapshot.quotedTotalAmount === 53 ? 5308 : quote.commercialSnapshot.quotedTotalAmount * 100, providerPayableAmount: quote.commercialSnapshot.quotedTotalAmount === 53 ? 53.08 : quote.commercialSnapshot.quotedTotalAmount, currency: "THB", status: "PENDING", qr: { image: "data:image/png;base64,ZmFrZQ==" } }; },
                 async refreshPayment() {}, async getPaymentResult() {}
             }
         });
@@ -229,8 +229,9 @@ async function main() {
         assert.strictEqual(result.checkout.packageName, quote.packageSnapshot.packageName);
         assert.strictEqual(result.payment.amount, quote.commercialSnapshot.quotedTotalAmount);
         if (quote.commercialSnapshot.quotedTotalAmount === 53) {
-            assert.strictEqual(result.session.amount, 53.06, "customer must see the exact provider payable amount");
+            assert.strictEqual(result.session.amount, 53.08, "customer must see the exact provider payable amount");
             assert.strictEqual(result.session.commerceAmount, 53);
+            assert.strictEqual(result.session.qrImage, "data:image/png;base64,ZmFrZQ==");
         }
         assert.strictEqual(outboundTmwCreates, 1);
     }
