@@ -1628,7 +1628,7 @@ async function validatePaymentMethodConfiguration(method) {
             throw configError("Thunder PromptPay requires the AZIEL receiving bank account number used for receiver matching.");
         }
         const recipient = normalizedPromptPayRecipient(method);
-        if (!recipient.type || !recipient.value) {
+        if (method.enabled === true && (!recipient.type || !recipient.value)) {
             throw configError("AZIEL Dynamic PromptPay QR requires a valid PromptPay recipient.");
         }
         if (method.enabled === true) {

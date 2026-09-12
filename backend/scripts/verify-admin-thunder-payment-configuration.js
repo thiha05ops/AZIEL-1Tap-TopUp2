@@ -44,16 +44,20 @@ async function main() {
     assert.strictEqual(coerced.autoVerificationSupported, true);
     assert.strictEqual(coerced.webhookSupported, false);
 
-    const draftWithoutAccount = applyCompatibilityModes({
+    const incompleteDraft = applyCompatibilityModes({
         ...thunderDefault,
         accountNumber: "",
-        promptPayRecipientType: "PHONE",
-        promptPayRecipientValue: "0812345678"
+        promptPayRecipientType: "",
+        promptPayRecipientValue: ""
     });
-    await assert.doesNotReject(() => validatePaymentMethodConfiguration(draftWithoutAccount));
+    await assert.doesNotReject(() => validatePaymentMethodConfiguration(incompleteDraft));
     await assert.rejects(
-        () => validatePaymentMethodConfiguration({ ...draftWithoutAccount, enabled: true }),
+        () => validatePaymentMethodConfiguration({ ...incompleteDraft, enabled: true }),
         /Thunder PromptPay requires the AZIEL receiving bank account number/
+    );
+    await assert.rejects(
+        () => validatePaymentMethodConfiguration({ ...incompleteDraft, enabled: true, accountNumber: "1234567890" }),
+        /AZIEL Dynamic PromptPay QR requires a valid PromptPay recipient/
     );
 
     const priorKey = process.env.THUNDER_API_KEY;
