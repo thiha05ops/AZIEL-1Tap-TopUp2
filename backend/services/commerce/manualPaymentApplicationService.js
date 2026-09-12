@@ -12,6 +12,7 @@ const { createThunderPromptPayAdapter } = require("./providers/thunderPromptPayA
 const { createThunderSlipPaymentService, ThunderSlipPaymentError } = require("./thunderSlipPaymentService");
 const { createManualAdminAdapter, MANUAL_ADMIN_PROVIDER_ID } = require("./providers/manualAdminAdapter");
 const { paymentMethodCapabilityState } = require("../paymentProviderRegistry");
+const { diagnosticTag, logThunderDiagnostic } = require("../../utils/thunderDiagnostics");
 const PaymentMethod = require("../../models/PaymentMethod");
 const {
     consumeCommercePromotion,
@@ -553,6 +554,9 @@ function createManualPaymentApplicationService(dependencies = {}) {
             receiptBound = true;
             duplicateUploadUnbound = updatedAttempt.reusedExisting === true;
             const boundAttempt = updatedAttempt.attempt || updatedAttempt;
+            if (normalizeUpper(attempt.provider) === THUNDER_PROVIDER_ID) {
+                logThunderDiagnostic(deps.logger, "THUNDER_RECEIPT_BINDING_COMPLETED", { correlationId: input.correlationId, orderTag: diagnosticTag(orderId), attemptTag: diagnosticTag(attemptId), evidenceBound: updatedAttempt.evidenceBound === true, reusedExisting: updatedAttempt.reusedExisting === true });
+            }
             await audit("COMMERCE_MANUAL_PAYMENT_RECEIPT_ATTACHED", { actor: input.actor || owner, resourceId: attemptId, metadata: { orderId, receiptId: evidence.receiptId } });
             await notify("commerce.manualPayment.receiptAttached", { orderId, attemptId, receiptId: evidence.receiptId });
             if (normalizeUpper(attempt.provider) === THUNDER_PROVIDER_ID) {
@@ -565,9 +569,10 @@ function createManualPaymentApplicationService(dependencies = {}) {
                     thunderClientOptions: dependencies.thunderClientOptions,
                     decodeSlipQr: dependencies.decodeSlipQr,
                     receiverBankAccount: config.receivingBankAccount,
-                    clock: deps.clock
+                    clock: deps.clock,
+                    logger: deps.logger
                 });
-                const payment = await verifier.verify({ orderId, attemptId, owner, fileBuffer: input.fileBuffer, receiptEvidence: boundAttempt.safeMetadata?.receiptEvidence || evidence });
+                const payment = await verifier.verify({ orderId, attemptId, owner, fileBuffer: input.fileBuffer, receiptEvidence: boundAttempt.safeMetadata?.receiptEvidence || evidence, correlationId: input.correlationId });
                 return { ...payment, _receiptUploadDisposition: updatedAttempt.reusedExisting ? "duplicate_unbound" : "bound" };
             }
             return toSafePaymentView({ order, attempt: boundAttempt });

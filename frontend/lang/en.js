@@ -1419,6 +1419,7 @@ window.AZIEL_LANG.en = {
     ,"payment.thunder.retry": "Retry Verification"
     ,"payment.thunder.retryable": "We couldn't verify your payment right now. Please try again."
     ,"payment.thunder.rejected": "Payment could not be verified. Please upload the correct payment slip for this order."
+    ,"payment.thunder.duplicate": "This slip has already been received. Your payment is not yet confirmed; please check your order status or contact support."
     ,"payment.thunder.invalidImage": "Please choose a valid image of your payment slip."
     ,"errors.INVALID_REQUEST": "Please check the information and try again."
     ,"errors.ORDER_NOT_FOUND": "Order not found."

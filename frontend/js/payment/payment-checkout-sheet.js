@@ -1641,9 +1641,14 @@
             "THUNDER_SLIP_STALE",
             "THUNDER_TRANSACTION_REUSED",
             "THUNDER_QR_DECODE_FAILED",
+            "THUNDER_SLIP_REJECTED",
             "THUNDER_SLIP_NOT_VERIFIED",
             "SLIP_QR_NOT_FOUND"
         ]).has(String(error.code || "").toUpperCase());
+    }
+
+    function isDuplicateReceiptReconciliation(error = {}) {
+        return String(error.code || "").toUpperCase() === "THUNDER_DUPLICATE";
     }
 
     function bindFilePreview() {
@@ -1674,6 +1679,7 @@
             preview.hidden = false;
             setMessage("", "");
             updateChecklist("upload_receipt");
+            if (activeState) activeState.reconciliationRequired = false;
             if (submit) submit.disabled = false;
             if (activeState?.autoSubmitReceipt === true) await activeState.submitSelectedReceipt?.();
         };
@@ -1897,8 +1903,15 @@
             } catch (error) {
                 console.log("Payment checkout sheet submit error:", error);
                 if (options.autoSubmitReceipt === true) {
-                    const definitiveRejection = isDefinitiveReceiptRejection(error);
-                    if (definitiveRejection) {
+                    const reconciliationRequired = isDuplicateReceiptReconciliation(error);
+                    const definitiveRejection = !reconciliationRequired && isDefinitiveReceiptRejection(error);
+                    if (reconciliationRequired) {
+                        if (activeState) {
+                            activeState.verificationPending = true;
+                            activeState.reconciliationRequired = true;
+                        }
+                        setLocalizedMessage("", "payment.thunder.duplicate", "This slip has already been received. Your payment is not yet confirmed; please check your order status or contact support.", options);
+                    } else if (definitiveRejection) {
                         const input = modal.querySelector("#azPaymentSheetSlipInput");
                         if (input) input.value = "";
                         modal.querySelector("#azPaymentSheetPreview")?.setAttribute("hidden", "");
@@ -1919,7 +1932,7 @@
                 setLoading(false);
                 const submit = modal.querySelector("#azPaymentSheetSubmit");
                 if (options.autoSubmitReceipt === true && submit) {
-                    submit.hidden = activeState?.verificationPending !== true;
+                    submit.hidden = activeState?.verificationPending !== true || activeState?.reconciliationRequired === true;
                     if (activeState?.verificationPending === true) setLocalizedText(submit, "payment.thunder.retry", "Retry Verification", options);
                 }
             }

@@ -69,6 +69,10 @@ function main() {
     assert(manual.includes('paymentText("payment.thunder.pending"'), "explicit Thunder pending messaging must use storefront localization");
     assert(manual.includes('setMessage?.("success", result.message || "Payment is still being verified. Please retry shortly.")'), "Manual PromptPay submitted messaging must remain unchanged");
     assert(sheet.includes("isDefinitiveReceiptRejection(error)"), "Thunder failures must use the existing backend error contract");
+    assert(sheet.includes('"THUNDER_SLIP_REJECTED"'), "provider-declared slip rejection must request another slip");
+    assert(sheet.includes('String(error.code || "").toUpperCase() === "THUNDER_DUPLICATE"'), "provider duplicate must have a distinct reconciliation classifier");
+    assert(sheet.includes('"payment.thunder.duplicate"'), "provider duplicate must use neutral reconciliation guidance");
+    assert(sheet.includes("activeState?.reconciliationRequired === true"), "provider duplicate must not offer blind verification retry");
     assert(sheet.includes("We couldn't verify your payment right now. Please try again."), "technical Thunder failures must retain retry UX");
     assert(sheet.includes("Payment could not be verified. Please upload the correct payment slip for this order."), "definitive Thunder rejection must request another slip");
     assert(sheet.includes('options.autoSubmitReceipt !== true && requiresSlip'), "manual receipt flow must retain its transfer-complete gate");
@@ -76,7 +80,7 @@ function main() {
     assert(manual.includes("if (!pending && (!thunderVerified || authoritativePaid))"), "Thunder recovery marker must clear only after authoritative payment");
     assert(!sheet.includes('paymentStatus: "paid"'), "frontend checkout must never assign paid authority");
 
-    const thunderKeys = ["title", "subtitle", "details", "instructions", "uploadTitle", "uploadHelper", "chooseSlip", "uploadAnother", "fileHint", "verifying", "verified", "confirmed", "pending", "retry", "retryable", "rejected", "invalidImage"];
+    const thunderKeys = ["title", "subtitle", "details", "instructions", "uploadTitle", "uploadHelper", "chooseSlip", "uploadAnother", "fileHint", "verifying", "verified", "confirmed", "pending", "retry", "retryable", "rejected", "duplicate", "invalidImage"];
     ["en", "th", "my"].forEach(lang => {
         const source = read(`frontend/lang/${lang}.js`);
         const runtime = read(`frontend/lang/runtime/${lang}.js`);

@@ -1,6 +1,7 @@
 "use strict";
 
 const { runtimeDebug } = require("../utils/runtimeDebug");
+const { diagnosticTag, logThunderDiagnostic } = require("../utils/thunderDiagnostics");
 
 const crypto = require("crypto");
 
@@ -96,6 +97,7 @@ function receiptId() {
 }
 
 function createCommerceManualPaymentController(options = {}) {
+    const uploadReceiptFile = options.uploadFile || uploadFile;
     const service =
         options.service ||
         createManualPaymentApplicationService(
@@ -317,10 +319,14 @@ function createCommerceManualPaymentController(options = {}) {
 
         async attachReceipt(req, res) {
             let evidence = null;
+            const logger = options.logger || options.serviceOptions?.logger || console;
+            const correlationId = diagnosticTag(req.headers?.["x-request-id"] || req.id || crypto.randomBytes(16).toString("hex"));
+            const diagnostic = { correlationId, orderTag: diagnosticTag(req.params.orderId), attemptTag: diagnosticTag(req.params.attemptId) };
 
             try {
                 if (req.file) {
-                    const uploaded = await uploadFile({
+                    logThunderDiagnostic(logger, "PAYMENT_RECEIPT_ACCEPTED", { ...diagnostic, mimeType: req.file.mimetype, fileSize: req.file.size || req.file.buffer?.length });
+                    const uploaded = await uploadReceiptFile({
                         file: req.file,
                         category: "paymentSlip",
                         ownerReference: req.params.attemptId
@@ -348,6 +354,7 @@ function createCommerceManualPaymentController(options = {}) {
                         uploadedAt:
                             new Date().toISOString()
                     };
+                    logThunderDiagnostic(logger, "PAYMENT_RECEIPT_STORAGE_COMPLETED", { ...diagnostic, mimeType: evidence.mimeType, fileSize: evidence.fileSize });
                 }
 
                 const payment =
@@ -363,7 +370,8 @@ function createCommerceManualPaymentController(options = {}) {
                         storageCommitted:
                             Boolean(evidence) ||
                             req.body?.storageCommitted === true,
-                        fileBuffer: req.file?.buffer
+                        fileBuffer: req.file?.buffer,
+                        correlationId
                     });
 
                 if (evidence && (payment?._receiptUploadDisposition === "duplicate_unbound" || (payment?.idempotent === true && payment?.verificationStatus === "verified"))) {
@@ -374,6 +382,7 @@ function createCommerceManualPaymentController(options = {}) {
                     }
                 }
                 if (payment && typeof payment === "object") delete payment._receiptUploadDisposition;
+                logThunderDiagnostic(logger, "PAYMENT_RECEIPT_RESPONSE", { ...diagnostic, azielErrorCode: payment?.verificationStatus === "verified" ? "PAID" : (payment?.code || payment?.verificationStatus || "RECEIPT_ACCEPTED"), afterPaymentState: payment?.status || payment?.paymentStatus || "" });
 
                 return respondSuccess(res, {
                     payment
@@ -397,6 +406,8 @@ function createCommerceManualPaymentController(options = {}) {
                         orderId: req.params.orderId
                     });
                 }
+
+                logThunderDiagnostic(logger, "PAYMENT_RECEIPT_RESPONSE", { ...diagnostic, azielErrorCode: error?.code || error?.name || "COMMERCE_MANUAL_PAYMENT_FAILED", retryable: error?.retryable === true, evidenceBound: error?.evidenceBound === true }, "warn");
 
                 return respondError(res, error);
             }
