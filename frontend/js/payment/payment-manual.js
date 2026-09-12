@@ -10,16 +10,33 @@
         fd.append("slip", file);
         const res = await fetch(`/api/commerce/orders/${encodeURIComponent(orderId)}/payments/${encodeURIComponent(attemptId)}/receipt`, { method: "POST", headers: window.PaymentUtils?.authHeaders?.() || {}, body: fd });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data.success) throw new Error(data.message || "Submission failed. Please try again.");
+        if (!res.ok || !data.success) {
+            const error = new Error("Payment verification failed.");
+            error.code = data.code || data.error || "";
+            error.retryable = data.retryable === true || res.status >= 500;
+            error.httpStatus = res.status;
+            throw error;
+        }
         const result = data.payment || {};
-        if (result.verificationStatus === "pending" || result.code === "SLIP_PENDING") {
+        const pending = result.verificationStatus === "pending" || result.code === "SLIP_PENDING";
+        const thunderVerified = String(paymentSession.confirmationMode || "") === "thunder_slip" || String(paymentSession.provider || "").toUpperCase() === "THUNDER_PROMPTPAY";
+        const authoritativePaid = String(result.paymentStatus || "").toLowerCase() === "paid" || ["paid", "processing", "completed"].includes(String(result.orderStatus || data.order?.status || "").toLowerCase());
+        if (thunderVerified) {
+            if (authoritativePaid) {
+                setMessage?.("success", "Payment verified.");
+            } else if (pending) {
+                setMessage?.("", "Payment verification is still pending. Please wait, then retry.");
+            } else {
+                setMessage?.("", "We couldn't verify your payment right now. Please try again.");
+            }
+        } else if (pending) {
             setMessage?.("success", result.message || "Payment is still being verified. Please retry shortly.");
         } else if (String(result.paymentStatus || "").toLowerCase() === "paid") {
             setMessage?.("success", "Payment verified.");
         } else {
             setMessage?.("success", data.message || "Payment slip submitted");
         }
-        if (result.verificationStatus !== "pending") {
+        if (!pending && (!thunderVerified || authoritativePaid)) {
             try { localStorage.removeItem("aziel:commerce-pending-payment"); } catch (_) { /* best effort */ }
         }
         return { orderId, data };
@@ -55,23 +72,26 @@
 
         async function submitFromSheet(file, setMessage, close) {
             const { orderId, data } = await submitCommerceReceipt(orderData, paymentSession, file, setMessage);
-            const verified = String(data.payment?.paymentStatus || "").toLowerCase() === "paid";
-            const pending = data.payment?.verificationStatus === "pending";
+            const orderStatus = String(data.order?.status || data.payment?.orderStatus || "").toLowerCase();
+            const verified = String(data.payment?.paymentStatus || data.order?.paymentStatus || "").toLowerCase() === "paid" || ["paid", "processing", "completed"].includes(orderStatus);
+            const pending = data.payment?.verificationStatus === "pending" || data.payment?.code === "SLIP_PENDING";
+            if (thunderVerified && !verified && pending) return { status: "pending" };
+            if (thunderVerified && !verified) return { status: "unconfirmed" };
             if (window.AZIEL_PAYMENT_PAGE_MODE === true) {
                 if (pending) return true;
                 sessionStorage.removeItem("azielPaymentPageSession");
                 window.AZIEL_PAYMENT_PAGE?.showCompletion?.({
                     orderId,
                     status: verified ? "paid" : (data.order?.status || "pending_verification"),
-                    paid: verified || ["paid", "processing", "completed"].includes(String(data.order?.status || "").toLowerCase()),
+                    paid: verified,
                     paymentReceived: verified
                 });
-                return true;
+                return thunderVerified ? { status: verified ? "verified" : "submitted" } : true;
             }
             if (pending) return true;
             window.PaymentUtils?.showSuccess?.(orderId, verified ? "Payment Verified" : "Slip Submitted", verified ? "Your payment has been confirmed. Processing your order..." : "Waiting for Verification. Your payment slip has been submitted. We'll notify you after verification.");
             close("submitted");
-            return true;
+            return thunderVerified ? { status: verified ? "verified" : "submitted" } : true;
         }
 
         window.PaymentCheckoutSheet.show({
@@ -114,6 +134,7 @@
             dynamicQrSupported: paymentSession.dynamicQrSupported === true || payment.dynamicQrSupported === true,
             amountPrefillSupported: paymentSession.amountPrefillSupported === true || payment.amountPrefillSupported === true,
             receiptUploadEnabled: paymentSession.receiptUploadEnabled !== false && payment.receiptUploadEnabled !== false,
+            autoSubmitReceipt: thunderVerified,
             checklistSteps: paymentSession.checklistSteps || payment.checklistSteps || [],
             submitLabel: thunderVerified ? "Upload Slip" : "Submit for Verification",
             loadingText: thunderVerified ? "Verifying payment..." : "Submitting receipt...",

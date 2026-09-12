@@ -925,15 +925,16 @@
         const summary = modal.querySelector("#azPaymentSheetReceiptSummary");
         const submit = modal.querySelector("#azPaymentSheetSubmit");
         const chooser = modal.querySelector("#azPaymentMobileBankChooser");
+        const autoSubmitReceipt = activeState.autoSubmitReceipt === true;
 
         modal.classList.toggle("is-mobile-promptpay", isMobileFlow);
         modal.classList.toggle("is-mobile-step-qr", isMobileFlow && step === "qr");
         modal.classList.toggle("is-mobile-step-receipt", isMobileFlow && step === "receipt");
         modal.classList.toggle("is-desktop-promptpay", isDesktopFlow);
 
-        if (nav) nav.hidden = !isMobileFlow;
+        if (nav) nav.hidden = !isMobileFlow || autoSubmitReceipt;
         if (continueBtn) {
-            continueBtn.hidden = !isMobileFlow || step !== "qr";
+            continueBtn.hidden = !isMobileFlow || step !== "qr" || autoSubmitReceipt;
             continueBtn.disabled = activeState.expired === true || isRecoveryExpired(activeState);
             continueBtn.textContent = t("payment_transfer_completed", "I've completed the transfer");
             continueBtn.onclick = () => {
@@ -942,18 +943,18 @@
             };
         }
         if (backBtn) {
-            backBtn.hidden = !isMobileFlow || step !== "receipt";
+            backBtn.hidden = !isMobileFlow || step !== "receipt" || autoSubmitReceipt;
             backBtn.disabled = activeState.expired === true || isRecoveryExpired(activeState);
             backBtn.textContent = t("payment_back_to_qr", "Back to QR");
             backBtn.onclick = () => setMobilePromptPayStep("qr");
         }
-        if (receipt) receipt.hidden = activeState.requiresSlip ? (!activeState.transferConfirmed || (isMobileFlow && step !== "receipt")) : true;
+        if (receipt) receipt.hidden = activeState.requiresSlip ? (!activeState.transferConfirmed || (isMobileFlow && step !== "receipt" && !autoSubmitReceipt)) : true;
         if (summary) {
             summary.hidden = !isMobileFlow || step !== "receipt";
             if (isMobileFlow && step === "receipt") renderMobileReceiptSummary(modal, activeState);
         }
-        if (submit) submit.hidden = isMobileFlow && step !== "receipt";
-        if (!isMobileFlow && submit) submit.hidden = activeState.requiresSlip && !activeState.transferConfirmed;
+        if (submit) submit.hidden = autoSubmitReceipt || (isMobileFlow && step !== "receipt");
+        if (!isMobileFlow && submit) submit.hidden = autoSubmitReceipt || (activeState.requiresSlip && !activeState.transferConfirmed);
         if (!isMobileFlow && receipt) receipt.hidden = !activeState.requiresSlip || !activeState.transferConfirmed;
         if (!isMobileFlow && summary) summary.hidden = true;
         if (!isMobileFlow && chooser) {
@@ -1620,6 +1621,18 @@
         return document.getElementById("azPaymentSheetSlipInput")?.files?.[0] || null;
     }
 
+    function isDefinitiveReceiptRejection(error = {}) {
+        return new Set([
+            "THUNDER_RECEIVER_MISMATCH",
+            "THUNDER_AMOUNT_MISMATCH",
+            "THUNDER_SLIP_STALE",
+            "THUNDER_TRANSACTION_REUSED",
+            "THUNDER_QR_DECODE_FAILED",
+            "THUNDER_SLIP_NOT_VERIFIED",
+            "SLIP_QR_NOT_FOUND"
+        ]).has(String(error.code || "").toUpperCase());
+    }
+
     function bindFilePreview() {
         const input = document.getElementById("azPaymentSheetSlipInput");
         const preview = document.getElementById("azPaymentSheetPreview");
@@ -1635,15 +1648,21 @@
         name.textContent = "";
         if (submit && activeState?.requiresSlip) submit.disabled = true;
 
-        input.onchange = () => {
+        input.onchange = async () => {
             const file = input.files?.[0];
             if (!file) return;
+            if (!String(file.type || "").toLowerCase().startsWith("image/")) {
+                input.value = "";
+                setMessage("error", "Please choose a valid image of your payment slip.");
+                return;
+            }
             name.textContent = file.name || "Selected payment receipt";
             image.src = URL.createObjectURL(file);
             preview.hidden = false;
             setMessage("", "");
             updateChecklist("upload_receipt");
             if (submit) submit.disabled = false;
+            if (activeState?.autoSubmitReceipt === true) await activeState.submitSelectedReceipt?.();
         };
 
         document.getElementById("azPaymentSheetRemoveFile").onclick = () => {
@@ -1691,6 +1710,11 @@
             mobileStep: "qr",
             transferConfirmed: requiresSlip === false
         };
+        if (options.autoSubmitReceipt === true) {
+            activeState.autoSubmitReceipt = true;
+            activeState.transferConfirmed = true;
+            activeState.mobileStep = "receipt";
+        }
         if (dynamicQr) activeState.submitLabel = t("payment_submit_for_verification", submitLabel);
 
         modal.querySelector("#azPaymentSheetTitle").textContent = recoveryMode
@@ -1763,12 +1787,16 @@
             openApp.onclick = null;
         }
 
-        modal.querySelector("#azPaymentSheetReceiptTitle").textContent = t("payment_upload_receipt_title", "Upload Payment Receipt");
-        modal.querySelector("#azPaymentSheetReceiptHelper").textContent = t("payment_receipt_helper", "Choose the screenshot after you finish the transfer.");
+        modal.querySelector("#azPaymentSheetReceiptTitle").textContent = options.autoSubmitReceipt === true
+            ? "Upload Payment Slip"
+            : t("payment_upload_receipt_title", "Upload Payment Receipt");
+        modal.querySelector("#azPaymentSheetReceiptHelper").textContent = options.autoSubmitReceipt === true
+            ? "Verification starts automatically after you choose your payment slip."
+            : t("payment_receipt_helper", "Choose the screenshot after you finish the transfer.");
         modal.querySelector("#azPaymentSheetUploadLabel").textContent = t("payment_choose_screenshot", "Choose Screenshot");
         const transferComplete = modal.querySelector("#azPaymentSheetTransferComplete");
         if (transferComplete) {
-            transferComplete.hidden = !requiresSlip || isMobileViewport();
+            transferComplete.hidden = options.autoSubmitReceipt === true || !requiresSlip || isMobileViewport();
             transferComplete.textContent = t("payment_transfer_completed", "I've completed the transfer");
             transferComplete.onclick = () => {
                 if (!activeState) return;
@@ -1779,11 +1807,13 @@
                 setMessage("", t("payment_upload_receipt_next", "Transfer completed. Upload your receipt for verification."));
             };
         }
-        modal.querySelector("#azPaymentSheetReceipt").hidden = requiresSlip;
+        modal.querySelector("#azPaymentSheetReceipt").hidden = options.autoSubmitReceipt !== true && requiresSlip;
         modal.querySelector("#azPaymentSheetSubmit").textContent = dynamicQr
             ? activeState.submitLabel
             : submitLabel;
-        modal.querySelector("#azPaymentSheetSubmit").onclick = async () => {
+        const submitSelectedReceipt = async () => {
+            if (!activeState || activeState.submitting === true) return false;
+            activeState.verificationPending = false;
             if (activeState.expired === true || isRecoveryExpired(activeState)) {
                 markRecoveryExpired();
                 return;
@@ -1804,6 +1834,10 @@
             }
 
             try {
+                activeState.submitting = true;
+                const slipInput = modal.querySelector("#azPaymentSheetSlipInput");
+                if (slipInput) slipInput.disabled = true;
+                if (options.autoSubmitReceipt === true) setMessage("", options.loadingText || "Verifying payment...");
                 setLoading(true, options.loadingText || "Submitting...");
                 const result = await options.onSubmit?.({
                     file,
@@ -1812,15 +1846,57 @@
                     setLoading,
                     options: activeState
                 });
+                if (result?.status === "pending" && activeState) {
+                    activeState.verificationPending = true;
+                    setMessage("", "Payment verification is still pending. Please wait, then retry verification.");
+                    const submit = modal.querySelector("#azPaymentSheetSubmit");
+                    if (submit) {
+                        submit.hidden = false;
+                        submit.textContent = "Retry Verification";
+                    }
+                    return result;
+                }
+                if (result?.status === "unconfirmed" && activeState) {
+                    activeState.verificationPending = true;
+                    setMessage("", "We couldn't verify your payment right now. Please try again.");
+                    return result;
+                }
                 if (result !== false && activeState) activeState.receiptSubmitted = true;
-                if (result !== false) setMessage("success", options.successMessage || "Submitted for verification.");
+                if (result !== false && options.autoSubmitReceipt !== true) setMessage("success", options.successMessage || "Submitted for verification.");
+                if (result?.status === "verified") setMessage("success", "Payment verified.");
+                return result;
             } catch (error) {
                 console.log("Payment checkout sheet submit error:", error);
-                setMessage("error", error.message || "Submission failed. Please try again.");
+                if (options.autoSubmitReceipt === true) {
+                    const definitiveRejection = isDefinitiveReceiptRejection(error);
+                    if (definitiveRejection) {
+                        const input = modal.querySelector("#azPaymentSheetSlipInput");
+                        if (input) input.value = "";
+                        modal.querySelector("#azPaymentSheetPreview")?.setAttribute("hidden", "");
+                        modal.querySelector("#azPaymentSheetUploadLabel").textContent = "Upload Another Slip";
+                        setMessage("error", "Payment could not be verified. Please upload the correct payment slip for this order.");
+                    } else {
+                        if (activeState) activeState.verificationPending = true;
+                        setMessage("error", "We couldn't verify your payment right now. Please try again.");
+                    }
+                } else {
+                    setMessage("error", error.message || "Submission failed. Please try again.");
+                }
+                return false;
             } finally {
+                if (activeState) activeState.submitting = false;
+                const slipInput = modal.querySelector("#azPaymentSheetSlipInput");
+                if (slipInput) slipInput.disabled = false;
                 setLoading(false);
+                const submit = modal.querySelector("#azPaymentSheetSubmit");
+                if (options.autoSubmitReceipt === true && submit) {
+                    submit.hidden = activeState?.verificationPending !== true;
+                    if (activeState?.verificationPending === true) submit.textContent = "Retry Verification";
+                }
             }
         };
+        activeState.submitSelectedReceipt = submitSelectedReceipt;
+        modal.querySelector("#azPaymentSheetSubmit").onclick = submitSelectedReceipt;
 
         bindFilePreview();
         applyMobilePromptPayState();
