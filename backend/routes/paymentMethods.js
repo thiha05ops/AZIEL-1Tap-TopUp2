@@ -1624,7 +1624,7 @@ async function validatePaymentMethodConfiguration(method) {
         if (method.confirmationMode === "thunder_slip" && (!method.autoVerificationSupported || method.webhookSupported === true)) {
             throw configError("Thunder PromptPay requires automatic verification without webhooks.");
         }
-        if (method.confirmationMode === "thunder_slip" && !String(method.accountNumber || "").trim()) {
+        if (method.enabled === true && method.confirmationMode === "thunder_slip" && !String(method.accountNumber || "").trim()) {
             throw configError("Thunder PromptPay requires the AZIEL receiving bank account number used for receiver matching.");
         }
         const recipient = normalizedPromptPayRecipient(method);
@@ -1906,5 +1906,6 @@ module.exports._test = {
     publicBankLaunchersProjection,
     publicTrustDisplayForMethod,
     sanitizeBankLaunchers,
+    validatePaymentMethodConfiguration,
     toPaymentMethodObject
 };

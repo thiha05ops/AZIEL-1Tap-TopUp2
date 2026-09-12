@@ -10,8 +10,8 @@ const {
     paymentMethodApplicableSections
 } = require("../services/paymentProviderRegistry");
 
-function main() {
-    const { applyCompatibilityModes, defaultMethods, normalizePaymentMethodKey } = paymentMethodsRoute._test;
+async function main() {
+    const { applyCompatibilityModes, defaultMethods, normalizePaymentMethodKey, validatePaymentMethodConfiguration } = paymentMethodsRoute._test;
     const thunderDefault = defaultMethods.find(method => method.key === "thunder_promptpay");
     const manualDefault = defaultMethods.find(method => method.key === "promptpay");
     const walletDefault = defaultMethods.find(method => method.key === "wallet");
@@ -44,6 +44,18 @@ function main() {
     assert.strictEqual(coerced.autoVerificationSupported, true);
     assert.strictEqual(coerced.webhookSupported, false);
 
+    const draftWithoutAccount = applyCompatibilityModes({
+        ...thunderDefault,
+        accountNumber: "",
+        promptPayRecipientType: "PHONE",
+        promptPayRecipientValue: "0812345678"
+    });
+    await assert.doesNotReject(() => validatePaymentMethodConfiguration(draftWithoutAccount));
+    await assert.rejects(
+        () => validatePaymentMethodConfiguration({ ...draftWithoutAccount, enabled: true }),
+        /Thunder PromptPay requires the AZIEL receiving bank account number/
+    );
+
     const priorKey = process.env.THUNDER_API_KEY;
     delete process.env.THUNDER_API_KEY;
     let state = paymentMethodCapabilityState({ ...thunderDefault, enabled: true, accountNumber: "1234567890", promptPayRecipientType: "PHONE", promptPayRecipientValue: "0812345678" });
@@ -74,4 +86,4 @@ function main() {
     console.log("Admin Thunder payment configuration verification passed.");
 }
 
-try { main(); } catch (error) { console.error(error); process.exitCode = 1; }
+main().catch(error => { console.error(error); process.exitCode = 1; });
