@@ -189,13 +189,14 @@ function projectManualRail(method = {}) {
             checklist: method.enableChecklist === true,
             receiptUpload: method.receiptUploadEnabled !== false,
             adminVerification: method.confirmationMode === "manual_admin",
+            automaticSlipVerification: method.confirmationMode === "thunder_slip",
             dynamicQr: method.dynamicQrSupported === true,
             bankLaunchers: Array.isArray(method.bankLaunchers) ? method.bankLaunchers.filter(item => item.enabled !== false).length : 0
         },
         diagnostics: [
             { label: "Display configured", status: method.method ? STATUS.READY : STATUS.NOT_CONFIGURED },
             { label: "Region configured", status: method.region ? STATUS.READY : STATUS.NOT_CONFIGURED },
-            { label: "Receiving account configured", status: method.qrMode === "aziel_promptpay_dynamic" || (method.accountName && method.accountNumber) ? STATUS.READY : STATUS.NOT_CONFIGURED },
+            { label: "Receiving account configured", status: method.confirmationMode === "thunder_slip" ? (method.accountNumber ? STATUS.READY : STATUS.NOT_CONFIGURED) : (method.qrMode === "aziel_promptpay_dynamic" || (method.accountName && method.accountNumber) ? STATUS.READY : STATUS.NOT_CONFIGURED) },
             { label: "QR generation available", status: method.qrMode === "aziel_promptpay_dynamic" || method.qrImageUrl || method.uploadedQrImage ? STATUS.READY : STATUS.NOT_CONFIGURED },
             { label: "Receipt upload enabled", status: method.receiptUploadEnabled !== false ? STATUS.READY : STATUS.DISABLED },
             { label: "Admin verification enabled", status: method.confirmationMode === "manual_admin" ? STATUS.READY : STATUS.DEGRADED }

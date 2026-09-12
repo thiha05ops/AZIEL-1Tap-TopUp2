@@ -44,6 +44,7 @@ const notificationService = require("../services/notificationService");
 
 const CANONICAL_PROVIDER_BY_KEY = Object.freeze({
     promptpay: "promptpay",
+    thunder_promptpay: "thunder_promptpay",
     scb: "scb",
     bangkok_bank: "bangkok_bank",
     kplus: "kplus",
@@ -184,6 +185,36 @@ const defaultMethods = [
         ],
         bankLaunchers: defaultPromptPayBankLaunchers,
         sortOrder: 10
+    },
+    {
+        method: "PromptPay Auto Verify",
+        key: "thunder_promptpay",
+        region: "TH",
+        enabled: false,
+        paymentType: "manual",
+        provider: "thunder_promptpay",
+        qrMode: "aziel_promptpay_dynamic",
+        receiptUploadEnabled: true,
+        confirmationMode: "thunder_slip",
+        openAppMode: "disabled",
+        badgeText: "AUTO VERIFY",
+        shortDescription: "Pay by PromptPay and upload your slip for automatic verification",
+        enableSaveQr: true,
+        enableOpenApp: false,
+        enableChecklist: true,
+        dynamicQrSupported: true,
+        amountPrefillSupported: true,
+        referenceSupported: true,
+        galleryScanSupported: true,
+        slipRequired: true,
+        autoVerificationSupported: true,
+        webhookSupported: false,
+        checklistSteps: [
+            { key: "save_qr", label: "Save QR", action: "save_qr", enabled: true, sortOrder: 10 },
+            { key: "upload_receipt", label: "Upload payment slip", action: "upload_receipt", enabled: true, sortOrder: 20 },
+            { key: "wait_for_confirmation", label: "Automatic verification", action: "wait_for_confirmation", enabled: true, sortOrder: 30 }
+        ],
+        sortOrder: 11
     },
     {
         method: "SCB",
@@ -527,7 +558,7 @@ function normalizePaymentMethodKey(value = "") {
         .replace(/\s+/g, "")
         .replace(/[-_]/g, "")
         .replace(/[^a-z0-9]/g, "");
-    return compact;
+    return compact === "thunderpromptpay" ? "thunder_promptpay" : compact;
 }
 
 function safeOpenAppMode(value = "", fallback = "disabled") {
@@ -540,7 +571,17 @@ function applyCompatibilityModes(method) {
     const provider = canonicalProviderForMethod(method);
     method.provider = provider;
 
-    if (key === "promptpay" && method.qrMode !== "aziel_promptpay_dynamic") {
+    if (key === "thunder_promptpay" || provider === "thunder_promptpay") {
+        method.region = "TH";
+        method.provider = "thunder_promptpay";
+        method.paymentType = "manual";
+        method.qrMode = "aziel_promptpay_dynamic";
+        method.slipRequired = true;
+        method.receiptUploadEnabled = true;
+        method.autoVerificationSupported = true;
+        method.webhookSupported = false;
+        method.confirmationMode = "thunder_slip";
+    } else if (key === "promptpay" && method.qrMode !== "aziel_promptpay_dynamic") {
         method.paymentType = "auto";
         method.qrMode = "provider_generated";
         method.slipRequired = false;
@@ -1397,7 +1438,7 @@ const PAYMENT_PATCH_FIELDS_BY_KIND = Object.freeze({
         "galleryScanSupported", "slipRequired", "receiptUploadEnabled", "confirmationMode", "checklistSteps"
     ]),
     [PAYMENT_CONFIGURATION_KINDS.PROMPTPAY_DYNAMIC]: new Set([
-        "promptPayRecipientType", "promptPayRecipientValue", "dynamicQrExpiryMinutes", "bankLaunchers", "enableSaveQr",
+        "accountName", "accountNumber", "recipientLabel", "promptPayRecipientType", "promptPayRecipientValue", "dynamicQrExpiryMinutes", "bankLaunchers", "enableSaveQr",
         "enableOpenApp", "enableChecklist", "dynamicQrSupported", "amountPrefillSupported", "referenceSupported",
         "galleryScanSupported", "slipRequired", "receiptUploadEnabled", "confirmationMode", "checklistSteps", "openAppMode",
         "appLaunchMode", "qrMode"

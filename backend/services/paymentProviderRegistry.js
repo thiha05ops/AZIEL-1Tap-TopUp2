@@ -151,7 +151,9 @@ function paymentConfigurationKind(method = {}) {
 }
 
 function paymentMethodApplicableSections(method = {}) {
-    return [...(APPLICABLE_SECTIONS[paymentConfigurationKind(method)] || [])];
+    const sections = [...(APPLICABLE_SECTIONS[paymentConfigurationKind(method)] || [])];
+    if (normalizeProviderKey(method.provider || method.key) === "thunder_promptpay" && !sections.includes("account")) sections.push("account");
+    return sections;
 }
 
 function hasEnabledBankLauncher(method = {}) {
