@@ -6,7 +6,10 @@ const ALLOWED_FIELDS = new Set([
     "correlationId", "orderTag", "attemptTag", "mimeType", "fileSize",
     "elapsedMs", "providerHttpStatus", "azielErrorCode", "providerErrorCode",
     "retryable", "validation", "passed", "beforePaymentState",
-    "afterPaymentState", "evidenceBound", "reusedExisting", "transactionRefTag"
+    "afterPaymentState", "evidenceBound", "reusedExisting", "transactionRefTag",
+    "matchedAccountPresent", "providerBankNumberPresent", "expectedReceiverLength",
+    "providerReceiverLength", "providerReceiverMasked", "expectedReceiverFingerprint",
+    "providerReceiverFingerprint", "bankCodeClass", "identifierType", "receiverFailureReason"
 ]);
 
 function safeToken(value, maxLength = 80) {
@@ -25,15 +28,48 @@ function diagnosticTag(value) {
     }
 }
 
+function receiverFingerprint(normalizedValue) {
+    try {
+        const value = String(normalizedValue == null ? "" : normalizedValue);
+        // Diagnostic-only correlation tag. No suitable keyed secret is available at this boundary.
+        return value ? crypto.createHash("sha256").update(value).digest("hex").slice(0, 12) : "";
+    } catch (_) {
+        return "";
+    }
+}
+
+function buildReceiverDiagnostic(input = {}) {
+    try {
+        const expected = String(input.expectedNormalized || "");
+        const provider = String(input.providerNormalized || "");
+        const originalProvider = String(input.originalProviderValue || "");
+        const bankCode = safeToken(input.bankCode || "UNKNOWN", 24).toUpperCase();
+        return {
+            matchedAccountPresent: input.matchedAccountPresent === true,
+            providerBankNumberPresent: input.providerBankNumberPresent === true,
+            expectedReceiverLength: expected.length,
+            providerReceiverLength: provider.length,
+            providerReceiverMasked: /[xX*]/.test(originalProvider),
+            expectedReceiverFingerprint: receiverFingerprint(expected),
+            providerReceiverFingerprint: receiverFingerprint(provider),
+            bankCodeClass: /^[A-Z0-9_-]{1,24}$/.test(bankCode) ? bankCode : "UNKNOWN",
+            identifierType: safeToken(input.identifierType || "BANK_ACCOUNT", 40).toUpperCase(),
+            receiverFailureReason: safeToken(input.receiverFailureReason || "", 60).toUpperCase()
+        };
+    } catch (_) {
+        return {};
+    }
+}
+
 function safeFields(fields = {}) {
     try {
         const result = {};
         for (const [key, value] of Object.entries(fields || {})) {
             if (!ALLOWED_FIELDS.has(key) || value === undefined || value === null || value === "") continue;
-            if (["fileSize", "elapsedMs", "providerHttpStatus"].includes(key)) {
+            if (["fileSize", "elapsedMs", "providerHttpStatus", "expectedReceiverLength", "providerReceiverLength"].includes(key)) {
                 const numeric = Number(value);
                 if (Number.isFinite(numeric)) result[key] = numeric;
-            } else if (["retryable", "passed", "evidenceBound", "reusedExisting"].includes(key)) {
+            } else if (["retryable", "passed", "evidenceBound", "reusedExisting", "matchedAccountPresent", "providerBankNumberPresent", "providerReceiverMasked"].includes(key)) {
                 result[key] = value === true;
             } else {
                 result[key] = safeToken(value);
@@ -62,4 +98,4 @@ function logThunderDiagnostic(logger, event, fields = {}, level = "info") {
     }
 }
 
-module.exports = Object.freeze({ ALLOWED_FIELDS, diagnosticTag, logThunderDiagnostic, safeFields });
+module.exports = Object.freeze({ ALLOWED_FIELDS, buildReceiverDiagnostic, diagnosticTag, logThunderDiagnostic, receiverFingerprint, safeFields });

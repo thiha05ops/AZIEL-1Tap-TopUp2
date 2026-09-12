@@ -7,6 +7,7 @@ const { createPaymentOrchestrator } = require("../services/commerce/paymentOrche
 const { createThunderPromptPayAdapter } = require("../services/commerce/providers/thunderPromptPayAdapter");
 const { createThunderSlipPaymentService, ThunderSlipPaymentError } = require("../services/commerce/thunderSlipPaymentService");
 const { createThunderApiClient, ThunderApiError } = require("../services/thunderApiClient");
+const { buildReceiverDiagnostic, receiverFingerprint } = require("../utils/thunderDiagnostics");
 const { createCommerceManualPaymentController } = require("../controllers/commerceManualPaymentController");
 
 const NOW = new Date("2026-09-12T03:00:00.000Z");
@@ -96,6 +97,45 @@ async function main() {
     h = harness(); await rejectsWithoutPaid(h, service(h, response({ matchedAccount: null })).verify({ orderId: "O1", attemptId: "A1", owner: OWNER, fileBuffer: Buffer.from("x") }), "THUNDER_RECEIVER_MISMATCH");
     h = harness(); await rejectsWithoutPaid(h, service(h, response({ matchedAccount: { bankNumber: "9999999999" } })).verify({ orderId: "O1", attemptId: "A1", owner: OWNER, fileBuffer: Buffer.from("x") }), "THUNDER_RECEIVER_MISMATCH");
     h = harness(); out = await service(h, response()).verify({ orderId: "O1", attemptId: "A1", owner: OWNER, fileBuffer: Buffer.from("x") }); assert.strictEqual(out.paymentStatus, "paid", "masked raw receiver must not false-reject an exact matchedAccount");
+
+    async function receiverCase(matchedAccount, expectedReason, shouldPay = false, receiverBankAccount = "1234567890") {
+        const receiverLogs = captureLogger();
+        const receiverHarness = harness();
+        const receiverService = createThunderSlipPaymentService({ paymentAttemptRepository: receiverHarness.attemptPort, orderRepository: receiverHarness.orderRepository, paymentOrchestrator: receiverHarness.orchestrator, receiverBankAccount, clock: () => new Date(NOW), logger: receiverLogs.logger, decodeSlipQr: async () => "payload", thunderClient: { verifyBank: async () => response({ matchedAccount }) } });
+        const promise = receiverService.verify({ orderId: "O1", attemptId: "A1", owner: OWNER, fileBuffer: Buffer.from("x") });
+        if (shouldPay) assert.strictEqual((await promise).paymentStatus, "paid");
+        else await rejectsWithoutPaid(receiverHarness, promise, "THUNDER_RECEIVER_MISMATCH");
+        const record = receiverLogs.records.map(([, item]) => item).find(item => item.event === "THUNDER_RECEIVER_VALIDATION");
+        assert(record, `missing receiver diagnostic for ${expectedReason}`);
+        assert.strictEqual(record.receiverFailureReason, expectedReason);
+        return { receiverHarness, record, serialized: JSON.stringify(receiverLogs.records) };
+    }
+
+    let receiverResult = await receiverCase(null, "MATCHED_ACCOUNT_MISSING");
+    assert.strictEqual(receiverResult.record.matchedAccountPresent, false);
+    receiverResult = await receiverCase(undefined, "MATCHED_ACCOUNT_MISSING");
+    receiverResult = await receiverCase("invalid", "MATCHED_ACCOUNT_INVALID");
+    receiverResult = await receiverCase({}, "PROVIDER_BANK_NUMBER_MISSING");
+    receiverResult = await receiverCase({ bankNumber: "xxx-x-x****-x", nameTh: "PRIVATE_RECEIVER_NAME", bank: { code: "SCB", nameEn: "PRIVATE_BANK_NAME" } }, "PROVIDER_BANK_NUMBER_MASKED");
+    assert.strictEqual(receiverResult.record.providerReceiverMasked, true);
+    for (const forbidden of ["xxx-x-x****-x", "PRIVATE_RECEIVER_NAME", "PRIVATE_BANK_NAME"]) assert(!receiverResult.serialized.includes(forbidden), `receiver diagnostic leaked ${forbidden}`);
+    receiverResult = await receiverCase({ bankNumber: "9876543210" }, "NORMALIZED_RECEIVER_MISMATCH");
+    assert(!receiverResult.serialized.includes("9876543210"));
+    receiverResult = await receiverCase({ bankNumber: "1234567890", bank: { code: "SCB" } }, "RECEIVER_MATCHED", true);
+    assert.strictEqual(receiverResult.record.providerReceiverMasked, false);
+    assert(!receiverResult.serialized.includes("1234567890"));
+    receiverResult = await receiverCase({ bankNumber: "123-456-789-0" }, "RECEIVER_MATCHED", true);
+    assert(!receiverResult.serialized.includes("123-456-789-0"));
+    const hostileBankMetadata = { bankNumber: "1234567890" };
+    Object.defineProperty(hostileBankMetadata, "bank", { get() { throw new Error("PRIVATE_BANK_METADATA"); } });
+    receiverResult = await receiverCase(hostileBankMetadata, "RECEIVER_MATCHED", true);
+    assert(!receiverResult.serialized.includes("PRIVATE_BANK_METADATA"));
+    assert.strictEqual(receiverFingerprint("NORMALIZED_ACCOUNT"), receiverFingerprint("NORMALIZED_ACCOUNT"), "receiver fingerprint must be deterministic");
+    const safeReceiverDiagnostic = buildReceiverDiagnostic({ expectedNormalized: "1234567890", providerNormalized: "1234567890", originalProviderValue: "123-456-789-0", matchedAccountPresent: true, providerBankNumberPresent: true, bankCode: "SCB", identifierType: "BANK_ACCOUNT", receiverFailureReason: "RECEIVER_MATCHED" });
+    assert(!JSON.stringify(safeReceiverDiagnostic).includes("1234567890"));
+    const throwingDiagnosticHarness = harness();
+    const throwingDiagnosticService = createThunderSlipPaymentService({ paymentAttemptRepository: throwingDiagnosticHarness.attemptPort, orderRepository: throwingDiagnosticHarness.orderRepository, paymentOrchestrator: throwingDiagnosticHarness.orchestrator, receiverBankAccount: "1234567890", clock: () => new Date(NOW), logger: captureLogger().logger, receiverDiagnosticBuilder: () => { throw new Error("diagnostic failed"); }, decodeSlipQr: async () => "payload", thunderClient: { verifyBank: async () => response() } });
+    assert.strictEqual((await throwingDiagnosticService.verify({ orderId: "O1", attemptId: "A1", owner: OWNER, fileBuffer: Buffer.from("x") })).paymentStatus, "paid", "throwing receiver diagnostics must not change a matching payment outcome");
     h = harness(); await rejectsWithoutPaid(h, service(h, response({ amountInSlip: 124 })).verify({ orderId: "O1", attemptId: "A1", owner: OWNER, fileBuffer: Buffer.from("x") }), "THUNDER_AMOUNT_MISMATCH");
     h = harness(); await rejectsWithoutPaid(h, service(h, response({ rawSlip: { ...response().data.rawSlip, date: "2025-01-01T00:00:00.000Z" } })).verify({ orderId: "O1", attemptId: "A1", owner: OWNER, fileBuffer: Buffer.from("x") }), "THUNDER_SLIP_STALE");
     h = harness(); await rejectsWithoutPaid(h, service(h, response({ rawSlip: { ...response().data.rawSlip, transRef: "" } })).verify({ orderId: "O1", attemptId: "A1", owner: OWNER, fileBuffer: Buffer.from("x") }), "THUNDER_RESPONSE_INVALID");
@@ -167,8 +207,10 @@ async function main() {
     const malformedLoggerController = createCommerceManualPaymentController({ logger: { get info() { throw new Error("bad logger"); } }, service: { attachReceiptEvidence: async () => ({ paymentStatus: "pending" }) } });
     await malformedLoggerController.attachReceipt({ ...req, headers: {}, file: null }, res); assert.strictEqual(res.body.success, true);
     const root = path.join(__dirname, ".."); const manual = fs.readFileSync(path.join(root, "services/commerce/providers/manualPromptPayAdapter.js"), "utf8"); const wallet = fs.readFileSync(path.join(root, "services/commerce/customerWalletCheckoutService.js"), "utf8"); const thunder = fs.readFileSync(path.join(root, "services/commerce/thunderSlipPaymentService.js"), "utf8"); const controller = fs.readFileSync(path.join(root, "controllers/commerceManualPaymentController.js"), "utf8"); const frontend = fs.readFileSync(path.join(root, "../frontend/js/payment/payment-manual.js"), "utf8");
+    const thunderClientSource = fs.readFileSync(path.join(root, "services/thunderApiClient.js"), "utf8");
+    assert(thunderClientSource.includes("matchAccount: true")); assert(thunderClientSource.includes("matchAmount: Number(input.matchAmount)")); assert(thunderClientSource.includes("checkDuplicate: true")); assert(thunder.includes("matchedReceiver !== expectedReceiver"));
     assert(manual.includes('confirmationMode: "manual_admin"')); assert(wallet.length > 0); assert(!/WonDD|FazerCards|ensurePaidOrderFulfillmentWork|paidFulfillmentRoutingService/.test(thunder)); assert(controller.includes('duplicate_unbound')); assert(controller.includes('delete payment._receiptUploadDisposition')); assert(frontend.includes('result.code === "SLIP_PENDING"')); assert(frontend.includes("if (!pending && (!thunderVerified || authoritativePaid))"));
-    console.log("Thunder verified-slip diagnostics verification passed (55 focused cases).");
+    console.log("Thunder verified-slip diagnostics verification passed (68 focused cases).");
 }
 
 main().catch(error => { console.error(error); process.exitCode = 1; });

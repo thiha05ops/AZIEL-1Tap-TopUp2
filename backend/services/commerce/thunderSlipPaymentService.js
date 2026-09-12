@@ -3,7 +3,7 @@
 const crypto = require("crypto");
 const { decodePaymentSlipQr } = require("../paymentSlipQrDecoder");
 const { createThunderApiClient } = require("../thunderApiClient");
-const { diagnosticTag, logThunderDiagnostic } = require("../../utils/thunderDiagnostics");
+const { buildReceiverDiagnostic, diagnosticTag, logThunderDiagnostic } = require("../../utils/thunderDiagnostics");
 
 const PROVIDER = "THUNDER_PROMPTPAY";
 
@@ -26,6 +26,7 @@ function createThunderSlipPaymentService(dependencies = {}) {
     const logger = dependencies.logger || console;
     const client = dependencies.thunderClient || createThunderApiClient({ ...(dependencies.thunderClientOptions || {}), logger });
     const clock = dependencies.clock || (() => new Date());
+    const receiverDiagnosticBuilder = dependencies.receiverDiagnosticBuilder || buildReceiverDiagnostic;
     if (!attempts || !orders || !orchestrator) throw new TypeError("Thunder slip verification dependencies are required.");
 
     async function verify(input = {}) {
@@ -72,9 +73,31 @@ function createThunderSlipPaymentService(dependencies = {}) {
         diag("THUNDER_VERIFICATION_CLASSIFIED", { azielErrorCode: "THUNDER_PROVIDER_VERIFIED", retryable: false });
         const matchedAccount = field(response, ["matchedAccount"]) ?? field(data, ["matchedAccount"]);
         const amountMatched = field(response, ["isAmountMatched", "matchedAmount"]) ?? field(data, ["isAmountMatched", "matchedAmount"]);
-        if (!matchedAccount || typeof matchedAccount !== "object" || Array.isArray(matchedAccount)) { diag("THUNDER_VALIDATION", { validation: "receiver", passed: false, azielErrorCode: "THUNDER_RECEIVER_MISMATCH" }, "warn"); fail("THUNDER_RECEIVER_MISMATCH", "This slip was paid to a different receiving account.", { evidenceBound: true }); }
         const expectedReceiver = normalizeAccount(dependencies.receiverBankAccount || "");
+        const receiverDiagnostic = fields => {
+            try { logThunderDiagnostic(logger, "THUNDER_RECEIVER_VALIDATION", receiverDiagnosticBuilder({ expectedNormalized: expectedReceiver, ...fields })); } catch (_) { /* Diagnostics must not affect receiver authority. */ }
+        };
+        if (!matchedAccount) {
+            receiverDiagnostic({ matchedAccountPresent: false, providerBankNumberPresent: false, identifierType: "UNKNOWN", receiverFailureReason: "MATCHED_ACCOUNT_MISSING" });
+            diag("THUNDER_VALIDATION", { validation: "receiver", passed: false, azielErrorCode: "THUNDER_RECEIVER_MISMATCH" }, "warn");
+            fail("THUNDER_RECEIVER_MISMATCH", "This slip was paid to a different receiving account.", { evidenceBound: true });
+        }
+        if (typeof matchedAccount !== "object" || Array.isArray(matchedAccount)) {
+            receiverDiagnostic({ matchedAccountPresent: true, providerBankNumberPresent: false, identifierType: "UNKNOWN", receiverFailureReason: "MATCHED_ACCOUNT_INVALID" });
+            diag("THUNDER_VALIDATION", { validation: "receiver", passed: false, azielErrorCode: "THUNDER_RECEIVER_MISMATCH" }, "warn");
+            fail("THUNDER_RECEIVER_MISMATCH", "This slip was paid to a different receiving account.", { evidenceBound: true });
+        }
+        const originalProviderReceiver = matchedAccount.bankNumber;
+        const providerBankNumberPresent = text(originalProviderReceiver) !== "";
         const matchedReceiver = normalizeAccount(matchedAccount.bankNumber);
+        const providerReceiverMasked = (() => { try { return /[xX*]/.test(String(originalProviderReceiver)); } catch (_) { return false; } })();
+        let bankCode;
+        try { bankCode = field(matchedAccount.bank, ["code", "shortCode"]); } catch (_) { bankCode = undefined; }
+        let receiverFailureReason = "RECEIVER_MATCHED";
+        if (!providerBankNumberPresent || !matchedReceiver) receiverFailureReason = "PROVIDER_BANK_NUMBER_MISSING";
+        else if (providerReceiverMasked && matchedReceiver !== expectedReceiver) receiverFailureReason = "PROVIDER_BANK_NUMBER_MASKED";
+        else if (!expectedReceiver || matchedReceiver !== expectedReceiver) receiverFailureReason = "NORMALIZED_RECEIVER_MISMATCH";
+        receiverDiagnostic({ matchedAccountPresent: true, providerBankNumberPresent, originalProviderValue: originalProviderReceiver, providerNormalized: matchedReceiver, bankCode, identifierType: "BANK_ACCOUNT", receiverFailureReason });
         if (!expectedReceiver || !matchedReceiver || matchedReceiver !== expectedReceiver) { diag("THUNDER_VALIDATION", { validation: "receiver", passed: false, azielErrorCode: "THUNDER_RECEIVER_MISMATCH" }, "warn"); fail("THUNDER_RECEIVER_MISMATCH", "This slip was paid to a different receiving account.", { evidenceBound: true }); }
         diag("THUNDER_VALIDATION", { validation: "receiver", passed: true });
         if (amountMatched !== true) { diag("THUNDER_VALIDATION", { validation: "amount", passed: false, azielErrorCode: "THUNDER_AMOUNT_MISMATCH" }, "warn"); fail("THUNDER_AMOUNT_MISMATCH", "The slip amount does not match this order.", { evidenceBound: true }); }
