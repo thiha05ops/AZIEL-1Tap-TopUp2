@@ -113,7 +113,7 @@ function verifyRouteAndFrontendContracts() {
     includes("frontend/js/admin-payments.js", "filter(rail => rail.customerVisible === true)", "Customer Display must render only authoritative customer-visible rails.");
     includes("frontend/js/admin-payments.js", "Configured · Disabled", "Configured readiness must remain distinct from enabled storefront state.");
     includes("frontend/js/admin-payments.js", "Unsaved · Disabled", "An unchecked draft must not continue to claim customer visibility before it is saved.");
-    includes("frontend/admin.html", "/js/admin-payments.js?v=20260910-tmw-admin-presentation", "Admin must publish the repaired payment controller under a fresh versioned asset URL.");
+    includes("frontend/admin.html", "/js/admin-payments.js?v=20260912-payment-admin", "Admin must publish the repaired payment controller under a fresh versioned asset URL.");
     includes("frontend/js/admin-payments.js", "Automatic Rails", "Automatic rails must have an admin surface.");
     includes("frontend/js/admin-payments.js", "Card", "Card readiness must have an admin surface.");
     includes("frontend/js/admin-payments.js", "rawSecretsReturned", "Frontend must consume safe credential/security projection.");

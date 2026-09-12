@@ -1,7 +1,6 @@
 const PaymentProviderConfig = require("../models/PaymentProviderConfig");
 const { getProviderAdapter, listProviderAdapters } = require("./paymentProviderAdapterRegistry");
 const { formatPaymentMethod } = require("./paymentDisplayNameService");
-const { configurationFromEnvironment: tmwConfigurationFromEnvironment } = require("./tmwEasyApiClient");
 
 const RAIL_TYPES = Object.freeze({
     MANUAL_QR: "MANUAL_QR",
@@ -78,19 +77,6 @@ function safeProviderEnvironmentStatus(env = {}) {
 function envStatusFromProcess(providerCode = "", environment = "TEST") {
     const code = String(providerCode || "").toUpperCase();
     const prefix = environment === "LIVE" ? "LIVE" : "TEST";
-    if (code === "TMW") {
-        const config = tmwConfigurationFromEnvironment(process.env);
-        return {
-            environment,
-            enabled: config.ready,
-            publicKeyConfigured: true,
-            secretKeyConfigured: Boolean(config.username && config.password),
-            webhookSecretConfigured: Boolean(config.apiKey),
-            merchantIdentifierConfigured: Boolean(config.conId && config.promptPayId && ["01", "02"].includes(config.promptPayType)),
-            healthState: config.ready ? STATUS.READY : STATUS.NOT_CONFIGURED,
-            missingConfiguration: config.missing
-        };
-    }
     if (code !== "OMISE") {
         return {
             environment,
@@ -120,15 +106,12 @@ function providerReadiness(provider = {}) {
     const providerCode = String(provider.providerCode || "").toUpperCase();
     const environments = Array.isArray(provider.environments) && provider.environments.length
         ? provider.environments
-        : providerCode === "TMW"
-            ? [envStatusFromProcess(provider.providerCode, "LIVE")]
-            : [envStatusFromProcess(provider.providerCode, "TEST"), envStatusFromProcess(provider.providerCode, "LIVE")];
+        : [envStatusFromProcess(provider.providerCode, "TEST"), envStatusFromProcess(provider.providerCode, "LIVE")];
     const readyEnvironment = environments.find(env =>
         env.enabled === true &&
-        (String(provider.providerCode || "").toUpperCase() === "TMW" || env.publicKeyConfigured) &&
+        env.publicKeyConfigured &&
         env.secretKeyConfigured &&
-        env.webhookSecretConfigured &&
-        (String(provider.providerCode || "").toUpperCase() !== "TMW" || env.merchantIdentifierConfigured)
+        env.webhookSecretConfigured
     );
     if (!readyEnvironment) missing.push("verified environment credentials");
     return {
@@ -143,9 +126,7 @@ function projectProvider(provider = {}) {
     const adapter = getProviderAdapter(provider.adapterName);
     const environments = Array.isArray(provider.environments) && provider.environments.length
         ? provider.environments
-        : String(provider.providerCode || "").toUpperCase() === "TMW"
-            ? [envStatusFromProcess(provider.providerCode, "LIVE")]
-            : [envStatusFromProcess(provider.providerCode, "TEST"), envStatusFromProcess(provider.providerCode, "LIVE")];
+        : [envStatusFromProcess(provider.providerCode, "TEST"), envStatusFromProcess(provider.providerCode, "LIVE")];
     return {
         providerCode: provider.providerCode,
         displayName: provider.displayName,
@@ -316,15 +297,6 @@ async function getPaymentInfrastructureSnapshot(methods = []) {
             adapterName: "omise",
             enabled: false,
             environments: [envStatusFromProcess("OMISE", "TEST"), envStatusFromProcess("OMISE", "LIVE")]
-        }, {
-            providerCode: "tmw",
-            displayName: "TMW Easy API PromptPay",
-            legalRegions: ["TH"],
-            supportedCurrencies: ["THB"],
-            supportedRails: ["AUTO_PROMPTPAY"],
-            adapterName: "tmw",
-            enabled: tmwConfigurationFromEnvironment(process.env).ready,
-            environments: [envStatusFromProcess("TMW", "LIVE")]
         }].map(projectProvider);
     const regions = railsByRegion(methods);
     regions.forEach(region => {

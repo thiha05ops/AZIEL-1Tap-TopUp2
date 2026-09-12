@@ -41,10 +41,8 @@ const {
     projectRecoverableAttempt
 } = require("../services/pendingPaymentRecoveryService");
 const notificationService = require("../services/notificationService");
-const { configurationFromEnvironment: tmwConfigurationFromEnvironment } = require("../services/tmwEasyApiClient");
 
 const CANONICAL_PROVIDER_BY_KEY = Object.freeze({
-    tmw_promptpay: "tmw",
     promptpay: "promptpay",
     scb: "scb",
     bangkok_bank: "bangkok_bank",
@@ -133,27 +131,6 @@ const defaultPromptPayBankLaunchers = Object.freeze([
 ]);
 
 const defaultMethods = [
-    {
-        method: "TMW PromptPay",
-        key: "tmw_promptpay",
-        region: "TH",
-        enabled: false,
-        paymentType: "auto",
-        provider: "tmw",
-        railType: "AUTO_PROMPTPAY",
-        availabilityMode: "AUTO_WITH_MANUAL_FALLBACK",
-        qrMode: "provider_generated",
-        receiptUploadEnabled: false,
-        slipRequired: false,
-        confirmationMode: "provider_webhook",
-        dynamicQrSupported: true,
-        amountPrefillSupported: true,
-        autoVerificationSupported: true,
-        webhookSupported: true,
-        badgeText: "Automatic",
-        shortDescription: "PromptPay with automatic confirmation",
-        sortOrder: 5
-    },
     {
         method: "KBZPay",
         key: "kbzpay",
@@ -550,7 +527,7 @@ function normalizePaymentMethodKey(value = "") {
         .replace(/\s+/g, "")
         .replace(/[-_]/g, "")
         .replace(/[^a-z0-9]/g, "");
-    return compact === "tmwpromptpay" ? "tmw_promptpay" : compact;
+    return compact;
 }
 
 function safeOpenAppMode(value = "", fallback = "disabled") {
@@ -563,24 +540,7 @@ function applyCompatibilityModes(method) {
     const provider = canonicalProviderForMethod(method);
     method.provider = provider;
 
-    if (key === "tmw_promptpay") {
-        method.method = "TMW PromptPay";
-        method.region = "TH";
-        method.paymentType = "auto";
-        method.provider = "tmw";
-        method.qrMode = "provider_generated";
-        method.slipRequired = false;
-        method.receiptUploadEnabled = false;
-        method.autoVerificationSupported = true;
-        method.webhookSupported = true;
-        method.confirmationMode = "provider_webhook";
-        method.enableSaveQr = false;
-        method.enableOpenApp = false;
-        method.enableChecklist = false;
-        method.openAppMode = "disabled";
-        method.shortDescription = "PromptPay with automatic confirmation";
-        method.badgeText = "Automatic";
-    } else if (key === "promptpay" && method.qrMode !== "aziel_promptpay_dynamic") {
+    if (key === "promptpay" && method.qrMode !== "aziel_promptpay_dynamic") {
         method.paymentType = "auto";
         method.qrMode = "provider_generated";
         method.slipRequired = false;
@@ -978,12 +938,6 @@ function canonicalDisplayValue(method = {}, value = "") {
 function formatMethod(method) {
     const obj = toPaymentMethodObject(method);
     const provider = normalizeProviderKey(obj.provider || obj.key || "");
-    const isTmwPromptPay = provider === "tmw" && String(obj.key || "").toLowerCase() === "tmw_promptpay";
-    if (isTmwPromptPay) {
-        obj.method = "TMW PromptPay";
-        obj.shortDescription = "PromptPay with automatic confirmation";
-        obj.badgeText = "Automatic";
-    }
     const configurationKind = paymentConfigurationKind(obj);
     const isDynamicPromptPayQr = obj.qrMode === "aziel_promptpay_dynamic";
     const configuredQrImage = safePublicAssetUrl(
@@ -995,13 +949,10 @@ function formatMethod(method) {
     const qrImage = configurationKind === PAYMENT_CONFIGURATION_KINDS.MANUAL_QR && !isDynamicPromptPayQr ? configuredQrImage : null;
     const displaySource = Object.assign({}, obj, { provider });
     const capabilityState = paymentMethodCapabilityState(displaySource);
-    const tmwConfiguration = provider === "tmw" ? tmwConfigurationFromEnvironment(process.env) : null;
-    const providerReady = !tmwConfiguration || tmwConfiguration.ready;
+    const providerReady = true;
     const readiness = {
         ready: capabilityState.publicReady && providerReady,
-        missing: providerReady
-            ? capabilityState.missingConfiguration
-            : [...new Set([...(capabilityState.missingConfiguration || []), ...(tmwConfiguration.missing || []).map(item => `tmw:${item}`)])]
+        missing: capabilityState.missingConfiguration
     };
 
     const publicMethodName = obj.region === "TH" && obj.key === "promptpay" && isDynamicPromptPayQr
@@ -1021,10 +972,10 @@ function formatMethod(method) {
         qrImageUrl: qrImage,
         uploadedQrImage: qrImage,
         maintenanceMessage: obj.maintenanceMessage || "",
-        shortDescription: isTmwPromptPay ? obj.shortDescription : canonicalDisplayValue(obj, obj.shortDescription),
+        shortDescription: canonicalDisplayValue(obj, obj.shortDescription),
         badgeText: configurationKind === PAYMENT_CONFIGURATION_KINDS.MANUAL_QR && String(obj.badgeText || "").trim().toLowerCase() === "bank app"
             ? ""
-            : isTmwPromptPay ? obj.badgeText : canonicalDisplayValue(obj, obj.badgeText),
+            : canonicalDisplayValue(obj, obj.badgeText),
         recipientLabel: obj.recipientLabel || "",
         referenceInstructions: obj.referenceInstructions || "",
         qrMode: obj.qrMode || "uploaded_static",

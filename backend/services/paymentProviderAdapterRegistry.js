@@ -18,18 +18,6 @@ const PROVIDER_ADAPTERS = Object.freeze({
             "refundCharge",
             "healthCheck"
         ])
-    }),
-    tmw: Object.freeze({
-        name: "tmw",
-        displayName: "TMW Easy API",
-        supportedRails: ["AUTO_PROMPTPAY"],
-        supportedCurrencies: ["THB"],
-        checkoutModes: ["QR"],
-        cardNetworks: [],
-        refundCapability: false,
-        partialRefundCapability: false,
-        webhookRequired: true,
-        methods: Object.freeze(["createPay", "detailPay", "cancelPay", "verifyWebhook", "healthCheck"])
     })
 });
 

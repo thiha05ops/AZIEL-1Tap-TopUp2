@@ -41,8 +41,7 @@
 
         pollingTimer = setInterval(async () => {
             try {
-                const isTmw = String(paymentSession.provider || "").toLowerCase() === "tmw" && paymentSession.attemptId;
-                const res = await fetch(PaymentUtils.apiUrl(isTmw ? `/api/commerce/payments/tmw/${encodeURIComponent(paymentSession.attemptId)}` : `/api/payment/status/${orderId}`), { headers: PaymentUtils.authHeaders?.() || {} });
+                const res = await fetch(PaymentUtils.apiUrl(`/api/payment/status/${orderId}`), { headers: PaymentUtils.authHeaders?.() || {} });
 
                 const data = await res.json();
 

@@ -124,16 +124,6 @@
         return data.session;
     }
 
-    async function createCommerceTmwPromptPayCheckout(orderData) {
-        const res = await fetch(PaymentUtils.apiUrl("/api/commerce/checkout/tmw-promptpay"), { method: "POST", headers: { "Content-Type": "application/json", ...PaymentUtils.authHeaders() }, body: JSON.stringify(orderData) });
-        const data = await res.json();
-        if (!res.ok || !data.success) throw createPaymentError(data);
-        if (data.session?.commerceOrderId && data.session?.attemptId) {
-            try { localStorage.setItem("aziel:commerce-pending-payment", JSON.stringify({ commerce: true, provider: "tmw", paymentType: "auto", orderId: data.session.commerceOrderId, attemptId: data.session.attemptId, productName: data.session.productName || orderData.game || "", packageName: data.session.packageName || orderData.packageName || "", productCode: orderData.productCode || orderData.gameKey || "", region: "TH", paymentMethod: "tmw_promptpay", createdAt: new Date().toISOString() })); } catch (_) { /* best effort */ }
-        }
-        return data.session;
-    }
-
     function stagePaymentPage(session, orderData, selectedPayment, type) {
         sessionStorage.setItem("azielPaymentPageSession", JSON.stringify({
             version: 1,
@@ -180,18 +170,6 @@
         if (useBlockingLoader) PaymentUtils.showLoading();
 
         try {
-            if (type === "auto" && String(selectedPayment.provider || orderData.provider || "").toLowerCase() === "tmw") {
-                const session = await createCommerceTmwPromptPayCheckout(orderData);
-                session.selectedPaymentMethod = selectedPayment;
-                const canonicalOrder = { ...orderData, orderId: session.orderId, commerceOrderId: session.commerceOrderId, amount: session.amount, currency: session.currency };
-                if (useBlockingLoader) PaymentUtils.hideLoading();
-                if (orderData.pagePresentation === true) {
-                    stagePaymentPage(session, canonicalOrder, selectedPayment, type);
-                    return { success: true, navigating: true, paymentType: type };
-                }
-                PaymentPromptPay.show(canonicalOrder, session);
-                return { success: true, navigating: false, paymentType: type };
-            }
             if (type === "wallet" || selectedPayment.key === "wallet") {
                 const walletResult = await PaymentWallet.pay(orderData);
                 if (!walletResult?.success) return { success: false, navigating: false };
@@ -280,7 +258,6 @@
         createManualAttempt,
         createCommerceManualPromptPayCheckout,
         createCommerceManualPaymentCheckout,
-        createCommerceTmwPromptPayCheckout,
         stageWalletCompletion
     };
 

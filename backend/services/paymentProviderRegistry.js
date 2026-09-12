@@ -10,8 +10,7 @@ const PROVIDERS = Object.freeze({
     ayapay: { key: "ayapay", label: "AYA Pay", region: "MM", logo: "/assets/payment/ayapay.png" },
     mmqr: { key: "mmqr", label: "MMQR", region: "MM", logo: "/assets/payment/payment-neutral.svg" },
     manual_bank: { key: "manual_bank", label: "Manual Bank Transfer", region: "MM", logo: "/assets/payment/bank-neutral.svg" },
-    wallet: { key: "wallet", label: "AZIEL Wallet", region: "GLOBAL", logo: "/assets/brand/aziel-icon.svg" },
-    tmw: { key: "tmw", label: "TMW PromptPay", region: "TH", logo: "/assets/payment/promptpay.png" }
+    wallet: { key: "wallet", label: "AZIEL Wallet", region: "GLOBAL", logo: "/assets/brand/aziel-icon.svg" }
 });
 
 const ALIASES = Object.freeze({
@@ -40,7 +39,7 @@ const ALIASES = Object.freeze({
 
 const PROVIDERS_BY_REGION_TYPE = Object.freeze({
     TH: {
-        auto: ["tmw", "promptpay"],
+        auto: ["promptpay"],
         deeplink: ["scb", "bangkok_bank", "kplus", "krungsri", "krungthai"],
         manual: ["promptpay", "scb", "bangkok_bank", "kplus", "krungsri", "krungthai"],
         wallet: ["wallet"]

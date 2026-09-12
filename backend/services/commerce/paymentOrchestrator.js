@@ -615,34 +615,9 @@ function createPaymentOrchestrator(dependencies = {}) {
                 intent,
                 attempt: detachAttempt(initiatingAttempt)
             };
-            if (normalizeString(intent.provider).toUpperCase() === "TMW") {
-                providerContext.persistProviderReference = async checkpoint => {
-                    const reference = normalizeId(checkpoint?.providerReference || checkpoint?.providerTransactionId, "providerReference");
-                    const persist = assertPortFunction(deps.paymentAttemptPort, "setProviderReference");
-                    checkpointedAttempt = await runTransaction(transactionContext => persist({
-                            attemptId,
-                            providerReference: reference,
-                            providerTransactionId: checkpoint?.providerTransactionId || reference,
-                            rawProviderStatus: checkpoint?.rawProviderStatus,
-                            safeMetadata: checkpoint?.safeMetadata,
-                            changedAt: deps.clock(),
-                            transactionContext
-                        })) || { ...checkpointedAttempt, providerReference: reference, providerTransactionId: reference };
-                    return detachAttempt(checkpointedAttempt);
-                };
-            }
             providerResult = normalizeProviderResult(await adapter.createPayment(providerContext), intent);
         } catch (error) {
             if (error instanceof PaymentOrchestratorError) throw error;
-
-            if (normalizeString(intent.provider).toUpperCase() === "TMW" && error?.submissionUncertain === true && !checkpointedAttempt?.providerReference && typeof deps.paymentAttemptPort.recordFailure === "function") {
-                await deps.paymentAttemptPort.recordFailure({
-                    attemptId,
-                    status: PAYMENT_STATES.INITIATING,
-                    error: { category: "OPERATIONAL_RECONCILIATION", code: "TMW_SUBMISSION_OUTCOME_UNKNOWN", safeMessage: "Provider submission outcome requires reconciliation before retry." },
-                    changedAt: deps.clock()
-                }).catch(() => null);
-            }
 
             deps.logger.error?.("Payment provider operation failed.", {
                 provider: intent.provider || "",
