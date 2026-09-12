@@ -1394,6 +1394,7 @@ window.AZIEL_LANG.en = {
     "auth.rememberMe": "Remember me",
     "auth.forgotPassword": "Forgot password?",
     "auth.continueGoogle": "Continue with Google",
+    "auth.googleFailed": "Google sign-in couldn't be completed. Please try again.",
     "auth.createAccount": "Create account",
     "readiness.comingSoon": "Coming Soon",
     "readiness.unavailable": "Product unavailable",

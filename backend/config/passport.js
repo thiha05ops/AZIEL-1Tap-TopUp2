@@ -6,6 +6,7 @@ const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 
 const User = require("../models/User");
+const { fingerprint, logGoogleOAuthDiagnostic } = require("../utils/googleOAuthDiagnostics");
 
 async function makeUniqueUsername(email, displayName) {
     const emailName = String(email || "")
@@ -42,10 +43,14 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
                 clientSecret: process.env.GOOGLE_CLIENT_SECRET,
                 callbackURL:
                     process.env.GOOGLE_CALLBACK_URL ||
-                    "/api/auth/google/callback"
+                    "/api/auth/google/callback",
+                passReqToCallback: true
             },
-            async (accessToken, refreshToken, profile, done) => {
+            async (req, accessToken, refreshToken, profile, done) => {
+                let googleOAuthStage = "profile";
                 try {
+                    const diagnostic = req.googleOAuthDiagnostic || {};
+                    logGoogleOAuthDiagnostic(console, "GOOGLE_OAUTH_PROFILE_RECEIVED", { ...diagnostic, profileTag: fingerprint(profile?.id) });
                     const email =
                         profile.emails?.[0]?.value?.toLowerCase() || "";
 
@@ -53,10 +58,13 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
                         return done(null, false);
                     }
 
+                    googleOAuthStage = "user_resolution";
                     let user =
                         await User.findOne({ googleId: profile.id }) ||
                         await User.findOne({ email });
 
+                    const created = !user;
+                    const previouslyLinked = Boolean(user?.googleId);
                     if (!user) {
                         const username = await makeUniqueUsername(
                             email,
@@ -99,8 +107,11 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
                         await user.save();
                     }
 
+                    logGoogleOAuthDiagnostic(console, "GOOGLE_OAUTH_USER_RESOLVED", { ...diagnostic, userTag: fingerprint(user?._id), created, linked: previouslyLinked || Boolean(user?.googleId) });
+
                     return done(null, user);
                 } catch (error) {
+                    try { error.googleOAuthStage = googleOAuthStage; } catch (_) { /* Diagnostic annotation only. */ }
                     return done(error, null);
                 }
             }

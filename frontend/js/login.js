@@ -63,6 +63,11 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
     }
 
+    const oauthParams = new URLSearchParams(window.location.search);
+    if (oauthParams.get("oauth") === "google" && oauthParams.get("error") === "token_exchange_failed") {
+        showMessage(authT("auth.googleFailed", "Google sign-in couldn't be completed. Please try again."), "error");
+    }
+
     if (togglePassword) {
         togglePassword.addEventListener("click", (e) => {
             e.preventDefault();

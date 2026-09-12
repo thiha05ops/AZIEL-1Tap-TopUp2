@@ -1392,6 +1392,7 @@ window.AZIEL_LANG.my = {
     "auth.rememberMe": "မှတ်ထားရန်",
     "auth.forgotPassword": "စကားဝှက် မေ့နေပါသလား?",
     "auth.continueGoogle": "Google ဖြင့် ဆက်လုပ်ရန်",
+    "auth.googleFailed": "Google ဖြင့် ဝင်ရောက်မှုကို မပြီးမြောက်နိုင်ပါ။ ထပ်မံကြိုးစားပါ။",
     "auth.createAccount": "အကောင့်ဖွင့်ရန်",
     "readiness.comingSoon": "မကြာမီ ရရှိမည်",
     "readiness.unavailable": "ထုတ်ကုန်မရနိုင်ပါ",

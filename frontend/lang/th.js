@@ -1393,6 +1393,7 @@ window.AZIEL_LANG.th = {
     "auth.rememberMe": "จดจำฉัน",
     "auth.forgotPassword": "ลืมรหัสผ่าน?",
     "auth.continueGoogle": "ดำเนินการต่อด้วย Google",
+    "auth.googleFailed": "ไม่สามารถลงชื่อเข้าใช้ด้วย Google ได้ โปรดลองอีกครั้ง",
     "auth.createAccount": "สร้างบัญชี",
     "readiness.comingSoon": "เร็ว ๆ นี้",
     "readiness.unavailable": "ผลิตภัณฑ์ไม่พร้อมใช้งาน",
