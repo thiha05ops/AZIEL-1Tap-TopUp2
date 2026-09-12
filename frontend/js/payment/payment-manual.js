@@ -2,6 +2,10 @@
 // AZIEL Manual QR Payment V2.5
 
 (function () {
+    function paymentText(key, fallback) {
+        return window.AZIEL_I18N?.t?.(key, fallback) || fallback;
+    }
+
     async function submitCommerceReceipt(orderData, paymentSession, file, setMessage) {
         const orderId = paymentSession.commerceOrderId || orderData.commerceOrderId || paymentSession.orderId || orderData.orderId;
         const attemptId = paymentSession.attemptId || orderData.commercePaymentAttemptId || orderData.manualPaymentAttemptId;
@@ -23,11 +27,11 @@
         const authoritativePaid = String(result.paymentStatus || "").toLowerCase() === "paid" || ["paid", "processing", "completed"].includes(String(result.orderStatus || data.order?.status || "").toLowerCase());
         if (thunderVerified) {
             if (authoritativePaid) {
-                setMessage?.("success", "Payment verified.");
+                setMessage?.("success", paymentText("payment.thunder.verified", "Payment verified."));
             } else if (pending) {
-                setMessage?.("", "Payment verification is still pending. Please wait, then retry.");
+                setMessage?.("", paymentText("payment.thunder.pending", "Payment verification is still pending. Please wait, then retry."));
             } else {
-                setMessage?.("", "We couldn't verify your payment right now. Please try again.");
+                setMessage?.("", paymentText("payment.thunder.retryable", "We couldn't verify your payment right now. Please try again."));
             }
         } else if (pending) {
             setMessage?.("success", result.message || "Payment is still being verified. Please retry shortly.");
@@ -97,7 +101,7 @@
         window.PaymentCheckoutSheet.show({
             ...payment,
             methodCode: paymentSession.paymentMethod || payment.key || orderData.paymentMethod,
-            methodName: window.AZIEL_PAYMENT_DISPLAY?.from?.(
+            methodName: thunderVerified ? paymentText("payment.thunder.title", "PromptPay Transfer") : window.AZIEL_PAYMENT_DISPLAY?.from?.(
                 paymentSession.paymentName || payment.method || orderData.paymentMethod,
                 paymentSession.paymentName || payment.method || orderData.paymentMethod || "Payment"
             ) || paymentSession.paymentName || payment.method || orderData.paymentMethod || "Payment",
@@ -113,7 +117,7 @@
             attemptId: paymentSession.attemptId || orderData.manualPaymentAttemptId || "",
             qrImageUrl: qr,
             qrMode: paymentSession.qrMode || payment.qrMode || "",
-            instructions: thunderVerified ? "Pay the fixed amount, then upload the slip for automatic verification." : "Transfer the exact amount, then upload the payment receipt.",
+            instructions: thunderVerified ? paymentText("payment.thunder.instructions", "Pay the fixed amount, then upload the slip for automatic verification.") : "Transfer the exact amount, then upload the payment receipt.",
             requiresSlip,
             enableSaveQr: paymentSession.enableSaveQr === true || payment.enableSaveQr === true,
             enableOpenApp: paymentSession.enableOpenApp === true || payment.enableOpenApp === true,
@@ -137,7 +141,7 @@
             autoSubmitReceipt: thunderVerified,
             checklistSteps: paymentSession.checklistSteps || payment.checklistSteps || [],
             submitLabel: thunderVerified ? "Upload Slip" : "Submit for Verification",
-            loadingText: thunderVerified ? "Verifying payment..." : "Submitting receipt...",
+            loadingText: thunderVerified ? paymentText("payment.thunder.verifying", "Verifying payment...") : "Submitting receipt...",
             onSubmit: async ({ file, setMessage, close }) => {
                 if (paymentSession.commerce === true || paymentSession.commerceOrderId || orderData.commerceOrderId) {
                     return submitFromSheet(file, setMessage, close);

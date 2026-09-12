@@ -59,14 +59,14 @@ function main() {
     assert(sheet.includes('activeState?.autoSubmitReceipt === true) await activeState.submitSelectedReceipt?.()'), "Thunder file selection must auto-start the existing submission callback");
     assert(sheet.includes("activeState.submitting === true"), "receipt auto-submit must reject duplicate in-flight requests");
     assert(sheet.includes('input.value = ""'), "failed receipt verification must allow the same file to be selected again");
-    assert(sheet.includes('submit.textContent = "Retry Verification"'), "pending Thunder verification must remain retryable with its bound receipt");
-    assert(sheet.includes('setMessage("", "Payment verification is still pending. Please wait, then retry verification.")'), "Thunder pending state must use neutral styling");
+    assert(sheet.includes('"payment.thunder.retry"'), "pending Thunder verification must use the localized retry action");
+    assert(sheet.includes('setLocalizedMessage("", "payment.thunder.pending"'), "Thunder pending state must use neutral localized styling");
     assert(manual.includes('["paid", "processing", "completed"].includes(orderStatus)'), "Thunder success must require an authoritative paid order response");
     assert(manual.includes("if (thunderVerified && !verified && pending) return { status: \"pending\" }"), "only explicit non-paid Thunder pending responses may use pending semantics");
     assert(manual.includes("if (thunderVerified && !verified) return { status: \"unconfirmed\" }"), "non-paid non-pending Thunder responses must remain distinctly unconfirmed");
     assert(sheet.includes('result?.status === "unconfirmed"'), "unexpected successful Thunder responses must use retryable unconfirmed UX");
     assert(manual.includes("if (authoritativePaid)"), "Thunder success messaging must require authoritative payment");
-    assert(manual.includes('setMessage?.("", "Payment verification is still pending. Please wait, then retry.")'), "explicit Thunder pending messaging must be neutral");
+    assert(manual.includes('paymentText("payment.thunder.pending"'), "explicit Thunder pending messaging must use storefront localization");
     assert(manual.includes('setMessage?.("success", result.message || "Payment is still being verified. Please retry shortly.")'), "Manual PromptPay submitted messaging must remain unchanged");
     assert(sheet.includes("isDefinitiveReceiptRejection(error)"), "Thunder failures must use the existing backend error contract");
     assert(sheet.includes("We couldn't verify your payment right now. Please try again."), "technical Thunder failures must retain retry UX");
@@ -75,6 +75,20 @@ function main() {
     assert(manual.includes('data.payment?.code === "SLIP_PENDING"'), "Thunder SLIP_PENDING must remain pending rather than failing");
     assert(manual.includes("if (!pending && (!thunderVerified || authoritativePaid))"), "Thunder recovery marker must clear only after authoritative payment");
     assert(!sheet.includes('paymentStatus: "paid"'), "frontend checkout must never assign paid authority");
+
+    const thunderKeys = ["title", "subtitle", "details", "instructions", "uploadTitle", "uploadHelper", "chooseSlip", "uploadAnother", "fileHint", "verifying", "verified", "confirmed", "pending", "retry", "retryable", "rejected", "invalidImage"];
+    ["en", "th", "my"].forEach(lang => {
+        const source = read(`frontend/lang/${lang}.js`);
+        const runtime = read(`frontend/lang/runtime/${lang}.js`);
+        thunderKeys.forEach(key => {
+            assert(source.includes(`"payment.thunder.${key}"`), `${lang} source locale must define payment.thunder.${key}`);
+            assert(runtime.includes(`"payment.thunder.${key}"`), `${lang} runtime locale must define payment.thunder.${key}`);
+        });
+    });
+    const css = read("frontend/css/payment/payment-checkout-sheet.css");
+    assert(sheet.includes('is-thunder-auto-slip'), "Thunder checkout must have isolated presentation state");
+    assert(css.includes('.is-thunder-auto-slip .az-payment-sheet__checklist'), "empty generic checklist must be hidden only for Thunder");
+    assert(css.includes('width: min(220px, 72vw)'), "Thunder QR must remain responsive at mobile width");
 
     console.log("Payment frontend capability flow verification passed.");
 }

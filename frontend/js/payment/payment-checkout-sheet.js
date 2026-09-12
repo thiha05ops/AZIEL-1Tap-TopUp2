@@ -73,7 +73,7 @@
                     <div id="azPaymentSheetAppFallback" class="az-payment-sheet__fallback" hidden></div>
 
                     <details class="az-payment-sheet__payment-details">
-                        <summary>Payment details</summary>
+                        <summary id="azPaymentSheetDetailsSummary">Payment details</summary>
                         <div id="azPaymentSheetDetails" class="az-payment-sheet__details"></div>
                     </details>
 
@@ -152,8 +152,20 @@
     function setMessage(type, message) {
         const el = document.getElementById("azPaymentSheetMessage");
         if (!el) return;
+        el.removeAttribute("data-i18n");
         el.className = `az-payment-sheet__message${type ? ` is-${type}` : ""}`;
         el.textContent = message || "";
+    }
+
+    function setLocalizedMessage(type, key, fallback, options = activeState || {}) {
+        setMessage(type, tr(options, key, fallback));
+        document.getElementById("azPaymentSheetMessage")?.setAttribute("data-i18n", key);
+    }
+
+    function setLocalizedText(element, key, fallback, options = activeState || {}) {
+        if (!element) return;
+        element.textContent = tr(options, key, fallback);
+        element.setAttribute("data-i18n", key);
     }
 
     function setLoading(isLoading, text) {
@@ -928,9 +940,10 @@
         const autoSubmitReceipt = activeState.autoSubmitReceipt === true;
 
         modal.classList.toggle("is-mobile-promptpay", isMobileFlow);
-        modal.classList.toggle("is-mobile-step-qr", isMobileFlow && step === "qr");
-        modal.classList.toggle("is-mobile-step-receipt", isMobileFlow && step === "receipt");
+        modal.classList.toggle("is-mobile-step-qr", isMobileFlow && step === "qr" && !autoSubmitReceipt);
+        modal.classList.toggle("is-mobile-step-receipt", isMobileFlow && step === "receipt" && !autoSubmitReceipt);
         modal.classList.toggle("is-desktop-promptpay", isDesktopFlow);
+        modal.classList.toggle("is-thunder-auto-slip", autoSubmitReceipt);
 
         if (nav) nav.hidden = !isMobileFlow || autoSubmitReceipt;
         if (continueBtn) {
@@ -1653,7 +1666,7 @@
             if (!file) return;
             if (!String(file.type || "").toLowerCase().startsWith("image/")) {
                 input.value = "";
-                setMessage("error", "Please choose a valid image of your payment slip.");
+                setLocalizedMessage("error", "payment.thunder.invalidImage", "Please choose a valid image of your payment slip.");
                 return;
             }
             name.textContent = file.name || "Selected payment receipt";
@@ -1722,10 +1735,12 @@
             : `${methodName} Transfer`;
         modal.querySelector("#azPaymentSheetAmount").textContent = `${amount.toLocaleString()} ${currency}`.trim();
         modal.querySelector("#azPaymentSheetSubtitle").textContent = dynamicQr
-            ? t("payment_promptpay_dynamic_subtitle", "Scan the amount-specific PromptPay QR")
+            ? (options.autoSubmitReceipt === true
+                ? tr(options, "payment.thunder.subtitle", "Transfer the exact amount")
+                : t("payment_promptpay_dynamic_subtitle", "Scan the amount-specific PromptPay QR"))
             : options.subtitle || "Transfer the exact amount";
         modal.querySelector("#azPaymentSheetInstructions").textContent =
-            dynamicQr
+            dynamicQr && options.autoSubmitReceipt !== true
                 ? t("payment_promptpay_manual_instructions", "Save the QR, open your banking app, scan the saved QR, then upload your payment receipt.")
                 : options.instructions || (requiresSlip
                     ? "Transfer the exact amount, then upload the payment receipt."
@@ -1780,6 +1795,8 @@
             qrImageUrl: qr,
             requiresSlip
         });
+        if (options.autoSubmitReceipt === true) modal.querySelector("#azPaymentSheetChecklist").hidden = true;
+        if (options.autoSubmitReceipt === true) modal.querySelector("#azPaymentSheetChecklist").hidden = true;
 
         const openApp = modal.querySelector("#azPaymentSheetOpenApp");
         if (openApp) {
@@ -1788,12 +1805,24 @@
         }
 
         modal.querySelector("#azPaymentSheetReceiptTitle").textContent = options.autoSubmitReceipt === true
-            ? "Upload Payment Slip"
+            ? tr(options, "payment.thunder.uploadTitle", "Upload Payment Slip")
             : t("payment_upload_receipt_title", "Upload Payment Receipt");
         modal.querySelector("#azPaymentSheetReceiptHelper").textContent = options.autoSubmitReceipt === true
-            ? "Verification starts automatically after you choose your payment slip."
+            ? tr(options, "payment.thunder.uploadHelper", "Verification starts automatically after you choose your payment slip.")
             : t("payment_receipt_helper", "Choose the screenshot after you finish the transfer.");
-        modal.querySelector("#azPaymentSheetUploadLabel").textContent = t("payment_choose_screenshot", "Choose Screenshot");
+        modal.querySelector("#azPaymentSheetUploadLabel").textContent = options.autoSubmitReceipt === true
+            ? tr(options, "payment.thunder.chooseSlip", "Choose Payment Slip")
+            : t("payment_choose_screenshot", "Choose Screenshot");
+        if (options.autoSubmitReceipt === true) {
+            setLocalizedText(modal.querySelector("#azPaymentSheetTitle"), "payment.thunder.title", "PromptPay Transfer", options);
+            setLocalizedText(modal.querySelector("#azPaymentSheetSubtitle"), "payment.thunder.subtitle", "Transfer the exact amount", options);
+            setLocalizedText(modal.querySelector("#azPaymentSheetDetailsSummary"), "payment.thunder.details", "Payment details", options);
+            setLocalizedText(modal.querySelector("#azPaymentSheetInstructions"), "payment.thunder.instructions", "Pay the fixed amount, then upload the slip for automatic verification.", options);
+            setLocalizedText(modal.querySelector("#azPaymentSheetReceiptTitle"), "payment.thunder.uploadTitle", "Upload Payment Slip", options);
+            setLocalizedText(modal.querySelector("#azPaymentSheetReceiptHelper"), "payment.thunder.uploadHelper", "Verification starts automatically after you choose your payment slip.", options);
+            setLocalizedText(modal.querySelector("#azPaymentSheetUploadLabel"), "payment.thunder.chooseSlip", "Choose Payment Slip", options);
+            setLocalizedText(modal.querySelector(".az-payment-sheet__upload small"), "payment.thunder.fileHint", "Image file, up to the platform upload limit", options);
+        }
         const transferComplete = modal.querySelector("#azPaymentSheetTransferComplete");
         if (transferComplete) {
             transferComplete.hidden = options.autoSubmitReceipt === true || !requiresSlip || isMobileViewport();
@@ -1837,7 +1866,7 @@
                 activeState.submitting = true;
                 const slipInput = modal.querySelector("#azPaymentSheetSlipInput");
                 if (slipInput) slipInput.disabled = true;
-                if (options.autoSubmitReceipt === true) setMessage("", options.loadingText || "Verifying payment...");
+                if (options.autoSubmitReceipt === true) setLocalizedMessage("", "payment.thunder.verifying", "Verifying payment...", options);
                 setLoading(true, options.loadingText || "Submitting...");
                 const result = await options.onSubmit?.({
                     file,
@@ -1848,22 +1877,22 @@
                 });
                 if (result?.status === "pending" && activeState) {
                     activeState.verificationPending = true;
-                    setMessage("", "Payment verification is still pending. Please wait, then retry verification.");
+                    setLocalizedMessage("", "payment.thunder.pending", "Payment verification is still pending. Please wait, then retry.", options);
                     const submit = modal.querySelector("#azPaymentSheetSubmit");
                     if (submit) {
                         submit.hidden = false;
-                        submit.textContent = "Retry Verification";
+                        setLocalizedText(submit, "payment.thunder.retry", "Retry Verification", options);
                     }
                     return result;
                 }
                 if (result?.status === "unconfirmed" && activeState) {
                     activeState.verificationPending = true;
-                    setMessage("", "We couldn't verify your payment right now. Please try again.");
+                    setLocalizedMessage("", "payment.thunder.retryable", "We couldn't verify your payment right now. Please try again.", options);
                     return result;
                 }
                 if (result !== false && activeState) activeState.receiptSubmitted = true;
                 if (result !== false && options.autoSubmitReceipt !== true) setMessage("success", options.successMessage || "Submitted for verification.");
-                if (result?.status === "verified") setMessage("success", "Payment verified.");
+                if (result?.status === "verified") setLocalizedMessage("success", "payment.thunder.verified", "Payment verified.", options);
                 return result;
             } catch (error) {
                 console.log("Payment checkout sheet submit error:", error);
@@ -1873,11 +1902,11 @@
                         const input = modal.querySelector("#azPaymentSheetSlipInput");
                         if (input) input.value = "";
                         modal.querySelector("#azPaymentSheetPreview")?.setAttribute("hidden", "");
-                        modal.querySelector("#azPaymentSheetUploadLabel").textContent = "Upload Another Slip";
-                        setMessage("error", "Payment could not be verified. Please upload the correct payment slip for this order.");
+                        setLocalizedText(modal.querySelector("#azPaymentSheetUploadLabel"), "payment.thunder.uploadAnother", "Upload Another Slip", options);
+                        setLocalizedMessage("error", "payment.thunder.rejected", "Payment could not be verified. Please upload the correct payment slip for this order.", options);
                     } else {
                         if (activeState) activeState.verificationPending = true;
-                        setMessage("error", "We couldn't verify your payment right now. Please try again.");
+                        setLocalizedMessage("error", "payment.thunder.retryable", "We couldn't verify your payment right now. Please try again.", options);
                     }
                 } else {
                     setMessage("error", error.message || "Submission failed. Please try again.");
@@ -1891,7 +1920,7 @@
                 const submit = modal.querySelector("#azPaymentSheetSubmit");
                 if (options.autoSubmitReceipt === true && submit) {
                     submit.hidden = activeState?.verificationPending !== true;
-                    if (activeState?.verificationPending === true) submit.textContent = "Retry Verification";
+                    if (activeState?.verificationPending === true) setLocalizedText(submit, "payment.thunder.retry", "Retry Verification", options);
                 }
             }
         };

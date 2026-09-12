@@ -560,6 +560,25 @@ body.light .az-payment-sheet {
     display: none !important;
 }
 
+.az-payment-sheet.is-thunder-auto-slip .az-payment-sheet__checklist {
+    display: none !important;
+}
+
+.az-payment-sheet.is-thunder-auto-slip .az-payment-sheet__instructions {
+    margin-bottom: 18px;
+}
+
+.az-payment-sheet.is-thunder-auto-slip .az-payment-sheet__receipt {
+    padding-top: 18px;
+    border-top: 1px solid var(--az-pay-sheet-border);
+}
+
+.az-payment-sheet.is-thunder-auto-slip .az-payment-sheet__message {
+    margin: 12px 2px 0;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
 .az-payment-sheet.is-desktop-promptpay .az-payment-sheet__desktop-banks {
     display: grid;
     gap: 8px;
@@ -656,6 +675,18 @@ body.light .az-payment-sheet {
     .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__body {
         padding: 0 18px calc(18px + env(safe-area-inset-bottom));
         overscroll-behavior: contain;
+    }
+
+    .az-payment-sheet.is-thunder-auto-slip .az-payment-sheet__body {
+        padding-bottom: calc(18px + env(safe-area-inset-bottom));
+    }
+
+    .az-payment-sheet.is-thunder-auto-slip .az-payment-sheet__qr img {
+        width: min(220px, 72vw);
+    }
+
+    .az-payment-sheet.is-thunder-auto-slip .az-payment-sheet__receipt {
+        padding-top: 16px;
     }
 
     .az-payment-sheet.is-mobile-promptpay .az-payment-sheet__header {
