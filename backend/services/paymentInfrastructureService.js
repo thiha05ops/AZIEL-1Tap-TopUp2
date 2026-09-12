@@ -77,6 +77,10 @@ function safeProviderEnvironmentStatus(env = {}) {
 function envStatusFromProcess(providerCode = "", environment = "TEST") {
     const code = String(providerCode || "").toUpperCase();
     const prefix = environment === "LIVE" ? "LIVE" : "TEST";
+    if (code === "THUNDER_PROMPTPAY" || code === "THUNDER") {
+        const configured = Boolean(process.env.THUNDER_API_KEY);
+        return { environment, enabled: configured, publicKeyConfigured: true, secretKeyConfigured: configured, webhookSecretConfigured: false, merchantIdentifierConfigured: true, healthState: configured ? STATUS.READY : STATUS.NOT_CONFIGURED };
+    }
     if (code !== "OMISE") {
         return {
             environment,
@@ -107,11 +111,12 @@ function providerReadiness(provider = {}) {
     const environments = Array.isArray(provider.environments) && provider.environments.length
         ? provider.environments
         : [envStatusFromProcess(provider.providerCode, "TEST"), envStatusFromProcess(provider.providerCode, "LIVE")];
+    const webhookRequired = adapter?.webhookRequired !== false;
     const readyEnvironment = environments.find(env =>
         env.enabled === true &&
         env.publicKeyConfigured &&
         env.secretKeyConfigured &&
-        env.webhookSecretConfigured
+        (!webhookRequired || env.webhookSecretConfigured)
     );
     if (!readyEnvironment) missing.push("verified environment credentials");
     return {
@@ -137,7 +142,7 @@ function projectProvider(provider = {}) {
         enabled: provider.enabled === true,
         healthState: provider.enabled ? readiness.status : STATUS.DISABLED,
         configurationReadiness: readiness.status,
-        webhookReadiness: readiness.missing.includes("verified environment credentials") ? STATUS.NOT_CONFIGURED : STATUS.READY,
+        webhookReadiness: adapter?.webhookRequired === false ? STATUS.READY : (readiness.missing.includes("verified environment credentials") ? STATUS.NOT_CONFIGURED : STATUS.READY),
         refundCapability: provider.refundCapability === true || adapter?.refundCapability === true,
         partialRefundCapability: provider.partialRefundCapability === true || adapter?.partialRefundCapability === true,
         checkoutModes: provider.checkoutModes || adapter?.checkoutModes || [],

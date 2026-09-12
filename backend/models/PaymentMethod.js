@@ -97,7 +97,7 @@ const paymentMethodSchema = new mongoose.Schema(
 
         confirmationMode: {
             type: String,
-            enum: ["manual_admin", "provider_webhook", "automatic_provider", "wallet_internal"],
+            enum: ["manual_admin", "thunder_slip", "provider_webhook", "automatic_provider", "wallet_internal"],
             default: "manual_admin"
         },
 

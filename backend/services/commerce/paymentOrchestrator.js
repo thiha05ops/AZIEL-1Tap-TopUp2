@@ -906,6 +906,15 @@ function createPaymentOrchestrator(dependencies = {}) {
         }
         assertTransition(current, result.status, { allowLatePaymentReconciliation: deps.allowLatePaymentReconciliation });
         const applied = await runTransaction(async transactionContext => {
+            if (source.verifiedTransactionRef) {
+                const bindVerifiedTransactionRef = assertPortFunction(deps.paymentAttemptPort, "bindVerifiedTransactionRef");
+                await bindVerifiedTransactionRef({
+                    attemptId: attempt.attemptId,
+                    verifiedTransactionRef: normalizeString(source.verifiedTransactionRef),
+                    changedAt: deps.clock(),
+                    transactionContext
+                });
+            }
             if (typeof deps.paymentAttemptPort.appendProviderEvent === "function") {
                 await deps.paymentAttemptPort.appendProviderEvent({
                     attemptId: attempt.attemptId,

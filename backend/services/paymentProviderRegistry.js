@@ -1,5 +1,6 @@
 const PROVIDERS = Object.freeze({
     promptpay: { key: "promptpay", label: "PromptPay", region: "TH", logo: "/assets/payment/promptpay.png" },
+    thunder_promptpay: { key: "thunder_promptpay", label: "PromptPay (Verified)", region: "TH", logo: "/assets/payment/promptpay.png" },
     scb: { key: "scb", label: "SCB", region: "TH", logo: "/assets/payment/scb.png" },
     bangkok_bank: { key: "bangkok_bank", label: "Bangkok Bank", region: "TH", logo: "/assets/payment/bank-neutral.svg" },
     kplus: { key: "kplus", label: "K PLUS", region: "TH", logo: "/assets/payment/bank-neutral.svg" },
@@ -41,7 +42,7 @@ const PROVIDERS_BY_REGION_TYPE = Object.freeze({
     TH: {
         auto: ["promptpay"],
         deeplink: ["scb", "bangkok_bank", "kplus", "krungsri", "krungthai"],
-        manual: ["promptpay", "scb", "bangkok_bank", "kplus", "krungsri", "krungthai"],
+        manual: ["promptpay", "thunder_promptpay", "scb", "bangkok_bank", "kplus", "krungsri", "krungthai"],
         wallet: ["wallet"]
     },
     MM: {
@@ -197,11 +198,12 @@ function paymentMethodReadiness(method = {}) {
 
     if (configurationKind === PAYMENT_CONFIGURATION_KINDS.PROMPTPAY_DYNAMIC) {
         if (String(method.region || "").toUpperCase() !== "TH") missing.push("Thailand region");
-        if (confirmationMode && confirmationMode !== "manual_admin") missing.push("manual admin confirmation mode");
+        if (confirmationMode && !["manual_admin", "thunder_slip"].includes(confirmationMode)) missing.push("supported confirmation mode");
         if (paymentType === "auto") missing.push("manual payment type");
         if (!isEnabled(method.dynamicQrSupported)) missing.push("dynamic QR supported");
         if (!isEnabled(method.amountPrefillSupported)) missing.push("amount prefill supported");
         if (!hasPromptPayRecipient(method)) missing.push("PromptPay recipient");
+        if (confirmationMode === "thunder_slip" && !String(method.accountNumber || "").trim()) missing.push("Thunder receiving bank account");
     }
 
     if ([PAYMENT_CONFIGURATION_KINDS.MANUAL_BANK_APP, PAYMENT_CONFIGURATION_KINDS.PROMPTPAY_DYNAMIC].includes(configurationKind)) {
@@ -229,9 +231,10 @@ function paymentMethodReadiness(method = {}) {
         if (method.slipRequired === false || method.slipRequired === "false") {
             missing.push("slip required");
         }
-        if (method.confirmationMode && method.confirmationMode !== "manual_admin") {
-            missing.push("manual admin confirmation mode");
+        if (method.confirmationMode && !["manual_admin", "thunder_slip"].includes(method.confirmationMode)) {
+            missing.push("supported confirmation mode");
         }
+        if (method.confirmationMode === "thunder_slip" && !String(process.env.THUNDER_API_KEY || "").trim()) missing.push("Thunder API key");
     }
 
     return { ready: missing.length === 0, missing };

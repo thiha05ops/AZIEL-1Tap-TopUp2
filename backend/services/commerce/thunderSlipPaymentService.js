@@ -1,0 +1,89 @@
+"use strict";
+
+const crypto = require("crypto");
+const { decodePaymentSlipQr } = require("../paymentSlipQrDecoder");
+const { createThunderApiClient } = require("../thunderApiClient");
+
+const PROVIDER = "THUNDER_PROMPTPAY";
+
+class ThunderSlipPaymentError extends Error {
+    constructor(code, message, options = {}) { super(message); this.name = "ThunderSlipPaymentError"; this.code = code; this.httpStatus = options.httpStatus || 422; this.retryable = options.retryable === true; this.evidenceBound = options.evidenceBound === true; }
+}
+function text(value) { return String(value ?? "").trim(); }
+function upper(value) { return text(value).replace(/-/g, "_").toUpperCase(); }
+function fail(code, message, options) { throw new ThunderSlipPaymentError(code, message, options); }
+function cents(value) { const n = Number(value); return Number.isFinite(n) ? Math.round((n + Number.EPSILON) * 100) : null; }
+function rawSlipOf(response = {}) { return response.rawSlip || response.data?.rawSlip || response.data?.data?.rawSlip || response.result?.rawSlip || {}; }
+function field(source, names) { for (const name of names) if (source?.[name] !== undefined && source?.[name] !== null) return source[name]; return undefined; }
+function normalizeAccount(value) { return text(value).replace(/[^0-9A-Za-z]/g, "").toUpperCase(); }
+
+function createThunderSlipPaymentService(dependencies = {}) {
+    const attempts = dependencies.paymentAttemptRepository;
+    const orders = dependencies.orderRepository;
+    const orchestrator = dependencies.paymentOrchestrator;
+    const decoder = dependencies.decodeSlipQr || decodePaymentSlipQr;
+    const client = dependencies.thunderClient || createThunderApiClient(dependencies.thunderClientOptions);
+    const clock = dependencies.clock || (() => new Date());
+    if (!attempts || !orders || !orchestrator) throw new TypeError("Thunder slip verification dependencies are required.");
+
+    async function verify(input = {}) {
+        const owner = input.owner || {};
+        const attempt = await attempts.findAttemptByIdForOwner({ attemptId: text(input.attemptId), owner });
+        const order = await orders.findOwnedOrderById({ orderId: text(input.orderId), owner });
+        if (!attempt || !order || attempt.orderId !== order.orderId) fail("THUNDER_PAYMENT_NOT_FOUND", "Payment attempt was not found.", { httpStatus: 404 });
+        if (upper(attempt.provider) !== PROVIDER || text(attempt.confirmationMode) !== "thunder_slip") fail("THUNDER_FLOW_REQUIRED", "This payment does not support automatic slip verification.");
+        if (upper(attempt.status) === "PAID") return { ...(await orchestrator.getPaymentResult({ attemptId: attempt.attemptId, owner })), verificationStatus: "verified", idempotent: true };
+        if (!["PENDING", "INITIATING"].includes(upper(attempt.status))) fail("THUNDER_PAYMENT_INACTIVE", "This payment attempt is no longer active.", { httpStatus: 409 });
+        if (upper(attempt.currency) !== "THB" || cents(attempt.amount) === null) fail("THUNDER_CURRENCY_UNSUPPORTED", "Automatic slip verification supports THB only.");
+        const now = clock();
+        if (attempt.expiresAt && new Date(attempt.expiresAt).getTime() + 120000 < now.getTime()) fail("THUNDER_SLIP_STALE", "This payment session has expired. Please start a new payment.", { httpStatus: 409 });
+
+        let payload;
+        try { payload = await decoder(input.fileBuffer); } catch (error) { fail(error.code || "THUNDER_QR_DECODE_FAILED", error.message || "The slip QR code could not be read.", { evidenceBound: true }); }
+        let response;
+        try { response = await client.verifyBank({ payload, remark: text(order.orderId).slice(0, 60), matchAmount: Number(attempt.amount) }); }
+        catch (error) { fail(error.code || "THUNDER_UNAVAILABLE", error.message || "Payment verification is temporarily unavailable.", { retryable: error.retryable === true, evidenceBound: true, httpStatus: error.retryable ? 503 : 422 }); }
+        const data = response?.data || {};
+        const providerStatus = upper(field(response, ["status", "code"]) || field(data, ["status", "code"]));
+        if (providerStatus === "SLIP_PENDING") return { ...(await orchestrator.getPaymentResult({ attemptId: attempt.attemptId, owner })), verificationStatus: "pending", code: "SLIP_PENDING", message: "Payment is still being verified. Please retry shortly." };
+        const rawSlip = rawSlipOf(response);
+        const success = field(response, ["success", "verified", "isSuccess"]) ?? field(response?.data, ["success", "verified", "isSuccess"]);
+        if (success !== true && !["SUCCESS", "VERIFIED", "OK"].includes(providerStatus)) fail("THUNDER_SLIP_NOT_VERIFIED", "The payment slip could not be verified.", { evidenceBound: true });
+        const matchedAccount = field(response, ["matchedAccount"]) ?? field(data, ["matchedAccount"]);
+        const amountMatched = field(response, ["isAmountMatched", "matchedAmount"]) ?? field(data, ["isAmountMatched", "matchedAmount"]);
+        if (!matchedAccount || typeof matchedAccount !== "object" || Array.isArray(matchedAccount)) fail("THUNDER_RECEIVER_MISMATCH", "This slip was paid to a different receiving account.", { evidenceBound: true });
+        const expectedReceiver = normalizeAccount(dependencies.receiverBankAccount || "");
+        const matchedReceiver = normalizeAccount(matchedAccount.bankNumber);
+        if (!expectedReceiver || !matchedReceiver || matchedReceiver !== expectedReceiver) fail("THUNDER_RECEIVER_MISMATCH", "This slip was paid to a different receiving account.", { evidenceBound: true });
+        if (amountMatched !== true) fail("THUNDER_AMOUNT_MISMATCH", "The slip amount does not match this order.", { evidenceBound: true });
+        const slipAmount = field(data, ["amountInSlip"]) ?? rawSlip?.amount?.amount ?? field(rawSlip, ["amountInSlip", "transferAmount"]);
+        if (cents(slipAmount) !== cents(attempt.amount)) fail("THUNDER_AMOUNT_MISMATCH", "The slip amount does not match this order.", { evidenceBound: true });
+        const transRef = text(field(rawSlip, ["transRef", "transactionRef", "reference"]) || field(response?.data, ["transRef"]));
+        if (!transRef) fail("THUNDER_RESPONSE_INVALID", "The verifier response was incomplete. Please retry.", { retryable: true, evidenceBound: true, httpStatus: 503 });
+        const transferredAtRaw = field(rawSlip, ["date", "transDateTime", "transactionDateTime", "transDate", "dateTime", "timestamp"]);
+        const transferredAt = transferredAtRaw ? new Date(transferredAtRaw) : null;
+        if (!transferredAt || !Number.isFinite(transferredAt.getTime())) fail("THUNDER_RESPONSE_INVALID", "The verifier response was incomplete. Please retry.", { retryable: true, evidenceBound: true, httpStatus: 503 });
+        const earliest = new Date(attempt.createdAt || order.createdAt).getTime() - 120000;
+        const latest = (attempt.expiresAt ? new Date(attempt.expiresAt).getTime() : now.getTime()) + 120000;
+        if (transferredAt.getTime() < earliest || transferredAt.getTime() > latest) fail("THUNDER_SLIP_STALE", "This slip is outside the valid payment time window.", { evidenceBound: true });
+        const receiverAccount = rawSlip?.receiver?.account || {};
+        const maskedReceiver = text(receiverAccount?.bank?.account || field(rawSlip, ["receiverAccount", "receiverAccountNo"]));
+        if (maskedReceiver && !/^[0-9xX*\-\s]+$/.test(maskedReceiver)) fail("THUNDER_RECEIVER_MISMATCH", "The receiving account details were inconsistent.", { evidenceBound: true });
+        const eventId = `thunder:${crypto.createHash("sha256").update(transRef).digest("hex").slice(0, 32)}`;
+        let payment;
+        try {
+            payment = await orchestrator.handleProviderEvent({ trustedOperational: true, verifiedTransactionRef: transRef, providerEvent: { provider: PROVIDER, providerReference: attempt.providerReference, providerEventId: eventId, eventType: "THUNDER_SLIP_VERIFIED", amount: attempt.amount, currency: "THB", occurredAt: transferredAt.toISOString(), metadata: { receiptId: text(input.receiptEvidence?.receiptId), verificationMethod: "thunder_slip" } } });
+        } catch (error) {
+            const current = await attempts.findAttemptByIdForOwner({ attemptId: attempt.attemptId, owner });
+            if (upper(current?.status) === "PAID" && current?.verifiedTransactionRef === transRef) {
+                payment = await orchestrator.getPaymentResult({ attemptId: attempt.attemptId, owner });
+            } else {
+                fail(error?.code === "PAYMENT_VERIFIED_TRANSACTION_EXISTS" ? "THUNDER_TRANSACTION_REUSED" : "THUNDER_PAYMENT_COMMIT_FAILED", "Payment verification could not be committed. Please retry.", { evidenceBound: true, retryable: error?.retryable === true, httpStatus: error?.code === "PAYMENT_VERIFIED_TRANSACTION_EXISTS" ? 409 : 503 });
+            }
+        }
+        return { ...payment, verificationStatus: "verified" };
+    }
+    return Object.freeze({ verify });
+}
+
+module.exports = Object.freeze({ PROVIDER, ThunderSlipPaymentError, createThunderSlipPaymentService });

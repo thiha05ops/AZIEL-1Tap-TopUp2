@@ -566,9 +566,9 @@ function applyCompatibilityModes(method) {
     } else if (["manual", "deeplink"].includes(String(method.paymentType || "").toLowerCase())) {
         method.receiptUploadEnabled = method.receiptUploadEnabled !== false;
         method.slipRequired = method.slipRequired !== false;
-        method.autoVerificationSupported = false;
+        method.autoVerificationSupported = method.confirmationMode === "thunder_slip";
         method.webhookSupported = false;
-        method.confirmationMode = "manual_admin";
+        method.confirmationMode = method.confirmationMode === "thunder_slip" ? "thunder_slip" : "manual_admin";
         method.openAppMode = method.enableOpenApp === true ? safeOpenAppMode(method.openAppMode, "direct") : "disabled";
         if (!["provider_generated", "uploaded_static", "aziel_promptpay_dynamic", "none"].includes(method.qrMode)) {
             method.qrMode = "uploaded_static";
@@ -1509,7 +1509,7 @@ function applyPaymentMethodPatch(method, body = {}) {
         method.openAppMode = safeOpenAppMode(body.openAppMode, method.openAppMode || "disabled");
     }
 
-    if (body.confirmationMode !== undefined && ["manual_admin", "provider_webhook", "automatic_provider", "wallet_internal"].includes(String(body.confirmationMode))) {
+    if (body.confirmationMode !== undefined && ["manual_admin", "thunder_slip", "provider_webhook", "automatic_provider", "wallet_internal"].includes(String(body.confirmationMode))) {
         method.confirmationMode = String(body.confirmationMode);
     }
 
@@ -1571,14 +1571,20 @@ async function validatePaymentMethodConfiguration(method) {
         if (!["manual", "deeplink"].includes(paymentType)) {
             throw configError("AZIEL Dynamic PromptPay QR requires a manual or deeplink payment type.");
         }
-        if (method.confirmationMode !== "manual_admin") {
-            throw configError("AZIEL Dynamic PromptPay QR requires manual admin confirmation.");
+        if (!["manual_admin", "thunder_slip"].includes(method.confirmationMode)) {
+            throw configError("AZIEL Dynamic PromptPay QR requires manual admin or Thunder slip confirmation.");
         }
         if (method.receiptUploadEnabled === false || method.slipRequired === false) {
             throw configError("AZIEL Dynamic PromptPay QR requires receipt upload and payment slip verification.");
         }
-        if (method.autoVerificationSupported === true || method.webhookSupported === true) {
+        if (method.confirmationMode === "manual_admin" && (method.autoVerificationSupported === true || method.webhookSupported === true)) {
             throw configError("Manual Dynamic PromptPay methods cannot enable automatic verification or webhooks.");
+        }
+        if (method.confirmationMode === "thunder_slip" && (!method.autoVerificationSupported || method.webhookSupported === true)) {
+            throw configError("Thunder PromptPay requires automatic verification without webhooks.");
+        }
+        if (method.confirmationMode === "thunder_slip" && !String(method.accountNumber || "").trim()) {
+            throw configError("Thunder PromptPay requires the AZIEL receiving bank account number used for receiver matching.");
         }
         const recipient = normalizedPromptPayRecipient(method);
         if (!recipient.type || !recipient.value) {

@@ -11,8 +11,17 @@
         const res = await fetch(`/api/commerce/orders/${encodeURIComponent(orderId)}/payments/${encodeURIComponent(attemptId)}/receipt`, { method: "POST", headers: window.PaymentUtils?.authHeaders?.() || {}, body: fd });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.success) throw new Error(data.message || "Submission failed. Please try again.");
-        setMessage?.("success", data.message || "Payment slip submitted");
-        try { localStorage.removeItem("aziel:commerce-pending-payment"); } catch (_) { /* best effort */ }
+        const result = data.payment || {};
+        if (result.verificationStatus === "pending" || result.code === "SLIP_PENDING") {
+            setMessage?.("success", result.message || "Payment is still being verified. Please retry shortly.");
+        } else if (String(result.paymentStatus || "").toLowerCase() === "paid") {
+            setMessage?.("success", "Payment verified.");
+        } else {
+            setMessage?.("success", data.message || "Payment slip submitted");
+        }
+        if (result.verificationStatus !== "pending") {
+            try { localStorage.removeItem("aziel:commerce-pending-payment"); } catch (_) { /* best effort */ }
+        }
         return { orderId, data };
     }
 
@@ -31,6 +40,7 @@
             ...(window.selectedPaymentData || {}),
             ...(paymentSession.selectedPaymentMethod || {})
         };
+        const thunderVerified = String(paymentSession.confirmationMode || payment.confirmationMode || "") === "thunder_slip" || String(paymentSession.provider || payment.provider || "").toUpperCase() === "THUNDER_PROMPTPAY";
 
         const qr =
             paymentSession.qrImage ||
@@ -45,16 +55,21 @@
 
         async function submitFromSheet(file, setMessage, close) {
             const { orderId, data } = await submitCommerceReceipt(orderData, paymentSession, file, setMessage);
+            const verified = String(data.payment?.paymentStatus || "").toLowerCase() === "paid";
+            const pending = data.payment?.verificationStatus === "pending";
             if (window.AZIEL_PAYMENT_PAGE_MODE === true) {
+                if (pending) return true;
                 sessionStorage.removeItem("azielPaymentPageSession");
                 window.AZIEL_PAYMENT_PAGE?.showCompletion?.({
                     orderId,
-                    status: data.order?.status || "pending_verification",
-                    paid: ["paid", "processing", "completed"].includes(String(data.order?.status || "").toLowerCase())
+                    status: verified ? "paid" : (data.order?.status || "pending_verification"),
+                    paid: verified || ["paid", "processing", "completed"].includes(String(data.order?.status || "").toLowerCase()),
+                    paymentReceived: verified
                 });
                 return true;
             }
-            window.PaymentUtils?.showSuccess?.(orderId, "Slip Submitted", "Waiting for Verification. Your payment slip has been submitted. We'll notify you after verification.");
+            if (pending) return true;
+            window.PaymentUtils?.showSuccess?.(orderId, verified ? "Payment Verified" : "Slip Submitted", verified ? "Your payment has been confirmed. Processing your order..." : "Waiting for Verification. Your payment slip has been submitted. We'll notify you after verification.");
             close("submitted");
             return true;
         }
@@ -78,7 +93,7 @@
             attemptId: paymentSession.attemptId || orderData.manualPaymentAttemptId || "",
             qrImageUrl: qr,
             qrMode: paymentSession.qrMode || payment.qrMode || "",
-            instructions: "Transfer the exact amount, then upload the payment receipt.",
+            instructions: thunderVerified ? "Pay the fixed amount, then upload the slip for automatic verification." : "Transfer the exact amount, then upload the payment receipt.",
             requiresSlip,
             enableSaveQr: paymentSession.enableSaveQr === true || payment.enableSaveQr === true,
             enableOpenApp: paymentSession.enableOpenApp === true || payment.enableOpenApp === true,
@@ -100,8 +115,8 @@
             amountPrefillSupported: paymentSession.amountPrefillSupported === true || payment.amountPrefillSupported === true,
             receiptUploadEnabled: paymentSession.receiptUploadEnabled !== false && payment.receiptUploadEnabled !== false,
             checklistSteps: paymentSession.checklistSteps || payment.checklistSteps || [],
-            submitLabel: "Submit for Verification",
-            loadingText: "Submitting receipt...",
+            submitLabel: thunderVerified ? "Upload Slip" : "Submit for Verification",
+            loadingText: thunderVerified ? "Verifying payment..." : "Submitting receipt...",
             onSubmit: async ({ file, setMessage, close }) => {
                 if (paymentSession.commerce === true || paymentSession.commerceOrderId || orderData.commerceOrderId) {
                     return submitFromSheet(file, setMessage, close);

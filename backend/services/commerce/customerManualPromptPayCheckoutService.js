@@ -134,7 +134,9 @@ async function assertAuthoritativeFulfillmentReady(catalog = {}, options = {}) {
 
 async function loadPromptPayMethod(input = {}, region) {
     const requestedKey = text(input.paymentMethod || input.methodCode || "promptpay").toLowerCase();
-    if (region !== "TH" || requestedKey !== "promptpay") {
+    const isManualPromptPay = !(region !== "TH" || requestedKey !== "promptpay");
+    const isThunderPromptPay = region === "TH" && requestedKey === "thunder_promptpay";
+    if (!isManualPromptPay && !isThunderPromptPay) {
         throw new CustomerManualPromptPayCheckoutError(
             ERROR_CODES.PAYMENT_METHOD_UNAVAILABLE,
             "Selected payment method is unavailable for this checkout.",
@@ -158,6 +160,7 @@ function paymentCapabilities(method = {}) {
         paymentMethod: method.key || "promptpay",
         paymentType: method.paymentType || "manual",
         provider: method.provider || "promptpay",
+        confirmationMode: method.confirmationMode || "manual_admin",
         accountName: method.accountName || "",
         accountNumber: method.accountNumber || "",
         qrMode: method.qrMode || "aziel_promptpay_dynamic",
@@ -574,7 +577,7 @@ async function startCustomerManualPromptPayCheckout(
                 idempotencyKey: `checkout:${idempotencySeed}`,
                 paymentSelection: {
                     paymentMethodId: method.key,
-                    paymentChannel: "MANUAL_PROMPTPAY"
+                    paymentChannel: method.confirmationMode === "thunder_slip" ? "THUNDER_PROMPTPAY" : "MANUAL_PROMPTPAY"
                 },
                 customerInput: {
                     gameAccount: {
@@ -611,9 +614,9 @@ async function startCustomerManualPromptPayCheckout(
                     allowed: true,
                     paymentSnapshot: {
                         paymentMethodId: method.key,
-                        paymentChannel: "MANUAL_PROMPTPAY",
-                        provider: "MANUAL_PROMPTPAY",
-                        flowType: "manual_promptpay",
+                        paymentChannel: method.confirmationMode === "thunder_slip" ? "THUNDER_PROMPTPAY" : "MANUAL_PROMPTPAY",
+                        provider: method.confirmationMode === "thunder_slip" ? "THUNDER_PROMPTPAY" : "MANUAL_PROMPTPAY",
+                        flowType: method.confirmationMode === "thunder_slip" ? "thunder_promptpay" : "manual_promptpay",
                         nextAction: "OPEN_MANUAL_PAYMENT",
                         paymentMethodBound: true,
                         metadata: {

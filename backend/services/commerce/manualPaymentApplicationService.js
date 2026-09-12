@@ -8,6 +8,8 @@ const { createPaymentOrchestrator, PaymentOrchestratorError } = require("./payme
 const { ensurePaidOrderFulfillmentWork } = require("../paidFulfillmentRoutingService");
 const { createProviderRegistry } = require("./providerRegistry");
 const { createManualPromptPayProvider } = require("./manualPromptPayProviderFactory");
+const { createThunderPromptPayAdapter } = require("./providers/thunderPromptPayAdapter");
+const { createThunderSlipPaymentService, ThunderSlipPaymentError } = require("./thunderSlipPaymentService");
 const { createManualAdminAdapter, MANUAL_ADMIN_PROVIDER_ID } = require("./providers/manualAdminAdapter");
 const { paymentMethodCapabilityState } = require("../paymentProviderRegistry");
 const PaymentMethod = require("../../models/PaymentMethod");
@@ -18,7 +20,8 @@ const {
 
 const SERVICE_VERSION = "commerce.manual-payment-application.v1";
 const MANUAL_PROVIDER_ID = "MANUAL_PROMPTPAY";
-const MANUAL_PROVIDER_IDS = Object.freeze(new Set([MANUAL_PROVIDER_ID, MANUAL_ADMIN_PROVIDER_ID]));
+const THUNDER_PROVIDER_ID = "THUNDER_PROMPTPAY";
+const MANUAL_PROVIDER_IDS = Object.freeze(new Set([MANUAL_PROVIDER_ID, MANUAL_ADMIN_PROVIDER_ID, THUNDER_PROVIDER_ID]));
 const ERROR_CODES = Object.freeze({
     VALIDATION_ERROR: "VALIDATION_ERROR",
     UNAUTHENTICATED: "UNAUTHENTICATED",
@@ -106,12 +109,16 @@ function isManualPromptPayOrder(order = {}) {
     return provider === MANUAL_PROVIDER_ID || provider === "MANUAL_PROMPTPAY" || method === "promptpay" || method === "aziel_promptpay_dynamic";
 }
 
+function isThunderPromptPayOrder(order = {}) {
+    return paymentProviderOf(order) === THUNDER_PROVIDER_ID || normalizeString(order.payment?.confirmationMode || order.payment?.metadata?.confirmationMode) === "thunder_slip";
+}
+
 function isManualAdminOrder(order = {}) {
     return paymentProviderOf(order) === MANUAL_ADMIN_PROVIDER_ID;
 }
 
 function isSupportedManualOrder(order = {}) {
-    return isManualPromptPayOrder(order) || isManualAdminOrder(order);
+    return isManualPromptPayOrder(order) || isThunderPromptPayOrder(order) || isManualAdminOrder(order);
 }
 
 function fingerprint(input = {}) {
@@ -150,6 +157,13 @@ async function defaultManualPromptPayConfigurationProvider() {
     };
 }
 
+async function defaultThunderPromptPayConfigurationProvider() {
+    const method = await PaymentMethod.findOne({ confirmationMode: "thunder_slip", qrMode: "aziel_promptpay_dynamic", enabled: true }).sort({ routingPriority: -1, updatedAt: -1 }).lean();
+    if (!method || !String(process.env.THUNDER_API_KEY || "").trim()) throw appError(ERROR_CODES.PROVIDER_UNAVAILABLE, "Thunder PromptPay is not configured.", 503, "provider");
+    if (!normalizeString(method.accountNumber)) throw appError(ERROR_CODES.PROVIDER_UNAVAILABLE, "Thunder receiving bank account is not configured.", 503, "provider");
+    return { enabled: true, recipientType: method.promptPayRecipientType, recipientValue: method.promptPayRecipientValue, receivingBankAccount: method.accountNumber, recipientDisplayName: method.method || "AZIEL PromptPay", defaultExpiryMinutes: method.dynamicQrExpiryMinutes || 15, environment: String(method.providerEnvironment || process.env.NODE_ENV || "production").toLowerCase() };
+}
+
 async function defaultManualAdminConfigurationProvider({ intent } = {}) {
     const methodKey = normalizeString(intent?.paymentMethodId).toLowerCase();
     const region = normalizeUpper(intent?.region);
@@ -178,10 +192,14 @@ async function defaultManualAdminConfigurationProvider({ intent } = {}) {
     };
 }
 
-function createProviderResolver(configProvider, providerOptions = {}, manualAdminConfigProvider = defaultManualAdminConfigurationProvider) {
+function createProviderResolver(configProvider, providerOptions = {}, manualAdminConfigProvider = defaultManualAdminConfigurationProvider, thunderConfigProvider = defaultThunderPromptPayConfigurationProvider) {
     let cached = null;
     let cachedSignature = "";
     return async function providerResolver({ intent }) {
+        if (normalizeUpper(intent?.provider) === THUNDER_PROVIDER_ID) {
+            const config = await thunderConfigProvider({ intent });
+            return createThunderPromptPayAdapter({ configuration: config, ...providerOptions });
+        }
         if (normalizeUpper(intent?.provider) === MANUAL_ADMIN_PROVIDER_ID) {
             const config = await manualAdminConfigProvider({ intent });
             return createManualAdminAdapter({ configuration: config, ...providerOptions });
@@ -257,12 +275,14 @@ function toSafePaymentView({ order = {}, attempt = {}, paymentResult = null, adm
     const source = paymentResult || attempt || {};
     const qr = source.qr || attempt.qr || null;
     const instructions = source.paymentInstructions || attempt.paymentInstructions || null;
+    const thunder = normalizeUpper(attempt.provider || source.provider) === THUNDER_PROVIDER_ID;
     return {
         manualPaymentApplicationVersion: SERVICE_VERSION,
         orderId: order.orderId || source.orderId || attempt.orderId || "",
         attemptId: source.attemptId || attempt.attemptId || "",
         paymentStatus: normalizeString(source.paymentStatus || attempt.status || order.paymentStatus).toLowerCase(),
         provider: normalizeString(attempt.provider || order.payment?.provider || source.provider),
+        confirmationMode: normalizeString(attempt.confirmationMode || instructions?.confirmationMode || order.payment?.metadata?.confirmationMode),
         paymentMethod: normalizeString(attempt.paymentMethod || attempt.paymentMethodId || order.payment?.paymentMethodId),
         region: normalizeString(attempt.region || order.commercial?.region).toUpperCase(),
         amount: Number(source.amount ?? attempt.amount ?? order.commercial?.totalAmount ?? 0),
@@ -272,7 +292,7 @@ function toSafePaymentView({ order = {}, attempt = {}, paymentResult = null, adm
             mode: qr.mode || "aziel_promptpay_dynamic",
             sourceType: qr.sourceType || "dynamic_response",
             image: qr.image || "",
-            payload: qr.payload || "",
+            payload: thunder ? "" : (qr.payload || ""),
             encodedAmount: qr.encodedAmount || "",
             encodedReference: qr.encodedReference || ""
         } : null,
@@ -321,6 +341,7 @@ function createManualPaymentApplicationService(dependencies = {}) {
         auditLogger: dependencies.auditLogger || { write: async () => null },
         notificationPort: dependencies.notificationPort || { publish: async () => null },
         manualPromptPayConfigurationProvider: dependencies.manualPromptPayConfigurationProvider || defaultManualPromptPayConfigurationProvider,
+        thunderPromptPayConfigurationProvider: dependencies.thunderPromptPayConfigurationProvider || defaultThunderPromptPayConfigurationProvider,
         manualAdminConfigurationProvider: dependencies.manualAdminConfigurationProvider || defaultManualAdminConfigurationProvider,
         providerOptions: dependencies.providerOptions || {},
         clock: dependencies.clock || (() => new Date()),
@@ -330,7 +351,7 @@ function createManualPaymentApplicationService(dependencies = {}) {
     const orchestrator = deps.paymentOrchestrator || createPaymentOrchestrator({
         orderRepository: deps.commerceOrderRepository,
         paymentAttemptPort: deps.paymentAttemptRepository,
-        providerResolver: createProviderResolver(deps.manualPromptPayConfigurationProvider, deps.providerOptions, deps.manualAdminConfigurationProvider),
+        providerResolver: createProviderResolver(deps.manualPromptPayConfigurationProvider, deps.providerOptions, deps.manualAdminConfigurationProvider, deps.thunderPromptPayConfigurationProvider),
         transactionRunner: deps.transactionRunner,
         clock: deps.clock,
         idGenerator: deps.idGenerator,
@@ -484,6 +505,8 @@ function createManualPaymentApplicationService(dependencies = {}) {
     }
 
     async function attachReceiptEvidence(input = {}) {
+        let receiptBound = false;
+        let duplicateUploadUnbound = false;
         try {
             const owner = normalizeOwner(input.owner || {});
             const orderId = assertId(input.orderId, "orderId");
@@ -494,20 +517,25 @@ function createManualPaymentApplicationService(dependencies = {}) {
             if (!MANUAL_PROVIDER_IDS.has(normalizeUpper(attempt.provider))) {
                 throw appError(ERROR_CODES.UNSUPPORTED_PAYMENT_METHOD, "Receipt attempt is not a supported manual payment.", 422, "receipt");
             }
+            if (normalizeUpper(attempt.provider) === THUNDER_PROVIDER_ID && normalizeUpper(attempt.status) === "PAID") {
+                return { ...toSafePaymentView({ order, attempt }), verificationStatus: "verified", idempotent: true };
+            }
             if (!ACTIVE_EVIDENCE_STATUSES.has(normalizeUpper(attempt.status))) {
                 throw appError(ERROR_CODES.INVALID_STATE, "Receipt cannot be attached to this payment state.", 409, "receipt");
             }
             const evidence = normalizeReceiptEvidence(input.receiptEvidence || input.evidence || {});
             const changedAt = deps.clock();
             const updatedAttempt = await deps.transactionRunner(async transactionContext => {
-                const boundAttempt = await deps.paymentAttemptRepository.attachReceiptEvidence({
+                const binding = await deps.paymentAttemptRepository.attachReceiptEvidence({
                     attemptId,
                     orderId,
                     evidence,
                     changedAt,
+                    returnBindingOutcome: true,
                     transactionContext
                 });
-                if (typeof deps.commerceOrderRepository.appendOperationalReference === "function") {
+                const boundAttempt = binding.attempt || binding;
+                if (binding.evidenceBound !== false && typeof deps.commerceOrderRepository.appendOperationalReference === "function") {
                     await deps.commerceOrderRepository.appendOperationalReference({
                         orderId,
                         owner,
@@ -520,13 +548,37 @@ function createManualPaymentApplicationService(dependencies = {}) {
                         }
                     }, { transactionContext });
                 }
-                return boundAttempt;
+                return { attempt: boundAttempt, evidenceBound: binding.evidenceBound !== false, reusedExisting: binding.reusedExisting === true };
             });
+            receiptBound = true;
+            duplicateUploadUnbound = updatedAttempt.reusedExisting === true;
+            const boundAttempt = updatedAttempt.attempt || updatedAttempt;
             await audit("COMMERCE_MANUAL_PAYMENT_RECEIPT_ATTACHED", { actor: input.actor || owner, resourceId: attemptId, metadata: { orderId, receiptId: evidence.receiptId } });
             await notify("commerce.manualPayment.receiptAttached", { orderId, attemptId, receiptId: evidence.receiptId });
-            return toSafePaymentView({ order, attempt: updatedAttempt });
+            if (normalizeUpper(attempt.provider) === THUNDER_PROVIDER_ID) {
+                const config = await deps.thunderPromptPayConfigurationProvider({ intent: { provider: THUNDER_PROVIDER_ID } });
+                const verifier = createThunderSlipPaymentService({
+                    paymentAttemptRepository: deps.paymentAttemptRepository,
+                    orderRepository: deps.commerceOrderRepository,
+                    paymentOrchestrator: orchestrator,
+                    thunderClient: dependencies.thunderClient,
+                    thunderClientOptions: dependencies.thunderClientOptions,
+                    decodeSlipQr: dependencies.decodeSlipQr,
+                    receiverBankAccount: config.receivingBankAccount,
+                    clock: deps.clock
+                });
+                const payment = await verifier.verify({ orderId, attemptId, owner, fileBuffer: input.fileBuffer, receiptEvidence: boundAttempt.safeMetadata?.receiptEvidence || evidence });
+                return { ...payment, _receiptUploadDisposition: updatedAttempt.reusedExisting ? "duplicate_unbound" : "bound" };
+            }
+            return toSafePaymentView({ order, attempt: boundAttempt });
         } catch (error) {
+            if (receiptBound) error.evidenceBound = true;
+            if (duplicateUploadUnbound) error.duplicateUploadUnbound = true;
             if (input.storageCommitted === true && !error.recoverableEvidenceBinding) error.recoverableEvidenceBinding = true;
+            if (error instanceof ThunderSlipPaymentError) {
+                error.evidenceBound = true;
+                throw error;
+            }
             throw mapPaymentError(error, "receipt");
         }
     }

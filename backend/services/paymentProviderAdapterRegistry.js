@@ -1,4 +1,16 @@
 const PROVIDER_ADAPTERS = Object.freeze({
+    thunder_promptpay: Object.freeze({
+        name: "thunder_promptpay",
+        displayName: "Thunder Verified PromptPay",
+        supportedRails: ["MANUAL_QR"],
+        supportedCurrencies: ["THB"],
+        checkoutModes: ["SLIP_UPLOAD"],
+        cardNetworks: [],
+        refundCapability: false,
+        partialRefundCapability: false,
+        webhookRequired: false,
+        methods: Object.freeze(["createPayment", "verifyBankSlip", "healthCheck"])
+    }),
     omise: Object.freeze({
         name: "omise",
         displayName: "OPN / Omise",

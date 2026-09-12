@@ -88,6 +88,7 @@ const paymentAttemptSchema = new mongoose.Schema(
         status: { type: String, enum: PAYMENT_ATTEMPT_STATUSES, default: "UNPAID", required: true },
         providerReference: { type: String, trim: true, default: "" },
         providerTransactionId: { type: String, trim: true, default: "" },
+        verifiedTransactionRef: { type: String, trim: true, default: "" },
         rawProviderStatus: { type: String, trim: true, default: "" },
         idempotencyKey: { type: String, trim: true, default: "", immutable: true },
         operation: { type: String, trim: true, default: "initiatePayment", immutable: true },
@@ -140,6 +141,10 @@ paymentAttemptSchema.index({ attemptId: 1 }, { unique: true });
 paymentAttemptSchema.index({ providerReference: 1 }, {
     unique: true,
     partialFilterExpression: { providerReference: { $exists: true, $gt: "" } }
+});
+paymentAttemptSchema.index({ verifiedTransactionRef: 1 }, {
+    unique: true,
+    partialFilterExpression: { verifiedTransactionRef: { $exists: true, $gt: "" } }
 });
 paymentAttemptSchema.index({ provider: 1, ownerId: 1, idempotencyKey: 1, operation: 1 }, {
     unique: true,

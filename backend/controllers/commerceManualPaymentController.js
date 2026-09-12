@@ -8,6 +8,7 @@ const {
     createManualPaymentApplicationService,
     ManualPaymentApplicationError
 } = require("../services/commerce/manualPaymentApplicationService");
+const { ThunderSlipPaymentError } = require("../services/commerce/thunderSlipPaymentService");
 
 const {
     startCustomerManualPromptPayCheckout,
@@ -69,6 +70,9 @@ function respondError(res, error) {
             message: error.message,
             retryable: error.retryable === true
         });
+    }
+    if (error instanceof ThunderSlipPaymentError) {
+        return res.status(error.httpStatus || 422).json({ success: false, error: error.code, code: error.code, message: error.message, retryable: error.retryable === true });
     }
 
     if (error instanceof CommercePaymentRecoveryError) {
@@ -358,23 +362,32 @@ function createCommerceManualPaymentController(options = {}) {
                             req.body,
                         storageCommitted:
                             Boolean(evidence) ||
-                            req.body?.storageCommitted === true
+                            req.body?.storageCommitted === true,
+                        fileBuffer: req.file?.buffer
                     });
+
+                if (evidence && (payment?._receiptUploadDisposition === "duplicate_unbound" || (payment?.idempotent === true && payment?.verificationStatus === "verified"))) {
+                    try {
+                        await cleanupAfterFailedPersistence({ provider: evidence.storageProvider || "", key: evidence.storageKey || evidence.fileReference || "" });
+                    } catch (_) {
+                        // Best effort only: never risk deleting the authoritative bound receipt.
+                    }
+                }
+                if (payment && typeof payment === "object") delete payment._receiptUploadDisposition;
 
                 return respondSuccess(res, {
                     payment
                 });
             } catch (error) {
-                if (evidence) {
-                    await cleanupAfterFailedPersistence({
-                        provider:
-                            evidence.storageProvider ||
-                            "",
-                        key:
-                            evidence.storageKey ||
-                            evidence.fileReference ||
-                            ""
-                    });
+                if (evidence && (error?.evidenceBound !== true || error?.duplicateUploadUnbound === true)) {
+                    try {
+                        await cleanupAfterFailedPersistence({
+                            provider: evidence.storageProvider || "",
+                            key: evidence.storageKey || evidence.fileReference || ""
+                        });
+                    } catch (_) {
+                        // Cleanup is best effort and must not hide the verification result.
+                    }
                 }
 
                 if (error instanceof StorageError) {

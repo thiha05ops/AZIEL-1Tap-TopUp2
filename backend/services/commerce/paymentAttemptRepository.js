@@ -25,6 +25,7 @@ const ERROR_CODES = Object.freeze({
     PAYMENT_ATTEMPT_NOT_FOUND: "PAYMENT_ATTEMPT_NOT_FOUND",
     PAYMENT_ATTEMPT_FORBIDDEN: "PAYMENT_ATTEMPT_FORBIDDEN",
     PAYMENT_PROVIDER_REFERENCE_EXISTS: "PAYMENT_PROVIDER_REFERENCE_EXISTS",
+    PAYMENT_VERIFIED_TRANSACTION_EXISTS: "PAYMENT_VERIFIED_TRANSACTION_EXISTS",
     PAYMENT_PROVIDER_PAYABLE_AMOUNT_CONFLICT: "PAYMENT_PROVIDER_PAYABLE_AMOUNT_CONFLICT",
     PAYMENT_INVALID_TRANSITION: "PAYMENT_INVALID_TRANSITION",
     PAYMENT_DUPLICATE_EVENT: "PAYMENT_DUPLICATE_EVENT",
@@ -584,7 +585,11 @@ async function attachReceiptEvidence(input = {}, options = {}) {
         });
     }
     const currentEvidence = existing.safeMetadata?.receiptEvidence || null;
-    if (currentEvidence?.checksum && evidence.checksum && currentEvidence.checksum === evidence.checksum) return existing;
+    if (currentEvidence?.checksum && evidence.checksum && currentEvidence.checksum === evidence.checksum) {
+        return input.returnBindingOutcome === true
+            ? { attempt: existing, evidenceBound: false, reusedExisting: true }
+            : existing;
+    }
     if (!EVIDENCE_ACCEPTING_STATUSES.includes(existing.status)) {
         throw new PaymentAttemptRepositoryError(ERROR_CODES.PAYMENT_INVALID_TRANSITION, "Receipt evidence cannot be attached to this payment state.", {
             stage: "receipt",
@@ -621,15 +626,49 @@ async function attachReceiptEvidence(input = {}, options = {}) {
         { returnDocument: "after", runValidators: true, session: opts.mongoSession || undefined }
     );
     const updated = request.exec ? await request.exec() : await request;
-    if (updated) return plainRecord(updated);
+    if (updated) {
+        const attempt = plainRecord(updated);
+        return input.returnBindingOutcome === true
+            ? { attempt, evidenceBound: true, reusedExisting: false }
+            : attempt;
+    }
     const current = await findAttemptById({ attemptId }, { ...opts, lean: true });
     if (current?.safeMetadata?.receiptEvidence?.checksum && evidence.checksum && current.safeMetadata.receiptEvidence.checksum === evidence.checksum) {
-        return current;
+        return input.returnBindingOutcome === true
+            ? { attempt: current, evidenceBound: false, reusedExisting: true }
+            : current;
     }
     throw new PaymentAttemptRepositoryError(ERROR_CODES.PAYMENT_INVALID_TRANSITION, "Receipt evidence could not be attached.", {
         stage: "receipt",
         metadata: { attemptId }
     });
+}
+
+async function bindVerifiedTransactionRef(input = {}, options = {}) {
+    const attemptId = assertId(input.attemptId, "attemptId", ERROR_CODES.INVALID_PAYMENT_ATTEMPT_ID);
+    const verifiedTransactionRef = normalizeString(input.verifiedTransactionRef || input.transactionRef);
+    if (!verifiedTransactionRef || verifiedTransactionRef.length > 240) {
+        throw new PaymentAttemptRepositoryError(ERROR_CODES.INVALID_PAYMENT_ATTEMPT_RECORD, "Verified transaction reference is invalid.", { stage: "verification" });
+    }
+    const opts = normalizeOptions({ ...options, transactionContext: input.transactionContext || options.transactionContext });
+    try {
+        const request = opts.model.findOneAndUpdate(
+            { attemptId, status: { $in: [STATUS.PENDING, STATUS.PAID] }, $or: [{ verifiedTransactionRef: "" }, { verifiedTransactionRef }] },
+            { $set: { verifiedTransactionRef, updatedAt: input.changedAt || new Date() } },
+            { returnDocument: "after", runValidators: true, session: opts.mongoSession || undefined }
+        );
+        const updated = request.exec ? await request.exec() : await request;
+        if (updated) return plainRecord(updated);
+        const current = await findAttemptById({ attemptId }, { ...opts, lean: true });
+        if (current?.verifiedTransactionRef === verifiedTransactionRef) return current;
+        throw new PaymentAttemptRepositoryError(ERROR_CODES.PAYMENT_VERIFIED_TRANSACTION_EXISTS, "This transaction cannot be used for this payment.", { stage: "verification" });
+    } catch (error) {
+        if (error instanceof PaymentAttemptRepositoryError) throw error;
+        if (error?.code === 11000) {
+            throw new PaymentAttemptRepositoryError(ERROR_CODES.PAYMENT_VERIFIED_TRANSACTION_EXISTS, "This transaction was already used for another payment.", { stage: "verification" });
+        }
+        throw classifyPersistenceError(error, { attemptId }, "verification");
+    }
 }
 
 function normalizeFailure(failure = {}) {
@@ -815,6 +854,7 @@ module.exports = Object.freeze({
     updateAttemptStatus: updateStatus,
     appendProviderEvent,
     attachReceiptEvidence,
+    bindVerifiedTransactionRef,
     recordFailure,
     setProviderReference,
     markCompleted,
