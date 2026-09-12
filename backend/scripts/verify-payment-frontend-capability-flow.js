@@ -16,6 +16,8 @@ function main() {
     ].forEach(file => {
         includes(file, ".__paymentMethod", "payment card must retain full PaymentMethod object");
         includes(file, "...originalMethod", "selected payment must preserve original PaymentMethod fields");
+        includes(file, '"thunderpromptpay"', "Thunder PromptPay must be recognized by public payment eligibility");
+        includes(file, 'provider: originalMethod.provider ||', "selected payment must preserve the Thunder provider identity");
         includes(file, "receiptUploadEnabled", "selected payment must preserve receiptUploadEnabled");
         includes(file, "galleryScanSupported", "selected payment must preserve galleryScanSupported");
         includes(file, "checklistSteps: Array.isArray(originalMethod.checklistSteps)", "selected payment must preserve checklistSteps array");

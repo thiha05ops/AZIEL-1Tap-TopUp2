@@ -118,7 +118,7 @@ async function loadDynamicPaymentMethods(region) {
             card.dataset.shortDescription = pay.shortDescription || "";
             card.dataset.badgeText = pay.badgeText || "";
 
-            const isPromptPay = String(region).toUpperCase() === "TH" && key === "promptpay";
+            const isPromptPay = String(region).toUpperCase() === "TH" && ["promptpay", "thunderpromptpay"].includes(normalizePaymentKey(key));
             const title = isPromptPay
                 ? translatePaymentText("payment_promptpay_qr", "PromptPay QR")
                 : name;
@@ -379,6 +379,7 @@ function getPaymentLogo(key) {
         wavepay: "assets/payment/wavepay.png",
         ayapay: "assets/payment/ayapay.png",
         promptpay: "assets/payment/promptpay.png",
+        thunderpromptpay: "assets/payment/promptpay.png",
         scb: "assets/payment/scb.png",
         bangkokbank: "assets/payment/bank-neutral.svg",
         kplus: "assets/payment/bank-neutral.svg",
@@ -398,6 +399,7 @@ function isKnownRegionPaymentProvider(key) {
         "wavepay",
         "ayapay",
         "promptpay",
+        "thunderpromptpay",
         "scb",
         "bangkokbank",
         "kplus",

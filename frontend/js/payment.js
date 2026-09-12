@@ -288,7 +288,7 @@ function buildPaymentCard(method, index) {
     card.dataset.checklistSteps = JSON.stringify(Array.isArray(method.checklistSteps) ? method.checklistSteps : []);
     card.dataset.bankLaunchers = JSON.stringify(Array.isArray(method.bankLaunchers) ? method.bankLaunchers : []);
 
-    const isPromptPay = String(region).toUpperCase() === "TH" && key === "promptpay";
+    const isPromptPay = String(region).toUpperCase() === "TH" && ["promptpay", "thunderpromptpay"].includes(normalizePaymentKey(key));
     const title = isPromptPay
         ? translatePaymentText("payment_promptpay_qr", "PromptPay QR")
         : displayName;
@@ -519,6 +519,7 @@ function getPaymentDisplayName(key) {
         wavepay: "WavePay",
         ayapay: "AYA Pay",
         promptpay: "PromptPay",
+        thunder_promptpay: "PromptPay Auto Verify",
         scb: "SCB",
         bangkokbank: "Bangkok Bank",
         kplus: "K PLUS",
@@ -544,6 +545,7 @@ function getPaymentLogo(key) {
         wavepay: "assets/payment/wavepay.png",
         ayapay: "assets/payment/ayapay.png",
         promptpay: "assets/payment/promptpay.png",
+        thunderpromptpay: "assets/payment/promptpay.png",
         scb: "assets/payment/scb.png",
         bangkokbank: "assets/payment/bank-neutral.svg",
         kplus: "assets/payment/bank-neutral.svg",
@@ -563,6 +565,7 @@ function isKnownPaymentProvider(key) {
         "wavepay",
         "ayapay",
         "promptpay",
+        "thunderpromptpay",
         "scb",
         "bangkokbank",
         "kplus",
