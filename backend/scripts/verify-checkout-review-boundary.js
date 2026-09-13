@@ -9,11 +9,27 @@ const { resolveFulfillmentCapability } = require("../services/fulfillmentCapabil
 const { reviewCustomerCheckout } = require("../services/commerce/customerManualPromptPayCheckoutService");
 const { createAndPersistPricingQuote } = require("../services/commerce/pricingQuoteApplicationService");
 const { checkoutFromQuote } = require("../services/commerce/checkoutApplicationService");
+const { ensurePaidOrderFulfillmentWork } = require("../services/paidFulfillmentRoutingService");
+const { isMarketDecoupledV2RouteSnapshot } = require("../services/fulfillmentService");
+const { buildFieldsFromContract } = require("../services/suppliers/fazercardsFulfillmentContractService");
 
 const ROOT = path.resolve(__dirname, "../..");
 const checkoutSource = fs.readFileSync(path.join(ROOT, "frontend/js/product-checkout.js"), "utf8");
-const packageCode = "MC_MLBB_1007_156_DIAMONDS_83C0D0F9";
+const packageCode = "MC_MLBB_50_5_DIAMONDS_FIRST_TOP_UP_BONUS_12A04D3D";
 const future = () => new Date(Date.now() + 30 * 60 * 1000).toISOString();
+
+function createMockOperationalPackageValidator(routeResolver) {
+    return async ({ quote }) => {
+        const route = await routeResolver({
+            productCode: quote.packageSnapshot?.gameCode,
+            packageCode: quote.packageSnapshot?.packageCode,
+            region: quote.commercialSnapshot?.region
+        });
+        return route.ready
+            ? { allowed: true, supplierRouteSnapshot: route.routeSnapshot }
+            : { allowed: false, reasonCode: route.blockers[0] || "PRIMARY_SUPPLIER_NOT_READY" };
+    };
+}
 
 function classList() {
     const values = new Set();
@@ -114,7 +130,7 @@ function publicQuote() {
 async function verifyBackend() {
     let persistedQuote = null;
     const mapping = {
-        _id: "6a94fec6591c7120027da868",
+        _id: "6a94fed2591c7120027da8cc",
         supplierId: "supplier",
         supplierCode: "FAZERCARDS",
         productCode: "mlbb",
@@ -124,7 +140,7 @@ async function verifyBackend() {
         executionMode: "API",
         productionRole: "PRIMARY",
         supplierProductCode: "mobile_legends_global",
-        supplierPackageCode: "1007_156_diamonds",
+        supplierPackageCode: "50_5_diamonds_first_top_up_bonus",
         fulfillmentEligibility: { mode: "CUSTOMER_MARKET_ALLOWLIST", allowedCustomerMarkets: ["TH"], evidenceCode: "OPERATOR_CONFIRMED_CAPABILITY", evidenceSource: "provider evidence", verifiedAt: new Date(), version: 2 },
         mappingMetadata: { readiness: { supplierMapped: true, inputReady: true, validationReady: true, pricingReady: true, fulfillmentReady: true, storefrontReady: true } }
     };
@@ -156,9 +172,9 @@ async function verifyBackend() {
         }
     );
     assert.strictEqual(result.review.status, "ISSUED");
-    assert.strictEqual(result.review.pricing.originalPrice, 651.08);
+    assert.strictEqual(result.review.pricing.originalPrice, 652);
     assert.strictEqual(result.review.pricing.discountAmount, 0);
-    assert.strictEqual(result.review.pricing.quotedTotalAmount, 651.08);
+    assert.strictEqual(result.review.pricing.quotedTotalAmount, 652);
     assert.strictEqual(result.review.pricing.currency, "THB");
 
     const supplierRouteSnapshot = {
@@ -193,6 +209,60 @@ async function verifyBackend() {
     assert(persistedOrder, "Valid userId/zoneId aliases must reach mocked CommerceOrder persistence.");
     assert.deepStrictEqual({ routeType: persistedOrder.fulfilment.routeSnapshot.routeType, supplierCode: persistedOrder.fulfilment.routeSnapshot.supplierCode, supplierMappingId: persistedOrder.fulfilment.routeSnapshot.supplierMappingId, supplierMarket: persistedOrder.fulfilment.routeSnapshot.supplierMarket, customerMarket: persistedOrder.fulfilment.routeSnapshot.customerMarket, snapshotVersion: persistedOrder.fulfilment.routeSnapshot.snapshotVersion }, { routeType: "SUPPLIER_API", supplierCode: "FAZERCARDS", supplierMappingId: mapping._id, supplierMarket: "GLOBAL", customerMarket: "TH", snapshotVersion: 2 });
     assert.strictEqual(supplierCalls, 0, "Checkout verification must not call the supplier.");
+
+    let resolvedInput = null;
+    const operationalValidator = createMockOperationalPackageValidator(async input => {
+        resolvedInput = input;
+        return { ready: true, blockers: [], routeSnapshot: supplierRouteSnapshot };
+    });
+    const validatedRoute = await operationalValidator({ quote: persistedQuote });
+    assert.deepStrictEqual(resolvedInput, { productCode: "mlbb", packageCode, region: "TH" });
+    assert.strictEqual(validatedRoute.supplierRouteSnapshot, supplierRouteSnapshot);
+
+    const blockedValidator = createMockOperationalPackageValidator(async () => ({
+        ready: false,
+        blockers: ["SUPPLIER_AUTO_FULFILLMENT_DISABLED"],
+        routeSnapshot: null
+    }));
+    const blocked = await blockedValidator({ quote: persistedQuote });
+    assert.deepStrictEqual(blocked, { allowed: false, reasonCode: "SUPPLIER_AUTO_FULFILLMENT_DISABLED" });
+    let blockedOrderCreates = 0;
+    await assert.rejects(() => checkoutFromQuote({
+        quoteId: persistedQuote.quoteId,
+        owner: { userId: "customer" },
+        idempotencyKey: "checkout:blocked-route",
+        paymentSelection: { paymentMethodId: "promptpay", paymentChannel: "MANUAL_PROMPTPAY" },
+        customerInput: { gameAccount: { userId: "439488505", zoneId: "2409" } }
+    }, {
+        findOwnedQuote: async () => persistedQuote,
+        findOrderByQuoteId: async () => null,
+        findOrderByCheckoutIdempotency: async () => null,
+        validateOperationalPackageState: blockedValidator,
+        getCheckoutTime: () => new Date(),
+        generateOrderId: () => "AZL-BLOCKED-ROUTE",
+        generateCheckoutId: () => "CHK-BLOCKED-ROUTE",
+        transactionRunner: async callback => callback({}),
+        createOrderRecord: async () => { blockedOrderCreates += 1; }
+    }), error => error.code === "SUPPLIER_AUTO_FULFILLMENT_DISABLED" && error.stage === "package");
+    assert.strictEqual(blockedOrderCreates, 0, "A blocked route must fail before CommerceOrder creation.");
+
+    assert.strictEqual(isMarketDecoupledV2RouteSnapshot({ routeSnapshot: persistedOrder.fulfilment.routeSnapshot, mapping, customerMarket: "TH" }), true);
+    assert.deepStrictEqual(buildFieldsFromContract(supplierRouteSnapshot.fulfillmentContract, persistedOrder.fulfilment.input), { player_id: "439488505", server_id: "2409" });
+    const paidResult = await ensurePaidOrderFulfillmentWork({
+        ...persistedOrder,
+        _id: "commerce-order-id",
+        status: "paid",
+        paymentStatus: "paid"
+    }, {
+        findAttemptByIdempotency: async () => null,
+        startSupplierFulfillment: async (_orderCode, payload) => {
+            supplierCalls += 1;
+            assert.strictEqual(payload.mappingId, mapping._id);
+            return { fulfillmentId: "FUL-ISOLATED-NO-SUPPLIER-CALL" };
+        }
+    });
+    assert.strictEqual(paidResult.reason, "SUPPLIER_FULFILLMENT_STARTED");
+    assert.strictEqual(supplierCalls, 1, "Only the mocked fulfillment boundary may be reached.");
 }
 
 async function verifyFrontend() {
@@ -222,7 +292,7 @@ async function verifyFrontend() {
 async function main() {
     await verifyBackend();
     await verifyFrontend();
-    console.log(JSON.stringify({ result: "PASS", state: "PAYMENT_READY", productCode: "mlbb", packageCode, region: "TH", basePrice: 651.08, finalTotal: 651.08, currency: "THB", promptPayAvailable: true, paymentSubmitted: false, supplierCalls: 0, productionWrites: 0 }, null, 2));
+    console.log(JSON.stringify({ result: "PASS", state: "PAYMENT_READY", productCode: "mlbb", packageCode, region: "TH", publishedPrice: 651.08, finalTotal: 652, currency: "THB", promptPayAvailable: true, paymentSubmitted: false, realSupplierCalls: 0, productionWrites: 0 }, null, 2));
 }
 
 main().catch(error => {
