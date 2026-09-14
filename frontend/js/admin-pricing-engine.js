@@ -8,7 +8,9 @@
         supplierId: "", supplierMarket: String(rememberedDaily.supplierMarket||"").toUpperCase(), selectedProductId: String(rememberedDaily.product||""), edits: new Map(), priceEdits: new Map(), selected: new Set(), previews: new Map(), search: "", previewSeq: 0,
         previewCompleted: false, previewError: "",
         previewController: null, previewTimer: null, saveTimer: null, publishing: false,
-        loadController: null, loadSeq: 0
+        loadController: null, loadSeq: 0,
+        productBrowserOpen: true,
+        productBrowserSearch: ""
     };
     const settings = { loaded: false, loading: false, policies: [], fxAuthorities: [], region: "TH", saving: false };
 
@@ -95,13 +97,110 @@
         return daily.navigationProducts;
     }
 
+    function productArtwork(product) {
+        return product?.imageAsset?.secureUrl || product?.imageAsset?.url || product?.imageUrl || "";
+    }
+
+    function renderProductBrowser() {
+        const browser = $("pricingProductBrowser");
+        const workspace = $("pricingPackageWorkspace");
+        const cards = $("pricingProductCards");
+        if (!browser || !workspace || !cards) return;
+
+        browser.hidden = !daily.productBrowserOpen;
+        workspace.hidden = daily.productBrowserOpen;
+
+        const regionControl = $("pricingProductBrowserRegion");
+        if (regionControl) regionControl.value = daily.region;
+
+        const query = daily.productBrowserSearch.toLowerCase();
+        const products = regionProducts().filter(product => {
+            if (!query) return true;
+            return `${product.productName || ""} ${product.productCode || ""}`.toLowerCase().includes(query);
+        });
+
+        const summary = $("pricingProductBrowserSummary");
+        if (summary) {
+            const total = regionProducts().length;
+            summary.textContent = query
+                ? `${products.length} of ${total} products`
+                : `${total} product${total === 1 ? "" : "s"}`;
+        }
+
+        if (!products.length) {
+            cards.innerHTML = `<div class="pricing-product-empty"><strong>No products found.</strong><span>Try another search or check the Store Catalog for this market.</span></div>`;
+            return;
+        }
+
+        cards.innerHTML = products.map(product => {
+            const artwork = productArtwork(product);
+            const count = Number(product.mappingCount ?? product.packages?.length ?? 0);
+            const state = upper(product.commerceState || "HIDDEN").replaceAll("_", " ");
+            return `<article class="pricing-product-card">
+                <div class="pricing-product-artwork">
+                    ${artwork
+                        ? `<img src="${artwork}" alt="" loading="lazy">`
+                        : `<span aria-hidden="true">${text(product.productName || product.productCode).slice(0, 1).toUpperCase()}</span>`}
+                </div>
+                <div class="pricing-product-card-main">
+                    <strong>${text(product.productName || product.productCode)}</strong>
+                    <span>${count} package${count === 1 ? "" : "s"}</span>
+                </div>
+                <div class="pricing-product-card-state">
+                    <span class="pricing-product-state">${state}</span>
+                </div>
+                <button class="admin-secondary-btn pricing-product-review"
+                    type="button"
+                    data-pricing-product-open="${text(product.productId || product.productCode)}">
+                    Review Prices
+                    <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                </button>
+            </article>`;
+        }).join("");
+    }
+
+    function renderSelectedProductIdentity() {
+        const target = $("pricingSelectedProductIdentity");
+        if (!target) return;
+
+        const product = regionProducts().find(item => item.productId === daily.selectedProductId);
+        if (!product) {
+            target.innerHTML = "";
+            return;
+        }
+
+        const artwork = productArtwork(product);
+        const count = Number(product.mappingCount ?? product.packages?.length ?? 0);
+
+        target.innerHTML = `
+            <div class="pricing-selected-product-artwork">
+                ${artwork
+                    ? `<img src="${artwork}" alt="" loading="lazy">`
+                    : `<span aria-hidden="true">${text(product.productName || product.productCode).slice(0, 1).toUpperCase()}</span>`}
+            </div>
+            <div>
+                <strong>${text(product.productName || product.productCode)}</strong>
+                <span>${daily.region === "TH" ? "Thailand" : "Myanmar"} · ${count} package${count === 1 ? "" : "s"}</span>
+            </div>`;
+    }
+
     function renderProductSelect() {
         const select = $("pricingProductSelect");
-        if (!select) return;
         const products = regionProducts();
-        if (!products.some(product => product.productId === daily.selectedProductId)) daily.selectedProductId = products[0]?.productId || "";
-        $("pricingProductOptions").innerHTML = products.map(product => `<option value="${product.productId}">${text(product.productName)} (${product.mappingCount ?? product.packages?.length ?? 0} mappings)</option>`).join("");
-        select.value = daily.selectedProductId;
+
+        if (!products.some(product => product.productId === daily.selectedProductId)) {
+            daily.selectedProductId = products[0]?.productId || "";
+        }
+
+        if (select) {
+            $("pricingProductOptions").innerHTML = products
+                .map(product => `<option value="${product.productId}">${text(product.productName)} (${product.mappingCount ?? product.packages?.length ?? 0} mappings)</option>`)
+                .join("");
+            select.value = daily.selectedProductId;
+        }
+
+        renderProductBrowser();
+        renderSelectedProductIdentity();
     }
 
     function dailyBlockingReason() {
@@ -686,8 +785,55 @@
         document.documentElement.dataset.pricingV3Bound = "true";
         $("pricingSupplierSelect")?.closest("label")?.setAttribute("hidden","");
         $("pricingSupplierMarketSelect")?.closest("label")?.setAttribute("hidden","");
-        const heading=document.querySelector("#section-pricing-engine h2");if(heading)heading.textContent="Daily Pricing";
-        $("pricingRegionSelect")?.addEventListener("change", event => { daily.region = event.target.value;rememberDailyScope(daily);daily.edits.clear(); daily.priceEdits.clear(); daily.selected.clear(); daily.previews.clear(); loadDaily(true); });
+        $("pricingProductSelect")?.closest("label")?.setAttribute("hidden","");
+        $("pricingSupplierCurrency")?.closest(".pricing-v3-readonly")?.setAttribute("hidden","");
+        const heading=document.querySelector("#section-pricing-engine h2");if(heading)heading.textContent="Pricing";
+        $("pricingProductBrowserSearch")?.addEventListener("input", event => {
+            daily.productBrowserSearch = event.target.value || "";
+            renderProductBrowser();
+        });
+
+        $("pricingProductBrowserRegion")?.addEventListener("change", event => {
+            daily.region = event.target.value;
+            daily.productBrowserOpen = true;
+            rememberDailyScope(daily);
+            daily.edits.clear();
+            daily.priceEdits.clear();
+            daily.selected.clear();
+            daily.previews.clear();
+            const pricingRegion = $("pricingRegionSelect");
+            if (pricingRegion) pricingRegion.value = daily.region;
+            loadDaily(true);
+        });
+
+        $("pricingProductCards")?.addEventListener("click", event => {
+            const trigger = event.target.closest("[data-pricing-product-open]");
+            if (!trigger) return;
+            const productId = trigger.dataset.pricingProductOpen;
+            if (!daily.navigationProducts.some(item => item.productId === productId)) return;
+
+            daily.selectedProductId = productId;
+            daily.productBrowserOpen = false;
+            daily.search = "";
+            daily.selected.clear();
+            daily.previews.clear();
+            const packageSearch = $("pricingPackageSearch");
+            if (packageSearch) packageSearch.value = "";
+            rememberDailyScope(daily);
+            renderProductBrowser();
+            renderSelectedProductIdentity();
+            loadDaily(true);
+        });
+
+        $("pricingBackToProducts")?.addEventListener("click", () => {
+            daily.productBrowserOpen = true;
+            daily.search = "";
+            const packageSearch = $("pricingPackageSearch");
+            if (packageSearch) packageSearch.value = "";
+            renderProductBrowser();
+        });
+
+        $("pricingRegionSelect")?.addEventListener("change", event => { daily.region = event.target.value;daily.productBrowserOpen=false;rememberDailyScope(daily);daily.edits.clear(); daily.priceEdits.clear(); daily.selected.clear(); daily.previews.clear(); const browserRegion=$("pricingProductBrowserRegion");if(browserRegion)browserRegion.value=daily.region; loadDaily(true); });
         $("pricingProductSelect")?.addEventListener("change", event => { const value=event.target.value;daily.selectedProductId=daily.navigationProducts.some(item=>item.productId===value)?value:"";event.target.value=daily.selectedProductId;rememberDailyScope(daily);daily.search = ""; $("pricingPackageSearch").value = ""; daily.selected.clear(); daily.previews.clear();if(daily.selectedProductId)loadDaily(true); });
         $("pricingSupplierSelect")?.addEventListener("change", event => { const supplier=daily.suppliers.find(item=>upper(item.supplierCode)===upper(event.target.value));daily.supplierId=supplier?String(supplier.id||supplier.supplierId||supplier._id):"";daily.supplierMarket="";daily.selectedProductId="";event.target.value=supplier?upper(supplier.supplierCode):"";daily.edits.clear(); daily.priceEdits.clear(); daily.selected.clear(); daily.previews.clear(); if(daily.supplierId)loadDaily(true); });
         $("pricingSupplierMarketSelect")?.addEventListener("change", event => { const value=upper(event.target.value);daily.supplierMarket=daily.supplierMarkets.some(item=>item.value===value)?value:"";event.target.value=daily.supplierMarket;daily.selectedProductId="";rememberDailyScope(daily);daily.edits.clear();daily.priceEdits.clear();daily.selected.clear();daily.previews.clear();if(daily.supplierMarket)loadDaily(true); });

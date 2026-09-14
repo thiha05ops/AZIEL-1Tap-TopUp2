@@ -59,12 +59,21 @@ function suppressionReasons(pkg = {}, customerMarket = "TH") {
 }
 
 function projectPackagePublication(pkg, recordOrRecords, customerMarket = "TH") {
-    const records = Array.isArray(recordOrRecords) ? recordOrRecords : (recordOrRecords ? [recordOrRecords] : []);
-    const publishedRecords = records.filter(record => record?.published === true);
-    const marketRecord = records.find(record => String(record?.customerMarket || "").trim().toUpperCase() === normalizeCustomerMarket(customerMarket));
-    const record = marketRecord || publishedRecords[0] || records[0] || null;
-    const published = publishedRecords.length > 0;
-    const reasons = published ? suppressionReasons(pkg, customerMarket) : [];
+    const records = Array.isArray(recordOrRecords)
+        ? recordOrRecords
+        : (recordOrRecords ? [recordOrRecords] : []);
+
+    const market = normalizeCustomerMarket(customerMarket);
+
+    const record = records.find(
+        item =>
+            String(item?.customerMarket || "")
+                .trim()
+                .toUpperCase() === market
+    ) || null;
+
+    const published = record?.published === true;
+    const reasons = published ? suppressionReasons(pkg, market) : [];
     return {
         customerMarket: normalizeCustomerMarket(customerMarket),
         published,

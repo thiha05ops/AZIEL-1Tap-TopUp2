@@ -82,6 +82,73 @@
         return payload.offers.slice(0, LIMIT);
     }
 
+    function personalizeOffers(offers = []) {
+        const list = Array.isArray(offers) ? [...offers] : [];
+        const discovery = window.AZIEL_CUSTOMER_DISCOVERY;
+
+        if (!discovery || list.length < 2) return list;
+
+        const viewedCodes = new Set(
+            discovery.recentProductCodes()
+                .map(code => String(code || "").trim().toLowerCase())
+                .filter(Boolean)
+        );
+
+        const byName = (a, b) => {
+            const aName = String(
+                a?.productName ||
+                a?.productCode ||
+                ""
+            ).trim();
+
+            const bName = String(
+                b?.productName ||
+                b?.productCode ||
+                ""
+            ).trim();
+
+            const productCompare = aName.localeCompare(
+                bName,
+                undefined,
+                { sensitivity: "base" }
+            );
+
+            if (productCompare) return productCompare;
+
+            return String(a?.packageName || a?.packageCode || "")
+                .localeCompare(
+                    String(b?.packageName || b?.packageCode || ""),
+                    undefined,
+                    { sensitivity: "base" }
+                );
+        };
+
+        const unviewed = list
+            .filter(offer =>
+                !viewedCodes.has(
+                    String(offer?.productCode || "").trim().toLowerCase()
+                )
+            )
+            .sort(byName);
+
+        const viewed = discovery.viewedFirst(
+            list.filter(offer =>
+                viewedCodes.has(
+                    String(offer?.productCode || "").trim().toLowerCase()
+                )
+            ),
+            offer => offer?.productCode
+        );
+
+        return [
+            ...discovery.rotate(
+                unviewed,
+                discovery.homeRotationCursor()
+            ),
+            ...viewed
+        ];
+    }
+
     function artworkFor(offer = {}) {
         return String(
             offer.packageIcon ||
@@ -235,7 +302,9 @@
         list.innerHTML = "";
 
         try {
-            const offers = await fetchExclusiveOffers();
+            const offers = personalizeOffers(
+                await fetchExclusiveOffers()
+            );
 
             if (!offers.length) {
                 panel.dataset.promotionPreviewState = "empty";

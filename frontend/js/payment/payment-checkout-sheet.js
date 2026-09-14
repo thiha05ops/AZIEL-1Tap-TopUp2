@@ -120,17 +120,68 @@
 
                 <div id="azPaymentMobileBankChooser" class="az-payment-sheet__mobile-chooser" hidden></div>
 
+                <div
+                    id="azPaymentVerificationLock"
+                    class="az-payment-verification"
+                    role="status"
+                    aria-live="polite"
+                    aria-hidden="true"
+                    hidden
+                >
+                    <div class="az-payment-verification__card">
+                        <div class="az-payment-verification__motion" aria-hidden="true">
+                            <div class="az-payment-verification__ring">
+                                <div class="az-payment-verification__icon">
+                                    <svg viewBox="0 0 24 24" focusable="false">
+                                        <path d="M7 3.75h7.2L18 7.55V20.25H7V3.75Z"></path>
+                                        <path d="M14 3.75v4h4"></path>
+                                        <path d="M9.5 11h6"></path>
+                                        <path d="M9.5 14h4.5"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+
+                        <strong class="az-payment-verification__title">
+                            Verifying your payment
+                        </strong>
+
+                        <p class="az-payment-verification__copy">
+                            Your slip has been received. We're securely checking the payment.
+                        </p>
+
+                        <div class="az-payment-verification__activity">
+                            <span></span>
+                            <b>Checking payment…</b>
+                        </div>
+
+                        <small class="az-payment-verification__hint">
+                            Please keep this page open. This usually takes a few seconds.
+                        </small>
+                    </div>
+                </div>
+
             </div>
         `;
 
         (pageMode ? document.getElementById("paymentSessionMount") : document.body)?.appendChild(modal);
 
         modal.addEventListener("click", event => {
-            if (event.target === modal) close("backdrop");
+            if (event.target === modal && !verificationLocked()) close("backdrop");
         });
-        modal.querySelector("[data-role='close']")?.addEventListener("click", () => close("button"));
+
+        modal.querySelector("[data-role='close']")?.addEventListener("click", () => {
+            if (!verificationLocked()) close("button");
+        });
+
         document.addEventListener("keydown", event => {
-            if (event.key === "Escape" && modal.classList.contains("show")) close("escape");
+            if (
+                event.key === "Escape" &&
+                modal.classList.contains("show") &&
+                !verificationLocked()
+            ) {
+                close("escape");
+            }
         });
 
         return modal;
@@ -166,6 +217,30 @@
         if (!element) return;
         element.textContent = tr(options, key, fallback);
         element.setAttribute("data-i18n", key);
+    }
+
+    function setVerificationLock(locked) {
+        const modal = document.getElementById("azPaymentCheckoutSheet");
+        const overlay = document.getElementById("azPaymentVerificationLock");
+        const shouldLock = Boolean(locked);
+
+        if (activeState) activeState.verificationLocked = shouldLock;
+
+        modal?.classList.toggle("is-verifying-payment", shouldLock);
+
+        if (overlay) {
+            overlay.hidden = !shouldLock;
+            overlay.setAttribute("aria-hidden", shouldLock ? "false" : "true");
+        }
+
+        document.body.classList.toggle(
+            "az-payment-verification-locked",
+            shouldLock
+        );
+    }
+
+    function verificationLocked() {
+        return activeState?.verificationLocked === true;
     }
 
     function setLoading(isLoading, text) {
@@ -1872,7 +1947,17 @@
                 activeState.submitting = true;
                 const slipInput = modal.querySelector("#azPaymentSheetSlipInput");
                 if (slipInput) slipInput.disabled = true;
-                if (options.autoSubmitReceipt === true) setLocalizedMessage("", "payment.thunder.verifying", "Verifying payment...", options);
+
+                if (options.autoSubmitReceipt === true) {
+                    setLocalizedMessage(
+                        "",
+                        "payment.thunder.verifying",
+                        "Verifying payment...",
+                        options
+                    );
+                    setVerificationLock(true);
+                }
+
                 setLoading(true, options.loadingText || "Submitting...");
                 const result = await options.onSubmit?.({
                     file,
@@ -1926,6 +2011,7 @@
                 }
                 return false;
             } finally {
+                setVerificationLock(false);
                 if (activeState) activeState.submitting = false;
                 const slipInput = modal.querySelector("#azPaymentSheetSlipInput");
                 if (slipInput) slipInput.disabled = false;

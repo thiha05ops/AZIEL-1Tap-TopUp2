@@ -62,6 +62,64 @@
             .sort((a, b) => Number(a.homepageOrder || 0) - Number(b.homepageOrder || 0));
     }
 
+    function personalizeHomeProducts(products = []) {
+        const list = Array.isArray(products) ? [...products] : [];
+        const discovery = window.AZIEL_CUSTOMER_DISCOVERY;
+
+        if (!discovery || list.length < 2) return list;
+
+        const viewedCodes = new Set(
+            discovery.recentProductCodes()
+                .map(code => String(code || "").trim().toLowerCase())
+                .filter(Boolean)
+        );
+
+        const viewed = discovery.viewedFirst(
+            list,
+            product => product?.productCode
+        ).filter(product =>
+            viewedCodes.has(
+                String(product?.productCode || "").trim().toLowerCase()
+            )
+        );
+
+        const remainder = list
+            .filter(product =>
+                !viewedCodes.has(
+                    String(product?.productCode || "").trim().toLowerCase()
+                )
+            )
+            .sort((a, b) => {
+                const aName = String(
+                    a?.name ||
+                    a?.displayName ||
+                    a?.productCode ||
+                    ""
+                ).trim();
+
+                const bName = String(
+                    b?.name ||
+                    b?.displayName ||
+                    b?.productCode ||
+                    ""
+                ).trim();
+
+                return aName.localeCompare(
+                    bName,
+                    undefined,
+                    { sensitivity: "base" }
+                );
+            });
+
+        return [
+            ...viewed,
+            ...discovery.rotate(
+                remainder,
+                discovery.homeRotationCursor()
+            )
+        ];
+    }
+
     function renderPopularCard(product) {
         const fallback = product.fallbackImage || window.AZIEL_CATALOG_PRESENTATION?.getProductImage?.(product.productCode) || "";
         const description = shortDescription(product);
@@ -152,15 +210,17 @@
     function renderHome() {
         const popularGrid = document.querySelector(".popular-game-grid");
         const categoryGrid = document.querySelector(".category-grid");
-        const products = popularProducts();
+        const products = personalizeHomeProducts(popularProducts());
 
         if (popularGrid && products.length) {
             popularGrid.innerHTML = products.map(renderPopularCard).join("");
         }
 
         if (categoryGrid) {
-            const categoryProducts = activeProducts()
-                .filter(product => ["mobile", "gift-card"].includes(product.category));
+            const categoryProducts = personalizeHomeProducts(
+                activeProducts()
+                    .filter(product => ["mobile", "gift-card"].includes(product.category))
+            );
 
             categoryGrid.innerHTML = [
                 ...categoryProducts.map(renderCategoryCard),
@@ -214,7 +274,7 @@
 
     async function renderDiscovery() {
         const page = pageName();
-        const supported = new Set(["home.html", "all-games.html", "mobile-games.html", "pc-games.html", "gift-cards.html", "social-topup.html"]);
+        const supported = new Set(["home.html", "all-games.html", "mobile-games.html", "pc-games.html", "gift-cards.html", "social-topup.html", "mobile-recharge.html", "entertainment.html"]);
 
         if (!supported.has(page)) return;
 
@@ -231,6 +291,8 @@
         if (page === "pc-games.html") renderProductCategory("pc");
         if (page === "gift-cards.html") renderProductCategory("gift-card");
         if (page === "social-topup.html") renderProductCategory("social");
+        if (page === "mobile-recharge.html") renderProductCategory("mobile-recharge");
+        if (page === "entertainment.html") renderProductCategory("entertainment");
         window.AZIEL_CATALOG_PRESENTATION?.bindImageFallbacks?.();
     }
 

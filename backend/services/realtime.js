@@ -3,6 +3,9 @@ const { verifyUserToken } = require("./authSessionService");
 const { resolveAdminRequest } = require("./adminAuthService");
 const jwt = require("jsonwebtoken");
 const { recordSuppressedEvent, suppressTestRealtime } = require("../e2e/e2eSafety");
+const {
+    createAdminOperationalNotification
+} = require("./adminOperationalNotificationService");
 
 const JWT_SECRET = process.env.JWT_SECRET || "aziel_jwt_secret";
 
@@ -299,12 +302,24 @@ async function emitSupportUpdate(username, payload) {
 }
 
 function emitAdminUpdate(payload = {}) {
+    const createdAt = payload.createdAt || new Date();
+
     emitToAdmin("admin:notification", {
         ...payload,
-        createdAt: payload.createdAt || new Date()
+        createdAt
     });
 
     emitToAdmin("adminNewUpdate", payload);
+
+    void createAdminOperationalNotification({
+        ...payload,
+        createdAt
+    }).catch(error => {
+        console.error(
+            "[admin-operational-notification] persistence failed:",
+            error?.message || error
+        );
+    });
 }
 
 function emitAdminOrderUpdate(payload = {}) {

@@ -18,8 +18,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
 const adminSectionTitles = {
     dashboard: {
-        titleKey: "dashboard",
-        subKey: "dashboard_sub"
+        title: "Overview",
+        subtitle: "Operational exceptions, current state, and today's performance."
     },
     website: {
         titleKey: "website",
@@ -34,8 +34,8 @@ const adminSectionTitles = {
         subtitle: "Manage what AZIEL sells and follow the next safe action."
     },
     payments: {
-        titleKey: "payment_methods",
-        subKey: "payment_methods_sub"
+        title: "Payments",
+        subtitle: "Transactions, verification, and payment issues requiring attention."
     },
     wallet: {
         titleKey: "wallet",
@@ -94,8 +94,8 @@ const adminSectionTitles = {
         subKey: "broadcast_sub"
     },
     "admin-security": {
-        titleKey: "admin_team",
-        subKey: "admin_team_sub"
+        title: "Team & Security",
+        subtitle: "Team access, roles, sessions, and audit history."
     },
     "advanced-settings": {
         title: "Advanced Settings",
@@ -147,9 +147,6 @@ function initAdminNavigation() {
 }
 
 function initAdminTopbarActions() {
-    document.getElementById("adminNotificationsBtn")?.addEventListener("click", () => {
-        window.open("/notifications.html", "_blank", "noopener,noreferrer");
-    });
     document.getElementById("adminProfileBtn")?.addEventListener("click", () => {
         openAdminSection("admin-security");
     });
@@ -401,9 +398,6 @@ function initAdminMobileShell() {
     openMoreButtons.forEach(button => button.addEventListener("click", () => openAdminMobileSurface("more", button)));
 
     document.getElementById("adminMobileContextBtn")?.addEventListener("click", handleAdminMobileContextAction);
-    document.getElementById("adminMobileNotificationsBtn")?.addEventListener("click", () => {
-        window.open("/notifications.html", "_blank", "noopener,noreferrer");
-    });
 
     document.querySelectorAll("[data-admin-mobile-close]").forEach(button => {
         button.addEventListener("click", closeAdminMobileSurface);
@@ -534,7 +528,7 @@ function filterAdminMobileMore() {
 }
 
 function syncAdminMobileNavigation(sectionName) {
-    const primarySections = new Set(["dashboard", "orders", "wallet", "catalog"]);
+    const primarySections = new Set(["dashboard", "orders", "fulfillment", "pricing-engine"]);
     document.querySelectorAll("#adminMobileBottomNav [data-mobile-section]").forEach(item => {
         const active = item.dataset.mobileSection === sectionName;
         item.classList.toggle("active", active);

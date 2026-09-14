@@ -3,6 +3,7 @@
 const mongoose = require("mongoose");
 const CatalogProduct = require("../../models/CatalogProduct");
 const CatalogPackage = require("../../models/CatalogPackage");
+const MediaAsset = require("../../models/MediaAsset");
 const Supplier = require("../../models/Supplier");
 const SupplierProductMapping = require("../../models/SupplierProductMapping");
 const SupplierCatalogOffer = require("../../models/SupplierCatalogOffer");
@@ -71,14 +72,62 @@ async function loadDailyPricingWorkspace({ supplierId = "", supplierMarket = "",
         : supplierMarkets[0]?.value || "";
     const marketMappings = selectedSupplierMappings.filter(item => upper(item.region) === selectedSupplierMarket);
     const navigationProductCodes = [...new Set((storeSelectionScoped?storeSelections:marketMappings).map(item => text(item.productCode).toLowerCase()).filter(Boolean))];
-    const navigationCatalogProducts = navigationProductCodes.length ? await CatalogProduct.find({ productCode: { $in: navigationProductCodes }, deletedAt: null }).select("productCode name enabled commerceState").lean() : [];
-    const navigationProductByCode = new Map(navigationCatalogProducts.map(item => [item.productCode, item]));
-    const navigationProducts = navigationProductCodes.map(code => ({
-        productId: code, productCode: code, productName: navigationProductByCode.get(code)?.name || code,
-        mappingCount: storeSelectionScoped?storeSelections.filter(item => item.productCode === code).reduce((count,item)=>count+(item.packages||[]).length,0):marketMappings.filter(item=>item.productCode===code).length,
-        enabled: navigationProductByCode.get(code)?.enabled !== false,
-        commerceState: navigationProductByCode.get(code)?.commerceState || "HIDDEN"
-    })).sort((a, b) => a.productName.localeCompare(b.productName));
+    const navigationCatalogProducts = navigationProductCodes.length
+        ? await CatalogProduct.find({
+            productCode: { $in: navigationProductCodes },
+            deletedAt: null
+        }).select("productCode name enabled commerceState presentation.imageAssetId").lean()
+        : [];
+
+    const navigationImageAssetIds = [...new Set(
+        navigationCatalogProducts
+            .map(item => text(item.presentation?.imageAssetId))
+            .filter(Boolean)
+    )];
+
+    const navigationImageAssets = navigationImageAssetIds.length
+        ? await MediaAsset.find({
+            assetId: { $in: navigationImageAssetIds },
+            status: "active"
+        }).select("assetId secureUrl url altText").lean()
+        : [];
+
+    const navigationImageAssetById = new Map(
+        navigationImageAssets.map(asset => [text(asset.assetId), asset])
+    );
+
+    const navigationProductByCode = new Map(
+        navigationCatalogProducts.map(item => [item.productCode, item])
+    );
+
+    const navigationProducts = navigationProductCodes.map(code => {
+        const catalogProduct = navigationProductByCode.get(code);
+        const imageAssetId = text(catalogProduct?.presentation?.imageAssetId);
+        const imageAsset = imageAssetId
+            ? navigationImageAssetById.get(imageAssetId) || null
+            : null;
+        const imageUrl = imageAsset?.secureUrl || imageAsset?.url || "";
+
+        return {
+            productId: code,
+            productCode: code,
+            productName: catalogProduct?.name || code,
+            imageAsset: imageAsset
+                ? {
+                    assetId: imageAsset.assetId,
+                    secureUrl: imageAsset.secureUrl || "",
+                    url: imageAsset.url || "",
+                    altText: imageAsset.altText || ""
+                }
+                : null,
+            imageUrl,
+            mappingCount: storeSelectionScoped
+                ? storeSelections.filter(item => item.productCode === code).reduce((count, item) => count + (item.packages || []).length, 0)
+                : marketMappings.filter(item => item.productCode === code).length,
+            enabled: catalogProduct?.enabled !== false,
+            commerceState: catalogProduct?.commerceState || "HIDDEN"
+        };
+    }).sort((a, b) => a.productName.localeCompare(b.productName));
     const selectedProductCode = navigationProductCodes.includes(requestedProductCode) ? requestedProductCode : navigationProducts[0]?.productCode || "";
     const activeSelection = selectedSupplierSelections.find(item => item.productCode === selectedProductCode && item.supplierMarket === selectedSupplierMarket);
     const activeMappingIds = (activeSelection?.packages || []).map(item => item.supplierProductMappingId);

@@ -735,3 +735,558 @@ body {
         padding: 20px;
     }
 }
+
+/* ===== AZIEL Tracking V2 — compact recent orders ===== */
+
+.recent-track-card {
+    padding: 18px;
+}
+
+.recent-track-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.recent-track-head h2 {
+    margin: 0;
+}
+
+.recent-track-head > span {
+    font-size: 12px;
+    opacity: .68;
+}
+
+#recentTrackOrders {
+    display: grid;
+    gap: 8px;
+}
+
+.recent-order-item {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 54px minmax(0, 1fr) auto 20px;
+    align-items: center;
+    gap: 12px;
+    min-height: 74px;
+    padding: 10px 12px;
+    border: 1px solid rgba(127, 127, 127, .16);
+    border-radius: 12px;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.recent-order-item:hover {
+    background: rgba(127, 127, 127, .055);
+    border-color: rgba(127, 127, 127, .26);
+}
+
+.recent-order-artwork {
+    width: 54px;
+    height: 54px;
+    border-radius: 11px;
+    overflow: hidden;
+    background: rgba(127, 127, 127, .1);
+    flex: 0 0 auto;
+}
+
+.recent-order-artwork img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+}
+
+.recent-order-main {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+}
+
+.recent-order-main > strong {
+    font-size: 14px;
+    font-weight: 650;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.recent-order-package {
+    font-size: 12.5px;
+    line-height: 1.3;
+    opacity: .78;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.recent-order-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    margin-top: 2px;
+    font-size: 10.5px;
+    opacity: .54;
+}
+
+.recent-order-financial {
+    min-width: 112px;
+    display: grid;
+    justify-items: end;
+    gap: 5px;
+}
+
+.recent-order-financial > strong {
+    font-size: 13px;
+    font-weight: 650;
+    white-space: nowrap;
+}
+
+.recent-order-status {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 650;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.recent-order-chevron {
+    font-size: 20px;
+    line-height: 1;
+    opacity: .42;
+}
+
+@media (max-width: 720px) {
+    .recent-track-card {
+        padding: 14px;
+    }
+
+    .recent-track-head {
+        align-items: flex-start;
+    }
+
+    .recent-track-head > span {
+        display: none;
+    }
+
+    .recent-order-item {
+        grid-template-columns: 48px minmax(0, 1fr) 14px;
+        gap: 10px;
+        min-height: 68px;
+        padding: 9px 10px;
+    }
+
+    .recent-order-artwork {
+        width: 48px;
+        height: 48px;
+        border-radius: 10px;
+    }
+
+    .recent-order-main > strong {
+        font-size: 13.5px;
+    }
+
+    .recent-order-package {
+        font-size: 11.5px;
+    }
+
+    .recent-order-meta {
+        font-size: 10px;
+        gap: 3px 8px;
+    }
+
+    .recent-order-financial {
+        grid-column: 2 / 3;
+        grid-row: 2;
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 8px;
+        margin-top: -2px;
+    }
+
+    .recent-order-financial > strong {
+        font-size: 11.5px;
+    }
+
+    .recent-order-status {
+        min-height: 20px;
+        padding: 3px 7px;
+        font-size: 9.5px;
+    }
+
+    .recent-order-chevron {
+        grid-column: 3;
+        grid-row: 1 / span 2;
+        align-self: center;
+    }
+}
+
+
+/* ===== AZIEL Tracking V4 — customer action + mobile refinement ===== */
+
+.tracking-product-artwork--link,
+.tracking-product-title-link {
+    appearance: none;
+    -webkit-appearance: none;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: inherit;
+    cursor: pointer;
+}
+
+.tracking-product-artwork--link {
+    display: block;
+}
+
+.tracking-product-artwork--link:hover img {
+    transform: scale(1.035);
+}
+
+.tracking-product-artwork img {
+    transition: transform 160ms ease;
+}
+
+.tracking-product-title-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.tracking-buy-again {
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 7px 12px;
+    border: 1px solid rgba(139, 92, 246, .42);
+    border-radius: 9px;
+    background: rgba(124, 58, 237, .14);
+    color: #a978ff;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 650;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.tracking-buy-again:hover {
+    background: rgba(124, 58, 237, .22);
+    border-color: rgba(139, 92, 246, .62);
+}
+
+.tracking-buy-again:disabled {
+    opacity: .55;
+    cursor: wait;
+}
+
+@media (max-width: 720px) {
+    .tracking-hero h1 {
+        font-size: 27px !important;
+        line-height: 1.08 !important;
+        font-weight: 700 !important;
+        letter-spacing: -.025em;
+    }
+
+    .tracking-hero p {
+        font-size: 14px !important;
+        line-height: 1.55 !important;
+        font-weight: 400 !important;
+    }
+
+    .tracking-search-card label,
+    .tracking-search-card h2,
+    .recent-track-head h2,
+    .tracking-detail-head h3 {
+        font-weight: 650 !important;
+    }
+
+    .tracking-order-header {
+        gap: 10px !important;
+        padding: 11px 12px !important;
+    }
+
+    .tracking-order-product {
+        gap: 9px !important;
+        min-width: 0;
+    }
+
+    .tracking-product-artwork {
+        width: 48px !important;
+        height: 48px !important;
+        min-width: 48px !important;
+        border-radius: 10px !important;
+        overflow: hidden;
+    }
+
+    .tracking-order-identity {
+        min-width: 0;
+    }
+
+    .tracking-order-identity .mini-label,
+    .tracking-section-eyebrow {
+        font-size: 8.5px !important;
+        font-weight: 650 !important;
+        letter-spacing: .055em !important;
+    }
+
+    .tracking-order-identity h2 {
+        margin: 2px 0 1px !important;
+        font-size: 15px !important;
+        line-height: 1.18 !important;
+        font-weight: 650 !important;
+        letter-spacing: -.01em;
+    }
+
+    .tracking-product-title-link {
+        display: -webkit-box;
+        overflow: hidden;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+    }
+
+    .tracking-order-identity > p {
+        margin: 0 !important;
+        font-size: 11.5px !important;
+        line-height: 1.25 !important;
+        font-weight: 400 !important;
+        opacity: .72;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .tracking-order-reference {
+        gap: 3px 7px !important;
+        margin-top: 4px !important;
+        font-size: 9px !important;
+        line-height: 1.25 !important;
+        font-weight: 400 !important;
+        opacity: .52;
+    }
+
+    .tracking-order-reference span:first-child {
+        max-width: 155px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .tracking-order-state {
+        min-width: 58px !important;
+        gap: 4px !important;
+    }
+
+    .tracking-order-state > strong {
+        font-size: 12px !important;
+        line-height: 1.1 !important;
+        font-weight: 650 !important;
+    }
+
+    .tracking-primary-status {
+        min-height: 20px !important;
+        gap: 4px !important;
+        padding: 3px 6px !important;
+        font-size: 9px !important;
+        font-weight: 600 !important;
+    }
+
+    .tracking-progress-panel {
+        padding: 10px 12px 12px !important;
+    }
+
+    .progress-title {
+        margin-bottom: 7px !important;
+    }
+
+    .progress-title h3 {
+        margin-top: 1px !important;
+        font-size: 12px !important;
+        line-height: 1.2 !important;
+        font-weight: 650 !important;
+    }
+
+    /*
+     * Mobile timeline is vertical. Four horizontal cards at 375px force
+     * Payment Confirmed / Processing / Completed to clip.
+     */
+    .tracking-order-center .track-timeline {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        gap: 0 !important;
+        overflow: visible !important;
+    }
+
+    .tracking-order-center .track-step {
+        position: relative;
+        min-width: 0 !important;
+        min-height: 0 !important;
+        display: grid !important;
+        grid-template-columns: 18px minmax(0, 1fr) !important;
+        gap: 8px !important;
+        align-items: start !important;
+        padding: 7px 8px !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        background: transparent !important;
+    }
+
+    .tracking-order-center .track-step + .track-step {
+        border-top: 1px solid rgba(127, 127, 127, .12) !important;
+    }
+
+    .tracking-order-center .step-dot {
+        width: 9px !important;
+        height: 9px !important;
+        margin: 4px auto 0 !important;
+    }
+
+    .tracking-order-center .track-step h4 {
+        margin: 0 !important;
+        font-size: 11.5px !important;
+        line-height: 1.25 !important;
+        font-weight: 600 !important;
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+    }
+
+    .tracking-order-center .track-step p {
+        margin: 2px 0 0 !important;
+        font-size: 9.5px !important;
+        line-height: 1.35 !important;
+        font-weight: 400 !important;
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        opacity: .62;
+    }
+
+    .tracking-order-details {
+        padding: 10px 12px 11px !important;
+    }
+
+    .tracking-detail-head {
+        margin-bottom: 7px !important;
+    }
+
+    .tracking-detail-head h3 {
+        font-size: 11.5px !important;
+        line-height: 1.2 !important;
+    }
+
+    .tracking-order-center .order-info-grid {
+        gap: 6px !important;
+    }
+
+    .tracking-order-center .order-info-item {
+        min-height: 46px !important;
+        padding: 7px 8px !important;
+        border-radius: 8px !important;
+    }
+
+    .tracking-order-center .order-info-item small {
+        font-size: 8.5px !important;
+        line-height: 1.2 !important;
+        font-weight: 500 !important;
+    }
+
+    .tracking-order-center .order-info-item strong {
+        margin-top: 2px !important;
+        font-size: 10.5px !important;
+        line-height: 1.25 !important;
+        font-weight: 600 !important;
+        overflow-wrap: anywhere;
+    }
+
+    .tracking-order-footer {
+        gap: 9px !important;
+        padding: 9px 12px 11px !important;
+    }
+
+    .tracking-order-footer .order-note {
+        font-size: 9.5px !important;
+        line-height: 1.35 !important;
+        font-weight: 400 !important;
+    }
+
+    .tracking-order-footer-actions {
+        width: 100%;
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 7px !important;
+    }
+
+    .tracking-order-footer-actions .tracking-buy-again {
+        grid-column: 1 / -1;
+        width: 100%;
+        min-height: 38px;
+        font-size: 11.5px;
+    }
+
+    .tracking-order-footer-actions > a {
+        min-height: 34px;
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+        padding: 6px 8px !important;
+        border: 1px solid rgba(127, 127, 127, .16);
+        border-radius: 8px;
+        font-size: 10px !important;
+        font-weight: 550 !important;
+        text-align: center;
+    }
+
+    .recent-track-head .mini-label {
+        font-size: 9px !important;
+        font-weight: 600 !important;
+        letter-spacing: .055em !important;
+    }
+
+    .recent-track-head h2 {
+        font-size: 17px !important;
+        line-height: 1.15 !important;
+    }
+
+    .recent-order-main > strong {
+        font-size: 12.5px !important;
+        line-height: 1.22 !important;
+        font-weight: 600 !important;
+    }
+
+    .recent-order-package {
+        font-size: 10.5px !important;
+        line-height: 1.25 !important;
+        font-weight: 400 !important;
+    }
+
+    .recent-order-meta {
+        font-size: 8.75px !important;
+        line-height: 1.3 !important;
+        font-weight: 400 !important;
+    }
+
+    .recent-order-financial > strong {
+        font-size: 10.5px !important;
+        font-weight: 600 !important;
+    }
+
+    .recent-order-status {
+        font-size: 8.5px !important;
+        font-weight: 600 !important;
+    }
+}

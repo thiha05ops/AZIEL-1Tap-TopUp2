@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 const User = require("../models/User");
-const Order = require("../models/Order");
+const CommerceOrder = require("../models/CommerceOrder");
 const WalletTransaction = require("../models/WalletTransaction");
 const SupportTicket = require("../models/SupportTicket");
 const Notification = require("../models/Notification");
@@ -19,7 +19,7 @@ const {
 } = require("../services/paginationService");
 
 const SALES_STATUSES = Object.freeze(["paid", "processing", "completed"]);
-const FAILED_STATUSES = Object.freeze(["failed", "cancelled", "expired"]);
+const FAILED_STATUSES = Object.freeze(["failed", "payment_failed", "cancelled", "expired"]);
 const REFUND_STATUSES = Object.freeze(["refund_requested", "refund_pending", "refunded"]);
 
 function normalizeCurrency(currency) {
@@ -51,36 +51,64 @@ function summarizeOrders(orders = []) {
         favoriteGame: "None",
         favoritePaymentMethod: "None"
     };
+
     const salesCounts = emptyCurrencyTotals();
     const gameCounts = new Map();
     const paymentCounts = new Map();
 
     orders.forEach(order => {
         const status = String(order.status || "").toLowerCase();
+        const paymentStatus = String(order.paymentStatus || order.payment?.status || "").toLowerCase();
+        const currency = normalizeCurrency(order.commercial?.currency);
+        const amount = Number(order.commercial?.totalAmount || 0);
+
         if (status === "completed") summary.completedOrders += 1;
         if (FAILED_STATUSES.includes(status)) summary.failedOrders += 1;
-        if (REFUND_STATUSES.includes(status) || order.refunded) summary.refundCount += 1;
+        if (REFUND_STATUSES.includes(status) || paymentStatus === "refunded") {
+            summary.refundCount += 1;
+        }
 
-        if (SALES_STATUSES.includes(status) && !order.refunded) {
-            addCurrency(summary.totalSpend, order.currency, order.amount);
-            salesCounts[normalizeCurrency(order.currency)] += 1;
+        if (
+            SALES_STATUSES.includes(status) &&
+            !REFUND_STATUSES.includes(status) &&
+            paymentStatus !== "refunded"
+        ) {
+            addCurrency(summary.totalSpend, currency, amount);
+            salesCounts[currency] += 1;
+
             const purchaseDate = formatDate(order.updatedAt || order.createdAt);
             if (purchaseDate && (!summary.lastPurchaseAt || purchaseDate > summary.lastPurchaseAt)) {
                 summary.lastPurchaseAt = purchaseDate;
             }
         }
 
-        const game = order.productName || order.game || order.productCode || "Unknown";
+        const game =
+            order.product?.gameName ||
+            order.product?.gameCode ||
+            order.product?.gameId ||
+            "Unknown";
+
         gameCounts.set(game, (gameCounts.get(game) || 0) + 1);
-        const method = order.paymentMethod || "Unknown";
+
+        const method =
+            order.payment?.paymentMethodId ||
+            "Unknown";
+
         paymentCounts.set(method, (paymentCounts.get(method) || 0) + 1);
     });
 
-    summary.averageOrder.MMK = salesCounts.MMK ? Number((summary.totalSpend.MMK / salesCounts.MMK).toFixed(2)) : 0;
-    summary.averageOrder.THB = salesCounts.THB ? Number((summary.totalSpend.THB / salesCounts.THB).toFixed(2)) : 0;
+    summary.averageOrder.MMK = salesCounts.MMK
+        ? Number((summary.totalSpend.MMK / salesCounts.MMK).toFixed(2))
+        : 0;
+
+    summary.averageOrder.THB = salesCounts.THB
+        ? Number((summary.totalSpend.THB / salesCounts.THB).toFixed(2))
+        : 0;
+
     summary.favoriteGame = topMapValue(gameCounts) || "None";
     summary.favoritePaymentMethod = topMapValue(paymentCounts) || "None";
-    summary.lifetimeValue = summary.totalSpend;
+    summary.lifetimeValue = { ...summary.totalSpend };
+
     return summary;
 }
 
@@ -147,11 +175,12 @@ function formatOrder(order) {
     return {
         id: order._id,
         orderId: order.orderId,
-        game: order.productName || order.game || "Unknown",
-        packageName: order.packageName || "-",
-        amount: Number(order.amount || 0),
-        currency: normalizeCurrency(order.currency),
+        game: order.product?.gameName || order.product?.gameCode || "Unknown",
+        packageName: order.product?.packageName || order.product?.packageCode || "-",
+        amount: Number(order.commercial?.totalAmount || 0),
+        currency: normalizeCurrency(order.commercial?.currency),
         status: order.status || "",
+        paymentMethod: order.payment?.paymentMethodId || "",
         date: order.createdAt
     };
 }
@@ -225,15 +254,22 @@ router.get("/admin/users", adminMiddleware, requireAdminPermission(PERMISSIONS.U
 
         if (search) {
             const escaped = escapeRegex(search);
-            const orderMatches = await Order.find({ orderId: { $regex: escaped, $options: "i" } })
-                .select("username")
+            const orderMatches = await CommerceOrder.find({
+                orderId: { $regex: escaped, $options: "i" },
+                "owner.type": "USER"
+            })
+                .select("owner.userId")
                 .limit(50)
                 .lean();
-            const orderUsernames = orderMatches.map(order => order.username).filter(Boolean);
+
+            const orderUserIds = orderMatches
+                .map(order => String(order.owner?.userId || "").trim())
+                .filter(value => /^[a-f\\d]{24}$/i.test(value));
+
             query.$or = [
                 { username: { $regex: `^${escaped}`, $options: "i" } },
                 { email: { $regex: `^${escaped}`, $options: "i" } },
-                { username: { $in: orderUsernames } }
+                { _id: { $in: orderUserIds } }
             ];
         }
         if (["MM", "TH"].includes(region)) query.region = region;
@@ -246,80 +282,167 @@ router.get("/admin/users", adminMiddleware, requireAdminPermission(PERMISSIONS.U
             .limit(limit + 1)
             .lean();
         const { page, pagination } = pageResult(usersRaw, limit);
-        const usernames = page.map(user => user.username).filter(Boolean);
-        const orderSummaries = usernames.length
-            ? await Order.aggregate([
-                { $match: { username: { $in: usernames } } },
+        const userIds = page
+            .map(user => String(user._id || "").trim())
+            .filter(Boolean);
+
+        const orderSummaries = userIds.length
+            ? await CommerceOrder.aggregate([
+                {
+                    $match: {
+                        "owner.type": "USER",
+                        "owner.userId": { $in: userIds }
+                    }
+                },
                 {
                     $addFields: {
-                        normalizedStatus: { $toLower: { $ifNull: ["$status", ""] } },
-                        normalizedCurrency: { $toUpper: { $ifNull: ["$currency", "MMK"] } }
+                        normalizedStatus: {
+                            $toLower: { $ifNull: ["$status", ""] }
+                        },
+                        normalizedPaymentStatus: {
+                            $toLower: {
+                                $ifNull: [
+                                    "$paymentStatus",
+                                    { $ifNull: ["$payment.status", ""] }
+                                ]
+                            }
+                        },
+                        normalizedCurrency: {
+                            $toUpper: {
+                                $ifNull: ["$commercial.currency", "MMK"]
+                            }
+                        }
                     }
                 },
                 {
                     $group: {
-                        _id: "$username",
+                        _id: "$owner.userId",
+
                         totalOrders: { $sum: 1 },
-                        completedOrders: { $sum: { $cond: [{ $eq: ["$normalizedStatus", "completed"] }, 1, 0] } },
-                        failedOrders: { $sum: { $cond: [{ $in: ["$normalizedStatus", FAILED_STATUSES] }, 1, 0] } },
+
+                        completedOrders: {
+                            $sum: {
+                                $cond: [
+                                    { $eq: ["$normalizedStatus", "completed"] },
+                                    1,
+                                    0
+                                ]
+                            }
+                        },
+
+                        failedOrders: {
+                            $sum: {
+                                $cond: [
+                                    { $in: ["$normalizedStatus", FAILED_STATUSES] },
+                                    1,
+                                    0
+                                ]
+                            }
+                        },
+
+                        refundCount: {
+                            $sum: {
+                                $cond: [
+                                    {
+                                        $or: [
+                                            { $in: ["$normalizedStatus", REFUND_STATUSES] },
+                                            { $eq: ["$normalizedPaymentStatus", "refunded"] }
+                                        ]
+                                    },
+                                    1,
+                                    0
+                                ]
+                            }
+                        },
+
                         totalSpendMMK: {
                             $sum: {
                                 $cond: [
                                     {
                                         $and: [
                                             { $in: ["$normalizedStatus", SALES_STATUSES] },
-                                            { $ne: ["$refunded", true] },
+                                            { $not: [{ $in: ["$normalizedStatus", REFUND_STATUSES] }] },
+                                            { $ne: ["$normalizedPaymentStatus", "refunded"] },
                                             { $eq: ["$normalizedCurrency", "MMK"] }
                                         ]
                                     },
-                                    { $ifNull: ["$amount", 0] },
+                                    { $ifNull: ["$commercial.totalAmount", 0] },
                                     0
                                 ]
                             }
                         },
+
                         totalSpendTHB: {
                             $sum: {
                                 $cond: [
                                     {
                                         $and: [
                                             { $in: ["$normalizedStatus", SALES_STATUSES] },
-                                            { $ne: ["$refunded", true] },
+                                            { $not: [{ $in: ["$normalizedStatus", REFUND_STATUSES] }] },
+                                            { $ne: ["$normalizedPaymentStatus", "refunded"] },
                                             { $eq: ["$normalizedCurrency", "THB"] }
                                         ]
                                     },
-                                    { $ifNull: ["$amount", 0] },
+                                    { $ifNull: ["$commercial.totalAmount", 0] },
                                     0
                                 ]
                             }
                         },
+
                         lastPurchaseAt: {
                             $max: {
                                 $cond: [
-                                    { $and: [{ $in: ["$normalizedStatus", SALES_STATUSES] }, { $ne: ["$refunded", true] }] },
+                                    {
+                                        $and: [
+                                            { $in: ["$normalizedStatus", SALES_STATUSES] },
+                                            { $not: [{ $in: ["$normalizedStatus", REFUND_STATUSES] }] },
+                                            { $ne: ["$normalizedPaymentStatus", "refunded"] }
+                                        ]
+                                    },
                                     { $ifNull: ["$updatedAt", "$createdAt"] },
                                     null
                                 ]
+                            }
+                        },
+
+                        lastOrderActivityAt: {
+                            $max: {
+                                $ifNull: ["$updatedAt", "$createdAt"]
                             }
                         }
                     }
                 }
             ])
             : [];
-        const summaryByUsername = new Map(orderSummaries.map(item => [String(item._id || ""), item]));
+
+        const summaryByUserId = new Map(
+            orderSummaries.map(item => [String(item._id || ""), item])
+        );
 
         let formattedUsers = page.map(user => {
-            const summary = summaryByUsername.get(user.username) || {};
+            const summary = summaryByUserId.get(String(user._id || "")) || {};
             const normalizedSummary = {
                 totalOrders: Number(summary.totalOrders || 0),
                 completedOrders: Number(summary.completedOrders || 0),
                 failedOrders: Number(summary.failedOrders || 0),
+                refundCount: Number(summary.refundCount || 0),
                 totalSpend: {
                     MMK: Number(summary.totalSpendMMK || 0),
                     THB: Number(summary.totalSpendTHB || 0)
                 },
-                lastPurchaseAt: summary.lastPurchaseAt || null
+                lastPurchaseAt: summary.lastPurchaseAt || null,
+                lastOrderActivityAt: summary.lastOrderActivityAt || null
             };
-            const lastActivityAt = lastActivity(user, [], [], [], []);
+
+            const lastActivityAt = lastActivity(
+                user,
+                normalizedSummary.lastOrderActivityAt
+                    ? [{ updatedAt: normalizedSummary.lastOrderActivityAt }]
+                    : [],
+                [],
+                [],
+                []
+            );
             const tags = calculateTags({ user, summary: normalizedSummary, lastActivityAt });
 
             return {
@@ -387,10 +510,13 @@ router.get("/admin/users/:id/crm", adminMiddleware, requireAdminPermission(PERMI
         }
 
         const [orders, wallet, support, notifications, notes] = await Promise.all([
-            Order.find({ username: user.username })
+            CommerceOrder.find({
+                "owner.type": "USER",
+                "owner.userId": String(user._id)
+            })
                 .sort({ createdAt: -1, _id: -1 })
                 .limit(50)
-                .select("orderId game productName productCode packageName amount currency status paymentMethod refunded refundAmount createdAt updatedAt")
+                .select("orderId owner product commercial payment paymentStatus status createdAt updatedAt")
                 .lean(),
             WalletTransaction.find({ username: user.username })
                 .sort({ createdAt: -1, _id: -1 })

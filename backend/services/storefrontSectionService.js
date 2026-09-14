@@ -58,6 +58,28 @@ const SYSTEM_SECTIONS = Object.freeze([
         isSystem: true
     },
     {
+        key: "mobile-recharge",
+        displayName: "Mobile Recharge",
+        icon: "mobile",
+        path: "/mobile-recharge.html",
+        status: "PUBLISHED",
+        showInGamesMenu: true,
+        showOnHome: false,
+        sortOrder: 5,
+        isSystem: true
+    },
+    {
+        key: "entertainment",
+        displayName: "Entertainment",
+        icon: "gift",
+        path: "/entertainment.html",
+        status: "PUBLISHED",
+        showInGamesMenu: true,
+        showOnHome: false,
+        sortOrder: 6,
+        isSystem: true
+    },
+    {
         key: "coming-soon",
         displayName: "Coming Soon",
         icon: "clock",
@@ -65,7 +87,7 @@ const SYSTEM_SECTIONS = Object.freeze([
         status: "HIDDEN",
         showInGamesMenu: false,
         showOnHome: false,
-        sortOrder: 5,
+        sortOrder: 7,
         isSystem: true
     },
     {

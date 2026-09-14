@@ -13,5 +13,161 @@ async function loadStorePackageActivationCards(item){item._activationTargets=[];
 async function startSellingStoreProduct(button){const item=storeCatalogAdmin.selections.find(row=>storeId(row)===storeCatalogAdmin.activeId),readyTargets=readyStoreActivationTargets(item);if(!item||!readyTargets.length)return;const markets=[...new Set(readyTargets.map(target=>target.customerMarket))].map(storeMarketName);if(!confirm(`Activate ${readyTargets.length} prepared supplier route${readyTargets.length===1?"":"s"} for ${item.productName} in ${markets.join(" and ")}?\n\nThis does not publish prices or turn Storefront visibility on.`))return;button.disabled=true;try{await adminFetch(`/api/admin/store-catalog-selections/${encodeURIComponent(storeId(item))}/start-selling`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({confirmed:true,targets:storeActivationRequestTargets(item)})});await loadStoreCatalogProducts()}finally{button.disabled=false}}
 async function removeStoreCatalogPackage(button){const item=storeCatalogAdmin.selections.find(row=>storeId(row)===storeCatalogAdmin.activeId),packageCode=button.dataset.storeRemovePackage;if(!item||!confirm(`Remove ${packageCode} from this Store Catalog product?\n\nIf it is live, it will no longer appear in Store Catalog-scoped pricing or storefront projection. Historical records and supplier mapping remain.`))return;await adminFetch(`/api/admin/store-catalog-selections/${encodeURIComponent(storeId(item))}/packages/${encodeURIComponent(packageCode)}`,{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({expectedDecisionVersion:item.decisionVersion,confirmed:true})});await loadStoreCatalogProducts()}
 async function updateStoreSellingMarkets(input){const item=storeCatalogAdmin.selections.find(row=>storeId(row)===input.dataset.selectionId);if(!item)return;const checked=[...document.querySelectorAll("[data-store-selling-region]:checked")].filter(row=>row.dataset.selectionId===input.dataset.selectionId).map(row=>row.dataset.storeSellingRegion).filter(Boolean);if(!checked.length){input.checked=true;alert("Choose at least one selling market.");return}try{await adminFetch(`/api/admin/store-catalog-selections/${encodeURIComponent(storeId(item))}/selling-regions`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({sellingRegions:checked,expectedDecisionVersion:Number(input.dataset.version)})});await loadStoreCatalogProducts();if(document.body.dataset.adminSection==="catalog")await renderNormalStorefrontControls()}catch(error){input.checked=!input.checked;alert(error.message)}}
-async function renderNormalStorefrontControls({advanced=false}={}){const host=document.querySelector("#section-catalog .catalog-workspace-shell");if(!host)return;const legacyViews=[host.querySelector(".catalog-top-tabs"),host.querySelector(".catalog-command-center"),host.querySelector(".catalog-storefront-panel")].filter(Boolean);let panel=document.getElementById("normalStorefrontControls");if(advanced){if(panel)panel.hidden=true;legacyViews.forEach(view=>view.hidden=false);window.setAdminCatalogStoreSelectionScope?.(null);return}legacyViews.forEach(view=>view.hidden=true);const data=await adminFetch("/api/admin/store-catalog-selections");const selections=data.selections||[];if(!panel){panel=document.createElement("section");panel.id="normalStorefrontControls";panel.className="panel normal-storefront-controls";host.prepend(panel)}panel.hidden=false;panel.innerHTML=`<div class="panel-head"><div><h3>Storefront Visibility</h3><span>Control what customers see. Pricing and supplier setup remain unchanged.</span></div></div>${selections.map(item=>`<article><div><strong>${storeEscape(item.productName)} (${item.supplierMarket==="GLOBAL"?"Global":storeEscape(item.supplierMarket)})</strong><small>${item.packages?.length||0} Store Catalog packages</small></div><div>${(item.sellingRegions||[]).map(region=>`<label><input type="checkbox" data-store-region-visibility data-selection-id="${storeEscape(storeId(item))}" data-region="${region}" data-version="${item.decisionVersion}" ${item.visibleRegions?.includes(region)?"checked":""}> ${region==="TH"?"Thailand":"Myanmar"}</label>`).join("")}</div></article>`).join("")||'<div class="admin-empty-state">Add a Store Catalog product first.</div>'}`;const command=host.querySelector(".catalog-command-center");if(command)command.hidden=!selections.length;window.setAdminCatalogStoreSelectionScope?.(selections.map(item=>item.productCode));if(selections.length)window.loadScopedAdminCatalog?.()}
+let storefrontVisibilityExpanded = false;
+let storefrontVisibilitySearch = "";
+
+async function renderNormalStorefrontControls({ advanced = false } = {}) {
+    const host = document.querySelector("#section-catalog .catalog-workspace-shell");
+    if (!host) return;
+
+    const legacyViews = [
+        host.querySelector(".catalog-top-tabs"),
+        host.querySelector(".catalog-command-center"),
+        host.querySelector(".catalog-storefront-panel")
+    ].filter(Boolean);
+
+    let panel = document.getElementById("normalStorefrontControls");
+
+    if (advanced) {
+        if (panel) panel.hidden = true;
+        legacyViews.forEach(view => view.hidden = false);
+        window.setAdminCatalogStoreSelectionScope?.(null);
+        return;
+    }
+
+    legacyViews.forEach(view => view.hidden = true);
+
+    const data = await adminFetch("/api/admin/store-catalog-selections");
+    const selections = Array.isArray(data?.selections) ? data.selections : [];
+
+    if (!panel) {
+        panel = document.createElement("section");
+        panel.id = "normalStorefrontControls";
+        panel.className = "panel normal-storefront-controls";
+        host.prepend(panel);
+    }
+
+    panel.hidden = false;
+
+    const query = storefrontVisibilitySearch.trim().toLowerCase();
+
+    const filtered = query
+        ? selections.filter(item => {
+            const haystack = [
+                item.productName,
+                item.productCode,
+                item.supplierMarket
+            ].filter(Boolean).join(" ").toLowerCase();
+
+            return haystack.includes(query);
+        })
+        : selections;
+
+    const visibleItems = storefrontVisibilityExpanded
+        ? filtered
+        : filtered.slice(0, 8);
+
+    const hiddenCount = Math.max(0, filtered.length - visibleItems.length);
+
+    const rows = visibleItems.map(item => `
+        <article class="storefront-visibility-row">
+            <div class="storefront-visibility-product">
+                <strong>
+                    ${storeEscape(item.productName)}
+                    (${item.supplierMarket === "GLOBAL" ? "Global" : storeEscape(item.supplierMarket)})
+                </strong>
+                <small>${item.packages?.length || 0} Store Catalog packages</small>
+            </div>
+
+            <div class="storefront-visibility-regions">
+                ${(item.sellingRegions || []).map(region => `
+                    <label>
+                        <input
+                            type="checkbox"
+                            data-store-region-visibility
+                            data-selection-id="${storeEscape(storeId(item))}"
+                            data-region="${region}"
+                            data-version="${item.decisionVersion}"
+                            ${item.visibleRegions?.includes(region) ? "checked" : ""}
+                        >
+                        ${region === "TH" ? "Thailand" : "Myanmar"}
+                    </label>
+                `).join("")}
+            </div>
+        </article>
+    `).join("");
+
+    panel.innerHTML = `
+        <div class="panel-head storefront-visibility-head">
+            <div>
+                <h3>Storefront Visibility</h3>
+                <span>
+                    Control what customers see. Pricing and supplier setup remain unchanged.
+                </span>
+            </div>
+
+            <div class="storefront-visibility-tools">
+                <input
+                    type="search"
+                    value="${storeEscape(storefrontVisibilitySearch)}"
+                    placeholder="Search products"
+                    data-storefront-visibility-search
+                >
+            </div>
+        </div>
+
+        <div class="storefront-visibility-list">
+            ${rows || `
+                <div class="admin-empty-state">
+                    ${query
+                        ? "No matching Store Catalog products."
+                        : "Add a Store Catalog product first."}
+                </div>
+            `}
+        </div>
+
+        ${filtered.length > 8 ? `
+            <div class="storefront-visibility-footer">
+                <button
+                    type="button"
+                    class="admin-secondary-btn"
+                    data-storefront-visibility-toggle
+                >
+                    ${storefrontVisibilityExpanded
+                        ? "Collapse"
+                        : `Show all ${filtered.length} products`}
+                </button>
+
+                ${!storefrontVisibilityExpanded && hiddenCount
+                    ? `<span>${hiddenCount} more products</span>`
+                    : ""}
+            </div>
+        ` : ""}
+    `;
+
+    panel.querySelector("[data-storefront-visibility-search]")
+        ?.addEventListener("input", event => {
+            storefrontVisibilitySearch = event.target.value || "";
+            storefrontVisibilityExpanded = false;
+            renderNormalStorefrontControls().catch(() => {});
+        });
+
+    panel.querySelector("[data-storefront-visibility-toggle]")
+        ?.addEventListener("click", () => {
+            storefrontVisibilityExpanded = !storefrontVisibilityExpanded;
+            renderNormalStorefrontControls().catch(() => {});
+        });
+
+    const command = host.querySelector(".catalog-command-center");
+    if (command) command.hidden = !selections.length;
+
+    window.setAdminCatalogStoreSelectionScope?.(
+        selections.map(item => item.productCode)
+    );
+
+    if (selections.length) {
+        window.loadScopedAdminCatalog?.();
+    }
+}
+
 document.addEventListener("DOMContentLoaded",()=>{document.getElementById("activationPrepare")?.setAttribute("hidden","");document.querySelector("#section-products .supplier-catalog-head p")?.replaceChildren(document.createTextNode("Choose what AZIEL offers, set retail prices, then Publish / Start Selling."));document.querySelector("#section-products .activation-filters")?.setAttribute("hidden","");document.getElementById("guidedSellingActions")?.setAttribute("hidden","");document.getElementById("activationProducts")?.addEventListener("click",event=>{const button=event.target.closest("[data-store-selection]");if(!button)return;storeCatalogAdmin.activeId=button.dataset.storeSelection;renderStoreCatalogProducts();renderStoreCatalogPackages()});document.getElementById("activationPackages")?.addEventListener("click",event=>{if(event.target.closest("[data-store-pricing]"))openAdminSection("pricing-engine");if(event.target.closest("[data-store-storefront]"))openAdminSection("catalog");const start=event.target.closest("[data-store-start-selling]");if(start)startSellingStoreProduct(start).catch(error=>alert(error.message));const remove=event.target.closest("[data-store-remove-package]");if(remove)removeStoreCatalogPackage(remove).catch(error=>alert(error.message))});document.getElementById("activationPackages")?.addEventListener("change",event=>{const sellingRegion=event.target.closest("[data-store-selling-region]");if(sellingRegion)updateStoreSellingMarkets(sellingRegion).catch(error=>alert(error.message))});document.getElementById("section-catalog")?.addEventListener("change",async event=>{const input=event.target.closest("[data-store-region-visibility]");if(!input)return;try{await adminFetch(`/api/admin/store-catalog-selections/${encodeURIComponent(input.dataset.selectionId)}/regions/${encodeURIComponent(input.dataset.region)}/visibility`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({visible:input.checked,expectedDecisionVersion:Number(input.dataset.version)})});await renderNormalStorefrontControls()}catch(error){input.checked=!input.checked;alert(error.message)}});window.addEventListener("aziel:admin-section-opened",event=>{if(event.detail?.section==="products")loadStoreCatalogProducts();if(event.detail?.section==="catalog")renderNormalStorefrontControls({advanced:event.detail?.context?.view==="advanced"}).catch(()=>{})});window.addEventListener("aziel:admin-auth-ready",()=>{if(document.body.dataset.adminSection==="products")loadStoreCatalogProducts();if(document.body.dataset.adminSection==="catalog")renderNormalStorefrontControls({advanced:document.body.dataset.adminEntry==="advanced"}).catch(()=>{})});if(document.body.dataset.adminSection==="products")loadStoreCatalogProducts()});

@@ -58,6 +58,8 @@ const PUBLIC_ROUTES = Object.freeze([
     { id: "pc-games", label: "PC Games", path: "/pc-games.html", domain: "Games" },
     { id: "gift-cards", label: "Gift Cards", path: "/gift-cards.html", domain: "Games" },
     { id: "social-topup", label: "Social Top Up", path: "/social-topup.html", domain: "Games" },
+    { id: "mobile-recharge", label: "Mobile Recharge", path: "/mobile-recharge.html", domain: "Games" },
+    { id: "entertainment", label: "Entertainment", path: "/entertainment.html", domain: "Games" },
     { id: "mlbb", label: "MLBB", path: "/mlbb.html", domain: "Games" },
     { id: "pubg", label: "PUBG", path: "/pubg.html", domain: "Games" },
     { id: "freefire", label: "Free Fire", path: "/freefire.html", domain: "Games" },

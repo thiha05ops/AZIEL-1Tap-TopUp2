@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="/css/theme/aziel-design-system.css?v=20260829-p4">
     <link rel="stylesheet" href="/css/theme/aziel-header.css?v=20260829-p4">
     <link rel="stylesheet" href="/css/theme/aziel-theme.css?v=20260829-p4">
-    <link rel="stylesheet" href="/css/tracking/tracking.css">
+    <link rel="stylesheet" href="/css/tracking/tracking.css?v=20260914-order-center-v2">
     <link rel="stylesheet" href="/css/commerce/purchase-shell.css?v=20260829-p4">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -47,17 +47,6 @@
             </p>
         </section>
 
-        <section class="recent-track-card">
-            <div class="recent-track-head">
-                <h2 data-i18n="trackingRecentOrders">Recent Orders</h2>
-                <span data-i18n="tracking.openAnOrderForDetails">Open an order for details</span>
-            </div>
-            <div id="recentTrackOrders" class="recent-orders-skeleton" aria-busy="true">
-                <span class="az-storefront-skeleton"></span><span class="az-storefront-skeleton"></span>
-                <span class="az-visually-hidden" data-i18n="tracking.loadingRecentOrders">Loading recent orders</span>
-            </div>
-        </section>
-
         <section class="tracking-search-card" aria-labelledby="manualTrackingTitle">
             <h2 id="manualTrackingTitle" data-i18n="tracking.trackAnotherOrder">Track another order</h2>
             <div class="tracking-input-wrap">
@@ -73,6 +62,21 @@
         </section>
 
         <section id="trackingResult" class="tracking-result"></section>
+
+        <section class="recent-track-card">
+            <div class="recent-track-head">
+                <div>
+                    <span class="tracking-section-eyebrow">Order history</span>
+                    <h2 data-i18n="trackingRecentOrders">Recent Orders</h2>
+                </div>
+                <span data-i18n="tracking.openAnOrderForDetails">Open an order for details</span>
+            </div>
+            <div id="recentTrackOrders" class="recent-orders-skeleton" aria-busy="true">
+                <span class="az-storefront-skeleton"></span><span class="az-storefront-skeleton"></span>
+                <span class="az-visually-hidden" data-i18n="tracking.loadingRecentOrders">Loading recent orders</span>
+            </div>
+        </section>
+
 
     </main>
     <footer class="purchase-footer"><span data-i18n="tracking.ordersAndPaymentStatusRemainProtectedInYourAZIEL">Orders and payment status remain protected in your AZIEL account.</span><a href="support.html" data-i18n="tracking.contactSupport">Contact support</a></footer>
@@ -136,8 +140,10 @@
 
     <script src="/js/motion.js?v=20260829-p4"></script>
     <script src="/js/ui-feedback.js?v=20260829-p4"></script>
+    <script src="/js/catalog-presentation.js?v=20260914-tracking-v2"></script>
+    <script src="/js/catalog-runtime.js?v=20260914-tracking-v2"></script>
     <script src="/js/payment-display.js?v=20260829-p4"></script>
-    <script src="/js/tracking.js?v=20260829-p4"></script>
+    <script src="/js/tracking.js?v=20260914-order-center-v2"></script>
     <script src="/js/pwa-fix.js?v=20260829-p4"></script>
 
 </body>

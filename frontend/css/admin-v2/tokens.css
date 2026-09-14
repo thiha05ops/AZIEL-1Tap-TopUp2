@@ -1,0 +1,176 @@
+.admin-v2 {
+    /* Color */
+    --v2-bg: #f7f8fa;
+    --v2-surface: #ffffff;
+    --v2-surface-raised: #ffffff;
+    --v2-subtle: #f2f4f6;
+    --v2-subtle-strong: #eceff3;
+
+    --v2-text: #1b1d21;
+    --v2-text-soft: #3f444c;
+    --v2-muted: #686e77;
+    --v2-faint: #8b919a;
+
+    --v2-line: #e2e5e9;
+    --v2-line-strong: #d3d7dc;
+
+    --v2-purple: #6840cf;
+    --v2-purple-hover: #5934bd;
+    --v2-purple-soft: #f0ebfb;
+
+    --v2-yellow: #a66c00;
+    --v2-yellow-soft: #fff7df;
+    --v2-red: #bd3d49;
+    --v2-red-soft: #fff0f2;
+    --v2-green: #207c59;
+    --v2-green-soft: #edf8f3;
+    --v2-blue: #376ea6;
+
+    /* Typography */
+    --v2-font: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --v2-font-size: 15px;
+    --v2-line-height: 1.5;
+
+    /* Spacing */
+    --v2-space-1: 4px;
+    --v2-space-2: 8px;
+    --v2-space-3: 12px;
+    --v2-space-4: 16px;
+    --v2-space-5: 20px;
+    --v2-space-6: 24px;
+    --v2-space-8: 32px;
+
+    /* Shell geometry */
+    --v2-sidebar-wide: 220px;
+    --v2-sidebar-medium: 204px;
+    --v2-sidebar-compact: 68px;
+    --v2-topbar: 60px;
+
+    /* Page geometry */
+    --v2-page-max: 1480px;
+    --v2-page-gutter: clamp(20px, 2.2vw, 36px);
+    --v2-section-gap: 28px;
+
+    /* Controls */
+    --v2-control: 36px;
+    --v2-touch: 44px;
+
+    /* Tables / rows */
+    --v2-row: 48px;
+    --v2-row-compact: 42px;
+
+    /* Inspector */
+    --v2-inspector-min: 420px;
+    --v2-inspector-ideal: 480px;
+    --v2-inspector-max: 560px;
+
+    /* Radius */
+    --v2-radius-control: 8px;
+    --v2-radius-surface: 10px;
+
+    /* Motion */
+    --v2-ease: cubic-bezier(.2,.7,.2,1);
+    --v2-fast: 140ms;
+    --v2-normal: 220ms;
+}
+
+
+/* AZIEL OS V2 — system theme authority */
+
+/*
+ * V2 is the visual authority.
+ * Legacy admin components consume the compatibility --admin-* bridge below.
+ */
+.admin-v2 {
+    color-scheme: light;
+
+    --admin-bg: var(--v2-bg);
+    --admin-bg-soft: var(--v2-subtle);
+    --admin-surface: var(--v2-surface);
+    --admin-surface-raised: var(--v2-surface-raised);
+    --admin-panel: var(--v2-surface);
+    --admin-input: var(--v2-surface);
+    --admin-border: var(--v2-line);
+    --admin-border-strong: var(--v2-line-strong);
+    --admin-text: var(--v2-text);
+    --admin-text-muted: var(--v2-muted);
+    --admin-primary: var(--v2-purple);
+    --admin-accent: var(--v2-purple);
+}
+
+/* Explicit Light class for legacy selectors that require body.theme-light. */
+html.theme-light .admin-v2,
+body.theme-light.admin-v2 {
+    color-scheme: light;
+}
+
+/* System Dark — same semantic tokens, different values. */
+@media (prefers-color-scheme: dark) {
+    .admin-v2 {
+        color-scheme: dark;
+
+        --v2-bg: #111317;
+        --v2-surface: #17191e;
+        --v2-surface-raised: #1d2026;
+        --v2-subtle: #202329;
+        --v2-subtle-strong: #272b32;
+
+        --v2-text: #f2f3f5;
+        --v2-text-soft: #d0d3d8;
+        --v2-muted: #9ca2ac;
+        --v2-faint: #737a85;
+
+        --v2-line: #2b2f36;
+        --v2-line-strong: #3b4049;
+
+        --v2-purple: #9b7bea;
+        --v2-purple-hover: #ad91ef;
+        --v2-purple-soft: #292139;
+
+        --v2-yellow: #d2a64b;
+        --v2-yellow-soft: #302817;
+        --v2-red: #e0747e;
+        --v2-red-soft: #341e22;
+        --v2-green: #62b890;
+        --v2-green-soft: #193027;
+        --v2-blue: #79a9da;
+
+        --admin-bg: var(--v2-bg);
+        --admin-bg-soft: var(--v2-subtle);
+        --admin-surface: var(--v2-surface);
+        --admin-surface-raised: var(--v2-surface-raised);
+        --admin-panel: var(--v2-surface);
+        --admin-input: var(--v2-surface);
+        --admin-border: var(--v2-line);
+        --admin-border-strong: var(--v2-line-strong);
+        --admin-text: var(--v2-text);
+        --admin-text-muted: var(--v2-muted);
+        --admin-primary: var(--v2-purple);
+        --admin-accent: var(--v2-purple);
+    }
+}
+
+/*
+ * Explicit classes mirror the system state.
+ * These keep legacy selectors such as body.theme-light working correctly.
+ */
+html.theme-dark .admin-v2,
+body.theme-dark.admin-v2 {
+    color-scheme: dark;
+}
+
+html.theme-light .admin-v2,
+body.theme-light.admin-v2 {
+    --admin-bg: var(--v2-bg);
+    --admin-bg-soft: var(--v2-subtle);
+    --admin-surface: var(--v2-surface);
+    --admin-surface-raised: var(--v2-surface-raised);
+    --admin-panel: var(--v2-surface);
+    --admin-input: var(--v2-surface);
+    --admin-border: var(--v2-line);
+    --admin-border-strong: var(--v2-line-strong);
+    --admin-text: var(--v2-text);
+    --admin-text-muted: var(--v2-muted);
+    --admin-primary: var(--v2-purple);
+    --admin-accent: var(--v2-purple);
+}

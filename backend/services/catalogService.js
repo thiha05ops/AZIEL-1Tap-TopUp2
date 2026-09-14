@@ -841,16 +841,26 @@ function applyAdminProductionAttribution(projection, mappings = [], suppliers = 
     const supplierById = new Map(suppliers.map(item => [String(item._id), item]));
     const productCompatibilityMarkets = productCompatibilityMarketsFromAuthority(projection);
     const publicationByPackage = new Map();
+
     for (const item of publications || []) {
-        if (String(item.productCode || "").toLowerCase() !== String(projection.productCode || "").toLowerCase()) continue;
+        if (
+            String(item.productCode || "").toLowerCase() !==
+            String(projection.productCode || "").toLowerCase()
+        ) {
+            continue;
+        }
+
+        if (
+            String(item.customerMarket || "")
+                .trim()
+                .toUpperCase() !== market
+        ) {
+            continue;
+        }
+
         const packageCode = String(item.packageCode || "").toUpperCase();
-        const current = publicationByPackage.get(packageCode) || { published: false, decisionVersion: 0 };
-        publicationByPackage.set(packageCode, {
-            ...current,
-            ...(String(item.customerMarket || "").toUpperCase() === market ? item : {}),
-            published: current.published === true || item.published === true,
-            decisionVersion: Math.max(Number(current.decisionVersion || 0), Number(item.decisionVersion || 0))
-        });
+
+        publicationByPackage.set(packageCode, item);
     }
     projection.packages.forEach(pkg => {
         const packageCode = String(pkg.packageCode || "").toUpperCase();
@@ -1533,10 +1543,14 @@ async function listPublicExclusiveOffers(options = {}) {
 
     if (!candidatePackages.length) return [];
 
+    // Preserve persisted product codes for database queries.
+    // normalizeProductCode() is intentionally lossy (for example,
+    // "afk-journey" -> "afkjourney") and must only be used for
+    // in-memory identity comparisons, not exact MongoDB productCode lookups.
     const candidateProductCodes = [
         ...new Set(
             candidatePackages
-                .map(pkg => normalizeProductCode(pkg.productCode))
+                .map(pkg => String(pkg.productCode || "").trim())
                 .filter(Boolean)
         )
     ];

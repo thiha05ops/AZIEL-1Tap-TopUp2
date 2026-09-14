@@ -59,9 +59,80 @@
         return review;
     }
 
+
+    function checkoutPresentation(order = {}, canonicalPackage = {}) {
+        const productCode = String(
+            order.productCode ||
+            order.gameKey ||
+            ""
+        ).trim();
+
+        const packageCode = String(
+            canonicalPackage.packageCode ||
+            order.packageCode ||
+            ""
+        ).trim();
+
+        const region = String(order.region || "TH").trim().toUpperCase();
+
+        const catalogProduct =
+            productCode
+                ? window.AZIEL_CATALOG?.getProduct?.(productCode)
+                : null;
+
+        const fallbackPresentation =
+            productCode
+                ? window.AZIEL_CATALOG_PRESENTATION?.getProductPresentation?.(
+                    productCode
+                )
+                : null;
+
+        const catalogPackage =
+            productCode && packageCode
+                ? window.AZIEL_CATALOG?.getPackage?.(
+                    productCode,
+                    packageCode,
+                    region
+                )
+                : null;
+
+        const productName = String(
+            catalogProduct?.name ||
+            catalogProduct?.productName ||
+            catalogProduct?.displayName ||
+            fallbackPresentation?.name ||
+            fallbackPresentation?.title ||
+            fallbackPresentation?.displayName ||
+            order.productName ||
+            canonicalPackage.productName ||
+            canonicalPackage.gameName ||
+            order.game ||
+            "Product"
+        ).trim();
+
+        const packageName = String(
+            catalogPackage?.name ||
+            catalogPackage?.packageName ||
+            catalogPackage?.displayName ||
+            canonicalPackage.packageName ||
+            order.packageName ||
+            "Package"
+        ).trim();
+
+        return {
+            productName,
+            packageName
+        };
+    }
+
     function render(order) {
-        document.getElementById("checkoutProduct").textContent = order.game;
-        document.getElementById("checkoutPackage").textContent = order.packageName;
+        const presentation = checkoutPresentation(order);
+
+        document.getElementById("checkoutProduct").textContent =
+            presentation.productName;
+
+        document.getElementById("checkoutPackage").textContent =
+            presentation.packageName;
         const accountFields = Array.isArray(order.accountFields)
             ? order.accountFields.filter(field => String(field?.value || "").trim())
             : [];
@@ -71,8 +142,11 @@
                 .join(" · ")
             : [order.userId, order.zoneId !== "-" ? order.zoneId : ""].filter(Boolean).join(" / ");
         document.getElementById("checkoutRegion").textContent = order.region;
-        document.getElementById("checkoutSummaryProduct").textContent = order.game;
-        document.getElementById("checkoutSummaryPackage").textContent = order.packageName;
+        document.getElementById("checkoutSummaryProduct").textContent =
+            presentation.productName;
+
+        document.getElementById("checkoutSummaryPackage").textContent =
+            presentation.packageName;
         setReviewValue("checkoutTotal", "", true);
         document.getElementById("checkoutBackLink").href = draft.returnUrl || "home.html";
         document.getElementById("checkoutChangePackage").href = draft.returnUrl || "home.html";
@@ -89,20 +163,39 @@
 
     function renderAuthoritativeReview(review) {
         const pricing = review?.pricing || {};
-        const canonicalPackage = review?.package || {};
-        const canonicalProductName = canonicalPackage.gameName || draft.order.game;
-        const canonicalPackageName = canonicalPackage.packageName || draft.order.packageName;
-        document.getElementById("checkoutProduct").textContent = canonicalProductName;
-        document.getElementById("checkoutPackage").textContent = canonicalPackageName;
-        document.getElementById("checkoutSummaryProduct").textContent = canonicalProductName;
-        document.getElementById("checkoutSummaryPackage").textContent = canonicalPackageName;
-        setReviewValue("checkoutBasePrice", formatMoney(pricing.originalPrice, pricing.currency));
-        setReviewValue("checkoutDiscount", pricing.discountAmount > 0
-            ? `−${formatMoney(pricing.discountAmount, pricing.currency)}`
-            : formatMoney(0, pricing.currency));
-        setReviewValue("checkoutPromo", review?.promotion?.code || t("checkout.promoNotApplied", "Not applied"));
-        setReviewValue("checkoutTotal", formatMoney(pricing.quotedTotalAmount, pricing.currency));
-        setReviewValue("checkoutSummaryTotal", formatMoney(pricing.quotedTotalAmount, pricing.currency));
+
+        // Product/package presentation is resolved once from the storefront
+        // catalog in render(). The authoritative checkout review owns pricing,
+        // quote validity and commerce authority — it must not replace
+        // customer-facing product identity with internal codes.
+
+        setReviewValue(
+            "checkoutBasePrice",
+            formatMoney(pricing.originalPrice, pricing.currency)
+        );
+
+        setReviewValue(
+            "checkoutDiscount",
+            pricing.discountAmount > 0
+                ? `−${formatMoney(pricing.discountAmount, pricing.currency)}`
+                : formatMoney(0, pricing.currency)
+        );
+
+        setReviewValue(
+            "checkoutPromo",
+            review?.promotion?.code ||
+            t("checkout.promoNotApplied", "Not applied")
+        );
+
+        setReviewValue(
+            "checkoutTotal",
+            formatMoney(pricing.quotedTotalAmount, pricing.currency)
+        );
+
+        setReviewValue(
+            "checkoutSummaryTotal",
+            formatMoney(pricing.quotedTotalAmount, pricing.currency)
+        );
     }
 
     function setReviewSkeletons() {

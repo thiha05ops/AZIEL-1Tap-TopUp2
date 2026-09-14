@@ -5,8 +5,173 @@ let currentOrderId = "";
 let currentTrackingOrder = null;
 let lastStatus = "";
 let liveTrackingTimer = null;
+
+
 let recentOrdersRequestSequence = 0;
-let recentOrdersAuthKey = null;
+
+let trackingCatalogReadyPromise = null;
+
+async function ensureTrackingCatalog() {
+    if (!window.AZIEL_CATALOG?.ensureFresh) return false;
+
+    if (!trackingCatalogReadyPromise) {
+        trackingCatalogReadyPromise = window.AZIEL_CATALOG
+            .ensureFresh()
+            .then(() => true)
+            .catch(error => {
+                console.warn("Tracking catalog unavailable:", error);
+                trackingCatalogReadyPromise = null;
+                return false;
+            });
+    }
+
+    return trackingCatalogReadyPromise;
+}
+
+function normalizeTrackingIdentity(value = "") {
+    return String(value || "").trim().toLowerCase();
+}
+
+function normalizeTrackingPackageCode(value = "") {
+    return String(value || "").trim().toUpperCase();
+}
+
+function humanizeTrackingCode(value = "") {
+    return String(value || "")
+        .trim()
+        .replace(/[_-]+/g, " ")
+        .replace(/\s+/g, " ")
+        .replace(/\b\w/g, letter => letter.toUpperCase());
+}
+
+function catalogProductForOrder(order = {}) {
+    const catalog = window.AZIEL_CATALOG;
+    if (!catalog) return null;
+
+    const explicitProductCode = normalizeTrackingIdentity(order.productCode);
+
+    if (explicitProductCode) {
+        const exact = catalog.getProduct?.(explicitProductCode);
+        if (exact) return exact;
+    }
+
+    const packageCode = normalizeTrackingPackageCode(order.packageCode);
+
+    if (packageCode) {
+        const byPackage = (catalog.getProducts?.() || []).find(product =>
+            Array.isArray(product?.packages) &&
+            product.packages.some(pkg =>
+                normalizeTrackingPackageCode(pkg?.packageCode) === packageCode
+            )
+        );
+
+        if (byPackage) {
+            return catalog.getProduct?.(byPackage.productCode) || byPackage;
+        }
+    }
+
+    const legacyIdentity = normalizeTrackingIdentity(order.game);
+
+    if (legacyIdentity) {
+        const candidates = catalog.getProducts?.() || [];
+
+        const byIdentity = candidates.find(product => {
+            const code = normalizeTrackingIdentity(product?.productCode);
+            const name = normalizeTrackingIdentity(
+                product?.name ||
+                product?.productName ||
+                product?.displayName
+            );
+
+            const route = normalizeTrackingIdentity(
+                String(product?.route || product?.productRoute || "")
+                    .replace(/^.*\//, "")
+                    .replace(/\.html.*$/, "")
+            );
+
+            return (
+                code === legacyIdentity ||
+                name === legacyIdentity ||
+                route === legacyIdentity
+            );
+        });
+
+        if (byIdentity) {
+            return catalog.getProduct?.(byIdentity.productCode) || byIdentity;
+        }
+    }
+
+    return null;
+}
+
+function catalogPackageForOrder(product, order = {}) {
+    if (!product) return null;
+
+    const targetCode = normalizeTrackingPackageCode(order.packageCode);
+
+    if (!targetCode) return null;
+
+    return (product.packages || []).find(pkg =>
+        normalizeTrackingPackageCode(pkg?.packageCode) === targetCode
+    ) || null;
+}
+
+function resolveOrderPresentation(order = {}) {
+    const catalogProduct = catalogProductForOrder(order);
+
+    const displayProduct = catalogProduct
+        ? (
+            window.AZIEL_CATALOG_PRESENTATION?.buildDisplayProduct?.(
+                catalogProduct
+            ) || catalogProduct
+        )
+        : null;
+
+    const catalogPackage = catalogPackageForOrder(catalogProduct, order);
+
+    const productName = String(
+        displayProduct?.name ||
+        displayProduct?.productName ||
+        displayProduct?.displayName ||
+        order.productName ||
+        order.game ||
+        humanizeTrackingCode(order.productCode) ||
+        t("game", "Game")
+    ).trim();
+
+    const packageName = String(
+        catalogPackage?.name ||
+        catalogPackage?.packageName ||
+        catalogPackage?.displayName ||
+        order.packageName ||
+        order.selectedPackage ||
+        humanizeTrackingCode(order.packageCode) ||
+        t("package", "Package")
+    ).trim();
+
+    const artwork = String(
+        displayProduct?.image ||
+        displayProduct?.imageUrl ||
+        displayProduct?.artworkPath ||
+        window.AZIEL_CATALOG_PRESENTATION?.resolveProductImage?.(
+            catalogProduct || {}
+        ) ||
+        ""
+    ).trim();
+
+    return {
+        productCode: String(
+            catalogProduct?.productCode ||
+            order.productCode ||
+            ""
+        ).trim(),
+        productName,
+        packageName,
+        artwork,
+        catalogProduct,
+        catalogPackage
+    };
+}
 
 function t(key, fallback = "") {
     if (window.AZIEL_I18N?.t) {
@@ -92,6 +257,8 @@ async function trackOrder(orderId) {
     window.AZIEL_UI?.button?.setLoading(trackBtn, { text: t("trackingChecking", "Checking...") });
 
     try {
+        await ensureTrackingCatalog();
+
         const res = await fetch(
             trackingApiUrl(`/api/order/track/${encodeURIComponent(orderId)}`),
             { headers: getTrackingAuthHeaders() }
@@ -110,73 +277,169 @@ async function trackOrder(orderId) {
         currentTrackingOrder = order;
         lastStatus = trackingStateKey(order);
 
-        result.innerHTML = `
-            <div class="phone-track-card">
-                <div class="tracking-workspace">
-                <div class="order-top">
-                    <div>
-                        <span class="mini-label">
-                            ${isRefundFlow(status)
-                ? t("refundStatusLabel", "REFUND STATUS")
-                : t("orderStatusLabel", "ORDER STATUS")}
-                        </span>
+        const presentation = resolveOrderPresentation(order);
+        const amountLabel = `${Number(order.amount || 0).toLocaleString()} ${order.currency || ""}`.trim();
+        const orderDate = formatDateTime(order.createdAt || order.updatedAt || "");
+        const productRoute = trackingProductRoute(presentation);
+        const productArtworkInner = presentation.artwork
+            ? `
+                <img
+                    src="${escapeHTML(presentation.artwork)}"
+                    alt="${escapeHTML(presentation.productName)}"
+                    decoding="async"
+                >
+            `
+            : `
+                <span class="tracking-product-artwork--fallback" aria-hidden="true">
+                    <i class="fa-solid fa-gamepad"></i>
+                </span>
+            `;
 
-                        <h2>${formatStatus(status)}</h2>
-                    </div>
-
-                    <div class="status-orb ${status}">
-                        ${getStatusIcon(status)}
-                    </div>
+        const artworkMarkup = productRoute
+            ? `
+                <button
+                    type="button"
+                    class="tracking-product-artwork tracking-product-artwork--link"
+                    onclick="openTrackingProduct('${escapeHTML(presentation.productCode)}')"
+                    aria-label="${escapeHTML(
+                        t("openProductDetails", "Open product details")
+                    )}"
+                >
+                    ${productArtworkInner}
+                </button>
+            `
+            : `
+                <div class="tracking-product-artwork">
+                    ${productArtworkInner}
                 </div>
+            `;
 
-                <div class="progress-wrap">
+        result.innerHTML = `
+            <article class="phone-track-card tracking-order-center">
+
+                <header class="tracking-order-header">
+                    <div class="tracking-order-product">
+                        ${artworkMarkup}
+
+                        <div class="tracking-order-identity">
+                            <span class="mini-label">
+                                ${isRefundFlow(status)
+                    ? t("refundStatusLabel", "REFUND STATUS")
+                    : t("orderStatusLabel", "ORDER STATUS")}
+                            </span>
+
+                            <h2>
+                                ${productRoute
+                    ? `
+                                        <button
+                                            type="button"
+                                            class="tracking-product-title-link"
+                                            onclick="openTrackingProduct('${escapeHTML(presentation.productCode)}')"
+                                        >
+                                            ${escapeHTML(presentation.productName)}
+                                        </button>
+                                    `
+                    : escapeHTML(presentation.productName)
+                }
+                            </h2>
+
+                            <p>${escapeHTML(presentation.packageName)}</p>
+
+                            <div class="tracking-order-reference">
+                                <span>${escapeHTML(order.orderId || "-")}</span>
+                                ${orderDate ? `<span>${escapeHTML(orderDate)}</span>` : ""}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tracking-order-state">
+                        <strong>${escapeHTML(amountLabel || "-")}</strong>
+
+                        <span class="tracking-primary-status ${status}">
+                            ${getStatusIcon(status)}
+                            <span>${formatStatus(status)}</span>
+                        </span>
+                    </div>
+                </header>
+
+                <section class="tracking-progress-panel">
                     <div class="progress-title">
-                        <h3>
-                            ${isRefundFlow(status)
-                ? t("refundTimeline", "Refund Timeline")
-                : t("progress", "Progress")}
-                        </h3>
-
-                        <span>${formatProgressStatus(order, status)}</span>
+                        <div>
+                            <span class="tracking-section-eyebrow">
+                                ${isRefundFlow(status)
+                    ? t("refundTimeline", "Refund Timeline")
+                    : t("progress", "Progress")}
+                            </span>
+                            <h3>${formatProgressStatus(order, status)}</h3>
+                        </div>
                     </div>
 
                     <div class="track-timeline">
                         ${renderTimeline(status, order)}
                     </div>
-                </div>
+                </section>
+
+                <section class="tracking-order-details" aria-label="Order details">
+                    <div class="tracking-detail-head">
+                        <h3>Order details</h3>
+                    </div>
+
+                    <div class="order-info-grid">
+                        ${infoItem(t("orderId", "Order ID"), order.orderId || "-")}
+                        ${infoItem(t("userId", "User ID"), order.userId || "-")}
+                        ${order.zoneId ? infoItem(t("serverId", "Server ID"), order.zoneId) : ""}
+                        ${infoItem(t("amount", "Amount"), amountLabel || "-")}
+                        ${infoItem(t("payment", "Payment"), formatPaymentName(order.paymentMethod || "-"))}
+                        ${order.paidAt || order.paymentTime
+                    ? infoItem(
+                        t("paymentTime", "Payment time"),
+                        formatDateTime(order.paidAt || order.paymentTime)
+                    )
+                    : ""}
+                        ${status === "refunded"
+                    ? infoItem(
+                        t("refund", "Refund"),
+                        `${Number(order.refundAmount || order.amount || 0).toLocaleString()} ${order.currency || ""}`
+                    )
+                    : ""}
+                        ${status === "refunded"
+                    ? infoItem(
+                        t("refundMethod", "Refund Method"),
+                        formatPaymentName(order.refundMethod || "wallet")
+                    )
+                    : ""}
+                    </div>
+                </section>
 
                 ${renderRefundAction(order, status)}
                 ${renderRefundStatusBox(order, status)}
 
-                <div class="support-box">
-                    <span>${t("needHelp", "Need help?")}</span>
-                    <a href="support.html">${t("contactSupport", "Contact Support")}</a>
-                </div>
+                <footer class="tracking-order-footer">
+                    <p class="order-note">
+                        ${escapeHTML(order.paymentMessage || order.note || getDefaultNote(status))}
+                    </p>
 
-                <p class="order-note">
-                    ${escapeHTML(order.paymentMessage || order.note || getDefaultNote(status))}
-                </p>
-                </div>
+                    <div class="tracking-order-footer-actions">
+                        ${status === "completed"
+                    ? `
+                                <button
+                                    type="button"
+                                    class="tracking-buy-again"
+                                    data-buy-again="${escapeHTML(order.orderId || "")}"
+                                    onclick="buyAgain('${escapeHTML(order.orderId || "")}')"
+                                >
+                                    <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
+                                    <span>${t("buyAgain", "Buy Again")}</span>
+                                </button>
+                            `
+                    : ""
+                }
+                        <a href="support.html">${t("contactSupport", "Contact Support")}</a>
+                        <a href="home.html">${t("backHome", "Back Home")}</a>
+                    </div>
+                </footer>
 
-                <aside class="tracking-summary" aria-label="Order summary">
-                    <div class="order-id-box">
-                        <small>${t("orderId", "Order ID")}</small>
-                        <strong>${escapeHTML(order.orderId || "-")}</strong>
-                    </div>
-                    <div class="order-info-grid">
-                        ${infoItem(t("game", "Game"), order.game || "-")}
-                        ${infoItem(t("package", "Package"), order.packageName || order.selectedPackage || "-")}
-                        ${infoItem(t("userId", "User ID"), order.userId || "-")}
-                        ${infoItem(t("serverId", "Server ID"), order.zoneId || "-")}
-                        ${infoItem(t("amount", "Amount"), `${Number(order.amount || 0).toLocaleString()} ${order.currency || ""}`)}
-                        ${infoItem(t("payment", "Payment"), formatPaymentName(order.paymentMethod || "-"))}
-                        ${order.paidAt || order.paymentTime ? infoItem(t("paymentTime", "Payment time"), formatDateTime(order.paidAt || order.paymentTime)) : ""}
-                        ${status === "refunded" ? infoItem(t("refund", "Refund"), `${Number(order.refundAmount || order.amount || 0).toLocaleString()} ${order.currency || ""}`) : ""}
-                        ${status === "refunded" ? infoItem(t("refundMethod", "Refund Method"), formatPaymentName(order.refundMethod || "wallet")) : ""}
-                    </div>
-                    <div class="tracking-next-actions"><a href="home.html">${t("backHome", "Back Home")}</a></div>
-                </aside>
-            </div>
+            </article>
         `;
 
         window.AZIEL_I18N?.translatePage?.(document);
@@ -690,6 +953,249 @@ function formatStatus(status) {
     return map[status] || t("statusPending", "Pending");
 }
 
+
+function trackingProductRoute(presentation = {}) {
+    const product =
+        presentation.catalogProduct ||
+        window.AZIEL_CATALOG?.getProduct?.(presentation.productCode) ||
+        null;
+
+    if (!product) return "";
+
+    const displayProduct =
+        window.AZIEL_CATALOG_PRESENTATION?.buildDisplayProduct?.(product) ||
+        product;
+
+    return String(
+        displayProduct?.route ||
+        displayProduct?.productRoute ||
+        ""
+    ).trim();
+}
+
+function openTrackingProduct(productCode = "") {
+    const presentation = resolveOrderPresentation({
+        productCode
+    });
+
+    const route = trackingProductRoute(presentation);
+
+    if (!route) {
+        window.AZIEL_UI?.toast?.error?.(
+            t("trackingProductUnavailable", "This product is currently unavailable.")
+        );
+        return;
+    }
+
+    window.location.href = route;
+}
+
+function buyAgainMessage(message, type = "error") {
+    if (window.AZIEL_UI?.toast?.[type]) {
+        window.AZIEL_UI.toast[type](message);
+        return;
+    }
+
+    window.alert(message);
+}
+
+async function buyAgain(orderId = "") {
+    const sourceOrder =
+        currentTrackingOrder &&
+        String(currentTrackingOrder.orderId || "") === String(orderId || "")
+            ? currentTrackingOrder
+            : null;
+
+    if (!sourceOrder) {
+        buyAgainMessage(
+            t("buyAgainOrderUnavailable", "Open the completed order again and try Buy Again.")
+        );
+        return;
+    }
+
+    const status = trackingDisplayStatus(sourceOrder);
+
+    if (status !== "completed") {
+        buyAgainMessage(
+            t("buyAgainCompletedOnly", "Buy Again is available for completed orders.")
+        );
+        return;
+    }
+
+    const button = document.querySelector(
+        `[data-buy-again="${CSS.escape(String(orderId || ""))}"]`
+    );
+
+    const originalText = button?.textContent || t("buyAgain", "Buy Again");
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = t("buyAgainPreparing", "Preparing...");
+    }
+
+    try {
+        if (!window.AZIEL_CATALOG?.ensureFreshForPurchase) {
+            throw new Error("Catalog runtime unavailable");
+        }
+
+        await window.AZIEL_CATALOG.ensureFreshForPurchase();
+
+        const presentation = resolveOrderPresentation(sourceOrder);
+        const productCode = String(
+            presentation.catalogProduct?.productCode ||
+            presentation.productCode ||
+            sourceOrder.productCode ||
+            ""
+        ).trim();
+
+        const packageCode = String(
+            sourceOrder.packageCode ||
+            presentation.catalogPackage?.packageCode ||
+            ""
+        ).trim();
+
+        const region = String(
+            sourceOrder.region ||
+            localStorage.getItem("region") ||
+            localStorage.getItem("selectedRegion") ||
+            "TH"
+        ).trim().toUpperCase();
+
+        if (!productCode || !packageCode) {
+            throw new Error("Order catalog identity unavailable");
+        }
+
+        const availability =
+            window.AZIEL_CATALOG.getAvailability?.(productCode, region) || {};
+
+        if (
+            availability.code &&
+            availability.code !== "AVAILABLE"
+        ) {
+            buyAgainMessage(
+                availability.message ||
+                t(
+                    "buyAgainProductUnavailable",
+                    "This product is no longer available in your region."
+                )
+            );
+            return;
+        }
+
+        const currentPackage =
+            window.AZIEL_CATALOG.getPackage?.(
+                productCode,
+                packageCode,
+                region
+            );
+
+        if (!currentPackage) {
+            buyAgainMessage(
+                t(
+                    "buyAgainPackageUnavailable",
+                    "This package is no longer available. Please choose another package."
+                )
+            );
+            return;
+        }
+
+        const product =
+            window.AZIEL_CATALOG.getProduct?.(productCode) ||
+            presentation.catalogProduct ||
+            null;
+
+        const displayProduct =
+            window.AZIEL_CATALOG_PRESENTATION?.buildDisplayProduct?.(product) ||
+            product ||
+            {};
+
+        const accountFields = Array.isArray(sourceOrder.accountFields)
+            ? sourceOrder.accountFields
+                .filter(field => field && field.key && field.value)
+                .map(field => ({
+                    key: String(field.key || "").trim(),
+                    label: String(field.label || field.key || "Account field").trim(),
+                    value: String(field.value || "").trim(),
+                    displayValue: String(
+                        field.displayValue ||
+                        field.value ||
+                        ""
+                    ).trim()
+                }))
+            : [];
+
+        const newOrder = {
+            orderId: `AZL-${Date.now()}`,
+            game: String(
+                displayProduct.name ||
+                displayProduct.productName ||
+                presentation.productName ||
+                productCode
+            ).trim(),
+            gameKey: productCode,
+            productCode,
+            packageName: String(
+                currentPackage.name ||
+                presentation.packageName ||
+                packageCode
+            ).trim(),
+            packageCode: String(currentPackage.packageCode || packageCode).trim(),
+            amount: Number(currentPackage.amount || currentPackage.price || 0),
+            currency: String(currentPackage.currency || sourceOrder.currency || "").trim(),
+            region: String(currentPackage.region || region).trim(),
+            promoCode: "",
+            userCouponId: "",
+            paymentMethod: "",
+            username: String(sourceOrder.username || "").trim(),
+            userId: String(sourceOrder.userId || "").trim(),
+            zoneId: String(sourceOrder.zoneId || "-").trim() || "-",
+            accountFields,
+            status: "pending_payment",
+            paymentType: "",
+            provider: ""
+        };
+
+        if (!newOrder.amount || newOrder.amount <= 0) {
+            throw new Error("Current package price unavailable");
+        }
+
+        const checkoutDraft = {
+            version: 2,
+            createdAt: new Date().toISOString(),
+            returnUrl:
+                `${window.location.pathname}?orderId=${encodeURIComponent(
+                    sourceOrder.orderId || ""
+                )}`,
+            authoritativeStatus: "pending",
+            order: newOrder
+        };
+
+        sessionStorage.setItem(
+            "azielProductCheckoutDraft",
+            JSON.stringify(checkoutDraft)
+        );
+
+        window.location.href = "checkout.html";
+    } catch (error) {
+        console.error("Buy Again error:", error);
+
+        buyAgainMessage(
+            t(
+                "buyAgainUnavailable",
+                "We couldn't prepare this order. Please try again."
+            )
+        );
+    } finally {
+        if (button && document.contains(button)) {
+            button.disabled = false;
+            button.textContent = originalText;
+        }
+    }
+}
+
+window.openTrackingProduct = openTrackingProduct;
+window.buyAgain = buyAgain;
+
 function getStatusIcon(status) {
     const map = {
         pending: "⏳",
@@ -825,6 +1331,7 @@ async function loadRecentOrders() {
     }
 
     try {
+        await ensureTrackingCatalog();
         const res = await fetch(
             trackingApiUrl("/api/order/user/me"),
             {
@@ -845,22 +1352,54 @@ async function loadRecentOrders() {
             return;
         }
 
-        const recentOrders = data.orders.slice(0, 5);
+        const recentOrders = data.orders.slice(0, 8);
 
-        renderRecentOrdersTerminal(box, requestSequence, recentOrders.map(order => `
-            <button type="button" class="recent-order-item" onclick="trackRecentOrder('${escapeHTML(order.orderId)}')">
+        renderRecentOrdersTerminal(
+            box,
+            requestSequence,
+            recentOrders.map(order => {
+                const presentation = resolveOrderPresentation(order);
+                const status = trackingDisplayStatus(order);
+                const amount = `${Number(order.amount || 0).toLocaleString()} ${order.currency || ""}`.trim();
+                const orderDate = formatDateTime(order.createdAt || order.updatedAt || "");
 
-                <div class="recent-order-left">
-                    <h4>${escapeHTML(order.game || t("game", "Game"))}</h4>
-                    <p>${escapeHTML(order.packageName || "-")}</p>
-                </div>
+                return `
+                    <button
+                        type="button"
+                        class="recent-order-item"
+                        onclick="trackRecentOrder('${escapeHTML(order.orderId)}')"
+                        aria-label="${escapeHTML(`${presentation.productName} ${presentation.packageName}`)}"
+                    >
+                        <span class="recent-order-artwork">
+                            <img
+                                src="${escapeHTML(presentation.artwork)}"
+                                alt=""
+                                loading="lazy"
+                                decoding="async"
+                            >
+                        </span>
 
-                <div class="recent-order-status ${trackingDisplayStatus(order)}">
-                    ${formatStatus(trackingDisplayStatus(order))}
-                </div>
-                <span class="recent-order-view">View Order</span>
-            </button>
-        `).join(""));
+                        <span class="recent-order-main">
+                            <strong>${escapeHTML(presentation.productName)}</strong>
+                            <span class="recent-order-package">${escapeHTML(presentation.packageName)}</span>
+                            <span class="recent-order-meta">
+                                <span>${escapeHTML(order.orderId || "-")}</span>
+                                ${orderDate ? `<span>${escapeHTML(orderDate)}</span>` : ""}
+                            </span>
+                        </span>
+
+                        <span class="recent-order-financial">
+                            <strong>${escapeHTML(amount || "-")}</strong>
+                            <span class="recent-order-status ${status}">
+                                ${formatStatus(status)}
+                            </span>
+                        </span>
+
+                        <span class="recent-order-chevron" aria-hidden="true">›</span>
+                    </button>
+                `;
+            }).join("")
+        );
 
     } catch (error) {
         if (requestSequence !== recentOrdersRequestSequence) return;

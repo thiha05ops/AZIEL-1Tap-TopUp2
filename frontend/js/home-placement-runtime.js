@@ -69,11 +69,61 @@
         return uniqueProducts(products.filter(product => product?.enabled !== false && product.homepageEnabled === true && product.discoverable === true && product.publicCategory === "mobile").filter(product => belongsToSection(product, "ALL_MOBILE_GAMES"))).sort(compareHomeOrder);
     }
     function selectSocialProducts(products = []) { return selectProducts(products, "SOCIAL_TOPUP"); }
+    function personalizeProductSection(products = [], sectionKey = "") {
+        const list = Array.isArray(products) ? [...products] : [];
+        const discovery = window.AZIEL_CUSTOMER_DISCOVERY;
+
+        if (
+            !discovery ||
+            list.length < 2 ||
+            !["POPULAR_MOBILE_GAMES", "ALL_MOBILE_GAMES"].includes(sectionKey)
+        ) {
+            return list;
+        }
+
+        const viewedCodes = new Set(
+            discovery.recentProductCodes()
+                .map(code => String(code || "").trim().toLowerCase())
+                .filter(Boolean)
+        );
+
+        const viewed = discovery.viewedFirst(
+            list,
+            product => codeOf(product)
+        ).filter(product => viewedCodes.has(codeOf(product)));
+
+        const remainder = list
+            .filter(product => !viewedCodes.has(codeOf(product)))
+            .sort((a, b) => {
+                const aName = String(a?.name || codeOf(a)).trim();
+                const bName = String(b?.name || codeOf(b)).trim();
+
+                return aName.localeCompare(
+                    bName,
+                    undefined,
+                    { sensitivity: "base" }
+                );
+            });
+
+        return [
+            ...viewed,
+            ...discovery.rotate(
+                remainder,
+                discovery.homeRotationCursor()
+            )
+        ];
+    }
     function renderSection(config, products, selection, catalogReady) {
         const section = document.getElementById(config.id);
         const target = document.getElementById(config.target);
         if (!section || !target) return;
-        const selected = catalogReady ? selectProducts(products, config.key) : [];
+        const selected = catalogReady
+            ? personalizeProductSection(
+                selectProducts(products, config.key),
+                config.key
+            )
+            : [];
+
         if (!selected.length) {
             hideSection(section, target, catalogReady ? "no-admin-placement" : "catalog-unavailable");
             selection.groups.push(groupReport(config.report, [], section.dataset.homeHiddenReason));

@@ -104,28 +104,29 @@ function verifyAdminWiring() {
         previous = index;
     });
 
-    [
+    const firstClassSections = [
         "dashboard",
-        "website",
         "orders",
         "wallet",
         "fulfillment",
         "support",
-        "chat",
         "catalog",
-        "promos",
         "media",
-        "site-content",
         "campaigns",
         "users",
-        "broadcast",
         "admin-security",
         "payments",
         "settings"
-    ].forEach(section => {
+    ];
+    firstClassSections.forEach(section => {
         assert(html.includes(`data-section="${section}"`), `Existing data-section ${section} must remain.`);
         assert(html.includes(`id="section-${section}"`), `Existing section panel ${section} must remain.`);
     });
+    ["website", "chat", "promos", "site-content", "broadcast"].forEach(section => {
+        assert(html.includes(`id="section-${section}"`), `Compatibility section ${section} must remain resolvable.`);
+    });
+    const v2Shell = read("frontend/js/admin-v2/admin-v2-shell.js");
+    assert(v2Shell.includes('"website"') && v2Shell.includes('"promos"') && v2Shell.includes('"site-content"'), "V2 adapter must retain legacy deep-link compatibility.");
 
     assert(html.includes(`href="/admin-design-studio.html"`), "Design Studio direct route must remain.");
     assert(!html.includes("/js/os/") || !read("frontend/home.html").includes("/js/os/"), "Public home must not load Admin OS kernel scripts.");

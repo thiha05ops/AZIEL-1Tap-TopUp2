@@ -159,7 +159,8 @@ function configureBaseApplication() {
         windowMs: 15 * 60 * 1000,
         limit: Number(process.env.RATE_LIMIT_GENERAL || 600),
         standardHeaders: true,
-        legacyHeaders: false
+        legacyHeaders: false,
+        skip: () => !isProduction
     });
     app.use("/api", generalLimiter);
     app.use("/api", databaseReadinessGate);
@@ -201,7 +202,7 @@ function configureDatabaseApplication(mongoConnection) {
     app.set("realtime", realtime);
 
     [
-        "auth", "adminPricingEngine", "adminAuth", "adminUsers", "adminStats", "order",
+        "auth", "adminPricingEngine", "adminAuth", "adminUsers", "adminStats", "adminOperationalNotifications", "order",
         "payment", "notification", "profile"
     ].forEach(route => app.use("/api", require(`./routes/${route}`)));
     app.use("/api/security", require("./routes/security"));

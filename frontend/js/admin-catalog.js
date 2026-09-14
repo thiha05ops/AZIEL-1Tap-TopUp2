@@ -395,7 +395,10 @@ function renderCatalogDetail(product) {
         product.bannerAsset || product.bannerUrl
     ].filter(Boolean).length;
     const bannerCount = selectedCatalogBanners.length;
-    if (!["general", "packages", "presentation", "availability", "seo", "media"].includes(activeCatalogTab)) {
+    // Storefront owns customer-facing product presentation.
+    // Package lifecycle, supplier routing and pricing are managed by their
+    // dedicated operational authorities, so Packages is not a storefront tab.
+    if (!["general", "merchandising", "presentation", "availability", "seo", "media"].includes(activeCatalogTab)) {
         activeCatalogTab = "general";
     }
 
@@ -438,7 +441,7 @@ function renderCatalogDetail(product) {
 
         <div class="catalog-workspace-tabs" role="tablist" aria-label="Product workspace">
             ${renderCatalogTabButton("general", "General")}
-            ${renderCatalogTabButton("packages", `Packages ${packages.length}`)}
+            ${renderCatalogTabButton("merchandising", "Merchandising")}
             ${renderCatalogTabButton("presentation", "Presentation")}
             ${renderCatalogTabButton("availability", "Availability")}
             ${renderCatalogTabButton("seo", "SEO")}
@@ -477,6 +480,176 @@ function renderCatalogTabButton(tab, label) {
     `;
 }
 
+function renderCatalogMerchandisingPanel(product, packages) {
+    const region = ["TH", "MM"].includes(catalogCustomerMarket)
+        ? catalogCustomerMarket
+        : "TH";
+
+    const currency = region === "MM" ? "MMK" : "THB";
+    const activePackages = packages.filter(pkg => !pkg.deleted && !pkg.deletedAt);
+
+    const rows = activePackages.map(pkg => {
+        const price = pkg.prices?.[region] || null;
+        const sellingPrice = Number(price?.amount);
+        const referencePrice = Number(price?.referencePrice);
+        const hasSellingPrice = Number.isFinite(sellingPrice) && sellingPrice > 0;
+        const hasReferencePrice =
+            Number.isFinite(referencePrice) &&
+            referencePrice > sellingPrice &&
+            hasSellingPrice;
+
+        const saveAmount = hasReferencePrice
+            ? referencePrice - sellingPrice
+            : 0;
+
+        const discountPercent = hasReferencePrice
+            ? Math.round((saveAmount / referencePrice) * 10000) / 100
+            : 0;
+
+        const exclusiveEligible =
+            pkg.merchandising?.exclusiveOfferEligible === true;
+
+        const exclusivePriority =
+            Number(pkg.merchandising?.exclusiveOfferPriority || 0);
+
+        const published = pkg.publication?.published === true;
+        const packageAvailable =
+            pkg.enabled !== false &&
+            price &&
+            price.enabled !== false &&
+            hasSellingPrice;
+
+        return `
+            <article
+                class="catalog-merch-row ${packageAvailable ? "" : "is-unavailable"}"
+                data-merch-package="${escapeHtml(pkg.packageCode)}"
+            >
+                <div class="catalog-merch-summary">
+                    <div class="catalog-merch-package">
+                        <div class="catalog-merch-package-icon">
+                            ${pkg.iconUrl
+                                ? `<img src="${escapeHtml(pkg.iconUrl)}" alt="">`
+                                : `<span>${escapeHtml((pkg.name || "?").slice(0, 1).toUpperCase())}</span>`}
+                        </div>
+                        <div>
+                            <strong>${escapeHtml(pkg.name || pkg.packageCode)}</strong>
+                            <small>
+                                ${packageAvailable
+                                    ? `${region === "TH" ? "Thailand" : "Myanmar"} storefront`
+                                    : `Not currently available in ${region}`}
+                            </small>
+                        </div>
+                    </div>
+
+                    <div class="catalog-merch-price">
+                        <span>Current price</span>
+                        <strong>
+                            ${hasSellingPrice
+                                ? escapeHtml(`${sellingPrice.toLocaleString()} ${currency}`)
+                                : "—"}
+                        </strong>
+                    </div>
+
+                    <div class="catalog-merch-offer-preview">
+                        <span>Customer offer</span>
+                        ${hasReferencePrice
+                            ? `
+                                <strong>${escapeHtml(`${discountPercent}% OFF`)}</strong>
+                                <small>
+                                    <del>${escapeHtml(`${referencePrice.toLocaleString()} ${currency}`)}</del>
+                                    · Save ${escapeHtml(`${saveAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${currency}`)}
+                                </small>
+                            `
+                            : `<strong>No discount display</strong><small>Current selling price only</small>`}
+                    </div>
+
+                    <div class="catalog-merch-state">
+                        <span class="catalog-merch-pill ${exclusiveEligible ? "is-active" : ""}">
+                            ${exclusiveEligible ? "Exclusive Offer" : "Standard"}
+                        </span>
+
+                        <label
+                            class="catalog-merch-public-toggle"
+                            title="${published ? "Visible to customers in this market" : "Hidden from customers in this market"}"
+                        >
+                            <input
+                                type="checkbox"
+                                data-merch-publication="${escapeHtml(pkg.packageCode)}"
+                                ${published ? "checked" : ""}
+                            >
+                            <span class="catalog-merch-public-toggle__track" aria-hidden="true">
+                                <span></span>
+                            </span>
+                            <strong>${published ? "Public" : "Private"}</strong>
+                        </label>
+                    </div>
+
+                    <div class="catalog-merch-actions">
+                        <button
+                            type="button"
+                            class="admin-secondary-btn catalog-merch-manage-btn"
+                            data-manage-merchandising="${escapeHtml(pkg.packageCode)}"
+                        >
+                            Manage Offer
+                        </button>
+
+                        <button
+                            type="button"
+                            class="catalog-merch-remove-btn"
+                            data-remove-storefront-package="${escapeHtml(pkg.packageCode)}"
+                            title="Remove from Storefront"
+                            aria-label="Remove ${escapeHtml(pkg.name || pkg.packageCode)} from Storefront"
+                        >
+                            <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </div>
+            </article>
+        `;
+    }).join("");
+
+    return `
+        <section class="catalog-merchandising-panel">
+            <div class="catalog-merchandising-head">
+                <div>
+                    <span>Storefront Merchandising</span>
+                    <h3>Package Offers</h3>
+                    <p>
+                        Control how existing package prices are marketed to customers.
+                        Selling prices remain owned by Pricing.
+                    </p>
+                </div>
+
+                <label class="catalog-merch-market">
+                    <span>Market</span>
+                    <select data-merch-market>
+                        <option value="TH" ${region === "TH" ? "selected" : ""}>Thailand · THB</option>
+                        <option value="MM" ${region === "MM" ? "selected" : ""}>Myanmar · MMK</option>
+                    </select>
+                </label>
+            </div>
+
+            <div class="catalog-merch-note">
+                <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                <span>
+                    Exclusive Offers, original-price display, discount badges and save amounts
+                    are customer-facing merchandising controls. Supplier cost and selling-price
+                    calculation are not edited here.
+                </span>
+            </div>
+
+            <div class="catalog-merch-list">
+                ${rows || `
+                    <div class="catalog-empty-state">
+                        <strong>No packages available</strong>
+                        <span>This product has no packages to merchandise.</span>
+                    </div>
+                `}
+            </div>
+        </section>
+    `;
+}
+
 function renderCatalogTabPanel(product, packages) {
     const productDeleted = product.deleted || product.deletedAt;
     const readiness = product.commerceReadiness || { ready: false, missing: ["readiness unavailable"] };
@@ -491,9 +664,8 @@ function renderCatalogTabPanel(product, packages) {
                 <div class="panel-head catalog-package-head">
                     <div>
                         <h3 data-admin-i18n="packages">${adminT("packages", "Packages")}</h3>
-                        <span>${packages.length} ${adminT("packages", "Packages")}</span>
+                        <span>${packages.length} packages · Read-only commerce overview</span>
                     </div>
-                    <button class="admin-secondary-btn" type="button" data-add-package>${adminT("add_package", "Add Package")}</button>
                 </div>
                 <div class="catalog-package-toolbar">
                     <input type="search" data-package-search value="${escapeHtml(catalogPackageSearch)}" placeholder="Search packages">
@@ -511,6 +683,10 @@ function renderCatalogTabPanel(product, packages) {
         `;
     }
 
+    if (activeCatalogTab === "merchandising") {
+        return renderCatalogMerchandisingPanel(product, packages);
+    }
+
     if (activeCatalogTab === "presentation") {
         return `
             <section class="catalog-overview-panel">
@@ -519,22 +695,22 @@ function renderCatalogTabPanel(product, packages) {
                     <h4>${escapeHtml(product.name)}</h4>
                     <p>${escapeHtml(product.description || adminT("no_description_provided", "No description provided."))}</p>
                     <dl>
-                        ${detailDefinition("storefront_title", product.name)}
-                        ${detailDefinition("storefront_subtitle", product.description || "-")}
-                        ${detailDefinition("short_description", product.description || "-")}
-                        ${detailDefinition("canonical_route", product.canonicalRoute || product.productRoute || "-")}
-                        ${detailDefinition("featured", product.featured ? "Yes" : "No")}
-                        ${detailDefinition("home_visibility", product.homepageEnabled ? "Shown on Home" : "Hidden from Home")}
+                        ${detailDefinitionLabel("Storefront Title", product.name)}
+                        ${detailDefinitionLabel("Storefront Subtitle", product.description || "-")}
+                        ${detailDefinitionLabel("Short Description", product.description || "-")}
+                        ${detailDefinitionLabel("Store URL", product.canonicalRoute || product.productRoute || "-")}
+                        ${detailDefinitionLabel("Featured Product", product.featured ? "Yes" : "No")}
+                        ${detailDefinitionLabel("Home Visibility", product.homepageEnabled ? "Shown on Home" : "Hidden from Home")}
                     </dl>
                 </article>
                 <article class="catalog-info-card catalog-info-card-wide">
                     <span>${adminT("presentation_metadata", "Presentation Metadata")}</span>
                     <dl>
-                        ${detailDefinition("home_category", product.homepageCategory || "-")}
-                        ${detailDefinition("home_order", Number(product.homepageOrder || 0))}
-                        ${detailDefinition("home_flags", (product.homepageFlags || []).join(", ") || "-")}
-                        ${detailDefinition("home_sections", (product.homepageSections || []).join(", ") || "-")}
-                        ${detailDefinition("preview_price", product.previewPrice?.amount ? `${product.previewPrice.amount} ${product.previewPrice.currency || ""}` : "-")}
+                        ${detailDefinitionLabel("Home Category", humanizeCatalogValue(product.homepageCategory))}
+                        ${detailDefinitionLabel("Home Position", Number(product.homepageOrder || 0))}
+                        ${detailDefinitionLabel("Badges", humanizeCatalogList(product.homepageFlags))}
+                        ${detailDefinitionLabel("Home Sections", humanizeCatalogList(product.homepageSections))}
+                        ${detailDefinitionLabel("Preview Price", product.previewPrice?.amount ? `${product.previewPrice.amount} ${product.previewPrice.currency || ""}` : "-")}
                     </dl>
                 </article>
             </section>
@@ -1081,7 +1257,696 @@ function filterPackages(packages = []) {
     });
 }
 
+
+function ensureCatalogMerchandisingModal() {
+    if (document.getElementById("catalogMerchandisingModal")) return;
+
+    const modal = document.createElement("div");
+    modal.id = "catalogMerchandisingModal";
+    modal.className = "admin-action-modal catalog-merch-modal";
+
+    modal.innerHTML = `
+        <div
+            class="admin-action-modal-box catalog-merch-modal-box"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="catalogMerchModalTitle"
+        >
+            <header class="catalog-merch-modal-header">
+                <div>
+                    <span>Storefront Merchandising</span>
+                    <h3 id="catalogMerchModalTitle">Manage Offer</h3>
+                    <p id="catalogMerchModalSubtitle">
+                        Control how this package offer is presented to customers.
+                    </p>
+                </div>
+
+                <button
+                    type="button"
+                    class="admin-icon-btn"
+                    data-close-merch-modal
+                    aria-label="Close"
+                >
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                </button>
+            </header>
+
+            <div class="catalog-merch-modal-content">
+                <section class="catalog-merch-price-summary">
+                    <div>
+                        <span>Current Selling Price</span>
+                        <strong data-merch-modal-selling-price>—</strong>
+                    </div>
+
+                    <div>
+                        <span>Customer Savings</span>
+                        <strong data-merch-modal-saving>—</strong>
+                    </div>
+
+                    <div>
+                        <span>Discount</span>
+                        <strong data-merch-modal-discount>—</strong>
+                    </div>
+                </section>
+
+                <section class="catalog-merch-modal-section">
+                    <div class="catalog-merch-modal-section-head">
+                        <span>Offer Display</span>
+                        <h4>Price Presentation</h4>
+                        <p>
+                            Selling price is read-only here and remains controlled by Pricing.
+                        </p>
+                    </div>
+
+                    <div class="catalog-merch-modal-fields">
+                        <label>
+                            <span>Original / Reference Price</span>
+                            <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                data-merch-modal-reference
+                                placeholder="Optional"
+                            >
+                            <small>
+                                Must be higher than the current selling price when discount display is enabled.
+                            </small>
+                        </label>
+
+                        <label>
+                            <span>Discount Label</span>
+                            <input
+                                type="text"
+                                maxlength="40"
+                                data-merch-modal-label
+                                placeholder="Example: HOT DEAL"
+                            >
+                        </label>
+                    </div>
+
+                    <div class="catalog-merch-modal-toggles">
+                        <label>
+                            <span>
+                                <b>Show Discount Badge</b>
+                                <small>Show the discount label or calculated percentage.</small>
+                            </span>
+                            <input type="checkbox" role="switch" data-merch-modal-show-discount>
+                        </label>
+
+                        <label>
+                            <span>
+                                <b>Show Original Price</b>
+                                <small>Show the crossed-out reference price.</small>
+                            </span>
+                            <input type="checkbox" role="switch" data-merch-modal-show-original>
+                        </label>
+
+                        <label>
+                            <span>
+                                <b>Show Save Amount</b>
+                                <small>Show how much the customer saves.</small>
+                            </span>
+                            <input type="checkbox" role="switch" data-merch-modal-show-save>
+                        </label>
+                    </div>
+                </section>
+
+                <section class="catalog-merch-modal-section">
+                    <div class="catalog-merch-modal-section-head">
+                        <span>Exclusive Offers</span>
+                        <h4>Campaign Eligibility</h4>
+                        <p>
+                            Eligibility does not create a discount by itself.
+                            A valid reference price above selling price is required for an actual customer offer.
+                        </p>
+                    </div>
+
+                    <div class="catalog-merch-modal-toggles catalog-merch-modal-toggles-single">
+                        <label>
+                            <span>
+                                <b>Feature in Exclusive Offers</b>
+                                <small>
+                                    Allows this package to compete for this product's Exclusive Offer slot.
+                                </small>
+                            </span>
+                            <input type="checkbox" role="switch" data-merch-modal-exclusive>
+                        </label>
+                    </div>
+
+                    <label class="catalog-merch-priority-field">
+                        <span>Exclusive Offer Priority</span>
+                        <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value="0"
+                            data-merch-modal-priority
+                        >
+                        <small>
+                            Higher priority wins when multiple packages are eligible for the same product.
+                        </small>
+                    </label>
+                </section>
+            </div>
+
+            <footer class="catalog-merch-modal-footer">
+                <button
+                    type="button"
+                    class="admin-secondary-btn"
+                    data-close-merch-modal
+                >
+                    Cancel
+                </button>
+
+                <button
+                    type="button"
+                    class="admin-primary-btn"
+                    data-save-merch-modal
+                >
+                    Save Offer
+                </button>
+            </footer>
+        </div>
+    `;
+
+    modal.addEventListener("click", event => {
+        if (
+            event.target === modal ||
+            event.target.closest("[data-close-merch-modal]")
+        ) {
+            modal.classList.remove("show");
+        }
+    });
+
+    document.body.appendChild(modal);
+}
+
+function closeCatalogMerchandisingModal() {
+    document.getElementById("catalogMerchandisingModal")
+        ?.classList.remove("show");
+}
+
+function openCatalogMerchandisingModal(product, pkg) {
+    ensureCatalogMerchandisingModal();
+
+    const modal = document.getElementById("catalogMerchandisingModal");
+    if (!modal) return;
+
+    const region = catalogCustomerMarket === "MM" ? "MM" : "TH";
+    const currency = region === "MM" ? "MMK" : "THB";
+    const price = pkg.prices?.[region] || null;
+
+    const sellingPrice = Number(price?.amount);
+    const referencePrice = Number(price?.referencePrice);
+
+    const hasSellingPrice =
+        Number.isFinite(sellingPrice) && sellingPrice > 0;
+
+    const hasReferencePrice =
+        Number.isFinite(referencePrice) &&
+        referencePrice > 0;
+
+    const saveAmount =
+        hasSellingPrice &&
+        hasReferencePrice &&
+        referencePrice > sellingPrice
+            ? referencePrice - sellingPrice
+            : 0;
+
+    const discountPercent =
+        saveAmount > 0
+            ? (saveAmount / referencePrice) * 100
+            : 0;
+
+    modal.querySelector("#catalogMerchModalTitle").textContent =
+        pkg.name || pkg.packageCode;
+
+    modal.querySelector("#catalogMerchModalSubtitle").textContent =
+        `${region === "TH" ? "Thailand" : "Myanmar"} · ${currency} · Storefront merchandising`;
+
+    modal.querySelector("[data-merch-modal-selling-price]").textContent =
+        hasSellingPrice
+            ? `${sellingPrice.toLocaleString()} ${currency}`
+            : "No selling price";
+
+    modal.querySelector("[data-merch-modal-saving]").textContent =
+        saveAmount > 0
+            ? `${saveAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${currency}`
+            : "—";
+
+    modal.querySelector("[data-merch-modal-discount]").textContent =
+        discountPercent > 0
+            ? `${discountPercent.toFixed(2).replace(/\.00$/, "")}%`
+            : "—";
+
+    const referenceInput =
+        modal.querySelector("[data-merch-modal-reference]");
+
+    referenceInput.value =
+        hasReferencePrice ? String(referencePrice) : "";
+
+    referenceInput.disabled = !hasSellingPrice;
+
+    const labelInput =
+        modal.querySelector("[data-merch-modal-label]");
+
+    labelInput.value = price?.discountLabel || "";
+    labelInput.disabled = !hasSellingPrice;
+
+    const showDiscount =
+        modal.querySelector("[data-merch-modal-show-discount]");
+
+    const showOriginal =
+        modal.querySelector("[data-merch-modal-show-original]");
+
+    const showSave =
+        modal.querySelector("[data-merch-modal-show-save]");
+
+    showDiscount.checked = price?.showDiscount === true;
+    showOriginal.checked = price?.showOriginalPrice !== false;
+    showSave.checked = price?.showSaveAmount !== false;
+
+    showDiscount.disabled = !hasSellingPrice;
+    showOriginal.disabled = !hasSellingPrice;
+    showSave.disabled = !hasSellingPrice;
+
+    modal.querySelector("[data-merch-modal-exclusive]").checked =
+        pkg.merchandising?.exclusiveOfferEligible === true;
+
+    modal.querySelector("[data-merch-modal-priority]").value =
+        String(pkg.merchandising?.exclusiveOfferPriority || 0);
+
+    const refreshPreview = () => {
+        const nextReference = Number(referenceInput.value);
+        const validReference =
+            hasSellingPrice &&
+            Number.isFinite(nextReference) &&
+            nextReference > sellingPrice;
+
+        const nextSave = validReference
+            ? nextReference - sellingPrice
+            : 0;
+
+        const nextDiscount = validReference
+            ? (nextSave / nextReference) * 100
+            : 0;
+
+        modal.querySelector("[data-merch-modal-saving]").textContent =
+            nextSave > 0
+                ? `${nextSave.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${currency}`
+                : "—";
+
+        modal.querySelector("[data-merch-modal-discount]").textContent =
+            nextDiscount > 0
+                ? `${nextDiscount.toFixed(2).replace(/\.00$/, "")}%`
+                : "—";
+    };
+
+    referenceInput.oninput = refreshPreview;
+
+    const saveButton =
+        modal.querySelector("[data-save-merch-modal]");
+
+    saveButton.onclick = async () => {
+        if (catalogPackageSavePending) return;
+
+        const referenceRaw =
+            String(referenceInput.value || "").trim();
+
+        const nextReferencePrice =
+            referenceRaw === ""
+                ? ""
+                : Number(referenceRaw);
+
+        const nextShowDiscount = showDiscount.checked;
+        const nextShowOriginal = showOriginal.checked;
+        const nextShowSave = showSave.checked;
+
+        const discountLabel =
+            String(labelInput.value || "").trim();
+
+        const exclusiveOfferEligible =
+            modal.querySelector("[data-merch-modal-exclusive]").checked;
+
+        const priorityRaw =
+            String(
+                modal.querySelector("[data-merch-modal-priority]").value || "0"
+            ).trim();
+
+        const exclusiveOfferPriority =
+            Number(priorityRaw || 0);
+
+        if (
+            !Number.isFinite(exclusiveOfferPriority) ||
+            exclusiveOfferPriority < 0
+        ) {
+            showAdminToast?.(
+                "Exclusive Offer Priority must be 0 or greater.",
+                "error"
+            );
+            return;
+        }
+
+        if (nextReferencePrice !== "") {
+            if (
+                !Number.isFinite(nextReferencePrice) ||
+                nextReferencePrice <= 0
+            ) {
+                showAdminToast?.(
+                    "Reference price must be a positive number.",
+                    "error"
+                );
+                return;
+            }
+
+            if (
+                nextShowDiscount &&
+                hasSellingPrice &&
+                nextReferencePrice <= sellingPrice
+            ) {
+                showAdminToast?.(
+                    "Reference price must be greater than the selling price when discount display is enabled.",
+                    "error"
+                );
+                return;
+            }
+        } else if (nextShowDiscount) {
+            showAdminToast?.(
+                "Reference price is required when discount display is enabled.",
+                "error"
+            );
+            return;
+        }
+
+        catalogPackageSavePending = true;
+        saveButton.disabled = true;
+        const oldText = saveButton.textContent;
+        saveButton.textContent = "Saving…";
+
+        try {
+            const result = await mutateCatalog(
+                `/api/admin/catalog/products/${encodeURIComponent(product.productCode)}/packages/${encodeURIComponent(pkg.packageCode)}`,
+                {
+                    prices: {
+                        [region]: {
+                            referencePrice: nextReferencePrice,
+                            showDiscount: nextShowDiscount,
+                            showOriginalPrice: nextShowOriginal,
+                            showSaveAmount: nextShowSave,
+                            discountLabel
+                        }
+                    },
+                    merchandising: {
+                        exclusiveOfferEligible,
+                        exclusiveOfferPriority
+                    },
+                    expectedUpdatedAt: pkg.updatedAt
+                }
+            );
+
+            if (!result?.success) return;
+
+            closeCatalogMerchandisingModal();
+
+            selectedCatalogProduct =
+                result.product || selectedCatalogProduct;
+
+            showAdminToast?.(
+                `${pkg.name || pkg.packageCode} offer updated`,
+                "success"
+            );
+
+            if (result.product) {
+                renderCatalogDetail(result.product);
+            } else {
+                await selectCatalogProduct(product.productCode, true);
+            }
+        } finally {
+            catalogPackageSavePending = false;
+            saveButton.disabled = false;
+            saveButton.textContent = oldText;
+        }
+    };
+
+    modal.classList.add("show");
+}
+
+async function updateMerchandisingPublication(product, pkg, input) {
+    const market = ["TH", "MM"].includes(catalogCustomerMarket)
+        ? catalogCustomerMarket
+        : "TH";
+
+    const previous = pkg.publication?.published === true;
+    const published = input.checked === true;
+    const marketName = market === "MM" ? "Myanmar" : "Thailand";
+
+    const confirmed = await confirmCatalogAction({
+        title: published
+            ? `Make this package public in ${marketName}?`
+            : `Hide this package from ${marketName}?`,
+        message:
+            `${pkg.name || pkg.packageCode}\n\n` +
+            (
+                published
+                    ? `Customers in ${marketName} will be able to see this package when all storefront readiness requirements are satisfied.`
+                    : `Customers in ${marketName} will no longer see or start a new purchase for this package.`
+            ) +
+            `\n\nSupplier mapping, fulfillment configuration, pricing history and past orders will not change.`,
+        confirmText: published ? "Make Public" : "Hide from Storefront"
+    });
+
+    if (!confirmed) {
+        input.checked = previous;
+        return;
+    }
+
+    input.disabled = true;
+
+    try {
+        const result = await mutateCatalog(
+            `/api/admin/catalog/products/${encodeURIComponent(product.productCode)}/packages/${encodeURIComponent(pkg.packageCode)}/publication`,
+            {
+                customerMarket: market,
+                published,
+                decisionNote: "Storefront Merchandising public visibility"
+            }
+        );
+
+        if (!result?.success) {
+            input.checked = previous;
+            return;
+        }
+
+        selectedCatalogProduct = result.product || selectedCatalogProduct;
+
+        renderCatalogDetail(
+            result.product ||
+            selectedCatalogProduct ||
+            product
+        );
+
+        showAdminToast?.(
+            published
+                ? `${pkg.name || pkg.packageCode} is public in ${marketName}`
+                : `${pkg.name || pkg.packageCode} is hidden in ${marketName}`,
+            "success"
+        );
+    } catch (error) {
+        input.checked = previous;
+        showAdminToast?.(
+            error?.message || "Package visibility could not be changed.",
+            "error"
+        );
+    } finally {
+        input.disabled = false;
+    }
+}
+
+async function findStoreCatalogSelectionForProduct(productCode) {
+    const data = await adminFetch("/api/admin/store-catalog-selections");
+    const selections = Array.isArray(data?.selections)
+        ? data.selections
+        : [];
+
+    const normalized = String(productCode || "")
+        .trim()
+        .toLowerCase();
+
+    return selections.find(item =>
+        String(item?.productCode || "")
+            .trim()
+            .toLowerCase() === normalized
+    ) || null;
+}
+
+async function removePackageFromStorefront(product, pkg, button) {
+    if (!product?.productCode || !pkg?.packageCode) return;
+
+    const selection = await findStoreCatalogSelectionForProduct(
+        product.productCode
+    );
+
+    if (!selection) {
+        showAdminToast?.(
+            "This product is not currently in the Store Catalog.",
+            "error"
+        );
+        return;
+    }
+
+    const selectionId = String(
+        selection?._id ||
+        selection?.id ||
+        ""
+    ).trim();
+
+    if (!selectionId) {
+        showAdminToast?.(
+            "Store Catalog selection could not be resolved.",
+            "error"
+        );
+        return;
+    }
+
+    const confirmed = await confirmCatalogAction({
+        title: "Remove package from Storefront?",
+        message:
+            `${pkg.name || pkg.packageCode}\n\n` +
+            `Customers will no longer see or purchase this package through the Storefront.\n\n` +
+            `Master Catalog data, supplier mapping, fulfillment configuration, pricing history and past orders will be retained.`,
+        confirmText: "Remove from Storefront"
+    });
+
+    if (!confirmed) return;
+
+    if (button) button.disabled = true;
+
+    try {
+        const result = await adminFetch(
+            `/api/admin/store-catalog-selections/${encodeURIComponent(selectionId)}/packages/${encodeURIComponent(pkg.packageCode)}`,
+            {
+                method: "DELETE",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    expectedDecisionVersion: Number(
+                        selection.decisionVersion || 0
+                    ),
+                    confirmed: true
+                })
+            }
+        );
+
+        if (!result?.success) {
+            throw new Error(
+                result?.message ||
+                "Package could not be removed from Storefront."
+            );
+        }
+
+        showAdminToast?.(
+            `${pkg.name || pkg.packageCode} removed from Storefront`,
+            "success"
+        );
+
+        await selectCatalogProduct(
+            product.productCode,
+            true
+        );
+
+        if (
+            typeof renderNormalStorefrontControls === "function" &&
+            document.body.dataset.adminSection === "catalog"
+        ) {
+            await renderNormalStorefrontControls().catch(() => {});
+        }
+    } catch (error) {
+        showAdminToast?.(
+            error?.message ||
+            "Package could not be removed from Storefront.",
+            "error"
+        );
+    } finally {
+        if (button) button.disabled = false;
+    }
+}
+
 function bindActiveCatalogTab(detail, product, packages) {
+    if (activeCatalogTab === "merchandising") {
+        detail.querySelector("[data-merch-market]")?.addEventListener("change", event => {
+            catalogCustomerMarket = event.target.value === "MM" ? "MM" : "TH";
+            sessionStorage.setItem(
+                "aziel.catalog.customerMarket",
+                catalogCustomerMarket
+            );
+            renderCatalogDetail(product);
+        });
+
+        detail.querySelectorAll("[data-manage-merchandising]").forEach(button => {
+            button.addEventListener("click", () => {
+                const pkg = packages.find(
+                    item => item.packageCode === button.dataset.manageMerchandising
+                );
+
+                if (pkg) {
+                    openCatalogMerchandisingModal(product, pkg);
+                }
+            });
+        });
+
+        detail.querySelectorAll("[data-merch-publication]").forEach(input => {
+            input.addEventListener("change", () => {
+                const pkg = packages.find(
+                    item =>
+                        item.packageCode ===
+                        input.dataset.merchPublication
+                );
+
+                if (!pkg) return;
+
+                updateMerchandisingPublication(
+                    product,
+                    pkg,
+                    input
+                ).catch(error => {
+                    input.checked =
+                        pkg.publication?.published === true;
+
+                    showAdminToast?.(
+                        error?.message ||
+                        "Package visibility could not be changed.",
+                        "error"
+                    );
+                });
+            });
+        });
+
+        detail.querySelectorAll("[data-remove-storefront-package]").forEach(button => {
+            button.addEventListener("click", () => {
+                const pkg = packages.find(
+                    item =>
+                        item.packageCode ===
+                        button.dataset.removeStorefrontPackage
+                );
+
+                if (!pkg) return;
+
+                removePackageFromStorefront(
+                    product,
+                    pkg,
+                    button
+                ).catch(error => {
+                    showAdminToast?.(
+                        error?.message ||
+                        "Package could not be removed from Storefront.",
+                        "error"
+                    );
+                });
+            });
+        });
+    }
+
     if (activeCatalogTab === "media") {
         detail.querySelector("[data-change-product-image]")?.addEventListener("click", () => attachProductImage(product));
         detail.querySelector("[data-remove-product-image]")?.addEventListener("click", () => clearProductImage(product));
@@ -1353,72 +2218,122 @@ function renderPackageTable(packages) {
             icon: "fa-solid fa-box-open",
             title: isUnfilteredEmpty
                 ? adminT("no_packages_yet", "No packages yet.")
-                : adminT(catalogPackageStatusFilter === "deleted" ? "no_deleted_packages" : "no_packages_found", catalogPackageStatusFilter === "deleted" ? "No deleted packages" : "No packages found"),
-            description: adminT("catalog_empty_packages_helper", "Packages for this product will appear here."),
-            action: catalogPackageStatusFilter === "deleted" ? "" : `<button class="admin-primary-btn" type="button" data-add-package>${adminT("add_package", "Add Package")}</button>`
+                : adminT(
+                    catalogPackageStatusFilter === "deleted" ? "no_deleted_packages" : "no_packages_found",
+                    catalogPackageStatusFilter === "deleted" ? "No deleted packages" : "No packages found"
+                ),
+            description: adminT(
+                "catalog_empty_packages_helper",
+                "Packages for this product will appear here."
+            ),
+            action: ""
         });
     }
 
     return `
-        <div class="catalog-package-table">
-            <div class="catalog-package-row catalog-package-header">
-                <span>Order</span>
-                <span data-admin-i18n="package_code">${adminT("package_code", "Package Code")}</span>
-                <span data-admin-i18n="package_name">${adminT("package_name", "Package Name")}</span>
-                <span>Production Attribution</span>
-                <span data-admin-i18n="package_icon">${adminT("package_icon", "Package Icon")}</span>
-                <span data-admin-i18n="mmk_price">${adminT("mmk_price", "MMK Price")}</span>
-                <span data-admin-i18n="thb_price">${adminT("thb_price", "THB Price")}</span>
-                <span data-admin-i18n="status">${adminT("status", "Status")}</span>
-                <span data-admin-i18n="action">${adminT("action", "Action")}</span>
+        <div class="catalog-package-table catalog-package-table-operational">
+            <div class="catalog-package-row catalog-package-header catalog-package-operational-row">
+                <span>Package</span>
+                <span>Supplier Route</span>
+                <span>Thailand Price</span>
+                <span>Myanmar Price</span>
+                <span>Status</span>
             </div>
-            ${packages.map((item, index) => {
-        const deleted = item.deleted || item.deletedAt;
-        const highlighted = catalogHighlightedPackageCode === item.packageCode ? "is-highlighted" : "";
-        return `
-                <div class="catalog-package-row ${deleted ? "is-deleted" : ""} ${highlighted}" data-package-row="${escapeHtml(item.packageCode)}" draggable="false">
-                    <span class="catalog-reorder-cell">
-                        <button class="catalog-drag-handle" type="button" draggable="true" data-package-drag="${escapeHtml(item.packageCode)}" aria-label="Drag package ${escapeHtml(item.name)}" ${deleted ? "disabled" : ""}><i class="fa-solid fa-grip-vertical" aria-hidden="true"></i></button>
-                        <small>${Number(item.sortOrder || index + 1)}</small>
-                    </span>
-                    <span><b>${escapeHtml(item.packageCode)}</b></span>
-                    <span>${escapeHtml(item.name)}${item.supplierSupport?.TH ? `<small><b class="admin-status-pill ${item.supplierSupport.TH.status === "SUPPORTED" ? "is-ok" : item.supplierSupport.TH.status === "NOT_READY" ? "is-warning" : "is-muted"}">${escapeHtml(item.supplierSupport.TH.status === "SUPPORTED" ? "SUPPORTED" : item.supplierSupport.TH.status === "NOT_READY" ? "NOT READY" : "UNSUPPORTED")}</b></small>` : ""}</span>
-                    <span>${renderProductionAttribution(item.productionAttribution)}</span>
-                    <span class="catalog-icon-cell">${renderPackageIconControl(item)}</span>
-                    <span>${renderPackageBusinessPrice(item.prices?.MM, "MM")}</span>
-                    <span>${renderPackageBusinessPrice(item.prices?.TH, "TH")}</span>
-                    <span><b class="admin-status-pill ${deleted ? "is-danger" : (item.enabled ? "is-ok" : "is-muted")}">${adminT(deleted ? "deleted" : (item.enabled ? "enabled" : "disabled"), deleted ? "Deleted" : (item.enabled ? "Enabled" : "Disabled"))}</b></span>
-                    <span class="catalog-package-actions">
-                        <button class="admin-icon-btn catalog-row-primary-action" type="button" data-edit-package="${escapeHtml(item.packageCode)}">
-                            <i class="fa-solid fa-pen" aria-hidden="true"></i>
-                            ${adminT("edit", "Edit")}
-                        </button>
-                        ${deleted
-                ? `<button class="admin-icon-btn" type="button" data-restore-package="${escapeHtml(item.packageCode)}"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i>${adminT("restore_package", "Restore")}</button>`
-                : `
-                        <details class="catalog-action-menu">
-                            <summary class="admin-icon-btn catalog-overflow-trigger" aria-label="${adminT("more_actions", "More Actions")}"><i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i></summary>
-                            <div class="catalog-action-menu-popover">
-                                <span class="catalog-menu-group-label">${adminT("media", "Media")}</span>
-                                <button type="button" data-change-package-icon="${escapeHtml(item.packageCode)}"><i class="fa-regular fa-image" aria-hidden="true"></i>${adminT("change_icon", "Change Icon")}</button>
-                                ${item.iconAsset || item.iconUrl ? `<button class="danger" type="button" data-remove-package-icon="${escapeHtml(item.packageCode)}"><i class="fa-solid fa-image-slash" aria-hidden="true"></i>${adminT("remove_icon", "Remove Icon")}</button>` : ""}
-                                <span class="catalog-menu-group-label">${adminT("order", "Order")}</span>
-                                <button type="button" data-move-package-up="${escapeHtml(item.packageCode)}" ${index === 0 ? "disabled" : ""}><i class="fa-solid fa-arrow-up" aria-hidden="true"></i>${adminT("move_up", "Move Up")}</button>
-                                <button type="button" data-move-package-down="${escapeHtml(item.packageCode)}" ${index === packages.length - 1 ? "disabled" : ""}><i class="fa-solid fa-arrow-down" aria-hidden="true"></i>${adminT("move_down", "Move Down")}</button>
-                                <span class="catalog-menu-group-label">${adminT("visibility", "Visibility")}</span>
-                                <button class="${item.enabled ? "danger" : ""}" type="button" data-toggle-package="${escapeHtml(item.packageCode)}">
-                                    <i class="fa-solid ${item.enabled ? "fa-eye-slash" : "fa-eye"}" aria-hidden="true"></i>
-                                    ${adminT(item.enabled ? "disable_package" : "enable_package", item.enabled ? "Disable" : "Enable")}
-                                </button>
-                                <span class="catalog-menu-group-label catalog-menu-danger-label">${adminT("danger_zone", "Danger")}</span>
-                                <button class="danger" type="button" data-delete-package="${escapeHtml(item.packageCode)}"><i class="fa-solid fa-trash" aria-hidden="true"></i>${adminT("delete", "Delete")}</button>
-                            </div>
-                        </details>`}
-                    </span>
-                </div>
-            `;
-    }).join("")}
+
+            ${packages.map(item => {
+                const deleted = item.deleted || item.deletedAt;
+                const highlighted = catalogHighlightedPackageCode === item.packageCode ? "is-highlighted" : "";
+                const thStatus = packageStaticPricingStatus(item.prices?.TH || {});
+                const mmStatus = packageStaticPricingStatus(item.prices?.MM || {});
+                const pricingIssue = [thStatus, mmStatus].find(status =>
+                    status && !["HEALTHY", "NOT_AVAILABLE"].includes(status)
+                );
+
+                const statusLabel = deleted
+                    ? "Deleted"
+                    : !item.enabled
+                        ? "Disabled"
+                        : pricingIssue
+                            ? humanizeCatalogValue(pricingIssue)
+                            : "Ready";
+
+                const statusClass = deleted
+                    ? "is-danger"
+                    : !item.enabled
+                        ? "is-muted"
+                        : pricingIssue
+                            ? "is-warning"
+                            : "is-ok";
+
+                return `
+                    <div
+                        class="catalog-package-row catalog-package-operational-row ${deleted ? "is-deleted" : ""} ${highlighted}"
+                        data-package-row="${escapeHtml(item.packageCode)}"
+                    >
+                        <span class="catalog-package-primary">
+                            <b>${escapeHtml(item.name || item.packageCode)}</b>
+                            <small>${escapeHtml(item.packageCode)}</small>
+                        </span>
+
+                        <span class="catalog-package-route-summary">
+                            ${renderPackageRouteSummary(item.productionAttribution)}
+                        </span>
+
+                        <span class="catalog-package-price-summary">
+                            ${renderPackageOperationalPrice(item.prices?.TH, "TH")}
+                        </span>
+
+                        <span class="catalog-package-price-summary">
+                            ${renderPackageOperationalPrice(item.prices?.MM, "MM")}
+                        </span>
+
+                        <span class="catalog-package-health">
+                            <b class="admin-status-pill ${statusClass}">${escapeHtml(statusLabel)}</b>
+                            ${pricingIssue
+                                ? `<small>Pricing needs attention</small>`
+                                : `<small>${item.enabled && !deleted ? "Available for commerce" : "Not currently selling"}</small>`
+                            }
+                        </span>
+                    </div>
+                `;
+            }).join("")}
         </div>
+    `;
+}
+
+function renderPackageRouteSummary(attribution) {
+    if (!attribution) {
+        return `
+            <strong>Master Catalog</strong>
+            <small>No production supplier route</small>
+        `;
+    }
+
+    const supplier = attribution.supplier?.name || attribution.supplier?.code || "Unresolved";
+    const market = attribution.supplierMarket || "Unresolved";
+    const selling = attribution.status === "SELLING";
+
+    return `
+        <strong>${escapeHtml(supplier)}</strong>
+        <small>${escapeHtml(market)} supplier market</small>
+        <small>${selling ? "Production route active" : humanizeCatalogValue(attribution.status || "Route not ready")}</small>
+    `;
+}
+
+function renderPackageOperationalPrice(price, region) {
+    if (!price || price.enabled === false) {
+        return `
+            <strong>Not available</strong>
+            <small>${region === "TH" ? "Thailand" : "Myanmar"}</small>
+        `;
+    }
+
+    const pricingStatus = packageStaticPricingStatus(price);
+    const healthy = pricingStatus === "HEALTHY";
+
+    return `
+        <strong>${escapeHtml(formatRegionalPrice(price))}</strong>
+        <small>${healthy ? "Ready" : humanizeCatalogValue(pricingStatus)}</small>
     `;
 }
 
@@ -3463,6 +4378,30 @@ function detailDefinition(key, value) {
             <dd>${escapeHtml(value || "-")}</dd>
         </div>
     `;
+}
+
+function detailDefinitionLabel(label, value) {
+    return `
+        <div>
+            <dt>${escapeHtml(label)}</dt>
+            <dd>${escapeHtml(value === 0 ? "0" : (value || "-"))}</dd>
+        </div>
+    `;
+}
+
+function humanizeCatalogValue(value) {
+    const raw = String(value ?? "").trim();
+    if (!raw) return "-";
+
+    return raw
+        .replace(/[_-]+/g, " ")
+        .toLowerCase()
+        .replace(/\b\w/g, char => char.toUpperCase());
+}
+
+function humanizeCatalogList(values) {
+    if (!Array.isArray(values) || !values.length) return "-";
+    return values.map(humanizeCatalogValue).join(", ");
 }
 
 function renderCatalogEmptyState({ icon = "fa-regular fa-circle", title = "", description = "", action = "" } = {}) {

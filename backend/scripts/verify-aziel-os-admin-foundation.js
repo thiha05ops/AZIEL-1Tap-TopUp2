@@ -44,15 +44,16 @@ function main() {
     includes("frontend/js/admin-os-brand.js", "/assets/brand/aziel-icon.svg", "AZIEL OS must use the canonical compact brand mark.");
     notIncludes("frontend/js/admin-os-brand.js", "<svg", "AZIEL OS must not embed a duplicate inline brand mark.");
 
-    assertOrder("frontend/admin.html", [
-        "<span class=\"admin-nav-label\">Home</span>",
-        "<span class=\"admin-nav-label\">Growth</span>",
-        "<span class=\"admin-nav-label\" data-admin-i18n=\"commerce\">Commerce</span>",
-        "<span class=\"admin-nav-label\" data-admin-i18n=\"operations\">Operations</span>",
-        "<span class=\"admin-nav-label\" data-admin-i18n=\"customers\">Customers</span>",
-        "<span class=\"admin-nav-label\">Administration</span>",
-        "<span class=\"admin-nav-label\">System</span>"
-    ], "Sidebar must follow AZIEL OS business-domain information architecture.");
+    assertOrder("frontend/js/admin-v2/admin-v2-shell.js", [
+        '["Home",',
+        '["Commerce",',
+        '["Operations",',
+        '["Store",',
+        '["Customers",',
+        '["System",'
+    ], "V2 sidebar adapter must follow the approved AZIEL OS information architecture.");
+    includes("frontend/admin.html", "/css/admin-v2/tokens.css", "Admin must load the scoped V2 token layer.");
+    includes("frontend/admin.html", "/js/admin-v2/admin-v2-shell.js", "Admin must load the V2 compatibility adapter.");
 
     includes("frontend/admin.html", "data-admin-permission=\"ORDERS_READ\"", "Orders route must remain permission gated.");
     includes("frontend/admin.html", "data-admin-permission=\"CATALOG_READ\"", "Catalog/Pricing routes must remain permission gated.");
@@ -60,7 +61,7 @@ function main() {
     includes("frontend/admin.html", "Dashboard</h3>", "Dashboard must use operations-centre naming.");
     includes("frontend/admin.html", "Commerce operations overview using live AZIEL data", "Dashboard must state live-data operating scope.");
     includes("frontend/admin.html", "<h3>Pricing</h3>", "Pricing Workspace must migrate to Pricing naming.");
-    includes("frontend/admin.html", "Preview calculated prices, fine-tune selected packages, and publish explicitly.", "Daily Pricing subtitle must describe its current authority.");
+    includes("frontend/admin.html", "Review supplier costs, compare new customer prices, and publish selected changes.", "Pricing subtitle must describe its current explicit-publish authority.");
     includes("frontend/admin.html", "id=\"section-pricing-settings\"", "Pricing Settings must remain the separate policy authority.");
     includes("frontend/admin.html", "Publish Selected (0)", "Daily Pricing must default to explicit zero-row publication selection.");
     includes("frontend/admin.html", "pricingSelectVisible", "Daily Pricing must expose explicit filtered selection instead of unsafe publish-all.");

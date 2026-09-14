@@ -45,6 +45,9 @@
     <link rel="stylesheet" href="/css/admin/admin-os-brand.css?v=20260827-brand">
     <!-- Global responsive shell owner: phone <768px, tablet 768-1023px, desktop >=1024px. -->
     <link rel="stylesheet" href="/css/admin/admin-mobile-shell.css?v=20260824-phase2-desktop-repair">
+    <link rel="stylesheet" href="/css/admin-v2/tokens.css?v=20260914-v21">
+    <link rel="stylesheet" href="/css/admin-v2/shell.css?v=20260914-v21">
+    <link rel="stylesheet" href="/css/admin-v2/components.css?v=20260914-v21">
     <link rel="stylesheet" href="/css/campaign/campaign-popup.css?v=20260715-visual">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -54,7 +57,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/assets/brand/apple-touch-icon.png">
 </head>
 
-<body class="admin-body">
+<body class="admin-body admin-v2">
 
     <div id="adminSidebarOverlay" class="admin-sidebar-overlay" aria-hidden="true"></div>
 
@@ -757,6 +760,46 @@
                     </header>
                     <div id="pricingDailyBlocking" class="pricing-v3-blocking" role="alert" hidden></div>
                     <button id="pricingRetryRefresh" class="admin-secondary-btn" type="button" hidden>Retry authoritative refresh</button>
+
+                    <div id="pricingProductBrowser" class="pricing-product-browser">
+                        <div class="pricing-product-browser-toolbar">
+                            <label class="pricing-product-market">
+                                <span>Customer Market</span>
+                                <select id="pricingProductBrowserRegion">
+                                    <option value="TH">Thailand</option>
+                                    <option value="MM">Myanmar</option>
+                                </select>
+                            </label>
+                            <label class="pricing-product-search">
+                                <span>Search products</span>
+                                <input id="pricingProductBrowserSearch" type="search"
+                                    placeholder="Search products..." autocomplete="off">
+                            </label>
+                        </div>
+
+                        <div class="pricing-product-browser-heading">
+                            <div>
+                                <h3>Products</h3>
+                                <p>Choose a product to review its package pricing.</p>
+                            </div>
+                            <span id="pricingProductBrowserSummary">Loading products...</span>
+                        </div>
+
+                        <div id="pricingProductCards" class="pricing-product-cards"
+                            aria-live="polite"></div>
+                    </div>
+
+                    <div id="pricingPackageWorkspace" class="pricing-package-workspace" hidden>
+                        <div class="pricing-package-workspace-head">
+                            <button id="pricingBackToProducts" class="admin-secondary-btn"
+                                type="button">
+                                <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                                Products
+                            </button>
+                            <div id="pricingSelectedProductIdentity"
+                                class="pricing-selected-product-identity"></div>
+                        </div>
+
                     <div class="pricing-v3-toolbar">
                         <label><span>Supplier</span><input id="pricingSupplierSelect" list="pricingSupplierOptions" placeholder="Search supplier" autocomplete="off"><datalist id="pricingSupplierOptions"></datalist></label>
                         <label><span>Supplier Market</span><input id="pricingSupplierMarketSelect" list="pricingSupplierMarketOptions" placeholder="Search exact market" autocomplete="off"><datalist id="pricingSupplierMarketOptions"></datalist></label>
@@ -797,6 +840,7 @@
                     </div>
                     <footer class="pricing-v3-footer"><span id="pricingDailySummary">No packages loaded</span><span
                             id="pricingDraftState">No unsaved changes</span></footer>
+                    </div>
                 </div>
             </section>
 
@@ -965,7 +1009,6 @@
 
             <section class="admin-section" id="section-campaigns">
                 <div class="media-library-center">
-                    <nav class="operator-workflow-tabs" aria-label="Promotion tools"><button class="active" type="button">Campaigns</button><button type="button" data-admin-open-section="promos">Coupon Campaigns</button></nav>
                     <div class="panel campaign-manager-panel">
                         <div class="panel-head">
                             <div>
@@ -1820,6 +1863,7 @@ TH</textarea></label>
     <script src="/js/admin-wallet.js?v=20260824-phase2"></script>
     <script src="/js/admin-users.js?v=20260723-customer-crm"></script>
     <script src="/js/admin-settings.js?v=20260713-phase1"></script>
+    <script src="/js/admin-v2/admin-v2-shell.js?v=20260914-v21"></script>
 
     <script src="/js/pwa-fix.js?v=20260731-cache-runtime-v1"></script>
 
