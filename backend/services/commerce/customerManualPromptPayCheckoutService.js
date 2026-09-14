@@ -97,7 +97,7 @@ async function loadCatalogPackage(input = {}) {
     const pkg = await findCatalogPackageByIdentity(productCode, packageCode, {
         enabled: true,
         deletedAt: null
-    }).lean();
+    });
     const price = pkg?.prices?.[region];
     if (
         !pkg ||

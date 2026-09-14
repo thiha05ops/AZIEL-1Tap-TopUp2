@@ -44,7 +44,7 @@ async function loadCatalogPackage(input = {}) {
     if (!/^[a-z0-9][a-z0-9-]{0,79}$/.test(productCode) || !product || !isProductPubliclyEligible(product)) {
         throw new CommercePricingPreviewError("PRODUCT_UNAVAILABLE", "Selected product is no longer available.", 409, "PRODUCT_DISABLED");
     }
-    const pkg = await findCatalogPackageByIdentity(productCode, packageCode, { enabled: true, deletedAt: null }).lean();
+    const pkg = await findCatalogPackageByIdentity(productCode, packageCode, { enabled: true, deletedAt: null });
     const price = pkg?.prices?.[region];
     if (!pkg || !price || price.enabled === false || upper(price.currency) !== currency) {
         throw new CommercePricingPreviewError("PACKAGE_UNAVAILABLE", "Selected package is no longer available.", 409, "PACKAGE_UNAVAILABLE");

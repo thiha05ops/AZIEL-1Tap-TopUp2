@@ -36,7 +36,7 @@ async function main() {
     for (const [oldProduct, packageCode, targetProduct, family] of TARGETS) {
         const pkg = packages.find(p => p.productCode === targetProduct && p.packageCode === packageCode); assert(pkg, `Missing moved package ${targetProduct}/${packageCode}.`); assert.strictEqual(pkg.packageFamily?.code, family); assert(pkg.productAliases?.includes(oldProduct), `Missing product alias ${oldProduct}/${packageCode}.`);
         assert(!packages.some(p => p.productCode === oldProduct && p.packageCode === packageCode), `Old package authority remains ${oldProduct}/${packageCode}.`);
-        const aliasResolved = await findCatalogPackageByIdentity(oldProduct, packageCode, { deletedAt: null }).lean(); assert.strictEqual(String(aliasResolved?._id), String(pkg._id), `Legacy identity did not resolve ${oldProduct}/${packageCode}.`);
+        const aliasResolved = await findCatalogPackageByIdentity(oldProduct, packageCode, { deletedAt: null }); assert.strictEqual(String(aliasResolved?._id), String(pkg._id), `Legacy identity did not resolve ${oldProduct}/${packageCode}.`);
     }
     assert(packages.filter(p => p.productCode === "mlbb").every(p => ["DIAMONDS", "FIRST_TOP_UP"].includes(p.packageFamily?.code)));
     assert(packages.filter(p => p.productCode === "freefire").every(p => p.packageFamily?.code === "DIAMONDS"));
