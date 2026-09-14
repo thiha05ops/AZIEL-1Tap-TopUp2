@@ -7,6 +7,7 @@ const FulfillmentAttempt = require("../models/FulfillmentAttempt");
 const SupplierCatalogOffer = require("../models/SupplierCatalogOffer");
 const SupplierOfferAvailability = require("../models/SupplierOfferAvailability");
 const { getSupplierAdapter } = require("./supplierAdapterRegistry");
+const { transactionalServiceCode } = require("./suppliers/wonddCatalogConfig");
 const {
     validateFulfillmentEligibility
 } = require("./supplierFulfillmentEligibilityService");
@@ -34,7 +35,7 @@ function gateEnabled(mapping, adapter) {
 }
 
 function supplierCapabilityProductCode(mapping = {}) {
-    if (upper(mapping.supplierCode) === "WONDD") return clean(mapping.supplierProductCode) || clean(mapping.productCode);
+    if (upper(mapping.supplierCode) === "WONDD") return transactionalServiceCode(mapping.supplierProductCode, mapping.productCode);
     return clean(mapping.productCode);
 }
 

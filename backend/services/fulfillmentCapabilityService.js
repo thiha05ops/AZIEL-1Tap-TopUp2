@@ -3,6 +3,7 @@ const Supplier = require("../models/Supplier");
 const SupplierProductMapping = require("../models/SupplierProductMapping");
 const SupplierCatalogOffer = require("../models/SupplierCatalogOffer");
 const SupplierOfferAvailability = require("../models/SupplierOfferAvailability");
+const { transactionalServiceCode } = require("./suppliers/wonddCatalogConfig");
 const { getSupplierAdapter } = require("./supplierAdapterRegistry");
 const { supportsMapping } = require("./suppliers/supplierFulfillmentDispatcher");
 const { validateFulfillmentEligibility, isCustomerMarketEligible, supplierRouteProductMarketCompatibility } = require("./supplierFulfillmentEligibilityService");
@@ -36,14 +37,14 @@ function resolvedSupplierMarketForReadiness(mapping = {}, supplierProduct = {}) 
 
 function supplierProductCodeForReadiness(mapping = {}, supplier = {}, supplierProduct = {}) {
     const supplierCode = String(supplier?.supplierCode || mapping?.supplierCode || "").trim().toUpperCase();
-    if (supplierCode === "WONDD") return String(supplierProduct?.metadata?.transactionalServiceCode || mapping?.supplierProductCode || "").trim();
+    if (supplierCode === "WONDD") return String(supplierProduct?.supplierProductCode || mapping?.supplierProductCode || "").trim();
     return String(supplierProduct?.supplierProductCode || "").trim();
 }
 
 function supplierCapabilityProductCode(mapping = {}, supplier = {}, supplierProduct = {}) {
     const supplierCode = String(supplier?.supplierCode || mapping?.supplierCode || "").trim().toUpperCase();
     if (supplierCode === "WONDD") {
-        return String(supplierProduct?.metadata?.transactionalServiceCode || mapping?.supplierProductCode || mapping?.productCode || "").trim();
+        return transactionalServiceCode(supplierProduct?.supplierProductCode || mapping?.supplierProductCode, mapping?.productCode);
     }
     return String(mapping?.productCode || "").trim();
 }
@@ -139,7 +140,7 @@ function assessProductionReadyFulfillmentMapping(mapping = {}, supplier = {}, co
             String(offer.supplierOfferCode || "").trim() === String(mapping.supplierPackageCode || "").trim() &&
             String(offer.catalogLifecycleState || "").toUpperCase() === "ACTIVE";
         if (!offerMatches) blockers.push("SUPPLIER_OFFER_NOT_ACTIVE");
-        if (!availability || String(availability.supplierCatalogOfferId) !== String(mapping.supplierCatalogOfferId) || String(availability.state || "").toUpperCase() !== "AVAILABLE") blockers.push("SUPPLIER_AVAILABILITY_NOT_CONFIRMED");
+        if (!availability || String(availability.supplierCatalogOfferId) !== String(mapping.supplierCatalogOfferId) || String(availability.state || "").toUpperCase() !== "AVAILABLE" || (availability.staleAt && new Date(availability.staleAt).getTime() <= Date.now())) blockers.push("SUPPLIER_AVAILABILITY_NOT_CONFIRMED");
     }
 
     return { ready: blockers.length === 0, blockers: [...new Set(blockers)].sort(), eligibility: eligibility.value, routeProductMarketCompatibility };
@@ -175,9 +176,7 @@ function assessPreCommercialFulfillmentReadiness({
     if (!canonicalProduct || packages.length === 0) blockers.push("MISSING_CANONICAL_LINK");
     if (packages.length > 1) blockers.push("AMBIGUOUS_CANONICAL_IDENTITY");
     if (mapping && offer) {
-        const offerProductCode = String(mapping?.supplierCode || "").trim().toUpperCase() === "WONDD"
-            ? String(mapping.supplierProductCode || "").trim()
-            : String(offer.supplierProductCode || "").trim();
+        const offerProductCode = String(offer.supplierProductCode || "").trim();
         if (String(mapping.supplierCatalogOfferId || "") !== String(offer._id || "") ||
             String(mapping.supplierId || "") !== String(offer.supplierId || "") ||
             String(mapping.supplierProductCode || "").trim() !== offerProductCode ||

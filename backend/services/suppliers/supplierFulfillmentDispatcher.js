@@ -10,14 +10,13 @@ function supportsMapping(mapping = {}) {
     if (!processorFor(code)) return false;
     if (code === "WONDD") {
         const { hasWonddGameIdFormatter } = require("./wonddFulfillmentProcessor");
-        const { CONFIRMED_SERVICE_CODES } = require("./wonddCatalogConfig");
+        const { resolveWonddCatalogIdentity } = require("./wonddCatalogConfig");
         const { providerGameCodeForProduct } = require("../commerce/canonicalGameInputContract");
         const productCode = String(mapping.productCode || "").trim().toLowerCase();
         const providerGameCode = providerGameCodeForProduct(productCode) || productCode;
-        const expectedServiceCode = CONFIRMED_SERVICE_CODES[productCode] || CONFIRMED_SERVICE_CODES[providerGameCode];
+        const identity = resolveWonddCatalogIdentity(mapping.supplierProductCode);
         return hasWonddGameIdFormatter(mapping.productCode) &&
-            Boolean(expectedServiceCode) &&
-            String(mapping.supplierProductCode || "").trim().toLowerCase() === String(expectedServiceCode || "").trim().toLowerCase();
+            identity?.family?.productCode === providerGameCode;
     }
     if (code === "FAZERCARDS") {
         return require("./fazercardsFulfillmentProcessor").supportsFazerCardsMapping(mapping);

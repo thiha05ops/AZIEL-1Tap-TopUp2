@@ -759,12 +759,12 @@ async function startFulfillmentForOrder(orderId, payload = {}, context = {}) {
         throw new FulfillmentError("SUPPLIER_ADAPTER_NOT_CONFIGURED", "Supplier API adapter is not configured.", 409);
     }
     if (supplier.supplierCode === "WONDD") {
-        const { CONFIRMED_SERVICE_CODES } = require("./suppliers/wonddCatalogConfig");
+        const { resolveWonddCatalogIdentity } = require("./suppliers/wonddCatalogConfig");
         const { hasWonddGameIdFormatter } = require("./suppliers/wonddGameIdFormatters");
+        const catalogIdentity = resolveWonddCatalogIdentity(mapping.supplierProductCode);
         const capabilityProductCode = supplierCapabilityProductCode(mapping, supplier);
-        const expectedServiceCode = CONFIRMED_SERVICE_CODES[capabilityProductCode] || capabilityProductCode;
-        if (mapping.executionMode !== SUPPLIER_EXECUTION_MODES.API || !expectedServiceCode || String(mapping.supplierProductCode || "").trim().toLowerCase() !== String(expectedServiceCode).toLowerCase() || !String(mapping.supplierPackageCode || "").trim()) {
-            throw new FulfillmentError("WONDD_PACKAGE_MAPPING_MISSING", "A verified WonDD servicecode and packcode mapping is required.", 409);
+        if (mapping.executionMode !== SUPPLIER_EXECUTION_MODES.API || !catalogIdentity || catalogIdentity.family.serviceCode !== capabilityProductCode || !String(mapping.supplierPackageCode || "").trim()) {
+            throw new FulfillmentError("WONDD_PACKAGE_MAPPING_MISSING", "A verified WonDD serviceid and packcode mapping is required.", 409);
         }
         if (!hasWonddGameIdFormatter(mapping.productCode)) {
             throw new FulfillmentError("WONDD_INPUT_CONTRACT_NOT_CONFIGURED", "WonDD player input contract is not configured.", 409);

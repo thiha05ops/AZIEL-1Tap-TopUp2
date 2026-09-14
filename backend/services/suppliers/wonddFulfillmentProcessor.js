@@ -5,7 +5,7 @@ const commerceOrderRepository = require("../commerce/orderRepository");
 const wonddAdapter = require("./wonddAdapter");
 const { normalizeSupplierResult } = require("../supplierAdapterRegistry");
 const { classifySupplierFailure } = require("../supplierFailureClassificationService");
-const { CONFIRMED_SERVICE_CODES } = require("./wonddCatalogConfig");
+const { resolveWonddCatalogIdentity, transactionalServiceCode } = require("./wonddCatalogConfig");
 const { buildWonddGameId, hasWonddGameIdFormatter } = require("./wonddGameIdFormatters");
 const { providerGameCodeForProduct } = require("../commerce/canonicalGameInputContract");
 
@@ -35,9 +35,9 @@ function validateWonddMapping(mapping = {}) {
         throw error;
     }
     const productCode = providerGameCodeForProduct(mapping.productCode) || String(mapping.productCode || "").trim().toLowerCase();
-    const expectedServiceCode = CONFIRMED_SERVICE_CODES[productCode];
-    if (String(mapping.executionMode || "API").toUpperCase() !== "API" || !expectedServiceCode || String(mapping.supplierProductCode || "").trim().toLowerCase() !== expectedServiceCode.toLowerCase() || !String(mapping.supplierPackageCode || "").trim()) {
-        const error = new Error("WonDD mapping must explicitly contain its confirmed servicecode and packcode.");
+    const catalogIdentity = resolveWonddCatalogIdentity(mapping.supplierProductCode);
+    if (String(mapping.executionMode || "API").toUpperCase() !== "API" || !catalogIdentity || catalogIdentity.family.productCode !== productCode || !String(mapping.supplierPackageCode || "").trim()) {
+        const error = new Error("WonDD mapping must explicitly contain its provider-native serviceid and packcode.");
         error.code = "WONDD_PACKAGE_MAPPING_MISSING";
         throw error;
     }
@@ -107,7 +107,7 @@ function createWonddFulfillmentProcessor(deps = {}) {
         validateWonddMapping(mapping);
         const input = order.fulfilment?.input || {};
         const productCode = providerGameCodeForProduct(mapping.productCode) || String(mapping.productCode).toLowerCase();
-        const serviceCode = CONFIRMED_SERVICE_CODES[productCode];
+        const serviceCode = transactionalServiceCode(mapping.supplierProductCode, productCode);
         const gameId = buildWonddGameId(productCode, input);
         attempt.supplierRequest = { ...(attempt.supplierRequest || {}), submissionState: "SUBMISSION_IN_FLIGHT", submissionStartedAt: new Date(), serviceCode, packCodeConfigured: true, playerInputValidated: true };
         await attempt.save();
@@ -135,7 +135,7 @@ function createWonddFulfillmentProcessor(deps = {}) {
         validateWonddMapping(mapping);
         const input = order.fulfilment?.input || {};
         const productCode = providerGameCodeForProduct(mapping.productCode) || String(mapping.productCode).toLowerCase();
-        return adapter.dryRunTopup({ productCode, serviceCode: CONFIRMED_SERVICE_CODES[productCode], packCode: mapping.supplierPackageCode, gameId: buildWonddGameId(productCode, input) });
+        return adapter.dryRunTopup({ productCode, serviceCode: transactionalServiceCode(mapping.supplierProductCode, productCode), packCode: mapping.supplierPackageCode, gameId: buildWonddGameId(productCode, input) });
     }
 
     async function dryRunForAttempt(attemptId) {

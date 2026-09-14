@@ -16,6 +16,7 @@ const { publicationPackageKey, publicationPackageMap, setPackageMarketPublicatio
 const { assessExistingPreparedRoute } = require("./supplierCatalog/supplierRoutePreparationService");
 const { contractFromSupplierCatalog } = require("./suppliers/fazercardsFulfillmentContractService");
 const { supplierCapabilityProductCode } = require("./fulfillmentCapabilityService");
+const { transactionalServiceCode } = require("./suppliers/wonddCatalogConfig");
 
 const COMMERCE_MARKETS = Object.freeze(["TH", "MM"]);
 const clean = value => String(value == null ? "" : value).trim();
@@ -105,7 +106,7 @@ function mappingReadiness({ mapping, supplier, pkg, offer, availability, custome
 
 function supplierExecutionProductCode(mapping = {}, supplier = {}, supplierProduct = {}, offer = {}) {
     const supplierCode = upper(supplier?.supplierCode || mapping?.supplierCode);
-    if (supplierCode === "WONDD") return clean(supplierProduct?.metadata?.transactionalServiceCode) || clean(mapping?.supplierProductCode);
+    if (supplierCode === "WONDD") return transactionalServiceCode(supplierProduct?.supplierProductCode || mapping?.supplierProductCode, mapping?.productCode);
     return clean(offer?.supplierProductCode) || clean(supplierProduct?.supplierProductCode) || clean(mapping?.supplierProductCode);
 }
 

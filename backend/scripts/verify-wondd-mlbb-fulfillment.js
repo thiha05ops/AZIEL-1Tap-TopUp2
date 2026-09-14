@@ -66,7 +66,7 @@ async function stateAuthorityTests() {
         static async findById(id) { return records.get(String(id)) || null; }
     }
     const order = { _id: "order-1", orderId: "AZ-1", status: "processing", fulfilment: { status: "processing", input: { userId: "123456789", zoneId: "1234" } } };
-    const mapping = { _id: "map-1", enabled: true, executionMode: "API", supplierCode: "WONDD", productCode: "mlbb", supplierProductCode: "mlbb", supplierPackageCode: "verified-pack", mappingMetadata: { readiness: { supplierMapped: true, inputReady: true, pricingReady: true, fulfillmentReady: true } } };
+    const mapping = { _id: "map-1", enabled: true, executionMode: "API", supplierCode: "WONDD", productCode: "mlbb", supplierProductCode: "9622", supplierPackageCode: "verified-pack", mappingMetadata: { readiness: { supplierMapped: true, inputReady: true, pricingReady: true, fulfillmentReady: true } } };
     validateWonddMapping(mapping);
     assert.throws(() => validateWonddMapping({ ...mapping, supplierPackageCode: "" }), error => error.code === "WONDD_PACKAGE_MAPPING_MISSING");
     assert.throws(() => validateWonddMapping({ ...mapping, mappingMetadata: { readiness: { ...mapping.mappingMetadata.readiness, pricingReady: false } } }), error => error.code === "WONDD_PACKAGE_NOT_PRODUCTION_READY");

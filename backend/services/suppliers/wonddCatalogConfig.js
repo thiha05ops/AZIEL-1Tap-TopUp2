@@ -20,6 +20,22 @@ function familyForServiceId(serviceId) {
     return WONDD_FAMILIES[String(serviceId)] || null;
 }
 
+function resolveWonddCatalogIdentity(value, families = WONDD_FAMILIES) {
+    const normalized = String(value == null ? "" : value).trim();
+    if (!normalized) return null;
+    if (families[normalized]) return { serviceId: normalized, family: families[normalized] };
+    const lowered = normalized.toLowerCase();
+    const matches = Object.entries(families).filter(([, family]) =>
+        String(family?.serviceCode || "").trim().toLowerCase() === lowered
+    );
+    return matches.length === 1 ? { serviceId: matches[0][0], family: matches[0][1] } : null;
+}
+
+function transactionalServiceCode(value, fallbackProductCode = "") {
+    return resolveWonddCatalogIdentity(value)?.family?.serviceCode ||
+        CONFIRMED_SERVICE_CODES[String(fallbackProductCode || "").trim().toLowerCase()] || "";
+}
+
 function resolveFamilyForServiceCode(serviceCode, families = WONDD_FAMILIES) {
     const normalized = String(serviceCode == null ? "" : serviceCode).trim().toLowerCase();
     if (!normalized) {
@@ -43,4 +59,4 @@ function resolveFamilyForServiceCode(serviceCode, families = WONDD_FAMILIES) {
     return { serviceId, family };
 }
 
-module.exports = { WONDD_FAMILIES, CONFIRMED_SERVICE_CODES, familyForServiceId, resolveFamilyForServiceCode };
+module.exports = { WONDD_FAMILIES, CONFIRMED_SERVICE_CODES, familyForServiceId, resolveWonddCatalogIdentity, resolveFamilyForServiceCode, transactionalServiceCode };
