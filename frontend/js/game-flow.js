@@ -405,7 +405,6 @@
             })
         );
 
-        if (readiness.ready) scrollToBuyOnce(flow);
     }
 
     function buildOrderData(flow) {
