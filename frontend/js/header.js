@@ -7,6 +7,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const drawerDismiss = event.target.closest(".az-mobile-drawer-close, .az-mobile-drawer-backdrop");
         const openMobileHeader = document.querySelector(".az-header.mobile-menu-open");
         if (drawerDismiss) {
+            event.preventDefault();
+            event.stopPropagation();
             closeMobileMenu(openMobileHeader, { restoreFocus: true });
             return;
         }
@@ -47,6 +49,66 @@ document.addEventListener("DOMContentLoaded", () => {
         const openMobileHeader = document.querySelector(".az-header.mobile-menu-open");
         if (openMobileHeader) closeMobileMenu(openMobileHeader, { restoreFocus: true });
     });
+
+    let mobileDrawerSwipe = null;
+
+    document.addEventListener("touchstart", event => {
+        if (window.innerWidth > 900 || event.touches.length !== 1) return;
+
+        const nav = event.target.closest(".az-header.mobile-menu-open > .az-nav");
+        if (!nav) return;
+
+        const touch = event.touches[0];
+        mobileDrawerSwipe = {
+            nav,
+            header: nav.closest(".az-header"),
+            startX: touch.clientX,
+            startY: touch.clientY,
+            dx: 0,
+            dragging: false
+        };
+    }, { passive: true });
+
+    document.addEventListener("touchmove", event => {
+        const swipe = mobileDrawerSwipe;
+        if (!swipe || event.touches.length !== 1) return;
+
+        const touch = event.touches[0];
+        const dx = touch.clientX - swipe.startX;
+        const dy = touch.clientY - swipe.startY;
+
+        if (!swipe.dragging) {
+            if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 8) {
+                mobileDrawerSwipe = null;
+                return;
+            }
+
+            if (dx >= 0 || Math.abs(dx) < 8) return;
+            swipe.dragging = true;
+            swipe.nav.classList.add("az-mobile-drawer-dragging");
+        }
+
+        swipe.dx = Math.min(0, dx);
+        swipe.nav.style.setProperty("--az-drawer-drag-x", `${swipe.dx}px`);
+    }, { passive: true });
+
+    const finishDrawerSwipe = () => {
+        const swipe = mobileDrawerSwipe;
+        if (!swipe) return;
+
+        const shouldClose = swipe.dragging && swipe.dx <= -70;
+
+        swipe.nav.classList.remove("az-mobile-drawer-dragging");
+        swipe.nav.style.removeProperty("--az-drawer-drag-x");
+        mobileDrawerSwipe = null;
+
+        if (shouldClose) {
+            closeMobileMenu(swipe.header);
+        }
+    };
+
+    document.addEventListener("touchend", finishDrawerSwipe, { passive: true });
+    document.addEventListener("touchcancel", finishDrawerSwipe, { passive: true });
     initHeader();
 
     window.addEventListener("aziel:headerLoaded", initHeader);
@@ -135,6 +197,19 @@ function renderHeader() {
         node.textContent = isThailand
             ? "🇹🇭 Thailand · English · THB"
             : "🇲🇲 Myanmar · English · MMK";
+    });
+
+    document.querySelectorAll("[data-mobile-region-flag]").forEach(node => {
+        node.textContent = isThailand ? "🇹🇭" : "🇲🇲";
+    });
+    document.querySelectorAll("[data-mobile-region-name]").forEach(node => {
+        node.textContent = isThailand ? "Thailand" : "Myanmar";
+    });
+    document.querySelectorAll("[data-mobile-currency-symbol]").forEach(node => {
+        node.textContent = isThailand ? "฿" : "Ks";
+    });
+    document.querySelectorAll("[data-mobile-currency-name]").forEach(node => {
+        node.textContent = isThailand ? "THB" : "MMK";
     });
 
     if (!user) {
@@ -322,6 +397,16 @@ function renderHeaderNav() {
 
     nav.dataset.rendered = "true";
 
+    const header = nav.closest(".az-header");
+    if (header && !header.querySelector(":scope > .az-mobile-drawer-backdrop")) {
+        const backdrop = document.createElement("button");
+        backdrop.type = "button";
+        backdrop.className = "az-mobile-drawer-backdrop";
+        backdrop.setAttribute("aria-label", "Close menu");
+        backdrop.setAttribute("tabindex", "-1");
+        header.insertBefore(backdrop, nav);
+    }
+
     nav.innerHTML = `
         <div class="az-mobile-drawer-head">
             <div class="az-mobile-drawer-brand" aria-hidden="true">
@@ -332,12 +417,16 @@ function renderHeaderNav() {
             </button>
         </div>
 
-        <a class="az-nav-link az-nav-home" href="home.html" data-i18n="nav_home">Home</a>
+        <a class="az-nav-link az-nav-home" href="home.html">
+            <i class="fa-solid fa-house az-mobile-nav-icon" aria-hidden="true"></i>
+            <span data-i18n="nav_home">Home</span>
+        </a>
 
         <div class="az-nav-dropdown" id="gamesNavDropdown">
             <button class="az-nav-drop-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="azGamesDropdownMenu">
+                <i class="fa-solid fa-gamepad az-mobile-nav-icon" aria-hidden="true"></i>
                 <span data-i18n="nav_games">Games</span>
-                <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                <i class="fa-solid fa-chevron-down az-mobile-nav-chevron" aria-hidden="true"></i>
             </button>
 
             <div class="az-nav-drop-menu" id="azGamesDropdownMenu" role="menu" aria-label="${escapeHeaderHtml(window.AZIEL_LOCALE?.t?.("header.gameCategories", "Game categories") || "Game categories")}">
@@ -349,8 +438,9 @@ function renderHeaderNav() {
 
         <div class="az-nav-dropdown" id="socialNavDropdown">
             <button class="az-nav-drop-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="azSocialDropdownMenu">
+                <i class="fa-solid fa-bolt az-mobile-nav-icon" aria-hidden="true"></i>
                 <span data-i18n="header.socialTopUp">Social Top Up</span>
-                <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                <i class="fa-solid fa-chevron-down az-mobile-nav-chevron" aria-hidden="true"></i>
             </button>
 
             <div class="az-nav-drop-menu" id="azSocialDropdownMenu" role="menu" aria-label="${escapeHeaderHtml(window.AZIEL_LOCALE?.t?.("header.socialCategories", "Social top up categories") || "Social top up categories")}">
@@ -359,13 +449,29 @@ function renderHeaderNav() {
             </div>
         </div>
 
-        <button id="mobilePreferenceBtn" class="az-mobile-preference-row" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="azPreferencePanel">
-            <span class="az-mobile-preference-title" data-i18n="preferences.title">Region & Preferences</span>
-            <span class="az-mobile-preference-summary" data-mobile-preference-summary>🇲🇲 Myanmar · English · MMK</span>
+        <button id="mobilePreferenceBtn" class="az-mobile-preference-row az-mobile-preference-footer" type="button" aria-label="Region and preferences" aria-haspopup="dialog" aria-expanded="false" aria-controls="azPreferencePanel">
+            <span class="az-mobile-pref-item">
+                <span data-mobile-region-flag>🇲🇲</span>
+                <span data-mobile-region-name>Myanmar</span>
+            </span>
+            <span class="az-mobile-pref-item">
+                <i class="fa-solid fa-globe" aria-hidden="true"></i>
+                <span>English</span>
+            </span>
+            <span class="az-mobile-pref-item">
+                <span class="az-mobile-currency-symbol" data-mobile-currency-symbol>Ks</span>
+                <span data-mobile-currency-name>MMK</span>
+            </span>
         </button>
 
-        <a class="az-mobile-drawer-link" href="tracking.html" data-i18n="nav_orders">Orders</a>
-        <a class="az-mobile-drawer-link" href="support.html" data-i18n="nav_support">Support</a>
+        <a class="az-mobile-drawer-link" href="tracking.html">
+            <i class="fa-solid fa-receipt az-mobile-nav-icon" aria-hidden="true"></i>
+            <span data-i18n="nav_orders">Orders</span>
+        </a>
+        <a class="az-mobile-drawer-link" href="support.html">
+            <i class="fa-regular fa-circle-question az-mobile-nav-icon" aria-hidden="true"></i>
+            <span data-i18n="nav_support">Support</span>
+        </a>
     `;
 
     markActiveHeaderLinks();

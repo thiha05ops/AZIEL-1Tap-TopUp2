@@ -34,6 +34,11 @@ const paymentMethodSchema = new mongoose.Schema(
             default: ""
         },
 
+        paymentChannel: {
+            type: String,
+            default: ""
+        },
+
         qrImageUrl: {
             type: String,
             default: ""
@@ -86,7 +91,7 @@ const paymentMethodSchema = new mongoose.Schema(
 
         qrMode: {
             type: String,
-            enum: ["provider_generated", "uploaded_static", "aziel_promptpay_dynamic", "none"],
+            enum: ["provider_generated", "uploaded_static", "aziel_promptpay_dynamic", "truemoney_template_dynamic", "none"],
             default: "uploaded_static"
         },
 
@@ -97,7 +102,7 @@ const paymentMethodSchema = new mongoose.Schema(
 
         confirmationMode: {
             type: String,
-            enum: ["manual_admin", "thunder_slip", "provider_webhook", "automatic_provider", "wallet_internal"],
+            enum: ["manual_admin", "thunder_slip", "thunder_truewallet_slip", "provider_webhook", "automatic_provider", "wallet_internal"],
             default: "manual_admin"
         },
 

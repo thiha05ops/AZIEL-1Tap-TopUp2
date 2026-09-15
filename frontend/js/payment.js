@@ -178,6 +178,12 @@ function isPublicPaymentMethodUsable(method = {}) {
     if (method.publicReady === false) return false;
     if (String(method.maintenanceMessage || "").trim()) return false;
     if (key === "wallet" || type === "wallet" || provider === "wallet") return true;
+    if (key === "truewallet" || provider === "truewallet") {
+        return String(method.region || "").toUpperCase() === "TH" &&
+            String(method.paymentChannel || "").toUpperCase() === "TRUE_MONEY_WALLET" &&
+            method.confirmationMode === "thunder_truewallet_slip" &&
+            Boolean(method.accountName && method.accountNumber);
+    }
     if (type === "auto" || provider === "omise") return true;
 
     const hasQr = Boolean(method.qrImage || method.qrImageUrl || method.uploadedQrImage || method.finalQrImage || method.qrMode === "aziel_promptpay_dynamic");
@@ -259,6 +265,8 @@ function buildPaymentCard(method, index) {
     card.dataset.accountNumber = method.accountNumber || "";
     card.dataset.paymentType = paymentType;
     card.dataset.provider = provider;
+    card.dataset.paymentChannel = method.paymentChannel || "";
+    card.dataset.confirmationMode = method.confirmationMode || "";
     card.dataset.region = region;
     card.dataset.maintenanceMessage = method.maintenanceMessage || "";
     card.dataset.shortDescription = method.shortDescription || "";
@@ -368,6 +376,8 @@ function selectPaymentCard(card) {
         accountNumber: originalMethod.accountNumber || card.dataset.accountNumber || "",
         paymentType: originalMethod.paymentType || card.dataset.paymentType || "manual",
         provider: originalMethod.provider || card.dataset.provider || "manual",
+        paymentChannel: originalMethod.paymentChannel || card.dataset.paymentChannel || "",
+        confirmationMode: originalMethod.confirmationMode || card.dataset.confirmationMode || "",
         region: originalMethod.region || card.dataset.region || "",
         maintenanceMessage: originalMethod.maintenanceMessage || card.dataset.maintenanceMessage || "",
         appDisplayName: originalMethod.appDisplayName || card.dataset.appDisplayName || card.dataset.name || "",
@@ -503,6 +513,9 @@ function normalizePaymentKey(name) {
         azielwallet: "wallet",
         promptpay: "promptpay",
         promptpayauto: "promptpay",
+        truemoney: "truewallet",
+        truemoneywallet: "truewallet",
+        thundertruewallet: "truewallet",
         bangkokbank: "bangkokbank",
         manualbanktransfer: "manualbank"
     };
@@ -546,6 +559,7 @@ function getPaymentLogo(key) {
         ayapay: "assets/payment/ayapay.png",
         promptpay: "assets/payment/promptpay.png",
         thunderpromptpay: "assets/payment/promptpay.png",
+        truewallet: "assets/payment/payment-neutral.svg",
         scb: "assets/payment/scb.png",
         bangkokbank: "assets/payment/bank-neutral.svg",
         kplus: "assets/payment/bank-neutral.svg",
@@ -566,6 +580,7 @@ function isKnownPaymentProvider(key) {
         "ayapay",
         "promptpay",
         "thunderpromptpay",
+        "truewallet",
         "scb",
         "bangkokbank",
         "kplus",

@@ -5,6 +5,7 @@
         ayapay: "AYA Pay",
         kbzpay: "KBZPay",
         wavepay: "WavePay",
+        truewallet: "TrueMoney Wallet",
         promptpay: "PromptPay",
         scb: "SCB",
         bangkokbank: "Bangkok Bank",
@@ -36,6 +37,11 @@
         if (key.includes("ayapay")) return LABELS.ayapay;
         if (key.includes("kbzpay")) return LABELS.kbzpay;
         if (key.includes("wavepay")) return LABELS.wavepay;
+        if (
+            key === "truewallet" ||
+            key.includes("truemoneywallet") ||
+            key.includes("thundertruewallet")
+        ) return LABELS.truewallet;
         if (key.includes("promptpay")) return LABELS.promptpay;
         if (key.includes("bangkokbank")) return LABELS.bangkokbank;
         if (key === "kplus" || key.includes("kplus")) return LABELS.kplus;
@@ -66,6 +72,8 @@
             [/\baya[\s_-]*pay\b/gi, LABELS.ayapay],
             [/\bkbz[\s_-]*pay\b/gi, LABELS.kbzpay],
             [/\bwave[\s_-]*pay\b/gi, LABELS.wavepay],
+            [/\btrue[\s_-]*money(\s*wallet)?\b/gi, LABELS.truewallet],
+            [/\btruewallet\b/gi, LABELS.truewallet],
             [/\bprompt[\s_-]*pay\b/gi, LABELS.promptpay],
             [/\bbangkok[\s_-]*bank\b/gi, LABELS.bangkokbank],
             [/\bk[\s_-]*plus\b/gi, LABELS.kplus],

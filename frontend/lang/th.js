@@ -6,6 +6,7 @@ window.AZIEL_LANG.th = {
     nav_home: "หน้าหลัก",
     nav_games: "เกม",
     nav_wallet: "กระเป๋าเงิน",
+    nav_money_transfer: "โอนเงิน",
     nav_orders: "คำสั่งซื้อ",
     nav_tracking: "ติดตามคำสั่งซื้อ",
     nav_support: "ช่วยเหลือ",
@@ -1421,6 +1422,13 @@ window.AZIEL_LANG.th = {
     ,"payment.thunder.rejected": "ไม่สามารถยืนยันการชำระเงินได้ โปรดอัปโหลดสลิปที่ถูกต้องสำหรับคำสั่งซื้อนี้"
     ,"payment.thunder.duplicate": "ระบบได้รับสลิปนี้แล้ว แต่ยังไม่ยืนยันการชำระเงิน โปรดตรวจสอบสถานะคำสั่งซื้อหรือติดต่อฝ่ายช่วยเหลือ"
     ,"payment.thunder.invalidImage": "โปรดเลือกไฟล์รูปภาพสลิปการชำระเงินที่ถูกต้อง"
+    ,"payment.truewallet.title": "ทรูมันนี่ วอลเล็ท"
+    ,"payment.truewallet.instructions": "สแกน QR นี้ด้วย TrueMoney ชำระยอดให้ตรง แล้วอัปโหลดสลิปการโอน"
+    ,"payment.truewallet.scan": "สแกน QR นี้ด้วย TrueMoney"
+    ,"payment.truewallet.chooseSlip": "อัปโหลดสลิปการโอนเงินทรูมันนี่"
+    ,"payment.truewallet.invalidSlip": "ไม่สามารถอ่านสลิปทรูมันนี่ได้ โปรดอัปโหลดสลิปการโอนที่ชัดเจน"
+    ,"payment.truewallet.wrongRecipient": "การโอนนี้ไม่ได้ส่งไปยังบัญชีทรูมันนี่ที่ถูกต้อง"
+    ,"payment.truewallet.wrongAmount": "จำนวนเงินที่โอนไม่ตรงกับคำสั่งซื้อนี้"
     ,"errors.INVALID_REQUEST": "กรุณาตรวจสอบข้อมูลแล้วลองอีกครั้ง"
     ,"errors.ORDER_NOT_FOUND": "ไม่พบคำสั่งซื้อ"
     ,"errors.PAYMENT_EXPIRED": "เซสชันการชำระเงินนี้หมดอายุแล้ว"

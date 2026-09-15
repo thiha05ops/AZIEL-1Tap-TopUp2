@@ -6,6 +6,7 @@ window.AZIEL_LANG.en = {
     nav_home: "Home",
     nav_games: "Games",
     nav_wallet: "Wallet",
+    nav_money_transfer: "Money Transfer",
     nav_orders: "Orders",
     nav_tracking: "Tracking",
     nav_support: "Support",
@@ -1422,6 +1423,13 @@ window.AZIEL_LANG.en = {
     ,"payment.thunder.rejected": "Payment could not be verified. Please upload the correct payment slip for this order."
     ,"payment.thunder.duplicate": "This slip has already been received. Your payment is not yet confirmed; please check your order status or contact support."
     ,"payment.thunder.invalidImage": "Please choose a valid image of your payment slip."
+    ,"payment.truewallet.title": "TrueMoney Wallet"
+    ,"payment.truewallet.instructions": "Scan this QR with TrueMoney, pay the exact amount, then upload the transfer slip."
+    ,"payment.truewallet.scan": "Scan this QR with TrueMoney"
+    ,"payment.truewallet.chooseSlip": "Upload TrueMoney Transfer Slip"
+    ,"payment.truewallet.invalidSlip": "Couldn't read this TrueMoney slip. Please upload a clear transfer slip."
+    ,"payment.truewallet.wrongRecipient": "This transfer was not sent to the correct TrueMoney account."
+    ,"payment.truewallet.wrongAmount": "The transferred amount does not match this order."
     ,"errors.INVALID_REQUEST": "Please check the information and try again."
     ,"errors.ORDER_NOT_FOUND": "Order not found."
     ,"errors.PAYMENT_EXPIRED": "This payment session has expired."

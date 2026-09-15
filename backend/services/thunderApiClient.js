@@ -72,7 +72,7 @@ class ThunderApiError extends Error {
 function createThunderApiClient(options = {}) {
     const apiKey = String(options.apiKey || process.env.THUNDER_API_KEY || "").trim();
     const fetchImpl = options.fetch || globalThis.fetch;
-    const timeoutMs = Math.max(1000, Math.min(Number(options.timeoutMs) || 10000, 30000));
+    const timeoutMs = Math.max(1000, Math.min(Number(options.timeoutMs || process.env.THUNDER_TIMEOUT_MS) || 10000, 30000));
     const logger = options.logger || console;
 
     async function verifyBank(input = {}) {
@@ -127,7 +127,54 @@ function createThunderApiClient(options = {}) {
         }
     }
 
-    return Object.freeze({ verifyBank });
+    async function verifyTrueWallet(input = {}) {
+        const startedAt = Date.now();
+        const diagnostic = { correlationId: input.correlationId || "", orderTag: input.orderTag || "", attemptTag: input.attemptTag || "" };
+        logThunderDiagnostic(logger, "THUNDER_TRUEWALLET_REQUEST_STARTED", diagnostic);
+        if (!apiKey) throw new ThunderApiError("THUNDER_NOT_CONFIGURED", "Payment verification is unavailable.");
+        if (typeof fetchImpl !== "function") throw new ThunderApiError("THUNDER_UNAVAILABLE", "Payment verification is unavailable.");
+        const evidence = ["image", "base64", "url"].filter(key => typeof input[key] === "string" && input[key].trim());
+        if (evidence.length !== 1) throw new ThunderApiError("THUNDER_SLIP_REJECTED", "Exactly one receipt evidence source is required.");
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            const evidenceKey = evidence[0];
+            const response = await fetchImpl(`${BASE_URL}/verify/truewallet`, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", Accept: "application/json" },
+                body: JSON.stringify({
+                    [evidenceKey]: input[evidenceKey],
+                    remark: String(input.remark || "").slice(0, 100),
+                    matchAccount: true,
+                    matchAmount: input.matchAmount,
+                    checkDuplicate: true
+                }),
+                signal: controller.signal
+            });
+            let body;
+            try { body = await response.json(); } catch (_) {
+                logThunderDiagnostic(logger, "THUNDER_TRUEWALLET_RESPONSE_MALFORMED", { ...diagnostic, providerHttpStatus: response.status, elapsedMs: Date.now() - startedAt, azielErrorCode: "THUNDER_INVALID_RESPONSE" }, "warn");
+                throw new ThunderApiError("THUNDER_INVALID_RESPONSE", "The slip verifier returned an invalid response.", { statusCode: response.status, retryable: true });
+            }
+            if (response.ok && (!body || typeof body !== "object" || Array.isArray(body))) {
+                throw new ThunderApiError("THUNDER_INVALID_RESPONSE", "The slip verifier returned an invalid response.", { statusCode: response.status, retryable: true });
+            }
+            const providerCode = normalizeProviderErrorCode(body);
+            const classification = response.ok ? "THUNDER_RESPONSE_OK" : classifyProviderError(providerCode, response.status);
+            const retryable = classification === "THUNDER_PROVIDER_UNAVAILABLE" || classification === "THUNDER_QUOTA_EXCEEDED" || response.status >= 500;
+            logThunderDiagnostic(logger, "THUNDER_TRUEWALLET_RESPONSE_RECEIVED", { ...diagnostic, providerHttpStatus: response.status, elapsedMs: Date.now() - startedAt, providerErrorCode: providerCode, azielErrorCode: classification, retryable });
+            if (!response.ok) throw new ThunderApiError(classification, "The slip could not be verified.", { statusCode: response.status, retryable, providerCode });
+            return body;
+        } catch (error) {
+            if (error instanceof ThunderApiError) throw error;
+            if (error?.name === "AbortError") throw new ThunderApiError("THUNDER_TIMEOUT", "Payment verification timed out. Please retry.", { retryable: true });
+            throw new ThunderApiError("THUNDER_UNAVAILABLE", "Payment verification is temporarily unavailable.", { retryable: true });
+        } finally {
+            clearTimeout(timer);
+        }
+    }
+
+    return Object.freeze({ verifyBank, verifyTrueWallet });
 }
 
 module.exports = Object.freeze({ BASE_URL, KNOWN_PROVIDER_CODES, PROVIDER_ERROR_CLASSIFICATIONS, ThunderApiError, classifyProviderError, createThunderApiClient, hasProviderOutcome, normalizeProviderErrorCode });

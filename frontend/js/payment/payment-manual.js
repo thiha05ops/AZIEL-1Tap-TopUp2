@@ -23,7 +23,7 @@
         }
         const result = data.payment || {};
         const pending = result.verificationStatus === "pending" || result.code === "SLIP_PENDING";
-        const thunderVerified = String(paymentSession.confirmationMode || "") === "thunder_slip" || String(paymentSession.provider || "").toUpperCase() === "THUNDER_PROMPTPAY";
+        const thunderVerified = ["thunder_slip", "thunder_truewallet_slip"].includes(String(paymentSession.confirmationMode || "")) || ["THUNDER_PROMPTPAY", "THUNDER_TRUEWALLET"].includes(String(paymentSession.provider || "").toUpperCase());
         const authoritativePaid = String(result.paymentStatus || "").toLowerCase() === "paid" || ["paid", "processing", "completed"].includes(String(result.orderStatus || data.order?.status || "").toLowerCase());
         if (thunderVerified) {
             if (authoritativePaid) {
@@ -61,7 +61,10 @@
             ...(window.selectedPaymentData || {}),
             ...(paymentSession.selectedPaymentMethod || {})
         };
-        const thunderVerified = String(paymentSession.confirmationMode || payment.confirmationMode || "") === "thunder_slip" || String(paymentSession.provider || payment.provider || "").toUpperCase() === "THUNDER_PROMPTPAY";
+        const confirmationMode = String(paymentSession.confirmationMode || payment.confirmationMode || "");
+        const provider = String(paymentSession.provider || payment.provider || "").toUpperCase();
+        const trueWallet = confirmationMode === "thunder_truewallet_slip" || provider === "THUNDER_TRUEWALLET";
+        const thunderVerified = trueWallet || confirmationMode === "thunder_slip" || provider === "THUNDER_PROMPTPAY";
 
         const qr =
             paymentSession.qrImage ||
@@ -101,7 +104,7 @@
         window.PaymentCheckoutSheet.show({
             ...payment,
             methodCode: paymentSession.paymentMethod || payment.key || orderData.paymentMethod,
-            methodName: thunderVerified ? paymentText("payment.thunder.title", "PromptPay Transfer") : window.AZIEL_PAYMENT_DISPLAY?.from?.(
+            methodName: trueWallet ? paymentText("payment.truewallet.title", "TrueMoney Wallet") : thunderVerified ? paymentText("payment.thunder.title", "PromptPay Transfer") : window.AZIEL_PAYMENT_DISPLAY?.from?.(
                 paymentSession.paymentName || payment.method || orderData.paymentMethod,
                 paymentSession.paymentName || payment.method || orderData.paymentMethod || "Payment"
             ) || paymentSession.paymentName || payment.method || orderData.paymentMethod || "Payment",
@@ -117,7 +120,9 @@
             attemptId: paymentSession.attemptId || orderData.manualPaymentAttemptId || "",
             qrImageUrl: qr,
             qrMode: paymentSession.qrMode || payment.qrMode || "",
-            instructions: thunderVerified ? paymentText("payment.thunder.instructions", "Pay the fixed amount, then upload the slip for automatic verification.") : "Transfer the exact amount, then upload the payment receipt.",
+            expiresAt: paymentSession.expiresAt || payment.expiresAt || "",
+            dynamicQr: paymentSession.dynamicQr || payment.dynamicQr || null,
+            instructions: trueWallet ? paymentText("payment.truewallet.instructions", "Transfer the exact amount to this TrueMoney Wallet number, then upload the TrueMoney transfer slip.") : thunderVerified ? paymentText("payment.thunder.instructions", "Pay the fixed amount, then upload the slip for automatic verification.") : "Transfer the exact amount, then upload the payment receipt.",
             requiresSlip,
             enableSaveQr: paymentSession.enableSaveQr === true || payment.enableSaveQr === true,
             enableOpenApp: paymentSession.enableOpenApp === true || payment.enableOpenApp === true,
@@ -139,8 +144,9 @@
             amountPrefillSupported: paymentSession.amountPrefillSupported === true || payment.amountPrefillSupported === true,
             receiptUploadEnabled: paymentSession.receiptUploadEnabled !== false && payment.receiptUploadEnabled !== false,
             autoSubmitReceipt: thunderVerified,
+            trueMoneyWallet: trueWallet,
             checklistSteps: paymentSession.checklistSteps || payment.checklistSteps || [],
-            submitLabel: thunderVerified ? "Upload Slip" : "Submit for Verification",
+            submitLabel: trueWallet ? paymentText("payment.truewallet.chooseSlip", "Upload TrueMoney Transfer Slip") : thunderVerified ? "Upload Slip" : "Submit for Verification",
             loadingText: thunderVerified ? paymentText("payment.thunder.verifying", "Verifying payment...") : "Submitting receipt...",
             onSubmit: async ({ file, setMessage, close }) => {
                 if (paymentSession.commerce === true || paymentSession.commerceOrderId || orderData.commerceOrderId) {

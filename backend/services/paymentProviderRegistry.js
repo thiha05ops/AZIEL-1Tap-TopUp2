@@ -1,6 +1,7 @@
 const PROVIDERS = Object.freeze({
     promptpay: { key: "promptpay", label: "PromptPay", region: "TH", logo: "/assets/payment/promptpay.png" },
     thunder_promptpay: { key: "thunder_promptpay", label: "PromptPay (Verified)", region: "TH", logo: "/assets/payment/promptpay.png" },
+    truewallet: { key: "truewallet", label: "TrueMoney Wallet", region: "TH", logo: "/assets/payment/payment-neutral.svg" },
     scb: { key: "scb", label: "SCB", region: "TH", logo: "/assets/payment/scb.png" },
     bangkok_bank: { key: "bangkok_bank", label: "Bangkok Bank", region: "TH", logo: "/assets/payment/bank-neutral.svg" },
     kplus: { key: "kplus", label: "K PLUS", region: "TH", logo: "/assets/payment/bank-neutral.svg" },
@@ -20,6 +21,9 @@ const ALIASES = Object.freeze({
     prompt_pay: "promptpay",
     promptpay: "promptpay",
     prompt: "promptpay",
+    truemoney: "truewallet",
+    truemoneywallet: "truewallet",
+    thunder_truewallet: "truewallet",
     aya: "ayapay",
     aya_pay: "ayapay",
     kbz_pay: "kbzpay",
@@ -42,7 +46,7 @@ const PROVIDERS_BY_REGION_TYPE = Object.freeze({
     TH: {
         auto: ["promptpay"],
         deeplink: ["scb", "bangkok_bank", "kplus", "krungsri", "krungthai"],
-        manual: ["promptpay", "thunder_promptpay", "scb", "bangkok_bank", "kplus", "krungsri", "krungthai"],
+        manual: ["promptpay", "thunder_promptpay", "truewallet", "scb", "bangkok_bank", "kplus", "krungsri", "krungthai"],
         wallet: ["wallet"]
     },
     MM: {
@@ -57,6 +61,7 @@ const PAYMENT_CONFIGURATION_KINDS = Object.freeze({
     MANUAL_QR: "MANUAL_QR",
     MANUAL_BANK_APP: "MANUAL_BANK_APP",
     PROMPTPAY_DYNAMIC: "PROMPTPAY_DYNAMIC",
+    TRUE_MONEY_WALLET: "TRUE_MONEY_WALLET",
     AZIEL_WALLET: "AZIEL_WALLET",
     AUTOMATIC_PROVIDER: "AUTOMATIC_PROVIDER"
 });
@@ -65,6 +70,7 @@ const APPLICABLE_SECTIONS = Object.freeze({
     [PAYMENT_CONFIGURATION_KINDS.MANUAL_QR]: ["display", "account", "staticQr", "availability", "manualVerification", "checklist"],
     [PAYMENT_CONFIGURATION_KINDS.MANUAL_BANK_APP]: ["display", "account", "bankApp", "availability", "manualVerification", "checklist"],
     [PAYMENT_CONFIGURATION_KINDS.PROMPTPAY_DYNAMIC]: ["display", "promptPay", "bankLaunchers", "availability", "manualVerification", "checklist"],
+    [PAYMENT_CONFIGURATION_KINDS.TRUE_MONEY_WALLET]: ["display", "account", "availability", "manualVerification", "checklist"],
     [PAYMENT_CONFIGURATION_KINDS.AZIEL_WALLET]: ["display", "availability", "wallet"],
     [PAYMENT_CONFIGURATION_KINDS.AUTOMATIC_PROVIDER]: ["display", "availability", "automaticProvider"]
 });
@@ -129,6 +135,17 @@ function hasPromptPayRecipient(method = {}) {
     return Boolean(value);
 }
 
+function hasTrueMoneyRecipient(method = {}) {
+    const digits = String(method.accountNumber || "").replace(/\D/g, "");
+    return /^(?:66|0)?[689]\d{8}$/.test(digits);
+}
+
+function normalizeTrueMoneyRecipient(value = "") {
+    const digits = String(value || "").replace(/\D/g, "");
+    if (/^66[689]\d{8}$/.test(digits)) return `0${digits.slice(2)}`;
+    return /^0[689]\d{8}$/.test(digits) ? digits : "";
+}
+
 function hasAndroidLaunchCapability(method = {}) {
     if (String(method.androidAppLaunchUrl || "").trim()) return true;
     return Boolean(
@@ -142,6 +159,7 @@ function paymentConfigurationKind(method = {}) {
     const region = String(method.region || "").toUpperCase();
     const paymentType = String(method.paymentType || "manual").toLowerCase();
     if (key === "wallet" || paymentType === "wallet") return PAYMENT_CONFIGURATION_KINDS.AZIEL_WALLET;
+    if (key === "truewallet") return PAYMENT_CONFIGURATION_KINDS.TRUE_MONEY_WALLET;
     if (region === "TH" && method.qrMode === "aziel_promptpay_dynamic") {
         return PAYMENT_CONFIGURATION_KINDS.PROMPTPAY_DYNAMIC;
     }
@@ -186,6 +204,29 @@ function paymentMethodReadiness(method = {}) {
     }
 
     if (configurationKind === PAYMENT_CONFIGURATION_KINDS.AUTOMATIC_PROVIDER) {
+        return { ready: missing.length === 0, missing };
+    }
+
+    if (configurationKind === PAYMENT_CONFIGURATION_KINDS.TRUE_MONEY_WALLET) {
+        if (method.enabled !== true) missing.push("method enabled");
+        if (String(method.region || "").toUpperCase() !== "TH") missing.push("Thailand region");
+        if (normalizedProvider !== "truewallet") missing.push("TrueMoney provider");
+        if (String(method.paymentChannel || "").toUpperCase() !== "TRUE_MONEY_WALLET") missing.push("TrueMoney payment rail");
+        if (paymentType !== "manual") missing.push("manual payment type");
+        if (String(method.confirmationMode || "") !== "thunder_truewallet_slip") missing.push("TrueMoney slip verification");
+        if (!String(method.accountName || "").trim()) missing.push("account name");
+        if (!hasTrueMoneyRecipient(method)) missing.push("valid TrueMoney receiving account");
+        if (!isEnabled(method.receiptUploadEnabled)) missing.push("receipt upload enabled");
+        if (!isEnabled(method.slipRequired)) missing.push("slip required");
+        if (!String(process.env.THUNDER_API_KEY || "").trim()) missing.push("Thunder API configuration");
+        const verificationReceiver = normalizeTrueMoneyRecipient(process.env.AZIEL_TRUEMONEY_RECEIVER_ACCOUNT);
+        const qrReceiver = normalizeTrueMoneyRecipient(method.accountNumber);
+        if (!verificationReceiver) missing.push("TrueMoney verification account configuration");
+        else if (qrReceiver && qrReceiver !== verificationReceiver) missing.push("TrueMoney QR receiver must match verification account");
+        if (method.qrMode !== "truemoney_template_dynamic") missing.push("TrueMoney template dynamic QR mode");
+        if (!String(process.env.AZIEL_TRUEMONEY_QR_TEMPLATE || "").trim()) missing.push("TrueMoney QR template configuration");
+        if (!isEnabled(method.dynamicQrSupported)) missing.push("dynamic QR supported");
+        if (!isEnabled(method.amountPrefillSupported)) missing.push("amount prefill supported");
         return { ready: missing.length === 0, missing };
     }
 

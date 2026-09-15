@@ -55,23 +55,25 @@ function main() {
     const internals = paymentMethodsRoute._test;
     assert(internals, "paymentMethods route internals must be exposed for verification");
 
-    const promptPayDefault = internals.defaultMethods.find(item => item.key === "promptpay");
-    assert(promptPayDefault, "PromptPay default must exist");
-    assert.strictEqual(promptPayDefault.method, "PromptPay QR", "PromptPay storefront label must be QR-specific");
-    assert.strictEqual(promptPayDefault.paymentType, "manual", "PromptPay must use manual attempt flow");
-    assert.strictEqual(promptPayDefault.qrMode, "aziel_promptpay_dynamic", "PromptPay must use AZIEL dynamic QR");
-    assert.strictEqual(promptPayDefault.openAppMode, "bank_chooser", "PromptPay must own bank chooser mode");
-    assert.strictEqual(promptPayDefault.appLaunchMode, "APP_ONLY", "PromptPay bank launch must be app-only guidance");
-    assert.strictEqual(promptPayDefault.confirmationMode, "manual_admin", "PromptPay remains manual admin verification");
-    assert.strictEqual(promptPayDefault.receiptUploadEnabled, true, "PromptPay must require receipt upload");
-    assert.strictEqual(promptPayDefault.slipRequired, true, "PromptPay must require slip upload");
-    assert.strictEqual(promptPayDefault.autoVerificationSupported, false, "PromptPay must not auto-verify manual QR");
-    assert.strictEqual(promptPayDefault.webhookSupported, false, "PromptPay must not use webhooks in manual dynamic mode");
-    assert.deepStrictEqual(
-        (promptPayDefault.checklistSteps || []).map(step => step.action),
-        ["save_qr", "open_app", "scan_saved_qr", "upload_receipt"],
-        "PromptPay checklist must be the approved manual QR guidance sequence"
-    );
+    assert(!internals.defaultMethods.some(item => item.key === "promptpay"), "Retired manual PromptPay must not be recreated by seed defaults");
+    const promptPayDefault = {
+        key: "promptpay", method: "PromptPay QR", region: "TH", enabled: true,
+        paymentType: "manual", provider: "promptpay", qrMode: "aziel_promptpay_dynamic",
+        confirmationMode: "manual_admin", bankLaunchers: internals.defaultPromptPayBankLaunchers
+    };
+    internals.applyPaymentMethodPatch(promptPayDefault, {});
+    assert.strictEqual(promptPayDefault.enabled, false, "Retired manual PromptPay must remain disabled");
+    assert.strictEqual(internals.isRetiredManualPromptPayMethod(promptPayDefault), true, "Retirement must use the canonical PromptPay key/region/provider identity");
+    assert.strictEqual(internals.formatAdminMethod(promptPayDefault).operatorHidden, true, "Retired manual PromptPay must be hidden from the normal Admin operator list");
+    const historicalProjection = internals.formatMethod(promptPayDefault);
+    assert.strictEqual(historicalProjection.key, "promptpay", "Retired PromptPay identity must remain readable for historical records");
+    assert.strictEqual(historicalProjection.customerVisible, false, "Retired PromptPay must remain unavailable to public discovery");
+    const activeThunder = internals.formatAdminMethod({
+        key: "thunder_promptpay", method: "PromptPay", region: "TH", enabled: true,
+        paymentType: "manual", provider: "thunder_promptpay", qrMode: "aziel_promptpay_dynamic",
+        confirmationMode: "thunder_slip"
+    });
+    assert.strictEqual(activeThunder.operatorHidden, false, "Active Thunder PromptPay must remain in the Admin operator list");
 
     const launchers = internals.sanitizeBankLaunchers(promptPayDefault.bankLaunchers || []);
     assert.deepStrictEqual(
@@ -164,7 +166,7 @@ function main() {
         "frontend/genshin.html",
         "frontend/roblox.html"
     ].forEach(file => {
-        includes(file, "payment-trust-display.js?v=20260722-region-trust", "game pages must load the shared payment trust runtime");
+        includes(file, "/js/payment-trust-display.js?v=", "game pages must load the shared payment trust runtime");
         notIncludes(file, "const logos = {", "game footers must not use static payment-logo lists");
         includes(file, "footer_supported_payments", "footer trust heading must use localized Supported Payments copy");
     });
@@ -244,7 +246,7 @@ function main() {
     includes("frontend/js/payment/payment-checkout-sheet.js", "az-payment-sheet__fallback-details", "account details must be secondary fallback details for dynamic QR");
     includes("frontend/js/payment/payment-checkout-sheet.js", "setMobilePromptPayStep", "mobile PromptPay must use explicit QR/receipt steps");
     includes("frontend/js/payment/payment-checkout-sheet.js", "azPaymentMobileBankChooser", "mobile bank chooser must be isolated from the main sheet");
-    includes("frontend/js/payment/payment-checkout-sheet.js", "payment_continue_to_receipt", "mobile QR step must continue to receipt upload");
+    includes("frontend/js/payment/payment-checkout-sheet.js", 'azPaymentSheetContinueReceipt")?.addEventListener("click", () => updateRecoveryMobileStep("receipt"))', "mobile QR step must continue to receipt upload");
     includes("frontend/js/payment/payment-checkout-sheet.js", "isDesktopPromptPayFlow", "desktop PromptPay must have explicit platform ownership");
     includes("frontend/js/payment/payment-checkout-sheet.js", "renderDesktopSupportedBanks", "desktop PromptPay must render informational supported-bank logos");
     assert(

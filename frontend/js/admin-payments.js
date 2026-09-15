@@ -5,12 +5,19 @@ let adminPaymentMethods = [];
 let adminPaymentInfrastructure = null;
 let adminPaymentInfrastructureActiveRegion = "TH";
 let adminPaymentInfrastructureActiveTab = "overview";
+let adminPaymentStatusFilter = "all";
+let adminSelectedPaymentMethodId = "";
+let adminPaymentEditorOpen = false;
+let adminPaymentEditorAdvancedOpen = false;
+const adminPaymentEnabledDrafts = new Map();
 let adminPaymentsInitialized = false;
 let paymentInfrastructureActionsBound = false;
+let paymentOperatorActionsBound = false;
 
 const ADMIN_PAYMENT_PROVIDERS = Object.freeze({
     promptpay: { key: "promptpay", label: "PromptPay", region: "TH" },
     thunder_promptpay: { key: "thunder_promptpay", label: "PromptPay (Verified)", region: "TH" },
+    truewallet: { key: "truewallet", label: "TrueMoney Wallet", region: "TH" },
     scb: { key: "scb", label: "SCB", region: "TH" },
     bangkok_bank: { key: "bangkok_bank", label: "Bangkok Bank", region: "TH" },
     kplus: { key: "kplus", label: "K PLUS", region: "TH" },
@@ -28,7 +35,7 @@ const ADMIN_PROVIDER_BY_REGION_TYPE = Object.freeze({
     TH: {
         auto: ["promptpay"],
         deeplink: ["scb", "bangkok_bank", "kplus", "krungsri", "krungthai"],
-        manual: ["promptpay", "thunder_promptpay", "scb", "bangkok_bank", "kplus", "krungsri", "krungthai"],
+        manual: ["promptpay", "thunder_promptpay", "truewallet", "scb", "bangkok_bank", "kplus", "krungsri", "krungthai"],
         wallet: ["wallet"]
     },
     MM: {
@@ -114,7 +121,7 @@ async function loadAdminPaymentMethods() {
     }
 }
 
-function renderAdminPaymentMethods(methods) {
+function renderLegacyAdminPaymentMethods(methods) {
     const box = document.getElementById("paymentMethodsContainer");
     if (!box) return;
     const activeRegion = getPaymentInfrastructureActiveRegion(methods);
@@ -322,8 +329,8 @@ function renderAdminPaymentMethods(methods) {
 
                 <div class="settings-row">
                     <div>
-                        <label>Account Number</label>
-                        <small>Bank / phone / recipient ID users can copy</small>
+                        <label>${method.key === "truewallet" ? "TrueMoney Telephone Number" : "Account Number"}</label>
+                        <small>${method.key === "truewallet" ? "Customer-visible destination only; verification authority remains server-side" : "Bank / phone / recipient ID users can copy"}</small>
                     </div>
                     <input class="pm-number" type="text" value="${escapeAdminHTML(method.accountNumber || "")}">
                 </div>
@@ -573,6 +580,7 @@ function renderAdminPaymentMethods(methods) {
                         <select class="pm-confirmation-mode">
                             <option value="manual_admin" ${method.confirmationMode === "manual_admin" || !method.confirmationMode ? "selected" : ""}>Manual Admin Verification</option>
                             <option value="thunder_slip" ${method.confirmationMode === "thunder_slip" ? "selected" : ""}>Thunder Automatic Slip Verification</option>
+                            <option value="thunder_truewallet_slip" ${method.confirmationMode === "thunder_truewallet_slip" ? "selected" : ""}>TrueMoney Automatic Slip Verification</option>
                             <option value="provider_webhook" ${method.confirmationMode === "provider_webhook" ? "selected" : ""}>Provider Webhook Confirmation</option>
                             <option value="automatic_provider" ${method.confirmationMode === "automatic_provider" ? "selected" : ""}>Automatic Provider Confirmation (Legacy)</option>
                             <option value="wallet_internal" ${method.confirmationMode === "wallet_internal" ? "selected" : ""}>AZIEL Wallet Internal Confirmation</option>
@@ -585,7 +593,7 @@ function renderAdminPaymentMethods(methods) {
                     <small class="payment-section-help">Allowed actions: save_qr, open_app, upload_receipt, wait_for_confirmation, confirm_payment</small>
                     <div class="pm-checklist-presets">
                         <button type="button" class="admin-small-btn" data-action="manual-bank-preset">Use Manual Bank Preset</button>
-                        <button type="button" class="admin-small-btn" data-action="promptpay-preset">Use PromptPay Auto Preset</button>
+                        ${method.key === "truewallet" ? "" : `<button type="button" class="admin-small-btn" data-action="promptpay-preset">Use PromptPay Auto Preset</button>`}
                         <button type="button" class="admin-small-btn" data-action="clear-checklist">Clear Steps</button>
                     </div>
                     ${checklistStepBuilder(method.checklistSteps || [])}
@@ -630,6 +638,324 @@ function renderAdminPaymentMethods(methods) {
     bindPaymentInfrastructureActions();
 }
 
+function operatorPaymentStatus(method = {}) {
+    const maintenance = Boolean(String(method.maintenanceMessage || "").trim());
+    const missing = (Array.isArray(method.missingConfiguration) ? method.missingConfiguration : [])
+        .filter(item => String(item).toLowerCase() !== "method enabled");
+    if (maintenance) return { key: "maintenance", label: "Maintenance", missing };
+    if (method.publicReady !== true && missing.length) return { key: "needs_setup", label: "Needs setup", missing };
+    if (method.enabled !== true) return { key: "disabled", label: "Disabled", missing: [] };
+    if (method.customerVisible === true || method.publicReady === true) return { key: "ready", label: "Ready", missing: [] };
+    return { key: "needs_setup", label: "Needs setup", missing };
+}
+
+function operatorPaymentType(method = {}) {
+    const key = normalizeAdminProvider(method.key || method.provider || "");
+    const kind = String(method.configurationKind || "");
+
+    if (key === "truewallet") {
+        return {
+            label: "Wallet transfer",
+            description: "Automatic slip verification"
+        };
+    }
+
+    if (key === "wallet" || kind === "AZIEL_WALLET") {
+        return {
+            label: "Wallet balance",
+            description: "Uses the customer’s AZIEL balance"
+        };
+    }
+
+    // Bank identity takes precedence over inherited PromptPay/QR configuration.
+    if (
+        kind === "MANUAL_BANK_APP" ||
+        ["scb", "bangkok_bank", "kplus", "krungsri", "krungthai"].includes(key)
+    ) {
+        return {
+            label: "Bank transfer",
+            description: method.shortDescription || "Bank app and transfer details"
+        };
+    }
+
+    if (
+        kind === "PROMPTPAY_DYNAMIC" ||
+        key === "promptpay" ||
+        key === "thunder_promptpay"
+    ) {
+        return {
+            label: key === "thunder_promptpay" ? "PromptPay transfer" : "Manual QR",
+            description: key === "thunder_promptpay"
+                ? "Automatic slip verification"
+                : "PromptPay transfer"
+        };
+    }
+
+    if (kind === "AUTOMATIC_PROVIDER" || method.paymentType === "auto") {
+        return {
+            label: "Automatic payment",
+            description: method.shortDescription || "Provider-confirmed payment"
+        };
+    }
+
+    return {
+        label: "Manual QR",
+        description: method.shortDescription || "Manual transfer"
+    };
+}
+
+function operatorRequirementLabel(reason = "") {
+    return ({
+        "account name": "Add account holder name",
+        "valid truemoney receiving account": "Add a valid TrueMoney number",
+        "thunder api configuration": "Thunder API key configured",
+        "truemoney verification account configuration": "Verification account configured",
+        "receipt upload enabled": "Slip upload enabled",
+        "slip required": "Transfer slip required",
+        "truemoney dynamic qr mode": "Activate TrueMoney dynamic QR",
+        "dynamic qr supported": "Activate dynamic QR support",
+        "amount prefill supported": "Activate exact-amount QR",
+        "truemoney qr receiver must match verification account": "Use the verified TrueMoney receiving number"
+    })[String(reason).toLowerCase()] || String(reason || "Complete required setup");
+}
+
+function renderOperatorRequirements(method = {}) {
+    const status = operatorPaymentStatus(method);
+    const trueWallet = method.key === "truewallet";
+    const required = trueWallet ? [
+        { label: "Slip upload enabled", ready: method.receiptUploadEnabled !== false },
+        { label: "Automatic verification supported", ready: method.autoVerificationSupported === true },
+        { label: "Thunder API key configured", ready: !status.missing.includes("Thunder API configuration") },
+        { label: "Verification account configured", ready: !status.missing.includes("TrueMoney verification account configuration") }
+    ] : status.missing.map(reason => ({ label: operatorRequirementLabel(reason), ready: false }));
+    if (trueWallet) {
+        const thunderReady = !status.missing.includes("Thunder API configuration")
+            && !status.missing.includes("TrueMoney verification account configuration");
+        const verificationReady = method.receiptUploadEnabled !== false
+            && method.autoVerificationSupported === true;
+
+        return `<section class="payment-operator-requirements payment-operator-requirements-compact">
+            <div>
+                <h5>Verification</h5>
+                <strong>${thunderReady && verificationReady ? "Ready" : "Needs attention"}</strong>
+            </div>
+            <ul>
+                <li class="${thunderReady ? "is-ready" : ""}">
+                    <span>${thunderReady ? "✓" : "○"}</span>
+                    Thunder ${thunderReady ? "connected" : "setup required"}
+                </li>
+                <li class="${verificationReady ? "is-ready" : ""}">
+                    <span>${verificationReady ? "✓" : "○"}</span>
+                    Slip verification ${verificationReady ? "active" : "setup required"}
+                </li>
+            </ul>
+        </section>`;
+    }
+
+    return `<section class="payment-operator-requirements"><div><h5>Status &amp; requirements</h5><strong>${escapeAdminHTML(status.label)}</strong></div>${status.missing.length ? `<p>${status.missing.length} item${status.missing.length === 1 ? "" : "s"} remaining</p>` : method.enabled ? `<p>Ready for storefront</p>` : `<p>Ready for storefront. Enable this method to publish it.</p>`}<ul>${required.map(item => `<li class="${item.ready ? "is-ready" : ""}"><span>${item.ready ? "✓" : "○"}</span>${escapeAdminHTML(item.label)}</li>`).join("")}</ul></section>`;
+}
+
+function paymentOperatorField(label, help, control) {
+    return `<div class="settings-row payment-operator-field"><div class="payment-operator-field-copy"><label>${escapeAdminHTML(label)}</label><small>${escapeAdminHTML(help)}</small></div><div class="payment-operator-field-control">${control}</div></div>`;
+}
+
+function renderOperatorStatus(method = {}) {
+    const status = operatorPaymentStatus(method);
+    const missing = status.missing.map(reason => `<li><span>○</span>${escapeAdminHTML(operatorRequirementLabel(reason))}</li>`).join("");
+    const verification = method.key === "truewallet" ? `
+        <li class="${status.missing.includes("Thunder API configuration") ? "" : "is-ready"}"><span>${status.missing.includes("Thunder API configuration") ? "○" : "✓"}</span>Thunder ${status.missing.includes("Thunder API configuration") ? "setup required" : "connected"}</li>
+        <li class="${method.autoVerificationSupported === true ? "is-ready" : ""}"><span>${method.autoVerificationSupported === true ? "✓" : "○"}</span>Automatic slip verification</li>` : "";
+    return `<section class="payment-operator-section payment-operator-status-section"><div class="payment-operator-section-heading"><div><h5>Status</h5><strong>${escapeAdminHTML(status.label)}</strong>${status.missing.length ? `<p>${status.missing.length} thing${status.missing.length === 1 ? "" : "s"} need attention</p>` : ""}</div></div>${status.missing.length ? `<ul>${missing}</ul>` : `<p>${method.enabled === true ? "Ready for storefront." : "Configuration is ready. Enable this method to publish it."}</p>`}${verification ? `<ul class="payment-operator-verification-indicators">${verification}</ul>` : ""}</section>`;
+}
+
+function renderOperatorSetup(method = {}) {
+    const kind = String(method.configurationKind || "MANUAL_QR");
+    const key = normalizeAdminProvider(method.key || "");
+    const isLegacyBank = isLegacyThailandBankAdminMethod(method);
+    let fields = "";
+
+    if (kind === "TRUE_MONEY_WALLET") {
+        fields += paymentOperatorField("Account holder name", "Receiver name shown to customers", `<input class="pm-name" type="text" value="${escapeAdminHTML(method.accountName || "")}">`);
+        fields += paymentOperatorField("TrueMoney receiving number", "The customer-visible TrueMoney destination", `<input class="pm-number" type="text" value="${escapeAdminHTML(method.accountNumber || "")}">`);
+    } else if (kind === "PROMPTPAY_DYNAMIC" && !isLegacyBank) {
+        fields += paymentOperatorField("PromptPay recipient type", "Identity used to generate the payment QR", `<select class="pm-promptpay-recipient-type"><option value="" ${!method.promptPayRecipientType ? "selected" : ""}>Select recipient type</option><option value="PHONE" ${method.promptPayRecipientType === "PHONE" ? "selected" : ""}>Phone</option><option value="NATIONAL_ID" ${method.promptPayRecipientType === "NATIONAL_ID" ? "selected" : ""}>National ID</option><option value="TAX_ID" ${method.promptPayRecipientType === "TAX_ID" ? "selected" : ""}>Tax ID</option></select>`);
+        fields += paymentOperatorField("PromptPay recipient value", "Stored securely and masked in public responses", `<input class="pm-promptpay-recipient-value" type="text" value="${escapeAdminHTML(method.promptPayRecipientValue || "")}">`);
+        if (key === "thunder_promptpay") {
+            fields += paymentOperatorField("Receiving account name", "Bank account holder used for verification", `<input class="pm-name" type="text" value="${escapeAdminHTML(method.accountName || "")}">`);
+            fields += paymentOperatorField("Receiving account number", "Bank account used for verified transfers", `<input class="pm-number" type="text" value="${escapeAdminHTML(method.accountNumber || "")}">`);
+        }
+    } else if (kind === "MANUAL_QR") {
+        const qr = method.uploadedQrImage || method.qrImageUrl || "";
+        fields += paymentOperatorField("Account holder name", "Receiver name shown to customers", `<input class="pm-name" type="text" value="${escapeAdminHTML(method.accountName || "")}">`);
+        fields += paymentOperatorField("Account number", "Bank, phone, or recipient ID customers can copy", `<input class="pm-number" type="text" value="${escapeAdminHTML(method.accountNumber || "")}">`);
+        fields += paymentOperatorField("Payment QR", "Upload the static QR shown at checkout", `<div class="payment-operator-upload"><input class="pm-file" type="file" accept="image/*"><button class="admin-small-btn upload-qr-btn" type="button" data-action="upload-payment-qr" data-id="${escapeAdminHTML(method._id)}">Upload QR</button></div><input class="pm-qr" type="hidden" value="${escapeAdminHTML(method.qrImageUrl || "")}"><input class="pm-uploaded-qr" type="hidden" value="${escapeAdminHTML(method.uploadedQrImage || "")}"><input class="pm-uploaded-qr-evidence" type="hidden" value="${escapeAdminHTML(JSON.stringify(method.uploadedQrImageEvidence || null))}">${qr ? `<div class="payment-qr-preview"><img src="${escapeAdminHTML(getAdminPaymentUploadUrl(qr))}" alt="QR preview"></div>` : ""}`);
+    } else if (kind === "MANUAL_BANK_APP" || isLegacyBank) {
+        fields += paymentOperatorField("Account holder name", "Receiver name shown to customers", `<input class="pm-name" type="text" value="${escapeAdminHTML(method.accountName || "")}" ${isLegacyBank ? "disabled" : ""}>`);
+        fields += paymentOperatorField("Account number", "Receiving account customers can copy", `<input class="pm-number" type="text" value="${escapeAdminHTML(method.accountNumber || "")}" ${isLegacyBank ? "disabled" : ""}>`);
+        if (!isLegacyBank) fields += paymentOperatorField("App display name", "Customer-facing name used for the app action", `<input class="pm-app-name" type="text" value="${escapeAdminHTML(method.appDisplayName || "")}">`);
+    } else if (kind === "AUTOMATIC_PROVIDER") {
+        fields = `<p class="payment-section-help">Provider setup is managed through Infrastructure. No operator setup fields are required here.</p>`;
+    } else {
+        fields = `<p class="payment-section-help">This wallet uses the customer’s AZIEL balance and has no receiving-account setup.</p>`;
+    }
+    return `<section class="payment-operator-section payment-operator-setup"><h5>Setup</h5>${isLegacyBank ? `<p class="payment-section-help">Managed under PromptPay supported banking apps.</p>` : ""}${fields}</section>`;
+}
+
+function renderOperatorCustomerDisplay(method = {}) {
+    const logoUrl = method.logoUrl || getAdminPaymentLogo(method);
+    return `<section class="payment-operator-section"><h5>Customer display</h5>
+        ${paymentOperatorField("Display name", "Name shown on storefront cards and payment summaries", `<input class="pm-method" type="text" value="${escapeAdminHTML(method.method || "")}">`)}
+        ${paymentOperatorField("Logo", "Dedicated payment-card logo", `<div class="payment-operator-logo-control"><img src="${escapeAdminHTML(logoUrl)}" alt="${escapeAdminHTML(method.method || method.key)} logo"><div><button class="admin-small-btn" type="button" data-action="choose-payment-logo" data-id="${escapeAdminHTML(method._id)}">Change</button><button class="admin-small-btn payment-operator-remove-logo" type="button" data-action="remove-payment-logo">Remove</button></div><input class="pm-logo-file" type="file" accept="image/*" hidden></div><input class="pm-logo-url" type="hidden" value="${escapeAdminHTML(method.logoUrl || "")}">`)}
+        ${paymentOperatorField("Customer instruction", "Short guidance shown to customers", `<input class="pm-description" type="text" value="${escapeAdminHTML(method.shortDescription || "")}">`)}
+        <div class="admin-payment-card-preview"><img src="${escapeAdminHTML(logoUrl)}" alt=""><div><strong>${escapeAdminHTML(method.method || method.key)}</strong><small>${escapeAdminHTML(method.badgeText || operatorPaymentType(method).label)}</small><span>${escapeAdminHTML(method.shortDescription || operatorPaymentType(method).description)}</span></div></div>
+    </section>`;
+}
+
+function renderOperatorAvailability(method = {}) {
+    const status = operatorPaymentStatus(method);
+    const blocked = status.key === "needs_setup";
+    return `<section class="payment-operator-section"><h5>Availability</h5>
+        <div class="payment-operator-toggle-row"><div><label>Available on storefront</label><small>Changes publish only after Save changes</small></div><label class="payment-operator-toggle payment-operator-availability-toggle"><input class="pm-enabled" type="checkbox" ${method.enabled ? "checked" : ""} ${blocked ? "disabled" : ""}><span class="payment-operator-switch-track" aria-hidden="true"><span class="payment-operator-switch-thumb"></span></span><span class="payment-operator-toggle-label">${blocked ? "Unavailable" : method.enabled ? "On" : "Off"}</span></label></div>${blocked ? `<p class="payment-operator-toggle-blocker">Complete setup before enabling.</p>` : ""}
+        ${paymentOperatorField("Supported market", "Payment method market identity", `<input class="pm-region-label" type="text" value="${escapeAdminHTML(getRegionLabel(method.region))}" readonly><input class="pm-region" type="hidden" value="${escapeAdminHTML(method.region)}">`)}
+        ${paymentOperatorField("Maintenance message", "Optional warning or delay note shown to customers", `<textarea class="pm-message">${escapeAdminHTML(method.maintenanceMessage || "")}</textarea>`)}
+        ${paymentOperatorField("Availability schedule", "Optional operator-managed availability note", `<input class="pm-availability-schedule" type="text" value="${escapeAdminHTML(method.availabilitySchedule || "")}">`)}
+    </section>`;
+}
+
+function renderOperatorAdvanced(method = {}) {
+    const kind = String(method.configurationKind || "MANUAL_QR");
+    let fields = "";
+    if (["TRUE_MONEY_WALLET", "MANUAL_QR", "MANUAL_BANK_APP"].includes(kind)) {
+        fields += paymentOperatorField("Recipient label", "Optional customer-facing label for the destination", `<input class="pm-recipient-label" type="text" value="${escapeAdminHTML(method.recipientLabel || "")}">`);
+        fields += paymentOperatorField("Payment reference instructions", "Optional customer-facing transfer note", `<textarea class="pm-reference-instructions">${escapeAdminHTML(method.referenceInstructions || "")}</textarea>`);
+    }
+    if (["TRUE_MONEY_WALLET", "PROMPTPAY_DYNAMIC"].includes(kind)) {
+        fields += paymentOperatorField("QR expiry minutes", "How long generated payment instructions remain current", `<input class="pm-dynamic-qr-expiry" type="number" min="1" max="1440" value="${escapeAdminHTML(method.dynamicQrExpiryMinutes || 15)}">`);
+    }
+    fields += paymentOperatorField("Badge text", "Optional compact payment-card badge", `<input class="pm-badge" type="text" value="${escapeAdminHTML(method.badgeText || "")}">`);
+    fields += paymentOperatorField("Sort order", "Lower numbers appear first", `<input class="pm-sort-order" type="number" step="1" value="${escapeAdminHTML(method.sortOrder || 0)}">`);
+    if (method.key === "promptpay") fields += renderPromptPayBankLauncherEditor(method);
+    return `<details class="payment-operator-advanced"><summary>Advanced settings</summary><div class="payment-operator-advanced-body">${fields}</div></details>`;
+}
+
+function renderOperatorPaymentEditor(method = {}) {
+    const legacyBank = isLegacyThailandBankAdminMethod(method);
+    return `${renderOperatorStatus(method)}${renderOperatorSetup(method)}${renderOperatorCustomerDisplay(method)}${renderOperatorAvailability(method)}${renderOperatorAdvanced(method)}<div class="payment-editor-savebar"><button class="admin-secondary-btn" type="button" data-action="cancel-payment-editor">Cancel</button><button class="save-payment-btn" type="button" data-action="save-payment-method" data-id="${escapeAdminHTML(method._id)}" ${legacyBank ? "disabled" : ""}>${legacyBank ? "Managed under PromptPay" : "Save changes"}</button></div>`;
+}
+
+function renderAdminPaymentMethods(methods) {
+    const box = document.getElementById("paymentMethodsContainer");
+    if (!box) return;
+    const region = getPaymentInfrastructureActiveRegion(methods) === "MM" ? "MM" : "TH";
+    adminPaymentInfrastructureActiveRegion = region;
+    const regionMethods = getPaymentMethodsForInfrastructureRegion(methods, region);
+    if (!adminSelectedPaymentMethodId || !regionMethods.some(item => String(item._id) === String(adminSelectedPaymentMethodId))) {
+        adminSelectedPaymentMethodId = String(regionMethods[0]?._id || "");
+        adminPaymentEditorOpen = false;
+    }
+    const filtered = regionMethods.filter(method => {
+        const status = operatorPaymentStatus(method);
+        return adminPaymentStatusFilter === "all" || status.key === adminPaymentStatusFilter;
+    });
+    const selected = methods.find(item => String(item._id) === String(adminSelectedPaymentMethodId));
+    const selectedStatus = selected ? operatorPaymentStatus(selected) : null;
+    const selectedLogo = selected ? (selected.logoUrl || getAdminPaymentLogo(selected)) : "";
+    const selectedDraft = selected ? adminPaymentEnabledDrafts.get(String(selected._id)) : undefined;
+    box.innerHTML = `
+        <div class="payment-operator-workspace ${adminPaymentEditorOpen ? "has-editor" : ""}">
+            <header class="payment-operator-header"><div><h2>Payments</h2><p>Manage how customers pay in each market.</p></div><div><button class="admin-secondary-btn" type="button" data-action="open-payment-infrastructure">Infrastructure</button><button class="admin-primary-btn payment-operator-add-btn" type="button" data-action="add-payment-method"><span class="payment-add-full">+ Add payment method</span><span class="payment-add-short">+ Add</span></button></div></header>
+            <div class="payment-operator-region" role="tablist" aria-label="Payment region"><button class="${region === "TH" ? "active" : ""}" data-operator-region="TH">Thailand</button><button class="${region === "MM" ? "active" : ""}" data-operator-region="MM">Myanmar</button></div>
+            <div class="payment-operator-filters" aria-label="Payment status filters">${[["all", "All"], ["ready", "Ready"], ["needs_setup", "Needs setup"], ["disabled", "Disabled"]].map(([key, label]) => `<button class="${adminPaymentStatusFilter === key ? "active" : ""}" data-payment-status-filter="${key}">${label}</button>`).join("")}</div>
+            <div class="payment-operator-layout"><section class="payment-operator-list"><div class="payment-operator-columns"><span>Payment method</span><span>Type</span><span>Status</span><span>Enabled</span><span></span></div>${filtered.map(method => { const status = operatorPaymentStatus(method); const type = operatorPaymentType(method); const id = String(method._id); const draft = adminPaymentEnabledDrafts.get(id); const enabled = draft === undefined ? method.enabled === true : draft; const blocked = status.key === "needs_setup"; return `<div class="payment-operator-row ${id === adminSelectedPaymentMethodId ? "is-selected" : ""}" data-payment-row="${escapeAdminHTML(id)}" tabindex="0"><div class="payment-operator-method"><img src="${escapeAdminHTML(method.logoUrl || getAdminPaymentLogo(method))}" alt=""><span><strong>${escapeAdminHTML(method.method || method.key)}</strong><small>${escapeAdminHTML(getRegionLabel(method.region))}</small></span></div><div class="payment-operator-type"><strong>${escapeAdminHTML(type.label)}</strong><small>${escapeAdminHTML(type.description)}</small></div><span class="payment-operator-status is-${status.key}">${escapeAdminHTML(status.label)}</span><label class="payment-operator-toggle${draft !== undefined ? " has-draft" : ""}" title="${blocked ? "Complete setup before enabling" : "Enabled state is saved with Save changes"}"><input type="checkbox" role="switch" aria-label="${escapeAdminHTML(`Enable ${method.method || method.key}`)}" aria-checked="${enabled ? "true" : "false"}" data-payment-row-toggle="${escapeAdminHTML(id)}" ${enabled ? "checked" : ""} ${blocked ? "disabled" : ""}><span class="payment-operator-switch-track" aria-hidden="true"><span class="payment-operator-switch-thumb"></span></span><small class="payment-operator-toggle-state">${draft !== undefined ? "Unsaved" : ""}</small></label><button class="payment-operator-more" data-payment-row-menu="${escapeAdminHTML(id)}" aria-label="More actions">•••</button></div>`; }).join("") || `<div class="admin-list-empty">No payment methods match this filter.</div>`}</section>
+            ${selected && adminPaymentEditorOpen ? `<aside class="payment-operator-editor"><div class="payment-operator-editor-head"><img src="${escapeAdminHTML(selectedLogo)}" alt=""><div><h3>${escapeAdminHTML(selected.method)}</h3><p>${escapeAdminHTML(getRegionLabel(selected.region))} · ${escapeAdminHTML(selectedStatus.label)}</p></div><button data-action="close-payment-editor" aria-label="Close editor">×</button></div><div class="payment-method-card payment-operator-editor-root" data-id="${escapeAdminHTML(selected._id)}" data-key="${escapeAdminHTML(selected.key)}" data-region="${escapeAdminHTML(selected.region)}" data-configuration-kind="${escapeAdminHTML(selected.configurationKind || "MANUAL_QR")}" data-legacy-thai-bank="${isLegacyThailandBankAdminMethod(selected) ? "true" : "false"}">${renderOperatorPaymentEditor({...selected, enabled: selectedDraft === undefined ? selected.enabled : selectedDraft})}</div></aside>` : ""}
+            </div>
+        </div>`;
+    if (selected && adminPaymentEditorOpen && selectedDraft !== undefined) {
+        const enabled = box.querySelector(".payment-operator-editor-root .pm-enabled");
+        if (enabled) enabled.checked = selectedDraft;
+    }
+    bindAdminPaymentActions();
+    bindPaymentOperatorActions();
+}
+
+function selectOperatorPaymentMethod(id) {
+    const normalizedId = String(id || "");
+    if (!adminPaymentMethods.some(method => String(method._id) === normalizedId)) return false;
+    adminSelectedPaymentMethodId = normalizedId;
+    adminPaymentEditorOpen = true;
+    renderAdminPaymentMethods(adminPaymentMethods);
+    return true;
+}
+
+function bindPaymentOperatorActions() {
+    const container = document.getElementById("paymentMethodsContainer");
+    if (!container || paymentOperatorActionsBound) return;
+    paymentOperatorActionsBound = true;
+
+    container.addEventListener("click", event => {
+        const region = event.target.closest("[data-operator-region]");
+        if (region) return void selectPaymentInfrastructureRegion(region.dataset.operatorRegion, { notify: false });
+        const filter = event.target.closest("[data-payment-status-filter]");
+        if (filter) {
+            adminPaymentStatusFilter = filter.dataset.paymentStatusFilter || "all";
+            return void renderAdminPaymentMethods(adminPaymentMethods);
+        }
+        if (event.target.closest('[data-action="open-payment-infrastructure"]')) return void showPaymentInfrastructureSurface();
+        if (event.target.closest('[data-action="close-payment-editor"], [data-action="cancel-payment-editor"]')) {
+            adminPaymentEditorOpen = false;
+            adminPaymentEnabledDrafts.delete(adminSelectedPaymentMethodId);
+            return void renderAdminPaymentMethods(adminPaymentMethods);
+        }
+        const menu = event.target.closest("[data-payment-row-menu]");
+        if (menu) {
+            event.stopPropagation();
+            selectOperatorPaymentMethod(menu.dataset.paymentRowMenu);
+            const card = container.querySelector(".payment-operator-editor-root");
+            if (card) showAdminPaymentPreview(card);
+            return;
+        }
+        const row = event.target.closest("[data-payment-row]");
+        if (row && !event.target.closest("button,input,label")) selectOperatorPaymentMethod(row.dataset.paymentRow);
+    });
+    container.addEventListener("keydown", event => {
+        const row = event.target.closest("[data-payment-row]");
+        if (!row || !["Enter", " "].includes(event.key) || event.target.closest("button,input")) return;
+        event.preventDefault();
+        selectOperatorPaymentMethod(row.dataset.paymentRow);
+    });
+    container.addEventListener("change", event => {
+        const toggle = event.target.closest("[data-payment-row-toggle]");
+        if (!toggle) return;
+        event.stopPropagation();
+        adminPaymentEnabledDrafts.set(toggle.dataset.paymentRowToggle, toggle.checked);
+        toggle.closest(".payment-operator-row")?.classList.add("has-unsaved-change");
+        const state = toggle.closest("label")?.querySelector(".payment-operator-toggle-state");
+        if (state) state.textContent = "Unsaved";
+        if (toggle.dataset.paymentRowToggle === adminSelectedPaymentMethodId) {
+            const editorToggle = container.querySelector(".payment-operator-editor-root .pm-enabled");
+            if (editorToggle) editorToggle.checked = toggle.checked;
+        }
+    });
+    container.addEventListener("toggle", event => {
+        if (event.target.matches?.(".payment-operator-advanced")) adminPaymentEditorAdvancedOpen = event.target.open;
+    }, true);
+}
+
+function showPaymentInfrastructureSurface() {
+    let modal = document.getElementById("paymentInfrastructureModal");
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "paymentInfrastructureModal";
+        modal.className = "payment-infrastructure-modal";
+        document.body.appendChild(modal);
+    }
+    const infra = adminPaymentInfrastructure || buildFallbackPaymentInfrastructure(adminPaymentMethods);
+    const region = infra.regions?.find(item => item.region === adminPaymentInfrastructureActiveRegion) || {};
+    modal.innerHTML = `<div class="payment-infrastructure-surface" role="dialog" aria-modal="true" aria-label="Payment infrastructure"><header><div><h3>Payment infrastructure</h3><p>Provider, routing and diagnostic information</p></div><button data-close-infrastructure aria-label="Close">×</button></header>${renderPaymentInfrastructureProviders(infra)}${renderPaymentInfrastructureRouting(infra)}${renderPaymentInfrastructureWebhooks(infra)}${renderPaymentInfrastructureCards(region)}${renderPaymentInfrastructureDiagnostics(region, infra)}</div>`;
+    modal.hidden = false;
+    modal.addEventListener("click", event => { if (event.target === modal || event.target.closest("[data-close-infrastructure]")) modal.hidden = true; }, { once: true });
+}
+
 function renderPromptPayBankLauncherEditor(method = {}) {
     const launchers = Array.isArray(method.bankLaunchers) && method.bankLaunchers.length
         ? method.bankLaunchers
@@ -669,7 +995,7 @@ function getPaymentMethodsForInfrastructureRegion(methods = [], region = "TH") {
     return methods.filter(method => {
         const methodRegion = String(method.region || "").toUpperCase();
         const methodKey = String(method.key || "").toLowerCase();
-        return methodRegion === region || methodKey === "wallet";
+        return method.operatorHidden !== true && (methodRegion === region || methodKey === "wallet");
     });
 }
 
@@ -958,6 +1284,7 @@ function renderPaymentInfrastructureWebhooks(infra = {}) {
 
 function renderPaymentInfrastructureDiagnostics(region = {}, infra = {}) {
     const rails = [...(region.manualRails || []), ...(region.automaticRails || [])];
+    const methods = adminPaymentMethods.filter(method => method.region === region.region);
     return `
         <div class="payment-diagnostics-list">
             ${rails.map(rail => `
@@ -968,6 +1295,31 @@ function renderPaymentInfrastructureDiagnostics(region = {}, infra = {}) {
                     `).join("") || "<p><span>No diagnostics</span><b>LEGACY</b></p>"}
                 </article>
             `).join("")}
+        </div>
+        <div class="payment-provider-grid payment-method-identity-diagnostics">
+            ${methods.map(method => {
+                const capabilities = [
+                    ["Save QR", method.enableSaveQr], ["Open app", method.enableOpenApp],
+                    ["Checklist", method.enableChecklist], ["Dynamic QR", method.dynamicQrSupported],
+                    ["Amount prefill", method.amountPrefillSupported], ["Reference", method.referenceSupported],
+                    ["Gallery scan", method.galleryScanSupported], ["Slip required", method.slipRequired],
+                    ["Receipt upload", method.receiptUploadEnabled], ["Auto verification", method.autoVerificationSupported],
+                    ["Webhook", method.webhookSupported]
+                ];
+                const runtimeProvider = method.key === "truewallet" ? "THUNDER_TRUEWALLET" : method.key === "thunder_promptpay" ? "THUNDER_PROMPTPAY" : method.provider;
+                return `<article class="payment-provider-card"><strong>${escapeAdminHTML(method.method || method.key)}</strong><small>Read-only method identity</small><dl>
+                    <div><dt>Canonical key</dt><dd>${escapeAdminHTML(method.key || "-")}</dd></div>
+                    <div><dt>Configuration kind</dt><dd>${escapeAdminHTML(method.configurationKind || "-")}</dd></div>
+                    <div><dt>Configured provider</dt><dd>${escapeAdminHTML(method.provider || "-")}</dd></div>
+                    <div><dt>Runtime provider</dt><dd>${escapeAdminHTML(runtimeProvider || "-")}</dd></div>
+                    <div><dt>Payment rail</dt><dd>${escapeAdminHTML(method.paymentChannel || method.railType || "-")}</dd></div>
+                    <div><dt>Payment type</dt><dd>${escapeAdminHTML(method.paymentType || "-")}</dd></div>
+                    <div><dt>Confirmation mode</dt><dd>${escapeAdminHTML(method.confirmationMode || "-")}</dd></div>
+                    <div><dt>QR mode</dt><dd>${escapeAdminHTML(method.qrMode || "-")}</dd></div>
+                    <div><dt>Missing configuration</dt><dd>${escapeAdminHTML((method.missingConfiguration || []).join(", ") || "None")}</dd></div>
+                    <div><dt>Capabilities</dt><dd>${capabilities.map(([label, enabled]) => `${label}: ${enabled === true ? "yes" : "no"}`).join(" · ")}</dd></div>
+                </dl></article>`;
+            }).join("") || `<div class="payment-infra-empty">No method diagnostics for this region.</div>`}
         </div>
     `;
 }
@@ -1159,6 +1511,9 @@ function normalizeAdminProvider(value = "") {
         omise: "promptpay",
         opnpromptpay: "promptpay",
         prompt_pay: "promptpay",
+        truemoney: "truewallet",
+        truemoneywallet: "truewallet",
+        thunder_truewallet: "truewallet",
         aya: "ayapay",
         aya_pay: "ayapay",
         kbz_pay: "kbzpay",
@@ -1445,6 +1800,7 @@ function methodIdentityOptionsHTML(region = "MM", selected = "") {
     const groups = {
         TH: [
             ["promptpay", "PromptPay"],
+            ["truewallet", "TrueMoney Wallet"],
             ["scb", "SCB"],
             ["bangkok_bank", "Bangkok Bank"],
             ["kplus", "K PLUS"],
@@ -1530,7 +1886,7 @@ function checklistStepRow(step = {}) {
 }
 
 function bindAdminPaymentActions() {
-    document.querySelector('[data-action="add-payment-method"]')?.addEventListener("click", addAdminPaymentMethod);
+    document.querySelector('[data-action="add-payment-method"]')?.addEventListener("click", showAddPaymentMethodModal);
 
     document.querySelectorAll('[data-action="save-payment-method"]').forEach(btn => {
         btn.addEventListener("click", () => saveAdminPaymentMethod(btn.dataset.id));
@@ -1575,7 +1931,7 @@ function bindAdminPaymentActions() {
 
     });
 
-    document.querySelectorAll(".payment-method-card")
+    document.querySelectorAll(".payment-method-card:not(.payment-operator-editor-root)")
         .forEach(card => {
 
             refreshPaymentEditorVisibility(card);
@@ -1591,11 +1947,25 @@ function bindAdminPaymentActions() {
         btn.addEventListener("click", () => uploadAdminPaymentLogo(btn.dataset.id));
     });
 
+    document.querySelectorAll('[data-action="choose-payment-logo"]').forEach(btn => {
+        btn.addEventListener("click", () => {
+            const card = btn.closest(".payment-method-card");
+            const input = card?.querySelector(".pm-logo-file");
+            if (!input) return;
+            input.onchange = () => {
+                if (input.files?.[0]) uploadAdminPaymentLogo(btn.dataset.id);
+            };
+            input.click();
+        });
+    });
+
     document.querySelectorAll('[data-action="remove-payment-logo"]').forEach(btn => {
         btn.addEventListener("click", () => {
             const card = btn.closest(".payment-method-card");
             const input = card?.querySelector(".pm-logo-url");
             if (input) input.value = "";
+            const logoPreview = card?.querySelector(".payment-operator-logo-control > img");
+            if (logoPreview) logoPreview.src = getAdminPaymentLogo({ key: card?.dataset.key || "" });
             updateInlineCardPreview(card);
         });
     });
@@ -2100,57 +2470,35 @@ async function saveAdminPaymentMethod(id) {
         return;
     }
 
-    const payload = {
-        method: card.querySelector(".pm-method")?.value || "",
-        region: card.querySelector(".pm-region")?.value || "MM",
-        enabled: card.querySelector(".pm-enabled")?.checked || false,
-        accountName: card.querySelector(".pm-name")?.value || "",
-        accountNumber: card.querySelector(".pm-number")?.value || "",
-        logoUrl: card.querySelector(".pm-logo-url")?.value || "",
-        shortDescription: card.querySelector(".pm-description")?.value || "",
-        badgeText: card.querySelector(".pm-badge")?.value || "",
-        recipientLabel: card.querySelector(".pm-recipient-label")?.value || "",
-        referenceInstructions: card.querySelector(".pm-reference-instructions")?.value || "",
-        qrMode: card.querySelector(".pm-qr-mode")?.value || "uploaded_static",
-        qrImageUrl: card.querySelector(".pm-qr")?.value || "",
-        uploadedQrImage: card.querySelector(".pm-uploaded-qr")?.value || "",
-        uploadedQrImageEvidence: parseAdminPaymentEvidence(card.querySelector(".pm-uploaded-qr-evidence")?.value),
-        maintenanceMessage: card.querySelector(".pm-message")?.value || "",
-        availabilitySchedule: card.querySelector(".pm-availability-schedule")?.value || "",
-        paymentType: card.querySelector(".pm-type")?.value || "manual",
-        provider: normalizeAdminProvider(card.querySelector(".pm-provider")?.value || ""),
-	        appDisplayName: card.querySelector(".pm-app-name")?.value || "",
-	        openAppMode: card.querySelector(".pm-open-app-mode")?.value || "disabled",
-	        deepLinkUrl: card.querySelector(".pm-deeplink")?.value || "",
-	        appLaunchMode: card.querySelector(".pm-app-launch-mode")?.value || "OFFICIAL_PAYMENT_DEEPLINK",
-	        iosAppLaunchUrl: card.querySelector(".pm-ios-app-launch")?.value || "",
-	        androidAppLaunchUrl: card.querySelector(".pm-android-app-launch")?.value || "",
-	        androidPackageName: card.querySelector(".pm-android-package-name")?.value || "",
-	        appStoreUrl: card.querySelector(".pm-app-store")?.value || "",
-	        playStoreUrl: card.querySelector(".pm-play-store")?.value || "",
-	        appStoreFallbackUrl: card.querySelector(".pm-app-store")?.value || "",
-	        playStoreFallbackUrl: card.querySelector(".pm-play-store")?.value || "",
-	        promptPayRecipientType: card.querySelector(".pm-promptpay-recipient-type")?.value || "",
-	        promptPayRecipientValue: card.querySelector(".pm-promptpay-recipient-value")?.value || "",
-	        dynamicQrExpiryMinutes: Number(card.querySelector(".pm-dynamic-qr-expiry")?.value || 15),
-        enableSaveQr: card.querySelector(".pm-enable-save-qr")?.checked || false,
-        enableOpenApp: card.querySelector(".pm-enable-open-app")?.checked || false,
-        enableChecklist: card.querySelector(".pm-enable-checklist")?.checked || false,
-        dynamicQrSupported: card.querySelector(".pm-dynamic-qr")?.checked || false,
-        amountPrefillSupported: card.querySelector(".pm-amount-prefill")?.checked || false,
-        referenceSupported: card.querySelector(".pm-reference")?.checked || false,
-        galleryScanSupported: card.querySelector(".pm-gallery-scan")?.checked || false,
-        slipRequired: card.querySelector(".pm-slip-required")?.checked || false,
-        receiptUploadEnabled: card.querySelector(".pm-receipt-upload")?.checked || false,
-        autoVerificationSupported: card.querySelector(".pm-auto-verification")?.checked || false,
-        webhookSupported: card.querySelector(".pm-webhook")?.checked || false,
-        confirmationMode: card.querySelector(".pm-confirmation-mode")?.value || "manual_admin",
-        checklistSteps: collectChecklistSteps(card),
-        bankLaunchers: collectBankLaunchers(card),
-        sortOrder: Number(card.querySelector(".pm-sort-order")?.value || 0)
+    const payload = {};
+    const copyValue = (name, selector, transform = value => value) => {
+        const control = card.querySelector(selector);
+        if (control) payload[name] = transform(control.value);
     };
+    copyValue("method", ".pm-method");
+    copyValue("region", ".pm-region");
+    const enabledControl = card.querySelector(".pm-enabled");
+    if (enabledControl) payload.enabled = enabledControl.checked;
+    copyValue("accountName", ".pm-name");
+    copyValue("accountNumber", ".pm-number");
+    copyValue("logoUrl", ".pm-logo-url");
+    copyValue("shortDescription", ".pm-description");
+    copyValue("badgeText", ".pm-badge");
+    copyValue("recipientLabel", ".pm-recipient-label");
+    copyValue("referenceInstructions", ".pm-reference-instructions");
+    copyValue("qrImageUrl", ".pm-qr");
+    copyValue("uploadedQrImage", ".pm-uploaded-qr");
+    copyValue("uploadedQrImageEvidence", ".pm-uploaded-qr-evidence", parseAdminPaymentEvidence);
+    copyValue("maintenanceMessage", ".pm-message");
+    copyValue("availabilitySchedule", ".pm-availability-schedule");
+    copyValue("appDisplayName", ".pm-app-name");
+    copyValue("promptPayRecipientType", ".pm-promptpay-recipient-type");
+    copyValue("promptPayRecipientValue", ".pm-promptpay-recipient-value");
+    copyValue("dynamicQrExpiryMinutes", ".pm-dynamic-qr-expiry", value => Number(value || 15));
+    copyValue("sortOrder", ".pm-sort-order", value => Number(value || 0));
+    if (card.querySelector(".pm-bank-launcher-row")) payload.bankLaunchers = collectBankLaunchers(card);
 
-    if (card.dataset.key === "promptpay" && payload.provider === "promptpay" && payload.region === "TH") {
+    if (card.dataset.key === "promptpay" && card.dataset.region === "TH") {
         payload.method = payload.method || "PromptPay QR";
         payload.paymentType = "manual";
         payload.qrMode = "aziel_promptpay_dynamic";
@@ -2170,7 +2518,7 @@ async function saveAdminPaymentMethod(id) {
         payload.webhookSupported = false;
     }
 
-    if (card.dataset.key === "thunder_promptpay" || payload.provider === "thunder_promptpay") {
+    if (card.dataset.key === "thunder_promptpay") {
         payload.method = payload.method || "PromptPay Auto Verify";
         payload.region = "TH";
         payload.provider = "thunder_promptpay";
@@ -2185,12 +2533,22 @@ async function saveAdminPaymentMethod(id) {
         payload.webhookSupported = false;
     }
 
-    if (["scb", "bangkok_bank", "kplus", "krungsri", "krungthai"].includes(payload.provider) && payload.region === "TH" && payload.paymentType !== "manual") {
-        payload.paymentType = "deeplink";
-    }
-
-    if (payload.provider === "wallet") {
-        payload.paymentType = "wallet";
+    if (card.dataset.key === "truewallet") {
+        payload.method = "TrueMoney Wallet";
+        payload.region = "TH";
+        payload.provider = "truewallet";
+        payload.paymentChannel = "TRUE_MONEY_WALLET";
+        payload.paymentType = "manual";
+        payload.qrMode = "aziel_promptpay_dynamic";
+        payload.confirmationMode = "thunder_truewallet_slip";
+        payload.receiptUploadEnabled = true;
+        payload.slipRequired = true;
+        payload.enableSaveQr = true;
+        payload.dynamicQrSupported = true;
+        payload.amountPrefillSupported = true;
+        payload.enableOpenApp = false;
+        payload.autoVerificationSupported = true;
+        payload.webhookSupported = false;
     }
 
     try {
@@ -2206,6 +2564,7 @@ async function saveAdminPaymentMethod(id) {
         }
 
         showAdminToast?.("Payment method saved", "success");
+        adminPaymentEnabledDrafts.delete(String(id));
         await loadAdminPaymentMethods();
 
     } catch (error) {
@@ -2217,12 +2576,13 @@ async function saveAdminPaymentMethod(id) {
 function collectAdminPaymentFormState(card) {
     const key = card?.dataset.key || "";
     const method = card?.querySelector(".pm-method")?.value || "";
-    const paymentType = card?.querySelector(".pm-type")?.value || "manual";
+    const source = adminPaymentMethods.find(item => String(item._id) === String(card?.dataset.id)) || {};
+    const paymentType = source.paymentType || "manual";
     return {
         key,
         configurationKind: card?.dataset.configurationKind || "MANUAL_QR",
         method,
-        region: card?.querySelector(".pm-region")?.value || "MM",
+        region: card?.querySelector(".pm-region")?.value || source.region || "MM",
         paymentType,
         provider: normalizeAdminProvider(key),
         logoUrl: card?.querySelector(".pm-logo-url")?.value || "",
@@ -2232,27 +2592,27 @@ function collectAdminPaymentFormState(card) {
         accountNumber: card?.querySelector(".pm-number")?.value || "",
         recipientLabel: card?.querySelector(".pm-recipient-label")?.value || "",
         referenceInstructions: card?.querySelector(".pm-reference-instructions")?.value || "",
-        qrMode: card?.querySelector(".pm-qr-mode")?.value || "uploaded_static",
+        qrMode: source.qrMode || "uploaded_static",
         qrImageUrl: card?.querySelector(".pm-qr")?.value || "",
         uploadedQrImage: card?.querySelector(".pm-uploaded-qr")?.value || "",
-	        appDisplayName: card?.querySelector(".pm-app-name")?.value || "",
-	        openAppMode: card?.querySelector(".pm-open-app-mode")?.value || "disabled",
-	        deepLinkUrl: card?.querySelector(".pm-deeplink")?.value || "",
-	        appLaunchMode: card?.querySelector(".pm-app-launch-mode")?.value || "OFFICIAL_PAYMENT_DEEPLINK",
-	        iosAppLaunchUrl: card?.querySelector(".pm-ios-app-launch")?.value || "",
-	        androidAppLaunchUrl: card?.querySelector(".pm-android-app-launch")?.value || "",
-	        androidPackageName: card?.querySelector(".pm-android-package-name")?.value || "",
-	        appStoreFallbackUrl: card?.querySelector(".pm-app-store")?.value || "",
-	        playStoreFallbackUrl: card?.querySelector(".pm-play-store")?.value || "",
-	        promptPayRecipientType: card?.querySelector(".pm-promptpay-recipient-type")?.value || "",
-	        promptPayRecipientValue: card?.querySelector(".pm-promptpay-recipient-value")?.value || "",
-	        dynamicQrExpiryMinutes: Number(card?.querySelector(".pm-dynamic-qr-expiry")?.value || 15),
-	        enableSaveQr: card?.querySelector(".pm-enable-save-qr")?.checked || false,
-        enableOpenApp: card?.querySelector(".pm-enable-open-app")?.checked || false,
-        enableChecklist: card?.querySelector(".pm-enable-checklist")?.checked || false,
-        slipRequired: card?.querySelector(".pm-slip-required")?.checked || false,
-        receiptUploadEnabled: card?.querySelector(".pm-receipt-upload")?.checked || false,
-        confirmationMode: card?.querySelector(".pm-confirmation-mode")?.value || "manual_admin",
+        appDisplayName: card?.querySelector(".pm-app-name")?.value || "",
+        openAppMode: card?.querySelector(".pm-open-app-mode")?.value || "disabled",
+        deepLinkUrl: card?.querySelector(".pm-deeplink")?.value || "",
+        appLaunchMode: card?.querySelector(".pm-app-launch-mode")?.value || "OFFICIAL_PAYMENT_DEEPLINK",
+        iosAppLaunchUrl: card?.querySelector(".pm-ios-app-launch")?.value || "",
+        androidAppLaunchUrl: card?.querySelector(".pm-android-app-launch")?.value || "",
+        androidPackageName: card?.querySelector(".pm-android-package-name")?.value || "",
+        appStoreFallbackUrl: card?.querySelector(".pm-app-store")?.value || "",
+        playStoreFallbackUrl: card?.querySelector(".pm-play-store")?.value || "",
+        promptPayRecipientType: card?.querySelector(".pm-promptpay-recipient-type")?.value || "",
+        promptPayRecipientValue: card?.querySelector(".pm-promptpay-recipient-value")?.value || "",
+        dynamicQrExpiryMinutes: Number(card?.querySelector(".pm-dynamic-qr-expiry")?.value || 15),
+        enableSaveQr: source.enableSaveQr === true,
+        enableOpenApp: source.enableOpenApp === true,
+        enableChecklist: source.enableChecklist === true,
+        slipRequired: source.slipRequired !== false,
+        receiptUploadEnabled: source.receiptUploadEnabled !== false,
+        confirmationMode: source.confirmationMode || "manual_admin",
         bankLaunchers: collectBankLaunchers(card),
         checklistSteps: collectChecklistSteps(card)
     };
@@ -2275,6 +2635,57 @@ function collectBankLaunchers(card) {
             operatorNotes: row.querySelector(".pm-bank-launcher-notes")?.value || ""
         }))
         .filter(item => item.key && item.key !== "kplus");
+}
+
+function showAddPaymentMethodModal() {
+    let modal = document.getElementById("addPaymentMethodModal");
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "addPaymentMethodModal";
+        modal.className = "payment-add-modal";
+        document.body.appendChild(modal);
+    }
+    const region = adminPaymentInfrastructureActiveRegion === "MM" ? "MM" : "TH";
+    const choices = getMethodChoices(region);
+    modal.innerHTML = `<form class="payment-add-panel"><header><div><h3>Add payment method</h3><p>Choose a method for ${region === "TH" ? "Thailand" : "Myanmar"}.</p></div><button type="button" data-close-add-payment aria-label="Close">×</button></header><label>Payment method<select name="methodKey">${choices.map(item => `<option value="${escapeAdminHTML(item.key)}">${escapeAdminHTML(item.label)}</option>`).join("")}</select></label><footer><button type="button" class="admin-secondary-btn" data-close-add-payment>Cancel</button><button class="admin-primary-btn" type="submit">Add method</button></footer></form>`;
+    modal.hidden = false;
+    modal.querySelectorAll("[data-close-add-payment]").forEach(button => button.addEventListener("click", () => modal.hidden = true));
+    modal.onclick = event => { if (event.target === modal) modal.hidden = true; };
+    modal.querySelector("form")?.addEventListener("submit", async event => {
+        event.preventDefault();
+        const selected = choices.find(item => item.key === new FormData(event.currentTarget).get("methodKey"));
+        if (!selected) return;
+        const existing = adminPaymentMethods.find(method => String(method.region || "").toUpperCase() === region && String(method.key || "").toLowerCase() === selected.key);
+        if (existing) {
+            modal.hidden = true;
+            adminSelectedPaymentMethodId = String(existing._id);
+            adminPaymentEditorOpen = true;
+            renderAdminPaymentMethods(adminPaymentMethods);
+            showAdminToast?.(`${selected.label} already exists.`, "info");
+            return;
+        }
+        await createAdminPaymentMethod(selected, region);
+        modal.hidden = true;
+    });
+}
+
+async function createAdminPaymentMethod(selected, region) {
+    const paymentType = selected.paymentType || "manual";
+    try {
+        const data = await adminFetch("/api/admin/payment-methods", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ method: selected.method || selected.label, key: selected.key, region, enabled: false, paymentType, provider: selected.provider || "", paymentChannel: selected.paymentChannel || "", slipRequired: selected.slipRequired ?? ["manual", "deeplink"].includes(paymentType), receiptUploadEnabled: selected.receiptUploadEnabled ?? ["manual", "deeplink"].includes(paymentType), autoVerificationSupported: selected.autoVerificationSupported === true, webhookSupported: selected.webhookSupported === true, qrMode: selected.qrMode || (paymentType === "auto" ? "provider_generated" : paymentType === "wallet" ? "none" : "uploaded_static"), confirmationMode: selected.confirmationMode || (paymentType === "auto" ? "provider_webhook" : paymentType === "wallet" ? "wallet_internal" : "manual_admin") })
+        });
+        if (!data?.success) return showAdminToast?.(data?.message || "Create failed", "error");
+        adminSelectedPaymentMethodId = String(data.method?._id || "");
+        adminPaymentEditorOpen = true;
+        showAdminToast?.("Payment method created", "success");
+        await loadAdminPaymentMethods();
+    } catch (error) {
+        console.log("Create payment method error:", error);
+        showAdminToast?.("Server error", "error");
+    }
 }
 
 async function addAdminPaymentMethod() {
@@ -2347,8 +2758,8 @@ async function addAdminPaymentMethod() {
 function getMethodChoices(region) {
     const choices = {
         TH: [
-            { key: "promptpay", label: "PromptPay QR", paymentType: "manual" },
             { key: "thunder_promptpay", label: "PromptPay Auto Verify", method: "PromptPay Auto Verify", paymentType: "manual", provider: "thunder_promptpay", qrMode: "aziel_promptpay_dynamic", confirmationMode: "thunder_slip", slipRequired: true, receiptUploadEnabled: true, autoVerificationSupported: true, webhookSupported: false },
+            { key: "truewallet", label: "TrueMoney Wallet", method: "TrueMoney Wallet", paymentType: "manual", provider: "truewallet", paymentChannel: "TRUE_MONEY_WALLET", qrMode: "truemoney_template_dynamic", confirmationMode: "thunder_truewallet_slip", slipRequired: true, receiptUploadEnabled: true, dynamicQrSupported: true, amountPrefillSupported: true, autoVerificationSupported: true, webhookSupported: false },
             { key: "scb", label: "SCB", paymentType: "deeplink" },
             { key: "bangkok_bank", label: "Bangkok Bank", paymentType: "deeplink" },
             { key: "kplus", label: "K PLUS", paymentType: "deeplink" },
@@ -2436,6 +2847,8 @@ async function uploadAdminPaymentLogo(id) {
 
         const input = card.querySelector(".pm-logo-url");
         if (input) input.value = data.image;
+        const logoPreview = card.querySelector(".payment-operator-logo-control > img");
+        if (logoPreview) logoPreview.src = data.image;
         updateInlineCardPreview(card);
 
         showAdminToast?.("Logo uploaded. Save the method to publish it.", "success");
@@ -2447,6 +2860,9 @@ async function uploadAdminPaymentLogo(id) {
 }
 
 function getPaymentTypeDescription(key, type, provider) {
+    if (key === "truewallet" || normalizeAdminProvider(provider) === "truewallet") {
+        return "TrueMoney Wallet transfer with automatic slip verification.";
+    }
     if (key === "thunder_promptpay" || normalizeAdminProvider(provider) === "thunder_promptpay") {
         return "PromptPay QR with automatic slip verification.";
     }
@@ -2474,6 +2890,7 @@ function refreshPaymentEditorVisibility(card) {
     const isWallet = kind === "AZIEL_WALLET";
     const isBankApp = kind === "MANUAL_BANK_APP";
     const isManualQr = kind === "MANUAL_QR";
+    const isTrueMoney = kind === "TRUE_MONEY_WALLET";
     const qrMode = card.querySelector(".pm-qr-mode");
 
     if (isPromptPay) {
@@ -2497,7 +2914,7 @@ function refreshPaymentEditorVisibility(card) {
     ].filter(Boolean);
 
     const isThunderPromptPay = normalizeAdminProvider(state.provider || state.key) === "thunder_promptpay";
-    if (accountSection) accountSection.hidden = !(isManualQr || isBankApp || isThunderPromptPay);
+    if (accountSection) accountSection.hidden = !(isManualQr || isBankApp || isThunderPromptPay || isTrueMoney);
     if (qrSection) qrSection.hidden = !(isManualQr || isPromptPayDynamic);
     const bankAppSection = card.querySelector(".payment-bank-app-section");
     if (bankAppSection) bankAppSection.hidden = !isBankApp;

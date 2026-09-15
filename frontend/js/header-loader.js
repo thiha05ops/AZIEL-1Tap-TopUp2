@@ -7,6 +7,7 @@ const AZIEL_NAV_ITEMS = {
         ["home.html", "nav_home"],
         ["home.html#popularGames", "nav_games"],
         ["home.html#categories", "nav_topup"],
+        ["money-transfer.html", "nav_money_transfer"],
         ["wallet.html", "nav_wallet"],
         ["tracking.html", "nav_transactions"],
         ["support.html", "nav_support"]
@@ -15,6 +16,7 @@ const AZIEL_NAV_ITEMS = {
     game: [
         ["home.html", "nav_home"],
         ["home.html#popularGames", "nav_games"],
+        ["money-transfer.html", "nav_money_transfer"],
         ["wallet.html", "nav_wallet"],
         ["tracking.html", "nav_orders"],
         ["support.html", "nav_support"]
@@ -22,6 +24,7 @@ const AZIEL_NAV_ITEMS = {
 
     account: [
         ["home.html", "nav_home"],
+        ["money-transfer.html", "nav_money_transfer"],
         ["wallet.html", "nav_wallet"],
         ["tracking.html", "nav_orders"],
         ["support.html", "nav_support"]
@@ -30,6 +33,7 @@ const AZIEL_NAV_ITEMS = {
     explore: [
         ["home.html", "nav_home"],
         ["explore.html", "nav_explore"],
+        ["money-transfer.html", "nav_money_transfer"],
         ["explore.html#features", "nav_features"],
         ["explore.html#platform", "nav_platform"],
         ["support.html", "nav_support"]
@@ -163,7 +167,8 @@ function getFallbackLabel(key) {
         nav_orders: "Orders",
         nav_support: "Support",
         nav_features: "Features",
-        nav_platform: "Platform"
+        nav_platform: "Platform",
+        nav_money_transfer: "Money Transfer"
     };
 
     return labels[key] || key;

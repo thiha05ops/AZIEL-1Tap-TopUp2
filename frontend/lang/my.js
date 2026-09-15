@@ -6,6 +6,7 @@ window.AZIEL_LANG.my = {
     nav_home: "ပင်မ",
     nav_games: "ဂိမ်းများ",
     nav_wallet: "ပိုက်ဆံအိတ်",
+    nav_money_transfer: "ငွေလွှဲ",
     nav_orders: "အော်ဒါများ",
     nav_tracking: "အော်ဒါစစ်ရန်",
     nav_support: "အကူအညီ",
@@ -1420,6 +1421,13 @@ window.AZIEL_LANG.my = {
     ,"payment.thunder.rejected": "ငွေပေးချေမှုကို အတည်မပြုနိုင်ပါ။ ဤအော်ဒါအတွက် မှန်ကန်သော ငွေလွှဲစလစ်ကို တင်ပါ။"
     ,"payment.thunder.duplicate": "ဤစလစ်ကို စနစ်က လက်ခံရရှိပြီးဖြစ်သော်လည်း ငွေပေးချေမှုကို အတည်မပြုရသေးပါ။ အော်ဒါအခြေအနေကို စစ်ဆေးပါ သို့မဟုတ် အကူအညီအဖွဲ့ကို ဆက်သွယ်ပါ။"
     ,"payment.thunder.invalidImage": "မှန်ကန်သော ငွေပေးချေမှုစလစ် ပုံဖိုင်ကို ရွေးချယ်ပါ။"
+    ,"payment.truewallet.title": "TrueMoney Wallet"
+    ,"payment.truewallet.instructions": "ဤ QR ကို TrueMoney ဖြင့် scan ဖတ်ပြီး ငွေပမာဏအတိအကျ ပေးချေကာ ငွေလွှဲစလစ်ကို တင်ပါ။"
+    ,"payment.truewallet.scan": "ဤ QR ကို TrueMoney ဖြင့် scan ဖတ်ပါ"
+    ,"payment.truewallet.chooseSlip": "TrueMoney ငွေလွှဲစလစ် တင်ရန်"
+    ,"payment.truewallet.invalidSlip": "ဤ TrueMoney စလစ်ကို ဖတ်မရပါ။ ကြည်လင်သော ငွေလွှဲစလစ်ကို တင်ပါ။"
+    ,"payment.truewallet.wrongRecipient": "ဤငွေလွှဲမှုကို မှန်ကန်သော TrueMoney အကောင့်သို့ မပို့ထားပါ။"
+    ,"payment.truewallet.wrongAmount": "လွှဲထားသော ငွေပမာဏသည် ဤအော်ဒါနှင့် မကိုက်ညီပါ။"
     ,"errors.INVALID_REQUEST": "အချက်အလက်ကို စစ်ဆေးပြီး ထပ်စမ်းပါ။"
     ,"errors.ORDER_NOT_FOUND": "အော်ဒါကို မတွေ့ပါ။"
     ,"errors.PAYMENT_EXPIRED": "ဤငွေပေးချေမှု session သက်တမ်းကုန်သွားပါပြီ။"

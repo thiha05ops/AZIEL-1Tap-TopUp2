@@ -1,4 +1,16 @@
 const PROVIDER_ADAPTERS = Object.freeze({
+    thunder_truewallet: Object.freeze({
+        name: "thunder_truewallet",
+        displayName: "Thunder Verified TrueMoney Wallet",
+        supportedRails: ["TRUE_MONEY_WALLET"],
+        supportedCurrencies: ["THB"],
+        checkoutModes: ["SLIP_UPLOAD"],
+        cardNetworks: [],
+        refundCapability: false,
+        partialRefundCapability: false,
+        webhookRequired: false,
+        methods: Object.freeze(["createPayment", "verifyTrueWallet", "healthCheck"])
+    }),
     thunder_promptpay: Object.freeze({
         name: "thunder_promptpay",
         displayName: "Thunder Verified PromptPay",

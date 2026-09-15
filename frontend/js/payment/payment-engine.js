@@ -187,7 +187,8 @@
 
             if (type === "manual" || type === "deeplink") {
                 const market = String(orderData.region || selectedPayment.region || "").toUpperCase();
-                const attemptSession = market === "MM"
+                const isTrueWallet = String(selectedPayment.key || orderData.paymentMethod || "").toLowerCase() === "truewallet" || String(selectedPayment.confirmationMode || "") === "thunder_truewallet_slip";
+                const attemptSession = market === "MM" || isTrueWallet
                     ? await createCommerceManualPaymentCheckout(orderData)
                     : await createCommerceManualPromptPayCheckout(orderData);
                 attemptSession.selectedPaymentMethod = selectedPayment;

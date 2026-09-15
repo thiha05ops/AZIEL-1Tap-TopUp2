@@ -104,20 +104,24 @@ function verifyRouteAndFrontendContracts() {
     includes("backend/routes/paymentMethods.js", 'router.get("/admin/payment-infrastructure"', "Admin payment infrastructure endpoint must exist.");
     includes("backend/routes/paymentMethods.js", "getPaymentInfrastructureSnapshot", "Route must use backend infrastructure projection.");
     includes("frontend/js/admin-payments.js", "/api/admin/payment-infrastructure", "Admin frontend must load infrastructure endpoint.");
-    includes("frontend/js/admin-payments.js", "renderPaymentInfrastructureWorkspace", "Admin frontend must render infrastructure workspace.");
+    includes("frontend/js/admin-payments.js", "payment-operator-workspace", "Admin frontend must render the payment operator workspace.");
     includes("frontend/js/admin-payments.js", "adminPaymentInfrastructureActiveRegion", "Infrastructure workspace must own active region state.");
     includes("frontend/js/admin-payments.js", "getPaymentMethodsForInfrastructureRegion", "Configuration editor must separate Myanmar and Thailand payment methods.");
     includes("frontend/js/admin-payments.js", "selectPaymentInfrastructureRegion", "Region selection must have one explicit read-only state transition.");
     includes("frontend/js/admin-payments.js", "paymentInfrastructureActionsBound", "Region and tab actions must use a stable delegated binding.");
     includes("frontend/js/admin-payments.js", 'method.enabled === true && method.publicReady === true', "Fallback customer visibility must fail closed on computed readiness.");
-    includes("frontend/js/admin-payments.js", "filter(rail => rail.customerVisible === true)", "Customer Display must render only authoritative customer-visible rails.");
-    includes("frontend/js/admin-payments.js", "Configured · Disabled", "Configured readiness must remain distinct from enabled storefront state.");
-    includes("frontend/js/admin-payments.js", "Unsaved · Disabled", "An unchecked draft must not continue to claim customer visibility before it is saved.");
+    includes("frontend/js/admin-payments.js", "operatorPaymentStatus", "Operator rows must derive status from authoritative readiness.");
+    includes("frontend/js/admin-payments.js", 'label: "Disabled"', "Configured readiness must remain distinct from enabled storefront state.");
+    includes("frontend/js/admin-payments.js", 'state.textContent = "Unsaved"', "Row toggles must expose unsaved local state.");
     includes("frontend/admin.html", "/js/admin-payments.js?v=20260912-payment-admin", "Admin must publish the repaired payment controller under a fresh versioned asset URL.");
-    includes("frontend/js/admin-payments.js", "Automatic Rails", "Automatic rails must have an admin surface.");
-    includes("frontend/js/admin-payments.js", "Card", "Card readiness must have an admin surface.");
+    includes("frontend/js/admin-payments.js", "showPaymentInfrastructureSurface", "Infrastructure details must remain available behind one secondary surface.");
+    includes("frontend/js/admin-payments.js", "renderPaymentInfrastructureCards", "Card readiness must remain available in the infrastructure surface.");
     includes("frontend/js/admin-payments.js", "rawSecretsReturned", "Frontend must consume safe credential/security projection.");
-    includes("frontend/css/admin/admin-design-system.css", ".payment-infrastructure-workspace", "Infrastructure workspace CSS must exist.");
+    includes("frontend/css/admin/admin.css", ".payment-operator-workspace", "Operator workspace CSS must exist.");
+    includes("frontend/css/admin/admin.css", ".payment-operator-field", "Unified operator fields must use a shared vertical layout.");
+    includes("frontend/css/admin/admin.css", ".payment-operator-logo-control", "Logo controls must use the shared preview/action layout.");
+    includes("frontend/css/admin/admin.css", ".payment-operator-toggle-row", "Availability must use the shared compact toggle row.");
+    includes("frontend/js/admin-payments.js", 'data-action="choose-payment-logo"', "Logo Change action must open the hidden file picker.");
     includes("backend/routes/paymentMethods.js", "router.get(\"/payment-methods\"", "Public payment methods route must remain.");
     includes("backend/routes/paymentMethods.js", ".map(formatMethod)", "Public checkout projection must still use formatMethod.");
     includes("backend/routes/paymentMethods.js", ".filter(method => method.customerVisible === true)", "Public capability must use the canonical backend visibility decision.");
@@ -160,7 +164,8 @@ function verifyAdminRegionRuntime() {
         };
         adminPaymentMethods = [
             { key: "kbzpay", region: "MM", enabled: true, publicReady: true },
-            { key: "promptpay", region: "TH", enabled: true, publicReady: true }
+            { key: "promptpay", region: "TH", enabled: false, publicReady: false, operatorHidden: true },
+            { key: "thunder_promptpay", region: "TH", enabled: true, publicReady: true }
         ];
         const before = JSON.stringify(adminPaymentMethods);
         let renderCount = 0;
@@ -186,12 +191,70 @@ function verifyAdminRegionRuntime() {
     assert.deepStrictEqual(Array.from(result.mmMethods), ["kbzpay"]);
     assert.strictEqual(result.repeated, false, "Repeated region selection must not stack work/toasts.");
     assert.strictEqual(result.thChanged, true);
-    assert.deepStrictEqual(Array.from(result.thMethods), ["promptpay"]);
+    assert.deepStrictEqual(Array.from(result.thMethods), ["thunder_promptpay"], "Retired manual PromptPay must be excluded while active Thunder PromptPay remains.");
     assert.strictEqual(result.futureChanged, true);
     assert.deepStrictEqual(Array.from(result.futureMethods), []);
     assert(result.mmMarkup.includes('data-payment-infra-region="MM"') && result.mmMarkup.includes('payment-infra-region active" type="button" data-payment-infra-region="MM"'), "Myanmar markup must own selected styling and content.");
     assert(result.thMarkup.includes('data-payment-infra-region="TH"') && result.thMarkup.includes('payment-infra-region active" type="button" data-payment-infra-region="TH"'), "Thailand markup must own selected styling and content.");
     assert(result.futureMarkup.includes('data-payment-infra-region="FUTURE"') && result.futureMarkup.includes('payment-infra-region active" type="button" data-payment-infra-region="FUTURE"'), "Future Regions markup must own selected styling and content.");
+
+    const editorResult = vm.runInContext(`
+        [
+            ["TRUE_MONEY_WALLET", "truewallet"],
+            ["PROMPTPAY_DYNAMIC", "promptpay"],
+            ["MANUAL_QR", "kbzpay"],
+            ["MANUAL_BANK_APP", "manual_bank"],
+            ["AUTOMATIC_PROVIDER", "tmw_promptpay"],
+            ["AZIEL_WALLET", "wallet"]
+        ].map(([configurationKind, key], index) => renderOperatorPaymentEditor({
+            _id: String(index + 1), key, method: key, region: key === "kbzpay" ? "MM" : "TH",
+            configurationKind, enabled: true, publicReady: true, customerVisible: true,
+            applicableSections: [], missingConfiguration: [], bankLaunchers: []
+        }));
+    `, context);
+    const forbidden = ["THUNDER_TRUEWALLET", "TRUE_MONEY_WALLET", "thunder_truewallet_slip", "aziel_promptpay_dynamic", "pm-qr-mode", 'class="pm-dynamic-qr"', "pm-amount-prefill", "pm-auto-verification", "pm-webhook", "pm-slip-required", "pm-receipt-upload"];
+    editorResult.forEach(markup => {
+        ["Status", "Setup", "Customer display", "Availability", "Advanced settings", "Cancel", "Save changes"].forEach(label => assert(markup.includes(label), `Unified operator editor must include ${label}.`));
+        forbidden.forEach(value => assert(!markup.includes(value), `Normal operator editor must not expose ${value}.`));
+        assert(markup.includes("payment-operator-section"), "Every configuration kind must use the shared operator section architecture.");
+    });
+    const frontendSource = read("frontend/js/admin-payments.js");
+    const activeRenderer = frontendSource.slice(frontendSource.indexOf("function renderAdminPaymentMethods"), frontendSource.indexOf("function bindPaymentOperatorActions"));
+    assert(!activeRenderer.includes("renderLegacyAdminPaymentMethods"), "Active operator renderer must not source markup from the legacy editor.");
+    assert(!activeRenderer.includes("is-truewallet"), "TrueMoney must not have a separate editor architecture.");
+    assert(frontendSource.includes("payment-method-identity-diagnostics"), "Infrastructure must preserve read-only method identity diagnostics.");
+
+    const selectionLifecycle = vm.runInContext(`
+        adminPaymentMethods = [
+            { _id: "promptpay", method: "PromptPay" },
+            { _id: "truewallet", method: "TrueMoney Wallet" },
+            { _id: "scb", method: "SCB" },
+            { _id: "bangkok_bank", method: "Bangkok Bank" },
+            { _id: "wallet", method: "AZIEL Wallet" }
+        ];
+        const sequence = ["promptpay", "truewallet", "scb", "bangkok_bank", "wallet", "promptpay", "truewallet", "scb", "bangkok_bank", "wallet", "truewallet", "promptpay", "scb", "wallet", "bangkok_bank", "truewallet", "promptpay", "wallet", "scb", "truewallet"];
+        const renders = [];
+        renderAdminPaymentMethods = methods => renders.push({ selected: adminSelectedPaymentMethodId, open: adminPaymentEditorOpen, active: methods.filter(item => String(item._id) === adminSelectedPaymentMethodId).length });
+        const results = sequence.map(id => selectOperatorPaymentMethod(id));
+        ({ sequence, results, renders, selected: adminSelectedPaymentMethodId, open: adminPaymentEditorOpen });
+    `, context);
+    assert.strictEqual(selectionLifecycle.renders.length, 20, "Twenty selections must execute exactly once each.");
+    selectionLifecycle.renders.forEach((render, index) => {
+        assert.strictEqual(render.selected, selectionLifecycle.sequence[index], "Selected method must change on every interaction.");
+        assert.strictEqual(render.active, 1, "Exactly one selected method/editor identity must be active.");
+        assert.strictEqual(render.open, true, "Editor must remain open after selection.");
+    });
+    assert(selectionLifecycle.results.every(Boolean), "Every repeated valid selection must succeed without a reload.");
+    const listenerLifecycle = vm.runInContext(`
+        const registrations = {};
+        const stableContainer = { addEventListener(type) { registrations[type] = (registrations[type] || 0) + 1; } };
+        document.getElementById = id => id === "paymentMethodsContainer" ? stableContainer : null;
+        paymentOperatorActionsBound = false;
+        bindPaymentOperatorActions();
+        bindPaymentOperatorActions();
+        registrations;
+    `, context);
+    assert.deepStrictEqual({ ...listenerLifecycle }, { click: 1, keydown: 1, change: 1, toggle: 1 }, "Persistent operator container must receive exactly one delegated listener per event type.");
 }
 
 verifyModelAndServices()

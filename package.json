@@ -4,6 +4,8 @@
   "description": "AZIEL 1Tap TopUp Shop",
   "main": "backend/server.js",
   "scripts": {
+    "verify:thunder-truewallet-payment-phase2": "node backend/scripts/verify-thunder-truewallet-payment-phase2.js",
+    "verify:thunder-truewallet-payment": "node backend/scripts/verify-thunder-truewallet-payment.js",
     "verify:supplier-catalog-ingestion-orchestrator": "node backend/scripts/verify-supplier-catalog-ingestion-orchestrator.js",
     "verify:supplier-catalog-ingestion-locking": "node backend/scripts/verify-supplier-catalog-ingestion-locking.js",
     "verify:supplier-catalog-ingestion-rbac": "node backend/scripts/verify-supplier-catalog-ingestion-rbac.js",

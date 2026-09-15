@@ -274,6 +274,185 @@ async function createPromptPayQr({ method, amount, currency, orderReference }) {
     };
 }
 
+
+function uniqueField(fields, id, label = id) {
+    const matches = fields.filter(field => field.id === id);
+    if (matches.length !== 1) {
+        throw Object.assign(new Error(`TrueMoney QR template requires exactly one ${label} field`), {
+            code: "TRUEMONEY_QR_TEMPLATE_INVALID"
+        });
+    }
+    return matches[0];
+}
+
+function decodeTrueMoneyTemplate(payload = "") {
+    const fields = parseEmvPayload(payload);
+
+    const format = uniqueField(fields, "00", "00");
+    const initiation = uniqueField(fields, "01", "01");
+    const merchant = uniqueField(fields, "29", "29");
+    const country = uniqueField(fields, "58", "58");
+    const currency = uniqueField(fields, "53", "53");
+    uniqueField(fields, "63", "63");
+
+    if (!validatePromptPayPayloadCrc(payload)) {
+        throw Object.assign(new Error("TrueMoney QR template CRC is invalid"), {
+            code: "TRUEMONEY_QR_TEMPLATE_INVALID"
+        });
+    }
+
+    if (format.value !== "01") {
+        throw Object.assign(new Error("TrueMoney QR template format is invalid"), {
+            code: "TRUEMONEY_QR_TEMPLATE_INVALID"
+        });
+    }
+
+    if (initiation.value !== "11") {
+        throw Object.assign(new Error("TrueMoney receive QR template must be static"), {
+            code: "TRUEMONEY_QR_TEMPLATE_INVALID"
+        });
+    }
+
+    if (country.value !== "TH" || currency.value !== "764") {
+        throw Object.assign(new Error("TrueMoney QR template must use Thailand / THB"), {
+            code: "TRUEMONEY_QR_TEMPLATE_INVALID"
+        });
+    }
+
+    if (fields.some(field => field.id === "54")) {
+        throw Object.assign(new Error("TrueMoney receive QR template must not contain an amount"), {
+            code: "TRUEMONEY_QR_TEMPLATE_INVALID"
+        });
+    }
+
+    const merchantFields = parseEmvPayload(merchant.value);
+    const applicationIds = merchantFields.filter(field => field.id === "00");
+
+    if (
+        applicationIds.length !== 1 ||
+        applicationIds[0].value !== "A000000677010111"
+    ) {
+        throw Object.assign(new Error("TrueMoney QR template merchant application ID is invalid"), {
+            code: "TRUEMONEY_QR_TEMPLATE_INVALID"
+        });
+    }
+
+    return {
+        fields,
+        merchantAccountInfoRaw: merchant.value
+    };
+}
+
+async function createTrueMoneyQrFromTemplate({
+    templatePayload,
+    amount,
+    currency,
+    expiryMinutes = 30
+} = {}) {
+    validateCurrency(currency);
+
+    const normalizedAmount = normalizeAmount(amount);
+    const template = String(templatePayload || "").trim();
+
+    if (!template) {
+        throw Object.assign(new Error("TrueMoney QR template is required"), {
+            code: "TRUEMONEY_QR_TEMPLATE_REQUIRED"
+        });
+    }
+
+    const decodedTemplate = decodeTrueMoneyTemplate(template);
+
+    const outputFields = [];
+    let amountInserted = false;
+
+    for (const field of decodedTemplate.fields) {
+        if (field.id === "63" || field.id === "54") continue;
+
+        if (field.id === "01") {
+            outputFields.push(emv("01", "12"));
+            continue;
+        }
+
+        /*
+         * Preserve TrueMoney's original field order. The observed
+         * amount-specific TrueMoney QR places tag 54 immediately before
+         * currency tag 53, so insert the authoritative amount there.
+         */
+        if (field.id === "53" && !amountInserted) {
+            outputFields.push(emv("54", normalizedAmount.toFixed(2)));
+            amountInserted = true;
+        }
+
+        outputFields.push(emv(field.id, field.value));
+    }
+
+    if (!amountInserted) {
+        throw Object.assign(new Error("TrueMoney QR template currency field is missing"), {
+            code: "TRUEMONEY_QR_TEMPLATE_INVALID"
+        });
+    }
+
+    const payloadWithoutCrc = `${outputFields.join("")}6304`;
+    const qrPayload = `${payloadWithoutCrc}${crc16Ccitt(payloadWithoutCrc)}`;
+
+    const generatedFields = parseEmvPayload(qrPayload);
+
+    const generatedFormat = uniqueField(generatedFields, "00", "00");
+    const generatedInitiation = uniqueField(generatedFields, "01", "01");
+    const generatedMerchant = uniqueField(generatedFields, "29", "29");
+    const generatedCountry = uniqueField(generatedFields, "58", "58");
+    const generatedCurrency = uniqueField(generatedFields, "53", "53");
+    const generatedAmount = uniqueField(generatedFields, "54", "54");
+    uniqueField(generatedFields, "63", "63");
+
+    if (
+        generatedFormat.value !== "01" ||
+        generatedInitiation.value !== "12" ||
+        generatedMerchant.value !== decodedTemplate.merchantAccountInfoRaw ||
+        generatedCountry.value !== "TH" ||
+        generatedCurrency.value !== "764" ||
+        generatedAmount.value !== normalizedAmount.toFixed(2) ||
+        validatePromptPayPayloadCrc(qrPayload) !== true
+    ) {
+        throw Object.assign(new Error("Generated TrueMoney QR failed authority validation"), {
+            code: "TRUEMONEY_QR_PAYLOAD_INVALID"
+        });
+    }
+
+    const qrImage = await QRCode.toDataURL(qrPayload, {
+        errorCorrectionLevel: "M",
+        margin: 1,
+        width: 640
+    });
+
+    const qrImagePayloadMatches = qrImageMatchesPayload(qrImage, qrPayload);
+    if (!qrImagePayloadMatches) {
+        throw Object.assign(new Error("Generated TrueMoney QR image does not match payload"), {
+            code: "TRUEMONEY_QR_IMAGE_MISMATCH"
+        });
+    }
+
+    const minutes = Number(expiryMinutes || 30);
+    const safeMinutes = Number.isFinite(minutes) && minutes > 0
+        ? Math.min(minutes, 120)
+        : 30;
+
+    return {
+        amount: normalizedAmount,
+        currency: "THB",
+        encodedAmount: generatedAmount.value,
+        qrPayload,
+        merchantAccountInfoRaw: generatedMerchant.value,
+        pointOfInitiationMethod: generatedInitiation.value,
+        country: generatedCountry.value,
+        currencyCode: generatedCurrency.value,
+        crcValid: true,
+        qrImagePayloadMatches,
+        qrImage,
+        expiresAt: new Date(Date.now() + safeMinutes * 60 * 1000).toISOString()
+    };
+}
+
 function parsePngDataUrl(dataUrl = "") {
     const match = String(dataUrl || "").match(/^data:image\/png;base64,(.+)$/);
     if (!match) {
@@ -320,12 +499,14 @@ module.exports = {
     RECIPIENT_TYPES,
     buildPromptPayPayload,
     createPromptPayQr,
+    createTrueMoneyQrFromTemplate,
     crc16Ccitt,
     decodePromptPayPayload,
     maskPromptPayRecipient,
     normalizeAmount,
     normalizePromptPayReference,
     normalizePromptPayRecipient,
+    parseEmvPayload,
     qrImageMatchesPayload,
     validatePromptPayPayloadCrc
 };

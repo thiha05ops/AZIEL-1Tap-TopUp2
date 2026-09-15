@@ -45,6 +45,7 @@ const notificationService = require("../services/notificationService");
 const CANONICAL_PROVIDER_BY_KEY = Object.freeze({
     promptpay: "promptpay",
     thunder_promptpay: "thunder_promptpay",
+    truewallet: "truewallet",
     scb: "scb",
     bangkok_bank: "bangkok_bank",
     kplus: "kplus",
@@ -154,39 +155,6 @@ const defaultMethods = [
         provider: "ayapay"
     },
     {
-        method: "PromptPay QR",
-        key: "promptpay",
-        region: "TH",
-        paymentType: "manual",
-        provider: "promptpay",
-        qrMode: "aziel_promptpay_dynamic",
-        receiptUploadEnabled: true,
-        confirmationMode: "manual_admin",
-        openAppMode: "bank_chooser",
-        appLaunchMode: "APP_ONLY",
-        badgeText: "QR",
-        shortDescription: "Pay with any Thai banking app",
-        appDisplayName: "Banking App",
-        enableSaveQr: true,
-        enableOpenApp: true,
-        enableChecklist: true,
-        dynamicQrSupported: true,
-        amountPrefillSupported: true,
-        referenceSupported: true,
-        galleryScanSupported: true,
-        slipRequired: true,
-        autoVerificationSupported: false,
-        webhookSupported: false,
-        checklistSteps: [
-            { key: "save_qr", label: "Save QR", action: "save_qr", enabled: true, sortOrder: 10 },
-            { key: "open_app", label: "Open Banking App", action: "open_app", enabled: true, sortOrder: 20 },
-            { key: "scan_saved_qr", label: "Scan the saved QR and pay", action: "scan_saved_qr", enabled: true, sortOrder: 30 },
-            { key: "upload_receipt", label: "Upload payment receipt", action: "upload_receipt", enabled: true, sortOrder: 40 }
-        ],
-        bankLaunchers: defaultPromptPayBankLaunchers,
-        sortOrder: 10
-    },
-    {
         method: "PromptPay Auto Verify",
         key: "thunder_promptpay",
         region: "TH",
@@ -215,6 +183,38 @@ const defaultMethods = [
             { key: "wait_for_confirmation", label: "Automatic verification", action: "wait_for_confirmation", enabled: true, sortOrder: 30 }
         ],
         sortOrder: 11
+    },
+    {
+        method: "TrueMoney Wallet",
+        key: "truewallet",
+        region: "TH",
+        enabled: false,
+        paymentType: "manual",
+        provider: "truewallet",
+        paymentChannel: "TRUE_MONEY_WALLET",
+        accountName: "",
+        accountNumber: "",
+        qrMode: "truemoney_template_dynamic",
+        receiptUploadEnabled: true,
+        confirmationMode: "thunder_truewallet_slip",
+        openAppMode: "disabled",
+        badgeText: "WALLET",
+        shortDescription: "Pay with TrueMoney Wallet and upload your transfer slip",
+        recipientLabel: "Receiving telephone number",
+        enableSaveQr: true,
+        enableOpenApp: false,
+        enableChecklist: true,
+        dynamicQrSupported: true,
+        amountPrefillSupported: true,
+        slipRequired: true,
+        autoVerificationSupported: true,
+        webhookSupported: false,
+        checklistSteps: [
+            { key: "open_app", label: "Open TrueMoney Wallet", action: "open_app", enabled: true, sortOrder: 10 },
+            { key: "upload_receipt", label: "Upload TrueMoney transfer slip", action: "upload_receipt", enabled: true, sortOrder: 20 },
+            { key: "wait_for_confirmation", label: "Automatic verification", action: "wait_for_confirmation", enabled: true, sortOrder: 30 }
+        ],
+        sortOrder: 12
     },
     {
         method: "SCB",
@@ -517,6 +517,7 @@ function applySeedDefaultsWithoutOverwriting(method, item = {}) {
         "amountPrefillSupported",
         "referenceSupported",
         "galleryScanSupported",
+        "paymentChannel",
         "slipRequired",
         "autoVerificationSupported",
         "webhookSupported",
@@ -558,7 +559,9 @@ function normalizePaymentMethodKey(value = "") {
         .replace(/\s+/g, "")
         .replace(/[-_]/g, "")
         .replace(/[^a-z0-9]/g, "");
-    return compact === "thunderpromptpay" ? "thunder_promptpay" : compact;
+    if (compact === "thunderpromptpay") return "thunder_promptpay";
+    if (["truemoney", "truemoneywallet", "thundertruewallet"].includes(compact)) return "truewallet";
+    return compact;
 }
 
 function safeOpenAppMode(value = "", fallback = "disabled") {
@@ -571,7 +574,24 @@ function applyCompatibilityModes(method) {
     const provider = canonicalProviderForMethod(method);
     method.provider = provider;
 
-    if (key === "thunder_promptpay" || provider === "thunder_promptpay") {
+    if (key === "truewallet" || provider === "truewallet") {
+        method.method = "TrueMoney Wallet";
+        method.region = "TH";
+        method.provider = "truewallet";
+        method.paymentChannel = "TRUE_MONEY_WALLET";
+        method.paymentType = "manual";
+        method.qrMode = "truemoney_template_dynamic";
+        method.slipRequired = true;
+        method.receiptUploadEnabled = true;
+        method.autoVerificationSupported = true;
+        method.webhookSupported = false;
+        method.confirmationMode = "thunder_truewallet_slip";
+        method.enableSaveQr = true;
+        method.dynamicQrSupported = true;
+        method.amountPrefillSupported = true;
+        method.enableOpenApp = false;
+        method.openAppMode = "disabled";
+    } else if (key === "thunder_promptpay" || provider === "thunder_promptpay") {
         method.region = "TH";
         method.provider = "thunder_promptpay";
         method.paymentType = "manual";
@@ -611,7 +631,7 @@ function applyCompatibilityModes(method) {
         method.webhookSupported = false;
         method.confirmationMode = method.confirmationMode === "thunder_slip" ? "thunder_slip" : "manual_admin";
         method.openAppMode = method.enableOpenApp === true ? safeOpenAppMode(method.openAppMode, "direct") : "disabled";
-        if (!["provider_generated", "uploaded_static", "aziel_promptpay_dynamic", "none"].includes(method.qrMode)) {
+        if (!["provider_generated", "uploaded_static", "aziel_promptpay_dynamic", "truemoney_template_dynamic", "none"].includes(method.qrMode)) {
             method.qrMode = "uploaded_static";
         }
     }
@@ -619,12 +639,20 @@ function applyCompatibilityModes(method) {
     return method;
 }
 
+function isRetiredManualPromptPayMethod(method = {}) {
+    return String(method.key || "").toLowerCase() === "promptpay" &&
+        String(method.region || "").toUpperCase() === "TH" &&
+        normalizeProviderKey(method.provider || method.key) === "promptpay";
+}
+
 function applyPromptPayConsolidation(method) {
-    if (String(method.key || "").toLowerCase() !== "promptpay" || String(method.region || "").toUpperCase() !== "TH") {
+    if (!isRetiredManualPromptPayMethod(method)) {
         return method;
     }
 
     method.method = "PromptPay QR";
+    // Retired configuration retained only for historical order/attempt references.
+    method.enabled = false;
     method.paymentType = "manual";
     method.provider = "promptpay";
     method.qrMode = "aziel_promptpay_dynamic";
@@ -845,7 +873,8 @@ function capabilityProjection(obj = {}) {
     const kind = paymentConfigurationKind(obj);
     const bankAppApplicable = kind === PAYMENT_CONFIGURATION_KINDS.MANUAL_BANK_APP;
     const promptPayApplicable = kind === PAYMENT_CONFIGURATION_KINDS.PROMPTPAY_DYNAMIC;
-    const qrApplicable = kind === PAYMENT_CONFIGURATION_KINDS.MANUAL_QR || promptPayApplicable;
+    const trueMoneyApplicable = kind === PAYMENT_CONFIGURATION_KINDS.TRUE_MONEY_WALLET;
+    const qrApplicable = kind === PAYMENT_CONFIGURATION_KINDS.MANUAL_QR || promptPayApplicable || trueMoneyApplicable;
     const checklistApplicable = ![PAYMENT_CONFIGURATION_KINDS.AZIEL_WALLET, PAYMENT_CONFIGURATION_KINDS.AUTOMATIC_PROVIDER].includes(kind);
     return {
         configurationKind: kind,
@@ -862,12 +891,12 @@ function capabilityProjection(obj = {}) {
         playStoreFallbackUrl: bankAppApplicable ? obj.playStoreFallbackUrl || obj.playStoreUrl || "" : "",
         promptPayRecipientType: promptPayApplicable ? obj.promptPayRecipientType || "" : "",
         promptPayRecipientMasked: promptPayApplicable ? maskPromptPayRecipient(obj.promptPayRecipientValue || "") : "",
-        dynamicQrExpiryMinutes: promptPayApplicable ? safePositiveInt(obj.dynamicQrExpiryMinutes, 15) : 0,
+        dynamicQrExpiryMinutes: promptPayApplicable || trueMoneyApplicable ? safePositiveInt(obj.dynamicQrExpiryMinutes, trueMoneyApplicable ? 30 : 15) : 0,
         enableSaveQr: qrApplicable && obj.enableSaveQr === true,
         enableOpenApp: (bankAppApplicable || promptPayApplicable) && obj.enableOpenApp === true,
         enableChecklist: checklistApplicable && obj.enableChecklist === true,
-        dynamicQrSupported: (promptPayApplicable || kind === PAYMENT_CONFIGURATION_KINDS.AUTOMATIC_PROVIDER) && obj.dynamicQrSupported === true,
-        amountPrefillSupported: (promptPayApplicable || kind === PAYMENT_CONFIGURATION_KINDS.AUTOMATIC_PROVIDER) && obj.amountPrefillSupported === true,
+        dynamicQrSupported: (promptPayApplicable || trueMoneyApplicable || kind === PAYMENT_CONFIGURATION_KINDS.AUTOMATIC_PROVIDER) && obj.dynamicQrSupported === true,
+        amountPrefillSupported: (promptPayApplicable || trueMoneyApplicable || kind === PAYMENT_CONFIGURATION_KINDS.AUTOMATIC_PROVIDER) && obj.amountPrefillSupported === true,
         referenceSupported: qrApplicable && obj.referenceSupported === true,
         galleryScanSupported: (bankAppApplicable || promptPayApplicable) && obj.galleryScanSupported === true,
         slipRequired: checklistApplicable ? isSlipRequired(obj) : false,
@@ -1009,6 +1038,7 @@ function formatMethod(method) {
         enabled: obj.enabled === true,
         accountName: obj.accountName || "",
         accountNumber: obj.accountNumber || "",
+        paymentChannel: obj.paymentChannel || "",
         qrImage,
         qrImageUrl: qrImage,
         uploadedQrImage: qrImage,
@@ -1050,6 +1080,7 @@ function formatAdminMethod(method) {
     const staticQrApplicable = publicMethod.configurationKind === PAYMENT_CONFIGURATION_KINDS.MANUAL_QR;
     return {
         ...publicMethod,
+        operatorHidden: isRetiredManualPromptPayMethod(obj),
         qrImage: staticQrApplicable ? configuredQrImage : "",
         qrImageUrl: staticQrApplicable ? configuredQrImage : "",
         uploadedQrImage: staticQrApplicable ? configuredQrImage : "",
@@ -1443,6 +1474,10 @@ const PAYMENT_PATCH_FIELDS_BY_KIND = Object.freeze({
         "galleryScanSupported", "slipRequired", "receiptUploadEnabled", "confirmationMode", "checklistSteps", "openAppMode",
         "appLaunchMode", "qrMode"
     ]),
+    [PAYMENT_CONFIGURATION_KINDS.TRUE_MONEY_WALLET]: new Set([
+        "accountName", "accountNumber", "recipientLabel", "referenceInstructions", "paymentChannel",
+        "slipRequired", "receiptUploadEnabled", "confirmationMode", "enableChecklist", "checklistSteps", "dynamicQrExpiryMinutes"
+    ]),
     [PAYMENT_CONFIGURATION_KINDS.AZIEL_WALLET]: new Set([]),
     [PAYMENT_CONFIGURATION_KINDS.AUTOMATIC_PROVIDER]: new Set([
         "qrMode", "autoVerificationSupported", "webhookSupported", "confirmationMode"
@@ -1485,6 +1520,7 @@ function applyPaymentMethodPatch(method, body = {}) {
         androidPackageName: 160,
         appStoreFallbackUrl: 500,
         playStoreFallbackUrl: 500,
+        paymentChannel: 80,
         promptPayRecipientValue: 80
     };
 
@@ -1502,7 +1538,8 @@ function applyPaymentMethodPatch(method, body = {}) {
         }
         else if (key === "androidAppLaunchUrl") method[key] = safeUrl(body[key], { deeplink: true });
         else if (key === "iosAppLaunchUrl") method[key] = safeUrl(body[key], { deeplink: true });
-        else if (["appStoreUrl", "playStoreUrl", "logoUrl", "appStoreFallbackUrl", "playStoreFallbackUrl"].includes(key)) method[key] = safeUrl(body[key]);
+        else if (key === "logoUrl") method[key] = safePublicAssetUrl(body[key]);
+        else if (["appStoreUrl", "playStoreUrl", "appStoreFallbackUrl", "playStoreFallbackUrl"].includes(key)) method[key] = safeUrl(body[key]);
         else method[key] = safeText(body[key], max);
     });
 
@@ -1535,7 +1572,7 @@ function applyPaymentMethodPatch(method, body = {}) {
         method.paymentType = String(body.paymentType);
     }
 
-    if (body.qrMode !== undefined && ["provider_generated", "uploaded_static", "aziel_promptpay_dynamic", "none"].includes(String(body.qrMode))) {
+    if (body.qrMode !== undefined && ["provider_generated", "uploaded_static", "aziel_promptpay_dynamic", "truemoney_template_dynamic", "none"].includes(String(body.qrMode))) {
         method.qrMode = String(body.qrMode);
     }
 
@@ -1550,7 +1587,7 @@ function applyPaymentMethodPatch(method, body = {}) {
         method.openAppMode = safeOpenAppMode(body.openAppMode, method.openAppMode || "disabled");
     }
 
-    if (body.confirmationMode !== undefined && ["manual_admin", "thunder_slip", "provider_webhook", "automatic_provider", "wallet_internal"].includes(String(body.confirmationMode))) {
+    if (body.confirmationMode !== undefined && ["manual_admin", "thunder_slip", "thunder_truewallet_slip", "provider_webhook", "automatic_provider", "wallet_internal"].includes(String(body.confirmationMode))) {
         method.confirmationMode = String(body.confirmationMode);
     }
 
@@ -1605,7 +1642,25 @@ async function validatePaymentMethodConfiguration(method) {
     const paymentType = String(method.paymentType || "manual").toLowerCase();
     const openAppMode = safeOpenAppMode(method.openAppMode, method.enableOpenApp === true ? "direct" : "disabled");
 
-    if (method.qrMode === "aziel_promptpay_dynamic") {
+    if (normalizeProviderKey(method.provider || method.key) === "truewallet") {
+        const digits = String(method.accountNumber || "").replace(/\D/g, "");
+        if (String(method.region || "").toUpperCase() !== "TH" || paymentType !== "manual" || String(method.paymentChannel || "").toUpperCase() !== "TRUE_MONEY_WALLET" || method.confirmationMode !== "thunder_truewallet_slip") {
+            throw configError("TrueMoney Wallet requires the Thailand region, manual payment type, TrueMoney payment rail, and TrueMoney slip verification.");
+        }
+        if (method.receiptUploadEnabled === false || method.slipRequired === false || method.autoVerificationSupported !== true || method.webhookSupported === true) {
+            throw configError("TrueMoney Wallet requires receipt upload and automatic slip verification without webhooks.");
+        }
+        if (method.enabled === true && (!String(method.accountName || "").trim() || !/^(?:66|0)?[689]\d{8}$/.test(digits))) {
+            throw configError("TrueMoney Wallet requires an account holder and a valid Thai receiving telephone number.");
+        }
+        const verificationDigits = String(process.env.AZIEL_TRUEMONEY_RECEIVER_ACCOUNT || "").replace(/\D/g, "");
+        const normalizePhone = value => value.startsWith("66") && value.length === 11 ? `0${value.slice(2)}` : value;
+        if (method.enabled === true && (!verificationDigits || normalizePhone(digits) !== normalizePhone(verificationDigits))) {
+            throw configError("TrueMoney Wallet QR receiver must match AZIEL_TRUEMONEY_RECEIVER_ACCOUNT.");
+        }
+    }
+
+    if (method.qrMode === "aziel_promptpay_dynamic" && normalizeProviderKey(method.provider || method.key) !== "truewallet") {
         if (String(method.region || "").toUpperCase() !== "TH") {
             throw configError("AZIEL Dynamic PromptPay QR is only available for Thailand methods.");
         }
@@ -1898,9 +1953,11 @@ module.exports._test = {
     applyPaymentMethodPatch,
     applySeedDefaultsWithoutOverwriting,
     defaultMethods,
+    defaultPromptPayBankLaunchers,
     formatAdminMethod,
     formatMethod,
     isLegacyThailandBankMethod,
+    isRetiredManualPromptPayMethod,
     mergePromptPayLaunchers,
     normalizePaymentMethodKey,
     publicBankLaunchersProjection,

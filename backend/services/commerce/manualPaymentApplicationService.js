@@ -10,6 +10,8 @@ const { createProviderRegistry } = require("./providerRegistry");
 const { createManualPromptPayProvider } = require("./manualPromptPayProviderFactory");
 const { createThunderPromptPayAdapter } = require("./providers/thunderPromptPayAdapter");
 const { createThunderSlipPaymentService, ThunderSlipPaymentError } = require("./thunderSlipPaymentService");
+const { createThunderTrueWalletAdapter } = require("./providers/thunderTrueWalletAdapter");
+const { createThunderTrueWalletVerificationService, ThunderTrueWalletVerificationError, normalizeThaiWalletAccount } = require("./thunderTrueWalletVerificationService");
 const { createManualAdminAdapter, MANUAL_ADMIN_PROVIDER_ID } = require("./providers/manualAdminAdapter");
 const { paymentMethodCapabilityState } = require("../paymentProviderRegistry");
 const { diagnosticTag, logThunderDiagnostic } = require("../../utils/thunderDiagnostics");
@@ -22,7 +24,8 @@ const {
 const SERVICE_VERSION = "commerce.manual-payment-application.v1";
 const MANUAL_PROVIDER_ID = "MANUAL_PROMPTPAY";
 const THUNDER_PROVIDER_ID = "THUNDER_PROMPTPAY";
-const MANUAL_PROVIDER_IDS = Object.freeze(new Set([MANUAL_PROVIDER_ID, MANUAL_ADMIN_PROVIDER_ID, THUNDER_PROVIDER_ID]));
+const THUNDER_TRUEWALLET_PROVIDER_ID = "THUNDER_TRUEWALLET";
+const MANUAL_PROVIDER_IDS = Object.freeze(new Set([MANUAL_PROVIDER_ID, MANUAL_ADMIN_PROVIDER_ID, THUNDER_PROVIDER_ID, THUNDER_TRUEWALLET_PROVIDER_ID]));
 const ERROR_CODES = Object.freeze({
     VALIDATION_ERROR: "VALIDATION_ERROR",
     UNAUTHENTICATED: "UNAUTHENTICATED",
@@ -114,12 +117,16 @@ function isThunderPromptPayOrder(order = {}) {
     return paymentProviderOf(order) === THUNDER_PROVIDER_ID || normalizeString(order.payment?.confirmationMode || order.payment?.metadata?.confirmationMode) === "thunder_slip";
 }
 
+function isThunderTrueWalletOrder(order = {}) {
+    return paymentProviderOf(order) === THUNDER_TRUEWALLET_PROVIDER_ID || normalizeString(order.payment?.confirmationMode || order.payment?.metadata?.confirmationMode) === "thunder_truewallet_slip";
+}
+
 function isManualAdminOrder(order = {}) {
     return paymentProviderOf(order) === MANUAL_ADMIN_PROVIDER_ID;
 }
 
 function isSupportedManualOrder(order = {}) {
-    return isManualPromptPayOrder(order) || isThunderPromptPayOrder(order) || isManualAdminOrder(order);
+    return isManualPromptPayOrder(order) || isThunderPromptPayOrder(order) || isThunderTrueWalletOrder(order) || isManualAdminOrder(order);
 }
 
 function fingerprint(input = {}) {
@@ -165,6 +172,29 @@ async function defaultThunderPromptPayConfigurationProvider() {
     return { enabled: true, recipientType: method.promptPayRecipientType, recipientValue: method.promptPayRecipientValue, receivingBankAccount: method.accountNumber, recipientDisplayName: method.method || "AZIEL PromptPay", defaultExpiryMinutes: method.dynamicQrExpiryMinutes || 15, environment: String(method.providerEnvironment || process.env.NODE_ENV || "production").toLowerCase() };
 }
 
+async function defaultThunderTrueWalletConfigurationProvider() {
+    const apiKey = normalizeString(process.env.THUNDER_API_KEY);
+    const receivingAccount = normalizeString(process.env.AZIEL_TRUEMONEY_RECEIVER_ACCOUNT);
+    const trueMoneyQrTemplate = normalizeString(process.env.AZIEL_TRUEMONEY_QR_TEMPLATE);
+    if (!apiKey || !receivingAccount || !trueMoneyQrTemplate) throw appError(ERROR_CODES.PROVIDER_UNAVAILABLE, "Thunder TrueMoney Wallet is not configured.", 503, "provider");
+    const method = await PaymentMethod.findOne({ key: "truewallet", region: "TH", provider: "truewallet", paymentChannel: "TRUE_MONEY_WALLET", confirmationMode: "thunder_truewallet_slip", enabled: true }).lean();
+    if (!method || paymentMethodCapabilityState(method).customerVisible !== true) throw appError(ERROR_CODES.PROVIDER_UNAVAILABLE, "TrueMoney Wallet payment method is unavailable.", 503, "provider");
+    const configuredReceiver = normalizeThaiWalletAccount(receivingAccount);
+    const qrReceiver = normalizeThaiWalletAccount(method.accountNumber);
+    if (!configuredReceiver || !qrReceiver || configuredReceiver !== qrReceiver) {
+        throw appError(ERROR_CODES.PROVIDER_UNAVAILABLE, "TrueMoney Wallet QR receiver does not match verification receiver.", 503, "provider");
+    }
+    return {
+        enabled: true,
+        receivingAccount: configuredReceiver,
+        trueMoneyQrTemplate,
+        customerAccountName: normalizeString(method.accountName),
+        customerAccountNumber: qrReceiver,
+        defaultExpiryMinutes: method.dynamicQrExpiryMinutes || 30,
+        environment: String(process.env.NODE_ENV || "production").toLowerCase()
+    };
+}
+
 async function defaultManualAdminConfigurationProvider({ intent } = {}) {
     const methodKey = normalizeString(intent?.paymentMethodId).toLowerCase();
     const region = normalizeUpper(intent?.region);
@@ -193,10 +223,14 @@ async function defaultManualAdminConfigurationProvider({ intent } = {}) {
     };
 }
 
-function createProviderResolver(configProvider, providerOptions = {}, manualAdminConfigProvider = defaultManualAdminConfigurationProvider, thunderConfigProvider = defaultThunderPromptPayConfigurationProvider) {
+function createProviderResolver(configProvider, providerOptions = {}, manualAdminConfigProvider = defaultManualAdminConfigurationProvider, thunderConfigProvider = defaultThunderPromptPayConfigurationProvider, trueWalletConfigProvider = defaultThunderTrueWalletConfigurationProvider) {
     let cached = null;
     let cachedSignature = "";
     return async function providerResolver({ intent }) {
+        if (normalizeUpper(intent?.provider) === THUNDER_TRUEWALLET_PROVIDER_ID) {
+            const config = await trueWalletConfigProvider({ intent });
+            return createThunderTrueWalletAdapter({ configuration: config, ...providerOptions });
+        }
         if (normalizeUpper(intent?.provider) === THUNDER_PROVIDER_ID) {
             const config = await thunderConfigProvider({ intent });
             return createThunderPromptPayAdapter({ configuration: config, ...providerOptions });
@@ -276,7 +310,7 @@ function toSafePaymentView({ order = {}, attempt = {}, paymentResult = null, adm
     const source = paymentResult || attempt || {};
     const qr = source.qr || attempt.qr || null;
     const instructions = source.paymentInstructions || attempt.paymentInstructions || null;
-    const thunder = normalizeUpper(attempt.provider || source.provider) === THUNDER_PROVIDER_ID;
+    const thunder = [THUNDER_PROVIDER_ID, THUNDER_TRUEWALLET_PROVIDER_ID].includes(normalizeUpper(attempt.provider || source.provider));
     return {
         manualPaymentApplicationVersion: SERVICE_VERSION,
         orderId: order.orderId || source.orderId || attempt.orderId || "",
@@ -343,6 +377,7 @@ function createManualPaymentApplicationService(dependencies = {}) {
         notificationPort: dependencies.notificationPort || { publish: async () => null },
         manualPromptPayConfigurationProvider: dependencies.manualPromptPayConfigurationProvider || defaultManualPromptPayConfigurationProvider,
         thunderPromptPayConfigurationProvider: dependencies.thunderPromptPayConfigurationProvider || defaultThunderPromptPayConfigurationProvider,
+        thunderTrueWalletConfigurationProvider: dependencies.thunderTrueWalletConfigurationProvider || defaultThunderTrueWalletConfigurationProvider,
         manualAdminConfigurationProvider: dependencies.manualAdminConfigurationProvider || defaultManualAdminConfigurationProvider,
         providerOptions: dependencies.providerOptions || {},
         clock: dependencies.clock || (() => new Date()),
@@ -352,7 +387,7 @@ function createManualPaymentApplicationService(dependencies = {}) {
     const orchestrator = deps.paymentOrchestrator || createPaymentOrchestrator({
         orderRepository: deps.commerceOrderRepository,
         paymentAttemptPort: deps.paymentAttemptRepository,
-        providerResolver: createProviderResolver(deps.manualPromptPayConfigurationProvider, deps.providerOptions, deps.manualAdminConfigurationProvider, deps.thunderPromptPayConfigurationProvider),
+        providerResolver: createProviderResolver(deps.manualPromptPayConfigurationProvider, deps.providerOptions, deps.manualAdminConfigurationProvider, deps.thunderPromptPayConfigurationProvider, deps.thunderTrueWalletConfigurationProvider),
         transactionRunner: deps.transactionRunner,
         clock: deps.clock,
         idGenerator: deps.idGenerator,
@@ -575,12 +610,27 @@ function createManualPaymentApplicationService(dependencies = {}) {
                 const payment = await verifier.verify({ orderId, attemptId, owner, fileBuffer: input.fileBuffer, receiptEvidence: boundAttempt.safeMetadata?.receiptEvidence || evidence, correlationId: input.correlationId });
                 return { ...payment, _receiptUploadDisposition: updatedAttempt.reusedExisting ? "duplicate_unbound" : "bound" };
             }
+            if (normalizeUpper(attempt.provider) === THUNDER_TRUEWALLET_PROVIDER_ID) {
+                const config = await deps.thunderTrueWalletConfigurationProvider({ intent: { provider: THUNDER_TRUEWALLET_PROVIDER_ID } });
+                const verifier = createThunderTrueWalletVerificationService({
+                    paymentAttemptRepository: deps.paymentAttemptRepository,
+                    orderRepository: deps.commerceOrderRepository,
+                    paymentOrchestrator: orchestrator,
+                    thunderClient: dependencies.thunderClient,
+                    thunderClientOptions: dependencies.thunderClientOptions,
+                    receiverAccount: config.receivingAccount,
+                    clock: deps.clock,
+                    logger: deps.logger
+                });
+                const payment = await verifier.verify({ orderId, attemptId, owner, fileBuffer: input.fileBuffer, receiptEvidence: boundAttempt.safeMetadata?.receiptEvidence || evidence, correlationId: input.correlationId });
+                return { ...payment, _receiptUploadDisposition: updatedAttempt.reusedExisting ? "duplicate_unbound" : "bound" };
+            }
             return toSafePaymentView({ order, attempt: boundAttempt });
         } catch (error) {
             if (receiptBound) error.evidenceBound = true;
             if (duplicateUploadUnbound) error.duplicateUploadUnbound = true;
             if (input.storageCommitted === true && !error.recoverableEvidenceBinding) error.recoverableEvidenceBinding = true;
-            if (error instanceof ThunderSlipPaymentError) {
+            if (error instanceof ThunderSlipPaymentError || error instanceof ThunderTrueWalletVerificationError) {
                 error.evidenceBound = true;
                 throw error;
             }

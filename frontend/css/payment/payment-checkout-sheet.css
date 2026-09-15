@@ -134,6 +134,19 @@ body.light .az-payment-sheet {
     border-bottom: 1px solid var(--az-pay-sheet-border);
 }
 
+.az-payment-sheet__method-logo {
+    display: block;
+    width: 52px;
+    height: 52px;
+    margin: 0 0 12px;
+    object-fit: contain;
+    border-radius: 12px;
+}
+
+.az-payment-sheet__method-logo[hidden] {
+    display: none;
+}
+
 .az-payment-sheet__title {
     margin: 0 42px 8px 0;
     color: var(--az-pay-sheet-title);
@@ -1284,5 +1297,42 @@ body.az-payment-verification-locked {
 @media (prefers-reduced-motion: reduce) {
     .az-payment-verification__motion {
         animation: none;
+    }
+}
+
+
+/* AZIEL payment mobile actions: Save QR / Open App are mobile-only */
+@media (min-width: 769px) {
+    #azPaymentSheetActions {
+        display: none !important;
+    }
+}
+
+
+/* AZIEL mobile payment QR compact layout */
+@media (max-width: 768px) {
+    .az-payment-sheet.is-thunder-auto-slip .az-payment-sheet__qr {
+        gap: 6px;
+        margin: 8px 0 8px;
+    }
+
+    .az-payment-sheet.is-thunder-auto-slip .az-payment-sheet__qr img {
+        width: clamp(170px, 48vw, 185px);
+        padding: 7px;
+        border-radius: 12px;
+    }
+
+    .az-payment-sheet.is-thunder-auto-slip .az-payment-sheet__actions {
+        margin-top: 0;
+        margin-bottom: 10px;
+    }
+
+    .az-payment-sheet.is-thunder-auto-slip .az-payment-sheet__instructions {
+        margin-bottom: 10px;
+        line-height: 1.45;
+    }
+
+    .az-payment-sheet.is-thunder-auto-slip .az-payment-sheet__receipt {
+        padding-top: 12px;
     }
 }

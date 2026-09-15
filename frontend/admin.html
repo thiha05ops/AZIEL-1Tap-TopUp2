@@ -1028,31 +1028,8 @@
             </section>
 
             <section class="admin-section" id="section-payments">
-                <div class="settings-page">
-                    <div class="settings-menu">
-                        <h3>Payment Control</h3>
-
-                        <button class="settings-tab active" data-settings-tab="payments">
-                            💳
-                            <span>
-                                <b>Payment Infrastructure</b>
-                                <small>Manual rails, providers, routing</small>
-                            </span>
-                        </button>
-                    </div>
-
-                    <div class="settings-content">
-                        <div class="settings-panel active" data-settings-panel="payments">
-                            <div class="settings-card">
-                                <h3>Payment Infrastructure</h3>
-                                <p>Separate manual payment rails from future automatic provider-backed payments.</p>
-
-                                <div id="paymentMethodsContainer">
-                                    Loading payment infrastructure...
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                <div id="paymentMethodsContainer" aria-live="polite">
+                    Loading payment methods...
                 </div>
             </section>
 

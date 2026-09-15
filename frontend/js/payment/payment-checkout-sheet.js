@@ -50,6 +50,7 @@
 
                 <div class="az-payment-sheet__body">
                     <header class="az-payment-sheet__header">
+                        <img id="azPaymentSheetMethodLogo" class="az-payment-sheet__method-logo" alt="" hidden>
                         <h2 id="azPaymentSheetTitle" class="az-payment-sheet__title">Payment</h2>
                         <strong id="azPaymentSheetAmount" class="az-payment-sheet__amount">-</strong>
                         <span id="azPaymentSheetSubtitle" class="az-payment-sheet__subtitle">Transfer the exact amount</span>
@@ -348,6 +349,14 @@
         return options.qrMode === "aziel_promptpay_dynamic";
     }
 
+    function isTrueMoneyDynamicMode(options = {}) {
+        return options.qrMode === "truemoney_template_dynamic";
+    }
+
+    function isDynamicQrMode(options = {}) {
+        return isDynamicPromptPayMode(options) || isTrueMoneyDynamicMode(options);
+    }
+
     function shouldGenerateDynamicPromptPay(options = {}) {
         return isDynamicPromptPayMode(options) && !isRecoveryMode(options) &&
             !options.qrImageUrl &&
@@ -370,7 +379,7 @@
     }
 
     function renderedQrSourceType(options = {}, qr = "") {
-        if (isDynamicPromptPayMode(options)) return qr ? "dynamic_response" : "";
+        if (isDynamicQrMode(options)) return qr ? "dynamic_response" : "";
         if (options.qrMode === "uploaded_static" && qr) return "uploaded_static";
         if (options.qrMode === "provider_generated" && qr) return "provider_generated";
         return "";
@@ -1198,8 +1207,14 @@
         if (qrFallback) qrFallback.hidden = true;
         if (retry) retry.hidden = true;
         setQrDiagnostic(activeState || {}, sourceType);
-        if (sourceType === "dynamic_response") startQrExpiryCountdown(activeState?.dynamicQr?.expiresAt);
-        else clearQrExpiryCountdown();
+        if (sourceType === "dynamic_response") {
+            startQrExpiryCountdown(
+                activeState?.dynamicQr?.expiresAt ||
+                activeState?.expiresAt
+            );
+        } else {
+            clearQrExpiryCountdown();
+        }
         qrWrap.hidden = false;
     }
 
@@ -1210,7 +1225,11 @@
         const openBankApp = modal?.querySelector("#azPaymentSheetOpenBankApp");
         const qr = isDynamicPromptPayMode(options)
             ? (activeDynamicQrMatchesCheckout(activeState?.activeDynamicQr, options) ? activeState.activeDynamicQr.imageDataUrl : "")
-            : (activeQrMatchesCheckout(activeState?.activeQr, options) ? activeState.activeQr.imageUrlOrDataUrl : "");
+            : (activeQrMatchesCheckout(activeState?.activeQr, options)
+                ? activeState.activeQr.imageUrlOrDataUrl
+                : (isTrueMoneyDynamicMode(options)
+                    ? normalizeUrl(options.qrImageUrl || options.qrImage || activeState?.qrImageUrl || activeState?.qrImage || "")
+                    : ""));
         const appTarget = resolveAppLaunchTarget(options);
         const directOpenAppMode = String(options.openAppMode || "direct") !== "bank_chooser";
         const androidPackageCapability = directOpenAppMode && hasAndroidLaunchCapability(options);
@@ -1719,6 +1738,11 @@
             "THUNDER_SLIP_REJECTED",
             "THUNDER_SLIP_NOT_VERIFIED",
             "SLIP_QR_NOT_FOUND"
+            ,"TRUEWALLET_INVALID_IMAGE"
+            ,"TRUEWALLET_RECEIVER_MISMATCH"
+            ,"TRUEWALLET_PROVIDER_MISMATCH"
+            ,"TRUEWALLET_AMOUNT_MISMATCH"
+            ,"TRUEWALLET_PROVIDER_DUPLICATE"
         ]).has(String(error.code || "").toUpperCase());
     }
 
@@ -1814,6 +1838,13 @@
         modal.querySelector("#azPaymentSheetTitle").textContent = recoveryMode
             ? t("recoveryResumePayment", "Resume Payment")
             : `${methodName} Transfer`;
+        const methodLogo = modal.querySelector("#azPaymentSheetMethodLogo");
+        const methodLogoUrl = normalizeUrl(options.methodLogo || options.logoUrl || options.logo || "");
+        if (methodLogo) {
+            methodLogo.hidden = !methodLogoUrl;
+            methodLogo.src = methodLogoUrl || "";
+            methodLogo.alt = methodLogoUrl ? `${methodName} logo` : "";
+        }
         modal.querySelector("#azPaymentSheetAmount").textContent = `${amount.toLocaleString()} ${currency}`.trim();
         modal.querySelector("#azPaymentSheetSubtitle").textContent = dynamicQr
             ? (options.autoSubmitReceipt === true
@@ -1828,18 +1859,20 @@
                     : "Scan or complete the payment using the details shown.");
 
         const detailRows = [
-            row("Account", options.accountName || "", options.accountName || ""),
-            row("Account Number", options.accountNumber || "", options.accountNumber || ""),
+            row(options.trueMoneyWallet ? "Account Holder" : "Account", options.accountName || "", options.accountName || ""),
+            row(options.trueMoneyWallet ? "Receiving Telephone Number" : "Account Number", options.accountNumber || "", options.accountNumber || ""),
             row("Reference", reference, reference)
         ].join("");
-        modal.querySelector("#azPaymentSheetDetails").innerHTML = dynamicQr && detailRows
-            ? `
-                <details class="az-payment-sheet__fallback-details">
-                    <summary>${escapeHTML(t("payment_transfer_details_fallback", "Fallback transfer details"))}</summary>
-                    ${detailRows}
-                </details>
-            `
-            : detailRows;
+        modal.querySelector("#azPaymentSheetDetails").innerHTML = options.trueMoneyWallet
+            ? ""
+            : dynamicQr && detailRows
+                ? `
+                    <details class="az-payment-sheet__fallback-details">
+                        <summary>${escapeHTML(t("payment_transfer_details_fallback", "Fallback transfer details"))}</summary>
+                        ${detailRows}
+                    </details>
+                `
+                : detailRows;
 
         modal.querySelectorAll("[data-copy]").forEach(btn => {
             btn.addEventListener("click", () => {
@@ -1895,10 +1928,10 @@
             ? tr(options, "payment.thunder.chooseSlip", "Choose Payment Slip")
             : t("payment_choose_screenshot", "Choose Screenshot");
         if (options.autoSubmitReceipt === true) {
-            setLocalizedText(modal.querySelector("#azPaymentSheetTitle"), "payment.thunder.title", "PromptPay Transfer", options);
-            setLocalizedText(modal.querySelector("#azPaymentSheetSubtitle"), "payment.thunder.subtitle", "Transfer the exact amount", options);
+            setLocalizedText(modal.querySelector("#azPaymentSheetTitle"), options.trueMoneyWallet ? "payment.truewallet.title" : "payment.thunder.title", options.trueMoneyWallet ? "TrueMoney Wallet" : "PromptPay Transfer", options);
+            setLocalizedText(modal.querySelector("#azPaymentSheetSubtitle"), options.trueMoneyWallet ? "payment.truewallet.scan" : "payment.thunder.subtitle", options.trueMoneyWallet ? "Scan this QR with TrueMoney" : "Transfer the exact amount", options);
             setLocalizedText(modal.querySelector("#azPaymentSheetDetailsSummary"), "payment.thunder.details", "Payment details", options);
-            setLocalizedText(modal.querySelector("#azPaymentSheetInstructions"), "payment.thunder.instructions", "Pay the fixed amount, then upload the slip for automatic verification.", options);
+            setLocalizedText(modal.querySelector("#azPaymentSheetInstructions"), options.trueMoneyWallet ? "payment.truewallet.instructions" : "payment.thunder.instructions", options.trueMoneyWallet ? "Scan this QR with TrueMoney, pay the exact amount, then upload the transfer slip." : "Pay the fixed amount, then upload the slip for automatic verification.", options);
             setLocalizedText(modal.querySelector("#azPaymentSheetReceiptTitle"), "payment.thunder.uploadTitle", "Upload Payment Slip", options);
             setLocalizedText(modal.querySelector("#azPaymentSheetReceiptHelper"), "payment.thunder.uploadHelper", "Verification starts automatically after you choose your payment slip.", options);
             setLocalizedText(modal.querySelector("#azPaymentSheetUploadLabel"), "payment.thunder.chooseSlip", "Choose Payment Slip", options);
@@ -2001,7 +2034,14 @@
                         if (input) input.value = "";
                         modal.querySelector("#azPaymentSheetPreview")?.setAttribute("hidden", "");
                         setLocalizedText(modal.querySelector("#azPaymentSheetUploadLabel"), "payment.thunder.uploadAnother", "Upload Another Slip", options);
-                        setLocalizedMessage("error", "payment.thunder.rejected", "Payment could not be verified. Please upload the correct payment slip for this order.", options);
+                        const code = String(error.code || "").toUpperCase();
+                        const trueWalletMessage = code === "TRUEWALLET_RECEIVER_MISMATCH"
+                            ? ["payment.truewallet.wrongRecipient", "This transfer was not sent to the correct TrueMoney account."]
+                            : code === "TRUEWALLET_AMOUNT_MISMATCH"
+                                ? ["payment.truewallet.wrongAmount", "The transferred amount does not match this order."]
+                                : ["payment.truewallet.invalidSlip", "Couldn't read this TrueMoney slip. Please upload a clear transfer slip."];
+                        const rejection = options.trueMoneyWallet ? trueWalletMessage : ["payment.thunder.rejected", "Payment could not be verified. Please upload the correct payment slip for this order."];
+                        setLocalizedMessage("error", rejection[0], rejection[1], options);
                     } else {
                         if (activeState) activeState.verificationPending = true;
                         setLocalizedMessage("error", "payment.thunder.retryable", "We couldn't verify your payment right now. Please try again.", options);

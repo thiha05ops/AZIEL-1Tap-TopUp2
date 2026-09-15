@@ -53,8 +53,6 @@ function verifyProviderRegistry() {
 function verifyBackendSeedAndProjection() {
     const routes = read("backend/routes/paymentMethods.js");
     [
-        'key: "promptpay"',
-        'provider: "promptpay"',
         'key: "scb"',
         'provider: "scb"',
         'key: "bangkok_bank"',
@@ -68,6 +66,8 @@ function verifyBackendSeedAndProjection() {
         'key: "wallet"',
         'provider: "wallet"'
     ].forEach(snippet => assert(routes.includes(snippet), `seed/projection missing ${snippet}`));
+    assert(!require("../routes/paymentMethods")._test.defaultMethods.some(item => item.key === "promptpay"), "Retired manual PromptPay must not remain in startup seed defaults");
+    includes("backend/routes/paymentMethods.js", "operatorHidden", "retired manual PromptPay must retain a guarded Admin retirement projection");
 
     includes("backend/routes/paymentMethods.js", "paymentMethodReadiness", "public projection must expose readiness");
     includes("backend/routes/paymentMethods.js", "missingConfiguration", "public/admin projection must explain missing config");
@@ -82,7 +82,7 @@ function verifyAdminProviderFiltering() {
     includes("frontend/js/admin-payments.js", "Internal provider:", "admin may only show provider as read-only system info");
     includes("frontend/js/admin-payments.js", "Provider is assigned automatically", "admin must explain provider auto-assignment");
     includes("frontend/js/admin-payments.js", "pm-logo-url", "admin must expose dedicated payment card logo URL");
-    includes("frontend/js/admin-payments.js", "payment-config-warning", "admin must show missing configuration warning");
+    includes("frontend/js/admin-payments.js", "payment-operator-requirements", "admin must show actionable configuration requirements");
     notIncludes("frontend/js/admin-payments.js", '<select class="pm-provider"', "normal admin UI must not expose editable provider selector");
     notIncludes("frontend/js/admin-payments.js", '<option value="omise"', "admin must not show duplicate Omise PromptPay provider");
 }

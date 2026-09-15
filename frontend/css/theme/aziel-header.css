@@ -285,6 +285,21 @@ body.theme-dark .az-header.scrolled {
     transition: .22s ease;
 }
 
+.az-nav>a[data-i18n="nav_money_transfer"]::after {
+    content: "Soon";
+    display: inline-flex;
+    margin-left: 7px;
+    padding: 3px 7px;
+    border-radius: 999px;
+    background: rgba(124, 58, 237, .1);
+    color: #7c3aed;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+
 .az-mobile-legacy-nav,
 .az-mobile-drawer-link,
 .az-mobile-drawer-brand {
@@ -2382,5 +2397,167 @@ body.dark .az-profile-dropdown .dropdown-divider {
 @media (max-width: 768px) {
     body.az-home-page .az-header {
         min-height: calc(60px + env(safe-area-inset-top)) !important;
+    }
+}
+
+
+/* AZIEL SAFE MOBILE DRAWER V2 */
+@media (max-width: 900px) {
+    html body .az-header > .az-nav {
+        display: flex !important;
+        flex-direction: column !important;
+    }
+
+    html body .az-header.mobile-menu-open > .az-nav,
+    html body #azHeaderMount.az-nav-hidden .az-header.mobile-menu-open > .az-nav,
+    html body #azHeaderMount.az-nav-visible .az-header.mobile-menu-open > .az-nav {
+        display: flex !important;
+    }
+
+    .az-header > .az-nav > .az-mobile-drawer-head {
+        order: 0;
+    }
+
+    .az-header > .az-nav > .az-nav-home {
+        order: 10;
+    }
+
+    .az-header > .az-nav > #gamesNavDropdown {
+        order: 20;
+    }
+
+    .az-header > .az-nav > #socialNavDropdown {
+        order: 30;
+    }
+
+    .az-header > .az-nav > a[href*="tracking"] {
+        order: 40;
+        margin-top: 14px !important;
+        padding-top: 4px !important;
+        border-top: 1px solid var(--border) !important;
+    }
+
+    .az-header > .az-nav > a[href*="support"] {
+        order: 50;
+    }
+
+    .az-header > .az-nav > #mobilePreferenceBtn {
+        order: 100;
+        margin-top: auto !important;
+    }
+
+    .az-header > .az-nav > a.az-nav-link,
+    .az-header > .az-nav > a.az-mobile-drawer-link,
+    .az-header > .az-nav > .az-nav-dropdown > .az-nav-drop-btn {
+        display: flex !important;
+        width: 100% !important;
+        min-height: 46px !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        gap: 12px !important;
+        padding: 0 12px !important;
+        border-radius: 9px !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+        line-height: 1.2 !important;
+    }
+
+    .az-mobile-nav-icon {
+        display: inline-block !important;
+        width: 18px !important;
+        flex: 0 0 18px !important;
+        color: var(--text-muted) !important;
+        font-size: 14px !important;
+        text-align: center !important;
+    }
+
+    .az-mobile-nav-chevron {
+        width: auto !important;
+        margin-left: auto !important;
+        color: var(--text-muted) !important;
+        font-size: 10px !important;
+    }
+
+    .az-mobile-preference-footer {
+        display: flex !important;
+        grid-template-columns: none !important;
+        width: 100% !important;
+        min-height: 50px !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 5px !important;
+        padding: 10px 7px !important;
+        border: 0 !important;
+        border-top: 1px solid var(--border) !important;
+        border-radius: 0 !important;
+        background: transparent !important;
+        white-space: nowrap !important;
+    }
+
+    .az-mobile-pref-item {
+        display: inline-flex;
+        min-width: 0;
+        align-items: center;
+        gap: 4px;
+        color: var(--text-muted);
+        font-size: 11px;
+        font-weight: 500;
+        line-height: 1;
+        white-space: nowrap;
+    }
+
+    .az-mobile-pref-item i {
+        font-size: 11px;
+    }
+
+    .az-mobile-currency-symbol {
+        color: var(--text);
+        font-weight: 700;
+    }
+
+    .az-header > .az-nav.az-mobile-drawer-dragging {
+        transition: none !important;
+        transform: translateX(var(--az-drawer-drag-x, 0px)) !important;
+    }
+}
+
+/* Mobile-only elements must never alter desktop navigation layout. */
+@media (min-width: 901px) {
+    .az-mobile-nav-icon {
+        display: none !important;
+    }
+
+    .az-mobile-preference-footer {
+        display: none !important;
+    }
+}
+
+/* AZIEL mobile drawer interaction shield */
+@media (max-width: 900px) {
+    body.az-mobile-drawer-open #azHeaderMount {
+        position: relative;
+        z-index: 100000;
+    }
+
+    body.az-mobile-drawer-open .az-header > .az-mobile-drawer-backdrop {
+        position: fixed !important;
+        inset: 0 !important;
+        z-index: 99998 !important;
+        display: block !important;
+        width: 100vw !important;
+        height: 100dvh !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+        touch-action: none !important;
+        cursor: default !important;
+    }
+
+    body.az-mobile-drawer-open .az-header > .az-nav {
+        z-index: 99999 !important;
+        pointer-events: auto !important;
     }
 }

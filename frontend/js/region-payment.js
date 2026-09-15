@@ -90,6 +90,8 @@ async function loadDynamicPaymentMethods(region) {
             card.dataset.accountName = pay.accountName || "";
             card.dataset.accountNumber = pay.accountNumber || "";
             card.dataset.provider = pay.provider || "manual";
+            card.dataset.paymentChannel = pay.paymentChannel || "";
+            card.dataset.confirmationMode = pay.confirmationMode || "";
             card.dataset.paymentType = pay.paymentType || "manual";
             card.dataset.appDisplayName = pay.appDisplayName || name;
             card.dataset.openAppMode = pay.openAppMode || "";
@@ -236,6 +238,12 @@ function isRegionPaymentMethodUsable(method = {}) {
     if (method.publicReady === false) return false;
     if (String(method.maintenanceMessage || "").trim()) return false;
     if (key === "wallet" || type === "wallet" || provider === "wallet") return true;
+    if (key === "truewallet" || provider === "truewallet") {
+        return String(method.region || "").toUpperCase() === "TH" &&
+            String(method.paymentChannel || "").toUpperCase() === "TRUE_MONEY_WALLET" &&
+            method.confirmationMode === "thunder_truewallet_slip" &&
+            Boolean(method.accountName && method.accountNumber);
+    }
     if (type === "auto" || provider === "omise") return true;
 
     const hasQr = Boolean(method.qrImage || method.qrImageUrl || method.uploadedQrImage || method.finalQrImage || method.qrMode === "aziel_promptpay_dynamic");
@@ -269,6 +277,8 @@ function selectPaymentCard(card) {
         accountName: originalMethod.accountName || card.dataset.accountName || "",
         accountNumber: originalMethod.accountNumber || card.dataset.accountNumber || "",
         provider: originalMethod.provider || card.dataset.provider || "manual",
+        paymentChannel: originalMethod.paymentChannel || card.dataset.paymentChannel || "",
+        confirmationMode: originalMethod.confirmationMode || card.dataset.confirmationMode || "",
         paymentType: originalMethod.paymentType || card.dataset.paymentType || "manual",
         appDisplayName: originalMethod.appDisplayName || card.dataset.appDisplayName || card.dataset.name || "",
         openAppMode: originalMethod.openAppMode || card.dataset.openAppMode || "disabled",
@@ -380,6 +390,7 @@ function getPaymentLogo(key) {
         ayapay: "assets/payment/ayapay.png",
         promptpay: "assets/payment/promptpay.png",
         thunderpromptpay: "assets/payment/promptpay.png",
+        truewallet: "assets/payment/payment-neutral.svg",
         scb: "assets/payment/scb.png",
         bangkokbank: "assets/payment/bank-neutral.svg",
         kplus: "assets/payment/bank-neutral.svg",
@@ -400,6 +411,7 @@ function isKnownRegionPaymentProvider(key) {
         "ayapay",
         "promptpay",
         "thunderpromptpay",
+        "truewallet",
         "scb",
         "bangkokbank",
         "kplus",
@@ -421,7 +433,10 @@ function normalizePaymentKey(value) {
         .replace(/[^a-z0-9]/g, "");
     const aliases = {
         azielwallet: "wallet",
-        manualbanktransfer: "manualbank"
+        manualbanktransfer: "manualbank",
+        truemoney: "truewallet",
+        truemoneywallet: "truewallet",
+        thundertruewallet: "truewallet"
     };
     return aliases[key] || key;
 }

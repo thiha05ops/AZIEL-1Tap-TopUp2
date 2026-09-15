@@ -16,28 +16,20 @@ function notIncludes(file, snippet, message) {
     assert(!read(file).includes(snippet), `${file}: ${message}`);
 }
 
-function qrModeOptions(adminPaymentsJs) {
-    const selectMatch = adminPaymentsJs.match(/<select class="pm-qr-mode">([\s\S]*?)<\/select>/);
-    assert(selectMatch, "Admin QR Mode select must exist.");
-    return Array.from(selectMatch[1].matchAll(/<option value="([^"]+)"[^>]*>([^<]+)<\/option>/g))
-        .map(match => ({ value: match[1], label: match[2].trim() }));
-}
-
 function main() {
     const adminPayments = read("frontend/js/admin-payments.js");
     const checkout = read("frontend/js/payment/payment-checkout-sheet.js");
     const paymentMethodsRoute = read("backend/routes/paymentMethods.js");
     const paymentMethodModel = read("backend/models/PaymentMethod.js");
 
-    assert.deepStrictEqual(qrModeOptions(adminPayments), [
-        { value: "provider_generated", label: "Provider Generated Dynamic QR" },
-        { value: "aziel_promptpay_dynamic", label: "AZIEL Generated PromptPay QR" },
-        { value: "uploaded_static", label: "Uploaded Static QR" },
-        { value: "none", label: "No QR" }
-    ], "Admin QR Mode dropdown must expose the exact canonical options in order.");
+    const operatorEditor = adminPayments.slice(
+        adminPayments.indexOf("function renderOperatorPaymentEditor"),
+        adminPayments.indexOf("function renderAdminPaymentMethods")
+    );
+    assert(!operatorEditor.includes("pm-qr-mode"), "Operator editor must not expose the internal QR mode selector.");
 
-    includes("backend/models/PaymentMethod.js", 'enum: ["provider_generated", "uploaded_static", "aziel_promptpay_dynamic", "none"]', "PaymentMethod schema must preserve aziel_promptpay_dynamic enum value.");
-    includes("backend/routes/paymentMethods.js", '["provider_generated", "uploaded_static", "aziel_promptpay_dynamic", "none"].includes(String(body.qrMode))', "Admin update route must accept aziel_promptpay_dynamic.");
+    includes("backend/models/PaymentMethod.js", 'enum: ["provider_generated", "uploaded_static", "aziel_promptpay_dynamic", "truemoney_template_dynamic", "none"]', "PaymentMethod schema must preserve distinct PromptPay and TrueMoney dynamic QR enum values.");
+    includes("backend/routes/paymentMethods.js", '["provider_generated", "uploaded_static", "aziel_promptpay_dynamic", "truemoney_template_dynamic", "none"].includes(String(body.qrMode))', "Admin update route must accept distinct PromptPay and TrueMoney dynamic QR modes.");
     includes("backend/routes/paymentMethods.js", 'qrMode: obj.qrMode || "uploaded_static"', "Public/admin projections must return saved qrMode.");
     includes("backend/routes/paymentMethods.js", 'key === "promptpay" && method.qrMode !== "aziel_promptpay_dynamic"', "Compatibility mode must not overwrite explicit dynamic PromptPay QR mode.");
     assert(!/method\.qrMode\s*=\s*"provider_generated";[\s\S]{0,160}method\.qrMode\s*=\s*"aziel_promptpay_dynamic"/.test(paymentMethodsRoute), "Backend must not normalize dynamic QR mode into provider generated mode.");
@@ -45,7 +37,7 @@ function main() {
     includes("frontend/js/admin-payments.js", 'payload.qrMode = "aziel_promptpay_dynamic"', "Admin save must preserve PromptPay as dynamic QR mode.");
     includes("frontend/js/admin-payments.js", 'payload.paymentType = "manual"', "Admin save must keep PromptPay on manual attempt flow.");
     includes("frontend/js/admin-payments.js", 'payload.openAppMode = "bank_chooser"', "Admin save must keep PromptPay on bank chooser mode.");
-    includes("frontend/js/admin-payments.js", 'qrMode: card.querySelector(".pm-qr-mode")?.value || "uploaded_static"', "Admin save payload must send selected qrMode.");
+    assert(!adminPayments.slice(adminPayments.indexOf("async function saveAdminPaymentMethod"), adminPayments.indexOf("function collectAdminPaymentFormState")).includes('card.querySelector(".pm-qr-mode")'), "Admin save must not depend on an operator-editable QR mode control.");
 
     includes("frontend/js/payment/payment-checkout-sheet.js", 'function isDynamicPromptPayMode', "Checkout must have explicit dynamic QR mode ownership.");
     includes(
@@ -79,7 +71,10 @@ function main() {
     includes("frontend/js/payment/payment-checkout-sheet.js", "return \"\";", "No-QR and unknown modes must resolve to an empty rendered QR source.");
     notIncludes("frontend/js/payment/payment-checkout-sheet.js", "paymentStatus: \"paid\"", "Checkout sheet must not change paid/webhook behavior.");
 
-    assert(paymentMethodModel.includes("aziel_promptpay_dynamic"), "Model must retain dynamic QR enum.");
+    assert(paymentMethodModel.includes("aziel_promptpay_dynamic"), "Model must retain PromptPay dynamic QR enum.");
+    assert(paymentMethodModel.includes("truemoney_template_dynamic"), "Model must retain TrueMoney template dynamic QR enum.");
+    assert(paymentMethodsRoute.includes('method.qrMode = "truemoney_template_dynamic";'), "TrueMoney compatibility must own the template-derived QR mode.");
+    assert(paymentMethodsRoute.includes('method.qrMode = "aziel_promptpay_dynamic";'), "PromptPay compatibility must retain its existing dynamic QR mode.");
     console.log("Payment QR mode integrity verification passed.");
 }
 

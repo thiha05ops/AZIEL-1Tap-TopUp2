@@ -10,6 +10,7 @@ const {
     ManualPaymentApplicationError
 } = require("../services/commerce/manualPaymentApplicationService");
 const { ThunderSlipPaymentError } = require("../services/commerce/thunderSlipPaymentService");
+const { ThunderTrueWalletVerificationError } = require("../services/commerce/thunderTrueWalletVerificationService");
 
 const {
     startCustomerManualPromptPayCheckout,
@@ -73,6 +74,9 @@ function respondError(res, error) {
         });
     }
     if (error instanceof ThunderSlipPaymentError) {
+        return res.status(error.httpStatus || 422).json({ success: false, error: error.code, code: error.code, message: error.message, retryable: error.retryable === true });
+    }
+    if (error instanceof ThunderTrueWalletVerificationError) {
         return res.status(error.httpStatus || 422).json({ success: false, error: error.code, code: error.code, message: error.message, retryable: error.retryable === true });
     }
 
