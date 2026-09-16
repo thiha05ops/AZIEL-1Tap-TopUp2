@@ -990,10 +990,13 @@ async function submitTopup() {
                 accountNumber: typedPayment.paymentInstructions?.accountNumber || payment.accountNumber,
                 qrImage: typedPayment.qr?.image || payment.qrImage,
                 slipRequired: true,
-                enableSaveQr: payment.enableSaveQr === true,
+                enableSaveQr: typedPayment.paymentInstructions?.enableSaveQr === true || payment.enableSaveQr === true,
                 enableOpenApp: payment.enableOpenApp === true,
                 enableChecklist: payment.enableChecklist === true,
                 checklistSteps: payment.checklistSteps || [],
+                galleryScanSupported: payment.galleryScanSupported === true,
+                dynamicQrSupported: payment.dynamicQrSupported === true,
+                amountPrefillSupported: payment.amountPrefillSupported === true,
                 qrMode: typedPayment.qr?.mode || payment.qrMode,
                 dynamicQr: typedPayment.qr || null,
                 method: payment,
@@ -1095,6 +1098,10 @@ function openWalletManualModal(data, info) {
     const qrImage = info.qrImage || data.qrImage || data.qrUrl || "";
     const slipRequired = info.slipRequired !== false;
     const deepLink = info.deepLink || "";
+    const confirmationMode = String(data.confirmationMode || info.method?.confirmationMode || "");
+    const providerCode = String(data.provider || info.provider || "").toUpperCase();
+    const trueWallet = confirmationMode === "thunder_truewallet_slip" || providerCode === "THUNDER_TRUEWALLET";
+    const thunderVerified = trueWallet || confirmationMode === "thunder_slip" || providerCode === "THUNDER_PROMPTPAY";
 
     activeWalletManualIntent = {
         intentId,
@@ -1110,6 +1117,7 @@ function openWalletManualModal(data, info) {
     window.PaymentCheckoutSheet.show({
         methodCode: data.method?.key || info.method?.key || data.paymentMethod || "",
         methodName: appName,
+        methodLogo: info.method?.logo || info.method?.logoUrl || "",
         amount: info.amount,
         currency: info.currency,
         accountName,
@@ -1119,12 +1127,22 @@ function openWalletManualModal(data, info) {
         qrMode: info.qrMode || "",
         dynamicQr: info.dynamicQr || null,
         expiresAt: data.expiresAt || "",
-        instructions: wt("wallet.transferInstructions", "Transfer the exact amount, then upload the payment receipt."),
+        instructions: trueWallet
+            ? wt("payment.truewallet.instructions", "Scan this QR with TrueMoney, pay the exact amount, then upload the transfer slip.")
+            : thunderVerified
+                ? wt("payment.thunder.instructions", "Pay the fixed amount, then upload the slip for automatic verification.")
+                : wt("wallet.transferInstructions", "Transfer the exact amount, then upload the payment receipt."),
         requiresSlip: slipRequired,
+        receiptUploadEnabled: slipRequired,
+        autoSubmitReceipt: thunderVerified,
+        trueMoneyWallet: trueWallet,
         deepLink,
         enableSaveQr: info.enableSaveQr === true,
         enableOpenApp: info.enableOpenApp === true,
         enableChecklist: info.enableChecklist === true,
+        galleryScanSupported: info.galleryScanSupported === true,
+        dynamicQrSupported: info.dynamicQrSupported === true,
+        amountPrefillSupported: info.amountPrefillSupported === true,
         appDisplayName: info.appDisplayName || appName,
         appStoreUrl: info.appStoreUrl || "",
         playStoreUrl: info.playStoreUrl || "",
@@ -1137,8 +1155,14 @@ function openWalletManualModal(data, info) {
         androidPackageName: info.androidPackageName || "",
         bankLaunchers: info.bankLaunchers || [],
         checklistSteps: info.checklistSteps || [],
-        submitLabel: wt("wallet.submitVerification", "Submit for Verification"),
-        loadingText: wt("wallet.submittingReceipt", "Submitting receipt..."),
+        submitLabel: trueWallet
+            ? wt("payment.truewallet.chooseSlip", "Upload TrueMoney Transfer Slip")
+            : thunderVerified
+                ? "Upload Slip"
+                : wt("wallet.submitVerification", "Submit for Verification"),
+        loadingText: thunderVerified
+            ? wt("payment.thunder.verifying", "Verifying payment...")
+            : wt("wallet.submittingReceipt", "Submitting receipt..."),
         onSubmit: async ({ file, setMessage, close }) => {
             const formData = new FormData();
             formData.append("slip", file);
@@ -1156,8 +1180,10 @@ function openWalletManualModal(data, info) {
             const result = await res.json().catch(() => ({}));
 
             if (!res.ok || result.success === false) {
-                setMessage("error", result?.message || wt("wallet.receiptFailed", "Receipt submission failed. Please try again."));
-                return false;
+                const error = new Error(result?.message || wt("wallet.receiptFailed", "Receipt submission failed. Please try again."));
+                error.code = result?.code || result?.error || "WALLET_RECEIPT_FAILED";
+                error.retryable = result?.retryable === true;
+                throw error;
             }
 
             if (topupId) {
@@ -1169,7 +1195,8 @@ function openWalletManualModal(data, info) {
             await loadWallet();
             close("submitted");
             resetTopupForm();
-            return true;
+            const verified = String(result.payment?.paymentStatus || "").toLowerCase() === "paid" || result.payment?.verificationStatus === "verified";
+            return thunderVerified ? { status: verified ? "verified" : "submitted" } : true;
         },
         onClose: () => {
             activeWalletManualIntent = null;

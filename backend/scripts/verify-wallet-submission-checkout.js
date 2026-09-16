@@ -80,6 +80,11 @@ function verifyFrontendSemantics() {
     includes(file, "await loadWallet();", "successful receipt submission must refresh durable wallet history.");
     includes(file, "activeWalletManualIntent = null", "closing the sheet must abandon the temporary intent client-side.");
     includes(file, "PaymentCheckoutSheet.show", "wallet manual flow must use the shared checkout sheet.");
+    includes(file, "autoSubmitReceipt: thunderVerified", "typed Thunder wallet payments must enter the Product Checkout receipt-upload path directly.");
+    includes(file, "trueMoneyWallet: trueWallet", "wallet must pass the same TrueMoney presentation mode as Product Checkout.");
+    includes(file, "receiptUploadEnabled: slipRequired", "wallet must explicitly enable the shared receipt uploader.");
+    includes("frontend/js/payment/payment-manual.js", "autoSubmitReceipt: thunderVerified", "Product Checkout Thunder behavior must remain the parity authority.");
+    notIncludes(file, "I've completed the transfer", "wallet must not render or configure an intermediate transfer-complete action.");
     includes("frontend/js/payment/payment-checkout-sheet.js", "Submit for Verification", "sheet must expose one verification submit action.");
     includes("frontend/js/payment/payment-checkout-sheet.js", "Choose screenshot", "sheet must use custom upload copy.");
     includes("frontend/js/payment/payment-checkout-sheet.js", "azPaymentSheetFileName", "sheet must show selected receipt filename.");
