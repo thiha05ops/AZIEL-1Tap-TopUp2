@@ -18,6 +18,9 @@ const ERROR_CODES = Object.freeze({
     INVALID_PAYMENT_ATTEMPT_RECORD: "INVALID_PAYMENT_ATTEMPT_RECORD",
     INVALID_PAYMENT_ATTEMPT_ID: "INVALID_PAYMENT_ATTEMPT_ID",
     INVALID_ORDER_ID: "INVALID_ORDER_ID",
+    INVALID_SUBJECT_TYPE: "INVALID_SUBJECT_TYPE",
+    INVALID_SUBJECT_ID: "INVALID_SUBJECT_ID",
+    SUBJECT_REFERENCE_MISMATCH: "SUBJECT_REFERENCE_MISMATCH",
     INVALID_OWNER: "INVALID_OWNER",
     INVALID_PROVIDER_REFERENCE: "INVALID_PROVIDER_REFERENCE",
     INVALID_PROVIDER_EVENT: "INVALID_PROVIDER_EVENT",
@@ -47,6 +50,10 @@ const TRANSITIONS = Object.freeze({
 
 const ACTIVE_STATUSES = Object.freeze([STATUS.INITIATING, STATUS.PENDING]);
 const EVIDENCE_ACCEPTING_STATUSES = Object.freeze([STATUS.PENDING]);
+const SUBJECT_TYPES = Object.freeze({
+    COMMERCE_ORDER: "COMMERCE_ORDER",
+    WALLET_TOPUP: "WALLET_TOPUP"
+});
 
 class PaymentAttemptRepositoryError extends Error {
     constructor(code, message, options = {}) {
@@ -138,9 +145,56 @@ async function execQuery(query, { mongoSession = null, lean = true } = {}) {
 function plainRecord(record) {
     if (!record) return null;
     if (typeof record.toObject === "function") {
-        return record.toObject({ depopulate: true, flattenMaps: true, versionKey: false });
+        return normalizeStoredAttempt(record.toObject({ depopulate: true, flattenMaps: true, versionKey: false }));
     }
-    return clonePlain(record);
+    return normalizeStoredAttempt(clonePlain(record));
+}
+
+function normalizeStoredAttempt(record) {
+    if (!record) return null;
+    if (!record.subjectType && record.orderId) record.subjectType = SUBJECT_TYPES.COMMERCE_ORDER;
+    if (!record.subjectId && record.subjectType === SUBJECT_TYPES.COMMERCE_ORDER && record.orderId) record.subjectId = record.orderId;
+    return record;
+}
+
+function normalizeSubjectReference(source = {}) {
+    const suppliedType = normalizeString(source.subjectType).toUpperCase();
+    const suppliedSubjectId = normalizeString(source.subjectId);
+    const suppliedOrderId = normalizeString(source.orderId);
+    if (!suppliedType && !suppliedSubjectId) {
+        const orderId = assertId(suppliedOrderId, "orderId", ERROR_CODES.INVALID_ORDER_ID);
+        return { subjectType: SUBJECT_TYPES.COMMERCE_ORDER, subjectId: orderId, orderId };
+    }
+    if (!Object.values(SUBJECT_TYPES).includes(suppliedType)) {
+        throw new PaymentAttemptRepositoryError(ERROR_CODES.INVALID_SUBJECT_TYPE, "subjectType is invalid.", {
+            stage: "input",
+            metadata: { subjectType: source.subjectType }
+        });
+    }
+    const subjectId = assertId(suppliedSubjectId, "subjectId", ERROR_CODES.INVALID_SUBJECT_ID);
+    if (suppliedType === SUBJECT_TYPES.COMMERCE_ORDER) {
+        const orderId = assertId(suppliedOrderId, "orderId", ERROR_CODES.INVALID_ORDER_ID);
+        if (subjectId !== orderId) {
+            throw new PaymentAttemptRepositoryError(ERROR_CODES.SUBJECT_REFERENCE_MISMATCH, "Commerce order subjectId must match orderId.", { stage: "input" });
+        }
+        return { subjectType: suppliedType, subjectId, orderId };
+    }
+    if (suppliedOrderId) {
+        throw new PaymentAttemptRepositoryError(ERROR_CODES.SUBJECT_REFERENCE_MISMATCH, "Wallet top-up subject must not contain orderId.", { stage: "input" });
+    }
+    return { subjectType: suppliedType, subjectId, orderId: "" };
+}
+
+function subjectQuery(subject) {
+    if (subject.subjectType === SUBJECT_TYPES.COMMERCE_ORDER) {
+        return {
+            $or: [
+                { subjectType: SUBJECT_TYPES.COMMERCE_ORDER, subjectId: subject.subjectId },
+                { subjectType: { $exists: false }, orderId: subject.orderId }
+            ]
+        };
+    }
+    return { subjectType: subject.subjectType, subjectId: subject.subjectId };
 }
 
 function safeMetadata(value) {
@@ -196,8 +250,12 @@ function attemptFingerprint(source = {}) {
 }
 
 function sameIdempotentPayload(existing = {}, payload = {}) {
+    const existingSubject = normalizeSubjectReference(existing);
+    const payloadSubject = normalizeSubjectReference(payload);
     return Boolean(
-        existing.orderId === payload.orderId &&
+        existingSubject.subjectType === payloadSubject.subjectType &&
+        existingSubject.subjectId === payloadSubject.subjectId &&
+        (payloadSubject.subjectType !== SUBJECT_TYPES.COMMERCE_ORDER || existingSubject.orderId === payloadSubject.orderId) &&
         existing.ownerId === payload.ownerId &&
         existing.provider === payload.provider &&
         existing.paymentMethod === payload.paymentMethod &&
@@ -208,6 +266,7 @@ function sameIdempotentPayload(existing = {}, payload = {}) {
 
 function normalizeAttemptPayload(source = {}) {
     const owner = normalizeOwner(source.owner || {});
+    const subject = normalizeSubjectReference(source);
     const amount = Number(source.amount);
     if (!Number.isFinite(amount) || amount < 0) {
         throw new PaymentAttemptRepositoryError(ERROR_CODES.INVALID_PAYMENT_ATTEMPT_RECORD, "amount must be non-negative.", {
@@ -240,7 +299,9 @@ function normalizeAttemptPayload(source = {}) {
     const failure = normalizeFailure(source.failure || {});
     return {
         attemptId: assertId(source.attemptId, "attemptId", ERROR_CODES.INVALID_PAYMENT_ATTEMPT_ID),
-        orderId: assertId(source.orderId, "orderId", ERROR_CODES.INVALID_ORDER_ID),
+        subjectType: subject.subjectType,
+        subjectId: subject.subjectId,
+        orderId: subject.orderId,
         quoteId: normalizeOptionalId(source.quoteId, "quoteId"),
         ownerId: owner.ownerId,
         owner: {
@@ -386,8 +447,13 @@ async function findAttemptByIdForOwner(input = {}, options = {}) {
 
 async function findAttemptsForOrder(input = {}, options = {}) {
     const orderId = assertId(input.orderId, "orderId", ERROR_CODES.INVALID_ORDER_ID);
+    return findAttemptsForSubject({ ...input, subjectType: SUBJECT_TYPES.COMMERCE_ORDER, subjectId: orderId, orderId }, options);
+}
+
+async function findAttemptsForSubject(input = {}, options = {}) {
+    const subject = normalizeSubjectReference(input);
     const opts = normalizeOptions(options);
-    let query = opts.model.find({ orderId });
+    let query = opts.model.find(subjectQuery(subject));
     query = withSession(query, opts.mongoSession);
     if (typeof query.sort === "function") query = query.sort({ createdAt: -1 });
     if (opts.lean && typeof query.lean === "function") query = query.lean();
@@ -397,10 +463,15 @@ async function findAttemptsForOrder(input = {}, options = {}) {
 
 async function findActiveAttemptForOrder(input = {}, options = {}) {
     const orderId = assertId(input.orderId, "orderId", ERROR_CODES.INVALID_ORDER_ID);
+    return findActiveAttemptForSubject({ ...input, subjectType: SUBJECT_TYPES.COMMERCE_ORDER, subjectId: orderId, orderId }, options);
+}
+
+async function findActiveAttemptForSubject(input = {}, options = {}) {
+    const subject = normalizeSubjectReference(input);
     const opts = normalizeOptions(options);
     try {
         return plainRecord(await findOne(opts.model, {
-            orderId,
+            ...subjectQuery(subject),
             ...ownerQuery(input.owner || {}),
             status: { $in: ACTIVE_STATUSES }
         }, opts));
@@ -460,12 +531,12 @@ async function findAttemptByProviderReference(input = {}, options = {}) {
 
 async function findAttemptByIdempotency(input = {}, options = {}) {
     const owner = normalizeOwner(input.owner || {});
-    const orderId = assertId(input.orderId, "orderId", ERROR_CODES.INVALID_ORDER_ID);
+    const subject = normalizeSubjectReference(input);
     const idempotencyKey = normalizeString(input.idempotencyKey);
     if (!idempotencyKey) return null;
     const opts = normalizeOptions(options);
     return plainRecord(await findOne(opts.model, {
-        orderId,
+        ...subjectQuery(subject),
         ownerId: owner.ownerId,
         idempotencyKey,
         operation: normalizeString(input.operation || "initiatePayment")
@@ -570,7 +641,8 @@ async function appendProviderEvent(input = {}, options = {}) {
 
 async function attachReceiptEvidence(input = {}, options = {}) {
     const attemptId = assertId(input.attemptId, "attemptId", ERROR_CODES.INVALID_PAYMENT_ATTEMPT_ID);
-    const orderId = input.orderId ? assertId(input.orderId, "orderId", ERROR_CODES.INVALID_ORDER_ID) : "";
+    const hasSubjectBinding = Boolean(input.subjectType || input.subjectId || input.orderId);
+    const requestedSubject = hasSubjectBinding ? normalizeSubjectReference(input) : null;
     const evidence = normalizeReceiptEvidence(input.evidence || input.receiptEvidence || {});
     const changedAt = input.changedAt ? new Date(input.changedAt) : evidence.uploadedAt;
     if (!Number.isFinite(changedAt.getTime())) {
@@ -579,10 +651,18 @@ async function attachReceiptEvidence(input = {}, options = {}) {
     const opts = normalizeOptions({ ...options, transactionContext: input.transactionContext || options.transactionContext });
     const existing = await findAttemptById({ attemptId }, { ...opts, lean: true });
     if (!existing) throw new PaymentAttemptRepositoryError(ERROR_CODES.PAYMENT_ATTEMPT_NOT_FOUND, "Payment attempt was not found.", { stage: "receipt" });
-    if (orderId && existing.orderId !== orderId) {
-        throw new PaymentAttemptRepositoryError(ERROR_CODES.INVALID_PAYMENT_ATTEMPT_RECORD, "Receipt evidence order binding mismatch.", {
+    if (input.owner && existing.ownerId !== normalizeOwner(input.owner).ownerId) {
+        throw new PaymentAttemptRepositoryError(ERROR_CODES.PAYMENT_ATTEMPT_FORBIDDEN, "Payment attempt owner binding mismatch.", { stage: "receipt" });
+    }
+    const existingSubject = normalizeSubjectReference(existing);
+    if (requestedSubject && (existingSubject.subjectType !== requestedSubject.subjectType || existingSubject.subjectId !== requestedSubject.subjectId)) {
+        const typedRequest = Boolean(input.subjectType || input.subjectId);
+        throw new PaymentAttemptRepositoryError(
+            typedRequest ? ERROR_CODES.SUBJECT_REFERENCE_MISMATCH : ERROR_CODES.INVALID_PAYMENT_ATTEMPT_RECORD,
+            typedRequest ? "Receipt evidence subject binding mismatch." : "Receipt evidence order binding mismatch.", {
             stage: "receipt"
-        });
+            }
+        );
     }
     const currentEvidence = existing.safeMetadata?.receiptEvidence || null;
     if (currentEvidence?.checksum && evidence.checksum && currentEvidence.checksum === evidence.checksum) {
@@ -845,6 +925,8 @@ module.exports = Object.freeze({
     createAttempt,
     findAttemptById,
     findAttemptByIdForOwner,
+    findAttemptsForSubject,
+    findActiveAttemptForSubject,
     findAttemptsForOrder,
     findActiveAttemptForOrder,
     findAttemptsForOwner,
@@ -864,5 +946,6 @@ module.exports = Object.freeze({
     ERROR_CODES,
     STATUS,
     TRANSITIONS,
-    ACTIVE_STATUSES
+    ACTIVE_STATUSES,
+    SUBJECT_TYPES
 });

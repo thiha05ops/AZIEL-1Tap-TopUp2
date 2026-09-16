@@ -10,12 +10,15 @@ const {
     createAttempt,
     findAttemptById,
     findAttemptByIdForOwner,
+    findAttemptsForSubject,
+    findActiveAttemptForSubject,
     findAttemptsForOrder,
     findActiveAttemptForOrder,
     findAttemptByProviderReference,
     findAttemptByIdempotency,
     updateStatus,
     appendProviderEvent,
+    attachReceiptEvidence,
     recordFailure,
     setProviderReference,
     markCompleted,
@@ -52,6 +55,7 @@ function setPath(object, dottedPath, value) {
 
 function matchesValue(actual, expected) {
     if (expected && typeof expected === "object" && !Array.isArray(expected) && !(expected instanceof Date)) {
+        if (Object.prototype.hasOwnProperty.call(expected, "$exists")) return expected.$exists ? actual !== undefined : actual === undefined;
         if (Object.prototype.hasOwnProperty.call(expected, "$in")) return expected.$in.includes(actual);
         if (Object.prototype.hasOwnProperty.call(expected, "$ne")) {
             if (Array.isArray(actual)) return !actual.includes(expected.$ne);
@@ -216,6 +220,8 @@ async function verifyModelStructure() {
     assert.throws(() => new PaymentAttempt({ ...attempt(), unexpected: true }), /not in schema/, "unknown fields rejected.");
     const immutablePaths = [
         "attemptId",
+        "subjectType",
+        "subjectId",
         "orderId",
         "ownerId",
         "owner",
@@ -233,6 +239,8 @@ async function verifyModelStructure() {
     assert(indexes.some(([fields, options]) => fields.providerReference === 1 && options.unique && options.partialFilterExpression), "sparse providerReference unique index declared.");
     assert(indexes.some(([fields, options]) => fields.provider === 1 && fields.ownerId === 1 && fields.idempotencyKey === 1 && options.unique), "provider/owner idempotency unique index declared.");
     assert(indexes.some(([fields]) => fields.ownerId === 1 && fields.orderId === 1), "ownerId + orderId index declared.");
+    assert(indexes.some(([fields, options]) => fields.ownerId === 1 && fields.subjectType === 1 && fields.subjectId === 1 && fields.createdAt === -1 && !options.unique), "owner + subject lookup index declared and non-unique.");
+    assert(indexes.some(([fields, options]) => fields.subjectType === 1 && fields.subjectId === 1 && fields.status === 1 && fields.createdAt === -1 && !options.unique), "subject status lookup index declared and non-unique.");
     assert(indexes.some(([fields]) => fields.orderId === 1 && fields.createdAt === -1), "orderId + createdAt index declared.");
     assert(indexes.some(([fields]) => fields.status === 1), "status index declared.");
     assert(indexes.some(([fields]) => fields.expiresAt === 1), "expiresAt index declared.");
@@ -246,12 +254,77 @@ async function verifyCreateAndLookup() {
     assert.strictEqual(created.ownerId, "user-1", "ownerId derived from owner.");
     assert.strictEqual(created.amount, 1490, "amount preserved.");
     assert.strictEqual(created.currency, "THB", "currency preserved.");
+    assert.strictEqual(created.subjectType, "COMMERCE_ORDER", "legacy create input is stored as typed CommerceOrder.");
+    assert.strictEqual(created.subjectId, created.orderId, "legacy create input preserves orderId as subjectId.");
     assert(model.sessions.includes(session), "Mongo session propagated to create.");
     assert(await findAttemptById({ attemptId: "ATT-0001" }, { model }), "find by id works.");
     assert(await findAttemptByIdForOwner({ attemptId: "ATT-0001", owner: { userId: "user-1" } }, { model }), "owner-safe lookup works.");
     assert.strictEqual(await findAttemptByIdForOwner({ attemptId: "ATT-0001", owner: { userId: "user-2" } }, { model }), null, "wrong owner cannot read attempt.");
     assert.strictEqual((await findAttemptsForOrder({ orderId: "AZL-ORDER-0001" }, { model })).length, 1, "find attempts for order works.");
     assert(await findActiveAttemptForOrder({ orderId: "AZL-ORDER-0001", owner: { userId: "user-1" } }, { model }), "active attempt lookup works.");
+}
+
+async function verifyTypedSubjectsAndLegacyReads() {
+    const model = createFakeModel();
+    const legacy = attempt({ attemptId: "ATT-LEGACY", idempotencyKey: "idem-legacy" });
+    delete legacy.subjectType;
+    delete legacy.subjectId;
+    model.records.push(clone(legacy));
+
+    const readLegacy = await findAttemptById({ attemptId: "ATT-LEGACY" }, { model });
+    assert.strictEqual(readLegacy.subjectType, "COMMERCE_ORDER", "legacy record normalizes to CommerceOrder.");
+    assert.strictEqual(readLegacy.subjectId, legacy.orderId, "legacy record normalizes subjectId from orderId.");
+
+    const typedOrder = await createAttempt(attempt({
+        attemptId: "ATT-TYPED-ORDER",
+        subjectType: "COMMERCE_ORDER",
+        subjectId: "AZL-ORDER-0002",
+        orderId: "AZL-ORDER-0002",
+        idempotencyKey: "idem-typed-order"
+    }), { model });
+    assert.strictEqual(typedOrder.subjectId, typedOrder.orderId, "typed CommerceOrder persists matching identifiers.");
+
+    const wallet = await createAttempt(attempt({
+        attemptId: "ATT-WALLET",
+        subjectType: "WALLET_TOPUP",
+        subjectId: "WALLET-TEST-0001",
+        orderId: "",
+        idempotencyKey: "idem-wallet"
+    }), { model });
+    assert.strictEqual(wallet.subjectType, "WALLET_TOPUP", "wallet subject type persists.");
+    assert.strictEqual(wallet.subjectId, "WALLET-TEST-0001", "wallet subject id persists.");
+    assert.strictEqual(wallet.orderId, "", "wallet attempt has no fake orderId.");
+
+    await assertRepoError(
+        () => createAttempt(attempt({ attemptId: "ATT-MISMATCH", subjectType: "COMMERCE_ORDER", subjectId: "OTHER", idempotencyKey: "idem-mismatch" }), { model }),
+        ERROR_CODES.SUBJECT_REFERENCE_MISMATCH,
+        "CommerceOrder subject mismatch rejected"
+    );
+    await assertRepoError(
+        () => createAttempt(attempt({ attemptId: "ATT-WALLET-ORDER", subjectType: "WALLET_TOPUP", subjectId: "WALLET-TEST-0002", idempotencyKey: "idem-wallet-order" }), { model }),
+        ERROR_CODES.SUBJECT_REFERENCE_MISMATCH,
+        "WalletTopup with orderId rejected"
+    );
+
+    const walletResults = await findAttemptsForSubject({ subjectType: "WALLET_TOPUP", subjectId: wallet.subjectId }, { model });
+    assert.strictEqual(walletResults.length, 1, "generic subject query finds typed wallet attempt.");
+    const commerceResults = await findAttemptsForSubject({ subjectType: "COMMERCE_ORDER", subjectId: legacy.orderId, orderId: legacy.orderId }, { model });
+    assert(commerceResults.some(item => item.attemptId === legacy.attemptId), "generic CommerceOrder query finds legacy attempt.");
+    assert(await findActiveAttemptForSubject({ subjectType: "WALLET_TOPUP", subjectId: wallet.subjectId, owner: { userId: "user-1" } }, { model }), "generic active query finds wallet attempt.");
+
+    const walletRetry = await createAttempt({ ...attempt({
+        attemptId: "ATT-WALLET-RETRY",
+        subjectType: "WALLET_TOPUP",
+        subjectId: wallet.subjectId,
+        orderId: "",
+        idempotencyKey: "idem-wallet"
+    }) }, { model });
+    assert.strictEqual(walletRetry.attemptId, wallet.attemptId, "same normalized wallet subject is idempotent.");
+    await assertRepoError(
+        () => createAttempt(attempt({ attemptId: "ATT-WALLET-CONFLICT", subjectType: "WALLET_TOPUP", subjectId: "WALLET-OTHER", orderId: "", idempotencyKey: "idem-wallet" }), { model }),
+        ERROR_CODES.PAYMENT_IDEMPOTENCY_CONFLICT,
+        "different subject cannot reuse idempotency key"
+    );
 }
 
 async function verifyIdempotency() {
@@ -264,6 +337,43 @@ async function verifyIdempotency() {
         ERROR_CODES.PAYMENT_IDEMPOTENCY_CONFLICT,
         "conflicting idempotency fingerprint rejected"
     );
+}
+
+async function verifyReceiptSubjectBinding() {
+    const model = createFakeModel();
+    await createAttempt(attempt({ status: STATUS.PENDING }), { model });
+    const evidence = {
+        receiptId: "RECEIPT-1",
+        fileReference: "receipts/receipt-1.jpg",
+        checksum: "sha256-receipt-1",
+        fileSize: 1024,
+        mimeType: "image/jpeg",
+        uploadedAt: NOW
+    };
+    await assertRepoError(
+        () => attachReceiptEvidence({
+            attemptId: "ATT-0001",
+            subjectType: "COMMERCE_ORDER",
+            subjectId: "AZL-ORDER-OTHER",
+            orderId: "AZL-ORDER-OTHER",
+            owner: { userId: "user-1" },
+            evidence
+        }, { model }),
+        ERROR_CODES.SUBJECT_REFERENCE_MISMATCH,
+        "receipt subject binding mismatch rejected"
+    );
+    await assertRepoError(
+        () => attachReceiptEvidence({ attemptId: "ATT-0001", orderId: "AZL-ORDER-0001", owner: { userId: "user-2" }, evidence }, { model }),
+        ERROR_CODES.PAYMENT_ATTEMPT_FORBIDDEN,
+        "receipt owner binding mismatch rejected"
+    );
+    const attached = await attachReceiptEvidence({
+        attemptId: "ATT-0001",
+        orderId: "AZL-ORDER-0001",
+        owner: { userId: "user-1" },
+        evidence
+    }, { model });
+    assert.strictEqual(attached.safeMetadata.receiptEvidence.receiptId, evidence.receiptId, "receipt attaches for normalized matching subject.");
 }
 
 async function verifyProviderReference() {
@@ -462,7 +572,9 @@ async function verifyOrchestratorCompatibility() {
 async function run() {
     await verifyModelStructure();
     await verifyCreateAndLookup();
+    await verifyTypedSubjectsAndLegacyReads();
     await verifyIdempotency();
+    await verifyReceiptSubjectBinding();
     await verifyProviderReference();
     await verifyEventsAndFailure();
     await verifyStatusTransitions();

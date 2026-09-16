@@ -15,6 +15,7 @@ const PAYMENT_ATTEMPT_STATUSES = Object.freeze([
 ]);
 
 const OWNER_TYPES = Object.freeze(["USER", "SESSION"]);
+const SUBJECT_TYPES = Object.freeze(["COMMERCE_ORDER", "WALLET_TOPUP"]);
 
 function finiteNonNegative(value) {
     return Number.isFinite(Number(value)) && Number(value) >= 0;
@@ -65,7 +66,9 @@ const failureSchema = new mongoose.Schema(
 const paymentAttemptSchema = new mongoose.Schema(
     {
         attemptId: { type: String, trim: true, required: true, immutable: true },
-        orderId: { type: String, trim: true, required: true, immutable: true },
+        subjectType: { type: String, enum: SUBJECT_TYPES, default: undefined, immutable: true },
+        subjectId: { type: String, trim: true, default: "", immutable: true },
+        orderId: { type: String, trim: true, default: "", immutable: true },
         quoteId: { type: String, trim: true, default: "", immutable: true },
         ownerId: { type: String, trim: true, required: true, immutable: true },
         owner: {
@@ -120,6 +123,19 @@ const paymentAttemptSchema = new mongoose.Schema(
 );
 
 paymentAttemptSchema.pre("validate", function validatePaymentAttempt() {
+    const subjectType = String(this.subjectType || "").trim();
+    const subjectId = String(this.subjectId || "").trim();
+    const orderId = String(this.orderId || "").trim();
+    if (!subjectType) {
+        if (!orderId || subjectId) this.invalidate("subjectType", "Legacy PaymentAttempt requires orderId and no subjectId.");
+    } else if (subjectType === "COMMERCE_ORDER") {
+        if (!subjectId) this.invalidate("subjectId", "COMMERCE_ORDER PaymentAttempt requires subjectId.");
+        if (!orderId) this.invalidate("orderId", "COMMERCE_ORDER PaymentAttempt requires orderId.");
+        if (subjectId && orderId && subjectId !== orderId) this.invalidate("subjectId", "COMMERCE_ORDER subjectId must match orderId.");
+    } else if (subjectType === "WALLET_TOPUP") {
+        if (!subjectId) this.invalidate("subjectId", "WALLET_TOPUP PaymentAttempt requires subjectId.");
+        if (orderId) this.invalidate("orderId", "WALLET_TOPUP PaymentAttempt must not contain orderId.");
+    }
     if (this.owner?.type === "USER" && this.ownerId !== this.owner.userId) {
         this.invalidate("ownerId", "USER PaymentAttempt ownerId must match owner.userId.");
     }
@@ -151,6 +167,8 @@ paymentAttemptSchema.index({ provider: 1, ownerId: 1, idempotencyKey: 1, operati
     partialFilterExpression: { idempotencyKey: { $exists: true, $gt: "" } }
 });
 paymentAttemptSchema.index({ ownerId: 1, orderId: 1 });
+paymentAttemptSchema.index({ ownerId: 1, subjectType: 1, subjectId: 1, createdAt: -1 });
+paymentAttemptSchema.index({ subjectType: 1, subjectId: 1, status: 1, createdAt: -1 });
 paymentAttemptSchema.index({ ownerId: 1, "owner.type": 1, provider: 1, status: 1, expiresAt: 1, createdAt: -1 });
 paymentAttemptSchema.index({ orderId: 1, createdAt: -1 });
 paymentAttemptSchema.index({ status: 1 });
@@ -162,3 +180,4 @@ paymentAttemptSchema.index({ "eventHistory.providerEventId": 1 }, {
 
 module.exports = mongoose.model("PaymentAttempt", paymentAttemptSchema);
 module.exports.PAYMENT_ATTEMPT_STATUSES = PAYMENT_ATTEMPT_STATUSES;
+module.exports.SUBJECT_TYPES = SUBJECT_TYPES;
