@@ -24,7 +24,7 @@ function verifyFrontendWalletEligibility() {
     includes(file, "method.amountPrefillSupported === true", "Amount-prefill support must preserve wallet eligibility.");
     includes(file, "method.receiptUploadEnabled !== false", "Receipt upload must remain required for manual wallet top-up.");
     includes(file, "[\"manual_admin\", \"thunder_slip\"].includes(method.confirmationMode)", "Wallet dynamic PromptPay eligibility must support legacy manual admin and typed Thunder verification.");
-    includes(file, "[\"promptpay\", \"thunder_promptpay\"].includes(provider)", "Wallet dynamic PromptPay eligibility must recognize the Thunder PromptPay provider.");
+    includes(file, "[\"promptpay\", \"thunderpromptpay\"].includes(provider)", "Wallet dynamic PromptPay eligibility must recognize the normalized Thunder PromptPay provider.");
     includes(file, "function isVerifiedDynamicWalletMethod", "Wallet frontend must explicitly recognize verified dynamic wallet methods.");
     includes(file, "qrMode === \"aziel_promptpay_dynamic\"", "Verified PromptPay wallet funding must require the canonical dynamic QR mode.");
     includes(file, "confirmationMode === \"thunder_slip\"", "Verified PromptPay wallet funding must require Thunder slip verification.");

@@ -277,7 +277,7 @@ function isManualDynamicPromptPayWalletMethod(method = {}) {
     const type = normalizePaymentKey(method.paymentType || "");
     const provider = normalizePaymentKey(method.provider || "");
     return ["manual", "deeplink"].includes(type) &&
-        ["promptpay", "thunder_promptpay"].includes(provider) &&
+        ["promptpay", "thunderpromptpay"].includes(provider) &&
         String(method.qrMode || "") === "aziel_promptpay_dynamic" &&
         method.dynamicQrSupported === true &&
         method.amountPrefillSupported === true &&
@@ -298,7 +298,7 @@ function isVerifiedDynamicWalletMethod(method = {}) {
     if (method.receiptUploadEnabled === false) return false;
 
     if (
-        ["promptpay", "thunder_promptpay"].includes(provider) &&
+        ["promptpay", "thunderpromptpay"].includes(provider) &&
         qrMode === "aziel_promptpay_dynamic" &&
         confirmationMode === "thunder_slip"
     ) {
