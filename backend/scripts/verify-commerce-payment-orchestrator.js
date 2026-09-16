@@ -3,6 +3,7 @@
 const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
+const mongoose = require("mongoose");
 const {
     createPaymentOrchestrator,
     PaymentOrchestratorError,
@@ -397,11 +398,13 @@ async function testPayableSubjectRegistryAndAdapter() {
 async function testWalletTopupSubject() {
     const store = createStore();
     let fulfillmentCalls = 0;
-    const topup = { topupId: "WALLET-TEST-0001", customerUserId: "user-1", username: "alice", amount: 300, currency: "THB", region: "TH", status: "pending", paymentStatus: "unpaid", settlementStatus: "not_ready", paymentAttemptId: "", paymentSnapshot: { paymentMethodId: "true_money", provider: "thunder_truewallet", providerType: "manual", paymentChannel: "TRUE_MONEY_WALLET", confirmationMode: "thunder_truewallet_slip" } };
-    const query = value => ({ lean() { return this; }, session() { return this; }, async exec() { return clone(value); } });
+    const walletOwnerId = "507f1f77bcf86cd799439011";
+    const topup = { topupId: "WALLET-TEST-0001", customerUserId: new mongoose.Types.ObjectId(walletOwnerId), username: "alice", amount: 300, currency: "THB", region: "TH", status: "pending", paymentStatus: "unpaid", settlementStatus: "not_ready", paymentAttemptId: "", paymentSnapshot: { paymentMethodId: "true_money", provider: "thunder_truewallet", providerType: "manual", paymentChannel: "TRUE_MONEY_WALLET", confirmationMode: "thunder_truewallet_slip" } };
+    let transitionOwnerId = null;
+    const query = value => ({ lean() { return this; }, session() { return this; }, async exec() { return value; } });
     const walletTopupModel = {
-        findOne(filter) { return query(filter.topupId === topup.topupId && (!filter.customerUserId || String(filter.customerUserId) === topup.customerUserId) ? topup : null); },
-        findOneAndUpdate(filter, update) { if (filter.topupId !== topup.topupId) return query(null); Object.assign(topup, clone(update.$set)); return query(topup); }
+        findOne(filter) { return query(filter.topupId === topup.topupId && (!filter.customerUserId || String(filter.customerUserId) === String(topup.customerUserId)) ? topup : null); },
+        findOneAndUpdate(filter, update) { transitionOwnerId = filter.customerUserId; if (filter.topupId !== topup.topupId) return query(null); Object.assign(topup, clone(update.$set)); return query(topup); }
     };
     const provider = { async createPayment({ intent }) { store.calls.createPayment += 1; store.providerInputs.push({ intent: clone(intent) }); return paymentResult({ amount: 300, safeMetadata: {}, orderId: undefined }); } };
     const orchestrator = createOrchestrator(store, {
@@ -409,7 +412,7 @@ async function testWalletTopupSubject() {
         providerResolver: () => provider,
         paidFulfillmentHandler: async () => { fulfillmentCalls += 1; }
     });
-    const result = await orchestrator.initiatePayment({ subjectType: SUBJECT_TYPES.WALLET_TOPUP, subjectId: topup.topupId, owner: owner(), idempotencyKey: "wallet-supported", amount: 999 });
+    const result = await orchestrator.initiatePayment({ subjectType: SUBJECT_TYPES.WALLET_TOPUP, subjectId: topup.topupId, owner: owner({ userId: walletOwnerId }), idempotencyKey: "wallet-supported", amount: 999 });
     assert.strictEqual(result.paymentStatus, "pending");
     assert.strictEqual(store.attempts[0].subjectType, SUBJECT_TYPES.WALLET_TOPUP);
     assert.strictEqual(store.attempts[0].subjectId, topup.topupId);
@@ -417,6 +420,7 @@ async function testWalletTopupSubject() {
     assert.strictEqual(store.providerInputs[0].intent.amount, 300, "wallet provider amount comes from stored top-up.");
     assert.strictEqual(store.providerInputs[0].intent.orderId, undefined, "wallet provider intent has no fake orderId.");
     assert.strictEqual(store.calls.ownedOrderLookups, 0, "wallet subject performs no CommerceOrder lookup.");
+    assert.strictEqual(transitionOwnerId, walletOwnerId, "wallet transition preserves ObjectId owner authority as a Mongoose-castable string.");
     assert.strictEqual(fulfillmentCalls, 0, "pending wallet payment does not reach fulfillment.");
     await assertPaymentError(
         () => orchestrator.initiatePayment({ subjectType: SUBJECT_TYPES.WALLET_TOPUP, subjectId: topup.topupId, owner: owner({ userId: "user-2" }), idempotencyKey: "cross-user" }),

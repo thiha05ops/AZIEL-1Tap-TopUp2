@@ -5,6 +5,10 @@ const { assertThWalletTopup } = require("../walletTopupPolicy");
 
 function text(value) { return String(value || "").trim(); }
 function clone(value) { return value === undefined ? undefined : structuredClone(value); }
+function cloneTopup(value = {}) {
+    const plain = typeof value.toObject === "function" ? value.toObject() : value;
+    return clone({ ...plain, customerUserId: text(plain.customerUserId) });
+}
 
 function createWalletTopupPayableSubjectAdapter(dependencies = {}) {
     const model = dependencies.model || WalletTopup;
@@ -23,13 +27,13 @@ function createWalletTopupPayableSubjectAdapter(dependencies = {}) {
         if (!ownerId) throw error("PAYMENT_FORBIDDEN", "Authenticated wallet owner is required.", { stage: "subject" });
         const topup = await execute(model.findOne({ topupId: subjectId, customerUserId: ownerId }), session);
         if (!topup) throw error("PAYMENT_SUBJECT_NOT_FOUND", "Wallet top-up was not found for this owner.", { stage: "subject", metadata: { subjectId } });
-        return clone(topup);
+        return cloneTopup(topup);
     }
 
     async function loadOperationalSubject({ subjectId, session = null }) {
         const topup = await execute(model.findOne({ topupId: subjectId }), session);
         if (!topup) throw error("PAYMENT_SUBJECT_NOT_FOUND", "Wallet top-up was not found.", { stage: "subject", metadata: { subjectId } });
-        return clone(topup);
+        return cloneTopup(topup);
     }
 
     function getSubjectId(subject = {}) { return text(subject.topupId); }
@@ -64,7 +68,7 @@ function createWalletTopupPayableSubjectAdapter(dependencies = {}) {
         );
         const updated = query.exec ? await query.exec() : await query;
         if (!updated) throw error("PAYMENT_ATTEMPT_CONFLICT", "Wallet top-up is bound to another payment attempt.", { stage: "subject" });
-        return clone(typeof updated.toObject === "function" ? updated.toObject() : updated);
+        return cloneTopup(updated);
     }
 
     return Object.freeze({ loadOwnedSubject, loadOperationalSubject, getSubjectId, getAuthoritativeAmount, getCurrency, getRegion, getPaymentSnapshot, assertPayable, applyPaymentTransition });
