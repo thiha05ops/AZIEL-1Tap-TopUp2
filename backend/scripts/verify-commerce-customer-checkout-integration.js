@@ -5,6 +5,9 @@ const path = require("path");
 const assert = require("assert");
 const PaymentMethod = require("../models/PaymentMethod");
 const {
+    createCommerceManualPaymentController
+} = require("../controllers/commerceManualPaymentController");
+const {
     loadPromptPayMethod,
     startCustomerManualPromptPayCheckout,
     ERROR_CODES
@@ -71,14 +74,58 @@ function verifyBackendBridge() {
     );
     includes(
         "backend/controllers/commerceManualPaymentController.js",
-        "uploadFile({",
-        "Commerce receipt controller must persist the receipt image before binding evidence."
-    );
-    includes(
-        "backend/controllers/commerceManualPaymentController.js",
         "attachReceiptEvidence",
         "Commerce receipt controller must bind receipt evidence to PaymentAttempt."
     );
+}
+
+async function verifyReceiptPersistenceOrdering() {
+    const trace = [];
+    const storedReference = "storage://receipt-test";
+    let boundEvidence = null;
+    const controller = createCommerceManualPaymentController({
+        uploadFile: async ({ file }) => {
+            trace.push("upload");
+            return {
+                url: storedReference,
+                key: "receipt-test-key",
+                provider: "verification",
+                mimeType: file.mimetype,
+                size: file.buffer.length
+            };
+        },
+        service: {
+            attachReceiptEvidence: async ({ evidence }) => {
+                trace.push("bind");
+                boundEvidence = evidence;
+                return { paymentStatus: "pending" };
+            }
+        },
+        logger: { info() {}, warn() {}, error() {} }
+    });
+    const req = {
+        headers: {},
+        params: { orderId: "ORDER-VERIFY", attemptId: "ATTEMPT-VERIFY" },
+        body: {},
+        user: { id: "USER-VERIFY" },
+        sessionID: "",
+        file: {
+            mimetype: "image/jpeg",
+            size: 12,
+            buffer: Buffer.from("receipt-test")
+        }
+    };
+    const res = {
+        statusCode: 200,
+        status(value) { this.statusCode = value; return this; },
+        json(value) { this.body = value; return value; }
+    };
+
+    await controller.attachReceipt(req, res);
+
+    assert.deepStrictEqual(trace, ["upload", "bind"], "Commerce receipt controller must persist the receipt image before binding evidence.");
+    assert.strictEqual(boundEvidence?.fileReference, storedReference, "Receipt evidence binding must receive the stored receipt reference.");
+    assert.strictEqual(res.body?.success, true, "Receipt upload verification request must complete successfully.");
 }
 
 async function verifyPaymentMethodAuthority() {
@@ -217,6 +264,7 @@ function verifyFrontendHandoff() {
 
 async function main() {
     verifyBackendBridge();
+    await verifyReceiptPersistenceOrdering();
     verifyFrontendHandoff();
     await verifyPaymentMethodAuthority();
     console.log("Commerce customer checkout integration verifier passed.");
