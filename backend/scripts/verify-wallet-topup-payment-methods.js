@@ -24,7 +24,15 @@ function verifyFrontendWalletEligibility() {
     includes(file, "method.amountPrefillSupported === true", "Amount-prefill support must preserve wallet eligibility.");
     includes(file, "method.receiptUploadEnabled !== false", "Receipt upload must remain required for manual wallet top-up.");
     includes(file, "[\"manual_admin\", \"thunder_slip\"].includes(method.confirmationMode)", "Wallet dynamic PromptPay eligibility must support legacy manual admin and typed Thunder verification.");
-    includes(file, "if (isManualDynamicPromptPayWalletMethod(method)) return true;", "Manual dynamic PromptPay must bypass the static QR/account requirement.");
+    includes(file, "[\"promptpay\", \"thunder_promptpay\"].includes(provider)", "Wallet dynamic PromptPay eligibility must recognize the Thunder PromptPay provider.");
+    includes(file, "function isVerifiedDynamicWalletMethod", "Wallet frontend must explicitly recognize verified dynamic wallet methods.");
+    includes(file, "qrMode === \"aziel_promptpay_dynamic\"", "Verified PromptPay wallet funding must require the canonical dynamic QR mode.");
+    includes(file, "confirmationMode === \"thunder_slip\"", "Verified PromptPay wallet funding must require Thunder slip verification.");
+    includes(file, "key === \"truewallet\"", "Wallet frontend must explicitly recognize the TrueMoney Wallet method.");
+    includes(file, "qrMode === \"truemoney_template_dynamic\"", "TrueMoney wallet funding must require the template-derived dynamic QR mode.");
+    includes(file, "confirmationMode === \"thunder_truewallet_slip\"", "TrueMoney wallet funding must require Thunder TrueMoney slip verification.");
+    includes(file, "if (isVerifiedDynamicWalletMethod(method) || isManualDynamicPromptPayWalletMethod(method)) return true;", "Verified dynamic wallet methods must bypass the legacy static QR/account requirement.");
+    includes(file, "type === \"wallet\" || provider === \"wallet\" || normalizePaymentKey(method.key) === \"wallet\"", "AZIEL Wallet must remain excluded as a wallet funding method.");
     includes(file, "provider === \"omise\"", "Only Omise/provider-auto wallet payments should use the automatic wallet path.");
     notIncludes(file, "provider === \"promptpay\" ||", "Manual PromptPay provider must not force the automatic wallet endpoint.");
     notIncludes(file, "method.includes(\"promptpay\")", "PromptPay display text must not force the automatic wallet endpoint.");

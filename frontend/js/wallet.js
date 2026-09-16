@@ -277,12 +277,37 @@ function isManualDynamicPromptPayWalletMethod(method = {}) {
     const type = normalizePaymentKey(method.paymentType || "");
     const provider = normalizePaymentKey(method.provider || "");
     return ["manual", "deeplink"].includes(type) &&
-        provider === "promptpay" &&
+        ["promptpay", "thunder_promptpay"].includes(provider) &&
         String(method.qrMode || "") === "aziel_promptpay_dynamic" &&
         method.dynamicQrSupported === true &&
         method.amountPrefillSupported === true &&
         method.receiptUploadEnabled !== false &&
         ["manual_admin", "thunder_slip"].includes(method.confirmationMode);
+}
+
+function isVerifiedDynamicWalletMethod(method = {}) {
+    const type = normalizePaymentKey(method.paymentType || "");
+    const key = normalizePaymentKey(method.key || "");
+    const provider = normalizePaymentKey(method.provider || "");
+    const confirmationMode = String(method.confirmationMode || "");
+    const qrMode = String(method.qrMode || "");
+
+    if (!["manual", "deeplink"].includes(type)) return false;
+    if (method.dynamicQrSupported !== true) return false;
+    if (method.amountPrefillSupported !== true) return false;
+    if (method.receiptUploadEnabled === false) return false;
+
+    if (
+        ["promptpay", "thunder_promptpay"].includes(provider) &&
+        qrMode === "aziel_promptpay_dynamic" &&
+        confirmationMode === "thunder_slip"
+    ) {
+        return true;
+    }
+
+    return key === "truewallet" &&
+        qrMode === "truemoney_template_dynamic" &&
+        confirmationMode === "thunder_truewallet_slip";
 }
 
 async function loadWalletPaymentMethods() {
@@ -354,7 +379,7 @@ function isWalletFundingMethodAvailable(method = {}) {
     if (type === "wallet" || provider === "wallet" || normalizePaymentKey(method.key) === "wallet") return false;
     if (String(method.maintenanceMessage || "").trim()) return false;
     if (type !== "auto" && provider !== "omise") {
-        if (isManualDynamicPromptPayWalletMethod(method)) return true;
+        if (isVerifiedDynamicWalletMethod(method) || isManualDynamicPromptPayWalletMethod(method)) return true;
         const hasQr = Boolean(method.qrImage || method.qrImageUrl || method.uploadedQrImage || method.finalQrImage);
         const hasAccount = Boolean(method.accountName && method.accountNumber);
         if (!hasQr || !hasAccount) return false;
