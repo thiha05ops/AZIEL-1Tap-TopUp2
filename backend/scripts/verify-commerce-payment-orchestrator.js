@@ -9,6 +9,14 @@ const {
     ERROR_CODES,
     PAYMENT_STATES
 } = require("../services/commerce/paymentOrchestrator");
+const {
+    createPayableSubjectRegistry,
+    UnsupportedPayableSubjectError,
+    SUBJECT_TYPES
+} = require("../services/commerce/payableSubjectRegistry");
+const {
+    createCommerceOrderPayableSubjectAdapter
+} = require("../services/commerce/commerceOrderPayableSubjectAdapter");
 
 const NOW = new Date("2026-07-26T12:00:00.000Z");
 
@@ -85,7 +93,9 @@ function createStore(options = {}) {
             updateOrderStatus: 0,
             appendProviderEvent: 0,
             recordFailure: 0,
-            transactions: 0
+            transactions: 0,
+            ownedOrderLookups: 0,
+            operationalOrderLookups: 0
         },
         txContexts: [],
         inTransaction: false,
@@ -156,9 +166,11 @@ function createDeps(store, overrides = {}) {
         },
         orderRepository: {
             async findOwnedOrderById({ orderId, owner: requestedOwner }) {
+                store.calls.ownedOrderLookups += 1;
                 return clone(store.orders.find(item => item.orderId === orderId && matchesOwner(item.owner, requestedOwner)) || null);
             },
             async findOrderById(orderId, options = {}) {
+                store.calls.operationalOrderLookups += 1;
                 assert.strictEqual(typeof orderId, "string", "operational order lookup receives the scalar business order id.");
                 if (options.transactionContext) {
                     assert.strictEqual(options.session, options.transactionContext.session, "operational lookup propagates transaction session.");
@@ -325,7 +337,80 @@ async function testCanonicalAmountAndCurrency() {
     await createOrchestrator(store).initiatePayment(initiateInput({ amount: 1, currency: "MMK" }));
     assert.strictEqual(store.providerInputs[0].intent.amount, 1490, "canonical amount comes from order.");
     assert.strictEqual(store.providerInputs[0].intent.currency, "THB", "canonical currency comes from order.");
+    assert.strictEqual(store.providerInputs[0].intent.subjectType, SUBJECT_TYPES.COMMERCE_ORDER, "legacy orderId input normalizes to CommerceOrder.");
+    assert.strictEqual(store.providerInputs[0].intent.subjectId, "AZL-ORDER-0001", "provider intent receives additive subjectId.");
+    assert.strictEqual(store.providerInputs[0].intent.orderId, "AZL-ORDER-0001", "provider intent retains the existing orderId.");
+    assert.strictEqual(store.attempts[0].subjectType, SUBJECT_TYPES.COMMERCE_ORDER, "created attempt receives typed CommerceOrder subject.");
+    assert.strictEqual(store.attempts[0].subjectId, "AZL-ORDER-0001", "created attempt receives the CommerceOrder subjectId.");
+    assert.strictEqual(store.attempts[0].orderId, "AZL-ORDER-0001", "created attempt retains the CommerceOrder orderId.");
     assert(!JSON.stringify(store.providerInputs[0].intent).includes("9999"), "provider receives no client-controlled discount.");
+}
+
+async function testPayableSubjectRegistryAndAdapter() {
+    const calls = [];
+    const sourceOrder = order();
+    const repository = {
+        async findOwnedOrderById({ orderId, owner: requestedOwner }) {
+            calls.push("owned");
+            return orderId === sourceOrder.orderId && requestedOwner.userId === sourceOrder.owner.userId ? sourceOrder : null;
+        },
+        async findOrderById(orderId) {
+            calls.push("operational");
+            return orderId === sourceOrder.orderId ? sourceOrder : null;
+        }
+    };
+    const adapter = createCommerceOrderPayableSubjectAdapter({
+        orderRepository: repository,
+        paymentStateOf: current => String(current.paymentStatus || current.payment?.status || "unpaid").toUpperCase(),
+        toOrderPaymentStatus: state => String(state).toLowerCase(),
+        paymentStates: PAYMENT_STATES,
+        error: (code, message, options) => new PaymentOrchestratorError(code, message, options)
+    });
+    const registry = createPayableSubjectRegistry({ [SUBJECT_TYPES.COMMERCE_ORDER]: adapter });
+    assert.strictEqual(registry.get(SUBJECT_TYPES.COMMERCE_ORDER), adapter, "registry resolves CommerceOrder adapter.");
+    assert.throws(() => registry.get(SUBJECT_TYPES.WALLET_TOPUP), UnsupportedPayableSubjectError, "WalletTopup is unsupported in Commit 2.");
+    assert.throws(
+        () => registry.register("MALFORMED_SUBJECT", { ...adapter, getCurrency: null }),
+        error => error instanceof TypeError && error.message.includes("getCurrency"),
+        "registry rejects a malformed adapter and identifies the invalid method."
+    );
+
+    const owned = await adapter.loadOwnedSubject({ subjectId: sourceOrder.orderId, owner: owner() });
+    const operational = await adapter.loadOperationalSubject({ subjectId: sourceOrder.orderId });
+    assert.deepStrictEqual(calls, ["owned", "operational"], "adapter uses existing owned and operational repository lookups.");
+    assert.strictEqual(adapter.getSubjectId(owned), sourceOrder.orderId);
+    assert.strictEqual(adapter.getAuthoritativeAmount(owned), 1490);
+    assert.strictEqual(adapter.getCurrency(owned), "THB");
+    assert.strictEqual(adapter.getRegion(owned), "TH");
+    assert.deepStrictEqual(adapter.getPaymentSnapshot(owned), sourceOrder.payment);
+    assert.doesNotThrow(() => adapter.assertPayable(operational), "existing unpaid CommerceOrder remains payable.");
+    assert.throws(
+        () => adapter.assertPayable(order({ paymentStatus: "paid", payment: { ...sourceOrder.payment, status: "paid" } })),
+        error => error instanceof PaymentOrchestratorError && error.code === ERROR_CODES.PAYMENT_NOT_PAYABLE,
+        "adapter preserves the existing not-payable error."
+    );
+}
+
+async function testUnsupportedWalletTopupSubject() {
+    const store = createStore();
+    let fulfillmentCalls = 0;
+    await assertPaymentError(
+        () => createOrchestrator(store, {
+            paidFulfillmentHandler: async () => { fulfillmentCalls += 1; }
+        }).initiatePayment({
+            subjectType: SUBJECT_TYPES.WALLET_TOPUP,
+            subjectId: "WALLET-TEST-0001",
+            owner: owner(),
+            idempotencyKey: "wallet-unsupported"
+        }),
+        ERROR_CODES.PAYMENT_SUBJECT_UNSUPPORTED,
+        "WalletTopup is rejected explicitly before an order fallback"
+    );
+    assert.strictEqual(store.calls.createAttempt, 0, "unsupported wallet subject creates no payment attempt.");
+    assert.strictEqual(store.calls.createPayment, 0, "unsupported wallet subject never reaches a provider.");
+    assert.strictEqual(store.calls.ownedOrderLookups, 0, "unsupported wallet subject performs no owned CommerceOrder lookup.");
+    assert.strictEqual(store.calls.operationalOrderLookups, 0, "unsupported wallet subject performs no operational CommerceOrder lookup.");
+    assert.strictEqual(fulfillmentCalls, 0, "unsupported wallet subject never reaches fulfillment.");
 }
 
 async function testIdempotentInitiation() {
@@ -838,6 +923,8 @@ async function run() {
     const orchestratorSource = fs.readFileSync(path.resolve(__dirname, "../services/commerce/paymentOrchestrator.js"), "utf8");
     assert(!orderRepositorySource.includes("ensurePaidOrderFulfillmentWork"), "repository persistence methods cannot start paid fulfillment.");
     assert(orchestratorSource.indexOf("await runTransaction(async transactionContext") < orchestratorSource.indexOf("await runPostCommitPaidFulfillment(applied)"), "paid fulfillment is sequenced after transaction completion.");
+    await testPayableSubjectRegistryAndAdapter();
+    await testUnsupportedWalletTopupSubject();
     await testSuccessfulPendingInitiation();
     await testImmediatePayment();
     await testProviderFailureResult();

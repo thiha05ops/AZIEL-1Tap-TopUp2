@@ -1,5 +1,8 @@
 "use strict";
 
+const { createPayableSubjectRegistry, UnsupportedPayableSubjectError, SUBJECT_TYPES } = require("./payableSubjectRegistry");
+const { createCommerceOrderPayableSubjectAdapter } = require("./commerceOrderPayableSubjectAdapter");
+
 const PAYMENT_ORCHESTRATOR_VERSION = "2.6.1";
 const MAX_ID_LENGTH = 200;
 
@@ -82,7 +85,8 @@ const ERROR_CODES = Object.freeze({
     PAYMENT_EVENT_DUPLICATE: "PAYMENT_EVENT_DUPLICATE",
     PAYMENT_EVENT_NOT_FOUND: "PAYMENT_EVENT_NOT_FOUND",
     PAYMENT_OUTCOME_UNKNOWN: "PAYMENT_OUTCOME_UNKNOWN",
-    PAYMENT_PERSISTENCE_ERROR: "PAYMENT_PERSISTENCE_ERROR"
+    PAYMENT_PERSISTENCE_ERROR: "PAYMENT_PERSISTENCE_ERROR",
+    PAYMENT_SUBJECT_UNSUPPORTED: "PAYMENT_SUBJECT_UNSUPPORTED"
 });
 
 class PaymentOrchestratorError extends Error {
@@ -146,6 +150,20 @@ function normalizeOwner(owner = {}, required = true) {
         throw new PaymentOrchestratorError(ERROR_CODES.PAYMENT_FORBIDDEN, "Owner identity is required.", { stage: "input" });
     }
     return { userId, sessionId, type: userId ? "USER" : "SESSION" };
+}
+
+function normalizeSubjectReference(source = {}) {
+    const explicitType = normalizeString(source.subjectType).toUpperCase();
+    const subjectType = explicitType || SUBJECT_TYPES.COMMERCE_ORDER;
+    const orderId = normalizeId(source.orderId, "orderId", false);
+    const subjectId = normalizeId(source.subjectId || orderId, "subjectId", true);
+    if (subjectType === SUBJECT_TYPES.COMMERCE_ORDER && orderId && subjectId !== orderId) {
+        throw new PaymentOrchestratorError(ERROR_CODES.PAYMENT_VALIDATION_ERROR, "Commerce order subjectId must match orderId.", {
+            stage: "input",
+            metadata: { subjectType, subjectId, orderId }
+        });
+    }
+    return { subjectType, subjectId, orderId: subjectType === SUBJECT_TYPES.COMMERCE_ORDER ? (orderId || subjectId) : orderId };
 }
 
 function normalizeState(value, fallback = PAYMENT_STATES.UNPAID) {
@@ -336,47 +354,45 @@ function createPaymentOrchestrator(dependencies = {}) {
     assertProviderFunction(deps.providerResolver, "providerResolver");
     assertProviderFunction(deps.transactionRunner, "transactionRunner");
 
+    const commerceOrderAdapter = createCommerceOrderPayableSubjectAdapter({
+        orderRepository: deps.orderRepository,
+        clock: deps.clock,
+        paymentStateOf: paymentStateOfOrder,
+        toOrderPaymentStatus,
+        paymentStates: PAYMENT_STATES,
+        error: (code, message, options) => new PaymentOrchestratorError(code, message, options)
+    });
+    const subjectRegistry = dependencies.payableSubjectRegistry || createPayableSubjectRegistry({
+        [SUBJECT_TYPES.COMMERCE_ORDER]: commerceOrderAdapter
+    });
+
+    function resolveSubjectAdapter(subjectType) {
+        try {
+            return subjectRegistry.get(subjectType);
+        } catch (error) {
+            if (!(error instanceof UnsupportedPayableSubjectError) && error?.code !== ERROR_CODES.PAYMENT_SUBJECT_UNSUPPORTED) throw error;
+            throw new PaymentOrchestratorError(ERROR_CODES.PAYMENT_SUBJECT_UNSUPPORTED, "Payable subject type is not supported.", {
+                stage: "subject",
+                metadata: { subjectType }
+            });
+        }
+    }
+
     async function runTransaction(callback, existingContext = null) {
         if (existingContext) return callback(existingContext);
         return deps.transactionRunner(callback);
     }
 
-    async function loadOwnedOrder({ orderId, owner, transactionContext = null }) {
-        const finder = deps.orderRepository.findOwnedOrderById || deps.orderRepository.findOwnedOrder;
-        if (typeof finder !== "function") {
-            throw new PaymentOrchestratorError(ERROR_CODES.PAYMENT_VALIDATION_ERROR, "orderRepository.findOwnedOrderById is required.", { stage: "dependencies" });
-        }
-        const order = await finder.call(deps.orderRepository, { orderId, owner, transactionContext });
-        if (!order) {
-            throw new PaymentOrchestratorError(ERROR_CODES.PAYMENT_ORDER_NOT_FOUND, "Commerce order was not found for this owner.", {
-                stage: "order",
-                metadata: { orderId }
-            });
-        }
-        return clonePlain(order);
+    async function loadOwnedSubject({ subjectReference, owner, transactionContext = null }) {
+        const adapter = resolveSubjectAdapter(subjectReference.subjectType);
+        const subject = await adapter.loadOwnedSubject({ subjectId: subjectReference.subjectId, owner, session: transactionContext });
+        return { adapter, subject, subjectReference };
     }
 
-    async function loadOperationalOrder({ orderId, transactionContext = null }) {
-        const finder = deps.orderRepository.findOrderById || deps.orderRepository.findOperationalOrderById;
-        if (typeof finder !== "function") {
-            throw new PaymentOrchestratorError(ERROR_CODES.PAYMENT_VALIDATION_ERROR, "orderRepository.findOrderById is required.", { stage: "dependencies" });
-        }
-        const order = await finder.call(
-            deps.orderRepository,
-            orderId,
-            {
-                transactionContext,
-                mongoSession: transactionContext?.mongoSession,
-                session: transactionContext?.session
-            }
-        );
-        if (!order) {
-            throw new PaymentOrchestratorError(ERROR_CODES.PAYMENT_ORDER_NOT_FOUND, "Commerce order was not found.", {
-                stage: "order",
-                metadata: { orderId }
-            });
-        }
-        return clonePlain(order);
+    async function loadOperationalSubject({ subjectReference, transactionContext = null }) {
+        const adapter = resolveSubjectAdapter(subjectReference.subjectType);
+        const subject = await adapter.loadOperationalSubject({ subjectId: subjectReference.subjectId, session: transactionContext });
+        return { adapter, subject, subjectReference };
     }
 
     async function runPostCommitPaidFulfillment(applied = {}) {
@@ -388,7 +404,9 @@ function createPaymentOrchestrator(dependencies = {}) {
         let committedOrder;
         let result;
         try {
-            committedOrder = await loadOperationalOrder({ orderId });
+            ({ subject: committedOrder } = await loadOperationalSubject({
+                subjectReference: { subjectType: SUBJECT_TYPES.COMMERCE_ORDER, subjectId: orderId, orderId }
+            }));
             if (normalizeString(committedOrder.status).toLowerCase() !== "paid" || paymentStateOfOrder(committedOrder) !== PAYMENT_STATES.PAID) {
                 result = { created: false, reason: "POST_COMMIT_ORDER_NOT_PAID", errorCode: "POST_COMMIT_ORDER_NOT_PAID" };
             } else {
@@ -431,7 +449,9 @@ function createPaymentOrchestrator(dependencies = {}) {
         const orderId = normalizeString(applied.order?.orderId || applied.attempt?.orderId);
         if (!orderId) return null;
         try {
-            const committedOrder = await loadOperationalOrder({ orderId });
+            const { subject: committedOrder } = await loadOperationalSubject({
+                subjectReference: { subjectType: SUBJECT_TYPES.COMMERCE_ORDER, subjectId: orderId, orderId }
+            });
             return await deps.paidSettlementHandler(committedOrder);
         } catch (error) {
             deps.logger.error?.("Paid payment settlement post-commit failed.", {
@@ -442,27 +462,30 @@ function createPaymentOrchestrator(dependencies = {}) {
         }
     }
 
-    function buildIntent(order, input = {}) {
-        const amount = amountFromOrder(order);
-        const currency = currencyFromOrder(order);
+    function buildIntent(order, input = {}, subjectAdapter = commerceOrderAdapter, subjectReference = null) {
+        const reference = subjectReference || normalizeSubjectReference({ orderId: order.orderId });
+        const amount = subjectAdapter.getAuthoritativeAmount(order);
+        const currency = subjectAdapter.getCurrency(order);
         if (!Number.isFinite(amount) || amount < 0 || !currency) {
             throw new PaymentOrchestratorError(ERROR_CODES.PAYMENT_NOT_PAYABLE, "Order has no payable commercial amount.", {
                 stage: "order",
                 metadata: { orderId: order.orderId }
             });
         }
-        const payment = paymentSnapshotFromOrder(order);
+        const payment = subjectAdapter.getPaymentSnapshot(order);
         const providerType = normalizeString(payment.providerType || payment.flowType || payment.paymentType || payment.paymentChannel || "manual");
         const provider = normalizeString(payment.provider || payment.providerKey || payment.paymentMethodId || payment.paymentMethod);
         return deepFreeze({
             paymentIntentId: normalizeId(input.paymentIntentId || deps.idGenerator("paymentIntent"), "paymentIntentId"),
+            subjectType: reference.subjectType,
+            subjectId: reference.subjectId,
             orderId: normalizeString(order.orderId),
             commerceOrderId: normalizeString(order.commerceOrderId || order.orderId),
             quoteId: normalizeString(order.quoteId),
             owner: clonePlain(order.owner || {}),
             amount,
             currency,
-            region: normalizeString(order.commercial?.region || order.product?.region || order.commercialSnapshot?.region).toUpperCase(),
+            region: subjectAdapter.getRegion(order),
             paymentMethodId: normalizeString(payment.paymentMethodId || payment.methodKey || payment.paymentMethod),
             paymentChannel: normalizeString(payment.paymentChannel || payment.flowType || ""),
             provider,
@@ -476,23 +499,6 @@ function createPaymentOrchestrator(dependencies = {}) {
         });
     }
 
-    function assertOrderPayable(order) {
-        const orderStatus = normalizeString(order.status);
-        const paymentState = paymentStateOfOrder(order);
-        if ([PAYMENT_STATES.PAID, PAYMENT_STATES.WAIVED, PAYMENT_STATES.REFUNDED].includes(paymentState)) {
-            throw new PaymentOrchestratorError(ERROR_CODES.PAYMENT_NOT_PAYABLE, "Order is not payable.", {
-                stage: "order",
-                metadata: { orderId: order.orderId, paymentStatus: paymentState }
-            });
-        }
-        if (["completed", "cancelled", "refunded"].includes(orderStatus)) {
-            throw new PaymentOrchestratorError(ERROR_CODES.PAYMENT_NOT_PAYABLE, "Order status is not payable.", {
-                stage: "order",
-                metadata: { orderId: order.orderId, orderStatus }
-            });
-        }
-    }
-
     async function resolveAdapter(intent, operation) {
         const adapter = await deps.providerResolver({ intent, operation });
         if (!adapter || typeof adapter !== "object") {
@@ -504,7 +510,7 @@ function createPaymentOrchestrator(dependencies = {}) {
         return adapter;
     }
 
-    async function applyPaymentStatus({ order, attempt, toStatus, reason, transactionContext }) {
+    async function applyPaymentStatus({ order, subjectAdapter = commerceOrderAdapter, attempt, toStatus, reason, transactionContext }) {
         const transition = assertTransition(attempt.status, toStatus, {
             allowLatePaymentReconciliation: deps.allowLatePaymentReconciliation
         });
@@ -517,53 +523,29 @@ function createPaymentOrchestrator(dependencies = {}) {
             changedAt: deps.clock(),
             transactionContext
         });
-        let updatedOrder = order;
-        const targetOrderPaymentStatus = toOrderPaymentStatus(transition.to);
-        const fromOrderState = paymentStateOfOrder(order);
-        if (targetOrderPaymentStatus !== toOrderPaymentStatus(fromOrderState) && typeof deps.orderRepository.updatePaymentStatus === "function") {
-            const repositoryOptions = {
-                transactionContext,
-                mongoSession: transactionContext?.mongoSession,
-                session: transactionContext?.session
-            };
-            updatedOrder = await deps.orderRepository.updatePaymentStatus({
-                orderId: order.orderId,
-                fromStatuses: [toOrderPaymentStatus(fromOrderState)],
-                toStatus: targetOrderPaymentStatus,
-                changedAt: deps.clock(),
-                reason,
-                owner: order.owner
-            }, repositoryOptions);
-            if (
-                targetOrderPaymentStatus === ORDER_PAYMENT_STATUS.PAID &&
-                normalizeString(updatedOrder?.status || order.status) === "pending_payment" &&
-                typeof deps.orderRepository.updateOrderStatus === "function"
-            ) {
-                updatedOrder = await deps.orderRepository.updateOrderStatus({
-                    orderId: order.orderId,
-                    fromStatuses: ["pending_payment"],
-                    toStatus: "paid",
-                    changedAt: deps.clock(),
-                    reason,
-                    owner: order.owner
-                }, repositoryOptions);
-            }
-        }
+        const updatedOrder = await subjectAdapter.applyPaymentTransition({
+            subject: order,
+            transition,
+            attempt: updatedAttempt || attempt,
+            reason,
+            session: transactionContext
+        });
         return { attempt: detachAttempt(updatedAttempt || { ...attempt, status: transition.to }), order: updatedOrder || order };
     }
 
     async function initiatePayment(input = {}) {
         const source = assertPlainObject(input, "input");
         const owner = normalizeOwner(source.owner || {});
-        const orderId = normalizeId(source.orderId, "orderId");
+        const subjectReference = normalizeSubjectReference(source);
+        const orderId = subjectReference.orderId;
         const idempotencyKey = normalizeId(source.idempotencyKey, "idempotencyKey", false);
-        const order = await loadOwnedOrder({ orderId, owner });
-        assertOrderPayable(order);
-        const intent = buildIntent(order, { ...source, idempotencyKey });
+        const { subject: order, adapter: subjectAdapter } = await loadOwnedSubject({ subjectReference, owner });
+        subjectAdapter.assertPayable(order, { operation: "initiatePayment" });
+        const intent = buildIntent(order, { ...source, idempotencyKey }, subjectAdapter, subjectReference);
         const fingerprint = fingerprintIntent(intent);
 
         if (idempotencyKey && typeof deps.paymentAttemptPort.findAttemptByIdempotency === "function") {
-            const existing = await deps.paymentAttemptPort.findAttemptByIdempotency({ orderId, owner, idempotencyKey, operation: "initiatePayment" });
+            const existing = await deps.paymentAttemptPort.findAttemptByIdempotency({ ...subjectReference, owner, idempotencyKey, operation: "initiatePayment" });
             if (existing) {
                 if (existing.requestFingerprint !== fingerprint) {
                     throw new PaymentOrchestratorError(ERROR_CODES.PAYMENT_IDEMPOTENCY_CONFLICT, "Payment idempotency key conflicts with another request.", {
@@ -589,6 +571,8 @@ function createPaymentOrchestrator(dependencies = {}) {
         const createAttempt = assertPortFunction(deps.paymentAttemptPort, "createAttempt");
         const initiatingAttempt = await runTransaction(transactionContext => createAttempt({
             attemptId,
+            subjectType: subjectReference.subjectType,
+            subjectId: subjectReference.subjectId,
             orderId,
             quoteId: intent.quoteId,
             owner,
@@ -672,6 +656,7 @@ function createPaymentOrchestrator(dependencies = {}) {
                 };
                 const applied = await applyPaymentStatus({
                     order,
+                    subjectAdapter,
                     attempt: currentAttempt,
                     toStatus: providerResult.status,
                     reason: "Payment initiated",
@@ -715,12 +700,13 @@ function createPaymentOrchestrator(dependencies = {}) {
         if (!attempt) {
             throw new PaymentOrchestratorError(ERROR_CODES.PAYMENT_EVENT_NOT_FOUND, "Payment attempt was not found.", { stage: "attempt" });
         }
-        const order = await loadOwnedOrder({ orderId: attempt.orderId, owner });
-        return { owner, attempt: detachAttempt(attempt), order };
+        const subjectReference = normalizeSubjectReference(attempt);
+        const { subject: order, adapter: subjectAdapter } = await loadOwnedSubject({ subjectReference, owner });
+        return { owner, attempt: detachAttempt(attempt), order, subjectAdapter, subjectReference };
     }
 
     async function retryPayment(input = {}) {
-        const { owner, attempt, order } = await loadAttemptForOwner(input, "retryPayment");
+        const { owner, attempt, order, subjectReference } = await loadAttemptForOwner(input, "retryPayment");
         const from = normalizeState(attempt.status);
         if (![PAYMENT_STATES.FAILED, PAYMENT_STATES.EXPIRED].includes(from)) {
             throw new PaymentOrchestratorError(ERROR_CODES.PAYMENT_RETRY_NOT_ALLOWED, "Payment attempt cannot be retried from its current state.", {
@@ -729,6 +715,8 @@ function createPaymentOrchestrator(dependencies = {}) {
             });
         }
         const retryInput = {
+            subjectType: subjectReference.subjectType,
+            subjectId: subjectReference.subjectId,
             orderId: order.orderId,
             owner,
             idempotencyKey: normalizeString(input.idempotencyKey || `${attempt.attemptId}:retry`),
@@ -738,8 +726,8 @@ function createPaymentOrchestrator(dependencies = {}) {
     }
 
     async function refreshPayment(input = {}) {
-        const { attempt, order } = await loadAttemptForOwner(input, "refreshPayment");
-        const intent = buildIntent(order, input);
+        const { attempt, order, subjectAdapter, subjectReference } = await loadAttemptForOwner(input, "refreshPayment");
+        const intent = buildIntent(order, input, subjectAdapter, subjectReference);
         const adapter = await resolveAdapter(intent, "refreshPayment");
         const query = adapter.refreshPayment || adapter.queryPayment;
         if (typeof query !== "function") {
@@ -776,7 +764,7 @@ function createPaymentOrchestrator(dependencies = {}) {
                     transactionContext
                 }) || attempt;
             }
-            return applyPaymentStatus({ order, attempt: refreshedAttempt, toStatus: result.status, reason: "Payment refreshed", transactionContext });
+            return applyPaymentStatus({ order, subjectAdapter, attempt: refreshedAttempt, toStatus: result.status, reason: "Payment refreshed", transactionContext });
         });
         await runPostCommitPaidFulfillment(applied);
         await runPostCommitPaidSettlement(applied);
@@ -784,17 +772,18 @@ function createPaymentOrchestrator(dependencies = {}) {
     }
 
     async function cancelPayment(input = {}) {
-        const { attempt, order } = await loadAttemptForOwner(input, "cancelPayment");
+        const { attempt, order, subjectAdapter, subjectReference } = await loadAttemptForOwner(input, "cancelPayment");
         const current = normalizeState(attempt.status);
         if (current === PAYMENT_STATES.CANCELLED) return buildPublicResult({ attempt, order, idempotent: true, outcome: "already_cancelled" });
         assertTransition(current, PAYMENT_STATES.CANCELLED);
-        const intent = buildIntent(order, input);
+        const intent = buildIntent(order, input, subjectAdapter, subjectReference);
         const adapter = await resolveAdapter(intent, "cancelPayment");
         if (typeof adapter.cancelPayment === "function") {
             await adapter.cancelPayment({ attempt: detachAttempt(attempt), intent });
         }
         const applied = await runTransaction(transactionContext => applyPaymentStatus({
             order,
+            subjectAdapter,
             attempt,
             toStatus: PAYMENT_STATES.CANCELLED,
             reason: "Payment cancelled",
@@ -804,17 +793,18 @@ function createPaymentOrchestrator(dependencies = {}) {
     }
 
     async function expirePayment(input = {}) {
-        const { attempt, order } = await loadAttemptForOwner(input, "expirePayment");
+        const { attempt, order, subjectAdapter, subjectReference } = await loadAttemptForOwner(input, "expirePayment");
         const current = normalizeState(attempt.status);
         if (current === PAYMENT_STATES.EXPIRED) return buildPublicResult({ attempt, order, idempotent: true, outcome: "already_expired" });
         assertTransition(current, PAYMENT_STATES.EXPIRED);
-        const intent = buildIntent(order, input);
+        const intent = buildIntent(order, input, subjectAdapter, subjectReference);
         const adapter = await resolveAdapter(intent, "expirePayment");
         if (typeof adapter.expirePayment === "function") {
             await adapter.expirePayment({ attempt: detachAttempt(attempt), intent });
         }
         const applied = await runTransaction(transactionContext => applyPaymentStatus({
             order,
+            subjectAdapter,
             attempt,
             toStatus: PAYMENT_STATES.EXPIRED,
             reason: "Payment expired",
@@ -837,12 +827,13 @@ function createPaymentOrchestrator(dependencies = {}) {
                 metadata: { providerReference }
             });
         }
+        const subjectReference = normalizeSubjectReference(attempt);
         if (attemptHasProviderEvent(attempt, eventId)) {
-            const order = await loadOperationalOrder({ orderId: attempt.orderId });
+            const { subject: order } = await loadOperationalSubject({ subjectReference });
             return buildPublicResult({ attempt, order, idempotent: true, duplicate: true, outcome: "duplicate_event" });
         }
-        const order = await loadOperationalOrder({ orderId: attempt.orderId });
-        const intent = buildIntent(order, source);
+        const { subject: order, adapter: subjectAdapter } = await loadOperationalSubject({ subjectReference });
+        const intent = buildIntent(order, source, subjectAdapter, subjectReference);
         const adapter = await resolveAdapter(intent, "handleProviderEvent");
         let providerEventResult = trustedEvent;
         if (
@@ -936,6 +927,7 @@ function createPaymentOrchestrator(dependencies = {}) {
             }
             return applyPaymentStatus({
                 order,
+                subjectAdapter,
                 attempt,
                 toStatus: result.status,
                 reason: "Provider event applied",
