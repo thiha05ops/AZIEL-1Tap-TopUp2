@@ -2,6 +2,7 @@
 
 const { createPayableSubjectRegistry, UnsupportedPayableSubjectError, SUBJECT_TYPES } = require("./payableSubjectRegistry");
 const { createCommerceOrderPayableSubjectAdapter } = require("./commerceOrderPayableSubjectAdapter");
+const { createWalletTopupPayableSubjectAdapter } = require("./walletTopupPayableSubjectAdapter");
 
 const PAYMENT_ORCHESTRATOR_VERSION = "2.6.1";
 const MAX_ID_LENGTH = 200;
@@ -86,7 +87,8 @@ const ERROR_CODES = Object.freeze({
     PAYMENT_EVENT_NOT_FOUND: "PAYMENT_EVENT_NOT_FOUND",
     PAYMENT_OUTCOME_UNKNOWN: "PAYMENT_OUTCOME_UNKNOWN",
     PAYMENT_PERSISTENCE_ERROR: "PAYMENT_PERSISTENCE_ERROR",
-    PAYMENT_SUBJECT_UNSUPPORTED: "PAYMENT_SUBJECT_UNSUPPORTED"
+    PAYMENT_SUBJECT_UNSUPPORTED: "PAYMENT_SUBJECT_UNSUPPORTED",
+    PAYMENT_SUBJECT_NOT_FOUND: "PAYMENT_SUBJECT_NOT_FOUND"
 });
 
 class PaymentOrchestratorError extends Error {
@@ -119,6 +121,10 @@ function deepFreeze(value) {
 
 function normalizeString(value) {
     return String(value || "").trim();
+}
+
+function textOwnerId(value) {
+    return normalizeString(value?._id || value);
 }
 
 function assertPlainObject(value, field) {
@@ -301,6 +307,8 @@ function buildPublicResult(value = {}) {
     const currency = normalizeString(attempt.currency || currencyFromOrder(order)).toUpperCase();
     return deepFreeze({
         paymentOrchestratorVersion: PAYMENT_ORCHESTRATOR_VERSION,
+        subjectType: normalizeString(attempt.subjectType || value.subjectType || (attempt.orderId || order.orderId ? SUBJECT_TYPES.COMMERCE_ORDER : "")),
+        subjectId: normalizeString(attempt.subjectId || value.subjectId || attempt.orderId || order.orderId),
         orderId: normalizeString(attempt.orderId || order.orderId),
         attemptId: normalizeString(attempt.attemptId),
         paymentStatus: publicStatus(attempt.status || attempt.paymentStatus || order.paymentStatus),
@@ -349,6 +357,7 @@ function createPaymentOrchestrator(dependencies = {}) {
         paidFulfillmentHandler: dependencies.paidFulfillmentHandler || null,
         paidFulfillmentFailureRecorder: dependencies.paidFulfillmentFailureRecorder || null,
         paidSettlementHandler: dependencies.paidSettlementHandler || null,
+        walletTopupSettlementHandler: dependencies.walletTopupSettlementHandler || null,
         allowLatePaymentReconciliation: dependencies.allowLatePaymentReconciliation === true
     };
     assertProviderFunction(deps.providerResolver, "providerResolver");
@@ -362,8 +371,14 @@ function createPaymentOrchestrator(dependencies = {}) {
         paymentStates: PAYMENT_STATES,
         error: (code, message, options) => new PaymentOrchestratorError(code, message, options)
     });
+    const walletTopupAdapter = createWalletTopupPayableSubjectAdapter({
+        model: dependencies.walletTopupModel,
+        clock: deps.clock,
+        error: (code, message, options) => new PaymentOrchestratorError(code, message, options)
+    });
     const subjectRegistry = dependencies.payableSubjectRegistry || createPayableSubjectRegistry({
-        [SUBJECT_TYPES.COMMERCE_ORDER]: commerceOrderAdapter
+        [SUBJECT_TYPES.COMMERCE_ORDER]: commerceOrderAdapter,
+        [SUBJECT_TYPES.WALLET_TOPUP]: walletTopupAdapter
     });
 
     function resolveSubjectAdapter(subjectType) {
@@ -462,6 +477,21 @@ function createPaymentOrchestrator(dependencies = {}) {
         }
     }
 
+    async function runPostCommitPaidEffects(applied = {}) {
+        if (normalizeState(applied.attempt?.status) !== PAYMENT_STATES.PAID) return null;
+        const subjectType = normalizeString(applied.attempt?.subjectType || (applied.attempt?.orderId ? SUBJECT_TYPES.COMMERCE_ORDER : "")).toUpperCase();
+        switch (subjectType) {
+            case SUBJECT_TYPES.COMMERCE_ORDER:
+                await runPostCommitPaidFulfillment(applied);
+                return runPostCommitPaidSettlement(applied);
+            case SUBJECT_TYPES.WALLET_TOPUP:
+                if (typeof deps.walletTopupSettlementHandler !== "function") return null;
+                return deps.walletTopupSettlementHandler({ attemptId: applied.attempt.attemptId, topupId: applied.attempt.subjectId });
+            default:
+                throw new PaymentOrchestratorError(ERROR_CODES.PAYMENT_SUBJECT_UNSUPPORTED, "Paid subject type is not supported.", { stage: "paid_effects", metadata: { subjectType } });
+        }
+    }
+
     function buildIntent(order, input = {}, subjectAdapter = commerceOrderAdapter, subjectReference = null) {
         const reference = subjectReference || normalizeSubjectReference({ orderId: order.orderId });
         const amount = subjectAdapter.getAuthoritativeAmount(order);
@@ -479,20 +509,22 @@ function createPaymentOrchestrator(dependencies = {}) {
             paymentIntentId: normalizeId(input.paymentIntentId || deps.idGenerator("paymentIntent"), "paymentIntentId"),
             subjectType: reference.subjectType,
             subjectId: reference.subjectId,
-            orderId: normalizeString(order.orderId),
-            commerceOrderId: normalizeString(order.commerceOrderId || order.orderId),
-            quoteId: normalizeString(order.quoteId),
-            owner: clonePlain(order.owner || {}),
+            ...(reference.subjectType === SUBJECT_TYPES.COMMERCE_ORDER ? {
+                orderId: normalizeString(order.orderId),
+                commerceOrderId: normalizeString(order.commerceOrderId || order.orderId),
+                quoteId: normalizeString(order.quoteId),
+                commercialSnapshot: clonePlain(order.commercial || order.commercialSnapshot || {})
+            } : {}),
+            owner: clonePlain(order.owner || { type: "USER", userId: textOwnerId(order.customerUserId) }),
             amount,
             currency,
             region: subjectAdapter.getRegion(order),
-            paymentMethodId: normalizeString(payment.paymentMethodId || payment.methodKey || payment.paymentMethod),
+            paymentMethodId: normalizeString(payment.paymentMethodId || payment.methodKey || payment.paymentMethod || payment.key),
             paymentChannel: normalizeString(payment.paymentChannel || payment.flowType || ""),
             provider,
             providerType,
             confirmationMode: normalizeString(payment.confirmationMode || payment.metadata?.confirmationMode || ""),
             paymentSnapshot: payment,
-            commercialSnapshot: clonePlain(order.commercial || order.commercialSnapshot || {}),
             idempotencyKey: normalizeString(input.idempotencyKey),
             traceId: normalizeString(input.traceId || input.requestMetadata?.traceId),
             clientIp: normalizeString(input.clientIp || input.requestMetadata?.clientIp)
@@ -557,8 +589,10 @@ function createPaymentOrchestrator(dependencies = {}) {
             }
         }
 
-        const activeFinder = assertPortFunction(deps.paymentAttemptPort, "findActiveAttemptForOrder");
-        const active = await activeFinder({ orderId, owner, transactionContext: null });
+        const activeFinder = subjectReference.subjectType === SUBJECT_TYPES.COMMERCE_ORDER
+            ? assertPortFunction(deps.paymentAttemptPort, "findActiveAttemptForOrder")
+            : assertPortFunction(deps.paymentAttemptPort, "findActiveAttemptForSubject");
+        const active = await activeFinder({ ...subjectReference, owner, transactionContext: null });
         if (active && ACTIVE_ATTEMPT_STATES.has(normalizeState(active.status))) {
             return buildPublicResult({ attempt: active, order, idempotent: true, duplicate: true, outcome: "active_attempt_reused" });
         }
@@ -573,7 +607,7 @@ function createPaymentOrchestrator(dependencies = {}) {
             attemptId,
             subjectType: subjectReference.subjectType,
             subjectId: subjectReference.subjectId,
-            orderId,
+            orderId: subjectReference.subjectType === SUBJECT_TYPES.COMMERCE_ORDER ? orderId : "",
             quoteId: intent.quoteId,
             owner,
             status: PAYMENT_STATES.INITIATING,
@@ -667,8 +701,7 @@ function createPaymentOrchestrator(dependencies = {}) {
                     order: applied.order
                 };
             });
-            await runPostCommitPaidFulfillment(applied);
-            await runPostCommitPaidSettlement(applied);
+            await runPostCommitPaidEffects(applied);
             return buildPublicResult({ attempt: applied.attempt, order: applied.order, outcome: "created" });
         } catch (error) {
             if (typeof deps.paymentAttemptPort.recordFailure === "function") {
@@ -705,6 +738,15 @@ function createPaymentOrchestrator(dependencies = {}) {
         return { owner, attempt: detachAttempt(attempt), order, subjectAdapter, subjectReference };
     }
 
+    async function loadOwnedPaymentSubject(input = {}) {
+        const owner = normalizeOwner(input.owner || {});
+        const attempt = input.attempt || await assertPortFunction(deps.paymentAttemptPort, "findAttemptByIdForOwner")({ attemptId: normalizeId(input.attemptId, "attemptId"), owner });
+        if (!attempt) throw new PaymentOrchestratorError(ERROR_CODES.PAYMENT_EVENT_NOT_FOUND, "Payment attempt was not found.", { stage: "attempt" });
+        const subjectReference = normalizeSubjectReference(attempt);
+        const loaded = await loadOwnedSubject({ subjectReference, owner, transactionContext: input.transactionContext || null });
+        return { attempt: detachAttempt(attempt), subject: loaded.subject, subjectAdapter: loaded.adapter, subjectReference };
+    }
+
     async function retryPayment(input = {}) {
         const { owner, attempt, order, subjectReference } = await loadAttemptForOwner(input, "retryPayment");
         const from = normalizeState(attempt.status);
@@ -717,7 +759,7 @@ function createPaymentOrchestrator(dependencies = {}) {
         const retryInput = {
             subjectType: subjectReference.subjectType,
             subjectId: subjectReference.subjectId,
-            orderId: order.orderId,
+            orderId: subjectReference.subjectType === SUBJECT_TYPES.COMMERCE_ORDER ? order.orderId : "",
             owner,
             idempotencyKey: normalizeString(input.idempotencyKey || `${attempt.attemptId}:retry`),
             traceId: input.traceId
@@ -766,8 +808,7 @@ function createPaymentOrchestrator(dependencies = {}) {
             }
             return applyPaymentStatus({ order, subjectAdapter, attempt: refreshedAttempt, toStatus: result.status, reason: "Payment refreshed", transactionContext });
         });
-        await runPostCommitPaidFulfillment(applied);
-        await runPostCommitPaidSettlement(applied);
+        await runPostCommitPaidEffects(applied);
         return buildPublicResult({ attempt: applied.attempt, order: applied.order, outcome: "refreshed" });
     }
 
@@ -890,8 +931,7 @@ function createPaymentOrchestrator(dependencies = {}) {
                 });
             }
             if (result.status === PAYMENT_STATES.PAID) {
-                await runPostCommitPaidFulfillment({ attempt, order });
-                await runPostCommitPaidSettlement({ attempt, order });
+                await runPostCommitPaidEffects({ attempt, order });
             }
             return buildPublicResult({ attempt, order, idempotent: true, outcome: "event_no_change" });
         }
@@ -934,8 +974,7 @@ function createPaymentOrchestrator(dependencies = {}) {
                 transactionContext
             });
         });
-        await runPostCommitPaidFulfillment(applied);
-        await runPostCommitPaidSettlement(applied);
+        await runPostCommitPaidEffects(applied);
         return buildPublicResult({ attempt: applied.attempt, order: applied.order, outcome: "provider_event_applied" });
     }
 
@@ -952,6 +991,7 @@ function createPaymentOrchestrator(dependencies = {}) {
         expirePayment,
         handleProviderEvent,
         getPaymentResult,
+        loadOwnedPaymentSubject,
         toPublicPaymentResult: value => buildPublicResult(value),
         assertTransition,
         normalizeProviderResult

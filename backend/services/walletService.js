@@ -169,6 +169,13 @@ async function mutateWallet(input = {}, options = {}) {
         return result;
     } catch (error) {
         if (isTransactionUnsupported(error)) {
+            if (options.requireTransaction === true) {
+                throw new WalletError(
+                    "WALLET_TRANSACTION_REQUIRED",
+                    "This wallet operation requires transactional database support.",
+                    503
+                );
+            }
             return mutateWalletWithoutTransaction({
                 ...input,
                 username,

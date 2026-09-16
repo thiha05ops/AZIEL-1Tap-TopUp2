@@ -4,6 +4,7 @@ const crypto = require("crypto");
 const mongoose = require("mongoose");
 const orderRepository = require("./orderRepository");
 const paymentAttemptRepository = require("./paymentAttemptRepository");
+const { settlePaidWalletTopup } = require("../walletTopupSettlementService");
 const { createPaymentOrchestrator, PaymentOrchestratorError } = require("./paymentOrchestrator");
 const { ensurePaidOrderFulfillmentWork } = require("../paidFulfillmentRoutingService");
 const { createProviderRegistry } = require("./providerRegistry");
@@ -261,6 +262,8 @@ function mapPaymentError(error, stage) {
         const map = {
             PAYMENT_FORBIDDEN: [ERROR_CODES.FORBIDDEN, 403],
             PAYMENT_ORDER_NOT_FOUND: [ERROR_CODES.NOT_FOUND, 404],
+            PAYMENT_SUBJECT_NOT_FOUND: [ERROR_CODES.NOT_FOUND, 404],
+            PAYMENT_SUBJECT_UNSUPPORTED: [ERROR_CODES.UNSUPPORTED_PAYMENT_METHOD, 422],
             PAYMENT_NOT_PAYABLE: [ERROR_CODES.INVALID_STATE, 409],
             PAYMENT_PROVIDER_UNSUPPORTED: [ERROR_CODES.UNSUPPORTED_PAYMENT_METHOD, 422],
             PAYMENT_PROVIDER_UNAVAILABLE: [ERROR_CODES.PROVIDER_UNAVAILABLE, 503],
@@ -313,6 +316,8 @@ function toSafePaymentView({ order = {}, attempt = {}, paymentResult = null, adm
     const thunder = [THUNDER_PROVIDER_ID, THUNDER_TRUEWALLET_PROVIDER_ID].includes(normalizeUpper(attempt.provider || source.provider));
     return {
         manualPaymentApplicationVersion: SERVICE_VERSION,
+        subjectType: source.subjectType || attempt.subjectType || (order.orderId ? "COMMERCE_ORDER" : ""),
+        subjectId: source.subjectId || attempt.subjectId || order.topupId || order.orderId || "",
         orderId: order.orderId || source.orderId || attempt.orderId || "",
         attemptId: source.attemptId || attempt.attemptId || "",
         paymentStatus: normalizeString(source.paymentStatus || attempt.status || order.paymentStatus).toLowerCase(),
@@ -393,6 +398,7 @@ function createManualPaymentApplicationService(dependencies = {}) {
         idGenerator: deps.idGenerator,
         logger: deps.logger,
         paidFulfillmentHandler: dependencies.paidFulfillmentHandler || ensurePaidOrderFulfillmentWork,
+        walletTopupSettlementHandler: dependencies.walletTopupSettlementHandler || settlePaidWalletTopup,
         paidFulfillmentFailureRecorder: dependencies.paidFulfillmentFailureRecorder || (async failure => {
             if (typeof deps.commerceOrderRepository.appendOperationalReference !== "function") return null;
             return deps.commerceOrderRepository.appendOperationalReference({
@@ -638,6 +644,112 @@ function createManualPaymentApplicationService(dependencies = {}) {
         }
     }
 
+    async function initiatePayablePayment(input = {}) {
+        try {
+            const owner = normalizeOwner(input.owner || {});
+            const subjectType = normalizeUpper(input.subjectType);
+            const subjectId = assertId(input.subjectId, "subjectId");
+            const result = await orchestrator.initiatePayment({
+                subjectType,
+                subjectId,
+                owner,
+                idempotencyKey: normalizeString(input.idempotencyKey || `payment:${subjectType}:${subjectId}`),
+                traceId: input.traceId
+            });
+            const attempt = await deps.paymentAttemptRepository.findAttemptByIdForOwner({ attemptId: result.attemptId, owner });
+            return toSafePaymentView({ order: { topupId: subjectId }, attempt, paymentResult: result });
+        } catch (error) {
+            throw mapPaymentError(error, "initiate");
+        }
+    }
+
+    async function getPayablePayment(input = {}) {
+        try {
+            const owner = normalizeOwner(input.owner || {});
+            const subjectType = normalizeUpper(input.subjectType);
+            const subjectId = assertId(input.subjectId, "subjectId");
+            const attempt = input.attemptId
+                ? await deps.paymentAttemptRepository.findAttemptByIdForOwner({ attemptId: assertId(input.attemptId, "attemptId"), owner })
+                : await deps.paymentAttemptRepository.findActiveAttemptForSubject({ subjectType, subjectId, owner });
+            if (!attempt || normalizeUpper(attempt.subjectType) !== subjectType || normalizeString(attempt.subjectId) !== subjectId) {
+                throw appError(ERROR_CODES.NOT_FOUND, "Payment attempt was not found.", 404, "attempt");
+            }
+            await orchestrator.loadOwnedPaymentSubject({ attempt, owner });
+            return toSafePaymentView({ order: { topupId: subjectId }, attempt });
+        } catch (error) {
+            throw mapPaymentError(error, "read");
+        }
+    }
+
+    async function attachPayableReceiptEvidence(input = {}) {
+        let receiptBound = false;
+        try {
+            const owner = normalizeOwner(input.owner || {});
+            const subjectType = normalizeUpper(input.subjectType);
+            const subjectId = assertId(input.subjectId, "subjectId");
+            const attemptId = assertId(input.attemptId, "attemptId");
+            const loaded = await orchestrator.loadOwnedPaymentSubject({ attemptId, owner });
+            const attempt = loaded.attempt;
+            if (normalizeUpper(attempt.subjectType) !== subjectType || normalizeString(attempt.subjectId) !== subjectId) {
+                throw appError(ERROR_CODES.NOT_FOUND, "Payment attempt was not found.", 404, "attempt");
+            }
+            if (![THUNDER_PROVIDER_ID, THUNDER_TRUEWALLET_PROVIDER_ID].includes(normalizeUpper(attempt.provider))) {
+                throw appError(ERROR_CODES.UNSUPPORTED_PAYMENT_METHOD, "Receipt attempt is not Thunder verified.", 422, "receipt");
+            }
+            if (normalizeUpper(attempt.status) === "PAID") {
+                return { ...toSafePaymentView({ order: { topupId: subjectId }, attempt }), verificationStatus: "verified", idempotent: true };
+            }
+            if (!ACTIVE_EVIDENCE_STATUSES.has(normalizeUpper(attempt.status))) {
+                throw appError(ERROR_CODES.INVALID_STATE, "Receipt cannot be attached to this payment state.", 409, "receipt");
+            }
+            const evidence = normalizeReceiptEvidence(input.receiptEvidence || input.evidence || {});
+            const binding = await deps.paymentAttemptRepository.attachReceiptEvidence({
+                attemptId, subjectType, subjectId, owner, evidence,
+                changedAt: deps.clock(), returnBindingOutcome: true
+            });
+            receiptBound = binding.evidenceBound !== false;
+            const boundAttempt = binding.attempt || binding;
+            let verifier;
+            if (normalizeUpper(attempt.provider) === THUNDER_PROVIDER_ID) {
+                const config = await deps.thunderPromptPayConfigurationProvider({ intent: { provider: THUNDER_PROVIDER_ID } });
+                verifier = createThunderSlipPaymentService({
+                    paymentAttemptRepository: deps.paymentAttemptRepository,
+                    orderRepository: deps.commerceOrderRepository,
+                    paymentOrchestrator: orchestrator,
+                    thunderClient: dependencies.thunderClient,
+                    thunderClientOptions: dependencies.thunderClientOptions,
+                    decodeSlipQr: dependencies.decodeSlipQr,
+                    receiverBankAccount: config.receivingBankAccount,
+                    clock: deps.clock,
+                    logger: deps.logger
+                });
+            } else {
+                const config = await deps.thunderTrueWalletConfigurationProvider({ intent: { provider: THUNDER_TRUEWALLET_PROVIDER_ID } });
+                verifier = createThunderTrueWalletVerificationService({
+                    paymentAttemptRepository: deps.paymentAttemptRepository,
+                    orderRepository: deps.commerceOrderRepository,
+                    paymentOrchestrator: orchestrator,
+                    thunderClient: dependencies.thunderClient,
+                    thunderClientOptions: dependencies.thunderClientOptions,
+                    receiverAccount: config.receivingAccount,
+                    clock: deps.clock,
+                    logger: deps.logger
+                });
+            }
+            const payment = await verifier.verify({
+                subjectType, subjectId, attemptId, owner,
+                fileBuffer: input.fileBuffer,
+                receiptEvidence: boundAttempt.safeMetadata?.receiptEvidence || evidence,
+                correlationId: input.correlationId
+            });
+            return { ...payment, _receiptUploadDisposition: binding.reusedExisting ? "duplicate_unbound" : "bound" };
+        } catch (error) {
+            if (receiptBound) error.evidenceBound = true;
+            if (error instanceof ThunderSlipPaymentError || error instanceof ThunderTrueWalletVerificationError) throw error;
+            throw mapPaymentError(error, "receipt");
+        }
+    }
+
     async function approveManualPayment(input = {}) {
         try {
             const admin = normalizeAdmin(input.admin || {});
@@ -758,6 +870,9 @@ function createManualPaymentApplicationService(dependencies = {}) {
         getManualPayment,
         resumeOrRetryManualPayment,
         attachReceiptEvidence,
+        initiatePayablePayment,
+        getPayablePayment,
+        attachPayableReceiptEvidence,
         approveManualPayment,
         rejectManualPayment,
         expireManualPayment,

@@ -23,15 +23,15 @@ function verifyFrontendWalletEligibility() {
     includes(file, "method.dynamicQrSupported === true", "Dynamic QR support must preserve wallet eligibility.");
     includes(file, "method.amountPrefillSupported === true", "Amount-prefill support must preserve wallet eligibility.");
     includes(file, "method.receiptUploadEnabled !== false", "Receipt upload must remain required for manual wallet top-up.");
-    includes(file, "method.confirmationMode === \"manual_admin\"", "Manual admin verification must remain the wallet manual dynamic PromptPay mode.");
+    includes(file, "[\"manual_admin\", \"thunder_slip\"].includes(method.confirmationMode)", "Wallet dynamic PromptPay eligibility must support legacy manual admin and typed Thunder verification.");
     includes(file, "if (isManualDynamicPromptPayWalletMethod(method)) return true;", "Manual dynamic PromptPay must bypass the static QR/account requirement.");
     includes(file, "provider === \"omise\"", "Only Omise/provider-auto wallet payments should use the automatic wallet path.");
     notIncludes(file, "provider === \"promptpay\" ||", "Manual PromptPay provider must not force the automatic wallet endpoint.");
     notIncludes(file, "method.includes(\"promptpay\")", "PromptPay display text must not force the automatic wallet endpoint.");
     includes(file, "qrMode: activeCard?.dataset.qrMode", "Wallet selected method must preserve QR mode.");
     includes(file, "bankLaunchers: parseWalletBankLaunchers", "Wallet selected method must preserve bank launcher metadata.");
-    includes(file, "qrMode: data.qrMode || data.method?.qrMode || payment.qrMode", "Wallet manual sheet handoff must pass QR mode.");
-    includes(file, "dynamicQr: data.dynamicQr || data.method?.dynamicQr || null", "Wallet manual sheet handoff must pass generated dynamic QR metadata.");
+    includes(file, "qrMode: typedPayment.qr?.mode || payment.qrMode", "Typed wallet sheet handoff must pass the provider QR mode.");
+    includes(file, "dynamicQr: typedPayment.qr || null", "Typed wallet sheet handoff must pass generated dynamic QR metadata.");
 }
 
 function verifyBackendWalletEligibility() {
@@ -47,6 +47,7 @@ function verifyBackendWalletEligibility() {
     includes(file, "methodPresentation.qrImage = dynamicQr.qrImage", "Wallet manual intent response must use the generated QR image.");
     includes(file, "qrMode: snapshot.qrMode", "Wallet manual intent response must expose QR mode.");
     includes(file, "dynamicQr: snapshot.dynamicQr", "Wallet manual intent response must expose dynamic QR metadata.");
+    includes(file, "router.post(\"/wallet/topups/:topupId/payment-attempts\"", "Typed wallet top-ups must initiate through PaymentAttempt.");
 }
 
 function verifySnapshotPersistenceAndCheckoutCompatibility() {

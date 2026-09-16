@@ -31,11 +31,14 @@ function createThunderSlipPaymentService(dependencies = {}) {
 
     async function verify(input = {}) {
         const owner = input.owner || {};
-        const diagnostic = { correlationId: input.correlationId || "", orderTag: diagnosticTag(input.orderId), attemptTag: diagnosticTag(input.attemptId) };
+        const diagnostic = { correlationId: input.correlationId || "", orderTag: diagnosticTag(input.subjectId || input.orderId), attemptTag: diagnosticTag(input.attemptId) };
         const diag = (event, fields = {}, level = "info") => logThunderDiagnostic(logger, event, { ...diagnostic, ...fields }, level);
         const attempt = await attempts.findAttemptByIdForOwner({ attemptId: text(input.attemptId), owner });
-        const order = await orders.findOwnedOrderById({ orderId: text(input.orderId), owner });
-        if (!attempt || !order || attempt.orderId !== order.orderId) fail("THUNDER_PAYMENT_NOT_FOUND", "Payment attempt was not found.", { httpStatus: 404 });
+        let order;
+        if (attempt && typeof orchestrator.loadOwnedPaymentSubject === "function") order = (await orchestrator.loadOwnedPaymentSubject({ attempt, owner })).subject;
+        else order = await orders.findOwnedOrderById({ orderId: text(input.orderId), owner });
+        const subjectId = text(attempt?.subjectId || attempt?.orderId);
+        if (!attempt || !order || subjectId !== text(order.topupId || order.orderId)) fail("THUNDER_PAYMENT_NOT_FOUND", "Payment attempt was not found.", { httpStatus: 404 });
         if (upper(attempt.provider) !== PROVIDER || text(attempt.confirmationMode) !== "thunder_slip") fail("THUNDER_FLOW_REQUIRED", "This payment does not support automatic slip verification.");
         if (upper(attempt.status) === "PAID") return { ...(await orchestrator.getPaymentResult({ attemptId: attempt.attemptId, owner })), verificationStatus: "verified", idempotent: true };
         if (!["PENDING", "INITIATING"].includes(upper(attempt.status))) fail("THUNDER_PAYMENT_INACTIVE", "This payment attempt is no longer active.", { httpStatus: 409 });
@@ -53,7 +56,7 @@ function createThunderSlipPaymentService(dependencies = {}) {
             fail(error.code || "THUNDER_QR_DECODE_FAILED", error.message || "The slip QR code could not be read.", { evidenceBound: true });
         }
         let response;
-        try { response = await client.verifyBank({ payload, remark: text(order.orderId).slice(0, 60), matchAmount: Number(attempt.amount), ...diagnostic }); }
+        try { response = await client.verifyBank({ payload, remark: subjectId.slice(0, 60), matchAmount: Number(attempt.amount), ...diagnostic }); }
         catch (error) {
             diag("THUNDER_VERIFICATION_CLASSIFIED", { azielErrorCode: error.code || "THUNDER_UNAVAILABLE", providerErrorCode: error.providerCode, retryable: error.retryable === true }, "warn");
             fail(error.code || "THUNDER_UNAVAILABLE", error.message || "Payment verification is temporarily unavailable.", { retryable: error.retryable === true, evidenceBound: true, httpStatus: error.retryable ? 503 : 422 });

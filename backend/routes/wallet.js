@@ -54,6 +54,9 @@ const {
 } = require("../services/paginationService");
 const { formatPaymentMethod } = require("../services/paymentDisplayNameService");
 const { createPromptPayQr } = require("../services/promptPayQrService");
+const { createAuthoritativeTopup, WalletTopupApplicationError } = require("../services/walletTopupApplicationService");
+const { createManualPaymentApplicationService, ManualPaymentApplicationError } = require("../services/commerce/manualPaymentApplicationService");
+const { settlePaidWalletTopup } = require("../services/walletTopupSettlementService");
 const {
     startCustomerWalletCheckout,
     CustomerWalletCheckoutError
@@ -138,7 +141,7 @@ function isManualDynamicPromptPayMethod(method = {}) {
         method.dynamicQrSupported === true &&
         method.amountPrefillSupported === true &&
         method.receiptUploadEnabled !== false &&
-        method.confirmationMode === "manual_admin"
+        ["manual_admin", "thunder_slip"].includes(method.confirmationMode)
     );
 }
 
@@ -219,18 +222,69 @@ function assertManualIntentUsable(intent) {
 }
 
 function createPaymentSnapshot(methodPresentation = {}) {
+    const confirmationMode = String(methodPresentation.confirmationMode || "").trim();
+    const provider = confirmationMode === "thunder_truewallet_slip"
+        ? "THUNDER_TRUEWALLET"
+        : confirmationMode === "thunder_slip"
+            ? "THUNDER_PROMPTPAY"
+            : methodPresentation.provider || "";
     return {
         method: formatPaymentMethod(methodPresentation, methodPresentation.method || "Payment"),
         key: methodPresentation.key || "",
         region: methodPresentation.region || "",
         paymentType: methodPresentation.paymentType || "",
-        provider: methodPresentation.provider || "",
+        provider,
+        providerType: methodPresentation.providerType || methodPresentation.paymentType || "",
+        paymentChannel: methodPresentation.paymentChannel || "",
+        confirmationMode: methodPresentation.confirmationMode || "",
+        paymentMethodId: methodPresentation.key || "",
         accountName: methodPresentation.accountName || "",
         accountNumber: methodPresentation.accountNumber || "",
         qrImage: methodPresentation.qrImage || "",
         qrMode: methodPresentation.qrMode || "",
         dynamicQr: methodPresentation.dynamicQr || null
     };
+}
+
+function typedWalletOwner(req) {
+    return { userId: String(req.user?._id || req.user?.id || "").trim() };
+}
+
+function projectTypedTopup(topup = {}) {
+    const item = typeof topup.toObject === "function" ? topup.toObject() : topup;
+    return {
+        topupId: item.topupId,
+        amount: Number(item.amount),
+        currency: item.currency,
+        region: item.region,
+        paymentMethod: item.paymentMethod,
+        paymentStatus: item.paymentStatus,
+        settlementStatus: item.settlementStatus,
+        status: item.status,
+        paymentAttemptId: item.paymentAttemptId || "",
+        walletTransactionId: item.walletTransactionId || "",
+        creditedAt: item.creditedAt || null,
+        createdAt: item.createdAt || null
+    };
+}
+
+function sendTypedTopupError(res, error) {
+    const status = error instanceof WalletTopupApplicationError
+        ? error.statusCode
+        : error instanceof ManualPaymentApplicationError
+            ? error.httpStatus
+            : Number(error?.statusCode || error?.httpStatus || 500);
+    return res.status(status).json({
+        success: false,
+        code: error?.code || "WALLET_TOPUP_FAILED",
+        message: status >= 500 ? "Wallet top-up operation failed." : error.message
+    });
+}
+
+let typedWalletPaymentService;
+function getTypedWalletPaymentService() {
+    if (!typedWalletPaymentService) typedWalletPaymentService = createManualPaymentApplicationService();
+    return typedWalletPaymentService;
 }
 
 async function resolveWalletPaymentMethod({ paymentMethod, region, currency }) {
@@ -595,6 +649,98 @@ async function createWalletNotification(req, topup, title, message, type = "wall
 // CREATE WALLET TOPUP
 // POST /api/wallet/create
 // ======================
+
+router.post("/wallet/topups", authMiddleware, async (req, res) => {
+    try {
+        const resolved = await resolveWalletPaymentMethod({ paymentMethod: req.body?.paymentMethod, region: "TH", currency: "THB" });
+        if (!["thunder_slip", "thunder_truewallet_slip"].includes(String(resolved.method.confirmationMode || ""))) {
+            const error = new Error("Selected payment method is not available for verified wallet top-up.");
+            error.statusCode = 422;
+            throw error;
+        }
+        const presentation = projectWalletPaymentMethod(resolved.method);
+        const result = await createAuthoritativeTopup({
+            amount: req.body?.amount,
+            paymentMethod: resolved.method.key,
+            paymentProvider: createPaymentSnapshot({ ...presentation, ...resolved.method }).provider,
+            paymentSnapshot: createPaymentSnapshot({ ...presentation, ...resolved.method })
+        }, {
+            user: req.user,
+            idempotencyKey: req.headers["idempotency-key"]
+        });
+        return res.status(result.idempotent ? 200 : 201).json({ success: true, idempotent: result.idempotent, topup: projectTypedTopup(result.topup) });
+    } catch (error) {
+        return sendTypedTopupError(res, error);
+    }
+});
+
+router.post("/wallet/topups/:topupId/payment-attempts", authMiddleware, async (req, res) => {
+    try {
+        const payment = await getTypedWalletPaymentService().initiatePayablePayment({
+            subjectType: "WALLET_TOPUP",
+            subjectId: req.params.topupId,
+            owner: typedWalletOwner(req),
+            idempotencyKey: req.headers["idempotency-key"],
+            traceId: req.headers["x-request-id"]
+        });
+        return res.status(201).json({ success: true, payment });
+    } catch (error) {
+        return sendTypedTopupError(res, error);
+    }
+});
+
+router.post("/wallet/topups/:topupId/payment-attempts/:attemptId/receipt", authMiddleware, upload.single("slip"), async (req, res) => {
+    let uploaded = null;
+    try {
+        if (!req.file) return res.status(400).json({ success: false, code: "WALLET_TOPUP_RECEIPT_REQUIRED", message: "Payment receipt is required." });
+        uploaded = await uploadFile({ file: req.file, category: "paymentSlip", ownerReference: req.params.attemptId });
+        const evidence = {
+            receiptId: `RCP-${Date.now()}-${crypto.randomBytes(5).toString("hex")}`,
+            fileReference: uploaded.url || uploaded.key,
+            storageProvider: uploaded.provider,
+            storageKey: uploaded.key,
+            mimeType: uploaded.mimeType,
+            fileSize: uploaded.size,
+            checksum: crypto.createHash("sha256").update(req.file.buffer).digest("hex"),
+            uploadedAt: new Date().toISOString()
+        };
+        const payment = await getTypedWalletPaymentService().attachPayableReceiptEvidence({
+            subjectType: "WALLET_TOPUP",
+            subjectId: req.params.topupId,
+            attemptId: req.params.attemptId,
+            owner: typedWalletOwner(req),
+            receiptEvidence: evidence,
+            fileBuffer: req.file.buffer,
+            correlationId: req.headers["x-request-id"]
+        });
+        return res.json({ success: true, payment });
+    } catch (error) {
+        if (uploaded && error?.evidenceBound !== true) await cleanupAfterFailedPersistence(uploaded).catch(() => null);
+        return sendTypedTopupError(res, error);
+    }
+});
+
+router.get("/wallet/topups/:topupId", authMiddleware, async (req, res) => {
+    try {
+        const ownerId = typedWalletOwner(req).userId;
+        let topup = await WalletTopup.findOne({ topupId: req.params.topupId, customerUserId: ownerId });
+        if (!topup) return res.status(404).json({ success: false, code: "WALLET_TOPUP_NOT_FOUND", message: "Wallet top-up was not found." });
+        if (topup.paymentAttemptId && topup.paymentStatus === "paid" && topup.settlementStatus !== "credited") {
+            await settlePaidWalletTopup({ attemptId: topup.paymentAttemptId, topupId: topup.topupId }).catch(() => null);
+            topup = await WalletTopup.findOne({ topupId: req.params.topupId, customerUserId: ownerId });
+        }
+        let payment = null;
+        if (topup.paymentAttemptId) {
+            payment = await getTypedWalletPaymentService().getPayablePayment({
+                subjectType: "WALLET_TOPUP", subjectId: topup.topupId,
+                attemptId: topup.paymentAttemptId, owner: typedWalletOwner(req)
+            });
+        }
+        return res.json({ success: true, topup: projectTypedTopup(topup), payment });
+    } catch (error) {
+        return sendTypedTopupError(res, error);
+    }
+});
 
 router.post("/wallet/create", authMiddleware, async (req, res) => {
     try {

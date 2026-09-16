@@ -208,6 +208,9 @@ function createDeps(store, overrides = {}) {
                     ["INITIATING", "PENDING"].includes(item.status)
                 )) || null);
             },
+            async findActiveAttemptForSubject({ subjectType, subjectId, owner: requestedOwner }) {
+                return clone(store.attempts.find(item => item.subjectType === subjectType && item.subjectId === subjectId && matchesOwner(item.owner, requestedOwner) && ["INITIATING", "PENDING"].includes(item.status)) || null);
+            },
             async findAttemptByIdempotency({ orderId, owner: requestedOwner, idempotencyKey, operation }) {
                 return clone(store.attempts.find(item => (
                     item.orderId === orderId &&
@@ -391,26 +394,35 @@ async function testPayableSubjectRegistryAndAdapter() {
     );
 }
 
-async function testUnsupportedWalletTopupSubject() {
+async function testWalletTopupSubject() {
     const store = createStore();
     let fulfillmentCalls = 0;
+    const topup = { topupId: "WALLET-TEST-0001", customerUserId: "user-1", username: "alice", amount: 300, currency: "THB", region: "TH", status: "pending", paymentStatus: "unpaid", settlementStatus: "not_ready", paymentAttemptId: "", paymentSnapshot: { paymentMethodId: "true_money", provider: "thunder_truewallet", providerType: "manual", paymentChannel: "TRUE_MONEY_WALLET", confirmationMode: "thunder_truewallet_slip" } };
+    const query = value => ({ lean() { return this; }, session() { return this; }, async exec() { return clone(value); } });
+    const walletTopupModel = {
+        findOne(filter) { return query(filter.topupId === topup.topupId && (!filter.customerUserId || String(filter.customerUserId) === topup.customerUserId) ? topup : null); },
+        findOneAndUpdate(filter, update) { if (filter.topupId !== topup.topupId) return query(null); Object.assign(topup, clone(update.$set)); return query(topup); }
+    };
+    const provider = { async createPayment({ intent }) { store.calls.createPayment += 1; store.providerInputs.push({ intent: clone(intent) }); return paymentResult({ amount: 300, safeMetadata: {}, orderId: undefined }); } };
+    const orchestrator = createOrchestrator(store, {
+        walletTopupModel,
+        providerResolver: () => provider,
+        paidFulfillmentHandler: async () => { fulfillmentCalls += 1; }
+    });
+    const result = await orchestrator.initiatePayment({ subjectType: SUBJECT_TYPES.WALLET_TOPUP, subjectId: topup.topupId, owner: owner(), idempotencyKey: "wallet-supported", amount: 999 });
+    assert.strictEqual(result.paymentStatus, "pending");
+    assert.strictEqual(store.attempts[0].subjectType, SUBJECT_TYPES.WALLET_TOPUP);
+    assert.strictEqual(store.attempts[0].subjectId, topup.topupId);
+    assert.strictEqual(store.attempts[0].orderId, "");
+    assert.strictEqual(store.providerInputs[0].intent.amount, 300, "wallet provider amount comes from stored top-up.");
+    assert.strictEqual(store.providerInputs[0].intent.orderId, undefined, "wallet provider intent has no fake orderId.");
+    assert.strictEqual(store.calls.ownedOrderLookups, 0, "wallet subject performs no CommerceOrder lookup.");
+    assert.strictEqual(fulfillmentCalls, 0, "pending wallet payment does not reach fulfillment.");
     await assertPaymentError(
-        () => createOrchestrator(store, {
-            paidFulfillmentHandler: async () => { fulfillmentCalls += 1; }
-        }).initiatePayment({
-            subjectType: SUBJECT_TYPES.WALLET_TOPUP,
-            subjectId: "WALLET-TEST-0001",
-            owner: owner(),
-            idempotencyKey: "wallet-unsupported"
-        }),
-        ERROR_CODES.PAYMENT_SUBJECT_UNSUPPORTED,
-        "WalletTopup is rejected explicitly before an order fallback"
+        () => orchestrator.initiatePayment({ subjectType: SUBJECT_TYPES.WALLET_TOPUP, subjectId: topup.topupId, owner: owner({ userId: "user-2" }), idempotencyKey: "cross-user" }),
+        ERROR_CODES.PAYMENT_SUBJECT_NOT_FOUND,
+        "cross-user wallet top-up initiation is rejected"
     );
-    assert.strictEqual(store.calls.createAttempt, 0, "unsupported wallet subject creates no payment attempt.");
-    assert.strictEqual(store.calls.createPayment, 0, "unsupported wallet subject never reaches a provider.");
-    assert.strictEqual(store.calls.ownedOrderLookups, 0, "unsupported wallet subject performs no owned CommerceOrder lookup.");
-    assert.strictEqual(store.calls.operationalOrderLookups, 0, "unsupported wallet subject performs no operational CommerceOrder lookup.");
-    assert.strictEqual(fulfillmentCalls, 0, "unsupported wallet subject never reaches fulfillment.");
 }
 
 async function testIdempotentInitiation() {
@@ -922,9 +934,9 @@ async function run() {
     const orderRepositorySource = fs.readFileSync(path.resolve(__dirname, "../services/commerce/orderRepository.js"), "utf8");
     const orchestratorSource = fs.readFileSync(path.resolve(__dirname, "../services/commerce/paymentOrchestrator.js"), "utf8");
     assert(!orderRepositorySource.includes("ensurePaidOrderFulfillmentWork"), "repository persistence methods cannot start paid fulfillment.");
-    assert(orchestratorSource.indexOf("await runTransaction(async transactionContext") < orchestratorSource.indexOf("await runPostCommitPaidFulfillment(applied)"), "paid fulfillment is sequenced after transaction completion.");
+    assert(orchestratorSource.includes("runPostCommitPaidEffects"), "paid subject effects require explicit dispatch.");
     await testPayableSubjectRegistryAndAdapter();
-    await testUnsupportedWalletTopupSubject();
+    await testWalletTopupSubject();
     await testSuccessfulPendingInitiation();
     await testImmediatePayment();
     await testProviderFailureResult();

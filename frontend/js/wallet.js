@@ -14,6 +14,7 @@ let walletHistoryPagination = {
 let walletHistoryVisibleCount = 10;
 let walletPaymentMethods = [];
 let activeWalletManualIntent = null;
+let walletTopupCreationRequest = { fingerprint: "", key: "" };
 
 /*
  * Wallet page async authority.
@@ -281,7 +282,7 @@ function isManualDynamicPromptPayWalletMethod(method = {}) {
         method.dynamicQrSupported === true &&
         method.amountPrefillSupported === true &&
         method.receiptUploadEnabled !== false &&
-        method.confirmationMode === "manual_admin";
+        ["manual_admin", "thunder_slip"].includes(method.confirmationMode);
 }
 
 async function loadWalletPaymentMethods() {
@@ -903,21 +904,25 @@ async function submitTopup() {
         }
 
         showLoading(true);
-        const isPromptPay = isPromptPayPayment(payment);
-
-        const endpoint = isPromptPay
-            ? "/api/wallet/create"
-            : "/api/wallet/manual-intent";
-        const res = await fetch(walletApiUrl(endpoint), {
+        if (region !== "TH") {
+            await submitLegacyWalletTopup({ user, amount, payment, paymentMethod, provider, currency, region });
+            return;
+        }
+        const creationFingerprint = `${amount}:${paymentMethod}`;
+        if (walletTopupCreationRequest.fingerprint !== creationFingerprint) {
+            walletTopupCreationRequest = {
+                fingerprint: creationFingerprint,
+                key: `wallet-topup:${Date.now()}:${Math.random().toString(16).slice(2)}`
+            };
+        }
+        const creationKey = walletTopupCreationRequest.key;
+        const res = await fetch(walletApiUrl("/api/wallet/topups"), {
             method: "POST",
-            headers: AZIEL.authHeaders?.({ "Content-Type": "application/json" }) || {
-                "Content-Type": "application/json"
+            headers: AZIEL.authHeaders?.({ "Content-Type": "application/json", "Idempotency-Key": creationKey }) || {
+                "Content-Type": "application/json", "Idempotency-Key": creationKey
             },
             body: JSON.stringify({
-                username: user.username,
                 amount,
-                currency,
-                region,
                 paymentMethod
             })
         });
@@ -929,46 +934,47 @@ async function submitTopup() {
             return;
         }
 
-        if (isPromptPay) {
-            openWalletQrModal(data, {
-                amount,
-                currency,
-                paymentMethod: "promptpay"
-            });
-
-            startPaymentStatusPolling(data.topupId);
-            await loadWallet();
-        } else {
-            openWalletManualModal(data, {
-                amount,
-                currency,
-                paymentMethod: data.paymentName || payment.method,
-                provider: data.provider || provider,
-                accountName: data.accountName || payment.accountName,
-                accountNumber: data.accountNumber || payment.accountNumber,
-                qrImage: data.qrImage || data.qrUrl || payment.qrImage,
-                slipRequired: data.slipRequired !== false,
-                deepLink: data.deepLinkUrl || data.deepLink || data.method?.deepLink || data.method?.deepLinkUrl || payment.deepLink,
-                appDisplayName: data.appDisplayName || data.method?.appDisplayName || payment.appDisplayName,
-                appStoreUrl: data.appStoreUrl || data.method?.appStoreUrl || payment.appStoreUrl,
-                playStoreUrl: data.playStoreUrl || data.method?.playStoreUrl || payment.playStoreUrl,
-                appStoreFallbackUrl: data.appStoreFallbackUrl || data.method?.appStoreFallbackUrl || payment.appStoreFallbackUrl,
-                playStoreFallbackUrl: data.playStoreFallbackUrl || data.method?.playStoreFallbackUrl || payment.playStoreFallbackUrl,
-                enableSaveQr: data.enableSaveQr === true || data.method?.enableSaveQr === true || payment.enableSaveQr === true,
-                enableOpenApp: data.enableOpenApp === true || data.method?.enableOpenApp === true || payment.enableOpenApp === true,
-                enableChecklist: data.enableChecklist === true || data.method?.enableChecklist === true || payment.enableChecklist === true,
-                checklistSteps: data.checklistSteps || data.method?.checklistSteps || payment.checklistSteps || [],
-                qrMode: data.qrMode || data.method?.qrMode || payment.qrMode,
-                dynamicQr: data.dynamicQr || data.method?.dynamicQr || null,
-                openAppMode: data.openAppMode || data.method?.openAppMode || payment.openAppMode,
-                appLaunchMode: data.appLaunchMode || data.method?.appLaunchMode || payment.appLaunchMode,
-                iosAppLaunchUrl: data.iosAppLaunchUrl || data.method?.iosAppLaunchUrl || payment.iosAppLaunchUrl,
-                androidAppLaunchUrl: data.androidAppLaunchUrl || data.method?.androidAppLaunchUrl || payment.androidAppLaunchUrl,
-                androidPackageName: data.androidPackageName || data.method?.androidPackageName || payment.androidPackageName,
-                bankLaunchers: data.bankLaunchers || data.method?.bankLaunchers || payment.bankLaunchers || [],
-                method: data.method || payment
-            });
+        const topup = data.topup;
+        const attemptRes = await fetch(walletApiUrl(`/api/wallet/topups/${encodeURIComponent(topup.topupId)}/payment-attempts`), {
+            method: "POST",
+            headers: AZIEL.authHeaders?.({ "Content-Type": "application/json", "Idempotency-Key": `wallet-payment:${topup.topupId}` }) || {
+                "Content-Type": "application/json", "Idempotency-Key": `wallet-payment:${topup.topupId}`
+            },
+            body: "{}"
+        });
+        const attemptData = await attemptRes.json().catch(() => ({}));
+        if (!attemptRes.ok || attemptData.success === false) {
+            showWalletToast(attemptData.message || wt("walletCreateFailed", "Create wallet payment failed."), "error");
+            return;
         }
+        const typedPayment = attemptData.payment || {};
+        openWalletManualModal({
+            ...typedPayment,
+            topupId: topup.topupId,
+            intentId: typedPayment.attemptId,
+            expiresAt: typedPayment.expiresAt,
+            qrImage: typedPayment.qr?.image || "",
+            qrMode: typedPayment.qr?.mode || payment.qrMode,
+            dynamicQr: typedPayment.qr || null
+        }, {
+                amount,
+                currency,
+                paymentMethod: payment.method,
+                provider: typedPayment.provider || provider,
+                accountName: typedPayment.paymentInstructions?.accountName || payment.accountName,
+                accountNumber: typedPayment.paymentInstructions?.accountNumber || payment.accountNumber,
+                qrImage: typedPayment.qr?.image || payment.qrImage,
+                slipRequired: true,
+                enableSaveQr: payment.enableSaveQr === true,
+                enableOpenApp: payment.enableOpenApp === true,
+                enableChecklist: payment.enableChecklist === true,
+                checklistSteps: payment.checklistSteps || [],
+                qrMode: typedPayment.qr?.mode || payment.qrMode,
+                dynamicQr: typedPayment.qr || null,
+                method: payment,
+                topupId: topup.topupId,
+                attemptId: typedPayment.attemptId
+        });
 
     } catch (error) {
         console.log("Wallet create error:", error);
@@ -985,6 +991,42 @@ async function submitTopup() {
             updateTopupButtonByMethod();
         }
     }
+}
+
+async function submitLegacyWalletTopup({ user, amount, payment, paymentMethod, provider, currency, region }) {
+    const promptPay = isPromptPayPayment(payment);
+    const endpoint = promptPay ? "/api/wallet/create" : "/api/wallet/manual-intent";
+    const res = await fetch(walletApiUrl(endpoint), {
+        method: "POST",
+        headers: AZIEL.authHeaders?.({ "Content-Type": "application/json" }) || { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: user.username, amount, currency, region, paymentMethod })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.success === false) throw new Error(data.message || "Create wallet payment failed.");
+    if (promptPay) {
+        openWalletQrModal(data, { amount, currency, paymentMethod });
+        startPaymentStatusPolling(data.topupId);
+        await loadWallet();
+        return;
+    }
+    openWalletManualModal(data, {
+        amount,
+        currency,
+        paymentMethod: data.paymentName || payment.method,
+        provider: data.provider || provider,
+        accountName: data.accountName || payment.accountName,
+        accountNumber: data.accountNumber || payment.accountNumber,
+        qrImage: data.qrImage || data.qrUrl || payment.qrImage,
+        slipRequired: data.slipRequired !== false,
+        deepLink: data.deepLinkUrl || payment.deepLink,
+        enableSaveQr: data.enableSaveQr === true || payment.enableSaveQr === true,
+        enableOpenApp: data.enableOpenApp === true || payment.enableOpenApp === true,
+        enableChecklist: data.enableChecklist === true || payment.enableChecklist === true,
+        checklistSteps: data.checklistSteps || payment.checklistSteps || [],
+        qrMode: data.qrMode || payment.qrMode,
+        dynamicQr: data.dynamicQr || null,
+        method: data.method || payment
+    });
 }
 
 function openWalletQrModal(data, info) {
@@ -1033,6 +1075,8 @@ function openWalletManualModal(data, info) {
         intentId,
         reference,
         expiresAt: data.expiresAt || "",
+        topupId: info.topupId || data.topupId || "",
+        attemptId: info.attemptId || data.attemptId || intentId,
         amount: info.amount,
         currency: info.currency,
         method: appName
@@ -1049,6 +1093,7 @@ function openWalletManualModal(data, info) {
         qrImageUrl: qrImage,
         qrMode: info.qrMode || "",
         dynamicQr: info.dynamicQr || null,
+        expiresAt: data.expiresAt || "",
         instructions: wt("wallet.transferInstructions", "Transfer the exact amount, then upload the payment receipt."),
         requiresSlip: slipRequired,
         deepLink,
@@ -1072,9 +1117,13 @@ function openWalletManualModal(data, info) {
         onSubmit: async ({ file, setMessage, close }) => {
             const formData = new FormData();
             formData.append("slip", file);
-            formData.append("intentId", intentId);
-
-            const res = await fetch(walletApiUrl(`/api/wallet/manual-intent/${encodeURIComponent(intentId)}/slip`), {
+            const topupId = info.topupId || data.topupId;
+            const attemptId = info.attemptId || data.attemptId || intentId;
+            const receiptUrl = topupId && attemptId
+                ? `/api/wallet/topups/${encodeURIComponent(topupId)}/payment-attempts/${encodeURIComponent(attemptId)}/receipt`
+                : `/api/wallet/manual-intent/${encodeURIComponent(intentId)}/slip`;
+            if (!topupId) formData.append("intentId", intentId);
+            const res = await fetch(walletApiUrl(receiptUrl), {
                 method: "POST",
                 headers: AZIEL.authHeaders?.() || {},
                 body: formData
@@ -1086,6 +1135,11 @@ function openWalletManualModal(data, info) {
                 return false;
             }
 
+            if (topupId) {
+                await fetch(walletApiUrl(`/api/wallet/topups/${encodeURIComponent(topupId)}`), {
+                    headers: AZIEL.authHeaders?.() || {}
+                }).catch(() => null);
+            }
             showWalletToast(wt("wallet.receiptSubmitted", "Payment receipt submitted for verification."), "success");
             await loadWallet();
             close("submitted");
@@ -1432,6 +1486,7 @@ function resetTopupForm() {
 
     if (amount) amount.value = "";
     if (method) method.value = "";
+    walletTopupCreationRequest = { fingerprint: "", key: "" };
 
     quickBtns.forEach(btn => btn.classList.remove("active"));
     payCards.forEach(card => card.classList.remove("active"));

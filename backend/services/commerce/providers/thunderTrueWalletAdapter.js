@@ -68,7 +68,7 @@ function createThunderTrueWalletAdapter(options = {}) {
         if (!trueMoneyQrTemplate) {
             throw new ProviderAdapterError(ERROR_CODES.PAYMENT_PROVIDER_CONFIGURATION_INVALID, "TrueMoney Wallet QR template is not configured.", { stage: "configuration" });
         }
-        const providerReference = `AZL-TMW-${text(intent.orderId)}-${text(attempt.attemptId)}`.replace(/[^A-Za-z0-9-]/g, "-").slice(0, 95);
+        const providerReference = `AZL-TMW-${text(intent.subjectId || intent.orderId)}-${text(attempt.attemptId)}`.replace(/[^A-Za-z0-9-]/g, "-").slice(0, 95);
         let qrResult;
         try {
             qrResult = await qrService({

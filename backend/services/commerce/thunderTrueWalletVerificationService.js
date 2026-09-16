@@ -61,13 +61,21 @@ function createThunderTrueWalletVerificationService(dependencies = {}) {
 
     async function verify(input = {}) {
         const owner = input.owner || {};
-        const diagnostic = { correlationId: input.correlationId || "", orderTag: diagnosticTag(input.orderId), attemptTag: diagnosticTag(input.attemptId) };
+        const diagnostic = { correlationId: input.correlationId || "", orderTag: diagnosticTag(input.subjectId || input.orderId), attemptTag: diagnosticTag(input.attemptId) };
         const diag = (event, fields = {}, level = "info") => logThunderDiagnostic(logger, event, { ...diagnostic, ...fields }, level);
         const attempt = await attempts.findAttemptByIdForOwner({ attemptId: text(input.attemptId), owner });
-        const order = await orders.findOwnedOrderById({ orderId: text(input.orderId), owner });
-        if (!attempt || !order || text(attempt.orderId) !== text(order.orderId)) fail("TRUEWALLET_PAYMENT_NOT_FOUND", "Payment attempt was not found.", { httpStatus: 404 });
+        let order;
+        if (attempt && typeof orchestrator.loadOwnedPaymentSubject === "function") {
+            order = (await orchestrator.loadOwnedPaymentSubject({ attempt, owner })).subject;
+        } else {
+            order = await orders.findOwnedOrderById({ orderId: text(input.orderId), owner });
+        }
+        const subjectId = text(attempt?.subjectId || attempt?.orderId);
+        const loadedSubjectId = text(order?.topupId || order?.orderId);
+        if (!attempt || !order || subjectId !== loadedSubjectId) fail("TRUEWALLET_PAYMENT_NOT_FOUND", "Payment attempt was not found.", { httpStatus: 404 });
         if (upper(attempt.provider) !== THUNDER_TRUEWALLET_PROVIDER_ID || text(attempt.confirmationMode) !== "thunder_truewallet_slip") fail("TRUEWALLET_FLOW_REQUIRED", "This payment does not support TrueMoney verification.");
-        if (upper(attempt.status) !== "PENDING" || text(order.status).toLowerCase() !== "pending_payment" || text(order.paymentStatus || order.payment?.status).toLowerCase() !== "pending") {
+        const walletSubject = upper(attempt.subjectType) === "WALLET_TOPUP";
+        if (upper(attempt.status) !== "PENDING" || (!walletSubject && (text(order.status).toLowerCase() !== "pending_payment" || text(order.paymentStatus || order.payment?.status).toLowerCase() !== "pending")) || (walletSubject && text(order.paymentStatus).toLowerCase() !== "pending")) {
             fail("TRUEWALLET_PAYMENT_INACTIVE", "This payment attempt is no longer eligible for verification.", { httpStatus: 409, evidenceBound: true });
         }
         if (attempt.expiresAt && new Date(attempt.expiresAt).getTime() <= clock().getTime()) {
@@ -84,7 +92,7 @@ function createThunderTrueWalletVerificationService(dependencies = {}) {
         try {
             response = await client.verifyTrueWallet({
                 base64: input.fileBuffer.toString("base64"),
-                remark: `AZIEL ${text(order.orderId)} ${text(attempt.attemptId)}`.slice(0, 100),
+                remark: `AZIEL ${subjectId} ${text(attempt.attemptId)}`.slice(0, 100),
                 matchAmount: attempt.amount,
                 ...diagnostic
             });

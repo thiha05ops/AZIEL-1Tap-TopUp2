@@ -36,9 +36,9 @@ function verifyWalletFrontendOwnership() {
     includes(file, "String(method.maintenanceMessage", "Wallet frontend must respect maintenance state.");
     includes(file, "provider === \"wallet\"", "Wallet frontend must prevent AZIEL Wallet self-funding.");
     includes(file, "paymentMethod", "Wallet must submit selected method code.");
-    includes(file, "data.qrImage || data.qrUrl || payment.qrImage", "Wallet manual modal must render canonical QR image.");
-    includes(file, "data.accountName || payment.accountName", "Wallet manual modal must use backend/account presentation.");
-    includes(file, "data.accountNumber || payment.accountNumber", "Wallet manual modal must use backend/account presentation.");
+    includes(file, "typedPayment.qr?.image || payment.qrImage", "Wallet checkout sheet must render the authoritative provider QR image.");
+    includes(file, "typedPayment.paymentInstructions?.accountName || payment.accountName", "Wallet checkout sheet must use backend/account presentation.");
+    includes(file, "typedPayment.paymentInstructions?.accountNumber || payment.accountNumber", "Wallet checkout sheet must use backend/account presentation.");
     includes(file, "slipRequired", "Wallet modal must respect canonical slip requirement.");
     includes(file, "deepLink", "Wallet Open App must depend on configured deep link.");
     notMatches(file, /APP_OPEN_METHODS|getWalletDeepLink|wavepay:\/\/|kbzpay:\/\/|ayapay:\/\/|scbeasy:\/\//, "Wallet frontend must not invent app deep links.");

@@ -36,7 +36,7 @@ function createThunderPromptPayAdapter(options = {}) {
     });
     async function createPayment({ intent = {}, attempt = {} } = {}) {
         if (text(intent.currency).toUpperCase() !== "THB" || !(Number(intent.amount) > 0)) throw error("Thunder PromptPay requires a positive THB amount.", "amount");
-        const providerReference = `AZL-${text(intent.orderId)}-${text(attempt.attemptId)}`.replace(/[^A-Za-z0-9-]/g, "-").slice(0, 95);
+        const providerReference = `AZL-${text(intent.subjectId || intent.orderId)}-${text(attempt.attemptId)}`.replace(/[^A-Za-z0-9-]/g, "-").slice(0, 95);
         const qrResult = await qrService({ method: { key: "commerce_thunder_promptpay", promptPayRecipientType: config.recipientType, promptPayRecipientValue: config.recipientValue, dynamicQrExpiryMinutes: config.expiryMinutes }, amount: Number(intent.amount), currency: "THB", orderReference: providerReference });
         return {
             ...base(intent, { ...attempt, providerReference }, "PENDING"),

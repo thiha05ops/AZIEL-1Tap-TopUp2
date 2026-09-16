@@ -25,7 +25,8 @@ const walletTopupSchema = new mongoose.Schema({
     customerUserId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
-        default: null
+        default: null,
+        immutable: true
     },
 
     amount: {
@@ -52,6 +53,27 @@ const walletTopupSchema = new mongoose.Schema({
         type: String,
         default: ""
     },
+
+    paymentAttemptId: { type: String, trim: true, default: "" },
+    paymentStatus: {
+        type: String,
+        enum: ["unpaid", "initiating", "pending", "paid", "failed", "expired", "cancelled"],
+        default: "unpaid"
+    },
+    settlementStatus: {
+        type: String,
+        enum: ["not_ready", "pending", "credited", "failed"],
+        default: "not_ready"
+    },
+    walletTransactionId: { type: String, trim: true, default: "" },
+    creditedAt: { type: Date, default: null },
+    settlementError: {
+        code: { type: String, default: "" },
+        message: { type: String, default: "" },
+        recordedAt: { type: Date, default: null }
+    },
+    creationIdempotencyKey: { type: String, trim: true, default: "", immutable: true },
+    creationFingerprint: { type: String, trim: true, default: "", immutable: true },
 
     topupIntentId: {
         type: String,
@@ -89,6 +111,10 @@ const walletTopupSchema = new mongoose.Schema({
         region: { type: String, default: "" },
         paymentType: { type: String, default: "" },
         provider: { type: String, default: "" },
+        providerType: { type: String, default: "" },
+        paymentChannel: { type: String, default: "" },
+        confirmationMode: { type: String, default: "" },
+        paymentMethodId: { type: String, default: "" },
         accountName: { type: String, default: "" },
         accountNumber: { type: String, default: "" },
         qrImage: { type: String, default: "" },
@@ -138,6 +164,13 @@ walletTopupSchema.index(
         partialFilterExpression: { topupIntentId: { $type: "string", $gt: "" } }
     }
 );
+walletTopupSchema.index({ paymentAttemptId: 1 }, { unique: true, partialFilterExpression: { paymentAttemptId: { $type: "string", $gt: "" } } });
+walletTopupSchema.index({ walletTransactionId: 1 }, { unique: true, partialFilterExpression: { walletTransactionId: { $type: "string", $gt: "" } } });
+walletTopupSchema.index(
+    { customerUserId: 1, creationIdempotencyKey: 1 },
+    { unique: true, partialFilterExpression: { customerUserId: { $type: "objectId" }, creationIdempotencyKey: { $type: "string", $gt: "" } } }
+);
+walletTopupSchema.index({ paymentStatus: 1, settlementStatus: 1, updatedAt: 1 });
 
 module.exports = mongoose.model(
     "WalletTopup",

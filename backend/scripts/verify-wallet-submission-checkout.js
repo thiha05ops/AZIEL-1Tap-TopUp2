@@ -74,8 +74,9 @@ function verifyHistoryAdminLedgerExclusion() {
 
 function verifyFrontendSemantics() {
     const file = "frontend/js/wallet.js";
-    includes(file, "\"/api/wallet/manual-intent\"", "manual flow must request payment instructions without creating a durable top-up.");
-    includes(file, "`/api/wallet/manual-intent/${encodeURIComponent(intentId)}/slip`", "manual receipt submission must use the intent slip endpoint.");
+    includes(file, "\"/api/wallet/topups\"", "typed flow must create an authoritative wallet top-up.");
+    includes(file, "`/api/wallet/topups/${encodeURIComponent(topup.topupId)}/payment-attempts`", "typed flow must create a payable-subject PaymentAttempt.");
+    includes(file, "`/api/wallet/topups/${encodeURIComponent(topupId)}/payment-attempts/${encodeURIComponent(attemptId)}/receipt`", "typed receipt submission must bind top-up and attempt.");
     includes(file, "await loadWallet();", "successful receipt submission must refresh durable wallet history.");
     includes(file, "activeWalletManualIntent = null", "closing the sheet must abandon the temporary intent client-side.");
     includes(file, "PaymentCheckoutSheet.show", "wallet manual flow must use the shared checkout sheet.");
