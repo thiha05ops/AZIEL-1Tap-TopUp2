@@ -48,7 +48,12 @@ function verifyBackendWalletEligibility() {
     includes(file, "function isManualDynamicPromptPayMethod", "Wallet backend must explicitly recognize manual dynamic PromptPay.");
     includes(file, "function isWalletFundingMethodEligible", "Wallet backend must centrally enforce wallet funding eligibility.");
     includes(file, "if (type === \"auto\") return isAutoPromptPayMethod(method);", "Automatic wallet methods must remain explicitly gated.");
-    includes(file, "if (isManualDynamicPromptPayMethod(method)) return true;", "Manual dynamic PromptPay must be eligible without static QR/account.");
+    includes(file, "function isVerifiedDynamicWalletMethod", "Wallet backend must explicitly recognize verified dynamic wallet funding methods.");
+    includes(file, "[\"promptpay\", \"thunderpromptpay\"].includes(provider)", "Wallet backend must recognize the normalized Thunder PromptPay provider.");
+    includes(file, "key === \"truewallet\"", "Wallet backend must recognize TrueMoney Wallet funding.");
+    includes(file, "qrMode === \"truemoney_template_dynamic\"", "TrueMoney Wallet funding must require the canonical template-derived QR mode.");
+    includes(file, "confirmationMode === \"thunder_truewallet_slip\"", "TrueMoney Wallet funding must require Thunder TrueMoney verification.");
+    includes(file, "if (isVerifiedDynamicWalletMethod(method) || isManualDynamicPromptPayMethod(method)) return true;", "Verified dynamic wallet methods must bypass the legacy static QR/account requirement.");
     includes(file, "return Boolean(getMethodQrImage(method)) && Boolean(method.accountName && method.accountNumber);", "Legacy manual methods must still require configured QR/account details.");
     includes(file, "dynamicQr = await createPromptPayQr", "Manual wallet intent must generate amount-specific dynamic PromptPay QR server-side.");
     includes(file, "orderReference: reference", "Wallet dynamic PromptPay QR must use the server-owned wallet intent reference.");

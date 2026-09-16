@@ -133,15 +133,49 @@ function isAutoPromptPayMethod(method = {}) {
 }
 
 function isManualDynamicPromptPayMethod(method = {}) {
+    const key = normalizeMethod(method.key);
+    const provider = normalizeMethod(method.provider);
+
     return (
         String(method.paymentType || "manual").toLowerCase() === "manual" &&
-        normalizeMethod(method.key) === "promptpay" &&
+        ["promptpay", "thunderpromptpay"].includes(key) &&
+        ["promptpay", "thunderpromptpay"].includes(provider) &&
         String(method.region || "").toUpperCase() === "TH" &&
         String(method.qrMode || "") === "aziel_promptpay_dynamic" &&
         method.dynamicQrSupported === true &&
         method.amountPrefillSupported === true &&
         method.receiptUploadEnabled !== false &&
         ["manual_admin", "thunder_slip"].includes(method.confirmationMode)
+    );
+}
+
+function isVerifiedDynamicWalletMethod(method = {}) {
+    const type = String(method.paymentType || "manual").toLowerCase();
+    const key = normalizeMethod(method.key);
+    const provider = normalizeMethod(method.provider);
+    const confirmationMode = String(method.confirmationMode || "");
+    const qrMode = String(method.qrMode || "");
+
+    if (!["manual", "deeplink"].includes(type)) return false;
+    if (String(method.region || "").toUpperCase() !== "TH") return false;
+    if (method.dynamicQrSupported !== true) return false;
+    if (method.amountPrefillSupported !== true) return false;
+    if (method.receiptUploadEnabled === false) return false;
+
+    if (
+        ["promptpay", "thunderpromptpay"].includes(key) &&
+        ["promptpay", "thunderpromptpay"].includes(provider) &&
+        qrMode === "aziel_promptpay_dynamic" &&
+        confirmationMode === "thunder_slip"
+    ) {
+        return true;
+    }
+
+    return (
+        key === "truewallet" &&
+        ["truewallet", "thundertruewallet"].includes(provider) &&
+        qrMode === "truemoney_template_dynamic" &&
+        confirmationMode === "thunder_truewallet_slip"
     );
 }
 
@@ -152,7 +186,7 @@ function isWalletFundingMethodEligible(method = {}) {
     const provider = String(method.provider || "").toLowerCase();
     if (type === "wallet" || provider === "wallet" || normalizeMethod(method.key) === "wallet") return false;
     if (type === "auto") return isAutoPromptPayMethod(method);
-    if (isManualDynamicPromptPayMethod(method)) return true;
+    if (isVerifiedDynamicWalletMethod(method) || isManualDynamicPromptPayMethod(method)) return true;
     if (!isManualLikePaymentMethod(method)) return false;
     return Boolean(getMethodQrImage(method)) && Boolean(method.accountName && method.accountNumber);
 }
