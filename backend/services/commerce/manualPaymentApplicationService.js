@@ -659,6 +659,23 @@ function createManualPaymentApplicationService(dependencies = {}) {
             const attempt = await deps.paymentAttemptRepository.findAttemptByIdForOwner({ attemptId: result.attemptId, owner });
             return toSafePaymentView({ order: { topupId: subjectId }, attempt, paymentResult: result });
         } catch (error) {
+            if (normalizeUpper(input.subjectType) === "WALLET_TOPUP") {
+                const metadata = error?.metadata && typeof error.metadata === "object" ? error.metadata : {};
+                deps.logger?.error?.("[WALLET_TOPUP_PAYMENT_ATTEMPT_DIAGNOSTIC]", {
+                    route: "POST /api/wallet/topups/:topupId/payment-attempts",
+                    stage: normalizeString(error?.stage || "initiate"),
+                    errorName: normalizeString(error?.name),
+                    errorCode: normalizeString(error?.code),
+                    causeCode: normalizeString(error?.causeCode),
+                    retryable: error?.retryable === true,
+                    metadataMessage: normalizeString(metadata.message),
+                    metadataPaths: Array.isArray(metadata.paths) ? metadata.paths.map(normalizeString).filter(Boolean) : [],
+                    attemptId: normalizeString(metadata.attemptId || error?.attemptId),
+                    subjectId: normalizeString(input.subjectId),
+                    provider: normalizeString(metadata.provider || error?.provider),
+                    paymentMethodId: normalizeString(metadata.paymentMethodId || error?.paymentMethodId)
+                });
+            }
             throw mapPaymentError(error, "initiate");
         }
     }
