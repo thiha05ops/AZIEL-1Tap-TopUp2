@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 1600 760"
+     fill="none">
+
+  <!-- LEFT: aggressive esports speed cuts -->
+  <path d="M-80 180 L470 500 L405 500 L-80 220 Z" fill="white"/>
+  <path d="M-80 245 L400 525 L340 525 L-80 285 Z" fill="white" opacity=".78"/>
+  <path d="M-80 310 L325 545 L270 545 L-80 350 Z" fill="white" opacity=".52"/>
+
+  <!-- RIGHT: mirrored speed cuts -->
+  <path d="M1680 180 L1130 500 L1195 500 L1680 220 Z" fill="white"/>
+  <path d="M1680 245 L1200 525 L1260 525 L1680 285 Z" fill="white" opacity=".78"/>
+  <path d="M1680 310 L1275 545 L1330 545 L1680 350 Z" fill="white" opacity=".52"/>
+
+  <!-- lower accent cuts -->
+  <path d="M-40 410 L255 575 L205 575 L-40 445 Z"
+        fill="white" opacity=".30"/>
+  <path d="M1640 410 L1345 575 L1395 575 L1640 445 Z"
+        fill="white" opacity=".30"/>
+
+</svg>

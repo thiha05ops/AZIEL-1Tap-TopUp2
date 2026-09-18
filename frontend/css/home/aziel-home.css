@@ -1570,7 +1570,6 @@ body.dark .az-home::before {
     margin-right: auto !important;
 }
 
-.az-home::before,
 .az-home-ambient-buffer {
     top: 0 !important;
     left: 50% !important;
@@ -1590,15 +1589,6 @@ body.dark .az-home::before {
             #000 22%,
             rgba(0, 0, 0, .70) 62%,
             transparent 100%) !important;
-}
-
-.az-home::before {
-    opacity: var(--ambient-home-opacity-light, .34) !important;
-}
-
-body.theme-dark .az-home::before,
-body.dark .az-home::before {
-    opacity: var(--ambient-home-opacity-dark, .44) !important;
 }
 
 .az-banner-zone {

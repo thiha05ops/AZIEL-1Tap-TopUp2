@@ -18,7 +18,7 @@
 }
 
 .az-home-ambient-buffer {
-    display: none !important;
+    display: block !important;
 }
 
 .az-home {
@@ -74,8 +74,157 @@
     transition: --home-hero-ambient-primary 560ms ease, --home-hero-ambient-secondary 560ms ease;
 }
 
+
+
+
+
+/* =========================================================
+   AZIEL Dynamic Hero V Atmosphere
+   Active banner RGB = color authority
+   Full-viewport V geometry
+   ========================================================= */
+
 .az-home::before {
+    content: "" !important;
+    position: absolute !important;
+    top: 0 !important;
+    bottom: auto !important;
+    left: 50% !important;
+    right: auto !important;
+
+    width: 100dvw !important;
+    height: 720px !important;
+
+    z-index: 0 !important;
+    pointer-events: none !important;
+
+    background:
+        linear-gradient(
+            115deg,
+            var(--home-hero-ambient-primary),
+            color-mix(
+                in srgb,
+                var(--home-hero-ambient-primary) 58%,
+                var(--home-hero-ambient-secondary)
+            ) 48%,
+            var(--home-hero-ambient-secondary)
+        ) !important;
+
+    -webkit-mask-image:
+        url("../../assets/home/aziel-home-chevron.svg") !important;
+    mask-image:
+        url("../../assets/home/aziel-home-chevron.svg") !important;
+
+    -webkit-mask-repeat: no-repeat !important;
+    mask-repeat: no-repeat !important;
+
+    -webkit-mask-position: center top !important;
+    mask-position: center top !important;
+
+    -webkit-mask-size: 125vw auto !important;
+    mask-size: 125vw auto !important;
+
+    filter:
+        blur(1px)
+        saturate(1.45) !important;
+
+    transform: translateX(-50%) !important;
+
+    opacity: .19 !important;
+
+    transition:
+        background 560ms ease,
+        opacity 300ms ease !important;
+}
+
+.az-home-ambient-buffer {
+    top: 0 !important;
+    left: 50% !important;
+
+    width: 100dvw !important;
+    height: 640px !important;
+
+    filter:
+        blur(34px)
+        saturate(1.48) !important;
+
+    transform:
+        translateX(-50%)
+        scale(1.06) !important;
+
+    opacity: .86 !important;
+
+    mask-image:
+        linear-gradient(
+            180deg,
+            rgba(0, 0, 0, .92) 0%,
+            rgba(0, 0, 0, .78) 38%,
+            rgba(0, 0, 0, .34) 72%,
+            transparent 100%
+        ) !important;
+
+    -webkit-mask-image:
+        linear-gradient(
+            180deg,
+            rgba(0, 0, 0, .92) 0%,
+            rgba(0, 0, 0, .78) 38%,
+            rgba(0, 0, 0, .34) 72%,
+            transparent 100%
+        ) !important;
+}
+
+.az-home::after {
     content: none !important;
+}
+
+body.theme-light .az-home::before {
+    opacity: .19 !important;
+}
+
+body.theme-dark .az-home::before,
+body.dark .az-home::before {
+    opacity: .40 !important;
+}
+
+@media (max-width: 768px) {
+    .az-home::before {
+        top: 0 !important;
+        width: 100dvw !important;
+        height: 470px !important;
+
+        -webkit-mask-size: 155vw auto !important;
+        mask-size: 155vw auto !important;
+
+        -webkit-mask-position: center top !important;
+        mask-position: center top !important;
+
+        filter:
+            blur(2.5px)
+            saturate(1.70) brightness(1.06) !important;
+
+        transform: translateX(-50%) !important;
+        opacity: .14 !important;
+    }
+
+    .az-home-ambient-buffer {
+        width: 100dvw !important;
+        height: 460px !important;
+
+        filter:
+            blur(30px)
+            saturate(1.34) !important;
+
+        transform:
+            translateX(-50%)
+            scale(1.04) !important;
+
+        opacity: .55 !important;
+    }
+
+    body.theme-dark .az-home::before,
+    body.dark .az-home::before {
+        opacity: .075 !important;
+    }
 }
 
 .az-home > * {
@@ -84,12 +233,22 @@
 }
 
 body.theme-light .az-home {
-    --home-hero-atmosphere-opacity: .075;
-    --home-hero-atmosphere-secondary-opacity: .04;
+    --home-hero-atmosphere-opacity: .22;
+    --home-hero-atmosphere-secondary-opacity: .14;
+
+    /*
+     * Neutral page canvas.
+     * Dynamic banner RGB atmosphere is owned exclusively by
+     * .az-home::before so multiple ambient layers do not stack.
+     */
     --home-page-background:
-        radial-gradient(ellipse 70% 400px at 50% 210px, color-mix(in srgb, var(--home-hero-ambient-primary) 12%, transparent), transparent 74%),
-        linear-gradient(180deg, color-mix(in srgb, var(--home-hero-ambient-primary) 7%, var(--bg)) 0, color-mix(in srgb, var(--home-hero-ambient-secondary) 4%, var(--bg)) 410px, var(--bg) 740px),
-        var(--bg);
+        linear-gradient(
+            180deg,
+            #ffffff 0%,
+            #ffffff 100%
+        ),
+        #ffffff;
+
     --home-hero-shadow: 0 10px 30px color-mix(in srgb, var(--bg) 10%, transparent);
     --home-popular-surface: color-mix(in srgb, var(--surface-strong) 88%, var(--primary) 4%);
     --home-popular-body:
@@ -961,8 +1120,8 @@ body.theme-light .az-home + .site-footer {
     body.dark .az-home {
         padding-bottom: 40px !important;
         --home-page-background:
-            radial-gradient(ellipse 92% 340px at 50% 170px, color-mix(in srgb, var(--home-hero-ambient-primary) 18%, transparent), transparent 74%),
-            linear-gradient(180deg, color-mix(in srgb, var(--home-hero-ambient-primary) 12%, var(--bg)) 0, color-mix(in srgb, var(--home-hero-ambient-secondary) 7%, var(--bg)) 340px, var(--bg) 580px),
+            radial-gradient(ellipse 92% 340px at 50% 170px, color-mix(in srgb, var(--home-hero-ambient-primary) 24%, transparent), transparent 74%),
+            linear-gradient(180deg, color-mix(in srgb, var(--home-hero-ambient-primary) 12%, var(--bg)) 0, color-mix(in srgb, var(--home-hero-ambient-secondary) 10%, var(--bg)) 340px, var(--bg) 580px),
             var(--bg);
     }
 
@@ -1892,5 +2051,95 @@ html body main.az-home #availableCoupons .az-section-head .home-coupon-subtitle 
     html body main.az-home #availableCoupons .home-coupon-subtitle {
         margin-left: 0 !important;
         padding-left: 0 !important;
+    }
+}
+
+/* =========================================================
+   AZIEL Hero RGB Background — Final Light Theme Authority
+   Active banner RGB follows the current carousel slide.
+   ========================================================= */
+
+body.theme-light .az-home {
+    --home-page-background:
+        radial-gradient(
+            ellipse 110% 620px at 50% 170px,
+            color-mix(
+                in srgb,
+                var(--home-hero-ambient-primary) 34%,
+                transparent
+            ) 0%,
+            color-mix(
+                in srgb,
+                var(--home-hero-ambient-primary) 20%,
+                transparent
+            ) 38%,
+            color-mix(
+                in srgb,
+                var(--home-hero-ambient-secondary) 12%,
+                transparent
+            ) 67%,
+            transparent 88%
+        ),
+        linear-gradient(
+            180deg,
+            color-mix(
+                in srgb,
+                var(--home-hero-ambient-primary) 18%,
+                #ffffff
+            ) 0px,
+            color-mix(
+                in srgb,
+                var(--home-hero-ambient-primary) 12%,
+                #ffffff
+            ) 360px,
+            color-mix(
+                in srgb,
+                var(--home-hero-ambient-secondary) 7%,
+                #ffffff
+            ) 700px,
+            #ffffff 1050px
+        ),
+        #ffffff !important;
+}
+
+body.theme-light .az-home::before {
+    opacity: .28 !important;
+    filter:
+        blur(1px)
+        saturate(1.65)
+        brightness(1.05) !important;
+}
+
+@media (max-width: 768px) {
+    body.theme-light .az-home {
+        --home-page-background:
+            radial-gradient(
+                ellipse 125% 460px at 50% 140px,
+                color-mix(
+                    in srgb,
+                    var(--home-hero-ambient-primary) 30%,
+                    transparent
+                ),
+                transparent 78%
+            ),
+            linear-gradient(
+                180deg,
+                color-mix(
+                    in srgb,
+                    var(--home-hero-ambient-primary) 16%,
+                    #ffffff
+                ) 0px,
+                color-mix(
+                    in srgb,
+                    var(--home-hero-ambient-secondary) 8%,
+                    #ffffff
+                ) 430px,
+                #ffffff 680px
+            ),
+            #ffffff !important;
+    }
+
+    body.theme-light .az-home::before {
+        opacity: .22 !important;
     }
 }
