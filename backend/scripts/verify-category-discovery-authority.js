@@ -42,6 +42,7 @@ function frontendRuntime(publicCatalog) {
         readyState: "loading",
         addEventListener(name, callback) { (listeners[name] ||= []).push(callback); },
         dispatchEvent(event) { (listeners[event.type] || []).forEach(callback => callback(event)); },
+        getElementById() { return null; },
         querySelector() { return null; },
         querySelectorAll() { return []; }
     };
@@ -82,9 +83,9 @@ async function discoveryMembership(products) {
 
 async function verifyFrontendContract() {
     const products = [
-        { productCode: "mobile-fixture", name: "Mobile", enabled: true, publicCategory: "mobile", productRoute: "mobile.html", packages: [] },
-        { productCode: "pc-fixture", name: "PC", enabled: true, publicCategory: "pc", productRoute: "pc.html", packages: [] },
-        { productCode: "social-fixture", name: "Social", enabled: true, publicCategory: "social", productRoute: "social.html", packages: [] }
+        { productCode: "mobile-fixture", name: "Mobile", enabled: true, publicCategory: "mobile", productRoute: "/products/mobile-fixture", packages: [] },
+        { productCode: "pc-fixture", name: "PC", enabled: true, publicCategory: "pc", productRoute: "/products/pc-fixture", packages: [] },
+        { productCode: "social-fixture", name: "Social", enabled: true, publicCategory: "social", productRoute: "/products/social-fixture", packages: [] }
     ];
     const membership = await discoveryMembership(products);
     assert.deepStrictEqual(membership.mobile, ["mobile-fixture"]);
@@ -98,7 +99,7 @@ async function verifyFrontendContract() {
 
     const discoverySource = fs.readFileSync(path.join(ROOT, "frontend/js/catalog-discovery.js"), "utf8");
     const presentationSource = fs.readFileSync(path.join(ROOT, "frontend/js/catalog-presentation.js"), "utf8");
-    assert(discoverySource.includes('href="all-games.html"'));
+    assert(discoverySource.includes('href="/explore"'));
     assert(!discoverySource.includes('<a href="mobile-games.html"><span>All Games</span></a>'));
     assert(!/activeProducts\([^)]*\)[\s\S]{0,200}\["mlbb"/.test(discoverySource), "Category membership must not use hardcoded product codes.");
     assert(!discoverySource.includes('const priority = ["mlbb", "pubg", "freefire", "hok"]'), "Popular discovery order must come from catalog Home placement fields.");

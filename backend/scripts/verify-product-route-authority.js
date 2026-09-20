@@ -39,22 +39,19 @@ function verifyBackendContract() {
         product.productCode,
         resolveCanonicalProductRoute(product.productCode)
     ]));
-    assert.strictEqual(destinations.mlbb, "mlbb.html");
-    assert.strictEqual(destinations.pubg, "pubg.html");
-    assert.strictEqual(destinations.freefire, "freefire.html");
-    assert.strictEqual(destinations.hok, "hok.html");
-    assert.strictEqual(destinations.telegram, "telegram.html");
-    assert.strictEqual(destinations.capcut, "product.html?product=capcut");
-    assert.strictEqual(resolveCanonicalProductRoute("unknown-safe-product"), "product.html?product=unknown-safe-product");
+    assert.strictEqual(destinations.mlbb, "/games/mlbb");
+    assert.strictEqual(destinations.pubg, "/games/pubg");
+    assert.strictEqual(destinations.freefire, "/games/freefire");
+    assert.strictEqual(destinations.hok, "/games/hok");
+    assert.strictEqual(destinations.telegram, "/products/telegram");
+    assert.strictEqual(destinations.capcut, "/products/capcut");
+    assert.strictEqual(resolveCanonicalProductRoute("unknown-safe-product"), "/products/unknown-safe-product");
     assert.strictEqual(genericProductRoute("bad/value"), "");
-    ["javascript:alert(1)", "data:text/html,bad", "//evil.example/x", "https://evil.example/x", "/absolute/path", "\\\\evil.example\\x"]
+    ["javascript:alert(1)", "data:text/html,bad", "//evil.example/x", "https://evil.example/x", "\\\\evil.example\\x"]
         .forEach(route => assert.strictEqual(isSafeStorefrontProductRoute(route), false, `${route} must be rejected.`));
-    ["mlbb.html", "product.html?product=capcut", "products/detail.html?id=one#buy"]
+    ["/games/mlbb", "/products/capcut", "/absolute/path", "products/detail?id=one#buy"]
         .forEach(route => assert.strictEqual(isSafeStorefrontProductRoute(route), true, `${route} must remain valid.`));
-    Object.values(destinations).forEach(route => {
-        assert(isSafeStorefrontProductRoute(route));
-        assert(fs.existsSync(path.join(ROOT, "frontend", route.split(/[?#]/)[0])), `${route} must resolve to an existing storefront page.`);
-    });
+    Object.values(destinations).forEach(route => assert(isSafeStorefrontProductRoute(route)));
 }
 
 function verifyFrontendContract() {
@@ -67,8 +64,8 @@ function verifyFrontendContract() {
         homepageFlags: []
     });
     assert.strictEqual(display.route, serverRoute, "Projected route must win even for a product that historically had a conflicting frontend route.");
-    assert.strictEqual(presentation.resolveProductRoute("", "unknown-safe-product"), "product.html?product=unknown-safe-product");
-    assert.strictEqual(presentation.resolveProductRoute("javascript:alert(1)", "mlbb"), "product.html?product=mlbb");
+    assert.strictEqual(presentation.resolveProductRoute("", "unknown-safe-product"), "/products/unknown-safe-product");
+    assert.strictEqual(presentation.resolveProductRoute("javascript:alert(1)", "mlbb"), "/products/mlbb");
 
     const source = read("frontend/js/catalog-presentation.js");
     assert(!source.includes("CANONICAL_PRODUCT_ROUTES"), "Frontend canonical route map must be removed.");
@@ -77,9 +74,9 @@ function verifyFrontendContract() {
     ["frontend/js/catalog-discovery.js", "frontend/js/search.js"].forEach(file => {
         assert(read(file).includes("product.route"), `${file} must consume projected routes.`);
     });
-    assert(read("frontend/js/home-placement-runtime.js").includes("resolveProductRoute?.(product.productRoute || product.route"));
+    assert(read("frontend/js/home-placement-runtime.js").includes("resolveProductRoute(product.route, product.productCode)"));
     assert(read("frontend/js/home-mobile-category-carousel.js").includes("resolveProductRoute?.(product.productRoute || product.route"));
-    assert(read("frontend/js/product-detail.js").includes("URLSearchParams"), "Generic product detail must resolve query-string identity.");
+    assert(read("frontend/js/product-detail.js").includes("pathMatch"), "Generic product detail must resolve clean pathname identity.");
 }
 
 function verifyAdminContract() {
@@ -149,7 +146,7 @@ async function verifyIsolatedComposition() {
         });
 
         let projected = await publicFixture();
-        assert.strictEqual(projected.productRoute, "product.html?product=capcut", "Unsafe persisted route must not override canonical projection.");
+        assert.strictEqual(projected.productRoute, "/products/capcut", "Unsafe persisted route must not override canonical projection.");
         assert.strictEqual(projected.packages[0].prices.TH, undefined, "Route authority must preserve MM-only projection.");
         const route = projected.productRoute;
 

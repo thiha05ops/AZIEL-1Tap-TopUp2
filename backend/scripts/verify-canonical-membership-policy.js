@@ -36,19 +36,19 @@ function read(relativePath) {
 function verifyPolicySource() {
     assert(CANONICAL_PRODUCT_CODES.length > 0);
     assert.strictEqual(isCanonicalProductCode(PRODUCT_CODE), false);
-    assert.strictEqual(genericProductRoute(PRODUCT_CODE), `product.html?product=${PRODUCT_CODE}`);
-    assert.strictEqual(resolveCanonicalProductRoute(PRODUCT_CODE), `product.html?product=${PRODUCT_CODE}`);
+    assert.strictEqual(genericProductRoute(PRODUCT_CODE), `/products/${PRODUCT_CODE}`);
+    assert.strictEqual(resolveCanonicalProductRoute(PRODUCT_CODE), `/products/${PRODUCT_CODE}`);
 
     const routes = read("backend/routes/catalog.js");
     assert(routes.includes("CANONICAL_OPERATIONAL_PRODUCTS.map"), "Admin list must enumerate the closed canonical registry.");
     assert(!routes.includes('router.post("/admin/catalog/products"'), "Admin must not expose arbitrary product creation.");
     const genericDetail = read("frontend/js/product-detail.js");
     assert(genericDetail.includes("PRODUCT_COPY"), "Generic detail remains bounded to known canonical product contracts.");
-    assert(genericDetail.includes('userIdSelector: "#userId"') && genericDetail.includes('zoneIdSelector: ""'), "Generic order fields remain a product-shell contract, not Mongo schema.");
+    assert(genericDetail.includes('userIdSelector: "#userId"') && genericDetail.includes("contract.accountFields"), "Generic order fields remain a verified product-shell contract, not URL-owned schema.");
     [
         "backend/services/commerce/customerManualPromptPayCheckoutService.js",
         "backend/services/commerce/customerWalletCheckoutService.js"
-    ].forEach(file => assert(read(file).includes("isCanonicalProductCode(productCode)"), `${file} must enforce canonical membership.`));
+    ].forEach(file => assert(!read(file).includes("isCanonicalProductCode(productCode)"), `${file} must use persisted catalog and commerce authority, not static route membership.`));
     assert(read("backend/services/commerce/adminPricingEngineService.js").includes("CANONICAL_PRICING_PRODUCT_CODES"), "Admin pricing workspace must enumerate only canonical products.");
     assert(read("backend/services/commerce/adminPricingControlCenterService.js").includes("CATALOG_PRODUCT_UNSUPPORTED"), "Direct Admin pricing operations must reject unsupported products.");
 }
@@ -147,7 +147,7 @@ async function verifyIsolatedPolicy() {
 async function main() {
     verifyPolicySource();
     if (process.argv.includes("--isolated")) await verifyIsolatedPolicy();
-    console.log("Closed canonical catalog membership policy verification passed.");
+    console.log("Catalog identity and specialized-route policy verification passed.");
 }
 
 main().catch(error => {

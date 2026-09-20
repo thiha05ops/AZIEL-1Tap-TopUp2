@@ -52,10 +52,10 @@ const selection = {
 };
 
 async function main() {
-    assert.strictEqual(resolveCanonicalProductRoute(productCode), `product.html?product=${productCode}`);
+    assert.strictEqual(resolveCanonicalProductRoute(productCode), `/products/${productCode}`);
     assert.strictEqual(fs.existsSync(path.join(ROOT, `frontend/${productCode}.html`)), false);
 
-    assert.deepStrictEqual(canonicalPricingRegions(product, pkg, "TH"), []);
+    assert.deepStrictEqual(canonicalPricingRegions(product, pkg, "TH"), ["TH"], "Pricing preparation remains independent from storefront activation.");
     assert.deepStrictEqual(canonicalPricingRegions(product, pkg, "TH", {
         allowDisabledProduct: true,
         allowDisabledPackage: true,
@@ -78,7 +78,7 @@ async function main() {
     });
     assert(adminProduct, "Presentation editor must resolve a persisted Master Catalog product outside the legacy page registry.");
     assert.strictEqual(adminProduct.productCode, productCode);
-    assert.strictEqual(adminProduct.productRoute, `product.html?product=${productCode}`);
+    assert.strictEqual(adminProduct.productRoute, `/products/${productCode}`);
     assert.strictEqual(adminProduct.packages.length, 1);
 
     const preparedProduct = { ...product, enabled: true, supportedRegions: ["TH"], commerceState: "PURCHASABLE", publicDiscoveryEnabled: true };
@@ -87,7 +87,7 @@ async function main() {
         regions: { TH: { fulfillment: true, availability: true } }, checks: { availability: true }
     });
     assert.strictEqual(readiness.state, "AVAILABLE");
-    assert.strictEqual(readiness.route, `product.html?product=${productCode}`);
+    assert.strictEqual(readiness.route, `/products/${productCode}`);
     const checkoutPrice = resolveDatabasePackagePriceFromRows({ productCode, packageCode, region: "TH" }, {
         products: [preparedProduct], packages: [preparedPackage]
     });

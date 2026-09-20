@@ -6,7 +6,8 @@ const http = require("http");
 const path = require("path");
 const { PAGE_ROUTES, LEGACY_ALIASES } = require("../config/storefrontRouteContract");
 const { CANONICAL_PRODUCT_CODES, resolveCanonicalProductRoute } = require("../catalog/canonicalOperationalCatalog");
-const { app, configureBaseApplication } = require("../server");
+const { app, configureBaseApplication, startup } = require("../server");
+const { buildPresentationPayload } = require("../services/homePresentationService");
 
 const root = path.resolve(__dirname, "../..");
 
@@ -30,9 +31,28 @@ async function main() {
         const route = resolveCanonicalProductRoute(code);
         assert(route.startsWith("/games/") || route === "/products/telegram" || route === `/products/${code}`, `${code} has non-clean route ${route}`);
     });
-    assert.strictEqual(resolveCanonicalProductRoute("not-canonical"), "");
+    assert.strictEqual(resolveCanonicalProductRoute("afk-journey"), "/products/afk-journey");
+    assert.strictEqual(resolveCanonicalProductRoute("not canonical"), "");
+    const homeProjection = buildPresentationPayload({
+        region: "TH",
+        selections: [{ productCode: "afk-journey" }, { productCode: "mlbb" }],
+        products: [
+            { productCode: "afk-journey", name: "AFK Journey", enabled: true, deletedAt: null, publicDiscoveryEnabled: true, homepageEnabled: true, homepageSections: ["ALL_MOBILE_GAMES"], catalogCategory: "MOBILE_GAME_TOPUP", commerceState: "PURCHASABLE", lifecycleStatus: "ACTIVE", productRoute: "product.html?product=afk-journey" },
+            { productCode: "mlbb", name: "Mobile Legends", enabled: true, deletedAt: null, publicDiscoveryEnabled: true, homepageEnabled: true, homepageSections: ["POPULAR_MOBILE_GAMES"], catalogCategory: "MOBILE_GAME_TOPUP", commerceState: "PURCHASABLE", lifecycleStatus: "ACTIVE", productRoute: "mlbb.html" }
+        ]
+    });
+    const homeRoutes = homeProjection.sections.flatMap(section => section.products).map(product => product.route);
+    assert(homeRoutes.includes("/products/afk-journey"));
+    assert(homeRoutes.includes("/games/mlbb"));
+    assert(homeRoutes.every(route => !route.includes(".html")), "Home projection must normalize persisted legacy routes.");
 
-    configureBaseApplication();
+    const publicProducts = new Set(["valorant", "afk-journey"]);
+    configureBaseApplication({
+        publicProductLookup: async productCode => publicProducts.has(productCode)
+            ? { productCode, discoverable: true }
+            : null
+    });
+    startup.databaseReady = true;
     const server = app.listen(0, "127.0.0.1");
     await new Promise(resolve => server.once("listening", resolve));
     const port = server.address().port;
@@ -49,9 +69,18 @@ async function main() {
         const generic = await request(port, "/product.html?product=valorant&feature=test");
         assert.strictEqual(generic.status, 308);
         assert.strictEqual(generic.headers.location, "/products/valorant?feature=test");
+        const dynamicLegacy = await request(port, "/product.html?product=afk-journey&feature=test");
+        assert.strictEqual(dynamicLegacy.status, 308);
+        assert.strictEqual(dynamicLegacy.headers.location, "/products/afk-journey?feature=test");
+        const dynamic = await request(port, "/products/afk-journey");
+        assert.strictEqual(dynamic.status, 200);
+        assert(dynamic.body.includes("az-product-detail"));
         const legacyVariant = await request(port, "/mlbb.html?product=mlbb-twilight-weekly-pass&feature=test");
         assert.strictEqual(legacyVariant.headers.location, "/products/mlbb-twilight-weekly-pass?feature=test");
-        assert.strictEqual((await request(port, "/products/not-canonical")).status, 404);
+        const unknown = await request(port, "/products/not-canonical");
+        assert.strictEqual(unknown.status, 404);
+        assert(unknown.body.includes("Product unavailable"));
+        assert(!unknown.body.includes("You're offline"));
         assert.notStrictEqual((await request(port, "/api/not-a-route")).status, 308, "API paths must not canonicalize as pages");
         assert.strictEqual((await request(port, "/css/core/main.css")).status, 200, "static assets must remain available");
     } finally {

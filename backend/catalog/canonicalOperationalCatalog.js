@@ -67,7 +67,7 @@ function isSafeStorefrontProductRoute(route = "") {
 
 function genericProductRoute(productCode = "") {
     const code = normalizeRouteProductCode(productCode);
-    return code && isCanonicalProductCode(code) ? `/products/${encodeURIComponent(code)}` : "";
+    return code ? `/products/${encodeURIComponent(code)}` : "";
 }
 
 function resolveCanonicalProductRoute(productCode = "") {
@@ -86,5 +86,6 @@ module.exports = Object.freeze({
     isCanonicalProductCode,
     isSafeStorefrontProductRoute,
     genericProductRoute,
+    normalizeRouteProductCode,
     resolveCanonicalProductRoute
 });

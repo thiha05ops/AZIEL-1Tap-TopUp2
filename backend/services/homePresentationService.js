@@ -7,7 +7,7 @@ const MediaAsset = require("../models/MediaAsset");
 const PackageMarketPublication = require("../models/PackageMarketPublication");
 const StoreCatalogSelection = require("../models/StoreCatalogSelection");
 const { publicCategoryFor } = require("../catalog/catalogTaxonomy");
-const { isSafeStorefrontProductRoute, resolveCanonicalProductRoute } = require("../catalog/canonicalOperationalCatalog");
+const { resolveCanonicalProductRoute } = require("../catalog/canonicalOperationalCatalog");
 
 const PRESENTATION_SECTIONS = Object.freeze([
     "POPULAR_MOBILE_GAMES",
@@ -81,9 +81,7 @@ function buildPresentationPayload({ region, products = [], selections = [], publ
                 productCode,
                 displayName: String(product.name || productCode).trim(),
                 subtitle: String(product.productKnowledge?.shortDescription || product.description || "").trim(),
-                route: isSafeStorefrontProductRoute(product.productRoute)
-                    ? product.productRoute
-                    : resolveCanonicalProductRoute(productCode),
+                route: resolveCanonicalProductRoute(productCode),
                 category: publicCategoryFor(product.homepageCategory || product.catalogCategory),
                 artwork: projectArtwork(imageAsset, product.artworkPath),
                 placement: {

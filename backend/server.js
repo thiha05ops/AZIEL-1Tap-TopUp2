@@ -12,8 +12,9 @@ const multer = require("multer");
 const { Server } = require("socket.io");
 const rateLimit = require("express-rate-limit");
 const mongoose = require("mongoose");
-const { isCanonicalProductCode, resolveCanonicalProductRoute } = require("./catalog/canonicalOperationalCatalog");
+const { normalizeRouteProductCode, resolveCanonicalProductRoute } = require("./catalog/canonicalOperationalCatalog");
 const { LEGACY_ALIASES, PAGE_ROUTES, PRODUCT_RENDERERS, frontendFile, preserveQuery } = require("./config/storefrontRouteContract");
+const { getCatalogProductDetail } = require("./services/catalogService");
 
 dotenv.config({ path: path.join(__dirname, "../.env") });
 const configurationLoadedAt = performance.now();
@@ -112,8 +113,9 @@ function setFrontendCacheHeaders(res, filePath) {
     res.setHeader("Cache-Control", "public, max-age=0, must-revalidate");
 }
 
-function configureBaseApplication() {
+function configureBaseApplication(options = {}) {
     if (baseConfigured) return;
+    const publicProductLookup = options.publicProductLookup || getCatalogProductDetail;
     const appStartedAt = performance.now();
     if (isProduction) app.set("trust proxy", 1);
     app.use(helmet({
@@ -150,15 +152,15 @@ function configureBaseApplication() {
     });
 
     app.get("/product.html", (req, res, next) => {
-        const productCode = String(req.query.product || "").trim().toLowerCase();
-        if (!isCanonicalProductCode(productCode)) return res.status(404).sendFile(frontendFile("offline.html"));
+        const productCode = normalizeRouteProductCode(req.query.product);
+        if (!productCode) return res.status(404).sendFile(frontendFile("product-unavailable.html"));
         return res.redirect(308, preserveQuery(req, resolveCanonicalProductRoute(productCode), ["product"]));
     });
 
     Object.entries(LEGACY_ALIASES).forEach(([legacy, clean]) => {
         app.get(legacy, (req, res) => {
-            const productCode = String(req.query.product || "").trim().toLowerCase();
-            const destination = isCanonicalProductCode(productCode)
+            const productCode = normalizeRouteProductCode(req.query.product);
+            const destination = productCode
                 ? resolveCanonicalProductRoute(productCode)
                 : clean;
             return res.redirect(308, preserveQuery(req, destination, productCode ? ["product"] : []));
@@ -169,11 +171,26 @@ function configureBaseApplication() {
         app.get(entry.route, (req, res) => res.sendFile(frontendFile(entry.file)));
     });
 
-    app.get("/products/:productCode", (req, res) => {
-        const productCode = String(req.params.productCode || "").trim().toLowerCase();
-        if (!isCanonicalProductCode(productCode)) return res.status(404).sendFile(frontendFile("offline.html"));
-        const renderer = PRODUCT_RENDERERS[productCode] || "product.html";
-        return res.sendFile(frontendFile(renderer));
+    app.get("/products/:productCode", async (req, res) => {
+        const productCode = normalizeRouteProductCode(req.params.productCode);
+        if (!productCode) return res.status(404).sendFile(frontendFile("product-unavailable.html"));
+        if (!startup.databaseReady) return res.status(503).sendFile(frontendFile("product-unavailable.html"));
+        try {
+            const customerMarket = String(req.query.region || req.headers["x-customer-region"] || "TH").trim().toUpperCase();
+            const product = await publicProductLookup(productCode, {
+                source: "database",
+                includeDisabled: false,
+                customerMarket
+            });
+            if (!product || !product.discoverable) {
+                return res.status(404).sendFile(frontendFile("product-unavailable.html"));
+            }
+            const renderer = PRODUCT_RENDERERS[productCode] || "product.html";
+            return res.sendFile(frontendFile(renderer));
+        } catch (error) {
+            console.log("Public product route error:", error?.code || error?.name || "PRODUCT_ROUTE_UNAVAILABLE");
+            return res.status(503).sendFile(frontendFile("product-unavailable.html"));
+        }
     });
 
     const staticStartedAt = performance.now();
