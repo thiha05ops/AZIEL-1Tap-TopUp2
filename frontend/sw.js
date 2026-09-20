@@ -1,7 +1,10 @@
 const CACHE_PREFIX = "aziel-runtime";
-const CORE_CACHE = `${CACHE_PREFIX}-core-v5-storefront-performance`;
-const PAGE_CACHE = `${CACHE_PREFIX}-pages-v2-storefront-performance`;
-const CODE_CACHE = `${CACHE_PREFIX}-code-v5-storefront-performance`;
+// Keep the suffix equal to the deterministic CORE_ASSETS content digest. The
+// migration verifier fails if a precached dependency changes without a bump.
+const SHELL_REVISION = "v6-645cf0a75d5ffd84";
+const CORE_CACHE = `${CACHE_PREFIX}-core-${SHELL_REVISION}`;
+const PAGE_CACHE = `${CACHE_PREFIX}-pages-v3-${SHELL_REVISION}`;
+const CODE_CACHE = `${CACHE_PREFIX}-code-${SHELL_REVISION}`;
 const MEDIA_CACHE = `${CACHE_PREFIX}-media-v3-storefront-performance`;
 const PRESENTATION_CACHE = `${CACHE_PREFIX}-presentation-v1`;
 
@@ -43,6 +46,8 @@ const CORE_ASSETS = [
     "/js/home-product-accent.js",
     "/js/home-footer-accordion.js",
     "/js/home-deferred-runtime.js",
+    "/js/live-chat.js",
+    "/css/support/live-chat.css",
     "/js/header.js",
     "/js/pwa-fix.js",
     "/assets/banners/hero-desktop-wide.webp",
@@ -116,13 +121,40 @@ self.addEventListener("install", event => {
 });
 
 self.addEventListener("activate", event => {
-    event.waitUntil(
-        Promise.all([
-            deleteOldAzielCaches(),
-            self.registration.navigationPreload?.enable()
-        ]).then(() => self.clients.claim())
-    );
+    event.waitUntil(activateAzielWorker());
 });
+
+async function activateAzielWorker() {
+    const cacheNames = await caches.keys();
+    const migratesPerformanceShell = cacheNames.includes("aziel-runtime-core-v5-storefront-performance");
+
+    await Promise.all([
+        deleteOldAzielCaches(),
+        self.registration.navigationPreload?.enable()
+    ]);
+    await self.clients.claim();
+
+    // The v5 shell can keep a running, pre-authority Live Chat DOM even after
+    // controller takeover. Refresh only public storefront clients once during
+    // this specific cache migration; fresh installs and future activations do not
+    // enter this branch.
+    if (migratesPerformanceShell) {
+        await refreshLegacyPublicClients();
+    }
+}
+
+async function refreshLegacyPublicClients() {
+    const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    await Promise.allSettled(clients.map(client => {
+        try {
+            const url = new URL(client.url);
+            if (url.origin !== self.location.origin || !isPublicHtml(url.pathname)) return null;
+            return client.navigate(client.url);
+        } catch {
+            return null;
+        }
+    }));
+}
 
 self.addEventListener("message", event => {
     if (event.data?.type === "SKIP_WAITING") {

@@ -478,6 +478,11 @@ function registerAzielServiceWorker() {
                 }
             );
 
+            // Registration normally schedules an update check, but an explicit
+            // check makes installed-app convergence independent of the browser's
+            // update throttle.
+            await registration.update().catch(() => { });
+
             if (registration.waiting) {
                 activateWaitingWorker(registration);
             }
