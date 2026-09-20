@@ -22,12 +22,74 @@ const AZIEL_CHAT = {
         "Guest",
     polling: null,
     lastMessageCount: 0,
-    isOpen: false
+    isOpen: false,
+    authorityEnabled: false,
+    initialized: false,
+    authorityPolling: null,
+    authorityRequestId: 0
 };
 
-function initializeLiveChat() {
+const LIVE_CHAT_AUTHORITY_REFRESH_MS = 30000;
+
+async function loadLiveChatAuthority() {
+    try {
+        const res = await fetch(apiUrl("/api/settings"), {
+            cache: "no-store",
+            headers: { Accept: "application/json" }
+        });
+        if (!res.ok) return false;
+
+        const data = await res.json();
+        return data?.success === true && data?.settings?.liveChatEnabled === true;
+    } catch (error) {
+        return false;
+    }
+}
+
+function disableLiveChat() {
+    AZIEL_CHAT.authorityEnabled = false;
+    AZIEL_CHAT.initialized = false;
+    AZIEL_CHAT.isOpen = false;
+
+    if (AZIEL_CHAT.polling) {
+        clearInterval(AZIEL_CHAT.polling);
+        AZIEL_CHAT.polling = null;
+    }
+
+    document.querySelector(".aziel-support-tab")?.remove();
+    document.querySelector(".live-chat-panel")?.remove();
+}
+
+async function refreshLiveChatAuthority() {
+    const requestId = ++AZIEL_CHAT.authorityRequestId;
+    const enabled = await loadLiveChatAuthority();
+    if (requestId !== AZIEL_CHAT.authorityRequestId) return AZIEL_CHAT.authorityEnabled;
+
+    if (!enabled) {
+        disableLiveChat();
+        return false;
+    }
+
+    AZIEL_CHAT.authorityEnabled = true;
     createLiveChatUI();
     initLiveChatSystem();
+    return true;
+}
+
+function initializeLiveChat() {
+    // Configuration is mutable operational authority. Never render from a cached
+    // assumption, and keep already-open pages aligned with an Admin ON/OFF change.
+    refreshLiveChatAuthority();
+
+    if (!AZIEL_CHAT.authorityPolling) {
+        AZIEL_CHAT.authorityPolling = setInterval(
+            refreshLiveChatAuthority,
+            LIVE_CHAT_AUTHORITY_REFRESH_MS
+        );
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "visible") refreshLiveChatAuthority();
+        });
+    }
 }
 
 if (document.readyState === "loading") {
@@ -37,6 +99,7 @@ if (document.readyState === "loading") {
 }
 
 function createLiveChatUI() {
+    if (AZIEL_CHAT.authorityEnabled !== true) return;
     if (document.querySelector(".aziel-support-tab")) return;
 
     const ball = document.createElement("button");
@@ -96,6 +159,9 @@ function createLiveChatUI() {
 }
 
 function initLiveChatSystem() {
+    if (AZIEL_CHAT.authorityEnabled !== true || AZIEL_CHAT.initialized) return;
+    AZIEL_CHAT.initialized = true;
+
     if (!window.AZIEL?.getToken?.()) {
         addChatMessage(
             "bot",
@@ -143,12 +209,14 @@ function initLiveChatRealtimeAssist() {
     window.__azielLiveChatRealtimeStarted = true;
 
     window.AZIEL.realtime.on("adminLiveReply", async () => {
+        if (AZIEL_CHAT.authorityEnabled !== true) return;
         await loadLiveChatHistory();
         await loadUnreadCount();
     });
 }
 
 async function sendLiveChatMessage() {
+    if (AZIEL_CHAT.authorityEnabled !== true) return;
     const input = document.getElementById("liveChatInput");
     const sendBtn = document.getElementById("sendLiveChatBtn");
     if (!input) return;
@@ -203,6 +271,7 @@ async function sendLiveChatMessage() {
 }
 
 async function loadLiveChatHistory() {
+    if (AZIEL_CHAT.authorityEnabled !== true) return;
     try {
         const res = await fetch(
             apiUrl(`/api/live-chat/user/${encodeURIComponent(AZIEL_CHAT.username)}`),
@@ -245,6 +314,7 @@ async function loadLiveChatHistory() {
 }
 
 async function loadUnreadCount() {
+    if (AZIEL_CHAT.authorityEnabled !== true) return;
     try {
         const res = await fetch(
             apiUrl(`/api/live-chat/user/${encodeURIComponent(AZIEL_CHAT.username)}/unread`),
@@ -264,6 +334,7 @@ async function loadUnreadCount() {
 }
 
 async function markUserRead() {
+    if (AZIEL_CHAT.authorityEnabled !== true) return;
     try {
         await fetch(
             apiUrl(`/api/live-chat/user/${encodeURIComponent(AZIEL_CHAT.username)}/read`),

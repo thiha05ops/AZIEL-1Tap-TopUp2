@@ -18,6 +18,7 @@ async function getOrCreateSettings() {
 // GET SETTINGS
 router.get("/settings", async (req, res) => {
     try {
+        res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
         const settings = await getOrCreateSettings();
 
         res.json({
