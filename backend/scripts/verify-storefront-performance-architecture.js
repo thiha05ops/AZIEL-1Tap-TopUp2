@@ -38,7 +38,20 @@ function presentation(region, revision = `revision-${region}`) {
     };
 }
 
-function homeRuntimeHarness({ initialRegion = "MM", initialStorage = {}, fetchImpl, throwOnFirstRender = false } = {}) {
+function presentationWithAllSections(region, revision = `layout-${region}`) {
+    const payload = presentation(region, revision);
+    const products = Array.from({ length: 8 }, (_, index) => ({
+        productCode: `fixture-${region.toLowerCase()}-${index + 1}`,
+        displayName: `Fixture ${index + 1}`,
+        route: `product.html?product=fixture-${region.toLowerCase()}-${index + 1}`
+    }));
+    payload.sections[0].products = products.slice(0, 4);
+    payload.sections[1].products = products;
+    payload.sections[2].products = products.slice(0, 3);
+    return payload;
+}
+
+function homeRuntimeHarness({ initialRegion = "MM", initialStorage = {}, fetchImpl, throwOnFirstRender = false, viewportWidth = 1024 } = {}) {
     const storage = new Map(Object.entries(initialStorage));
     const documentListeners = new Map();
     const windowListeners = new Map();
@@ -72,7 +85,7 @@ function homeRuntimeHarness({ initialRegion = "MM", initialStorage = {}, fetchIm
     const window = {
         AZIEL: { getShopRegion: () => initialRegion },
         addEventListener(type, handler) { windowListeners.set(type, handler); },
-        matchMedia() { return { matches: false, addEventListener() {} }; }
+        matchMedia(query) { return { matches: /max-width:\s*720px/.test(query) && viewportWidth <= 720, addEventListener() {} }; }
     };
     const sandbox = {
         window,
@@ -101,6 +114,7 @@ function homeRuntimeHarness({ initialRegion = "MM", initialStorage = {}, fetchIm
         start() { documentListeners.get("DOMContentLoaded")?.(); },
         changeRegion(next) { window.AZIEL.getShopRegion = () => next; windowListeners.get("aziel:shopRegionChanged")?.({ detail: { region: next } }); },
         snapshot() { return window.AZIEL_HOME_PRESENTATION.getSnapshot(); },
+        markup(id) { return targets.get(id)?.innerHTML || ""; },
         testing: window.AZIEL_HOME_PRESENTATION_TESTING
     };
 }
@@ -181,6 +195,43 @@ async function verifyHomeRuntimeSafety() {
     renderRecovery.start();
     await settle();
     assert.strictEqual(renderRecovery.snapshot().revision, "network-recovery", "cached render exception must not prevent network recovery");
+
+    for (const viewportWidth of [360, 375, 390]) {
+        const mobile = homeRuntimeHarness({
+            initialRegion: "MM",
+            viewportWidth,
+            fetchImpl: async () => ({ ok: true, status: 200, json: async () => presentationWithAllSections("MM") })
+        });
+        mobile.start();
+        await settle();
+        assert.ok(mobile.markup("allMobileGamesList").includes('class="home-product-panel home-product-panel--mobile-two-row"'), `${viewportWidth}px All Mobile must use approved two-row rail panel`);
+        assert.ok(mobile.markup("allMobileGamesList").includes('class="home-product-item'), `${viewportWidth}px All Mobile cards must retain product-card class`);
+        assert.ok(!mobile.markup("popularGamesList").includes("home-product-panel--mobile-two-row"), `${viewportWidth}px Popular must retain its independent rail contract`);
+        assert.ok(!mobile.markup("socialTopUpList").includes("home-product-panel--mobile-two-row"), `${viewportWidth}px Social must retain its independent rail contract`);
+    }
+
+    for (const viewportWidth of [768, 1280]) {
+        const wide = homeRuntimeHarness({
+            initialRegion: "MM",
+            viewportWidth,
+            fetchImpl: async () => ({ ok: true, status: 200, json: async () => presentationWithAllSections("MM") })
+        });
+        wide.start();
+        await settle();
+        assert.ok(!wide.markup("allMobileGamesList").includes("home-product-panel--mobile-two-row"), `${viewportWidth}px must retain desktop/tablet panel layout`);
+    }
+
+    const cachedLayout = presentationWithAllSections("MM", "cached-layout");
+    const reconciliation = homeRuntimeHarness({
+        initialRegion: "MM",
+        viewportWidth: 360,
+        initialStorage: { "aziel.home.presentation.v1.MM": JSON.stringify(cachedLayout) },
+        fetchImpl: async () => ({ ok: true, status: 200, json: async () => presentationWithAllSections("MM", "network-layout") })
+    });
+    reconciliation.start();
+    const cachedMarkup = reconciliation.markup("allMobileGamesList");
+    await settle();
+    assert.strictEqual(reconciliation.markup("allMobileGamesList"), cachedMarkup, "cached and network reconciliation must use identical All Mobile markup");
 }
 
 async function main() {

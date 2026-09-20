@@ -100,7 +100,10 @@
         const result = [];
         for (let offset = 0; offset < products.length; offset += Math.max(1, size)) {
             const items = products.slice(offset, offset + Math.max(1, size));
-            result.push(`<div class="home-product-panel" role="list" data-panel-size="${items.length}">${items.map((product, index) => productCard(product, groupId, offset + index)).join("")}</div>`);
+            const mobileTwoRowClass = window.matchMedia?.(MOBILE).matches && groupId === "all-mobile-games"
+                ? " home-product-panel--mobile-two-row"
+                : "";
+            result.push(`<div class="home-product-panel${mobileTwoRowClass}" role="list" data-panel-size="${items.length}">${items.map((product, index) => productCard(product, groupId, offset + index)).join("")}</div>`);
         }
         return result.join("");
     }
