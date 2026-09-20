@@ -1,7 +1,7 @@
 // frontend/js/mlbb.js
 // Thin Mobile Legends page configuration for the shared AZIEL game flow.
 
-const requestedProduct = new URLSearchParams(window.location.search).get("product");
+const requestedProduct = new URLSearchParams(window.location.search).get("product") || (window.location.pathname === "/products/mlbb-twilight-weekly-pass" ? "mlbb-twilight-weekly-pass" : "");
 const isPassProduct = requestedProduct === "mlbb-twilight-weekly-pass";
 const productCode = isPassProduct ? requestedProduct : "mlbb";
 const productName = isPassProduct
@@ -25,5 +25,5 @@ window.AZIEL_GAME_FLOW?.init({
     accountFields: window.AZIEL_GAME_INPUT_CONTRACTS?.forProduct(productCode)?.accountFields,
     userIdRequiredMessage: "Please enter your MLBB User ID.",
     zoneRequiredMessage: "Please enter your Zone ID.",
-    pendingReturnUrl: isPassProduct ? "mlbb.html?product=mlbb-twilight-weekly-pass" : "mlbb.html"
+    pendingReturnUrl: isPassProduct ? "/products/mlbb-twilight-weekly-pass" : "/games/mlbb"
 });

@@ -28,7 +28,7 @@
         const role = params.get("role") || "user";
 
         if (!token) {
-            window.location.href = "login.html";
+            window.location.href = "/login";
         } else {
             const user = {
                 username,
@@ -51,7 +51,7 @@
             localStorage.setItem("user", JSON.stringify(user));
             localStorage.setItem("azielUser", JSON.stringify(user));
 
-            window.location.replace("home.html");
+            window.location.replace("/");
         }
     </script>
 </body>

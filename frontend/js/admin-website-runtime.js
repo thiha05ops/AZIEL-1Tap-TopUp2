@@ -4,7 +4,7 @@
         data: null,
         loading: false,
         error: "",
-        previewRoute: "/home.html",
+        previewRoute: "/",
         previewRegion: "MM",
         previewMode: "desktop",
         inventorySearch: "",
@@ -138,7 +138,7 @@
     }
 
     function normalizePreviewRoute(route) {
-        const fallback = allowedPreviewRoutes().includes("/home.html") ? "/home.html" : allowedPreviewRoutes()[0] || "/home.html";
+        const fallback = allowedPreviewRoutes().includes("/") ? "/" : allowedPreviewRoutes()[0] || "/";
         const cleanRoute = String(route || "").split("?")[0].trim();
         return allowedPreviewRoutes().includes(cleanRoute) ? cleanRoute : fallback;
     }
@@ -197,7 +197,7 @@
     }
 
     function renderOwnerContextBar(data = state.data || {}) {
-        const route = state.previewRoute || "/home.html";
+        const route = state.previewRoute || "/";
         const previewState = state.previewHealth.refreshState || "Idle";
         return `
             <section class="website-owner-context" aria-label="Website workspace context">
@@ -262,7 +262,7 @@
         if (openPublic && openPublic.dataset.bound !== "true") {
             openPublic.dataset.bound = "true";
             openPublic.addEventListener("click", () => {
-                window.open(state.previewRoute || "/home.html", "_blank", "noopener,noreferrer");
+                window.open(state.previewRoute || "/", "_blank", "noopener,noreferrer");
             });
         }
 
@@ -1253,7 +1253,7 @@
             const context = {
                 region: state.configuration.contextRegion,
                 language: window.AZIEL_ADMIN_I18N?.getLocale?.() || "en",
-                route: "/home.html",
+                route: "/",
                 previewMode: state.previewMode
             };
             const data = service
@@ -1284,7 +1284,7 @@
             const context = {
                 region: state.configuration.contextRegion,
                 language: window.AZIEL_ADMIN_I18N?.getLocale?.() || "en",
-                route: "/home.html",
+                route: "/",
                 previewMode: state.previewMode
             };
             const value = state.configuration.resolution?.configuredValue || { placements: [] };
@@ -1429,7 +1429,7 @@
         return {
             region: state.configuration.contextRegion,
             language: window.AZIEL_ADMIN_I18N?.getLocale?.() || "en",
-            route: "/home.html",
+            route: "/",
             previewMode: state.previewMode
         };
     }

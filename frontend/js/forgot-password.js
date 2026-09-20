@@ -46,7 +46,7 @@ document.addEventListener("DOMContentLoaded", () => {
             showMessage(t("auth.otp.sentRedirecting", "OTP sent. Redirecting..."), "success");
 
             setTimeout(() => {
-                window.location.href = "verify-otp.html";
+                window.location.href = "/verify-otp";
             }, 800);
 
         } catch (error) {

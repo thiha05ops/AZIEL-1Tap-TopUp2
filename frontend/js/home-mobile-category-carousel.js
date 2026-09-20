@@ -78,14 +78,14 @@
             {
                 id: "popular-game-cards",
                 title: t("popularGameCards", "Popular Game Cards"),
-                route: "gift-cards.html",
+                route: "/gift-cards",
                 enabled: document.getElementById("popularGameCards")?.hidden !== true,
                 items: homeSectionProducts(products, "POPULAR_GAME_CARDS")
             },
             {
                 id: "popular-game-top-up",
                 title: t("home_popular_game_topup", "Popular Game Top-Up"),
-                route: "mobile-games.html",
+                route: "/mobile-games",
                 enabled: document.getElementById("popularGames")?.hidden !== true,
                 items: homeSectionProducts(products, "POPULAR_GAME_TOPUP").length
                     ? homeSectionProducts(products, "POPULAR_GAME_TOPUP")
@@ -94,35 +94,35 @@
             {
                 id: "pc-games",
                 title: t("pcGames", "Popular PC Games"),
-                route: "pc-games.html",
+                route: "/pc-games",
                 enabled: document.getElementById("popularPcGames")?.hidden !== true,
                 items: homeSectionProducts(products, "POPULAR_PC_GAMES")
             },
             {
                 id: "gift-cards",
                 title: t("home_popular_gift_cards", "Gift Cards"),
-                route: "gift-cards.html",
+                route: "/gift-cards",
                 enabled: document.getElementById("popularGiftCards")?.hidden !== true,
                 items: homeSectionProducts(products, "POPULAR_GIFT_CARDS")
             },
             {
                 id: "new-game-cards",
                 title: t("newGameCards", "New Game Cards"),
-                route: "gift-cards.html",
+                route: "/gift-cards",
                 enabled: document.getElementById("newGameCards")?.hidden !== true,
                 items: homeSectionProducts(products, "NEW_GAME_CARDS")
             },
             {
                 id: "digital-services",
                 title: t("digitalServices", "Digital Services"),
-                route: "explore.html",
+                route: "/explore",
                 enabled: document.getElementById("digitalServices")?.hidden !== true,
                 items: homeSectionProducts(products, "DIGITAL_SERVICES")
             },
             {
                 id: "new-games",
                 title: t("newGames", "New Games"),
-                route: "mobile-games.html",
+                route: "/mobile-games",
                 enabled: document.getElementById("newGames")?.hidden !== true,
                 items: homeSectionProducts(products, "NEW_GAME_TOPUP")
             }

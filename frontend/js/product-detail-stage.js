@@ -262,7 +262,7 @@
         copy.textContent = product.availabilityReason || window.AZIEL_CATALOG?.availabilityMessage?.(availabilityCode) || (isComingSoon
             ? tr("readiness.comingSoonBody", "This product is listed in AZIEL but is not yet available for purchase in your selected region.")
             : tr("readiness.unavailableBody", "This product is currently unavailable."));
-        const explore = document.createElement("a"); explore.href = "/mobile-games.html"; explore.textContent = tr("readiness.continueExploring", "Continue Exploring");
+        const explore = document.createElement("a"); explore.href = "/mobile-games"; explore.textContent = tr("readiness.continueExploring", "Continue Exploring");
         status.append(heading, copy, explore);
         if (state === "HIDDEN") {
             identity?.replaceChildren();

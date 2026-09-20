@@ -9,5 +9,5 @@ window.AZIEL_GAME_FLOW?.init({
     zoneRequired: true,
     userIdRequiredMessage: "Please enter your Genshin UID.",
     zoneRequiredMessage: "Please select your Genshin server.",
-    pendingReturnUrl: "genshin.html"
+    pendingReturnUrl: "/games/genshin"
 });

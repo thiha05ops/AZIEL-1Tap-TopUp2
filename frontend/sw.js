@@ -1,7 +1,7 @@
 const CACHE_PREFIX = "aziel-runtime";
 // Keep the suffix equal to the deterministic CORE_ASSETS content digest. The
 // migration verifier fails if a precached dependency changes without a bump.
-const SHELL_REVISION = "v6-645cf0a75d5ffd84";
+const SHELL_REVISION = "v7-990cc7f20b2e6c76";
 const CORE_CACHE = `${CACHE_PREFIX}-core-${SHELL_REVISION}`;
 const PAGE_CACHE = `${CACHE_PREFIX}-pages-v3-${SHELL_REVISION}`;
 const CODE_CACHE = `${CACHE_PREFIX}-code-${SHELL_REVISION}`;
@@ -63,30 +63,28 @@ const CORE_ASSETS = [
 
 const PUBLIC_HTML_ALLOWLIST = new Set([
     "/",
-    "/home.html",
-    "/mobile-games.html",
-    "/all-games.html",
-    "/pc-games.html",
-    "/gift-cards.html",
-    "/social-topup.html",
-    "/mlbb.html",
-    "/pubg.html",
-    "/freefire.html",
-    "/hok.html",
-    "/aov-id.html",
-    "/pubg-rp.html",
-    "/telegram.html",
-    "/genshin.html",
-    "/roblox.html",
-    "/valorant.html",
-    "/faq.html",
-    "/about.html",
-    "/contact.html",
-    "/policies/privacy.html",
-    "/policies/terms.html",
-    "/policies/payment.html",
-    "/policies/refund.html",
-    "/policies/support.html"
+    "/explore",
+    "/mobile-games",
+    "/pc-games",
+    "/gift-cards",
+    "/social-topup",
+    "/games/mlbb",
+    "/games/pubg",
+    "/games/freefire",
+    "/games/hok",
+    "/games/aov-id",
+    "/games/pubg-rp",
+    "/products/telegram",
+    "/games/genshin",
+    "/games/roblox",
+    "/faq",
+    "/about",
+    "/contact",
+    "/policies/privacy",
+    "/policies/terms",
+    "/policies/payment",
+    "/policies/refund",
+    "/policies/support"
 ]);
 
 const NEVER_CACHE_PREFIXES = [
@@ -126,7 +124,9 @@ self.addEventListener("activate", event => {
 
 async function activateAzielWorker() {
     const cacheNames = await caches.keys();
-    const migratesPerformanceShell = cacheNames.includes("aziel-runtime-core-v5-storefront-performance");
+    const migratesLegacyShell = cacheNames.some(name =>
+        name.startsWith(`${CACHE_PREFIX}-core-`) && name !== CORE_CACHE
+    );
 
     await Promise.all([
         deleteOldAzielCaches(),
@@ -138,7 +138,7 @@ async function activateAzielWorker() {
     // controller takeover. Refresh only public storefront clients once during
     // this specific cache migration; fresh installs and future activations do not
     // enter this branch.
-    if (migratesPerformanceShell) {
+    if (migratesLegacyShell) {
         await refreshLegacyPublicClients();
     }
 }
@@ -148,7 +148,7 @@ async function refreshLegacyPublicClients() {
     await Promise.allSettled(clients.map(client => {
         try {
             const url = new URL(client.url);
-            if (url.origin !== self.location.origin || !isPublicHtml(url.pathname)) return null;
+            if (url.origin !== self.location.origin || (url.pathname !== "/home.html" && !isPublicHtml(url.pathname))) return null;
             return client.navigate(client.url);
         } catch {
             return null;
@@ -268,7 +268,7 @@ async function handleNavigation(event, request, url) {
 async function staleWhileRevalidatePublicPage(event, request, url) {
     const cache = await caches.open(PAGE_CACHE);
     const cacheKey = createNormalizedCacheKey(request);
-    const shellFallback = ["/", "/home.html"].includes(url.pathname)
+    const shellFallback = url.pathname === "/"
         ? await caches.match("/home.html")
         : null;
     const cached = await cache.match(cacheKey) || shellFallback;

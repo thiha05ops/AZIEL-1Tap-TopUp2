@@ -12,7 +12,7 @@ function getFrontendUrl(env = process.env) {
 
 function configured(req, res, next, env = process.env) {
     if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) return next();
-    return res.redirect(`${getFrontendUrl(env)}/login.html`);
+    return res.redirect(`${getFrontendUrl(env)}/login`);
 }
 
 function urlClass(value, expectedPath) {
@@ -46,7 +46,7 @@ function providerStatus(error) {
 }
 
 function oauthFailureUrl(env = process.env) {
-    return `${getFrontendUrl(env)}/login.html?oauth=google&error=token_exchange_failed`;
+    return `${getFrontendUrl(env)}/login?oauth=google&error=token_exchange_failed`;
 }
 
 function createSocialAuthRouter(options = {}) {
@@ -95,7 +95,7 @@ function createSocialAuthRouter(options = {}) {
             try {
                 const params = new URLSearchParams({ token: issued.token, username: user.username || "", displayName: user.displayName || user.username || "", email: user.email || "", region: user.region || "MM", role: user.role || "user" });
                 logGoogleOAuthDiagnostic(logger, "GOOGLE_OAUTH_REDIRECT_ISSUED", { ...diagnostic, destinationOriginClass: "frontend", destinationPathClass: "google_success" });
-                return res.redirect(`${getFrontendUrl(env)}/google-success.html?${params.toString()}`);
+                return res.redirect(`${getFrontendUrl(env)}/auth/google/success?${params.toString()}`);
             } catch (_) {
                 logGoogleOAuthDiagnostic(logger, "GOOGLE_OAUTH_HANDOFF_FAILED", { ...diagnostic, errorCategory: "GOOGLE_HANDOFF_CONSTRUCTION_ERROR", elapsedMs: Date.now() - startedAt }, "warn");
                 logGoogleOAuthDiagnostic(logger, "GOOGLE_OAUTH_REDIRECT_ISSUED", { ...diagnostic, destinationOriginClass: "frontend", destinationPathClass: "login" });

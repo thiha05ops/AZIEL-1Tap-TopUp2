@@ -8,5 +8,5 @@ window.AZIEL_GAME_FLOW?.init({
     zoneIdSelector: "",
     zoneRequired: false,
     userIdRequiredMessage: "Please enter your Telegram username or phone number.",
-    pendingReturnUrl: "telegram.html"
+    pendingReturnUrl: "/products/telegram"
 });

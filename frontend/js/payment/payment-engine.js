@@ -23,7 +23,7 @@
                     action: {
                         label: "View My Orders",
                         onClick: () => {
-                            window.location.href = "account.html#orders";
+                            window.location.href = "/account#orders";
                         }
                     }
                 });
@@ -138,7 +138,7 @@
         const params = new URLSearchParams();
         if (orderId) params.set("orderId", orderId);
         if (attemptId) params.set("attemptId", attemptId);
-        window.location.href = `payment.html${params.toString() ? `?${params.toString()}` : ""}`;
+        window.location.href = `/payment${params.toString() ? `?${params.toString()}` : ""}`;
     }
 
     function stageWalletCompletion(result, orderData, selectedPayment) {
@@ -156,7 +156,7 @@
             paymentType: "wallet"
         }));
         window.dispatchEvent(new CustomEvent("aziel:payment-completed", { detail: { orderId, paymentType: "wallet" } }));
-        window.location.href = `payment.html?orderId=${encodeURIComponent(orderId)}`;
+        window.location.href = `/payment?orderId=${encodeURIComponent(orderId)}`;
     }
 
     async function start(orderData) {

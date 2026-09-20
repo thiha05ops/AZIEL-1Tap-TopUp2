@@ -16,7 +16,9 @@
     });
 
     function productCodeFromUrl() {
-        return String(new URLSearchParams(window.location.search).get("product") || "").trim().toLowerCase();
+        const queryCode = new URLSearchParams(window.location.search).get("product");
+        const pathMatch = window.location.pathname.match(/^\/products\/([a-z0-9][a-z0-9-]{0,79})\/?$/i);
+        return String(queryCode || pathMatch?.[1] || "").trim().toLowerCase();
     }
 
     function applyText(selector, value) {
@@ -36,12 +38,17 @@
     }
 
     const productCode = productCodeFromUrl();
+    if (productCode) {
+        const canonicalUrl = `${window.location.origin}/products/${encodeURIComponent(productCode)}`;
+        document.getElementById("productCanonicalUrl")?.setAttribute("href", canonicalUrl);
+        document.getElementById("productOpenGraphUrl")?.setAttribute("content", canonicalUrl);
+    }
     if (productCode === "mlbb-twilight-weekly-pass") {
-        window.location.replace("mlbb.html?product=mlbb-twilight-weekly-pass");
+        window.location.replace("/products/mlbb-twilight-weekly-pass");
         return;
     }
     if (productCode === "freefire-pass-membership") {
-        window.location.replace("freefire.html?product=freefire-pass-membership");
+        window.location.replace("/products/freefire-pass-membership");
         return;
     }
     const route = window.AZIEL_CATALOG_PRESENTATION?.resolveProductRoute?.("", productCode) || "";
@@ -132,7 +139,7 @@
             zoneRequired: contract.accountFields.some(field => field.key === "zoneId" && field.required),
             userIdRequiredMessage: firstField.requiredMessage,
             accountFields: resolvedAccountFields,
-            pendingReturnUrl: `product.html?product=${encodeURIComponent(productCode)}`
+            pendingReturnUrl: `/products/${encodeURIComponent(productCode)}`
         });
         return product;
     }

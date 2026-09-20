@@ -10,7 +10,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const email = localStorage.getItem("verifyEmail");
 
     if (!email) {
-        window.location.href = "register.html";
+        window.location.href = "/register";
         return;
     }
 
@@ -57,7 +57,7 @@ document.addEventListener("DOMContentLoaded", () => {
             showMessage("Account created ✅ Redirecting to login...", "success");
 
             setTimeout(() => {
-                window.location.href = "login.html";
+                window.location.href = "/login";
             }, 900);
 
         } catch (error) {

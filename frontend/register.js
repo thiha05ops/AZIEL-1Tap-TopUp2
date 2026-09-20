@@ -53,7 +53,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 msg.innerHTML = `<div class="success-msg">Account created ✅ Redirecting...</div>`;
 
                 setTimeout(() => {
-                    window.location.href = "login.html";
+                    window.location.href = "/login";
                 }, 1000);
             } else {
                 msg.innerHTML = `<div class="error-msg">${safeEmailMessage(data.message)}</div>`;

@@ -131,7 +131,7 @@ function paymentLabel(value = "") {
 }
 
 function trackingPath(order = {}) {
-    return `/tracking.html?orderId=${encodeURIComponent(order.orderId || "")}`;
+    return `/orders?orderId=${encodeURIComponent(order.orderId || "")}`;
 }
 
 function buildOrderEmail(order = {}, eventType) {
@@ -140,7 +140,7 @@ function buildOrderEmail(order = {}, eventType) {
 
     const orderId = String(order.orderId || "");
     const trackingUrl = absoluteUrl(trackingPath(order));
-    const supportUrl = absoluteUrl("/support.html");
+    const supportUrl = absoluteUrl("/support");
     const refundDestination = eventType === "REFUND_COMPLETED"
         ? `Refund destination: ${order.refundMethod === "wallet" || !order.refundMethod ? "AZIEL Wallet" : paymentLabel(order.refundMethod)}`
         : "";

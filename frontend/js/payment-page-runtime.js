@@ -78,8 +78,8 @@
         [[t("payment.amount", "Amount"), amount != null ? money(amount, currency) : ""], [t("payment.method", "Payment Method"), methodName], [t("payment.reference", "Reference"), reference]].forEach(([label, value]) => { if (!value) return; const row = document.createElement("div"); const dt = document.createElement("dt"); dt.textContent = label; const dd = document.createElement("dd"); dd.textContent = value; row.append(dt, dd); details.append(row); });
         const countdown = document.createElement("p"); countdown.id = "paymentRedirectCountdown"; countdown.textContent = t("payment.redirectCountdown", "Redirecting to order tracking in {seconds} seconds", { seconds: remaining });
         const actions = document.createElement("div"); actions.className = "payment-completion__actions";
-        const track = document.createElement("a"); track.id = "trackOrderNow"; track.className = "primary-commerce-action"; track.href = `tracking.html?orderId=${encodeURIComponent(orderId)}`; track.textContent = t("payment.trackOrderNow", "Track Order");
-        const home = document.createElement("a"); home.id = "paymentBackHome"; home.href = "home.html"; home.textContent = t("payment.backHome", "Back to Home");
+        const track = document.createElement("a"); track.id = "trackOrderNow"; track.className = "primary-commerce-action"; track.href = `/orders?orderId=${encodeURIComponent(orderId)}`; track.textContent = t("payment.trackOrderNow", "Track Order");
+        const home = document.createElement("a"); home.id = "paymentBackHome"; home.href = "/"; home.textContent = t("payment.backHome", "Back to Home");
         actions.append(track, home); section.append(icon, eyebrow, title, body); if (details.childElementCount) section.append(details); section.append(countdown, actions); mount.replaceChildren(section);
         text("paymentOrderId", orderId);
         if (amount != null) text("paymentAmount", money(amount, currency));
@@ -93,7 +93,7 @@
             const node = document.getElementById("paymentRedirectCountdown");
             if (node && remaining > 0) node.textContent = t("payment.redirectCountdown", "Redirecting to order tracking in {seconds} seconds", { seconds: remaining });
         }, 1000);
-        redirectTimer = window.setTimeout(() => window.location.replace(`tracking.html?orderId=${encodeURIComponent(orderId)}`), 5000);
+        redirectTimer = window.setTimeout(() => window.location.replace(`/orders?orderId=${encodeURIComponent(orderId)}`), 5000);
     }
 
     function readMarker() {
@@ -193,7 +193,7 @@
         const unavailable = document.createElement("section"); unavailable.className = "checkout-card";
         const heading = document.createElement("h2"); heading.textContent = t("payment.sessionUnavailable", "Payment session unavailable");
         const help = document.createElement("p"); help.textContent = t("payment.sessionUnavailableHelp", "Open My Orders to resume an active payment or review its status.");
-        const orders = document.createElement("a"); orders.className = "primary-commerce-action payment-page-link"; orders.href = "tracking.html"; orders.textContent = t("payment.viewOrders", "View My Orders");
+        const orders = document.createElement("a"); orders.className = "primary-commerce-action payment-page-link"; orders.href = "/orders"; orders.textContent = t("payment.viewOrders", "View My Orders");
         unavailable.append(heading, help, orders); mount.replaceChildren(unavailable);
     });
 

@@ -5,7 +5,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (token && username && helpLoginBtn) {
         helpLoginBtn.innerText = username;
-        helpLoginBtn.href = "account.html";
+        helpLoginBtn.href = "/account";
     }
 });
 async function loadNotifications() {

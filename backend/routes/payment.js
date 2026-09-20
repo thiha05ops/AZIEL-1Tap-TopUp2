@@ -740,7 +740,7 @@ async function emitManualOrderSubmitted(req, order, duplicate = false) {
         action: {
             type: "navigate",
             label: "View Order",
-            url: `/tracking.html?orderId=${encodeURIComponent(order.orderId)}`
+            url: `/orders?orderId=${encodeURIComponent(order.orderId)}`
         },
         metadata: {
             orderId: order.orderId,
@@ -1513,7 +1513,7 @@ router.post("/payment/submit", authMiddleware, upload.single("slip"), async (req
             action: {
                 type: "navigate",
                 label: "View Order",
-                url: `/tracking.html?orderId=${encodeURIComponent(order.orderId)}`
+                url: `/orders?orderId=${encodeURIComponent(order.orderId)}`
             },
             metadata: {
                 orderId: order.orderId,

@@ -250,6 +250,7 @@ async function main() {
         homepageSections: ["POPULAR_MOBILE_GAMES", "ALL_MOBILE_GAMES"],
         commerceState: "PURCHASABLE",
         lifecycleStatus: "ACTIVE",
+        productRoute: "/products/fixture-game",
         artworkPath: "",
         presentation: { imageAssetId: "fixture-art" },
         updatedAt: "2026-09-20T00:00:00.000Z"

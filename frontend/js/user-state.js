@@ -51,8 +51,8 @@ AZIEL.handleAuthFailure = function (message = "Session expired. Please login aga
     AZIEL.clearAuthState();
     localStorage.setItem("authMessage", message);
 
-    if (!/login\.html$/.test(window.location.pathname)) {
-        window.location.href = "login.html";
+    if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
     }
 };
 

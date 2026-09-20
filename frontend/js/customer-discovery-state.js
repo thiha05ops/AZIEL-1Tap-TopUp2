@@ -165,9 +165,9 @@
     }
 
     function initializeCurrentPage() {
-        const page = window.location.pathname.split("/").pop() || "home.html";
+        const page = window.location.pathname.split("/").pop() || "/";
 
-        if (page === "home.html" || page === "") {
+        if (page === "/" || page === "") {
             beginHomeVisit();
             return;
         }

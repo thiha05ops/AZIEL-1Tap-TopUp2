@@ -26,13 +26,13 @@
     };
 
     const staticResults = () => [
-        item(t("search.mobileGames", "Mobile Games"), t("search.category", "Category"), t("search.mobileGamesHelp", "Browse mobile game top-ups"), "mobile-games.html", "mobile"),
-        item(t("search.pcGames", "PC Games"), t("search.category", "Category"), t("search.pcGamesHelp", "Browse PC game services"), "pc-games.html", "desktop"),
-        item(t("search.giftCards", "Gift Cards"), t("search.category", "Category"), t("search.giftCardsHelp", "Browse gift cards"), "gift-cards.html", "gift"),
-        item(t("search.socialTopUp", "Social Top Up"), t("search.category", "Category"), t("search.socialTopUpHelp", "Telegram and social services"), "social-topup.html", "telegram"),
-        item(t("search.supportCenter", "Support Center"), t("search.support", "Support"), t("search.supportHelp", "Get help with orders, payments, wallet, and account issues"), "support.html", "support"),
-        item(t("search.faq", "FAQ"), t("search.support", "Support"), t("search.faqHelp", "Common questions and answers"), "faq.html", "help"),
-        item(t("search.contact", "Contact"), t("search.company", "Company"), t("search.contactHelp", "General and business inquiries"), "contact.html", "message")
+        item(t("search.mobileGames", "Mobile Games"), t("search.category", "Category"), t("search.mobileGamesHelp", "Browse mobile game top-ups"), "/mobile-games", "mobile"),
+        item(t("search.pcGames", "PC Games"), t("search.category", "Category"), t("search.pcGamesHelp", "Browse PC game services"), "/pc-games", "desktop"),
+        item(t("search.giftCards", "Gift Cards"), t("search.category", "Category"), t("search.giftCardsHelp", "Browse gift cards"), "/gift-cards", "gift"),
+        item(t("search.socialTopUp", "Social Top Up"), t("search.category", "Category"), t("search.socialTopUpHelp", "Telegram and social services"), "/social-topup", "telegram"),
+        item(t("search.supportCenter", "Support Center"), t("search.support", "Support"), t("search.supportHelp", "Get help with orders, payments, wallet, and account issues"), "/support", "support"),
+        item(t("search.faq", "FAQ"), t("search.support", "Support"), t("search.faqHelp", "Common questions and answers"), "/faq", "help"),
+        item(t("search.contact", "Contact"), t("search.company", "Company"), t("search.contactHelp", "General and business inquiries"), "/contact", "message")
     ];
 
     function item(title, category, subtitle, url, icon = "search", image = "") {
@@ -217,7 +217,7 @@
                         promotion.title || t("search.promotion", "Promotion"),
                         t("search.promotions", "Promotions"),
                         promotion.summary || promotion.message || t("search.activeOffer", "Active offer"),
-                        promotion.ctaUrl || "/notifications.html?filter=promotions",
+                        promotion.ctaUrl || "/notifications?filter=promotions",
                         "gift",
                         promotion.imageUrl || ""
                     ));

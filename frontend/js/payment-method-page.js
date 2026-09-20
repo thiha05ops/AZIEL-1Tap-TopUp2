@@ -36,7 +36,7 @@
             const orderId = authority?.orderId(activeTransaction) || "";
             const params = new URLSearchParams({ attemptId: activeTransaction.session.attemptId });
             if (orderId) params.set("orderId", orderId);
-            window.location.href = `payment.html?${params.toString()}`;
+            window.location.href = `/payment?${params.toString()}`;
             return;
         }
         if (!draft?.review?.quoteId) return;
@@ -65,7 +65,7 @@
             activeTransaction = null;
             sessionStorage.removeItem(PAYMENT_SESSION_KEY);
         }
-        if (!draft?.order && !activeTransaction?.orderData) { window.location.replace("checkout.html"); return; }
+        if (!draft?.order && !activeTransaction?.orderData) { window.location.replace("/checkout"); return; }
         if (activeTransaction?.orderData && authority?.stagedSessionMatchesDraft(activeTransaction, draft)) {
             draft = { ...draft, order: activeTransaction.orderData, review: draft?.review || {} };
         }

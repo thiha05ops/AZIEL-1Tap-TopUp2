@@ -39,13 +39,14 @@ function main() {
 
     SEO_FILES.forEach(file => {
         const source = read(file);
-        const title = source.match(/<title>([^<]+)<\/title>/i)?.[1] || "";
+        const title = source.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] || "";
         assert(title, `${file}: title missing.`);
         assert(!titles.has(title), `${file}: duplicate title ${title}.`);
         titles.add(title);
-        assert(count(source, /<title>/gi) === 1, `${file}: must have one title.`);
+        assert(count(source, /<title(?:\s[^>]*)?>/gi) === 1, `${file}: must have one title.`);
         assert(count(source, /name="description"/gi) === 1, `${file}: must have one meta description.`);
         assert(source.includes(`rel="canonical" href="${SITE}/`), `${file}: canonical must use ${SITE}.`);
+        assert(!/rel="canonical"[^>]+\.html/i.test(source), `${file}: canonical must not expose an HTML filename.`);
         assert(source.includes('property="og:title"'), `${file}: Open Graph title missing.`);
         assert(source.includes('property="og:description"'), `${file}: Open Graph description missing.`);
         assert(source.includes('name="twitter:card"'), `${file}: Twitter card missing.`);
@@ -67,8 +68,8 @@ function main() {
     const robots = read("frontend/robots.txt");
     const sitemap = read("frontend/sitemap.xml");
     assert(robots.includes(`Sitemap: ${SITE}/sitemap.xml`), "robots.txt must point to azielplay sitemap.");
-    assert(robots.includes("Disallow: /wallet.html") && robots.includes("Disallow: /notifications.html"), "robots.txt must exclude private surfaces.");
-    assert(sitemap.includes(`${SITE}/home.html`) && sitemap.includes(`${SITE}/mlbb.html`), "Sitemap must use azielplay public URLs.");
+    assert(robots.includes("Disallow: /wallet") && robots.includes("Disallow: /notifications"), "robots.txt must exclude private surfaces.");
+    assert(sitemap.includes(`${SITE}/games/mlbb`) && !/<loc>[^<]*\.html/i.test(sitemap), "Sitemap must use clean azielplay public URLs.");
     assert(!/onrender\.com|localhost|127\.0\.0\.1/i.test(sitemap + robots), "Sitemap/robots must not use local or Render URLs.");
 
     console.log("Public SEO verification passed.");

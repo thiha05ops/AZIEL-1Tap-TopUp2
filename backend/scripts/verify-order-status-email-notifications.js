@@ -135,8 +135,8 @@ async function verifyLifecycleStatus(status, eventType) {
     assert.strictEqual(sent.messageType, eventType, `${status}: wrong message type.`);
     assert(sent.subject && sent.subject.includes(order.orderId), `${status}: subject should include order id.`);
     assert(sent.html.includes("AZIEL 1Tap Shop"), `${status}: branded HTML template missing.`);
-    assert(sent.html.includes("/tracking.html?orderId="), `${status}: tracking link missing.`);
-    assert(sent.html.includes("/support.html"), `${status}: support link missing.`);
+    assert(sent.html.includes("/orders?orderId="), `${status}: tracking link missing.`);
+    assert(sent.html.includes("/support"), `${status}: support link missing.`);
     assert(sent.text.includes("Track order:"), `${status}: plain text tracking link missing.`);
 
     const second = await orderEmailService.notifyOrderTransition(order, { status });

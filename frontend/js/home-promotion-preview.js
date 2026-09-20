@@ -48,7 +48,7 @@
                 product.productRoute || product.route,
                 product.productCode
             ) ||
-            `product.html?product=${encodeURIComponent(product.productCode || "")}`;
+            `/products/${encodeURIComponent(product.productCode || "")}`;
 
         if (!packageCode) return base;
 
@@ -319,7 +319,7 @@
                 ?.replaceChildren(document.createTextNode("Exclusive Offers"));
 
             if (viewAll) {
-                viewAll.href = "/mobile-games.html";
+                viewAll.href = "/mobile-games";
                 viewAll.hidden = false;
             }
 

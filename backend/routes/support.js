@@ -229,7 +229,7 @@ router.put("/admin/support/tickets/:id/reply", adminMiddleware, requireAdminPerm
             action: {
                 type: "navigate",
                 label: "View Support",
-                url: "/support.html"
+                url: "/support"
             },
             source: "support_reply"
         };

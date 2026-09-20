@@ -49,12 +49,12 @@ function walletApiUrl(path) {
 document.addEventListener("DOMContentLoaded", async () => {
     if (!window.AZIEL) {
         console.error("AZIEL user-state.js not loaded");
-        window.location.href = "login.html";
+        window.location.href = "/login";
         return;
     }
 
     if (!AZIEL.getToken?.()) {
-        window.location.href = "login.html";
+        window.location.href = "/login";
         return;
     }
 
@@ -81,7 +81,7 @@ async function ensureWalletState() {
     if (!AZIEL.user) await AZIEL.loadUser?.();
 
     if (!AZIEL.user) {
-        window.location.href = "login.html";
+        window.location.href = "/login";
         return;
     }
 
@@ -885,7 +885,7 @@ async function submitTopup() {
     const user = getWalletUser();
 
     if (!user?.username) {
-        window.location.href = "login.html";
+        window.location.href = "/login";
         return;
     }
 
@@ -1525,7 +1525,7 @@ function showSubmitSuccessModal() {
 
     if (homeBtn) {
         homeBtn.onclick = () => {
-            window.location.href = "home.html";
+            window.location.href = "/";
         };
     }
 }

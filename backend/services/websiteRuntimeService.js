@@ -52,32 +52,32 @@ const READINESS_STATES = Object.freeze([
 ]);
 
 const PUBLIC_ROUTES = Object.freeze([
-    { id: "home", label: "Home", path: "/home.html", domain: "Home" },
-    { id: "explore", label: "Explore", path: "/explore.html", domain: "Games" },
-    { id: "mobile-games", label: "Mobile Games", path: "/mobile-games.html", domain: "Games" },
-    { id: "pc-games", label: "PC Games", path: "/pc-games.html", domain: "Games" },
-    { id: "gift-cards", label: "Gift Cards", path: "/gift-cards.html", domain: "Games" },
-    { id: "social-topup", label: "Social Top Up", path: "/social-topup.html", domain: "Games" },
-    { id: "mobile-recharge", label: "Mobile Recharge", path: "/mobile-recharge.html", domain: "Games" },
-    { id: "entertainment", label: "Entertainment", path: "/entertainment.html", domain: "Games" },
-    { id: "mlbb", label: "MLBB", path: "/mlbb.html", domain: "Games" },
-    { id: "pubg", label: "PUBG", path: "/pubg.html", domain: "Games" },
-    { id: "freefire", label: "Free Fire", path: "/freefire.html", domain: "Games" },
-    { id: "hok", label: "HOK", path: "/hok.html", domain: "Games" },
-    { id: "aov-id", label: "AOV ID", path: "/aov-id.html", domain: "Games" },
-    { id: "pubg-rp", label: "PUBG Royale Pass", path: "/pubg-rp.html", domain: "Games" },
-    { id: "telegram", label: "Telegram", path: "/telegram.html", domain: "Games" },
-    { id: "genshin", label: "Genshin", path: "/genshin.html", domain: "Games" },
-    { id: "roblox", label: "Roblox", path: "/roblox.html", domain: "Games" },
-    { id: "support", label: "Support", path: "/support.html", domain: "System" },
-    { id: "faq", label: "FAQ", path: "/faq.html", domain: "Legal" },
-    { id: "privacy", label: "Privacy", path: "/privacy.html", domain: "Legal" },
-    { id: "refund", label: "Refund", path: "/refund.html", domain: "Legal" },
-    { id: "contact", label: "Contact", path: "/contact.html", domain: "Legal" },
-    { id: "login", label: "Login", path: "/login.html", domain: "System" },
-    { id: "register", label: "Register", path: "/register.html", domain: "System" },
-    { id: "wallet", label: "Wallet", path: "/wallet.html", domain: "System" },
-    { id: "tracking", label: "Tracking", path: "/tracking.html", domain: "System" }
+    { id: "home", label: "Home", path: "/", domain: "Home" },
+    { id: "explore", label: "Explore", path: "/explore", domain: "Games" },
+    { id: "mobile-games", label: "Mobile Games", path: "/mobile-games", domain: "Games" },
+    { id: "pc-games", label: "PC Games", path: "/pc-games", domain: "Games" },
+    { id: "gift-cards", label: "Gift Cards", path: "/gift-cards", domain: "Games" },
+    { id: "social-topup", label: "Social Top Up", path: "/social-topup", domain: "Games" },
+    { id: "mobile-recharge", label: "Mobile Recharge", path: "/mobile-recharge", domain: "Games" },
+    { id: "entertainment", label: "Entertainment", path: "/entertainment", domain: "Games" },
+    { id: "mlbb", label: "MLBB", path: "/games/mlbb", domain: "Games" },
+    { id: "pubg", label: "PUBG", path: "/games/pubg", domain: "Games" },
+    { id: "freefire", label: "Free Fire", path: "/games/freefire", domain: "Games" },
+    { id: "hok", label: "HOK", path: "/games/hok", domain: "Games" },
+    { id: "aov-id", label: "AOV ID", path: "/games/aov-id", domain: "Games" },
+    { id: "pubg-rp", label: "PUBG Royale Pass", path: "/games/pubg-rp", domain: "Games" },
+    { id: "telegram", label: "Telegram", path: "/products/telegram", domain: "Games" },
+    { id: "genshin", label: "Genshin", path: "/games/genshin", domain: "Games" },
+    { id: "roblox", label: "Roblox", path: "/games/roblox", domain: "Games" },
+    { id: "support", label: "Support", path: "/support", domain: "System" },
+    { id: "faq", label: "FAQ", path: "/faq", domain: "Legal" },
+    { id: "privacy", label: "Privacy", path: "/policies/privacy", domain: "Legal" },
+    { id: "refund", label: "Refund", path: "/policies/refund", domain: "Legal" },
+    { id: "contact", label: "Contact", path: "/contact", domain: "Legal" },
+    { id: "login", label: "Login", path: "/login", domain: "System" },
+    { id: "register", label: "Register", path: "/register", domain: "System" },
+    { id: "wallet", label: "Wallet", path: "/wallet", domain: "System" },
+    { id: "tracking", label: "Tracking", path: "/orders", domain: "System" }
 ]);
 
 const OWNER_APPS = Object.freeze({
@@ -330,7 +330,7 @@ async function buildWebsiteRuntimeProjection({ baseUrl = "" } = {}) {
             id: "home.hero",
             displayName: "Home Hero / Banner Carousel",
             domain: "Home",
-            route: "/home.html",
+            route: "/",
             sourceType: "ADMIN_MANAGED",
             sourceOwner: "Home Banners",
             sourceReference: "HomeBanner",
@@ -344,7 +344,7 @@ async function buildWebsiteRuntimeProjection({ baseUrl = "" } = {}) {
             id: "home.placements",
             displayName: "Home Placements",
             domain: "Home",
-            route: "/home.html",
+            route: "/",
             sourceType: "MIXED",
             sourceOwner: "Site Placement Controls",
             sourceReference: "SitePlacement",
@@ -358,7 +358,7 @@ async function buildWebsiteRuntimeProjection({ baseUrl = "" } = {}) {
             id: "campaign.entry-popup",
             displayName: "Entry Popup Campaign",
             domain: "Campaigns",
-            route: "/home.html",
+            route: "/",
             sourceType: "ADMIN_MANAGED",
             sourceOwner: "Campaign Manager",
             sourceReference: "Campaign",
@@ -581,7 +581,7 @@ function isAllowedPreviewRoute(route = "") {
 }
 
 function normalizePreviewRoute(route = "") {
-    const raw = String(route || "").trim() || "/home.html";
+    const raw = String(route || "").trim() || "/";
     if (/^https?:\/\//i.test(raw) || raw.startsWith("//")) return "";
     const pathOnly = raw.split("#")[0].split("?")[0];
     const normalized = pathOnly.startsWith("/") ? pathOnly : `/${pathOnly}`;

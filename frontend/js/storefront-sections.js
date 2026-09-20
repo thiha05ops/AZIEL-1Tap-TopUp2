@@ -1,20 +1,20 @@
 (function () {
     const FALLBACK_SECTIONS = [
-        { key: "mobile-games", displayName: "Mobile Games", icon: "mobile", path: "/mobile-games.html", status: "PUBLISHED", showInGamesMenu: true, sortOrder: 1 },
-        { key: "pc-games", displayName: "PC Games", icon: "desktop", path: "/pc-games.html", status: "COMING_SOON", showInGamesMenu: true, sortOrder: 2 },
-        { key: "gift-cards", displayName: "Gift Cards", icon: "gift", path: "/gift-cards.html", status: "PUBLISHED", showInGamesMenu: true, sortOrder: 3 },
-        { key: "social-topup", displayName: "Social Top Up", icon: "telegram", path: "/social-topup.html", status: "COMING_SOON", showInGamesMenu: true, sortOrder: 4 },
-        { key: "mobile-recharge", displayName: "Mobile Recharge", icon: "mobile", path: "/mobile-recharge.html", status: "PUBLISHED", showInGamesMenu: true, sortOrder: 5 },
-        { key: "entertainment", displayName: "Entertainment", icon: "gift", path: "/entertainment.html", status: "PUBLISHED", showInGamesMenu: true, sortOrder: 6 },
-        { key: "coming-soon", displayName: "Coming Soon", icon: "clock", path: "/coming-soon.html", status: "HIDDEN", showInGamesMenu: false, sortOrder: 7 },
-        { key: "popular-game-cards", displayName: "Popular Game Cards", icon: "gift", path: "/gift-cards.html", status: "PUBLISHED", showInGamesMenu: false, sortOrder: 10 },
-        { key: "popular-game-topup", displayName: "Popular Game Top-Up", icon: "mobile", path: "/mobile-games.html", status: "PUBLISHED", showInGamesMenu: false, sortOrder: 11 },
-        { key: "popular-pc-games", displayName: "Popular PC Games", icon: "desktop", path: "/pc-games.html", status: "PUBLISHED", showInGamesMenu: false, sortOrder: 12 },
-        { key: "popular-gift-cards", displayName: "Popular Gift Cards", icon: "gift", path: "/gift-cards.html", status: "PUBLISHED", showInGamesMenu: false, sortOrder: 13 },
-        { key: "new-game-cards", displayName: "New Game Cards", icon: "gift", path: "/gift-cards.html", status: "PUBLISHED", showInGamesMenu: false, sortOrder: 14 },
-        { key: "new-game-topup", displayName: "New Game Top-Up", icon: "mobile", path: "/mobile-games.html", status: "PUBLISHED", showInGamesMenu: false, sortOrder: 15 },
-        { key: "digital-services-home", displayName: "Digital Services", icon: "telegram", path: "/explore.html", status: "PUBLISHED", showInGamesMenu: false, sortOrder: 16 },
-        { key: "news-promotions", displayName: "News & Promotions", icon: "gift", path: "/notifications.html?filter=promotions", status: "PUBLISHED", showInGamesMenu: false, sortOrder: 17 }
+        { key: "mobile-games", displayName: "Mobile Games", icon: "mobile", path: "/mobile-games", status: "PUBLISHED", showInGamesMenu: true, sortOrder: 1 },
+        { key: "pc-games", displayName: "PC Games", icon: "desktop", path: "/pc-games", status: "COMING_SOON", showInGamesMenu: true, sortOrder: 2 },
+        { key: "gift-cards", displayName: "Gift Cards", icon: "gift", path: "/gift-cards", status: "PUBLISHED", showInGamesMenu: true, sortOrder: 3 },
+        { key: "social-topup", displayName: "Social Top Up", icon: "telegram", path: "/social-topup", status: "COMING_SOON", showInGamesMenu: true, sortOrder: 4 },
+        { key: "mobile-recharge", displayName: "Mobile Recharge", icon: "mobile", path: "/mobile-recharge", status: "PUBLISHED", showInGamesMenu: true, sortOrder: 5 },
+        { key: "entertainment", displayName: "Entertainment", icon: "gift", path: "/entertainment", status: "PUBLISHED", showInGamesMenu: true, sortOrder: 6 },
+        { key: "coming-soon", displayName: "Coming Soon", icon: "clock", path: "/coming-soon", status: "HIDDEN", showInGamesMenu: false, sortOrder: 7 },
+        { key: "popular-game-cards", displayName: "Popular Game Cards", icon: "gift", path: "/gift-cards", status: "PUBLISHED", showInGamesMenu: false, sortOrder: 10 },
+        { key: "popular-game-topup", displayName: "Popular Game Top-Up", icon: "mobile", path: "/mobile-games", status: "PUBLISHED", showInGamesMenu: false, sortOrder: 11 },
+        { key: "popular-pc-games", displayName: "Popular PC Games", icon: "desktop", path: "/pc-games", status: "PUBLISHED", showInGamesMenu: false, sortOrder: 12 },
+        { key: "popular-gift-cards", displayName: "Popular Gift Cards", icon: "gift", path: "/gift-cards", status: "PUBLISHED", showInGamesMenu: false, sortOrder: 13 },
+        { key: "new-game-cards", displayName: "New Game Cards", icon: "gift", path: "/gift-cards", status: "PUBLISHED", showInGamesMenu: false, sortOrder: 14 },
+        { key: "new-game-topup", displayName: "New Game Top-Up", icon: "mobile", path: "/mobile-games", status: "PUBLISHED", showInGamesMenu: false, sortOrder: 15 },
+        { key: "digital-services-home", displayName: "Digital Services", icon: "telegram", path: "/explore", status: "PUBLISHED", showInGamesMenu: false, sortOrder: 16 },
+        { key: "news-promotions", displayName: "News & Promotions", icon: "gift", path: "/notifications?filter=promotions", status: "PUBLISHED", showInGamesMenu: false, sortOrder: 17 }
     ];
 
     let sections = null;
@@ -137,7 +137,7 @@
             ? t("storefront.sectionPreparing", "Products are being prepared for this section.")
             : t("storefront.sectionUnavailable", "This section is currently unavailable.");
         const link = document.createElement("a");
-        link.href = "/mobile-games.html";
+        link.href = "/mobile-games";
         link.textContent = t("storefront.exploreGames", "Explore available games");
         state.append(iconWrap, eyebrow, heading, message, link);
         target.replaceChildren(state);

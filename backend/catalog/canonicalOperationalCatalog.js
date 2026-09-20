@@ -1,23 +1,23 @@
 const CANONICAL_OPERATIONAL_PRODUCTS = Object.freeze([
-    product("mlbb", "Mobile Legends Diamonds", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 10, "mlbb.html", "Mobile Games", "Mobile Legends"),
-    product("mlbb-twilight-weekly-pass", "Mobile Legends Twilight Pass & Weekly Diamonds", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 20, "mlbb.html?product=mlbb-twilight-weekly-pass", "Mobile Games", "Mobile Legends"),
-    product("pubg", "PUBG Mobile UC", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 30, "pubg.html", "Mobile Games", "PUBG Mobile"),
-    product("pubgrp", "PUBG Mobile Pass", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 40, "pubg-rp.html", "Mobile Games", "PUBG Mobile"),
-    product("freefire", "Free Fire Diamonds", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 50, "freefire.html", "Mobile Games", "Free Fire"),
-    product("freefire-pass-membership", "Free Fire Pass & Membership", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 55, "freefire.html?product=freefire-pass-membership", "Mobile Games", "Free Fire"),
-    product("marvel-rivals", "Marvel Rivals Top Up", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 60, "product.html?product=marvel-rivals", "Mobile Games", "Marvel Rivals"),
-    product("blood-strike", "Blood Strike Golds", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 70, "product.html?product=blood-strike", "Mobile Games", "Blood Strike"),
-    product("blood-strike-pass", "Blood Strike Pass", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 80, "product.html?product=blood-strike-pass", "Mobile Games", "Blood Strike"),
-    product("age-of-empires-mobile", "Age of Empires Mobile Top Up", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 90, "product.html?product=age-of-empires-mobile", "Mobile Games", "Age of Empires Mobile"),
-    product("lineage-2m", "Lineage 2M Top Up", "games", "mobile", "southeast_asia", "MOBILE_GAME_TOPUP", 100, "product.html?product=lineage-2m", "Mobile Games", "Lineage 2M"),
-    product("overmortal", "OverMortal Voucher", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 110, "product.html?product=overmortal", "Mobile Games", "OverMortal"),
-    product("magic-chess-go-go", "Magic Chess: Go Go Top Up", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 120, "product.html?product=magic-chess-go-go", "Mobile Games", "Magic Chess: Go Go"),
-    product("lifeafter", "LifeAfter Credits & Packages", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 130, "product.html?product=lifeafter", "Mobile Games", "LifeAfter"),
-    product("hok", "Honor of Kings Tokens", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 140, "hok.html", "Mobile Games", "Honor of Kings"),
-    product("hok-pass-cards", "Honor of Kings Pass & Cards", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 142, "product.html?product=hok-pass-cards", "Mobile Games", "Honor of Kings"),
-    product("valorant", "Valorant", "games", "pc", "thailand", "PC_GAME", 145, "product.html?product=valorant", "PC Games", "Valorant", ["TH"]),
-    product("telegram", "Telegram Top Up", "social_topup", "service", "global", "DIGITAL_SERVICE", 150, "telegram.html", "Social Top Up", "Telegram"),
-    product("capcut", "CapCut Top Up", "social_topup", "service", "global", "DIGITAL_SERVICE", 160, "product.html?product=capcut", "Social Top Up", "CapCut")
+    product("mlbb", "Mobile Legends Diamonds", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 10, "/games/mlbb", "Mobile Games", "Mobile Legends"),
+    product("mlbb-twilight-weekly-pass", "Mobile Legends Twilight Pass & Weekly Diamonds", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 20, "/products/mlbb-twilight-weekly-pass", "Mobile Games", "Mobile Legends"),
+    product("pubg", "PUBG Mobile UC", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 30, "/games/pubg", "Mobile Games", "PUBG Mobile"),
+    product("pubgrp", "PUBG Mobile Pass", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 40, "/games/pubg-rp", "Mobile Games", "PUBG Mobile"),
+    product("freefire", "Free Fire Diamonds", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 50, "/games/freefire", "Mobile Games", "Free Fire"),
+    product("freefire-pass-membership", "Free Fire Pass & Membership", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 55, "/products/freefire-pass-membership", "Mobile Games", "Free Fire"),
+    product("marvel-rivals", "Marvel Rivals Top Up", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 60, "/products/marvel-rivals", "Mobile Games", "Marvel Rivals"),
+    product("blood-strike", "Blood Strike Golds", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 70, "/products/blood-strike", "Mobile Games", "Blood Strike"),
+    product("blood-strike-pass", "Blood Strike Pass", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 80, "/products/blood-strike-pass", "Mobile Games", "Blood Strike"),
+    product("age-of-empires-mobile", "Age of Empires Mobile Top Up", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 90, "/products/age-of-empires-mobile", "Mobile Games", "Age of Empires Mobile"),
+    product("lineage-2m", "Lineage 2M Top Up", "games", "mobile", "southeast_asia", "MOBILE_GAME_TOPUP", 100, "/products/lineage-2m", "Mobile Games", "Lineage 2M"),
+    product("overmortal", "OverMortal Voucher", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 110, "/products/overmortal", "Mobile Games", "OverMortal"),
+    product("magic-chess-go-go", "Magic Chess: Go Go Top Up", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 120, "/products/magic-chess-go-go", "Mobile Games", "Magic Chess: Go Go"),
+    product("lifeafter", "LifeAfter Credits & Packages", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 130, "/products/lifeafter", "Mobile Games", "LifeAfter"),
+    product("hok", "Honor of Kings Tokens", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 140, "/games/hok", "Mobile Games", "Honor of Kings"),
+    product("hok-pass-cards", "Honor of Kings Pass & Cards", "games", "mobile", "global", "MOBILE_GAME_TOPUP", 142, "/products/hok-pass-cards", "Mobile Games", "Honor of Kings"),
+    product("valorant", "Valorant", "games", "pc", "thailand", "PC_GAME", 145, "/products/valorant", "PC Games", "Valorant", ["TH"]),
+    product("telegram", "Telegram Top Up", "social_topup", "service", "global", "DIGITAL_SERVICE", 150, "/products/telegram", "Social Top Up", "Telegram"),
+    product("capcut", "CapCut Top Up", "social_topup", "service", "global", "DIGITAL_SERVICE", 160, "/products/capcut", "Social Top Up", "CapCut")
 ]);
 
 const CANONICAL_PRODUCT_CODES = Object.freeze(CANONICAL_OPERATIONAL_PRODUCTS.map(item => item.productCode));
@@ -55,7 +55,7 @@ function normalizeRouteProductCode(productCode = "") {
 
 function isSafeStorefrontProductRoute(route = "") {
     const value = String(route || "").trim();
-    if (!value || value.startsWith("/") || value.startsWith("\\") || /[\u0000-\u001f\u007f]/.test(value)) return false;
+    if (!value || value.startsWith("//") || value.startsWith("\\") || /[\u0000-\u001f\u007f]/.test(value)) return false;
     if (/^[a-z][a-z0-9+.-]*:/i.test(value) || value.startsWith("//")) return false;
     try {
         const parsed = new URL(value, "https://aziel.invalid/");
@@ -67,7 +67,7 @@ function isSafeStorefrontProductRoute(route = "") {
 
 function genericProductRoute(productCode = "") {
     const code = normalizeRouteProductCode(productCode);
-    return code ? `product.html?product=${encodeURIComponent(code)}` : "";
+    return code && isCanonicalProductCode(code) ? `/products/${encodeURIComponent(code)}` : "";
 }
 
 function resolveCanonicalProductRoute(productCode = "") {

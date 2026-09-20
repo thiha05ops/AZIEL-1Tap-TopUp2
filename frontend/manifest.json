@@ -29,7 +29,7 @@
             "name": "Browse Games",
             "short_name": "Games",
             "description": "Browse AZIEL game top-ups.",
-            "url": "/mobile-games.html",
+            "url": "/mobile-games",
             "icons": [
                 {
                     "src": "/assets/brand/icon-192.png",
@@ -41,7 +41,7 @@
             "name": "Track Orders",
             "short_name": "Orders",
             "description": "Open order tracking.",
-            "url": "/tracking.html",
+            "url": "/orders",
             "icons": [
                 {
                     "src": "/assets/brand/icon-192.png",
@@ -53,7 +53,7 @@
             "name": "Support Center",
             "short_name": "Support",
             "description": "Open AZIEL Support Center.",
-            "url": "/support.html",
+            "url": "/support",
             "icons": [
                 {
                     "src": "/assets/brand/icon-192.png",

@@ -1,7 +1,7 @@
 // frontend/js/freefire.js
 // Thin Free Fire page configuration for the shared AZIEL game flow.
 
-const requestedProduct = new URLSearchParams(window.location.search).get("product");
+const requestedProduct = new URLSearchParams(window.location.search).get("product") || (window.location.pathname === "/products/freefire-pass-membership" ? "freefire-pass-membership" : "");
 const isPassProduct = requestedProduct === "freefire-pass-membership";
 const productCode = isPassProduct ? requestedProduct : "freefire";
 const productName = isPassProduct ? "Free Fire Pass & Membership" : "Free Fire Diamonds";
@@ -22,5 +22,5 @@ window.AZIEL_GAME_FLOW?.init({
     zoneRequired: false,
     accountFields: window.AZIEL_GAME_INPUT_CONTRACTS?.forProduct(productCode)?.accountFields,
     userIdRequiredMessage: "Please enter your User ID.",
-    pendingReturnUrl: isPassProduct ? "freefire.html?product=freefire-pass-membership" : "freefire.html"
+    pendingReturnUrl: isPassProduct ? "/products/freefire-pass-membership" : "/games/freefire"
 });

@@ -205,7 +205,7 @@ document.addEventListener("DOMContentLoaded", () => {
         showMessage(authT("auth.login.success", "Login success. Redirecting..."), "success");
 
         const redirectUrl =
-            localStorage.getItem("redirectAfterLogin") || "home.html";
+            localStorage.getItem("redirectAfterLogin") || "/";
 
         localStorage.removeItem("redirectAfterLogin");
 

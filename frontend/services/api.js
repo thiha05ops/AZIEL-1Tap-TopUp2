@@ -22,7 +22,7 @@ function logoutUser(message = "") {
         localStorage.setItem("logoutMessage", message);
     }
 
-    window.location.href = "login.html";
+    window.location.href = "/login";
 }
 
 function isTokenExpired(token) {

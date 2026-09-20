@@ -1,4 +1,4 @@
-<!-- frontend/verify-otp.html -->
+<!-- frontend/verify-otp -->
 <!DOCTYPE html>
 <html lang="en">
 
@@ -35,7 +35,7 @@
     <main class="auth-shell">
 
         <section class="auth-brand-panel">
-            <a href="home.html" class="auth-logo"><img src="/assets/brand/aziel-logo-light.svg" alt="AZIEL"></a>
+            <a href="/" class="auth-logo"><img src="/assets/brand/aziel-logo-light.svg" alt="AZIEL"></a>
 
             <div class="auth-brand-content">
                 <span class="auth-pill" data-i18n="verify.otp.securityCheck">Security Check</span>
@@ -45,14 +45,14 @@
         </section>
 
         <section class="auth-card">
-            <a href="home.html" class="auth-mobile-logo"><img src="/assets/brand/aziel-logo-dark.svg" alt="AZIEL"></a>
+            <a href="/" class="auth-mobile-logo"><img src="/assets/brand/aziel-logo-dark.svg" alt="AZIEL"></a>
 
             <div class="auth-card-head">
                 <div>
                     <h2 data-i18n="verify.otp.enterOTP">Enter OTP</h2>
                     <p id="otpEmailText" data-i18n="verify.otp.checkYourGmailInbox">Check your Gmail inbox</p>
                 </div>
-                <a href="forgot-password.html" data-i18n="verify.otp.back">Back</a>
+                <a href="/forgot-password" data-i18n="verify.otp.back">Back</a>
             </div>
 
             <div id="msg" class="auth-message"></div>
@@ -71,7 +71,7 @@
 
                 <p class="auth-bottom-text">
                     <span data-i18n="verify.otp.didntReceive">Didn’t receive code?</span>
-                    <a href="forgot-password.html" data-i18n="verify.otp.sendAgain">Send again</a>
+                    <a href="/forgot-password" data-i18n="verify.otp.sendAgain">Send again</a>
                 </p>
 
             </form>

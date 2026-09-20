@@ -7,14 +7,14 @@ document.addEventListener("DOMContentLoaded", () => {
         sessionStorage.getItem("token");
 
     const protectedPages = [
-        "account.html",
-        "wallet.html",
-        "notifications.html",
-        "tracking.html"
+        "/account",
+        "/wallet",
+        "/notifications",
+        "/orders"
     ];
 
     const currentPage =
-        window.location.pathname.split("/").pop() || "home.html";
+        (window.location.pathname || "/").replace(/\/$/, "") || "/";
 
     if (!protectedPages.includes(currentPage)) return;
 
@@ -24,6 +24,6 @@ document.addEventListener("DOMContentLoaded", () => {
             window.location.href
         );
 
-        window.location.href = "login.html";
+        window.location.href = "/login";
     }
 });

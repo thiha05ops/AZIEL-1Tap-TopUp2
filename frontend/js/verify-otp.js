@@ -11,7 +11,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const email = localStorage.getItem("resetEmail");
 
     if (!email) {
-        window.location.href = "forgot-password.html";
+        window.location.href = "/forgot-password";
         return;
     }
 
@@ -80,11 +80,11 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             setTimeout(() => {
-                window.location.href = "reset-password.html";
+                window.location.href = "/reset-password";
             }, 1500);
 
             setTimeout(() => {
-                window.location.href = "reset-password.html";
+                window.location.href = "/reset-password";
             }, 700);
 
         } catch (error) {

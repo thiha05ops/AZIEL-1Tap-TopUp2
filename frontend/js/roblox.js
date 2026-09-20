@@ -7,5 +7,5 @@ window.AZIEL_GAME_FLOW?.init({
     userIdSelector: "#userId",
     zoneIdSelector: "",
     zoneRequired: false,
-    pendingReturnUrl: "roblox.html"
+    pendingReturnUrl: "/games/roblox"
 });

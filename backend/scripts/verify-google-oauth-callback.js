@@ -65,7 +65,7 @@ async function failureCase(error, expectedEvent, expectedCategory, loggerOverrid
     const router = createSocialAuthRouter({ passport: stub.passport, issueUserSession: async () => { sessionCalls += 1; }, logger: observed.logger, env: ENV, ...routerOptions });
     const req = request(); const res = response();
     await runRoute(router, "/auth/google/callback", req, res);
-    assert.strictEqual(res.redirectUrl, "https://azielplay.com/login.html?oauth=google&error=token_exchange_failed");
+    assert.strictEqual(res.redirectUrl, "https://azielplay.com/login?oauth=google&error=token_exchange_failed");
     assert.strictEqual(sessionCalls, 0, "OAuth failure must not create an AZIEL session/JWT");
     assert.strictEqual(stub.calls.length, 1, "callback must invoke Passport exactly once");
     if (!loggerOverride) {
@@ -116,7 +116,7 @@ async function main() {
     const req = request("SUCCESS_CODE_SECRET"); const res = response();
     await runRoute(router, "/auth/google/callback", req, res);
     assert.strictEqual(sessionCalls, 1);
-    assert(res.redirectUrl.startsWith("https://azielplay.com/google-success.html?"));
+    assert(res.redirectUrl.startsWith("https://azielplay.com/auth/google/success?"));
     assert(res.redirectUrl.includes("token=JWT_SECRET_VALUE"), "existing JWT handoff must remain unchanged");
     const successLogs = JSON.stringify(observed.records);
     for (const secret of ["SUCCESS_CODE_SECRET", "JWT_SECRET_VALUE", "SESSION_SECRET_ID", "USER_SECRET_ID", "private@example.com"]) assert(!successLogs.includes(secret), `diagnostics leaked ${secret}`);
@@ -132,7 +132,7 @@ async function main() {
     assert(sessionLogs.includes("GOOGLE_OAUTH_SESSION_FAILED"));
     assert(!sessionLogs.includes("GOOGLE_OAUTH_TOKEN_EXCHANGE_FAILED"));
     assert(!sessionLogs.includes("JWT_SECRET_FAILURE"));
-    assert.strictEqual(sessionRes.redirectUrl, "https://azielplay.com/login.html?oauth=google&error=token_exchange_failed");
+    assert.strictEqual(sessionRes.redirectUrl, "https://azielplay.com/login?oauth=google&error=token_exchange_failed");
 
     const handoffObserved = captureLogger();
     const handoffUser = { _id: "HANDOFF_USER_SECRET", get username() { throw new Error("HANDOFF_PROFILE_SECRET"); } };
@@ -144,20 +144,20 @@ async function main() {
     assert(handoffLogs.includes("GOOGLE_OAUTH_HANDOFF_FAILED"));
     assert(!handoffLogs.includes("GOOGLE_OAUTH_TOKEN_EXCHANGE_FAILED"));
     for (const secret of ["HANDOFF_USER_SECRET", "HANDOFF_PROFILE_SECRET", "HANDOFF_JWT_SECRET", "HANDOFF_SESSION_SECRET"]) assert(!handoffLogs.includes(secret));
-    assert.strictEqual(handoffRes.redirectUrl, "https://azielplay.com/login.html?oauth=google&error=token_exchange_failed");
+    assert.strictEqual(handoffRes.redirectUrl, "https://azielplay.com/login?oauth=google&error=token_exchange_failed");
 
     const diagnosticObserved = captureLogger();
     const diagnosticStub = passportResult(null, user);
     const diagnosticRouter = createSocialAuthRouter({ passport: diagnosticStub.passport, issueUserSession: async () => ({ token: "SAFE_JWT", session: { sessionId: "SAFE_SESSION" } }), logger: diagnosticObserved.logger, env: ENV, randomBytes: () => { throw new Error("crypto unavailable"); } });
     const diagnosticRes = response();
     await runRoute(diagnosticRouter, "/auth/google/callback", request(), diagnosticRes);
-    assert(diagnosticRes.redirectUrl.startsWith("https://azielplay.com/google-success.html?"), "throwing diagnostic correlation construction must not affect OAuth success");
+    assert(diagnosticRes.redirectUrl.startsWith("https://azielplay.com/auth/google/success?"), "throwing diagnostic correlation construction must not affect OAuth success");
 
     const hostileRequest = request();
     Object.defineProperty(hostileRequest, "query", { get() { throw new Error("HOSTILE_REQUEST_GETTER_SECRET"); } });
     const hostileRequestRes = response();
     await runRoute(diagnosticRouter, "/auth/google/callback", hostileRequest, hostileRequestRes);
-    assert(hostileRequestRes.redirectUrl.startsWith("https://azielplay.com/google-success.html?"), "throwing request accessors used by diagnostics must not affect OAuth success");
+    assert(hostileRequestRes.redirectUrl.startsWith("https://azielplay.com/auth/google/success?"), "throwing request accessors used by diagnostics must not affect OAuth success");
 
     const root = path.resolve(__dirname, "../..");
     const social = fs.readFileSync(path.join(root, "backend/routes/socialAuth.js"), "utf8");

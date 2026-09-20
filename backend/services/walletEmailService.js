@@ -83,8 +83,8 @@ function buildWalletTopupEmail(topup = {}, eventType) {
     if (!copy) return null;
 
     const topupId = String(topup.topupId || "");
-    const walletUrl = absoluteUrl("/wallet.html");
-    const supportUrl = absoluteUrl("/support.html");
+    const walletUrl = absoluteUrl("/wallet");
+    const supportUrl = absoluteUrl("/support");
     const fields = [
         ["Top-up ID", topupId],
         ["Amount", formatMoney(topup)],

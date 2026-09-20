@@ -10,5 +10,5 @@ window.AZIEL_GAME_FLOW?.init({
     accountFields: window.AZIEL_GAME_INPUT_CONTRACTS?.forProduct("hok")?.accountFields,
     directWallet: true,
     legacyPaymentPreferred: true,
-    pendingReturnUrl: "hok.html"
+    pendingReturnUrl: "/games/hok"
 });

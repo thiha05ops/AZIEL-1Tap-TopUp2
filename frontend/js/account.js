@@ -47,7 +47,7 @@ async function initAccount() {
     const token = window.AZIEL?.getToken?.();
 
     if (!token) {
-        window.location.href = "login.html";
+        window.location.href = "/login";
         return;
     }
 
@@ -56,7 +56,7 @@ async function initAccount() {
     currentUser = window.AZIEL?.user || null;
 
     if (!currentUser) {
-        window.location.href = "login.html";
+        window.location.href = "/login";
         return;
     }
 
@@ -524,7 +524,7 @@ async function saveProfile() {
     const token = window.AZIEL?.getToken?.();
 
     if (!token) {
-        window.location.href = "login.html";
+        window.location.href = "/login";
         return;
     }
 
@@ -654,7 +654,7 @@ function renderHistory(orders) {
 
                 <p>${t("ordersAppearHere", "Your recent top-up orders will appear here.")}</p>
 
-                <a href="home.html">
+                <a href="/">
                     ${t("startTopUp", "Start Top Up")}
                 </a>
             </div>
@@ -676,7 +676,7 @@ function renderRecent(orders) {
 
     box.innerHTML = orders.slice(0, 3).map(order => `
         <div class="recent-order-item"
-             onclick="window.location.href='tracking.html?orderId=${escapeHTML(order.orderId)}'">
+             onclick="window.location.href='/orders?orderId=${escapeHTML(order.orderId)}'">
 
             <div>
                 <strong>${escapeHTML(order.game || t("game", "Game"))}</strong>
@@ -718,7 +718,7 @@ function orderCard(order) {
                 </strong>
 
                 <a class="order-track-link"
-                   href="tracking.html?orderId=${encodeURIComponent(orderId)}">
+                   href="/orders?orderId=${encodeURIComponent(orderId)}">
                     ${t("trackOrder", "Track Order")}
                 </a>
             </div>
@@ -774,7 +774,7 @@ async function loadBellOrders() {
 
         panel.innerHTML = data.orders.slice(0, 8).map(order => `
             <div class="noti-item"
-                 onclick="window.location.href='tracking.html?orderId=${escapeHTML(order.orderId)}'">
+                 onclick="window.location.href='/orders?orderId=${escapeHTML(order.orderId)}'">
 
                 🔔 <b>${escapeHTML(order.game || t("game", "Game"))}</b><br>
 
@@ -1315,13 +1315,13 @@ function initButtons() {
     document
         .getElementById("goWalletTopupBtn")
         ?.addEventListener("click", () => {
-            window.location.href = "wallet.html";
+            window.location.href = "/wallet";
         });
 
     document
         .getElementById("goWalletHistoryBtn")
         ?.addEventListener("click", () => {
-            window.location.href = "wallet.html#history";
+            window.location.href = "/wallet#history";
         });
 
     document

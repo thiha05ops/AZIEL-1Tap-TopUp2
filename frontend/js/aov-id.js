@@ -7,5 +7,5 @@ window.AZIEL_GAME_FLOW?.init({
     userIdSelector: "#userId",
     zoneIdSelector: "",
     zoneRequired: false,
-    pendingReturnUrl: "aov-id.html"
+    pendingReturnUrl: "/games/aov-id"
 });

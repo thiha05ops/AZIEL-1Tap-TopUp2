@@ -22,17 +22,13 @@ function assertFileExists(relativePath) {
     assert(fs.existsSync(path.join(ROOT, relativePath)), `${relativePath} must exist`);
 }
 
-function routePath(route = "") {
-    return String(route || "").split("?")[0];
-}
-
 function assertCanonicalRoutes() {
     const destinations = {};
 
     CANONICAL_OPERATIONAL_PRODUCTS.forEach(product => {
         const route = resolveCanonicalProductRoute(product.productCode);
         assert(route, `${product.productCode} must resolve to a canonical destination.`);
-        assertFileExists(`frontend/${routePath(route)}`);
+        assert(/^\/(?:games|products)\/[a-z0-9-]+$/.test(route), `${product.productCode} must use a clean product route.`);
         destinations[product.productCode] = route;
     });
 
@@ -58,7 +54,7 @@ function assertFrontendUsesCanonicalRouteSource(destinations) {
     assert(mobileCarousel.includes("resolveProductRoute"), "Mobile storefront rows must consume projected routes.");
     assert(discovery.includes("product.route"), "Catalog discovery cards must use product.route.");
     assert(search.includes("product.route"), "Search results must use product.route.");
-    assert(presentation.includes("product.html?product="), "One generic defensive product fallback must remain.");
+    assert(presentation.includes("/products/${encodeURIComponent(code)}"), "One generic clean product fallback must remain.");
 }
 
 function assertPaymentPricingUntouched() {
@@ -119,7 +115,7 @@ async function run() {
         canonicalDestinations: destinations,
         storefrontRouteSource: "public Catalog productRoute",
         backendRouteSource: "backend/catalog/canonicalOperationalCatalog.js",
-        fallbackBehavior: "product.html?product=<code> is the dedicated-page and malformed-payload generic fallback.",
+        fallbackBehavior: "/products/<canonical-code> is the generic presentation fallback.",
         databaseProjection,
         paymentPricingUntouched: true
     };

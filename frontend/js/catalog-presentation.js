@@ -348,7 +348,7 @@
 
     function safeProjectedRoute(productRoute = "") {
         const route = String(productRoute || "").trim();
-        if (!route || route.startsWith("/") || route.startsWith("\\") || /[\u0000-\u001f\u007f]/.test(route)) return "";
+        if (!route || route.startsWith("//") || route.startsWith("\\") || /[\u0000-\u001f\u007f]/.test(route)) return "";
         if (/^[a-z][a-z0-9+.-]*:/i.test(route) || route.startsWith("//")) return "";
         try {
             const parsed = new URL(route, "https://aziel.invalid/");
@@ -363,7 +363,7 @@
         if (projected) return projected;
         const code = String(productCode || "").trim().toLowerCase();
         return /^[a-z0-9][a-z0-9-]{0,79}$/.test(code)
-            ? `product.html?product=${encodeURIComponent(code)}`
+            ? `/products/${encodeURIComponent(code)}`
             : "";
     }
 })();

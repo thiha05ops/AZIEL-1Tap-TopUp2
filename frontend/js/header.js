@@ -417,7 +417,7 @@ function renderHeaderNav() {
             </button>
         </div>
 
-        <a class="az-nav-link az-nav-home" href="home.html">
+        <a class="az-nav-link az-nav-home" href="/">
             <i class="fa-solid fa-house az-mobile-nav-icon" aria-hidden="true"></i>
             <span data-i18n="nav_home">Home</span>
         </a>
@@ -430,9 +430,9 @@ function renderHeaderNav() {
             </button>
 
             <div class="az-nav-drop-menu" id="azGamesDropdownMenu" role="menu" aria-label="${escapeHeaderHtml(window.AZIEL_LOCALE?.t?.("header.gameCategories", "Game categories") || "Game categories")}">
-                <a href="mobile-games.html" role="menuitem" data-i18n="header.mobileGames">Mobile Games</a>
-                <a href="pc-games.html" role="menuitem" data-i18n="header.pcGames">PC Games</a>
-                <a href="coming-soon.html?feature=webgame" role="menuitem" data-i18n="header.webgame">Webgame</a>
+                <a href="/mobile-games" role="menuitem" data-i18n="header.mobileGames">Mobile Games</a>
+                <a href="/pc-games" role="menuitem" data-i18n="header.pcGames">PC Games</a>
+                <a href="/coming-soon?feature=webgame" role="menuitem" data-i18n="header.webgame">Webgame</a>
             </div>
         </div>
 
@@ -444,8 +444,8 @@ function renderHeaderNav() {
             </button>
 
             <div class="az-nav-drop-menu" id="azSocialDropdownMenu" role="menu" aria-label="${escapeHeaderHtml(window.AZIEL_LOCALE?.t?.("header.socialCategories", "Social top up categories") || "Social top up categories")}">
-                <a href="telegram.html" role="menuitem" data-i18n="header.telegramTopUp">Telegram Top Up</a>
-                <a href="coming-soon.html?feature=capcut-top-up" role="menuitem" data-i18n="header.capcutTopUp">CapCut Top Up</a>
+                <a href="/products/telegram" role="menuitem" data-i18n="header.telegramTopUp">Telegram Top Up</a>
+                <a href="/coming-soon?feature=capcut-top-up" role="menuitem" data-i18n="header.capcutTopUp">CapCut Top Up</a>
             </div>
         </div>
 
@@ -464,11 +464,11 @@ function renderHeaderNav() {
             </span>
         </button>
 
-        <a class="az-mobile-drawer-link" href="tracking.html">
+        <a class="az-mobile-drawer-link" href="/orders">
             <i class="fa-solid fa-receipt az-mobile-nav-icon" aria-hidden="true"></i>
             <span data-i18n="nav_orders">Orders</span>
         </a>
-        <a class="az-mobile-drawer-link" href="support.html">
+        <a class="az-mobile-drawer-link" href="/support">
             <i class="fa-regular fa-circle-question az-mobile-nav-icon" aria-hidden="true"></i>
             <span data-i18n="nav_support">Support</span>
         </a>
@@ -481,10 +481,10 @@ function renderHeaderNav() {
 
 function getFallbackStorefrontSections() {
     return [
-        { key: "mobile-games", displayName: "Mobile Games", icon: "mobile", path: "/mobile-games.html", status: "PUBLISHED", showInGamesMenu: true, sortOrder: 1 },
-        { key: "pc-games", displayName: "PC Games", icon: "desktop", path: "/pc-games.html", status: "COMING_SOON", showInGamesMenu: true, sortOrder: 2 },
-        { key: "gift-cards", displayName: "Gift Cards", icon: "gift", path: "/gift-cards.html", status: "PUBLISHED", showInGamesMenu: true, sortOrder: 3 },
-        { key: "social-topup", displayName: "Social Top Up", icon: "telegram", path: "/social-topup.html", status: "COMING_SOON", showInGamesMenu: true, sortOrder: 4 }
+        { key: "mobile-games", displayName: "Mobile Games", icon: "mobile", path: "/mobile-games", status: "PUBLISHED", showInGamesMenu: true, sortOrder: 1 },
+        { key: "pc-games", displayName: "PC Games", icon: "desktop", path: "/pc-games", status: "COMING_SOON", showInGamesMenu: true, sortOrder: 2 },
+        { key: "gift-cards", displayName: "Gift Cards", icon: "gift", path: "/gift-cards", status: "PUBLISHED", showInGamesMenu: true, sortOrder: 3 },
+        { key: "social-topup", displayName: "Social Top Up", icon: "telegram", path: "/social-topup", status: "COMING_SOON", showInGamesMenu: true, sortOrder: 4 }
     ];
 }
 
@@ -504,7 +504,7 @@ function renderGamesDropdownItems(sections = []) {
         .filter(section => section?.showInGamesMenu !== false && section?.status !== "HIDDEN")
         .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0))
         .map(section => `
-            <a href="${escapeHeaderHtml(section.path || "/mobile-games.html")}" role="menuitem" data-storefront-section="${escapeHeaderHtml(section.key || "")}">
+            <a href="${escapeHeaderHtml(section.path || "/mobile-games")}" role="menuitem" data-storefront-section="${escapeHeaderHtml(section.key || "")}">
                 <i class="${escapeHeaderHtml(sectionIconClass(section.icon))}"></i>
                 <span>${escapeHeaderHtml(section.displayName || "Games")}</span>
             </a>
@@ -773,7 +773,7 @@ function initProfileDropdown() {
         const user = window.AZIEL?.user || null;
 
         if (!user) {
-            window.location.href = "login.html";
+            window.location.href = "/login";
             return;
         }
 
@@ -846,7 +846,7 @@ function initHeaderLogout() {
 
         window.dispatchEvent(new Event("aziel:userChanged"));
 
-        window.location.href = "login.html";
+        window.location.href = "/login";
     });
 }
 

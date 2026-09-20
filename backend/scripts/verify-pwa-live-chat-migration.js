@@ -113,7 +113,7 @@ function makeHarness({ legacy = true, failInstall = false } = {}) {
         digest.update(fs.readFileSync(path.join(root, "frontend", asset.replace(/^\//, ""))));
         digest.update("\0");
     });
-    const expectedRevision = `v6-${digest.digest("hex").slice(0, 16)}`;
+    const expectedRevision = `v7-${digest.digest("hex").slice(0, 16)}`;
     assert(swSource.includes(`const SHELL_REVISION = "${expectedRevision}"`), "precache content changed without a shell revision bump");
     assert(swSource.includes('"/js/live-chat.js"') && swSource.includes('"/css/support/live-chat.css"'));
     assert(swSource.indexOf("cache.addAll(CORE_ASSETS)") < swSource.indexOf("self.skipWaiting()"));

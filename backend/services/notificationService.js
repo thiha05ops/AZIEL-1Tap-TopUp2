@@ -241,7 +241,7 @@ function normalizeNotification(notification) {
             ? {
                 type: "navigate",
                 label: "View Order",
-                url: `/tracking.html?orderId=${encodeURIComponent(metadata.orderId)}`
+                url: `/orders?orderId=${encodeURIComponent(metadata.orderId)}`
             }
             : null);
 
@@ -289,7 +289,7 @@ async function ensurePaymentRecoveryNotification(input = {}) {
     const action = sanitizeAction({
         type: PAYMENT_RECOVERY_ACTION_TYPE,
         label: "Continue Payment",
-        url: "notifications.html"
+        url: "/notifications"
     });
     const filter = {
         userId: owner.id,

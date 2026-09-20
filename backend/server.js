@@ -12,6 +12,8 @@ const multer = require("multer");
 const { Server } = require("socket.io");
 const rateLimit = require("express-rate-limit");
 const mongoose = require("mongoose");
+const { isCanonicalProductCode, resolveCanonicalProductRoute } = require("./catalog/canonicalOperationalCatalog");
+const { LEGACY_ALIASES, PAGE_ROUTES, PRODUCT_RENDERERS, frontendFile, preserveQuery } = require("./config/storefrontRouteContract");
 
 dotenv.config({ path: path.join(__dirname, "../.env") });
 const configurationLoadedAt = performance.now();
@@ -135,7 +137,7 @@ function configureBaseApplication() {
     });
     app.get("/", (req, res, next) => {
         if (isProduction && isAdminHost(req)) return res.redirect(302, "/admin-login.html");
-        return res.sendFile(path.join(__dirname, "../frontend/home.html"));
+        return res.sendFile(frontendFile("home.html"));
     });
     app.get(["/admin-login.html", "/admin.html", "/admin-design-studio.html"], (req, res, next) => {
         if (!isProduction || !isPublicProductionHost(req)) return next();
@@ -145,6 +147,33 @@ function configureBaseApplication() {
     app.get("/admin.html", (req, res, next) => {
         if (req.query.shell === "1") return next();
         return res.sendFile(path.join(__dirname, "../frontend/admin-entry.html"));
+    });
+
+    app.get("/product.html", (req, res, next) => {
+        const productCode = String(req.query.product || "").trim().toLowerCase();
+        if (!isCanonicalProductCode(productCode)) return res.status(404).sendFile(frontendFile("offline.html"));
+        return res.redirect(308, preserveQuery(req, resolveCanonicalProductRoute(productCode), ["product"]));
+    });
+
+    Object.entries(LEGACY_ALIASES).forEach(([legacy, clean]) => {
+        app.get(legacy, (req, res) => {
+            const productCode = String(req.query.product || "").trim().toLowerCase();
+            const destination = isCanonicalProductCode(productCode)
+                ? resolveCanonicalProductRoute(productCode)
+                : clean;
+            return res.redirect(308, preserveQuery(req, destination, productCode ? ["product"] : []));
+        });
+    });
+
+    PAGE_ROUTES.filter(entry => entry.route !== "/").forEach(entry => {
+        app.get(entry.route, (req, res) => res.sendFile(frontendFile(entry.file)));
+    });
+
+    app.get("/products/:productCode", (req, res) => {
+        const productCode = String(req.params.productCode || "").trim().toLowerCase();
+        if (!isCanonicalProductCode(productCode)) return res.status(404).sendFile(frontendFile("offline.html"));
+        const renderer = PRODUCT_RENDERERS[productCode] || "product.html";
+        return res.sendFile(frontendFile(renderer));
     });
 
     const staticStartedAt = performance.now();

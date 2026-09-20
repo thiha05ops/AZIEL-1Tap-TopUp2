@@ -176,11 +176,14 @@ async function verifySlowMongoAllowsEarlyStaticAndThenReady() {
         assert(!getOutput().includes('"milestone":"background_workers_ready"'), "DB workers must not start before Mongo");
         assert.strictEqual((await request(port, "/health")).status, 200, "health should be live at T0");
         for (const staticPath of [
-            "/", "/home.html", "/css/core/main.css", "/js/locale-loader.js",
+            "/", "/css/core/main.css", "/js/locale-loader.js",
             "/assets/banners/hero-desktop-wide.webp", "/lang/runtime/en.js", "/manifest.json", "/sw.js"
         ]) {
             assert.strictEqual((await request(port, staticPath)).status, 200, `${staticPath} should be available at T0`);
         }
+        const legacyHome = await request(port, "/home.html");
+        assert.strictEqual(legacyHome.status, 308, "legacy Home must canonicalize at T0");
+        assert.strictEqual(legacyHome.headers.location, "/");
         assert.strictEqual((await request(port, "/ready")).status, 503, "readiness should be 503 while Mongo is pending");
         assert.strictEqual((await request(port, "/api/catalog")).status, 503, "API should be 503 while Mongo is pending");
 

@@ -148,8 +148,8 @@
         document.getElementById("checkoutSummaryPackage").textContent =
             presentation.packageName;
         setReviewValue("checkoutTotal", "", true);
-        document.getElementById("checkoutBackLink").href = draft.returnUrl || "home.html";
-        document.getElementById("checkoutChangePackage").href = draft.returnUrl || "home.html";
+        document.getElementById("checkoutBackLink").href = draft.returnUrl || "/";
+        document.getElementById("checkoutChangePackage").href = draft.returnUrl || "/";
     }
 
     function setReviewValue(id, value, loading = false) {
@@ -395,7 +395,7 @@
     document.addEventListener("DOMContentLoaded", () => {
         draft = readDraft();
         if (!draft) {
-            window.location.replace("home.html");
+            window.location.replace("/");
             return;
         }
         render(draft.order);

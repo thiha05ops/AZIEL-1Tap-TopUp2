@@ -126,19 +126,19 @@ function loadPendingPaymentRecoveryOverlay() {
 
     if (loaderState.loaded || loaderState.loading || window.__AZIEL_PENDING_PAYMENT_RECOVERY_INITIALIZED__) return;
 
-    const page = (window.location.pathname.split("/").pop() || "home.html").toLowerCase();
+    const page = (window.location.pathname || "/").replace(/\/$/, "") || "/";
     const eligiblePages = new Set([
-        "home.html",
-        "mlbb.html",
-        "pubg.html",
-        "freefire.html",
-        "hok.html",
-        "aov-id.html",
-        "pubg-rp.html",
-        "telegram.html",
-        "genshin.html",
-        "roblox.html",
-        "notifications.html"
+        "/",
+        "/games/mlbb",
+        "/games/pubg",
+        "/games/freefire",
+        "/games/hok",
+        "/games/aov-id",
+        "/games/pubg-rp",
+        "/products/telegram",
+        "/games/genshin",
+        "/games/roblox",
+        "/notifications"
     ]);
 
     if (!eligiblePages.has(page)) return;

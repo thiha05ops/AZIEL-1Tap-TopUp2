@@ -6,112 +6,112 @@
         <priority>1.0</priority>
     </url>
     <url>
-        <loc>https://azielplay.com/home.html</loc>
-        <changefreq>daily</changefreq>
-        <priority>1.0</priority>
-    </url>
-    <url>
-        <loc>https://azielplay.com/mobile-games.html</loc>
+        <loc>https://azielplay.com/mobile-games</loc>
         <changefreq>weekly</changefreq>
         <priority>0.8</priority>
     </url>
     <url>
-        <loc>https://azielplay.com/all-games.html</loc>
+        <loc>https://azielplay.com/explore</loc>
         <changefreq>daily</changefreq>
         <priority>0.8</priority>
     </url>
     <url>
-        <loc>https://azielplay.com/pc-games.html</loc>
+        <loc>https://azielplay.com/pc-games</loc>
         <changefreq>weekly</changefreq>
         <priority>0.7</priority>
     </url>
     <url>
-        <loc>https://azielplay.com/gift-cards.html</loc>
+        <loc>https://azielplay.com/gift-cards</loc>
         <changefreq>weekly</changefreq>
         <priority>0.7</priority>
     </url>
     <url>
-        <loc>https://azielplay.com/mlbb.html</loc>
+        <loc>https://azielplay.com/social-topup</loc>
+        <changefreq>weekly</changefreq>
+        <priority>0.7</priority>
+    </url>
+    <url>
+        <loc>https://azielplay.com/games/mlbb</loc>
         <changefreq>weekly</changefreq>
         <priority>0.8</priority>
     </url>
     <url>
-        <loc>https://azielplay.com/pubg.html</loc>
+        <loc>https://azielplay.com/games/pubg</loc>
         <changefreq>weekly</changefreq>
         <priority>0.8</priority>
     </url>
     <url>
-        <loc>https://azielplay.com/freefire.html</loc>
+        <loc>https://azielplay.com/games/freefire</loc>
         <changefreq>weekly</changefreq>
         <priority>0.8</priority>
     </url>
     <url>
-        <loc>https://azielplay.com/hok.html</loc>
+        <loc>https://azielplay.com/games/hok</loc>
         <changefreq>weekly</changefreq>
         <priority>0.7</priority>
     </url>
     <url>
-        <loc>https://azielplay.com/aov-id.html</loc>
+        <loc>https://azielplay.com/games/aov-id</loc>
         <changefreq>weekly</changefreq>
         <priority>0.7</priority>
     </url>
     <url>
-        <loc>https://azielplay.com/pubg-rp.html</loc>
+        <loc>https://azielplay.com/games/pubg-rp</loc>
         <changefreq>weekly</changefreq>
         <priority>0.7</priority>
     </url>
     <url>
-        <loc>https://azielplay.com/telegram.html</loc>
+        <loc>https://azielplay.com/products/telegram</loc>
         <changefreq>weekly</changefreq>
         <priority>0.6</priority>
     </url>
     <url>
-        <loc>https://azielplay.com/genshin.html</loc>
+        <loc>https://azielplay.com/games/genshin</loc>
         <changefreq>weekly</changefreq>
         <priority>0.6</priority>
     </url>
     <url>
-        <loc>https://azielplay.com/roblox.html</loc>
+        <loc>https://azielplay.com/games/roblox</loc>
         <changefreq>weekly</changefreq>
         <priority>0.6</priority>
     </url>
     <url>
-        <loc>https://azielplay.com/about.html</loc>
+        <loc>https://azielplay.com/about</loc>
         <changefreq>monthly</changefreq>
         <priority>0.5</priority>
     </url>
     <url>
-        <loc>https://azielplay.com/contact.html</loc>
+        <loc>https://azielplay.com/contact</loc>
         <changefreq>monthly</changefreq>
         <priority>0.5</priority>
     </url>
     <url>
-        <loc>https://azielplay.com/faq.html</loc>
+        <loc>https://azielplay.com/faq</loc>
         <changefreq>monthly</changefreq>
         <priority>0.5</priority>
     </url>
     <url>
-        <loc>https://azielplay.com/policies/privacy.html</loc>
+        <loc>https://azielplay.com/policies/privacy</loc>
         <changefreq>yearly</changefreq>
         <priority>0.3</priority>
     </url>
     <url>
-        <loc>https://azielplay.com/policies/terms.html</loc>
+        <loc>https://azielplay.com/policies/terms</loc>
         <changefreq>yearly</changefreq>
         <priority>0.3</priority>
     </url>
     <url>
-        <loc>https://azielplay.com/policies/payment.html</loc>
+        <loc>https://azielplay.com/policies/payment</loc>
         <changefreq>yearly</changefreq>
         <priority>0.3</priority>
     </url>
     <url>
-        <loc>https://azielplay.com/policies/refund.html</loc>
+        <loc>https://azielplay.com/policies/refund</loc>
         <changefreq>yearly</changefreq>
         <priority>0.3</priority>
     </url>
     <url>
-        <loc>https://azielplay.com/policies/support.html</loc>
+        <loc>https://azielplay.com/policies/support</loc>
         <changefreq>yearly</changefreq>
         <priority>0.3</priority>
     </url>

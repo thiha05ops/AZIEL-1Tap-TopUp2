@@ -229,14 +229,14 @@
         const trackBtn = document.getElementById("trackOrderBtn");
         if (trackBtn) {
             trackBtn.onclick = () => {
-                window.location.href = `tracking.html?orderId=${orderId}`;
+                window.location.href = `/orders?orderId=${orderId}`;
             };
         }
 
         const homeBtn = document.getElementById("backHomeBtn");
         if (homeBtn) {
             homeBtn.onclick = () => {
-                window.location.href = "home.html";
+                window.location.href = "/";
             };
         }
     }

@@ -91,7 +91,7 @@ function verifyCompletionHandoff() {
     const staged = JSON.parse(sessionStorage.getItem("azielPaymentPageSession"));
     assert.equal(staged.completion.orderId, "AZL-RETURNED/42");
     assert.equal(staged.orderData.orderId, "AZL-RETURNED/42");
-    assert.equal(location.href, "payment.html?orderId=AZL-RETURNED%2F42", "completion must navigate with the exact returned order ID");
+    assert.equal(location.href, "/payment?orderId=AZL-RETURNED%2F42", "completion must navigate with the exact returned order ID");
     assert.equal(events.length, 1);
     assert.equal(events[0].type, "aziel:payment-completed", "selection controls must be locked before navigation");
 }
@@ -111,7 +111,7 @@ function verifyPresentationContracts() {
     assert(methodPage.includes("grid.inert = true"), "payment methods must be disabled during success navigation");
     assert(runtime.includes("staged?.completion?.paid === true"), "payment page must recognize staged paid Wallet completion");
     assert(runtime.includes("Your payment has been received. Your order is being processed."), "completion copy must be provider-neutral");
-    assert(runtime.includes("tracking.html?orderId=${encodeURIComponent(orderId)}"), "Track Order must use the completion order ID");
+    assert(runtime.includes("/orders?orderId=${encodeURIComponent(orderId)}"), "Track Order must use the completion order ID");
 
     const renderIndex = runtime.indexOf("showCompletion({", runtime.indexOf("staged?.completion?.paid === true"));
     const clearDraftIndex = runtime.indexOf('sessionStorage.removeItem("azielProductCheckoutDraft")', renderIndex);

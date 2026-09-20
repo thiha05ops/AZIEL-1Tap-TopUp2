@@ -17,20 +17,20 @@ function notIncludes(file, snippet, message) {
 }
 
 function verifyLoader() {
-    includes("frontend/js/pwa-fix.js", "loadPendingPaymentRecoveryOverlay();", "PWA runtime must load the recovery overlay once.");
+    includes("frontend/js/pwa-fix.js", "schedulePendingPaymentRecoveryOverlay();", "PWA runtime must schedule the recovery overlay once.");
     includes("frontend/js/pwa-fix.js", "eligiblePages", "loader must use an explicit customer page allow-list.");
-    includes("frontend/js/pwa-fix.js", "\"home.html\"", "home must be eligible.");
-    includes("frontend/js/pwa-fix.js", "\"mlbb.html\"", "game pages must be eligible.");
-    includes("frontend/js/pwa-fix.js", "\"notifications.html\"", "notifications must be eligible.");
-    notIncludes("frontend/js/pwa-fix.js", "\"wallet.html\"", "wallet must not load the page-level recovery overlay.");
-    notIncludes("frontend/js/pwa-fix.js", "\"tracking.html\"", "tracking/orders page must not load the page-level recovery overlay.");
+    includes("frontend/js/pwa-fix.js", "\"/\"", "home must be eligible.");
+    includes("frontend/js/pwa-fix.js", "\"/games/mlbb\"", "game pages must be eligible.");
+    includes("frontend/js/pwa-fix.js", "\"/notifications\"", "notifications must be eligible.");
+    notIncludes("frontend/js/pwa-fix.js", "\"/wallet\"", "wallet must not load the page-level recovery overlay.");
+    notIncludes("frontend/js/pwa-fix.js", "\"/orders\"", "tracking/orders page must not load the page-level recovery overlay.");
     includes("frontend/js/pwa-fix.js", "azHeaderMount", "loader must require shared header mount.");
     includes("frontend/js/pwa-fix.js", "/css/payment/pending-payment-recovery.css", "loader must include shared overlay CSS.");
     includes("frontend/js/pwa-fix.js", "/js/payment/pending-payment-recovery.js", "loader must include shared overlay JS.");
     const loader = read("frontend/js/pwa-fix.js");
     const pageSet = loader.slice(loader.indexOf("const eligiblePages"), loader.indexOf("if (!eligiblePages.has(page))"));
-    assert(!pageSet.includes("\"login.html\""), "login must not be eligible.");
-    assert(!pageSet.includes("\"register.html\""), "register must not be eligible.");
+    assert(!pageSet.includes("\"/login\""), "login must not be eligible.");
+    assert(!pageSet.includes("\"/register\""), "register must not be eligible.");
     assert(!pageSet.includes("\"admin.html\""), "admin must not be eligible.");
 }
 

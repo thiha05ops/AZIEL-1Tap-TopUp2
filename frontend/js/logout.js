@@ -7,7 +7,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     btn.addEventListener("click", () => {
         localStorage.clear();
-        window.location.href = "login.html";
+        window.location.href = "/login";
     });
 });
 function logout() {
@@ -19,7 +19,7 @@ function logout() {
 
     sessionStorage.clear();
 
-    window.location.href = "login.html";
+    window.location.href = "/login";
 }
 // frontend/js/logout.js
 
@@ -36,5 +36,5 @@ function logout() {
     sessionStorage.removeItem("displayName");
     sessionStorage.removeItem("region");
 
-    window.location.href = "login.html";
+    window.location.href = "/login";
 }

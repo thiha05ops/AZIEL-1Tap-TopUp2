@@ -434,8 +434,8 @@ async function trackOrder(orderId) {
                             `
                     : ""
                 }
-                        <a href="support.html">${t("contactSupport", "Contact Support")}</a>
-                        <a href="home.html">${t("backHome", "Back Home")}</a>
+                        <a href="/support">${t("contactSupport", "Contact Support")}</a>
+                        <a href="/">${t("backHome", "Back Home")}</a>
                     </div>
                 </footer>
 
@@ -1175,7 +1175,7 @@ async function buyAgain(orderId = "") {
             JSON.stringify(checkoutDraft)
         );
 
-        window.location.href = "checkout.html";
+        window.location.href = "/checkout";
     } catch (error) {
         console.error("Buy Again error:", error);
 

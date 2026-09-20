@@ -87,7 +87,7 @@ document.addEventListener("DOMContentLoaded", () => {
             showMessage(t("auth.otp.sentCheckGmail", "OTP sent. Check your Gmail."), "success");
 
             setTimeout(() => {
-                window.location.href = "verify-email.html";
+                window.location.href = "/verify-email";
             }, 800);
 
         } catch (error) {

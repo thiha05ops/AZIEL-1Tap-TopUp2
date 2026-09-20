@@ -3,40 +3,40 @@
 
 const AZIEL_NAV_ITEMS = {
     home: [
-        ["explore.html", "nav_explore"],
-        ["home.html", "nav_home"],
-        ["home.html#popularGames", "nav_games"],
-        ["home.html#categories", "nav_topup"],
+        ["/explore", "nav_explore"],
+        ["/", "nav_home"],
+        ["/#popularGames", "nav_games"],
+        ["/#categories", "nav_topup"],
         ["money-transfer.html", "nav_money_transfer"],
-        ["wallet.html", "nav_wallet"],
-        ["tracking.html", "nav_transactions"],
-        ["support.html", "nav_support"]
+        ["/wallet", "nav_wallet"],
+        ["/orders", "nav_transactions"],
+        ["/support", "nav_support"]
     ],
 
     game: [
-        ["home.html", "nav_home"],
-        ["home.html#popularGames", "nav_games"],
+        ["/", "nav_home"],
+        ["/#popularGames", "nav_games"],
         ["money-transfer.html", "nav_money_transfer"],
-        ["wallet.html", "nav_wallet"],
-        ["tracking.html", "nav_orders"],
-        ["support.html", "nav_support"]
+        ["/wallet", "nav_wallet"],
+        ["/orders", "nav_orders"],
+        ["/support", "nav_support"]
     ],
 
     account: [
-        ["home.html", "nav_home"],
+        ["/", "nav_home"],
         ["money-transfer.html", "nav_money_transfer"],
-        ["wallet.html", "nav_wallet"],
-        ["tracking.html", "nav_orders"],
-        ["support.html", "nav_support"]
+        ["/wallet", "nav_wallet"],
+        ["/orders", "nav_orders"],
+        ["/support", "nav_support"]
     ],
 
     explore: [
-        ["home.html", "nav_home"],
-        ["explore.html", "nav_explore"],
+        ["/", "nav_home"],
+        ["/explore", "nav_explore"],
         ["money-transfer.html", "nav_money_transfer"],
-        ["explore.html#features", "nav_features"],
-        ["explore.html#platform", "nav_platform"],
-        ["support.html", "nav_support"]
+        ["/explore#features", "nav_features"],
+        ["/explore#platform", "nav_platform"],
+        ["/support", "nav_support"]
     ]
 };
 
@@ -105,7 +105,7 @@ function renderHeaderNav(navType) {
     if (!nav) return;
 
     const items = AZIEL_NAV_ITEMS[navType] || AZIEL_NAV_ITEMS.home;
-    const currentPage = location.pathname.split("/").pop() || "home.html";
+    const currentPage = (location.pathname || "/").replace(/\/$/, "") || "/";
     const currentHash = location.hash || "";
 
     nav.innerHTML = `

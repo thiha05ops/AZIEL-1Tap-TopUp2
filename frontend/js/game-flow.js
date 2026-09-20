@@ -16,7 +16,7 @@
         directWallet: false,
         legacyPaymentPreferred: false,
         paymentSelectionStage: "checkout",
-        checkoutUrl: "checkout.html",
+        checkoutUrl: "/checkout",
         pendingReturnUrl: window.location.pathname
     };
 
@@ -486,7 +486,7 @@
 
         if (!hasToken()) {
             storePendingBuy(flow);
-            window.location.href = "login.html";
+            window.location.href = "/login";
             return;
         }
 
@@ -663,7 +663,7 @@
 
         sessionStorage.setItem("azielProductCheckoutDraft", JSON.stringify(checkoutDraft));
         flow.purchaseNavigationCommitted = true;
-        window.location.href = flow.config.checkoutUrl || "checkout.html";
+        window.location.href = flow.config.checkoutUrl || "/checkout";
     }
 
     async function payWithWalletDirect(orderData, flow) {
@@ -687,7 +687,7 @@
             }
 
             window.PaymentUtils?.showToast?.("Paid with wallet");
-            window.location.href = `tracking.html?orderId=${data.order?.orderId || orderData.orderId}`;
+            window.location.href = `/orders?orderId=${data.order?.orderId || orderData.orderId}`;
         } catch (error) {
             console.log("Wallet payment error:", error);
             setText(flow.config.noteSelector, "Server error");

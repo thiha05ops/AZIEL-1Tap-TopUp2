@@ -113,8 +113,8 @@ function verifyOrderEmailOwnership() {
 function verifyTemplateAndLinkSafety() {
     const service = read("backend/services/orderEmailService.js");
     assert(service.includes("FRONTEND_URL"), "Order emails must use environment-owned public URL.");
-    assert(service.includes("/tracking.html?orderId="), "Order emails must include tracking link contract.");
-    assert(service.includes("/support.html"), "Order emails must include Support Center link.");
+    assert(service.includes("/orders?orderId="), "Order emails must include tracking link contract.");
+    assert(service.includes("/support"), "Order emails must include Support Center link.");
     assert(service.includes("text,") && service.includes("html,"), "Order emails must include plain text and HTML.");
     assert(!/https?:\/\/(?:localhost|127\.0\.0\.1)/.test(service), "Order email templates must not hardcode localhost URLs.");
     ["password", "OTP", "paymentEvidence", "supplierReference", "supplier credentials", "Admin-only"].forEach(term => {

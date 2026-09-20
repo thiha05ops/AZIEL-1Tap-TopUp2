@@ -9,5 +9,5 @@ window.AZIEL_GAME_FLOW?.init({
     zoneRequired: false,
     accountFields: window.AZIEL_GAME_INPUT_CONTRACTS?.forProduct("pubg")?.accountFields,
     directWallet: true,
-    pendingReturnUrl: "pubg.html"
+    pendingReturnUrl: "/games/pubg"
 });

@@ -13,7 +13,7 @@
     }
 
     function pageName() {
-        return window.location.pathname.split("/").pop() || "home.html";
+        return window.location.pathname.split("/").pop() || "/";
     }
 
     function escapeHtml(value = "") {
@@ -224,7 +224,7 @@
 
             categoryGrid.innerHTML = [
                 ...categoryProducts.map(renderCategoryCard),
-                `<a href="all-games.html"><span>All Games</span></a>`
+                `<a href="/explore"><span>All Games</span></a>`
             ].join("");
         }
     }
@@ -257,12 +257,12 @@
     }
 
     function renderCatalogFailure(page) {
-        if (page === "home.html") {
+        if (page === "/") {
             const categoryGrid = document.querySelector(".category-grid");
             if (categoryGrid) categoryGrid.innerHTML = catalogFailureMarkup();
             return;
         }
-        if (page === "mobile-games.html") {
+        if (page === "/mobile-games") {
             document.querySelector(".az-featured-grid")?.replaceChildren();
             const posterGrid = document.querySelector(".az-poster-grid");
             if (posterGrid) posterGrid.innerHTML = catalogFailureMarkup();
@@ -274,7 +274,7 @@
 
     async function renderDiscovery() {
         const page = pageName();
-        const supported = new Set(["home.html", "all-games.html", "mobile-games.html", "pc-games.html", "gift-cards.html", "social-topup.html", "mobile-recharge.html", "entertainment.html"]);
+        const supported = new Set(["/", "/explore", "/mobile-games", "/pc-games", "/gift-cards", "/social-topup", "/mobile-recharge", "/entertainment"]);
 
         if (!supported.has(page)) return;
 
@@ -285,14 +285,14 @@
             return;
         }
 
-        if (page === "home.html") renderHome();
-        if (page === "all-games.html") renderProductCategory("all");
-        if (page === "mobile-games.html") renderMobileGames();
-        if (page === "pc-games.html") renderProductCategory("pc");
-        if (page === "gift-cards.html") renderProductCategory("gift-card");
-        if (page === "social-topup.html") renderProductCategory("social");
-        if (page === "mobile-recharge.html") renderProductCategory("mobile-recharge");
-        if (page === "entertainment.html") renderProductCategory("entertainment");
+        if (page === "/") renderHome();
+        if (page === "/explore") renderProductCategory("all");
+        if (page === "/mobile-games") renderMobileGames();
+        if (page === "/pc-games") renderProductCategory("pc");
+        if (page === "/gift-cards") renderProductCategory("gift-card");
+        if (page === "/social-topup") renderProductCategory("social");
+        if (page === "/mobile-recharge") renderProductCategory("mobile-recharge");
+        if (page === "/entertainment") renderProductCategory("entertainment");
         window.AZIEL_CATALOG_PRESENTATION?.bindImageFallbacks?.();
     }
 

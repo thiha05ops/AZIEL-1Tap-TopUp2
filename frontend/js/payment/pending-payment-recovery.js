@@ -70,30 +70,30 @@
     }
 
     function currentPage() {
-        return (window.location.pathname.split("/").pop() || "home.html").toLowerCase();
+        return ((window.location.pathname || "/").replace(/\/$/, "") || "/").toLowerCase();
     }
 
     function getRecoveryPageContext() {
         const page = currentPage();
         const gameMap = {
-            "mlbb.html": "mlbb",
-            "pubg.html": "pubg",
-            "freefire.html": "freefire",
-            "hok.html": "hok",
-            "aov-id.html": "aov",
-            "pubg-rp.html": "pubg-rp",
-            "telegram.html": "telegram",
-            "genshin.html": "genshin",
-            "roblox.html": "roblox"
+            "/games/mlbb": "mlbb",
+            "/games/pubg": "pubg",
+            "/games/freefire": "freefire",
+            "/games/hok": "hok",
+            "/games/aov-id": "aov",
+            "/games/pubg-rp": "pubg-rp",
+            "/products/telegram": "telegram",
+            "/games/genshin": "genshin",
+            "/games/roblox": "roblox"
         };
 
-        if (page === "home.html" || page === "" || page === "/") {
+        if (page === "/" || page === "" || page === "/") {
             return { type: "home", gameKey: null };
         }
-        if (page === "notifications.html") {
+        if (page === "/notifications") {
             return { type: "notifications", gameKey: null };
         }
-        if (page === "checkout.html") {
+        if (page === "/checkout") {
             return { type: "checkout", gameKey: null };
         }
         if (gameMap[page]) {
@@ -788,7 +788,7 @@
             window.AZIEL_PENDING_PAYMENT_RECOVERY.selectedRecovery = state.selectedRecovery;
 
             removeOverlay();
-            window.location.href = `payment.html?attemptId=${encodeURIComponent(recoverable.attemptId)}`;
+            window.location.href = `/payment?attemptId=${encodeURIComponent(recoverable.attemptId)}`;
         } catch (error) {
             if (isDev()) console.warn("Pending payment resume failed:", error.message);
             await fetchRecoverable({ force: true });

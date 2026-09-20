@@ -61,7 +61,7 @@ function openPaymentConfirmModal(order, payment) {
     const modal = document.getElementById("paymentConfirmModal");
 
     if (!modal) {
-        alert("Payment modal not found in mlbb.html");
+        alert("Payment modal not found in /games/mlbb");
         return;
     }
 
@@ -170,7 +170,7 @@ async function confirmPaymentOrder() {
             showSuccessModal(order.orderId);
         } else {
             alert("Order submitted successfully");
-            window.location.href = `tracking.html?orderId=${order.orderId}`;
+            window.location.href = `/orders?orderId=${order.orderId}`;
         }
 
     } catch (error) {

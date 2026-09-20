@@ -21,7 +21,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (!email || verified !== "true") {
-        window.location.href = "forgot-password.html";
+        window.location.href = "/forgot-password";
         return;
     }
 
@@ -87,7 +87,7 @@ document.addEventListener("DOMContentLoaded", () => {
             showMessage(t("auth.reset.success", "Password updated. Redirecting to login..."), "success");
 
             setTimeout(() => {
-                window.location.href = "login.html";
+                window.location.href = "/login";
             }, 900);
 
         } catch (error) {
